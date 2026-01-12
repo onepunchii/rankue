@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Guest ID 수정</title>
+</head>
+<body>
+    <h2>모바일 프로필 인증 완료된 Guest ID로 변경</h2>
+    
+    <p>현재 Guest ID: <span id="current-id"></span></p>
+    <p>완료된 프로필 Guest ID: guest_1752658793616_TW96aWxsYS81LjAgKExp</p>
+    
+    <button onclick="fixGuestId()">프로필 완료된 ID로 변경</button>
+    <button onclick="checkStorage()">현재 저장소 확인</button>
+    
+    <div id="result"></div>
+
+    <script>
+        function checkStorage() {
+            const currentId = localStorage.getItem('polli_guest_id');
+            document.getElementById('current-id').textContent = currentId || '없음';
+            
+            const result = document.getElementById('result');
+            result.innerHTML = `
+                <h3>현재 localStorage 상태:</h3>
+                <p>polli_guest_id: ${localStorage.getItem('polli_guest_id')}</p>
+                <p>polli_guest_created_at: ${localStorage.getItem('polli_guest_created_at')}</p>
+                <p>polli_guest_nickname: ${localStorage.getItem('polli_guest_nickname')}</p>
+            `;
+        }
+        
+        function fixGuestId() {
+            // 프로필 완료된 guest ID로 변경
+            localStorage.setItem('polli_guest_id', 'guest_1752658793616_TW96aWxsYS81LjAgKExp');
+            localStorage.setItem('polli_guest_created_at', new Date().toISOString());
+            localStorage.setItem('polli_guest_nickname', '민첩한 연구원');
+            
+            document.getElementById('result').innerHTML = `
+                <h3 style="color: green;">✅ Guest ID 변경 완료!</h3>
+                <p>새로운 ID: guest_1752658793616_TW96aWxsYS81LjAgKExp</p>
+                <p>닉네임: 민첩한 연구원</p>
+                <p><strong>이제 Polli 사이트를 새로고침하면 프로필 완료 상태로 접속됩니다!</strong></p>
+            `;
+        }
+        
+        // 페이지 로드시 현재 상태 확인
+        window.onload = function() {
+            checkStorage();
+        }
+    </script>
+</body>
+</html>

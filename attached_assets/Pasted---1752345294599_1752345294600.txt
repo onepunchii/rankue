@@ -1,0 +1,153 @@
+아주 좋습니다. 말씀하신 구조를 기반으로, 실제 **서비스 수준의 견고한 상태관리 구조**를 아래에 시각적으로 구성하고, 구체적인 처리 예시를 함께 제공드릴게요.
+
+---
+
+## ✅ 1. 상태관리 플로우차트 (Guest → User)
+
+```plaintext
+   [앱/웹 첫 진입]
+         ↓
+  [localStorage에 guest_id 존재 여부 확인]
+         ↓
+     ┌────────────┐
+     │ 존재하면 → guest 모드 유지
+     └────────────┘
+         ↓
+     [guest_id 생성 및 저장]
+         ↓
+┌─────────────────────┐
+│ 게스트 모드로 서비스 사용 가능 │
+└─────────────────────┘
+         ↓
+   [프로필 인증 시도 버튼 클릭]
+         ↓
+ [SMS 인증코드 전송 + 대기 상태 표시]
+         ↓
+  [인증코드 입력 → 검증 성공]
+         ↓
+┌────────────────────────────┐
+│ ✔ user_id 발급 (전화번호 기반)   │
+│ ✔ localStorage에 저장          │
+│ ✔ guest_id 제거                │
+└────────────────────────────┘
+         ↓
+  [user 모드로 자동 전환 완료]
+```
+
+---
+
+## ✅ 2. 통합 API 핸들링 구조
+
+모든 API에서 다음 방식으로 인증 여부를 판단하고 처리하세요:
+
+### 📌 공통 유저 식별 방식
+
+```js
+// 프론트에서 항상 이 함수 사용
+function getAuthId() {
+  return localStorage.getItem("user_id") || localStorage.getItem("guest_id");
+}
+```
+
+### 📌 서버에서 처리 시 (예: Express)
+
+```js
+app.post("/api/submit", (req, res) => {
+  const authId = req.body.user_id || req.body.guest_id;
+
+  if (!authId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // authId 기준으로 DB에서 작업 진행
+  processSurvey(authId, req.body.answers).then(() => {
+    res.json({ success: true });
+  });
+});
+```
+
+> 📌 **모든 요청에 `authId` 사용 (user\_id 우선, 없으면 guest\_id)**
+
+---
+
+## ✅ 3. 오류 자동 복구 로직
+
+### ⚠️ 문제:
+
+* 인증 도중 새로고침하거나 페이지 전환으로 인증 정보 유실
+
+### 💡 해결 방법:
+
+* `localStorage`에 인증 상태 캐싱 (`auth_pending`, `auth_expire_at`)
+* 자동 확인 루틴으로 상태 점검 후 UI/세션 복구
+
+### 📦 예시 구조 (로컬저장소)
+
+```json
+{
+  "guest_id": "guest_123",
+  "auth_pending": true,
+  "auth_expire_at": "2025-07-13T04:30:00Z"
+}
+```
+
+### 🧠 자동 복구 로직 (앱 진입 시 실행)
+
+```js
+function checkAuthState() {
+  const pending = localStorage.getItem("auth_pending");
+  const expire = localStorage.getItem("auth_expire_at");
+  const now = new Date().toISOString();
+
+  if (pending === "true" && now < expire) {
+    // 인증 중이었음 → 인증화면 유지
+    showVerifyScreen();
+  } else if (localStorage.getItem("user_id")) {
+    // 인증 완료된 사용자
+    enterUserMode();
+  } else if (localStorage.getItem("guest_id")) {
+    // 게스트
+    enterGuestMode();
+  } else {
+    // 처음 진입 → guest_id 생성
+    const newGuest = "guest_" + generateUUID();
+    localStorage.setItem("guest_id", newGuest);
+    enterGuestMode();
+  }
+}
+```
+
+---
+
+## ✅ 보너스: 인증 완료 후 guest 데이터 → user로 이관 (선택)
+
+예를 들어 guest로 만든 로또 티켓이나 설문응답을 user\_id로 이전하려면 다음 처리:
+
+```sql
+UPDATE survey_responses
+SET user_id = 'user_12345'
+WHERE guest_id = 'guest_abcde';
+```
+
+---
+
+## ✅ 전체 요약 체크리스트
+
+| 항목                           | 완료 여부 |
+| ---------------------------- | ----- |
+| guest\_id 자동 발급 및 저장         | ✅     |
+| 인증 후 guest\_id → user\_id 전환 | ✅     |
+| API 공통 식별자(authId)로 처리       | ✅     |
+| 인증 중 상태 `auth_pending` 관리    | ✅     |
+| 자동 복구 로직으로 상태 유지             | ✅     |
+| 인증 완료 후 DB 이전 처리(선택)         | ✅     |
+
+---
+
+필요하시면 이 구조 기반으로:
+
+* 🔧 Express API 예제 전체 코드
+* 🧩 Firebase 기반으로 변환
+* 📱 React/Vue용 상태관리 구조
+
+도 맞춤 설계해드릴 수 있어요. 사용 중인 프레임워크나 백엔드 환경 알려주시면 바로 예제 드릴게요!

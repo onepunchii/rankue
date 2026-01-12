@@ -1,0 +1,168 @@
+좋아—레플릿 AI(또는 개발자)에게 그대로 붙여 넣으면 되는 **어드민 페이지 제작 프롬프트**를 준비했어. 아래 그대로 복사해서 쓰면 된다.
+
+---
+
+# 레플릿에 붙일 프롬프트 (복붙)
+
+**프로젝트 목표**
+“Polli”의 포인트 리워드샵용 **관리자 페이지**를 만든다. 사용자가 포인트로 상품 주문 → 관리자가 승인 → KT 기프티쇼 API로 쿠폰 발행 → 사용자에게 전송되는 흐름. 승인 전에는 포인트가 **HOLD** 상태로 묶이고, 실패/거절 시 즉시 환급된다.
+
+**스택**
+
+* 프론트: React + Tailwind (다크 UI), 라우팅은 `/admin/*`
+* 백엔드: Node/Express(또는 Next.js API routes), TypeScript
+* DB: PostgreSQL (Prisma 사용)
+* 작업큐: 간단히 DB 폴링 워커로 시작(추후 Redis/BullMQ로 교체 가능)
+* 인증: 관리자 RBAC(ROLE=admin) 필수. 서버 사이드에서 권한 재검증.
+
+**화면(라우트)**
+
+1. `/admin/rewards/orders` – 주문 대기/목록
+
+   * 필터: 상태, 상품, 날짜, 사용자, 전화번호
+   * 테이블 컬럼: 주문ID, 사용자, 상품, 포인트, 수신번호, 상태, 생성시각, 승인자/시각
+   * 액션: 단건/일괄 **승인**, **거절**, **재발송**, **CSV 내보내기**
+   * 상세 드로어: 주문 전체 정보 + 외부 연동 로그 보기
+2. `/admin/rewards/products` – 상품 관리
+
+   * 목록, 생성/수정(이름, `provider=giftishow`, `provider_sku`, `point_cost`, 활성화)
+3. `/admin/rewards/logs` – 외부 연동 로그 뷰어
+4. 상단에 **프로바이더 크레딧/한도** 위젯(숫자 카드)
+
+**주요 상태 머신**
+`requested → pending_approval → approved → issuing → issued → delivered`
+
+* 거절: `pending_approval → rejected` (포인트 hold 해제)
+* 실패: `issuing → failed` (포인트 hold 해제, 사유 표시)
+
+**DB 스키마(Prisma 예시)**
+
+```prisma
+model RewardProduct {
+  id           BigInt @id @default(autoincrement())
+  name         String
+  provider     String @default("giftishow")
+  providerSku  String
+  pointCost    Int
+  faceValueWon Int?
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+  orders       RewardOrder[]
+}
+
+model RewardOrder {
+  id              BigInt @id @default(autoincrement())
+  userId          BigInt
+  productId       BigInt
+  pointCost       Int
+  status          String   // requested, pending_approval, approved, issuing, issued, delivered, rejected, failed
+  approverId      BigInt?
+  approvedAt      DateTime?
+  giftCode        String?
+  expiresAt       DateTime?
+  providerOrderId String?
+  sendChannel     String   @default("sms") // sms/kakao/email/provider
+  recipientPhone  String
+  memo            String?
+  createdAt       DateTime @default(now())
+  product         RewardProduct @relation(fields: [productId], references: [id])
+  logs            ProviderLog[]
+}
+
+model PointLedger {
+  id        BigInt @id @default(autoincrement())
+  userId    BigInt
+  delta     Int    // +earn / -spend / -hold / +release
+  reason    String // earn/spend/hold/release/adjust
+  refTable  String?
+  refId     BigInt?
+  createdAt DateTime @default(now())
+}
+
+model PointBalance {
+  userId    BigInt @id
+  available Int    @default(0)
+  onHold    Int    @default(0)
+  updatedAt DateTime @default(now())
+}
+
+model ProviderLog {
+  id          BigInt @id @default(autoincrement())
+  provider    String
+  orderId     BigInt
+  requestJson Json?
+  responseJson Json?
+  statusCode  Int?
+  createdAt   DateTime @default(now())
+  order       RewardOrder @relation(fields: [orderId], references: [id])
+}
+```
+
+**핵심 API**
+
+```http
+POST   /api/rewards/orders          // 유저 주문 생성(포인트 hold)
+POST   /api/admin/rewards/:id/approve  // 승인 → queue에 발행 작업 등록
+POST   /api/admin/rewards/:id/reject   // 거절 → hold 해제
+POST   /api/admin/rewards/:id/resend   // 재발송
+GET    /api/admin/rewards/orders       // 목록/필터
+GET    /api/admin/rewards/orders/:id   // 상세+로그
+CRUD   /api/admin/rewards/products
+```
+
+**작업큐(워커) 의사코드**
+
+```ts
+// 30초마다 approved 주문을 집계하여 발행
+async function issueWorker() {
+  const jobs = await db.order.findMany({ where: { status: "approved" }});
+  for (const job of jobs) {
+    await db.order.update({ where: { id: job.id }, data: { status: "issuing" }});
+    const res = await giftishow.issue({ sku: job.product.providerSku, phone: job.recipientPhone });
+    if (res.ok) {
+      await db.order.update({ where: { id: job.id }, data: { status: "issued", giftCode: res.code, expiresAt: res.expiresAt, providerOrderId: res.id }});
+      await sendVoucher(job, res); // sms/kakao
+      await db.order.update({ where: { id: job.id }, data: { status: "delivered" }});
+    } else {
+      await db.order.update({ where: { id: job.id }, data: { status: "failed" }});
+      await releasePointHold(job.userId, job.pointCost, job.id);
+    }
+  }
+}
+```
+
+**승인/거절 로직**
+
+* 승인 시: 상태 `pending_approval → approved`, 감사 로그 기록, 중복승인 방지용 **idempotency key** 사용
+* 거절 시: 상태 `rejected`, 포인트 hold **즉시 해제**(원장 + 캐시 갱신)
+
+**보안·감사**
+
+* 서버에서 `ROLE=admin` 확인(프론트 토글 신뢰 X)
+* 쿠폰코드는 DB에 **암호화 저장**(예: AES + KMS)
+* 감사 로그: 누가 언제 승인/거절했는지 기록
+* 일/주/월 단위 교환 **상한 정책** 검증 훅
+
+**환경변수**
+
+```
+GIFTISHOW_BASE_URL=
+GIFTISHOW_API_KEY=
+SMS_API_KEY=        # 자체 발송 시
+KAKAO_ALIMTALK_KEY= # 선택
+```
+
+**완료 기준(E2E 시나리오)**
+
+* 잔액 충분한 계정으로 주문 → `requested/pending_approval` 생성, 포인트 on\_hold 증가
+* 어드민에서 승인 → 워커가 발행 → `delivered` 도달, 사용자에게 메시지 수신
+* 발행 실패 시 → `failed`, on\_hold 환급
+* 거절 시 → `rejected`, on\_hold 환급
+* 목록/필터/CSV/재발송 정상 동작
+
+---
+
+## 추가로
+
+원하면 위 스펙 그대로 \*\*관리자 UI 코드(React/Tailwind)\*\*까지 바로 만들어 캔버스에 올려줄게.
+선호 스택(Next.js vs Express)만 찍어줘—바로 뽑아줄게!

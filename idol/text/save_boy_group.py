@@ -1,0 +1,95 @@
+import os
+
+# 1. 남자 그룹 데이터 (투표수 제거, 성별/타입 자동 추가됨)
+csv_content = """rank,name,gender,type
+1,몬스타엑스,Male,Group
+2,방탄소년단,Male,Group
+3,라이즈,Male,Group
+4,투모로우바이투게더,Male,Group
+5,Stray Kids,Male,Group
+6,EXO,Male,Group
+7,빅뱅,Male,Group
+8,GOT7,Male,Group
+9,에이티즈,Male,Group
+10,아스트로,Male,Group
+11,세븐틴,Male,Group
+12,알파드라이브원,Male,Group
+13,NEXZ,Male,Group
+14,슈퍼주니어,Male,Group
+15,원어스,Male,Group
+16,BOYNEXTDOOR,Male,Group
+17,ENHYPEN,Male,Group
+18,앤팀,Male,Group
+19,아홉,Male,Group
+20,n.SSign,Male,Group
+21,CORTIS,Male,Group
+22,플레이브,Male,Group
+23,펜타곤,Male,Group
+24,TWS,Male,Group
+25,저스트비,Male,Group
+26,WHIB,Male,Group
+27,TREASURE,Male,Group
+28,비투비,Male,Group
+29,NCT,Male,Group
+30,MCND,Male,Group
+31,KickFlip,Male,Group
+32,VERIVERY,Male,Group
+33,샤이니,Male,Group
+34,JO1,Male,Group
+35,B1A4,Male,Group
+36,제로베이스원,Male,Group
+37,젝스키스,Male,Group
+38,OMEGA X,Male,Group
+39,Xdinary Heroes,Male,Group
+40,업텐션,Male,Group
+41,아오엔,Male,Group
+42,TNX,Male,Group
+43,INI,Male,Group
+44,iKON,Male,Group
+45,DAY6,Male,Group
+46,SEVENTOEIGHT,Male,Group
+47,XLOV,Male,Group
+48,CIX,Male,Group
+49,BAE173,Male,Group
+50,AB6IX,Male,Group
+51,NexT1DE,Male,Group
+52,POLARIX,Male,Group
+53,A.C.E,Male,Group
+54,NCT WISH,Male,Group
+55,NCT DREAM,Male,Group
+56,빅스,Male,Group
+57,틴탑,Male,Group
+58,P1Harmony,Male,Group
+59,SF9,Male,Group
+60,하이라이트,Male,Group
+61,Xikers,Male,Group
+62,온앤오프,Male,Group
+63,더보이즈,Male,Group
+64,신화,Male,Group
+65,판타지보이즈,Male,Group
+66,NouerA,Male,Group
+67,위아이,Male,Group
+68,빅톤,Male,Group
+69,호라이즌,Male,Group
+70,TEMPEST,Male,Group
+71,XODIAC,Male,Group
+72,WayV,Male,Group
+73,인피니트,Male,Group
+74,FT아일랜드,Male,Group
+75,CRAVITY,Male,Group
+76,YOUNITE,Male,Group
+77,DKZ,Male,Group
+78,LUCY,Male,Group
+"""
+
+# 2. 바탕화면 경로 찾기
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+file_path = os.path.join(desktop_path, "boy_group.csv")
+
+# 3. 파일 저장
+try:
+    with open(file_path, "w", encoding="utf-8-sig") as f:
+        f.write(csv_content)
+    print(f"🎉 성공! 바탕화면에 'boy_group.csv' 파일이 생성되었습니다.")
+except Exception as e:
+    print(f"❌ 오류 발생: {e}")

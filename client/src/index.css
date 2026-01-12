@@ -1,0 +1,779 @@
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 모바일 일관성을 위한 기본 설정 */
+html {
+  /* 모바일에서 확대/축소 방지 */
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+
+  /* 부드러운 스크롤링 */
+  scroll-behavior: smooth;
+
+  /* 기본 폰트 크기 설정 - 모든 기기에서 일관성 유지 */
+  font-size: 16px;
+}
+
+body {
+  /* 모바일에서 텍스트 렌더링 최적화 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+
+  /* 기본 라인 높이 일관성 */
+  line-height: 1.5;
+
+  /* 모바일에서 텍스트 선택 최적화 */
+  -webkit-tap-highlight-color: transparent;
+
+  /* 기본 폰트 패밀리 */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* 반응형 폰트 크기 시스템 */
+.text-mobile-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+/* 12px */
+.text-mobile-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+/* 14px */
+.text-mobile-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+/* 16px */
+.text-mobile-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+/* 18px */
+.text-mobile-xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+/* 20px */
+.text-mobile-2xl {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+/* 24px */
+.text-mobile-3xl {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+}
+
+/* 30px */
+
+/* 작은 화면에서의 텍스트 크기 조정 */
+@media (max-width: 375px) {
+  .text-mobile-xs {
+    font-size: 0.7rem;
+  }
+
+  .text-mobile-sm {
+    font-size: 0.8rem;
+  }
+
+  .text-mobile-base {
+    font-size: 0.9rem;
+  }
+
+  .text-mobile-lg {
+    font-size: 1rem;
+  }
+
+  .text-mobile-xl {
+    font-size: 1.1rem;
+  }
+
+  .text-mobile-2xl {
+    font-size: 1.3rem;
+  }
+
+  .text-mobile-3xl {
+    font-size: 1.6rem;
+  }
+}
+
+/* 큰 화면에서의 텍스트 크기 조정 */
+@media (min-width: 768px) {
+  .text-mobile-xs {
+    font-size: 0.8rem;
+  }
+
+  .text-mobile-sm {
+    font-size: 0.9rem;
+  }
+
+  .text-mobile-base {
+    font-size: 1rem;
+  }
+
+  .text-mobile-lg {
+    font-size: 1.2rem;
+  }
+
+  .text-mobile-xl {
+    font-size: 1.3rem;
+  }
+
+  .text-mobile-2xl {
+    font-size: 1.6rem;
+  }
+
+  .text-mobile-3xl {
+    font-size: 2rem;
+  }
+}
+
+/* 반짝이는 하이라이트 애니메이션 */
+@keyframes sparkle {
+
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(59, 130, 246, 0.5), 0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(59, 130, 246, 0.1);
+  }
+
+  25% {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(59, 130, 246, 0.6), 0 0 80px rgba(59, 130, 246, 0.3);
+  }
+
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(147, 51, 234, 0.8), 0 0 50px rgba(147, 51, 234, 0.6), 0 0 100px rgba(147, 51, 234, 0.3);
+  }
+
+  75% {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(59, 130, 246, 0.6), 0 0 80px rgba(59, 130, 246, 0.3);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.sparkle-highlight {
+  animation: sparkle 2s ease-in-out 3;
+  position: relative;
+  overflow: hidden;
+}
+
+.sparkle-highlight::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent);
+  animation: shimmer 1.5s ease-in-out 2;
+  z-index: 1;
+}
+
+@layer utilities {
+
+  /* 스크롤바 숨김 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    /* Internet Explorer 10+ */
+    scrollbar-width: none;
+    /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+    /* Safari and Chrome */
+  }
+
+  @keyframes pulse-slow {
+
+    0%,
+    100% {
+      opacity: 0.1;
+      transform: scale(1);
+    }
+
+    50% {
+      opacity: 0.2;
+      transform: scale(1.1);
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 4s ease-in-out infinite;
+  }
+}
+
+
+@layer components {
+
+  /* Global Glassmorphism for all Shadcn Cards */
+  .bg-card {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .bg-popover {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .glass-card {
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  /* 스크롤바 숨기기 유틸리티 클래스 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari and Opera */
+  }
+
+  .glass-card-light {
+    background: rgba(255, 255, 255, 0.05);
+    /* Adjusted for dark mode default */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  }
+
+  .glass-card-strong {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  }
+
+  /* E-Card Style */
+  .e-card {
+    background: transparent;
+    box-shadow: 0px 8px 28px -9px rgba(0, 0, 0, 0.45);
+    position: relative;
+    width: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .e-card .wave {
+    position: absolute;
+    width: 540px;
+    height: 700px;
+    opacity: 0.6;
+    left: 0;
+    top: 0;
+    margin-left: -50%;
+    margin-top: -70%;
+    border-radius: 40%;
+    animation: wave 55s infinite linear;
+  }
+
+  .e-card .wave:nth-child(1) {
+    background: linear-gradient(744deg, #af40ff, #5b42f3 60%, #00ddeb);
+    animation-delay: 0s;
+  }
+
+  .e-card .wave:nth-child(2) {
+    background: linear-gradient(744deg, #af40ff, #5b42f3 60%, #00ddeb);
+    animation-delay: -10s;
+    animation-duration: 50s;
+  }
+
+  .e-card .wave:nth-child(3) {
+    background: linear-gradient(744deg, #af40ff, #5b42f3 60%, #00ddeb);
+    animation-delay: -20s;
+    animation-duration: 45s;
+  }
+
+  .e-card.playing .wave {
+    animation: wave 3000ms infinite linear;
+  }
+
+  .e-card .wave:nth-child(2),
+  .e-card .wave:nth-child(3) {
+    top: 210px;
+  }
+
+  .e-card.playing .wave:nth-child(2) {
+    animation-duration: 4000ms;
+  }
+
+  .e-card .wave:nth-child(2) {
+    animation-duration: 50s;
+  }
+
+  .e-card.playing .wave:nth-child(3) {
+    animation-duration: 5000ms;
+  }
+
+  .e-card .wave:nth-child(3) {
+    animation-duration: 45s;
+  }
+
+  @keyframes wave {
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+:root {
+  /* Enforced Dark Mode (Glassmorphism) */
+  --background: hsla(222, 14%, 10%, 0.3);
+  /* Neutral Dark Charcoal */
+  --foreground: hsl(210, 40%, 98%);
+
+  --muted: hsl(217, 19%, 27%);
+  --muted-foreground: hsl(215, 20%, 65%);
+  --popover: hsla(222, 14%, 12%, 0.6);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --card: hsla(222, 14%, 12%, 0.5);
+  --card-foreground: hsl(210, 40%, 98%);
+  --border: hsl(217, 19%, 27%);
+  --input: hsl(217, 19%, 27%);
+  --primary: hsl(265, 83%, 65%);
+  --primary-foreground: hsl(0, 0%, 100%);
+
+  --secondary: hsla(240, 3.7%, 15.9%, 0.8);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsla(240, 3.7%, 15.9%, 0.8);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+
+  /* Custom polli colors - Refined */
+  --polli-primary: hsl(265, 83%, 62%);
+  --polli-yellow: hsl(265, 83%, 62%);
+  --polli-green: hsl(140, 60%, 50%);
+  --polli-red: hsl(350, 85%, 60%);
+  --polli-surface: hsla(0, 0%, 0%, 0.5);
+  --polli-background: hsla(265, 20%, 10%, 0.3);
+}
+
+@layer base {
+
+  html,
+  body {
+    background-color: black;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  }
+}
+
+@layer components {
+  .shadow-soft {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .shadow-medium {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    /* text-wrap: balance is not supported in older browsers, removing to clear lint */
+  }
+}
+
+/* Font Awesome CDN included at top for icons */
+
+/* Glowing box effects for header level display */
+.glowing-box {
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 999px;
+  display: inline-block;
+  position: relative;
+  transition: 0.4s cubic-bezier(0.77, -0.68, 0.62, 1.23);
+}
+
+.glowing-box:hover {
+  transition: 0.4s cubic-bezier(0.77, -0.68, 0.62, 1.23);
+  transform: scale(1.05);
+  box-shadow: 1px 1px 20px 1px rgba(245, 73, 144, 0.1);
+}
+
+.glowing-box-active .glowing-box-animations,
+.glowing-box-active .glowing-box-borders-masker {
+  opacity: 1;
+}
+
+.glowing-box-animations {
+  opacity: 0;
+  pointer-events: none;
+  transition: 1s ease opacity;
+}
+
+.glowing-box-animations,
+.glowing-box-borders {
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+
+.glowing-box-animations:before,
+.glowing-box-borders:before {
+  content: "";
+  float: left;
+  padding-top: 100%;
+}
+
+.glowing-box-glow {
+  filter: blur(8px);
+  opacity: 0.15;
+}
+
+.glowing-box-animations * {
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+
+.glowing-box-stars-masker {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg width='28' height='24' viewBox='0 0 28 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M14.0534 15.732C13.8444 15.283 14.2848 14.8489 14.7326 15.051C14.8296 15.0959 14.9043 15.1707 14.949 15.268C15.1506 15.717 14.7177 16.1511 14.2698 15.949C14.1728 15.9041 14.0982 15.8293 14.0534 15.732Z' fill='black'/%3E%3C/svg%3E") repeat;
+  mask: url("data:image/svg+xml,%3Csvg width='28' height='24' viewBox='0 0 28 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M14.0534 15.732C13.8444 15.283 14.2848 14.8489 14.7326 15.051C14.8296 15.0959 14.9043 15.1707 14.949 15.268C15.1506 15.717 14.7177 16.1511 14.2698 15.949C14.1728 15.9041 14.0982 15.8293 14.0534 15.732Z' fill='black'/%3E%3C/svg%3E") repeat;
+  -webkit-mask-size: 13%;
+  mask-size: 13%;
+}
+
+.glowing-box-borders,
+.glowing-box-glow,
+.glowing-box-stars {
+  animation: borderTurn var(--animation-speed) infinite linear;
+  background-image: conic-gradient(from 0 at 50% 50%,
+      rgba(245, 73, 144, 0.8) 0deg,
+      rgba(245, 73, 144, 0) 60deg,
+      rgba(245, 73, 144, 0) 310deg,
+      rgba(245, 73, 144, 0.8) 360deg);
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.glowing-box-animations:after,
+.glowing-box-borders:after {
+  clear: both;
+  content: "";
+  display: block;
+}
+
+.glowing-box-borders-masker {
+  border-radius: 999px;
+  content: "";
+  inset: 0;
+  left: 0;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: xor;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  padding: 0.8px;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  transition: 1s ease opacity;
+}
+
+.glowing-box-borders {
+  animation-name: borderTurnWithTranslate;
+}
+
+.glowing-box-button {
+  background: rgba(245, 73, 144, 0.08);
+  border: 1px solid rgba(245, 73, 144, 0.2);
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 4px 12px;
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 20px;
+}
+
+.glowing-box-button:after {
+  background: radial-gradient(73% 117% at 50% 126%,
+      rgba(245, 73, 144, 0.3) 0%,
+      rgba(245, 73, 144, 0) 100%);
+  border-radius: 999px;
+  content: "";
+  height: calc(100% + 4px);
+  left: -2px;
+  opacity: 0;
+  position: absolute;
+  top: -2px;
+  transition: 0.8s all;
+  width: calc(100% + 4px);
+}
+
+.glowing-box-button .glowing-span {
+  color: rgba(245, 73, 144, 1);
+  display: block;
+}
+
+.glowing-box-button:hover:after {
+  opacity: 0.4;
+}
+
+@keyframes borderTurnWithTranslate {
+  0% {
+    transform: translate(-50%, -50%) rotate(0);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes borderTurn {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 로또 카드 물결 애니메이션 */
+.lottery-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.lottery-wave {
+  position: absolute;
+  width: 540px;
+  height: 700px;
+  opacity: 0.15;
+  left: 0;
+  top: 0;
+  margin-left: -50%;
+  margin-top: -70%;
+  background: rgba(245, 73, 144, 0.15);
+  border-radius: 40%;
+  animation: lottery-wave-rotate 15s infinite linear;
+}
+
+.lottery-wave-1 {
+  animation-duration: 12s;
+}
+
+.lottery-wave-2 {
+  top: 210px;
+  animation-duration: 14s;
+  background: rgba(245, 103, 164, 0.12);
+}
+
+.lottery-wave-3 {
+  top: 210px;
+  animation-duration: 16s;
+  background: rgba(245, 123, 184, 0.1);
+}
+
+@keyframes lottery-wave-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 포인트 카드 물결 애니메이션 (블루) */
+.points-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.points-wave {
+  position: absolute;
+  width: 540px;
+  height: 700px;
+  opacity: 0.12;
+  left: 0;
+  top: 0;
+  margin-left: -50%;
+  margin-top: -70%;
+  background: rgba(245, 73, 144, 0.12);
+  border-radius: 40%;
+  animation: points-wave-rotate 18s infinite linear;
+}
+
+.points-wave-1 {
+  animation-duration: 15s;
+}
+
+.points-wave-2 {
+  top: 210px;
+  animation-duration: 17s;
+  background: rgba(245, 103, 164, 0.1);
+}
+
+.points-wave-3 {
+  top: 210px;
+  animation-duration: 19s;
+  background: rgba(245, 123, 184, 0.08);
+}
+
+@keyframes points-wave-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+
+
+/* 스크롤바 숨기기 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 축하 애니메이션 키프레임 */
+@keyframes celebration-burst {
+  0% {
+    transform: scale(0) rotate(0deg);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.2) rotate(180deg);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(0.8) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes firework-sparkle {
+  0% {
+    transform: scale(0) translateY(0);
+    opacity: 1;
+  }
+
+  30% {
+    transform: scale(1) translateY(-10px);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.5) translateY(-20px);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-100px) rotate(0deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(100px) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* 추가 애니메이션 클래스 */
+.animate-celebration {
+  animation: celebration-burst 2s infinite;
+}
+
+.animate-firework {
+  animation: firework-sparkle 1.5s infinite;
+}
+
+.animate-confetti {
+  animation: confetti-fall 3s infinite linear;
+}

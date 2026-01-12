@@ -1,0 +1,118 @@
+import os
+
+# 1. 여자 배우 100명 데이터 (인지도/트렌드 반영)
+csv_content = """rank,name,gender,type
+1,김지원,Female,Actor
+2,박은빈,Female,Actor
+3,송혜교,Female,Actor
+4,한소희,Female,Actor
+5,김유정,Female,Actor
+6,임지연,Female,Actor
+7,고윤정,Female,Actor
+8,김고은,Female,Actor
+9,아이유,Female,Actor
+10,수지,Female,Actor
+11,윤아,Female,Actor
+12,서현진,Female,Actor
+13,박보영,Female,Actor
+14,신혜선,Female,Actor
+15,한효주,Female,Actor
+16,전지현,Female,Actor
+17,손예진,Female,Actor
+18,김태희,Female,Actor
+19,이성경,Female,Actor
+20,박신혜,Female,Actor
+21,김소현,Female,Actor
+22,문가영,Female,Actor
+23,안은진,Female,Actor
+24,천우희,Female,Actor
+25,김다미,Female,Actor
+26,신세경,Female,Actor
+27,고민시,Female,Actor
+28,이세영,Female,Actor
+29,박민영,Female,Actor
+30,공효진,Female,Actor
+31,김태리,Female,Actor
+32,한지민,Female,Actor
+33,정소민,Female,Actor
+34,김혜수,Female,Actor
+35,이하늬,Female,Actor
+36,전도연,Female,Actor
+37,엄정화,Female,Actor
+38,김희애,Female,Actor
+39,하지원,Female,Actor
+40,이보영,Female,Actor
+41,김서형,Female,Actor
+42,염정아,Female,Actor
+43,라미란,Female,Actor
+44,김해숙,Female,Actor
+45,김선영,Female,Actor
+46,이정은,Female,Actor
+47,장나라,Female,Actor
+48,유인나,Female,Actor
+49,서지혜,Female,Actor
+50,강한나,Female,Actor
+51,조이현,Female,Actor
+52,박규영,Female,Actor
+53,노윤서,Female,Actor
+54,신예은,Female,Actor
+55,김혜윤,Female,Actor
+56,표예진,Female,Actor
+57,설인아,Female,Actor
+58,조보아,Female,Actor
+59,임수정,Female,Actor
+60,정유미,Female,Actor
+61,배두나,Female,Actor
+62,김세정,Female,Actor
+63,지수,Female,Actor
+64,혜리,Female,Actor
+65,정은지,Female,Actor
+66,나나,Female,Actor
+67,권나라,Female,Actor
+68,김민주,Female,Actor
+69,보나,Female,Actor
+70,크리스탈,Female,Actor
+71,이다희,Female,Actor
+72,김소연,Female,Actor
+73,이민정,Female,Actor
+74,차주영,Female,Actor
+75,김히어라,Female,Actor
+76,염혜란,Female,Actor
+77,박지현,Female,Actor
+78,전종서,Female,Actor
+79,이유미,Female,Actor
+80,박소담,Female,Actor
+81,조여정,Female,Actor
+82,오연서,Female,Actor
+83,진기주,Female,Actor
+84,원진아,Female,Actor
+85,신현빈,Female,Actor
+86,전미도,Female,Actor
+87,곽선영,Female,Actor
+88,김지지,Female,Actor
+89,박주현,Female,Actor
+90,이솜,Female,Actor
+91,이엘,Female,Actor
+92,고아성,Female,Actor
+93,이연희,Female,Actor
+94,고준희,Female,Actor
+95,유이,Female,Actor
+96,황정음,Female,Actor
+97,최지우,Female,Actor
+98,이영애,Female,Actor
+99,고현정,Female,Actor
+100,윤여정,Female,Actor
+"""
+
+# 2. 바탕화면 경로 찾기
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+file_path = os.path.join(desktop_path, "actor_female.csv")
+
+# 3. 파일 저장
+try:
+    with open(file_path, "w", encoding="utf-8-sig") as f:
+        f.write(csv_content)
+    print(f"🎉 성공! 바탕화면에 'actor_female.csv' 파일이 생성되었습니다.")
+    print(f"저장 위치: {file_path}")
+except Exception as e:
+    print(f"❌ 오류 발생: {e}")

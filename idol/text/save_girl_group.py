@@ -1,0 +1,61 @@
+import os
+
+# 1. 여자 그룹 데이터
+csv_content = """rank,name,gender,type
+1,TWICE,Female,Group
+2,뉴진스,Female,Group
+3,오마이걸,Female,Group
+4,BLACKPINK,Female,Group
+5,ME:I,Female,Group
+6,GIRLSET,Female,Group
+7,NMIXX,Female,Group
+8,ITZY,Female,Group
+9,Billlie,Female,Group
+10,소녀시대,Female,Group
+11,에이핑크,Female,Group
+12,IVE,Female,Group
+13,프로미스나인,Female,Group
+14,레드벨벳,Female,Group
+15,QWER,Female,Group
+16,드림캐쳐,Female,Group
+17,마마무,Female,Group
+18,에스파,Female,Group
+19,메이딘,Female,Group
+20,하츠투하츠,Female,Group
+21,아일릿,Female,Group
+22,여자친구,Female,Group
+23,IS:SUE,Female,Group
+24,NiziU,Female,Group
+25,Kep1er,Female,Group
+26,SECRET NUMBER,Female,Group
+27,BABYMONSTER,Female,Group
+28,르세라핌,Female,Group
+29,VIVIZ,Female,Group
+30,유니스,Female,Group
+31,아이들,Female,Group
+32,첫사랑,Female,Group
+33,트리플에스,Female,Group
+34,라필루스,Female,Group
+35,러블리즈,Female,Group
+36,모모랜드,Female,Group
+37,STAYC,Female,Group
+38,브브걸,Female,Group
+39,KISS OF LIFE,Female,Group
+40,ARTMS,Female,Group
+41,리센느,Female,Group
+42,izna,Female,Group
+43,BINI,Female,Group
+44,MEOVV,Female,Group
+"""
+
+# 2. 바탕화면 경로 찾기
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+file_path = os.path.join(desktop_path, "girl_group.csv")
+
+# 3. 파일 저장
+try:
+    with open(file_path, "w", encoding="utf-8-sig") as f:
+        f.write(csv_content)
+    print(f"🎉 성공! 바탕화면에 'girl_group.csv' 파일이 생성되었습니다.")
+except Exception as e:
+    print(f"❌ 오류 발생: {e}")

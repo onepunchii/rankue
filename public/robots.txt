@@ -1,0 +1,42 @@
+# Polli - 참여형 여론조사 플랫폼
+# https://www.polli.co.kr
+
+User-agent: *
+Allow: /
+
+# 크롤링 허용 - 주요 공개 페이지
+Allow: /surveys
+Allow: /survey-result/
+Allow: /results
+Allow: /category/
+Allow: /poll/*
+Allow: /blog/*
+Allow: /enterprise-research
+Allow: /statistics
+
+# 크롤링 차단 - 비공개/개인정보/관리자 페이지
+Disallow: /api/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /profile
+Disallow: /persona
+Disallow: /test-*
+Disallow: /debug-*
+Disallow: /private/
+Disallow: /*.json$
+
+# 검색엔진별 최적화 설정
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Yeti
+Allow: /
+Crawl-delay: 1
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# Sitemap 위치
+Sitemap: https://www.polli.co.kr/sitemap.xml

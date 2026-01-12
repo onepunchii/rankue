@@ -1,0 +1,95 @@
+좋아, 그럼 **국회의원 활동지수**를 만들기 위해 필요한 **국회 API 연결 방법**을 단계별로 정리해줄게. 이건 **국회 의안정보시스템 OpenAPI**를 기반으로 진행할 수 있어.
+
+---
+
+## 🧩 1. 국회 API 활용 개요
+
+| 항목     | 설명                                                                                                         |
+| ------ | ---------------------------------------------------------------------------------------------------------- |
+| 공식 명칭  | 국회 의안정보시스템 OpenAPI                                                                                         |
+| 활용 목적  | 국회의원 법안 발의·통과 건수, 회기별 활동 내역 수집                                                                             |
+| API 종류 | XML 기반 REST API (인증키 필요 없음)                                                                                |
+| 공식 문서  | [http://likms.assembly.go.kr/law/openApi/openApi.jsp](http://likms.assembly.go.kr/law/openApi/openApi.jsp) |
+
+---
+
+## 🔑 2. 활용 가능한 주요 API 목록
+
+| 기능                  | API 예시              | 비고                  |
+| ------------------- | ------------------- | ------------------- |
+| 🔍 **의원별 법안 발의 정보** | `getMemberBillList` | 이름 기반 검색            |
+| 🧾 **법안 상세 정보**     | `getBillInfo`       | 법안 ID로 조회           |
+| 📊 **법안 통과 여부 확인**  | `getBillStatus`     | 처리 결과 포함            |
+| 🧑‍💼 **국회의원 명단**   | `getMemberList`     | 기본 인적정보 (정당, 지역구 등) |
+
+---
+
+## 🧪 3. API 사용 예시 (의원별 법안 발의 수)
+
+```http
+GET http://open.assembly.go.kr/portal/openapi/nwvrqwxyaytdsfvhu
+```
+
+### 📌 주요 파라미터
+
+| 파라미터               | 설명                     |
+| ------------------ | ---------------------- |
+| **AGE**            | 국회 대수 (예: 22)          |
+| **BILL\_KIND\_CD** | 법안 종류 (예: 일반 법률안은 "1") |
+| **PROPOSER**       | 의원 이름 (예: 홍길동)         |
+| **TYPE**           | 반환 형식 (json 또는 xml)    |
+
+### 예시 호출 (JSON 요청)
+
+```http
+http://open.assembly.go.kr/portal/openapi/nwvrqwxyaytdsfvhu?PROPOSER=홍길동&AGE=22&TYPE=json
+```
+
+---
+
+## 🧑‍💻 4. Python 코드 예제 (법안 발의 수 가져오기)
+
+```python
+import requests
+
+def get_member_bills(name, age=22):
+    url = "http://open.assembly.go.kr/portal/openapi/nwvrqwxyaytdsfvhu"
+    params = {
+        "PROPOSER": name,
+        "AGE": age,
+        "TYPE": "json"
+    }
+    res = requests.get(url, params=params)
+    if res.status_code == 200:
+        bills = res.json()
+        return len(bills['nwvrqwxyaytdsfvhu'])  # 법안 건수
+    return 0
+```
+
+---
+
+## 📦 5. 활동지수용 데이터 설계 예시
+
+| 이름  | 정당     | 지역구     | 대표발의수 | 공동발의수 | 통과율 | 활동지수 |
+| --- | ------ | ------- | ----- | ----- | --- | ---- |
+| 홍길동 | 더불어민주당 | 서울 강남구갑 | 32건   | 58건   | 12% | 84점  |
+
+---
+
+## 🚀 다음 할 일
+
+1. 의원 이름 리스트에서 루프 돌며 API로 발의 건수 가져오기
+2. 결과를 DB 또는 Pandas로 정리
+3. 활동지수 산정 공식 적용
+4. 카드형 UI 적용
+
+---
+
+필요하면:
+
+* Replit에 붙일 API 연동 코드
+* FastAPI나 Flask 서버 예제
+* 전체 의원 대상 크롤링 스크립트
+  도 도와줄게.
+
+**어떤 방식으로 구현할 거야? Replit 웹앱에 바로 적용? 아니면 데이터 수집부터 해볼까?**

@@ -1,0 +1,41 @@
+{
+  "name": "Polli - 블록체인 설문조사 플랫폼",
+  "short_name": "Polli",
+  "description": "참여는 가볍게, 신뢰는 무겁게! AI 기반 스마트 설문조사와 로또 시스템",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ec4899",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "social", "business"],
+  "lang": "ko",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "설문 참여하기",
+      "short_name": "설문 참여",
+      "description": "새로운 설문에 참여하고 포인트를 획득하세요",
+      "url": "/surveys",
+      "icons": [{ "src": "/favicon.ico", "sizes": "48x48" }]
+    },
+    {
+      "name": "설문 만들기",
+      "short_name": "설문 생성",
+      "description": "나만의 설문을 만들어 공유하세요",
+      "url": "/create",
+      "icons": [{ "src": "/favicon.ico", "sizes": "48x48" }]
+    }
+  ]
+}
