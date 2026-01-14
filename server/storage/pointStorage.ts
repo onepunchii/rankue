@@ -224,7 +224,7 @@ export class PointStorage {
     }
 
     async getProviderLogs(orderId?: number, provider?: string, limit: number = 100): Promise<ProviderLog[]> {
-        let conditions = [];
+        let conditions: any[] = [];
         if (orderId) conditions.push(eq(providerLogs.orderId, orderId));
         if (provider) conditions.push(eq(providerLogs.provider, provider));
 

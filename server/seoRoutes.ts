@@ -1,6 +1,6 @@
 import { Express, Request, Response } from "express";
 import { db } from "./db.js";
-import { surveys, blogPosts } from "../shared/schema.js";
+import { surveys } from "../shared/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import {
   generateSlug,
