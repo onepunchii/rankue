@@ -60,7 +60,7 @@ export class BalanceGameStorage {
 
     // Vote Operations
     async voteBalanceGame(vote: InsertBalanceGameVote): Promise<BalanceGameVote> {
-        return await db.transaction(async (tx) => {
+        return await db.transaction(async (tx: any) => {
             const [newVote] = await tx
                 .insert(balanceGameVotes)
                 .values(vote)
