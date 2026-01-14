@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'polli-pwa-v2';
+const CACHE_NAME = 'polli-pwa-v3';
 const urlsToCache = [
     '/',
     '/index.html',

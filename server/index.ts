@@ -8,6 +8,10 @@ import { registerOGImageRoutes } from "./ogImageGenerator.js";
 import prerender from "prerender-node";
 import { authMiddleware } from "./simpleAuth.js";
 import { aggregateAllPastPoliticalSurveys } from "./services/politicalStatsService.js";
+import session from "express-session";
+import MemoryStoreLoader from "memorystore";
+
+const MemoryStore = MemoryStoreLoader(session);
 
 const log = (message: string) => console.log(`[Express] ${message}`);
 const app = express();
@@ -21,16 +25,28 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(authMiddleware);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+app.use(session({
+  cookie: { maxAge: 86400000 },
+  store: new MemoryStore({
+    checkPeriod: 86400000
+  }),
+  resave: false,
+  saveUninitialized: false,
+  secret: process.env.SESSION_SECRET || 'polli-secret-key'
+}));
+
+app.use(authMiddleware);
+
 // Force root to home redirect to prevent white screening on root
-app.get("/", (req, res) => {
-  if (req.url === '/' && !req.originalUrl.includes('/api')) {
-    res.redirect("/home");
-    return;
+// Force root to home redirect to prevent white screening on root
+app.use((req, res, next) => {
+  if (req.path === '/' && !req.originalUrl.includes('/api')) {
+    return res.redirect("/home");
   }
+  next();
 });
 
 // Prerender.io SEO 미들웨어 (검색엔진 크롤러를 위한 사전 렌더링)
@@ -127,7 +143,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const message = err.message || "Internal Server Error";
 
   res.status(status).json({ message });
-  throw err;
 });
 
 // importantly only setup vite in development and after
