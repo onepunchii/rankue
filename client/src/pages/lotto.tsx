@@ -231,7 +231,7 @@ export default function LottoPage() {
 
                             <div className="flex flex-col items-center">
                                 <h2 className="text-2xl font-black tracking-tight">
-                                    제 <span className="text-purple-400">{currentViewedDraw.round}</span>회 추첨 결과
+                                    제 <span className="text-purple-400">{currentViewedDraw.id}</span>회 추첨 결과
                                 </h2>
                                 <p className="text-sm text-white/50 mt-1">
                                     {new Date(currentViewedDraw.drawDate).toLocaleDateString()} 추첨
@@ -396,7 +396,8 @@ export default function LottoPage() {
                                 </div>
                             ) : (
                                 myTickets.map((ticket, idx) => {
-                                    const draw = lotteryHistory.find((h: any) => h.round === ticket.roundId);
+                                    // Find draw by ID since lottery_draws table uses 'id' as the round number
+                                    const draw = lotteryHistory.find((h: any) => Number(h.id) === Number(ticket.roundId));
                                     let status = { text: "결과 대기 중", color: "text-purple-300" };
 
                                     if (draw) {
