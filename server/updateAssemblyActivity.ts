@@ -16,7 +16,7 @@ export async function updateAllMembersActivity() {
     console.log(`📋 총 ${members.length}명의 국회의원 발견`);
 
     // 2. 이름 목록 추출
-    const memberNames = members.map(m => m.name);
+    const memberNames = members.map((m: any) => m.name);
 
     // 3. API를 통해 활동 정보 수집
     console.log('📊 국회 API를 통한 활동 정보 수집 시작...');
@@ -28,7 +28,7 @@ export async function updateAllMembersActivity() {
 
     for (const activity of activities) {
       try {
-        const member = members.find(m => m.name === activity.name);
+        const member = members.find((m: any) => m.name === activity.name);
         if (!member) {
           console.warn(`⚠️  ${activity.name} 의원을 DB에서 찾을 수 없음`);
           continue;
@@ -67,7 +67,7 @@ export async function updateAllMembersActivity() {
       .limit(10);
 
     console.log('\n🏆 활동지수 상위 10명:');
-    topMembers.forEach((member, index) => {
+    topMembers.forEach((member: any, index: any) => {
       console.log(`   ${index + 1}. ${member.name} (${member.party}) - ${member.activityScore}점 (발의 ${member.billsProposed}건)`);
     });
 
@@ -97,14 +97,14 @@ export async function updateSampleMembersActivity(sampleSize: number = 10) {
       .limit(sampleSize);
 
     console.log('📋 선택된 샘플 의원:');
-    members.forEach(m => console.log(`   - ${m.name} (${m.party})`));
+    members.forEach((m: any) => console.log(`   - ${m.name} (${m.party})`));
 
-    const memberNames = members.map(m => m.name);
+    const memberNames = members.map((m: any) => m.name);
     const activities = await batchCollectActivity(memberNames, 2000);
 
     let updateCount = 0;
     for (const activity of activities) {
-      const member = members.find(m => m.name === activity.name);
+      const member = members.find((m: any) => m.name === activity.name);
       if (member) {
         await db.update(assemblyMembers)
           .set({
