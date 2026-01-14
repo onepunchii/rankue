@@ -60,7 +60,7 @@ import PolliDemoSetup from "@/pages/polli-demo-setup";
 import NewsPage from "@/pages/news";
 import NewsViewer from "@/pages/news-viewer";
 import Statistics from "@/pages/statistics";
-import Landing from "@/pages/landing";
+
 import LightPillar from "@/components/ui/light-pillar";
 import LottoPage from "@/pages/lotto";
 
@@ -191,7 +191,7 @@ function Router() {
       {/* Balance Game Archive */}
       <Route path="/balance-game/archive" component={BalanceGameArchive} />
 
-      <Route path="/landing" component={Landing} />
+
 
       {/* Lotto Feature */}
       <Route path="/lotto" component={LottoPage} />

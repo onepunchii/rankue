@@ -190,26 +190,7 @@ export default function Home() {
   // Simple Auth 폼 상태
   const [isLoading, setIsLoading] = useState(false);
 
-  // 첫 방문자 감지 및 랜딩 페이지 리디렉션
-  useEffect(() => {
-    // 프로필 완료 직후 플래그 체크
-    const justCompleted = localStorage.getItem('profileJustCompleted');
-    if (justCompleted) {
-      localStorage.removeItem('profileJustCompleted');
-      // 사용자 데이터 강제 새로고침
-      refreshUser();
-      return;
-    }
 
-    // 온보딩 완료 플래그 확인 - 이것이 없으면 새로운 사용자
-    const onboardingCompleted = localStorage.getItem('onboardingCompleted');
-
-    // 온보딩을 완료하지 않은 새로운 사용자라면 랜딩 페이지로 리디렉션
-    if (!onboardingCompleted) {
-      setLocation('/landing');
-      return;
-    }
-  }, [setLocation, refreshUser]);
 
   // 로또 추첨까지 남은 시간 계산 (매일 자정 00:00 기준)
   useEffect(() => {
@@ -353,7 +334,7 @@ export default function Home() {
     const interval = setInterval(() => {
       fetchUserParticipations();
     }, 5000); // 5초마다 업데이트
-
+  
     return () => clearInterval(interval);
   }, [fetchUserParticipations]);
   */
