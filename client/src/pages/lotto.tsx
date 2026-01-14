@@ -414,7 +414,7 @@ export default function LottoPage() {
                                     return (
                                         <div key={idx} className="p-4 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
                                             <div>
-                                                <div className="text-xs text-purple-300 mb-1">{ticket.roundId}회차</div>
+                                                <div className="text-xs text-purple-300 mb-1">{draw ? draw.round : ticket.roundId}회차</div>
                                                 <div className="flex gap-1.5">
                                                     {(Array.isArray(ticket.numbers) ? ticket.numbers : JSON.parse(ticket.numbers || '[]')).map((n: number, i: number) => (
                                                         <span key={i} className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center text-xs text-white font-medium">{n}</span>
