@@ -1,12 +1,12 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
-import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
+import { fileURLToPath } from "url";
 
-const viteLogger = createLogger();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -20,6 +20,11 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  const { createServer: createViteServer, createLogger } = await import("vite");
+  // Use explicit .ts extension for local development with tsx
+  const viteConfig = (await import("../vite.config.ts")).default;
+  const viteLogger = createLogger();
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
@@ -46,7 +51,7 @@ export async function setupVite(app: Express, server: Server) {
 
     try {
       const clientTemplate = path.resolve(
-        import.meta.dirname,
+        __dirname,
         "..",
         "client",
         "index.html",
@@ -68,13 +73,35 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // In Vercel environment, __dirname is usually /var/task/server
+  // But our build output is in /var/task/dist/public or similar depending on Vercel build config.
+  // We need to robustly find the 'dist/public' directory.
 
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+  // Try to find the dist folder relative to the current file location
+  const possiblePaths = [
+    path.resolve(__dirname, "../dist/public"), // Local build
+    path.resolve(__dirname, "../../dist/public"), // Nested structure
+    path.resolve(process.cwd(), "dist/public"), // Project root
+    path.resolve(process.cwd(), "public") // Fallback
+  ];
+
+  let distPath = "";
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      distPath = p;
+      break;
+    }
   }
+
+  if (!distPath) {
+    // On Vercel, static files are handled by 'Handle: filesystem' in vercel.json.
+    // So if the directory isn't found, we might rely on Vercel's routing, 
+    // BUT we still need to serve index.html for SPA fallback.
+    // Let's assume standard Vercel structure if not found.
+    console.warn("⚠️ Could not find static build directory. SPA fallback might fail.");
+    distPath = path.resolve(process.cwd(), "dist/public");
+  }
+
 
   app.use(express.static(distPath));
 

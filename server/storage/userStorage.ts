@@ -1,5 +1,5 @@
-import { profiles, type Profile } from "@shared/schema";
-import { db } from "../db";
+import { profiles, type Profile } from "../../shared/schema.js";
+import { db } from "../db.js";
 import { eq, sql } from "drizzle-orm";
 
 export class UserStorage {

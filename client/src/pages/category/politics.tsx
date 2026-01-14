@@ -45,6 +45,8 @@ import {
   Plus
 } from "lucide-react";
 import PartyLogo from "@/components/PartyLogo";
+import InteractiveChartCard, { type ChartDataPoint } from "@/components/political/InteractiveChartCard";
+import { CheckSquare, Briefcase, MessageCircle, RefreshCw, Scale, Zap } from "lucide-react";
 import LightPillar from "@/components/ui/light-pillar";
 import MobileHeader from "@/components/mobile-header";
 import BottomNav from "@/components/bottom-nav";
@@ -139,7 +141,7 @@ export default function PoliticsCategory() {
   const [showPastSurveys, setShowPastSurveys] = useState(false);
   const [showMoreBills, setShowMoreBills] = useState(false);
   const [candidateSearch, setCandidateSearch] = useState("");
-  const [trendType, setTrendType] = useState<'presidential' | 'party' | 'candidate'>('party');
+  const [trendType, setTrendType] = useState<'presidential' | 'party' | 'priority'>('party');
   const [selectedWeekData, setSelectedWeekData] = useState<any>(null);
 
   const { data: politicsSurveys, isLoading } = useQuery({
@@ -182,10 +184,21 @@ export default function PoliticsCategory() {
     staleTime: 10 * 60 * 1000,
   });
 
+  const { data: currentStats } = useQuery({
+    queryKey: ['/api/political/current-stats'],
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: weeklyTrends } = useQuery({
-    queryKey: ['/api/political/weekly-trends'],
+    queryKey: ['/api/political/weekly-trends', user?.gender, (user as any)?.ageGroup, user?.region],
     queryFn: async () => {
-      const response = await fetch('/api/political/weekly-trends');
+      const params = new URLSearchParams();
+      if (user?.gender === 'male') params.append('gender', '남성');
+      else if (user?.gender === 'female') params.append('gender', '여성');
+      if ((user as any)?.ageGroup) params.append('ageGroup', (user as any).ageGroup);
+      if (user?.region) params.append('region', user.region);
+
+      const response = await fetch(`/api/political/weekly-trends?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch weekly trends');
       return response.json();
     },
@@ -425,187 +438,111 @@ export default function PoliticsCategory() {
             </div>
 
             {/* Presidential Approval */}
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card-strong p-6 rounded-[32px] border border-white/10 bg-black/20 backdrop-blur-3xl">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-xs font-black text-orange-400 uppercase tracking-widest mb-1 italic">Approval Rating</h3>
-                  <h2 className="text-xl font-black italic uppercase text-white">대통령 국정수행 지지율</h2>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-orange-400" />
-                </div>
-              </div>
-
-              {/* Horizontal Progress Bars */}
-              <div className="space-y-5 mb-8">
-                {calculateApprovalSummary(presidentialData || []).map((item, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/70 font-bold text-xs">
-                        {item.label === 'Positive' ? '긍정' : item.label === 'Negative' ? '부정' : '중립'}
-                      </span>
-                      <span className="text-white font-black text-sm">{item.value}%</span>
-                    </div>
-                    <div className="relative h-2.5 bg-white/5 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${item.value}%` }}
-                        transition={{ duration: 1.2, delay: index * 0.15, ease: "easeOut" }}
-                        className={`absolute inset-y-0 left-0 rounded-full ${item.color === 'text-emerald-400' ? 'bg-emerald-500' : item.color === 'text-red-400' ? 'bg-red-500' : 'bg-amber-500'}`}
-                        style={{
-                          boxShadow: `0 0 20px ${item.color === 'text-emerald-400' ? 'rgba(16, 185, 129, 0.5)' : item.color === 'text-red-400' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(251, 191, 36, 0.5)'}`
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                {calculateApprovalSummary(presidentialData || []).map((stat, i) => (
-                  <div key={i} className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                    <div className={`text-lg font-black ${stat.color}`}>{stat.value as any}%</div>
-                    <div className="text-[9px] font-black text-white/30 uppercase tracking-widest mt-1 italic">
-                      {stat.label === 'Positive' ? '긍정' : stat.label === 'Negative' ? '부정' : '중립'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
+            <InteractiveChartCard
+              title="대통령 국정수행 지지율"
+              subTitle="Approval Rating"
+              type="PRESIDENTIAL"
+              icon={<TrendingUp className="h-6 w-6 text-orange-400" />}
+              data={(() => {
+                const p = (currentStats as any)?.presidential || {};
+                return [
+                  { label: "Positive", value: p.positive || 0, color: "#10b981", twColorClass: "text-emerald-400" },
+                  { label: "Negative", value: p.negative || 0, color: "#ef4444", twColorClass: "text-rose-400" },
+                  { label: "Neutral", value: p.neutral || 0, color: "#6b7280", twColorClass: "text-gray-400" }
+                ];
+              })()}
+              genderBreakdown={(currentStats as any)?.genderBreakdown}
+              ageBreakdown={(currentStats as any)?.ageBreakdown}
+              regionBreakdown={(currentStats as any)?.regionBreakdown}
+            />
 
             {/* Party Support */}
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card-strong p-8 rounded-[32px] border border-white/10 bg-black/20 backdrop-blur-3xl relative overflow-hidden">
-              {/* Background gradient */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-transparent to-red-900/10 pointer-events-none" />
+            <InteractiveChartCard
+              title="정당 지지율"
+              subTitle="Party Support"
+              type="PARTY"
+              icon={<PieChartIcon className="h-5 w-5 text-purple-400" />}
+              data={(() => {
+                const p = (currentStats as any)?.parties || {};
+                // Define party color mapping (simplified)
+                const colors: Record<string, string> = {
+                  "더불어민주당": "#2563eb",
+                  "국민의힘": "#dc2626",
+                  "정의당": "#facc15",
+                  "조국혁신당": "#1d4ed8",
+                  "개혁신당": "#ea580c",
+                  "무당층/기타": "#6b7280"
+                };
+                return Object.entries(p).map(([name, value]) => ({
+                  label: name,
+                  value: value as number,
+                  color: colors[name] || "#6b7280",
+                  icon: <div className="w-5 h-5 rounded flex items-center justify-center overflow-hidden"><PartyLogo party={name} size="sm" /></div>
+                }));
+              })()}
+              genderBreakdown={(currentStats as any)?.genderBreakdown}
+              ageBreakdown={(currentStats as any)?.ageBreakdown}
+              regionBreakdown={(currentStats as any)?.regionBreakdown}
+            />
 
-              <div className="relative z-10">
-                <div className="flex items-center space-x-3 mb-8">
-                  <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center">
-                    <PieChartIcon className="h-5 w-5 text-purple-400" />
-                  </div>
-                  <h3 className="text-xl font-black text-white">정당 지지율</h3>
-                </div>
+            {/* Presidential Priorities */}
+            <InteractiveChartCard
+              title="국정 우선 과제"
+              subTitle="Top Priorities"
+              type="PRIORITY"
+              icon={<CheckSquare className="h-5 w-5 text-blue-400" />}
+              data={(() => {
+                const p = (currentStats as any)?.priorities || {};
+                const colors: Record<string, string> = {
+                  "물가/경제 안정": "#3b82f6", // Blue
+                  "소통/협치": "#a855f7", // Purple
+                  "인적 쇄신": "#22c55e", // Green
+                  "공정/부패 척결": "#ef4444", // Red
+                  "개혁 마무리": "#f97316" // Orange
+                };
+                return Object.entries(p).map(([name, value]) => ({
+                  label: name,
+                  value: value as number,
+                  color: colors[name] || "#6b7280",
+                  twColorClass: colors[name] ? `text-[${colors[name]}]` : "text-gray-400"
+                })).sort((a, b) => b.value - a.value);
+              })()}
+              genderBreakdown={(currentStats as any)?.genderBreakdown}
+              ageBreakdown={(currentStats as any)?.ageBreakdown}
+              regionBreakdown={(currentStats as any)?.regionBreakdown}
+            />
 
-                {/* Horizontal Progress Bars - Relative to Max */}
-                <div className="space-y-4 mb-6">
-                  {(() => {
-                    const partyList = processPartyData(partyData || []);
-                    const maxValue = Math.max(...partyList.map(p => p.value), 1);
-
-                    return partyList.map((party, index) => {
-                      const relativeWidth = (party.value / maxValue) * 100;
-
-                      return (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-6 h-6 bg-white rounded-lg flex items-center justify-center shadow-md p-0.5 overflow-hidden">
-                                <PartyLogo party={party.name} size="sm" />
-                              </div>
-                              <span className="text-white/80 font-bold text-xs">{party.name}</span>
-                            </div>
-                            <span className="text-white font-black text-sm">{party.value}%</span>
-                          </div>
-                          <div className="relative h-2.5 bg-white/5 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${relativeWidth}%` }}
-                              transition={{
-                                duration: 1.5,
-                                delay: index * 0.1,
-                                ease: [0.16, 1, 0.3, 1] // Custom easing for smooth effect
-                              }}
-                              className="h-full rounded-full relative"
-                              style={{
-                                backgroundColor: party.color,
-                                boxShadow: `0 0 20px ${party.color}50`
-                              }}
-                            >
-                              {/* Shimmer effect */}
-                              <motion.div
-                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                                initial={{ x: '-100%' }}
-                                animate={{ x: '200%' }}
-                                transition={{
-                                  duration: 2,
-                                  delay: index * 0.1 + 0.5,
-                                  ease: "easeInOut"
-                                }}
-                              />
-                            </motion.div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Candidate Support */}
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card-strong p-8 rounded-[32px] border border-white/10 bg-black/20 backdrop-blur-3xl relative overflow-hidden">
-              <div className="flex items-center justify-between mb-8 space-x-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center">
-                    <Users className="h-5 w-5 text-amber-400" />
-                  </div>
-                  <h3 className="text-xl font-black italic uppercase text-white">차기 대선 후보</h3>
-                </div>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-full bg-white/5 hover:bg-white/10" onClick={() => toast({ title: "준비 중", description: "후보 등록 기능은 곧 오픈됩니다." })}>
-                  <Plus className="h-4 w-4 text-white/50" />
-                </Button>
-              </div>
-
-              {/* Simple Search UI */}
-              <div className="mb-6 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-                <Input
-                  value={candidateSearch}
-                  onChange={(e) => setCandidateSearch(e.target.value)}
-                  placeholder="후보자 검색..."
-                  className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-2xl h-10 text-xs focus:ring-1 focus:ring-purple-500/50"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                {processCandidateData(candidateData || []).map((candidate, i) => (
-                  <div key={i} className="bg-white/[0.03] rounded-2xl p-4 text-center border border-white/5 relative overflow-hidden group hover:bg-white/[0.06] transition-colors">
-                    <div className="w-12 h-12 bg-gradient-to-br from-white/10 to-transparent rounded-2xl flex items-center justify-center shadow-lg mb-3 mx-auto p-1 overflow-hidden">
-                      <User className="w-6 h-6 text-white/80" />
-                    </div>
-                    <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 italic truncate">{candidate.name}</div>
-                    <div className={`text-lg font-black text-purple-400 ${candidate.opacity}`}>{candidate.value}</div>
-                  </div>
-                ))}
-                {(!candidateData || candidateData.length === 0) && (
-                  <div className="col-span-3 text-center py-8 text-white/30 text-xs italic">
-                    아직 수집된 데이터가 없습니다.
-                  </div>
-                )}
-              </div>
-            </motion.div >
           </TabsContent>
 
           <TabsContent value="trends" className="space-y-8">
             {/* Trend Type Selector */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="flex overflow-x-auto hide-scrollbar border-b border-white/5 bg-black/50 backdrop-blur-sm mb-6">
               {[
-                { id: 'presidential' as const, label: '대통령 지지율', icon: '👤' },
-                { id: 'party' as const, label: '정당 지지율', icon: '🏛️' },
-                { id: 'candidate' as const, label: '대선 후보', icon: '🎯' }
-              ].map((type) => (
-                <button
-                  key={type.id}
-                  onClick={() => setTrendType(type.id)}
-                  className={`px-4 py-2 rounded-xl border transition-all text-xs font-black whitespace-nowrap ${trendType === type.id
-                    ? 'bg-orange-600/10 border-orange-500/20 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.1)]'
-                    : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
-                    }`}
-                >
-                  <span className="mr-2">{type.icon}</span>
-                  {type.label}
-                </button>
-              ))}
+                { id: 'presidential' as const, label: '대통령 지지율' },
+                { id: 'party' as const, label: '정당 지지율' },
+                { id: 'priority' as const, label: '국정 우선 과제' }
+              ].map((type) => {
+                const isActive = trendType === type.id;
+                return (
+                  <button
+                    key={type.id}
+                    onClick={() => setTrendType(type.id)}
+                    className={`
+                      relative py-4 px-6 text-sm font-bold whitespace-nowrap transition-colors outline-none
+                      ${isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}
+                    `}
+                  >
+                    {type.label}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeTrendTab"
+                        className="absolute bottom-0 left-0 right-0 h-[2px] bg-orange-500 shadow-[0_-2px_8px_rgba(249,115,22,0.5)]"
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Hot Issue Badge */}
@@ -624,15 +561,15 @@ export default function PoliticsCategory() {
                   <div className="text-sm font-bold text-white">
                     {trendType === 'presidential' && '대통령 지지율 '}
                     {trendType === 'party' && '더불어민주당 '}
-                    {trendType === 'candidate' && '이재명 후보 '}
+                    {trendType === 'priority' && '물가/경제 안정 '}
                     <span className="text-emerald-400">
                       {trendType === 'presidential' && '▲6.0%p'}
                       {trendType === 'party' && '▲6.0%p'}
-                      {trendType === 'candidate' && '▲4.0%p'}
+                      {trendType === 'priority' && '35%'}
                     </span>
                     {trendType === 'presidential' && ' 상승!'}
                     {trendType === 'party' && ' 상승하며 1위 달성!'}
-                    {trendType === 'candidate' && ' 상승하며 1위 탈환!'}
+                    {trendType === 'priority' && ' 압도적 1위!'}
                   </div>
                 </div>
               </div>
@@ -651,7 +588,7 @@ export default function PoliticsCategory() {
                   <h2 className="text-2xl font-black text-white">
                     {trendType === 'presidential' && '대통령 지지율 추이'}
                     {trendType === 'party' && '정당 지지율 추이'}
-                    {trendType === 'candidate' && '대선 후보 지지율 추이'}
+                    {trendType === 'priority' && '국정 우선 과제 추이'}
                   </h2>
                 </div>
                 <div className="text-right">
@@ -662,7 +599,7 @@ export default function PoliticsCategory() {
                     {(() => {
                       if (selectedWeekData) return selectedWeekData.참여자;
                       const data = trendType === 'presidential' ? weeklyTrends?.presidential :
-                        trendType === 'party' ? weeklyTrends?.party : weeklyTrends?.candidate;
+                        weeklyTrends?.party;
                       const latestWeek = data?.[data.length - 1];
                       return latestWeek?.참여자 || 0;
                     })()}명
@@ -703,7 +640,6 @@ export default function PoliticsCategory() {
                       <Tooltip contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(12px)' }} itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }} labelStyle={{ color: '#a78bfa', fontWeight: 'bold', marginBottom: '8px' }} />
                       <Area type="monotone" dataKey="긍정" stroke="#10b981" strokeWidth={3} fill="url(#colorPositive)" dot={{ fill: '#10b981', r: 4 }} activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2 }} />
                       <Area type="monotone" dataKey="부정" stroke="#ef4444" strokeWidth={3} fill="url(#colorNegative)" dot={{ fill: '#ef4444', r: 4 }} activeDot={{ r: 6, stroke: '#ef4444', strokeWidth: 2 }} />
-                      <Area type="monotone" dataKey="중립" stroke="#fbbf24" strokeWidth={3} fill="url(#colorNeutral)" dot={{ fill: '#fbbf24', r: 4 }} activeDot={{ r: 6, stroke: '#fbbf24', strokeWidth: 2 }} />
                     </AreaChart>
                   ) : trendType === 'party' ? (
                     <AreaChart
@@ -731,15 +667,15 @@ export default function PoliticsCategory() {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="week" stroke="rgba(255,255,255,0.3)" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
-                      <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} domain={[0, 50]} />
+                      <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700' }} axisLine={false} tickLine={false} domain={[0, 50]} />
                       <Tooltip contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(12px)' }} itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }} labelStyle={{ color: '#a78bfa', fontWeight: 'bold', marginBottom: '8px' }} />
                       <Area type="monotone" dataKey="더불어민주당" stroke="#004EA2" strokeWidth={3} fill="url(#colorDemocrat)" dot={{ fill: '#004EA2', r: 4 }} activeDot={{ r: 6, stroke: '#004EA2', strokeWidth: 2 }} />
                       <Area type="monotone" dataKey="국민의힘" stroke="#E61E2B" strokeWidth={3} fill="url(#colorPeople)" dot={{ fill: '#E61E2B', r: 4 }} activeDot={{ r: 6, stroke: '#E61E2B', strokeWidth: 2 }} />
-                      <Area type="monotone" dataKey="조국혁신당" stroke="#0073CF" strokeWidth={3} fill="url(#colorCho)" dot={{ fill: '#0073CF', r: 4 }} activeDot={{ r: 6, stroke: '#0073CF', strokeWidth: 2 }} />
+                      <Area type="monotone" dataKey="조국혁신당" stackId="1" stroke="#1d4ed8" strokeWidth={2} fill="#1d4ed8" />
                     </AreaChart>
                   ) : (
                     <AreaChart
-                      data={weeklyTrends?.candidate || []}
+                      data={weeklyTrends?.priority || []}
                       margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                       onClick={(data) => {
                         if (data && data.activePayload && data.activePayload[0]) {
@@ -748,31 +684,20 @@ export default function PoliticsCategory() {
                       }}
                     >
                       <defs>
-                        <linearGradient id="colorLee" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#004EA2" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#004EA2" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorHan" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#E61E2B" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#E61E2B" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorCho2" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0073CF" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#0073CF" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorOh" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#FF7920" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#FF7920" stopOpacity={0} />
+                        <linearGradient id="colorPriority" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="week" stroke="rgba(255,255,255,0.3)" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
-                      <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} domain={[0, 40]} />
+                      <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(12px)' }} itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }} labelStyle={{ color: '#a78bfa', fontWeight: 'bold', marginBottom: '8px' }} />
-                      <Area type="monotone" dataKey="이재명" stroke="#004EA2" strokeWidth={3} fill="url(#colorLee)" dot={{ fill: '#004EA2', r: 4 }} activeDot={{ r: 6, stroke: '#004EA2', strokeWidth: 2 }} />
-                      <Area type="monotone" dataKey="한동훈" stroke="#E61E2B" strokeWidth={3} fill="url(#colorHan)" dot={{ fill: '#E61E2B', r: 4 }} activeDot={{ r: 6, stroke: '#E61E2B', strokeWidth: 2 }} />
-                      <Area type="monotone" dataKey="조국" stroke="#0073CF" strokeWidth={3} fill="url(#colorCho2)" dot={{ fill: '#0073CF', r: 4 }} activeDot={{ r: 6, stroke: '#0073CF', strokeWidth: 2 }} />
-                      <Area type="monotone" dataKey="오세훈" stroke="#FF7920" strokeWidth={3} fill="url(#colorOh)" dot={{ fill: '#FF7920', r: 4 }} activeDot={{ r: 6, stroke: '#FF7920', strokeWidth: 2 }} />
+                      <Area type="monotone" dataKey="물가/경제 안정" stackId="1" stroke="#3b82f6" strokeWidth={2} fill="url(#colorPriority)" />
+                      <Area type="monotone" dataKey="소통/협치" stackId="1" stroke="#a855f7" strokeWidth={2} fill="#a855f7" />
+                      <Area type="monotone" dataKey="인적 쇄신" stackId="1" stroke="#22c55e" strokeWidth={2} fill="#22c55e" />
+                      <Area type="monotone" dataKey="공정/부패 척결" stackId="1" stroke="#ef4444" strokeWidth={2} fill="#ef4444" />
+                      <Area type="monotone" dataKey="개혁 마무리" stackId="1" stroke="#f97316" strokeWidth={2} fill="#f97316" />
                     </AreaChart>
                   )}
                 </ResponsiveContainer>
@@ -812,26 +737,6 @@ export default function PoliticsCategory() {
                     </div>
                   </>
                 )}
-                {trendType === 'candidate' && (
-                  <>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-[#004EA2]"></div>
-                      <span className="text-xs font-bold text-white/70">이재명</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-[#E61E2B]"></div>
-                      <span className="text-xs font-bold text-white/70">한동훈</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-[#0073CF]"></div>
-                      <span className="text-xs font-bold text-white/70">조국</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-[#FF7920]"></div>
-                      <span className="text-xs font-bold text-white/70">오세훈</span>
-                    </div>
-                  </>
-                )}
               </div>
             </motion.div>
 
@@ -846,14 +751,10 @@ export default function PoliticsCategory() {
               >
                 <div className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-2">최고 상승</div>
                 <div className="text-2xl font-black text-white mb-1">
-                  {trendType === 'presidential' && '+6.0%p'}
-                  {trendType === 'party' && '+6.0%p'}
-                  {trendType === 'candidate' && '+4.0%p'}
+                  {trendType === 'presidential' ? '+6.0%p' : '+6.0%p'}
                 </div>
                 <div className="text-xs text-white/60 font-bold">
-                  {trendType === 'presidential' && '긍정 평가'}
-                  {trendType === 'party' && '더불어민주당'}
-                  {trendType === 'candidate' && '이재명'}
+                  {trendType === 'presidential' ? '긍정 평가' : '더불어민주당'}
                 </div>
               </motion.div>
 
@@ -866,17 +767,79 @@ export default function PoliticsCategory() {
               >
                 <div className="text-xs font-black text-red-400 uppercase tracking-widest mb-2">최대 하락</div>
                 <div className="text-2xl font-black text-white mb-1">
-                  {trendType === 'presidential' && '-6.0%p'}
-                  {trendType === 'party' && '-6.0%p'}
-                  {trendType === 'candidate' && '-3.0%p'}
+                  {trendType === 'presidential' ? '-6.0%p' : '-6.0%p'}
                 </div>
                 <div className="text-xs text-white/60 font-bold">
                   {trendType === 'presidential' && '부정 평가'}
                   {trendType === 'party' && '국민의힘'}
-                  {trendType === 'candidate' && '한동훈'}
                 </div>
               </motion.div>
             </div>
+
+            {/* Detailed Analysis for Selected Week */}
+            <AnimatePresence mode="wait">
+              {selectedWeekData?.raw ? (
+                <motion.div
+                  key={`detail-${selectedWeekData.week}-${trendType}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="space-y-6 pt-4"
+                >
+                  <div className="flex items-center justify-between px-1">
+                    <h2 className="text-xs font-black text-orange-400 uppercase tracking-widest">{selectedWeekData.week} 상세 분석</h2>
+                    <Badge variant="outline" className="text-[9px] border-orange-500/30 text-orange-400 uppercase font-black">Archive</Badge>
+                  </div>
+
+                  <InteractiveChartCard
+                    title={trendType === 'presidential' ? "대통령 국정수행 지지율" : "정당 지지율"}
+                    subTitle={trendType === 'presidential' ? "Approval Rating" : "Party Support"}
+                    type={trendType === 'presidential' ? "PRESIDENTIAL" : "PARTY"}
+                    icon={trendType === 'presidential' ? <TrendingUp className="h-6 w-6 text-orange-400" /> : <PieChartIcon className="h-5 w-5 text-purple-400" />}
+                    data={(() => {
+                      const raw = selectedWeekData.raw;
+                      if (raw) {
+                        if (trendType === 'presidential') {
+                          const p = raw.presidential || {};
+                          return [
+                            { label: "Positive", value: p.positive || 0, color: "#10b981", twColorClass: "text-emerald-400" },
+                            { label: "Negative", value: p.negative || 0, color: "#ef4444", twColorClass: "text-rose-400" },
+                            { label: "Neutral", value: p.neutral || 0, color: "#6b7280", twColorClass: "text-gray-400" }
+                          ];
+                        } else {
+                          const p = raw.parties || {};
+                          const colors: Record<string, string> = {
+                            "더불어민주당": "#2563eb",
+                            "국민의힘": "#dc2626",
+                            "정의당": "#facc15",
+                            "조국혁신당": "#1d4ed8",
+                            "개혁신당": "#ea580c",
+                            "무당층/기타": "#6b7280"
+                          };
+                          return Object.entries(p).map(([name, value]) => ({
+                            label: name,
+                            value: value as number,
+                            color: colors[name] || "#6b7280",
+                            icon: <div className="w-5 h-5 rounded flex items-center justify-center overflow-hidden"><PartyLogo party={name} size="sm" /></div>
+                          }));
+                        }
+                      }
+                      return [];
+                    })()}
+                    genderBreakdown={selectedWeekData.raw.genderBreakdown}
+                    ageBreakdown={selectedWeekData.raw.ageBreakdown}
+                    regionBreakdown={selectedWeekData.raw.regionBreakdown}
+                  />
+                </motion.div>
+              ) : (
+                <div className="glass-card-strong p-8 rounded-[32px] border border-white/5 bg-white/[0.02] text-center mt-4">
+                  <p className="text-[11px] font-bold text-white/30 uppercase tracking-[0.2em] leading-relaxed">
+                    차트의 데이터 점을 클릭하여<br />
+                    해당 주차의 <span className="text-orange-400/50">상세 여론조사 결과</span>를 확인하세요
+                  </p>
+                </div>
+              )}
+            </AnimatePresence>
           </TabsContent>
 
           <TabsContent value="surveys" className="space-y-6">

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { supabaseAdmin } from "./supabase";
 import { db } from "./db";
-import { musicArtists, musicCategories } from "@shared/schema";
+import { musicArtists, musicCategories } from "../shared/schema.js";
 import { eq } from "drizzle-orm";
 
 // Supabase celebrities를 musicArtists로 마이그레이션

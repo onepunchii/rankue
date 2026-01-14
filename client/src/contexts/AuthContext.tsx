@@ -23,6 +23,7 @@ export interface AuthUser {
     incomeLevel?: string;
     maritalStatus?: string;
     isPetOwner?: boolean;
+    profileImageUrl?: string;
 
     // Gamification
     level: number;

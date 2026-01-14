@@ -4,8 +4,8 @@ import {
     surveys,
     type QuickPoll,
     type InsertQuickPoll,
-} from "@shared/schema";
-import { db } from "../db";
+} from "../../shared/schema.js";
+import { db } from "../db.js";
 import { eq, desc, and, count, sql } from "drizzle-orm";
 
 export class DiscussionStorage {

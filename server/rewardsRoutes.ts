@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { authMiddleware, requireAuth } from "./simpleAuth";
-import { storage } from "./storage";
+import { authMiddleware, requireAuth } from "./simpleAuth.js";
+import { storage } from "./storage.js";
 // Schema imports removed - using basic validation instead
 
 // 관리자 권한 체크 미들웨어

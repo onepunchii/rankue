@@ -1,20 +1,32 @@
-import { useState, useEffect, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { Link, useLocation } from "wouter";
-import CountUp from "@/components/ui/count-up";
-// Clean Auth 시스템 제거 - Simple Auth로 통합
-
+// Optimize: Critical Path Components are imported normally
 import MobileHeader from "@/components/mobile-header";
-import BottomNav from "@/components/bottom-nav";
-import CategoryCard from "@/components/category-card";
-import SurveyCard from "@/components/survey-card";
-import LocationPrompt from "@/components/location-prompt";
-import NewsCarousel from "@/components/news-carousel";
-import PointSendModal from "@/components/point-send-modal";
-import RewardsModal from "@/components/rewards-modal";
-import PointHistoryModal from "@/components/point-history-modal";
+import { Link, useLocation } from "wouter";
 import { SEOHead } from "@/components/seo-head";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePWA } from "@/contexts/PWAContext";
+import { useHomeDashboard } from "@/hooks/useHomeDashboard";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useCallback, Suspense, lazy } from "react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import BottomNav from "@/components/bottom-nav";
+import CountUp from "@/components/ui/count-up";
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+
+// Optimize: Lazy Load Heavy Components
+const NewsCarousel = lazy(() => import("@/components/news-carousel"));
+const CategoryCard = lazy(() => import("@/components/category-card"));
+const SurveyCard = lazy(() => import("@/components/survey-card"));
+const LocationPrompt = lazy(() => import("@/components/location-prompt"));
+const PointSendModal = lazy(() => import("@/components/point-send-modal"));
+const RewardsModal = lazy(() => import("@/components/rewards-modal"));
+const PointHistoryModal = lazy(() => import("@/components/point-history-modal"));
+const CelebrityBentoGrid = lazy(() => import("@/components/CelebrityBentoGrid"));
+const BentoGridSection = lazy(() => import("@/components/BentoGridSection"));
+// BalanceGameCard needs to be compatible with lazy loading (default export)
+const BalanceGameCard = lazy(() => import("@/components/BalanceGameCard").then(module => ({ default: module.BalanceGameCard })));
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,20 +34,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Survey } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 import GuestWarningBanner from "@/components/GuestWarningBanner";
-import { Eye, EyeOff, CheckCircle, XCircle, History, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, CheckCircle, XCircle, History, ArrowRight, ChevronRight, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import PartyLogo from "@/components/PartyLogo";
 import { filterActiveOnly } from "@/utils/survey-filters";
-import { DotLottieReact } from '@lottiefiles/dotlottie-react';
-import { useHomeDashboard } from "@/hooks/useHomeDashboard";
-import BentoGridSection from "@/components/BentoGridSection";
-import CelebrityBentoGrid from "@/components/CelebrityBentoGrid";
+import type { BalanceGame } from "@shared/schema";
 
+// Types
+interface BrainStats {
+  level: number;
+  ratings: any;
+  topPercent: number;
+}
 
 export default function Home() {
   // Simple Auth 시스템만 사용
@@ -52,19 +64,128 @@ export default function Home() {
   const [currentStreak, setCurrentStreak] = useState(0);
   const [weeklyChallenge, setWeeklyChallenge] = useState({ completed: 0, target: 10 });
   const [showParticipantsExpanded, setShowParticipantsExpanded] = useState(true);
+  const { scheduleNotification } = usePWA();
+
+  // Fetch Brain Stats for Banner
+  const { data: brainStats } = useQuery<BrainStats>({
+    queryKey: ["brainStats", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const res = await fetch("/api/user/stats");
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user,
+  });
+
+  const getTierName = (level: number) => {
+    const tiers = ["Bronze", "Silver", "Gold", "Platinum", "Diamond"];
+    return tiers[level - 1] || "Unranked";
+  };
+
+  const getTierColor = (level: number) => {
+    const colors = [
+      "text-amber-600",
+      "text-slate-300",
+      "text-yellow-400",
+      "text-cyan-400",
+      "text-purple-400"
+    ];
+    return colors[level - 1] || "text-white/50";
+  };
+
+  // Balance Game Logic
+  // const [balanceGameIndex, setBalanceGameIndex] = useState(0); // Removed index-based logic
+
+  const { data: balanceGames = [], refetch: refetchBalanceGames } = useQuery<BalanceGame[]>({
+    queryKey: ['/api/balance-games'],
+    retry: false
+  });
+
+  // Fetch user's vote history to filter out already played games
+  const { data: myVotes = [], refetch: refetchMyVotes } = useQuery<any[]>({
+    queryKey: ['/api/balance-games/votes/me'],
+    enabled: !!user && !user.isGuest,
+    retry: false
+  });
+
+  // Validated Voted IDs (Server + Local Session)
+  const [localVotedIds, setLocalVotedIds] = useState<Set<number>>(new Set());
+
+  // Filter games: Exclude if in server votes OR local session votes
+  const unvotedGames = balanceGames.filter(g => {
+    // Check Server Data
+    const playedOnServer = myVotes.some(v => v.gameId === g.id);
+    // Check Local Session
+    const playedLocally = localVotedIds.has(g.id);
+    return !playedOnServer && !playedLocally;
+  });
+
+  // Always show the first unvoted game
+  const currentBalanceGame = unvotedGames[0];
+
+  const handleBalanceGameVote = async (gameId: number, choice: 'A' | 'B') => {
+    try {
+      await apiRequest(`/api/balance-games/${gameId}/vote`, {
+        method: "POST",
+        body: { choice }
+      });
+
+      // Update counts silently if needed
+      refetchBalanceGames();
+      // We don't strictly need to refetchMyVotes immediately because we use localVotedIds for standard UX
+
+      // Local Notification Trigger for PWA experience
+      scheduleNotification(
+        "⏰ 투표 결과가 도착했습니다!",
+        {
+          body: `'${currentBalanceGame.title}' 게임의 최신 득표 내역을 확인해보세요!`,
+          icon: '/favicon.ico',
+          badge: '/favicon.ico'
+        },
+        5000 // In a real scenario, this would be set to the D-Day/Result time
+      );
+
+      // Auto-advance after 1.5s
+      setTimeout(() => {
+        setLocalVotedIds(prev => {
+          const next = new Set(prev);
+          next.add(gameId);
+          return next;
+        });
+
+        // Also Trigger visual success feedback/toast if desired? 
+        // User just wants next card.
+      }, 1500);
+
+    } catch (e: any) {
+      if (e.message.includes('ALREADY_VOTED') || e.code === 'ALREADY_VOTED') {
+        toast({
+          title: "이미 참여하셨습니다.",
+          variant: "destructive",
+          className: "bg-black/90 backdrop-blur-xl border border-red-500/20 text-white shadow-2xl"
+        });
+        // If already voted, maybe we should also skip it cleanly?
+        // Let's force skip it so they don't get stuck.
+        setLocalVotedIds(prev => {
+          const next = new Set(prev);
+          next.add(gameId);
+          return next;
+        });
+      } else {
+        toast({ title: "투표 실패", description: "로그인이 필요합니다.", variant: "destructive" });
+      }
+    }
+  };
 
   // Supabase Data Fetching (Optimized)
   const { data: dashboardData, loading: dashboardLoading } = useHomeDashboard();
 
   const [directUserParticipations, setDirectUserParticipations] = useState<any[]>([]);
-  const [visibleTicketCount, setVisibleTicketCount] = useState(5); // 초기에 5개 표시
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
 
-  const { data: lotteryHistory = [] } = useQuery<any[]>({ queryKey: ['/api/lottery/history'] });
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Simple Auth 폼 상태
   const [isLoading, setIsLoading] = useState(false);
@@ -85,8 +206,6 @@ export default function Home() {
 
     // 온보딩을 완료하지 않은 새로운 사용자라면 랜딩 페이지로 리디렉션
     if (!onboardingCompleted) {
-      // 온보딩 완료 플래그를 바로 설정하여 무한 루프 방지
-      localStorage.setItem('onboardingCompleted', 'true');
       setLocation('/landing');
       return;
     }
@@ -346,7 +465,7 @@ export default function Home() {
       }
     },
     onSuccess: (data, variables) => {
-      setShowSuccessModal(true);
+      // setShowSuccessModal(true);
       console.log("[Home] Mutation Success");
       setIsCreatingTicket(false); // Force state release
       toast({
@@ -360,14 +479,14 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
 
       if (refreshUser) refreshUser();
-      if (refetchTickets) refetchTickets();
+      // if (refetchTickets) refetchTickets();
 
       // 강제 새로고침을 위한 약간의 지연 (서버 DB 반영 시간 고려)
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/lottery/tickets'] });
         queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
         if (refreshUser) refreshUser();
-        if (refetchTickets) refetchTickets();
+        // if (refetchTickets) refetchTickets();
       }, 500);
     },
     onError: (error: any) => {
@@ -515,43 +634,6 @@ export default function Home() {
   }, []);
 
   // 나의 티켓 조회 (Robust Fetch 적용)
-  const { data: myTickets = [], refetch: refetchTickets } = useQuery({
-    queryKey: ['/api/lottery/tickets'],
-    queryFn: async () => {
-      // Robust Token Retrieval (Clone of mutationFn logic)
-      let token: string | null = null;
-      try {
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1500));
-        const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-        token = data?.session?.access_token;
-      } catch (e) { }
-
-      if (!token) {
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('sb-') && key.includes('auth-token')) {
-            try {
-              const sessionData = JSON.parse(localStorage.getItem(key) || '{}');
-              token = sessionData.access_token;
-              if (token) break;
-            } catch (e) { }
-          }
-        }
-      }
-
-      if (!token) throw new Error("No token found");
-
-      const res = await fetch('/api/lottery/tickets', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error("Failed to fetch tickets");
-      return await res.json();
-    },
-    enabled: !!user && !user.isGuest,
-  });
-
-  const lotteryTickets = myTickets;
 
   // 로또 티켓 상태 확인 함수 (수정된 로직 - 시계 표시)
   const getTicketStatus = (ticket: any, draw?: any) => {
@@ -654,7 +736,6 @@ export default function Home() {
       <MobileHeader />
       <main className="max-w-md mx-auto pb-20">
 
-
         {/* Profile Setup Banner - Show for guest users to encourage authentication */}
         {
           (!user || user.isGuest) && (
@@ -750,374 +831,91 @@ export default function Home() {
 
 
         {/* Premium Lottery Card - Repositioned Here */}
-        <section id="polli-lottery-section" className="px-4 mb-6 pt-2">
-          <div className="glass-card p-6 relative overflow-hidden border border-white/10 bg-black/20 backdrop-blur-xl">
-            {/* Background Animation - strictly non-interactive, only visible when collapsed */}
-            {!showLotteryExpanded && (
-              <div className="absolute inset-0 h-full w-full opacity-30 pointer-events-none z-0 overflow-hidden">
-                <DotLottieReact
-                  src="https://lottie.host/ce974c74-c7a1-4028-924e-4612820e30e9/eyHZW5hNJU.lottie"
-                  loop
-                  autoplay
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
+        <style>{`
+          @keyframes float-slow {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+          }
+          @keyframes float-medium {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+          }
+          @keyframes float-fast {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+          }
+          @keyframes shadow-pulse {
+            0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.4; }
+            50% { transform: translateX(-50%) scale(0.8); opacity: 0.2; }
+          }
+          .animate-float-slow { animation: float-slow 3s ease-in-out infinite; }
+          .animate-float-medium { animation: float-medium 2.5s ease-in-out infinite; }
+          .animate-float-fast { animation: float-fast 2s ease-in-out infinite; }
+          .animate-shadow-pulse { animation: shadow-pulse 3s ease-in-out infinite; }
+        `}</style>
+        {/* Lotto 540 Banner */}
+        <div className="px-4 mb-6">
+          <div onClick={() => setLocation('/lotto')} className="w-full relative overflow-hidden rounded-3xl bg-black border border-white/20 shadow-lg shadow-purple-900/20 group cursor-pointer hover:scale-[1.02] transition-transform duration-300">
+            {/* Background Effects (Stars/Glow) */}
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 animate-pulse"></div>
+            <div className="absolute top-[-50%] left-[-20%] w-[150%] h-[150%] bg-gradient-to-t from-transparent via-white/5 to-transparent rotate-45 pointer-events-none"></div>
 
-            {/* Minimal Background Decoration */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-[60px] transform translate-x-10 -translate-y-10 pointer-events-none"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-500/5 rounded-full blur-[40px] transform -translate-x-10 translate-y-10 pointer-events-none"></div>
+            {/* Content Container */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center py-6">
 
-            <div className="flex items-center justify-between mb-4 relative z-10">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center shadow-lg shrink-0 border border-white/10">
-                  <i className="fas fa-gem text-muted-foreground text-lg"></i>
+              {/* White Text Header */}
+              <h3 className="text-4xl font-extrabold italic tracking-tighter mb-6 relative z-20 text-white drop-shadow-lg">
+                LOTTO 540
+              </h3>
+
+              {/* 3D Floating Balls Container */}
+              <div className="flex items-center gap-6 relative z-10">
+
+                {/* Ball 5 (Gold) - Floating Up/Down */}
+                <div className="relative animate-float-slow" style={{ animationDelay: '0s' }}>
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center relative shadow-xl" style={{
+                    background: 'radial-gradient(circle at 30% 30%, #ffd700, #d4af37, #8a6e05)',
+                    boxShadow: 'inset -5px -5px 15px rgba(0,0,0,0.3), 0 10px 20px rgba(0,0,0,0.4)'
+                  }}>
+                    <div className="absolute top-2 left-3 w-4 h-3 bg-white/40 rounded-full blur-[2px] transform -rotate-45"></div>
+                    <span className="text-3xl font-black text-[#5c4900] drop-shadow-md">5</span>
+                  </div>
+                  {/* Shadow */}
+                  <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-10 h-2 bg-black/40 rounded-[100%] blur-sm animate-shadow-pulse"></div>
                 </div>
-                <div>
-                  <p className="text-xl font-bold text-foreground">폴리 로또</p>
+
+                {/* Ball 4 (Blue) - Floating with Delay */}
+                <div className="relative animate-float-medium top-4" style={{ animationDelay: '0.3s' }}>
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center relative shadow-xl" style={{
+                    background: 'radial-gradient(circle at 30% 30%, #60a5fa, #2563eb, #1e3a8a)',
+                    boxShadow: 'inset -5px -5px 15px rgba(0,0,0,0.3), 0 10px 20px rgba(0,0,0,0.4)'
+                  }}>
+                    <div className="absolute top-2 left-3 w-4 h-3 bg-white/40 rounded-full blur-[2px] transform -rotate-45"></div>
+                    <span className="text-3xl font-black text-white drop-shadow-md">4</span>
+                  </div>
+                  <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-10 h-2 bg-black/40 rounded-[100%] blur-sm animate-shadow-pulse" style={{ animationDelay: '0.3s' }}></div>
                 </div>
+
+                {/* Ball 0 (Red) - Floating with Delay */}
+                <div className="relative animate-float-fast" style={{ animationDelay: '0.6s' }}>
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center relative shadow-xl" style={{
+                    background: 'radial-gradient(circle at 30% 30%, #f87171, #dc2626, #7f1d1d)',
+                    boxShadow: 'inset -5px -5px 15px rgba(0,0,0,0.3), 0 10px 20px rgba(0,0,0,0.4)'
+                  }}>
+                    <div className="absolute top-2 left-3 w-4 h-3 bg-white/40 rounded-full blur-[2px] transform -rotate-45"></div>
+                    <span className="text-3xl font-black text-white drop-shadow-md">0</span>
+                  </div>
+                  <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-10 h-2 bg-black/40 rounded-[100%] blur-sm animate-shadow-pulse" style={{ animationDelay: '0.6s' }}></div>
+                </div>
+
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowHistoryModal(true)}
-                className="bg-white/10 hover:bg-white/20 text-white rounded-full h-10 w-10 border border-white/10 shadow-lg transition-all"
-              >
-                <History className="w-5 h-5" />
-              </Button>
+
+
+
             </div>
-
-            <Dialog open={showHistoryModal} onOpenChange={setShowHistoryModal}>
-              <DialogContent className="max-w-sm bg-[#1a1a1a]/95 backdrop-blur-xl border-white/10 text-white p-6 rounded-3xl">
-                <DialogHeader className="mb-4">
-                  <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                    <History className="w-5 h-5 text-purple-400" />
-                    로또 당첨 기록
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                  {lotteryHistory?.map((draw: any, i: number) => (
-                    <div key={draw.id} className="bg-white/5 p-4 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-xs font-medium text-gray-400">
-                          {new Date(draw.drawDate || draw.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                          <span className="text-[10px] text-gray-400">당첨 {draw.winnersCount || 0}명</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-center gap-2">
-                        {Array.isArray(draw.winningNumbers) ? draw.winningNumbers.map((n: number, idx: number) => (
-                          <div key={idx} className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-sm font-bold text-purple-300 shadow-sm">
-                            {n}
-                          </div>
-                        )) : (
-                          <span className="text-xs text-muted-foreground">번호 불러오기 실패</span>
-                        )}
-                      </div>
-                      <div className="mt-3 pt-3 border-t border-white/5 flex justify-between text-[10px] text-gray-500">
-                        <span>총 참여 {draw.totalParticipants || 0}명</span>
-                        <span>회차: {draw.id}회</span>
-                      </div>
-                    </div>
-                  ))}
-                  {(!lotteryHistory || lotteryHistory.length === 0) && (
-                    <div className="text-center py-10 text-gray-500">
-                      <History className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                      <p className="text-sm">아직 추첨 기록이 없습니다.</p>
-                      <p className="text-xs text-muted-foreground mt-1">오늘 밤 첫 추첨이 진행됩니다!</p>
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <div className="grid grid-cols-2 gap-3 mb-4 relative z-10">
-              <div className="bg-white/5 backdrop-blur-sm p-4 text-center rounded-xl border border-white/10">
-                <div className="flex items-center justify-center mb-1">
-                  <i className="fas fa-clock text-muted-foreground text-xs"></i>
-                </div>
-                <div className="text-xl font-bold text-foreground">{timeUntilDraw}</div>
-                {/* Time to Draw removed */}
-              </div>
-              <div className="bg-white/5 backdrop-blur-sm p-4 text-center rounded-xl border border-white/10">
-                <div className="flex items-center justify-center mb-1">
-                  <i className="fas fa-coins text-muted-foreground text-xs"></i>
-                </div>
-                <div className="text-xl font-bold text-foreground">50,000 Point</div>
-                {/* Prize Pool removed */}
-              </div>
-            </div>
-
-            <div className="text-center relative z-10">
-              <Button
-                onClick={() => {
-                  setShowLotteryExpanded(!showLotteryExpanded);
-                  if (!showLotteryExpanded) {
-                    setVisibleTicketCount(5); // Reset to initial count when opening
-                  }
-                }}
-                className={`w-full py-4 rounded-xl font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${showLotteryExpanded
-                  ? 'bg-white/10 text-white border border-white/20'
-                  : 'bg-white/10 hover:bg-white/20 text-white border border-white/20 shadow-xl'
-                  }`}
-              >
-                <i className={`fas ${showLotteryExpanded ? 'fa-chevron-up' : 'fa-ticket-alt'} text-xs text-muted-foreground`}></i>
-                {showLotteryExpanded ? '접기' : '로또 참여하기'}
-              </Button>
-            </div>
-
-            {!showLotteryExpanded && (
-              <div className="mt-4 text-center relative z-10">
-                <p className="text-[10px] text-muted-foreground">
-                  설문 참여로 레벨업하면 로또 티켓을 받을 수 있어요!
-                </p>
-              </div>
-            )}
-
-            {/* 확장된 로또 섹션 */}
-            {showLotteryExpanded && (
-              <div className="mt-6 space-y-6 animate-in slide-in-from-top-2 duration-300 relative z-10">
-                {/* 내 티켓 정보 */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-white/5 p-4 text-center rounded-xl border border-white/10">
-                    <div className="text-lg font-bold text-foreground">
-                      {user?.availableLotteryTickets !== undefined ? user.availableLotteryTickets : 0}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground font-medium">보유 티켓</div>
-                  </div>
-                  <div className="bg-white/5 p-4 text-center rounded-xl border border-white/10">
-                    <div className="text-lg font-bold text-foreground">
-                      {Array.isArray(lotteryTickets) ? lotteryTickets.filter((t: any) => t.isWinner).length : 0}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground font-medium">당첨 횟수</div>
-                  </div>
-                  <div className="bg-white/5 p-4 text-center rounded-xl border border-white/10">
-                    <div className="text-lg font-bold text-foreground">
-                      {Array.isArray(lotteryTickets) ?
-                        lotteryTickets.filter((t: any) => t.isWinner).reduce((sum: number, t: any) => sum + (t.prizeAmount || 0), 0).toLocaleString()
-                        : 0}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground font-medium">총 당첨금(P)</div>
-                  </div>
-                </div>
-
-                {/* 오늘의 당첨 번호 */}
-                {todayDraw && (todayDraw as any).winningNumbers && (
-                  <div className="bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/10">
-                    <h4 className="font-bold text-foreground mb-3 text-center text-sm">오늘의 당첨 번호</h4>
-                    <div className="flex justify-center gap-2 mb-3">
-                      {(todayDraw as any).winningNumbers.map((num: number, index: number) => (
-                        <div
-                          key={index}
-                          className="w-10 h-10 bg-white/10 text-white rounded-full flex items-center justify-center text-sm font-bold border border-white/20 shadow-md"
-                        >
-                          {num}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-center text-[10px] text-muted-foreground">
-                      참가자: {(todayDraw as any).totalParticipants || 0}명 | 당첨자: {(todayDraw as any).winnersCount || 0}명
-                    </div>
-                  </div>
-                )}
-
-                {/* 수동 번호 선택 */}
-                <div className="bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/10">
-                  <h4 className="font-bold text-foreground mb-3 text-center text-sm">수동 번호 선택</h4>
-
-                  <div className="mb-4">
-                    <div className="text-center mb-2">
-                      <span className="text-xs text-muted-foreground">선택된 번호: {selectedNumbers.length}/5</span>
-                    </div>
-                    <div className="flex justify-center gap-2 mb-4">
-                      {selectedNumbers.map((num, index) => (
-                        <div
-                          key={index}
-                          className="w-8 h-8 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-md border border-white/20 bg-purple-600"
-                        >
-                          {num}
-                        </div>
-                      ))}
-                      {Array.from({ length: 5 - selectedNumbers.length }, (_, index) => (
-                        <div
-                          key={`empty-${index}`}
-                          className="w-8 h-8 border-2 border-dashed border-white/20 rounded-full flex items-center justify-center"
-                        >
-                          <span className="text-muted-foreground text-[10px]">?</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-8 gap-1 mb-4">
-                    {Array.from({ length: 40 }, (_, i) => i + 1).map((number) => (
-                      <button
-                        key={number}
-                        onClick={() => toggleNumber(number)}
-                        className={`
-                              w-8 h-8 rounded-lg text-xs font-medium transition-all duration-200 border
-                              ${selectedNumbers.includes(number)
-                            ? 'text-white border-white/40 shadow-md scale-105 bg-purple-600/80'
-                            : 'bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10'
-                          }
-                            `}
-                      >
-                        {number}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-2 mb-4">
-                    <Button
-                      onClick={generateRandomNumbers}
-                      disabled={createManualTicketMutation.isPending}
-                      variant="ghost"
-                      className="flex-1 bg-white/5 border border-white/10 rounded-xl font-bold text-[11px] text-foreground hover:bg-white/10 h-auto py-3"
-                    >
-                      <i className="fas fa-dice mr-2 text-muted-foreground"></i>
-                      자동 선택
-                    </Button>
-                    <Button
-                      onClick={() => setSelectedNumbers([])}
-                      variant="ghost"
-                      className="flex-1 bg-white/5 border border-white/10 rounded-xl font-bold text-[11px] text-foreground hover:bg-white/10 h-auto py-3"
-                    >
-                      <i className="fas fa-redo mr-2 text-muted-foreground"></i>
-                      초기화
-                    </Button>
-                  </div>
-
-                  <div className="flex gap-2">
-                    {/* Button을 div로 변경하여 form submit 완전 차단 */}
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => handleCreateTicket(e as any)}
-                      className={`
-                        w-full text-white border border-white/20 shadow-xl rounded-xl font-bold text-sm transition-all py-4 flex items-center justify-center cursor-pointer select-none
-                        ${(selectedNumbers.length !== 5 || createManualTicketMutation.isPending || isCreatingTicket || !user || (user?.availableLotteryTickets || 0) <= 0)
-                          ? 'bg-white/5 opacity-50 cursor-not-allowed'
-                          : 'bg-white/10 hover:bg-white/20'
-                        }
-                      `}
-                    >
-                      {(createManualTicketMutation.isPending || isCreatingTicket) ? (
-                        <>
-                          <i className="fas fa-spinner fa-spin mr-2 text-muted-foreground"></i>
-                          생성 중...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fas fa-ticket-alt mr-2 text-muted-foreground"></i>
-                          지금 바로 티켓 생성
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 내 티켓 목록 */}
-                <div className="bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/10">
-                  <h4 className="font-bold text-foreground mb-3 text-sm">생성한 로또 티켓</h4>
-                  {lotteryTickets.length > 0 ? (
-                    <div className="space-y-2 max-h-80 overflow-y-auto">
-                      {lotteryTickets.slice(0, visibleTicketCount).map((ticket: any) => (
-                        <div key={ticket.id} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-1 mb-1">
-                              {(typeof ticket.numbers === 'string' ? JSON.parse(ticket.numbers) : ticket.numbers).map((num: number, index: number) => (
-                                <div
-                                  key={index}
-                                  className="w-6 h-6 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white/20 bg-purple-600/60"
-                                >
-                                  {num}
-                                </div>
-                              ))}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground">
-                              {(ticket.createdAt || ticket.created_at) ? new Date(ticket.createdAt || ticket.created_at).toLocaleDateString('ko-KR', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              }) : '날짜 불명'} 생성
-                              {(ticket.isManualSelection || ticket.is_manual_selection) && ' • 수동선택'}
-                            </div>
-                          </div>
-                          <Badge className={`${getTicketBadgeColor(ticket, todayDraw)} rounded-lg px-2 py-1 text-[10px] font-medium border border-white/10 bg-white/10`}>
-                            {getTicketStatus(ticket, todayDraw)}
-                          </Badge>
-                        </div>
-                      ))}
-                      {lotteryTickets.length > visibleTicketCount && (
-                        <div className="text-center mt-3">
-                          <Button
-                            variant="ghost"
-                            className="text-xs hover:bg-white/5 w-full text-muted-foreground py-2 h-auto"
-                            onClick={() => setVisibleTicketCount(prev => Math.min(prev + 5, lotteryTickets.length))}
-                          >
-                            <i className="fas fa-chevron-down mr-2"></i>
-                            더보기 ({lotteryTickets.length - visibleTicketCount}개 더)
-                          </Button>
-                        </div>
-                      )}
-                      {visibleTicketCount >= lotteryTickets.length && lotteryTickets.length > 5 && (
-                        <div className="text-center mt-3">
-                          <Button
-                            variant="ghost"
-                            className="text-xs hover:bg-white/5 text-muted-foreground py-2 h-auto"
-                            onClick={() => setVisibleTicketCount(5)}
-                          >
-                            <i className="fas fa-chevron-up mr-2"></i>
-                            접기
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 bg-white/10 border border-white/10">
-                        <i className="fas fa-ticket-alt text-lg text-muted-foreground"></i>
-                      </div>
-                      <p className="text-muted-foreground font-medium text-xs">아직 생성한 티켓이 없습니다</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        번호를 선택해서 티켓을 생성하세요!
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* 로또 안내 */}
-                <div className="bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/10">
-                  <h4 className="font-bold text-foreground mb-3 text-center text-sm">시스템 안내</h4>
-                  <div className="grid grid-cols-1 gap-2 text-[10px] text-muted-foreground">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-1 h-1 rounded-full bg-purple-500"></div>
-                      <span>레벨업 시마다 수동 티켓 1장 지급</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-1 h-1 rounded-full bg-purple-500"></div>
-                      <span>매일 자정 00:00 자동 추첨</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-1 h-1 rounded-full bg-purple-500"></div>
-                      <span>5개: 50,000P, 4개: 5,000P, 3개: 500P</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-1 h-1 rounded-full bg-purple-500"></div>
-                      <span>신규가입 5장, 레벨업 1장, 친구초대 3장</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-1 h-1 rounded-full bg-purple-500"></div>
-                      <span>보유 티켓 1장당 로또 1회 생성 가능</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
-        </section>
+        </div>
+
 
         {/* Profile Setup Banner - Show for guest users to encourage authentication */}
 
@@ -1136,8 +934,87 @@ export default function Home() {
         {/* Celebrity Battle Bento Grid */}
         <CelebrityBentoGrid />
 
+        {/* Brain Ranking Banner */}
+        {/* Brain Ranking Banner */}
+        <div className="px-4 mb-8 mt-6">
+          <Link href="/brain-ranking">
+            <div className="w-full relative overflow-hidden rounded-[2rem] bg-black border border-white/10 shadow-lg shadow-indigo-900/20 group cursor-pointer hover:border-indigo-500/50 transition-all duration-300">
+              {/* Background Effects */}
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
 
+              <div className="relative z-10 flex items-center justify-between py-10 px-8">
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-bold text-indigo-400 tracking-wider">MY RANK</span>
+                    <span className={`text-2xl font-black italic sans-serif ${brainStats ? getTierColor(brainStats.level) : 'text-white/50'}`}>
+                      {brainStats ? getTierName(brainStats.level) : 'Unranked'}
+                    </span>
+                  </div>
+                  <h3 className="text-3xl font-extrabold text-white mb-2 tracking-tight">
+                    Brain Rank
+                  </h3>
+                  <p className="text-sm text-white/60 font-medium leading-relaxed">
+                    나의 지능 티어는 몇 단계일까요?<br />
+                    지금 바로 측정해보세요!
+                  </p>
+                </div>
 
+                {/* Lottie Animation */}
+                <div className="w-32 h-32 flex items-center justify-center">
+                  <DotLottieReact
+                    src="https://lottie.host/ce2c81ab-10a8-47ea-a6a7-b41dadb05faa/VQFzZlqtdZ.lottie"
+                    loop
+                    autoplay
+                  />
+                </div>
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        {/* Balance Game Section */}
+        {/* Balance Game Section - Single Card Stack View */}
+        {balanceGames.length > 0 && (
+          <section className="px-4 mb-10">
+            <div className="flex items-center justify-between mb-4 px-1">
+              <div>
+                <h2 className="text-lg font-bold text-white leading-none">밸런스 게임</h2>
+                <p className="text-[10px] text-white/50 font-medium mt-0.5">
+                  매일 새로운 주제로 토론해보세요!
+                </p>
+              </div>
+              <Link href="/balance-game/archive">
+                <Button variant="ghost" size="sm" className="text-[11px] font-bold px-3 py-1 h-8 text-white/40 hover:text-white bg-white/5 border border-white/5 hover:border-white/10 rounded-full transition-all">
+                  모두보기
+                </Button>
+              </Link>
+            </div>
+
+            {/* Balance Game 2.0 (Lazy Loaded) */}
+            <Suspense fallback={<div className="h-48 rounded-3xl bg-white/5 animate-pulse mx-4 mt-6" />}>
+              <div className="mt-6">
+                <AnimatePresence mode="wait">
+                  {currentBalanceGame ? (
+                    <motion.div
+                      key={currentBalanceGame.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: -100 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <BalanceGameCard
+                        game={currentBalanceGame}
+                        onVote={handleBalanceGameVote}
+                      />
+                    </motion.div>
+                  ) : (
+                    <div className="hidden" /> // No game available
+                  )}
+                </AnimatePresence>
+              </div>
+            </Suspense>
+          </section>
+        )}
 
 
 
@@ -1171,7 +1048,6 @@ export default function Home() {
           </Link>
         </section>
 
-
         {/* Bottom Copy */}
         <section className="px-4 mb-6">
           <div className="text-center py-8">
@@ -1188,28 +1064,36 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Footer Section */}
+        <div className="mt-auto px-4 pb-6">
+          <div className="flex items-center justify-center gap-4 py-6 border-t border-white/5">
+            <Link href="/privacy" className="text-[10px] text-white/30 hover:text-white/60 transition-colors">개인정보처리방침</Link>
+            <span className="w-px h-2 bg-white/10"></span>
+            <Link href="/terms" className="text-[10px] text-white/30 hover:text-white/60 transition-colors">이용약관</Link>
+          </div>
+
+          {/* Bottom Nav Placeholder for spacing */}
+          <div className="h-16" />
+        </div>
       </main>
 
       <BottomNav />
 
-      {/* Modals */}
-      {
-        showLocationPrompt && (
+      {/* Lazy Load Modals */}
+      <Suspense fallback={null}>
+        {showLocationPrompt && (
           <LocationPrompt
             onLocationSet={(city, district) => {
+              console.log("Location set:", city, district);
               setShowLocationPrompt(false);
-              setLocation(`/category/location?city=${encodeURIComponent(city)}&district=${encodeURIComponent(district)}`);
+              queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
             }}
-            onSkip={() => {
-              setShowLocationPrompt(false);
-              setLocation('/category/location');
-            }}
+            onSkip={() => setShowLocationPrompt(false)}
           />
-        )
-      }
+        )}
 
-      {
-        showPointSend && (
+        {showPointSend && (
           <PointSendModal
             onClose={() => setShowPointSend(false)}
             onSuccess={() => {
@@ -1217,77 +1101,29 @@ export default function Home() {
               queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
             }}
           />
-        )
-      }
+        )}
 
-      {
-        showRewards && (
-          <RewardsModal
-            onClose={() => setShowRewards(false)}
-            onSuccess={() => {
-              setShowRewards(false);
-              queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-            }}
-          />
-        )
-      }
+        {
+          showRewards && (
+            <RewardsModal
+              onClose={() => setShowRewards(false)}
+              onSuccess={() => {
+                setShowRewards(false);
+                queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+              }}
+            />
+          )
+        }
 
-      {
-        showPointHistory && (
-          <PointHistoryModal
-            onClose={() => setShowPointHistory(false)}
-          />
-        )
-      }
+        {
+          showPointHistory && (
+            <PointHistoryModal
+              onClose={() => setShowPointHistory(false)}
+            />
+          )
+        }
+      </Suspense>
 
-      {/* Lottery Success Modal */}
-      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-        <DialogContent className="max-w-sm rounded-[24px] bg-[#0F0F1A] border border-white/10 p-0 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-transparent to-blue-500/10 pointer-events-none" />
-
-          <div className="p-8 pb-6 flex flex-col items-center text-center relative z-10">
-            {/* Lottie Animation or Icon */}
-            <div className="w-24 h-24 mb-6 relative">
-              <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full animate-pulse" />
-              <div className="relative w-full h-full bg-gradient-to-tr from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
-                <i className="fas fa-ticket-alt text-4xl text-white transform rotate-12"></i>
-              </div>
-              <div className="absolute -top-2 -right-2">
-                <div className="bg-yellow-400 text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg animate-bounce">
-                  LUCKY!
-                </div>
-              </div>
-            </div>
-
-            <DialogTitle className="text-2xl font-black text-white mb-2 tracking-tight">
-              티켓 발급 완료!
-            </DialogTitle>
-
-            <p className="text-white/60 text-sm leading-relaxed mb-6 font-medium">
-              행운의 번호가 안전하게 저장되었습니다.<br />
-              <span className="text-purple-400 font-bold">내일 00:00</span> 추첨 결과를 기대해주세요!
-            </p>
-
-            <div className="w-full bg-white/5 rounded-xl p-4 border border-white/10 mb-6">
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-widest font-bold">SELECTED NUMBERS</p>
-              <div className="flex justify-center gap-2">
-                {selectedNumbers.map((num) => (
-                  <div key={num} className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-sm font-bold text-purple-200">
-                    {num}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              onClick={() => setShowSuccessModal(false)}
-              className="w-full h-12 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-purple-500/25 transition-all duration-300"
-            >
-              확인
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div >
   );
 }

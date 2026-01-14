@@ -5,15 +5,59 @@ import {
     pointTransactions,
     type LotteryTicket,
     type LotteryDraw
-} from "@shared/schema";
-import { db } from "../db";
-import { eq, desc, sql } from "drizzle-orm";
+} from "../../shared/schema.js";
+import { db } from "../db.js";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 
 export class LotteryStorage {
     async getUserLotteryTickets(userId: string): Promise<LotteryTicket[]> {
         return await db.select().from(lotteryTickets)
             .where(eq(lotteryTickets.userId, userId))
             .orderBy(desc(lotteryTickets.createdAt));
+    }
+
+    /**
+     * Get lottery history with winner statistics (1st, 2nd, 3rd place counts)
+     */
+    async getLotteryHistoryWithStats(limit: number = 30): Promise<any[]> {
+        // 1. Get recent finalized draws (those with winning numbers)
+        const draws = await db.select()
+            .from(lotteryDraws)
+            .where(sql`${lotteryDraws.winningNumbers} IS NOT NULL`)
+            .orderBy(desc(lotteryDraws.drawDate))
+            .limit(limit);
+
+        if (!draws.length) return [];
+
+        // Filter out draws that have empty winning numbers (just in case)
+        const validDraws = draws.filter(d => d.winningNumbers && Array.isArray(d.winningNumbers) && d.winningNumbers.length > 0);
+        if (!validDraws.length) return [];
+
+        const drawIds = validDraws.map(d => d.id);
+
+        // 2. Get winner stats for these draws
+        const stats = await db.select({
+            roundId: lotteryTickets.roundId,
+            prize: lotteryTickets.prizeAmount,
+            count: sql<number>`count(*)::int`
+        })
+            .from(lotteryTickets)
+            .where(inArray(lotteryTickets.roundId, drawIds))
+            .groupBy(lotteryTickets.roundId, lotteryTickets.prizeAmount);
+
+        // 3. Merge stats into draws
+        return validDraws.map(draw => {
+            const drawStats = stats.filter(s => s.roundId === draw.id);
+            const winnerCounts = {
+                first: drawStats.find(s => s.prize === 50000)?.count || 0,
+                second: drawStats.find(s => s.prize === 5000)?.count || 0,
+                third: drawStats.find(s => s.prize === 500)?.count || 0,
+            };
+            return {
+                ...draw,
+                winnerCounts
+            };
+        });
     }
 
     /**

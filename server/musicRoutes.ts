@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db } from "./db";
+import { db } from "./db.js";
 import {
   musicCategories,
   musicArtists,
@@ -9,7 +9,7 @@ import {
   type MusicCategory,
   type MusicArtist,
   type InsertMusicVote
-} from "@shared/schema";
+} from "../shared/schema.js";
 import { eq, and, desc, sql } from "drizzle-orm";
 
 const router = Router();
@@ -101,7 +101,7 @@ router.get("/artists/:categoryId", async (req, res) => {
 // 사용자 전체 투표 현황 조회 (카테고리 구분 없음)
 router.get("/user-votes", async (req, res) => {
   try {
-    const userId = req.user?.authId || "guest_common";
+    const userId = req.user?.id || "guest_common";
 
     const userVotes = await db
       .select({ artistId: musicVotes.artistId })
@@ -167,7 +167,7 @@ router.get("/monthly-winner/:categoryId/:month", async (req, res) => {
 router.post("/vote", async (req, res) => {
   try {
     const { artistId, categoryId } = req.body;
-    const userId = req.user?.authId || "guest_common";
+    const userId = req.user?.id || "guest_common";
     const currentMonth = getCurrentMonth();
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'];

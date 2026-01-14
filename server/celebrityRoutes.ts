@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { supabaseAdmin } from "./supabase";
+import { supabaseAdmin } from "./supabase.js";
 
 // Helper to convert snake_case to camelCase
 function toCamelCase(obj: any): any {
@@ -59,9 +59,9 @@ export function registerCelebrityRoutes(app: Express) {
             }
 
             // 고유한 카테고리 값들 추출
-            const categories = [...new Set(data?.map(item => item.category))].filter(Boolean).sort();
-            const genders = [...new Set(data?.map(item => item.gender))].filter(Boolean).sort();
-            const types = [...new Set(data?.map(item => item.type))].filter(Boolean).sort();
+            const categories = Array.from(new Set(data?.map(item => item.category))).filter(Boolean).sort();
+            const genders = Array.from(new Set(data?.map(item => item.gender))).filter(Boolean).sort();
+            const types = Array.from(new Set(data?.map(item => item.type))).filter(Boolean).sort();
 
             console.log(`✅ Found ${categories.length} unique categories`);
             res.json({ categories, genders, types });

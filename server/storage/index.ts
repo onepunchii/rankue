@@ -1,11 +1,14 @@
-import { IStorage } from "./storage_interface";
-import { UserStorage } from "./userStorage";
-import { SurveyStorage } from "./surveyStorage";
-import { LotteryStorage } from "./lotteryStorage";
-import { PointStorage } from "./pointStorage";
-import { DiscussionStorage } from "./discussionStorage";
-import { NewsStorage } from "./newsStorage";
-import { PoliticsStorage } from "./politicsStorage";
+import { IStorage } from "./storage_interface.js";
+import { UserStorage } from "./userStorage.js";
+import { SurveyStorage } from "./surveyStorage.js";
+import { LotteryStorage } from "./lotteryStorage.js";
+import { PointStorage } from "./pointStorage.js";
+import { DiscussionStorage } from "./discussionStorage.js";
+import { NewsStorage } from "./newsStorage.js";
+import { PoliticsStorage } from "./politicsStorage.js";
+import { BalanceGameStorage } from "./balanceGameStorage.js";
+import { NotificationStorage } from "./notificationStorage.js";
+import { PostgresBrainStorage } from "./brainStorage.js";
 import {
     type User, type UpsertUser, type Survey, type InsertSurvey,
     type SurveyQuestion, type InsertSurveyQuestion, type SurveyResponse,
@@ -15,8 +18,11 @@ import {
     type RewardItem, type InsertRewardItem,
     type RewardOrder, type InsertRewardOrder, type ProviderLog, type InsertProviderLog,
     type QuickPoll, type InsertQuickPoll,
-    type NewsArticle, type InsertNewsArticle
-} from "@shared/schema";
+    type NewsArticle, type InsertNewsArticle,
+    type BalanceGame, type InsertBalanceGame, type BalanceGameVote, type InsertBalanceGameVote,
+    type Notification, type InsertNotification, type BalanceGameComment, type InsertBalanceGameComment,
+    type InsertBrainQuestion, type InsertBrainGameLog
+} from "../../shared/schema.js";
 
 export class DatabaseStorage implements IStorage {
     private profiles = new UserStorage();
@@ -26,6 +32,31 @@ export class DatabaseStorage implements IStorage {
     private discussions = new DiscussionStorage();
     private news = new NewsStorage();
     private politics = new PoliticsStorage();
+    private balanceGames = new BalanceGameStorage();
+    private notificationRecords = new NotificationStorage();
+    private brain = new PostgresBrainStorage();
+
+    // Notification operations
+    getNotifications(userId: string) { return this.notificationRecords.getNotifications(userId); }
+    createNotification(notification: InsertNotification) { return this.notificationRecords.createNotification(notification); }
+    markNotificationAsRead(id: number) { return this.notificationRecords.markNotificationAsRead(id); }
+    markAllNotificationsAsRead(userId: string) { return this.notificationRecords.markAllNotificationsAsRead(userId); }
+    getUnreadNotificationCount(userId: string) { return this.notificationRecords.getUnreadNotificationCount(userId); }
+
+    // ... (existing methods remain unchanged)
+
+    // Balance Game Operations
+    createBalanceGame(game: InsertBalanceGame) { return this.balanceGames.createBalanceGame(game); }
+    getBalanceGame(id: number) { return this.balanceGames.getBalanceGame(id); }
+    getBalanceGames(status?: string, limit?: number, category?: string) { return this.balanceGames.getBalanceGames(status, limit, category); }
+    updateBalanceGameStatus(id: number, status: string) { return this.balanceGames.updateBalanceGameStatus(id, status); }
+    deleteBalanceGame(id: number) { return this.balanceGames.deleteBalanceGame(id); }
+    voteBalanceGame(vote: InsertBalanceGameVote) { return this.balanceGames.voteBalanceGame(vote); }
+    getUserBalanceGameVote(userId: string | undefined, deviceId: string | undefined, gameId: number) { return this.balanceGames.getUserVote(userId, deviceId, gameId); }
+    getUserBalanceGameVotes(userId: string) { return this.balanceGames.getUserBalanceGameVotes(userId); }
+    getBalanceGameStats(gameId: number) { return this.balanceGames.getBalanceGameStats(gameId); }
+    getBalanceGameComments(gameId: number) { return this.balanceGames.getBalanceGameComments(gameId); }
+    createBalanceGameComment(comment: InsertBalanceGameComment) { return this.balanceGames.createBalanceGameComment(comment); }
 
     // Auth & Identity compatibility
     get users() { return this; }
@@ -72,6 +103,7 @@ export class DatabaseStorage implements IStorage {
     createLotteryTicket(userId: string, roundId: number, numbers: number[]) {
         return this.lottery.createTicket(userId, roundId, numbers);
     }
+    getLotteryHistoryWithStats(limit?: number) { return this.lottery.getLotteryHistoryWithStats(limit); }
 
     // Points & Rewards
     addPersonalPoints(uid: string, a: number, d: string) { return this.points.addPersonalPoints(uid, a, d); }
@@ -137,12 +169,21 @@ export class DatabaseStorage implements IStorage {
     getPoliticianRatings(id: number, type: 'assembly' | 'local') { return this.politics.getPoliticianRatings(id, type); }
     getPoliticianAverageRatings(id: number, type: 'assembly' | 'local') { return this.politics.getPoliticianAverageRatings(id, type); }
     getUserPoliticianRating(uid: string, pid: number, type: 'assembly' | 'local') { return this.politics.getUserPoliticianRating(uid, pid, type); }
-    createOrUpdatePoliticianRating(uid: string, pid: number, type: 'assembly' | 'local', rating: number, comment?: string) { return this.politics.createOrUpdatePoliticianRating(uid, pid, type, rating, comment); }
+    createOrUpdatePoliticianRating(uid: string, pid: number, type: 'assembly' | 'local', rating: number, comment?: string, details?: any) { return this.politics.createOrUpdatePoliticianRating(uid, pid, type, rating, comment, details); }
 
     getPoliticianComments(pid: number, type: 'assembly' | 'local', limit?: number, offset?: number) { return this.politics.getPoliticianComments(pid, type, limit, offset); }
     createPoliticianComment(uid: string, pid: number, type: 'assembly' | 'local', content: string) { return this.politics.createPoliticianComment(uid, pid, type, content); }
     toggleCommentLike(uid: string, cid: number, type: 'assembly' | 'local') { return this.politics.toggleCommentLike(uid, cid, type); }
     reportComment(cid: number, type: 'assembly' | 'local') { return this.politics.reportComment(cid, type); }
+
+    // Brain Rank Operations
+    createBrainQuestion(q: InsertBrainQuestion) { return this.brain.createQuestion(q); }
+    getBrainQuestion(id: number) { return this.brain.getQuestion(id); }
+    getBrainDailyQuestions(level: number) { return this.brain.getDailyQuestions(level); }
+    recordBrainGameLog(log: InsertBrainGameLog) { return this.brain.recordGameLog(log); }
+    updateBrainRatings(uid: string, qid: number, correct: boolean, timeTaken: number = 0) { return this.brain.updateRatings(uid, qid, correct, timeTaken); }
+    getUserBrainStats(uid: string) { return this.brain.getUserBrainStats(uid); }
+    getBrainLeaderboard(cat: string, limit?: number) { return this.brain.getLeaderboard(cat, limit); }
 }
 
 export const storage = new DatabaseStorage();

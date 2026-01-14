@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { db } from './db';
-import { assemblyBills, surveys, surveyQuestions } from '@shared/schema';
+import { db } from './db.js';
+import { assemblyBills, surveys, surveyQuestions } from '../shared/schema.js';
 import { eq, desc } from 'drizzle-orm';
 
 const router = Router();
@@ -43,7 +43,7 @@ router.get('/api/assembly-bills', async (req, res) => {
 // 수동 테스트용 스케줄러 실행 API
 router.post('/api/assembly-bills/run-scheduler', async (req, res) => {
   try {
-    const { runAssemblyBillScheduler } = await import('./assemblyBillScheduler');
+    const { runAssemblyBillScheduler } = await import('./assemblyBillScheduler.js');
     const result = await runAssemblyBillScheduler();
     res.json(result);
   } catch (error) {

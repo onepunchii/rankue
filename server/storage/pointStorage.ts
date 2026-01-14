@@ -11,10 +11,10 @@ import {
     type InsertRewardOrder,
     type ProviderLog,
     type InsertProviderLog
-} from "@shared/schema";
-import { db } from "../db";
+} from "../../shared/schema.js";
+import { db } from "../db.js";
 import { eq, desc, and, sql, lt, gt } from "drizzle-orm";
-import { giftishowAdapter } from "../giftishowAdapter";
+import { giftishowAdapter } from "../giftishowAdapter.js";
 
 export class PointStorage {
     // --- Point Operations ---

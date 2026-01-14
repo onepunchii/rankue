@@ -1,12 +1,12 @@
-import { supabaseAdmin } from "../supabase";
-import { db } from "../db";
-import { assemblyMembers, localCouncilMembers, assemblyRatings, localCouncilRatings, assemblyComments, localCouncilComments } from "@shared/schema";
+import { supabaseAdmin } from "../supabase.js";
+import { db } from "../db.js";
+import { assemblyMembers, localCouncilMembers, assemblyRatings, localCouncilRatings, assemblyComments, localCouncilComments } from "../../shared/schema.js";
 import { eq, desc, and, like, ilike } from "drizzle-orm";
 
 // Interfaces mirroring the Drizzle schema for type safety
 // (You might want to import these from a types file if they exist, or define them here)
 // For now, using 'any' for simplicity in transition, or defining essential interfaces.
-// Ideally usage of @shared/schema types is preferred, but they are Drizzle-bound.
+// Ideally usage of ../../shared/schema.js types is preferred, but they are Drizzle-bound.
 // We'll stick to returning what the frontend expects.
 
 // Helper to convert snake_case object keys to camelCase
@@ -213,21 +213,34 @@ export class PoliticsStorage {
 
     async getPoliticianAverageRatings(politicianId: number, type: 'assembly' | 'local' = 'assembly'): Promise<any> {
         const ratings = await this.getPoliticianRatings(politicianId, type);
-        if (!ratings || ratings.length === 0) { // Added check for safety
-            return { averageRating: 0, totalRatings: 0 };
+        if (!ratings || ratings.length === 0) {
+            return {
+                averageRating: 0,
+                totalRatings: 0,
+                communicationAvg: 0,
+                policyAvg: 0,
+                integrityAvg: 0,
+                localDevAvg: 0
+            };
         }
-        // Assuming simple rating field or we calculate average of 'rating' column
-        // The schema has 'rating: integer'. 
-        // Previous logic had communication/policy etc. but schema only had 'rating'.
-        // I will assume schema is correct (single rating).
+
         const total = ratings.reduce((acc, r) => acc + r.rating, 0);
+        const commTotal = ratings.reduce((acc, r) => acc + (r.communicationRating || 0), 0);
+        const policyTotal = ratings.reduce((acc, r) => acc + (r.policyRating || 0), 0);
+        const integrityTotal = ratings.reduce((acc, r) => acc + (r.integrityRating || 0), 0);
+        const localDevTotal = ratings.reduce((acc, r) => acc + (r.localDevRating || 0), 0);
+
         return {
             averageRating: parseFloat((total / ratings.length).toFixed(1)),
-            totalRatings: ratings.length
+            totalRatings: ratings.length,
+            communicationAvg: parseFloat((commTotal / ratings.length).toFixed(1)),
+            policyAvg: parseFloat((policyTotal / ratings.length).toFixed(1)),
+            integrityAvg: parseFloat((integrityTotal / ratings.length).toFixed(1)),
+            localDevAvg: parseFloat((localDevTotal / ratings.length).toFixed(1))
         };
     }
 
-    async createOrUpdatePoliticianRating(userId: string, politicianId: number, type: 'assembly' | 'local', ratingVal: number, comment?: string): Promise<any> {
+    async createOrUpdatePoliticianRating(userId: string, politicianId: number, type: 'assembly' | 'local', ratingVal: number, comment?: string, details?: { communicationRating?: number, policyRating?: number, integrityRating?: number, localDevRating?: number }): Promise<any> {
         const table = type === 'assembly' ? 'assembly_ratings' : 'local_council_ratings';
 
         // Check existing
@@ -242,6 +255,10 @@ export class PoliticsStorage {
             target_id: politicianId,
             rating: ratingVal,
             comment,
+            communication_rating: details?.communicationRating || 0,
+            policy_rating: details?.policyRating || 0,
+            integrity_rating: details?.integrityRating || 0,
+            local_dev_rating: details?.localDevRating || 0,
             // updated_at is not in schema for ratings? created_at is defaultNow. 
             // If update, we might just update rating/comment.
         };

@@ -1,7 +1,7 @@
-import { storage } from "../storage";
-import { generateSurveyFromNews } from "../ai";
-import { db } from "../db";
-import { surveys, surveyQuestions, newsArticles } from "@shared/schema";
+import { storage } from "../storage.js";
+import { generateSurveyFromNews } from "../ai.js";
+import { db } from "../db.js";
+import { surveys, surveyQuestions, newsArticles } from "../../shared/schema.js";
 import { eq, and, gte, desc } from "drizzle-orm";
 
 export async function generateAutoSurvey(articleUrl: string) {

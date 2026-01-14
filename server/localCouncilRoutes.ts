@@ -1,8 +1,7 @@
 import type { Express } from "express";
-import { storage } from "./storage"; // Use storage interface which will use Supabase
-import { storage } from "./storage";
-import { db } from "./db";
-import { localCouncilMembers } from "@shared/schema";
+import { storage } from "./storage.js"; // Use storage interface which will use Supabase
+import { db } from "./db.js";
+import { localCouncilMembers } from "../shared/schema.js";
 import { eq, and, ilike, sql } from "drizzle-orm";
 
 export function registerLocalCouncilRoutes(app: Express) {

@@ -6,8 +6,10 @@ import {
     type PointTransaction, type InsertPointTransaction,
     type RewardItem, type InsertRewardItem,
     type QuickPoll, type InsertQuickPoll,
-    type NewsArticle, type InsertNewsArticle
-} from "@shared/schema";
+    type NewsArticle, type InsertNewsArticle,
+    type BalanceGame, type InsertBalanceGame, type BalanceGameVote, type InsertBalanceGameVote,
+    type Notification, type InsertNotification
+} from "../../shared/schema.js";
 
 export interface IStorage {
     // Auth & Identity compatibility
@@ -23,6 +25,13 @@ export interface IStorage {
     getUsersByPushToken(): Promise<User[]>;
     updateUserNotificationSettings(userId: string, settings: any): Promise<void>;
     getUserByEmail(email: string): Promise<User | undefined>;
+
+    // Notification operations
+    getNotifications(userId: string): Promise<Notification[]>;
+    createNotification(notification: InsertNotification): Promise<Notification>;
+    markNotificationAsRead(id: number): Promise<void>;
+    markAllNotificationsAsRead(userId: string): Promise<void>;
+    getUnreadNotificationCount(userId: string): Promise<number>;
 
     // Survey operations
     getSurveys(category?: string): Promise<Survey[]>;
@@ -68,6 +77,15 @@ export interface IStorage {
     getNewsAnalysis(url: string): Promise<NewsArticle | undefined>;
     saveNewsAnalysis(data: any): Promise<NewsArticle>;
     saveNewsArticle(data: any): Promise<NewsArticle>;
+
+    // Balance Game Operations
+    createBalanceGame(game: InsertBalanceGame): Promise<BalanceGame>;
+    getBalanceGame(id: number): Promise<BalanceGame | undefined>;
+    getBalanceGames(status?: string, limit?: number, category?: string): Promise<BalanceGame[]>;
+    updateBalanceGameStatus(id: number, status: string): Promise<BalanceGame | undefined>;
+    deleteBalanceGame(id: number): Promise<void>;
+    voteBalanceGame(vote: InsertBalanceGameVote): Promise<BalanceGameVote>;
+    getUserBalanceGameVote(userId: string | undefined, deviceId: string | undefined, gameId: number): Promise<BalanceGameVote | undefined>;
 
     // Politics & Politicians
     getPoliticians(type?: string, region?: string, limit?: number): Promise<any[]>;

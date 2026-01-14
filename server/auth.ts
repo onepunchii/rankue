@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import { supabaseAdmin } from "./supabase";
-import { storage } from "./storage";
-import { type User } from "@shared/schema";
+import { supabaseAdmin } from "./supabase.js";
+import { storage } from "./storage.js";
+import { type User } from "../shared/schema.js";
 
 // Supabase Auth 연동 미들웨어
 export async function authenticateUser(req: Request, res: Response, next: NextFunction) {
@@ -30,7 +30,6 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
                 nickname: user.user_metadata.nickname || user.user_metadata.full_name || user.email?.split('@')[0],
                 fullName: user.user_metadata.full_name,
                 profileImageUrl: user.user_metadata.avatar_url,
-                userType: 'verified',
                 level: 1,
                 experience: 0,
                 personalPoints: 0,

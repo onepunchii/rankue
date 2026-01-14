@@ -1,6 +1,6 @@
-import { supabaseAdmin } from "./supabase";
-import { db } from "./db";
-import { profiles } from "@shared/schema";
+import { supabaseAdmin } from "./supabase.js";
+import { db } from "./db.js";
+import { profiles } from "../shared/schema.js";
 import { eq } from "drizzle-orm";
 
 export interface AuthUser {
@@ -13,6 +13,7 @@ export interface AuthUser {
   name?: string | null;
   phone?: string | null;
   nickname?: string | null;
+  profileImageUrl?: string | null;
   level: number;
   experience: number;
   personalPoints: number;
@@ -57,6 +58,7 @@ export const simpleAuthStorage = {
         name: profile.fullName || profile.nickname,
         phone: profile.phone,
         nickname: profile.nickname,
+        profileImageUrl: profile.profileImageUrl,
         level: profile.level || 1,
         experience: profile.experience || 0,
         personalPoints: profile.personalPoints || 0,
@@ -119,6 +121,7 @@ export const simpleAuthStorage = {
     if (updates.name !== undefined && updates.name !== null) dbUpdates.fullName = updates.name;
     if (updates.fullName !== undefined && updates.fullName !== null) dbUpdates.fullName = updates.fullName;
     if (updates.nickname !== undefined && updates.nickname !== null) dbUpdates.nickname = updates.nickname;
+    if (updates.profileImageUrl !== undefined) dbUpdates.profileImageUrl = updates.profileImageUrl;
     if (updates.points !== undefined) dbUpdates.personalPoints = updates.points;
     if (updates.level !== undefined) dbUpdates.level = updates.level;
 

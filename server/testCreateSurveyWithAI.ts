@@ -1,5 +1,6 @@
 import { db } from './db';
-import { surveys, surveyQuestions } from '@shared/schema';
+import { surveys, surveyQuestions } from '../shared/schema.js';
+import { eq } from 'drizzle-orm';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -8,7 +9,7 @@ const openai = new OpenAI({
 
 async function generateAIAnalysis() {
   console.log('🤖 AI 분석 생성 중...');
-  
+
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
@@ -106,7 +107,7 @@ async function testCreateSurvey() {
     const savedSurvey = await db
       .select()
       .from(surveys)
-      .where(surveys.id.eq(createdSurvey.id))
+      .where(eq(surveys.id, createdSurvey.id))
       .limit(1);
 
     if (savedSurvey[0]) {

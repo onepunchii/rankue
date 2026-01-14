@@ -1,15 +1,14 @@
 import { Router } from "express";
-import { storage } from "./storage";
-import { requireAuth } from "./simpleAuth";
-import { db } from "./db";
+import { storage } from "./storage.js";
+import { requireAuth, type AuthUser } from "./simpleAuth.js";
+import { db } from "./db.js";
 import {
   insertAssemblyRatingSchema,
   insertLocalCouncilRatingSchema,
   insertAssemblyCommentSchema,
   insertLocalCouncilCommentSchema,
   localCouncilMembers,
-  type UserAuth
-} from "@shared/schema";
+} from "../shared/schema.js";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
@@ -17,7 +16,7 @@ import { z } from "zod";
 declare global {
   namespace Express {
     interface Request {
-      user?: UserAuth;
+      user?: AuthUser;
     }
   }
 }
@@ -33,7 +32,7 @@ router.get("/politicians/:type/:id/ratings", async (req, res) => {
     if (!politicianId || (type !== 'assembly' && type !== 'local_council' && type !== 'national' && type !== 'local')) {
       return res.status(400).json({ error: "Invalid politician type or ID" });
     }
-    
+
     // Normalize type
     const normalizedType = (type === 'assembly' || type === 'national') ? 'assembly' : 'local';
 
@@ -70,14 +69,35 @@ router.post("/politicians/:type/:id/ratings", requireAuth, async (req, res) => {
 
     // Validate using appropriate schema
     let validatedData;
-    const bodyWithIds = { ...req.body, userId: req.user!.id, targetId: politicianId };
-    
-    if (normalizedType === 'assembly') {
-        validatedData = insertAssemblyRatingSchema.parse(bodyWithIds);
-    } else {
-        validatedData = insertLocalCouncilRatingSchema.parse(bodyWithIds);
+
+    // Calculate average rating if not provided but detailed ratings are present
+    const { communicationRating, policyRating, integrityRating, localDevRating } = req.body;
+    let calculatedRating = req.body.rating;
+
+    if (!calculatedRating && (communicationRating || policyRating || integrityRating || localDevRating)) {
+      const sum = (Number(communicationRating) || 0) +
+        (Number(policyRating) || 0) +
+        (Number(integrityRating) || 0) +
+        (Number(localDevRating) || 0);
+      const count = 4; // Assuming all 4 are always relevant in the UI form
+      calculatedRating = Math.round(sum / count);
     }
 
+    const bodyWithIds = {
+      ...req.body,
+      userId: req.user!.id,
+      targetId: politicianId,
+      rating: calculatedRating || 0 // Ensure rating exists
+    };
+
+    if (normalizedType === 'assembly') {
+      validatedData = insertAssemblyRatingSchema.parse(bodyWithIds);
+    } else {
+      validatedData = insertLocalCouncilRatingSchema.parse(bodyWithIds);
+    }
+
+    // Region check removed as per user request (anyone can rate)
+    /*
     // Check if user is rating their local representative
     const userLocation = {
       cityProvince: req.user!.cityProvince,
@@ -95,7 +115,7 @@ router.post("/politicians/:type/:id/ratings", requireAuth, async (req, res) => {
       const member = await storage.getPolitician(politicianId, 'assembly');
       if (member) {
         // Check if member represents user's district
-        const normalizedUserLocation = `${ userLocation.cityProvince } ${ userLocation.district } `.replace(/특별시|광역시|특별자치시|도$/g, '').trim();
+        const normalizedUserLocation = `${userLocation.cityProvince} ${userLocation.district} `.replace(/특별시|광역시|특별자치시|도$/g, '').trim();
         const normalizedConstituency = (member.constituency || '').replace(/특별시|광역시|특별자치시|도$/g, '').trim();
         isLocalRepresentative = normalizedConstituency.includes(normalizedUserLocation) ||
           normalizedUserLocation.includes(normalizedConstituency);
@@ -117,14 +137,21 @@ router.post("/politicians/:type/:id/ratings", requireAuth, async (req, res) => {
     if (!isLocalRepresentative) {
       return res.status(403).json({ error: "내 지역구 대표만 평가할 수 있습니다." });
     }
+    */
 
     // Call storage
     const rating = await storage.createOrUpdatePoliticianRating(
-        req.user!.id, 
-        politicianId, 
-        normalizedType, 
-        validatedData.rating, 
-        validatedData.comment || undefined
+      req.user!.id,
+      politicianId,
+      normalizedType,
+      validatedData.rating,
+      validatedData.comment || undefined,
+      {
+        communicationRating: validatedData.communicationRating,
+        policyRating: validatedData.policyRating,
+        integrityRating: validatedData.integrityRating,
+        localDevRating: validatedData.localDevRating
+      }
     );
     res.json(rating);
   } catch (error) {
@@ -172,12 +199,13 @@ router.post("/politicians/:type/:id/comments", requireAuth, async (req, res) => 
     // Validate body
     const bodyWithIds = { ...req.body, userId: req.user!.id, targetId: politicianId };
     if (normalizedType === 'assembly') {
-        insertAssemblyCommentSchema.parse(bodyWithIds);
+      insertAssemblyCommentSchema.parse(bodyWithIds);
     } else {
-        insertLocalCouncilCommentSchema.parse(bodyWithIds);
+      insertLocalCouncilCommentSchema.parse(bodyWithIds);
     }
 
     // Check if user is commenting on their local representative
+    /*
     const userLocation = {
       cityProvince: req.user!.cityProvince,
       district: req.user!.district,
@@ -192,16 +220,16 @@ router.post("/politicians/:type/:id/comments", requireAuth, async (req, res) => 
     if (normalizedType === 'assembly') {
       const member = await storage.getPolitician(politicianId, 'assembly');
       if (member) {
-        const normalizedUserLocation = `${ userLocation.cityProvince } ${ userLocation.district } `.replace(/특별시|광역시|특별자치시|도$/g, '').trim();
+        const normalizedUserLocation = `${userLocation.cityProvince} ${userLocation.district} `.replace(/특별시|광역시|특별자치시|도$/g, '').trim();
         const normalizedConstituency = (member.constituency || '').replace(/특별시|광역시|특별자치시|도$/g, '').trim();
         isLocalRepresentative = normalizedConstituency.includes(normalizedUserLocation) ||
           normalizedUserLocation.includes(normalizedConstituency);
       }
     } else {
-       // Only verifying region match for local council for now to save DB call if needed, 
-       // but strictly we should check ID existence in region.
-       // Reusing previous logic:
-       const members = await db
+      // Only verifying region match for local council for now to save DB call if needed, 
+      // but strictly we should check ID existence in region.
+      // Reusing previous logic:
+      const members = await db
         .select()
         .from(localCouncilMembers)
         .where(
@@ -217,6 +245,7 @@ router.post("/politicians/:type/:id/comments", requireAuth, async (req, res) => 
     if (!isLocalRepresentative) {
       return res.status(403).json({ error: "내 지역구 대표에게만 댓글을 작성할 수 있습니다." });
     }
+    */
 
     const comment = await storage.createPoliticianComment(req.user!.id, politicianId, normalizedType, req.body.content);
     res.json(comment);
@@ -267,20 +296,20 @@ router.post("/comments/:type/:id/report", async (req, res) => {
 });
 
 // Political Persona Generation (Strict Type Version)
-import { generatePoliticianPersona } from "./ai";
+import { generatePoliticianPersona } from "./ai.js";
 
 router.get("/politicians/:type/:id/persona", async (req, res) => {
   try {
     const { type, id } = req.params;
     const politicianId = parseInt(id);
-    
+
     if (!politicianId || (type !== 'assembly' && type !== 'local_council' && type !== 'national' && type !== 'local')) {
       return res.status(400).json({ error: "Invalid politician type or ID" });
     }
 
     const normalizedType = (type === 'assembly' || type === 'national') ? 'assembly' : 'local';
 
-    console.log(`🎮 Generating persona for ${ normalizedType } politician ID: ${ politicianId } `);
+    console.log(`🎮 Generating persona for ${normalizedType} politician ID: ${politicianId} `);
 
     const politician = await storage.getPolitician(politicianId, normalizedType);
     if (!politician) {
@@ -288,24 +317,24 @@ router.get("/politicians/:type/:id/persona", async (req, res) => {
     }
 
     if (politician.aiPersona) {
-      console.log(`✅ Using cached persona for ${ normalizedType } politician ID: ${ politicianId } `);
+      console.log(`✅ Using cached persona for ${normalizedType} politician ID: ${politicianId} `);
       // Ensure type is correct in cached version just in case
-      if ( politician.aiPersona.type !== (normalizedType === 'assembly' ? 'national' : 'local') ) {
-          console.warn("⚠️ Cached persona type mismatch. Regenerating...");
+      if (politician.aiPersona.type !== (normalizedType === 'assembly' ? 'national' : 'local')) {
+        console.warn("⚠️ Cached persona type mismatch. Regenerating...");
       } else {
         return res.json(politician.aiPersona);
       }
     }
 
-    console.log(`🚀 No valid cached persona.Generating new on for ${ normalizedType } ID: ${ politicianId } `);
-    
+    console.log(`🚀 No valid cached persona.Generating new on for ${normalizedType} ID: ${politicianId} `);
+
     // Explicitly pass type to generator
     const politicianForAI = { ...politician, type: normalizedType };
     const persona = await generatePoliticianPersona(politicianForAI);
 
     try {
       await storage.updatePolitician(politicianId, { aiPersona: persona }, normalizedType);
-      console.log(`💾 Saved newly generated persona to DB for ${ normalizedType } ID: ${ politicianId } `);
+      console.log(`💾 Saved newly generated persona to DB for ${normalizedType} ID: ${politicianId} `);
     } catch (saveError) {
       console.error("⚠️ Error saving persona to DB (non-fatal):", saveError);
     }

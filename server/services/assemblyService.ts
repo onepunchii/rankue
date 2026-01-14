@@ -1,7 +1,7 @@
 
 import axios from 'axios';
-import { db } from "../db";
-import { assemblyMembers } from "@shared/schema";
+import { db } from "../db.js";
+import { assemblyMembers } from "../../shared/schema.js";
 import { eq } from "drizzle-orm";
 
 const KEY = '54424d7984cf4edd93b711fb868e22df';

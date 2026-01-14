@@ -1,3 +1,3 @@
-export * from "./storage/index";
-export { storage } from "./storage/index";
-export type { IStorage } from "./storage/storage_interface";
+export * from "./storage/index.js";
+export { storage } from "./storage/index.js";
+export type { IStorage } from "./storage/storage_interface.js";

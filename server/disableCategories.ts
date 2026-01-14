@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { db } from "./db";
-import { musicCategories } from "@shared/schema";
+import { musicCategories } from "../shared/schema.js";
 import { inArray } from "drizzle-orm";
 
 async function disableCategories() {

@@ -104,7 +104,7 @@ export default function NewsCarousel() {
 
     const url = article.link || article.originallink;
     const encodedUrl = encodeURIComponent(url || '');
-    setLocation(`/news/view?url=${encodedUrl}`);
+    setLocation(`/news/view?url=${encodedUrl}&from=/`);
   };
 
   const scrollToLeft = () => {

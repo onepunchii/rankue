@@ -452,15 +452,11 @@ export default function PoliticianDetail({ type }: PoliticianDetailProps) {
                               }`}></div>
                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Yeouido Scouter v1.0</span>
                           </div>
-                          <h2 className="text-2xl font-black italic text-white flex items-center gap-2">
+                          <h2 className="text-xl font-black italic text-white flex items-center gap-2 tracking-tight">
                             <span className="text-emerald-400">{persona.hero_summary?.class_icon || '⚔️'}</span> {persona.hero_summary?.class_name || '분석 중'}
                           </h2>
                           <div className="flex items-center gap-2 mt-1">
                             <p className="text-sm font-bold text-sky-400">{persona.hero_summary?.level_title || '레벨 분석 중'}</p>
-                            <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                            <p className="text-[11px] font-bold text-white/60 bg-white/5 px-2 py-0.5 rounded-lg border border-white/10">
-                              {politician.mainCommittee || politician.committees || '소속 위원회 없음'}
-                            </p>
                           </div>
                         </div>
                         <div className="flex flex-col items-end">
@@ -683,10 +679,6 @@ export default function PoliticianDetail({ type }: PoliticianDetailProps) {
                       </>
                     ) : (
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white/[0.03] p-3 rounded-2xl border border-white/5 text-center col-span-2">
-                          <div className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">소속 위원회</div>
-                          <div className="text-xs font-bold text-white/80">{politician.mainCommittee || politician.committees || '정보 없음'}</div>
-                        </div>
                         <div className="bg-white/[0.03] p-3 rounded-2xl border border-white/5 text-center">
                           <div className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">법안 발의</div>
                           <div className="text-sm font-bold text-emerald-400">{politician.billsProposed || 0}건</div>
@@ -749,10 +741,10 @@ export default function PoliticianDetail({ type }: PoliticianDetailProps) {
                         <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider">{item.label}</span>
                       </div>
                       <div className="flex items-end gap-2">
-                        <span className="text-lg font-black text-white">{item.value.toFixed(1)}</span>
+                        <span className="text-lg font-black text-white">{(item.value || 0).toFixed(1)}</span>
                         <div className="flex gap-0.5 mb-1.5">
                           {[1, 2, 3, 4, 5].map((star) => (
-                            <div key={star} className={`w-1 h-1 rounded-full ${star <= Math.round(item.value) ? item.color.replace('text-', 'bg-') : 'bg-white/10'}`} />
+                            <div key={star} className={`w-1 h-1 rounded-full ${star <= Math.round(item.value || 0) ? item.color.replace('text-', 'bg-') : 'bg-white/10'}`} />
                           ))}
                         </div>
                       </div>

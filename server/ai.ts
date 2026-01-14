@@ -559,3 +559,90 @@ export async function analyzeUserPersonality(
     };
   }
 }
+
+export interface BrainQuestionGenerated {
+  q: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+}
+
+export async function generateBrainQuestions(
+  category: string,
+  level: number,
+  count: number
+): Promise<BrainQuestionGenerated[]> {
+  try {
+    // Prompt Engineering per Spec
+    // Categories: LOGIC, MATH, VERBAL, ECONOMY, TRIVIA
+    // Level: 1-5
+    // Format: 4 Options (mostly), Trivia Lv1-2 mixed with O/X (30%)
+
+    // Difficulty Mapping Description
+    const difficultyDesc = [
+      "초등학생 수준 (Very Easy)",
+      "중학생/상식 수준 (Easy)",
+      "일반 성인 평균 수준 (Normal)",
+      "상위 10% 지능 수준 (Hard)",
+      "멘사/전문가 수준 (Very Hard)"
+    ][level - 1] || "Normal";
+
+    const prompt = `
+대주제: [${category}]
+난이도: Level ${level} (${difficultyDesc})
+수량: ${count}개
+
+당신은 지능 지수(IQ) 측정을 위한 전문 출제위원입니다.
+제시된 주제와 난이도에 맞는 4지선다형(또는 일부 O/X) 문제를 JSON 배열 포맷으로 생성해주세요.
+
+# 출제 가이드라인
+1. **${category}** 영역의 본질적 능력을 테스트해야 합니다.
+2. **Level ${level}**: ${difficultyDesc} 난이도를 정확히 준수하세요.
+   - Level 2는 일반인 평균이므로 너무 어렵거나 너무 쉬우면 안 됩니다.
+   - Level 4-5는 확실히 변별력이 있어야 합니다 (함정, 복합 추론 등).
+3. **오답(Distractors) 전략**:
+   - 찍어서 맞히기 어렵도록, 매력적인 오답을 포함해야 합니다.
+   - Math의 경우 단순 계산 실수로 나올 수 있는 값을 오답에 넣으세요.
+4. **형식**: 기본 4지선다.
+   - 단, 'TRIVIA' 카테고리의 Level 1, 2일 경우에만 30% 확률로 O/X(양자택일) 문제를 섞어주세요.
+
+# JSON Output Format (Array)
+[
+  {
+    "q": "문제 지문 (필요시 상황 설명 포함)",
+    "options": ["선택지 A", "선택지 B", "선택지 C", "선택지 D"], (O/X 문제면 ["O", "X"])
+    "answer": "정답 텍스트 (옵션 중 하나와 정확히 일치)",
+    "explanation": "해설 및 정답 근거 (사용자가 납득할 수 있게)"
+  }
+]
+`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are a professional IQ Test creator. Output strict JSON array."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.8
+    });
+
+    const content = response.choices[0].message.content;
+    const parsed = JSON.parse(content || '{"questions": []}');
+    // Sometimes GPT returns { questions: [...] } even if asked for array. Handle both.
+    const questions = Array.isArray(parsed) ? parsed : (parsed.questions || parsed.data || []);
+
+    return questions as BrainQuestionGenerated[];
+
+  } catch (error) {
+    console.error("Error generating brain questions:", error);
+    // Fallback: Empty array or basic mock
+    return [];
+  }
+}

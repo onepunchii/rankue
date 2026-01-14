@@ -1,10 +1,10 @@
-import { db } from "../db";
+import { db } from "../db.js";
 import {
     surveys, surveyQuestions, surveyResponses, userSurveyParticipation,
     type Survey, type InsertSurvey, type SurveyQuestion, type InsertSurveyQuestion,
     type SurveyResponse, type InsertSurveyResponse, type UserSurveyParticipation,
     type InsertUserSurveyParticipation
-} from "@shared/schema";
+} from "../../shared/schema.js";
 import { eq, and, desc, sql, gte } from "drizzle-orm";
 
 export class SurveyStorage {

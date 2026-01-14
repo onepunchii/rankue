@@ -1,13 +1,16 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import Shuffle from "@/components/ui/shuffle-text";
 import { useLocation } from "wouter";
 import { ArrowLeft, Bell } from "lucide-react";
+import NotificationHistoryModal from "./NotificationHistoryModal";
 
 export default function MobileHeader({ showBack = false }: { showBack?: boolean }) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const [notiModalOpen, setNotiModalOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 w-full bg-background/0 backdrop-blur-xl supports-[backdrop-filter]:bg-background/0">
@@ -64,7 +67,7 @@ export default function MobileHeader({ showBack = false }: { showBack?: boolean 
 
           <button
             className="w-8 h-8 rounded-full bg-secondary border border-border/50 hover:bg-secondary/80 flex items-center justify-center transition-colors text-primary"
-            onClick={() => setLocation('/notifications')} // Notification page routing
+            onClick={() => setNotiModalOpen(true)}
           >
             <Bell className="w-4 h-4" />
           </button>
@@ -79,6 +82,8 @@ export default function MobileHeader({ showBack = false }: { showBack?: boolean 
           }}
         ></div>
       </div>
+
+      <NotificationHistoryModal open={notiModalOpen} onOpenChange={setNotiModalOpen} />
     </header>
   );
 }

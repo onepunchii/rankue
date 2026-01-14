@@ -1,5 +1,5 @@
-import { db } from "../db";
-import { politicalStats, surveys, surveyQuestions, surveyResponses } from "@shared/schema";
+import { db } from "../db.js";
+import { politicalStats, surveys, surveyQuestions, surveyResponses, profiles } from "../../shared/schema.js";
 import { eq, and, like, desc, gte, lte } from "drizzle-orm";
 
 type SurveyResponseInfo = typeof surveyResponses.$inferSelect;
@@ -25,81 +25,114 @@ export async function aggregatePoliticalStats(surveyId: number): Promise<void> {
         // 2. Fetch Questions
         const questions = await db.select().from(surveyQuestions).where(eq(surveyQuestions.surveyId, surveyId)).orderBy(surveyQuestions.order);
 
-        // 3. Fetch Responses
-        const responses = await db.select().from(surveyResponses).where(eq(surveyResponses.surveyId, surveyId));
+        // 3. Fetch Responses joined with Profiles for demographic info
+        const responsesWithProfiles = await db.select({
+            response: surveyResponses,
+            profile: profiles
+        })
+            .from(surveyResponses)
+            .leftJoin(profiles, eq(surveyResponses.userId, profiles.id))
+            .where(eq(surveyResponses.surveyId, surveyId));
 
-        // Count distinct users? (userId can be null for anonymous, use simple length for now or set)
-        const totalParticipants = responses.length; // Simplified for now
+        if (responsesWithProfiles.length === 0) {
+            console.warn(`[Stats] No responses for survey ${surveyId}`);
+            return;
+        }
 
-        // Initialize Result Objects
-        const presidential: any = {};
-        const parties: any = {};
-        const candidates: any = {};
+        // Total Teilnehmer (unique users?) - simple for now
+        const totalParticipants = new Set(responsesWithProfiles.map((r: any) => r.response.userId).filter(Boolean)).size || 1;
 
-        // Helper to count frequencies
-        const countResponses = (qResponses: SurveyResponseInfo[]) => {
-            const counts: Record<string, number> = {};
-            qResponses.forEach((r) => {
-                let ans = r.answer;
-                if (typeof ans === 'object' && ans !== null) {
-                    // @ts-ignore - JSON handling
-                    ans = ans.choice || ans.text || ans.answer;
-                }
-                if (typeof ans === 'string') {
-                    counts[ans] = (counts[ans] || 0) + 1;
-                }
-            });
-            return counts;
+        // Initialize Breakdown Objects
+        // Structure: breakdowns[dimension][value][metric] = percent
+        const genderBreakdown: any = {};
+        const ageBreakdown: any = {};
+        const regionBreakdown: any = {};
+
+        const DIMENSIONS = [
+            { key: 'gender', target: genderBreakdown },
+            { key: 'ageGroup', target: ageBreakdown },
+            { key: 'region', target: regionBreakdown }
+        ];
+
+        // 4. Processing logic
+        const q1 = questions.find((q: any) => q.order === 1); // Presidential
+        const q2 = questions.find((q: any) => q.order === 2); // Parties
+        const q3 = questions.find((q: any) => q.order === 3); // Priorities
+
+        // Helper to extract answer label
+        const getLabel = (ans: any) => {
+            if (typeof ans === 'object' && ans !== null) {
+                return ans.choice || ans.text || ans.answer;
+            }
+            return ans;
         };
 
-        // Q1: Presidential (Order 1) logic
-        const q1 = questions.find((q: SurveyQuestionInfo) => q.order === 1);
-        if (q1) {
-            const q1Responses = responses.filter((r) => r.questionId === q1.id);
-            const counts = countResponses(q1Responses);
-            const total = q1Responses.length || 1;
+        // --- Calculate TOTALS ---
+        const calcTotals = (questionId: number | undefined) => {
+            if (!questionId) return {};
+            const qResponses = responsesWithProfiles.filter((r: any) => r.response.questionId === questionId);
+            const counts: Record<string, number> = {};
+            qResponses.forEach((r: any) => {
+                const label = getLabel(r.response.answer);
+                if (label) counts[label] = (counts[label] || 0) + 1;
+            });
+            const total = qResponses.length || 1;
+            const percentages: Record<string, number> = {};
+            Object.entries(counts).forEach(([k, v]) => {
+                percentages[k] = Math.round((v / total) * 100);
+            });
+            return { percentages, raw: counts };
+        };
 
-            let positive = 0;
-            let negative = 0;
-            let neutral = 0;
+        const presidentialTotal = calcTotals(q1?.id);
+        const partiesTotal = calcTotals(q2?.id);
+        const candidatesTotal = calcTotals(q3?.id);
 
-            Object.entries(counts).forEach(([label, count]) => {
-                if (label.includes('잘하고')) positive += count;
-                else if (label.includes('잘못하고')) negative += count;
-                else neutral += count;
+        // --- Calculate BREAKDOWNS ---
+        DIMENSIONS.forEach(dim => {
+            const groups: Record<string, any[]> = {};
+            responsesWithProfiles.forEach((r: any) => {
+                // @ts-ignore
+                const val = r.profile?.[dim.key] || 'Unknown';
+                if (!groups[val]) groups[val] = [];
+                groups[val].push(r);
             });
 
-            presidential.positive = Math.round((positive / total) * 100);
-            presidential.negative = Math.round((negative / total) * 100);
-            presidential.neutral = Math.round((neutral / total) * 100);
-            presidential.raw = counts;
-        }
+            Object.entries(groups).forEach(([groupVal, groupResponses]) => {
+                const results: any = { presidential: {}, parties: {}, priorities: {} };
 
-        // Q2: Parties (Order 2)
-        const q2 = questions.find((q: SurveyQuestionInfo) => q.order === 2);
-        if (q2) {
-            const q2Responses = responses.filter((r) => r.questionId === q2.id);
-            const counts = countResponses(q2Responses);
-            const total = q2Responses.length || 1;
+                // Helper to calculate score for group
+                const calcGroup = (questionId: number | undefined) => {
+                    const qResponses = groupResponses.filter((r: any) => r.response.questionId === questionId);
+                    const counts: Record<string, number> = {};
+                    qResponses.forEach((r: any) => {
+                        const label = getLabel(r.response.answer);
+                        if (label) counts[label] = (counts[label] || 0) + 1;
+                    });
+                    const total = qResponses.length || 1;
+                    const percentages: Record<string, number> = {};
+                    Object.entries(counts).forEach(([k, v]) => {
+                        percentages[k] = Math.round((v / total) * 100);
+                    });
+                    return percentages;
+                };
 
-            Object.entries(counts).forEach(([party, count]) => {
-                parties[party] = Math.round((count / total) * 100);
+                // Presidential Aggregate (Simplify to positive/negative/neutral)
+                const pres = calcGroup(q1?.id);
+                results.presidential = {
+                    positive: Object.entries(pres).filter(([k]) => k.includes('잘하고')).reduce((a, b) => a + b[1], 0),
+                    negative: Object.entries(pres).filter(([k]) => k.includes('잘못하고')).reduce((a, b) => a + b[1], 0),
+                    neutral: Object.entries(pres).filter(([k]) => !k.includes('잘하고') && !k.includes('잘못하고')).reduce((a, b) => a + b[1], 0)
+                };
+
+                results.parties = calcGroup(q2?.id);
+                results.priorities = calcGroup(q3?.id);
+
+                dim.target[groupVal] = results;
             });
-        }
+        });
 
-        // Q3: Candidates (Order 3)
-        const q3 = questions.find((q: SurveyQuestionInfo) => q.order === 3);
-        if (q3) {
-            const q3Responses = responses.filter((r) => r.questionId === q3.id);
-            const counts = countResponses(q3Responses);
-            const total = q3Responses.length || 1;
-
-            Object.entries(counts).forEach(([candidate, count]) => {
-                candidates[candidate] = Math.round((count / total) * 100);
-            });
-        }
-
-        // 4. Generate Weak Label
+        // 5. Generate Week Label
         let weekLabel = "Unknown";
         const titleMatch = survey.title.match(/(\d+년\s*\d+월\s*\d+주차)/);
         if (titleMatch) {
@@ -109,31 +142,35 @@ export async function aggregatePoliticalStats(surveyId: number): Promise<void> {
             weekLabel = `${d.getFullYear()}년 ${d.getMonth() + 1}월 W${Math.ceil(d.getDate() / 7)}`;
         }
 
-        // 5. Upsert to DB
+        // Final structured data
+        const statsToSave = {
+            surveyId,
+            weekLabel,
+            presidential: {
+                positive: Object.entries(presidentialTotal.percentages || {}).filter(([k]) => k.includes('잘하고')).reduce((a, b) => a + b[1], 0),
+                negative: Object.entries(presidentialTotal.percentages || {}).filter(([k]) => k.includes('잘못하고')).reduce((a, b) => a + b[1], 0),
+                neutral: Object.entries(presidentialTotal.percentages || {}).filter(([k]) => !k.includes('잘하고') && !k.includes('잘못하고')).reduce((a, b) => a + b[1], 0)
+            },
+            parties: partiesTotal.percentages,
+            priorities: candidatesTotal.percentages,
+            genderBreakdown,
+            ageBreakdown,
+            regionBreakdown,
+            totalParticipants,
+            updatedAt: new Date()
+        };
+
+        // 6. Upsert to DB
         const existingStats = await db.select().from(politicalStats).where(eq(politicalStats.surveyId, surveyId));
 
         if (existingStats.length > 0) {
             await db.update(politicalStats)
-                .set({
-                    presidential,
-                    parties,
-                    candidates,
-                    totalParticipants,
-                    weekLabel,
-                    updatedAt: new Date()
-                })
+                .set(statsToSave)
                 .where(eq(politicalStats.surveyId, surveyId));
         } else {
-            await db.insert(politicalStats).values({
-                surveyId,
-                weekLabel,
-                presidential,
-                parties,
-                candidates,
-                totalParticipants
-            });
+            await db.insert(politicalStats).values(statsToSave as any);
         }
-        console.log(`[Stats] Aggregated ${weekLabel} (ID: ${surveyId})`);
+        console.log(`[Stats] Aggregated ${weekLabel} with breakdowns (ID: ${surveyId})`);
 
     } catch (e) {
         console.error(`[Stats] Error aggregating survey ${surveyId}:`, e);
@@ -158,3 +195,4 @@ export async function aggregateAllPastPoliticalSurveys() {
         console.error('[Stats] Full aggregation failed:', e);
     }
 }
+

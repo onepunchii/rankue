@@ -40,6 +40,16 @@ export const profiles = pgTable("profiles", {
   personalPoints: integer("personal_points").default(0).notNull(),
   availableLotteryTickets: integer("available_lottery_tickets").default(1).notNull(),
 
+  // Brain Rank System (Level & ELO Ratings)
+  brainLevel: integer("brain_level").default(2).notNull(), // Start at Silver (2)
+  brainRatingLogic: integer("brain_rating_logic").default(1200).notNull(), // Logic
+  brainRatingMath: integer("brain_rating_math").default(1200).notNull(), // Math
+  brainRatingVerbal: integer("brain_rating_verbal").default(1200).notNull(), // Verbal
+  brainRatingEconomy: integer("brain_rating_economy").default(1200).notNull(), // Economy
+  brainRatingTrivia: integer("brain_rating_trivia").default(1200).notNull(), // Trivia (Common Sense)
+  brainCurrentStreak: integer("brain_current_streak").default(0).notNull(),
+  brainLastRank: integer("brain_last_rank"), // For calculating rank change (updated daily)
+
   // 인구통계 정보 (설문 분석용)
   ageGroup: varchar("age_group", { length: 20 }),
   gender: varchar("gender", { length: 10 }),
@@ -142,9 +152,12 @@ export const politicalStats = pgTable("political_stats", {
   id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
   surveyId: bigint("survey_id", { mode: "number" }).notNull(),
   weekLabel: text("week_label").notNull(), // e.g. "2026년 1월 3주차"
-  presidential: jsonb("presidential").notNull(), // { positive: 30, negative: 60, neutral: 10 }
-  parties: jsonb("parties").notNull(), // { '더불어민주당': 40, '국민의힘': 35... }
-  candidates: jsonb("candidates").notNull(), // { '이재명': 40, '한동훈': 30... }
+  presidential: jsonb("presidential").notNull(), // Total: { positive: 30, negative: 60, neutral: 10 }
+  parties: jsonb("parties").notNull(), // Total: { '더불어민주당': 40, '국민의힘': 35... }
+  priorities: jsonb("priorities").notNull(), // Total: { '물가/경제 안정': 40, '소통/협치': 30... }
+  genderBreakdown: jsonb("gender_breakdown"), // { '남성': { presidential: {...}, parties: {...} }, '여성': {...} }
+  ageBreakdown: jsonb("age_breakdown"), // { '20대': { ... }, '30대': { ... } }
+  regionBreakdown: jsonb("region_breakdown"), // { '서울': { ... }, '부산': { ... } }
   totalParticipants: integer("total_participants").default(0).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -327,7 +340,11 @@ export const assemblyRatings = pgTable("assembly_ratings", {
   id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
   targetId: bigint("target_id", { mode: "number" }).references(() => assemblyMembers.id, { onDelete: "cascade" }),
   userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
-  rating: integer("rating").notNull(),
+  rating: integer("rating").notNull(), // Overall/Average rating
+  communicationRating: integer("communication_rating").default(0).notNull(),
+  policyRating: integer("policy_rating").default(0).notNull(),
+  integrityRating: integer("integrity_rating").default(0).notNull(),
+  localDevRating: integer("local_dev_rating").default(0).notNull(),
   comment: text("comment"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -336,7 +353,11 @@ export const localCouncilRatings = pgTable("local_council_ratings", {
   id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
   targetId: bigint("target_id", { mode: "number" }).references(() => localCouncilMembers.id, { onDelete: "cascade" }),
   userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
-  rating: integer("rating").notNull(),
+  rating: integer("rating").notNull(), // Overall/Average rating
+  communicationRating: integer("communication_rating").default(0).notNull(),
+  policyRating: integer("policy_rating").default(0).notNull(),
+  integrityRating: integer("integrity_rating").default(0).notNull(),
+  localDevRating: integer("local_dev_rating").default(0).notNull(),
   comment: text("comment"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -581,8 +602,8 @@ export type BattleVote = typeof battleVotes.$inferSelect;
 export type QuickPoll = typeof quickPolls.$inferSelect;
 export type RewardItem = typeof rewardItems.$inferSelect;
 export type AssemblyBill = typeof assemblyBills.$inferSelect;
-export type Politician = typeof politicians.$inferSelect;
-export type PoliticianRating = typeof politicianRatings.$inferSelect;
+export type Politician = typeof assemblyMembers.$inferSelect;
+export type PoliticianRating = typeof assemblyRatings.$inferSelect;
 export type AssemblyMember = Politician; // Alias for compatibility
 export type NewsArticle = typeof newsArticles.$inferSelect;
 export type PointTransaction = typeof pointTransactions.$inferSelect;
@@ -604,8 +625,8 @@ export type InsertBattleVote = z.infer<typeof insertBattleVoteSchema>;
 export type InsertQuickPoll = z.infer<typeof insertQuickPollSchema>;
 export type InsertRewardItem = z.infer<typeof insertRewardItemSchema>;
 export type InsertAssemblyBill = z.infer<typeof insertAssemblyBillSchema>;
-export type InsertPolitician = z.infer<typeof insertPoliticianSchema>;
-export type InsertPoliticianRating = z.infer<typeof insertPoliticianRatingSchema>;
+export type InsertPolitician = z.infer<typeof insertAssemblyMemberSchema>;
+export type InsertPoliticianRating = z.infer<typeof insertAssemblyRatingSchema>;
 export type InsertAssemblyMember = InsertPolitician; // Alias for compatibility
 export type InsertNewsArticle = z.infer<typeof insertNewsArticleSchema>;
 export type InsertPointTransaction = z.infer<typeof insertPointTransactionSchema>;
@@ -628,3 +649,109 @@ export type InsertMusicCategory = z.infer<typeof insertMusicCategorySchema>;
 export type InsertMusicArtist = z.infer<typeof insertMusicArtistSchema>;
 export type InsertMusicVote = z.infer<typeof insertMusicVoteSchema>;
 export type InsertMusicMonthlyRanking = z.infer<typeof insertMusicMonthlyRankingSchema>;
+
+// --- Brain Ranking System Tables ---
+export const brainQuestions = pgTable("brain_questions", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+  category: varchar("category", { length: 50 }).notNull(), // LOGIC, MATH, VERBAL, ECONOMY, TRIVIA
+  level: integer("level").default(1).notNull(), // 1~5
+  eloRating: integer("elo_rating").default(1300).notNull(),
+  content: jsonb("content").notNull(),
+  // e.g. { "q": "...", "options": ["A", "B", "C", "D"], "answer": "A", "explanation": "..." }
+  isActive: boolean("is_active").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const brainGameLogs = pgTable("brain_game_logs", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }).notNull(),
+  questionId: bigint("question_id", { mode: "number" }).references(() => brainQuestions.id).notNull(),
+  isCorrect: boolean("is_correct").notNull(),
+  userLevelAtTime: integer("user_level_at_time").notNull(),
+  solvedAt: timestamp("solved_at").defaultNow().notNull(),
+});
+
+export const insertBrainQuestionSchema = createInsertSchema(brainQuestions);
+export const insertBrainGameLogSchema = createInsertSchema(brainGameLogs);
+
+export type BrainQuestion = typeof brainQuestions.$inferSelect;
+export type BrainGameLog = typeof brainGameLogs.$inferSelect;
+export type InsertBrainQuestion = z.infer<typeof insertBrainQuestionSchema>;
+export type InsertBrainGameLog = z.infer<typeof insertBrainGameLogSchema>;
+
+// --- Balance Game Tables ---
+export const balanceGames = pgTable("balance_games", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+  createdAt: timestamp("created_at").defaultNow(),
+  status: varchar("status", { length: 20 }).default("PENDING").notNull(), // 'PENDING', 'ACTIVE', 'REJECTED'
+  category: varchar("category", { length: 20 }).notNull(), // 'POLITICS', 'ENTERTAINMENT', 'SOCIAL'
+  title: text("title").notNull(),
+  optionA: jsonb("option_a").notNull(), // { "text": "...", "emoji": "...", "keyword": "...", "image_url": "..." }
+  optionB: jsonb("option_b").notNull(),
+  countA: integer("count_a").default(0),
+  countB: integer("count_b").default(0),
+  sourceNewsTitle: text("source_news_title"),
+  sourceNewsUrl: text("source_news_url"),
+});
+
+export const balanceGameVotes = pgTable("balance_game_votes", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+  userId: uuid("user_id").references(() => profiles.id),
+  deviceId: text("device_id"),
+  gameId: bigint("game_id", { mode: "number" }).references(() => balanceGames.id),
+  choice: varchar("choice", { length: 10 }), // 'A', 'B'
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique().on(table.userId, table.gameId),
+  unique().on(table.deviceId, table.gameId),
+]);
+
+export const balanceGamesRelations = relations(balanceGames, ({ many }) => ({
+  votes: many(balanceGameVotes),
+}));
+
+export const balanceGameVotesRelations = relations(balanceGameVotes, ({ one }) => ({
+  game: one(balanceGames, { fields: [balanceGameVotes.gameId], references: [balanceGames.id] }),
+  user: one(profiles, { fields: [balanceGameVotes.userId], references: [profiles.id] }),
+}));
+
+export const insertBalanceGameSchema = createInsertSchema(balanceGames);
+export const insertBalanceGameVoteSchema = createInsertSchema(balanceGameVotes);
+
+export const balanceGameComments = pgTable("balance_game_comments", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+  gameId: bigint("game_id", { mode: "number" }).references(() => balanceGames.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => profiles.id).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const balanceGameCommentsRelations = relations(balanceGameComments, ({ one }) => ({
+  game: one(balanceGames, { fields: [balanceGameComments.gameId], references: [balanceGames.id] }),
+  user: one(profiles, { fields: [balanceGameComments.userId], references: [profiles.id] }),
+}));
+
+export const insertBalanceGameCommentSchema = createInsertSchema(balanceGameComments);
+
+export type BalanceGame = typeof balanceGames.$inferSelect;
+export type BalanceGameVote = typeof balanceGameVotes.$inferSelect;
+export type BalanceGameComment = typeof balanceGameComments.$inferSelect;
+export type InsertBalanceGame = z.infer<typeof insertBalanceGameSchema>;
+export type InsertBalanceGameVote = z.infer<typeof insertBalanceGameVoteSchema>;
+export type InsertBalanceGameComment = z.infer<typeof insertBalanceGameCommentSchema>;
+
+// --- Notifications Table ---
+export const notifications = pgTable("notifications", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }).notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // 'politics', 'fandom', 'balance_game', 'reward', 'result'
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body").notNull(),
+  data: jsonb("data").default({}),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications);
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;

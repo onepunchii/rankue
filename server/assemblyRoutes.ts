@@ -1,16 +1,18 @@
 
 import type { Express } from "express";
-import { storage } from "./storage";
-import { generatePoliticianPersona } from "./ai";
+import { storage } from "./storage.js";
+import { generatePoliticianPersona } from "./ai.js";
 import { z } from "zod";
-import { insertAssemblyMemberSchema } from "@shared/schema";
-import { updateSampleMembersActivity, updateAllMembersActivity } from "./updateAssemblyActivity";
+import { insertAssemblyMemberSchema } from "../shared/schema.js";
+import { updateSampleMembersActivity, updateAllMembersActivity } from "./updateAssemblyActivity.js";
 import fs from "fs";
 import path from "path";
 
 export function registerAssemblyRoutes(app: Express) {
   // 국회의원 랭킹 API (순서 중요: :id 보다 먼저 와야 함)
   app.get("/api/assembly/rankings", async (req, res) => {
+    // Cache for 5 minutes
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
     try {
       const allMembers = await storage.getAssemblyMembers(300);
 
@@ -66,6 +68,8 @@ export function registerAssemblyRoutes(app: Express) {
 
   // 추천 국회의원/상위 국회의원 정보를 JSON에서 조회하는 API
   app.get("/api/assembly/top-member-info", async (req, res) => {
+    // Cache for 5 minutes
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
     try {
       console.log('🔍 /api/assembly/top-member-info 요청 받음');
 
@@ -140,6 +144,8 @@ export function registerAssemblyRoutes(app: Express) {
 
   // 국회 ON 대시보드 통계 데이터 (이 라우트를 :id 보다 먼저 배치)
   app.get("/api/assembly/dashboard-stats", async (req, res) => {
+    // Cache for 60 seconds to reduce DB load
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=30');
     try {
       const [allMembers, topMembers] = await Promise.all([
         storage.getAssemblyMembers(300), // 전체 국회의원

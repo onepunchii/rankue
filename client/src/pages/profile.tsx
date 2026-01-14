@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Camera, Pencil } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, Link } from "wouter";
 import MobileHeader from "@/components/mobile-header";
@@ -13,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LotterySectionRedesigned from "@/components/lottery-section-redesigned";
 import PersonalityAnalysisCard from "@/components/personality-analysis-card";
-import FriendReferralCard from "@/components/friend-referral-card";
+
 import { NicknameEditDialog } from "@/components/NicknameEditDialog";
 import NotificationSettingsModal from "@/components/notification-settings-modal";
 import { apiRequest } from "@/lib/queryClient";
@@ -175,6 +177,92 @@ export default function Profile() {
     },
     enabled: !!authUser && !authUser.isGuest
   });
+
+  // State for avatar upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+
+  const convertToWebP = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas context failed')); return; }
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Conversion failed'));
+        }, 'image/webp', 0.8);
+      };
+      img.onerror = () => reject(new Error('Image load failed'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const handleAvatarClick = () => {
+    if (!isAvatarUploading) fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input value to allow re-selection of same file if it fails
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    setIsAvatarUploading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+    try {
+      const webpBlob = await convertToWebP(file);
+      const formData = new FormData();
+      formData.append('avatar', webpBlob, 'avatar.webp');
+
+      // Robust Token Retrieval (with timeout)
+      let token: string | undefined;
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Token limit")), 2000));
+        const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        token = data?.session?.access_token;
+      } catch (err) {
+        console.warn("Token fetch timeout, attempting fallback or anon");
+        // Fallback to localStorage check if needed, or proceed without token (server might handle guest)
+      }
+
+      const res = await fetch("/api/user/avatar", {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: formData,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`Upload failed: ${res.status}`);
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/profile'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+
+      toast({ title: "프로필 이미지 변경 완료" });
+    } catch (e: any) {
+      console.error("Avatar upload error:", e);
+      let errorMsg = "이미지 변경 실패";
+      if (e.name === 'AbortError') errorMsg = "업로드 시간 초과";
+      toast({ title: errorMsg, description: "잠시 후 다시 시도해주세요.", variant: "destructive" });
+    } finally {
+      setIsAvatarUploading(false);
+      clearTimeout(timeoutId);
+    }
+  };
 
   // 참여 완료한 설문 ID 목록 생성
   const participatedSurveyIds = Array.isArray(participations) ? participations
@@ -362,36 +450,61 @@ export default function Profile() {
           <Card className="glass-card-strong border-0 shadow-2xl bg-white/[0.05]">
             <CardContent className="p-6">
               <div className="flex items-center space-x-4 mb-6">
-                <Avatar className="w-20 h-20 shadow-2xl border-2 border-white/10 ring-4 ring-purple-600/20">
-                  <AvatarFallback className={`
-                    ${authUser?.gender === '남성'
-                      ? 'bg-blue-600/20 text-blue-400'
-                      : authUser?.gender === '여성'
-                        ? 'bg-pink-600/20 text-pink-400'
-                        : 'bg-purple-600/20 text-purple-400'
-                    } 
-                    border border-white/10 shadow-inner text-2xl font-black
-                  `}>
-                    {authUser?.gender === '남성' ? (
-                      <i className="fas fa-user-tie text-xl text-blue-400"></i>
-                    ) : authUser?.gender === '여성' ? (
-                      <i className="fas fa-female text-xl text-pink-400"></i>
-                    ) : authUser?.nickname ? (
-                      <i className="fas fa-user-circle text-xl text-purple-400"></i>
+                <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
+                  <Avatar className="w-20 h-20 shadow-2xl border-2 border-white/10 ring-4 ring-purple-600/20 transition-all group-hover:ring-purple-500/50">
+                    <AvatarFallback className={`
+                      ${authUser?.gender === '남성'
+                        ? 'bg-blue-600/20 text-blue-400'
+                        : authUser?.gender === '여성'
+                          ? 'bg-pink-600/20 text-pink-400'
+                          : 'bg-purple-600/20 text-purple-400'
+                      } 
+                      border border-white/10 shadow-inner text-2xl font-black
+                    `}>
+                      <AvatarImage src={authUser?.profileImageUrl || undefined} className="object-cover" />
+                      {authUser?.gender === '남성' ? (
+                        <i className="fas fa-user-tie text-xl text-blue-400"></i>
+                      ) : authUser?.gender === '여성' ? (
+                        <i className="fas fa-female text-xl text-pink-400"></i>
+                      ) : authUser?.nickname ? (
+                        <i className="fas fa-user-circle text-xl text-purple-400"></i>
+                      ) : (
+                        <span className="text-xl font-bold text-purple-400">
+                          {authUser?.nickname?.[0]?.toUpperCase() || authUser?.fullName?.[0]?.toUpperCase() || authUser?.email?.[0]?.toUpperCase() || 'G'}
+                        </span>
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className={`absolute inset-0 bg-black/60 rounded-full flex items-center justify-center transition-opacity duration-200 ${isAvatarUploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    {isAvatarUploading ? (
+                      <Loader2 className="w-6 h-6 text-white animate-spin" />
                     ) : (
-                      <span className="text-xl font-bold text-purple-400">
-                        {authUser?.nickname?.[0]?.toUpperCase() || authUser?.fullName?.[0]?.toUpperCase() || authUser?.email?.[0]?.toUpperCase() || 'G'}
-                      </span>
+                      <Camera className="w-6 h-6 text-white" />
                     )}
-                  </AvatarFallback>
-                </Avatar>
+                  </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    hidden
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    onClick={(e) => (e.target as any).value = null} // Allow selecting same file again
+                  />
+                </div>
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h1 className="text-xl font-bold text-white flex items-center gap-2">
                       {authUser?.nickname || authUser?.fullName || (authUser?.email ? authUser.email.split('@')[0] : '게스트 사용자')}
+                      {!authUser?.isGuest && (
+                        <NicknameEditDialog currentNickname={authUser?.nickname || ''} isGuest={false}>
+                          <button className="p-1.5 hover:bg-white/10 rounded-full transition-colors group">
+                            <Pencil className="w-3.5 h-3.5 text-white/40 group-hover:text-purple-400 transition-colors" />
+                          </button>
+                        </NicknameEditDialog>
+                      )}
                     </h1>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-gray-400">
                     {(authUser?.nickname || authUser?.fullName || authUser?.email) ? '프로필 인증 완료' : authUser?.isGuest ? '게스트 모드' : '인증된 사용자'}
                   </p>
                   <div className="flex items-center space-x-3 mt-3">
@@ -676,13 +789,7 @@ export default function Profile() {
           </Card>
         </section>
 
-        <section className="px-4 mb-10">
-          <div className="flex items-center space-x-2 mb-6 px-4">
-            <i className="fas fa-user-friends text-sm text-purple-400"></i>
-            <h2 className="text-sm font-black text-white/50 uppercase tracking-widest">친구 초대 혜택</h2>
-          </div>
-          <FriendReferralCard userId={authUser?.id || ''} />
-        </section>
+
 
 
 
@@ -702,7 +809,7 @@ export default function Profile() {
                 >
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                      <i className="fas fa-user-edit text-purple-400"></i>
+                      <i className="fas fa-user-edit text-white"></i>
                     </div>
                     <div className="text-left">
                       <div className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors">프로필 수정</div>
@@ -722,7 +829,7 @@ export default function Profile() {
                 >
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center group-hover:bg-pink-500/20 transition-colors">
-                      <i className="fas fa-bell text-pink-400"></i>
+                      <i className="fas fa-bell text-white"></i>
                     </div>
                     <div className="text-left">
                       <div className="text-sm font-bold text-white group-hover:text-pink-300 transition-colors">알림 설정</div>
@@ -742,7 +849,7 @@ export default function Profile() {
                 >
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-                      <i className="fas fa-shield-alt text-blue-400"></i>
+                      <i className="fas fa-shield-alt text-white"></i>
                     </div>
                     <div className="text-left">
                       <div className="text-sm font-bold text-white group-hover:text-blue-300 transition-colors">개인정보 보호</div>
@@ -795,7 +902,7 @@ export default function Profile() {
                 >
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                      <i className="fas fa-question-circle text-orange-400"></i>
+                      <i className="fas fa-question-circle text-white"></i>
                     </div>
                     <div className="text-left">
                       <div className="text-sm font-bold text-white group-hover:text-orange-300 transition-colors">도움말</div>

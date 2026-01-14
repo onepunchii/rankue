@@ -1,9 +1,9 @@
 import cron from 'node-cron';
-// import { supabaseAdmin } from './supabase'; // Replaced with Drizzle
+// import { supabaseAdmin } from './supabase.js'; // Replaced with Drizzle
 import OpenAI from 'openai';
-import { storage } from './storage';
-import { db } from './db';
-import { assemblyBills, surveys } from '@shared/schema';
+import { storage } from './storage.js';
+import { db } from './db.js';
+import { assemblyBills, surveys } from '../shared/schema.js';
 import { eq } from 'drizzle-orm';
 
 // OpenAI initialization moved to methods to prevent crash

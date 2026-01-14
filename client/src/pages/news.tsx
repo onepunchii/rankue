@@ -316,7 +316,7 @@ export default function NewsPage() {
                       onClick={() => {
                         const url = article.link;
                         if (url) {
-                          setLocation(`/news/view?url=${encodeURIComponent(url)}`);
+                          setLocation(`/news/view?url=${encodeURIComponent(url)}&from=/news`);
                         }
                       }}
                     >

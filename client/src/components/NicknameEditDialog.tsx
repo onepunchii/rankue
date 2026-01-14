@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { generateMultipleNicknames } from "@/lib/nicknameGenerator";
 import { updateGuestNickname } from "@/lib/guestId";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface NicknameEditDialogProps {
   currentNickname: string;
@@ -65,13 +65,11 @@ export function NicknameEditDialog({ currentNickname, isGuest, children }: Nickn
         // localStorage 업데이트
         updateGuestNickname(nickname.trim());
       } else {
-        // 일반 사용자 닉네임 업데이트 (추후 구현)
-        toast({
-          title: "준비중",
-          description: "일반 사용자 닉네임 변경 기능은 준비중입니다.",
-          variant: "default",
+        // Authenticated user update
+        await apiRequest("/api/user/profile", {
+          method: "PATCH",
+          body: { nickname: nickname.trim() }
         });
-        return;
       }
 
       // 캐시 무효화
@@ -101,92 +99,91 @@ export function NicknameEditDialog({ currentNickname, isGuest, children }: Nickn
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="glass-card-strong border-0 shadow-xl bg-gradient-to-br from-white/90 to-pink-50/90 dark:from-gray-800/90 dark:to-gray-700/90 max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+      <DialogContent className="bg-zinc-950/95 backdrop-blur-xl border border-white/10 text-white w-[85%] rounded-[32px] max-w-[320px] p-6 shadow-2xl gap-6">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-center text-lg font-bold text-white">
             닉네임 변경
           </DialogTitle>
+          <p className="text-center text-[11px] text-white/40 font-medium">
+            나만의 멋진 닉네임을 설정해보세요
+          </p>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-              새 닉네임
-            </label>
-            <Input
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder="새 닉네임을 입력하세요"
-              className="glass-card border-pink-200 focus:border-pink-400"
-              maxLength={20}
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              {nickname.length}/20자
+
+        <div className="space-y-5">
+          {/* Input Section */}
+          <div className="space-y-2">
+            <div className="relative">
+              <Input
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="닉네임 입력"
+                className="bg-black/40 border-white/10 text-center text-white font-bold text-base h-12 rounded-2xl focus-visible:ring-purple-500/50 placeholder:text-white/20"
+                maxLength={20}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/20 font-medium">
+                {nickname.length}/20
+              </div>
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {/* Suggestions Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-xs font-bold text-white/50">
                 추천 닉네임
               </label>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleGenerateSuggestions}
-                className="text-pink-600 hover:text-pink-700 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                className="h-6 px-2 text-[10px] text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-full"
               >
-                <i className="fas fa-refresh mr-1 text-xs"></i>
+                <i className="fas fa-sync-alt mr-1.5"></i>
                 새로고침
               </Button>
             </div>
-            <div className="space-y-2">
+
+            <div className="flex flex-wrap gap-2 justify-center bg-white/5 p-3 rounded-2xl border border-white/5 min-h-[80px] items-center">
               {suggestions.length === 0 ? (
-                <Button
-                  variant="outline"
+                <button
                   onClick={handleGenerateSuggestions}
-                  className="w-full glass-card border-pink-200 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                  className="text-[11px] text-white/30 flex flex-col items-center gap-1 hover:text-white/50 transition-colors py-2"
                 >
-                  <i className="fas fa-magic mr-2"></i>
-                  추천 닉네임 생성
-                </Button>
+                  <i className="fas fa-magic text-sm mb-1 opacity-50"></i>
+                  <span>터치하여 추천받기</span>
+                </button>
               ) : (
                 suggestions.map((suggestion, index) => (
-                  <Button
+                  <button
                     key={index}
-                    variant="outline"
                     onClick={() => setNickname(suggestion)}
-                    className="w-full glass-card border-pink-200 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20 text-left justify-start"
+                    className="px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 hover:border-purple-500/30 border border-white/10 rounded-xl text-[11px] text-white/80 transition-all active:scale-95"
                   >
                     {suggestion}
-                  </Button>
+                  </button>
                 ))
               )}
             </div>
           </div>
 
-          <div className="flex space-x-2">
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-3 pt-2">
             <Button
               variant="outline"
               onClick={() => setIsOpen(false)}
-              className="flex-1 glass-card border-gray-300"
+              className="bg-white/5 border-white/5 hover:bg-white/10 text-white/60 hover:text-white h-12 rounded-2xl text-sm font-bold active:scale-95 transition-transform"
             >
               취소
             </Button>
             <Button
               onClick={handleUpdateNickname}
               disabled={isUpdating || !nickname.trim()}
-              className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white"
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border-0 shadow-lg shadow-purple-900/30 h-12 rounded-2xl text-sm font-bold active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isUpdating ? (
-                <>
-                  <i className="fas fa-spinner fa-spin mr-2"></i>
-                  변경 중...
-                </>
+                <i className="fas fa-spinner fa-spin"></i>
               ) : (
-                <>
-                  <i className="fas fa-check mr-2"></i>
-                  변경
-                </>
+                "변경하기"
               )}
             </Button>
           </div>

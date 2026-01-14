@@ -1,0 +1,18 @@
+{
+    "name": "Polli - 매일 돈 버는 투표 & 덕질 앱",
+    "short_name": "Polli",
+    "description": "터치 한 번으로 포인트가 쌓여요! 내 최애 아이돌 1등 만들고, 쉬운 정치 참여까지.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#111827",
+    "theme_color": "#000000",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}

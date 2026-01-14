@@ -75,9 +75,13 @@ export default function NewsViewer() {
         .slice(0, 5);
 
     useEffect(() => {
+        // Only run validation if we are actually on the view page
+        if (location !== '/news/view') return;
+
         if (!articleUrl && !articleId) {
-            toast({ title: "오류", description: "유효하지 않은 기사 링크입니다.", variant: "destructive" });
-            setLocation('/');
+            // Silently redirect if invalid, no toast needed as it might be a navigation artifact
+            const from = searchParams.get('from');
+            setLocation(from || '/');
             return;
         }
 
@@ -200,8 +204,11 @@ export default function NewsViewer() {
             <MobileHeader />
 
             <div className="sticky top-14 z-40 bg-[#121212]/80 backdrop-blur-md border-b border-white/10 px-4 py-3 flex justify-between items-center">
-                <Button variant="ghost" size="sm" onClick={() => setLocation('/')} className="text-gray-400 hover:text-white -ml-2">
-                    <ChevronLeft className="w-5 h-5 mr-1" /> 홈으로
+                <Button variant="ghost" size="sm" onClick={() => {
+                    const from = searchParams.get('from');
+                    setLocation(from || '/');
+                }} className="text-gray-400 hover:text-white -ml-2">
+                    <ChevronLeft className="w-5 h-5 mr-1" /> {searchParams.get('from') === '/news' ? '목록으로' : '홈으로'}
                 </Button>
                 <div className="flex gap-2">
                     <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white"><Share2 className="w-5 h-5" /></Button>

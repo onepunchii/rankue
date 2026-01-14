@@ -1,5 +1,5 @@
-import { db } from "../db";
-import { newsArticles, type NewsArticle, type InsertNewsArticle } from "@shared/schema";
+import { db } from "../db.js";
+import { newsArticles, type NewsArticle, type InsertNewsArticle } from "../../shared/schema.js";
 import { eq, desc, or, ilike, and } from "drizzle-orm";
 
 export class NewsStorage {

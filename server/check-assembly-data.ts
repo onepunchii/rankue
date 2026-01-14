@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { supabaseAdmin } from './supabase';
 import { db } from './db';
-import { surveys } from '@shared/schema';
+import { surveys } from '../shared/schema.js';
 import { eq, desc } from 'drizzle-orm';
 
 async function checkData() {

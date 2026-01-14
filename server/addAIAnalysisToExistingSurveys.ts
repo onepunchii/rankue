@@ -1,5 +1,5 @@
 import { db } from './db';
-import { surveys } from '@shared/schema';
+import { surveys } from '../shared/schema.js';
 import { isNotNull, and, isNull, or, eq } from 'drizzle-orm';
 import OpenAI from 'openai';
 
@@ -43,9 +43,9 @@ async function generateAIAnalysisForSurvey(survey: any) {
     });
 
     const analysisData = JSON.parse(response.choices[0].message.content || '{}');
-    
+
     console.log(`✅ "${survey.title}" AI 분석 생성 완료`);
-    
+
     return {
       summary: analysisData.summary || '',
       pros: analysisData.pros || [],
@@ -93,7 +93,7 @@ async function addAIAnalysisToExistingSurveys() {
       try {
         // AI 분석 생성
         const aiAnalysis = await generateAIAnalysisForSurvey(survey);
-        
+
         if (!aiAnalysis) {
           failCount++;
           continue;

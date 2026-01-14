@@ -164,35 +164,6 @@ export default function CelebrityBentoGrid() {
                     </div>
                 </motion.div>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="col-span-1 glass-card p-5 relative overflow-hidden border border-white/10 bg-black/50 backdrop-blur-xl rounded-[2rem] flex items-center justify-between group cursor-pointer aspect-[2/1] sm:aspect-[1.8/1]"
-                    onClick={() => setLocation('/celebrity-ranking')}
-                >
-                    <div className="relative z-10 text-left">
-                        <h4 className="text-lg font-black text-white leading-tight">전체<br />랭킹</h4>
-                    </div>
-                    <div className="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center border border-white/10 group-hover:bg-white/10 transition-colors flex-shrink-0">
-                        <ArrowRight className="w-4 h-4 text-white/20" />
-                    </div>
-                </motion.div>
-
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="col-span-1 glass-card p-5 relative overflow-hidden border border-white/10 bg-black/50 backdrop-blur-xl rounded-[2rem] flex items-center justify-between group cursor-pointer aspect-[2/1] sm:aspect-[1.8/1]"
-                    onClick={() => setLocation('/celebrity-ranking')}
-                >
-                    <div className="relative z-10 text-left">
-                        <h4 className="text-lg font-black text-white leading-tight">투표<br />참여</h4>
-                    </div>
-                    <div className="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center border border-white/10 group-hover:bg-white/10 transition-colors flex-shrink-0">
-                        <PlusCircle className="w-4 h-4 text-white/20" />
-                    </div>
-                </motion.div>
 
             </div>
         </section>

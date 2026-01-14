@@ -11,10 +11,10 @@ interface SEOHeadProps {
 }
 
 export function SEOHead({
-  title = "Polli - 참여형 여론조사 플랫폼",
-  description = "누구나 쉽게 여론조사 만들고 참여하세요!",
-  keywords = "설문조사, 투표, 여론조사, 포인트, 리워드, AI, 뉴스, 로또, 익명투표, 지역설문",
-  image = "https://www.polli.co.kr/polli_og_image.png",
+  title = "Polli - 매일 돈 버는 투표 & 덕질 앱",
+  description = "터치 한 번으로 포인트가 쌓여요! 내 최애 아이돌 1등 만들고, 쉬운 정치 참여까지. 지금 바로 무료 투표하고 기프티콘 받아가세요.",
+  keywords = "앱테크, 리워드앱, 돈버는앱, 기프티콘, 아이돌투표, 정치참여, 여론조사, 폴리, POLLI",
+  image = "https://www.polli.co.kr/polli_og_marketing_v1.png",
   url = "https://www.polli.co.kr",
   type = "website",
   structuredData

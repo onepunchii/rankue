@@ -1,6 +1,6 @@
-import { db } from "./db";
-import { assemblyMembers } from "@shared/schema";
-import { batchCollectActivity } from "./assemblyApi";
+import { db } from "./db.js";
+import { assemblyMembers } from "../shared/schema.js";
+import { batchCollectActivity } from "./assemblyApi.js";
 import { eq, desc } from "drizzle-orm";
 
 export async function updateAllMembersActivity() {

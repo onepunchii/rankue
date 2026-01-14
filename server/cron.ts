@@ -1,11 +1,11 @@
 import * as cron from 'node-cron';
-import { storage } from './storage';
-import { syncAssemblyRankingData } from './services/assemblyService';
-import { createWeeklyPoliticalSurvey } from './politicalScheduler';
-import { syncNews } from './services/newsService';
-import { aggregateAllPastPoliticalSurveys, aggregatePoliticalStats } from './services/politicalStatsService';
-import { db } from './db';
-import { surveys } from '@shared/schema';
+import { storage } from './storage.js';
+import { syncAssemblyRankingData } from './services/assemblyService.js';
+import { createWeeklyPoliticalSurvey } from './politicalScheduler.js';
+import { syncNews } from './services/newsService.js';
+import { aggregateAllPastPoliticalSurveys, aggregatePoliticalStats } from './services/politicalStatsService.js';
+import { db } from './db.js';
+import { surveys } from '../shared/schema.js';
 import { eq, and, like } from 'drizzle-orm';
 
 export function setupCronJobs() {
@@ -37,7 +37,7 @@ export function setupCronJobs() {
     cron.schedule('0 0 1 * *', async () => {
         console.log('📅 Running monthly ranking update...');
         try {
-            await updateRankingData();
+            await syncAssemblyRankingData();
             console.log('✅ Monthly ranking update completed');
         } catch (error) {
             console.error('❌ Monthly ranking update failed:', error);

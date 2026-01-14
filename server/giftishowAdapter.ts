@@ -1,4 +1,4 @@
-import { InsertProviderLog } from "@shared/schema";
+import { InsertProviderLog } from "../shared/schema.js";
 
 // KT 기프티쇼 API 어댑터
 export class GiftishowAdapter {
@@ -50,12 +50,12 @@ export class GiftishowAdapter {
             message: "모의 쿠폰이 발행되었습니다",
           },
         };
-        
+
         const duration = Date.now() - startTime;
         const logEntry = this.log("issue", requestPayload, mockResponse, true, duration);
-        
-        return { 
-          success: true, 
+
+        return {
+          success: true,
           data: mockResponse.data,
           logEntry
         };
@@ -139,12 +139,12 @@ export class GiftishowAdapter {
           statusCode: 200,
           message: "모의 쿠폰이 취소되었습니다",
         };
-        
+
         const duration = Date.now() - startTime;
         const logEntry = this.log("cancel", requestPayload, mockResponse, true, duration);
-        
-        return { 
-          success: true, 
+
+        return {
+          success: true,
           message: mockResponse.message,
           logEntry
         };
@@ -225,12 +225,12 @@ export class GiftishowAdapter {
             deliveredAt: new Date().toISOString(),
           },
         };
-        
+
         const duration = Date.now() - startTime;
         const logEntry = this.log("status_check", requestPayload, mockResponse, true, duration);
-        
-        return { 
-          success: true, 
+
+        return {
+          success: true,
           data: mockResponse.data,
           logEntry
         };

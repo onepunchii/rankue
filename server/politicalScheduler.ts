@@ -1,5 +1,5 @@
-import { db } from './db';
-import { surveys, surveyQuestions } from '@shared/schema';
+import { db } from './db.js';
+import { surveys, surveyQuestions } from '../shared/schema.js';
 import { eq, and, gte, lte } from 'drizzle-orm';
 
 // 주차 계산 헬퍼
@@ -57,11 +57,11 @@ export async function createWeeklyPoliticalSurvey(): Promise<void> {
       experienceReward: 50,
       personalPointsReward: 30,
       // AI 분석 데이터 추가 (통일된 형식 유지)
-      aiAnalysisSummary: "대한민국 정치 현황을 파악하기 위한 주간 정기 여론조사입니다. 대통령 국정수행 평가, 정당 지지도, 그리고 차기 대선 후보 적합도를 조사하여 민심의 흐름을 분석합니다.",
-      aiAnalysisPros: ["객관적인 수치를 통한 민심 파악 가능", "정치권의 정책 방향 설정에 참고 자료 제공", "유권자의 목소리를 직접적으로 반영"],
+      aiAnalysisSummary: "대한민국 정치 현황을 파악하기 위한 주간 정기 여론조사입니다. 대통령 국정수행 평가, 정당 지지도, 그리고 국정 우선 과제를 조사하여 민심의 흐름을 분석합니다.",
+      aiAnalysisPros: ["객관적인 수치를 통한 민심 파악 가능", "국정 운영 우선순위에 대한 유권자 의사 반영", "정치권의 정책 방향 설정에 참고 자료 제공"],
       aiAnalysisCons: ["표본의 대표성 및 응답 편향 가능성", "단기적인 이슈에 의한 급격한 변동 가능성", "정치적 양극화 심화 우려"],
       aiAnalysisOneLiner: "매주 기록되는 지표는 대한민국 민주주의의 현재를 보여주는 거울입니다.",
-      aiAnalysisKeywords: ["지지율", "정당지지도", "대선주자", "민심", "정기조사"]
+      aiAnalysisKeywords: ["지지율", "정당지지도", "국정과제", "민심", "정기조사"]
       // createdBy 필드는 비워둡니다 (시스템 생성)
     }).returning();
 
@@ -89,12 +89,12 @@ export async function createWeeklyPoliticalSurvey(): Promise<void> {
       isRequired: true
     });
 
-    // Q3. 차기 대선 후보 적합도
+    // Q3. 대통령 우선 과제
     await db.insert(surveyQuestions).values({
       surveyId: survey.id,
-      question: "차기 대통령으로 누가 가장 적합하다고 생각하십니까?",
+      question: "남은 임기 동안, 대통령이 '1순위'로 집중해야 할 과제는 무엇일까요?",
       type: "single_choice",
-      options: ["이재명", "한동훈", "조국", "오세훈", "홍준표", "김동연", "안철수", "이준석", "기타 인물"],
+      options: ["물가/경제 안정", "소통/협치", "인적 쇄신", "공정/부패 척결", "개혁 마무리"],
       order: 3,
       isRequired: true
     });

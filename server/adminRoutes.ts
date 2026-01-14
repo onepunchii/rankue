@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
-import { db } from "./db";
-import { surveys, profiles, userSurveyParticipation, surveyResponses } from "@shared/schema";
-import { eq, and, gte, gt, lte, desc, count, sql, inArray } from "drizzle-orm";
+import { db } from "./db.js";
+import { surveys, profiles, userSurveyParticipation, surveyResponses } from "../shared/schema.js";
+import { eq, and, gte, gt, lte, desc, count, sql, inArray, ne } from "drizzle-orm";
 import OpenAI from "openai";
 
 const ADMIN_CREDENTIALS = {
@@ -81,8 +81,8 @@ export function registerAdminRoutes(app: Express) {
       req.session.adminUsername = username;
 
       console.log("Admin login successful:", username);
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "관리자 로그인 성공",
         username: username
       });
@@ -123,8 +123,8 @@ export function registerAdminRoutes(app: Express) {
       req.session.adminUsername = username;
 
       console.log("Gangnam login successful:", username);
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "강남구 관리자 로그인 성공",
         username: username
       });
@@ -138,7 +138,7 @@ export function registerAdminRoutes(app: Express) {
   app.get("/api/admin/surveys", requireAdmin, async (req, res) => {
     try {
       const { search = '', category = 'all' } = req.query as { search: string; category: string };
-      
+
       // 기본 설문 목록만 조회 (JOIN 없이)
       let query = db.select().from(surveys);
 
@@ -162,7 +162,7 @@ export function registerAdminRoutes(app: Express) {
               .select({ count: count() })
               .from(userSurveyParticipation)
               .where(eq(userSurveyParticipation.surveyId, survey.id));
-            
+
             return {
               ...survey,
               participantCount: participantCount[0]?.count || 0
@@ -187,14 +187,14 @@ export function registerAdminRoutes(app: Express) {
   app.delete("/api/admin/surveys/:id", requireAdmin, async (req, res) => {
     try {
       const surveyId = parseInt(req.params.id);
-      
+
       // 설문 응답과 참여 기록 먼저 삭제
       await db.delete(surveyResponses).where(eq(surveyResponses.surveyId, surveyId));
       await db.delete(userSurveyParticipation).where(eq(userSurveyParticipation.surveyId, surveyId));
-      
+
       // 설문 삭제
       await db.delete(surveys).where(eq(surveys.id, surveyId));
-      
+
       console.log(`Admin deleted survey: ${surveyId}`);
       res.json({ success: true, message: "설문이 삭제되었습니다." });
     } catch (error) {
@@ -214,8 +214,7 @@ export function registerAdminRoutes(app: Express) {
       // 활성 사용자 수 (실제 데이터)
       const activeUsersResult = await db
         .select({ count: count() })
-        .from(profiles)
-        .where(ne(profiles.userType, 'guest'));
+        .from(profiles);
       const activeUsers = activeUsersResult[0]?.count || 0;
 
       // 기간 내 새 설문 수 (실제 데이터)
@@ -247,24 +246,24 @@ export function registerAdminRoutes(app: Express) {
 
       const categoryData = categoryDistribution.map(item => ({
         name: item.category === 'life' ? '라이프' :
-              item.category === 'politics' ? '정치' :
-              item.category === 'policy' ? '정책' :
+          item.category === 'politics' ? '정치' :
+            item.category === 'policy' ? '정책' :
               item.category === 'fun' ? '재미' :
-              item.category === 'deep' ? '딥' :
-              item.category === 'location' ? '지역' : item.category,
+                item.category === 'deep' ? '딥' :
+                  item.category === 'location' ? '지역' : item.category,
         value: item.count
       }));
 
       // 일별 참여 데이터 (실제 데이터 - 최근 기간)
       const dailyParticipations = await db
         .select({
-          date: sql<string>`DATE(${userSurveyParticipation.createdAt})`,
+          date: sql<string>`DATE(${userSurveyParticipation.completedAt})`,
           count: count()
         })
         .from(userSurveyParticipation)
-        .where(gte(userSurveyParticipation.createdAt, startDate))
-        .groupBy(sql`DATE(${userSurveyParticipation.createdAt})`)
-        .orderBy(sql`DATE(${userSurveyParticipation.createdAt})`);
+        .where(gte(userSurveyParticipation.completedAt, startDate))
+        .groupBy(sql`DATE(${userSurveyParticipation.completedAt})`)
+        .orderBy(sql`DATE(${userSurveyParticipation.completedAt})`);
 
       // 일별 데이터 배열 생성 (빈 날짜는 0으로 채움)
       const dailyData = Array.from({ length: days }, (_, i) => {
@@ -307,72 +306,72 @@ export function registerAdminRoutes(app: Express) {
       const totalSurveys = surveysResult[0]?.count || 238;
 
       const topSurveys = [
-        { 
-          id: 322, 
-          title: "7월 30일주차 국정 여론조사", 
-          category: "정치", 
-          participantCount: 15 
+        {
+          id: 322,
+          title: "7월 30일주차 국정 여론조사",
+          category: "정치",
+          participantCount: 15
         },
-        { 
-          id: 118, 
-          title: "산업기술혁신 촉진법 일부개정법률안", 
-          category: "정책", 
-          participantCount: 12 
+        {
+          id: 118,
+          title: "산업기술혁신 촉진법 일부개정법률안",
+          category: "정책",
+          participantCount: 12
         },
-        { 
-          id: 290, 
-          title: "주택임대차보호법 일부개정법률안", 
-          category: "정책", 
-          participantCount: 8 
+        {
+          id: 290,
+          title: "주택임대차보호법 일부개정법률안",
+          category: "정책",
+          participantCount: 8
         },
-        { 
-          id: 156, 
-          title: "시간외근무 수당 관련 설문", 
-          category: "라이프", 
-          participantCount: 6 
+        {
+          id: 156,
+          title: "시간외근무 수당 관련 설문",
+          category: "라이프",
+          participantCount: 6
         },
-        { 
-          id: 98, 
-          title: "환경보호 정책 우선순위", 
-          category: "정책", 
-          participantCount: 5 
+        {
+          id: 98,
+          title: "환경보호 정책 우선순위",
+          category: "정책",
+          participantCount: 5
         }
       ];
 
       // 실제 사용자 데이터 기반
-      const usersResult = await db.select({ count: count() }).from(profiles).where(ne(profiles.userType, 'guest'));
+      const usersResult = await db.select({ count: count() }).from(profiles);
       const totalUsers = usersResult[0]?.count || 5;
 
       const topUsers = [
-        { 
-          id: "user_1753161904083_x1t13zls1", 
-          name: "정성수", 
-          level: 5, 
-          participationCount: 18 
+        {
+          id: "user_1753161904083_x1t13zls1",
+          name: "정성수",
+          level: 5,
+          participationCount: 18
         },
-        { 
-          id: "user_guest_common", 
-          name: "김민준", 
-          level: 3, 
-          participationCount: 12 
+        {
+          id: "user_guest_common",
+          name: "김민준",
+          level: 3,
+          participationCount: 12
         },
-        { 
-          id: "user_1752344729967_abc123", 
-          name: "이서현", 
-          level: 4, 
-          participationCount: 9 
+        {
+          id: "user_1752344729967_abc123",
+          name: "이서현",
+          level: 4,
+          participationCount: 9
         },
-        { 
-          id: "user_1752585255453_def456", 
-          name: "박지우", 
-          level: 2, 
-          participationCount: 7 
+        {
+          id: "user_1752585255453_def456",
+          name: "박지우",
+          level: 2,
+          participationCount: 7
         },
-        { 
-          id: "user_1752588683237_ghi789", 
-          name: "최예린", 
-          level: 3, 
-          participationCount: 5 
+        {
+          id: "user_1752588683237_ghi789",
+          name: "최예린",
+          level: 3,
+          participationCount: 5
         }
       ];
 
@@ -391,14 +390,14 @@ export function registerAdminRoutes(app: Express) {
   // 사용자 관리 API (확장된 필터링 지원)
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
-      const { 
-        search = '', 
-        filter = 'all', 
+      const {
+        search = '',
+        filter = 'all',
         age = 'all',
         gender = 'all',
         region = 'all',
         activity = 'all',
-        page = 1 
+        page = 1
       } = req.query;
       const pageSize = 20;
       const offset = (Number(page) - 1) * pageSize;
@@ -417,7 +416,7 @@ export function registerAdminRoutes(app: Express) {
       // 상태 필터
       let statusCondition = null;
       if (filter === 'active') {
-        statusCondition = ne(profiles.userType, 'guest');
+        // statusCondition = ne(profiles.userType, 'guest'); // Column removed
       } else if (filter === 'high_level') {
         statusCondition = gte(profiles.level, 7);
       } else if (filter === 'recent') {
@@ -481,20 +480,20 @@ export function registerAdminRoutes(app: Express) {
   app.get("/api/admin/user-statistics", requireAdmin, async (req, res) => {
     try {
       const totalUsers = await db.select({ count: count() }).from(profiles);
-      const activeUsers = await db.select({ count: count() }).from(profiles).where(ne(profiles.userType, 'guest'));
-      
+      const activeUsers = await db.select({ count: count() }).from(profiles);
+
       // 간단한 통계 계산 (복잡한 SQL 피하기)
       const participationCount = await db.select({ count: count() }).from(userSurveyParticipation);
-      
+
       // 오늘 가입자 (간단한 쿼리)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const newUsersToday = await db
         .select({ count: count() })
         .from(profiles)
         .where(gte(profiles.createdAt, today));
-      
+
       const stats = {
         totalUsers: totalUsers[0].count,
         activeUsers: activeUsers[0].count,
@@ -778,7 +777,7 @@ export function registerAdminRoutes(app: Express) {
         id: surveys.id,
         title: surveys.title
       }).from(surveys).where(eq(surveys.isActive, true)).limit(50);
-      
+
       res.json(surveysList);
     } catch (error) {
       console.error("Surveys list error:", error);
@@ -831,7 +830,7 @@ export function registerAdminRoutes(app: Express) {
       const newParticipationsResult = await db
         .select({ count: count() })
         .from(userSurveyParticipation)
-        .where(gte(userSurveyParticipation.createdAt, thisMonth));
+        .where(gte(userSurveyParticipation.completedAt, thisMonth));
       const newParticipationsThisMonth = newParticipationsResult[0]?.count || 0;
 
       // 활성 사용자 (최근 7일)
@@ -840,7 +839,7 @@ export function registerAdminRoutes(app: Express) {
       const activeUsersResult = await db
         .select({ count: sql`COUNT(DISTINCT ${userSurveyParticipation.userId})` })
         .from(userSurveyParticipation)
-        .where(gte(userSurveyParticipation.createdAt, sevenDaysAgo));
+        .where(gte(userSurveyParticipation.completedAt, sevenDaysAgo));
       const activeUsers = activeUsersResult[0]?.count || 0;
 
       // 평균 참여율 계산 (간단 버전)
@@ -860,10 +859,10 @@ export function registerAdminRoutes(app: Express) {
           .select({ count: count() })
           .from(userSurveyParticipation)
           .where(and(
-            gte(userSurveyParticipation.createdAt, startOfDay),
-            lte(userSurveyParticipation.createdAt, endOfDay)
+            gte(userSurveyParticipation.completedAt, startOfDay),
+            lte(userSurveyParticipation.completedAt, endOfDay)
           ));
-        
+
         dailyParticipations.push({
           date: date.toISOString().split('T')[0],
           count: dayParticipationsResult[0]?.count || 0
@@ -1087,7 +1086,7 @@ export function registerAdminRoutes(app: Express) {
   app.get("/api/admin/gangnam-survey-report", requireAdmin, async (req, res) => {
     try {
       const GANGNAM_SURVEY_ID = 1653;
-      const { surveyQuestions } = await import("@shared/schema");
+      const { surveyQuestions } = await import("../shared/schema.js");
 
       // 1. Overview 데이터
       const survey = await db
@@ -1104,7 +1103,7 @@ export function registerAdminRoutes(app: Express) {
         .select({ count: sql<number>`COUNT(DISTINCT ${surveyResponses.userId})` })
         .from(surveyResponses)
         .where(eq(surveyResponses.surveyId, GANGNAM_SURVEY_ID));
-      
+
       const totalResponses = totalResponsesResult[0]?.count || 0;
 
       // 2. 질문 목록 가져오기
@@ -1117,7 +1116,7 @@ export function registerAdminRoutes(app: Express) {
       // 3. 거주지별 통계 (Q2: 현재 거주 지역을 선택해주세요.)
       const residenceQuestion = questions.find(q => q.question.includes("거주") && q.question.includes("지역"));
       let residenceStats = { gangnam: 0, other: 0, noAnswer: 0 };
-      
+
       if (residenceQuestion) {
         const residenceResponses = await db
           .select({ answer: surveyResponses.answer, count: sql<number>`COUNT(*)` })
@@ -1139,7 +1138,7 @@ export function registerAdminRoutes(app: Express) {
           } catch (e) {
             // 파싱 실패시 원본 사용
           }
-          
+
           if (answerText === '강남구') residenceStats.gangnam = Number(r.count);
           else if (answerText === '그 외 지역') residenceStats.other = Number(r.count);
           else if (answerText === '응답하지 않음') residenceStats.noAnswer = Number(r.count);
@@ -1149,7 +1148,7 @@ export function registerAdminRoutes(app: Express) {
       // 4. KPI 계산 함수
       const calculateKPI = async (questionIds: number[]) => {
         if (questionIds.length === 0) return 0;
-        
+
         const responses = await db
           .select({ answer: surveyResponses.answer })
           .from(surveyResponses)
@@ -1173,7 +1172,7 @@ export function registerAdminRoutes(app: Express) {
       };
 
       // Q16,17,18 기반 접근성 개선지수
-      const accessQuestions = questions.filter(q => 
+      const accessQuestions = questions.filter(q =>
         [15, 16, 17].includes(q.order || 0)
       ).map(q => q.id);
       const accessibilityIndex = await calculateKPI(accessQuestions);
@@ -1243,7 +1242,7 @@ export function registerAdminRoutes(app: Express) {
             const optionCounts: Record<string, number> = {};
             responses.forEach(r => {
               if (!r.answer) return;
-              
+
               try {
                 let options;
                 // 이미 배열인 경우 (JSONB가 자동 파싱됨)
@@ -1302,12 +1301,12 @@ export function registerAdminRoutes(app: Express) {
             const validResponses = responses
               .filter(r => {
                 if (!r.answer) return false;
-                
+
                 // 문자열인 경우
                 if (typeof r.answer === 'string') {
                   return r.answer.trim() !== '';
                 }
-                
+
                 // 객체나 배열인 경우 (혹시 모를 경우)
                 return true;
               })
@@ -1414,7 +1413,7 @@ ${responsesText}
       });
     } catch (error) {
       console.error("AI summary error:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "AI 요약 생성 중 오류가 발생했습니다.",
         details: error instanceof Error ? error.message : "Unknown error"
       });

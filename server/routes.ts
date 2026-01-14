@@ -1,22 +1,24 @@
+import { generateBalanceGameFromNews } from "./services/balanceGameGenerator.js";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { db } from "./db";
-import { userSurveyParticipation, surveys, profiles, newsArticles, quickPolls, quickPollVotes, lotteryDraws, surveyQuestions, surveyResponses } from "@shared/schema";
+import { storage } from "./storage.js";
+import { db } from "./db.js";
+import { userSurveyParticipation, surveys, profiles, newsArticles, quickPolls, quickPollVotes, lotteryDraws, surveyQuestions, surveyResponses, politicalStats } from "../shared/schema.js";
 import { eq, and, sql, desc, like, gte, lte } from "drizzle-orm";
-import { upload } from "./uploads";
+import { upload } from "./uploads.js";
 import express from "express";
-import { insertSurveySchema, insertSurveyQuestionSchema, insertSurveyResponseSchema } from "@shared/schema";
-import { analyzeNews, crawlNewsContent, searchNews } from "./newsAnalyzer";
-import { analyzeUserPersonality } from "./ai";
-import { syncNews } from "./services/newsService";
+import { insertSurveySchema, insertSurveyQuestionSchema, insertSurveyResponseSchema } from "../shared/schema.js";
+import { analyzeNews, crawlNewsContent, searchNews } from "./newsAnalyzer.js";
+import { analyzeUserPersonality } from "./ai.js";
+import { syncNews } from "./services/newsService.js";
 import { z } from "zod";
-import { registerAdminRoutes } from "./adminRoutes";
-import { registerAssemblyRoutes } from "./assemblyRoutes";
-import { registerLocalCouncilRoutes } from "./localCouncilRoutes";
-import { authenticateUser, handleGetProfile } from "./auth";
-import { simpleAuthStorage, requireAuth } from "./simpleAuth";
-import { politicianRoutes } from "./politicianRoutes";
+import { registerAdminRoutes } from "./adminRoutes.js";
+import { registerAssemblyRoutes } from "./assemblyRoutes.js";
+import { registerLocalCouncilRoutes } from "./localCouncilRoutes.js";
+import { authenticateUser, handleGetProfile } from "./auth.js";
+import { simpleAuthStorage, requireAuth } from "./simpleAuth.js";
+import { politicianRoutes } from "./politicianRoutes.js";
+import brainRouter from "./brainRoutes.js";
 
 function getUserId(req: any): string | null {
   return req.user?.id || req.body?.userId || null;
@@ -46,6 +48,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, updatedFields: updated });
     } catch (error) {
       res.status(500).json({ message: "프로필 업데이트 실패" });
+    }
+  });
+
+  app.post("/api/user/avatar", authenticateUser, upload.single("avatar"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      const userId = req.user.id;
+      const fileUrl = `/uploads/${req.file.filename}`;
+
+      await simpleAuthStorage.updateUser(userId, { profileImageUrl: fileUrl });
+      res.json({ success: true, url: fileUrl });
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      res.status(500).json({ message: "Avatar upload failed" });
     }
   });
 
@@ -509,9 +527,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json([]);
   });
 
+  // Get latest aggregated stats with breakdowns
+  app.get("/api/political/current-stats", async (req, res) => {
+    try {
+      const [latest] = await db.select()
+        .from(politicalStats)
+        .innerJoin(surveys, eq(politicalStats.surveyId, surveys.id))
+        .orderBy(desc(surveys.createdAt))
+        .limit(1);
+
+      if (!latest) return res.status(404).json({ message: "No stats found" });
+      res.json(latest.political_stats);
+    } catch (error) {
+      console.error("Failed to fetch current stats:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Weekly Trends API - Returns aggregated data by week (excluding current week)
   app.get("/api/political/weekly-trends", async (req, res) => {
     try {
+      const { gender, ageGroup, region } = req.query as Record<string, string>;
+
       // Optimally fetch from political_stats table
       const stats = await db.select({
         stats: politicalStats,
@@ -522,8 +559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(surveys.category, 'politics'))
         .orderBy(surveys.createdAt);
 
-      // Get current week to exclude it (week = Monday to Sunday)
-      // Note: We keep the logic of showing only "completed" weeks for the trend chart
+      // Get current week to exclude it
       const now = new Date();
       const dayOfWeek = now.getDay();
       const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -531,7 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       thisWeekMonday.setDate(now.getDate() - daysFromMonday);
       thisWeekMonday.setHours(0, 0, 0, 0);
 
-      const pastStats = stats.filter(row => {
+      const pastStats = stats.filter((row: any) => {
         const surveyDate = new Date(row.createdAt);
         return surveyDate < thisWeekMonday;
       });
@@ -539,37 +575,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const weeklyData: any = {
         presidential: [],
         party: [],
-        candidate: []
+        priority: []
       };
 
       for (const row of pastStats) {
         const s = row.stats;
-        // Simplify label: "2026년 1월 2주차" -> "1월 2주"
         const match = s.weekLabel.match(/(\d+)월\s*(\d+)주/);
         const displayLabel = match ? `${match[1]}월 ${match[2]}주` : s.weekLabel;
 
+        // Determine which data to use (Total vs Breakdown)
+        let pres: any = s.presidential;
+        let partyObj: any = s.parties;
+        let prioObj: any = s.priorities || s.candidates; // Fallback for old data
+
+        if (gender && s.genderBreakdown && (s.genderBreakdown as any)[gender]) {
+          const b = (s.genderBreakdown as any)[gender];
+          pres = b.presidential || pres;
+          partyObj = b.parties || partyObj;
+          prioObj = b.priorities || b.candidates || prioObj;
+        } else if (ageGroup && s.ageBreakdown && (s.ageBreakdown as any)[ageGroup]) {
+          const b = (s.ageBreakdown as any)[ageGroup];
+          pres = b.presidential || pres;
+          partyObj = b.parties || partyObj;
+          prioObj = b.priorities || b.candidates || prioObj;
+        } else if (region && s.regionBreakdown && (s.regionBreakdown as any)[region]) {
+          const b = (s.regionBreakdown as any)[region];
+          pres = b.presidential || pres;
+          partyObj = b.parties || partyObj;
+          prioObj = b.priorities || b.candidates || prioObj;
+        }
+
         // 1. Presidential
-        const pres = s.presidential as any;
         weeklyData.presidential.push({
           week: displayLabel,
           긍정: pres.positive || 0,
           부정: pres.negative || 0,
           중립: pres.neutral || 0,
-          참여자: s.totalParticipants
+          참여자: s.totalParticipants,
+          raw: s
         });
 
         // 2. Party
-        const partyObj = s.parties as any;
-        const partyEntry: any = { week: displayLabel, 참여자: s.totalParticipants };
-        // Ensure keys match what Frontend expects (The aggregation service saves them as keys)
+        const partyEntry: any = { week: displayLabel, 참여자: s.totalParticipants, raw: s };
         Object.assign(partyEntry, partyObj);
         weeklyData.party.push(partyEntry);
 
-        // 3. Candidate
-        const candObj = s.candidates as any;
-        const candEntry: any = { week: displayLabel, 참여자: s.totalParticipants };
-        Object.assign(candEntry, candObj);
-        weeklyData.candidate.push(candEntry);
+        // 3. Priority
+        const prioEntry: any = { week: displayLabel, 참여자: s.totalParticipants, raw: s };
+        Object.assign(prioEntry, prioObj);
+        weeklyData.priority.push(prioEntry);
       }
 
       res.json(weeklyData);
@@ -727,8 +781,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/stats/today-participants", async (req, res) => {
     try {
+      // Cache for 60 seconds (Client) / 60 seconds (CDN/Vercel) / Allow stale for 30s
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=30');
+
       const count = await storage.getTodayParticipantCount();
-      console.log(`[Stats] Today's participants count fetched: ${count} at ${new Date().toISOString()}`);
+      console.log(`[Stats] Fetched: ${count} (Cached when possible)`);
       res.json({ count });
     } catch (error) {
       console.error("[Stats] Error fetching today's participants:", error);
@@ -757,6 +814,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 5. Lottery
   app.get("/api/lottery/today-draw", async (req, res) => {
+    // Cache for 5 minutes as draw info rarely changes during the day
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
     const draw = await storage.getTodayLotteryDraw();
     res.json(draw);
   });
@@ -768,7 +827,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/lottery/history", async (req, res) => {
     try {
-      const history = await db.select().from(lotteryDraws).orderBy(desc(lotteryDraws.drawDate)).limit(30);
+      // const history = await db.select().from(lotteryDraws).orderBy(desc(lotteryDraws.drawDate)).limit(30);
+      const history = await storage.getLotteryHistoryWithStats(30);
       res.json(history);
     } catch (error) {
       console.error("Lottery history error:", error);
@@ -782,9 +842,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[API] Creating lottery ticket request:", req.body);
       const { roundId, numbers } = req.body;
       if (!roundId || !numbers || !Array.isArray(numbers) || numbers.length !== 5) {
-        return res.status(400).json({ message: "Invalid ticket data (need roundId and 5 numbers)" });
         console.error("🔥 [DEBUG_SERVER] Validation Failed: Invalid input data", { roundId, numbers });
-        return res.status(400).json({ error: "유효하지 않은 입력 데이터입니다." });
+        return res.status(400).json({ message: "Invalid ticket data (need roundId and 5 numbers)" });
       }
 
       console.log("🔥 [DEBUG_SERVER] Calling storage.createLotteryTicket...");
@@ -798,13 +857,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 6. External Module Registrations
+  // 6. Balance Game Routes
+  app.get("/api/balance-games", async (req, res) => {
+    try {
+      // Get ACTIVE games for public
+      const games = await storage.getBalanceGames('ACTIVE');
+      res.json(games);
+    } catch (error) {
+      console.error("Failed to fetch balance games:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/balance-games/all", requireAuth, async (req: any, res) => {
+    // Admin check logic can be added here or in the middleware
+    // For now, assuming authenticated user is admin for this proof of concept or check simple flag
+    try {
+      const games = await storage.getBalanceGames('PENDING'); // or all
+      // To get ALL statuses, we might need to adjust getBalanceGames or call it multiple times
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch pending games" });
+    }
+  });
+
+  app.post("/api/balance-games/:id/vote", authenticateUser, async (req: any, res) => {
+    // Only allow logged-in users to vote
+    try {
+      const gameId = parseInt(req.params.id);
+      const userId = req.user.id;
+      const choice = req.body.choice; // 'A' or 'B'
+
+      // Check if already voted by this user
+      const existingVote = await storage.getUserBalanceGameVote(userId, undefined, gameId);
+      if (existingVote) {
+        return res.status(400).json({ message: "Already voted", code: "ALREADY_VOTED" });
+      }
+
+      const vote = await storage.voteBalanceGame({
+        userId,
+        deviceId: undefined, // deviceId no longer used
+        gameId,
+        choice
+      });
+
+      // [POLLI STANDARD] Logic:
+      // 1. Voting Period: Unlimited
+      // 2. Rewards: 5 EXP (Always awarded since auth is required)
+      // 3. Stats: Count towards today's participants
+      await storage.updateUserGameStats(userId, 5);
+
+      res.json(vote);
+    } catch (error: any) {
+      if (error?.message?.includes('violates unique constraint')) {
+        return res.status(400).json({ message: "Already voted", code: "ALREADY_VOTED" });
+      }
+      res.status(500).json({ message: "Vote failed" });
+    }
+  });
+
+  app.patch("/api/balance-games/:id/status", requireAuth, async (req: any, res) => {
+    // Update status (Approve/Reject)
+    try {
+      const gameId = parseInt(req.params.id);
+      const status = req.body.status;
+      const updated = await storage.updateBalanceGameStatus(gameId, status);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Update failed" });
+    }
+  });
+
+  app.delete("/api/balance-games/:id", requireAuth, async (req: any, res) => {
+    try {
+      const gameId = parseInt(req.params.id);
+      await storage.deleteBalanceGame(gameId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Delete failed" });
+    }
+  });
+
+  app.post("/api/balance-games/generate", requireAuth, async (req: any, res) => {
+    const url = req.body.url;
+    if (!url) return res.status(400).json({ message: "URL required" });
+
+    try {
+      console.log(`[API] Triggering Balance Game Generation for ${url}`);
+      const game = await generateBalanceGameFromNews(url);
+      if (game) {
+        res.json({ success: true, game });
+      } else {
+        res.status(500).json({ message: "Failed to generate game content" });
+      }
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Generation failed" });
+    }
+  });
+
+  // Get My Balance Game Votes
+  app.get("/api/balance-games/votes/me", authenticateUser, async (req: any, res) => {
+    try {
+      const votes = await storage.getUserBalanceGameVotes(req.user.id);
+      res.json(votes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch votes" });
+    }
+  });
+
+  // Get Balance Game Stats
+  app.get("/api/balance-games/:id/stats", async (req, res) => {
+    try {
+      const stats = await storage.getBalanceGameStats(Number(req.params.id));
+      res.json(stats);
+    } catch (error) {
+      console.error("Stats error", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // Get Comments
+  app.get("/api/balance-games/:id/comments", async (req, res) => {
+    try {
+      const comments = await storage.getBalanceGameComments(Number(req.params.id));
+      res.json(comments);
+    } catch (error) {
+      console.error("Comments fetch error", error);
+      res.status(500).json({ message: "Failed to fetch comments" });
+    }
+  });
+
+  // Post Comment
+  app.post("/api/balance-games/:id/comments", authenticateUser, async (req: any, res) => {
+    try {
+      const content = req.body.content;
+      if (!content || !content.trim()) return res.status(400).json({ message: "Content required" });
+
+      const comment = await storage.createBalanceGameComment({
+        gameId: Number(req.params.id),
+        userId: req.user.id,
+        content: content.trim()
+      });
+      res.json(comment);
+    } catch (error) {
+      console.error("Comment post error", error);
+      res.status(500).json({ message: "Failed to post comment" });
+    }
+  });
+
+  // 7. Notifications
+  app.get("/api/notifications", authenticateUser, async (req: any, res) => {
+    try {
+      const notifications = await storage.getNotifications(req.user.id);
+      res.json(notifications);
+    } catch (e) {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", authenticateUser, async (req: any, res) => {
+    try {
+      const count = await storage.getUnreadNotificationCount(req.user.id);
+      res.json({ count });
+    } catch (e) {
+      res.status(500).json({ count: 0 });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", authenticateUser, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.markNotificationAsRead(id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.post("/api/notifications/read-all", authenticateUser, async (req: any, res) => {
+    try {
+      await storage.markAllNotificationsAsRead(req.user.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // 8. External Module Registrations
   registerAdminRoutes(app);
   registerAssemblyRoutes(app);
   registerLocalCouncilRoutes(app);
 
   // Register politician routes (for AI persona generation)
+  // Register politician routes (for AI persona generation)
   app.use('/api', politicianRoutes);
+  app.use('/api', brainRouter);
 
   const httpServer = createServer(app);
   return httpServer;

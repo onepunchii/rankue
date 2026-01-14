@@ -1,10 +1,13 @@
-import { Switch, Route } from "wouter";
+import { useState, useEffect } from "react";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { PWAProvider } from "@/contexts/PWAContext";
+import { SmartInstallBanner } from "@/components/SmartInstallBanner";
 import CustomHelmetProvider from "@/components/HelmetProvider";
 import NotFound from "@/pages/not-found";
 
@@ -30,9 +33,13 @@ import CelebrityBattle from "@/pages/celebrity-battle";
 import MusicRanking from "@/pages/music-ranking";
 import CelebrityRanking from "@/pages/celebrity-ranking";
 import CelebrityAdmin from "@/pages/celebrity-admin";
-import CreateVoteTopic from "@/pages/create-vote-topic";
+import BrainRanking from "@/pages/brain-ranking";
+import BrainQuiz from "@/pages/brain-quiz";
+import BrainLeaderboard from "@/pages/brain-leaderboard";
+
 
 // Admin pages
+import BalanceGameReview from "@/pages/admin/balance-game-review";
 import { AdminLogin } from "@/pages/admin/login";
 import { AdminDashboard } from "@/pages/admin/dashboard";
 import { DatabaseStatus } from "@/pages/admin/database-status";
@@ -53,12 +60,15 @@ import PolliDemoSetup from "@/pages/polli-demo-setup";
 import NewsPage from "@/pages/news";
 import NewsViewer from "@/pages/news-viewer";
 import Statistics from "@/pages/statistics";
+import Landing from "@/pages/landing";
 import LightPillar from "@/components/ui/light-pillar";
+import LottoPage from "@/pages/lotto";
 
 // SEO Pages
 import About from "@/pages/about";
 import Politics from "@/pages/politics";
 import Entertainment from "@/pages/entertainment";
+import BalanceGameArchive from "@/pages/balance-game/archive";
 // Assembly pages
 import AssemblyRankings from "@/pages/assembly-rankings";
 import MyDistrict from "@/pages/my-district";
@@ -69,7 +79,25 @@ import PoliticianDetail from "@/pages/PoliticianDetail";
 // import BlogPost from "@/pages/blog-post";
 // import BlogCategory from "@/pages/blog-category";
 
+function ViewTransitionWrapper({ children }: { children: React.ReactNode }) {
+  // We use this to wrap the Switch so that every route change can potentially be a transition
+  return <>{children}</>;
+}
+
 function Router() {
+  const [location] = useLocation();
+
+  useEffect(() => {
+    // Attempt View Transition on route change
+    if (document.startViewTransition) {
+      // In a real world React scenario, this is tricky because React renders asynchronously.
+      // But for simple page morphs, we can trigger it.
+      document.startViewTransition(() => {
+        // Technically this should wrap the state update, but wouter handles it internally.
+        // For now we just trigger it to allow CSS view-transition-names to work.
+      });
+    }
+  }, [location]);
 
   return (
     <Switch>
@@ -114,8 +142,10 @@ function Router() {
       <Route path="/celebrity-battle" component={CelebrityBattle} />
       <Route path="/music-ranking" component={MusicRanking} />
       <Route path="/celebrity-ranking" component={CelebrityRanking} />
-      <Route path="/create-vote-topic" component={CreateVoteTopic} />
       <Route path="/celebrity-admin" component={CelebrityAdmin} />
+      <Route path="/brain-ranking" component={BrainRanking} />
+      <Route path="/brain-quiz" component={BrainQuiz} />
+      <Route path="/brain-leaderboard" component={BrainLeaderboard} />
 
       {/* Assembly ON pages */}
       <Route path="/assembly-rankings" component={AssemblyRankings} />
@@ -155,7 +185,16 @@ function Router() {
       <Route path="/admin/rewards" component={AdminRewards} />
       <Route path="/admin/analytics-rewards" component={AdminRewardsAnalytics} />
       <Route path="/admin/integration" component={AdminIntegration} />
+      <Route path="/admin/balance-games" component={BalanceGameReview} />
       <Route path="/admin/gangnam-dashboard" component={GangnamDashboard} />
+
+      {/* Balance Game Archive */}
+      <Route path="/balance-game/archive" component={BalanceGameArchive} />
+
+      <Route path="/landing" component={Landing} />
+
+      {/* Lotto Feature */}
+      <Route path="/lotto" component={LottoPage} />
 
       {/* 메인 페이지 라우팅 제거: 위에서 이미 처리됨 */}
       <Route component={NotFound} />
@@ -182,12 +221,15 @@ function App() {
       </div>
       <div className="relative z-10 w-full min-h-screen">
         <AuthProvider>
-          <QueryClientProvider client={queryClient}>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
-          </QueryClientProvider>
+          <PWAProvider>
+            <QueryClientProvider client={queryClient}>
+              <TooltipProvider>
+                <Toaster />
+                <Router />
+                <SmartInstallBanner />
+              </TooltipProvider>
+            </QueryClientProvider>
+          </PWAProvider>
         </AuthProvider>
       </div>
     </CustomHelmetProvider>

@@ -163,12 +163,8 @@ export async function crawlNaverHeadlines(sectionId: string): Promise<NewsItem[]
     }
 }
 
-import { Readability } from '@mozilla/readability';
-import { JSDOM } from 'jsdom';
-
 /**
- * Crawl News Content using Readability and JSDOM
- * Robust extraction for various news sites.
+ * Crawl News Content using Cheerio (Replacing JSDOM/Readability for stability)
  */
 export async function crawlNewsContent(url: string): Promise<string> {
     try {
@@ -201,41 +197,43 @@ export async function crawlNewsContent(url: string): Promise<string> {
             }
         }
 
-        // Use JSDOM and Readability
-        const dom = new JSDOM(contentHtml, { url });
-        const reader = new Readability(dom.window.document);
-        const article = reader.parse();
+        const $ = cheerio.load(contentHtml);
 
-        if (!article || !article.content || (article.textContent?.trim().length ?? 0) < 100) {
-            console.warn(`⚠️ Readability failed or content too short for ${url}. Trying fallback.`);
-            // Basic fallback using Cheerio if readability fails
-            const $ = cheerio.load(contentHtml);
-            $('script, style, iframe, nav, header, footer, aside').remove();
-            const text = $('body').text().replace(/\s+/g, ' ').trim();
-            if (text.length > 100) return text.substring(0, 5000);
-            return "기사 내용을 추출하지 못했습니다.";
+        // Remove unnecessary elements
+        $('script, style, iframe, nav, header, footer, aside, .advertisement, .ad, .bypass').remove();
+
+        // Target common news content containers
+        // Naver News: #dic_area, #articleBodyContents
+        // Generic: article, main, .content, .article
+        let $content = $('#dic_area, #articleBodyContents, #articeBody, .article_view, .news_view, article, main, .post-content');
+
+        // If no specific content found, fallback to body but cleaner
+        if ($content.length === 0) {
+            $content = $('body');
         }
 
-        // Convert cleaned HTML to Markdown
+        // Convert normalized HTML to Markdown
         const turndownService = new TurndownService({
             headingStyle: 'atx',
             codeBlockStyle: 'fenced'
         });
 
-        // Remove images and other junk from the readability content if needed
-        let cleanedHtml = article.content;
-        const $final = cheerio.load(cleanedHtml);
-        $final('img, video, audio, source, iframe, button, input').remove();
-
-        let markdown = turndownService.turndown($final.html());
+        let markdown = turndownService.turndown($content.html() || "");
 
         // Post-processing
         markdown = markdown
             .replace(/\n{3,}/g, '\n\n')
-            .replace(/\[\s*\]/g, '')
+            .replace(/\[\s*\]/g, '') // remove empty links/images
             .trim();
 
+        // Final fallback if markdown is too short
+        if (markdown.length < 50) {
+            const text = $('body').text().replace(/\s+/g, ' ').trim();
+            return text.substring(0, 5000);
+        }
+
         return markdown;
+
     } catch (error) {
         console.error('❌ Crawling Error:', error);
         throw new Error('Failed to crawl the news content.');

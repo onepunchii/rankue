@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { resetMonthlyVotes } from "./musicRoutes";
 import { db } from "./db";
-import { musicCategories, musicArtists } from "@shared/schema";
+import { musicCategories, musicArtists } from "../shared/schema.js";
 import { eq } from "drizzle-orm";
 
 class MusicScheduler {
@@ -134,33 +134,33 @@ class MusicScheduler {
 
       // Define new artist arrays (example data)
       const coedArtists = [
-          { name: "AKMU", agency: "YG", debutYear: 2014 },
-          { name: "KARD", agency: "DSP Media", debutYear: 2017 }
+        { name: "AKMU", agency: "YG", debutYear: 2014 },
+        { name: "KARD", agency: "DSP Media", debutYear: 2017 }
       ];
 
       const maleSoloArtists = [
-          { name: "G-Dragon", agency: "YG", debutYear: 2006 },
-          { name: "Taemin", agency: "SM", debutYear: 2008 }
+        { name: "G-Dragon", agency: "YG", debutYear: 2006 },
+        { name: "Taemin", agency: "SM", debutYear: 2008 }
       ];
 
       const femaleSoloArtists = [
-          { name: "IU", agency: "EDAM Entertainment", debutYear: 2008 },
-          { name: "Sunmi", agency: "Abyss Company", debutYear: 2013 }
+        { name: "IU", agency: "EDAM Entertainment", debutYear: 2008 },
+        { name: "Sunmi", agency: "Abyss Company", debutYear: 2013 }
       ];
 
       const bandRockArtists = [
-          { name: "DAY6", agency: "JYP", debutYear: 2015 },
-          { name: "Buzz", agency: "Santa Music", debutYear: 2003 }
+        { name: "DAY6", agency: "JYP", debutYear: 2015 },
+        { name: "Buzz", agency: "Santa Music", debutYear: 2003 }
       ];
 
       const hiphopRnbArtists = [
-          { name: "Jay Park", agency: "MORE VISION", debutYear: 2008 },
-          { name: "Heize", agency: "P NATION", debutYear: 2014 }
+        { name: "Jay Park", agency: "MORE VISION", debutYear: 2008 },
+        { name: "Heize", agency: "P NATION", debutYear: 2014 }
       ];
 
       const popForeignArtists = [
-          { name: "Taylor Swift", agency: "Republic", debutYear: 2006 },
-          { name: "Justin Bieber", agency: "Def Jam", debutYear: 2009 }
+        { name: "Taylor Swift", agency: "Republic", debutYear: 2006 },
+        { name: "Justin Bieber", agency: "Def Jam", debutYear: 2009 }
       ];
 
       // 카테고리별 아티스트 추가
