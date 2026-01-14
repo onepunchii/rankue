@@ -154,7 +154,7 @@ export class BalanceGameStorage {
 
             // 2. Age (Assuming ageGroup stored as '20s', '30s' or similar)
             // Map DB ageGroup to labels
-            let ageLabel = null;
+            let ageLabel: string | null = null;
             if (vote.ageGroup) {
                 if (vote.ageGroup.includes('10')) ageLabel = "10대";
                 else if (vote.ageGroup.includes('20')) ageLabel = "20대";
