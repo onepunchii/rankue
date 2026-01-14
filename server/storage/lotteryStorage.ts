@@ -30,10 +30,10 @@ export class LotteryStorage {
         if (!draws.length) return [];
 
         // Filter out draws that have empty winning numbers (just in case)
-        const validDraws = draws.filter(d => d.winningNumbers && Array.isArray(d.winningNumbers) && d.winningNumbers.length > 0);
+        const validDraws = draws.filter((d: any) => d.winningNumbers && Array.isArray(d.winningNumbers) && d.winningNumbers.length > 0);
         if (!validDraws.length) return [];
 
-        const drawIds = validDraws.map(d => d.id);
+        const drawIds = validDraws.map((d: any) => d.id);
 
         // 2. Get winner stats for these draws
         const stats = await db.select({
@@ -46,12 +46,12 @@ export class LotteryStorage {
             .groupBy(lotteryTickets.roundId, lotteryTickets.prizeAmount);
 
         // 3. Merge stats into draws
-        return validDraws.map(draw => {
-            const drawStats = stats.filter(s => s.roundId === draw.id);
+        return validDraws.map((draw: any) => {
+            const drawStats = stats.filter((s: any) => s.roundId === draw.id);
             const winnerCounts = {
-                first: drawStats.find(s => s.prize === 50000)?.count || 0,
-                second: drawStats.find(s => s.prize === 5000)?.count || 0,
-                third: drawStats.find(s => s.prize === 500)?.count || 0,
+                first: drawStats.find((s: any) => s.prize === 50000)?.count || 0,
+                second: drawStats.find((s: any) => s.prize === 5000)?.count || 0,
+                third: drawStats.find((s: any) => s.prize === 500)?.count || 0,
             };
             return {
                 ...draw,
