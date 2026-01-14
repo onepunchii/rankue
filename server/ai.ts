@@ -1,11 +1,14 @@
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-const apiKey = process.env.OPENAI_API_KEY || "dummy-key-to-prevent-crash";
-const openai = new OpenAI({ apiKey });
-
-if (!process.env.OPENAI_API_KEY) {
-  console.warn("⚠️ OPENAI_API_KEY is not set. AI features (survey generation) will not work.");
+// Lazy initialization to prevent crash on startup if key is missing
+let openaiInstance: OpenAI | null = null;
+function getOpenAI() {
+  if (!openaiInstance) {
+    const apiKey = process.env.OPENAI_API_KEY || "dummy-key-to-prevent-crash";
+    openaiInstance = new OpenAI({ apiKey });
+  }
+  return openaiInstance;
 }
 
 interface GeneratedSurvey {
@@ -69,7 +72,7 @@ JSON 형식:
   ]
 }`;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
@@ -260,7 +263,7 @@ ${JSON.stringify(politicianData, null, 2)}
   }
 }`;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
@@ -330,7 +333,7 @@ export async function generateSurveyTitleFromNews(newsTitle: string): Promise<st
 
 설문 제목만 응답해주세요 (JSON 형식 없이):`;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
@@ -504,7 +507,7 @@ export async function analyzeUserPersonality(
 }
 `;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
@@ -617,7 +620,7 @@ export async function generateBrainQuestions(
 ]
 `;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
         {

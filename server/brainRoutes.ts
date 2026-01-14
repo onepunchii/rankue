@@ -1,9 +1,9 @@
 
 import { Router } from "express";
-import { storage } from "./storage";
-import { generateBrainQuestions } from "./ai";
-import { requireAuth } from "./simpleAuth";
-import { BrainEloSystem } from "./utils/brainElo";
+import { storage } from "./storage.js";
+import { generateBrainQuestions } from "./ai.js";
+import { requireAuth } from "./simpleAuth.js";
+import { BrainEloSystem } from "./utils/brainElo.js";
 
 const router = Router();
 
@@ -147,12 +147,12 @@ router.get("/user/stats", requireAuth, async (req, res) => {
 });
 
 // Leaderboard
-router.get("/rank/top", async (req, res) => {
-    const { category, page } = req.query;
-    const limit = 50;
-    // page logic implementation needed in storage if we want pagination
+// User: Get Leaderboard
+router.get("/brain/leaderboard", async (req, res) => {
+    const { category, limit: queryLimit } = req.query;
+    const limit = parseInt(queryLimit as string) || 20;
 
-    const leaderboard = await storage.getBrainLeaderboard(category as string, limit);
+    const leaderboard = await storage.getBrainLeaderboard(category as string || 'TOTAL', limit);
     res.json(leaderboard);
 });
 

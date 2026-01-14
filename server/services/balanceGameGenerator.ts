@@ -4,7 +4,13 @@ import { crawlNewsContent } from "../newsAnalyzer.js";
 
 // Ensure OpenAI client is initialized (reusing key check logic locally or importing if exposed, but simple re-init is fine)
 const apiKey = process.env.OPENAI_API_KEY;
-const openai = new OpenAI({ apiKey: apiKey || "dummy" });
+let openaiInstance: OpenAI | null = null;
+function getOpenAI() {
+    if (!openaiInstance) {
+        openaiInstance = new OpenAI({ apiKey: apiKey || "dummy" });
+    }
+    return openaiInstance;
+}
 
 export async function generateBalanceGameFromNews(url: string) {
     if (!apiKey) {
@@ -41,7 +47,7 @@ export async function generateBalanceGameFromNews(url: string) {
         }
         `;
 
-        const response = await openai.chat.completions.create({
+        const response = await getOpenAI().chat.completions.create({
             model: "gpt-4o",
             messages: [
                 { role: "system", content: "You are an expert game content creator specializing in viral balance games." },

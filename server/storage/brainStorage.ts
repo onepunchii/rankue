@@ -1,10 +1,10 @@
 
-import { db } from "../db";
-import { brainQuestions, brainGameLogs, profiles } from "@shared/schema";
+import { db } from "../db.js";
+import { brainQuestions, brainGameLogs, profiles } from "../../shared/schema.js";
 import { eq, sql, inArray, and, desc, asc } from "drizzle-orm";
-import { BrainQuestion, BrainGameLog, InsertBrainQuestion, InsertBrainGameLog } from "@shared/schema";
+import { BrainQuestion, BrainGameLog, InsertBrainQuestion, InsertBrainGameLog } from "../../shared/schema.js";
 
-import { BrainEloSystem } from "../utils/brainElo";
+import { BrainEloSystem } from "../utils/brainElo.js";
 
 // ELO K-Factor
 const K_FACTOR = 32;
@@ -20,6 +20,10 @@ export interface BrainStorage {
 }
 
 export class PostgresBrainStorage implements BrainStorage {
+    // Simple In-Memory Cache for Leaderboard
+    private cache = new Map<string, { data: any[], timestamp: number }>();
+    private readonly CACHE_TTL = 30 * 1000; // 30 seconds
+
     async createQuestion(question: InsertBrainQuestion): Promise<BrainQuestion> {
         const [newQuestion] = await db
             .insert(brainQuestions)
@@ -166,6 +170,17 @@ export class PostgresBrainStorage implements BrainStorage {
     }
 
     async getLeaderboard(category: string, limit: number = 50): Promise<any[]> {
+        // Cache Check
+        const cacheKey = `${category}_${limit}`;
+        const cached = this.cache.get(cacheKey);
+
+        if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL)) {
+            // console.log(`[Cache-Hit] Leaderboard ${cacheKey}`);
+            return cached.data;
+        }
+
+        // console.log(`[Cache-Miss] Fetching Leaderboard ${cacheKey}`);
+
         let orderBy;
         switch (category) {
             case 'LOGIC': orderBy = desc(profiles.brainRatingLogic); break;
@@ -179,7 +194,7 @@ export class PostgresBrainStorage implements BrainStorage {
                 break;
         }
 
-        return await db.select({
+        const result = await db.select({
             id: profiles.id,
             username: profiles.nickname,
             avatarUrl: profiles.profileImageUrl,
@@ -196,5 +211,10 @@ export class PostgresBrainStorage implements BrainStorage {
             .from(profiles)
             .orderBy(orderBy)
             .limit(limit);
+
+        // Update Cache
+        this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
+
+        return result;
     }
 }

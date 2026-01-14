@@ -1,8 +1,10 @@
+
 import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import { db } from "./server/db";
 import { brainQuestions } from "./shared/schema";
+import { sql } from "drizzle-orm";
 
 async function ingestQuiz() {
     console.log("🧠 Brain Quiz Questions Ingest Started...");
@@ -15,16 +17,17 @@ async function ingestQuiz() {
     }
 
     try {
+        // Clear existing questions and logs
+        console.log("🧹 Clearing existing questions and logs...");
+        const { brainGameLogs } = await import("./shared/schema");
+        await db.delete(brainGameLogs).execute();
+        await db.delete(brainQuestions).execute();
+        console.log("✅ Tables cleared.");
+
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         const questions = JSON.parse(fileContent);
 
-        console.log(`📂 Loaded ${questions.length} questions`);
-
-        // Check if DB is connected
-        if (!process.env.DATABASE_URL) {
-            console.error("❌ DATABASE_URL is missing. Please check .env file.");
-            process.exit(1);
-        }
+        console.log(`📂 Loaded ${questions.length} questions from file.`);
 
         // transform
         console.log("🔄 Transforming data...");
@@ -33,7 +36,7 @@ async function ingestQuiz() {
             return {
                 category: q.category,
                 level: q.level,
-                eloRating: 1300, // default
+                eloRating: 1200 + (q.level * 100), // Updated level-based ELO
                 isActive: true,
                 content: {
                     q: q.question,
@@ -44,8 +47,8 @@ async function ingestQuiz() {
             };
         });
 
-        // Batch insert in chunks of 100
-        const batchSize = 100;
+        // Batch insert in chunks of 50 (smaller batches for safety)
+        const batchSize = 50;
         let insertedCount = 0;
 
         console.log("🚀 Starting upload to Supabase...");
@@ -58,6 +61,11 @@ async function ingestQuiz() {
         }
 
         console.log("\n🎉 Brain Quiz Questions Uploaded Successfully!");
+
+        // Final count verification
+        const [finalCount] = await db.select({ count: sql<number>`count(*)` }).from(brainQuestions);
+        console.log(`📊 Final DB Count: ${finalCount.count}`);
+
         process.exit(0);
     } catch (err) {
         console.error("\n❌ Error during ingestion:", err);

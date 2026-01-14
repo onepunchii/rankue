@@ -16,12 +16,16 @@ const mockPool = {
   query: () => { throw new Error("DB not connected"); },
 } as any;
 
+const poolConfig = {
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 10, // Max clients in the pool
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 5000, // Return an error if connection takes more than 5 seconds
+};
+
 export const pool = hasDbUrl
-  ? new Pool({
-    connectionString: process.env.DATABASE_URL,
-    // SSL generally required for cloud postgres (Supabase, Neon)
-    ssl: { rejectUnauthorized: false }
-  })
+  ? new Pool(poolConfig)
   : mockPool;
 
 export const db = hasDbUrl

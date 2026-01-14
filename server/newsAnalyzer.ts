@@ -10,9 +10,14 @@ const NAVER_CLIENT_ID = process.env.NAVER_CLIENT_ID;
 const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET;
 
 // OpenAI Config
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+const apiKey = process.env.OPENAI_API_KEY || "dummy";
+let openaiInstance: OpenAI | null = null;
+function getOpenAI() {
+    if (!openaiInstance) {
+        openaiInstance = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || apiKey });
+    }
+    return openaiInstance;
+}
 
 export interface NewsItem {
     title: string;
@@ -268,7 +273,7 @@ export async function analyzeNews(url: string, cachedContent?: string): Promise<
 }
 `;
 
-        const completion = await openai.chat.completions.create({
+        const completion = await getOpenAI().chat.completions.create({
             model: "gpt-4o",
             messages: [
                 { role: "system", content: systemPrompt },

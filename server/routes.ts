@@ -1049,7 +1049,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerLocalCouncilRoutes(app);
 
   // Register politician routes (for AI persona generation)
-  // Register politician routes (for AI persona generation)
   app.use('/api', politicianRoutes);
   app.use('/api', brainRouter);
 
