@@ -43,17 +43,20 @@ export default function StepAuth({ data, formData, onNext, onBack }: StepAuthPro
       // Import dynamically to avoid build errors if lib/supabase is not ready yet
       const { supabase } = await import('@/lib/supabase');
 
+      let options: any = {
+        redirectTo: `${window.location.origin}/`,
+      };
+
+      if (provider === 'google') {
+        options.queryParams = {
+          access_type: 'offline',
+          prompt: 'consent',
+        };
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
-        options: {
-          // Redirect to the home page or wherever you want after login
-          // We attach query params to indicate successful login if needed
-          redirectTo: `${window.location.origin}/`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
+        options: options,
       });
 
       if (error) throw error;
@@ -68,6 +71,7 @@ export default function StepAuth({ data, formData, onNext, onBack }: StepAuthPro
       });
       setIsLoading(null);
     }
+
   };
 
   return (
