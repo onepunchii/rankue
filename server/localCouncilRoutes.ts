@@ -54,7 +54,7 @@ export function registerLocalCouncilRoutes(app: Express) {
       // Map to frontend expected structure if needed, or return as is.
       // Frontend expects: id, name, party, cityProvince, district, ward, etc.
       // Drizzle returns camelCase keys from schema.
-      const mappedMembers = members.map(m => ({
+      const mappedMembers = members.map((m: any) => ({
         ...m,
         ward: m.constituency, // Mapping for frontend compatibility
         electedCount: m.candidacyCount,
@@ -118,7 +118,7 @@ export function registerLocalCouncilRoutes(app: Express) {
       }).from(localCouncilMembers).where(and(...conditions));
 
       const partyStats: Record<string, { count: number, totalAge: number }> = {};
-      members.forEach(m => {
+      members.forEach((m: any) => {
         const party = m.party || '무소속';
         if (!partyStats[party]) partyStats[party] = { count: 0, totalAge: 0 };
         partyStats[party].count++;
@@ -155,7 +155,7 @@ export function registerLocalCouncilRoutes(app: Express) {
 
       const regionStats: Record<string, any> = {};
 
-      members.forEach(m => {
+      members.forEach((m: any) => {
         const key = `${m.cityProvince}|${m.district}`;
         if (!regionStats[key]) {
           regionStats[key] = {
