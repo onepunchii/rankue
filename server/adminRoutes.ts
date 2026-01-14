@@ -49,7 +49,7 @@ export function registerAdminRoutes(app: Express) {
         },
         timestamp: new Date().toISOString()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Database connection error:", error);
       res.status(500).json({
         status: "error",
@@ -846,7 +846,7 @@ export function registerAdminRoutes(app: Express) {
       const averageParticipationRate = totalSurveys > 0 ? Math.round((totalParticipations / totalSurveys) * 100) / 100 : 0;
 
       // 일별 참여 추이 (최근 7일)
-      const dailyParticipations = [];
+      const dailyParticipations: any[] = [];
       for (let i = 6; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
@@ -863,9 +863,9 @@ export function registerAdminRoutes(app: Express) {
             lte(userSurveyParticipation.completedAt, endOfDay)
           ));
 
-        dailyParticipations.push({
+        (dailyParticipations as any[]).push({
           date: date.toISOString().split('T')[0],
-          count: dayParticipationsResult[0]?.count || 0
+          count: (dayParticipationsResult[0] as any)?.count || 0
         });
       }
 
@@ -1127,7 +1127,7 @@ export function registerAdminRoutes(app: Express) {
           ))
           .groupBy(surveyResponses.answer);
 
-        residenceResponses.forEach(r => {
+        residenceResponses.forEach((r: any) => {
           // 응답이 JSON 형식으로 저장되어 있을 수 있으므로 파싱 시도
           let answerText = r.answer as string;
           try {
@@ -1157,7 +1157,7 @@ export function registerAdminRoutes(app: Express) {
             inArray(surveyResponses.questionId, questionIds)
           ));
 
-        const scores = responses.map(r => {
+        const scores = responses.map((r: any) => {
           const answerMap: Record<string, number> = {
             '전혀 아니다': 1, '아니다': 2, '보통이다': 3, '그렇다': 4, '매우 그렇다': 5,
             '전혀 쉽지 않았다': 1, '쉽지 않았다': 2, '쉬웠다': 4, '매우 쉬웠다': 5,
@@ -1240,7 +1240,7 @@ export function registerAdminRoutes(app: Express) {
               ));
 
             const optionCounts: Record<string, number> = {};
-            responses.forEach(r => {
+            responses.forEach((r: any) => {
               if (!r.answer) return;
 
               try {
@@ -1259,7 +1259,7 @@ export function registerAdminRoutes(app: Express) {
                 }
 
                 if (Array.isArray(options)) {
-                  options.forEach(opt => {
+                  options.forEach((opt: any) => {
                     if (opt && typeof opt === 'string') {
                       optionCounts[opt] = (optionCounts[opt] || 0) + 1;
                     }
@@ -1299,7 +1299,7 @@ export function registerAdminRoutes(app: Express) {
 
             // 응답 필터링 및 안전한 처리
             const validResponses = responses
-              .filter(r => {
+              .filter((r: any) => {
                 if (!r.answer) return false;
 
                 // 문자열인 경우
@@ -1310,7 +1310,7 @@ export function registerAdminRoutes(app: Express) {
                 // 객체나 배열인 경우 (혹시 모를 경우)
                 return true;
               })
-              .map(r => ({
+              .map((r: any) => ({
                 answer: typeof r.answer === 'string' ? r.answer : JSON.stringify(r.answer),
                 userId: r.userId
               }));
@@ -1371,7 +1371,7 @@ export function registerAdminRoutes(app: Express) {
         apiKey: process.env.OPENAI_API_KEY,
       });
 
-      const responsesText = responses.map((r, idx) => `${idx + 1}. ${r.answer}`).join('\n');
+      const responsesText = responses.map((r: any, idx: any) => `${idx + 1}. ${r.answer}`).join('\n');
 
       const prompt = `다음은 강남구 펫터디 반려동물 장례 서비스 만족도 조사의 자유서술 응답입니다.
 

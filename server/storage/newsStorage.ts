@@ -71,7 +71,7 @@ export class NewsStorage {
     async getLatestNewsArticles(limit: number = 20, category?: string, searchQuery?: string): Promise<NewsArticle[]> {
         let query = db.select().from(newsArticles);
 
-        let conditions = [];
+        let conditions: any[] = [];
 
         if (category && category !== '전체') {
             // @ts-ignore - category filter

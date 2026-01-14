@@ -204,7 +204,7 @@ function Router() {
 
 function App() {
   // Initialize push notifications
-  usePushNotifications();
+  // usePushNotifications();
 
   return (
     <CustomHelmetProvider>
