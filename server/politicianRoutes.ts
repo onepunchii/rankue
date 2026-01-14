@@ -39,7 +39,7 @@ router.get("/politicians/:type/:id/ratings", async (req, res) => {
     const averageRatings = await storage.getPoliticianAverageRatings(politicianId, normalizedType);
 
     // Get user's rating if authenticated and verified
-    let userRating = null;
+    let userRating: any = null;
     if (req.user?.isVerified) {
       userRating = await storage.getUserPoliticianRating(req.user.id, politicianId, normalizedType);
     }

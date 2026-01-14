@@ -651,7 +651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       else if (totalActivities >= 10) nextAnalysisAt = 50;
 
       // Determine analysis level
-      let analysisLevel = null;
+      let analysisLevel: any = null;
       if (totalActivities >= 100) analysisLevel = 'comprehensive';
       else if (totalActivities >= 50) analysisLevel = 'advanced';
       else if (totalActivities >= 10) analysisLevel = 'basic';
