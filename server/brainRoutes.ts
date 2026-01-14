@@ -22,7 +22,7 @@ router.post("/admin/generate-questions", requireAuth, async (req, res) => {
         const generated = await generateBrainQuestions(category, parseInt(level), numCount);
 
         // Save to DB
-        const saved = [];
+        const saved: any[] = [];
         for (const q of generated) {
             const qData = {
                 category,
