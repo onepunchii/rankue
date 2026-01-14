@@ -13,15 +13,23 @@ export class GiftishowAdapter {
   }
 
   private log(action: string, requestPayload: any, responsePayload: any, success: boolean, duration?: number, errorMessage?: string): InsertProviderLog {
+    // Combine extra metadata into the response object for storage
+    const enrichedResponse = {
+      ...responsePayload,
+      _meta: {
+        statusCode: responsePayload?.statusCode || null,
+        success,
+        errorMessage,
+        duration
+      }
+    };
+
     return {
       provider: "giftishow",
       action,
-      requestPayload,
-      responsePayload,
-      statusCode: responsePayload?.statusCode || null,
-      success,
-      errorMessage,
-      duration,
+      payload: requestPayload,
+      response: enrichedResponse,
+      status: success ? "success" : "failure",
     };
   }
 
