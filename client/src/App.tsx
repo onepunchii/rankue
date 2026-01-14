@@ -110,7 +110,7 @@ function Router() {
       <Route path="/entertainment" component={Entertainment} />
 
       {/* PolliAuth 시스템: 모든 사용자 접근 가능한 페이지들 */}
-      <Route path="/" component={Home} />
+      <Route path="/" component={() => <Redirect to="/home" />} />
       <Route path="/home" component={Home} />
       <Route path="/profile" component={Profile} />
       <Route path="/persona" component={Persona} />
