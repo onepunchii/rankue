@@ -77,8 +77,8 @@ export function registerAdminRoutes(app: Express) {
         console.log("Session not initialized, creating new session");
         req.session = {};
       }
-      req.session.isAdmin = true;
-      req.session.adminUsername = username;
+      (req.session as any).isAdmin = true;
+      (req.session as any).adminUsername = username;
 
       console.log("Admin login successful:", username);
       res.json({
@@ -95,8 +95,8 @@ export function registerAdminRoutes(app: Express) {
   // 어드민 로그아웃
   app.post("/api/admin/logout", (req, res) => {
     if (req.session) {
-      req.session.isAdmin = false;
-      req.session.adminUsername = null;
+      (req.session as any).isAdmin = false;
+      (req.session as any).adminUsername = null;
     }
     console.log("Admin logout successful");
     res.json({ success: true, message: "로그아웃 되었습니다." });
@@ -119,8 +119,8 @@ export function registerAdminRoutes(app: Express) {
         console.log("Session not initialized, creating new session");
         req.session = {};
       }
-      req.session.isAdmin = true;
-      req.session.adminUsername = username;
+      (req.session as any).isAdmin = true;
+      (req.session as any).adminUsername = username;
 
       console.log("Gangnam login successful:", username);
       res.json({
@@ -414,7 +414,7 @@ export function registerAdminRoutes(app: Express) {
       }
 
       // 상태 필터
-      let statusCondition = null;
+      let statusCondition: any = null;
       if (filter === 'active') {
         // statusCondition = ne(profiles.userType, 'guest'); // Column removed
       } else if (filter === 'high_level') {
