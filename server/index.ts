@@ -25,6 +25,14 @@ app.use(authMiddleware);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Force root to home redirect to prevent white screening on root
+app.get("/", (req, res) => {
+  if (req.url === '/' && !req.originalUrl.includes('/api')) {
+    res.redirect("/home");
+    return;
+  }
+});
+
 // Prerender.io SEO 미들웨어 (검색엔진 크롤러를 위한 사전 렌더링)
 if (process.env.PRERENDER_TOKEN) {
   app.use(prerender.set('prerenderToken', process.env.PRERENDER_TOKEN));
