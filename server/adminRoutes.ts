@@ -75,7 +75,7 @@ export function registerAdminRoutes(app: Express) {
       // 세션에 관리자 인증 상태 저장
       if (!req.session) {
         console.log("Session not initialized, creating new session");
-        req.session = {};
+        (req.session as any) = {};
       }
       (req.session as any).isAdmin = true;
       (req.session as any).adminUsername = username;
@@ -117,7 +117,7 @@ export function registerAdminRoutes(app: Express) {
       // 세션에 관리자 인증 상태 저장
       if (!req.session) {
         console.log("Session not initialized, creating new session");
-        req.session = {};
+        (req.session as any) = {};
       }
       (req.session as any).isAdmin = true;
       (req.session as any).adminUsername = username;
