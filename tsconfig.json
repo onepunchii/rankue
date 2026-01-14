@@ -16,6 +16,7 @@
     "noEmit": true,
     "module": "ESNext",
     "strict": true,
+    "noImplicitAny": false,
     "lib": [
       "esnext",
       "dom",
