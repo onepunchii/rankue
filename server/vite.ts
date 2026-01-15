@@ -105,6 +105,16 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
+  // prevent API or asset 404s from falling through to SPA index.html
+  app.use("*", (req, res, next) => {
+    if (req.originalUrl.startsWith("/api") ||
+      req.originalUrl.startsWith("/assets") ||
+      req.originalUrl.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|json)$/)) {
+      return res.status(404).send("Not Found");
+    }
+    next();
+  });
+
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
