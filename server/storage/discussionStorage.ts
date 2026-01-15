@@ -19,6 +19,11 @@ export class DiscussionStorage {
         return poll;
     }
 
+    async getLatestQuickPoll(): Promise<QuickPoll | undefined> {
+        const [poll] = await db.select().from(quickPolls).orderBy(desc(quickPolls.createdAt)).limit(1);
+        return poll;
+    }
+
     async voteQuickPoll(userId: string, pollId: number, optionId: number): Promise<{ success: boolean }> {
         const [existing] = await db.select().from(quickPollVotes).where(
             and(

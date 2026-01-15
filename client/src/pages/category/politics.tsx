@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import PoliticsResultsModal from "@/components/PoliticsResultsModal";
 import { Input } from "@/components/ui/input";
 import {
@@ -50,6 +52,7 @@ import { CheckSquare, Briefcase, MessageCircle, RefreshCw, Scale, Zap } from "lu
 import LightPillar from "@/components/ui/light-pillar";
 import MobileHeader from "@/components/mobile-header";
 import BottomNav from "@/components/bottom-nav";
+import NewsCarousel from "@/components/news-carousel";
 import { motion, AnimatePresence } from "framer-motion";
 
 const RADIAN = Math.PI / 180;
@@ -145,73 +148,53 @@ export default function PoliticsCategory() {
   const [selectedWeekData, setSelectedWeekData] = useState<any>(null);
 
   const { data: politicsSurveys, isLoading } = useQuery({
-    queryKey: ['/api/auth/politics-surveys'],
-    queryFn: async () => {
-      const response = await fetch('/api/auth/politics-surveys');
-      if (!response.ok) throw new Error('Failed to fetch politics surveys');
-      return response.json();
-    },
+    queryKey: [queryKeys.POLITICAL_SURVEYS],
+    queryFn: () => apiRequest(queryKeys.POLITICAL_SURVEYS),
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: presidentialData } = useQuery({
-    queryKey: ['/api/political/presidential-approval'],
-    queryFn: async () => {
-      const response = await fetch('/api/political/presidential-approval');
-      if (!response.ok) throw new Error('Failed to fetch presidential data');
-      return response.json();
-    },
+    queryKey: [queryKeys.PRESIDENTIAL_APPROVAL],
+    queryFn: () => apiRequest(queryKeys.PRESIDENTIAL_APPROVAL),
     staleTime: 10 * 60 * 1000,
   });
 
   const { data: partyData } = useQuery({
-    queryKey: ['/api/political/party-support'],
-    queryFn: async () => {
-      const response = await fetch('/api/political/party-support');
-      if (!response.ok) throw new Error('Failed to fetch party data');
-      return response.json();
-    },
+    queryKey: [queryKeys.PARTY_SUPPORT],
+    queryFn: () => apiRequest(queryKeys.PARTY_SUPPORT),
     staleTime: 10 * 60 * 1000,
   });
 
   const { data: candidateData } = useQuery({
-    queryKey: ['/api/political/candidate-support'],
-    queryFn: async () => {
-      const response = await fetch('/api/political/candidate-support');
-      if (!response.ok) throw new Error('Failed to fetch candidate data');
-      return response.json();
-    },
+    queryKey: [queryKeys.CANDIDATE_SUPPORT],
+    queryFn: () => apiRequest(queryKeys.CANDIDATE_SUPPORT),
     staleTime: 10 * 60 * 1000,
   });
 
   const { data: currentStats } = useQuery({
-    queryKey: ['/api/political/current-stats'],
+    queryKey: [queryKeys.POLITICAL_CURRENT_STATS],
+    queryFn: () => apiRequest(queryKeys.POLITICAL_CURRENT_STATS),
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: weeklyTrends } = useQuery({
-    queryKey: ['/api/political/weekly-trends', user?.gender, (user as any)?.ageGroup, user?.region],
+    queryKey: [queryKeys.WEEKLY_TRENDS, user?.gender, user?.ageGroup, user?.region],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (user?.gender === 'male') params.append('gender', '남성');
       else if (user?.gender === 'female') params.append('gender', '여성');
-      if ((user as any)?.ageGroup) params.append('ageGroup', (user as any).ageGroup);
+      else if (user?.gender) params.append('gender', user.gender);
+      if (user?.ageGroup) params.append('ageGroup', user.ageGroup);
       if (user?.region) params.append('region', user.region);
 
-      const response = await fetch(`/api/political/weekly-trends?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch weekly trends');
-      return response.json();
+      return apiRequest(`${queryKeys.WEEKLY_TRENDS}?${params.toString()}`);
     },
     staleTime: 10 * 60 * 1000,
   });
 
   const { data: assemblyBills = [] } = useQuery({
-    queryKey: ['/api/assembly-bills'],
-    queryFn: async () => {
-      const response = await fetch('/api/assembly-bills');
-      if (!response.ok) throw new Error('Failed to fetch assembly bills');
-      return response.json();
-    },
+    queryKey: [queryKeys.ASSEMBLY_BILLS],
+    queryFn: () => apiRequest(queryKeys.ASSEMBLY_BILLS),
     staleTime: 30 * 60 * 1000,
   });
 
@@ -236,7 +219,8 @@ export default function PoliticsCategory() {
   });
 
   const { data: userParticipations = [] } = useQuery({
-    queryKey: ['/api/auth/user/participations'],
+    queryKey: [queryKeys.AUTH_USER_PARTICIPATIONS],
+    queryFn: () => apiRequest(queryKeys.AUTH_USER_PARTICIPATIONS),
     enabled: !!user && !user.isGuest,
     staleTime: 1 * 60 * 1000,
   });
@@ -332,9 +316,7 @@ export default function PoliticsCategory() {
   const handleViewResults = async (surveyId: number) => {
     setLoadingResults(true);
     try {
-      const response = await fetch(`/api/auth/politics-survey-results/${surveyId}`);
-      if (!response.ok) throw new Error('Failed to fetch survey results');
-      const results = await response.json();
+      const results = await apiRequest(queryKeys.POLITICAL_SURVEY_RESULTS(surveyId));
       setSurveyResults(results);
       setShowResults(surveyId);
     } catch (error) {
@@ -512,6 +494,10 @@ export default function PoliticsCategory() {
               regionBreakdown={(currentStats as any)?.regionBreakdown}
             />
 
+            {/* Political News Summary */}
+            <div className="-mx-6">
+              <NewsCarousel category="정치" />
+            </div>
           </TabsContent>
 
           <TabsContent value="trends" className="space-y-8">

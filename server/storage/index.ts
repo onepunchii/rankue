@@ -98,11 +98,6 @@ export class DatabaseStorage implements IStorage {
 
     // Lottery
     getUserLotteryTickets(uid: string) { return this.lottery.getUserLotteryTickets(uid); }
-    getTodayLotteryDraw() { return this.lottery.getTodayLotteryDraw(); }
-    runDailyLotteryDraw() { return this.lottery.runDailyLotteryDraw(); }
-    createLotteryTicket(userId: string, roundId: number, numbers: number[]) {
-        return this.lottery.createTicket(userId, roundId, numbers);
-    }
     getLotteryHistoryWithStats(limit?: number) { return this.lottery.getLotteryHistoryWithStats(limit); }
 
     // Points & Rewards
@@ -134,6 +129,7 @@ export class DatabaseStorage implements IStorage {
     // Quick Polls
     createQuickPoll(p: InsertQuickPoll) { return this.discussions.createQuickPoll(p); }
     getQuickPoll(pid: number) { return this.discussions.getQuickPoll(pid); }
+    getLatestQuickPoll() { return this.discussions.getLatestQuickPoll(); }
     voteQuickPoll(uid: string, pid: number, oid: number) { return this.discussions.voteQuickPoll(uid, pid, oid); }
 
     // News
@@ -153,6 +149,11 @@ export class DatabaseStorage implements IStorage {
     updatePoliticianActivity(id: number, d: any) { return this.politics.updatePoliticianActivity(id, d); }
     getPoliticianByName(n: string, type: 'assembly' | 'local' = 'assembly') { return this.politics.getPoliticianByName(n, type); }
     updatePolitician(id: number, p: any, type: 'assembly' | 'local' = 'assembly') { return this.politics.updatePolitician(id, p, type); }
+
+    // Political Stats & Trends
+    getLatestPoliticalStats() { return this.politics.getLatestPoliticalStats(); }
+    getWeeklyTrends(limit?: number) { return this.politics.getWeeklyTrends(limit); }
+    getPoliticalSurveys() { return this.politics.getPoliticalSurveys(); }
 
     // Assembly Compatibility Aliases
     getAssemblyMembers(limit?: number) { return this.politics.getPoliticians('assembly', undefined, limit); }

@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
+import { apiRequest } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 
 // Union type for backward compatibility
 interface PersonalityAnalysis {
@@ -69,14 +71,16 @@ export default function PersonalityAnalysisCard({ userId }: PersonalityAnalysisC
 
   // Check eligibility first
   const { data: eligibilityData, isLoading: eligibilityLoading } = useQuery<EligibilityData>({
-    queryKey: ["/api/auth/personality-eligibility"],
+    queryKey: [queryKeys.PERSONALITY_ELIGIBILITY],
+    queryFn: () => apiRequest(queryKeys.PERSONALITY_ELIGIBILITY),
     enabled: !!userId,
     staleTime: 1 * 60 * 1000,
   });
 
   // Only fetch analysis if eligible
   const { data: analysisData, isLoading: analysisLoading, error } = useQuery<AnalysisResponse>({
-    queryKey: ["/api/auth/personality-analysis"],
+    queryKey: [queryKeys.PERSONALITY_ANALYSIS],
+    queryFn: () => apiRequest(queryKeys.PERSONALITY_ANALYSIS),
     enabled: !!userId && !!eligibilityData?.isEligible,
     staleTime: 0, // Always fetch fresh data
     refetchOnWindowFocus: true,

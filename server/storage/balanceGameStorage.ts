@@ -10,10 +10,11 @@ import { eq, desc, and, sql } from "drizzle-orm";
 export class BalanceGameStorage {
     // Game Operations
     async createBalanceGame(game: InsertBalanceGame): Promise<BalanceGame> {
-        const [newGame] = await db
+        const results = await db
             .insert(balanceGames)
             .values(game)
             .returning();
+        const newGame = results[0];
         return newGame;
     }
 
@@ -61,10 +62,11 @@ export class BalanceGameStorage {
     // Vote Operations
     async voteBalanceGame(vote: InsertBalanceGameVote): Promise<BalanceGameVote> {
         return await db.transaction(async (tx: any) => {
-            const [newVote] = await tx
+            const results = await tx
                 .insert(balanceGameVotes)
                 .values(vote)
                 .returning();
+            const newVote = results[0];
 
             if (vote.choice === 'A') {
                 await tx.update(balanceGames)
@@ -232,7 +234,7 @@ export class BalanceGameStorage {
         const [newComment] = await db
             .insert(balanceGameComments)
             .values(comment)
-            .returning();
+            .returning() as any[];
         return newComment;
     }
 }

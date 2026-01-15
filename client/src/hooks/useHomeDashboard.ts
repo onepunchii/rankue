@@ -1,5 +1,7 @@
 
 import { useState, useEffect } from 'react';
+import { apiRequest } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
 
 export interface HomeDashboardData {
     today_participants: number;
@@ -20,30 +22,26 @@ export function useHomeDashboard() {
             try {
                 if (isMounted) setLoading(true);
 
-                // Fetch data from API endpoints instead of RPC to avoid "relation does not exist" errors
-                const [participantsRes, surveysRes, lotteryRes, topPoliticianRes] = await Promise.allSettled([
-                    fetch('/api/stats/today-participants').then(res => res.json()),
-                    fetch('/api/surveys/paginated?page=1&limit=3&sortBy=recent').then(res => res.json()),
-                    fetch('/api/lottery/today-draw').then(res => res.json()),
-                    fetch('/api/assembly/top-member-info').then(res => res.json())
+                // Fetch data from API endpoints using apiRequest for standard auth/response handling
+                const [participantsData, paginatedSurveys, lotteryData, topPoliticianData] = await Promise.all([
+                    apiRequest('/api/stats/today-participants'),
+                    apiRequest(`${queryKeys.SURVEYS_PAGINATED}?page=1&limit=3&sortBy=recent`),
+                    apiRequest(queryKeys.LOTTERY_TODAY_DRAW),
+                    apiRequest('/api/assembly/top-member-info')
                 ]);
-
-                const todayParticipants = participantsRes.status === 'fulfilled' ? (participantsRes.value.count || 0) : 0;
-                const latestSurveys = surveysRes.status === 'fulfilled' ? (surveysRes.value.surveys || []) : [];
-                const nextLotteryDraw = lotteryRes.status === 'fulfilled' ? lotteryRes.value : null;
-                const topPolitician = topPoliticianRes.status === 'fulfilled' ? topPoliticianRes.value : null;
 
                 if (isMounted) {
                     setData({
-                        today_participants: todayParticipants,
-                        latest_surveys: latestSurveys,
-                        top_politician: topPolitician,
-                        next_lottery_draw: nextLotteryDraw
+                        today_participants: participantsData?.count || 0,
+                        latest_surveys: paginatedSurveys?.surveys || [],
+                        top_politician: topPoliticianData,
+                        next_lottery_draw: lotteryData
                     });
                 }
             } catch (err: any) {
                 console.error('Error fetching home dashboard:', err);
                 if (isMounted) {
+                    setError(err);
                     // Fallback to empty data to prevent UI from crashing
                     setData({
                         today_participants: 0,

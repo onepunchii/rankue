@@ -1,109 +1,31 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
-
-interface LotteryTicket {
-  id: number;
-  userId: string;
-  numbers: number[];
-  drawDate: string;
-  isWinner: boolean;
-  prizeAmount: number;
-  isManualSelection: boolean;
-  createdAt: string;
-}
-
-interface LotteryDraw {
-  id: number;
-  drawDate: string;
-  winningNumbers: number[];
-  totalParticipants: number;
-  totalPrizePool: number;
-  winnersCount: number;
-  createdAt: string;
-}
+import { useLottery, ExtendedLotteryTicket } from '@/hooks/useLottery'; // Import hook
+import { LotteryDraw } from '@shared/schema';
 
 interface LotterySectionProps {
   userId: string;
 }
 
 export default function LotterySection({ userId }: LotterySectionProps) {
-  const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
-  const [showNumberSelection, setShowNumberSelection] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const { data: tickets = [], isLoading: ticketsLoading } = useQuery({
-    queryKey: ['/api/lottery/tickets'],
-  });
-
-  const { data: todayDraw } = useQuery({
-    queryKey: ['/api/lottery/today-draw'],
-  });
-
-  const createManualTicketMutation = useMutation({
-    mutationFn: async (numbers: number[]) => {
-      return apiRequest('/api/lottery/manual-ticket', {
-        method: 'POST',
-        body: { numbers },
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "로또 티켓 생성 완료",
-        description: "로또 번호가 성공적으로 선택되었습니다!",
-      });
-      setSelectedNumbers([]);
-      setShowNumberSelection(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/lottery/tickets'] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "프로필 인증이 필요해요",
-        description: error.message || "프로필 인증을 완료하시면 사용가능합니다.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const toggleNumber = (number: number) => {
-    if (selectedNumbers.includes(number)) {
-      setSelectedNumbers(selectedNumbers.filter(n => n !== number));
-    } else if (selectedNumbers.length < 5) {
-      setSelectedNumbers([...selectedNumbers, number].sort((a, b) => a - b));
-    }
-  };
-
-  const handleCreateManualTicket = () => {
-    if (selectedNumbers.length !== 5) {
-      toast({
-        title: "번호 선택 오류",
-        description: "정확히 5개의 번호를 선택해주세요.",
-        variant: "destructive",
-      });
-      return;
-    }
-    createManualTicketMutation.mutate(selectedNumbers);
-  };
-
-  const getTicketStatus = (ticket: LotteryTicket, draw?: LotteryDraw) => {
-    if (!draw) return "추첨 대기중";
-    if (ticket.isWinner) return `당첨! ${ticket.prizeAmount.toLocaleString()}원`;
-    return "미당첨";
-  };
-
-  const getTicketBadgeColor = (ticket: LotteryTicket, draw?: LotteryDraw) => {
-    if (!draw) return "bg-yellow-100 text-yellow-800";
-    if (ticket.isWinner) return "bg-green-100 text-green-800";
-    return "bg-gray-100 text-gray-800";
-  };
-
-  const winningTickets = tickets.filter((ticket: LotteryTicket) => ticket.isWinner);
-  const totalPrize = winningTickets.reduce((sum: number, ticket: LotteryTicket) => sum + (ticket.prizeAmount || 0), 0);
+  const {
+    tickets,
+    todayDraw,
+    ticketsLoading,
+    winningTickets,
+    totalPrize,
+    selectedNumbers,
+    setSelectedNumbers,
+    showNumberSelection,
+    setShowNumberSelection,
+    toggleNumber,
+    handleCreateManualTicket,
+    createManualTicketMutation,
+    getTicketStatus,
+    getTicketBadgeColor,
+  } = useLottery();
 
   if (ticketsLoading) {
     return (
@@ -129,7 +51,7 @@ export default function LotterySection({ userId }: LotterySectionProps) {
               로또 하러가기
             </Button>
           </div>
-          
+
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
               <div className="text-lg font-bold text-blue-600">{tickets.length}</div>
@@ -152,7 +74,7 @@ export default function LotterySection({ userId }: LotterySectionProps) {
         <Card className="shadow-soft">
           <CardContent className="p-4">
             <h4 className="font-bold text-gray-800 mb-4">로또 번호 선택 (1-40 중 5개)</h4>
-            
+
             <div className="mb-4">
               <div className="text-sm text-gray-600 mb-2">
                 선택된 번호: {selectedNumbers.length}/5
@@ -220,7 +142,7 @@ export default function LotterySection({ userId }: LotterySectionProps) {
               ))}
             </div>
             <div className="text-xs text-gray-500">
-              참가자: {todayDraw.totalParticipants}명 | 당첨자: {todayDraw.winnersCount}명
+              참가자: {todayDraw.totalParticipants || 0}명 | 당첨자: {(todayDraw as any).winnersCount || 0}명
             </div>
           </CardContent>
         </Card>
@@ -232,7 +154,7 @@ export default function LotterySection({ userId }: LotterySectionProps) {
           <h4 className="font-bold text-gray-800 mb-3">내 로또 티켓</h4>
           {tickets.length > 0 ? (
             <div className="space-y-3 max-h-64 overflow-y-auto">
-              {tickets.slice(0, 10).map((ticket: LotteryTicket) => (
+              {tickets.slice(0, 10).map((ticket: ExtendedLotteryTicket) => (
                 <div key={ticket.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     <div className="flex items-center gap-1 mb-1">
@@ -246,7 +168,7 @@ export default function LotterySection({ userId }: LotterySectionProps) {
                       ))}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {new Date(ticket.drawDate).toLocaleDateString('ko-KR')} 추첨
+                      {ticket.drawDate ? new Date(ticket.drawDate).toLocaleDateString('ko-KR') : '추첨 예정'} 추첨
                       {ticket.isManualSelection && ' • 수동선택'}
                     </div>
                   </div>

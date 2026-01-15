@@ -16,6 +16,7 @@ export interface AuthUser {
     ageGroup?: string;
     gender?: string;
     region?: string;
+    city?: string;
     cityProvince?: string;
     district?: string;
     jobCategory?: string;
@@ -134,7 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     throw new Error('Failed to fetch user profile from server');
                 }
 
-                const profileData = await response.json();
+                const result = await response.json();
+                const profileData = result.success ? result.data : result;
                 console.log('📊 [AuthContext] Profile data received:', profileData);
 
                 // Apply pending profile changes if any (Fixes race condition: ensure profile exists first)
@@ -147,7 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (freshRes.ok) {
-                        const freshData = await freshRes.json();
+                        const freshResult = await freshRes.json();
+                        const freshData = freshResult.success ? freshResult.data : freshResult;
                         Object.assign(profileData, freshData);
                     }
                 }
@@ -205,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
                 // CANONICAL PATTERN: Check localStorage for Supabase session
                 // Supabase stores session in localStorage with key format: sb-{project-ref}-auth-token
-                let sessionData = null;
+                let sessionData: string | null = null;
                 let accessToken = null;
 
                 // Try to find Supabase session in localStorage
@@ -259,7 +262,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     return;
                 }
 
-                const profileData = await response.json();
+                const result = await response.json();
+                const profileData = result.success ? result.data : result;
                 console.log('📊 [AuthContext] Profile data received:', profileData);
 
                 if (profileData && profileData.id && profileData.id !== 'guest') {

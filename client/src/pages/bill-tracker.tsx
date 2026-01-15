@@ -26,18 +26,19 @@ export default function BillTracker() {
         credentials: 'include'
       });
       if (!response.ok) throw new Error("Failed to fetch bills");
-      return response.json();
+      const json = await response.json();
+      return json.success ? json.data : json;
     }
   });
 
   // 검색 및 필터링
   const filteredBills = bills.filter((bill: any) => {
-    const matchesSearch = bill.title?.includes(searchQuery) || 
-                         bill.proposer?.includes(searchQuery) ||
-                         bill.committee?.includes(searchQuery);
-    
+    const matchesSearch = bill.title?.includes(searchQuery) ||
+      bill.proposer?.includes(searchQuery) ||
+      bill.committee?.includes(searchQuery);
+
     const matchesStatus = selectedStatus === "all" || bill.status === selectedStatus;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -45,7 +46,7 @@ export default function BillTracker() {
   const getStatusColor = (status: string) => {
     const colors = {
       "발의": "bg-blue-100 text-blue-700 border-blue-200",
-      "심사중": "bg-yellow-100 text-yellow-700 border-yellow-200", 
+      "심사중": "bg-yellow-100 text-yellow-700 border-yellow-200",
       "통과": "bg-green-100 text-green-700 border-green-200",
       "부결": "bg-red-100 text-red-700 border-red-200",
       "폐기": "bg-gray-100 text-gray-700 border-gray-200"
@@ -55,19 +56,19 @@ export default function BillTracker() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 dark:from-gray-900 dark:via-purple-900/20 dark:to-indigo-900/20">
-      <SEOHead 
+      <SEOHead
         title="법안 추적 - 국회 발의법률안 현황"
         description="국회에서 발의된 법률안의 진행 상황을 실시간으로 추적하고 검색해보세요. 심사 현황과 통과율을 한눈에 확인할 수 있습니다."
       />
-      
+
       <MobileHeader />
-      
+
       <div className="pt-16 pb-20">
         {/* Header Section */}
         <section className="px-4 pb-6">
           <div className="glass-card-strong p-6 relative overflow-hidden bg-gradient-to-br from-purple-500/10 to-indigo-500/10 backdrop-blur-md border border-purple-200/30">
             <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full transform translate-x-8 -translate-y-8"></div>
-            
+
             <div className="flex items-center justify-between mb-4 relative z-10">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
@@ -78,8 +79,8 @@ export default function BillTracker() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">국회 발의법률안 현황</p>
                 </div>
               </div>
-              <Button 
-                onClick={() => setLocation('/')}
+              <Button
+                onClick={() => setLocation('/home')}
                 variant="ghost"
                 className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
               >
@@ -195,7 +196,7 @@ export default function BillTracker() {
                             <ProposerWithParty proposer={bill.proposer} />
                           </div>
                         )}
-                        
+
                         {bill.committee && (
                           <div className="flex items-center space-x-2">
                             <i className="fas fa-building text-indigo-600 text-sm w-4"></i>
@@ -229,7 +230,7 @@ export default function BillTracker() {
                             </Badge>
                           )}
                         </div>
-                        
+
                         <div className="flex items-center space-x-2">
                           <Button
                             variant="outline"

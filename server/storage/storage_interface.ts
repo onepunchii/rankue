@@ -57,8 +57,7 @@ export interface IStorage {
 
     // Lottery system
     getUserLotteryTickets(userId: string): Promise<LotteryTicket[]>;
-    getTodayLotteryDraw(): Promise<LotteryDraw | undefined>;
-    runDailyLotteryDraw(): Promise<LotteryDraw | null>;
+    getLotteryHistoryWithStats(limit?: number): Promise<any[]>;
 
     // Point system
     addPersonalPoints(userId: string, amount: number, description: string): Promise<void>;

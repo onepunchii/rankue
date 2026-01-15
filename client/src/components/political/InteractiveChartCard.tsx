@@ -144,13 +144,13 @@ export default function InteractiveChartCard({
     }, [data, genderBreakdown, ageBreakdown, regionBreakdown, type]);
 
     // --- "My Tribe" Logic ---
-    const myRegion = (user as any)?.city ? (user as any).city.split(" ")[0] : "서울"; // Fallback to Seoul
+    const myRegion = user?.city ? user.city.split(" ")[0] : "서울"; // Fallback to Seoul
     const myGender = user?.gender === "male" ? "남성" : (user?.gender === "female" ? "여성" : null);
 
     // Parse age group (e.g., "1990" -> "30대")
     const myAgeGroup = useMemo(() => {
-        if (!(user as any)?.ageGroup) return "20대"; // Default
-        return (user as any).ageGroup;
+        if (!user?.ageGroup) return "20대"; // Default
+        return user.ageGroup;
     }, [user]);
 
     // Determine current "My Tribe" key based on tab

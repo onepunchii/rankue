@@ -42,7 +42,7 @@ export default function BrainLeaderboard() {
     const { data: leaderboard = [], isLoading, isError } = useQuery<LeaderboardUser[]>({
         queryKey: ["brainLeaderboard", activeCategory],
         queryFn: async () => {
-            const res = await fetch(`/api/rank/top?category=${activeCategory}`);
+            const res = await fetch(`/api/brain/leaderboard?category=${activeCategory}`);
             if (!res.ok) throw new Error("Failed to fetch leaderboard");
             return res.json();
         }

@@ -140,6 +140,7 @@ export default function PoliticianDetail({ type }: PoliticianDetailProps) {
   // Fetch politician data
   const { data: politician, isLoading: politicianLoading, error: politicianError } = useQuery<Politician>({
     queryKey: [`/api/${type === 'assembly' ? 'assembly' : 'local-council'}/${validId}`],
+    queryFn: () => apiRequest(`/api/${type === 'assembly' ? 'assembly' : 'local-council'}/${validId}`),
     enabled: !!validId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 2,
@@ -148,18 +149,21 @@ export default function PoliticianDetail({ type }: PoliticianDetailProps) {
   // Fetch ratings
   const { data: ratingsData } = useQuery<RatingsInfo>({
     queryKey: [`/api/politicians/${type}/${validId}/ratings`],
+    queryFn: () => apiRequest(`/api/politicians/${type}/${validId}/ratings`),
     enabled: !!validId,
   });
 
   // Fetch comments
   const { data: comments = [] } = useQuery<Comment[]>({
     queryKey: [`/api/politicians/${type}/${validId}/comments`],
+    queryFn: () => apiRequest(`/api/politicians/${type}/${validId}/comments`),
     enabled: !!validId,
   });
 
   // Fetch AI Persona (Game Card)
   const { data: persona, isLoading: personaLoading } = useQuery<PoliticianPersona>({
     queryKey: [`/api/politicians/${type}/${validId}/persona`],
+    queryFn: () => apiRequest(`/api/politicians/${type}/${validId}/persona`),
     enabled: !!validId,
     staleTime: 24 * 60 * 60 * 1000, // 24 hours
     retry: false, // 오류 시 재시도하지 않음

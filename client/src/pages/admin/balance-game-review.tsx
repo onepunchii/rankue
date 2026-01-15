@@ -15,7 +15,13 @@ export default function BalanceGameReview() {
 
     // Fetch Pending Games
     const { data: pendingGames = [], refetch } = useQuery<BalanceGame[]>({
-        queryKey: ['/api/balance-games/all'], // This endpoint fetches pending items
+        queryKey: ['/api/balance-games', 'PENDING'],
+        queryFn: async () => {
+            const res = await fetch('/api/balance-games?status=PENDING');
+            if (!res.ok) throw new Error("Failed to fetch pending games");
+            const json = await res.json();
+            return Array.isArray(json.data) ? json.data : [];
+        },
         retry: false
     });
 

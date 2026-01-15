@@ -60,10 +60,22 @@ export default function BalanceGameArchive() {
     // Actually fetching games
     const { data: balanceGames = [] } = useQuery<BalanceGame[]>({
         queryKey: ['/api/balance-games'],
+        queryFn: async () => {
+            const res = await fetch('/api/balance-games');
+            if (!res.ok) throw new Error("Failed to fetch balance games");
+            const json = await res.json();
+            return Array.isArray(json.data) ? json.data : [];
+        }
     });
 
     const { data: myVotes = [], refetch: refetchMyVotes } = useQuery<any[]>({
         queryKey: ['/api/balance-games/votes/me'],
+        queryFn: async () => {
+            const res = await fetch('/api/balance-games/votes/me');
+            if (!res.ok) throw new Error("Failed to fetch user votes");
+            const json = await res.json();
+            return Array.isArray(json.data) ? json.data : [];
+        },
         enabled: !!user && !user.isGuest
     });
 
@@ -91,12 +103,24 @@ export default function BalanceGameArchive() {
     // Fetch Stats for Selected Game
     const { data: gameStats = INITIAL_STATS } = useQuery<GameStats>({
         queryKey: [`/api/balance-games/${selectedGame?.id}/stats`],
+        queryFn: async () => {
+            const res = await fetch(`/api/balance-games/${selectedGame?.id}/stats`);
+            if (!res.ok) throw new Error("Failed to fetch stats");
+            const json = await res.json();
+            return json.data || INITIAL_STATS;
+        },
         enabled: !!selectedGame
     });
 
     // Fetch Comments
     const { data: comments = [], refetch: refetchComments } = useQuery<Comment[]>({
         queryKey: [`/api/balance-games/${selectedGame?.id}/comments`],
+        queryFn: async () => {
+            const res = await fetch(`/api/balance-games/${selectedGame?.id}/comments`);
+            if (!res.ok) throw new Error("Failed to fetch comments");
+            const json = await res.json();
+            return Array.isArray(json.data) ? json.data : [];
+        },
         enabled: !!selectedGame
     });
 

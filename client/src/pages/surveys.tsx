@@ -7,6 +7,8 @@ import BottomNav from "@/components/bottom-nav";
 import SurveyCard from "@/components/survey-card";
 import { SEOHead } from "@/components/seo-head";
 import { Button } from "@/components/ui/button";
+import { queryKeys } from "@/lib/queryKeys";
+import { apiRequest } from "@/lib/queryClient";
 import { Survey } from "@shared/schema";
 
 type SortType = 'recent' | 'timeLeft';
@@ -26,32 +28,20 @@ export default function Surveys() {
     isLoading,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ["/api/surveys/paginated", sortBy],
+    queryKey: [queryKeys.SURVEYS_PAGINATED, sortBy],
     queryFn: async ({ pageParam = 1 }) => {
-      const response = await fetch(`/api/surveys/paginated?page=${pageParam}&limit=20&sortBy=${sortBy}`);
-      if (!response.ok) throw new Error('Failed to fetch surveys');
-      return response.json();
+      return apiRequest(`${queryKeys.SURVEYS_PAGINATED}?page=${pageParam}&limit=20&sortBy=${sortBy}`);
     },
-    getNextPageParam: (lastPage) => {
+    getNextPageParam: (lastPage: any) => {
       return lastPage.hasMore ? lastPage.page + 1 : undefined;
     },
     initialPageParam: 1,
   });
 
   // Simple Auth 사용자 참여 데이터 가져오기
-  const { data: userParticipations = [] } = useQuery({
-    queryKey: ["/api/auth/user/participations", user?.id],
-    queryFn: async () => {
-      const token = document.cookie.split('polli_token=')[1]?.split(';')[0] || '';
-      const response = await fetch(`/api/auth/user/participations`, {
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch participations');
-      return response.json();
-    },
+  const { data: userParticipations = [] } = useQuery<any[]>({
+    queryKey: [queryKeys.AUTH_USER_PARTICIPATIONS],
+    queryFn: () => apiRequest(queryKeys.AUTH_USER_PARTICIPATIONS),
     staleTime: 5000,
     enabled: !!user && !user.isGuest,
     refetchOnWindowFocus: false,

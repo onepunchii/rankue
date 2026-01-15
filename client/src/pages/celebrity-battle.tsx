@@ -19,6 +19,8 @@ import { Image, X, Users, Eye, Trophy, Trash2, ArrowLeft } from 'lucide-react';
 import { insertCelebrityBattleSchema } from '@shared/schema';
 import LightPillar from "@/components/ui/light-pillar";
 import { motion, AnimatePresence } from "framer-motion";
+import { apiRequest } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 
 
 // 카테고리 옵션 (Supabase DB 실제 데이터 기준)
@@ -92,27 +94,15 @@ const CelebrityBattle = () => {
 
   // Supabase에서 셀럽 데이터 가져오기
   const { data: celebrities = [], isLoading } = useQuery({
-    queryKey: ['/api/celebrities/by-category', activeCategory],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      // DB에는 'actor_female' 같은 형태로 저장되어 있음
-      if (activeCategory) params.append('category', activeCategory);
-
-      const response = await fetch(`/api/celebrities/by-category?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch celebrities');
-      return response.json();
-    },
+    queryKey: [queryKeys.CELEBRITIES_BY_CATEGORY, activeCategory],
+    queryFn: () => apiRequest(`${queryKeys.CELEBRITIES_BY_CATEGORY}?category=${activeCategory}`),
     enabled: !!activeCategory,
   });
 
   // 모든 셀럽 데이터 가져오기 (검색용)
   const { data: allCelebrities = [] } = useQuery({
-    queryKey: ['/api/celebrities/all'],
-    queryFn: async () => {
-      const response = await fetch('/api/celebrities/by-category');
-      if (!response.ok) throw new Error('Failed to fetch all celebrities');
-      return response.json();
-    },
+    queryKey: [queryKeys.CELEBRITIES_BY_CATEGORY],
+    queryFn: () => apiRequest(queryKeys.CELEBRITIES_BY_CATEGORY),
   });
 
   // 검색 기능

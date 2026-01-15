@@ -78,7 +78,7 @@ function cleanText(text: string): string {
 
 export default function NewsPage() {
   const [, setLocation] = useLocation();
-  const [selectedCategory, setSelectedCategory] = useState<string>("전체");
+  const [selectedCategory, setSelectedCategory] = useState<string>("랭킹");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [limit, setLimit] = useState(50);
@@ -105,13 +105,18 @@ export default function NewsPage() {
     queryKey: ["/api/news", selectedCategory, debouncedQuery, limit],
     queryFn: async () => {
       const url = new URL("/api/news", window.location.origin);
-      if (selectedCategory !== "전체") url.searchParams.append("category", selectedCategory);
+      // '랭킹' is now the default view (formerly '전체'), so we don't send a category param for it
+      // unless we want specific ranking logic, but user request implies merging '전체' into '랭킹'
+      if (selectedCategory !== "랭킹") url.searchParams.append("category", selectedCategory);
+      else url.searchParams.append("category", "전체"); // Explicitly send '전체' if needed by backend, or omit if backend defaults to all
+
       if (debouncedQuery) url.searchParams.append("q", debouncedQuery);
       url.searchParams.append("limit", limit.toString());
 
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error("Failed to fetch news");
-      return res.json();
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
     },
     refetchInterval: 6 * 60 * 60 * 1000,
     staleTime: 60 * 1000, // Reduced staleTime for search freshness
@@ -205,7 +210,7 @@ export default function NewsPage() {
     });
   };
 
-  const categories = ["전체", "랭킹", "토론", "정치", "경제", "사회", "기타"];
+  const categories = ["랭킹", "토론", "정치", "경제", "사회", "기타"];
 
   return (
     <div className="min-h-screen bg-black text-white">

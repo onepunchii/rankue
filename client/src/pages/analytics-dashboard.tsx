@@ -77,8 +77,8 @@ export default function AnalyticsDashboard() {
             <p className="text-gray-600 dark:text-gray-400">
               분석 대시보드는 관리자만 접근할 수 있습니다.
             </p>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="mt-4"
               onClick={() => window.history.back()}
             >
@@ -165,7 +165,7 @@ export default function AnalyticsDashboard() {
         structuredData={analyticsStructuredData}
       />
       <MobileHeader />
-      
+
       <main className="max-w-7xl mx-auto p-4 pb-20">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -173,7 +173,7 @@ export default function AnalyticsDashboard() {
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white">분석 대시보드</h1>
             <p className="text-gray-600 dark:text-gray-400">플랫폼 성과와 사용자 참여 분석</p>
           </div>
-          
+
           <div className="flex gap-3">
             <Select value={timeRange} onValueChange={setTimeRange}>
               <SelectTrigger className="w-32">
@@ -186,7 +186,7 @@ export default function AnalyticsDashboard() {
                 <SelectItem value="90d">90일</SelectItem>
               </SelectContent>
             </Select>
-            
+
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -210,35 +210,35 @@ export default function AnalyticsDashboard() {
               <div className="text-sm text-gray-600 dark:text-gray-400">총 설문</div>
             </CardContent>
           </Card>
-          
+
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-green-600">{analytics?.overview.totalParticipants || 0}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">총 참여자</div>
             </CardContent>
           </Card>
-          
+
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-purple-600">{analytics?.overview.averageCompletionRate || 0}%</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">완료율</div>
             </CardContent>
           </Card>
-          
+
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-orange-600">{analytics?.overview.totalResponses || 0}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">총 응답</div>
             </CardContent>
           </Card>
-          
+
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-pink-600">{analytics?.overview.activeUsersToday || 0}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">오늘 활성 사용자</div>
             </CardContent>
           </Card>
-          
+
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-indigo-600">{analytics?.overview.newUsersToday || 0}</div>
@@ -254,7 +254,7 @@ export default function AnalyticsDashboard() {
             <TabsTrigger value="users">사용자 분석</TabsTrigger>
             <TabsTrigger value="engagement">참여도</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="trends" className="space-y-6">
             {/* Participation Trend */}
             <Card className="glass-card">
@@ -270,7 +270,7 @@ export default function AnalyticsDashboard() {
                 />
               </CardContent>
             </Card>
-            
+
             {/* Category Distribution */}
             <Card className="glass-card">
               <CardHeader>
@@ -286,7 +286,7 @@ export default function AnalyticsDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="surveys" className="space-y-6">
             {/* Top Performing Surveys */}
             <Card className="glass-card">
@@ -317,7 +317,7 @@ export default function AnalyticsDashboard() {
                 </div>
               </CardContent>
             </Card>
-            
+
             {/* Category Performance */}
             <Card className="glass-card">
               <CardHeader>
@@ -337,7 +337,7 @@ export default function AnalyticsDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="users" className="space-y-6">
             {/* Age Demographics */}
             <Card className="glass-card">
@@ -353,7 +353,7 @@ export default function AnalyticsDashboard() {
                 />
               </CardContent>
             </Card>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Gender Demographics */}
               <Card className="glass-card">
@@ -369,7 +369,7 @@ export default function AnalyticsDashboard() {
                   />
                 </CardContent>
               </Card>
-              
+
               {/* Location Demographics */}
               <Card className="glass-card">
                 <CardHeader>
@@ -377,13 +377,16 @@ export default function AnalyticsDashboard() {
                 </CardHeader>
                 <CardContent>
                   <ChartComponents.PieChart
-                    data={analytics?.userDemographics?.location?.slice(0, 8) || []}
+                    data={analytics?.userDemographics?.location?.slice(0, 8).map(item => ({
+                      name: item.city,
+                      value: item.count
+                    })) || []}
                   />
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
-          
+
           <TabsContent value="engagement" className="space-y-6">
             {/* Engagement Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -400,7 +403,7 @@ export default function AnalyticsDashboard() {
                   </p>
                 </CardContent>
               </Card>
-              
+
               <Card className="glass-card">
                 <CardHeader>
                   <CardTitle>재방문율</CardTitle>
@@ -414,7 +417,7 @@ export default function AnalyticsDashboard() {
                   </p>
                 </CardContent>
               </Card>
-              
+
               <Card className="glass-card">
                 <CardHeader>
                   <CardTitle>공유율</CardTitle>
@@ -429,7 +432,7 @@ export default function AnalyticsDashboard() {
                 </CardContent>
               </Card>
             </div>
-            
+
             {/* Platform Usage */}
             <Card className="glass-card">
               <CardHeader>
@@ -447,7 +450,7 @@ export default function AnalyticsDashboard() {
           </TabsContent>
         </Tabs>
       </main>
-      
+
       <BottomNav />
     </div>
   );

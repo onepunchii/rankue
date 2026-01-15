@@ -1,0 +1,93 @@
+.glass-header {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.03) 0%, rgba(236, 72, 153, 0.05) 100%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+}
+
+.back-button {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+.stat-card-1 {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.05) 0%, rgba(236, 72, 153, 0.08) 100%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+}
+
+.stat-icon-1 {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+}
+
+.stat-card-2 {
+    background: linear-gradient(135deg, rgba(219, 39, 119, 0.05) 0%, rgba(245, 73, 144, 0.08) 100%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+}
+
+.stat-icon-2 {
+    background: linear-gradient(135deg, rgba(219, 39, 119, 0.1) 0%, rgba(245, 73, 144, 0.1) 100%);
+}
+
+.stat-card-3 {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.05) 0%, rgba(219, 39, 119, 0.08) 100%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+}
+
+.stat-icon-3 {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.1) 100%);
+}
+
+.stat-card-4 {
+    background: linear-gradient(135deg, rgba(190, 24, 93, 0.05) 0%, rgba(236, 72, 153, 0.08) 100%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+}
+
+.stat-icon-4 {
+    background: linear-gradient(135deg, rgba(190, 24, 93, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+}
+
+.survey-selection-card {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.03) 0%, rgba(236, 72, 153, 0.05) 100%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+}
+
+.survey-selection-icon {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.9) 0%, rgba(236, 72, 153, 0.9) 100%);
+}
+
+.survey-button-selected {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+.survey-button-default {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(245, 73, 144, 0.02) 100%);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+.survey-check-icon {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.9) 0%, rgba(236, 72, 153, 0.9) 100%);
+}
+
+.demographic-card {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.03) 0%, rgba(236, 72, 153, 0.05) 100%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+}
+
+.demographic-icon {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.9) 0%, rgba(236, 72, 153, 0.9) 100%);
+}
+
+.summary-card {
+    background: linear-gradient(135deg, rgba(245, 73, 144, 0.9) 0%, rgba(236, 72, 153, 0.9) 50%, rgba(219, 39, 119, 0.9) 100%);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+}

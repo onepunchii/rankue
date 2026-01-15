@@ -26,11 +26,31 @@ export default function CelebrityBentoGrid() {
 
     // 실제 데이터 페칭
     const { data: categories = [] } = useQuery<Category[]>({
-        queryKey: ["/api/music/categories"],
+        queryKey: ["/api/celebrities/categories"],
+        queryFn: async () => {
+            const res = await fetch("/api/celebrities/categories");
+            if (!res.ok) throw new Error("Failed to fetch categories");
+            const json = await res.json();
+            // Server returns { success: true, data: { categories: string[], ... } }
+            // Assuming the component expects [{ id: 1, name: 'cat' }] but server returns strings.
+            // Let's adapt it to match the interface or change interface if needed.
+            // Based on server code: res.json({ categories: string[], ... });
+            // Wait, server code was: return sendSuccess(res, { categories, genders, types });
+            // So json.data.categories is string[].
+            // We need to map string[] to Category[] interface { id: number, name: string }
+            const categoryNames: string[] = json.data?.categories || [];
+            return categoryNames.map((name, idx) => ({ id: idx, name }));
+        }
     });
 
     const { data: allArtists = [], isLoading } = useQuery<Artist[]>({
-        queryKey: ["/api/music/all-artists"],
+        queryKey: ["/api/celebrities/by-category"],
+        queryFn: async () => {
+            const res = await fetch("/api/celebrities/by-category"); // No category param = get all
+            if (!res.ok) throw new Error("Failed to fetch artists");
+            const json = await res.json();
+            return Array.isArray(json.data) ? json.data : [];
+        }
     });
 
     // 각 카테고리별 1위 추출
@@ -38,7 +58,12 @@ export default function CelebrityBentoGrid() {
         if (!categories.length || !allArtists.length) return [];
 
         return categories.map(cat => {
-            const topArtist = allArtists.find(a => a.categoryId === cat.id);
+            // Server returns string categories like 'actor_male', frontend maps them to { id, name }
+            // Artist object from server has 'category' string field.
+            const topArtist = allArtists
+                .filter(a => (a as any).category === cat.name) // Type assertion until interface is updated
+                .sort((a, b) => (b.currentMonthVotes || 0) - (a.currentMonthVotes || 0))[0];
+
             return {
                 categoryId: cat.id,
                 categoryName: cat.name,
@@ -59,7 +84,6 @@ export default function CelebrityBentoGrid() {
         const timer = setInterval(() => {
             setCurrentWinnerIndex((prev) => (prev + 1) % winners.length);
         }, 3000);
-        return () => clearInterval(timer);
     }, [winners]);
 
     const currentWinner = winners[currentWinnerIndex] || { categoryName: "인기투표", winner: "로딩중..." };

@@ -1,8 +1,9 @@
+
 import { TagCloud } from "react-tagcloud";
-import { 
-  BarChart, Bar, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid,
-  PolarAngleAxis, PolarRadiusAxis, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer 
+import {
+  BarChart as RechartsBarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, RadarChart as RechartsRadarChart, Radar, PolarGrid,
+  PolarAngleAxis, PolarRadiusAxis, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, LineChart as RechartsLineChart, Line
 } from "recharts";
 
 export const chartTheme = {
@@ -28,6 +29,104 @@ export const chartTheme = {
   },
 };
 
+interface SimpleChartProps {
+  data: any[];
+  xKey?: string;
+  yKeys?: string[];
+  colors?: string[];
+}
+
+export const LineChart = ({ data, xKey, yKeys, colors }: SimpleChartProps) => {
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <RechartsLineChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.neutral.gray200} />
+        <XAxis
+          dataKey={xKey}
+          axisLine={false}
+          tickLine={false}
+          tick={{ fill: chartTheme.neutral.gray600, fontSize: chartTheme.typography.small }}
+        />
+        <YAxis
+          axisLine={false}
+          tickLine={false}
+          tick={{ fill: chartTheme.neutral.gray600, fontSize: chartTheme.typography.small }}
+        />
+        <Tooltip />
+        <Legend />
+        {yKeys?.map((key, index) => (
+          <Line
+            key={key}
+            type="monotone"
+            dataKey={key}
+            stroke={colors?.[index] || chartTheme.colors.primary}
+            strokeWidth={2}
+            dot={false}
+          />
+        ))}
+      </RechartsLineChart>
+    </ResponsiveContainer>
+  );
+};
+
+export const BarChart = ({ data, xKey, yKeys, colors }: SimpleChartProps) => {
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <RechartsBarChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.neutral.gray200} />
+        <XAxis
+          dataKey={xKey}
+          axisLine={false}
+          tickLine={false}
+          tick={{ fill: chartTheme.neutral.gray600, fontSize: chartTheme.typography.small }}
+        />
+        <YAxis
+          axisLine={false}
+          tickLine={false}
+          tick={{ fill: chartTheme.neutral.gray600, fontSize: chartTheme.typography.small }}
+        />
+        <Tooltip />
+        <Legend />
+        {yKeys?.map((key, index) => (
+          <Bar
+            key={key}
+            dataKey={key}
+            fill={colors?.[index] || chartTheme.colors.primary}
+            radius={[4, 4, 0, 0]}
+          />
+        ))}
+      </RechartsBarChart>
+    </ResponsiveContainer>
+  );
+};
+
+export const PieChart = ({ data }: { data: { name: string; value: number }[] }) => {
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <RechartsPieChart>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          innerRadius={60}
+          outerRadius={80}
+          fill="#8884d8"
+          paddingAngle={5}
+          dataKey="value"
+        >
+          {data.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+        <Legend />
+      </RechartsPieChart>
+    </ResponsiveContainer>
+  );
+};
+
 interface KPIRadarChartProps {
   data: Array<{
     subject: string;
@@ -38,26 +137,26 @@ interface KPIRadarChartProps {
 export const KPIRadarChart = ({ data }: KPIRadarChartProps) => {
   return (
     <ResponsiveContainer width="100%" height={400}>
-      <RadarChart data={data}>
+      <RechartsRadarChart data={data}>
         <PolarGrid stroke={chartTheme.neutral.gray200} />
-        <PolarAngleAxis 
-          dataKey="subject" 
+        <PolarAngleAxis
+          dataKey="subject"
           tick={{ fill: chartTheme.neutral.gray600, fontSize: chartTheme.typography.medium }}
         />
-        <PolarRadiusAxis 
-          angle={90} 
+        <PolarRadiusAxis
+          angle={90}
           domain={[0, 100]}
           tick={{ fill: chartTheme.neutral.gray400, fontSize: chartTheme.typography.small }}
         />
-        <Radar 
-          name="점수" 
-          dataKey="score" 
-          stroke={chartTheme.colors.primary} 
+        <Radar
+          name="점수"
+          dataKey="score"
+          stroke={chartTheme.colors.primary}
           fill={chartTheme.colors.primary}
           fillOpacity={0.3}
         />
         <Tooltip />
-      </RadarChart>
+      </RechartsRadarChart>
     </ResponsiveContainer>
   );
 };
@@ -78,7 +177,7 @@ export const GaugeChart = ({ score, maxScore = 100, title }: GaugeChartProps) =>
   return (
     <div className="relative">
       <ResponsiveContainer width="100%" height={200}>
-        <PieChart>
+        <RechartsPieChart>
           <Pie
             data={data}
             cx="50%"
@@ -93,7 +192,7 @@ export const GaugeChart = ({ score, maxScore = 100, title }: GaugeChartProps) =>
               <Cell key={`cell-${index}`} fill={entry.fill} />
             ))}
           </Pie>
-        </PieChart>
+        </RechartsPieChart>
       </ResponsiveContainer>
       <div className="absolute top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
         <div className="text-3xl font-bold text-blue-600">{score.toFixed(1)}</div>
@@ -113,24 +212,24 @@ export const LikertBar = ({ data, showAverage, average }: LikertBarProps) => {
   return (
     <div>
       <ResponsiveContainer width="100%" height={240}>
-        <BarChart data={data}>
+        <RechartsBarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.neutral.gray100} />
-          <XAxis 
-            dataKey="answer" 
-            angle={-10} 
-            textAnchor="end" 
-            height={80} 
+          <XAxis
+            dataKey="answer"
+            angle={-10}
+            textAnchor="end"
+            height={80}
             fontSize={chartTheme.typography.small}
             stroke={chartTheme.neutral.gray400}
           />
           <YAxis stroke={chartTheme.neutral.gray400} fontSize={chartTheme.typography.small} />
           <Tooltip />
-          <Bar 
-            dataKey="count" 
+          <Bar
+            dataKey="count"
             fill={chartTheme.colors.primary}
             radius={[4, 4, 0, 0]}
           />
-        </BarChart>
+        </RechartsBarChart>
       </ResponsiveContainer>
       {showAverage && average !== undefined && (
         <div className="mt-2 text-center">
@@ -148,8 +247,6 @@ interface DivergingLikertBarProps {
 }
 
 export const DivergingLikertBar = ({ data }: DivergingLikertBarProps) => {
-  const total = data.reduce((sum, item) => sum + item.count, 0);
-  
   const transformedData = data.map((item, index) => {
     const isNegative = index < data.length / 2;
     return {
@@ -161,12 +258,12 @@ export const DivergingLikertBar = ({ data }: DivergingLikertBarProps) => {
 
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <BarChart data={transformedData} layout="horizontal">
+      <RechartsBarChart data={transformedData} layout="horizontal">
         <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.neutral.gray100} />
         <XAxis type="number" stroke={chartTheme.neutral.gray400} fontSize={chartTheme.typography.small} />
-        <YAxis 
-          dataKey="answer" 
-          type="category" 
+        <YAxis
+          dataKey="answer"
+          type="category"
           width={120}
           fontSize={chartTheme.typography.small}
           stroke={chartTheme.neutral.gray400}
@@ -177,7 +274,7 @@ export const DivergingLikertBar = ({ data }: DivergingLikertBarProps) => {
             <Cell key={`cell-${index}`} fill={entry.fill} />
           ))}
         </Bar>
-      </BarChart>
+      </RechartsBarChart>
     </ResponsiveContainer>
   );
 };
@@ -189,7 +286,7 @@ interface DonutChartProps {
 export const DonutChart = ({ data }: DonutChartProps) => {
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <PieChart>
+      <RechartsPieChart>
         <Pie
           data={data}
           cx="50%"
@@ -201,14 +298,14 @@ export const DonutChart = ({ data }: DonutChartProps) => {
           labelLine={false}
         >
           {data.map((entry, index) => (
-            <Cell 
-              key={`cell-${index}`} 
-              fill={chartTheme.palette[index % chartTheme.palette.length]} 
+            <Cell
+              key={`cell-${index}`}
+              fill={chartTheme.palette[index % chartTheme.palette.length]}
             />
           ))}
         </Pie>
         <Tooltip />
-      </PieChart>
+      </RechartsPieChart>
     </ResponsiveContainer>
   );
 };
@@ -221,7 +318,7 @@ interface WordCloudChartProps {
 
 export const WordCloudChart = ({ responses, minSize = 14, maxSize = 50 }: WordCloudChartProps) => {
   const words = responses.map(r => r.answer.trim()).filter(Boolean);
-  
+
   const wordFrequency: Record<string, number> = {};
   words.forEach(text => {
     const tokens = text.split(/\s+/);
@@ -246,7 +343,7 @@ export const WordCloudChart = ({ responses, minSize = 14, maxSize = 50 }: WordCl
   }
 
   return (
-    <div className="p-4" style={{ minHeight: '300px' }}>
+    <div className="p-4 min-h-[300px]">
       <TagCloud
         minSize={minSize}
         maxSize={maxSize}
@@ -267,23 +364,23 @@ interface VerticalGroupedBarProps {
 export const VerticalGroupedBar = ({ data }: VerticalGroupedBarProps) => {
   return (
     <ResponsiveContainer width="100%" height={Math.max(240, data.length * 40)}>
-      <BarChart data={data} layout="vertical">
+      <RechartsBarChart data={data} layout="vertical">
         <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.neutral.gray100} />
         <XAxis type="number" stroke={chartTheme.neutral.gray400} fontSize={chartTheme.typography.small} />
-        <YAxis 
-          dataKey="answer" 
-          type="category" 
+        <YAxis
+          dataKey="answer"
+          type="category"
           width={180}
           fontSize={chartTheme.typography.small}
           stroke={chartTheme.neutral.gray400}
         />
         <Tooltip />
-        <Bar 
-          dataKey="count" 
+        <Bar
+          dataKey="count"
           fill={chartTheme.colors.primary}
           radius={[0, 4, 4, 0]}
         />
-      </BarChart>
+      </RechartsBarChart>
     </ResponsiveContainer>
   );
 };
@@ -296,6 +393,9 @@ const ChartComponents = {
   DonutChart,
   WordCloudChart,
   VerticalGroupedBar,
+  LineChart,
+  BarChart,
+  PieChart
 };
 
 export default ChartComponents;

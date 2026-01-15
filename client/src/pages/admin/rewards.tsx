@@ -15,6 +15,38 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 import { motion } from "framer-motion";
+import { queryKeys } from "@/lib/queryKeys";
+
+interface Product {
+  id: number;
+  name: string;
+  description: string | null;
+  pointCost: number;
+  categoryId: string;
+  providerSku: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+interface Order {
+  id: number;
+  status: string;
+  userId: number;
+  productId: number;
+  pointCost: number;
+  createdAt: string;
+  recipientPhone?: string | null;
+  failReason?: string | null;
+  user?: { name: string; email: string };
+  product?: { name: string };
+}
+
+interface Stats {
+  totalOrders?: number;
+  pendingOrders?: number;
+  approvedOrders?: number;
+  activeProducts?: number;
+}
 
 export default function AdminRewards() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -32,29 +64,29 @@ export default function AdminRewards() {
   const queryClient = useQueryClient();
 
   // 상품 목록 조회
-  const { data: products = [], isLoading: productsLoading } = useQuery({
-    queryKey: ["/api/admin/rewards/products"],
+  const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
+    queryKey: [queryKeys.ADMIN_REWARDS_PRODUCTS],
   });
 
   // 주문 목록 조회
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ["/api/admin/rewards/orders"],
+  const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
+    queryKey: [queryKeys.ADMIN_REWARDS_ORDERS],
   });
 
   // 통계 조회
-  const { data: stats = {} } = useQuery({
-    queryKey: ["/api/admin/rewards/stats"],
+  const { data: stats = {} } = useQuery<Stats>({
+    queryKey: [queryKeys.ADMIN_REWARDS_STATS],
   });
 
   // 상품 생성 뮤테이션
   const createProductMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/admin/rewards/products", {
+    mutationFn: (data: any) => apiRequest(queryKeys.ADMIN_REWARDS_PRODUCTS, {
       method: "POST",
       body: JSON.stringify(data),
     }),
     onSuccess: () => {
       toast({ title: "상품이 생성되었습니다" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/rewards/products"] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.ADMIN_REWARDS_PRODUCTS] });
       setIsProductDialogOpen(false);
       setNewProduct({
         name: "",
@@ -73,12 +105,12 @@ export default function AdminRewards() {
 
   // 주문 승인 뮤테이션
   const approveOrderMutation = useMutation({
-    mutationFn: (orderId: number) => apiRequest(`/api/admin/rewards/orders/${orderId}/approve`, {
+    mutationFn: (orderId: number) => apiRequest(`${queryKeys.ADMIN_REWARDS_ORDERS}/${orderId}/approve`, {
       method: "POST",
     }),
     onSuccess: () => {
       toast({ title: "주문이 승인되었습니다" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/rewards/orders"] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.ADMIN_REWARDS_ORDERS] });
     },
     onError: (error: Error) => {
       toast({ title: "주문 승인 실패", description: error.message, variant: "destructive" });
@@ -87,14 +119,14 @@ export default function AdminRewards() {
 
   // 주문 거절 뮤테이션
   const rejectOrderMutation = useMutation({
-    mutationFn: ({ orderId, reason }: { orderId: number; reason: string }) => 
-      apiRequest(`/api/admin/rewards/orders/${orderId}/reject`, {
+    mutationFn: ({ orderId, reason }: { orderId: number; reason: string }) =>
+      apiRequest(`${queryKeys.ADMIN_REWARDS_ORDERS}/${orderId}/reject`, {
         method: "POST",
         body: JSON.stringify({ reason }),
       }),
     onSuccess: () => {
       toast({ title: "주문이 거절되었습니다" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/rewards/orders"] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.ADMIN_REWARDS_ORDERS] });
     },
     onError: (error: Error) => {
       toast({ title: "주문 거절 실패", description: error.message, variant: "destructive" });
@@ -109,7 +141,7 @@ export default function AdminRewards() {
       rejected: { variant: "destructive" as const, text: "거절됨" },
       failed: { variant: "destructive" as const, text: "실패" },
     };
-    
+
     const config = statusConfig[status as keyof typeof statusConfig] || { variant: "secondary" as const, text: status };
     return <Badge variant={config.variant}>{config.text}</Badge>;
   };
@@ -191,7 +223,7 @@ export default function AdminRewards() {
                   />
                   <Label htmlFor="isActive">활성화</Label>
                 </div>
-                <Button 
+                <Button
                   onClick={() => createProductMutation.mutate(newProduct)}
                   disabled={createProductMutation.isPending}
                   className="w-full"

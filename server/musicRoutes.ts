@@ -11,6 +11,7 @@ import {
   type InsertMusicVote
 } from "../shared/schema.js";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { sendSuccess, sendError } from "./utils/response.js";
 
 const router = Router();
 
@@ -29,10 +30,10 @@ router.get("/categories", async (req, res) => {
       .where(eq(musicCategories.isActive, true))
       .orderBy(musicCategories.sortOrder, musicCategories.name);
 
-    res.json(categories);
+    sendSuccess(res, categories);
   } catch (error) {
     console.error("카테고리 조회 오류:", error);
-    res.status(500).json({ message: "카테고리를 불러오는데 실패했습니다." });
+    sendError(res, 500, "카테고리를 불러오는데 실패했습니다.");
   }
 });
 
@@ -53,10 +54,10 @@ router.get("/all-artists", async (req, res) => {
       .where(eq(musicArtists.isActive, true))
       .orderBy(desc(musicArtists.currentMonthVotes), musicArtists.name);
 
-    res.json(artists);
+    sendSuccess(res, artists);
   } catch (error) {
     console.error("전체 아티스트 조회 오류:", error);
-    res.status(500).json({ message: "전체 아티스트 목록을 불러오는데 실패했습니다." });
+    sendError(res, 500, "전체 아티스트 목록을 불러오는데 실패했습니다.");
   }
 });
 
@@ -91,10 +92,10 @@ router.get("/artists/:categoryId", async (req, res) => {
       )
       .orderBy(desc(musicArtists.currentMonthVotes), musicArtists.name);
 
-    res.json(artists);
+    sendSuccess(res, artists);
   } catch (error) {
     console.error("아티스트 목록 조회 오류:", error);
-    res.status(500).json({ message: "아티스트 목록을 불러오는데 실패했습니다." });
+    sendError(res, 500, "아티스트 목록을 불러오는데 실패했습니다.");
   }
 });
 
@@ -119,10 +120,10 @@ router.get("/user-votes", async (req, res) => {
       voteStatus[vote.artistId] = true;
     });
 
-    res.json(voteStatus);
+    sendSuccess(res, voteStatus);
   } catch (error) {
     console.error("사용자 투표 현황 조회 오류:", error);
-    res.status(500).json({ message: "투표 현황을 불러오는데 실패했습니다." });
+    sendError(res, 500, "투표 현황을 불러오는데 실패했습니다.");
   }
 });
 
@@ -153,13 +154,13 @@ router.get("/monthly-winner/:categoryId/:month", async (req, res) => {
       .limit(1);
 
     if (winner.length > 0) {
-      res.json(winner[0]);
+      sendSuccess(res, winner[0]);
     } else {
-      res.json(null);
+      sendSuccess(res, null);
     }
   } catch (error) {
     console.error("월별 우승자 조회 오류:", error);
-    res.status(500).json({ message: "월별 우승자 데이터를 불러오는데 실패했습니다." });
+    sendError(res, 500, "월별 우승자 데이터를 불러오는데 실패했습니다.");
   }
 });
 
@@ -173,14 +174,11 @@ router.post("/vote", async (req, res) => {
     const userAgent = req.headers['user-agent'];
 
     if (!artistId || !categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: "아티스트 ID와 카테고리 ID가 필요합니다."
-      });
+      return sendError(res, 400, "아티스트 ID와 카테고리 ID가 필요합니다.");
     }
 
     if (userId === "guest_common") {
-      return res.status(401).json({ success: false, message: "로그인이 필요합니다." });
+      return sendError(res, 401, "로그인이 필요합니다.");
     }
 
     // 사용자 레벨 및 투표 수 확인
@@ -198,7 +196,7 @@ router.post("/vote", async (req, res) => {
       );
 
     if (Number(voteCountResult?.count || 0) >= userLevel) {
-      return res.status(400).json({ success: false, message: "보유한 투표권을 모두 사용하셨습니다." });
+      return sendError(res, 400, "보유한 투표권을 모두 사용하셨습니다.");
     }
 
     // 이미 투표했는지 확인
@@ -216,10 +214,7 @@ router.post("/vote", async (req, res) => {
       .limit(1);
 
     if (existingVote.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "이미 이 아티스트에게 투표하셨습니다."
-      });
+      return sendError(res, 400, "이미 이 아티스트에게 투표하셨습니다.");
     }
 
     // 아티스트가 존재하고 활성 상태인지 확인
@@ -236,10 +231,7 @@ router.post("/vote", async (req, res) => {
       .limit(1);
 
     if (artist.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "아티스트를 찾을 수 없습니다."
-      });
+      return sendError(res, 404, "아티스트를 찾을 수 없습니다.");
     }
 
     // 트랜잭션으로 투표 기록 및 카운트 업데이트
@@ -267,17 +259,11 @@ router.post("/vote", async (req, res) => {
     // 랭킹 재계산 (백그라운드에서)
     setTimeout(() => updateCategoryRanking(categoryId), 1000);
 
-    res.json({
-      success: true,
-      message: `${artist[0].name}에게 투표해주셔서 감사합니다!`
-    });
+    sendSuccess(res, { message: `${artist[0].name}에게 투표해주셔서 감사합니다!` });
 
   } catch (error) {
     console.error("투표 처리 오류:", error);
-    res.status(500).json({
-      success: false,
-      message: "투표 처리 중 오류가 발생했습니다."
-    });
+    sendError(res, 500, "투표 처리 중 오류가 발생했습니다.");
   }
 });
 
@@ -381,9 +367,9 @@ export async function resetMonthlyVotes() {
 router.post("/admin/reset-monthly", async (req, res) => {
   try {
     await resetMonthlyVotes();
-    res.json({ success: true, message: "월별 리셋이 완료되었습니다." });
+    sendSuccess(res, null, "월별 리셋이 완료되었습니다.");
   } catch (error) {
-    res.status(500).json({ success: false, message: "리셋 실패" });
+    sendError(res, 500, "리셋 실패");
   }
 });
 

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { PieChart, BarChart, Users, Calendar, MapPin, Briefcase, GraduationCap, Coins, Heart, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
+import './statistics.css';
 
 interface DemographicStats {
   byAge: Record<string, number>;
@@ -19,12 +20,25 @@ interface DemographicStats {
   completedDemographics: number;
 }
 
+interface OverallStats {
+  totalParticipants: number;
+  todayParticipants: number;
+  avgCompletionRate: number;
+  activeSurveys: number;
+}
+
+interface Survey {
+  id: number;
+  title: string;
+  participantCount: number;
+}
+
 export default function Statistics() {
   const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
   const [, setLocation] = useLocation();
-  
+
   // 전체 통계 가져오기
-  const { data: overallStats } = useQuery({
+  const { data: overallStats } = useQuery<OverallStats>({
     queryKey: ['/api/statistics/overall']
   });
 
@@ -35,7 +49,7 @@ export default function Statistics() {
   });
 
   // 최근 설문 목록
-  const { data: recentSurveys } = useQuery({
+  const { data: recentSurveys } = useQuery<Survey[]>({
     queryKey: ['/api/surveys?limit=10']
   });
 
@@ -60,25 +74,18 @@ export default function Statistics() {
     <div className="min-h-screen bg-gradient-to-br from-pink-50/50 via-white to-rose-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-pink-900/20 pt-20 pb-20">
       <div className="max-w-7xl mx-auto px-4">
         {/* 헤더 */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 pt-[16px] pb-[16px] pl-[24px] pr-[24px] mt-[-9px] mb-[-9px]"
-            style={{
-              background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.03) 0%, rgba(236, 72, 153, 0.05) 100%)',
-              backdropFilter: 'blur(20px)'
-            }}
+          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 pt-[16px] pb-[16px] pl-[24px] pr-[24px] mt-[-9px] mb-[-9px] glass-header"
           >
             <div className="flex items-center gap-4 mb-4">
               <button
-                onClick={() => setLocation('/')}
-                className="w-12 h-12 rounded-xl flex items-center justify-center hover:scale-105 transition-all duration-300 border border-pink-200/50 dark:border-pink-400/30"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)',
-                  backdropFilter: 'blur(10px)'
-                }}
+                onClick={() => setLocation('/home')}
+                className="w-12 h-12 rounded-xl flex items-center justify-center hover:scale-105 transition-all duration-300 border border-pink-200/50 dark:border-pink-400/30 back-button"
+                aria-label="뒤로 가기"
               >
                 <ArrowLeft className="w-5 h-5 text-pink-600" />
               </button>
@@ -95,17 +102,13 @@ export default function Statistics() {
         </motion.div>
 
         {/* 전체 통계 카드 */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
         >
-          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 hover:scale-105 transition-transform duration-300"
-            style={{
-              background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.05) 0%, rgba(236, 72, 153, 0.08) 100%)',
-              backdropFilter: 'blur(20px)'
-            }}
+          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 hover:scale-105 transition-transform duration-300 stat-card-1"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -114,19 +117,14 @@ export default function Statistics() {
                   {overallStats?.totalParticipants || 0}
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)' }}
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center stat-icon-1"
               >
                 <Users className="w-6 h-6 text-pink-600" />
               </div>
             </div>
           </div>
 
-          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 hover:scale-105 transition-transform duration-300"
-            style={{
-              background: 'linear-gradient(135deg, rgba(219, 39, 119, 0.05) 0%, rgba(245, 73, 144, 0.08) 100%)',
-              backdropFilter: 'blur(20px)'
-            }}
+          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 hover:scale-105 transition-transform duration-300 stat-card-2"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -135,19 +133,14 @@ export default function Statistics() {
                   {overallStats?.todayParticipants || 0}
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(219, 39, 119, 0.1) 0%, rgba(245, 73, 144, 0.1) 100%)' }}
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center stat-icon-2"
               >
                 <Calendar className="w-6 h-6 text-rose-600" />
               </div>
             </div>
           </div>
 
-          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 hover:scale-105 transition-transform duration-300"
-            style={{
-              background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.05) 0%, rgba(219, 39, 119, 0.08) 100%)',
-              backdropFilter: 'blur(20px)'
-            }}
+          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 hover:scale-105 transition-transform duration-300 stat-card-3"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -156,19 +149,14 @@ export default function Statistics() {
                   {overallStats?.avgCompletionRate || 0}%
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.1) 100%)' }}
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center stat-icon-3"
               >
                 <BarChart className="w-6 h-6 text-pink-700" />
               </div>
             </div>
           </div>
 
-          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 hover:scale-105 transition-transform duration-300"
-            style={{
-              background: 'linear-gradient(135deg, rgba(190, 24, 93, 0.05) 0%, rgba(236, 72, 153, 0.08) 100%)',
-              backdropFilter: 'blur(20px)'
-            }}
+          <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 hover:scale-105 transition-transform duration-300 stat-card-4"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -177,8 +165,7 @@ export default function Statistics() {
                   {overallStats?.activeSurveys || 0}
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(190, 24, 93, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)' }}
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center stat-icon-4"
               >
                 <PieChart className="w-6 h-6 text-pink-800" />
               </div>
@@ -191,15 +178,10 @@ export default function Statistics() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 mb-8"
-          style={{
-            background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.03) 0%, rgba(236, 72, 153, 0.05) 100%)',
-            backdropFilter: 'blur(20px)'
-          }}
+          className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 mb-8 survey-selection-card"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.9) 0%, rgba(236, 72, 153, 0.9) 100%)' }}
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center survey-selection-icon"
             >
               <i className="fas fa-poll text-white text-lg"></i>
             </div>
@@ -212,31 +194,23 @@ export default function Statistics() {
               </p>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {recentSurveys?.map((survey: any) => (
               <button
                 key={survey.id}
                 onClick={() => setSelectedSurveyId(survey.id)}
-                className={`p-4 rounded-xl border transition-all duration-300 text-left hover:scale-105 ${
-                  selectedSurveyId === survey.id 
-                    ? 'border-pink-300 dark:border-pink-500 shadow-lg' 
-                    : 'border-pink-100/50 dark:border-pink-500/20 hover:border-pink-200 dark:hover:border-pink-400'
-                }`}
-                style={{
-                  background: selectedSurveyId === survey.id 
-                    ? 'linear-gradient(135deg, rgba(245, 73, 144, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)'
-                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(245, 73, 144, 0.02) 100%)',
-                  backdropFilter: 'blur(10px)'
-                }}
+                className={`p-4 rounded-xl border transition-all duration-300 text-left hover:scale-105 ${selectedSurveyId === survey.id
+                  ? 'border-pink-300 dark:border-pink-500 shadow-lg survey-button-selected'
+                  : 'border-pink-100/50 dark:border-pink-500/20 hover:border-pink-200 dark:hover:border-pink-400 survey-button-default'
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className={`font-semibold text-lg mb-1 ${
-                      selectedSurveyId === survey.id 
-                        ? 'bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent' 
-                        : 'text-gray-800 dark:text-white'
-                    }`}>
+                    <p className={`font-semibold text-lg mb-1 ${selectedSurveyId === survey.id
+                      ? 'bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent'
+                      : 'text-gray-800 dark:text-white'
+                      }`}>
                       {survey.title}
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -244,8 +218,7 @@ export default function Statistics() {
                     </p>
                   </div>
                   {selectedSurveyId === survey.id && (
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center"
-                      style={{ background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.9) 0%, rgba(236, 72, 153, 0.9) 100%)' }}
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center survey-check-icon"
                     >
                       <i className="fas fa-check text-white text-sm"></i>
                     </div>
@@ -264,15 +237,10 @@ export default function Statistics() {
             className="space-y-6"
           >
             {/* 성별 분포 */}
-            <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20"
-              style={{
-                background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.03) 0%, rgba(236, 72, 153, 0.05) 100%)',
-                backdropFilter: 'blur(20px)'
-              }}
+            <div className="glass-card p-6 border border-pink-100/30 dark:border-pink-500/20 demographic-card"
             >
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.9) 0%, rgba(236, 72, 153, 0.9) 100%)' }}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center demographic-icon"
                 >
                   <Users className="w-5 h-5 text-white" />
                 </div>
@@ -280,7 +248,7 @@ export default function Statistics() {
                   성별 분포
                 </h3>
               </div>
-              
+
               <div className="space-y-4">
                 {Object.entries(demographicStats.byGender).map(([gender, count], index) => (
                   <div key={gender} className="space-y-3">
@@ -296,7 +264,7 @@ export default function Statistics() {
                         animate={{ width: `${getPercentage(count, demographicStats.totalParticipants)}%` }}
                         transition={{ duration: 0.8, delay: index * 0.1 }}
                         className="h-full rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-inner"
-                        style={{ 
+                        style={{
                           background: `linear-gradient(135deg, ${chartColors.gender[index]} 0%, ${chartColors.gender[index]}dd 100%)`
                         }}
                       >
@@ -321,26 +289,26 @@ export default function Statistics() {
                   {Object.entries(demographicStats.byAge)
                     .sort((a, b) => a[0].localeCompare(b[0]))
                     .map(([age, count], index) => (
-                    <div key={age} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{age}</span>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          {count}명 ({getPercentage(count, demographicStats.totalParticipants)}%)
-                        </span>
+                      <div key={age} className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{age}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {count}명 ({getPercentage(count, demographicStats.totalParticipants)}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6 overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${getPercentage(count, demographicStats.totalParticipants)}%` }}
+                            transition={{ duration: 0.5, delay: index * 0.1 }}
+                            className="h-full rounded-full flex items-center justify-center text-white text-xs font-medium"
+                            style={{ backgroundColor: chartColors.age[index % chartColors.age.length] }}
+                          >
+                            {getPercentage(count, demographicStats.totalParticipants)}%
+                          </motion.div>
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6 overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${getPercentage(count, demographicStats.totalParticipants)}%` }}
-                          transition={{ duration: 0.5, delay: index * 0.1 }}
-                          className="h-full rounded-full flex items-center justify-center text-white text-xs font-medium"
-                          style={{ backgroundColor: chartColors.age[index % chartColors.age.length] }}
-                        >
-                          {getPercentage(count, demographicStats.totalParticipants)}%
-                        </motion.div>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </CardContent>
             </Card>
@@ -359,24 +327,24 @@ export default function Statistics() {
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 10)
                     .map(([region, count], index) => (
-                    <div key={region} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-sm">{region}</span>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          {count}명 ({getPercentage(count, demographicStats.totalParticipants)}%)
-                        </span>
+                      <div key={region} className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-sm">{region}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {count}명 ({getPercentage(count, demographicStats.totalParticipants)}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-5 overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${getPercentage(count, demographicStats.totalParticipants)}%` }}
+                            transition={{ duration: 0.5, delay: index * 0.05 }}
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: chartColors.region[index % chartColors.region.length] }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-5 overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${getPercentage(count, demographicStats.totalParticipants)}%` }}
-                          transition={{ duration: 0.5, delay: index * 0.05 }}
-                          className="h-full rounded-full"
-                          style={{ backgroundColor: chartColors.region[index % chartColors.region.length] }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </CardContent>
             </Card>
@@ -407,11 +375,7 @@ export default function Statistics() {
             )}
 
             {/* 통계 요약 */}
-            <div className="glass-card p-8 border border-pink-200/50 dark:border-pink-400/30"
-              style={{
-                background: 'linear-gradient(135deg, rgba(245, 73, 144, 0.9) 0%, rgba(236, 72, 153, 0.9) 50%, rgba(219, 39, 119, 0.9) 100%)',
-                backdropFilter: 'blur(20px)'
-              }}
+            <div className="glass-card p-8 border border-pink-200/50 dark:border-pink-400/30 summary-card"
             >
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -419,7 +383,7 @@ export default function Statistics() {
                 </div>
                 <h3 className="text-2xl font-bold text-white">통계 요약</h3>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white/10 rounded-xl p-6 backdrop-blur-sm border border-white/20">
                   <div className="flex items-center gap-3 mb-2">
@@ -430,7 +394,7 @@ export default function Statistics() {
                   </div>
                   <p className="text-3xl font-bold text-white">{demographicStats.totalParticipants}<span className="text-lg">명</span></p>
                 </div>
-                
+
                 <div className="bg-white/10 rounded-xl p-6 backdrop-blur-sm border border-white/20">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">

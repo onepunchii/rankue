@@ -4,6 +4,7 @@ import { syncAssemblyRankingData } from './services/assemblyService.js';
 import { createWeeklyPoliticalSurvey } from './politicalScheduler.js';
 import { syncNews } from './services/newsService.js';
 import { aggregateAllPastPoliticalSurveys, aggregatePoliticalStats } from './services/politicalStatsService.js';
+import { lotteryService } from './services/lotteryService.js';
 import { db } from './db.js';
 import { surveys } from '../shared/schema.js';
 import { eq, and, like } from 'drizzle-orm';
@@ -21,12 +22,10 @@ export function setupCronJobs() {
         createWeeklyPoliticalSurvey().catch(err => console.error('❌ Failed to create weekly survey on startup:', err));
     }
 
-    storage.runDailyLotteryDraw().then((draw) => {
-        if (draw) {
-            console.log(`✅ Missed lottery draw processed on startup: 회차 ${draw.id}`);
-        }
+    lotteryService.ensureDrawsAreUpToDate().then(() => {
+        console.log(`✅ Lottery draws synchronization check completed`);
     }).catch(error => {
-        console.error('❌ Failed to run missed lottery draw on startup:', error);
+        console.error('❌ Failed to sync lottery draws on startup:', error);
     });
 
     // 0. Startup: Ensure stats are populated (One-off or check)
@@ -78,7 +77,7 @@ export function setupCronJobs() {
     cron.schedule('0 0 * * *', async () => {
         console.log('🎰 Running daily lottery draw...');
         try {
-            await storage.runDailyLotteryDraw();
+            await lotteryService.runDailyDraw();
             console.log('✅ Daily lottery draw completed');
         } catch (error) {
             console.error('❌ Daily lottery draw failed:', error);

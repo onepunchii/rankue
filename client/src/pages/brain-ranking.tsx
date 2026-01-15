@@ -4,6 +4,8 @@ import { Link, useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
+import { apiRequest } from "@/lib/queryClient";
 import {
     Radar,
     RadarChart,
@@ -47,30 +49,14 @@ export default function BrainRanking() {
 
     // Fetch Stats
     const { data: stats, isLoading, isError } = useQuery<BrainStats>({
-        queryKey: ["brainStats"],
-        queryFn: async () => {
-            // [Auth Fix] Get token manually
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            const headers: Record<string, string> = {};
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-
-            const res = await fetch("/api/user/stats", { headers });
-            if (!res.ok) throw new Error("Failed to fetch stats");
-            return res.json();
-        }
+        queryKey: [queryKeys.AUTH_USER_STATS],
     });
 
     // Fetch Leaderboard Preview
     const { data: leaderboard } = useQuery<LeaderboardUser[]>({
-        queryKey: ["brainLeaderboardPreview"],
+        queryKey: [queryKeys.BRAIN_LEADERBOARD, "preview"],
         queryFn: async () => {
-            const res = await fetch("/api/brain/leaderboard?limit=3");
-            if (!res.ok) return [];
-            return res.json();
+            return apiRequest(`${queryKeys.BRAIN_LEADERBOARD}?limit=3`);
         }
     });
 

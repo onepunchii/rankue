@@ -649,3 +649,35 @@ export async function generateBrainQuestions(
     return [];
   }
 }
+
+export async function generateBalanceGame(topic?: string): Promise<{ title: string; category: string; optionA: any; optionB: any }> {
+  try {
+    const prompt = `재미있는 밸런스 게임(A vs B 선택)문제를 하나 생성해주세요. 
+    ${topic ? `주제: ${topic}` : '일상적이거나 기발한 주제'}
+    
+    JSON 형식으로만 답해주세요:
+    {
+      "title": "게임을 관통하는 짧고 강렬한 제목",
+      "category": "ENTERTAINMENT|SOCIAL|POLITICS",
+      "optionA": { "text": "A 옵션 내용", "emoji": " 이모지", "keyword": "키워드" },
+      "optionB": { "text": "B 옵션 내용", "emoji": " 이모지", "keyword": "키워드" }
+    }`;
+
+    const response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.8
+    });
+
+    return JSON.parse(response.choices[0].message.content || '{}');
+  } catch (error) {
+    console.error("Error generating balance game:", error);
+    return {
+      title: "평생 고민",
+      category: "SOCIAL",
+      optionA: { text: "평생 라면만 먹기", emoji: "🍜", keyword: "라면" },
+      optionB: { text: "평생 치킨만 먹기", emoji: "🍗", keyword: "치킨" }
+    };
+  }
+}

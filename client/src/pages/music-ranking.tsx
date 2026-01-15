@@ -36,9 +36,7 @@ interface MusicArtist {
 }
 
 interface VoteResponse {
-  success: boolean;
   message: string;
-  userVoteCount?: number;
 }
 
 const MusicRanking = () => {
@@ -103,25 +101,17 @@ const MusicRanking = () => {
       });
     },
     onSuccess: (data: VoteResponse, artistId: number) => {
-      if (data.success) {
-        toast({
-          title: "투표 완료!",
-          description: data.message,
-        });
+      toast({
+        title: "투표 완료!",
+        description: data.message,
+      });
 
-        // 캐시 무효화
-        queryClient.invalidateQueries({ queryKey: ["/api/music/artists", selectedCategory] });
-        queryClient.invalidateQueries({ queryKey: ["/api/music/user-votes", selectedCategory] });
+      // 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["/api/music/artists", selectedCategory] });
+      queryClient.invalidateQueries({ queryKey: ["/api/music/user-votes", selectedCategory] });
 
-        // 로컬 상태 업데이트
-        setUserVotes(prev => ({ ...prev, [artistId]: true }));
-      } else {
-        toast({
-          title: "투표 실패",
-          description: data.message,
-          variant: "destructive",
-        });
-      }
+      // 로컬 상태 업데이트
+      setUserVotes(prev => ({ ...prev, [artistId]: true }));
     },
     onError: (error: Error) => {
       toast({

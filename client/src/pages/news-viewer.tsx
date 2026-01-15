@@ -148,7 +148,8 @@ export default function NewsViewer() {
                 });
 
                 if (contentResponse.ok) {
-                    const contentData = await contentResponse.json();
+                    const json = await contentResponse.json();
+                    const contentData = json.success ? json.data : json;
                     setContent(contentData.content);
                 }
             } catch (error) {
@@ -165,7 +166,8 @@ export default function NewsViewer() {
                 });
 
                 if (response.ok) {
-                    const data = await response.json();
+                    const json = await response.json();
+                    const data = json.success ? json.data : json;
                     setAnalysisResult(data);
                     if (data.content) setContent(data.content);
                 }

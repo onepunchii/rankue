@@ -46,7 +46,7 @@ export default function StepComplete({ onNext, formData }: StepCompleteProps) {
 
       // 프로필 페이지로 리디렉션
       setTimeout(() => {
-        setLocation('/profile');
+        setLocation('/home');
       }, 1500);
     },
     onError: (error: any) => {
@@ -94,7 +94,7 @@ export default function StepComplete({ onNext, formData }: StepCompleteProps) {
   };
 
   const handleGoHome = () => {
-    setLocation('/profile');
+    setLocation('/home');
   };
 
   useEffect(() => {

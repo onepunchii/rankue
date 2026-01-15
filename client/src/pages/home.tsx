@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { queryKeys } from "@/lib/queryKeys";
 import BottomNav from "@/components/bottom-nav";
 import CountUp from "@/components/ui/count-up";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
@@ -68,14 +69,9 @@ export default function Home() {
 
   // Fetch Brain Stats for Banner
   const { data: brainStats } = useQuery<BrainStats>({
-    queryKey: ["brainStats", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const res = await fetch("/api/user/stats");
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: !!user,
+    queryKey: [queryKeys.AUTH_USER_STATS],
+    queryFn: () => apiRequest(queryKeys.AUTH_USER_STATS),
+    enabled: !!user && !user.isGuest,
   });
 
   const getTierName = (level: number) => {
@@ -97,14 +93,17 @@ export default function Home() {
   // Balance Game Logic
   // const [balanceGameIndex, setBalanceGameIndex] = useState(0); // Removed index-based logic
 
+  /* 밸런스 게임 - Fetch Standardized API */
   const { data: balanceGames = [], refetch: refetchBalanceGames } = useQuery<BalanceGame[]>({
-    queryKey: ['/api/balance-games'],
+    queryKey: [queryKeys.BALANCE_GAMES],
+    queryFn: () => apiRequest(queryKeys.BALANCE_GAMES),
     retry: false
   });
 
   // Fetch user's vote history to filter out already played games
   const { data: myVotes = [], refetch: refetchMyVotes } = useQuery<any[]>({
-    queryKey: ['/api/balance-games/votes/me'],
+    queryKey: [queryKeys.BALANCE_GAMES_MY_VOTES],
+    queryFn: () => apiRequest(queryKeys.BALANCE_GAMES_MY_VOTES),
     enabled: !!user && !user.isGuest,
     retry: false
   });
@@ -230,14 +229,8 @@ export default function Home() {
 
   // 카테고리별 활성 설문 수 조회
   const { data: categoryCounts = {} } = useQuery({
-    queryKey: ["/api/surveys/category-counts"],
-    queryFn: async () => {
-      const response = await fetch('/api/surveys/category-counts', {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch category counts');
-      return response.json();
-    }
+    queryKey: [queryKeys.SURVEYS_CATEGORY_COUNTS],
+    queryFn: () => apiRequest(queryKeys.SURVEYS_CATEGORY_COUNTS),
   });
 
   // Simple Auth 사용자 참여 데이터 가져오기
@@ -245,37 +238,8 @@ export default function Home() {
     if (!user || user.isGuest) return;
 
     try {
-      // Get token from Supabase session in localStorage
-      let token = '';
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('sb-') && key.includes('auth-token')) {
-          const sessionData = localStorage.getItem(key);
-          if (sessionData) {
-            try {
-              const session = JSON.parse(sessionData);
-              token = session?.access_token || '';
-            } catch (e) {
-              console.error('Failed to parse session:', e);
-            }
-          }
-          break;
-        }
-      }
-
-      const response = await fetch(`/api/auth/user/participations?direct=${Date.now()}`, {
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch participations');
-      const data = await response.json();
-      setDirectUserParticipations(data);
+      const data = await apiRequest(`${queryKeys.AUTH_USER_PARTICIPATIONS}?direct=${Date.now()}`);
+      setDirectUserParticipations(data || []);
     } catch (error) {
       console.error('Error fetching user participations:', error);
       setDirectUserParticipations([]);
@@ -288,37 +252,9 @@ export default function Home() {
   }, [fetchUserParticipations]);
 
   // Simple Auth 사용자 참여 데이터 (React Query)
-  const { data: userParticipations = [], refetch: refetchParticipations } = useQuery({
-    queryKey: ["/api/auth/user/participations", user?.id],
-    queryFn: async () => {
-      // Get token from Supabase session in localStorage
-      let token = '';
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('sb-') && key.includes('auth-token')) {
-          const sessionData = localStorage.getItem(key);
-          if (sessionData) {
-            try {
-              const session = JSON.parse(sessionData);
-              token = session?.access_token || '';
-            } catch (e) {
-              console.error('Failed to parse session:', e);
-            }
-          }
-          break;
-        }
-      }
-
-      const response = await fetch(`/api/auth/user/participations?rq=${Date.now()}`, {
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Cache-Control': 'no-cache',
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch participations');
-      return response.json();
-    },
+  const { data: userParticipations = [], refetch: refetchParticipations } = useQuery<any[]>({
+    queryKey: [queryKeys.AUTH_USER_PARTICIPATIONS],
+    queryFn: () => apiRequest(queryKeys.AUTH_USER_PARTICIPATIONS),
     staleTime: 0,
     gcTime: 0,
     enabled: !!user && !user.isGuest,
@@ -416,16 +352,12 @@ export default function Home() {
         }
         addLog("토큰 확보 완료 (" + token.substring(0, 10) + "...). Fetch 시작...");
 
-        const res = await fetch("/api/lottery/create-ticket", {
+        const res = await apiRequest(queryKeys.LOTTERY_CREATE_TICKET, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({
+          body: {
             roundId,
             numbers
-          })
+          }
         });
 
         addLog(`Fetch 완료. 응답 코드: ${res.status}`);
@@ -455,17 +387,17 @@ export default function Home() {
       });
       setSelectedNumbers([]);
       // 로또 티켓 데이터 새로고침 (올바른 키 사용)
-      queryClient.invalidateQueries({ queryKey: ['/api/lottery/tickets'] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.LOTTERY_TICKETS] });
       // 사용자 정보 새로고침 (티켓 수 감소 반영)
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
 
       if (refreshUser) refreshUser();
       // if (refetchTickets) refetchTickets();
 
       // 강제 새로고침을 위한 약간의 지연 (서버 DB 반영 시간 고려)
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/lottery/tickets'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+        queryClient.invalidateQueries({ queryKey: [queryKeys.LOTTERY_TICKETS] });
+        queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
         if (refreshUser) refreshUser();
         // if (refetchTickets) refetchTickets();
       }, 500);
@@ -902,18 +834,24 @@ export default function Home() {
 
 
         {/* News Carousel */}
-        <NewsCarousel />
+        <Suspense fallback={<div className="h-48 rounded-3xl bg-white/5 animate-pulse mx-4 mt-6" />}>
+          <div className="mt-6">
+            <NewsCarousel />
+          </div>
+        </Suspense>
 
 
 
         {/* Bento Grid Dashboard */}
-        <BentoGridSection assemblyDashboard={assemblyDashboard} localCouncilStats={localCouncilStats} />
-
-
-
+        {/* Bento Grid Dashboard */}
+        <Suspense fallback={<div className="h-64 rounded-3xl bg-white/5 animate-pulse mx-4 mt-6" />}>
+          <BentoGridSection assemblyDashboard={assemblyDashboard} localCouncilStats={localCouncilStats} />
+        </Suspense>
 
         {/* Celebrity Battle Bento Grid */}
-        <CelebrityBentoGrid />
+        <Suspense fallback={<div className="h-64 rounded-3xl bg-white/5 animate-pulse mx-4 mt-6" />}>
+          <CelebrityBentoGrid />
+        </Suspense>
 
         {/* Brain Ranking Banner */}
         {/* Brain Ranking Banner */}
@@ -1068,7 +1006,7 @@ export default function Home() {
             onLocationSet={(city, district) => {
               console.log("Location set:", city, district);
               setShowLocationPrompt(false);
-              queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+              queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
             }}
             onSkip={() => setShowLocationPrompt(false)}
           />
@@ -1079,7 +1017,7 @@ export default function Home() {
             onClose={() => setShowPointSend(false)}
             onSuccess={() => {
               setShowPointSend(false);
-              queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+              queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
             }}
           />
         )}
@@ -1090,7 +1028,7 @@ export default function Home() {
               onClose={() => setShowRewards(false)}
               onSuccess={() => {
                 setShowRewards(false);
-                queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+                queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
               }}
             />
           )

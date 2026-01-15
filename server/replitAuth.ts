@@ -57,13 +57,15 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
+  // Replit sub might not be a valid UUID, but our schema expects a UUID for profiles.id.
+  // For now, we'll try to find or create. If sub is not a UUID, this might fail unless cleaned.
+  // Note: If Replit Auth is used alongside Supabase, id types must match.
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
+    fullName: claims["name"] || `${claims["first_name"] || ""} ${claims["last_name"] || ""}`.trim(),
     profileImageUrl: claims["profile_image_url"],
-  });
+  } as any);
 }
 
 export async function setupAuth(app: Express) {

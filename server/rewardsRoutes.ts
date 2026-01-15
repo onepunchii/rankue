@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { authMiddleware, requireAuth } from "./simpleAuth.js";
+import { authMiddleware, requireAuth } from "./auth.js";
 import { storage } from "./storage.js";
 // Schema imports removed - using basic validation instead
 

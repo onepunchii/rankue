@@ -362,7 +362,7 @@ class PolicyBriefingScheduler {
           aiAnalysisKeywords: survey.aiAnalysis?.keywords || null,
           seoTitle: survey.title,
           seoDescription: survey.description,
-          seoKeywords: '정책브리핑,정부정책,국민의견,여론조사',
+          seoKeywords: ['정책브리핑', '정부정책', '국민의견', '여론조사'],
           ogImage: null,
           canonicalUrl: null,
           isIndexable: true,

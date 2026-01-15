@@ -9,7 +9,7 @@ class VerificationStore {
   private store: Map<string, VerificationData> = new Map();
   private readonly EXPIRY_MINUTES = 5;
 
-  store(phone: string, code: string, authId: string): void {
+  storeVerification(phone: string, code: string, authId: string): void {
     const expiresAt = Date.now() + (this.EXPIRY_MINUTES * 60 * 1000);
     this.store.set(phone, { code, authId, expiresAt });
     console.log(`인증번호 저장: ${phone} -> ${code} (만료: ${new Date(expiresAt).toLocaleTimeString()})`);
@@ -17,7 +17,7 @@ class VerificationStore {
 
   verify(phone: string, inputCode: string): { authId: string } | null {
     const data = this.store.get(phone);
-    
+
     if (!data) {
       console.log(`인증번호 없음: ${phone}`);
       return null;

@@ -26,7 +26,8 @@ export default function AssemblyRankings() {
       if (!response.ok) {
         throw new Error("Failed to fetch assembly members");
       }
-      const allMembers = await response.json();
+      const json = await response.json();
+      const allMembers = json.success ? json.data : json;
 
       // Process rankings client-side
       const activityRanking = [...allMembers].sort((a: any, b: any) => (b.activityScore || 0) - (a.activityScore || 0));
@@ -105,7 +106,7 @@ export default function AssemblyRankings() {
         <div className="max-w-md mx-auto flex items-center justify-between">
           <Button
             variant="ghost"
-            onClick={() => setLocation('/')}
+            onClick={() => setLocation('/home')}
             className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-10 w-10 p-0"
           >
             <ArrowLeft className="h-5 w-5" />

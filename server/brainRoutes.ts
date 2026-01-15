@@ -2,19 +2,16 @@
 import { Router } from "express";
 import { storage } from "./storage.js";
 import { generateBrainQuestions } from "./ai.js";
-import { requireAuth } from "./simpleAuth.js";
+import { requireAuth } from "./auth.js";
 import { BrainEloSystem } from "./utils/brainElo.js";
+import { sendSuccess, sendError } from "./utils/response.js";
 
 const router = Router();
 
 // Admin: Generate Questions
 router.post("/admin/generate-questions", requireAuth, async (req, res) => {
-    // Security check: Only allow admin (or for now, anyone logged in if we don't have roles)
-    // Let's assume basic auth is enough for prototype, or we check userId.
-    // if (req.user?.id !== 'ADMIN_ID') ... 
-
     const { category, level, count } = req.body;
-    if (!category || !level) return res.status(400).json({ error: "Missing parameters" });
+    if (!category || !level) return sendError(res, 400, "Missing parameters");
 
     const numCount = count || 5;
 
@@ -35,10 +32,10 @@ router.post("/admin/generate-questions", requireAuth, async (req, res) => {
             saved.push(savedQ);
         }
 
-        res.json({ success: true, generated: saved.length });
+        return sendSuccess(res, { generatedCount: saved.length }, "Questions generated successfully");
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Failed to generate questions" });
+        return sendError(res, 500, "Failed to generate questions");
     }
 });
 
@@ -46,114 +43,107 @@ router.post("/admin/generate-questions", requireAuth, async (req, res) => {
 router.get("/quiz/daily", requireAuth, async (req, res) => {
     try {
         const userId = req.user!.id;
-        console.log(`[BrainQuiz] User ${userId} requested daily quiz.`);
-
         const user = await storage.getUserBrainStats(userId);
 
         let brainLevel = 1;
-        if (!user) {
-            console.warn(`[BrainQuiz] User profile not found in profiles table: ${userId}. Using defaults.`);
-            // If user exists in Auth but not Profile (edge case), default to Level 1
-        } else {
+        if (user) {
             brainLevel = user.brainLevel || 1;
         }
 
-        console.log(`[BrainQuiz] User Brain Level: ${brainLevel}`);
-
         const questions = await storage.getBrainDailyQuestions(brainLevel);
-        console.log(`[BrainQuiz] Questions found: ${questions.length}`);
-
-        if (questions.length === 0) {
-            console.warn(`[BrainQuiz] No questions found! Active filter applied?`);
-        }
-
-        res.json({ questions });
+        return sendSuccess(res, { questions });
     } catch (e: any) {
         console.error(`[BrainQuiz] Error fetching daily quiz:`, e);
-        res.status(500).json({ error: "서버 오류: " + e.message });
+        return sendError(res, 500, "서버 오류: " + e.message);
     }
 });
 
 // User: Submit Quiz Answer
 router.post("/quiz/submit", requireAuth, async (req, res) => {
-    const userId = req.user!.id;
-    const { questionId, answer, timeTaken } = req.body;
+    try {
+        const userId = req.user!.id;
+        const { questionId, answer, timeTaken } = req.body;
 
-    // Default time if not provided (assume late/slow)
-    const timeInSeconds = typeof timeTaken === 'number' ? timeTaken : 60;
+        const timeInSeconds = typeof timeTaken === 'number' ? timeTaken : 60;
 
-    const question = await storage.getBrainQuestion(questionId);
-    if (!question) return res.status(404).json({ error: "Question not found" });
+        const question = await storage.getBrainQuestion(questionId);
+        if (!question) return sendError(res, 404, "Question not found");
 
-    // Check answer
-    // question.content is JSONB. We need to cast it or access it.
-    const content = question.content as any;
-    const isCorrect = content.answer === answer;
+        const content = question.content as any;
+        const isCorrect = content.answer === answer;
 
-    // Update Ratings & Log
-    const { userNewRating, questionNewRating, diff, breakdown } = await storage.updateBrainRatings(userId, questionId, isCorrect, timeInSeconds);
+        const { userNewRating, questionNewRating, diff, breakdown } = await storage.updateBrainRatings(userId, questionId, isCorrect, timeInSeconds);
 
-    await storage.recordBrainGameLog({
-        userId,
-        questionId,
-        isCorrect,
-        userLevelAtTime: (await storage.getUserBrainStats(userId)).brainLevel,
-    });
+        const userStats = await storage.getUserBrainStats(userId);
 
-    res.json({
-        correct: isCorrect,
-        userRating: userNewRating,
-        ratingDiff: diff,
-        breakdown,
-        correctAnswer: isCorrect ? undefined : content.answer,
-        explanation: content.explanation
-    });
+        await storage.recordBrainGameLog({
+            userId,
+            questionId,
+            isCorrect,
+            userLevelAtTime: userStats.brainLevel,
+        });
+
+        return sendSuccess(res, {
+            correct: isCorrect,
+            userRating: userNewRating,
+            ratingDiff: diff,
+            breakdown,
+            correctAnswer: isCorrect ? undefined : content.answer,
+            explanation: content.explanation
+        });
+    } catch (error: any) {
+        return sendError(res, 500, error.message);
+    }
 });
 
 // User: Get Stats
 router.get("/user/stats", requireAuth, async (req, res) => {
-    const userId = req.user!.id;
-    const user = await storage.getUserBrainStats(userId);
+    try {
+        const userId = req.user!.id;
+        const user = await storage.getUserBrainStats(userId);
 
-    // Calculate total score
-    const totalScore =
-        user.brainRatingLogic +
-        user.brainRatingMath +
-        user.brainRatingVerbal +
-        user.brainRatingEconomy +
-        user.brainRatingTrivia;
+        const totalScore =
+            user.brainRatingLogic +
+            user.brainRatingMath +
+            user.brainRatingVerbal +
+            user.brainRatingEconomy +
+            user.brainRatingTrivia;
 
-    // Calculate IQ & Report
-    const iq = BrainEloSystem.calculateBrainIQ(totalScore);
-    const report = BrainEloSystem.getBrainComment(iq);
+        const iq = BrainEloSystem.calculateBrainIQ(totalScore);
+        const report = BrainEloSystem.getBrainComment(iq);
 
-    const stats = {
-        level: user.brainLevel,
-        ratings: {
-            logic: user.brainRatingLogic,
-            math: user.brainRatingMath,
-            verbal: user.brainRatingVerbal,
-            economy: user.brainRatingEconomy,
-            trivia: user.brainRatingTrivia,
-        },
-        totalScore,
-        iq,
-        report, // title, comment, icon, topPercent
-        // Mock percentile for now
-        topPercent: 35
-    };
+        const stats = {
+            level: user.brainLevel,
+            ratings: {
+                logic: user.brainRatingLogic,
+                math: user.brainRatingMath,
+                verbal: user.brainRatingVerbal,
+                economy: user.brainRatingEconomy,
+                trivia: user.brainRatingTrivia,
+            },
+            totalScore,
+            iq,
+            report,
+            topPercent: 35
+        };
 
-    res.json(stats);
+        return sendSuccess(res, stats);
+    } catch (error: any) {
+        return sendError(res, 500, error.message);
+    }
 });
 
 // Leaderboard
-// User: Get Leaderboard
 router.get("/brain/leaderboard", async (req, res) => {
-    const { category, limit: queryLimit } = req.query;
-    const limit = parseInt(queryLimit as string) || 20;
+    try {
+        const { category, limit: queryLimit } = req.query;
+        const limit = parseInt(queryLimit as string) || 20;
 
-    const leaderboard = await storage.getBrainLeaderboard(category as string || 'TOTAL', limit);
-    res.json(leaderboard);
+        const leaderboard = await storage.getBrainLeaderboard(category as string || 'TOTAL', limit);
+        return sendSuccess(res, leaderboard);
+    } catch (error: any) {
+        return sendError(res, 500, error.message);
+    }
 });
 
 export default router;

@@ -30,7 +30,8 @@ export default function MyDistrict() {
     queryFn: async () => {
       const response = await fetch("/api/auth/me", { credentials: 'include' });
       if (!response.ok) throw new Error("Failed to fetch user profile");
-      return response.json();
+      const json = await response.json();
+      return json.success ? json.data : json;
     },
   });
 
@@ -91,7 +92,8 @@ export default function MyDistrict() {
 
       const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error("Failed to fetch assembly members");
-      return response.json();
+      const json = await response.json();
+      return json.success ? json.data : json;
     },
     enabled: true
   });
@@ -144,7 +146,8 @@ export default function MyDistrict() {
 
       const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error("Failed to fetch local council members");
-      return response.json();
+      const json = await response.json();
+      return json.success ? json.data : json;
     },
     enabled: true
   });
@@ -258,7 +261,7 @@ export default function MyDistrict() {
               </div>
             </div>
             <Button
-              onClick={() => setLocation('/')}
+              onClick={() => setLocation('/home')}
               variant="ghost"
               className="h-8 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-[10px] font-black text-white/60 uppercase tracking-widest"
             >

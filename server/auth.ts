@@ -1,13 +1,43 @@
 import { Request, Response, NextFunction } from "express";
 import { supabaseAdmin } from "./supabase.js";
-import { storage } from "./storage.js";
-import { type User } from "../shared/schema.js";
+import { authService, AuthUser } from "./services/authService.js";
+import { sendSuccess, sendError } from "./utils/response.js";
 
-// Supabase Auth 연동 미들웨어
+// Global Auth Middleware (Soft - allows Guest)
+export async function authMiddleware(req: any, res: any, next: any) {
+    const token = req.headers.authorization?.replace("Bearer ", "") || req.cookies?.['sb-access-token'];
+
+    if (token) {
+        try {
+            const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
+
+            if (supabaseUser && !error) {
+                const authUser = await authService.ensureProfileExists(supabaseUser);
+                if (authUser) {
+                    req.user = authUser;
+                    return next();
+                }
+            }
+        } catch (error) {
+            console.error('🔑 [AuthMiddleware] Error:', error);
+        }
+    }
+
+    // Fallback to guest
+    req.user = await authService.getGuestUser();
+    next();
+}
+
+// Strict Auth Middleware (Requires login)
 export async function authenticateUser(req: Request, res: Response, next: NextFunction) {
+    // If global middleware already authenticated a real user, just pass.
+    if ((req as any).user && !(req as any).user.isGuest) {
+        return next();
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: "인증 토큰이 필요합니다." });
+        return sendError(res, 401, "인증 토큰이 필요합니다.", "UNAUTHORIZED");
     }
 
     const token = authHeader.split(' ')[1];
@@ -15,46 +45,41 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
         const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
         if (error || !user) {
-            return res.status(401).json({ message: "유효하지 않은 토큰입니다." });
+            return sendError(res, 401, "유효하지 않은 토큰입니다.", "INVALID_TOKEN");
         }
 
-        // 서버 사이드 사용자 객체 설정
-        (req as any).user = user;
+        const authUser = await authService.ensureProfileExists(user);
 
-        // DB 프로필 동기화 (최초 로그인 시 생성)
-        const profile = await storage.users.getUser(user.id);
-        if (!profile) {
-            await storage.users.upsertUser({
-                id: user.id,
-                email: user.email,
-                nickname: user.user_metadata.nickname || user.user_metadata.full_name || user.email?.split('@')[0],
-                fullName: user.user_metadata.full_name,
-                profileImageUrl: user.user_metadata.avatar_url,
-                level: 1,
-                experience: 0,
-                personalPoints: 0,
-                availableLotteryTickets: 1,
-                badges: [],
-            });
+        if (!authUser) {
+            return sendError(res, 500, "사용자 프로필 생성 실패");
         }
+
+        (req as any).user = authUser;
 
         next();
     } catch (err) {
         console.error("Auth middleware error:", err);
-        res.status(500).json({ message: "인증 처리 중 오류가 발생했습니다." });
+        return sendError(res, 500, "인증 처리 중 오류가 발생했습니다.");
     }
+}
+
+export function requireAuth(req: any, res: any, next: any) {
+    if (!req.user || req.user.isGuest) {
+        return res.status(401).json({ error: "로그인이 필요합니다." });
+    }
+    next();
 }
 
 // 프로필 라우트 핸들러
 export async function handleGetProfile(req: Request, res: Response) {
     const user = (req as any).user;
-    if (!user) return res.status(401).json({ message: "로그인이 필요합니다." });
+    if (!user) return sendError(res, 401, "로그인이 필요합니다.");
 
     try {
-        const profile = await storage.users.getUser(user.id);
-        if (!profile) return res.status(404).json({ message: "프로필을 찾을 수 없습니다." });
-        res.json(profile);
+        const profile = await authService.getUser(user.id);
+        if (!profile) return sendError(res, 404, "프로필을 찾을 수 없습니다.");
+        return sendSuccess(res, profile);
     } catch (err) {
-        res.status(500).json({ message: "프로필 조회 실패" });
+        return sendError(res, 500, "프로필 조회 실패");
     }
 }

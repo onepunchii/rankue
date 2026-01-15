@@ -1,4 +1,5 @@
 
+
 import type { Express } from "express";
 import { storage } from "./storage.js";
 import { generatePoliticianPersona } from "./ai.js";
@@ -7,6 +8,7 @@ import { insertAssemblyMemberSchema } from "../shared/schema.js";
 import { updateSampleMembersActivity, updateAllMembersActivity } from "./updateAssemblyActivity.js";
 import fs from "fs";
 import path from "path";
+import { sendSuccess, sendError } from "./utils/response.js";
 
 export function registerAssemblyRoutes(app: Express) {
   // 국회의원 랭킹 API (순서 중요: :id 보다 먼저 와야 함)
@@ -37,14 +39,14 @@ export function registerAssemblyRoutes(app: Express) {
         })
         .slice(0, 50);
 
-      res.json({
+      return sendSuccess(res, {
         activityRanking,
         billsRanking,
         attendanceRanking
       });
     } catch (error) {
       console.error("Error fetching assembly rankings:", error);
-      res.status(500).json({ message: "Failed to fetch assembly rankings" });
+      return sendError(res, 500, "Failed to fetch assembly rankings");
     }
   });
 
@@ -53,16 +55,16 @@ export function registerAssemblyRoutes(app: Express) {
     try {
       const allMembers = await storage.getAssemblyMembers(300);
       if (allMembers.length === 0) {
-        return res.json(null);
+        return sendSuccess(res, null);
       }
       const monthlyChampion = allMembers.reduce((champion, member) =>
         (member.activityScore || 0) > (champion.activityScore || 0) ? member : champion
       );
 
-      res.json(monthlyChampion);
+      return sendSuccess(res, monthlyChampion);
     } catch (error) {
       console.error("Error fetching monthly champion:", error);
-      res.status(500).json({ message: "Failed to fetch monthly champion" });
+      return sendError(res, 500, "Failed to fetch monthly champion");
     }
   });
 
@@ -77,7 +79,7 @@ export function registerAssemblyRoutes(app: Express) {
       const allMembers = await storage.getAssemblyMembers(300);
       if (!allMembers || allMembers.length === 0) {
         console.log('⚠️ 국회의원 데이터가 없습니다.');
-        return res.json(null);
+        return sendSuccess(res, null);
       }
 
       const topMember = allMembers.reduce((champion, member) =>
@@ -91,7 +93,7 @@ export function registerAssemblyRoutes(app: Express) {
 
       if (!fs.existsSync(jsonPath)) {
         console.warn("⚠️ 당선인 명부 파일이 없습니다. 기본 데이터를 반환합니다.");
-        return res.json({
+        return sendSuccess(res, {
           name: topMember.name,
           party: topMember.party,
           constituency: topMember.constituency
@@ -109,7 +111,7 @@ export function registerAssemblyRoutes(app: Express) {
 
       if (biography) {
         console.log('✅ JSON 매칭 성공:', biography.성명);
-        res.json({
+        return sendSuccess(res, {
           name: biography.성명,
           party: biography.소속정당명,
           constituency: biography.선거구명,
@@ -118,7 +120,7 @@ export function registerAssemblyRoutes(app: Express) {
         });
       } else {
         console.log('ℹ️ JSON 매칭 실패 (DB 데이터 반환)');
-        res.json({
+        return sendSuccess(res, {
           name: topMember.name,
           party: topMember.party,
           constituency: topMember.constituency
@@ -126,7 +128,7 @@ export function registerAssemblyRoutes(app: Express) {
       }
     } catch (error) {
       console.error("❌ /api/assembly/top-member-info 오류:", error);
-      res.status(500).json({ message: "Failed to fetch top member info" });
+      return sendError(res, 500, "Failed to fetch top member info");
     }
   });
 
@@ -135,10 +137,10 @@ export function registerAssemblyRoutes(app: Express) {
     try {
       const limit = Number(req.query.limit) || 50;
       const members = await storage.getAssemblyMembers(limit);
-      res.json(members);
+      return sendSuccess(res, members);
     } catch (error) {
       console.error("Error fetching assembly members:", error);
-      res.status(500).json({ message: "Failed to fetch assembly members" });
+      return sendError(res, 500, "Failed to fetch assembly members");
     }
   });
 
@@ -176,7 +178,7 @@ export function registerAssemblyRoutes(app: Express) {
         (member.activityScore || 0) > (champion.activityScore || 0) ? member : champion
       );
 
-      res.json({
+      return sendSuccess(res, {
         basicStats: {
           totalMembers,
           averageActivityScore: Math.round(averageActivityScore),
@@ -190,7 +192,7 @@ export function registerAssemblyRoutes(app: Express) {
       });
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+      return sendError(res, 500, "Failed to fetch dashboard stats");
     }
   });
 
@@ -201,17 +203,17 @@ export function registerAssemblyRoutes(app: Express) {
 
       // Validate ID is a valid number
       if (isNaN(id) || !isFinite(id) || id <= 0) {
-        return res.status(400).json({ message: "Invalid assembly member ID" });
+        return sendError(res, 400, "Invalid assembly member ID");
       }
 
       const member = await storage.getAssemblyMember(id);
       if (!member) {
-        return res.status(404).json({ message: "Assembly member not found" });
+        return sendError(res, 404, "Assembly member not found");
       }
-      res.json(member);
+      return sendSuccess(res, member);
     } catch (error) {
       console.error("Error fetching assembly member:", error);
-      res.status(500).json({ message: "Failed to fetch assembly member" });
+      return sendError(res, 500, "Failed to fetch assembly member");
     }
   });
 
@@ -260,10 +262,10 @@ export function registerAssemblyRoutes(app: Express) {
       filteredMembers.sort((a, b) => (b.activityScore || 0) - (a.activityScore || 0));
 
       console.log(`🏛️ 최종 결과: ${filteredMembers.length}명 조회 완료`);
-      res.json(filteredMembers);
+      return sendSuccess(res, filteredMembers);
     } catch (error: any) {
       console.error("Error fetching assembly members by district:", error);
-      res.status(500).json({ message: "Failed to fetch assembly members by district" });
+      return sendError(res, 500, "Failed to fetch assembly members by district");
     }
   });
 
@@ -274,17 +276,17 @@ export function registerAssemblyRoutes(app: Express) {
 
       // Validate ID is a valid number
       if (isNaN(id) || !isFinite(id) || id <= 0) {
-        return res.status(400).json({ message: "Invalid assembly member ID" });
+        return sendError(res, 400, "Invalid assembly member ID");
       }
 
       const member = await storage.getAssemblyMember(id);
       if (!member) {
-        return res.status(404).json({ message: "Assembly member not found" });
+        return sendError(res, 404, "Assembly member not found");
       }
-      res.json(member);
+      return sendSuccess(res, member);
     } catch (error) {
       console.error("Error fetching assembly member:", error);
-      res.status(500).json({ message: "Failed to fetch assembly member" });
+      return sendError(res, 500, "Failed to fetch assembly member");
     }
   });
 
@@ -293,10 +295,10 @@ export function registerAssemblyRoutes(app: Express) {
     try {
       const constituency = req.params.constituency;
       const members = await storage.getAssemblyMembersByConstituency(constituency);
-      res.json(members);
+      return sendSuccess(res, members);
     } catch (error) {
       console.error("Error fetching members by constituency:", error);
-      res.status(500).json({ message: "Failed to fetch members by constituency" });
+      return sendError(res, 500, "Failed to fetch members by constituency");
     }
   });
 
@@ -305,10 +307,10 @@ export function registerAssemblyRoutes(app: Express) {
     try {
       const limit = Number(req.query.limit) || 10;
       const topMembers = await storage.getTopAssemblyMembersByActivity(limit);
-      res.json(topMembers);
+      return sendSuccess(res, topMembers);
     } catch (error) {
       console.error("Error fetching top active members:", error);
-      res.status(500).json({ message: "Failed to fetch top active members" });
+      return sendError(res, 500, "Failed to fetch top active members");
     }
   });
 
@@ -317,10 +319,10 @@ export function registerAssemblyRoutes(app: Express) {
     try {
       const memberId = req.query.memberId ? Number(req.query.memberId) : undefined;
       const activities = await storage.getAssemblyActivities(memberId);
-      res.json(activities);
+      return sendSuccess(res, activities);
     } catch (error) {
       console.error("Error fetching assembly activities:", error);
-      res.status(500).json({ message: "Failed to fetch assembly activities" });
+      return sendError(res, 500, "Failed to fetch assembly activities");
     }
   });
 
@@ -331,13 +333,13 @@ export function registerAssemblyRoutes(app: Express) {
     try {
       const memberData = insertAssemblyMemberSchema.parse(req.body);
       const newMember = await storage.createAssemblyMember(memberData);
-      res.json(newMember);
+      return sendSuccess(res, newMember);
     } catch (error) {
       console.error("Error creating assembly member:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid member data", errors: error.errors });
+        return sendError(res, 400, "Invalid member data", "INVALID_DATA", { errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create assembly member" });
+      return sendError(res, 500, "Failed to create assembly member");
     }
   });
 
@@ -347,10 +349,10 @@ export function registerAssemblyRoutes(app: Express) {
       const id = Number(req.params.id);
       const activityData = req.body;
       const updatedMember = await storage.updateAssemblyMemberActivity(id, activityData);
-      res.json(updatedMember);
+      return sendSuccess(res, updatedMember);
     } catch (error) {
       console.error("Error updating member activity:", error);
-      res.status(500).json({ message: "Failed to update member activity" });
+      return sendError(res, 500, "Failed to update member activity");
     }
   });
 
@@ -359,13 +361,13 @@ export function registerAssemblyRoutes(app: Express) {
     try {
       console.log('🧪 샘플 활동지수 업데이트 요청 받음');
       const result = await updateSampleMembersActivity(10);
-      res.json({
+      return sendSuccess(res, {
         message: "샘플 활동지수 업데이트 완료",
         ...result
       });
     } catch (error) {
       console.error("Error updating sample activity:", error);
-      res.status(500).json({ message: "Failed to update sample activity" });
+      return sendError(res, 500, "Failed to update sample activity");
     }
   });
 
@@ -374,13 +376,13 @@ export function registerAssemblyRoutes(app: Express) {
     try {
       console.log('🚀 전체 활동지수 업데이트 요청 받음');
       const result = await updateAllMembersActivity();
-      res.json({
+      return sendSuccess(res, {
         message: "전체 활동지수 업데이트 완료",
         ...result
       });
     } catch (error) {
       console.error("Error updating all activity:", error);
-      res.status(500).json({ message: "Failed to update all activity" });
+      return sendError(res, 500, "Failed to update all activity");
     }
   });
 
@@ -427,10 +429,10 @@ export function registerAssemblyRoutes(app: Express) {
         }
       ];
 
-      res.json(sampleBills);
+      return sendSuccess(res, sampleBills);
     } catch (error) {
       console.error("Error fetching bills:", error);
-      res.status(500).json({ message: "Failed to fetch bills" });
+      return sendError(res, 500, "Failed to fetch bills");
     }
   });
 
@@ -440,7 +442,7 @@ export function registerAssemblyRoutes(app: Express) {
       const jsonData = req.body;
 
       if (!Array.isArray(jsonData)) {
-        return res.status(400).json({ message: "Invalid data format. Expected array." });
+        return sendError(res, 400, "Invalid data format. Expected array.");
       }
 
       console.log(`🏛️ 국회의원 데이터 업데이트 시작: ${jsonData.length}명`);
@@ -497,14 +499,14 @@ export function registerAssemblyRoutes(app: Express) {
 
       console.log(`🏛️ 국회의원 데이터 업데이트 완료: 성공 ${successCount}명, 실패 ${errorCount}명`);
 
-      res.json({
+      return sendSuccess(res, {
         message: "국회의원 데이터 업데이트 완료",
         successCount,
         errorCount
       });
     } catch (error) {
       console.error("Error updating assembly members:", error);
-      res.status(500).json({ message: "Failed to update assembly members" });
+      return sendError(res, 500, "Failed to update assembly members");
     }
   });
 }

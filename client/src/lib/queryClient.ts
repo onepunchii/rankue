@@ -55,10 +55,12 @@ export async function apiRequest(
     method?: string;
     body?: unknown;
     headers?: Record<string, string>;
+    signal?: AbortSignal;
   }
 ): Promise<any> {
   const method = options?.method || "GET";
   const body = options?.body;
+  const signal = options?.signal;
 
   // Get Supabase session token reliably
   const supabaseToken = await getSupabaseToken();
@@ -72,10 +74,13 @@ export async function apiRequest(
     headers['Authorization'] = `Bearer ${supabaseToken}`;
   }
 
-  // Only add Content-Type and stringify body if it's not already a string
-  let finalBody: string | undefined = undefined;
+  // Handle body based on type
+  let finalBody: any = undefined;
   if (body !== undefined) {
-    if (typeof body === 'string') {
+    if (body instanceof FormData) {
+      finalBody = body;
+      // Content-Type should NOT be set manually for FormData to allow browser to set boundary
+    } else if (typeof body === 'string') {
       finalBody = body;
       headers["Content-Type"] = "application/json";
     } else {
@@ -103,7 +108,11 @@ export async function apiRequest(
     // Return JSON response for successful requests
     const contentType = res.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
-      return await res.json();
+      const json = await res.json();
+      if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+        return json.data;
+      }
+      return json;
     }
     return res;
   } catch (error) {
@@ -140,7 +149,11 @@ export const getQueryFn: <T>(options: {
       }
 
       await throwIfResNotOk(res);
-      return await res.json();
+      const json = await res.json();
+      if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+        return json.data;
+      }
+      return json;
     };
 
 export const queryClient = new QueryClient({

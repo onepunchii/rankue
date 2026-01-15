@@ -20,6 +20,7 @@ import { NicknameEditDialog } from "@/components/NicknameEditDialog";
 import NotificationSettingsModal from "@/components/notification-settings-modal";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
+import { queryKeys } from "@/lib/queryKeys";
 import { motion } from "framer-motion";
 
 import type { Survey } from "@shared/schema";
@@ -167,14 +168,9 @@ export default function Profile() {
   const [isBusinessInfoExpanded, setIsBusinessInfoExpanded] = useState(false);
 
   // 참여 정보 가져오기
-  const { data: participations = [] } = useQuery({
-    queryKey: ["/api/auth/user/participations"],
-    queryFn: async () => {
-      if (authUser && !authUser.isGuest) {
-        return await apiRequest("/api/auth/user/participations");
-      }
-      return [];
-    },
+  const { data: participations = [] } = useQuery<any[]>({
+    queryKey: [queryKeys.AUTH_USER_PARTICIPATIONS],
+    queryFn: () => apiRequest(queryKeys.AUTH_USER_PARTICIPATIONS),
     enabled: !!authUser && !authUser.isGuest
   });
 
@@ -222,35 +218,16 @@ export default function Profile() {
       const formData = new FormData();
       formData.append('avatar', webpBlob, 'avatar.webp');
 
-      // Robust Token Retrieval (with timeout)
-      let token: string | undefined;
-      try {
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Token limit")), 2000));
-        const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-        token = data?.session?.access_token;
-      } catch (err) {
-        console.warn("Token fetch timeout, attempting fallback or anon");
-        // Fallback to localStorage check if needed, or proceed without token (server might handle guest)
-      }
-
-      const res = await fetch("/api/user/avatar", {
+      await apiRequest(queryKeys.USER_AVATAR, {
         method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
         body: formData,
         signal: controller.signal
       });
 
       clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        throw new Error(`Upload failed: ${res.status}`);
-      }
-
-      await queryClient.invalidateQueries({ queryKey: ['/api/auth/profile'] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      await queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_PROFILE] });
+      await queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
 
       toast({ title: "프로필 이미지 변경 완료" });
     } catch (e: any) {
@@ -271,43 +248,29 @@ export default function Profile() {
 
   // 생성한 설문 가져오기
   const { data: createdSurveys = [] } = useQuery<Survey[]>({
-    queryKey: ["/api/auth/user/created-surveys"],
-    queryFn: async () => {
-      if (authUser && !authUser.isGuest) {
-        return await apiRequest("/api/auth/user/created-surveys");
-      }
-      return [];
-    },
+    queryKey: [queryKeys.AUTH_USER_CREATED_SURVEYS],
+    queryFn: () => apiRequest(queryKeys.AUTH_USER_CREATED_SURVEYS),
     enabled: !!authUser && !authUser.isGuest
   });
 
   // 로또 티켓 가져오기
-  const { data: lotteryTickets = [] } = useQuery({
-    queryKey: ["/api/auth/lottery/tickets"],
-    queryFn: async () => {
-      if (authUser && !authUser.isGuest) {
-        return await apiRequest("/api/auth/lottery/tickets");
-      }
-      return [];
-    },
+  const { data: lotteryTickets = [] } = useQuery<any[]>({
+    queryKey: [queryKeys.LOTTERY_TICKETS],
+    queryFn: () => apiRequest(queryKeys.LOTTERY_TICKETS),
     enabled: !!authUser && !authUser.isGuest
   });
 
   // 포인트 거래 내역 가져오기
-  const { data: pointTransactions = [] } = useQuery({
-    queryKey: ["/api/auth/points/transactions"],
-    queryFn: async () => {
-      if (authUser && !authUser.isGuest) {
-        return await apiRequest("/api/auth/points/transactions");
-      }
-      return [];
-    },
+  const { data: pointTransactions = [] } = useQuery<any[]>({
+    queryKey: [queryKeys.AUTH_USER_POINTS_TRANSACTIONS],
+    queryFn: () => apiRequest(queryKeys.AUTH_USER_POINTS_TRANSACTIONS),
     enabled: !!authUser && !authUser.isGuest
   });
 
   // 보상 아이템 가져오기
-  const { data: rewardItems = [] } = useQuery({
-    queryKey: ['/api/rewards/items'],
+  const { data: rewardItems = [] } = useQuery<any[]>({
+    queryKey: [queryKeys.REWARD_ITEMS],
+    queryFn: () => apiRequest(queryKeys.REWARD_ITEMS),
     enabled: !!authUser && !authUser.isGuest
   });
 
@@ -330,7 +293,7 @@ export default function Profile() {
   // Point transfer mutation
   const transferPointsMutation = useMutation({
     mutationFn: async ({ receiverEmail, amount }: { receiverEmail: string; amount: number }) => {
-      return await apiRequest(`/api/points/transfer`, {
+      return await apiRequest(queryKeys.POINTS_TRANSFER, {
         method: 'POST',
         body: { receiverEmail, amount }
       });
@@ -342,8 +305,8 @@ export default function Profile() {
       });
       setTransferAmount("");
       setReceiverEmail("");
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/points/transactions'] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER_POINTS_TRANSACTIONS] });
     },
     onError: (error: any) => {
       toast({
@@ -357,7 +320,7 @@ export default function Profile() {
   // Reward purchase mutation
   const purchaseRewardMutation = useMutation({
     mutationFn: async (rewardId: number) => {
-      return await apiRequest(`/api/rewards/purchase`, {
+      return await apiRequest(queryKeys.REWARDS_PURCHASE, {
         method: 'POST',
         body: { rewardId }
       });
@@ -367,8 +330,8 @@ export default function Profile() {
         title: "리워드 구매 완료",
         description: "리워드를 성공적으로 구매했습니다!",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/points/transactions'] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER_POINTS_TRANSACTIONS] });
     },
     onError: (error: any) => {
       toast({
@@ -595,7 +558,7 @@ export default function Profile() {
                           설문 참여 완료
                         </div>
                         <div className="text-xs font-bold text-white/40 mt-2">
-                          {new Date(participation.createdAt).toLocaleDateString('ko-KR')}
+                          {(participation.completedAt) ? new Date(participation.completedAt).toLocaleDateString('ko-KR') : '날짜 없음'}
                         </div>
                       </div>
                       <div className="text-right">
@@ -603,7 +566,7 @@ export default function Profile() {
                           +{participation.pointsEarned || 0}P
                         </div>
                         <div className="text-[10px] font-black bg-purple-600/10 text-purple-400 px-2.5 py-1 rounded-full border border-purple-500/20 uppercase mt-2">
-                          {participation.completed ? 'COMPLETED' : 'IN PROGRESS'}
+                          {participation.completedAt ? 'COMPLETED' : 'IN PROGRESS'}
                         </div>
                       </div>
                     </div>

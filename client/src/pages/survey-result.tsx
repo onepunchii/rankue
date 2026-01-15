@@ -9,25 +9,31 @@ import ChartComponents from "@/components/chart-components";
 import ShareSurvey from "@/components/share-survey";
 import { Survey } from "@shared/schema";
 import { SEOHead } from "@/components/seo-head";
+import { apiRequest } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 
 export default function SurveyResult() {
   const { id } = useParams();
   const surveyId = parseInt(id!);
 
   const { data: survey, isLoading: surveyLoading } = useQuery<Survey & { questions: any[] }>({
-    queryKey: [`/api/surveys/${surveyId}`],
+    queryKey: [queryKeys.SURVEY_DETAIL(surveyId)],
+    queryFn: () => apiRequest(queryKeys.SURVEY_DETAIL(surveyId)),
   });
 
   const { data: analytics = [], isLoading: analyticsLoading } = useQuery<any[]>({
-    queryKey: [`/api/surveys/${surveyId}/analytics`],
+    queryKey: [queryKeys.SURVEY_ANALYTICS(surveyId)],
+    queryFn: () => apiRequest(queryKeys.SURVEY_ANALYTICS(surveyId)),
   });
 
   const { data: stats } = useQuery<{ totalParticipants: number; completed: number }>({
-    queryKey: [`/api/surveys/${surveyId}/stats`],
+    queryKey: [queryKeys.SURVEY_STATS(surveyId)],
+    queryFn: () => apiRequest(queryKeys.SURVEY_STATS(surveyId)),
   });
 
   const { data: demographics } = useQuery<any>({
-    queryKey: [`/api/surveys/${surveyId}/demographics`],
+    queryKey: [queryKeys.SURVEY_DEMOGRAPHICS(surveyId)],
+    queryFn: () => apiRequest(queryKeys.SURVEY_DEMOGRAPHICS(surveyId)),
   });
 
   if (surveyLoading || analyticsLoading) {
@@ -292,8 +298,8 @@ export default function SurveyResult() {
                                           </div>
                                           <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
                                             <div
-                                              className="bg-purple-600 h-full rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(147,51,234,0.4)]"
-                                              style={{ width: `${percentage}%` }}
+                                              className="bg-purple-600 h-full rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(147,51,234,0.4)] w-[var(--progress-width)]"
+                                              style={{ "--progress-width": `${percentage}%` } as React.CSSProperties}
                                             ></div>
                                           </div>
                                           <div className="mt-2 text-right">
@@ -367,8 +373,8 @@ export default function SurveyResult() {
                       </div>
                       <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-white opacity-40 rounded-full transition-all duration-1000"
-                          style={{ width: `${demographics.percentages?.byAge?.[age] || 0}%` }}
+                          className="h-full bg-white opacity-40 rounded-full transition-all duration-1000 w-[var(--demographic-width)]"
+                          style={{ "--demographic-width": `${demographics.percentages?.byAge?.[age] || 0}%` } as React.CSSProperties}
                         ></div>
                       </div>
                     </div>
@@ -408,8 +414,8 @@ export default function SurveyResult() {
                         <div className="flex items-center space-x-4">
                           <div className="w-24 h-1 bg-white/5 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.4)]"
-                              style={{ width: `${demographics.percentages?.byRegion?.[region] || 0}%` }}
+                              className="h-full bg-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.4)] w-[var(--region-width)]"
+                              style={{ "--region-width": `${demographics.percentages?.byRegion?.[region] || 0}%` } as React.CSSProperties}
                             ></div>
                           </div>
                           <span className="text-[11px] font-black text-purple-400 italic">

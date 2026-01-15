@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { supabaseAdmin } from "./supabase.js";
+import { sendSuccess, sendError } from "./utils/response.js";
 
 // Helper to convert snake_case to camelCase
 function toCamelCase(obj: any): any {
@@ -28,19 +29,18 @@ export function registerCelebrityRoutes(app: Express) {
 
             if (error) {
                 console.error("❌ Debug Error:", error);
-                return res.json({ success: false, error: error.message, details: error });
+                return sendError(res, 500, error.message, "DB_ERROR", error);
             }
 
             console.log(`✅ Debug Success: Found ${count} total celebrities, showing first ${data?.length}`);
-            res.json({
-                success: true,
+            return sendSuccess(res, {
                 totalCount: count,
                 sampleData: data?.map(toCamelCase),
                 message: `Successfully fetched ${data?.length} celebrities out of ${count} total`
             });
         } catch (error: any) {
             console.error("❌ Debug Exception:", error);
-            res.json({ success: false, error: error.message, stack: error.stack });
+            return sendError(res, 500, error.message, "INTERNAL_ERROR", error.stack);
         }
     });
 
@@ -64,10 +64,10 @@ export function registerCelebrityRoutes(app: Express) {
             const types = Array.from(new Set(data?.map(item => item.type))).filter(Boolean).sort();
 
             console.log(`✅ Found ${categories.length} unique categories`);
-            res.json({ categories, genders, types });
+            return sendSuccess(res, { categories, genders, types });
         } catch (error: any) {
             console.error("❌ Exception:", error);
-            res.json({ success: false, error: error.message });
+            return sendError(res, 500, error.message);
         }
     });
 
@@ -94,10 +94,10 @@ export function registerCelebrityRoutes(app: Express) {
             }
 
             console.log(`✅ Fetched ${data?.length || 0} celebrities for category: ${category}`);
-            res.json((data || []).map(toCamelCase));
+            return sendSuccess(res, (data || []).map(toCamelCase));
         } catch (error) {
             console.error("❌ Error fetching celebrities:", error);
-            res.status(500).json({ message: "Failed to fetch celebrities" });
+            return sendError(res, 500, "Failed to fetch celebrities");
         }
     });
 
@@ -113,12 +113,12 @@ export function registerCelebrityRoutes(app: Express) {
                 .single();
 
             if (error) throw error;
-            if (!data) return res.status(404).json({ message: "Celebrity not found" });
+            if (!data) return sendError(res, 404, "Celebrity not found", "NOT_FOUND");
 
-            res.json(toCamelCase(data));
+            return sendSuccess(res, toCamelCase(data));
         } catch (error) {
             console.error("Error fetching celebrity:", error);
-            res.status(500).json({ message: "Failed to fetch celebrity" });
+            return sendError(res, 500, "Failed to fetch celebrity");
         }
     });
 
@@ -143,10 +143,10 @@ export function registerCelebrityRoutes(app: Express) {
                 .sort((a, b) => a.sort - b.sort)
                 .map(({ value }) => value);
 
-            res.json(shuffled.map(toCamelCase));
+            return sendSuccess(res, shuffled.map(toCamelCase));
         } catch (error) {
             console.error("Error fetching battle candidates:", error);
-            res.status(500).json({ message: "Failed to fetch battle candidates" });
+            return sendError(res, 500, "Failed to fetch battle candidates");
         }
     });
 
@@ -181,10 +181,10 @@ export function registerCelebrityRoutes(app: Express) {
                 }
             });
 
-            res.json(stats);
+            return sendSuccess(res, stats);
         } catch (error) {
             console.error("Error fetching celebrity stats:", error);
-            res.status(500).json({ message: "Failed to fetch celebrity stats" });
+            return sendError(res, 500, "Failed to fetch celebrity stats");
         }
     });
 }

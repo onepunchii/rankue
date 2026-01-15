@@ -82,7 +82,7 @@ export default function ProfileSetup() {
     if (stepIndex > 0) {
       setStepIndex(stepIndex - 1);
     } else {
-      setLocation('/');
+      setLocation('/home');
     }
   };
 

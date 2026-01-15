@@ -54,7 +54,7 @@ export default function PolliDemoSetup() {
 
       // 홈으로 리다이렉트
       setTimeout(() => {
-        setLocation('/');
+        setLocation('/home');
       }, 1500);
     },
     onError: (error: any) => {

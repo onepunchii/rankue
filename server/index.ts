@@ -6,10 +6,11 @@ import { registerRoutes } from "./routes.js";
 import { registerSEORoutes } from "./seoRoutes.js";
 import { registerOGImageRoutes } from "./ogImageGenerator.js";
 import prerender from "prerender-node";
-import { authMiddleware } from "./simpleAuth.js";
+import { authMiddleware } from "./auth.js";
 import session from "express-session";
 import MemoryStoreLoader from "memorystore";
 import { serveStatic } from "./vite.js";
+import { errorHandler } from "./middleware/error.js";
 
 const MemoryStore = MemoryStoreLoader(session);
 
@@ -42,15 +43,8 @@ app.use(session({
 app.use('/images', express.static('public/images'));
 app.use('/uploads', express.static('public/uploads'));
 
+// Auth middleware
 app.use(authMiddleware);
-
-// Force root to home redirect to prevent white screening on root
-app.use((req, res, next) => {
-  if (req.path === '/' && !req.originalUrl.includes('/api')) {
-    return res.redirect("/home");
-  }
-  next();
-});
 
 // Prerender.io SEO 미들웨어 (검색엔진 크롤러를 위한 사전 렌더링)
 if (process.env.PRERENDER_TOKEN) {
@@ -125,12 +119,7 @@ if (!process.env.VERCEL) {
 
 
 
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-
-  res.status(status).json({ message });
-});
+app.use(errorHandler);
 
 // importantly only setup vite in development and after
 // setting up all the other routes so the catch-all route
@@ -148,7 +137,7 @@ export default app;
 // Start server if not running in Vercel
 if (!process.env.VERCEL) {
   const port = process.env.PORT ? parseInt(process.env.PORT) : 5001;
-  server.listen({
+  const serverInstance = server.listen({
     port,
     host: "0.0.0.0",
   }, async () => {
@@ -160,6 +149,16 @@ if (!process.env.VERCEL) {
       setupCronJobs();
     } catch (e) {
       console.error("Failed to setup cron jobs on startup:", e);
+    }
+  });
+
+  serverInstance.on('error', (e: any) => {
+    if (e.code === 'EADDRINUSE') {
+      console.error(`Error: Port ${port} is already in use.`);
+      console.error(`Please kill the process using port ${port} or specify a different PORT.`);
+      process.exit(1);
+    } else {
+      console.error("Server startup error:", e);
     }
   });
 }

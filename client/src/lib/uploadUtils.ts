@@ -23,7 +23,8 @@ export const uploadImage = async (file: File): Promise<UploadResponse> => {
     throw new Error(error.message || 'Failed to upload image');
   }
 
-  return response.json();
+  const result = await response.json();
+  return result.success && result.data ? result.data : result;
 };
 
 export const validateImageFile = (file: File): string | null => {

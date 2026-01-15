@@ -13,8 +13,8 @@ import { Phone, Shield, Clock, CheckCircle, User, Calendar, MapPin, Briefcase, G
 const AGE_GROUPS = ['10대', '20대', '30대', '40대', '50대', '60대+'];
 const GENDERS = ['남성', '여성', '기타'];
 const REGIONS = [
-  '서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시', '대전광역시', 
-  '울산광역시', '세종특별자치시', '경기도', '강원도', '충청북도', '충청남도', 
+  '서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시', '대전광역시',
+  '울산광역시', '세종특별자치시', '경기도', '강원도', '충청북도', '충청남도',
   '전라북도', '전라남도', '경상북도', '경상남도', '제주특별자치도'
 ];
 const JOB_CATEGORIES = ['학생', '회사원', '자영업', '공무원', '주부', '무직', '기타'];
@@ -28,7 +28,7 @@ export default function DemographicSetup() {
   const queryClient = useQueryClient();
   // const { user, isAuthenticated } = useAuth(); // cleanAuth로 대체됨
   const authId = localStorage.getItem('guestId');
-  
+
   const [formData, setFormData] = useState({
     ageGroup: '',
     gender: '',
@@ -76,7 +76,7 @@ export default function DemographicSetup() {
     mutationFn: async (phone: string) => {
       const { GuestAuthManager } = await import('@/lib/guestAuth');
       const guestId = GuestAuthManager.getCurrentGuestId();
-      
+
       return await apiRequest('/api/auth/sms/send', {
         method: 'POST',
         body: { phoneNumber: phone, guestId }
@@ -85,7 +85,7 @@ export default function DemographicSetup() {
     onSuccess: (data: any) => {
       setIsCodeSent(true);
       setTimeLeft(180); // 3분 타이머
-      
+
       // 데모 모드일 때 인증번호를 토스트에 표시
       if (data.demoCode) {
         toast({
@@ -113,7 +113,7 @@ export default function DemographicSetup() {
     mutationFn: async ({ phone, code }: { phone: string; code: string }) => {
       const { GuestAuthManager } = await import('@/lib/guestAuth');
       const guestId = GuestAuthManager.getCurrentGuestId();
-      
+
       return await apiRequest('/api/auth/sms/verify', {
         method: 'POST',
         body: { phoneNumber: phone, verificationCode: code, guestId }
@@ -124,7 +124,7 @@ export default function DemographicSetup() {
       import('@/lib/guestAuth').then(({ GuestAuthManager }) => {
         GuestAuthManager.markSimpleAuthCompleted(variables.phone);
       });
-      
+
       setIsVerified(true);
       setTimeLeft(0);
       toast({
@@ -152,11 +152,11 @@ export default function DemographicSetup() {
         localStorage.setItem('guestId', guestId);
         localStorage.setItem('onboardingCompleted', 'true');
       }
-      
+
       const requestData = { ...data, guestId };
       console.log('Demographics 요청 데이터:', requestData);
       console.log('Guest ID:', guestId);
-      
+
       const response = await apiRequest('/api/user/demographics', {
         method: 'POST',
         body: requestData
@@ -170,12 +170,12 @@ export default function DemographicSetup() {
       if (guestId) {
         queryClient.invalidateQueries({ queryKey: ['user-state', guestId] });
       }
-      
+
       // 강제 새로고침을 위한 추가 무효화
       setTimeout(() => {
         queryClient.invalidateQueries();
       }, 100);
-      
+
       if (data?.lotteryTicketsAwarded > 0) {
         toast({
           title: "프로필 설정 완료!",
@@ -187,10 +187,10 @@ export default function DemographicSetup() {
           description: "인구통계 정보가 성공적으로 등록되었습니다.",
         });
       }
-      
+
       // 홈으로 리다이렉트 (페이지 새로고침으로 캐시 문제 해결)
       setTimeout(() => {
-        window.location.href = '/';
+        window.location.href = '/home';
       }, 1000);
     },
     onError: (error) => {
@@ -204,7 +204,7 @@ export default function DemographicSetup() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // 필수 항목 검증 (나이, 성별, 거주지역)
     if (!formData.ageGroup || !formData.gender || !formData.region) {
       toast({
@@ -219,7 +219,7 @@ export default function DemographicSetup() {
   };
 
   const isFormValid = formData.ageGroup && formData.gender && formData.region;
-  
+
   // cleanAuth 시스템: 필수 정보만 입력하면 완료 가능 (SMS 인증 불필요)
   const isCompleteFormValid = isFormValid;
 
@@ -242,7 +242,7 @@ export default function DemographicSetup() {
               <span className="text-white text-xs font-bold">로또 티켓 5장 지급!</span>
             </div>
           </CardHeader>
-          
+
           <CardContent className="space-y-5 px-6 pb-6">
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* 필수 항목들 */}
@@ -255,7 +255,7 @@ export default function DemographicSetup() {
                     필수 정보
                   </h3>
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">나이</label>
                   <Select onValueChange={(value) => setFormData(prev => ({ ...prev, ageGroup: value }))}>
@@ -375,7 +375,7 @@ export default function DemographicSetup() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setLocation('/')}
+                  onClick={() => setLocation('/home')}
                   className="flex-1 border-gray-300/60 hover:bg-gray-50 dark:hover:bg-gray-800 h-11 rounded-xl font-medium text-sm transition-all duration-200"
                 >
                   나중에 하기

@@ -18,6 +18,8 @@ export const useGeolocation = () => {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [error, setError] = useState<LocationError | null>(null);
   const [loading, setLoading] = useState(false);
+  const [city, setCity] = useState<string | null>(null);
+  const [district, setDistrict] = useState<string | null>(null);
 
   const getCurrentPosition = async (enableHighAccuracy = true): Promise<LocationData | null> => {
     setLoading(true);
@@ -25,9 +27,8 @@ export const useGeolocation = () => {
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // 네이티브 앱에서 권한 확인
         const permissions = await Geolocation.checkPermissions();
-        
+
         if (permissions.location !== 'granted') {
           const requestResult = await Geolocation.requestPermissions();
           if (requestResult.location !== 'granted') {
@@ -35,11 +36,10 @@ export const useGeolocation = () => {
           }
         }
 
-        // 위치 정보 가져오기
         const coordinates = await Geolocation.getCurrentPosition({
           enableHighAccuracy,
           timeout: 10000,
-          maximumAge: 3600000, // 1시간 캐시
+          maximumAge: 3600000,
         });
 
         const locationData: LocationData = {
@@ -50,10 +50,12 @@ export const useGeolocation = () => {
         };
 
         setLocation(locationData);
+        // 좌표로 주소 변환 시도 (실제로는 API 키 필요하므로 여기서는 생략하거나 모의 처리)
+        // await updateAddress(locationData.latitude, locationData.longitude);
+
         setLoading(false);
         return locationData;
       } else {
-        // 웹에서 브라우저 Geolocation API 사용
         return new Promise((resolve, reject) => {
           if (!navigator.geolocation) {
             const error = { code: 0, message: '위치 서비스가 지원되지 않습니다.' };
@@ -71,8 +73,11 @@ export const useGeolocation = () => {
                 accuracy: position.coords.accuracy,
                 timestamp: position.timestamp,
               };
-              
+
               setLocation(locationData);
+              // 좌표로 주소 변환 시도
+              // updateAddress(locationData.latitude, locationData.longitude);
+
               setLoading(false);
               resolve(locationData);
             },
@@ -81,7 +86,7 @@ export const useGeolocation = () => {
                 code: error.code,
                 message: getErrorMessage(error.code),
               };
-              
+
               setError(locationError);
               setLoading(false);
               reject(locationError);
@@ -99,76 +104,85 @@ export const useGeolocation = () => {
         code: error.code || 0,
         message: error.message || '위치 정보를 가져올 수 없습니다.',
       };
-      
+
       setError(locationError);
       setLoading(false);
       return null;
     }
   };
 
+  // getCurrentAction alias
+  const getCurrentLocation = getCurrentPosition;
+
   const watchPosition = (callback: (location: LocationData) => void) => {
-    if (Capacitor.isNativePlatform()) {
-      // 네이티브 앱에서 위치 추적
-      const watchId = Geolocation.watchPosition(
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 3600000,
-        },
-        (position) => {
-          if (position) {
+    let watchId: string | number | undefined;
+
+    const startWatch = async () => {
+      if (Capacitor.isNativePlatform()) {
+        watchId = await Geolocation.watchPosition(
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 3600000,
+          },
+          (position) => {
+            if (position) {
+              const locationData: LocationData = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                timestamp: position.timestamp,
+              };
+
+              setLocation(locationData);
+              callback(locationData);
+            }
+          }
+        );
+      } else {
+        if (!navigator.geolocation) {
+          setError({ code: 0, message: '위치 서비스가 지원되지 않습니다.' });
+          return;
+        }
+
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
             const locationData: LocationData = {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
               accuracy: position.coords.accuracy,
               timestamp: position.timestamp,
             };
-            
+
             setLocation(locationData);
             callback(locationData);
+          },
+          (error) => {
+            setError({
+              code: error.code,
+              message: getErrorMessage(error.code),
+            });
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 3600000,
           }
-        }
-      );
-      
-      return () => {
-        Geolocation.clearWatch({ id: watchId });
-      };
-    } else {
-      // 웹에서 위치 추적
-      if (!navigator.geolocation) {
-        setError({ code: 0, message: '위치 서비스가 지원되지 않습니다.' });
-        return () => {};
+        );
       }
+    };
 
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const locationData: LocationData = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: position.timestamp,
-          };
-          
-          setLocation(locationData);
-          callback(locationData);
-        },
-        (error) => {
-          setError({
-            code: error.code,
-            message: getErrorMessage(error.code),
-          });
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 3600000,
+    startWatch();
+
+    return () => {
+      if (watchId !== undefined) {
+        if (Capacitor.isNativePlatform()) {
+          Geolocation.clearWatch({ id: watchId as string });
+        } else {
+          navigator.geolocation.clearWatch(watchId as number);
         }
-      );
-
-      return () => {
-        navigator.geolocation.clearWatch(watchId);
-      };
-    }
+      }
+    };
   };
 
   const getErrorMessage = (code: number): string => {
@@ -184,15 +198,16 @@ export const useGeolocation = () => {
     }
   };
 
-  // 주소 역변환 (좌표 → 주소)
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
     try {
-      // Kakao Maps API 사용 (실제 구현시 API 키 필요)
+      // Mock implementation for now as API key is missing
+      // In production, uncomment the fetch call below
+      /*
       const response = await fetch(
         `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${lng}&y=${lat}`,
         {
           headers: {
-            Authorization: 'KakaoAK YOUR_KAKAO_API_KEY', // 실제 API 키로 교체 필요
+            Authorization: 'KakaoAK YOUR_KAKAO_API_KEY', 
           },
         }
       );
@@ -201,10 +216,17 @@ export const useGeolocation = () => {
       
       if (data.documents && data.documents.length > 0) {
         const address = data.documents[0].address;
-        return `${address.region_1depth_name} ${address.region_2depth_name} ${address.region_3depth_name}`;
+        const fullAddress = `${address.region_1depth_name} ${address.region_2depth_name} ${address.region_3depth_name}`;
+        setCity(address.region_1depth_name);
+        setDistrict(address.region_2depth_name);
+        return fullAddress;
       }
-      
-      return '주소를 찾을 수 없습니다.';
+      */
+
+      // Dummy data for testing
+      setCity("서울");
+      setDistrict("중구");
+      return "서울특별시 중구 (테스트)";
     } catch (error) {
       console.error('주소 변환 실패:', error);
       return '주소 변환에 실패했습니다.';
@@ -213,9 +235,14 @@ export const useGeolocation = () => {
 
   return {
     location,
+    latitude: location?.latitude,
+    longitude: location?.longitude,
+    city,
+    district,
     error,
     loading,
     getCurrentPosition,
+    getCurrentLocation,
     watchPosition,
     reverseGeocode,
   };

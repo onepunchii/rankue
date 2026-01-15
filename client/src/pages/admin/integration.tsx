@@ -15,6 +15,28 @@ import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { AlertCircle, CheckCircle, Clock, Settings, TestTube, Zap } from "lucide-react";
+import { queryKeys } from "@/lib/queryKeys";
+
+interface IntegrationLog {
+  id: number;
+  orderId: number;
+  provider: string;
+  status: string;
+  method?: string;
+  endpoint?: string;
+  requestBody?: any;
+  responseBody?: any;
+  error?: string;
+  createdAt: string;
+  responseTime?: number;
+}
+
+interface Stats {
+  totalOrders?: number;
+  pendingOrders?: number;
+  approvedOrders?: number;
+  activeProducts?: number;
+}
 
 export default function AdminIntegration() {
   const [testData, setTestData] = useState({
@@ -28,18 +50,18 @@ export default function AdminIntegration() {
   const queryClient = useQueryClient();
 
   // 최근 연동 로그 조회
-  const { data: recentLogs = [], isLoading: logsLoading } = useQuery({
-    queryKey: ["/api/admin/rewards/logs"],
+  const { data: recentLogs = [], isLoading: logsLoading } = useQuery<IntegrationLog[]>({
+    queryKey: [queryKeys.ADMIN_REWARDS_LOGS],
   });
 
   // 통계 조회
-  const { data: stats = {} } = useQuery({
-    queryKey: ["/api/admin/rewards/stats"],
+  const { data: stats = {} } = useQuery<Stats>({
+    queryKey: [queryKeys.ADMIN_REWARDS_STATS],
   });
 
   // 테스트 연동 뮤테이션
   const testIntegrationMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/admin/rewards/test-integration", {
+    mutationFn: (data: any) => apiRequest(queryKeys.ADMIN_REWARDS_TEST, {
       method: "POST",
       body: JSON.stringify(data),
     }),
@@ -47,13 +69,13 @@ export default function AdminIntegration() {
       if (result.success) {
         toast({ title: "테스트 성공", description: "연동이 정상적으로 작동합니다" });
       } else {
-        toast({ 
-          title: "테스트 실패", 
-          description: result.error || "알 수 없는 오류가 발생했습니다", 
-          variant: "destructive" 
+        toast({
+          title: "테스트 실패",
+          description: result.error || "알 수 없는 오류가 발생했습니다",
+          variant: "destructive"
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/rewards/logs"] });
+      queryClient.invalidateQueries({ queryKey: [queryKeys.ADMIN_REWARDS_LOGS] });
       setIsTestDialogOpen(false);
     },
     onError: (error: Error) => {
@@ -78,12 +100,12 @@ export default function AdminIntegration() {
       error: { variant: "destructive" as const, text: "오류" },
       pending: { variant: "secondary" as const, text: "대기" },
     };
-    
+
     const config = statusConfig[status as keyof typeof statusConfig] || { variant: "secondary" as const, text: status };
     return <Badge variant={config.variant}>{config.text}</Badge>;
   };
 
-  const successRate = recentLogs.length > 0 
+  const successRate = recentLogs.length > 0
     ? Math.round((recentLogs.filter((log: any) => log.status === 'success').length / recentLogs.length) * 100)
     : 0;
 
@@ -150,7 +172,7 @@ export default function AdminIntegration() {
                     placeholder="홍길동"
                   />
                 </div>
-                <Button 
+                <Button
                   onClick={() => testIntegrationMutation.mutate(testData)}
                   disabled={testIntegrationMutation.isPending}
                   className="w-full"
@@ -319,45 +341,45 @@ export default function AdminIntegration() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>API 엔드포인트</Label>
-                        <Input 
-                          value="https://api.giftishow.com" 
-                          disabled 
+                        <Input
+                          value="https://api.giftishow.com"
+                          disabled
                           className="bg-gray-50"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>타임아웃 (초)</Label>
-                        <Input 
-                          value="30" 
-                          disabled 
+                        <Input
+                          value="30"
+                          disabled
                           className="bg-gray-50"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>재시도 횟수</Label>
-                        <Input 
-                          value="3" 
-                          disabled 
+                        <Input
+                          value="3"
+                          disabled
                           className="bg-gray-50"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>재시도 간격 (초)</Label>
-                        <Input 
-                          value="5" 
-                          disabled 
+                        <Input
+                          value="5"
+                          disabled
                           className="bg-gray-50"
                         />
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">알림 설정</h3>
                     <div className="space-y-2">
                       <Label>오류 알림 이메일</Label>
-                      <Input 
-                        placeholder="admin@polli.com" 
+                      <Input
+                        placeholder="admin@polli.com"
                         className="bg-gray-50"
                         disabled
                       />
@@ -408,7 +430,7 @@ export default function AdminIntegration() {
                           {log.responseTime || 0}ms
                         </div>
                       </div>
-                      
+
                       {log.error && (
                         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
                           <p className="text-sm text-red-600 font-medium">오류:</p>

@@ -31,14 +31,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     queryFn: () => adminFetch("/api/admin/db-status"),
     refetchInterval: 30000, // 30초마다 갱신
     retry: false, // 401 오류 시 재시도하지 않음
-    onError: (error: any) => {
-      if (error.message === 'Session expired') {
-        // 이미 리다이렉트됨
-        return;
-      }
+  });
+
+  useEffect(() => {
+    if (error && (error as any).message !== 'Session expired') {
       console.error('DB status fetch error:', error);
     }
-  });
+  }, [error]);
 
   const handleLogout = async () => {
     try {
@@ -92,7 +91,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         DB 연결됨
                       </div>
                       <div className="text-xs mt-1">
-                        회원: {dbStatus.stats?.totalUsers?.toLocaleString() || 0}명 | 
+                        회원: {dbStatus.stats?.totalUsers?.toLocaleString() || 0}명 |
                         설문: {dbStatus.stats?.totalSurveys?.toLocaleString() || 0}개
                       </div>
                     </div>
@@ -123,11 +122,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <li key={item.path}>
                 <Button
                   variant="ghost"
-                  className={`w-full justify-start text-left ${
-                    window.location.pathname === item.path 
-                      ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                  className={`w-full justify-start text-left ${window.location.pathname === item.path
+                      ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
                       : 'text-gray-700 hover:bg-gray-100'
-                  }`}
+                    }`}
                   onClick={() => setLocation(item.path)}
                 >
                   <i className={`${item.icon} ${sidebarOpen ? 'mr-3' : ''} w-4`}></i>

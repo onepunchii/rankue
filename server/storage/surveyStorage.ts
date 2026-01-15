@@ -65,7 +65,7 @@ export class SurveyStorage {
     }
 
     async createSurveyResponse(responseData: InsertSurveyResponse): Promise<SurveyResponse> {
-        const [response] = await db.insert(surveyResponses).values(responseData).returning();
+        const [response] = await db.insert(surveyResponses).values(responseData).returning() as any[];
         return response;
     }
 
@@ -74,7 +74,8 @@ export class SurveyStorage {
     }
 
     async createParticipation(participationData: InsertUserSurveyParticipation): Promise<UserSurveyParticipation> {
-        const [participation] = await db.insert(userSurveyParticipation).values(participationData).returning();
+        const results = await db.insert(userSurveyParticipation).values(participationData).returning();
+        const participation = results[0];
 
         // 참여자 수 증가
         await db.update(surveys)
@@ -91,17 +92,11 @@ export class SurveyStorage {
     }
 
     async getUserParticipations(userId: string): Promise<any[]> {
-        // Optimized: Only select necessary fields (surveyId, completedAt) instead of full join
-        // This dramatically reduces payload size and query time for the home page
-        const rows = await db.select({
-            surveyId: userSurveyParticipation.surveyId,
-            completedAt: userSurveyParticipation.completedAt
-        })
+        // Return all fields for the profile page's recent activity section
+        const rows = await db.select()
             .from(userSurveyParticipation)
             .where(eq(userSurveyParticipation.userId, userId))
-            .orderBy(desc(userSurveyParticipation.completedAt))
-        // Limit recent history if needed, but for now just removing the heavy JOIN is a big win
-        //.limit(500); 
+            .orderBy(desc(userSurveyParticipation.completedAt));
 
         return rows;
     }

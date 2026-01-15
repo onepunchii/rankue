@@ -3,6 +3,8 @@ import { db } from './db.js';
 import { assemblyBills, surveys, surveyQuestions } from '../shared/schema.js';
 import { eq, desc } from 'drizzle-orm';
 
+import { sendSuccess, sendError } from './utils/response.js';
+
 const router = Router();
 
 // 국회 발의법률안 목록 조회
@@ -33,10 +35,10 @@ router.get('/api/assembly-bills', async (req, res) => {
       createdAt: bill.createdAt,
     }));
 
-    res.json(transformedBills);
+    sendSuccess(res, transformedBills);
   } catch (error) {
     console.error('법률안 조회 오류:', error);
-    res.status(500).json({ error: '법률안을 불러올 수 없습니다.' });
+    sendError(res, 500, '법률안을 불러올 수 없습니다.');
   }
 });
 

@@ -7,6 +7,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import MobileHeader from "@/components/mobile-header";
 import BottomNav from "@/components/bottom-nav";
 import { Button } from "@/components/ui/button";
@@ -49,22 +50,13 @@ export default function SurveyDetail() {
 
   const { data: survey, isLoading } = useQuery<Survey & { questions: SurveyQuestion[] }>({
     queryKey: [surveyEndpoint],
+    queryFn: () => apiRequest(surveyEndpoint)
   });
 
   // Simple Auth 사용자 참여 상태 확인 (최적화된 단일 요청)
-  const { data: participations } = useQuery({
-    queryKey: ["/api/auth/user/participations", user?.id],
-    queryFn: async () => {
-      const token = document.cookie.split('polli_token=')[1]?.split(';')[0] || '';
-      const response = await fetch(`/api/auth/user/participations`, {
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch participations');
-      return response.json();
-    },
+  const { data: participations = [] } = useQuery<any[]>({
+    queryKey: [queryKeys.AUTH_USER_PARTICIPATIONS],
+    queryFn: () => apiRequest(queryKeys.AUTH_USER_PARTICIPATIONS),
     staleTime: 5000,
     enabled: !!user && !user.isGuest,
     refetchOnWindowFocus: false,
@@ -98,7 +90,7 @@ export default function SurveyDetail() {
       console.log('✅ Survey participation successful');
       if (!isPublicSurvey) {
         // Optimistically update participations cache
-        const queryKey = ["/api/auth/user/participations", user?.id];
+        const queryKey = [queryKeys.AUTH_USER_PARTICIPATIONS];
         queryClient.setQueryData(queryKey, (old: any[] | undefined) => {
           const newParticipation = {
             surveyId: parseInt(id!),
@@ -109,7 +101,7 @@ export default function SurveyDetail() {
         });
 
         // Also invalidate for safety
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user/participations"] });
+        queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER_PARTICIPATIONS] });
       }
     },
     onError: (error: any) => {
@@ -184,7 +176,7 @@ export default function SurveyDetail() {
 
       if (!isPublicSurvey) {
         // Optimistically update participations cache for immediate UI overlay
-        const queryKey = ["/api/auth/user/participations", user?.id];
+        const queryKey = [queryKeys.AUTH_USER_PARTICIPATIONS];
         queryClient.setQueryData(queryKey, (old: any[] | undefined) => {
           const newParticipation = {
             surveyId: parseInt(id!),
@@ -196,8 +188,8 @@ export default function SurveyDetail() {
           return [...filtered, newParticipation];
         });
 
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user/participations"] });
+        queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
+        queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER_PARTICIPATIONS] });
       }
 
       // Delay navigation slightly to let the user see the "Completed" state if they stay for a split second

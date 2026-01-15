@@ -129,8 +129,8 @@ export default function BrainQuiz() {
                     }
                 }
                 const data = await res.json();
-                console.log("[BrainQuiz] Data received, questions:", data.questions?.length);
-                return data;
+                console.log("[BrainQuiz] Data received, questions:", data.data?.questions?.length);
+                return data.data;
             } catch (err) {
                 console.error("[BrainQuiz] Fetch Error:", err);
                 throw err;
@@ -185,7 +185,8 @@ export default function BrainQuiz() {
                 const text = await res.text();
                 throw new Error(text || "Failed to fetch stats");
             }
-            return res.json();
+            const json = await res.json();
+            return json.data;
         },
         enabled: isFinished, // trigger only when finished
         retry: 2
@@ -224,7 +225,8 @@ export default function BrainQuiz() {
                     throw new Error(text || "Submit failed");
                 }
             }
-            return res.json() as Promise<QuizResult>;
+            const json = await res.json();
+            return json.data as QuizResult;
         },
         onSuccess: (data) => {
             setResult(data);

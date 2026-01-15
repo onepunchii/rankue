@@ -19,7 +19,7 @@ export default function BottomNav() {
   };
 
   const navItems = [
-    { path: "/", icon: "fas fa-home", label: "홈" },
+    { path: "/home", icon: "fas fa-home", label: "홈" },
     { path: "/surveys", icon: "fas fa-poll", label: "설문" },
     { path: "/persona", icon: "fas fa-user-circle", label: "페르소나" },
     { path: "/results", icon: "fas fa-chart-bar", label: "결과" },

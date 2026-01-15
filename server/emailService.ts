@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 // In demo mode, we'll simulate email sending
 const isDemoMode = !process.env.EMAIL_USER || !process.env.EMAIL_PASS;
 
-const transporter = isDemoMode ? null : nodemailer.createTransporter({
+const transporter = isDemoMode ? null : nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
@@ -49,7 +49,7 @@ export async function sendVerificationEmail(email: string, code: string): Promis
       `,
     };
 
-    await transporter.sendMail(mailOptions);
+    await transporter!.sendMail(mailOptions);
     return true;
   } catch (error) {
     console.error('Email sending failed:', error);

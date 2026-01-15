@@ -73,10 +73,10 @@ export async function generateBalanceGameFromNews(url: string) {
             optionB: result.option_b,
             sourceNewsUrl: url,
             sourceNewsTitle: "AI Generated based on Trend",
-            status: 'ACTIVE', // Auto-approve per user request
+            status: 'ACTIVE',
             countA: 0,
             countB: 0
-        });
+        } as any);
 
         console.log(`[BalanceGame] Generated ACTIVE Game: ID ${game.id} - ${game.title}`);
         return game;

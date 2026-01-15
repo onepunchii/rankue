@@ -55,8 +55,8 @@ export async function syncNews() {
 
             // [Auto Survey & Balance Game] 섹션별로 가장 상단 기사 하나를 뽑아 콘텐츠 자동 생성 시도
             if (topArticleUrl) {
-                const { generateAutoSurvey } = await import("./autoSurveyService");
-                const { generateBalanceGameFromNews } = await import("./balanceGameGenerator");
+                const { generateAutoSurvey } = await import("./autoSurveyService.js");
+                const { generateBalanceGameFromNews } = await import("./balanceGameGenerator.js");
 
                 // 백그라운드에서 실행 (동기화 속도에 영향을 주지 않도록)
                 Promise.allSettled([

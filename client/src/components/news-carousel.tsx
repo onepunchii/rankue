@@ -34,7 +34,7 @@ interface NewsArticle {
   };
 }
 
-export default function NewsCarousel() {
+export default function NewsCarousel({ category }: { category?: string }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -44,17 +44,21 @@ export default function NewsCarousel() {
   const [, setLocation] = useLocation();
 
   const { data: newsArticles = [], isLoading, error } = useQuery<NewsArticle[]>({
-    queryKey: ["/api/news"],
+    queryKey: ["/api/news", category],
     queryFn: async () => {
-      console.log("[NewsCarousel] Fetching news...");
-      const res = await fetch("/api/news");
+      console.log(`[NewsCarousel] Fetching news for category: ${category || 'all'}...`);
+      const url = new URL("/api/news", window.location.origin);
+      if (category) url.searchParams.append("category", category);
+
+      const res = await fetch(url.toString());
       if (!res.ok) throw new Error("Network response was not ok");
-      const data = await res.json();
-      console.log("[NewsCarousel] News fetched:", data);
-      return data;
+      const json = await res.json();
+      console.log("[NewsCarousel] News fetched:", json);
+      // Backend sendSuccess wraps data in { success: true, data: [...] }
+      return Array.isArray(json.data) ? json.data : [];
     },
     refetchInterval: 6 * 60 * 60 * 1000,
-    staleTime: 0, // Force refetch for debugging
+    staleTime: 5 * 60 * 1000, // Reasonable stale time
   });
 
   console.log("[NewsCarousel] Render state:", { isLoading, hasData: newsArticles.length, error });

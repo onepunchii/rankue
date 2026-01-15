@@ -6,16 +6,38 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 import { motion } from "framer-motion";
+import { queryKeys } from "@/lib/queryKeys";
+
+interface IntegrationLog {
+  id: number;
+  orderId: number;
+  provider: string;
+  status: string;
+  method?: string;
+  endpoint?: string;
+  requestBody?: any;
+  responseBody?: any;
+  error?: string;
+  createdAt: string;
+  responseTime?: number;
+}
+
+interface Stats {
+  totalOrders?: number;
+  pendingOrders?: number;
+  approvedOrders?: number;
+  activeProducts?: number;
+}
 
 export default function AdminRewardsAnalytics() {
   // 연동 로그 조회
-  const { data: logs = [], isLoading: logsLoading } = useQuery({
-    queryKey: ["/api/admin/rewards/logs"],
+  const { data: logs = [], isLoading: logsLoading } = useQuery<IntegrationLog[]>({
+    queryKey: [queryKeys.ADMIN_REWARDS_LOGS],
   });
 
   // 통계 조회
-  const { data: stats = {} } = useQuery({
-    queryKey: ["/api/admin/rewards/stats"],
+  const { data: stats = {} } = useQuery<Stats>({
+    queryKey: [queryKeys.ADMIN_REWARDS_STATS],
   });
 
   const getStatusBadge = (status: string) => {
@@ -24,7 +46,7 @@ export default function AdminRewardsAnalytics() {
       error: { variant: "destructive" as const, text: "오류" },
       pending: { variant: "secondary" as const, text: "대기" },
     };
-    
+
     const config = statusConfig[status as keyof typeof statusConfig] || { variant: "secondary" as const, text: status };
     return <Badge variant={config.variant}>{config.text}</Badge>;
   };
@@ -64,7 +86,7 @@ export default function AdminRewardsAnalytics() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">성공률</p>
                   <p className="text-2xl font-bold">
-                    {logs.length > 0 
+                    {logs.length > 0
                       ? Math.round((logs.filter((log: any) => log.status === 'success').length / logs.length) * 100)
                       : 0
                     }%
@@ -127,35 +149,35 @@ export default function AdminRewardsAnalytics() {
                           응답시간: {log.responseTime || 0}ms
                         </div>
                       </div>
-                      
+
                       {log.requestBody && (
                         <details className="mt-2">
                           <summary className="text-sm cursor-pointer text-blue-600 hover:text-blue-800">
                             요청 데이터 보기
                           </summary>
                           <pre className="mt-2 p-2 bg-gray-50 rounded text-xs overflow-x-auto">
-                            {typeof log.requestBody === 'string' 
-                              ? log.requestBody 
+                            {typeof log.requestBody === 'string'
+                              ? log.requestBody
                               : JSON.stringify(log.requestBody, null, 2)
                             }
                           </pre>
                         </details>
                       )}
-                      
+
                       {log.responseBody && (
                         <details className="mt-2">
                           <summary className="text-sm cursor-pointer text-blue-600 hover:text-blue-800">
                             응답 데이터 보기
                           </summary>
                           <pre className="mt-2 p-2 bg-gray-50 rounded text-xs overflow-x-auto">
-                            {typeof log.responseBody === 'string' 
-                              ? log.responseBody 
+                            {typeof log.responseBody === 'string'
+                              ? log.responseBody
                               : JSON.stringify(log.responseBody, null, 2)
                             }
                           </pre>
                         </details>
                       )}
-                      
+
                       {log.error && (
                         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
                           <p className="text-sm text-red-600 font-medium">오류:</p>
@@ -206,22 +228,22 @@ export default function AdminRewardsAnalytics() {
                             </p>
                           </div>
                         </div>
-                        
+
                         {log.error && (
                           <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded">
                             <p className="text-sm text-red-800 font-medium">오류 메시지:</p>
                             <p className="text-sm text-red-900">{log.error}</p>
                           </div>
                         )}
-                        
+
                         {log.responseBody && (
                           <details className="mt-2">
                             <summary className="text-sm cursor-pointer text-red-700 hover:text-red-900">
                               상세 응답 보기
                             </summary>
                             <pre className="mt-2 p-2 bg-red-100 rounded text-xs overflow-x-auto">
-                              {typeof log.responseBody === 'string' 
-                                ? log.responseBody 
+                              {typeof log.responseBody === 'string'
+                                ? log.responseBody
                                 : JSON.stringify(log.responseBody, null, 2)
                               }
                             </pre>

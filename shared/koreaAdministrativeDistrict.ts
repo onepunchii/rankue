@@ -56,7 +56,8 @@ export const CITY_PROVINCES = Object.keys(KOREA_ADMINISTRATIVE_DISTRICT);
 
 // 구/군 목록 반환 함수
 export function getDistrictsByProvince(cityProvince: string): string[] {
-  return KOREA_ADMINISTRATIVE_DISTRICT[cityProvince as keyof typeof KOREA_ADMINISTRATIVE_DISTRICT] || [];
+  const districts = KOREA_ADMINISTRATIVE_DISTRICT[cityProvince as keyof typeof KOREA_ADMINISTRATIVE_DISTRICT];
+  return districts ? [...districts] : [];
 }
 
 // 시/도명 유효성 검증

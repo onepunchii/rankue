@@ -3,6 +3,7 @@ import { storage } from "./storage.js"; // Use storage interface which will use 
 import { db } from "./db.js";
 import { localCouncilMembers } from "../shared/schema.js";
 import { eq, and, ilike, sql } from "drizzle-orm";
+import { sendSuccess, sendError } from "./utils/response.js";
 
 export function registerLocalCouncilRoutes(app: Express) {
   // 지역별 기초의원 조회
@@ -17,15 +18,15 @@ export function registerLocalCouncilRoutes(app: Express) {
       if (!cityProvince || cityProvince === '전체 지역' || cityProvince === '전체') {
         const members = await storage.getPoliticians('local', undefined, 5000);
         console.log(`✅ 전체 기초의원 ${members.length}명 조회 완료 (필터 없음)`);
-        return res.json(members);
+        return sendSuccess(res, members);
       }
 
       const members = await storage.getLocalCouncilMembers(cityProvince, district);
       console.log(`✅ 기초의원 ${members.length}명 조회 완료`);
-      res.json(members);
+      return sendSuccess(res, members);
     } catch (error) {
       console.error("❌ 기초의원 조회 오류:", error);
-      res.status(500).json({ error: "기초의원 데이터 조회 중 오류가 발생했습니다." });
+      return sendError(res, 500, "기초의원 데이터 조회 중 오류가 발생했습니다.");
     }
   });
 
@@ -61,10 +62,10 @@ export function registerLocalCouncilRoutes(app: Express) {
         imageUrl: m.profileImage
       }));
 
-      res.json(mappedMembers);
+      return sendSuccess(res, mappedMembers);
     } catch (error) {
       console.error("❌ 기초의원 검색 오류:", error);
-      res.status(500).json({ error: "기초의원 검색 중 오류가 발생했습니다." });
+      return sendError(res, 500, "기초의원 검색 중 오류가 발생했습니다.");
     }
   });
 
@@ -72,12 +73,12 @@ export function registerLocalCouncilRoutes(app: Express) {
   app.get("/api/local-council/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+      if (isNaN(id)) return sendError(res, 400, "Invalid ID");
 
       const member = await storage.getPolitician(id, 'local');
 
       if (!member) {
-        return res.status(404).json({ error: "기초의원을 찾을 수 없습니다." });
+        return sendError(res, 404, "기초의원을 찾을 수 없습니다.");
       }
 
       // Map fields for frontend compatibility
@@ -91,10 +92,10 @@ export function registerLocalCouncilRoutes(app: Express) {
         // wait, I don't see phone in schema.
       };
 
-      res.json(response);
+      return sendSuccess(res, response);
     } catch (error) {
       console.error("❌ 기초의원 상세 조회 오류:", error);
-      res.status(500).json({ error: "기초의원 상세 정보 조회 중 오류가 발생했습니다." });
+      return sendError(res, 500, "기초의원 상세 정보 조회 중 오류가 발생했습니다.");
     }
   });
 
@@ -133,10 +134,10 @@ export function registerLocalCouncilRoutes(app: Express) {
         }))
         .sort((a, b) => b.count - a.count);
 
-      res.json(result);
+      return sendSuccess(res, result);
     } catch (error) {
       console.error("❌ 기초의원 정당별 통계 오류:", error);
-      res.status(500).json({ error: "정당별 통계 조회 중 오류가 발생했습니다." });
+      return sendError(res, 500, "정당별 통계 조회 중 오류가 발생했습니다.");
     }
   });
 
@@ -184,10 +185,10 @@ export function registerLocalCouncilRoutes(app: Express) {
           return (a.district || "").localeCompare(b.district || "");
         });
 
-      res.json(result);
+      return sendSuccess(res, result);
     } catch (error) {
       console.error("❌ 기초의원 지역별 통계 오류:", error);
-      res.status(500).json({ error: "지역별 통계 조회 중 오류가 발생했습니다." });
+      return sendError(res, 500, "지역별 통계 조회 중 오류가 발생했습니다.");
     }
   });
 }

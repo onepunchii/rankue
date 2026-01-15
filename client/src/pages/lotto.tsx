@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,18 +29,21 @@ export default function LottoPage() {
 
     // Queries
     const { data: lotteryHistory = [] } = useQuery<any[]>({
-        queryKey: ['/api/lottery/history'],
+        queryKey: [queryKeys.LOTTERY_HISTORY],
+        queryFn: () => apiRequest(queryKeys.LOTTERY_HISTORY),
         refetchInterval: 60000
     });
 
     const { data: todayDraw } = useQuery<any>({
-        queryKey: ['/api/lottery/today-draw'],
+        queryKey: [queryKeys.LOTTERY_TODAY_DRAW],
+        queryFn: () => apiRequest(queryKeys.LOTTERY_TODAY_DRAW),
         refetchInterval: 60000
     });
 
     const { data: myTickets = [] } = useQuery<any[]>({
-        queryKey: ['/api/lottery/tickets'],
-        enabled: !!user
+        queryKey: [queryKeys.LOTTERY_TICKETS],
+        queryFn: () => apiRequest(queryKeys.LOTTERY_TICKETS),
+        enabled: !!user && !user.isGuest
     });
 
     // Derived Data
@@ -110,7 +114,7 @@ export default function LottoPage() {
     };
 
     const handleCreateTicket = async () => {
-        if (!user) {
+        if (!user || user.isGuest) {
             toast({ title: "로그인이 필요합니다", variant: "destructive" });
             return;
         }
@@ -125,60 +129,17 @@ export default function LottoPage() {
 
         setIsCreating(true);
         try {
-            let token: string | null = null;
-            try {
-                // validation
-                const { data } = await Promise.race([
-                    supabase.auth.getSession(),
-                    new Promise<{ data: any }>((_, reject) => setTimeout(() => reject(new Error("Token limit")), 2000))
-                ]);
-                token = data?.session?.access_token || null;
-            } catch (e) {
-                console.log("Token fetch error, trying local", e);
-            }
-
-            if (!token) {
-                // Fallback to local storage
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && key.startsWith('sb-') && key.includes('auth-token')) {
-                        try {
-                            const sessionData = JSON.parse(localStorage.getItem(key) || '{}');
-                            token = sessionData.access_token;
-                            if (token) break;
-                        } catch (e) { }
-                    }
-                }
-            }
-
-            if (!token) throw new Error("로그인 세션을 찾을 수 없습니다.");
-
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-            const res = await fetch("/api/lottery/create-ticket", {
+            await apiRequest(queryKeys.LOTTERY_CREATE_TICKET, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
+                body: {
                     roundId,
                     numbers: selectedNumbers
-                }),
-                signal: controller.signal
-            }).finally(() => clearTimeout(timeoutId));
-
-            if (!res.ok) {
-                const text = await res.text();
-                throw new Error(text || `Server Error: ${res.status}`);
-            }
-
-            const json = await res.json();
+                },
+            });
 
             // Success
-            queryClient.invalidateQueries({ queryKey: ['/api/lottery/tickets'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+            queryClient.invalidateQueries({ queryKey: [queryKeys.LOTTERY_TICKETS] });
+            queryClient.invalidateQueries({ queryKey: [queryKeys.AUTH_USER] });
             if (refreshUser) refreshUser();
 
             setShowSuccessModal(true);
@@ -187,11 +148,7 @@ export default function LottoPage() {
 
         } catch (error: any) {
             console.error("Ticket creation failed", error);
-            if (error.name === 'AbortError') {
-                toast({ title: "응답 지연", description: "서버 응답이 늦어지고 있습니다. 잠시 후 다시 시도해주세요.", variant: "destructive" });
-            } else {
-                toast({ title: "생성 실패", description: error.message || "오류가 발생했습니다.", variant: "destructive" });
-            }
+            toast({ title: "생성 실패", description: error.message || "오류가 발생했습니다.", variant: "destructive" });
         } finally {
             setIsCreating(false);
         }

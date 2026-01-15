@@ -352,4 +352,52 @@ export class PoliticsStorage {
         }
         return { filtered, content: filteredContent };
     }
+
+    // Political Stats & Trends
+    async getLatestPoliticalStats(): Promise<any> {
+        const { data, error } = await supabaseAdmin
+            .from('political_stats')
+            .select('*')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (error) throw error;
+        return toCamelCase(data);
+    }
+
+    async getWeeklyTrends(limit = 10): Promise<any[]> {
+        const { data, error } = await supabaseAdmin
+            .from('political_stats')
+            .select('*')
+            .order('updated_at', { ascending: false })
+            .limit(limit);
+        if (error) throw error;
+        // Return in chronological order for charts
+        return (data || []).reverse().map(toCamelCase);
+    }
+
+    async getPoliticalSurveys(): Promise<{ currentSurveys: any[], pastSurveys: any[] }> {
+        const now = new Date().toISOString();
+
+        const { data: currentSurveys, error: err1 } = await supabaseAdmin
+            .from('surveys')
+            .select('*')
+            .eq('category', 'politics')
+            .or(`voting_end_date.is.null,voting_end_date.gte.${now}`)
+            .order('created_at', { ascending: false });
+
+        const { data: pastSurveys, error: err2 } = await supabaseAdmin
+            .from('surveys')
+            .select('*')
+            .eq('category', 'politics')
+            .lt('voting_end_date', now)
+            .order('created_at', { ascending: false });
+
+        if (err1 || err2) throw (err1 || err2);
+
+        return {
+            currentSurveys: (currentSurveys || []).map(toCamelCase),
+            pastSurveys: (pastSurveys || []).map(toCamelCase)
+        };
+    }
 }

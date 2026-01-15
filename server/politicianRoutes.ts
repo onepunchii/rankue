@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { storage } from "./storage.js";
-import { requireAuth, type AuthUser } from "./simpleAuth.js";
+import { requireAuth } from "./auth.js";
+import { type AuthUser } from "./services/authService.js";
 import { db } from "./db.js";
 import {
   insertAssemblyRatingSchema,
@@ -11,6 +12,8 @@ import {
 } from "../shared/schema.js";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import { sendSuccess, sendError } from "./utils/response.js";
+import { generatePoliticianPersona } from "./ai.js";
 
 // Extend Express Request type to include user
 declare global {
@@ -30,7 +33,7 @@ router.get("/politicians/:type/:id/ratings", async (req, res) => {
     const politicianId = parseInt(id);
 
     if (!politicianId || (type !== 'assembly' && type !== 'local_council' && type !== 'national' && type !== 'local')) {
-      return res.status(400).json({ error: "Invalid politician type or ID" });
+      return sendError(res, 400, "Invalid politician type or ID");
     }
 
     // Normalize type
@@ -44,10 +47,10 @@ router.get("/politicians/:type/:id/ratings", async (req, res) => {
       userRating = await storage.getUserPoliticianRating(req.user.id, politicianId, normalizedType);
     }
 
-    res.json({ averageRatings, userRating });
+    return sendSuccess(res, { averageRatings, userRating });
   } catch (error) {
     console.error("Error fetching politician ratings:", error);
-    res.status(500).json({ error: "Failed to fetch ratings" });
+    return sendError(res, 500, "Failed to fetch ratings");
   }
 });
 
@@ -55,14 +58,14 @@ router.get("/politicians/:type/:id/ratings", async (req, res) => {
 router.post("/politicians/:type/:id/ratings", requireAuth, async (req, res) => {
   try {
     if (!req.user?.isVerified) {
-      return res.status(401).json({ error: "본인인증을 완료한 회원만 평가할 수 있습니다." });
+      return sendError(res, 401, "본인인증을 완료한 회원만 평가할 수 있습니다.", "UNVERIFIED");
     }
 
     const { type, id } = req.params;
     const politicianId = parseInt(id);
 
     if (!politicianId || (type !== 'assembly' && type !== 'local_council' && type !== 'local' && type !== 'national')) {
-      return res.status(400).json({ error: "Invalid politician type or ID" });
+      return sendError(res, 400, "Invalid politician type or ID");
     }
 
     const normalizedType = (type === 'assembly' || type === 'national') ? 'assembly' : 'local';
@@ -96,49 +99,6 @@ router.post("/politicians/:type/:id/ratings", requireAuth, async (req, res) => {
       validatedData = insertLocalCouncilRatingSchema.parse(bodyWithIds);
     }
 
-    // Region check removed as per user request (anyone can rate)
-    /*
-    // Check if user is rating their local representative
-    const userLocation = {
-      cityProvince: req.user!.cityProvince,
-      district: req.user!.district,
-    };
-
-    if (!userLocation.cityProvince || !userLocation.district) {
-      return res.status(403).json({ error: "프로필에서 지역 정보를 먼저 설정해주세요." });
-    }
-
-    // Verify politician is from user's district
-    let isLocalRepresentative = false;
-
-    if (normalizedType === 'assembly') {
-      const member = await storage.getPolitician(politicianId, 'assembly');
-      if (member) {
-        // Check if member represents user's district
-        const normalizedUserLocation = `${userLocation.cityProvince} ${userLocation.district} `.replace(/특별시|광역시|특별자치시|도$/g, '').trim();
-        const normalizedConstituency = (member.constituency || '').replace(/특별시|광역시|특별자치시|도$/g, '').trim();
-        isLocalRepresentative = normalizedConstituency.includes(normalizedUserLocation) ||
-          normalizedUserLocation.includes(normalizedConstituency);
-      }
-    } else {
-      const members = await db
-        .select()
-        .from(localCouncilMembers)
-        .where(
-          and(
-            eq(localCouncilMembers.cityProvince, userLocation.cityProvince),
-            eq(localCouncilMembers.district, userLocation.district),
-            eq(localCouncilMembers.isActive, true)
-          )
-        );
-      isLocalRepresentative = members.some((m: any) => m.id === politicianId);
-    }
-
-    if (!isLocalRepresentative) {
-      return res.status(403).json({ error: "내 지역구 대표만 평가할 수 있습니다." });
-    }
-    */
-
     // Call storage
     const rating = await storage.createOrUpdatePoliticianRating(
       req.user!.id,
@@ -153,10 +113,10 @@ router.post("/politicians/:type/:id/ratings", requireAuth, async (req, res) => {
         localDevRating: validatedData.localDevRating
       }
     );
-    res.json(rating);
+    return sendSuccess(res, rating);
   } catch (error) {
     console.error("Error creating/updating rating:", error);
-    res.status(500).json({ error: "Failed to save rating" });
+    return sendError(res, 500, "Failed to save rating");
   }
 });
 
@@ -169,15 +129,15 @@ router.get("/politicians/:type/:id/comments", async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
 
     if (!politicianId) {
-      return res.status(400).json({ error: "Invalid politician ID" });
+      return sendError(res, 400, "Invalid politician ID");
     }
     const normalizedType = (type === 'local_council' || type === 'local') ? 'local' : 'assembly';
 
     const comments = await storage.getPoliticianComments(politicianId, normalizedType, limit, offset);
-    res.json(comments);
+    return sendSuccess(res, comments);
   } catch (error) {
     console.error("Error fetching comments:", error);
-    res.status(500).json({ error: "Failed to fetch comments" });
+    return sendError(res, 500, "Failed to fetch comments");
   }
 });
 
@@ -185,14 +145,14 @@ router.get("/politicians/:type/:id/comments", async (req, res) => {
 router.post("/politicians/:type/:id/comments", requireAuth, async (req, res) => {
   try {
     if (!req.user?.isVerified) {
-      return res.status(401).json({ error: "본인인증을 완료한 회원만 댓글을 작성할 수 있습니다." });
+      return sendError(res, 401, "본인인증을 완료한 회원만 댓글을 작성할 수 있습니다.", "UNVERIFIED");
     }
 
     const { type, id } = req.params;
     const politicianId = parseInt(id);
 
     if (!politicianId) {
-      return res.status(400).json({ error: "Invalid politician ID" });
+      return sendError(res, 400, "Invalid politician ID");
     }
     const normalizedType = (type === 'local_council' || type === 'local') ? 'local' : 'assembly';
 
@@ -204,54 +164,11 @@ router.post("/politicians/:type/:id/comments", requireAuth, async (req, res) => 
       insertLocalCouncilCommentSchema.parse(bodyWithIds);
     }
 
-    // Check if user is commenting on their local representative
-    /*
-    const userLocation = {
-      cityProvince: req.user!.cityProvince,
-      district: req.user!.district,
-    };
-
-    if (!userLocation.cityProvince || !userLocation.district) {
-      return res.status(403).json({ error: "프로필에서 지역 정보를 먼저 설정해주세요." });
-    }
-
-    // Verify politician is from user's district
-    let isLocalRepresentative = false;
-    if (normalizedType === 'assembly') {
-      const member = await storage.getPolitician(politicianId, 'assembly');
-      if (member) {
-        const normalizedUserLocation = `${userLocation.cityProvince} ${userLocation.district} `.replace(/특별시|광역시|특별자치시|도$/g, '').trim();
-        const normalizedConstituency = (member.constituency || '').replace(/특별시|광역시|특별자치시|도$/g, '').trim();
-        isLocalRepresentative = normalizedConstituency.includes(normalizedUserLocation) ||
-          normalizedUserLocation.includes(normalizedConstituency);
-      }
-    } else {
-      // Only verifying region match for local council for now to save DB call if needed, 
-      // but strictly we should check ID existence in region.
-      // Reusing previous logic:
-      const members = await db
-        .select()
-        .from(localCouncilMembers)
-        .where(
-          and(
-            eq(localCouncilMembers.cityProvince, userLocation.cityProvince),
-            eq(localCouncilMembers.district, userLocation.district),
-            eq(localCouncilMembers.isActive, true)
-          )
-        );
-      isLocalRepresentative = members.some((m: any) => m.id === politicianId);
-    }
-
-    if (!isLocalRepresentative) {
-      return res.status(403).json({ error: "내 지역구 대표에게만 댓글을 작성할 수 있습니다." });
-    }
-    */
-
     const comment = await storage.createPoliticianComment(req.user!.id, politicianId, normalizedType, req.body.content);
-    res.json(comment);
+    return sendSuccess(res, comment);
   } catch (error) {
     console.error("Error creating comment:", error);
-    res.status(500).json({ error: "Failed to create comment" });
+    return sendError(res, 500, "Failed to create comment");
   }
 });
 
@@ -260,20 +177,20 @@ router.post("/politicians/:type/:id/comments", requireAuth, async (req, res) => 
 router.post("/comments/:type/:id/like", requireAuth, async (req, res) => {
   try {
     if (!req.user?.isVerified) {
-      return res.status(401).json({ error: "본인인증을 완료한 회원만 이용 가능합니다." });
+      return sendError(res, 401, "본인인증을 완료한 회원만 이용 가능합니다.", "UNVERIFIED");
     }
     const { type, id } = req.params;
     const commentId = parseInt(id);
     if (!commentId) {
-      return res.status(400).json({ error: "Invalid comment ID" });
+      return sendError(res, 400, "Invalid comment ID");
     }
     const normalizedType = (type === 'local_council' || type === 'local') ? 'local' : 'assembly';
 
     const liked = await storage.toggleCommentLike(req.user!.id, commentId, normalizedType);
-    res.json({ liked });
+    return sendSuccess(res, { liked });
   } catch (error) {
     console.error("Error toggling like:", error);
-    res.status(500).json({ error: "Failed to toggle like" });
+    return sendError(res, 500, "Failed to toggle like");
   }
 });
 
@@ -283,28 +200,26 @@ router.post("/comments/:type/:id/report", async (req, res) => {
     const { type, id } = req.params;
     const commentId = parseInt(id);
     if (!commentId) {
-      return res.status(400).json({ error: "Invalid comment ID" });
+      return sendError(res, 400, "Invalid comment ID");
     }
     const normalizedType = (type === 'local_council' || type === 'local') ? 'local' : 'assembly';
 
     await storage.reportComment(commentId, normalizedType);
-    res.json({ success: true });
+    return sendSuccess(res, { success: true });
   } catch (error) {
     console.error("Error reporting comment:", error);
-    res.status(500).json({ error: "Failed to report comment" });
+    return sendError(res, 500, "Failed to report comment");
   }
 });
 
 // Political Persona Generation (Strict Type Version)
-import { generatePoliticianPersona } from "./ai.js";
-
 router.get("/politicians/:type/:id/persona", async (req, res) => {
   try {
     const { type, id } = req.params;
     const politicianId = parseInt(id);
 
     if (!politicianId || (type !== 'assembly' && type !== 'local_council' && type !== 'national' && type !== 'local')) {
-      return res.status(400).json({ error: "Invalid politician type or ID" });
+      return sendError(res, 400, "Invalid politician type or ID");
     }
 
     const normalizedType = (type === 'assembly' || type === 'national') ? 'assembly' : 'local';
@@ -313,7 +228,7 @@ router.get("/politicians/:type/:id/persona", async (req, res) => {
 
     const politician = await storage.getPolitician(politicianId, normalizedType);
     if (!politician) {
-      return res.status(404).json({ message: "Politician not found" });
+      return sendError(res, 404, "Politician not found");
     }
 
     if (politician.aiPersona) {
@@ -322,7 +237,7 @@ router.get("/politicians/:type/:id/persona", async (req, res) => {
       if (politician.aiPersona.type !== (normalizedType === 'assembly' ? 'national' : 'local')) {
         console.warn("⚠️ Cached persona type mismatch. Regenerating...");
       } else {
-        return res.json(politician.aiPersona);
+        return sendSuccess(res, politician.aiPersona);
       }
     }
 
@@ -339,10 +254,10 @@ router.get("/politicians/:type/:id/persona", async (req, res) => {
       console.error("⚠️ Error saving persona to DB (non-fatal):", saveError);
     }
 
-    res.json(persona);
+    return sendSuccess(res, persona);
   } catch (error) {
     console.error("Error generating persona route:", error);
-    res.status(500).json({ message: "Failed to generate politician persona" });
+    return sendError(res, 500, "Failed to generate politician persona");
   }
 });
 

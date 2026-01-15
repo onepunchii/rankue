@@ -77,7 +77,7 @@ export default function Category() {
   });
 
   // 사용자 참여 정보 조회
-  const { data: userParticipations = [] } = useQuery({
+  const { data: userParticipations = [] } = useQuery<any[]>({
     queryKey: ["/api/user/participations"],
   });
 
@@ -201,7 +201,7 @@ export default function Category() {
         <div className="max-w-md mx-auto flex items-center justify-between">
           <Button
             variant="ghost"
-            onClick={() => setLocation('/')}
+            onClick={() => setLocation('/home')}
             className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-10 w-10 p-0"
           >
             <ArrowLeft className="h-5 w-5" />

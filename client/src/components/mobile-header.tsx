@@ -20,13 +20,13 @@ export default function MobileHeader({ showBack = false }: { showBack?: boolean 
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setLocation('/')}
+              onClick={() => setLocation('/home')}
               className="w-10 h-10 p-0 text-white/40 hover:text-white hover:bg-white/5 rounded-2xl transition-all"
             >
               <ArrowLeft className="h-6 w-6" />
             </Button>
           ) : (
-            <div className="flex items-center cursor-pointer" onClick={() => window.location.href = '/'}>
+            <div className="flex items-center cursor-pointer" onClick={() => setLocation('/home')}>
               <Shuffle
                 text="POLLI"
                 className="text-2xl font-black text-primary tracking-tighter"
