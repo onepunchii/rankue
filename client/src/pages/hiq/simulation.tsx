@@ -1,0 +1,686 @@
+import { useEffect, useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown, LucideRefreshCw, LucidePlay, Sparkles, Zap, Target } from "lucide-react";
+import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { Card } from "@/components/ui/card";
+import { PhysicsEngine2D } from "@/lib/physics-engine-2d";
+import { ScoringEngine, ShotResult } from "@/lib/scoring-engine";
+import { Vector3 } from "three";
+
+type GameMode = "3c" | "4c";
+
+export default function HiqSimulation() {
+    const { toast } = useToast();
+    const [, setLocation] = useLocation();
+    const sceneRef = useRef<HTMLDivElement>(null);
+    const engineRef = useRef<PhysicsEngine2D | null>(null);
+    const [dpr, setDpr] = useState(1);
+
+    // --- Core State ---
+    const [activeMode, setActiveMode] = useState<"setup" | "result">("setup");
+    const [activeBall, setActiveBall] = useState<"white" | "yellow" | "red">("white");
+    const [gameMode] = useState<GameMode>("4c");
+    const [isSimulating, setIsSimulating] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [showGrid, setShowGrid] = useState(false);
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    interface BallPos { x: number; y: number }
+    const [userPositions, setUserPositions] = useState({
+        white: { x: 100, y: 125 },
+        yellow: { x: 400, y: 125 },
+        red: { x: 250, y: 60 }
+    });
+
+    // Screen positions for Premium Rendering (Layer 5)
+    const [ballPositions, setBallPositions] = useState<Record<string, BallPos>>({
+        white: { x: -100, y: -100 },
+        yellow: { x: -100, y: -100 },
+        red: { x: -100, y: -100 }
+    });
+
+    const [simulationData, setSimulationData] = useState<any | null>(null);
+    const [recommendedSolutions, setRecommendedSolutions] = useState<any[]>([]);
+    const [activeSolutionIndex, setActiveSolutionIndex] = useState(0);
+    const [cueStick, setCueStick] = useState({ show: false, x: 0, y: 0, angle: 0, offset: 40 });
+    const [isShaking, setIsShaking] = useState(false);
+    const [physicsPaths, setPhysicsPaths] = useState<Record<string, any[]>>({});
+    const [pointsEarned, setPointsEarned] = useState<number | null>(null);
+
+    // Indirect Control State
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragCurrent, setDragCurrent] = useState<{ x: number, y: number } | null>(null);
+
+    // --- Physics Engine Initialization ---
+    useEffect(() => {
+        if (!engineRef.current) {
+            engineRef.current = new PhysicsEngine2D([]);
+        }
+    }, []);
+
+    const initWorld = useCallback(() => {
+        if (!sceneRef.current) return;
+        const layoutW = sceneRef.current.clientWidth;
+        const layoutH = layoutW / 1.7399;
+        setDimensions({ width: layoutW, height: layoutH });
+    }, []);
+
+    // Handle initial positioning and sync
+    useEffect(() => {
+        if (!sceneRef.current || dimensions.width === 0) return;
+
+        const hPadding = dimensions.width * 0.054;
+        const vPadding = dimensions.height * 0.112;
+        const playW = dimensions.width * 0.892;
+        const playH = dimensions.height * 0.776;
+        const ballRadius = playW / 96.0;
+
+        const mapX = (x: number) => hPadding + ballRadius + (x / 500) * (playW - 2 * ballRadius);
+        const mapY = (y: number) => vPadding + ballRadius + (y / 250) * (playH - 2 * ballRadius);
+
+        const newPos = {
+            white: { x: mapX(userPositions.white.x), y: mapY(userPositions.white.y) },
+            yellow: { x: mapX(userPositions.yellow.x), y: mapY(userPositions.yellow.y) },
+            red: { x: mapX(userPositions.red.x), y: mapY(userPositions.red.y) }
+        };
+
+        // Immediate sync for Layer 5 rendering (Fixes crosshair drift)
+        if (activeMode === "setup") {
+            setBallPositions(newPos);
+        }
+    }, [userPositions, dimensions, activeMode]);
+
+    // --- Lifecycle ---
+    useEffect(() => {
+        initWorld();
+        window.addEventListener('resize', initWorld);
+        return () => window.removeEventListener('resize', initWorld);
+    }, [initWorld]);
+
+    // --- Logic ---
+    const runAISolution = async () => {
+        if (isAnalyzing || !engineRef.current) return;
+        setIsAnalyzing(true);
+        try {
+            // Map 0-500 scale to meters for search
+            const TABLE_W = 1.422;
+            const TABLE_H = 2.844;
+            const ballPositionsInMeters: any = {};
+            Object.entries(userPositions).forEach(([id, pos]) => {
+                ballPositionsInMeters[id] = {
+                    x: (pos.x / 500) * TABLE_W,
+                    y: (pos.y / 250) * TABLE_H
+                };
+            });
+
+            const solutions = await apiRequest("/api/hiq/ai-solutions", {
+                method: "POST",
+                body: {
+                    gameType: gameMode,
+                    ballPositions: ballPositionsInMeters
+                }
+            });
+
+            if (solutions && solutions.length > 0) {
+                setRecommendedSolutions(solutions);
+                selectSolution(solutions[0], 0);
+            } else {
+                toast({ title: "조회 결과 없음", description: "현재 배치와 매칭되는 실제 게임 데이터가 없습니다." });
+            }
+        } catch (e) {
+            console.error("AISolution Error:", e);
+            toast({ title: "검색 실패", description: "데이터베이스 연결 오류" });
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const selectSolution = (shot: any, index: number) => {
+        setSimulationData(shot);
+        setActiveSolutionIndex(index);
+        setActiveMode("result");
+
+        if (engineRef.current) {
+            // Dry Run Trajectory using Unified Physics
+            engineRef.current.initFromPositions(shot.ballPositions);
+
+            const { angle, power, spinX, spinY } = shot.shotParams;
+            const shotSpeed = power * 0.1;
+
+            const TABLE_W = 1.422;
+            const TABLE_H = 2.844;
+
+            const trajectory = engineRef.current.projectTrajectory('white', shotSpeed, angle + Math.PI, spinX, spinY);
+
+            // Map trajectory back to 0-500 scale for UI Path drawing
+            const mappedPaths: Record<string, any[]> = {};
+            Object.entries(trajectory).forEach(([id, path]) => {
+                mappedPaths[id] = path.map(p => ({
+                    x: (p.x / TABLE_W) * 500,
+                    y: (p.y / TABLE_H) * 250
+                }));
+            });
+
+            setPhysicsPaths(mappedPaths);
+        }
+    };
+
+    const runReplay = useCallback(async (data?: any) => {
+        const sol = data || simulationData;
+        if (!engineRef.current || isSimulating || !sol) return;
+
+        setIsSimulating(true);
+
+        const hPadding = dimensions.width * 0.054;
+        const vPadding = dimensions.height * 0.112;
+        const playW = dimensions.width * 0.892;
+        const playH = dimensions.height * 0.776;
+        const ballRadius = playW / 96.0;
+
+        const mapX = (x: number) => hPadding + ballRadius + (x / 500) * (playW - 2 * ballRadius);
+        const mapY = (y: number) => vPadding + ballRadius + (y / 250) * (playH - 2 * ballRadius);
+
+        const TABLE_W = 1.422;
+        const TABLE_H = 2.844;
+
+        // 1. Initialize Engine with recorded positions
+        engineRef.current.initFromPositions(sol.ballPositions);
+
+        // 2. Animate Cue Stick
+        const { angle, power, spinX, spinY } = sol.shotParams;
+        const whitePos = sol.ballPositions.white;
+        const startVisualX = mapX((whitePos.x / TABLE_W) * 500);
+        const startVisualY = mapY((whitePos.y / TABLE_H) * 250);
+
+        let sequenceStart = performance.now();
+        const sequenceStep = () => {
+            const elapsed = performance.now() - sequenceStart;
+            if (elapsed < 300) {
+                const progress = elapsed / 300;
+                const swing = Math.sin(progress * Math.PI) * 40;
+                setCueStick({ show: true, x: startVisualX, y: startVisualY, angle: angle + Math.PI, offset: 15 + swing });
+                requestAnimationFrame(sequenceStep);
+            } else {
+                setCueStick(prev => ({ ...prev, show: false }));
+                setIsShaking(true);
+                setTimeout(() => setIsShaking(false), 80);
+
+                // 3. Real Physical Simulation Starts
+                const shotSpeed = power * 0.1;
+                engineRef.current!.shoot('white', shotSpeed, angle + Math.PI, spinX, spinY);
+
+                let lastReplayTime = performance.now();
+                const replayFrame = () => {
+                    const now = performance.now();
+                    const dt = Math.min((now - lastReplayTime) / 1000, 0.1);
+                    lastReplayTime = now;
+
+                    if (engineRef.current) {
+                        engineRef.current.update(dt);
+
+                        // Sync UI ball positions
+                        const currentBalls = engineRef.current.getBalls();
+                        const updateUI: Record<string, { x: number, y: number }> = {};
+                        currentBalls.forEach(b => {
+                            updateUI[b.id] = {
+                                x: mapX((b.pos.x / TABLE_W) * 500),
+                                y: mapY((b.pos.y / TABLE_H) * 250)
+                            };
+                        });
+                        setBallPositions(updateUI);
+
+                        if (engineRef.current.isAllStationary()) {
+                            setIsSimulating(false);
+                            setPointsEarned(ScoringEngine.calculatePoints({
+                                cushionCount: sol.cushionCount || 0,
+                                travelDistance: 1000,
+                                isSuccess: true,
+                                precisionError: 0,
+                                spinComplexity: 0.5
+                            } as ShotResult));
+                        } else {
+                            requestAnimationFrame(replayFrame);
+                        }
+                    }
+                };
+                requestAnimationFrame(replayFrame);
+            }
+        };
+        requestAnimationFrame(sequenceStep);
+
+    }, [dimensions, isSimulating, simulationData]);
+
+    // --- Drag Interaction ---
+    const handleDrag = useCallback((clientX: number, clientY: number) => {
+        if (!isDragging || activeMode !== "setup" || !dragCurrent) return;
+
+        const sensitivity = 0.5;
+        const dx = (clientX - dragCurrent.x) * sensitivity;
+        const dy = (clientY - dragCurrent.y) * sensitivity;
+
+        setUserPositions(prev => ({
+            ...prev,
+            [activeBall]: {
+                x: Math.min(500, Math.max(0, prev[activeBall].x + dx)),
+                y: Math.min(250, Math.max(0, prev[activeBall].y + dy))
+            }
+        }));
+        setDragCurrent({ x: clientX, y: clientY });
+    }, [isDragging, activeMode, dragCurrent, activeBall]);
+
+    return (
+        <div
+            className="fixed inset-0 bg-[#0F0F0F] flex flex-col font-sans overflow-hidden select-none"
+            onMouseMove={(e) => handleDrag(e.clientX, e.clientY)}
+            onMouseUp={() => setIsDragging(false)}
+            onMouseLeave={() => setIsDragging(false)}
+            onTouchMove={(e) => {
+                const t = e.touches[0];
+                handleDrag(t.clientX, t.clientY);
+            }}
+            onTouchEnd={() => setIsDragging(false)}
+        >
+            {/* Header */}
+            <header className="h-16 flex items-center justify-between px-6 bg-white/5 border-b border-white/10 z-50">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => setLocation('/')}
+                        className="p-2 hover:bg-white/5 rounded-full"
+                        title="홈으로 돌아가기"
+                    >
+                        <ChevronDown className="w-6 h-6 rotate-90 text-white/40" />
+                    </button>
+                    <h1 className="text-white font-bold tracking-tight">HiQ AI SOLUTION</h1>
+                </div>
+                <div className="w-20" /> {/* Spacer for Title Centering */}
+            </header>
+
+            {/* Main Area */}
+            <main className="flex-1 flex flex-col p-4 items-center gap-4">
+                <motion.div
+                    animate={isShaking ? { x: [0, -2, 2, -2, 0], y: [0, 2, -2, 2, 0] } : {}}
+                    transition={{ duration: 0.1 }}
+                    className="w-full max-w-[900px] relative mt-4 shadow-2xl"
+                >
+                    {/* Cue Stick Graphic */}
+                    <AnimatePresence>
+                        {cueStick.show && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0 }}
+                                style={{
+                                    position: 'absolute',
+                                    left: cueStick.x,
+                                    top: cueStick.y,
+                                    width: dimensions.width * 0.4,
+                                    height: Math.max(4, dimensions.width * 0.008),
+                                    background: 'linear-gradient(to right, #dfbb8b 0%, #6d4c41 80%, #212121 100%)',
+                                    borderRadius: '100px',
+                                    transformOrigin: 'left center',
+                                    rotate: `${cueStick.angle * (180 / Math.PI) + 180}deg`,
+                                    x: cueStick.offset,
+                                    zIndex: 45,
+                                    boxShadow: '0 8px 20px rgba(0,0,0,0.6)',
+                                    pointerEvents: 'none',
+                                    border: '1px solid rgba(0,0,0,0.2)'
+                                }}
+                            >
+                                {/* Cue Tip Detail */}
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[10%] h-[120%] bg-blue-400 rounded-sm opacity-80 blur-[1px]" />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                    {/* Layer 1: Base Frame (Removed Grey Background) */}
+                    <div className="absolute inset-0 bg-transparent" />
+
+                    {/* Layer 2: Playing Cloth (Premium Felt with Vignette & Texture) */}
+                    <div
+                        className="absolute overflow-hidden"
+                        style={{
+                            left: dimensions.width * 0.054,
+                            top: dimensions.height * 0.112,
+                            width: dimensions.width * 0.892,
+                            height: dimensions.height * 0.776,
+                            background: 'radial-gradient(circle, #2E7D32 0%, #1B5E20 70%, #0A3311 100%)'
+                        }}
+                    >
+                        {/* Fine Cloth Texture Overlay */}
+                        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
+                    </div>
+
+                    {/* Layer 3: Canvas (Matter.js Rendering / Balls) */}
+                    <div ref={sceneRef} className="relative w-full aspect-[1.7399/1] overflow-hidden" />
+
+                    {/* Layer 4: The Blueprint Overlay (With 2.5% Squash) */}
+                    <img
+                        src="/assets/images/당구대.png"
+                        alt="Billiard Table Blueprint"
+                        className="absolute w-full pointer-events-none object-fill"
+                        style={{ height: '97.5%', top: '1.25%', left: 0 }}
+                    />
+
+                    {/* Optional Grid Overlay */}
+                    {showGrid && (
+                        <div
+                            className="absolute pointer-events-none border border-white/10 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:12.5%_25%]"
+                            style={{
+                                left: dimensions.width * 0.054,
+                                top: dimensions.height * 0.112,
+                                width: dimensions.width * 0.892,
+                                height: dimensions.height * 0.776
+                            }}
+                        />
+                    )}
+
+                    {/* Crosshair Overlay (Above Balls for absolute precision) */}
+                    {activeMode === "setup" && dimensions.width > 0 && (
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none z-30">
+                            {(() => {
+                                const hPadding = dimensions.width * 0.054;
+                                const vPadding = dimensions.height * 0.112;
+                                const playW = dimensions.width * 0.892;
+                                const playH = dimensions.height * 0.776;
+                                const br = playW / 96.0;
+
+                                const cx = hPadding + br + (userPositions[activeBall].x / 500) * (playW - 2 * br);
+                                const cy = vPadding + br + (userPositions[activeBall].y / 250) * (playH - 2 * br);
+
+                                return (
+                                    <>
+                                        <line
+                                            x1={cx} y1={vPadding} x2={cx} y2={dimensions.height - vPadding}
+                                            stroke="#FF0000" strokeWidth="1" strokeOpacity="0.8"
+                                        />
+                                        <line
+                                            x1={hPadding} y1={cy} x2={dimensions.width - hPadding} y2={cy}
+                                            stroke="#FF0000" strokeWidth="1" strokeOpacity="0.8"
+                                        />
+                                    </>
+                                );
+                            })()}
+                        </svg>
+                    )}
+
+                    {/* Layer 4: Trajectory Layer (Path visualization) */}
+                    {activeMode === "result" && simulationData && dimensions.width > 0 && (
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none z-[15]">
+                            {(() => {
+                                const hPadding = dimensions.width * 0.054;
+                                const vPadding = dimensions.height * 0.112;
+                                const playW = dimensions.width * 0.892;
+                                const playH = dimensions.height * 0.776;
+                                const ballRadius = playW / 96.0;
+
+                                const mapX = (x: number) => hPadding + ballRadius + (x / 500) * (playW - 2 * ballRadius);
+                                const mapY = (y: number) => vPadding + ballRadius + (y / 250) * (playH - 2 * ballRadius);
+
+                                return Object.entries(physicsPaths).map(([color, frames]) => {
+                                    if (!frames || frames.length < 2) return null;
+                                    const isTarget = color === 'white';
+                                    const strokeColor = color === 'white' ? '#FFFFFF' : color === 'yellow' ? '#FFD54F' : '#EF5350';
+
+                                    const pathD = frames.map((p, i) => `${i === 0 ? 'M' : 'L'} ${mapX(p.x)} ${mapY(p.y)}`).join(' ');
+
+                                    return (
+                                        <g key={color}>
+                                            <motion.path
+                                                d={pathD}
+                                                fill="none"
+                                                stroke={strokeColor}
+                                                strokeWidth={isTarget ? 2 : 1.5}
+                                                strokeOpacity={isTarget ? 0.6 : 0.2}
+                                                initial={{ pathLength: 0 }}
+                                                animate={{ pathLength: 1 }}
+                                                transition={{ duration: 1.2, ease: "easeOut" }}
+                                                strokeDasharray={isTarget ? "none" : "4,4"}
+                                            />
+                                        </g>
+                                    );
+                                });
+                            })()}
+                        </svg>
+                    )}
+
+                    {/* Layer 5: Premium Glossy Balls Layer */}
+                    <div className="absolute inset-0 pointer-events-none z-20">
+                        {Object.entries(ballPositions).map(([color, pos]) => {
+                            const hPadding = dimensions.width * 0.054;
+                            const playW = dimensions.width * 0.892;
+                            const ballRadius = playW / 96.0;
+                            const borderW = ballRadius * 0.1; // 5% of size (10% of radius)
+
+                            // Vivid Realistic Colors
+                            const baseColors = {
+                                white: { main: '#FDFDFD', dark: '#E0E0E0' },
+                                yellow: { main: '#FFD54F', dark: '#F9A825' },
+                                red: { main: '#EF5350', dark: '#B71C1C' }
+                            };
+                            const c = baseColors[color as keyof typeof baseColors];
+
+                            return (
+                                <div
+                                    key={color}
+                                    className="absolute rounded-full shadow-lg overflow-hidden flex items-center justify-center"
+                                    style={{
+                                        left: pos.x - ballRadius,
+                                        top: pos.y - ballRadius,
+                                        width: ballRadius * 2,
+                                        height: ballRadius * 2,
+                                        boxSizing: 'border-box',
+                                        border: `${borderW}px solid #111111`,
+                                        background: `radial-gradient(circle at 35% 35%, ${c.main} 0%, ${c.dark} 100%)`
+                                    }}
+                                >
+                                    {/* Glossy Highlight Overlay */}
+                                    <div
+                                        className="absolute inset-0 rounded-full"
+                                        style={{
+                                            background: 'radial-gradient(circle at 35% 35%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 60%)'
+                                        }}
+                                    />
+                                    {/* Active Pulse */}
+                                    {activeMode === 'setup' && activeBall === color && (
+                                        <div className="absolute inset-0 border-2 border-white/40 rounded-full animate-pulse" />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </motion.div>
+
+                {/* Touchpad Area */}
+                <div
+                    className="flex-1 w-full max-w-[900px] mt-4 relative bg-white/5 border border-white/5 overflow-hidden cursor-move touch-none"
+                    onMouseDown={(e) => {
+                        setIsDragging(true);
+                        setDragCurrent({ x: e.clientX, y: e.clientY });
+                    }}
+                    onTouchStart={(e) => {
+                        setIsDragging(true);
+                        const t = e.touches[0];
+                        setDragCurrent({ x: t.clientX, y: t.clientY });
+                    }}
+                >
+                    <AnimatePresence mode="wait">
+                        {activeMode === "setup" ? (
+                            <motion.div
+                                key="setup" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                                className="absolute inset-0 p-8 flex flex-col items-center justify-between"
+                            >
+                                <div className="flex gap-4">
+                                    {(['white', 'yellow', 'red'] as const).map(c => {
+                                        const baseColors = {
+                                            white: { main: '#FDFDFD', dark: '#E0E0E0' },
+                                            yellow: { main: '#FFD54F', dark: '#F9A825' },
+                                            red: { main: '#EF5350', dark: '#B71C1C' }
+                                        };
+                                        const colorData = baseColors[c];
+                                        const isActive = activeBall === c;
+                                        const label = c === 'white' ? '수구' : c === 'yellow' ? '1적구' : '2적구';
+
+                                        return (
+                                            <div key={c} className="flex flex-col items-center gap-3">
+                                                {/* 3D Ball Icon */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setActiveBall(c); }}
+                                                    className={`group relative w-10 h-10 rounded-full transition-all duration-300 ${isActive ? 'scale-110' : 'opacity-40 grayscale-[0.5] hover:opacity-70 hover:grayscale-0'}`}
+                                                    style={{
+                                                        background: `radial-gradient(circle at 35% 35%, ${colorData.main} 0%, ${colorData.dark} 100%)`,
+                                                        boxShadow: isActive ? '0 0 15px rgba(255,255,255,0.2)' : 'none'
+                                                    }}
+                                                >
+                                                    <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_35%_35%,rgba(255,255,255,0.4)_0%,rgba(255,255,255,0)_60%)] pointer-events-none" />
+                                                </button>
+
+                                                {/* Clean Button Label */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setActiveBall(c); }}
+                                                    className={`px-4 py-1.5 rounded-xl text-[11px] font-black transition-all duration-300 ${isActive
+                                                        ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+                                                        : 'bg-white/5 text-white/30 border border-white/5'
+                                                        }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="text-center flex flex-col items-center">
+                                    <p className="text-white/40 text-[11px] font-medium mb-3 tracking-tight">
+                                        현재 배치에서 3,000개의 족보 데이터를 기반으로<br />가장 높은 확률의 정답을 찾아냅니다.
+                                    </p>
+                                    <Button
+                                        onClick={(e) => { e.stopPropagation(); runAISolution(); }}
+                                        disabled={isAnalyzing}
+                                        className="h-16 px-16 bg-white text-black hover:bg-slate-100 rounded-3xl text-lg font-black shadow-[0_20px_40px_rgba(255,255,255,0.1)] active:scale-95 transition-all"
+                                    >
+                                        {isAnalyzing ? <LucideRefreshCw className="animate-spin w-6 h-6 mr-3" /> : <Target className="w-6 h-6 mr-3" />}
+                                        최적 공략 검색
+                                    </Button>
+                                </div>
+
+                                {/* Central Instruction Text */}
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
+                                    <p className="text-white/20 text-[11px] uppercase font-bold tracking-[0.2em] whitespace-nowrap opacity-60">
+                                        빈 공간을 드래그하여 공을 옮기세요
+                                    </p>
+                                </div>
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="result" initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }}
+                                className="absolute inset-0 bg-[#1A1A1A] p-8 flex flex-col"
+                            >
+                                <div className="flex flex-col mb-6">
+                                    <p className="text-blue-400 text-[10px] uppercase font-black tracking-[0.2em] mb-4">AI Recommended Strategies</p>
+                                    <div className="flex gap-3">
+                                        {recommendedSolutions.map((sol, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => selectSolution(sol, i)}
+                                                className={`flex-1 py-3 px-4 rounded-xl border transition-all duration-300 flex flex-col items-center justify-center gap-1 ${activeSolutionIndex === i
+                                                    ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.3)]'
+                                                    : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                                    }`}
+                                            >
+                                                <span className={`text-[10px] font-black uppercase tracking-widest ${activeSolutionIndex === i ? 'text-blue-100' : 'text-white/20'}`}>Option {i + 1}</span>
+                                                <span className={`text-[11px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-white' : 'text-white/40'}`}>
+                                                    {(!sol.title || sol.title === 'Unknown') ? '추천 공략' : sol.title}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-end mb-6">
+                                    <div className="flex-1 min-w-0 pr-4">
+                                        <h2 className="text-2xl font-black text-white tracking-tighter truncate leading-tight">
+                                            {simulationData?.title || 'AI 추천 공략'}
+                                        </h2>
+                                        <p className="text-white/40 text-[11px] mt-1 font-medium">{simulationData?.description || '해당 배치에 대한 정석 데이터 분석 결과입니다.'}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => runReplay()}
+                                            title="시뮬레이션 재생"
+                                            className="w-12 h-12 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center text-white"
+                                        >
+                                            <LucidePlay className="w-5 h-5 fill-current" />
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveMode("setup")}
+                                            title="배치 수정으로 돌아가기"
+                                            className="h-12 px-6 bg-blue-500 rounded-xl text-white font-bold whitespace-nowrap"
+                                        >
+                                            배치 수정
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4 mb-8">
+                                    <Card className="bg-black/40 border-none p-4 h-24 flex items-center justify-center">
+                                        <SpinVisualizer spin={simulationData?.solution.spin} />
+                                    </Card>
+                                    <Card className="bg-black/40 border-none p-4 h-24 col-span-2 flex items-center justify-between px-8">
+                                        <ThicknessVisualizer thickness={simulationData?.solution.thickness} />
+                                        <PowerGauge power={simulationData?.solution.power} />
+                                    </Card>
+                                </div>
+
+                                <div className="flex-1 bg-white/5 rounded-2xl p-6 border border-white/5 overflow-y-auto">
+                                    <p className="text-sm text-white/70 leading-relaxed font-medium">{simulationData?.tip || simulationData?.solution?.tip}</p>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </main>
+        </div>
+    );
+}
+
+const SpinVisualizer = ({ spin }: { spin: any }) => {
+    const x = spin ? (spin.x / 12) * 100 : 0;
+    const y = spin ? (spin.y / 12) * 100 : 0;
+    return (
+        <div className="relative w-16 h-16 rounded-full border-2 border-white/10 bg-gradient-to-br from-white/5 to-transparent flex items-center justify-center">
+            <div
+                className="absolute w-3 h-3 bg-red-600 rounded-full shadow-[0_0_10px_red]"
+                style={{ transform: `translate(${x}%, ${-y}%)` } as any}
+            />
+            <div className="text-[7px] font-black text-white/20 mt-10 tracking-widest">SPIN</div>
+        </div>
+    );
+};
+
+const ThicknessVisualizer = ({ thickness }: { thickness: number }) => (
+    <div className="flex flex-col items-center">
+        <div className="relative w-24 h-8 flex items-center">
+            <div className="absolute w-8 h-8 rounded-full border border-white/20 bg-white/5" style={{ left: 0 } as any} />
+            <div
+                className="absolute w-8 h-8 rounded-full border border-blue-500 bg-blue-500/30"
+                style={{ '--thickness-offset': `${(thickness || 0) * 32}px`, left: 'var(--thickness-offset)' } as any}
+            />
+        </div>
+        <span className="text-[7px] font-black text-white/20 mt-2 tracking-widest">THICKNESS {Math.round((thickness || 0) * 8)}/8</span>
+    </div>
+);
+
+const PowerGauge = ({ power }: { power: number }) => (
+    <div className="flex flex-col items-center">
+        <div className="flex gap-1 h-6 items-end">
+            {[1, 2, 3, 4, 5].map(i => (
+                <div
+                    key={i}
+                    className={`w-2 rounded-sm ${power >= i * 20 ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-white/5'}`}
+                    style={{ '--bar-height': `${i * 20}%`, height: 'var(--bar-height)' } as any}
+                />
+            ))}
+        </div>
+        <span className="text-[7px] font-black text-white/20 mt-2 tracking-widest uppercase">Power {power}%</span>
+    </div>
+);

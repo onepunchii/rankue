@@ -55,8 +55,8 @@ export const queryKeys = {
     POLITICAL_SURVEY_RESULTS: (id: number | string) => `/api/auth/politics-survey-results/${id}`,
 
     // Personality Analysis
-    PERSONALITY_ELIGIBILITY: "/api/auth/personality/eligibility",
-    PERSONALITY_ANALYSIS: "/api/auth/personality/analysis",
+    PERSONALITY_ELIGIBILITY: "/api/personality/eligibility",
+    PERSONALITY_ANALYSIS: "/api/personality/analysis",
 
     // Lottery
     LOTTERY_HISTORY: "/api/lottery/history",

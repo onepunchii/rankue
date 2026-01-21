@@ -1,9 +1,23 @@
+import 'dotenv/config';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "../shared/schema.js";
+import path from 'path';
+import fs from 'fs';
+
+// Debug Env Loading
+const envPath = path.resolve(process.cwd(), '.env');
+if (fs.existsSync(envPath)) {
+  console.log(`✅ .env file found at ${envPath}`);
+} else {
+  console.warn(`❌ .env file NOT found at ${envPath} (CWD: ${process.cwd()})`);
+}
 
 if (!process.env.DATABASE_URL) {
   console.warn("⚠️ DATABASE_URL is not set. The backend will not be able to connect to the database.");
+  console.log("Current Env Keys:", Object.keys(process.env).filter(k => k.includes('DB') || k.includes('SUPABASE')));
+} else {
+  console.log("✅ DATABASE_URL is set (starting with):", process.env.DATABASE_URL.substring(0, 15) + "...");
 }
 
 const hasDbUrl = !!process.env.DATABASE_URL;
@@ -17,11 +31,13 @@ const mockPool = {
 } as any;
 
 const poolConfig = {
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL?.includes(':6543') && !process.env.DATABASE_URL.includes('pgbouncer=true')
+    ? process.env.DATABASE_URL + '?pgbouncer=true'
+    : process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
-  max: 10, // Max clients in the pool
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 5000, // Return an error if connection takes more than 5 seconds
+  max: 20, // Increased for Transaction Pooler
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000, // Increased timeout
 };
 
 export const pool = hasDbUrl

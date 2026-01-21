@@ -73,50 +73,68 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // In Vercel environment, __dirname is usually /var/task/server
-  // But our build output is in /var/task/dist/public or similar depending on Vercel build config.
-  // We need to robustly find the 'dist/public' directory.
+  const rootDir = process.cwd();
 
-  // Try to find the dist folder relative to the current file location
+  // Vercel deployment structure can vary. We search for dist/public with high priority.
   const possiblePaths = [
-    path.resolve(__dirname, "../dist/public"), // Local build
-    path.resolve(__dirname, "../../dist/public"), // Nested structure
-    path.resolve(process.cwd(), "dist/public"), // Project root
-    path.resolve(process.cwd(), "public") // Fallback
+    path.join(rootDir, "dist", "public"),           // Standard build output
+    path.join(rootDir, "public"),                  // Fallback to source public
+    path.join(__dirname, "public"),                 // Relative if bundled in same dir
+    path.join(__dirname, "..", "dist", "public"),   // Common node structure
+    path.join(__dirname, "..", "..", "dist", "public") // Source structure
   ];
 
   let distPath = "";
   for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      distPath = p;
-      break;
+    if (fs.existsSync(p) && fs.statSync(p).isDirectory()) {
+      if (fs.existsSync(path.join(p, "index.html"))) {
+        distPath = p;
+        break;
+      }
     }
   }
 
   if (!distPath) {
-    // On Vercel, static files are handled by 'Handle: filesystem' in vercel.json.
-    // So if the directory isn't found, we might rely on Vercel's routing, 
-    // BUT we still need to serve index.html for SPA fallback.
-    // Let's assume standard Vercel structure if not found.
-    console.warn("⚠️ Could not find static build directory. SPA fallback might fail.");
-    distPath = path.resolve(process.cwd(), "dist/public");
+    distPath = path.resolve(rootDir, "dist/public");
+    console.warn(`[Static] ⚠️ index.html not found in common paths. Defaulting to: ${distPath}`);
+  } else {
+    console.log(`[Static] ✅ Serving from: ${distPath}`);
   }
 
-
-  app.use(express.static(distPath));
-
-  // prevent API or asset 404s from falling through to SPA index.html
-  app.use("*", (req, res, next) => {
-    if (req.originalUrl.startsWith("/api") ||
-      req.originalUrl.startsWith("/assets") ||
-      req.originalUrl.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|json)$/)) {
-      return res.status(404).send("Not Found");
+  // Handle static assets first
+  // Use absolute path for express.static
+  app.use(express.static(distPath, {
+    index: false,
+    maxAge: '1d', // Assets are hashed, so they can be cached
+    setHeaders: (res, filePath) => {
+      // Never cache index.html
+      if (filePath.endsWith("index.html")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      }
     }
-    next();
-  });
+  }));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // SPA Fallback: Serve index.html for any non-API/non-asset route
+  app.use((req, res, next) => {
+    // 1. Skip API calls
+    if (req.url.startsWith("/api")) return next();
+
+    // 2. Identify if it's an asset request that express.static MISSED
+    // If it's a known asset extension but we're here, it's a genuine 404
+    const isAsset = req.url.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|json|webmanifest|woff2?|ttf|otf)$/);
+    if (isAsset) {
+      console.log(`[Static] ❌ Asset not found: ${req.url}`);
+      return res.status(404).send(`Asset ${req.url} was not found on this server.`);
+    }
+
+    // 3. For everything else (e.g., /persona, /home), serve the SPA entry point
+    const indexPath = path.join(distPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.sendFile(indexPath);
+    }
+
+    // 4. Final fallback
+    res.status(404).send("Application shell (index.html) not found. Build may have failed.");
   });
 }

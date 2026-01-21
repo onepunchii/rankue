@@ -23,13 +23,13 @@ const ToastViewport = React.forwardRef<
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName
 
 const toastVariants = cva(
-  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-2xl border p-6 pr-8 shadow-2xl backdrop-blur-xl transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-bottom-full",
+  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-xl border p-4 pr-6 shadow-lg backdrop-blur-md transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-bottom-full",
   {
     variants: {
       variant: {
-        default: "border border-pink-100/30 bg-white/90 dark:bg-gray-900/90 text-gray-800 dark:text-gray-200",
+        default: "border-cyan-500/30 bg-[#0a0a10]/95 text-cyan-50 shadow-[0_0_15px_rgba(34,211,238,0.1)]",
         destructive:
-          "destructive group border-pink-200/40 bg-gradient-to-r from-pink-50/95 to-rose-50/95 dark:from-pink-900/30 dark:to-rose-900/30 text-pink-800 dark:text-pink-200",
+          "destructive group border-red-500/50 bg-[#1a0505]/95 text-red-50 shadow-[0_0_15px_rgba(239,68,68,0.15)]",
       },
     },
     defaultVariants: {
@@ -41,7 +41,7 @@ const toastVariants = cva(
 const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
-    VariantProps<typeof toastVariants>
+  VariantProps<typeof toastVariants>
 >(({ className, variant, ...props }, ref) => {
   return (
     <ToastPrimitives.Root
@@ -75,7 +75,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      "absolute right-3 top-3 rounded-full p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 opacity-60 transition-all hover:opacity-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-pink-300 group-hover:opacity-100 group-[.destructive]:text-pink-400 group-[.destructive]:hover:text-pink-600 group-[.destructive]:hover:bg-pink-100/50 group-[.destructive]:focus:ring-pink-300",
+      "absolute right-2 top-2 rounded-md p-1 text-cyan-500/50 hover:text-cyan-400 opacity-60 hover:opacity-100 transition-all hover:bg-cyan-500/10 focus:opacity-100 focus:outline-none focus:ring-2 group-[.destructive]:text-red-500/50 group-[.destructive]:hover:text-red-400 group-[.destructive]:hover:bg-red-500/10",
       className
     )}
     toast-close=""
@@ -92,7 +92,7 @@ const ToastTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Title
     ref={ref}
-    className={cn("text-sm font-semibold text-gray-800 dark:text-gray-200 group-[.destructive]:text-pink-800 dark:group-[.destructive]:text-pink-200", className)}
+    className={cn("text-sm font-bold text-cyan-100 group-[.destructive]:text-red-100", className)}
     {...props}
   />
 ))
@@ -104,7 +104,7 @@ const ToastDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Description
     ref={ref}
-    className={cn("text-sm opacity-80 text-gray-600 dark:text-gray-400 group-[.destructive]:text-pink-700 dark:group-[.destructive]:text-pink-300", className)}
+    className={cn("text-xs opacity-90 text-cyan-200/70 group-[.destructive]:text-red-200/80", className)}
     {...props}
   />
 ))

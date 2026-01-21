@@ -32,6 +32,9 @@ export default defineConfig({
   server: {
     port: 5173, // 고정 포트 설정 (OAuth 리디렉션용)
     strictPort: true, // 포트가 사용 중이면 에러 발생
+    hmr: {
+      port: 5001, // Express server port
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],

@@ -20,16 +20,24 @@ const customFetch: typeof fetch = (input, init?) => {
 };
 
 // Create Supabase client with custom fetch
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-    },
-    global: {
-        fetch: customFetch,
-    }
-});
+// Create Supabase client with custom fetch
+export const supabase = (supabaseUrl && supabaseAnonKey)
+    ? createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+        },
+        global: {
+            fetch: customFetch,
+        }
+    })
+    : new Proxy({}, {
+        get: () => () => {
+            console.warn("⚠️ Supabase function called but credentials are missing.");
+            return Promise.reject(new Error("Supabase not configured"));
+        }
+    }) as any;
 
 // Debugging: attach to window
 if (typeof window !== 'undefined') {

@@ -70,6 +70,11 @@ export async function apiRequest(
     ...options?.headers,
   };
 
+  // Inject current store slug for SaaS multi-tenancy
+  const searchParams = new URLSearchParams(window.location.search);
+  const storeSlug = searchParams.get("store") || "hiq";
+  headers['x-store-slug'] = storeSlug;
+
   if (supabaseToken) {
     headers['Authorization'] = `Bearer ${supabaseToken}`;
   }
@@ -91,7 +96,7 @@ export async function apiRequest(
 
   console.log(`[apiRequest] Fetching ${url}...`);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for AI generation
 
   try {
     const res = await fetch(url, {

@@ -1,0 +1,19 @@
+{
+    "name": "하이큐 당구장",
+    "short_name": "하이큐",
+    "description": "스마트한 당구 경기 기록 및 관리 시스템",
+    "start_url": "/hiq/",
+    "scope": "/hiq/",
+    "display": "standalone",
+    "background_color": "#000000",
+    "theme_color": "#000000",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}

@@ -30,5 +30,11 @@
             "src": "/(.*)",
             "dest": "server/index.ts"
         }
+    ],
+    "crons": [
+        {
+            "path": "/api/cron/notifications",
+            "schedule": "* * * * *"
+        }
     ]
 }

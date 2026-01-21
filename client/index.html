@@ -6,6 +6,7 @@
   <link rel="icon" href="/favicon.ico" />
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <base href="/" />
 
   <title>Polli - 매일 돈 버는 투표 & 덕질 앱</title>
   <meta name="description" content="터치 한 번으로 포인트가 쌓여요! 내 최애 아이돌 1등 만들고, 쉬운 정치 참여까지. 지금 바로 무료 투표하고 기프티콘 받아가세요." />
@@ -36,7 +37,14 @@
   <!-- Icons -->
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/icon.svg" />
-  <link rel="manifest" href="/manifest.json" />
+  <link rel="manifest" href="/manifest.json" id="app-manifest" />
+  <script>
+    if (window.location.pathname.startsWith('/hiq')) {
+      document.getElementById('app-manifest').setAttribute('href', '/hiq-manifest.json');
+      // Update meta tags for HiQ
+      document.title = "하이큐 당구장";
+    }
+  </script>
 
   <!-- External Resources -->
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />

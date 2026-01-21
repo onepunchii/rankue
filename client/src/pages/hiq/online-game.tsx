@@ -1,0 +1,1280 @@
+
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useToast } from "@/hooks/use-toast";
+import {
+    ChevronLeft,
+    ChevronRight,
+    Undo2,
+    Crosshair,
+    Grid3X3,
+    CircleDashed,
+    Zap,
+    Play,
+    LayoutList,
+    ChevronUp,
+    ChevronDown
+} from "lucide-react";
+import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
+import { PhysicsEngine2D } from "@/lib/physics-engine-2d";
+import { GameRuleEngine } from "@/lib/scoring-engine";
+import { VirtualJoystick } from "@/components/hiq/VirtualJoystick";
+import { Vector3, Quaternion } from "three";
+import { TableSpec, PRESETS } from "@/lib/physics-core";
+
+// Visual Constants - Increased for better visibility
+const CANVAS_W = 320;
+const CANVAS_H = 640;
+
+// Type for Raycasting
+interface CollisionResult {
+    x: number;
+    y: number;
+    ball: { id: string; pos: { x: number, y: number } };
+}
+
+export default function HiqOnlineGame() {
+    const [, setLocation] = useLocation();
+    const { toast } = useToast();
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const engineRef = useRef<PhysicsEngine2D | null>(null);
+
+    // Game State
+    const [isSimulating, setIsSimulating] = useState(false);
+    const [cueAngle, setCueAngle] = useState(Math.PI / 2); // 90 deg (Up)
+
+    // UI States
+    const [showAim, setShowAim] = useState(true);
+    const [showGrid, setShowGrid] = useState(true);
+    const [hasShownSpinNotice, setHasShownSpinNotice] = useState(false);
+    const [showSpinPanel, setShowSpinPanel] = useState(false);
+    const [showPowerPanel, setShowPowerPanel] = useState(false);
+    const [cueSpin, setCueSpin] = useState({ x: 0, y: 0 });
+    const [cuePower, setCuePower] = useState(50);
+
+    // Image Asset State
+    const [tableImage, setTableImage] = useState<HTMLImageElement | null>(null);
+    const [activePanel, setActivePanel] = useState<'none' | 'spin' | 'power'>('none');
+    const [isJoystickActive, setIsJoystickActive] = useState(false);
+    const [joystickOpacity, setJoystickOpacity] = useState(1);
+    const joystickOpacityRef = useRef(1);
+
+    // --- Scoreboard State ---
+    const [score, setScore] = useState(0);
+    const [innings, setInnings] = useState(1);
+    const [highRun, setHighRun] = useState(0);
+    const [currentRun, setCurrentRun] = useState(0);
+    const [inningRecords, setInningRecords] = useState<{ inning: number; score: number }[]>([]);
+    const [isScoreSheetOpen, setIsScoreSheetOpen] = useState(false);
+    const [lastShotData, setLastShotData] = useState<{
+        ballPositions: any;
+        shotParams: any;
+    } | null>(null);
+    const [lastTargetedBallId, setLastTargetedBallId] = useState<string | null>(null);
+    const avg = innings > 0 ? (score / innings).toFixed(2) : "0.00";
+
+    // Default Table State
+    // Helper to get initial balls based on URL mode
+    const getInitialBalls = useCallback(() => {
+        let mode = '3ball';
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            mode = params.get('mode') || '3ball';
+        }
+
+        const balls = [
+            { id: 'white', xRatio: 0.5, yRatio: 0.8, color: '#ffffff' },
+            { id: 'yellow', xRatio: 0.25, yRatio: 0.25, color: '#ffd700' },
+            { id: 'red', xRatio: 0.75, yRatio: 0.25, color: '#ff4d4d' }
+        ];
+
+        if (mode === '4ball') {
+            balls.push({ id: 'red2', xRatio: 0.5, yRatio: 0.25, color: '#ff4d4d' });
+        }
+        return balls;
+    }, []);
+
+    // Initialize Engine with Game Mode & Table Spec
+    useEffect(() => {
+        if (!engineRef.current) {
+            const params = new URLSearchParams(window.location.search);
+            const tableType = params.get('table')?.toUpperCase() || 'LARGE';
+            const spec = PRESETS[tableType] || PRESETS.LARGE;
+
+            engineRef.current = new PhysicsEngine2D(getInitialBalls(), spec);
+        }
+    }, [getInitialBalls]);
+
+
+    // Load Table Image
+    useEffect(() => {
+        const img = new Image();
+        // Use encodeURI to handle Hangul characters safely
+        img.src = encodeURI("/assets/images/당구대.png");
+        img.onload = () => {
+            console.log("🎱 online-game: Table image loaded successfully", img.width, img.height);
+            setTableImage(img);
+        };
+        img.onerror = (e) => {
+            console.error("🚨 online-game: Failed to load table image", e);
+            // Retry with unencoded just in case (local dev quirk sometimes)
+            const fallbackImg = new Image();
+            fallbackImg.src = "/assets/images/당구대.png";
+            fallbackImg.onload = () => setTableImage(fallbackImg);
+        };
+    }, []);
+
+    // Core Loop
+    // --- High DPI Handling ---
+    // --- High DPI Handling (Reverted) ---
+    // --- High DPI Handling ---
+    const [dpr, setDpr] = useState(1);
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setDpr(window.devicePixelRatio || 1);
+        }
+    }, []);
+
+    // Scoring Logic Hook
+    useEffect(() => {
+        if (!isSimulating && engineRef.current) {
+            const events = engineRef.current.getAndClearEvents();
+            if (events.length === 0) return;
+
+            const params = new URLSearchParams(window.location.search);
+            const mode = (params.get('mode') || '3ball') as '3ball' | '4ball';
+
+            const result = GameRuleEngine.evaluateTurn(events, mode);
+
+            if (result.type === 'success') {
+                setScore(s => s + result.scoreChange);
+                setCurrentRun(r => {
+                    const next = r + result.scoreChange;
+                    if (next > highRun) setHighRun(next);
+                    return next;
+                });
+
+                // Update or Add record for CURRENT inning
+                setInningRecords(prev => {
+                    const existing = prev.find(r => r.inning === innings);
+                    if (existing) {
+                        return prev.map(r => r.inning === innings ? { ...r, score: r.score + result.scoreChange } : r);
+                    } else {
+                        return [...prev, { inning: innings, score: result.scoreChange }];
+                    }
+                });
+
+                // --- AI Solution DB: Record Successful Shot Data ---
+                if (lastShotData) {
+                    apiRequest("/api/hiq/successful-shot", {
+                        method: "POST",
+                        body: {
+                            gameType: mode === '3ball' ? '3c' : '4c',
+                            ballPositions: lastShotData.ballPositions,
+                            shotParams: lastShotData.shotParams,
+                            cushionCount: result.cushionCount || 0
+                        }
+                    }).catch(err => console.error("Failed to record successful shot:", err));
+                    setLastShotData(null);
+                }
+
+                toast({
+                    title: "NICE SHOT! 🔥",
+                    description: result.message,
+                });
+            } else if (result.type === 'foul') {
+                setScore(s => s + result.scoreChange);
+                setCurrentRun(0);
+
+                // Ensure current inning is recorded even if 0 or negative
+                setInningRecords(prev => {
+                    const existing = prev.find(r => r.inning === innings);
+                    if (existing) {
+                        return prev.map(r => r.inning === innings ? { ...r, score: r.score + result.scoreChange } : r);
+                    } else {
+                        return [...prev, { inning: innings, score: result.scoreChange }];
+                    }
+                });
+
+                setInnings(i => i + 1);
+                toast({
+                    variant: 'destructive',
+                    title: "FOUL! ⚠️",
+                    description: result.message
+                });
+            } else {
+                // Missed
+                setCurrentRun(0);
+
+                // Add empty inning record if not exists
+                setInningRecords(prev => {
+                    if (!prev.find(r => r.inning === innings)) {
+                        return [...prev, { inning: innings, score: 0 }];
+                    }
+                    return prev;
+                });
+
+                setInnings(i => i + 1);
+                if (result.message) {
+                    toast({ title: "MISSED", description: result.message });
+                }
+            }
+        }
+    }, [isSimulating]);
+
+    // Core Loop
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        let animationFrameId: number;
+        let lastTime = performance.now();
+
+        const render = (time: number) => {
+            const dt = Math.min((time - lastTime) / 1000, 0.1);
+            lastTime = time;
+
+            if (isSimulating && engineRef.current) {
+                engineRef.current.update(dt);
+                if (engineRef.current.isAllStationary() && dt > 0) {
+                    setIsSimulating(false);
+                }
+            }
+
+            if (!engineRef.current) {
+                animationFrameId = requestAnimationFrame(render);
+                return;
+            }
+
+            // --- Draw ---
+            // --- Draw ---
+            // High-DPI scaling: Reset transform to scale by DPR
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+            // --- Background: Table Image ---
+            // --- Coordinate Mapping & Scaling ---
+            // --- Coordinate Mapping & Scaling ---
+
+            // 1. Set Fixed Table Width (Master Dimension) - Optimized for Max Mobile View (leaving ~80px for UI)
+            const TABLE_VISUAL_W = 290;
+
+            // 2. Play Area Width (Inner) - based on X Margin ratio
+            // But wait, user said "ratio update to section similarly".
+            // If I fix TABLE_W=230, I should determine PLAY_W.
+            const MARGIN_RATIO_X = 0.112;
+            const PLAY_W = TABLE_VISUAL_W * (1 - MARGIN_RATIO_X * 2);
+
+            // 3. Force Play Area Height to 1:2 Ratio
+            const PLAY_H = PLAY_W * 2.0;
+
+            // 4. Back-calculate Table Height (Outer) based on Y Margins
+            const MARGIN_RATIO_Y = 0.054;
+            // PlayH = TableH * (1 - 2*0.054)
+            const TABLE_VISUAL_H = PLAY_H / (1 - MARGIN_RATIO_Y * 2);
+
+            // We use these for drawing
+            // Draw Table Width IS Table Visual Width (230)
+            const DRAW_TABLE_W = TABLE_VISUAL_W;
+
+            // Perform Left Alignment (User Request: Move to Back Button Area)
+            const START_X = 16 + 20; // Shifted right by 20px
+            const START_Y = (CANVAS_H - PLAY_H) / 2 + 20; // Shifted down by 20px
+
+            // --- Background: Table Image ---
+            // --- Background: Table Image REMOVED ---
+            // Filled with black for cleanliness
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+
+
+            // --- Green Felt Overlay (Premium Design) ---
+            const cx = START_X + PLAY_W / 2;
+            const cy = START_Y + PLAY_H / 2;
+            const bgRadius = Math.hypot(PLAY_W, PLAY_H) * 0.6;
+
+            const feltGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, bgRadius);
+            feltGrad.addColorStop(0, "#2E7D32");
+            feltGrad.addColorStop(0.7, "#1B5E20");
+            feltGrad.addColorStop(1, "#0A3311");
+
+            ctx.fillStyle = feltGrad; // Apply premium gradient
+            ctx.fillRect(START_X, START_Y, PLAY_W, PLAY_H);
+
+            // --- Grid Overlay (User Requested: Dual Layer) ---
+            if (showGrid) {
+                // 1. Secondary Grid (Faint - 8x16 - Subdivides major cells)
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+                ctx.lineWidth = 0.5; // Halved
+                ctx.setLineDash([3, 5]); // Dashed
+
+                const minorCols = 8;
+                const minorRows = 16;
+                // Verticals
+                for (let i = 1; i < minorCols; i++) {
+                    const x = START_X + (PLAY_W / minorCols) * i;
+                    ctx.moveTo(x, START_Y);
+                    ctx.lineTo(x, START_Y + PLAY_H);
+                }
+                // Horizontals
+                for (let i = 1; i < minorRows; i++) {
+                    const y = START_Y + (PLAY_H / minorRows) * i;
+                    ctx.moveTo(START_X, y);
+                    ctx.lineTo(START_X + PLAY_W, y);
+                }
+                ctx.stroke();
+
+                // 2. Primary Grid (Bold - 4x8 - Standard Diamonds)
+                ctx.beginPath();
+                ctx.setLineDash([]); // Solid
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+                ctx.lineWidth = 0.75; // Halved
+
+                const majorCols = 4;
+                const majorRows = 8;
+                // Verticals
+                for (let i = 1; i < majorCols; i++) {
+                    const x = START_X + (PLAY_W / majorCols) * i;
+                    ctx.moveTo(x, START_Y);
+                    ctx.lineTo(x, START_Y + PLAY_H);
+                }
+                // Horizontals
+                for (let i = 1; i < majorRows; i++) {
+                    const y = START_Y + (PLAY_H / majorRows) * i;
+                    ctx.moveTo(START_X, y);
+                    ctx.lineTo(START_X + PLAY_W, y);
+                }
+                ctx.stroke();
+            }
+
+            // Physics Table Size (Meters) - Dynamic from Engine Spec
+            const engineSpec = engineRef.current.getSpec();
+            const TABLE_W = engineSpec.width;
+            const TABLE_H = engineSpec.height;
+
+            const mapX = (xMeter: number) => START_X + (xMeter / TABLE_W) * PLAY_W;
+            const mapY = (yMeter: number) => START_Y + (yMeter / TABLE_H) * PLAY_H;
+            const scaleR = (rMeter: number) => (rMeter / TABLE_W) * PLAY_W;
+
+            // 4. Balls (Premium Glossy Design)
+            const balls = engineRef.current.getBalls();
+            balls.forEach((ball) => {
+                const screenX = mapX(ball.pos.x);
+                const screenY = mapY(ball.pos.y);
+                const screenR = scaleR(ball.radius);
+                const drawR = Math.max(0.1, screenR);
+
+                // Ivory: #F0F0F0 -> #D0D0D0
+                // Matte Gold: #C5A059 -> #A68040
+                // Deep Crimson: #B71C1C -> #8B0000
+                let mainColor = '#F0F0F0';
+                let darkColor = '#D0D0D0';
+
+                if (ball.id === 'yellow') {
+                    mainColor = '#C5A059';
+                    darkColor = '#A68040';
+                } else if (ball.id.startsWith('red')) {
+                    mainColor = '#B71C1C';
+                    darkColor = '#8B0000';
+                }
+
+                ctx.save();
+                // 0. Soft Ground Shadow
+                ctx.beginPath();
+                ctx.arc(screenX, screenY + 2, drawR, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+                ctx.filter = "blur(4px)";
+                ctx.fill();
+                ctx.filter = "none";
+
+                // 1. Draw Border (Solid Dark)
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, drawR, 0, Math.PI * 2);
+                ctx.fillStyle = "#111111";
+                ctx.fill();
+
+                // 2. Draw Base Sphere (Radial Gradient)
+                const innerR = drawR * 0.92;
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, innerR, 0, Math.PI * 2);
+
+                const lightX = screenX - innerR * 0.35;
+                const lightY = screenY - innerR * 0.35;
+
+                const baseGrad = ctx.createRadialGradient(lightX, lightY, innerR * 0.1, screenX, screenY, innerR);
+                baseGrad.addColorStop(0, mainColor);
+                baseGrad.addColorStop(1, darkColor);
+
+                ctx.fillStyle = baseGrad;
+                ctx.fill();
+
+                // 3. Glossy Highlight
+                const glossGrad = ctx.createRadialGradient(lightX, lightY, innerR * 0.1, lightX, lightY, innerR * 0.6);
+                glossGrad.addColorStop(0, "rgba(255,255,255,0.4)");
+                glossGrad.addColorStop(1, "rgba(255,255,255,0)");
+
+                ctx.fillStyle = glossGrad;
+                ctx.fill();
+
+                // 4. Dot Pattern (Pro-Cup style)
+                // 3D Dot coordinates on a unit sphere (6 points)
+                const dotPositions = [
+                    new Vector3(1, 0, 0), new Vector3(-1, 0, 0),
+                    new Vector3(0, 1, 0), new Vector3(0, -1, 0),
+                    new Vector3(0, 0, 1), new Vector3(0, 0, -1)
+                ];
+
+                const ballQ = new Quaternion(ball.orientation.x, ball.orientation.y, ball.orientation.z, ball.orientation.w);
+
+                // Dot Color
+                let dotColor = "rgba(230, 0, 0, 0.9)"; // Red dots for white/yellow
+                if (ball.id.startsWith('red')) dotColor = "rgba(255, 255, 255, 0.8)"; // White dots for red ball
+
+                dotPositions.forEach(p => {
+                    // Rotate the 3D dot position
+                    p.applyQuaternion(ballQ);
+
+                    // If point's Z is positive (>0), it's on the front half (visible)
+                    // (Canvas Z points toward user in our projected space calculation)
+                    if (p.z > 0) {
+                        const dotX = screenX + p.x * innerR;
+                        const dotY = screenY + p.y * innerR;
+
+                        // Dot size scales slightly with depth (Z) for 3D effect
+                        const dotR = (0.15 * innerR) * (0.6 + 0.4 * p.z);
+
+                        ctx.beginPath();
+                        ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
+                        ctx.fillStyle = dotColor;
+                        ctx.fill();
+
+                        // Subtle highlight on the dot itself
+                        const dotGloss = ctx.createRadialGradient(dotX - dotR * 0.3, dotY - dotR * 0.3, 0, dotX, dotY, dotR);
+                        dotGloss.addColorStop(0, "rgba(255,255,255,0.4)");
+                        dotGloss.addColorStop(1, "rgba(255,255,255,0)");
+                        ctx.fillStyle = dotGloss;
+                        ctx.fill();
+                    }
+                });
+
+                ctx.restore();
+            });
+
+            // 5. Aim & Cue (Only when allowed)
+            if (!isSimulating && showAim) {
+                const whiteBall = balls.find((b) => b.id === 'white');
+                if (whiteBall) {
+                    const bx = mapX(whiteBall.pos.x);
+                    const by = mapY(whiteBall.pos.y);
+                    // The cueAngle now represents the direction pointing FROM the ball TO the handle.
+                    // Therefore, the shot angle (where the ball goes) is exactly opposite (angle + PI).
+                    const shotAngle = cueAngle + Math.PI;
+                    const aimX = Math.cos(shotAngle);
+                    const aimY = Math.sin(shotAngle);
+
+                    // Ghost Ball Logic (Physics Space Calculation)
+                    let minDist = 10000;
+                    let collision: CollisionResult | null = null;
+                    const R = whiteBall.radius; // Meters
+
+                    // 1. Check Ball Collisions
+                    balls.forEach(target => {
+                        if (target.id === 'white') return;
+                        const dx = target.pos.x - whiteBall.pos.x;
+                        const dy = target.pos.y - whiteBall.pos.y;
+                        const t = dx * aimX + dy * aimY; // Vector projection (Meters)
+
+                        if (t > 0) {
+                            const px = whiteBall.pos.x + t * aimX;
+                            const py = whiteBall.pos.y + t * aimY;
+                            const distSq = (target.pos.x - px) ** 2 + (target.pos.y - py) ** 2;
+                            if (distSq < (2 * R) ** 2) {
+                                const backDist = Math.sqrt((2 * R) ** 2 - distSq);
+                                const contactDist = t - backDist;
+                                if (contactDist >= 0 && contactDist < minDist) {
+                                    minDist = contactDist;
+                                    collision = {
+                                        x: whiteBall.pos.x + contactDist * aimX,
+                                        y: whiteBall.pos.y + contactDist * aimY,
+                                        ball: target // Target physics ball
+                                    };
+                                }
+                            }
+                        }
+                    });
+
+                    // 2. Check Wall Collisions
+                    const minX = R;
+                    const maxX = TABLE_W - R;
+                    const minY = R;
+                    const maxY = TABLE_H - R;
+
+                    let wallDist = 10000;
+                    if (Math.abs(aimX) > 1e-6) {
+                        const t1 = (minX - whiteBall.pos.x) / aimX;
+                        if (t1 > 0 && t1 < wallDist) wallDist = t1;
+                        const t2 = (maxX - whiteBall.pos.x) / aimX;
+                        if (t2 > 0 && t2 < wallDist) wallDist = t2;
+                    }
+                    if (Math.abs(aimY) > 1e-6) {
+                        const t3 = (minY - whiteBall.pos.y) / aimY;
+                        if (t3 > 0 && t3 < wallDist) wallDist = t3;
+                        const t4 = (maxY - whiteBall.pos.y) / aimY;
+                        if (t4 > 0 && t4 < wallDist) wallDist = t4;
+                    }
+
+                    if (wallDist < minDist) {
+                        minDist = wallDist;
+                        collision = null;
+                    }
+
+                    // 3. Draw Aim Line
+                    const endMetersX = whiteBall.pos.x + minDist * aimX;
+                    const endMetersY = whiteBall.pos.y + minDist * aimY;
+                    const cx = mapX(endMetersX);
+                    const cy = mapY(endMetersY);
+
+                    ctx.beginPath();
+                    ctx.setLineDash([2, 4]); // Thin dots
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                    ctx.lineWidth = 1;
+                    ctx.moveTo(bx, by);
+                    ctx.lineTo(cx, cy);
+                    ctx.stroke();
+
+                    // 4. Ghost Ball & Thickness Info (Enhanced)
+                    if (collision) {
+                        const targetBall = (collision as CollisionResult).ball;
+
+                        // --- Thickness Calculation ---
+                        // Impact Parameter h = distance from target center to aim line
+                        const dx = targetBall.pos.x - whiteBall.pos.x;
+                        const dy = targetBall.pos.y - whiteBall.pos.y;
+                        const h = Math.abs(dx * aimY - dy * aimX); // Perpendicular distance
+                        // Thickness = 1 - (h / 2R)
+                        // h ranges from 0 (Full) to 2R (Miss)
+                        const thicknessRatio = Math.max(0, 1 - (h / (2 * R)));
+                        const thicknessPercent = Math.round(thicknessRatio * 100);
+
+                        // --- Ghost Ball Visuals (Neon Glow) ---
+                        ctx.save();
+                        // Glow Effect
+                        ctx.shadowBlur = 12;
+                        ctx.shadowColor = "rgba(0, 255, 255, 0.8)"; // Cyan Neon
+
+                        ctx.beginPath();
+                        ctx.setLineDash([]);
+                        ctx.arc(cx, cy, scaleR(R), 0, Math.PI * 2);
+                        // Semi-transparent fill to show overlap
+                        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+                        ctx.fill();
+                        // Strong border
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
+                        ctx.restore();
+
+                        // --- Impact Point (Red Dot) ---
+                        const targetScreenX = mapX(targetBall.pos.x);
+                        const targetScreenY = mapY(targetBall.pos.y);
+                        const impactX = cx + (targetScreenX - cx) / 2;
+                        const impactY = cy + (targetScreenY - cy) / 2;
+
+                        ctx.beginPath();
+                        ctx.arc(impactX, impactY, 3, 0, Math.PI * 2);
+                        ctx.fillStyle = "#FF3333";
+                        ctx.fill();
+
+                        // --- Mini Dashboard (Visual Cut View) ---
+                        // Position relative to collision - Intelligently shift to avoid edges
+                        let tipX = cx + 45;
+                        let tipY = cy - 45;
+
+                        // Dashboard radius is ~30px. Ensure it stays within PLAY AREA boundaries (Green Felt).
+                        const dashboardMargin = 32;
+                        const rightLimit = START_X + PLAY_W - dashboardMargin;
+                        const leftLimit = START_X + dashboardMargin;
+                        const topLimit = START_Y + dashboardMargin;
+                        const bottomLimit = START_Y + PLAY_H - 100; // Account for the label pill below
+
+                        // If too close to right edge, flip to left
+                        if (tipX > rightLimit) {
+                            tipX = cx - 45;
+                        }
+                        // If too close to left edge (if it flipped), nudge back
+                        if (tipX < leftLimit) {
+                            tipX = cx + 45;
+                        }
+
+                        // If too close to top edge, drop lower
+                        if (tipY < topLimit) {
+                            tipY = cy + 45;
+                        }
+
+                        // Final Clamp to ensure it never bleeds out of the green area
+                        tipX = Math.max(leftLimit, Math.min(tipX, rightLimit));
+                        tipY = Math.max(topLimit, Math.min(tipY, bottomLimit));
+
+                        const vR = 14;
+
+                        // Target Color map
+                        let tMain = '#FDFDFD';
+                        let tDark = '#E0E0E0';
+                        if (targetBall.id === 'yellow') {
+                            tMain = '#FFD54F'; tDark = '#F9A825';
+                        } else if (targetBall.id.startsWith('red')) {
+                            tMain = '#EF5350'; tDark = '#B71C1C';
+                        }
+
+                        // Background Bubble
+                        ctx.beginPath();
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+                        ctx.lineWidth = 1;
+                        ctx.arc(tipX, tipY, 26, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        // 1. Draw Target Ball (Mini)
+                        ctx.beginPath();
+                        ctx.arc(tipX, tipY, vR, 0, Math.PI * 2);
+                        const tGrad = ctx.createRadialGradient(tipX - 4, tipY - 4, 2, tipX, tipY, vR);
+                        tGrad.addColorStop(0, tMain);
+                        tGrad.addColorStop(1, tDark);
+                        ctx.fillStyle = tGrad;
+                        ctx.fill();
+
+                        // 2. Draw Ghost Ball (Mini)
+                        const crossVal = dx * aimY - dy * aimX;
+                        const pixelOffset = (crossVal / R) * vR;
+
+                        ctx.beginPath();
+                        ctx.arc(tipX + pixelOffset, tipY, vR, 0, Math.PI * 2);
+                        ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+                        ctx.fill();
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+
+                        // 3. Thickness Text (Percentage)
+                        const label = `${thicknessPercent}%`;
+                        ctx.font = "bold 9px Inter";
+                        const textWidth = ctx.measureText(label).width;
+
+                        // Minimalist Semi-transparent Pill
+                        ctx.beginPath();
+                        (ctx as any).roundRect(tipX - (textWidth + 10) / 2, tipY + 34, textWidth + 10, 13, 6);
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+                        ctx.fill();
+
+                        ctx.fillStyle = "#FFFFFF";
+                        ctx.textAlign = "center";
+                        ctx.fillText(label, tipX, tipY + 44);
+                    }
+                    ctx.setLineDash([]);
+
+                    // Cue Stick (Premium Visuals)
+                    const cueDist = 20;
+                    const dirX = Math.cos(cueAngle);
+                    const dirY = Math.sin(cueAngle);
+                    const perpX = -dirY;
+                    const perpY = dirX;
+
+                    // Helper to draw tapered rect
+                    const drawSection = (startD: number, len: number, wStart: number, wEnd: number, color: string) => {
+                        const sX = bx + dirX * startD;
+                        const sY = by + dirY * startD;
+                        const eX = bx + dirX * (startD + len);
+                        const eY = by + dirY * (startD + len);
+
+                        ctx.beginPath();
+                        ctx.moveTo(sX + perpX * wStart / 2, sY + perpY * wStart / 2);
+                        ctx.lineTo(eX + perpX * wEnd / 2, eY + perpY * wEnd / 2);
+                        ctx.lineTo(eX - perpX * wEnd / 2, eY - perpY * wEnd / 2);
+                        ctx.lineTo(sX - perpX * wStart / 2, sY - perpY * wStart / 2);
+                        ctx.closePath();
+                        ctx.fillStyle = color;
+                        ctx.fill();
+                    };
+
+                    ctx.save();
+                    // Global Drop Shadow for depth
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = "rgba(0,0,0,0.6)";
+                    ctx.shadowOffsetY = 4;
+
+                    // 1. Tip (Blue Layered Leather)
+                    drawSection(cueDist, 4, 3.5, 3.5, '#0288d1');
+
+                    // 2. Ferrule (Ivory/White)
+                    drawSection(cueDist + 4, 14, 3.5, 3.8, '#f8f9fa');
+
+                    // 3. Ring (Black)
+                    drawSection(cueDist + 18, 1, 3.8, 3.8, '#111');
+
+                    // 4. Shaft (Maple Wood - Gradient Approximation)
+                    // Use gradients to simulate roundness
+                    const shaftStart = cueDist + 19;
+                    const shaftLen = 220;
+
+                    // Since gradient across width is hard for varying angles, we use solid + inner bright line?
+                    // Or just a really nice wood color.
+                    drawSection(shaftStart, shaftLen, 3.8, 6.0, '#e3cfa3');
+
+                    // 5. Joint (Metal/Black)
+                    const jointStart = shaftStart + shaftLen;
+                    drawSection(jointStart, 15, 6.0, 6.2, '#222');
+                    drawSection(jointStart + 3, 9, 6.05, 6.15, '#silver'); // Metal ring? Just keep dark.
+
+                    // 6. Butt (Dark Ebony with Pattern)
+                    const buttStart = jointStart + 15;
+                    drawSection(buttStart, 160, 6.2, 8.0, '#3e2723');
+
+                    ctx.restore();
+
+                    // Add subtle shine line along the shaft (Lighting)
+                    /*
+                    ctx.beginPath();
+                    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+                    ctx.lineWidth = 1;
+                    ctx.moveTo(bx + dirX * (cueDist + 20) + perpX * -1, by + dirY * (cueDist + 20) + perpY * -1);
+                    ctx.lineTo(bx + dirX * (cueDist + 400) + perpX * -2, by + dirY * (cueDist + 400) + perpY * -2);
+                    ctx.stroke();
+                    */
+                }
+            }
+
+
+            // 6. Auto-Transparency Calculation for UI
+            const whiteBallCheck = engineRef.current.getBalls().find(b => b.id === 'white');
+            if (whiteBallCheck) {
+                const bx = mapX(whiteBallCheck.pos.x);
+                const by = mapY(whiteBallCheck.pos.y);
+                const jcX = 72; // 24 + 48
+                const jcY = 552; // 640 - 40 - 48
+                const dist = Math.sqrt((bx - jcX) ** 2 + (by - jcY) ** 2);
+                const targetOpacity = dist < 100 ? 0.2 : 1.0;
+                if (joystickOpacityRef.current !== targetOpacity) {
+                    joystickOpacityRef.current = targetOpacity;
+                    setJoystickOpacity(targetOpacity);
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(render);
+        };
+        animationFrameId = requestAnimationFrame(render);
+        return () => cancelAnimationFrame(animationFrameId);
+    }, [isSimulating, cueAngle, showAim, showGrid, dpr]);
+
+    // --- Fine Tune Continuous Control ---
+    const fineAdjustTimerRef = useRef<any>(null);
+    const fineAdjustIntervalRef = useRef<any>(null);
+
+    const stopFineAdjust = useCallback(() => {
+        if (fineAdjustTimerRef.current) clearTimeout(fineAdjustTimerRef.current);
+        if (fineAdjustIntervalRef.current) clearInterval(fineAdjustIntervalRef.current);
+        fineAdjustTimerRef.current = null;
+        fineAdjustIntervalRef.current = null;
+    }, []);
+
+    const startFineAdjust = useCallback((dir: number) => {
+        if (isSimulating) return;
+        stopFineAdjust();
+        // Initial step
+        setCueAngle(prev => prev + dir * 0.002);
+        // Start long-press timer
+        fineAdjustTimerRef.current = setTimeout(() => {
+            fineAdjustIntervalRef.current = setInterval(() => {
+                setCueAngle(prev => prev + dir * 0.001); // Smooth continuous movement
+            }, 25);
+        }, 250);
+    }, [isSimulating, stopFineAdjust]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => stopFineAdjust();
+    }, [stopFineAdjust]);
+
+    // Handlers
+    const handleAutoTarget = useCallback(() => {
+        if (!engineRef.current || isSimulating) return;
+        const balls = engineRef.current.getBalls();
+        const white = balls.find(b => b.id === 'white');
+        if (!white) return;
+
+        // Collect other balls and calculate distances
+        const targets = balls
+            .filter(b => b.id !== 'white')
+            .map(b => ({
+                id: b.id,
+                pos: b.pos,
+                dist: Math.hypot(b.pos.x - white.pos.x, b.pos.y - white.pos.y)
+            }))
+            .sort((a, b) => a.dist - b.dist);
+
+        if (targets.length === 0) return;
+
+        // Cycle through sorted targets
+        let nextIndex = 0;
+        if (lastTargetedBallId) {
+            const currentIndex = targets.findIndex(t => t.id === lastTargetedBallId);
+            if (currentIndex !== -1) {
+                nextIndex = (currentIndex + 1) % targets.length;
+            }
+        }
+
+        const target = targets[nextIndex];
+        const angle = Math.atan2(target.pos.y - white.pos.y, target.pos.x - white.pos.x);
+
+        // Map physics angle to cueAngle (cueAngle is angle to handle, so shot direction is cueAngle + PI)
+        // shotAngle = angle
+        // cueAngle = shotAngle - PI
+        setCueAngle(angle - Math.PI);
+        setLastTargetedBallId(target.id);
+
+        // Visual feedback
+        toast({
+            title: "자동 조준",
+            description: `${target.id === 'yellow' ? '노란 공' : '빨간 공'}을(를) 조준합니다.`,
+            duration: 1000
+        });
+    }, [engineRef, isSimulating, lastTargetedBallId, toast]);
+
+    const handleShot = useCallback(() => {
+        if (isSimulating || !engineRef.current) return;
+
+        // --- Capture Initial State for AI Solution DB ---
+        const ballPositions: any = {};
+        engineRef.current.getBalls().forEach(b => {
+            ballPositions[b.id] = { x: b.pos.x, y: b.pos.y };
+        });
+
+        setLastShotData({
+            ballPositions,
+            shotParams: {
+                angle: cueAngle,
+                power: cuePower,
+                spinX: cueSpin.x,
+                spinY: cueSpin.y
+            }
+        });
+
+        const shotSpeed = cuePower * 0.1;
+        // Invert the cueAngle (which points to the handle) to get the shot direction
+        engineRef.current.shoot('white', shotSpeed, cueAngle + Math.PI, cueSpin.x, cueSpin.y);
+        setIsSimulating(true);
+        setActivePanel('none');
+    }, [isSimulating, cueAngle, cueSpin, cuePower, lastShotData]);
+
+    // --- UI States ---
+
+
+    const handleUndo = () => {
+        setIsSimulating(false);
+        if (engineRef.current) {
+            engineRef.current.init(getInitialBalls());
+            // Reset cue params
+            setCueAngle(Math.PI / 2);
+            setCueSpin({ x: 0, y: 0 });
+            setCuePower(50);
+        }
+    };
+
+    // --- Pointer Interactions ---
+    const [isDragging, setIsDragging] = useState(false);
+
+    const getPointerPos = (e: React.PointerEvent) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
+        const rect = canvas.getBoundingClientRect();
+        // Map to Logical Grid (CANVAS_W, CANVAS_H)
+        const scaleX = CANVAS_W / rect.width;
+        const scaleY = CANVAS_H / rect.height;
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    };
+
+    // Inverse Mapping: Screen -> Physics Meter
+    const getPhysicsPos = (screenX: number, screenY: number) => {
+        // Must match Render Scale Logic exactly
+        const params = new URLSearchParams(window.location.search);
+        const tableType = params.get('table')?.toUpperCase() || 'LARGE';
+        const spec = PRESETS[tableType] || PRESETS.LARGE;
+
+        const TABLE_VISUAL_W = 290;
+        const MARGIN_RATIO_X = 0.112;
+        const PLAY_W = TABLE_VISUAL_W * (1 - MARGIN_RATIO_X * 2);
+        const PLAY_H = PLAY_W * 2.0;
+
+        const START_X = 16 + 20;
+        const MARGIN_RATIO_Y = 0.054;
+        const START_Y = (CANVAS_H - PLAY_H) / 2 + 20;
+
+        const TABLE_W = spec.width;
+        const TABLE_H = spec.height;
+
+        return {
+            x: ((screenX - START_X) / PLAY_W) * TABLE_W,
+            y: ((screenY - START_Y) / PLAY_H) * TABLE_H
+        };
+    }
+
+
+    return (
+        <div className="fixed inset-0 w-full h-[100dvh] bg-black overflow-hidden select-none touch-none overscroll-none">
+
+            {/* 1. Main Canvas Area */}
+            <canvas
+                ref={canvasRef}
+                width={CANVAS_W * dpr}
+                height={CANVAS_H * dpr}
+                className="block w-full h-full object-cover"
+            />
+
+            {/* 2. Top Navigation & Scoreboard */}
+            <div className="absolute top-0 left-0 right-0 p-4 z-40">
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setLocation("/hiq/dashboard")}
+                            title="돌아가기"
+                            className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-md border border-white/10 active:scale-90 transition-transform pointer-events-auto"
+                        >
+                            <ChevronLeft className="w-6 h-6 text-white" />
+                        </button>
+
+                        {/* Scoreboard */}
+                        <div className="flex-1 h-12 premium-glass rounded-2xl flex items-center px-4 justify-between overflow-hidden shadow-2xl">
+                            <div className="flex flex-col items-start leading-none min-w-[40px]">
+                                <span className="text-[9px] text-[#E0E0E0]/40 font-bold uppercase tracking-tighter">INN</span>
+                                <span className="text-xl font-black text-[#E0E0E0]/70">{innings}</span>
+                            </div>
+
+                            <div className="h-6 w-[1px] bg-white/5" />
+
+                            <div className="flex flex-col items-center leading-none min-w-[40px]">
+                                <span className="text-[9px] text-[#E0E0E0]/40 font-bold uppercase tracking-tighter">SCORE</span>
+                                <span className="text-xl font-black text-[#E0E0E0]">{score}</span>
+                            </div>
+
+                            <div className="h-6 w-[1px] bg-white/5" />
+
+                            <div className="flex flex-col items-center leading-none min-w-[50px]">
+                                <span className="text-[9px] text-[#E0E0E0]/40 font-bold uppercase tracking-tighter">AVG</span>
+                                <span className="text-xl font-black text-chrome">{avg}</span>
+                            </div>
+
+                            <div className="h-6 w-[1px] bg-white/5" />
+
+                            <div className="flex flex-col items-end leading-none min-w-[50px]">
+                                <span className="text-[9px] text-[#E0E0E0]/40 font-bold uppercase tracking-tighter">HIGH</span>
+                                <span className="text-xl font-black text-matte-gold">{highRun}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {currentRun > 0 && (
+                        <div className="flex justify-center">
+                            <div className="px-4 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 backdrop-blur-sm animate-pulse">
+                                <span className="text-[10px] font-black text-indigo-300">HIGH RUN (+{currentRun}) 🔥</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* 3. Right Sidebar Toolbar & Main Action (Top-Right Alignment) */}
+            <div className="absolute right-4 top-24 flex flex-col gap-5 items-center z-30 pointer-events-auto">
+
+
+
+
+                <button
+                    onClick={() => setIsScoreSheetOpen(true)}
+                    title="이닝별 기록표"
+                    className="w-12 h-12 rounded-full premium-glass flex items-center justify-center text-[#E0E0E0]/40 hover:text-matte-gold transition-all active:scale-90"
+                >
+                    <LayoutList strokeWidth={1.5} size={24} />
+                    <span className="sr-only">Score Sheet</span>
+                </button>
+
+                {/* Spin Control (Mini Ball Icon) */}
+                <div className="relative">
+                    <button
+                        onClick={() => setShowSpinPanel(!showSpinPanel)}
+                        title="당점 설정"
+                        className={`w-12 h-12 rounded-full premium-glass transition-all active:scale-95 flex items-center justify-center relative ${showSpinPanel
+                            ? 'text-matte-gold border-white/30'
+                            : 'text-[#E0E0E0]/40 border-white/5'
+                            }`}
+                    >
+                        <CircleDashed strokeWidth={1.5} size={24} />
+                        <span className="sr-only">Spin</span>
+                        {/* Dot indicating spin */}
+                        <div
+                            className="absolute bg-red-600 rounded-full w-1.5 h-1.5 shadow-[0_0_5px_rgba(220,38,38,0.5)]"
+                            style={{
+                                top: '50%', left: '50%',
+                                transform: `translate(-50%, -50%) translate(${cueSpin.x * 6}px, ${-cueSpin.y * 6}px)`
+                            }}
+                        />
+                    </button>
+                    {/* Spin Popover */}
+                    {showSpinPanel && (
+                        <div className="absolute right-12 top-1/2 -translate-y-1/2 w-48 h-48 bg-black/90 rounded-2xl border border-white/10 p-4 backdrop-blur-xl shadow-2xl flex items-center justify-center">
+                            <div className="relative w-full h-full rounded-full border border-white/20 bg-white/5">
+                                {/* Concentric Guide Lines (10% intervals) */}
+                                {[...Array(9)].map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border ${(i + 1) === 8 ? 'border-red-500/40 border-dashed z-0' : 'border-white/5'
+                                            }`}
+                                        style={{
+                                            width: `${(i + 1) * 10}%`,
+                                            height: `${(i + 1) * 10}%`,
+                                        }}
+                                    />
+                                ))}
+
+                                {/* Crosshair */}
+                                <div className="absolute top-1/2 left-0 w-full h-px bg-white/5" />
+                                <div className="absolute left-1/2 top-0 h-full w-px bg-white/5" />
+                                {/* Touch Area */}
+                                <div
+                                    className="absolute inset-0 cursor-crosshair z-10"
+                                    onClick={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const rawX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                                        const rawY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+
+                                        // 360-Degree Cue-Relative Mapping
+                                        // We treat the current shot direction as 'Up' (12 o'clock) in the UI.
+                                        // shotAngle = cueAngle + PI (points towards target)
+                                        // To map UI coords to physics-space spin (where +Y is always 'top' of ball):
+                                        // We don't actually need to rotate rawX/rawY here because the physics 
+                                        // calculation engineRef.current.shoot already interprets X/Y as relative 
+                                        // to the shot vector if we pass them as side/vertical spin.
+                                        // HOWEVER, to be 100% consistent with the user's view:
+                                        // 'Clicking Up' in UI = 'Follow Spin' (top of ball from cue perspective)
+
+                                        const x = rawX;
+                                        const y = rawY;
+
+                                        const dist = Math.sqrt(x * x + y * y);
+                                        const MAX_THRESHOLD = 0.8;
+
+                                        if (dist > MAX_THRESHOLD) {
+                                            const scale = MAX_THRESHOLD / dist;
+                                            setCueSpin({ x: x * scale, y: y * scale });
+                                        } else {
+                                            setCueSpin({ x, y });
+                                        }
+                                    }}
+                                />
+
+                                {/* Perspective Guides (Fixed UI, Relative Logic) */}
+                                <div className="absolute inset-0 pointer-events-none p-2 text-[8px] font-black tracking-tighter">
+                                    {/* Top: Follow */}
+                                    <div className="absolute top-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-red-400">
+                                        <ChevronUp size={8} />
+                                        <span>FOLLOW</span>
+                                    </div>
+                                    {/* Bottom: Draw */}
+                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-blue-400">
+                                        <span>DRAW</span>
+                                        <ChevronDown size={8} />
+                                    </div>
+                                    {/* Left: Left English */}
+                                    <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[#E0E0E0]/60 [writing-mode:vertical-lr] rotate-180">
+                                        <ChevronLeft size={8} />
+                                        <span>LEFT</span>
+                                    </div>
+                                    {/* Right: Right English */}
+                                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[#E0E0E0]/60 [writing-mode:vertical-lr]">
+                                        <span>RIGHT</span>
+                                        <ChevronRight size={8} />
+                                    </div>
+                                </div>
+
+                                {/* Indicator */}
+                                <div
+                                    className="absolute w-4 h-4 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)] pointer-events-none transition-all duration-75"
+                                    style={{
+                                        left: `${(cueSpin.x + 1) * 50}%`,
+                                        top: `${(-cueSpin.y + 1) * 50}%`,
+                                        transform: 'translate(-50%, -50%)'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Auto Target Button */}
+                <button
+                    onClick={handleAutoTarget}
+                    title="가까운 공 자동 조준"
+                    className="w-12 h-12 rounded-full premium-glass flex items-center justify-center text-[#E0E0E0]/40 hover:text-matte-gold transition-all active:scale-90"
+                >
+                    <Crosshair strokeWidth={1.5} size={24} />
+                    <span className="sr-only">Auto Target</span>
+                </button>
+
+
+                {/* Vertical Power Bar */}
+                <div className="h-40 w-12 flex flex-col items-center justify-end premium-glass rounded-full overflow-hidden relative group shadow-inner">
+                    {/* Fill */}
+                    <div
+                        className="w-full bg-gradient-to-t from-[#C5A059] to-[#8B4513] transition-all duration-100 ease-out opacity-90 shadow-lg"
+                        style={{ height: `${cuePower}%` }}
+                    />
+                    {/* Input Overlay */}
+                    <input
+                        type="range"
+                        min="0" max="100"
+                        value={cuePower}
+                        onChange={(e) => setCuePower(Number(e.target.value))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-10"
+                        style={{ writingMode: 'vertical-lr', direction: 'rtl' } as any}
+                        title="Power Control"
+                    />
+                    <Zap size={16} className="absolute bottom-3 text-black/50 pointer-events-none" strokeWidth={2.5} />
+                </div>
+
+                {/* 4. Bottom Main Action (Stroke Button) */}
+                <button
+                    onClick={handleShot}
+                    disabled={isSimulating}
+                    title="스트로크"
+                    className="w-12 h-12 rounded-full flex items-center justify-center premium-glass border-white/10 text-matte-gold shadow-[0_0_20px_rgba(197,160,89,0.15)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed group relative mt-2"
+                >
+                    <Play className="w-5 h-5 fill-current ml-0.5" />
+                    {/* Ripple/Glow effect ring */}
+                    <div className="absolute inset-0 rounded-full border border-matte-gold/30 animate-ping opacity-30" />
+                </button>
+            </div>
+
+
+
+            {/* 5. Inning Record Modal */}
+            {isScoreSheetOpen && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+                    <div className="w-full max-w-sm premium-glass rounded-3xl border border-white/10 p-6 flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-black text-white tracking-tight">이닝별 기록표</h2>
+                            <button
+                                onClick={() => setIsScoreSheetOpen(false)}
+                                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white"
+                                title="닫기"
+                            >
+                                <ChevronLeft className="rotate-90" size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto max-h-[60vh] space-y-2 pr-2 custom-scrollbar">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-white/5">
+                                        <th className="py-2 text-[10px] font-bold text-white/40 uppercase">Inning</th>
+                                        <th className="py-2 text-[10px] font-bold text-white/40 uppercase text-center">Score</th>
+                                        <th className="py-2 text-[10px] font-bold text-white/40 uppercase text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {inningRecords.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} className="py-8 text-center text-xs text-white/20 italic">
+                                                기록된 이닝이 없습니다.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        [...inningRecords].reverse().map((r) => {
+                                            // Calculate cumulative score for that inning
+                                            const cumulative = inningRecords
+                                                .filter(item => item.inning <= r.inning)
+                                                .reduce((sum, item) => sum + item.score, 0);
+
+                                            return (
+                                                <tr key={r.inning} className="border-b border-white/5 last:border-0">
+                                                    <td className="py-3 text-sm font-medium text-white/60">{r.inning}</td>
+                                                    <td className={`py-3 text-sm font-black text-center ${r.score > 0 ? 'text-indigo-400' : 'text-white/20'}`}>
+                                                        {r.score > 0 ? `+${r.score}` : r.score}
+                                                    </td>
+                                                    <td className="py-3 text-sm font-bold text-white text-right">{cumulative}</td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center">
+                            <div>
+                                <span className="text-[10px] font-bold text-white/40 uppercase block leading-none">TOTAL SCORE</span>
+                                <span className="text-2xl font-black text-indigo-400">{score}</span>
+                            </div>
+                            <div className="text-right flex flex-col items-end">
+                                <span className="text-[10px] font-bold text-white/40 uppercase block leading-none">
+                                    {engineRef.current?.getSpec().name.split(' ')[0] || "대대"} 모드
+                                </span>
+                                <span className="text-xl font-black text-white">{avg}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 6. Virtual Joystick (Bottom Right) */}
+            {!isSimulating && (
+                <div
+                    className={`absolute right-6 bottom-10 z-50 pointer-events-auto transition-opacity duration-300 ease-in-out ${joystickOpacity < 0.5 ? 'opacity-20' : 'opacity-100'
+                        }`}
+                >
+                    <VirtualJoystick
+                        onStart={() => setIsJoystickActive(true)}
+                        onEnd={() => setIsJoystickActive(false)}
+                        onMove={(delta) => {
+                            setCueAngle(prev => prev + delta);
+                        }}
+                    />
+                </div>
+            )}
+
+            {/* 7. Fine Angle Control (Bottom Center) - Horizontal Layout */}
+            {!isSimulating && (
+                <div
+                    className={`absolute left-1/2 -translate-x-1/2 bottom-10 z-50 flex items-center gap-4 premium-glass rounded-full px-4 py-1 border-white/5 transition-opacity duration-300 ease-in-out ${joystickOpacity < 0.5 ? 'opacity-20' : 'opacity-100'
+                        }`}
+                >
+                    <button
+                        onPointerDown={() => startFineAdjust(-1)}
+                        onPointerUp={stopFineAdjust}
+                        onPointerLeave={stopFineAdjust}
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-[#E0E0E0]/40 hover:text-matte-gold active:scale-90 transition-all pointer-events-auto"
+                        title="미세조절 (좌)"
+                    >
+                        <ChevronLeft strokeWidth={2.5} size={20} />
+                    </button>
+                    <div className="w-px h-5 bg-white/10" />
+                    <button
+                        onPointerDown={() => startFineAdjust(1)}
+                        onPointerUp={stopFineAdjust}
+                        onPointerLeave={stopFineAdjust}
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-[#E0E0E0]/40 hover:text-matte-gold active:scale-90 transition-all pointer-events-auto"
+                        title="미세조절 (우)"
+                    >
+                        <ChevronRight strokeWidth={2.5} size={20} />
+                    </button>
+                </div>
+            )}
+
+        </div >
+    );
+}

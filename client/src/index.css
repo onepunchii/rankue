@@ -1,5 +1,46 @@
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 
+/* HiQ Brand & Tier Utilities */
+.hiq-neon-glow {
+  filter: drop-shadow(0 0 8px var(--hiq-brand-color, #22c55e));
+}
+
+.tier-master {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.tier-diamond {
+  color: #a855f7;
+  border-color: rgba(168, 85, 247, 0.2);
+  background-color: rgba(168, 85, 247, 0.05);
+}
+
+.tier-platinum {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.2);
+  background-color: rgba(56, 189, 248, 0.05);
+}
+
+.tier-gold {
+  color: #ffd700;
+  border-color: rgba(255, 215, 0, 0.2);
+  background-color: rgba(255, 215, 0, 0.05);
+}
+
+.tier-silver {
+  color: #e2e8f0;
+  border-color: rgba(226, 232, 240, 0.2);
+  background-color: rgba(226, 232, 240, 0.05);
+}
+
+.tier-bronze {
+  color: #cd7f32;
+  border-color: rgba(205, 127, 50, 0.2);
+  background-color: rgba(205, 127, 50, 0.05);
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -209,7 +250,7 @@ body {
 
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
-    /* Safari and Chrome */
+    /* Chrome, Safari and Opera */
   }
 
   @keyframes pulse-slow {
@@ -395,6 +436,11 @@ body {
   --polli-red: hsl(350, 85%, 60%);
   --polli-surface: hsla(0, 0%, 0%, 0.5);
   --polli-background: hsla(265, 20%, 10%, 0.3);
+
+  /* HiQ Branding Variables (Theming) */
+  --brand-primary: #6366f1;
+  /* Default Blue */
+  --brand-neon: #818cf8;
 }
 
 @layer base {
@@ -435,6 +481,99 @@ body {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+  }
+}
+
+@layer utilities {
+  .hiq-brand-accent {
+    color: var(--brand-primary, #6366f1);
+  }
+
+  .hiq-brand-neon {
+    color: var(--brand-neon, #818cf8);
+  }
+
+  /* Visibility Utility */
+  .text-premium-bright {
+    color: #F5F5F5;
+  }
+
+  /* Premium Dark & Neon Utilities */
+  .premium-glass {
+    background: rgba(0, 0, 0, 0.4);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    /* Top Highlight */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .text-premium {
+    color: #E0E0E0;
+  }
+
+  .text-matte-gold {
+    color: #C5A059;
+    text-shadow: 0 0 1px rgba(197, 160, 89, 0.3);
+  }
+
+  .text-chrome {
+    color: #94A3B8;
+  }
+
+  .bg-premium-billiards {
+    background-image: url('/assets/hiq-bg.png');
+    background-size: cover;
+    background-position: center;
+  }
+
+  .premium-glass-strong {
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .neon-glow {
+    filter: drop-shadow(0 0 8px var(--hiq-brand-color));
+  }
+
+  .neon-border {
+    border: 1px solid var(--hiq-brand-color);
+    box-shadow: 0 0 15px var(--hiq-brand-color);
+  }
+
+  .text-shadow-neon {
+    text-shadow: 0 0 10px var(--hiq-brand-color);
+  }
+
+  @keyframes ticker {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+
+  .animate-ticker {
+    animation: ticker 60s linear infinite;
+  }
+
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
   }
 }
 

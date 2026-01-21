@@ -1,757 +1,241 @@
 import {
   pgTable,
   text,
-  varchar,
   timestamp,
-  jsonb,
   integer,
-  bigint,
   boolean,
   unique,
   uuid,
-  numeric,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
 
-// 1. 통합 인증 및 AI 페르소나 시스템
+// 1. 프로필 (기본 사용자 정보 - HiQ에서 참조할 수 있음)
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().notNull(), // Supabase Auth user id
-  nickname: varchar("nickname", { length: 50 }),
-  email: varchar("email", { length: 255 }),
-  fullName: varchar("full_name", { length: 100 }),
-  phone: varchar("phone", { length: 50 }),
-  profileImageUrl: varchar("profile_image_url", { length: 500 }),
-
-  // [중요] 정치 성향 및 AI 페르소나 분석
-  participationCount: integer("participation_count").default(0).notNull(),
-  politicalAnalysis: jsonb("political_analysis").default({
-    economic: 50, // 0: 분배/복지, 100: 성장/상생
-    social: 50,   // 0: 진보/자유, 100: 보수/질서
-    keywords: []
-  }).notNull(),
-  aiPersona: jsonb("ai_persona").default({}).notNull(),
-  personaStatus: varchar("persona_status", { length: 20 }).default("collecting").notNull(), // 'collecting', 'ready', 'generated'
-
-  // 등급 및 포인트 시스템
-  level: integer("level").default(1).notNull(),
-  experience: integer("experience").default(0).notNull(),
-  personalPoints: integer("personal_points").default(0).notNull(),
-  availableLotteryTickets: integer("available_lottery_tickets").default(1).notNull(),
-
-  // Brain Rank System (Level & ELO Ratings)
-  brainLevel: integer("brain_level").default(2).notNull(), // Start at Silver (2)
-  brainRatingLogic: integer("brain_rating_logic").default(1200).notNull(), // Logic
-  brainRatingMath: integer("brain_rating_math").default(1200).notNull(), // Math
-  brainRatingVerbal: integer("brain_rating_verbal").default(1200).notNull(), // Verbal
-  brainRatingEconomy: integer("brain_rating_economy").default(1200).notNull(), // Economy
-  brainRatingTrivia: integer("brain_rating_trivia").default(1200).notNull(), // Trivia (Common Sense)
-  brainCurrentStreak: integer("brain_current_streak").default(0).notNull(),
-  brainLastRank: integer("brain_last_rank"), // For calculating rank change (updated daily)
-
-  // 인구통계 정보 (설문 분석용)
-  ageGroup: varchar("age_group", { length: 20 }),
-  gender: varchar("gender", { length: 10 }),
-  region: varchar("region", { length: 50 }),
-  city: varchar("city", { length: 100 }),
-  constituency: varchar("constituency", { length: 200 }), // 지역구 정보
-  jobCategory: varchar("job_category", { length: 100 }),
-  educationLevel: varchar("education_level", { length: 100 }),
-  incomeLevel: varchar("income_level", { length: 50 }),
-  maritalStatus: varchar("marital_status", { length: 50 }),
-  isPetOwner: boolean("is_pet_owner").default(false),
-
-  // 설정 및 메타데이터
-  badges: text("badges").array().default([]).notNull(),
-  pushToken: varchar("push_token", { length: 255 }),
-  notificationSettings: jsonb("notification_settings").default({
-    push: true,
-    email: true,
-    marketing: false
-  }),
-  lastLoginAt: timestamp("last_login_at"),
+  nickname: text("nickname"),
+  email: text("email"),
+  phone: text("phone"),
+  profileImageUrl: text("profile_image_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// 2. 인물 마스터 데이터 (CSV 소스 기반)
-export const celebrities = pgTable("celebrities", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  name: varchar("name", { length: 200 }).notNull(),
-  category: varchar("category", { length: 50 }).notNull(), // 'boy_group', 'actor_female', etc.
-  gender: varchar("gender", { length: 50 }),
-  type: varchar("type", { length: 100 }), // 'Individual', 'Group'
-  imageUrl: varchar("image_url", { length: 500 }),
-  description: text("description"),
-  rankOriginal: integer("rank_original"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// 3. 설문(투표) 시스템
-export const surveys = pgTable("surveys", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  title: varchar("title", { length: 255 }).notNull(),
-  slug: varchar("slug", { length: 300 }).unique(),
-  description: text("description"),
-  category: varchar("category", { length: 50 }).notNull(),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdBy: uuid("created_by").references(() => profiles.id),
-  participantCount: integer("participant_count").default(0).notNull(),
-
-  experienceReward: integer("experience_reward").default(10),
-  personalPointsReward: integer("personal_points_reward").default(0),
-
-  isAnonymous: boolean("is_anonymous").default(false),
-  rewardType: varchar("reward_type", { length: 50 }).default("experience"),
-  rewardAmount: integer("reward_amount").default(0),
-  newsSourceUrl: text("news_source_url"),
-
-  // SEO & Social Meta
-  seoTitle: varchar("seo_title", { length: 255 }),
-  seoDescription: text("seo_description"),
-  seoKeywords: text("seo_keywords").array(),
-  canonicalUrl: text("canonical_url"),
-  ogImage: text("og_image"),
-
-  // AI 분석 메타데이터
-  aiAnalysisSummary: text("ai_analysis_summary"),
-  aiAnalysisPros: text("ai_analysis_pros").array(),
-  aiAnalysisCons: text("ai_analysis_cons").array(),
-  aiAnalysisKeywords: text("ai_analysis_keywords").array(),
-  aiAnalysisOneLiner: text("ai_analysis_one_liner"),
-
-  votingStartDate: timestamp("voting_start_date").defaultNow(),
-  votingEndDate: timestamp("voting_end_date"),
+// --- HiQ (Billiard Service) Tables ---
+export const hiqStores = pgTable("hiq_stores", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  slug: text("slug").unique().notNull(), // URL identifier (e.g. 'hiq', 'busan')
+  name: text("name").notNull(),
+  logoText: text("logo_text"),
+  themeColor: text("theme_color").default("#0e4d2a"),
+  neonColor: text("neon_color").default("#ffd700"),
+  subText: text("sub_text"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const surveyQuestions = pgTable("survey_questions", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  surveyId: bigint("survey_id", { mode: "number" }).references(() => surveys.id, { onDelete: "cascade" }),
-  question: text("question").notNull(),
-  type: varchar("type", { length: 50 }).notNull(), // 'multiple_choice', 'text', 'rating', 'ranking'
-  options: jsonb("options"), // 선택지 배열
-  isRequired: boolean("is_required").default(true),
-  order: integer("order").default(0),
-  ratingScale: integer("rating_scale").default(5),
-});
-
-export const surveyResponses = pgTable("survey_responses", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  surveyId: bigint("survey_id", { mode: "number" }).references(() => surveys.id, { onDelete: "cascade" }),
-  questionId: bigint("question_id", { mode: "number" }).references(() => surveyQuestions.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "set null" }),
-  answer: jsonb("answer").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// Political Aggregation Stats
-export const politicalStats = pgTable("political_stats", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  surveyId: bigint("survey_id", { mode: "number" }).notNull(),
-  weekLabel: text("week_label").notNull(), // e.g. "2026년 1월 3주차"
-  presidential: jsonb("presidential").notNull(), // Total: { positive: 30, negative: 60, neutral: 10 }
-  parties: jsonb("parties").notNull(), // Total: { '더불어민주당': 40, '국민의힘': 35... }
-  priorities: jsonb("priorities").notNull(), // Total: { '물가/경제 안정': 40, '소통/협치': 30... }
-  genderBreakdown: jsonb("gender_breakdown"), // { '남성': { presidential: {...}, parties: {...} }, '여성': {...} }
-  ageBreakdown: jsonb("age_breakdown"), // { '20대': { ... }, '30대': { ... } }
-  regionBreakdown: jsonb("region_breakdown"), // { '서울': { ... }, '부산': { ... } }
-  totalParticipants: integer("total_participants").default(0).notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const insertPoliticalStatsSchema = createInsertSchema(politicalStats);
-
-export const userSurveyParticipation = pgTable("user_survey_participation", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
-  surveyId: bigint("survey_id", { mode: "number" }).references(() => surveys.id, { onDelete: "cascade" }),
-  pointsEarned: integer("points_earned").default(0),
-  completedAt: timestamp("completed_at").defaultNow(),
-}, (table) => [
-  unique().on(table.userId, table.surveyId),
-]);
-
-// 6. 커뮤니티 및 기타 기능
-export const celebrityBattles = pgTable("celebrity_battles", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  title: varchar("title", { length: 255 }).notNull(),
-  category: varchar("category", { length: 50 }).notNull(),
-  description: text("description"),
-  status: varchar("status", { length: 20 }).default("active"),
-  startDate: timestamp("start_date").defaultNow(),
-  endDate: timestamp("endDate"),
-});
-
-export const quickPolls = pgTable("quick_polls", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  title: varchar("title", { length: 255 }).notNull(),
-  options: jsonb("options").notNull(),
-  creatorId: uuid("creator_id").references(() => profiles.id),
-  voteCount: integer("vote_count").default(0),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const quickPollVotes = pgTable("quick_poll_votes", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  pollId: bigint("poll_id", { mode: "number" }).references(() => quickPolls.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
-  optionId: integer("option_id").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  unique().on(table.pollId, table.userId),
-]);
-
-export const rewardItems = pgTable("reward_items", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  name: varchar("name", { length: 100 }).notNull(),
-  description: text("description"),
-  pointCost: integer("point_cost").notNull(),
-  category: varchar("category", { length: 50 }).notNull(),
-  isActive: boolean("is_active").default(true),
+export const hiqMembers = pgTable("hiq_members", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  storeId: uuid("store_id").references(() => hiqStores.id).notNull(),
+  phone: text("phone").notNull(),
+  name: text("name").notNull(),
+  birthYear: integer("birth_year"),
+  handi3c: integer("handi_3c"),
+  handi4c: integer("handi_4c"),
+  average: text("average"),
+  marketingAgree: boolean("marketing_agree").default(false),
+  visitCount: integer("visit_count").default(0),
+  lastVisitedAt: timestamp("last_visited_at"),
+  gender: text("gender", { enum: ["male", "female"] }),
+  // totalSimPoints: integer("total_sim_points").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const battleParticipants = pgTable("battle_participants", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  battleId: bigint("battle_id", { mode: "number" }).references(() => celebrityBattles.id, { onDelete: "cascade" }),
-  celebrityId: bigint("celebrity_id", { mode: "number" }).references(() => celebrities.id),
-  voteCount: integer("vote_count").default(0),
-});
-
-export const battleVotes = pgTable("battle_votes", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  battleId: bigint("battle_id", { mode: "number" }).references(() => celebrityBattles.id, { onDelete: "cascade" }),
-  participantId: bigint("participant_id", { mode: "number" }).references(() => battleParticipants.id, { onDelete: "cascade" }),
-  voterId: uuid("voter_id").references(() => profiles.id),
-  createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
-  unique().on(table.battleId, table.voterId),
+  unique().on(table.storeId, table.phone),
 ]);
 
-// 5. 국회 및 뉴스 의안 시스템
-export const assemblyBills = pgTable("assembly_bills", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  billName: varchar("bill_name", { length: 500 }).notNull(),
-  proposer: varchar("proposer", { length: 200 }).notNull(),
-  billId: varchar("bill_id", { length: 100 }).unique(),
-  procStage: varchar("proc_stage", { length: 100 }),
-  proposalDate: timestamp("proposal_date"),
-  summary: text("summary"),
-  detailLink: varchar("detail_link", { length: 500 }),
-  surveyId: bigint("survey_id", { mode: "number" }).references(() => surveys.id),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
+export const hiqGames = pgTable("hiq_games", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  storeId: uuid("store_id").references(() => hiqStores.id).notNull(),
+  gameMode: text("game_mode", { enum: ["match", "practice"] }).notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  player1Id: uuid("player1_id").references(() => hiqMembers.id).notNull(),
+  player2Id: uuid("player2_id").references(() => hiqMembers.id),
+  player3Id: uuid("player3_id").references(() => hiqMembers.id),
+  player4Id: uuid("player4_id").references(() => hiqMembers.id),
+
+  player2Name: text("player2_name"),
+  player3Name: text("player3_name"),
+  player4Name: text("player4_name"),
+
+  player1Target: integer("player1_target").default(0).notNull(),
+  player2Target: integer("player2_target").default(0).notNull(),
+  player3Target: integer("player3_target").default(0).notNull(),
+  player4Target: integer("player4_target").default(0).notNull(),
+
+  player1Score: integer("player1_score").default(0).notNull(),
+  player2Score: integer("player2_score").default(0).notNull(),
+  player3Score: integer("player3_score").default(0).notNull(),
+  player4Score: integer("player4_score").default(0).notNull(),
+
+  player1FinishScore: integer("player1_finish_score").default(0).notNull(),
+  player2FinishScore: integer("player2_finish_score").default(0).notNull(),
+  player3FinishScore: integer("player3_finish_score").default(0).notNull(),
+  player4FinishScore: integer("player4_finish_score").default(0).notNull(),
+
+  finishTargetCount: integer("finish_target_count").default(0).notNull(),
+  ruleFinishType: text("rule_finish_type", { enum: ["none", "3c", "bank"] }).default("none").notNull(),
+  usePbaRule: boolean("use_pba_rule").default(false).notNull(),
+  targetScore: integer("target_score").notNull(),
+  totalInnings: integer("total_innings").default(0).notNull(),
+  winnerId: uuid("winner_id").references(() => hiqMembers.id), // The player who triggered finish
+
+  player1FinishInnings: integer("player1_finish_innings").default(0).notNull(),
+  player2FinishInnings: integer("player2_finish_innings").default(0).notNull(),
+  player3FinishInnings: integer("player3_finish_innings").default(0).notNull(),
+  player4FinishInnings: integer("player4_finish_innings").default(0).notNull(),
+
+  player1HighRun: integer("player1_high_run").default(0).notNull(),
+  player2HighRun: integer("player2_high_run").default(0).notNull(),
+  player3HighRun: integer("player3_high_run").default(0).notNull(),
+  player4HighRun: integer("player4_high_run").default(0).notNull(),
+
+  player1Innings: jsonb("player1_innings"),
+  player2Innings: jsonb("player2_innings"),
+  player3Innings: jsonb("player3_innings"),
+  player4Innings: jsonb("player4_innings"),
+
+  status: text("status", { enum: ["playing_base", "playing_finish", "finished"] }).default("playing_base").notNull(),
+  isRanked: boolean("is_ranked").default(false).notNull(), // True if at least one VERIFIED MEMBER opponent existed
+  player1Name: text("player1_name"),
+  result: text("result"), // Summary of game outcome
+  playedAt: timestamp("played_at").defaultNow().notNull(),
 });
 
-// 5. 국회 및 뉴스 의안 시스템
-export const assemblyMembers = pgTable("assembly_members", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  name: varchar("name", { length: 100 }).notNull(),
-  nameHanja: varchar("name_hanja", { length: 100 }), // 한자명
-  nameEng: varchar("name_eng", { length: 100 }), // 영문명
-  party: varchar("party", { length: 100 }),
-
-  // 지역 정보
-  region: varchar("region", { length: 50 }), // 시/도
-  district: varchar("district", { length: 100 }), // 시/군/구
-  constituency: varchar("constituency", { length: 200 }), // 선거구
-
-  // 상세 프로필
-  gender: varchar("gender", { length: 10 }),
-  birthDate: varchar("birth_date", { length: 20 }),
-  age: integer("age"),
-  polyImage: varchar("image_url", { length: 500 }),
-
-  // 당선 정보
-  electionTerm: varchar("election_term", { length: 20 }), // 당선 대수 (21대, 22대 등)
-  reelectionStatus: varchar("reelection_status", { length: 50 }), // 재선 여부 (초선, 재선, 3선, 4선 등)
-
-  // 의정 활동 데이터
-  mainCommittee: varchar("main_committee", { length: 200 }), // 주요 상임위원회
-  committee: varchar("committee", { length: 200 }), // 소속 위원회 (복수 가능)
-  committees: text("committees"), // 전체 위원회 목록
-  billsProposed: integer("bills_proposed").default(0),
-  attendanceRate: numeric("attendance_rate", { precision: 5, scale: 2 }).default("0.00"),
-
-  // 경력 및 학력
-  education: text("education"), // 학력
-  career1: text("career1"), // 주요 경력 1
-  career2: text("career2"), // 주요 경력 2
-
-  // 연락처
-  phoneNumber: varchar("phone_number", { length: 50 }), // 전화번호
-  email: varchar("email", { length: 100 }), // 이메일
-  officeRoom: varchar("office_room", { length: 100 }), // 사무실 호실
-  homepage: varchar("homepage", { length: 200 }), // 홈페이지
-
-  // 기타
-  status: varchar("status", { length: 50 }).default("재직"), // 재직 상태
-
-  // AI 및 평가
-  activityScore: integer("activity_score").default(0),
-  jobEvaluation: integer("job_evaluation").default(0), // 직무 수행 평가 점수
-  aiPersona: jsonb("ai_persona"), // AI 생성 페르소나 카드 데이터
-
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+export const hiqVisitLogs = pgTable("hiq_visit_logs", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  visitedAt: timestamp("visited_at").defaultNow().notNull(),
 });
 
-export const localCouncilMembers = pgTable("local_council_members", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  name: varchar("name", { length: 100 }).notNull(),
-  party: varchar("party", { length: 100 }),
-
-  // 지역 정보 (광역/기초 구분)
-  type: varchar("type", { length: 50 }).notNull(), // 'metro_council' (광역의원), 'local_council' (기초의원), 'metro_head' (광역단체장), 'local_head' (기초단체장)
-  cityProvince: varchar("city_province", { length: 100 }).notNull(), // 시/도
-  district: varchar("district", { length: 100 }), // 시/군/구 (기초의원/단체장일 경우)
-  constituency: varchar("constituency", { length: 200 }), // 선거구명
-
-  // 프로필
-  gender: varchar("gender", { length: 10 }),
-  birthDate: varchar("birth_date", { length: 20 }),
-  age: integer("age"),
-  address: varchar("address", { length: 500 }),
-  profileImage: varchar("profile_image", { length: 500 }),
-
-  // 상세 정보
-  job: varchar("job", { length: 100 }), // 직업
-  education: text("education"), // 학력
-  career1: text("career1"), // 경력1
-  career2: text("career2"), // 경력2
-
-  property: bigint("property", { mode: "number" }), // 재산신고액 (천원)
-  taxArrears: bigint("tax_arrears", { mode: "number" }), // 체납액 (천원)
-  criminalHistory: varchar("criminal_history", { length: 200 }), // 전과기록
-  candidacyCount: varchar("candidacy_count", { length: 50 }), // 입후보횟수
-  aiPersona: jsonb("ai_persona"), // AI 생성 페르소나 카드 데이터
-
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Ratings & Comments
-export const assemblyRatings = pgTable("assembly_ratings", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  targetId: bigint("target_id", { mode: "number" }).references(() => assemblyMembers.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
-  rating: integer("rating").notNull(), // Overall/Average rating
-  communicationRating: integer("communication_rating").default(0).notNull(),
-  policyRating: integer("policy_rating").default(0).notNull(),
-  integrityRating: integer("integrity_rating").default(0).notNull(),
-  localDevRating: integer("local_dev_rating").default(0).notNull(),
-  comment: text("comment"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const localCouncilRatings = pgTable("local_council_ratings", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  targetId: bigint("target_id", { mode: "number" }).references(() => localCouncilMembers.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
-  rating: integer("rating").notNull(), // Overall/Average rating
-  communicationRating: integer("communication_rating").default(0).notNull(),
-  policyRating: integer("policy_rating").default(0).notNull(),
-  integrityRating: integer("integrity_rating").default(0).notNull(),
-  localDevRating: integer("local_dev_rating").default(0).notNull(),
-  comment: text("comment"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertAssemblyMemberSchema = createInsertSchema(assemblyMembers);
-export const insertLocalCouncilMemberSchema = createInsertSchema(localCouncilMembers);
-export const insertAssemblyRatingSchema = createInsertSchema(assemblyRatings);
-export const insertLocalCouncilRatingSchema = createInsertSchema(localCouncilRatings); // Added export
-
-
-export const assemblyComments = pgTable("assembly_comments", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  targetId: bigint("target_id", { mode: "number" }).references(() => assemblyMembers.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
-  content: text("content").notNull(),
-  likeCount: integer("like_count").default(0),
-  reportCount: integer("report_count").default(0),
-  isFiltered: boolean("is_filtered").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const localCouncilComments = pgTable("local_council_comments", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  targetId: bigint("target_id", { mode: "number" }).references(() => localCouncilMembers.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
-  content: text("content").notNull(),
-  likeCount: integer("like_count").default(0),
-  reportCount: integer("report_count").default(0),
-  isFiltered: boolean("is_filtered").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const newsArticles = pgTable("news_articles", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  title: text("title").notNull(),
-  url: text("url").unique().notNull(),
-  publishedAt: timestamp("published_at"),
-  imageUrl: text("image_url"),
-  content: text("content"),
-  category: text("category").default("전체"),
-  mindTranslation: jsonb("mind_translation"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// 6. 포인트 및 가상 재화 시스템
-export const pointTransactions = pgTable("point_transactions", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }).notNull(),
-  type: varchar("type", { length: 20 }).notNull(), // 'earn', 'spend', 'send', 'receive'
-  amount: integer("amount").notNull(),
-  description: text("description").notNull(),
-  referenceId: varchar("reference_id", { length: 100 }), // e.g., order_id, external_id
-  relatedUserId: uuid("related_user_id").references(() => profiles.id),
-  status: varchar("status", { length: 20 }).default("completed").notNull(),
+export const hiqGameHistory = pgTable("hiq_game_history", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  gameId: uuid("game_id").references(() => hiqGames.id).notNull(),
+  gameMode: text("game_mode", { enum: ["match", "practice"] }).notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  score: integer("score").notNull(),
+  innings: integer("innings").notNull(),
+  average: text("average").notNull(),
+  isWinner: boolean("is_winner").default(false).notNull(),
+  isRanked: boolean("is_ranked").default(false).notNull(),
+  highRun: integer("high_run").default(0).notNull(),
+  inningData: jsonb("inning_data"),
+  earnedPoints: integer("earned_points").default(0).notNull(),
+  opponentName: text("opponent_name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const lotteryTickets = pgTable("lottery_tickets", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }),
-  roundId: integer("round_id").notNull(),
-  numbers: integer("numbers").array().notNull(),
-  isWinner: boolean("is_winner").default(false),
-  prizeAmount: integer("prize_amount").default(0),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const lotteryDraws = pgTable("lottery_draws", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  drawDate: timestamp("draw_date").notNull().unique(),
-  winningNumbers: integer("winning_numbers").array().notNull(),
-  totalParticipants: integer("total_participants").default(0),
-  totalPrizePool: integer("total_prize_pool").default(0),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// 7. 음악 랭킹 시스템
-export const musicCategories = pgTable("music_categories", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  name: varchar("name", { length: 100 }).notNull(),
-  icon: varchar("icon", { length: 50 }),
-  description: text("description"),
-  sortOrder: integer("sort_order").default(0),
-  isActive: boolean("is_active").default(true),
-});
-
-export const musicArtists = pgTable("music_artists", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  name: varchar("name", { length: 200 }).notNull(),
-  categoryId: bigint("category_id", { mode: "number" }).references(() => musicCategories.id),
-  imageUrl: varchar("image_url", { length: 500 }),
-  description: text("description"),
-  debutYear: integer("debut_year"),
-  agency: varchar("agency", { length: 200 }),
-  currentMonthVotes: integer("current_month_votes").default(0),
-  totalVotes: integer("total_votes").default(0),
-  currentRank: integer("current_rank").default(0),
-  previousRank: integer("previous_rank").default(0),
-  isActive: boolean("is_active").default(true),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const musicVotes = pgTable("music_votes", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  userId: varchar("user_id", { length: 100 }).notNull(), // guest_common or uuid
-  artistId: bigint("artist_id", { mode: "number" }).references(() => musicArtists.id),
-  categoryId: bigint("category_id", { mode: "number" }).references(() => musicCategories.id),
-  voteMonth: varchar("vote_month", { length: 7 }).notNull(), // YYYY-MM
-  ipAddress: varchar("ip_address", { length: 50 }),
-  userAgent: text("user_agent"),
-  createdAt: timestamp("created_at").defaultNow(),
+export const hiqFriendships = pgTable("hiq_friendships", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  requesterId: uuid("requester_id").references(() => hiqMembers.id).notNull(),
+  receiverId: uuid("receiver_id").references(() => hiqMembers.id).notNull(),
+  status: text("status", { enum: ["pending", "accepted"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
-  unique().on(table.userId, table.artistId, table.voteMonth), // 한 달에 아티스트당 1회 투표 제한 (또는 로직에 따라 변경 가능)
+  unique().on(table.requesterId, table.receiverId),
 ]);
 
-export const musicMonthlyRankings = pgTable("music_monthly_rankings", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
-  categoryId: bigint("category_id", { mode: "number" }).references(() => musicCategories.id),
-  artistId: bigint("artist_id", { mode: "number" }).references(() => musicArtists.id),
-  finalRank: integer("final_rank").notNull(),
-  totalVotes: integer("total_votes").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  unique().on(table.month, table.categoryId, table.artistId),
-]);
+export const insertHiqStoreSchema = createInsertSchema(hiqStores).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertHiqMemberSchema = createInsertSchema(hiqMembers, {
+  phone: z.string().min(10, "전화번호 형식이 올바르지 않습니다."),
+  name: z.string().min(2, "이름은 2글자 이상이어야 합니다."),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  visitCount: true
+});
 
-// --- Relations ---
-export const profilesRelations = relations(profiles, ({ many }) => ({
-  surveys: many(surveys),
-  responses: many(surveyResponses),
-  participations: many(userSurveyParticipation),
-  transactions: many(pointTransactions),
-  lotteryTickets: many(lotteryTickets),
-  battleVotes: many(battleVotes),
-}));
+export const insertHiqGameSchema = createInsertSchema(hiqGames).omit({
+  id: true,
+  playedAt: true
+});
 
-export const surveysRelations = relations(surveys, ({ one, many }) => ({
-  creator: one(profiles, { fields: [surveys.createdBy], references: [profiles.id] }),
-  questions: many(surveyQuestions),
-  responses: many(surveyResponses),
-  assemblyBill: one(assemblyBills, { fields: [surveys.id], references: [assemblyBills.surveyId] }),
-}));
+export const insertHiqVisitLogSchema = createInsertSchema(hiqVisitLogs).omit({
+  id: true,
+  visitedAt: true
+});
 
-export const celebrityBattlesRelations = relations(celebrityBattles, ({ many }) => ({
-  participants: many(battleParticipants),
-}));
+export const insertHiqGameHistorySchema = createInsertSchema(hiqGameHistory).omit({
+  id: true,
+  createdAt: true
+});
 
-export const battleParticipantsRelations = relations(battleParticipants, ({ one }) => ({
-  battle: one(celebrityBattles, { fields: [battleParticipants.battleId], references: [celebrityBattles.id] }),
-  celebrity: one(celebrities, { fields: [battleParticipants.celebrityId], references: [celebrities.id] }),
-}));
+export const insertHiqFriendshipSchema = createInsertSchema(hiqFriendships).omit({
+  id: true,
+  createdAt: true
+});
 
-// 11. 정치 지표 (여론조사 데이터)
-export const politicalPolls = pgTable("political_polls", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  pollDate: timestamp("poll_date").notNull(),
-  pollType: varchar("poll_type", { length: 50 }).notNull(), // 'presidential_approval', 'party_support', 'candidate_support'
-  targetName: varchar("target_name", { length: 100 }).notNull(), // '윤석열', '더불어민주당' 등
-  value: varchar("value", { length: 50 }).notNull(), // 지지율 (숫자 문자열)
-  category: varchar("category", { length: 50 }), // '긍정', '부정', '무응답' 등 (대통령 지지율의 경우)
-  source: varchar("source", { length: 100 }), // 조사 기관/출처
-  sampleSize: integer("sample_size"), // 표본 크기
-  marginOfError: varchar("margin_of_error", { length: 50 }), // 오차 범위
+export const hiqInvites = pgTable("hiq_invites", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  code: text("code").notNull(), // 6-digit code
+  hostId: uuid("host_id").references(() => hiqMembers.id).notNull(),
+  guestId: uuid("guest_id").references(() => hiqMembers.id), // Filled when a member joins
+  status: text("status", { enum: ["pending", "accepted", "expired"] }).default("pending").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const politicalFigures = pgTable("political_figures", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  name: varchar("name", { length: 100 }).notNull(),
-  party: varchar("party", { length: 100 }),
-  position: varchar("position", { length: 100 }),
-  imageUrl: varchar("image_url", { length: 500 }),
-  description: text("description"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// --- Zod Schemas ---
-export const insertProfileSchema = createInsertSchema(profiles);
-export const insertSurveySchema = createInsertSchema(surveys);
-export const insertSurveyQuestionSchema = createInsertSchema(surveyQuestions);
-export const insertSurveyResponseSchema = createInsertSchema(surveyResponses);
-export const insertUserSurveyParticipationSchema = createInsertSchema(userSurveyParticipation);
-export const insertCelebritySchema = createInsertSchema(celebrities);
-export const insertCelebrityBattleSchema = createInsertSchema(celebrityBattles);
-export const insertBattleParticipantSchema = createInsertSchema(battleParticipants);
-export const insertBattleVoteSchema = createInsertSchema(battleVotes);
-export const insertQuickPollSchema = createInsertSchema(quickPolls);
-export const insertRewardItemSchema = createInsertSchema(rewardItems);
-export const insertAssemblyBillSchema = createInsertSchema(assemblyBills);
-export const insertAssemblyCommentSchema = createInsertSchema(assemblyComments);
-export const insertLocalCouncilCommentSchema = createInsertSchema(localCouncilComments);
-export const insertNewsArticleSchema = createInsertSchema(newsArticles);
-export const insertPointTransactionSchema = createInsertSchema(pointTransactions);
-export const insertLotteryTicketSchema = createInsertSchema(lotteryTickets);
-export const insertLotteryDrawSchema = createInsertSchema(lotteryDraws);
-
-// Added Tables for Rewards System
-export const rewardOrders = pgTable("reward_orders", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  userId: uuid("user_id").references(() => profiles.id).notNull(),
-  productId: bigint("product_id", { mode: "number" }).references(() => rewardItems.id).notNull(),
-  productName: varchar("product_name", { length: 200 }).notNull(),
-  pointCost: integer("point_cost").notNull(),
-  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, approved, rejected, completed, failed
-  couponCode: varchar("coupon_code", { length: 100 }),
-  approvedBy: uuid("approved_by").references(() => profiles.id),
-  approvedAt: timestamp("approved_at"),
-  rejectedBy: uuid("rejected_by").references(() => profiles.id),
-  rejectedReason: text("rejected_reason"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const providerLogs = pgTable("provider_logs", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  orderId: bigint("order_id", { mode: "number" }).references(() => rewardOrders.id),
-  provider: varchar("provider", { length: 50 }).notNull(),
-  action: varchar("action", { length: 50 }).notNull(),
-  status: varchar("status", { length: 20 }).notNull(),
-  payload: jsonb("payload"),
-  response: jsonb("response"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const insertRewardOrderSchema = createInsertSchema(rewardOrders);
-export const insertProviderLogSchema = createInsertSchema(providerLogs);
-
-// --- Types ---
 export type Profile = typeof profiles.$inferSelect;
-export type User = Profile; // Alias for compatibility
-export type UpsertUser = z.infer<typeof insertProfileSchema>;
-export type Celebrity = typeof celebrities.$inferSelect;
-export type Survey = typeof surveys.$inferSelect;
-export type SurveyQuestion = typeof surveyQuestions.$inferSelect;
-export type SurveyResponse = typeof surveyResponses.$inferSelect;
-export type UserSurveyParticipation = typeof userSurveyParticipation.$inferSelect;
-export type CelebrityBattle = typeof celebrityBattles.$inferSelect;
-export type BattleParticipant = typeof battleParticipants.$inferSelect;
-export type BattleVote = typeof battleVotes.$inferSelect;
-export type QuickPoll = typeof quickPolls.$inferSelect;
-export type RewardItem = typeof rewardItems.$inferSelect;
-export type AssemblyBill = typeof assemblyBills.$inferSelect;
-export type Politician = typeof assemblyMembers.$inferSelect;
-export type PoliticianRating = typeof assemblyRatings.$inferSelect;
-export type AssemblyMember = Politician; // Alias for compatibility
-export type NewsArticle = typeof newsArticles.$inferSelect;
-export type PointTransaction = typeof pointTransactions.$inferSelect;
-export type LotteryTicket = typeof lotteryTickets.$inferSelect;
-export type LotteryDraw = typeof lotteryDraws.$inferSelect;
-export type RewardOrder = typeof rewardOrders.$inferSelect;
-export type ProviderLog = typeof providerLogs.$inferSelect;
-
-export type InsertProfile = z.infer<typeof insertProfileSchema>;
-export type InsertSurvey = z.infer<typeof insertSurveySchema>;
-export type InsertSurveyQuestion = z.infer<typeof insertSurveyQuestionSchema>;
-export type InsertSurveyResponse = z.infer<typeof insertSurveyResponseSchema>;
-export type InsertPoliticalStats = z.infer<typeof insertPoliticalStatsSchema>;
-export type InsertUserSurveyParticipation = z.infer<typeof insertUserSurveyParticipationSchema>;
-export type InsertCelebrity = z.infer<typeof insertCelebritySchema>;
-export type InsertCelebrityBattle = z.infer<typeof insertCelebrityBattleSchema>;
-export type InsertBattleParticipant = z.infer<typeof insertBattleParticipantSchema>;
-export type InsertBattleVote = z.infer<typeof insertBattleVoteSchema>;
-export type InsertQuickPoll = z.infer<typeof insertQuickPollSchema>;
-export type InsertRewardItem = z.infer<typeof insertRewardItemSchema>;
-export type InsertAssemblyBill = z.infer<typeof insertAssemblyBillSchema>;
-export type InsertPolitician = z.infer<typeof insertAssemblyMemberSchema>;
-export type InsertPoliticianRating = z.infer<typeof insertAssemblyRatingSchema>;
-export type InsertAssemblyMember = InsertPolitician; // Alias for compatibility
-export type InsertNewsArticle = z.infer<typeof insertNewsArticleSchema>;
-export type InsertPointTransaction = z.infer<typeof insertPointTransactionSchema>;
-export type InsertLotteryTicket = z.infer<typeof insertLotteryTicketSchema>;
-export type InsertLotteryDraw = z.infer<typeof insertLotteryDrawSchema>;
-export type InsertRewardOrder = z.infer<typeof insertRewardOrderSchema>;
-export type InsertProviderLog = z.infer<typeof insertProviderLogSchema>;
-
-export type MusicCategory = typeof musicCategories.$inferSelect;
-export type MusicArtist = typeof musicArtists.$inferSelect;
-export type MusicVote = typeof musicVotes.$inferSelect;
-export type MusicMonthlyRanking = typeof musicMonthlyRankings.$inferSelect;
-
-export const insertMusicCategorySchema = createInsertSchema(musicCategories);
-export const insertMusicArtistSchema = createInsertSchema(musicArtists);
-export const insertMusicVoteSchema = createInsertSchema(musicVotes);
-export const insertMusicMonthlyRankingSchema = createInsertSchema(musicMonthlyRankings);
-
-export type InsertMusicCategory = z.infer<typeof insertMusicCategorySchema>;
-export type InsertMusicArtist = z.infer<typeof insertMusicArtistSchema>;
-export type InsertMusicVote = z.infer<typeof insertMusicVoteSchema>;
-export type InsertMusicMonthlyRanking = z.infer<typeof insertMusicMonthlyRankingSchema>;
-
-// --- Brain Ranking System Tables ---
-export const brainQuestions = pgTable("brain_questions", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  category: varchar("category", { length: 50 }).notNull(), // LOGIC, MATH, VERBAL, ECONOMY, TRIVIA
-  level: integer("level").default(1).notNull(), // 1~5
-  eloRating: integer("elo_rating").default(1300).notNull(),
-  content: jsonb("content").notNull(),
-  // e.g. { "q": "...", "options": ["A", "B", "C", "D"], "answer": "A", "explanation": "..." }
-  isActive: boolean("is_active").default(false).notNull(),
+export type HiqStore = typeof hiqStores.$inferSelect;
+export type InsertHiqStore = z.infer<typeof insertHiqStoreSchema>;
+export type HiqMember = typeof hiqMembers.$inferSelect;
+export type InsertHiqMember = z.infer<typeof insertHiqMemberSchema>;
+export type HiqGame = typeof hiqGames.$inferSelect;
+export type InsertHiqGame = z.infer<typeof insertHiqGameSchema>;
+export type HiqVisitLog = typeof hiqVisitLogs.$inferSelect;
+export type InsertHiqVisitLog = z.infer<typeof insertHiqVisitLogSchema>;
+export type HiqGameHistory = typeof hiqGameHistory.$inferSelect;
+export type InsertHiqGameHistory = z.infer<typeof insertHiqGameHistorySchema>;
+export type HiqFriendship = typeof hiqFriendships.$inferSelect;
+export type InsertHiqFriendship = z.infer<typeof insertHiqFriendshipSchema>;
+export const hiqSimRecords = pgTable("hiq_sim_records", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  shotData: jsonb("shot_data").notNull(), // The coordinates and params of the shot
+  points: integer("points").notNull(),
+  difficulty: text("difficulty"), // 'easy', 'normal', 'hard', 'pro'
+  cushionCount: integer("cushion_count"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const brainGameLogs = pgTable("brain_game_logs", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }).notNull(),
-  questionId: bigint("question_id", { mode: "number" }).references(() => brainQuestions.id).notNull(),
-  isCorrect: boolean("is_correct").notNull(),
-  userLevelAtTime: integer("user_level_at_time").notNull(),
-  solvedAt: timestamp("solved_at").defaultNow().notNull(),
+export const hiqLeaderboard = pgTable("hiq_leaderboard", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  score: integer("score").notNull(),
+  rank: integer("rank"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertBrainQuestionSchema = createInsertSchema(brainQuestions);
-export const insertBrainGameLogSchema = createInsertSchema(brainGameLogs);
-
-export type BrainQuestion = typeof brainQuestions.$inferSelect;
-export type BrainGameLog = typeof brainGameLogs.$inferSelect;
-export type InsertBrainQuestion = z.infer<typeof insertBrainQuestionSchema>;
-export type InsertBrainGameLog = z.infer<typeof insertBrainGameLogSchema>;
-
-// --- Balance Game Tables ---
-export const balanceGames = pgTable("balance_games", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  createdAt: timestamp("created_at").defaultNow(),
-  status: varchar("status", { length: 20 }).default("PENDING").notNull(), // 'PENDING', 'ACTIVE', 'REJECTED'
-  category: varchar("category", { length: 20 }).notNull(), // 'POLITICS', 'ENTERTAINMENT', 'SOCIAL'
-  title: text("title").notNull(),
-  optionA: jsonb("option_a").notNull(), // { "text": "...", "emoji": "...", "keyword": "...", "image_url": "..." }
-  optionB: jsonb("option_b").notNull(),
-  countA: integer("count_a").default(0),
-  countB: integer("count_b").default(0),
-  sourceNewsTitle: text("source_news_title"),
-  sourceNewsUrl: text("source_news_url"),
-});
-
-export const balanceGameVotes = pgTable("balance_game_votes", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  userId: uuid("user_id").references(() => profiles.id),
-  deviceId: text("device_id"),
-  gameId: bigint("game_id", { mode: "number" }).references(() => balanceGames.id),
-  choice: varchar("choice", { length: 10 }), // 'A', 'B'
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  unique().on(table.userId, table.gameId),
-  unique().on(table.deviceId, table.gameId),
-]);
-
-export const balanceGamesRelations = relations(balanceGames, ({ many }) => ({
-  votes: many(balanceGameVotes),
-}));
-
-export const balanceGameVotesRelations = relations(balanceGameVotes, ({ one }) => ({
-  game: one(balanceGames, { fields: [balanceGameVotes.gameId], references: [balanceGames.id] }),
-  user: one(profiles, { fields: [balanceGameVotes.userId], references: [profiles.id] }),
-}));
-
-export const insertBalanceGameSchema = createInsertSchema(balanceGames);
-export const insertBalanceGameVoteSchema = createInsertSchema(balanceGameVotes);
-
-export const balanceGameComments = pgTable("balance_game_comments", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  gameId: bigint("game_id", { mode: "number" }).references(() => balanceGames.id, { onDelete: "cascade" }).notNull(),
-  userId: uuid("user_id").references(() => profiles.id).notNull(),
-  content: text("content").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const balanceGameCommentsRelations = relations(balanceGameComments, ({ one }) => ({
-  game: one(balanceGames, { fields: [balanceGameComments.gameId], references: [balanceGames.id] }),
-  user: one(profiles, { fields: [balanceGameComments.userId], references: [profiles.id] }),
-}));
-
-export const insertBalanceGameCommentSchema = createInsertSchema(balanceGameComments);
-
-export type BalanceGame = typeof balanceGames.$inferSelect;
-export type BalanceGameVote = typeof balanceGameVotes.$inferSelect;
-export type BalanceGameComment = typeof balanceGameComments.$inferSelect;
-export type InsertBalanceGame = z.infer<typeof insertBalanceGameSchema>;
-export type InsertBalanceGameVote = z.infer<typeof insertBalanceGameVoteSchema>;
-export type InsertBalanceGameComment = z.infer<typeof insertBalanceGameCommentSchema>;
-
-// --- Notifications Table ---
-export const notifications = pgTable("notifications", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
-  userId: uuid("user_id").references(() => profiles.id, { onDelete: "cascade" }).notNull(),
-  type: varchar("type", { length: 50 }).notNull(), // 'politics', 'fandom', 'balance_game', 'reward', 'result'
-  title: varchar("title", { length: 255 }).notNull(),
-  body: text("body").notNull(),
-  data: jsonb("data").default({}),
-  isRead: boolean("is_read").default(false).notNull(),
+export const hiqSuccessfulShots = pgTable("hiq_successful_shots", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  // Initial Ball Positions
+  ballPositions: jsonb("ball_positions").notNull(), // { white: {x,y}, yellow: {x,y}, red: {x,y} }
+  // Winning Shot Parameters
+  shotParams: jsonb("shot_params").notNull(),     // { angle, power, spinX, spinY }
+  // Result Info
+  cushionCount: integer("cushion_count"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertNotificationSchema = createInsertSchema(notifications);
-export type Notification = typeof notifications.$inferSelect;
-export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export const insertHiqSimRecordSchema = createInsertSchema(hiqSimRecords).omit({ id: true, createdAt: true });
+export const insertHiqLeaderboardSchema = createInsertSchema(hiqLeaderboard).omit({ id: true, updatedAt: true });
+export const insertHiqSuccessfulShotSchema = createInsertSchema(hiqSuccessfulShots).omit({ id: true, createdAt: true });
+
+export type HiqSimRecord = typeof hiqSimRecords.$inferSelect;
+export type HiqLeaderboard = typeof hiqLeaderboard.$inferSelect;
+export type HiqSuccessfulShot = typeof hiqSuccessfulShots.$inferSelect;
+export type InsertHiqSuccessfulShot = z.infer<typeof insertHiqSuccessfulShotSchema>;

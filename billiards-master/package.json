@@ -1,0 +1,57 @@
+{
+  "name": "billiards",
+  "description": "Billiards",
+  "version": "0.3.1",
+  "author": "tailuge",
+  "homepage": "https://github.com/tailuge",
+  "keywords": [
+    "billiards",
+    "snooker",
+    "threejs",
+    "swc",
+    "physics"
+  ],
+  "license": "GPL-3.0",
+  "engines": {
+    "yarn": "1.x"
+  },
+  "scripts": {
+    "test": "jest --config ./test/jest.config.js --verbose",
+    "coverage": "jest --config ./test/jest.config.js --coverage",
+    "dev": "webpack",
+    "prettify": "prettier --cache true --write --trailing-comma es5 --no-semi {src,test}/**/*.[jt]s dist/**/*.{css,html} *.[jt]s *.json",
+    "markdownlint": "npx markdownlint-cli2 README.md --fix",
+    "serve": "webpack serve",
+    "deps": "npx yarn-check --skip-unused",
+    "gltfpack": "npx gltfpack -i dist/models/p8.gltf -o dist/models/p8.min.gltf && npx gltfpack -i dist/models/threecushion.gltf -o dist/models/threecushion.min.gltf && npx gltfpack -i dist/models/snooker.gltf -o dist/models/snooker.min.gltf && npx gltfpack -i dist/models/d-snooker.gltf -o dist/models/d-snooker.min.gltf"
+  },
+  "dependencies": {
+    "cross-fetch": "^4.1.0",
+    "interactjs": "1.10.27",
+    "jsoncrush": "^1.1.8",
+    "three": "0.182.0"
+  },
+  "devDependencies": {
+    "@swc/core": "1.15.8",
+    "@swc/jest": "0.2.39",
+    "@testing-library/dom": "10.4.1",
+    "@types/chai": "5.2.3",
+    "@types/jest": "30.0.0",
+    "@types/node": "25.0.3",
+    "@types/three": "0.182.0",
+    "chai": "6.2.2",
+    "jest": "30.2.0",
+    "jest-environment-jsdom": "30.2.0",
+    "node-notifier": "^10.0.1",
+    "prettier": "3.7.4",
+    "swc-loader": "^0.2.6",
+    "ts-jest": "29.4.6",
+    "ts-loader": "9.5.4",
+    "ts-node": "^10.9.2",
+    "typescript": "5.9.3",
+    "webpack": "5.104.1",
+    "webpack-cli": "6.0.1",
+    "webpack-dev-server": "5.2.2",
+    "webpack-node-externals": "^3.0.0"
+  }
+}
