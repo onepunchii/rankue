@@ -5,6 +5,7 @@ import { tenantMiddleware } from "../middleware/tenant.js";
 import { insertHiqMemberSchema } from "../../shared/schema.js";
 import { sendSuccess, sendError } from "../utils/response.js";
 
+// Trigger restart
 const router = Router();
 
 // GET /api/hiq/branding/:slug - Get store branding info
@@ -90,11 +91,12 @@ router.get("/members/:memberId", async (req, res) => {
 router.get("/rankings", async (req, res) => {
     const member = await storage.getMemberById(req.cookies.hiq_user_id);
     const scope = req.query.scope as string; // 'national' | 'store'
+    const type = (req.query.type as '3c' | '4c') || '4c';
 
     // Default to store if not specified
     const targetStoreId = (scope === 'national') ? undefined : member!.storeId;
 
-    const rankings = await storage.getTopRankings(targetStoreId, 20);
+    const rankings = await storage.getTopRankings(targetStoreId, 20, type);
     return sendSuccess(res, rankings);
 });
 
@@ -112,7 +114,8 @@ router.get("/history", async (req, res) => {
 router.get("/stats/analysis", async (req, res) => {
     try {
         const memberId = (req.query.memberId as string) || req.cookies.hiq_user_id;
-        const stats = await storage.getMemberStatsAnalysis(memberId);
+        const type = (req.query.type as "3c" | "4c") || "4c";
+        const stats = await storage.getMemberStatsAnalysis(memberId, type);
         return sendSuccess(res, stats);
     } catch (error: any) {
         return sendError(res, 500, "분석 데이터 로드 실패");
@@ -125,6 +128,15 @@ router.get("/stats/h2h/:id", async (req, res) => {
         return sendSuccess(res, stats);
     } catch (error: any) {
         return sendError(res, 500, "상대 전적 로드 실패");
+    }
+});
+
+router.get("/games/vs/:opponentId", async (req, res) => {
+    try {
+        const games = await storage.getHeadToHeadGames(req.cookies.hiq_user_id, req.params.opponentId);
+        return sendSuccess(res, games);
+    } catch (error: any) {
+        return sendError(res, 500, "상대 경기 기록 로드 실패");
     }
 });
 
@@ -242,9 +254,32 @@ router.post("/game/start", async (req, res) => {
     // Ranked if at least one other verified member is playing
     const isRanked = !!(player2Id || player3Id || player4Id);
 
+    // Ensure names are populated for all members
+    let p1Name = member!.name;
+    let p2Name = req.body.player2Name;
+    let p3Name = req.body.player3Name;
+    let p4Name = req.body.player4Name;
+
+    if (player2Id && !p2Name) {
+        const p2 = await storage.getMemberById(player2Id);
+        if (p2) p2Name = p2.name;
+    }
+    if (player3Id && !p3Name) {
+        const p3 = await storage.getMemberById(player3Id);
+        if (p3) p3Name = p3.name;
+    }
+    if (player4Id && !p4Name) {
+        const p4 = await storage.getMemberById(player4Id);
+        if (p4) p4Name = p4.name;
+    }
+
     const game = await storage.startHiqGame({
         ...req.body,
         storeId: member!.storeId,
+        player1Name: p1Name,
+        player2Name: p2Name,
+        player3Name: p3Name,
+        player4Name: p4Name,
         isRanked
     });
     return sendSuccess(res, game);
@@ -252,6 +287,36 @@ router.post("/game/start", async (req, res) => {
 
 router.get("/game/:id", async (req, res) => {
     const game = await storage.getHiqGameById(req.params.id);
+
+    // Self-healing: If name is missing but ID exists, fetch and update it
+    if (game) {
+        let needsUpdate = false;
+        const updates: any = {};
+
+        if (game.player2Id && !game.player2Name) {
+            const p2 = await storage.getMemberById(game.player2Id);
+            if (p2) {
+                game.player2Name = p2.name;
+                updates.player2Name = p2.name;
+                needsUpdate = true;
+            }
+        }
+        // Check P1 too just in case
+        if (game.player1Id && !game.player1Name) {
+            const p1 = await storage.getMemberById(game.player1Id);
+            if (p1) {
+                game.player1Name = p1.name;
+                updates.player1Name = p1.name;
+                needsUpdate = true;
+            }
+        }
+
+        if (needsUpdate) {
+            // Async update to DB so we don't block response too much, or await it if fast enough
+            await storage.updateHiqGameScore(game.id, updates);
+        }
+    }
+
     return sendSuccess(res, game);
 });
 

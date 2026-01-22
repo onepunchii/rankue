@@ -7,13 +7,21 @@ export function useGameAudio() {
     useEffect(() => {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
             synthRef.current = window.speechSynthesis;
-            // Cancel any ongoing speech when mounting to ensure fresh start
-            synthRef.current.cancel();
+            // Clear any stuck state on mount
+            window.speechSynthesis.cancel();
         }
+    }, []);
 
-        return () => {
-            if (synthRef.current) synthRef.current.cancel();
-        };
+    // Ensure voices are loaded (especially for mobile/Chrome)
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+            const loadVoices = () => {
+                // Just calling this populates the list in some browsers
+                window.speechSynthesis.getVoices();
+            };
+            loadVoices();
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
     }, []);
 
     const speak = useCallback((text: string) => {
@@ -23,30 +31,35 @@ export function useGameAudio() {
         synthRef.current.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ko-KR'; // Korean
         utterance.rate = 1.1; // Slightly faster for game pacing
         utterance.pitch = 1.0;
 
-        // Force select a Korean voice if available (Android/iOS fix)
-        const voices = synthRef.current.getVoices();
-        const korVoice = voices.find(v => v.lang.includes('ko') || v.lang.includes('KR'));
-        if (korVoice) utterance.voice = korVoice;
+        // 1. Get voices
+        let voices = synthRef.current.getVoices();
 
-        // Mobile browsers require a user interaction to start audio context sometimes.
-        // Assuming this is called within event handlers (clicks).
+        // 2. Retry loading voices if empty (common issue)
+        if (voices.length === 0) {
+            window.speechSynthesis.getVoices();
+            voices = synthRef.current.getVoices();
+        }
+
+        // 3. Try to find Korean voice, but DON'T fail if missing
+        const korVoice = voices.find(v => v.lang.includes('ko') || v.lang.includes('KR'));
+
+        if (korVoice) {
+            utterance.voice = korVoice;
+            utterance.lang = 'ko-KR';
+        } else {
+            // Fallback: Use default voice (better English/strange accent than silence)
+            // Ideally we hint 'ko-KR', but if the browser strictly checks lang vs voice supported langs, 
+            // it might silence it. Let's try to set lang, but if it fails, the default voice usually works.
+            utterance.lang = 'ko-KR';
+            console.warn("Korean voice not found, using system default.");
+        }
+
+        // 4. Speak
         synthRef.current.speak(utterance);
     }, [isMuted]);
-
-    // Ensure voices are loaded (especially for mobile)
-    useEffect(() => {
-        if (typeof window !== 'undefined' && window.speechSynthesis) {
-            const loadVoices = () => {
-                window.speechSynthesis.getVoices();
-            };
-            loadVoices();
-            window.speechSynthesis.onvoiceschanged = loadVoices;
-        }
-    }, []);
 
     // Simple beep effect using Web Audio API
     const playEffect = useCallback((type: 'click' | 'turn' | 'win' | 'finishing') => {

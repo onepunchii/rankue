@@ -9,8 +9,8 @@ export class HiqService {
             // Default branding
             return {
                 slug: "default",
-                name: "RANKUE 랭큐",
-                logoText: "RANKUE 랭큐",
+                name: "RANKUE",
+                logoText: "RANKUE",
                 themeColor: "#6366f1",
                 neonColor: "#818cf8",
                 subText: "Global Billiards Solution"

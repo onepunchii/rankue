@@ -1,7 +1,7 @@
 {
-    "name": "하이큐 당구장",
-    "short_name": "하이큐",
-    "description": "스마트한 당구 경기 기록 및 관리 시스템",
+    "name": "RANKUE",
+    "short_name": "RANKUE",
+    "description": "당구 실력, 앱 하나로 레벨업! 🎱",
     "start_url": "/hiq/",
     "scope": "/hiq/",
     "display": "standalone",

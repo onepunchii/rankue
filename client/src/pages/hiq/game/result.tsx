@@ -22,22 +22,22 @@ export default function HiqGameResult() {
     const [viewingPlayer, setViewingPlayer] = useState<any>(null);
 
     const { data: p1 } = useQuery<HiqMember>({
-        queryKey: [`/api/hiq/member/${result?.game?.player1Id}`],
+        queryKey: [`/api/hiq/members/${result?.game?.player1Id}`],
         enabled: !!result?.game?.player1Id,
     });
 
     const { data: p2 } = useQuery<HiqMember>({
-        queryKey: [`/api/hiq/member/${result?.game?.player2Id}`],
+        queryKey: [`/api/hiq/members/${result?.game?.player2Id}`],
         enabled: !!result?.game?.player2Id,
     });
 
     const { data: p3 } = useQuery<HiqMember>({
-        queryKey: [`/api/hiq/member/${result?.game?.player3Id}`],
+        queryKey: [`/api/hiq/members/${result?.game?.player3Id}`],
         enabled: !!result?.game?.player3Id,
     });
 
     const { data: p4 } = useQuery<HiqMember>({
-        queryKey: [`/api/hiq/member/${result?.game?.player4Id}`],
+        queryKey: [`/api/hiq/members/${result?.game?.player4Id}`],
         enabled: !!result?.game?.player4Id,
     });
 
@@ -119,8 +119,8 @@ export default function HiqGameResult() {
                 </div>
 
                 <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-5xl font-black text-white">{game.gameType === '4c' ? Math.floor(score / 10) : score}</span>
-                    <span className="text-white/20 font-black text-xl">/ {game.gameType === '4c' ? Math.floor(target / 10) : target}</span>
+                    <span className="text-5xl font-black text-white">{score}</span>
+                    <span className="text-white/20 font-black text-xl">/ {target}</span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/5">
@@ -199,12 +199,12 @@ export default function HiqGameResult() {
                     name={p1?.name}
                     score={game.player1Score}
                     target={game.player1Target}
-                    avg={(game.player1Score / (game.gameType === '4c' ? 10 : 1) / (game.totalInnings || 1)).toFixed(2)}
+                    avg={(game.player1Score / (game.totalInnings || 1)).toFixed(2)}
                     win={p1Win}
                     handicapUpdate={handicapUpdate1}
                     pNo={1}
                     innings={result.p1Innings}
-                    highRun={game.gameType === '4c' ? Math.floor(result.p1HighRun / 10) : result.p1HighRun}
+                    highRun={result.p1HighRun}
                 />
 
                 {!isPractice && (
@@ -213,25 +213,25 @@ export default function HiqGameResult() {
                             name={p2?.name || game.player2Name}
                             score={game.player2Score}
                             target={game.player2Target}
-                            avg={(game.player2Score / (game.gameType === '4c' ? 10 : 1) / (game.totalInnings || 1)).toFixed(2)}
+                            avg={(game.player2Score / (game.totalInnings || 1)).toFixed(2)}
                             win={p2Win}
                             handicapUpdate={handicapUpdate2}
                             pNo={2}
                             memberId={game.player2Id}
                             innings={result.p2Innings}
-                            highRun={game.gameType === '4c' ? Math.floor(result.p2HighRun / 10) : result.p2HighRun}
+                            highRun={result.p2HighRun}
                         />
                         {totalPlayers >= 3 && (
                             <PlayerStats
                                 name={p3?.name || game.player3Name}
                                 score={game.player3Score}
                                 target={game.player3Target}
-                                avg={(game.player3Score / (game.gameType === '4c' ? 10 : 1) / (game.totalInnings || 1)).toFixed(2)}
+                                avg={(game.player3Score / (game.totalInnings || 1)).toFixed(2)}
                                 win={p3Win}
                                 pNo={3}
                                 memberId={game.player3Id}
                                 innings={result.p3Innings}
-                                highRun={game.gameType === '4c' ? Math.floor(result.p3HighRun / 10) : result.p3HighRun}
+                                highRun={result.p3HighRun}
                             />
                         )}
                         {totalPlayers >= 4 && (
@@ -239,12 +239,12 @@ export default function HiqGameResult() {
                                 name={p4?.name || game.player4Name}
                                 score={game.player4Score}
                                 target={game.player4Target}
-                                avg={(game.player4Score / (game.gameType === '4c' ? 10 : 1) / (game.totalInnings || 1)).toFixed(2)}
+                                avg={(game.player4Score / (game.totalInnings || 1)).toFixed(2)}
                                 win={p4Win}
                                 pNo={4}
                                 memberId={game.player4Id}
                                 innings={result.p4Innings}
-                                highRun={game.gameType === '4c' ? Math.floor(result.p4HighRun / 10) : result.p4HighRun}
+                                highRun={result.p4HighRun}
                             />
                         )}
                     </>
@@ -292,7 +292,7 @@ export default function HiqGameResult() {
                                             <div key={i} className="flex flex-col items-center gap-1">
                                                 <span className="text-[8px] text-white/20">{i + 1}</span>
                                                 <div className="w-full h-10 flex items-center justify-center rounded-lg text-xs font-black bg-white/5 text-[#ffd700]">
-                                                    {game.gameType === '4c' ? Math.floor(inningScore / 10) : inningScore}
+                                                    {inningScore}
                                                 </div>
                                             </div>
                                         ))}

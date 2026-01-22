@@ -129,10 +129,10 @@ function PlayerCard({
         theme === 'yellow' ? '#fde047' :
             theme === 'red' ? '#ef4444' : '#3b82f6';
 
-    const displayScore = is4c ? Math.floor(score / 10) : score;
-    const displayRun = is4c ? Math.floor(run / 10) : run;
-    const displayHighRun = is4c ? Math.floor(highRun / 10) : highRun;
-    const displayRemaining = is4c ? Math.floor(Math.max(0, target - score) / 10) : Math.max(0, target - score);
+    const displayScore = score;
+    const displayRun = run;
+    const displayHighRun = highRun;
+    const displayRemaining = Math.max(0, target - score);
 
     const bgTone = isTurn ? "bg-[#1c1c2e]" : "bg-[#000000]";
     const glowStyle = isTurn
@@ -153,13 +153,14 @@ function PlayerCard({
             <div
                 {...dragAttributes}
                 {...dragListeners}
-                className="flex-[0_0_15%] flex items-center justify-between px-8 relative z-50 border-b transition-all duration-300 pointer-events-auto touch-none cursor-grab active:cursor-grabbing"
+                className="flex-[0_0_15%] flex items-center justify-between px-8 relative z-50 border-b transition-all duration-300 pointer-events-none touch-none"
                 style={{
                     backgroundColor: 'rgba(0, 0, 0, 0.3)',
                     borderColor: isTurn ? themeColor : 'rgba(255, 255, 255, 0.1)'
                 }}
             >
-                <div className="flex items-center gap-3">
+                {/* Content Container - Capture Drag Here */}
+                <div className="flex items-center gap-3 pointer-events-auto cursor-grab active:cursor-grabbing">
                     <h2 className={`text-3xl lg:text-4xl font-extrabold tracking-tighter ${isTurn ? 'text-white' : 'text-white/30'}`}>
                         {player?.name || "Player"}
                     </h2>
@@ -170,7 +171,7 @@ function PlayerCard({
                     )}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 pointer-events-auto">
                     <div className="flex flex-col items-end">
                         <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Target</span>
                         <span className={`text-xl font-black italic ${isTurn ? 'text-white/60' : 'text-white/10'}`}>{target}</span>
@@ -178,21 +179,22 @@ function PlayerCard({
                 </div>
             </div>
 
-            {/* Global Touch Zones (Overlapping Header/Body/Footer) */}
-            <div className="absolute inset-0 z-30 flex flex-col cursor-pointer touch-manipulation">
+            {/* Global Touch Zones (Expanded to Cover Full Card) */}
+            <div className="absolute inset-0 z-[45] flex flex-col cursor-pointer touch-manipulation">
                 {/* Top Zone (Increase) - Covers Top 50% */}
                 <div
-                    className="flex-1 w-full relative active:bg-green-500/5 transition-colors"
+                    className="absolute inset-x-0 top-0 h-[50%] active:bg-green-500/5 transition-colors"
                     onClick={() => onTap("top")}
                 />
 
                 {/* Bottom Zone (Decrease) - Covers Bottom 50% */}
                 <div
-                    className="flex-1 w-full relative active:bg-red-500/5 transition-colors"
+                    className="absolute inset-x-0 bottom-0 h-[50%] active:bg-red-500/5 transition-colors"
                     onClick={() => onTap("bottom")}
                 />
-                {/* Visual Divider */}
-                <div className="absolute top-1/2 left-0 right-0 h-px bg-white/5 pointer-events-none" />
+
+                {/* Visual Divider - Enhanced Visibility */}
+                <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-white/20 pointer-events-none shadow-[0_0_10px_rgba(255,255,255,0.2)]" />
             </div>
 
             {/* Score Body (Flex-1) */}
@@ -255,12 +257,11 @@ function PlayerCard({
 
             {/* Info Footer (15%) - Symmetric & Clean */}
             <div
-                className="flex-[0_0_15%] flex items-center justify-between px-5 relative z-50 border-t transition-all duration-300 pointer-events-auto bg-black/30 backdrop-blur-md"
+                className="flex-[0_0_15%] flex items-center justify-between px-5 relative z-50 border-t transition-all duration-300 pointer-events-none bg-black/30 backdrop-blur-md"
                 style={{
                     backgroundColor: 'rgba(0, 0, 0, 0.3)',
                     borderColor: isTurn ? themeColor : 'rgba(255, 255, 255, 0.1)'
                 }}
-                onClick={(e) => e.stopPropagation()}
             >
                 {/* Left Section: Average (Top) & High Run (Bottom) */}
                 <div className="flex flex-col gap-3">
@@ -454,17 +455,17 @@ export default function HiqScoreboard() {
     });
 
     const { data: player2 } = useQuery<HiqMember>({
-        queryKey: [`/api/hiq/member/${game?.player2Id}`],
+        queryKey: [`/api/hiq/members/${game?.player2Id}`],
         enabled: !!game?.player2Id,
     });
 
     const { data: player3 } = useQuery<HiqMember>({
-        queryKey: [`/api/hiq/member/${game?.player3Id}`],
+        queryKey: [`/api/hiq/members/${game?.player3Id}`],
         enabled: !!game?.player3Id,
     });
 
     const { data: player4 } = useQuery<HiqMember>({
-        queryKey: [`/api/hiq/member/${game?.player4Id}`],
+        queryKey: [`/api/hiq/members/${game?.player4Id}`],
         enabled: !!game?.player4Id,
     });
 
@@ -581,6 +582,14 @@ export default function HiqScoreboard() {
         useSensor(MouseSensor, {})
     );
 
+    // Game Start Voice
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            speak("경기 시작. 1이닝입니다.");
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, []);
+
     const handleDragEnd = (event: any) => {
         const { active, over } = event;
 
@@ -596,6 +605,8 @@ export default function HiqScoreboard() {
     if (isLoading || !game) {
         return <div className="min-h-screen bg-black flex items-center justify-center text-white">LOADING...</div>;
     }
+
+
 
     // Handlers
     const handleTurnChange = (targetPlayer?: number) => {
@@ -666,17 +677,22 @@ export default function HiqScoreboard() {
         }
 
         // 2. Score Logic
-        // Check if Finish Mode
         if (currentScore >= target) {
             // Any tap in finish mode triggers win (user request: "1 more click to finish")
             playEffect('win');
-            finishMutation.mutate({ winnerId: player1?.id || undefined, winnerIndex: playerIndex });
+
+            let winnerId: string | undefined | null = undefined;
+            if (playerIndex === 1) winnerId = game.player1Id;
+            else if (playerIndex === 2) winnerId = game.player2Id;
+            else if (playerIndex === 3) winnerId = game.player3Id;
+            else if (playerIndex === 4) winnerId = game.player4Id;
+
+            finishMutation.mutate({ winnerId: winnerId || undefined, winnerIndex: playerIndex });
             return;
         }
 
         // Normal Mode
-        const unit = game.gameType === "4c" ? 10 : 1;
-        const change = zone === "top" ? unit : -unit;
+        const change = zone === "top" ? 1 : -1;
         // Allow negative scores (removed Math.max(0, ...))
         const newScore = currentScore + change;
 
@@ -698,13 +714,23 @@ export default function HiqScoreboard() {
                 speak("마무리 기회");
             } else {
                 playEffect('click');
-                speak(`${newScore}점`);
+                // 남은 점수 계산
+                const remaining = target - newScore;
+
+                // 점수가 증가했을 때만 남은 점수를 알려주는 것이 자연스러움 (감소 시에는 굳이?)
+                // 사용자가 "1개를 득점하면" 이라고 했으므로 top tap(증가) 기준
+                if (change > 0 && remaining > 0) {
+                    speak(`${newScore}점. ${remaining}점 남았습니다.`);
+                } else {
+                    // 감소하거나 남은 점수가 0 이하(위에서 처리되겠지만)인 경우 그냥 점수만
+                    speak(`${newScore}점`);
+                }
             }
         }
     };
 
     // Calculate Averages Helper
-    const getAvg = (score: number) => (score / (game.gameType === "4c" ? 10 : 1) / Math.max(1, gameState.innings)).toFixed(2);
+    const getAvg = (score: number) => (score / Math.max(1, gameState.innings)).toFixed(2);
 
     return (
         <LandscapeGuard>

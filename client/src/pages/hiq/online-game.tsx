@@ -147,9 +147,14 @@ export default function HiqOnlineGame() {
             const result = GameRuleEngine.evaluateTurn(events, mode);
 
             if (result.type === 'success') {
-                setScore(s => s + result.scoreChange);
+                // Normalize score for 4-ball (if engine returns 10, convert to 1)
+                const normalizedChange = (mode === '4ball' && result.scoreChange >= 10)
+                    ? result.scoreChange / 10
+                    : result.scoreChange;
+
+                setScore(s => s + normalizedChange);
                 setCurrentRun(r => {
-                    const next = r + result.scoreChange;
+                    const next = r + normalizedChange;
                     if (next > highRun) setHighRun(next);
                     return next;
                 });
@@ -158,9 +163,9 @@ export default function HiqOnlineGame() {
                 setInningRecords(prev => {
                     const existing = prev.find(r => r.inning === innings);
                     if (existing) {
-                        return prev.map(r => r.inning === innings ? { ...r, score: r.score + result.scoreChange } : r);
+                        return prev.map(r => r.inning === innings ? { ...r, score: r.score + normalizedChange } : r);
                     } else {
-                        return [...prev, { inning: innings, score: result.scoreChange }];
+                        return [...prev, { inning: innings, score: normalizedChange }];
                     }
                 });
 
@@ -749,19 +754,33 @@ export default function HiqOnlineGame() {
             }
 
 
-            // 6. Auto-Transparency Calculation for UI
-            const whiteBallCheck = engineRef.current.getBalls().find(b => b.id === 'white');
-            if (whiteBallCheck) {
-                const bx = mapX(whiteBallCheck.pos.x);
-                const by = mapY(whiteBallCheck.pos.y);
-                const jcX = 72; // 24 + 48
-                const jcY = 552; // 640 - 40 - 48
-                const dist = Math.sqrt((bx - jcX) ** 2 + (by - jcY) ** 2);
-                const targetOpacity = dist < 100 ? 0.2 : 1.0;
-                if (joystickOpacityRef.current !== targetOpacity) {
-                    joystickOpacityRef.current = targetOpacity;
-                    setJoystickOpacity(targetOpacity);
+            // 6. Auto-Transparency Calculation for UI (Check all balls and controllers)
+            const allBalls = engineRef.current.getBalls();
+            let isBallUnderControls = false;
+
+            // Controller Areas (Logical Canvas Coords)
+            const joystickX = CANVAS_W - 72; // Center of 96x96 joystick at right-24
+            const joystickY = CANVAS_H - 88; // Center of joystick at bottom-40
+            const fineX = CANVAS_W / 2;     // Bottom-Center
+            const fineY = CANVAS_H - 64;     // Approximate bottom-center area
+
+            for (const ball of allBalls) {
+                const bx = mapX(ball.pos.x);
+                const by = mapY(ball.pos.y);
+
+                const dJoystick = Math.sqrt((bx - joystickX) ** 2 + (by - joystickY) ** 2);
+                const dFine = Math.sqrt((bx - fineX) ** 2 + (by - fineY) ** 2);
+
+                if (dJoystick < 80 || dFine < 80) {
+                    isBallUnderControls = true;
+                    break;
                 }
+            }
+
+            const targetOpacity = isBallUnderControls ? 0.2 : 1.0;
+            if (joystickOpacityRef.current !== targetOpacity) {
+                joystickOpacityRef.current = targetOpacity;
+                setJoystickOpacity(targetOpacity);
             }
 
             animationFrameId = requestAnimationFrame(render);

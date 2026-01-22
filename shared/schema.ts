@@ -48,7 +48,9 @@ export const hiqMembers = pgTable("hiq_members", {
   visitCount: integer("visit_count").default(0),
   lastVisitedAt: timestamp("last_visited_at"),
   gender: text("gender", { enum: ["male", "female"] }),
-  // totalSimPoints: integer("total_sim_points").default(0).notNull(),
+  rating3c: integer("rating_3c").default(0).notNull(),
+  rating4c: integer("rating_4c").default(0).notNull(),
+  totalSimPoints: integer("total_sim_points").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

@@ -59,7 +59,7 @@ export default function HiqRegister() {
             birthYear: 1980,
             gender: "male",
             handi3c: 15,
-            handi4c: 150,
+            handi4c: 15,
             average: "0.5",
             marketingAgree: false
         },
@@ -160,7 +160,7 @@ export default function HiqRegister() {
                     <div
                         key={idx}
                         className="flex-1 transition-all duration-700 ease-out"
-                        style={{ backgroundColor: idx <= currentStep ? 'var(--hiq-brand-neon)' : "transparent" }}
+                        style={{ backgroundColor: idx <= currentStep ? '#10b981' : "transparent" }}
                     />
                 ))}
             </div>
@@ -174,7 +174,7 @@ export default function HiqRegister() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                     >
-                        <span className="font-bold text-xs uppercase tracking-widest mb-2 block hiq-brand-accent">Step {currentStep + 1} of {STEPS.length}</span>
+                        <span className="font-bold text-xs uppercase tracking-widest mb-2 block" style={{ color: "#10b981" }}>Step {currentStep + 1} of {STEPS.length}</span>
                         <h1 className="text-4xl font-black mb-3 text-white leading-tight tracking-tighter">
                             {STEPS[currentStep].title}
                         </h1>
@@ -197,18 +197,17 @@ export default function HiqRegister() {
                             >
                                 <div className="space-y-4">
                                     <Label className="text-sm font-bold text-white/40 uppercase tracking-wider">성함</Label>
-                                    <Input
+                                    <input
                                         {...register("name")}
                                         placeholder="이름을 입력하세요"
                                         autoFocus
-                                        className="h-16 text-2xl bg-white/5 border-white/10 rounded-2xl focus:border-opacity-50 transition-all placeholder:text-white/10"
-                                        style={{ borderColor: `${brand.themeColor}33` }}
+                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-3xl font-black tracking-[0.1em] text-white placeholder:text-white/10 py-4 transition-all outline-none"
                                     />
-                                    {errors.name && <p className="text-red-400 text-sm font-bold">{errors.name.message}</p>}
+                                    {errors.name && <p className="text-red-400 text-sm font-bold text-center">{errors.name.message}</p>}
                                 </div>
                                 <div className="space-y-4">
                                     <Label className="text-sm font-bold text-white/40 uppercase tracking-wider">휴대폰 번호</Label>
-                                    <div className="h-16 flex items-center px-4 rounded-2xl bg-white/5 border border-white/10 text-white/30 text-2xl font-mono italic">
+                                    <div className="w-full border-b-2 border-white/5 py-4 flex items-center justify-center text-white/20 text-3xl font-black tracking-widest">
                                         {phoneFromQuery}
                                     </div>
                                 </div>
@@ -228,10 +227,10 @@ export default function HiqRegister() {
                                     variant={formData.gender === "male" ? "default" : "outline"}
                                     className="flex-1 h-32 rounded-[2rem] flex flex-col gap-3 transition-all"
                                     style={{
-                                        backgroundColor: formData.gender === "male" ? (brand.neonColor || brand.themeColor) : "rgba(255,255,255,0.05)",
+                                        backgroundColor: formData.gender === "male" ? "#10b981" : "rgba(255,255,255,0.05)",
                                         color: formData.gender === "male" ? "#000" : "rgba(255,255,255,0.4)",
                                         border: formData.gender === "male" ? "none" : "1px solid rgba(255,255,255,0.1)",
-                                        boxShadow: formData.gender === "male" ? `0 10px 30px ${brand.themeColor}66` : "none"
+                                        boxShadow: formData.gender === "male" ? `0 10px 30px rgba(16, 185, 129, 0.4)` : "none"
                                     }}
                                 >
                                     <span className="text-4xl">♂️</span>
@@ -242,10 +241,10 @@ export default function HiqRegister() {
                                     variant={formData.gender === "female" ? "default" : "outline"}
                                     className="flex-1 h-32 rounded-[2rem] flex flex-col gap-3 transition-all"
                                     style={{
-                                        backgroundColor: formData.gender === "female" ? (brand.neonColor || brand.themeColor) : "rgba(255,255,255,0.05)",
+                                        backgroundColor: formData.gender === "female" ? "#10b981" : "rgba(255,255,255,0.05)",
                                         color: formData.gender === "female" ? "#000" : "rgba(255,255,255,0.4)",
                                         border: formData.gender === "female" ? "none" : "1px solid rgba(255,255,255,0.1)",
-                                        boxShadow: formData.gender === "female" ? `0 10px 30px ${brand.themeColor}66` : "none"
+                                        boxShadow: formData.gender === "female" ? `0 10px 30px rgba(16, 185, 129, 0.4)` : "none"
                                     }}
                                 >
                                     <span className="text-4xl">♀️</span>
@@ -271,10 +270,10 @@ export default function HiqRegister() {
                                             title={`${year}년생`}
                                             className="h-14 text-lg rounded-xl transition-all"
                                             style={{
-                                                backgroundColor: formData.birthYear === year ? (brand.neonColor || brand.themeColor) : "transparent",
+                                                backgroundColor: formData.birthYear === year ? "#10b981" : "transparent",
                                                 color: formData.birthYear === year ? "#000" : "rgba(255,255,255,0.4)",
                                                 border: formData.birthYear === year ? "none" : "1px solid rgba(255,255,255,0.1)",
-                                                boxShadow: formData.birthYear === year ? `0 0 20px ${brand.themeColor}66` : "none"
+                                                boxShadow: formData.birthYear === year ? `0 0 20px rgba(16, 185, 129, 0.4)` : "none"
                                             }}
                                         >
                                             {year}
@@ -295,64 +294,62 @@ export default function HiqRegister() {
                                 <div className="space-y-4">
                                     <Label className="text-sm font-bold text-white/40 tracking-wider uppercase flex justify-between">
                                         <span>3구 수지</span>
-                                        <span style={{ color: brand.neonColor || brand.themeColor }}>{formData.handi3c} 점</span>
+                                        <span className="text-white">{formData.handi3c} 점</span>
                                     </Label>
-                                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                                    <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
                                         {[10, 15, 20, 25, 30, 35, 40].map(val => (
                                             <Button
                                                 key={val}
                                                 onClick={() => setValue("handi3c", val)}
                                                 variant={formData.handi3c === val ? "default" : "outline"}
-                                                className="flex-none w-16 h-14 text-lg rounded-xl transition-all"
+                                                className="flex-none px-5 h-12 text-base rounded-full transition-all"
                                                 style={{
-                                                    backgroundColor: formData.handi3c === val ? (brand.neonColor || brand.themeColor) : "rgba(255,255,255,0.05)",
+                                                    backgroundColor: formData.handi3c === val ? "#10b981" : "rgba(255,255,255,0.05)",
                                                     color: formData.handi3c === val ? "#000" : "rgba(255,255,255,0.4)",
-                                                    border: formData.handi3c === val ? "none" : "1px solid rgba(255,255,255,0.1)",
-                                                    boxShadow: formData.handi3c === val ? `0 0 20px ${brand.themeColor}4D` : "none"
+                                                    border: "none"
                                                 }}
                                             >
                                                 {val}
                                             </Button>
                                         ))}
                                     </div>
-                                    <Input
+                                    <input
                                         type="number"
-                                        title="3구 핸디캡 직접 입력"
+                                        inputMode="numeric"
+                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-4xl font-black py-4 transition-all outline-none text-white"
                                         value={formData.handi3c ?? 0}
                                         onChange={(e) => setValue("handi3c", parseInt(e.target.value) || 0)}
-                                        className="h-14 text-xl bg-white/5 border-white/10 text-right pr-6"
                                     />
                                 </div>
 
                                 <div className="space-y-4">
                                     <Label className="text-sm font-bold text-white/40 tracking-wider uppercase flex justify-between">
                                         <span>4구 수지</span>
-                                        <span style={{ color: brand.neonColor || brand.themeColor }}>{formData.handi4c} 점</span>
+                                        <span className="text-white">{formData.handi4c} 점</span>
                                     </Label>
-                                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                                        {[80, 100, 120, 150, 200, 250, 300, 400, 500].map(val => (
+                                    <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
+                                        {[8, 10, 12, 15, 20, 25, 30, 40, 50].map(val => (
                                             <Button
                                                 key={val}
                                                 onClick={() => setValue("handi4c", val)}
                                                 variant={formData.handi4c === val ? "default" : "outline"}
-                                                className="flex-none w-16 h-14 text-lg rounded-xl transition-all"
+                                                className="flex-none px-5 h-12 text-base rounded-full transition-all"
                                                 style={{
-                                                    backgroundColor: formData.handi4c === val ? (brand.neonColor || brand.themeColor) : "rgba(255,255,255,0.05)",
+                                                    backgroundColor: formData.handi4c === val ? "#10b981" : "rgba(255,255,255,0.05)",
                                                     color: formData.handi4c === val ? "#000" : "rgba(255,255,255,0.4)",
-                                                    border: formData.handi4c === val ? "none" : "1px solid rgba(255,255,255,0.1)",
-                                                    boxShadow: formData.handi4c === val ? `0 0 20px ${brand.themeColor}4D` : "none"
+                                                    border: "none"
                                                 }}
                                             >
                                                 {val}
                                             </Button>
                                         ))}
                                     </div>
-                                    <Input
+                                    <input
                                         type="number"
-                                        title="4구 핸디캡 직접 입력"
+                                        inputMode="numeric"
+                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-4xl font-black py-4 transition-all outline-none text-white"
                                         value={formData.handi4c ?? 0}
                                         onChange={(e) => setValue("handi4c", parseInt(e.target.value) || 0)}
-                                        className="h-14 text-xl bg-white/5 border-white/10 text-right pr-6"
                                     />
                                 </div>
                             </motion.div>
@@ -371,7 +368,7 @@ export default function HiqRegister() {
                                         <Checkbox
                                             id="essential"
                                             className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:border-none"
-                                            style={{ backgroundColor: brand.themeColor }}
+                                            style={{ backgroundColor: "#10b981" }}
                                             checked={true}
                                             disabled={true}
                                         />
@@ -384,7 +381,7 @@ export default function HiqRegister() {
                                         <Checkbox
                                             id="marketing"
                                             className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:border-none"
-                                            style={{ backgroundColor: brand.themeColor }}
+                                            style={{ backgroundColor: "#10b981" }}
                                             onCheckedChange={(checked) => setValue("marketingAgree", !!checked)}
                                         />
                                         <Label htmlFor="marketing" className="text-lg text-white/60 leading-tight">
@@ -415,8 +412,9 @@ export default function HiqRegister() {
                             title="가입 완료"
                             className="flex-[2] h-16 text-xl font-black text-white rounded-2xl active:scale-95 transition-all"
                             style={{
-                                backgroundColor: 'var(--hiq-brand-color)',
-                                boxShadow: `0 10px 30px var(--hiq-brand-color)33`
+                                backgroundColor: '#10b981',
+                                boxShadow: `0 10px 30px rgba(16, 185, 129, 0.2)`,
+                                color: '#000'
                             }}
                         >
                             {isSubmitting ? "처리 중..." : "가입 완료"}
@@ -426,7 +424,11 @@ export default function HiqRegister() {
                             onClick={nextStep}
                             disabled={currentStep === 0 && !formData.name}
                             title="다음 단계"
-                            className="flex-[2] h-16 text-xl font-black bg-white text-black hover:bg-white/90 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all"
+                            className="flex-[2] h-16 text-xl font-black rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all outline-none"
+                            style={{
+                                backgroundColor: (currentStep === 0 && !formData.name) ? "#1a1a1a" : "#10b981",
+                                color: (currentStep === 0 && !formData.name) ? "#555" : "#000"
+                            }}
                         >
                             다음 <LucideChevronRight className="w-6 h-6" />
                         </Button>

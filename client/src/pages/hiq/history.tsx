@@ -58,9 +58,13 @@ export default function HiqHistory() {
     ) || [];
 
     // Calculate aggregated stats from official match data
-    const totalScore = officialHistory.reduce((acc, g) => acc + g.score, 0);
+    const totalNormalizedScore = officialHistory.reduce((acc, g) => {
+        return acc + g.score;
+    }, 0);
     const totalInnings = officialHistory.reduce((acc, g) => acc + g.innings, 0);
-    const cumulativeAverage = totalInnings > 0 ? (totalScore / totalInnings).toFixed(3) : "0.000";
+    const cumulativeAverage = totalInnings > 0
+        ? (totalNormalizedScore / totalInnings).toFixed(3)
+        : "0.000";
 
     // Additional stats for the enhanced card
     const totalGames = officialHistory.length;
@@ -77,7 +81,9 @@ export default function HiqHistory() {
     const recent10 = officialHistory.slice(0, 10);
     const r10Score = recent10.reduce((acc, g) => acc + g.score, 0);
     const r10Innings = recent10.reduce((acc, g) => acc + g.innings, 0);
-    const recent10Avg = r10Innings > 0 ? (r10Score / r10Innings).toFixed(3) : "0.000";
+    const recent10Avg = r10Innings > 0
+        ? (r10Score / r10Innings).toFixed(3)
+        : "0.000";
 
     // 3. Empty Inning Rate (공타율)
     let totalEmptyInnings = 0;
@@ -134,28 +140,24 @@ export default function HiqHistory() {
     const mainMode = games3cCount >= games4cCount ? "3-Cushion" : "4-Ball";
 
     // Tier calculation with Premium Dark palette
-    const getTier = (handi: number, is3c: boolean) => {
+    const getTier = (avg: number, is3c: boolean) => {
         if (is3c) {
-            if (handi >= 45) return { label: "MASTER", color: "#ef4444", icon: "🔥", glow: "rgba(239, 68, 68, 0.5)" };
-            if (handi >= 35) return { label: "DIAMOND", color: "#B9F2FF", icon: "💠", glow: "rgba(185, 242, 255, 0.5)" };
-            if (handi >= 28) return { label: "PLATINUM", color: "#00FFD1", icon: "💎", glow: "rgba(0, 255, 209, 0.5)" };
-            if (handi >= 22) return { label: "GOLD", color: "#FFD700", icon: "🥇", glow: "rgba(255, 215, 0, 0.5)" };
-            if (handi >= 16) return { label: "SILVER", color: "#E0E0E0", icon: "🥈", glow: "rgba(224, 224, 224, 0.5)" };
-            return { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.5)" };
+            if (avg >= 0.90) return { label: "PLATINUM", color: "#00FFD1", icon: "💎", glow: "rgba(0, 255, 209, 0.15)" };
+            if (avg >= 0.56) return { label: "GOLD", color: "#FFD700", icon: "🥇", glow: "rgba(255, 215, 0, 0.15)" };
+            if (avg >= 0.36) return { label: "SILVER", color: "#E0E0E0", icon: "🥈", glow: "rgba(224, 224, 224, 0.15)" };
+            return { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.15)" };
         } else {
-            if (handi >= 700) return { label: "MASTER", color: "#ef4444", icon: "🔥", glow: "rgba(239, 68, 68, 0.5)" };
-            if (handi >= 400) return { label: "DIAMOND", color: "#B9F2FF", icon: "💠", glow: "rgba(185, 242, 255, 0.5)" };
-            if (handi >= 250) return { label: "PLATINUM", color: "#00FFD1", icon: "💎", glow: "rgba(0, 255, 209, 0.5)" };
-            if (handi >= 150) return { label: "GOLD", color: "#FFD700", icon: "🥇", glow: "rgba(255, 215, 0, 0.5)" };
-            if (handi >= 80) return { label: "SILVER", color: "#E0E0E0", icon: "🥈", glow: "rgba(224, 224, 224, 0.5)" };
-            return { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.5)" };
+            if (avg >= 5.00) return { label: "PLATINUM", color: "#00FFD1", icon: "💎", glow: "rgba(0, 255, 209, 0.15)" };
+            if (avg >= 3.00) return { label: "GOLD", color: "#FFD700", icon: "🥇", glow: "rgba(255, 215, 0, 0.15)" };
+            if (avg >= 1.51) return { label: "SILVER", color: "#E0E0E0", icon: "🥈", glow: "rgba(224, 224, 224, 0.15)" };
+            return { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.15)" };
         }
     };
 
-    const currentTier = member ? getTier(
-        filter === "3c" ? (member.handi3c || 0) : filter === "4c" ? (member.handi4c || 0) : (member.handi4c || 0),
+    const currentTier = getTier(
+        parseFloat(cumulativeAverage),
         filter === "3c"
-    ) : { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.5)" };
+    );
 
     // Last week comparison (comparing recent 3 games vs previous 3 games)
     const recentGames = [...officialHistory].slice(0, 3);
@@ -179,31 +181,33 @@ export default function HiqHistory() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
                 <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-[#0e4d2a] border-t-[#ffd700] rounded-full"
+                    className="w-12 h-12 border-4 border-white/10 border-t-[#10b981] rounded-full"
                 />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a] text-white p-6 pb-24 font-sans">
+        <div className="min-h-screen bg-[#0A0A0A] text-white p-6 pb-24 font-sans relative overflow-x-hidden">
+            {/* Background Light Effect */}
+            <div className="absolute top-0 right-0 w-[80dvw] h-[40dvh] bg-[#10b981]/5 blur-[120px] rounded-full -mr-[30dvw] -mt-[10dvh] pointer-events-none" />
+
             {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
-                <Button
-                    variant="ghost"
-                    size="icon"
+            <div className="flex items-center gap-5 py-4 mb-6 relative z-10">
+                <motion.button
+                    whileTap={{ scale: 0.9 }}
                     onClick={() => setLocation("/dashboard")}
-                    className="bg-white/5 border border-white/10 rounded-xl"
+                    className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center backdrop-blur-md active:scale-95 transition-all text-white/40"
                 >
                     <LucideChevronLeft className="w-6 h-6" />
-                </Button>
+                </motion.button>
                 <div>
-                    <h1 className="text-2xl font-black text-white">공식 경기 성적표</h1>
-                    <p className="text-[#ffd700] text-[10px] font-black uppercase tracking-widest mt-0.5">Official Match Records</p>
+                    <h1 className="text-3xl font-black tracking-tighter text-white">공식 경기 성적표</h1>
+                    <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mt-0.5">Official Match Records</p>
                 </div>
             </div>
 
@@ -218,11 +222,11 @@ export default function HiqHistory() {
                         key={tab.id}
                         onClick={() => setFilter(tab.id as FilterType)}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${filter === tab.id
-                            ? "bg-[#0e4d2a] text-white shadow-lg"
+                            ? "bg-[#10b981] text-black shadow-lg"
                             : "text-gray-500 hover:text-gray-300"
                             }`}
                     >
-                        <tab.icon className={`w-4 h-4 ${filter === tab.id ? "text-[#ffd700]" : ""}`} />
+                        <tab.icon className={`w-4 h-4 ${filter === tab.id ? "text-black" : ""}`} />
                         {tab.label}
                     </button>
                 ))}
@@ -239,10 +243,10 @@ export default function HiqHistory() {
                     className="rounded-3xl overflow-hidden relative"
                     style={{
                         background: 'linear-gradient(135deg, #111111 0%, #0a1f13 100%)',
-                        borderWidth: '1px',
+                        borderWidth: '1.5px',
                         borderStyle: 'solid',
-                        borderColor: currentTier.color,
-                        boxShadow: `0 0 30px ${currentTier.glow}, 0 20px 60px rgba(0,0,0,0.8)`
+                        borderColor: `${currentTier.color}44`,
+                        boxShadow: `0 0 15px ${currentTier.glow}, 0 10px 40px rgba(0,0,0,0.6)`
                     }}
                 >
 
@@ -277,7 +281,7 @@ export default function HiqHistory() {
                                         className="text-xl font-black uppercase tracking-wide truncate shadow-sm"
                                         style={{
                                             color: currentTier.color,
-                                            textShadow: `0 0 20px ${currentTier.glow}`
+                                            textShadow: `0 0 10px ${currentTier.glow}`
                                         }}
                                     >
                                         {currentTier.label}
@@ -296,7 +300,7 @@ export default function HiqHistory() {
                                     background: `linear-gradient(135deg, ${currentTier.color} 0%, ${currentTier.color}CC 100%)`,
                                     WebkitBackgroundClip: 'text',
                                     WebkitTextFillColor: 'transparent',
-                                    filter: `drop-shadow(0 0 30px ${currentTier.glow})`,
+                                    filter: `drop-shadow(0 0 20px ${currentTier.glow})`,
                                     fontFeatureSettings: '"tnum"'
                                 }}
                             >
@@ -337,7 +341,7 @@ export default function HiqHistory() {
                                         </div>
                                         <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
                                             <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Points</p>
-                                            <p className="text-xs font-black text-white">{totalScore}</p>
+                                            <p className="text-xs font-black text-white">{totalNormalizedScore}</p>
                                         </div>
                                         <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
                                             <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Win %</p>
@@ -351,9 +355,9 @@ export default function HiqHistory() {
 
                                     {/* Row 2: 3 Columns (Advanced Performance) */}
                                     <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-white/10">
-                                        <div className="text-center py-2 rounded-xl bg-[#ffd700]/10 border border-[#ffd700]/30 min-w-0">
-                                            <p className="text-[#ffd700] text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Best AVG</p>
-                                            <p className="text-xs font-black text-[#ffd700]">{bestAverage}</p>
+                                        <div className="text-center py-2 rounded-xl bg-[#10b981]/10 border border-[#10b981]/30 min-w-0">
+                                            <p className="text-[#10b981] text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Best AVG</p>
+                                            <p className="text-xs font-black text-[#10b981]">{bestAverage}</p>
                                         </div>
                                         <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
                                             <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Recent 10</p>
@@ -373,7 +377,7 @@ export default function HiqHistory() {
 
 
             <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-white/50">
-                <LucideHistory className="w-5 h-5 text-[#ffd700]" />
+                <LucideHistory className="w-5 h-5 text-[#10b981]" />
                 최근 공식 매치 리스트
             </h3>
             <div className="space-y-4">
@@ -388,14 +392,14 @@ export default function HiqHistory() {
                                 transition={{ delay: idx * 0.05 }}
                             >
                                 <Card
-                                    className="bg-[#151515] border-[#222] rounded-2xl overflow-hidden hover:border-[#ffd700]/30 transition-all border-l-4 border-l-transparent hover:border-l-[#0e4d2a] cursor-pointer"
+                                    className="bg-[#151515] border-[#222] rounded-2xl overflow-hidden hover:border-[#10b981]/30 transition-all border-l-4 border-l-transparent hover:border-l-[#10b981] cursor-pointer"
                                     onClick={() => setSelectedGameId(game.gameId)}
                                 >
                                     <CardContent className="p-5">
                                         <div className="flex justify-between items-start mb-3">
                                             <div className="flex gap-2">
-                                                <span className="px-2 py-0.5 rounded-lg bg-[#ffd700]/10 text-[#ffd700] border border-[#ffd700]/20 text-[9px] font-black uppercase flex items-center gap-1">
-                                                    <div className="w-1 h-1 rounded-full bg-[#ffd700]" /> OFFICIAL
+                                                <span className="px-2 py-0.5 rounded-lg bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20 text-[9px] font-black uppercase flex items-center gap-1">
+                                                    <div className="w-1 h-1 rounded-full bg-[#10b981]" /> OFFICIAL
                                                 </span>
                                                 <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-lg text-[9px] font-black text-gray-400 uppercase">
                                                     {game.gameType === "3c" ? "3구" : "4구"}
@@ -420,8 +424,10 @@ export default function HiqHistory() {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-[#ffd700] text-xs font-black uppercase mb-0.5 tracking-wider">에버리지</p>
-                                                <p className="text-3xl font-black text-white leading-none tracking-tighter">{game.average}</p>
+                                                <p className="text-[#10b981] text-xs font-black uppercase mb-0.5 tracking-wider">에버리지</p>
+                                                <p className="text-3xl font-black text-white leading-none tracking-tighter">
+                                                    {game.average}
+                                                </p>
                                             </div>
                                         </div>
                                     </CardContent>
@@ -447,11 +453,11 @@ export default function HiqHistory() {
 
             {/* Match Detail Dialog */}
             <Dialog open={!!selectedGameId} onOpenChange={(open) => !open && setSelectedGameId(null)}>
-                <DialogContent className="bg-[#0a0a0a] border-[#222] text-white max-w-lg w-[95%] rounded-3xl p-0 overflow-hidden">
+                <DialogContent className="bg-[#050505] border-[#222] text-white max-w-lg w-[95%] rounded-3xl p-0 overflow-hidden">
                     <DialogHeader className="p-6 bg-gradient-to-b from-[#0e4d2a]/20 to-transparent border-b border-white/5">
                         <div>
                             <DialogTitle className="text-xl font-black flex items-center gap-2">
-                                <LucideSwords className="w-5 h-5 text-[#ffd700]" />
+                                <LucideSwords className="w-5 h-5 text-[#10b981]" />
                                 경기 상세 매치 리포트
                             </DialogTitle>
                             <DialogDescription className="text-white/40 text-[10px] uppercase font-bold tracking-widest mt-1">
@@ -467,32 +473,57 @@ export default function HiqHistory() {
                             </div>
                         ) : selectedGameData ? (
                             <>
-                                {/* VS Section */}
-                                <div className="flex items-center justify-between gap-4 p-4 bg-white/5 rounded-2xl border border-white/10">
-                                    <div className="text-center flex-1">
-                                        <p className="text-[10px] font-bold text-white/30 uppercase mb-1">ME</p>
-                                        <p className="text-lg font-black">{member?.name}</p>
-                                        <p className="text-2xl font-black text-[#ffd700]">{selectedGameData.player1Target}</p>
+                                {/* Players Section (Dynamic 2-4 Players) */}
+                                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[10px] font-bold text-white/30 uppercase">PLAYERS</span>
+                                        <span className="text-[10px] font-bold text-[#10b981]">{selectedGameData.gameType === '4c' ? '4구' : '3구'}</span>
                                     </div>
-                                    <div className="flex flex-col items-center opacity-30">
-                                        <span className="text-xs font-black italic">VS</span>
-                                        <div className="w-px h-8 bg-white/20 my-1" />
-                                    </div>
-                                    <div className="text-center flex-1">
-                                        <p className="text-[10px] font-bold text-white/30 uppercase mb-1">OPPONENT</p>
-                                        <p className="text-lg font-black">{selectedGameData.player2Name || "상대방"}</p>
-                                        <p className="text-2xl font-black text-white/60">{selectedGameData.player2Target || "-"}</p>
+                                    <div className={`grid gap-3 ${selectedGameData.player3Name ? (selectedGameData.player4Name ? 'grid-cols-4' : 'grid-cols-3') : 'grid-cols-2'}`}>
+                                        {[1, 2, 3, 4].map((idx) => {
+                                            const pId = selectedGameData[`player${idx}Id`];
+                                            const pName = selectedGameData[`player${idx}Name`];
+                                            const pTarget = selectedGameData[`player${idx}Target`];
+                                            const pScore = selectedGameData[`player${idx}Score`];
+                                            const isMe = member?.id && pId === member.id;
+
+                                            // Skip if player doesn't exist (e.g. P3/P4 in a 2p game)
+                                            if (idx > 2 && !pName) return null;
+
+                                            return (
+                                                <div key={idx} className="text-center bg-black/20 rounded-lg py-2 border border-white/5 relative overflow-hidden">
+                                                    {selectedGameData.winnerId === pId && <div className="absolute top-0 right-0 p-1"><div className="w-2 h-2 bg-[#ffd700] rounded-full shadow-[0_0_8px_rgba(255,215,0,0.6)]" /></div>}
+                                                    <p className={`text-[9px] font-bold mb-0.5 ${isMe ? 'text-blue-400' : 'text-gray-500'}`}>
+                                                        {isMe ? 'ME' : `P${idx}`}
+                                                    </p>
+                                                    <p className="text-sm font-black truncate px-1">{pName || (isMe ? member?.name : `Player ${idx}`)}</p>
+                                                    <div className={`text-lg font-black flex items-center justify-center gap-1 ${isMe ? 'text-[#10b981]' : 'text-white/60'}`}>
+                                                        <span>{pTarget || "-"}</span>
+                                                        <span className="text-white/20 text-sm">/</span>
+                                                        <span className={isMe ? 'text-white' : 'text-white/40'}>{pScore || 0}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
                                 {/* Stat Grid */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                                        <div className="flex items-center gap-2 mb-2 text-[#ffd700]">
+                                        <div className="flex items-center gap-2 mb-2 text-[#10b981]">
                                             <LucideZap className="w-4 h-4" />
                                             <span className="text-[10px] font-black uppercase">하이런 (HR)</span>
                                         </div>
-                                        <p className="text-2xl font-black">{selectedGameData.player1HighRun || 0}</p>
+                                        <p className="text-2xl font-black">
+                                            {(() => {
+                                                // Display High Run for ME (if found) or Winner or P1? 
+                                                // Ideally, we should show "My High Run" if I participated, otherwise P1/Winner.
+                                                // Let's search for my slot.
+                                                const mySlot = [1, 2, 3, 4].find(i => selectedGameData[`player${i}Id`] === member?.id) || 1;
+                                                return selectedGameData[`player${mySlot}HighRun`] || 0;
+                                            })()}
+                                        </p>
                                     </div>
                                     <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
                                         <div className="flex items-center gap-2 mb-2 text-white/40">
@@ -510,21 +541,42 @@ export default function HiqHistory() {
                                         이닝별 득점 상세
                                     </h4>
                                     <div className="bg-[#151515] rounded-2xl border border-[#222] overflow-hidden">
-                                        <div className="grid grid-cols-[60px_1fr_1fr] bg-white/5 border-b border-white/5 p-3 text-[10px] font-black text-white/40 uppercase">
+                                        <div
+                                            className="grid bg-white/5 border-b border-white/5 p-3 text-[10px] font-black text-white/40 uppercase gap-1"
+                                            style={{ gridTemplateColumns: `60px repeat(${selectedGameData.player4Name ? 4 : selectedGameData.player3Name ? 3 : 2}, 1fr)` }}
+                                        >
                                             <div>이닝</div>
-                                            <div className="text-center">나</div>
-                                            <div className="text-center">상대</div>
+                                            {[1, 2, 3, 4].map(idx => {
+                                                if (idx > 2 && !selectedGameData[`player${idx}Name`]) return null;
+                                                const isMe = member?.id && selectedGameData[`player${idx}Id`] === member.id;
+                                                return (
+                                                    <div key={idx} className={`text-center truncate px-1 ${isMe ? 'text-blue-400' : ''}`}>
+                                                        {isMe ? '나' : (selectedGameData[`player${idx}Name`] || `P${idx}`)}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                         <div className="max-h-[300px] overflow-y-auto">
                                             {Array.from({ length: selectedGameData.totalInnings || 0 }).map((_, i) => (
-                                                <div key={i} className="grid grid-cols-[60px_1fr_1fr] p-3 border-b border-white/[0.02] items-center">
+                                                <div
+                                                    key={i}
+                                                    className="grid p-3 border-b border-white/[0.02] items-center gap-1"
+                                                    style={{ gridTemplateColumns: `60px repeat(${selectedGameData.player4Name ? 4 : selectedGameData.player3Name ? 3 : 2}, 1fr)` }}
+                                                >
                                                     <div className="text-[10px] font-black text-white/20 italic">{i + 1}</div>
-                                                    <div className="text-center font-black text-sm text-[#ffd700]">
-                                                        {(selectedGameData.player1Innings as number[])?.[i] || 0}
-                                                    </div>
-                                                    <div className="text-center font-bold text-sm text-white/40">
-                                                        {(selectedGameData.player2Innings as number[])?.[i] || 0}
-                                                    </div>
+
+                                                    {[1, 2, 3, 4].map(idx => {
+                                                        if (idx > 2 && !selectedGameData[`player${idx}Name`]) return null;
+                                                        const isMe = member?.id && selectedGameData[`player${idx}Id`] === member.id;
+                                                        const sc = (selectedGameData[`player${idx}Innings`] as number[])?.[i] || 0;
+                                                        const displayScore = selectedGameData.gameType === '4c' && sc >= 10 ? sc / 10 : sc;
+
+                                                        return (
+                                                            <div key={idx} className={`text-center font-bold text-sm ${isMe ? 'text-[#10b981]' : 'text-white/40'}`}>
+                                                                {displayScore}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             ))}
                                         </div>

@@ -137,7 +137,20 @@ export default function HiqSimulation() {
         }
     };
 
-    const selectSolution = (shot: any, index: number) => {
+    const selectSolution = (rawShot: any, index: number) => {
+        // Normalize data structure (handle DB format vs Legacy format)
+        const shot = {
+            ...rawShot,
+            title: rawShot.title || `AI Solution #${index + 1}`,
+            description: rawShot.description || `Optimized path based on ${rawShot.cushionCount || 3}-Cushion logic.`,
+            solution: rawShot.solution || {
+                spin: { x: rawShot.shotParams?.spinX || 0, y: rawShot.shotParams?.spinY || 0 },
+                power: rawShot.shotParams?.power || 0,
+                thickness: 0,
+                tip: "Follow the guide above for precise control."
+            }
+        };
+
         setSimulationData(shot);
         setActiveSolutionIndex(index);
         setActiveMode("result");
@@ -146,7 +159,15 @@ export default function HiqSimulation() {
             // Dry Run Trajectory using Unified Physics
             engineRef.current.initFromPositions(shot.ballPositions);
 
-            const { angle, power, spinX, spinY } = shot.shotParams;
+            // Handle both legacy and new parameter structure
+            const params = shot.shotParams || {
+                angle: 0,
+                power: shot.solution?.power || 0,
+                spinX: shot.solution?.spin?.x || 0,
+                spinY: shot.solution?.spin?.y || 0
+            };
+
+            const { angle, power, spinX, spinY } = params;
             const shotSpeed = power * 0.1;
 
             const TABLE_W = 1.422;
@@ -272,7 +293,7 @@ export default function HiqSimulation() {
 
     return (
         <div
-            className="fixed inset-0 bg-[#0F0F0F] flex flex-col font-sans overflow-hidden select-none"
+            className="fixed inset-0 bg-[#050505] flex flex-col font-sans overflow-hidden select-none"
             onMouseMove={(e) => handleDrag(e.clientX, e.clientY)}
             onMouseUp={() => setIsDragging(false)}
             onMouseLeave={() => setIsDragging(false)}
@@ -292,7 +313,7 @@ export default function HiqSimulation() {
                     >
                         <ChevronDown className="w-6 h-6 rotate-90 text-white/40" />
                     </button>
-                    <h1 className="text-white font-bold tracking-tight">HiQ AI SOLUTION</h1>
+                    <h1 className="text-white font-black tracking-tight">RANKUE AI SOLUTION</h1>
                 </div>
                 <div className="w-20" /> {/* Spacer for Title Centering */}
             </header>
@@ -418,9 +439,10 @@ export default function HiqSimulation() {
                                 const mapY = (y: number) => vPadding + ballRadius + (y / 250) * (playH - 2 * ballRadius);
 
                                 return Object.entries(physicsPaths).map(([color, frames]) => {
+                                    if (color !== 'white') return null; // Only show white ball path
                                     if (!frames || frames.length < 2) return null;
-                                    const isTarget = color === 'white';
-                                    const strokeColor = color === 'white' ? '#FFFFFF' : color === 'yellow' ? '#FFD54F' : '#EF5350';
+                                    const isTarget = true;
+                                    const strokeColor = '#FFFFFF';
 
                                     const pathD = frames.map((p, i) => `${i === 0 ? 'M' : 'L'} ${mapX(p.x)} ${mapY(p.y)}`).join(' ');
 
@@ -539,7 +561,7 @@ export default function HiqSimulation() {
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setActiveBall(c); }}
                                                     className={`px-4 py-1.5 rounded-xl text-[11px] font-black transition-all duration-300 ${isActive
-                                                        ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+                                                        ? 'bg-[#10b981] text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
                                                         : 'bg-white/5 text-white/30 border border-white/5'
                                                         }`}
                                                 >
@@ -556,7 +578,7 @@ export default function HiqSimulation() {
                                     <Button
                                         onClick={(e) => { e.stopPropagation(); runAISolution(); }}
                                         disabled={isAnalyzing}
-                                        className="h-16 px-16 bg-white text-black hover:bg-slate-100 rounded-3xl text-lg font-black shadow-[0_20px_40px_rgba(255,255,255,0.1)] active:scale-95 transition-all"
+                                        className="h-16 px-16 bg-[#10b981] text-black hover:bg-[#10b981]/90 rounded-3xl text-lg font-black shadow-[0_20px_40px_rgba(16,185,129,0.1)] active:scale-95 transition-all"
                                     >
                                         {isAnalyzing ? <LucideRefreshCw className="animate-spin w-6 h-6 mr-3" /> : <Target className="w-6 h-6 mr-3" />}
                                         최적 공략 검색
@@ -576,19 +598,19 @@ export default function HiqSimulation() {
                                 className="absolute inset-0 bg-[#1A1A1A] p-8 flex flex-col"
                             >
                                 <div className="flex flex-col mb-6">
-                                    <p className="text-blue-400 text-[10px] uppercase font-black tracking-[0.2em] mb-4">AI Recommended Strategies</p>
+                                    <p className="text-[#10b981] text-[10px] uppercase font-black tracking-[0.2em] mb-4">AI Recommended Strategies</p>
                                     <div className="flex gap-3">
                                         {recommendedSolutions.map((sol, i) => (
                                             <button
                                                 key={i}
                                                 onClick={() => selectSolution(sol, i)}
                                                 className={`flex-1 py-3 px-4 rounded-xl border transition-all duration-300 flex flex-col items-center justify-center gap-1 ${activeSolutionIndex === i
-                                                    ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.3)]'
+                                                    ? 'bg-[#10b981] border-[#10b981] text-black shadow-[0_0_20px_rgba(16,185,129,0.2)]'
                                                     : 'bg-white/5 border-white/5 hover:bg-white/10'
                                                     }`}
                                             >
-                                                <span className={`text-[10px] font-black uppercase tracking-widest ${activeSolutionIndex === i ? 'text-blue-100' : 'text-white/20'}`}>Option {i + 1}</span>
-                                                <span className={`text-[11px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-white' : 'text-white/40'}`}>
+                                                <span className={`text-[10px] font-black uppercase tracking-widest ${activeSolutionIndex === i ? 'text-black/40' : 'text-white/20'}`}>Option {i + 1}</span>
+                                                <span className={`text-[11px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-black' : 'text-white/40'}`}>
                                                     {(!sol.title || sol.title === 'Unknown') ? '추천 공략' : sol.title}
                                                 </span>
                                             </button>
@@ -614,7 +636,7 @@ export default function HiqSimulation() {
                                         <button
                                             onClick={() => setActiveMode("setup")}
                                             title="배치 수정으로 돌아가기"
-                                            className="h-12 px-6 bg-blue-500 rounded-xl text-white font-bold whitespace-nowrap"
+                                            className="h-12 px-6 bg-[#10b981] rounded-xl text-black font-black whitespace-nowrap active:scale-95 transition-all shadow-[0_5px_15px_rgba(16,185,129,0.1)]"
                                         >
                                             배치 수정
                                         </button>

@@ -31,11 +31,10 @@ export default function Landing() {
 
     const { store: brand, isLoading: isBrandLoading } = useStore();
 
-    const handleKeys = (key: string) => {
-        if (key === "back") {
-            setPhone(prev => prev.slice(0, -1));
-        } else if (phone.length < 11) {
-            setPhone(prev => prev + key);
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value.replace(/[^0-9]/g, "");
+        if (val.length <= 11) {
+            setPhone(val);
         }
     };
 
@@ -137,53 +136,23 @@ export default function Landing() {
                     </motion.div>
                 </div>
 
-                {/* Display Area */}
-                <div className="px-8 py-8">
-                    <div className="h-24 flex flex-col items-center justify-center bg-black/20 rounded-3xl border border-white/5 shadow-inner">
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={phone || "empty"}
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 1.05 }}
-                                className="flex flex-col items-center"
-                            >
-                                {phone ? (
-                                    <span className="text-4xl font-mono font-black text-white tracking-widest text-shadow-neon" style={{ ['--hiq-brand-color' as any]: brand?.neonColor || brand?.themeColor }}>
-                                        {formattedPhone(phone)}
-                                    </span>
-                                ) : (
-                                    <span className="text-4xl font-mono font-black text-white/5 tracking-widest">
-                                        010-0000-0000
-                                    </span>
-                                )}
-                                <div className="mt-2 h-1 w-12 rounded-full bg-white/5 overflow-hidden">
-                                    <motion.div
-                                        className="h-full bg-white/20"
-                                        animate={{ width: `${(phone.length / 11) * 100}%` }}
-                                    />
-                                </div>
-                            </motion.div>
-                        </AnimatePresence>
-                    </div>
-                </div>
-
-                {/* Premium Keypad */}
-                <div className="px-8 pb-8">
-                    <div className="grid grid-cols-3 gap-4">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                            <KeypadButton key={num} value={num.toString()} onClick={handleKeys} brandColor={brand?.themeColor || undefined} />
-                        ))}
-                        <div className="flex items-center justify-center" />
-                        <KeypadButton value="0" onClick={handleKeys} brandColor={brand?.themeColor || undefined} />
-                        <motion.button
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleKeys("back")}
-                            title="삭제"
-                            className="flex items-center justify-center h-16 w-16 rounded-full text-white/20 hover:text-white/60 transition-colors mx-auto"
-                        >
-                            <LucideDelete className="w-8 h-8" />
-                        </motion.button>
+                {/* Input Area */}
+                <div className="px-8 py-10 flex flex-col items-center">
+                    <div className="w-full relative group">
+                        <input
+                            type="tel"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoComplete="tel"
+                            placeholder="휴대폰 번호 입력"
+                            value={formattedPhone(phone)}
+                            onChange={handlePhoneChange}
+                            className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-3xl font-black tracking-[0.2em] text-white placeholder:text-white/10 py-4 transition-all outline-none"
+                        />
+                        {/* Tooltip hint */}
+                        <p className="text-center text-[10px] text-white/20 mt-4 font-bold tracking-widest uppercase">
+                            Enter your phone number to login
+                        </p>
                     </div>
                 </div>
 
@@ -196,8 +165,8 @@ export default function Landing() {
                         whileTap={{ scale: 0.98 }}
                         className="w-full h-18 py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-20 shadow-[0_20px_40px_rgba(0,0,0,0.4)] relative overflow-hidden group"
                         style={{
-                            background: phone.length >= 10 ? (brand?.themeColor || "#6366f1") : "#1a1a1a",
-                            color: phone.length >= 10 ? "#000" : "#555"
+                            background: phone.length === 11 ? "#10b981" : "#1a1a1a",
+                            color: phone.length === 11 ? "#000" : "#555"
                         }}
                     >
                         {isLoading ? (

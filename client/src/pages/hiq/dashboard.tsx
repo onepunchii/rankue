@@ -27,7 +27,8 @@ import {
     LucideMapPin,
     LucideShoppingBag,
     LucideMonitorPlay,
-    LucideGamepad2
+    LucideGamepad2,
+    HelpCircle
 } from "lucide-react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { apiRequest } from "@/lib/queryClient";
@@ -37,6 +38,39 @@ import { OpponentSelector } from "../../components/hiq/OpponentSelector";
 import { useStore } from "@/contexts/StoreContext";
 import { useToast } from "@/hooks/use-toast";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+
+// Helper to calculate target score based on average and game type
+const calculateTargetScore = (avg: string | number | null | undefined, type: '3c' | '4c'): number => {
+    const average = typeof avg === 'string' ? parseFloat(avg) : (avg || 0);
+    if (isNaN(average) || average === 0) return type === '3c' ? 15 : 15; // Minimum defaults
+
+    if (type === '3c') {
+        const calculated = Math.round(average * 35);
+        return Math.max(1, calculated);
+    } else {
+        const calculated = Math.round(average * 20);
+        return Math.max(1, calculated);
+    }
+};
+
+// Helper to calculate Record Average from history
+const calculateRecordAverage = (history: HiqGameHistory[] | undefined, type: '3c' | '4c', defaultAvg: string | undefined | null) => {
+    if (!history) return defaultAvg || "0.000";
+
+    // Filter for official match games of the specific type
+    const validGames = history.filter(g =>
+        g.gameType === type &&
+        g.gameMode === "match" &&
+        (g as any).isRanked
+    );
+
+    if (validGames.length === 0) return defaultAvg || "0.000";
+
+    const totalScore = validGames.reduce((acc, g) => acc + g.score, 0);
+    const totalInnings = validGames.reduce((acc, g) => acc + g.innings, 0);
+
+    return totalInnings > 0 ? (totalScore / totalInnings).toFixed(3) : (defaultAvg || "0.000");
+};
 
 function PlayerStatsDisplay({ memberId }: { memberId: string }) {
     const { data: analysis, isLoading: analysisLoading } = useQuery<{
@@ -109,6 +143,10 @@ export default function HiqDashboard() {
     const [numberOfPlayers, setNumberOfPlayers] = useState(2);
     const [opponents, setOpponents] = useState<Opponent[]>([]);
     const [rankingTab, setRankingTab] = useState<"3c" | "4c">("4c");
+    const [statsTab, setStatsTab] = useState<"3c" | "4c">("4c");
+
+    // RP Guide Modal State
+    const [isRpModalOpen, setIsRpModalOpen] = useState(false);
 
     // Invite & Polling State
     const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -177,13 +215,18 @@ export default function HiqDashboard() {
                         setOpponents(prev => {
                             const newOpponents = [...prev];
                             res.guests.forEach((guest: any, idx: number) => {
-                                // Match joining guests to member slots starting from P2 (idx 0 in opponents)
                                 if (idx < newOpponents.length) {
-                                    newOpponents[idx] = {
-                                        ...newOpponents[idx],
-                                        type: 'member',
-                                        member: guest
-                                    };
+                                    // Only update if it's a new member joining this slot or slot was empty/guest
+                                    const currentMemberId = newOpponents[idx].member?.id;
+                                    if (currentMemberId !== guest.id) {
+                                        newOpponents[idx] = {
+                                            ...newOpponents[idx],
+                                            type: 'member',
+                                            member: guest,
+                                            target: calculateTargetScore(guest.average, gameType),
+                                            name: guest.name
+                                        };
+                                    }
                                 }
                             });
                             return newOpponents;
@@ -195,7 +238,7 @@ export default function HiqDashboard() {
             }, 3000);
             return () => clearInterval(interval);
         }
-    }, [isGameModalOpen, inviteCode, gameMode]);
+    }, [isGameModalOpen, inviteCode, gameMode, gameType]);
 
     const handleJoinGame = async () => {
         if (joinCode.length !== 6) return;
@@ -238,21 +281,20 @@ export default function HiqDashboard() {
 
     const { data: history } = useQuery<HiqGameHistory[]>({
         queryKey: ["/api/hiq/history"],
-        enabled: isScoreModalOpen,
     });
 
     const { data: rankings } = useQuery<HiqMember[]>({
-        queryKey: ["/api/hiq/rankings"],
+        queryKey: [`/api/hiq/rankings?type=${rankingTab}`],
     });
 
     const { data: analysis } = useQuery<any>({
-        queryKey: ["/api/hiq/stats/analysis"],
+        queryKey: [`/api/hiq/stats/analysis`, { type: statsTab }],
     });
 
     // --- Derived Stats for Score Grid ---
     const getPercentile = useCallback((type: '3c' | '4c') => {
         if (!rankings || !member) return null;
-        const field = type === '3c' ? 'handi3c' : 'handi4c';
+        const field = type === '3c' ? 'rating3c' : 'rating4c';
         const scores = rankings
             .map(r => r[field])
             .filter((s): s is number => (s ?? 0) > 0)
@@ -286,7 +328,8 @@ export default function HiqDashboard() {
     const handleStartGame = (mode: "practice" | "match") => {
         setGameMode(mode);
         if (member) {
-            setP1Target(gameType === "3c" ? (member.handi3c || 15) : (member.handi4c || 150));
+            const recordAvg = calculateRecordAverage(history, gameType, member.average);
+            setP1Target(calculateTargetScore(recordAvg, gameType));
         }
         setIsGameModalOpen(true);
     };
@@ -458,24 +501,50 @@ export default function HiqDashboard() {
     }
 
 
-    // --- UI Helpers ---
-    const getTier = (handi: number, is3c: boolean) => {
-        if (is3c) {
-            if (handi >= 45) return { label: "MASTER", class: "tier-master", icon: "🔥" };
-            if (handi >= 35) return { label: "DIAMOND", class: "tier-diamond", icon: "💠" };
-            if (handi >= 28) return { label: "PLATINUM", class: "tier-platinum", icon: "💎" };
-            if (handi >= 22) return { label: "GOLD", class: "tier-gold", icon: "🥇" };
-            if (handi >= 16) return { label: "SILVER", class: "tier-silver", icon: "🥈" };
-            return { label: "BRONZE", class: "tier-bronze", icon: "🥉" };
-        } else {
-            if (handi >= 700) return { label: "MASTER", class: "tier-master", icon: "🔥" };
-            if (handi >= 400) return { label: "DIAMOND", class: "tier-diamond", icon: "💠" };
-            if (handi >= 250) return { label: "PLATINUM", class: "tier-platinum", icon: "💎" };
-            if (handi >= 150) return { label: "GOLD", class: "tier-gold", icon: "🥇" };
-            if (handi >= 80) return { label: "SILVER", class: "tier-silver", icon: "🥈" };
-            return { label: "BRONZE", class: "tier-bronze", icon: "🥉" };
-        }
+    // Calculate Live Average from History (to match History Page)
+    const calculateLiveAvg = (type: '3c' | '4c') => {
+        if (!history) return "0.000";
+        const validGames = history.filter(g =>
+            g.gameType === type &&
+            g.gameMode === "match" &&
+            (g as any).isRanked
+        );
+        if (validGames.length === 0) return "0.000";
+        const totalScore = validGames.reduce((acc, g) => acc + g.score, 0);
+        const totalInnings = validGames.reduce((acc, g) => acc + g.innings, 0);
+        return totalInnings > 0 ? (totalScore / totalInnings).toFixed(3) : "0.000";
     };
+
+    const liveAvg3c = calculateLiveAvg('3c');
+    const liveAvg4c = calculateLiveAvg('4c');
+
+    // --- UI Helpers ---
+    const getTier = (avg: number, is3c: boolean) => {
+        // 1. Base Tier (Absolute Evaluation by Average)
+        let tier = { label: "BRONZE", class: "tier-bronze", icon: "🥉" };
+        if (is3c) {
+            if (avg >= 0.90) tier = { label: "PLATINUM", class: "tier-platinum", icon: "💎" };
+            else if (avg >= 0.56) tier = { label: "GOLD", class: "tier-gold", icon: "🥇" };
+            else if (avg >= 0.36) tier = { label: "SILVER", class: "tier-silver", icon: "🥈" };
+        } else {
+            if (avg >= 5.00) tier = { label: "PLATINUM", class: "tier-platinum", icon: "💎" };
+            else if (avg >= 3.00) tier = { label: "GOLD", class: "tier-gold", icon: "🥇" };
+            else if (avg >= 1.51) tier = { label: "SILVER", class: "tier-silver", icon: "🥈" };
+        }
+
+        // 2. High Tier Promotion (Relative Evaluation by RP Ranking)
+        // If skilled enough for Platinum, check RP Ranking for Title Borders
+        if (tier.label === "PLATINUM") {
+            const p = getPercentile(is3c ? '3c' : '4c');
+            if (p !== null) {
+                if (p <= 1) return { label: "MASTER", class: "tier-master", icon: "🔥" };
+                if (p <= 10) return { label: "DIAMOND", class: "tier-diamond", icon: "💠" };
+            }
+        }
+
+        return tier;
+    };
+
 
     const summary = analysis?.summary;
     const prominentTitle = (() => {
@@ -529,43 +598,137 @@ export default function HiqDashboard() {
         return mapped === activeStat;
     })?.A || 0;
 
-    const tier = getTier(member.handi4c || 0, false);
+    const tier = getTier(parseFloat(summary?.avg4c || "0"), false);
 
     return (
-        <div className="min-h-screen bg-black text-white p-6 pb-32 font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-[#0A0A0A] text-white p-6 pb-32 font-sans relative overflow-x-hidden">
 
+
+            {/* RP Guide Modal */}
+            <AnimatePresence>
+                {isRpModalOpen && (
+                    <Dialog open={isRpModalOpen} onOpenChange={setIsRpModalOpen}>
+                        <DialogContent className="bg-black/80 backdrop-blur-xl border-[#10b981]/30 max-w-sm rounded-3xl text-white">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                            >
+                                <DialogHeader className="mb-4">
+                                    <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                                        <LucideTrophy className="w-5 h-5 text-[#10b981]" />
+                                        <span>랭킹 포인트(RP) 가이드</span>
+                                    </DialogTitle>
+                                </DialogHeader>
+
+                                {/* Section 1: Definition */}
+                                <div className="mb-6 p-4 bg-white/5 rounded-2xl border border-white/5">
+                                    <p className="text-sm text-gray-300 leading-relaxed font-medium">
+                                        티어는 <span className="text-[#10b981] font-bold">에버리지(Avg)</span>를 기준으로 산정됩니다.
+                                        <br />
+                                        플래티넘 이상부터는 RP 랭킹에 따라 <span className="text-[#00e5ff] font-bold">다이아/마스터</span>가 결정됩니다!
+                                    </p>
+                                </div>
+
+                                {/* Section 2: Rules */}
+                                <div className="mb-6 space-y-3">
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">Winning Rules</h4>
+                                    <div className="bg-white/5 rounded-2xl border border-white/5 p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-bold">승리 시 (Win)</span>
+                                            <span className="text-[#10b981] font-black">+30 RP</span>
+                                        </div>
+                                        <div className="h-px bg-white/10" />
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-bold">패배 시 (Loss)</span>
+                                            <span className="text-red-400 font-black">-15 RP</span>
+                                        </div>
+                                        <p className="text-[11px] text-gray-500 mt-2 bg-black/20 p-2 rounded-lg leading-relaxed">
+                                            ※ <span className="text-white font-bold">초보자 보호:</span> 실버 등급 이하는 패배 시 점수가 차감되지 않거나(-0), 소폭 차감(-5)되어 부담 없이 즐길 수 있습니다.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Section 3: Tier Table */}
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 mb-3">Tier Standards (Handicap)</h4>
+                                    <div className="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
+                                        <table className="w-full text-xs text-left">
+                                            <thead className="bg-white/5 text-gray-400">
+                                                <tr>
+                                                    <th className="p-3 font-bold">Tier</th>
+                                                    <th className="p-3 font-bold">3-Cushion</th>
+                                                    <th className="p-3 font-bold">4-Ball</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5 text-gray-300">
+                                                <tr>
+                                                    <td className="p-3 font-bold text-[#cd7f32]">BRONZE</td>
+                                                    <td className="p-3">Avg ~ 0.35</td>
+                                                    <td className="p-3">Avg ~ 1.50</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="p-3 font-bold text-gray-300">SILVER</td>
+                                                    <td className="p-3">Avg 0.36 ~ 0.55</td>
+                                                    <td className="p-3">Avg 1.51 ~ 2.99</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="p-3 font-bold text-[#ffd700]">GOLD</td>
+                                                    <td className="p-3">Avg 0.56 ~ 0.89</td>
+                                                    <td className="p-3">Avg 3.00 ~ 4.99</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="p-3 font-bold text-[#00e5ff]">PLATINUM</td>
+                                                    <td className="p-3">Avg 0.90 +</td>
+                                                    <td className="p-3">Avg 5.00 +</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                        <div className="p-3 bg-white/[0.02] text-[10px] text-center text-gray-500">
+                                            * 플래티넘 달성 시, RP 랭킹으로 상위 티어 도전 가능
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </DialogContent>
+                    </Dialog>
+                )}
+            </AnimatePresence>
 
             {/* Profile & Tier Section */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="relative z-10 mb-10 pt-4"
+                className="relative z-10 mb-8 pt-4"
             >
-                <div className="flex items-end justify-between mb-8">
-                    <div className="space-y-1">
+                <div className="flex items-center justify-between mb-8">
+                    <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                            <span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase">Player Online</span>
+                            <div className="h-1.5 w-1.5 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981]" />
+                            <span className="text-[10px] font-black text-[#10b981]/60 tracking-[0.2em] uppercase">Player Active</span>
                         </div>
-                        <h2 className="text-4xl font-black text-premium-bright tracking-tighter leading-tight">
-                            {member.name}님
-                        </h2>
-                        <div className="flex items-center gap-3 mt-2">
+                        <div className="flex flex-col">
+                            <h2 className="text-4xl font-black text-white tracking-tighter leading-tight">
+                                {member.name}님
+                            </h2>
+                            <span className="text-[10px] font-black text-white/20 uppercase tracking-widest mt-0.5">DASHBOARD OVERVIEW</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-4">
                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md flex items-center gap-2">
-                                <span className="text-[10px] font-black text-white/60">Lv.{Math.floor((member.visitCount || 0) / 5) + 1}</span>
+                                <span className="text-[9px] font-black text-white/40 uppercase">Lv.{Math.floor((member.visitCount || 0) / 5) + 1}</span>
                             </div>
-                            <div className={`px-3 py-1 rounded-full border flex items-center gap-2 ${tier.class}`}>
-                                <span className="text-[10px] font-black">{tier.label} TIER</span>
+                            <div className={`px-3 py-1 rounded-full border flex items-center gap-2 ${tier.class} bg-white/5 backdrop-blur-md`}>
+                                <span className="text-[9px] font-black uppercase">{tier.label} TIER</span>
                             </div>
-                            <div className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 backdrop-blur-md flex items-center gap-2">
-                                <LucideZap className="w-3 h-3 text-blue-400" />
-                                <span className="text-[10px] font-black text-blue-400">{(member as any).totalSimPoints?.toLocaleString() || 0} SP</span>
+                            <div className="px-3 py-1 rounded-full bg-[#10b981]/10 border border-[#10b981]/20 backdrop-blur-md flex items-center gap-2">
+                                <LucideZap className="w-3 h-3 text-[#10b981]" />
+                                <span className="text-[9px] font-black text-[#10b981]">{(member as any).totalSimPoints?.toLocaleString() || 0} SP</span>
                             </div>
                         </div>
                     </div>
                     <div className="relative group">
-                        <div className="absolute inset-0 bg-white/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="w-20 h-20 rounded-3xl premium-glass flex items-center justify-center text-4xl shadow-2xl rotate-3">
+                        <div className="absolute inset-0 bg-[#10b981]/20 blur-3xl rounded-full opacity-50" />
+                        <div className="w-20 h-20 rounded-[2rem] bg-white/[0.03] border border-white/10 flex items-center justify-center text-4xl shadow-2xl backdrop-blur-xl relative z-10">
                             {tier.icon}
                         </div>
                     </div>
@@ -575,37 +738,57 @@ export default function HiqDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                     <motion.div
                         whileHover={{ y: -5 }}
-                        className="premium-glass p-5 rounded-[2rem] border-white/5 relative overflow-hidden group"
+                        className="bg-white/[0.03] p-6 rounded-[2.5rem] border border-white/5 relative overflow-hidden group backdrop-blur-sm"
                     >
-                        <p className="text-[10px] font-black text-white/30 tracking-[0.2em] uppercase mb-3">3-Cushion</p>
-                        <div className="flex items-baseline gap-2">
-                            <h3 className="text-4xl font-black text-white">{member.handi3c || 0}</h3>
-                            <span className="text-xs font-bold text-white/40">점</span>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-[#10b981] tracking-[0.2em] uppercase mb-1">3-Cushion</span>
+                            <span className="text-[8px] font-bold text-white/20 uppercase tracking-widest mb-4">MATCH RATING</span>
                         </div>
-                        <div className="mt-4 flex items-center gap-1.5 text-[10px] font-bold text-green-400">
+                        <div className="flex items-baseline gap-2">
+                            <h3 className="text-5xl font-black text-white tracking-tighter">{member.rating3c || 0}</h3>
+                            <span className="text-sm font-bold text-[#10b981] ml-1">RP</span>
+                            <button onClick={() => setIsRpModalOpen(true)} className="ml-1 opacity-50 hover:opacity-100 transition-opacity">
+                                <HelpCircle className="w-4 h-4 text-[#10b981]" />
+                            </button>
+                        </div>
+                        <div className="absolute top-6 right-6 flex flex-col items-end">
+                            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">AVG</span>
+                            <span className="text-xl font-black text-white tracking-tight">{liveAvg3c}</span>
+                        </div>
+                        <div className="mt-6 flex items-center gap-1.5 text-[10px] font-black text-[#10b981] bg-[#10b981]/10 w-fit px-3 py-1 rounded-full border border-[#10b981]/20">
                             {getPercentile('3c') ? (
                                 <>
                                     <ChevronUp className="w-3 h-3" />
-                                    <span>상위 {getPercentile('3c')}%</span>
+                                    <span>TOP {getPercentile('3c')}%</span>
                                 </>
                             ) : (
-                                <span className="text-white/10 uppercase italic">Calculating...</span>
+                                <span className="text-white/20 uppercase italic">ANALYZING...</span>
                             )}
                         </div>
                     </motion.div>
 
                     <motion.div
                         whileHover={{ y: -5 }}
-                        className="premium-glass p-5 rounded-[2rem] border-white/5 relative overflow-hidden group"
+                        className="bg-white/[0.03] p-6 rounded-[2.5rem] border border-white/5 relative overflow-hidden group backdrop-blur-sm"
                     >
-                        <p className="text-[10px] font-black text-white/30 tracking-[0.2em] uppercase mb-3">4-Ball</p>
-                        <div className="flex items-baseline gap-2">
-                            <h3 className="text-4xl font-black text-white">{member.handi4c || 0}</h3>
-                            <span className="text-xs font-bold text-white/40">점</span>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase mb-1">4-Ball</span>
+                            <span className="text-[8px] font-bold text-white/20 uppercase tracking-widest mb-4">MATCH RATING</span>
                         </div>
-                        <div className={`mt-4 flex items-center gap-1.5 text-[10px] font-bold ${getTrend().color}`}>
+                        <div className="flex items-baseline gap-2">
+                            <h3 className="text-5xl font-black text-white tracking-tighter">{member.rating4c || 0}</h3>
+                            <span className="text-sm font-bold text-white/40 ml-1">RP</span>
+                            <button onClick={() => setIsRpModalOpen(true)} className="ml-1 opacity-30 hover:opacity-100 transition-opacity">
+                                <HelpCircle className="w-4 h-4 text-white" />
+                            </button>
+                        </div>
+                        <div className="absolute top-6 right-6 flex flex-col items-end">
+                            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">AVG</span>
+                            <span className="text-xl font-black text-white tracking-tight">{liveAvg4c}</span>
+                        </div>
+                        <div className={`mt-6 flex items-center gap-1.5 text-[10px] font-black ${getTrend().color} bg-white/5 w-fit px-3 py-1 rounded-full border border-white/10`}>
                             {getTrend().icon}
-                            <span>{getTrend().label}</span>
+                            <span className="uppercase">{getTrend().label}</span>
                         </div>
                     </motion.div>
                 </div>
@@ -615,13 +798,31 @@ export default function HiqDashboard() {
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="mb-10 premium-glass p-6 rounded-[3rem] border-white/5 relative flex flex-col items-center"
+                className="mb-10 bg-white/[0.03] p-6 rounded-[2.5rem] border border-white/5 relative flex flex-col items-center backdrop-blur-sm"
             >
                 {prominentTitle && (
-                    <div className="mb-2 px-4 py-1.5 rounded-full bg-[#22c55e]/20 border border-[#22c55e]/30 shadow-lg backdrop-blur-md">
-                        <span className="text-xs font-black text-[#22c55e] tracking-tight">{prominentTitle}</span>
+                    <div className="mb-2 px-4 py-1.5 rounded-full bg-[#10b981]/20 border border-[#10b981]/30 shadow-lg backdrop-blur-md">
+                        <span className="text-xs font-black text-[#10b981] tracking-tight">{prominentTitle}</span>
                     </div>
                 )}
+
+                {/* Stats Type Switcher (3-Cushion vs 4-Ball) */}
+                <div className="flex justify-center mb-0 mt-4 relative z-10">
+                    <div className="flex p-1 bg-black/40 rounded-xl border border-white/5 backdrop-blur-sm">
+                        <button
+                            onClick={() => setStatsTab('4c')}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${statsTab === '4c' ? 'bg-[#10b981] text-black shadow-lg shadow-[#10b981]/20' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            4구
+                        </button>
+                        <button
+                            onClick={() => setStatsTab('3c')}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${statsTab === '3c' ? 'bg-[#10b981] text-black shadow-lg shadow-[#10b981]/20' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            3구
+                        </button>
+                    </div>
+                </div>
 
                 <div className="w-full h-[320px] relative mt-2">
                     <ResponsiveContainer width="100%" height="100%">
@@ -675,9 +876,9 @@ export default function HiqDashboard() {
                             <Radar
                                 name="My Stats"
                                 dataKey="A"
-                                stroke="#22c55e"
+                                stroke="#10b981"
                                 strokeWidth={3}
-                                fill="#22c55e"
+                                fill="#10b981"
                                 fillOpacity={0.6}
                                 animationDuration={1000}
                             />
@@ -695,30 +896,68 @@ export default function HiqDashboard() {
                     )}
                 </div>
 
-                {/* Analysis Description Card */}
-                {currentStatData && (
-                    <motion.div
-                        key={activeStat}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="w-full mt-6 bg-white/5 rounded-2xl p-4 border border-white/10"
-                    >
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex flex-col">
-                                <h4 className="text-lg font-black text-white tracking-tighter">{currentStatData.title}</h4>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-2xl font-black text-[#22c55e]">{activeScore}</div>
-                                <div className="mt-1 px-2 py-0.5 rounded-lg bg-white/10 border border-white/10 text-[10px] font-black text-white/60 uppercase inline-block shadow-sm">
-                                    {currentStatData.data}
+                {/* Stat Controller Tabs */}
+                <div className="w-full mt-8 flex p-1.5 bg-black/20 rounded-2xl border border-white/5">
+                    {Object.keys(statInfo).map((stat) => (
+                        <button
+                            key={stat}
+                            onClick={() => setActiveStat(stat)}
+                            className={`flex-1 py-3 rounded-xl transition-all duration-300 flex flex-col items-center justify-center gap-1 ${activeStat === stat
+                                ? "bg-[#10b981]/10 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                                : "hover:bg-white/5"
+                                }`}
+                        >
+                            <span className={`text-[11px] font-black tracking-tighter transition-colors ${activeStat === stat ? "text-[#10b981]" : "text-white/30"
+                                }`}>
+                                {stat}
+                            </span>
+                            {activeStat === stat && (
+                                <motion.div
+                                    layoutId="stat-indicator"
+                                    className="w-1 h-1 rounded-full bg-[#10b981] shadow-[0_0_5px_#10b981]"
+                                />
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Dynamic Content Card */}
+                <AnimatePresence mode="wait">
+                    {currentStatData && (
+                        <motion.div
+                            key={activeStat}
+                            initial={{ opacity: 0, scale: 0.98, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                            className="w-full mt-4 bg-white/[0.04] rounded-[2.5rem] p-8 border border-white/10 backdrop-blur-md shadow-2xl relative overflow-hidden group"
+                        >
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-[#10b981]/5 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-[#10b981]/10 transition-colors" />
+
+                            <div className="flex items-center justify-between mb-6 relative z-10">
+                                <div className="flex flex-col">
+                                    <h4 className="text-2xl font-black text-white tracking-tighter mb-1">{currentStatData.title}</h4>
+                                    <span className="text-[10px] font-black text-[#10b981]/60 uppercase tracking-[0.2em]">Detailed Analysis</span>
+                                </div>
+                                <div className="text-right flex flex-col items-end">
+                                    <div className="text-4xl font-black text-[#10b981] tracking-tighter mb-1 leading-none">
+                                        {activeScore}
+                                    </div>
+                                    <div className="px-3 py-1 rounded-full bg-[#10b981]/10 border border-[#10b981]/20 text-[10px] font-black text-[#10b981] uppercase tracking-wider">
+                                        {currentStatData.data}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <p className="text-xs text-white/60 leading-relaxed font-medium">
-                            {currentStatData.desc}
-                        </p>
-                    </motion.div>
-                )}
+
+                            <p className="text-sm text-white/50 leading-relaxed font-medium relative z-10">
+                                {currentStatData.desc}
+                            </p>
+
+                            {/* Decorative line */}
+                            <div className="absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#10b981]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </motion.div>
 
             {/* Quick Actions */}
@@ -728,43 +967,88 @@ export default function HiqDashboard() {
                     <LucideSmartphone className="w-4 h-4 text-white/10" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 auto-rows-min">
+                    {/* [1] 혼자 연습하기 (1x1) */}
                     <motion.button
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleStartGame("practice")}
-                        className="h-32 rounded-[2.5rem] bg-white/[0.05] border border-white/10 flex flex-col items-center justify-center gap-3 group relative overflow-hidden"
+                        className="row-span-1 h-34 rounded-[2.5rem] bg-white/[0.08] border border-white/10 flex flex-col items-center justify-center gap-3 group relative overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.02)]"
                     >
                         <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:neon-glow transition-all" style={{ ['--hiq-brand-color' as any]: brand?.themeColor }}>
-                            <LucideTrophy className="w-6 h-6 text-white" />
+                        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center transition-all">
+                            <LucideTrophy className="w-7 h-7 text-white/40 group-hover:text-white" />
                         </div>
-                        <span className="font-bold text-sm text-white">혼자 연습하기</span>
+                        <div className="text-center px-4">
+                            <span className="block font-black text-sm text-white/60 group-hover:text-white transition-colors">혼자 연습하기</span>
+                            <span className="text-[9px] font-black text-white/20 uppercase tracking-widest mt-0.5 block">PRACTICE MODE</span>
+                        </div>
                     </motion.button>
 
+                    {/* [2] 매칭 대결 (1x2 Tall) */}
                     <motion.button
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleStartGame("match")}
-                        className="h-32 rounded-[2.5rem] bg-white/[0.05] border border-white/10 flex flex-col items-center justify-center gap-3 group relative overflow-hidden"
+                        className="row-span-2 h-72 rounded-[2.5rem] bg-white/[0.08] border border-[#10b981]/30 flex flex-col items-center justify-center gap-6 group relative overflow-hidden shadow-[0_0_20px_rgba(16,185,129,0.05)]"
                     >
                         <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:neon-glow transition-all" style={{ ['--hiq-brand-color' as any]: brand?.themeColor }}>
-                            <LucideUsers className="w-6 h-6 text-white" />
+                        <div className="w-20 h-20 rounded-[2rem] bg-[#10b981]/10 flex items-center justify-center group-hover:neon-glow transition-all" style={{ ['--hiq-brand-color' as any]: '#10b981' }}>
+                            <LucideUsers className="w-10 h-10 text-[#10b981]" />
                         </div>
-                        <span className="font-bold text-sm text-white">매칭 대결</span>
+                        <div className="text-center px-4">
+                            <span className="block font-black text-base text-white">매칭 대결</span>
+                            <span className="text-[10px] font-black text-white/20 uppercase tracking-widest mt-1 block">MATCH MODE</span>
+                        </div>
                     </motion.button>
 
+                    {/* [3] PIN 참여 (1x1) - Practice 아래 배치 */}
                     <motion.button
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setIsJoinModalOpen(true)}
+                        className="h-34 rounded-[2.5rem] bg-white/[0.05] border border-[#10b981]/30 flex flex-col items-center justify-center gap-3 group relative overflow-hidden shadow-[0_0_20px_rgba(16,185,129,0.05)]"
+                    >
+                        <div className="absolute inset-0 bg-[#10b981]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="w-14 h-14 rounded-2xl bg-[#10b981]/10 flex items-center justify-center group-hover:neon-glow transition-all" style={{ ['--hiq-brand-color' as any]: '#10b981' }}>
+                            <LucideHash className="w-6 h-6 text-[#10b981]" />
+                        </div>
+                        <div className="text-center">
+                            <span className="block font-black text-sm text-white">PIN 참여</span>
+                            <span className="text-[9px] font-black text-[#10b981]/40 uppercase tracking-widest mt-0.5 block">JOIN GAME</span>
+                        </div>
+                    </motion.button>
+
+                    {/* [4] 온라인 게임 (Wide) */}
+                    <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setIsOnlineGameModalOpen(true)}
+                        className="col-span-2 h-32 rounded-[2.5rem] bg-[#10b981]/10 border border-[#10b981]/20 flex items-center justify-start px-10 gap-6 group relative overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.05)]"
+                    >
+                        <div className="absolute inset-0 bg-[#10b981]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="w-16 h-16 rounded-[2rem] bg-[#10b981]/20 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.1)] group-hover:shadow-[0_0_30px_rgba(16,185,129,0.2)] transition-all">
+                            <LucideGamepad2 className="w-8 h-8 text-[#10b981]" />
+                        </div>
+                        <div className="text-left">
+                            <span className="block font-black text-xl text-[#10b981]">e-빌리어드</span>
+                            <span className="text-[10px] font-black text-[#10b981]/40 uppercase tracking-widest">Digital Sports Experience</span>
+                        </div>
+                    </motion.button>
+
+                    {/* [5] 시뮬레이션 (1x1) */}
+                    <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setLocation("/simulation")}
                         className="h-32 rounded-[2.5rem] bg-white/[0.05] border border-white/10 flex flex-col items-center justify-center gap-3 group relative overflow-hidden"
                     >
                         <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:neon-glow transition-all" style={{ ['--hiq-brand-color' as any]: brand?.themeColor }}>
-                            <LucideHash className="w-6 h-6 text-white" />
+                        <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center group-hover:neon-glow transition-all">
+                            <LucideMonitorPlay className="w-6 h-6 text-white/40 group-hover:text-white" />
                         </div>
-                        <span className="font-bold text-sm text-white">PIN 참여</span>
+                        <div className="text-center">
+                            <span className="block font-black text-sm text-white/70 group-hover:text-white transition-colors">시뮬레이션</span>
+                            <span className="text-[9px] font-black text-white/20 uppercase tracking-widest mt-0.5 block">VIRTUAL SIM</span>
+                        </div>
                     </motion.button>
 
+                    {/* [6] 매장 찾기 (1x1) */}
                     <motion.button
                         whileTap={{ scale: 0.95 }}
                         onClick={() => {
@@ -773,42 +1057,18 @@ export default function HiqDashboard() {
                                 description: "가까운 매장 찾기 기능이 곧 추가됩니다.",
                             });
                         }}
-                        className="h-32 rounded-[2.5rem] bg-white/[0.05] border border-white/10 flex flex-col items-center justify-center gap-3 group relative overflow-hidden"
+                        className="h-32 rounded-[2.5rem] bg-white/[0.03] border border-white/5 flex flex-col items-center justify-center gap-3 group relative overflow-hidden opacity-50 hover:opacity-100 transition-opacity"
                     >
-                        <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:neon-glow transition-all" style={{ ['--hiq-brand-color' as any]: brand?.themeColor }}>
-                            <LucideMapPin className="w-6 h-6 text-white" />
+                        <LucideMapPin className="w-6 h-6 text-white/20 group-hover:text-white/60" />
+                        <div className="text-center">
+                            <span className="block font-bold text-sm text-white/30 group-hover:text-white/60 transition-colors">매장 찾기</span>
+                            <span className="text-[9px] font-black text-white/10 uppercase tracking-widest mt-0.5 block">FIND CLUB</span>
                         </div>
-                        <span className="font-bold text-sm text-white">매장 찾기</span>
-                    </motion.button>
-
-                    <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setLocation("/simulation")}
-                        className="h-32 rounded-[2.5rem] bg-gradient-to-br from-[#ffd700]/10 to-transparent border border-[#ffd700]/20 flex flex-col items-center justify-center gap-3 group relative overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-[#ffd700]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="w-12 h-12 rounded-2xl bg-[#ffd700]/20 flex items-center justify-center shadow-[0_0_20px_rgba(255,215,0,0.1)] group-hover:shadow-[0_0_30px_rgba(255,215,0,0.2)] transition-all">
-                            <LucideMonitorPlay className="w-6 h-6 text-[#ffd700]" />
-                        </div>
-                        <span className="font-bold text-sm text-[#ffd700]/80 group-hover:text-[#ffd700]">빌리아드 시뮬레이션</span>
-                    </motion.button>
-
-                    <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setIsOnlineGameModalOpen(true)}
-                        className="h-32 rounded-[2.5rem] bg-gradient-to-br from-indigo-500/10 to-transparent border border-indigo-500/20 flex flex-col items-center justify-center gap-3 group relative overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.1)] group-hover:shadow-[0_0_30px_rgba(99,102,241,0.2)] transition-all">
-                            <LucideGamepad2 className="w-6 h-6 text-indigo-400" />
-                        </div>
-                        <span className="font-bold text-sm text-indigo-400/80 group-hover:text-indigo-400">온라인 게임</span>
                     </motion.button>
                 </div>
             </div>
 
-            {/* Online Game Mode Selection Modal */}
+            {/* Online Game Mode Selection Modal (Premium Bento) */}
             <Dialog
                 open={isOnlineGameModalOpen}
                 onOpenChange={(open) => {
@@ -816,91 +1076,118 @@ export default function HiqDashboard() {
                     if (!open) setThreeBallSelectionMode(false);
                 }}
             >
-                <DialogContent className="premium-glass border-white/10 text-white sm:max-w-md overflow-hidden">
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-black text-center">게임 모드 선택</DialogTitle>
-                        <DialogDescription className="text-center text-white/40">
-                            플레이할 종목을 선택해주세요.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid grid-cols-2 gap-4 py-4 min-h-[160px]">
-                        {/* 3-BALL CARD */}
-                        <div
-                            className={`relative flex flex-col items-center justify-center p-6 rounded-3xl transition-all duration-300 border overflow-hidden cursor-pointer active:scale-[0.98] ${threeBallSelectionMode
-                                ? "bg-indigo-500/20 border-indigo-500/40 col-span-2 shadow-[0_0_30px_rgba(99,102,241,0.1)]"
-                                : "bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/20"
-                                }`}
-                            onClick={() => !threeBallSelectionMode && setThreeBallSelectionMode(true)}
-                        >
-                            {!threeBallSelectionMode ? (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="flex flex-col items-center gap-3"
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-2xl shadow-inner">
-                                        🎱
-                                    </div>
-                                    <div className="text-center">
-                                        <span className="font-bold text-lg block">3구</span>
-                                        <span className="text-[10px] font-black text-white/30 uppercase tracking-tighter">3-Ball Game</span>
-                                    </div>
-                                </motion.div>
-                            ) : (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="w-full flex flex-col gap-4"
-                                >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-black text-white/40 uppercase tracking-widest">3-BALL TABLE SIZE</span>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setThreeBallSelectionMode(false); }}
-                                            className="text-[10px] font-black text-white/20 hover:text-white/60 uppercase transition-colors"
-                                        >
-                                            CANCEL
-                                        </button>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setLocation("/online-game?mode=3ball&table=medium"); }}
-                                            className="flex flex-col items-center p-4 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 transition-all active:scale-95 group"
-                                        >
-                                            <span className="font-black text-sm text-white/80 group-hover:text-white">중대</span>
-                                            <span className="text-[9px] font-bold text-white/30">일반 연습용</span>
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setLocation("/online-game?mode=3ball&table=large"); }}
-                                            className="flex flex-col items-center p-4 rounded-2xl bg-indigo-500/40 hover:bg-indigo-500/60 border border-indigo-400/40 transition-all active:scale-95 group"
-                                        >
-                                            <span className="font-black text-sm text-white group-hover:neon-glow" style={{ "--hiq-brand-color": "#818cf8" } as any}>대대</span>
-                                            <span className="text-[9px] font-bold text-white/60">국제식 (추천)</span>
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </div>
+                <DialogContent hideClose className="bg-[#0A0A0A]/95 backdrop-blur-xl border border-white/10 text-white max-w-lg w-[95%] rounded-[3rem] p-0 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] focus:outline-none">
+                    <div className="p-10 bg-gradient-to-br from-white/[0.02] to-transparent relative">
+                        <DialogHeader className="mb-10">
+                            <div className="flex flex-col items-center text-center">
+                                <DialogTitle className="text-4xl font-black tracking-tighter text-white mb-2">게임 모드 선택</DialogTitle>
+                                <DialogDescription className="text-[11px] font-black text-[#10b981]/60 uppercase tracking-[0.2em]">
+                                    Pick your billiards arena
+                                </DialogDescription>
+                            </div>
+                        </DialogHeader>
 
-                        {/* 4-BALL CARD */}
-                        <AnimatePresence>
-                            {!threeBallSelectionMode && (
-                                <motion.button
-                                    initial={{ opacity: 0, scale: 0.9, x: 20 }}
-                                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9, x: 20 }}
-                                    onClick={() => setLocation("/online-game?mode=4ball&table=medium")}
-                                    className="flex flex-col items-center justify-center p-6 rounded-3xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all gap-3 active:scale-[0.98] group"
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-inner">
-                                        🔴
-                                    </div>
-                                    <div className="text-center">
-                                        <span className="font-bold text-lg block">4구</span>
-                                        <span className="text-[10px] font-black text-white/30 uppercase tracking-tighter">4-Ball Game</span>
-                                    </div>
-                                </motion.button>
-                            )}
-                        </AnimatePresence>
+                        {/* Custom Close Button */}
+                        <button
+                            onClick={() => setIsOnlineGameModalOpen(false)}
+                            className="absolute top-8 right-8 w-10 h-10 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all group"
+                        >
+                            <span className="text-2xl text-white/20 group-hover:text-white">&times;</span>
+                        </button>
+
+                        <div className={`grid ${threeBallSelectionMode ? 'grid-cols-1' : 'grid-cols-2'} gap-6 py-2 min-h-[220px]`}>
+                            {/* 3-BALL CARD */}
+                            <motion.div
+                                layout
+                                className={`relative flex flex-col items-center justify-center p-8 rounded-[2.5rem] transition-all duration-500 border overflow-hidden cursor-pointer group/card ${threeBallSelectionMode
+                                    ? "bg-[#10b981]/10 border-[#10b981]/30 col-span-1 shadow-[0_0_40px_rgba(16,185,129,0.15)] h-[280px]"
+                                    : "bg-white/[0.03] hover:bg-white/[0.08] border-white/5 hover:border-[#10b981]/30 active:scale-[0.98]"
+                                    }`}
+                                onClick={() => !threeBallSelectionMode && setThreeBallSelectionMode(true)}
+                            >
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-[#10b981]/5 blur-[60px] rounded-full -mr-16 -mt-16 group-hover/card:bg-[#10b981]/15 transition-colors" />
+
+                                {!threeBallSelectionMode ? (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex flex-col items-center gap-5 relative z-10"
+                                    >
+                                        <div className="w-20 h-20 rounded-3xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-4xl shadow-2xl group-hover/card:scale-110 transition-transform">
+                                            🎱
+                                        </div>
+                                        <div className="text-center">
+                                            <span className="font-black text-2xl block tracking-tighter text-white mb-1">3구</span>
+                                            <span className="text-[10px] font-black text-white/20 uppercase tracking-widest group-hover/card:text-[#10b981]/60 transition-colors">3-Ball Game</span>
+                                        </div>
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="w-full h-full flex flex-col justify-between relative z-10"
+                                    >
+                                        <div className="flex items-center justify-between mb-8">
+                                            <div className="flex flex-col">
+                                                <span className="text-lg font-black text-white tracking-tighter">테이블 규격 선택</span>
+                                                <span className="text-[9px] font-black text-[#10b981] uppercase tracking-widest">Select Arena Size</span>
+                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setThreeBallSelectionMode(false); }}
+                                                className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-black hover:bg-white/10 transition-all"
+                                            >
+                                                <ChevronDown className="w-4 h-4 text-white/40 rotate-90" />
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <motion.button
+                                                whileHover={{ y: -4 }}
+                                                whileTap={{ scale: 0.96 }}
+                                                onClick={(e) => { e.stopPropagation(); setLocation("/online-game?mode=3ball&table=medium"); }}
+                                                className="flex flex-col items-center p-6 rounded-[1.8rem] bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 transition-all group/btn shadow-xl"
+                                            >
+                                                <span className="font-black text-xl text-white/80 group-hover/btn:text-white mb-1">중대</span>
+                                                <span className="text-[9px] font-black text-white/20 uppercase tracking-widest group-hover/btn:text-white/40">Domestic</span>
+                                            </motion.button>
+                                            <motion.button
+                                                whileHover={{ y: -4 }}
+                                                whileTap={{ scale: 0.96 }}
+                                                onClick={(e) => { e.stopPropagation(); setLocation("/online-game?mode=3ball&table=large"); }}
+                                                className="flex flex-col items-center p-6 rounded-[1.8rem] bg-[#10b981]/20 hover:bg-[#10b981]/30 border border-[#10b981]/30 transition-all group/btn shadow-[0_10px_30px_rgba(16,185,129,0.2)]"
+                                            >
+                                                <span className="font-black text-xl text-white group-hover/btn:scale-105 transition-transform mb-1">대대</span>
+                                                <span className="text-[9px] font-black text-white/60 uppercase tracking-widest group-hover/btn:text-white/80">International</span>
+                                            </motion.button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </motion.div>
+
+                            {/* 4-BALL CARD */}
+                            <AnimatePresence>
+                                {!threeBallSelectionMode && (
+                                    <motion.button
+                                        initial={{ opacity: 0, scale: 0.9, x: 20 }}
+                                        animate={{ opacity: 1, scale: 1, x: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9, x: 20 }}
+                                        onClick={() => setLocation("/online-game?mode=4ball&table=medium")}
+                                        className="relative flex flex-col items-center justify-center p-8 rounded-[2.5rem] bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-[#10b981]/30 transition-all active:scale-[0.98] group/card overflow-hidden h-full"
+                                    >
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-[60px] rounded-full -mr-16 -mt-16 group-hover/card:bg-red-500/15 transition-colors" />
+
+                                        <div className="flex flex-col items-center gap-5 relative z-10">
+                                            <div className="w-20 h-20 rounded-3xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-4xl shadow-2xl group-hover/card:scale-110 transition-transform">
+                                                🔴
+                                            </div>
+                                            <div className="text-center">
+                                                <span className="font-black text-2xl block tracking-tighter text-white mb-1">4구</span>
+                                                <span className="text-[10px] font-black text-white/20 uppercase tracking-widest group-hover/card:text-[#10b981]/60 transition-colors">4-Ball Game</span>
+                                            </div>
+                                        </div>
+                                    </motion.button>
+                                )}
+                            </AnimatePresence>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
@@ -999,8 +1286,18 @@ export default function HiqDashboard() {
                             <div className="grid grid-cols-2 gap-3 mb-4">
                                 <Button
                                     onClick={() => {
-                                        setGameType("4c");
-                                        if (member) setP1Target(member.handi4c || 150);
+                                        const newType = "4c";
+                                        setGameType(newType);
+                                        if (member) {
+                                            const recordAvg = calculateRecordAverage(history, newType, member.average);
+                                            setP1Target(calculateTargetScore(recordAvg, newType));
+                                        }
+                                        setOpponents(prev => prev.map(o => {
+                                            if (o.type === 'member' && o.member) {
+                                                return { ...o, target: calculateTargetScore(o.member.average, newType) };
+                                            }
+                                            return o;
+                                        }));
                                     }}
                                     className={`h-14 text-xl font-black rounded-2xl ${gameType === "4c" ? "bg-[#0e4d2a] text-white" : "bg-white/5 text-gray-400"}`}
                                 >
@@ -1008,8 +1305,18 @@ export default function HiqDashboard() {
                                 </Button>
                                 <Button
                                     onClick={() => {
-                                        setGameType("3c");
-                                        if (member) setP1Target(member.handi3c || 15);
+                                        const newType = "3c";
+                                        setGameType(newType);
+                                        if (member) {
+                                            const recordAvg = calculateRecordAverage(history, newType, member.average);
+                                            setP1Target(calculateTargetScore(recordAvg, newType));
+                                        }
+                                        setOpponents(prev => prev.map(o => {
+                                            if (o.type === 'member' && o.member) {
+                                                return { ...o, target: calculateTargetScore(o.member.average, newType) };
+                                            }
+                                            return o;
+                                        }));
                                     }}
                                     className={`h-14 text-xl font-black rounded-2xl ${gameType === "3c" ? "bg-[#0e4d2a] text-white" : "bg-white/5 text-gray-400"}`}
                                 >
@@ -1052,16 +1359,19 @@ export default function HiqDashboard() {
                                     </div>
 
                                     {/* Input Display */}
-                                    <div className="h-12 flex items-center bg-black/20 rounded-xl px-4 border border-white/5">
+                                    <div className="h-12 flex items-center justify-between bg-black/20 rounded-xl px-4 border border-white/5">
                                         <span className="font-black text-white text-lg truncate">
                                             {member.name}
+                                        </span>
+                                        <span className="text-xs font-bold text-gray-400 bg-black/30 px-2 py-1 rounded-lg">
+                                            AVG {calculateRecordAverage(history, gameType, member.average)}
                                         </span>
                                     </div>
 
                                     {/* Big Score Control */}
                                     <div className="flex items-center gap-2">
                                         <button
-                                            onClick={() => setP1Target(prev => Math.max(0, prev - (gameType === "4c" ? 10 : 1)))}
+                                            onClick={() => setP1Target(prev => Math.max(0, prev - 1))}
                                             aria-label="점수 내리기"
                                             className="flex-1 h-14 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center border border-white/5"
                                         >
@@ -1071,7 +1381,7 @@ export default function HiqDashboard() {
                                             {p1Target}
                                         </div>
                                         <button
-                                            onClick={() => setP1Target(prev => prev + (gameType === "4c" ? 10 : 1))}
+                                            onClick={() => setP1Target(prev => prev + 1)}
                                             aria-label="점수 올리기"
                                             className="flex-1 h-14 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center border border-white/5"
                                         >
@@ -1132,11 +1442,16 @@ export default function HiqDashboard() {
                                                     />
                                                 </div>
                                             ) : (
-                                                <div className="h-12 w-full flex items-center bg-black/20 rounded-xl px-4 border border-white/5">
+                                                <div className="h-12 w-full flex items-center bg-black/20 rounded-xl px-4 border border-white/5 justify-between">
                                                     {opponent?.member ? (
-                                                        <span className="font-black text-white text-lg truncate">
-                                                            {opponent.member.name}
-                                                        </span>
+                                                        <>
+                                                            <span className="font-black text-white text-lg truncate">
+                                                                {opponent.member.name}
+                                                            </span>
+                                                            <span className="text-xs font-bold text-gray-400 bg-black/30 px-2 py-1 rounded-lg">
+                                                                AVG {opponent.member.average}
+                                                            </span>
+                                                        </>
                                                     ) : (
                                                         <span className="font-bold text-white/20 text-sm animate-pulse">
                                                             PIN입력 대기 중...
@@ -1148,7 +1463,7 @@ export default function HiqDashboard() {
                                             {/* Big Score Control */}
                                             <div className="flex items-center gap-2">
                                                 <button
-                                                    onClick={() => updateOpponentData(idx, { target: Math.max(0, (opponent?.target || 0) - (gameType === "4c" ? 10 : 1)) })}
+                                                    onClick={() => updateOpponentData(idx, { target: Math.max(0, (opponent?.target || 0) - 1) })}
                                                     aria-label={`상대방 ${idx + 1} 점수 내리기`}
                                                     className="flex-1 h-14 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center border border-white/5"
                                                 >
@@ -1158,7 +1473,7 @@ export default function HiqDashboard() {
                                                     {opponent?.target || 0}
                                                 </div>
                                                 <button
-                                                    onClick={() => updateOpponentData(idx, { target: Math.max(0, (opponent?.target || 0) + (gameType === "4c" ? 10 : 1)) })}
+                                                    onClick={() => updateOpponentData(idx, { target: Math.max(0, (opponent?.target || 0) + 1) })}
                                                     aria-label={`상대방 ${idx + 1} 점수 올리기`}
                                                     className="flex-1 h-14 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center border border-white/5"
                                                 >
@@ -1239,81 +1554,101 @@ export default function HiqDashboard() {
             </Dialog>
 
             {/* Real-time Rankings */}
-            <Card className="bg-[#151515] border-[#222] rounded-3xl overflow-hidden">
-                <CardHeader className="p-6 pb-2">
-                    <CardTitle className="text-xl font-black flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                            <LucideTrophy className="w-6 h-6 text-[#ffd700]" />
-                            당구장 실시간 랭킹
+            <div className="bg-white/[0.03] border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm mb-12">
+                <div className="p-8 pb-4">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-2 mb-1">
+                                <LucideTrophy className="w-5 h-5 text-[#ffd700]" />
+                                <h3 className="text-xl font-black text-white tracking-tighter">당구장 실시간 랭킹</h3>
+                            </div>
+                            <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Real-time Ranking</span>
                         </div>
                         <button
                             onClick={() => setLocation('/ranking')}
-                            className="text-xs text-white/60 font-bold hover:text-white transition-colors"
+                            className="bg-white/5 px-4 py-2 rounded-full text-[10px] text-white/40 font-black hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest"
                         >
-                            자세히 보기 &gt;
+                            View All
                         </button>
-                    </CardTitle>
+                    </div>
 
                     {/* Ranking Tabs */}
-                    <div className="flex gap-2 p-1 bg-white/5 rounded-2xl">
+                    <div className="flex gap-2 p-1.5 bg-black/20 rounded-2xl border border-white/5 mb-4">
                         <Button
                             variant="ghost"
                             onClick={() => setRankingTab("4c")}
-                            className={`flex-1 h-10 rounded-xl font-black text-sm transition-all ${rankingTab === "4c" ? "bg-[#14643a] text-white shadow-lg" : "text-white/50 hover:text-white/80"}`}
+                            className={`flex-1 h-12 rounded-xl font-black text-sm transition-all ${rankingTab === "4c"
+                                ? "bg-[#10b981]/20 text-[#10b981] shadow-[0_0_20px_rgba(16,185,129,0.1)] border border-[#10b981]/20"
+                                : "text-white/40 hover:text-white/80"
+                                }`}
                         >
-                            ⚪ 4구 랭킹
+                            <span className={rankingTab === "4c" ? "text-[#10b981]" : "text-white/20"}>⚪</span> 4구 랭킹
                         </Button>
                         <Button
                             variant="ghost"
                             onClick={() => setRankingTab("3c")}
-                            className={`flex-1 h-10 rounded-xl font-black text-sm transition-all ${rankingTab === "3c" ? "bg-[#ffd700] text-white shadow-lg" : "text-white/50 hover:text-white/80"}`}
+                            className={`flex-1 h-12 rounded-xl font-black text-sm transition-all ${rankingTab === "3c"
+                                ? "bg-[#10b981]/20 text-[#10b981] shadow-[0_0_20px_rgba(16,185,129,0.1)] border border-[#10b981]/20"
+                                : "text-white/40 hover:text-white/80"
+                                }`}
                         >
-                            ⚪ 3구 랭킹
+                            <span className={rankingTab === "3c" ? "text-[#10b981]" : "text-white/20"}>⚪</span> 3구 랭킹
                         </Button>
                     </div>
-                </CardHeader>
-                <CardContent className="p-4 space-y-2">
-                    {rankings?.filter((r: any) => {
-                        const handi = rankingTab === "3c" ? r.handi3c : r.handi4c;
-                        return handi > 0;
-                    })
-                        .sort((a: any, b: any) => {
-                            const handiA = rankingTab === "3c" ? a.handi3c : a.handi4c;
-                            const handiB = rankingTab === "3c" ? b.handi3c : b.handi4c;
-                            if (handiB !== handiA) return handiB - handiA;
-                            return parseFloat(b.average || "0") - parseFloat(a.average || "0");
-                        })
-                        .map((rank: any, idx: number) => (
-                            <div
-                                key={rank.id}
-                                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${rank.id === member.id ? "bg-[#0e4d2a]/20 border-[#0e4d2a] scale-[1.02]" : "bg-[#1a1a1a] border-white/5"
-                                    }`}
-                            >
-                                <div className="flex items-center gap-4">
-                                    <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${idx === 0 ? "bg-[#ffd700] text-black ring-4 ring-[#ffd700]/20" :
-                                        idx === 1 ? "bg-gray-300 text-black ring-4 ring-gray-300/20" :
-                                            idx === 2 ? "bg-amber-600 text-white ring-4 ring-amber-600/20" : "text-gray-500"
-                                        }`}>
-                                        {idx + 1}
-                                    </span>
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-black text-lg">{rank.name}</span>
-                                            {rank.id === member.id && <span className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black text-white/50 uppercase tracking-tighter">YOU</span>}
-                                        </div>
-                                        <span className="text-gray-600 text-[10px] font-bold uppercase tracking-widest">Lv.{Math.floor(rank.visitCount / 5) + 1} Member</span>
-                                    </div>
+                </div>
+
+                <div className="px-4 pb-8 space-y-3">
+                    {rankings?.map((rank: any, idx: number) => (
+                        <div
+                            key={rank.id}
+                            className={`flex items-center justify-between p-5 rounded-[2rem] border transition-all ${rank.id === member.id
+                                ? "bg-[#10b981]/10 border-[#10b981]/40 shadow-[0_0_20px_rgba(16,185,129,0.05)]"
+                                : "bg-white/[0.02] border-white/5 active:bg-white/[0.05]"
+                                }`}
+                        >
+                            <div className="flex items-center gap-5">
+                                <div className={`w-10 h-10 rounded-[1rem] flex items-center justify-center font-black text-sm ${idx === 0 ? "bg-[#ffd700] text-black shadow-[0_0_15px_rgba(255,215,0,0.3)]" :
+                                    idx === 1 ? "bg-slate-300 text-black shadow-[0_0_15px_rgba(203,213,225,0.2)]" :
+                                        idx === 2 ? "bg-amber-600 text-white shadow-[0_0_15px_rgba(217,119,6,0.2)]" :
+                                            "bg-white/5 text-white/20"
+                                    }`}>
+                                    {idx + 1}
                                 </div>
-                                <div className="text-right">
-                                    <div className="font-black text-xl text-white">
-                                        {rankingTab === "4c" ? "4구" : "3구"} {rankingTab === "4c" ? rank.handi4c : rank.handi3c}
+                                <div className="flex flex-col">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <span className="font-black text-lg text-white tracking-tighter">{rank.name}</span>
+                                        {rank.id === member.id && (
+                                            <span className="px-2 py-0.5 bg-[#10b981] text-black rounded text-[8px] font-black uppercase tracking-tighter">YOU</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-white/20 text-[9px] font-black uppercase tracking-widest">
+                                            Lv.{Math.floor(rank.visitCount / 5) + 1} Member
+                                        </span>
                                     </div>
                                 </div>
                             </div>
-                        ))}
-                    {!rankings && <p className="text-center py-10 text-gray-500">데이터를 불러오는 중입니다...</p>}
-                </CardContent>
-            </Card>
+                            <div className="text-right">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-[10px] font-black text-[#10b981] uppercase tracking-widest mb-1">
+                                        {rankingTab === "4c" ? "Record Rating" : "Record Rating"}
+                                    </span>
+                                    <div className="font-black text-2xl text-white tracking-tighter">
+                                        {rankingTab === "4c" ? rank.rating4c : rank.rating3c}
+                                        <span className="text-xs font-bold text-[#10b981] ml-1">RP</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {!rankings && (
+                        <div className="py-20 flex flex-col items-center justify-center gap-4 opacity-20">
+                            <LucideRefreshCw className="w-8 h-8 animate-spin-slow" />
+                            <span className="text-xs font-black uppercase tracking-widest">Loading Records...</span>
+                        </div>
+                    )}
+                </div>
+            </div>
 
 
 
@@ -1418,9 +1753,9 @@ export default function HiqDashboard() {
 
 
             <Dialog open={isJoinModalOpen} onOpenChange={setIsJoinModalOpen}>
-                <DialogContent className="bg-[#111] border-[#333] text-white rounded-[2.5rem] p-8">
+                <DialogContent className="bg-[#050505] border-white/5 text-white rounded-[3rem] p-8 shadow-2xl overflow-hidden">
                     <DialogHeader>
-                        <DialogTitle className="text-center text-xl font-bold">PIN 번호 입력</DialogTitle>
+                        <DialogTitle className="text-center text-2xl font-black tracking-tighter">PIN 번호 입력</DialogTitle>
                         <DialogDescription className="text-center text-white/50">
                             호스트에게 전달받은 6자리 번호를 입력하세요.
                         </DialogDescription>
@@ -1428,45 +1763,21 @@ export default function HiqDashboard() {
                     <div className="py-6 space-y-6">
                         <div className="flex justify-center">
                             <input
-                                type="text"
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 maxLength={6}
                                 value={joinCode}
                                 onChange={(e) => setJoinCode(e.target.value.replace(/[^0-9]/g, ''))}
-                                className="w-full max-w-[400px] h-18 text-center text-5xl font-black tracking-[0.4em] bg-white/5 border border-white/10 rounded-3xl focus:border-[#ffd700] focus:outline-none transition-all pl-[0.4em] shadow-inner"
+                                className="w-full max-w-[400px] h-20 text-center text-5xl font-black tracking-[0.4em] bg-white/5 border border-white/10 rounded-3xl focus:border-[#10b981] focus:outline-none transition-all pl-[0.4em] shadow-inner caret-[#10b981]"
                                 placeholder="000000"
+                                autoFocus
                             />
-                        </div>
-                        <div className="grid grid-cols-3 gap-3 px-2">
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                                <button
-                                    key={num}
-                                    title={num.toString()}
-                                    onClick={() => joinCode.length < 6 && setJoinCode(prev => prev + num)}
-                                    className="h-14 w-full rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-2xl font-black transition-all active:scale-95"
-                                >
-                                    {num}
-                                </button>
-                            ))}
-                            <div />
-                            <button
-                                onClick={() => joinCode.length < 6 && setJoinCode(prev => prev + "0")}
-                                title="0"
-                                className="h-14 w-full rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-2xl font-black transition-all active:scale-95"
-                            >
-                                0
-                            </button>
-                            <button
-                                onClick={() => setJoinCode(prev => prev.slice(0, -1))}
-                                title="삭제"
-                                className="h-14 w-full rounded-2xl flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all active:scale-95 group"
-                            >
-                                <LucideDelete className="w-8 h-8 transition-transform group-hover:scale-110" strokeWidth={3} />
-                            </button>
                         </div>
                         <Button
                             onClick={handleJoinGame}
                             disabled={joinCode.length !== 6}
-                            className="w-full h-14 text-lg font-black bg-[#0e4d2a] hover:bg-[#126335] text-white rounded-xl disabled:opacity-50"
+                            className="w-full h-16 text-lg font-black bg-[#10b981] hover:bg-[#10b981]/90 text-black rounded-2xl disabled:bg-white/5 disabled:text-white/20 disabled:opacity-100 shadow-[0_10px_30px_rgba(16,185,129,0.2)] active:scale-[0.98] transition-all"
                         >
                             입장하기
                         </Button>

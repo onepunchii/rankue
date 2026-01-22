@@ -13,13 +13,13 @@ export async function searchUsers(keyword: string, currentUserId: string): Promi
         .from(hiqFriendships)
         .where(
             or(
-                eq(hiqFriendships.senderId, currentUserId),
+                eq(hiqFriendships.requesterId, currentUserId),
                 eq(hiqFriendships.receiverId, currentUserId)
             )
         );
 
     const friendIds = friendships.map(f =>
-        f.senderId === currentUserId ? f.receiverId : f.senderId
+        f.requesterId === currentUserId ? f.receiverId : f.requesterId
     );
 
     // Search users
@@ -86,13 +86,13 @@ export async function getRecentOpponents(currentUserId: string): Promise<any[]> 
         .from(hiqFriendships)
         .where(
             or(
-                eq(hiqFriendships.senderId, currentUserId),
+                eq(hiqFriendships.requesterId, currentUserId),
                 eq(hiqFriendships.receiverId, currentUserId)
             )
         );
 
     const friendIds = friendships.map(f =>
-        f.senderId === currentUserId ? f.receiverId : f.senderId
+        f.requesterId === currentUserId ? f.receiverId : f.requesterId
     );
 
     // Get recent match games

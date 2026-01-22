@@ -4,14 +4,17 @@ import type { HiqStore, InsertHiqStore, HiqMember, InsertHiqMember, HiqGame, Ins
 import { eq, desc, and, or, sql, gt, isNull } from "drizzle-orm";
 
 const HANDICAP_MAP_4C = [
-    { avg: 2.0, handi: 250 },
-    { avg: 1.5, handi: 200 },
-    { avg: 1.2, handi: 150 },
-    { avg: 1.0, handi: 120 },
-    { avg: 0.8, handi: 100 },
-    { avg: 0.5, handi: 80 },
-    { avg: 0.3, handi: 50 },
-    { avg: 0.0, handi: 30 },
+    { avg: 1.5, handi: 50 },
+    { avg: 1.2, handi: 40 },
+    { avg: 0.9, handi: 30 },
+    { avg: 0.75, handi: 25 },
+    { avg: 0.6, handi: 20 },
+    { avg: 0.45, handi: 15 },
+    { avg: 0.35, handi: 12 },
+    { avg: 0.3, handi: 10 },
+    { avg: 0.24, handi: 8 },
+    { avg: 0.15, handi: 5 },
+    { avg: 0.0, handi: 3 },
 ];
 
 const HANDICAP_MAP_3C = [
@@ -102,19 +105,18 @@ export class HiqStorage {
         }
     }
 
-    async getTopRankings(storeId?: string, limit: number = 20): Promise<HiqMember[]> {
+    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c'): Promise<HiqMember[]> {
+        const field = type === '3c' ? hiqMembers.rating3c : hiqMembers.rating4c;
+        const query = db.select().from(hiqMembers);
+
         if (storeId) {
-            return await db
-                .select()
-                .from(hiqMembers)
+            return await query
                 .where(eq(hiqMembers.storeId, storeId))
-                .orderBy(sql`${hiqMembers.handi4c} DESC`)
+                .orderBy(desc(field))
                 .limit(limit);
         } else {
-            return await db
-                .select()
-                .from(hiqMembers)
-                .orderBy(sql`${hiqMembers.handi4c} DESC`)
+            return await query
+                .orderBy(desc(field))
                 .limit(limit);
         }
     }
@@ -222,9 +224,15 @@ export class HiqStorage {
     }
 
     async finishHiqGame(id: string, finalData: Partial<HiqGame>): Promise<HiqGame> {
+        const currentGame = await this.getHiqGameById(id);
+        if (!currentGame) throw new Error("Game not found");
+
+        const isRanked = currentGame.gameMode === "match" && !!currentGame.player2Id;
+
         const [game] = await db.update(hiqGames).set({
             ...finalData,
             status: "finished",
+            isRanked
         }).where(eq(hiqGames.id, id)).returning();
 
         // Save history for Player 1
@@ -237,7 +245,7 @@ export class HiqStorage {
             score: game.player1Score,
             innings: game.totalInnings,
             average: p1Average,
-            isRanked: game.isRanked,
+            isRanked: game.isRanked, // Now correctly reflects ranked status
             isWinner: game.winnerId === game.player1Id,
             highRun: game.player1HighRun || 0,
             inningData: game.player1Innings,
@@ -301,6 +309,50 @@ export class HiqStorage {
             });
         }
 
+        // Update Ratings based on result (Record-based Ranking Point)
+        // Update Ratings based on result (Record-based Ranking Point with Tier Protection)
+        const ratingField = game.gameType === "3c" ? "rating3c" : "rating4c";
+        const handiField = game.gameType === "3c" ? "handi3c" : "handi4c";
+
+        // Helper: Calculate Delta
+        const calculateRpDelta = (isWinner: boolean, handi: number) => {
+            if (isWinner) return 30;
+
+            // Loss Logic - Check Tier Protection
+            const h = handi || 0;
+            if (game.gameType === "3c") {
+                if (h < 16) return 0; // Bronze: No penalty
+                if (h < 22) return -5; // Silver: Soft penalty
+                return -15; // Gold+: Full penalty
+            } else {
+                if (h < 80) return 0; // Bronze
+                if (h < 150) return -5; // Silver
+                return -15; // Gold+
+            }
+        };
+
+        // Fetch Members to get current handicap
+        // ONLY update RP for RANKED MATCH mode (Member vs Member)
+        if (game.isRanked) {
+            const p1 = await this.getMemberById(game.player1Id);
+            if (p1) {
+                const delta = calculateRpDelta(game.winnerId === game.player1Id, p1[handiField] || 0);
+                await db.update(hiqMembers)
+                    .set({ [ratingField]: sql`GREATEST(0, ${hiqMembers[ratingField]} + ${delta})` })
+                    .where(eq(hiqMembers.id, game.player1Id));
+            }
+
+            if (game.player2Id) {
+                const p2 = await this.getMemberById(game.player2Id);
+                if (p2) {
+                    const delta = calculateRpDelta(game.winnerId === game.player2Id, p2[handiField] || 0);
+                    await db.update(hiqMembers)
+                        .set({ [ratingField]: sql`GREATEST(0, ${hiqMembers[ratingField]} + ${delta})` })
+                        .where(eq(hiqMembers.id, game.player2Id));
+                }
+            }
+        }
+
         return game;
     }
 
@@ -360,99 +412,100 @@ export class HiqStorage {
                 newHandi,
                 message: `🎉 실력 상승! ${gameType === "3c" ? "3구" : "4구"} 핸디가 ${currentHandi} → ${newHandi}로 조정되었습니다!`
             };
+        } else {
+            // Even if no promotion, update the official average (Recent 10 games)
+            await db.update(hiqMembers).set({
+                average: avg.toFixed(2),
+                updatedAt: new Date()
+            }).where(eq(hiqMembers.id, userId));
         }
 
         return { oldHandi: currentHandi || 0, newHandi: currentHandi || 0, message: null };
     }
-    async getMemberStatsAnalysis(memberId: string): Promise<any> {
+    async getMemberStatsAnalysis(memberId: string, type: "3c" | "4c" = "4c"): Promise<any> {
         const member = await this.getMemberById(memberId);
         if (!member) return null;
 
-        const history = await this.getMemberGameHistory(memberId);
+        const allHistory = await this.getMemberGameHistory(memberId);
+        // Filter history by type for stats calculation (Official Ranked Match Only)
+        // Ensure we only use games that are actually RANKED (isRanked: true) 
+        // Note: gameMode 'match' is usually implied by isRanked, but we check isRanked specifically for official records.
+        const history = allHistory.filter(h => h.gameType === type && h.gameMode === 'match' && h.isRanked);
         const totalGames = history.length;
 
         // 1. Power (AVG)
-        // Assume default game type preference or average both.
-        // For simplicity, use the stored 'average' and handle mixed types roughly or pick 4c if present.
-        const currentAvg = parseFloat(member.average || "0");
-        const handi4c = member.handi4c || 0;
-        const handi3c = member.handi3c || 0;
+        // Calculate actual average from history
+        const totalScore = history.reduce((sum, h) => sum + h.score, 0);
+        const totalInnings = history.reduce((sum, h) => sum + h.innings, 0);
 
-        // Define max standard
-        // If 3c player (handi3c > 0 and handi4c == 0 or much smaller relative to scale), use 3c scale.
-        // Scale: 4c 500pt ~ 5.0 avg. 3c 30pt ~ 1.0 avg.
-        let maxAvg = 5.0; // Default 4c
-        if (handi3c > 0 && handi4c === 0) {
-            maxAvg = 1.0;
-        } else if (handi3c > 0 && handi4c > 0) {
-            // Mixed player, check which is higher tier relatively
-            const tier4c = handi4c / 500;
-            const tier3c = handi3c / 30;
-            if (tier3c > tier4c) maxAvg = 1.0;
+        let avgVal = 0;
+        if (totalInnings > 0) {
+            avgVal = totalScore / totalInnings;
         }
 
-        const power = Math.min(100, (currentAvg / maxAvg) * 100);
+        // Scale
+        // 3c: 1.0 (Master Standard) = 100 Power
+        // 4c: 5.0 (Platinum/Diamond Standard) = 100 Power
+        const maxAvg = type === '3c' ? 1.0 : 5.0;
+        const power = Math.min(100, (avgVal / maxAvg) * 100);
 
-        // 2. Technique (High Run Proxy)
-        // Heuristic: High Run ~ Avg * 4. 
-        // Score = (High Run / (Target * 0.2)) * 100
-        //       = (Avg * 4 / (Target * 0.2)) * 100
-        //       = (Avg / Target) * 20 * 100 ? No. 
-        //       = (Avg * 4) / (Target / 5) * 100 
-        //       = (20 * Avg / Target) * 100
-        const target = handi4c > 0 ? handi4c : (handi3c > 0 ? handi3c * 10 : 150); // Normalize 3c to 4c scale approx for calculation if needed, or just use raw.
-        const estHighRun = currentAvg * 4;
-        // If 3c, avg ~0.5 -> HR ~2. Target ~20. 20% = 4. 2/4 * 100 = 50.
-        // If 4c, avg ~3.0 -> HR ~12. Target ~150. 20% = 30. 12/30 * 100 = 40.
-        // This seems conservative which is good.
-        const technique = Math.min(100, target > 0 ? (estHighRun / (target * 0.2)) * 100 : 50);
+        // 2. Technique (High Run)
+        // 2. Technique (High Run)
+        const actualHighRun = history.reduce((max, h) => Math.max(max, h.highRun || 0), 0);
+        // Target Reference (3c: 10, 4c: 50) - DB now stores Count for both.
+        const highRunCount = actualHighRun;
+        const hrTarget = type === '3c' ? 10 : 50;
+        const technique = Math.min(100, (highRunCount / hrTarget) * 100);
 
         // 3. Mental (Win Rate)
-        // Query actual wins from hiqGames to be accurate
-        const winsResult = await db.select({ count: sql<number>`count(*)` })
-            .from(hiqGames)
-            .where(and(
-                eq(hiqGames.winnerId, memberId),
-                eq(hiqGames.status, "finished")
-            ));
-
-        // Total games where user was a player
-        // Note: history.length is roughly total games played in finish mode.
-        // But history includes practice maybe? history has gameMode.
-        // Let's filter history for matches only.
-        const matchHistory = history.filter(h => h.gameMode === "match");
-        const matchCount = matchHistory.length;
-        const winCount = Number(winsResult[0]?.count || 0);
-
-        const winRate = matchCount > 0 ? (winCount / matchCount) : 0;
+        const wins = history.filter(h => h.isWinner).length;
+        const winRate = totalGames > 0 ? wins / totalGames : 0;
         const mental = Math.min(100, winRate * 100);
 
-        // 4. Experience (Total Games)
-        // Log scale: 100 games -> 100 pts.
-        // Linear: min(100, totalGames).
-        // Let's use Linear for simplicity as "100 games" is a good milestone.
-        const experience = Math.min(100, totalGames);
+        // 4. Experience (Games Count)
+        // 50 games = 100 Experience
+        const experience = Math.min(100, totalGames * 2);
 
         // 5. Trend (Recent vs Total)
         const recentGames = history.slice(0, 10);
         let recentAvg = 0;
         if (recentGames.length > 0) {
-            recentAvg = recentGames.reduce((acc, g) => acc + parseFloat(g.average), 0) / recentGames.length;
+            const rScore = recentGames.reduce((sum, h) => sum + h.score, 0);
+            const rInn = recentGames.reduce((sum, h) => sum + h.innings, 0);
+            if (rInn > 0) {
+                recentAvg = rScore / rInn;
+            }
         }
 
-        // If no games, trend is 50 (neutral).
-        // If recent > total, > 50. 
-        // Example: Recent 1.5, Total 1.0 -> 1.5/1.0 = 1.5 * 50 = 75.
-        // Example: Recent 0.8, Total 1.0 -> 0.8 * 50 = 40.
-        const totalAvgVal = currentAvg > 0 ? currentAvg : 1; // avoid div by 0
-        const trend = Math.min(100, (recentAvg / totalAvgVal) * 50);
+        // 1.2x of Avg = 100 Trend (Rising Star)
+        // 0.8x of Avg = 60 Trend
+        // Base 50 + (Ratio - 1.0) * 100? 
+        // Let's use simple Ratio * 80?
+        // If Recent == Overall, Trend = 80.
+        // If Recent 1.2 * Overall, Trend = 96.
+        const baseTrend = avgVal > 0 ? (recentAvg / avgVal) : 0;
+        const trend = Math.min(100, baseTrend * 80);
 
         // Tags
         const tags: string[] = [];
         if (technique > power + 20) tags.push("폭격기 💣");
-        if (mental > power + 20) tags.push("늪 당구 🐢");
-        if (Math.abs(recentAvg - currentAvg) < 0.1 && totalGames > 10) tags.push("AI 🤖");
-        if (trend > 70) tags.push("불도저 🔥");
+        if (mental > 80) tags.push("늪 당구 🐢");
+
+        // Calculate type-specific averages (Based on Recent 10 Match Games - Official Standard)
+        const games3c = allHistory
+            .filter(h => h.gameType === '3c' && h.gameMode === 'match')
+            .slice(0, 10);
+        const score3c = games3c.reduce((sum, h) => sum + h.score, 0);
+        const innings3c = games3c.reduce((sum, h) => sum + h.innings, 0);
+        const avg3c = innings3c > 0 ? (score3c / innings3c).toFixed(2) : "0.00";
+
+        const games4c = allHistory
+            .filter(h => h.gameType === '4c' && h.gameMode === 'match')
+            .slice(0, 10);
+        const score4c = games4c.reduce((sum, h) => sum + h.score, 0);
+        const innings4c = games4c.reduce((sum, h) => sum + h.innings, 0);
+        // 4-ball score IS now shot count (normalized)
+        const avg4c = innings4c > 0 ? (score4c / innings4c).toFixed(2) : "0.00";
 
         return {
             stats: [
@@ -463,12 +516,14 @@ export class HiqStorage {
                 { subject: 'Trend', A: Math.round(trend), fullMark: 100 },
             ],
             summary: {
-                overallAvg: currentAvg.toFixed(2),
-                recentAvg: recentAvg.toFixed(2),
-                highRun: Math.round(estHighRun),
-                wins: winCount,
-                losses: matchCount - winCount,
-                matchCount
+                overallAvg: avgVal.toFixed(3),
+                recentAvg: recentAvg.toFixed(3),
+                highRun: actualHighRun,
+                wins,
+                losses: totalGames - wins,
+                matchCount: totalGames,
+                avg3c,
+                avg4c
             },
             tags
         };
@@ -539,6 +594,15 @@ export class HiqStorage {
         });
 
         return { wins, losses, draws };
+    }
+
+    async getHeadToHeadGames(myId: string, friendId: string) {
+        return await db.select().from(hiqGames).where(
+            or(
+                and(eq(hiqGames.player1Id, myId), eq(hiqGames.player2Id, friendId)),
+                and(eq(hiqGames.player1Id, friendId), eq(hiqGames.player2Id, myId))
+            )
+        ).orderBy(desc(hiqGames.playedAt));
     }
 
     // --- Invite System ---

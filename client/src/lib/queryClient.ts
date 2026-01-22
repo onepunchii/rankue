@@ -141,8 +141,30 @@ export const getQueryFn: <T>(options: {
         headers['Authorization'] = `Bearer ${supabaseToken}`;
       }
 
-      // Handle queryKey joining safely
-      const url = Array.isArray(queryKey) ? queryKey.join('/') : String(queryKey);
+      let url = "";
+      const queryParams = new URLSearchParams();
+
+      if (Array.isArray(queryKey)) {
+        const segments: string[] = [];
+        for (const item of queryKey) {
+          if (typeof item === "object" && item !== null) {
+            Object.entries(item).forEach(([k, v]) => {
+              if (v !== undefined && v !== null) {
+                queryParams.append(k, String(v));
+              }
+            });
+          } else {
+            segments.push(String(item));
+          }
+        }
+        url = segments.join("/");
+      } else {
+        url = String(queryKey);
+      }
+
+      if (queryParams.toString()) {
+        url += (url.includes("?") ? "&" : "?") + queryParams.toString();
+      }
 
       const res = await fetch(url, {
         credentials: "include",
