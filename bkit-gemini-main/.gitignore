@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local settings
+.claude/
+
+# PDCA artifacts
+docs/.pdca-snapshots/
+docs/archive/
+
+# Local symlinks (absolute paths)
+bkit-system/philosophy
+
+# Documents
+docs/bkit-Best-Practice.pdf

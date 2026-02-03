@@ -404,50 +404,54 @@ body {
 }
 
 :root {
-  /* Enforced Dark Mode (Glassmorphism) */
-  --background: hsla(222, 14%, 10%, 0.3);
-  /* Neutral Dark Charcoal */
-  --foreground: hsl(210, 40%, 98%);
+  touch-action: pan-x pan-y;
+  /* Prevent pinch-zoom and double-tap zoom globally */
+  height: 100dvh;
+  /* Dynamic viewport height */
 
-  --muted: hsl(217, 19%, 27%);
-  --muted-foreground: hsl(215, 20%, 65%);
-  --popover: hsla(222, 14%, 12%, 0.6);
-  --popover-foreground: hsl(210, 40%, 98%);
-  --card: hsla(222, 14%, 12%, 0.5);
-  --card-foreground: hsl(210, 40%, 98%);
-  --border: hsl(217, 19%, 27%);
-  --input: hsl(217, 19%, 27%);
-  --primary: hsl(265, 83%, 65%);
-  --primary-foreground: hsl(0, 0%, 100%);
+  /* Enforce Dark Mode for Browser UI elements */
+  color-scheme: dark;
+
+  /* RANGKUE Design Guide v1.1 Enforced */
+  --background: #0A0A0A;
+  --foreground: #FFFFFF;
+
+  --muted: rgba(255, 255, 255, 0.1);
+  --muted-foreground: rgba(255, 255, 255, 0.6);
+  --popover: rgba(20, 20, 20, 0.8);
+  --popover-foreground: #FFFFFF;
+  --card: rgba(20, 20, 20, 0.5);
+  --card-foreground: #FFFFFF;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.1);
+  --primary: #10B981;
+  /* Rankue Green */
+  --primary-foreground: #000000;
 
   --secondary: hsla(240, 3.7%, 15.9%, 0.8);
   --secondary-foreground: hsl(0, 0%, 98%);
-  --accent: hsla(240, 3.7%, 15.9%, 0.8);
-  --accent-foreground: hsl(0, 0%, 98%);
+  --accent: rgba(255, 255, 255, 0.05);
+  --accent-foreground: #FFFFFF;
   --destructive: hsl(0, 62.8%, 30.6%);
   --destructive-foreground: hsl(0, 0%, 98%);
-  --ring: hsl(240, 4.9%, 83.9%);
-  --radius: 0.5rem;
+  --ring: #10B981;
+  --radius: 2.5rem;
+  /* Bento Large Radius */
 
-  /* Custom polli colors - Refined */
-  --polli-primary: hsl(265, 83%, 62%);
-  --polli-yellow: hsl(265, 83%, 62%);
-  --polli-green: hsl(140, 60%, 50%);
-  --polli-red: hsl(350, 85%, 60%);
-  --polli-surface: hsla(0, 0%, 0%, 0.5);
-  --polli-background: hsla(265, 20%, 10%, 0.3);
-
-  /* HiQ Branding Variables (Theming) */
-  --brand-primary: #6366f1;
-  /* Default Blue */
-  --brand-neon: #818cf8;
+  /* Custom Rankue Utilities */
+  --rankue-green: #10B981;
+  --rankue-surface: #141414;
+  --rankue-text-main: #FFFFFF;
+  --rankue-text-sub: rgba(255, 255, 255, 0.6);
+  --rankue-text-desc: rgba(255, 255, 255, 0.4);
 }
 
 @layer base {
 
   html,
   body {
-    background-color: black;
+    background-color: #000000;
+    overscroll-behavior-y: none;
   }
 
   * {
@@ -498,16 +502,42 @@ body {
     color: #F5F5F5;
   }
 
-  /* Premium Dark & Neon Utilities */
+  /* Premium Dark & Neon Utilities (Updated for Rankue) */
   .premium-glass {
-    background: rgba(0, 0, 0, 0.4);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    border: 0.5px solid rgba(255, 255, 255, 0.1);
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-    /* Top Highlight */
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    background: rgba(20, 20, 20, 0.4);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   }
+
+  .bento-card {
+    background: #141414;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 2.5rem;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .bento-card:hover {
+    transform: scale(1.02);
+  }
+
+  .text-rankue-green {
+    color: #10B981;
+  }
+
+  .text-main {
+    color: #FFFFFF;
+  }
+
+  .text-sub {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .text-desc {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
 
   .text-premium {
     color: #E0E0E0;
@@ -1055,4 +1085,48 @@ body {
 
 .animate-shadow-pulse {
   animation: shadow-pulse 3s ease-in-out infinite;
+}
+
+/* --- Crew Community UI --- */
+
+/* 1. 메인 커버 (Header) */
+.crew-cover-image {
+  aspect-ratio: 16 / 9;
+  /* 16:9 비율 고정 */
+  width: 100%;
+  object-fit: cover;
+  /* 비율 안 맞는 사진도 꽉 차게 보정 */
+  border-radius: 0 0 16px 16px;
+  /* 하단 모서리 둥글게 */
+}
+
+/* 2. 로고 (Avatar) */
+.crew-logo-image {
+  aspect-ratio: 1 / 1;
+  /* 1:1 비율 고정 */
+  width: 80px;
+  height: 80px;
+  border-radius: 9999px;
+  /* 완전 원형 */
+  object-fit: cover;
+  border: 2px solid white;
+  /* 배경과 구분선 */
+}
+
+/* 3. 사진첩 썸네일 (Grid Item) */
+.gallery-thumbnail {
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  /* 중앙 크롭 효과 */
+}
+
+/* PWA Bottom Navigation Fix */
+@media (display-mode: standalone) {
+  .bottom-navigation-container {
+    /* PWA일 때만 안전 영역만큼 띄우기 */
+    padding-bottom: env(safe-area-inset-bottom);
+    /* 투명해서 겹쳐 보이지 않게 배경색 채우기 */
+    background-color: #0f0f0f;
+    /* 네비게이션 바 색상과 동일하게 */
+  }
 }

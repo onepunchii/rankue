@@ -1,0 +1,176 @@
+import { motion } from "framer-motion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { LucideSwords, LucideZap, LucideCalendar, LucideUsers } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
+import { HiqGame } from "@shared/schema";
+import { SportConfig } from "./types";
+
+interface GameDetailDialogProps {
+    gameId: string | null;
+    onClose: () => void;
+    currentMemberId: string | undefined;
+    config: SportConfig;
+    currentSport: string;
+}
+
+export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, currentSport }: GameDetailDialogProps) => {
+
+    const { data: game, isLoading } = useQuery<HiqGame>({
+        queryKey: [`/api/hiq/game/${gameId}`],
+        queryFn: async () => await apiRequest(`/api/hiq/game/${gameId}`),
+        enabled: !!gameId,
+    });
+
+    return (
+        <Dialog open={!!gameId} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="bg-[#050505] border-[#222] text-white max-w-lg w-[95%] rounded-3xl p-0 overflow-hidden">
+                <DialogHeader className="p-6 bg-gradient-to-b from-[#0e4d2a]/20 to-transparent border-b border-white/5">
+                    <div>
+                        <div>
+                            <DialogTitle className="text-xl font-black flex items-center gap-2">
+                                <config.mainIcon className={cn("w-5 h-5", config.themeColor)} />
+                                {config.detailTitle}
+                            </DialogTitle>
+                            <DialogDescription className="text-white/40 text-[10px] uppercase font-bold tracking-widest mt-1">
+                                {config.detailSubtitle}
+                            </DialogDescription>
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+                    {isLoading ? (
+                        <div className="py-12 flex justify-center">
+                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-8 h-8 border-2 border-[#ffd700] border-t-transparent rounded-full" />
+                        </div>
+                    ) : game ? (
+                        <>
+                            {/* Players Section (Dynamic 2-4 Players) */}
+                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-bold text-white/30 uppercase">PLAYERS</span>
+                                    <span className={cn("text-[10px] font-bold", config.themeColor)}>
+                                        {game.gameType === '4c' ? '4구' : (currentSport === "GOLF" ? "18H" : "3구")}
+                                    </span>
+                                </div>
+                                <div className={`grid gap-3 ${game.player3Name ? (game.player4Name ? 'grid-cols-4' : 'grid-cols-3') : 'grid-cols-2'}`}>
+                                    {[1, 2, 3, 4].map((idx) => {
+                                        const pId = (game as any)[`player${idx}Id`];
+                                        const pName = (game as any)[`player${idx}Name`];
+                                        const pTarget = (game as any)[`player${idx}Target`];
+                                        const pScore = (game as any)[`player${idx}Score`];
+                                        const isMe = currentMemberId && pId === currentMemberId;
+
+                                        // Skip if player doesn't exist (e.g. P3/P4 in a 2p game)
+                                        if (idx > 2 && !pName) return null;
+
+                                        return (
+                                            <div key={idx} className="text-center bg-black/20 rounded-lg py-2 border border-white/5 relative overflow-hidden">
+                                                {game.winnerId === pId && <div className="absolute top-0 right-0 p-1"><div className="w-2 h-2 bg-[#ffd700] rounded-full shadow-[0_0_8px_rgba(255,215,0,0.6)]" /></div>}
+                                                <p className={`text-[9px] font-bold mb-0.5 ${isMe ? 'text-blue-400' : 'text-gray-500'}`}>
+                                                    {isMe ? 'ME' : `P${idx}`}
+                                                </p>
+                                                <p className="text-sm font-black truncate px-1">{pName || (isMe ? "나" : `Player ${idx}`)}</p>
+                                                <div className={`text-lg font-black flex items-center justify-center gap-1 ${isMe ? config.themeColor : 'text-white/60'}`}>
+                                                    <span>{pTarget || "-"}</span>
+                                                    <span className="text-white/20 text-sm">/</span>
+                                                    <span className={isMe ? 'text-white' : 'text-white/40'}>{pScore || 0}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Stat Grid */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                    <div className={cn(
+                                        "flex items-center gap-2 mb-2",
+                                        config.themeColor
+                                    )}>
+                                        <LucideZap className="w-4 h-4" />
+                                        <span className="text-[10px] font-black uppercase">
+                                            {config.statLabels.extra3 || "High Run"}
+                                        </span>
+                                    </div>
+                                    <p className="text-2xl font-black">
+                                        {(() => {
+                                            const mySlot = [1, 2, 3, 4].find(i => (game as any)[`player${i}Id`] === currentMemberId) || 1;
+                                            return (game as any)[`player${mySlot}HighRun`] || 0;
+                                        })()}
+                                    </p>
+                                </div>
+                                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                    <div className="flex items-center gap-2 mb-2 text-white/40">
+                                        <LucideCalendar className="w-4 h-4" />
+                                        <span className="text-[10px] font-black uppercase">
+                                            {currentSport === "GOLF" ? "총 홀" : "총 이닝"}
+                                        </span>
+                                    </div>
+                                    <p className="text-2xl font-black">{game.totalInnings || 0}</p>
+                                </div>
+                            </div>
+
+                            {/* Inning Table */}
+                            <div>
+                                <h4 className="text-xs font-black uppercase text-white/30 mb-3 flex items-center gap-2">
+                                    <LucideUsers className="w-3 h-3" />
+                                    {currentSport === "GOLF" ? "홀별 스코어 상세" : "이닝별 득점 상세"}
+                                </h4>
+                                <div className="bg-[#151515] rounded-2xl border border-[#222] overflow-hidden">
+                                    <div
+                                        className="grid bg-white/5 border-b border-white/5 p-3 text-[10px] font-black text-white/40 uppercase gap-1"
+                                        style={{ gridTemplateColumns: `60px repeat(${game.player4Name ? 4 : game.player3Name ? 3 : 2}, 1fr)` }}
+                                    >
+                                        <div>{currentSport === "GOLF" ? "HOLE" : "이닝"}</div>
+                                        {[1, 2, 3, 4].map(idx => {
+                                            if (idx > 2 && !(game as any)[`player${idx}Name`]) return null;
+                                            const isMe = currentMemberId && (game as any)[`player${idx}Id`] === currentMemberId;
+                                            return (
+                                                <div key={idx} className={`text-center truncate px-1 ${isMe ? 'text-blue-400' : ''}`}>
+                                                    {isMe ? '나' : ((game as any)[`player${idx}Name`] || `P${idx}`)}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="max-h-[300px] overflow-y-auto">
+                                        {Array.from({ length: game.totalInnings || 0 }).map((_, i) => (
+                                            <div
+                                                key={i}
+                                                className="grid p-3 border-b border-white/[0.02] items-center gap-1"
+                                                style={{ gridTemplateColumns: `60px repeat(${game.player4Name ? 4 : game.player3Name ? 3 : 2}, 1fr)` }}
+                                            >
+                                                <div className="text-[10px] font-black text-white/20 italic">{i + 1}</div>
+
+                                                {[1, 2, 3, 4].map(idx => {
+                                                    if (idx > 2 && !(game as any)[`player${idx}Name`]) return null;
+                                                    const isMe = currentMemberId && (game as any)[`player${idx}Id`] === currentMemberId;
+                                                    const sc = ((game as any)[`player${idx}Innings`] as number[])?.[i] || 0;
+                                                    const displayScore = game.gameType === '4c' && sc >= 10 ? sc / 10 : sc;
+
+                                                    return (
+                                                        <div key={idx} className={cn(
+                                                            "text-center font-bold text-sm",
+                                                            isMe ? config.themeColor : "text-white/40"
+                                                        )}>
+                                                            {displayScore}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="py-12 text-center text-white/40">데이터를 불러오는 중입니다...</div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};

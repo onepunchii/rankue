@@ -4,17 +4,20 @@ import type { HiqStore, InsertHiqStore, HiqMember, InsertHiqMember, HiqGame, Ins
 import { eq, desc, and, or, sql, gt, isNull } from "drizzle-orm";
 
 // Search users by nickname, ID, or phone
-export async function searchUsers(keyword: string, currentUserId: string): Promise<any[]> {
+export async function searchUsers(keyword: string, currentUserId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<any[]> {
     // Remove hyphens from phone numbers for comparison
-    const cleanKeyword = keyword.replace(/-/g, '');
+    const cleanKeyword = keyword.replace(/[^0-9]/g, '');
 
     // Get current user's friends to mark them
     const friendships = await db.select()
         .from(hiqFriendships)
         .where(
-            or(
-                eq(hiqFriendships.requesterId, currentUserId),
-                eq(hiqFriendships.receiverId, currentUserId)
+            and(
+                or(
+                    eq(hiqFriendships.requesterId, currentUserId),
+                    eq(hiqFriendships.receiverId, currentUserId)
+                ),
+                eq(hiqFriendships.sportCategory, sport)
             )
         );
 
@@ -22,19 +25,28 @@ export async function searchUsers(keyword: string, currentUserId: string): Promi
         f.requesterId === currentUserId ? f.receiverId : f.requesterId
     );
 
+    // Build search conditions
+    const searchConditions: any[] = [
+        sql`${hiqMembers.name} ILIKE ${'%' + keyword + '%'}` // Nickname
+    ];
+
+    // Only search by ID if keyword is a valid UUID (prevents 22P02 error)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(keyword);
+    if (isUuid) {
+        searchConditions.push(eq(hiqMembers.id, keyword));
+    }
+
+    // Only search phone if there are digits (prevents '%%' matching everything)
+    if (cleanKeyword.length > 0) {
+        searchConditions.push(
+            sql`REPLACE(REPLACE(${hiqMembers.phone}, '-', ''), ' ', '') LIKE ${'%' + cleanKeyword + '%'}`
+        );
+    }
+
     // Search users
     const users = await db.select()
         .from(hiqMembers)
-        .where(
-            and(
-                sql`${hiqMembers.id} != ${currentUserId}`, // Exclude self
-                or(
-                    sql`${hiqMembers.name} ILIKE ${'%' + keyword + '%'}`, // Nickname partial match
-                    eq(hiqMembers.id, keyword), // ID exact match
-                    sql`REPLACE(${hiqMembers.phone}, '-', '') = ${cleanKeyword}` // Phone exact match
-                )
-            )
-        )
+        .where(or(...searchConditions))
         .limit(10);
 
     // Check if user has played with this person
@@ -44,6 +56,7 @@ export async function searchUsers(keyword: string, currentUserId: string): Promi
             .where(
                 and(
                     eq(hiqGames.gameMode, "match"),
+                    eq(hiqGames.sportCategory, sport),
                     or(
                         and(
                             eq(hiqGames.player1Id, currentUserId),
@@ -73,11 +86,12 @@ export async function searchUsers(keyword: string, currentUserId: string): Promi
         };
     }));
 
+    console.log(`[Search] Keyword: "${keyword}", Clean: "${cleanKeyword}", Found: ${users.length}`);
     return results;
 }
 
 // Get Recent Opponents (last 7 days, not friends yet)
-export async function getRecentOpponents(currentUserId: string): Promise<any[]> {
+export async function getRecentOpponents(currentUserId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<any[]> {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -85,9 +99,12 @@ export async function getRecentOpponents(currentUserId: string): Promise<any[]> 
     const friendships = await db.select()
         .from(hiqFriendships)
         .where(
-            or(
-                eq(hiqFriendships.requesterId, currentUserId),
-                eq(hiqFriendships.receiverId, currentUserId)
+            and(
+                or(
+                    eq(hiqFriendships.requesterId, currentUserId),
+                    eq(hiqFriendships.receiverId, currentUserId)
+                ),
+                eq(hiqFriendships.sportCategory, sport)
             )
         );
 
@@ -102,6 +119,7 @@ export async function getRecentOpponents(currentUserId: string): Promise<any[]> 
             and(
                 eq(hiqGames.gameMode, "match"),
                 eq(hiqGames.status, "finished"),
+                eq(hiqGames.sportCategory, sport),
                 gt(hiqGames.playedAt, sevenDaysAgo),
                 or(
                     eq(hiqGames.player1Id, currentUserId),

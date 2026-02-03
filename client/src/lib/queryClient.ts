@@ -1,5 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase } from "./supabase";
+import { persistQueryClient } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
 // Robust Token Retrieval Helper
 async function getSupabaseToken() {
@@ -197,3 +199,16 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+if (typeof window !== "undefined") {
+  const persister = createSyncStoragePersister({
+    storage: window.localStorage,
+  });
+
+  persistQueryClient({
+    queryClient,
+    persister,
+    maxAge: 1000 * 60 * 60 * 24 * 365, // 1 year
+    buster: "RANKUE_CACHE_v1", // Increment this to clear cache on updates
+  });
+}

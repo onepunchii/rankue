@@ -7,70 +7,169 @@ import {
   unique,
   uuid,
   jsonb,
+  doublePrecision,
+  date
 } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// 1. 프로필 (기본 사용자 정보 - HiQ에서 참조할 수 있음)
+export const SUBSCRIPTION_TIERS = {
+  BASIC: "BASIC",
+  PREMIUM: "PREMIUM"
+} as const;
+
+// 1. 프로필 (통합 계정 - Auth)
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().notNull(), // Supabase Auth user id
   nickname: text("nickname"),
   email: text("email"),
   phone: text("phone"),
+  password: text("password"), // Simple password for proto
   profileImageUrl: text("profile_image_url"),
+  role: text("role", { enum: ["user", "store_owner", "admin", "super_admin", "booking_manager"] }).default("user").notNull(),
+  status: text("status", { enum: ["active", "banned"] }).default("active").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  currentSport: text("current_sport", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
 });
 
-// --- HiQ (Billiard Service) Tables ---
+// 2. 당구장 (Club/Store) - SaaS Tenant
 export const hiqStores = pgTable("hiq_stores", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
-  slug: text("slug").unique().notNull(), // URL identifier (e.g. 'hiq', 'busan')
+  slug: text("slug").unique().notNull(), // URL/QR identifier
   name: text("name").notNull(),
+  ownerId: uuid("owner_id").references(() => profiles.id), // 사장님 계정 ID
+
+  // Display Info
   logoText: text("logo_text"),
   themeColor: text("theme_color").default("#0e4d2a"),
   neonColor: text("neon_color").default("#ffd700"),
   subText: text("sub_text"),
+  description: text("description"),
+  notice: text("notice"),
+
+  // Business Info
+  region: text("region"), // e.g., "Seoul/Gangnam"
+  address: text("address"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  phone: text("phone"),
+
+  // Facilities & Pricing
+  pricePer10Min: integer("price_per_10min"), // Legacy
+  priceLarge: integer("price_large").default(2000),
+  priceMedium: integer("price_medium").default(1500),
+
+  openTime: text("open_time"),
+  closeTime: text("close_time"),
+
+  hasParking: boolean("has_parking").default(false), // Legacy flag
+  parkingDescription: text("parking_description"), // Detailed parking info
+
+  // Subscription (Billing)
+  // Legacy plan field might be there, but using new requested fields
+  plan: text("plan").default("free"),
+  subscriptionTier: text("subscription_tier").default("BASIC"), // BASIC | PREMIUM
+  subscriptionExpiresAt: timestamp("subscription_expires_at"),
+  subscriptionStatus: text("subscription_status", { enum: ["active", "overdue", "cancelled"] }).default("active").notNull(),
+  nextBillingDate: timestamp("next_billing_date"),
+  billingKey: text("billing_key"), // Token for recurring payment
+  paymentMethod: text("payment_method"), // CARD, etc.
+
+  tableCount: integer("table_count").default(0), // Legacy
+  tableLarge: integer("table_large").default(0),
+  tableMedium: integer("table_medium").default(0),
+
+  facilities: jsonb("facilities").$type<string[]>(), // ["smoking", "food", "lesson"]
+  images: jsonb("images").$type<string[]>(),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// 3. 회원 (Global Member Identity)
 export const hiqMembers = pgTable("hiq_members", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
-  storeId: uuid("store_id").references(() => hiqStores.id).notNull(),
+  storeId: uuid("store_id").references(() => hiqStores.id).notNull(), // 가입 경로 (모항) - SaaS Context
+
+  // Personal Info
   phone: text("phone").notNull(),
-  name: text("name").notNull(),
+  name: text("name").notNull(), // Display Name
   birthYear: integer("birth_year"),
+  gender: text("gender", { enum: ["male", "female"] }),
+
+  // Global Stats (Default)
   handi3c: integer("handi_3c"),
   handi4c: integer("handi_4c"),
   average: text("average"),
+  rating3c: integer("rating_3c").default(0).notNull(),
+  rating4c: integer("rating_4c").default(0).notNull(),
+  avg3c: doublePrecision("avg_3c").default(0),
+  avg4c: doublePrecision("avg_4c").default(0),
+
+  // Golf Stats
+  golfHandicap: integer("golf_handicap").default(0),
+  golfBestScore: integer("golf_best_score").default(0),
+  golfAvgScore: doublePrecision("golf_avg_score").default(0),
+  golfGrade: text("golf_grade"),
+  golfGradeVerified: boolean("golf_grade_verified").default(false).notNull(),
+  totalGolfGames: integer("total_golf_games").default(0).notNull(),
+
+  // Meta
+  profileId: uuid("profile_id").references(() => profiles.id), // Link to Auth Profile if connected
   marketingAgree: boolean("marketing_agree").default(false),
   visitCount: integer("visit_count").default(0),
   lastVisitedAt: timestamp("last_visited_at"),
-  gender: text("gender", { enum: ["male", "female"] }),
-  rating3c: integer("rating_3c").default(0).notNull(),
-  rating4c: integer("rating_4c").default(0).notNull(),
   totalSimPoints: integer("total_sim_points").default(0).notNull(),
+
+  // Default Settlement Account
+  defaultAccountBank: text("default_account_bank"),
+  defaultAccountNumber: text("default_account_number"),
+  defaultAccountHolder: text("default_account_holder"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
-  unique().on(table.storeId, table.phone),
+  unique().on(table.storeId, table.phone), // 같은 매장에서 같은 번호 중복 방지 (기존 호환)
 ]);
 
-export const hiqGames = pgTable("hiq_games", {
+// 4. 매장별 회원 멤버십 (N:M Relation - New for SaaS)
+export const hiqClubMembers = pgTable("hiq_club_members", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   storeId: uuid("store_id").references(() => hiqStores.id).notNull(),
-  gameMode: text("game_mode", { enum: ["match", "practice"] }).notNull(),
-  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+
+  // Store-specific Override (Optional)
+  localHandi3c: integer("local_handi_3c"),
+  localHandi4c: integer("local_handi_4c"),
+  memo: text("memo"), // 사장님 메모
+
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.storeId, table.memberId),
+]);
+
+// 5. 게임 (Game Session)
+export const hiqGames = pgTable("hiq_games", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  storeId: uuid("store_id").references(() => hiqStores.id).notNull(), // 게임이 발생한 장소
+
+  gameMode: text("game_mode", { enum: ["match", "practice", "tournament"] }).notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c", "golf"] }).notNull(),
+
+  // Players
   player1Id: uuid("player1_id").references(() => hiqMembers.id).notNull(),
   player2Id: uuid("player2_id").references(() => hiqMembers.id),
   player3Id: uuid("player3_id").references(() => hiqMembers.id),
   player4Id: uuid("player4_id").references(() => hiqMembers.id),
 
+  player1Name: text("player1_name"),
   player2Name: text("player2_name"),
   player3Name: text("player3_name"),
   player4Name: text("player4_name"),
 
+  // Targets & Scores
   player1Target: integer("player1_target").default(0).notNull(),
   player2Target: integer("player2_target").default(0).notNull(),
   player3Target: integer("player3_target").default(0).notNull(),
@@ -86,38 +185,373 @@ export const hiqGames = pgTable("hiq_games", {
   player3FinishScore: integer("player3_finish_score").default(0).notNull(),
   player4FinishScore: integer("player4_finish_score").default(0).notNull(),
 
-  finishTargetCount: integer("finish_target_count").default(0).notNull(),
-  ruleFinishType: text("rule_finish_type", { enum: ["none", "3c", "bank"] }).default("none").notNull(),
-  usePbaRule: boolean("use_pba_rule").default(false).notNull(),
-  targetScore: integer("target_score").notNull(),
-  totalInnings: integer("total_innings").default(0).notNull(),
-  winnerId: uuid("winner_id").references(() => hiqMembers.id), // The player who triggered finish
+  targetScore: integer("target_score"),
 
   player1FinishInnings: integer("player1_finish_innings").default(0).notNull(),
   player2FinishInnings: integer("player2_finish_innings").default(0).notNull(),
   player3FinishInnings: integer("player3_finish_innings").default(0).notNull(),
   player4FinishInnings: integer("player4_finish_innings").default(0).notNull(),
 
+  // Stats
   player1HighRun: integer("player1_high_run").default(0).notNull(),
   player2HighRun: integer("player2_high_run").default(0).notNull(),
   player3HighRun: integer("player3_high_run").default(0).notNull(),
   player4HighRun: integer("player4_high_run").default(0).notNull(),
 
+  // Innings Data
   player1Innings: jsonb("player1_innings"),
   player2Innings: jsonb("player2_innings"),
   player3Innings: jsonb("player3_innings"),
   player4Innings: jsonb("player4_innings"),
 
+  totalInnings: integer("total_innings").default(0).notNull(),
+
+  // Game State
   status: text("status", { enum: ["playing_base", "playing_finish", "finished"] }).default("playing_base").notNull(),
-  isRanked: boolean("is_ranked").default(false).notNull(), // True if at least one VERIFIED MEMBER opponent existed
-  player1Name: text("player1_name"),
-  result: text("result"), // Summary of game outcome
+  result: text("result"),
+  isRanked: boolean("is_ranked").default(false).notNull(),
+
+  // Finish Rules
+  finishTargetCount: integer("finish_target_count").default(0).notNull(),
+  ruleFinishType: text("rule_finish_type", { enum: ["none", "3c", "bank"] }).default("none").notNull(),
+  usePbaRule: boolean("use_pba_rule").default(false).notNull(),
+
+  winnerId: uuid("winner_id").references(() => hiqMembers.id),
   playedAt: timestamp("played_at").defaultNow().notNull(),
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
+
+  // Tournament Link
+  tournamentId: uuid("tournament_id"), // FK added later if needed or loose link
 });
+
+// 6. 대회 (Tournament) - Store Event
+export const hiqTournaments = pgTable("hiq_tournaments", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  storeId: uuid("store_id").references(() => hiqStores.id).notNull(),
+
+  title: text("title").notNull(),
+  content: text("content"), // 대회 요강 (description)
+
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"), // Optional
+  recruitEnd: timestamp("recruit_end"), // 접수 마감
+
+  gameType: text("game_type", { enum: ["3c", "4c", "golf"] }).notNull(),
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
+  format: text("format", { enum: ["knockout", "league"] }).default("knockout").notNull(),
+
+  matchMethod: text("match_method", { enum: ["handicap", "fixed"] }).default("handicap").notNull(),
+  handicapRule: text("handicap_rule"), // text description
+
+  // Rule Details
+  handicapRate: integer("handicap_rate").default(100), // e.g. 100%, 70%
+  targetScore: integer("target_score"), // Only for fixed method
+  bankShotPoint: integer("bank_shot_point").default(2),
+  timeLimit: integer("time_limit").default(40),
+
+  maxPlayers: integer("max_players").default(32),
+  entryFee: integer("entry_fee").default(20000),
+  prizes: jsonb("prizes"), // { "1st": "30만원" }
+
+  status: text("status", { enum: ["recruiting", "preparing", "ongoing", "ended"] }).default("recruiting").notNull(),
+  posterUrl: text("poster_url"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 7. 대회 참가자
+export const hiqTournamentParticipants = pgTable("hiq_tournament_participants", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  tournamentId: uuid("tournament_id").references(() => hiqTournaments.id).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+
+  currentRank: integer("current_rank"),
+  status: text("status", { enum: ["active", "eliminated", "winner"] }).default("active"),
+
+  registeredAt: timestamp("registered_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.tournamentId, table.memberId),
+]);
+
+// 8. 크루 (Crew/Club) - Community
+export const hiqCrews = pgTable("hiq_crews", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  leaderId: uuid("leader_id").references(() => hiqMembers.id).notNull(),
+  baseStoreId: uuid("base_store_id").references(() => hiqStores.id), // Basecamp
+
+  // New Fields for Wizard
+  emblem: text("emblem"), // Emoji or URL
+  gameType: text("game_type", { enum: ["3c", "4c", "pocket", "any", "field", "screen", "range"] }).default("any").notNull(),
+  region: text("region"),
+  tags: jsonb("tags"), // ["#tag1", "#tag2"]
+  joinType: text("join_type", { enum: ["auto", "approval"] }).default("auto").notNull(),
+  maxMembers: integer("max_members").default(50),
+  coverImage: text("cover_image"), // New Cover Image URL
+  shortIntro: text("short_intro"), // Short slogan (e.g. "광진구 2030 크루")
+  meetingDay: text("meeting_day"), // e.g. "SAT"
+  meetingTime: text("meeting_time"), // e.g. "14:00"
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "MIXED"] }).default("BILLIARDS").notNull(),
+
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const hiqCrewMembers = pgTable("hiq_crew_members", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  role: text("role", { enum: ["leader", "manage", "member", "pending"] }).default("member").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.crewId, table.memberId)
+]);
+
+export const hiqCrewActivities = pgTable("hiq_crew_activities", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id).notNull(),
+  creatorId: uuid("creator_id").references(() => hiqMembers.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  activityDate: timestamp("activity_date").notNull(),
+  locationStoreId: uuid("location_store_id").references(() => hiqStores.id), // If at a HiQ store
+  locationName: text("location_name"), // If generic location
+  maxParticipants: integer("max_participants").default(8),
+  cost: text("cost"), // e.g. "Game fee Dutch pay"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const hiqCrewActivityParticipants = pgTable("hiq_crew_activity_participants", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  activityId: uuid("activity_id").references(() => hiqCrewActivities.id).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(), // Links to HiqMember directly for simplicity (or CrewMember)
+  status: text("status", { enum: ["joined", "waiting"] }).default("joined").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.activityId, table.memberId)
+]);
+
+// 8.1 크루 게시판 (Crew Posts)
+export const hiqCrewPosts = pgTable("hiq_crew_posts", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id).notNull(),
+  authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  category: text("category"), // 공지사항, 가입인사, 모임후기, 자유글
+  isNotice: boolean("is_notice").default(false).notNull(),
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 8.2 크루 댓글 (Crew Comments)
+export const hiqCrewComments = pgTable("hiq_crew_comments", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  postId: uuid("post_id").references(() => hiqCrewPosts.id).notNull(),
+  authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 8.3 크루 사진첩 (Crew Photos)
+export const hiqCrewPhotos = pgTable("hiq_crew_photos", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id).notNull(),
+  uploaderId: uuid("uploader_id").references(() => hiqMembers.id).notNull(),
+  url: text("url").notNull(),
+  caption: text("caption"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 8.4 크루 채팅 (Crew Chats)
+export const hiqCrewChats = pgTable("hiq_crew_chats", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id).notNull(),
+  senderId: uuid("sender_id").references(() => hiqMembers.id).notNull(),
+  message: text("message").notNull(),
+  type: text("type", { enum: ["text", "photo", "settlement"] }).default("text").notNull(),
+  metadata: jsonb("metadata"), // For settlementId, photoUrl, etc.
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 8.5 정산 (Settlements)
+export const hiqSettlements = pgTable("hiq_settlements", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id).notNull(),
+  creatorId: uuid("creator_id").references(() => hiqMembers.id).notNull(),
+  title: text("title").notNull(), // "11/24 불금 정모"
+  accountBank: text("account_bank"),
+  accountNumber: text("account_number"),
+  accountHolder: text("account_holder"),
+  status: text("status", { enum: ["active", "completed"] }).default("active").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const hiqSettlementItems = pgTable("hiq_settlement_items", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  settlementId: uuid("settlement_id").references(() => hiqSettlements.id, { onDelete: 'cascade' }).notNull(),
+  roundOrder: integer("round_order").notNull(), // 1, 2, 3...
+  title: text("title").notNull(), // "1차 고기", "2차 노래방"
+  amount: integer("amount").notNull(),
+  payerId: uuid("payer_id").references(() => hiqMembers.id).notNull(), // Who paid this round
+});
+
+export const hiqSettlementParticipants = pgTable("hiq_settlement_participants", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  itemId: uuid("item_id").references(() => hiqSettlementItems.id, { onDelete: 'cascade' }).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+}, (table) => [
+  unique().on(table.itemId, table.memberId)
+]);
+
+// 8.5 크루 게시글 좋아요 (Crew Post Likes)
+export const hiqCrewLikes = pgTable("hiq_crew_likes", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  postId: uuid("post_id").references(() => hiqCrewPosts.id).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.postId, table.memberId),
+]);
+
+// 8.6 크루 사진 좋아요 (Crew Photo Likes)
+export const hiqCrewPhotoLikes = pgTable("hiq_crew_photo_likes", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  photoId: uuid("photo_id").references(() => hiqCrewPhotos.id, { onDelete: 'cascade' }).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.photoId, table.memberId)
+]);
+
+// 8.7 크루 사진 댓글 (Crew Photo Comments)
+export const hiqCrewPhotoComments = pgTable("hiq_crew_photo_comments", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  photoId: uuid("photo_id").references(() => hiqCrewPhotos.id, { onDelete: 'cascade' }).notNull(),
+  authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ... (other schemas)
+
+export const insertHiqCrewSchema = createInsertSchema(hiqCrews).omit({ id: true, createdAt: true });
+export const insertHiqCrewMemberSchema = createInsertSchema(hiqCrewMembers).omit({ id: true, joinedAt: true });
+
+// --- Types Export ---
+export type HiqCrew = typeof hiqCrews.$inferSelect;
+export type InsertHiqCrew = z.infer<typeof insertHiqCrewSchema>;
+export type HiqCrewMember = typeof hiqCrewMembers.$inferSelect;
+export type InsertHiqCrewMember = z.infer<typeof insertHiqCrewMemberSchema>;
+
+export const insertHiqCrewPostSchema = createInsertSchema(hiqCrewPosts).omit({ id: true, createdAt: true });
+export type HiqCrewPost = typeof hiqCrewPosts.$inferSelect;
+export type InsertHiqCrewPost = z.infer<typeof insertHiqCrewPostSchema>;
+
+// 9. 파트너 입점 문의 (Lead Gen)
+export const partnerLeads = pgTable("partner_leads", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  ownerName: text("owner_name").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  storeName: text("store_name"),
+  region: text("region"),
+  status: text("status", { enum: ["NEW", "CONTACTED", "REGISTERED"] }).default("NEW").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  businessNumber: text("business_number"), // New
+  businessLicenseFile: text("business_license_file"), // New (URL or Path)
+  regionDetail: text("region_detail"), // New (Gu/Dong info)
+});
+
+// 9.1 골프 부킹 (Golf Booking)
+export const golfBookings = pgTable("golf_bookings", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  courseId: text("course_id").notNull(),
+  courseName: text("course_name").notNull(),
+  region: text("region").notNull(),
+  datetime: timestamp("datetime").notNull(),
+  managerPhone: text("manager_phone").notNull(),
+  greenFee: integer("green_fee").notNull(),
+  isHotDeal: boolean("is_hot_deal").default(false).notNull(),
+  options: jsonb("options").$type<string[]>().default([]),
+  courseType: text("course_type"),
+  comment: text("comment"),
+  isBlind: boolean("is_blind").default(false).notNull(),
+  blindName: text("blind_name"),
+  policyType: text("policy_type").default("POLICY_STANDARD").notNull(),
+  policyCustomText: text("policy_custom_text"),
+  listingType: text("listing_type").default("BOOKING").notNull(),
+  joinHeadcount: integer("join_headcount"),
+  joinCondition: text("join_condition"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 9.2 골프 조인 (Golf Join) - Separated from Booking
+export const golfJoins = pgTable("golf_joins", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  courseName: text("course_name").notNull(),
+  region: text("region").notNull(),
+  datetime: timestamp("datetime").notNull(),
+  hostId: uuid("host_id"),
+  managerPhone: text("manager_phone"),
+  greenFee: integer("green_fee").notNull(),
+  joinHeadcount: integer("join_headcount").notNull(),
+  joinCondition: text("join_condition"),
+  roundDate: date("round_date"),
+  comment: text("comment"),
+  status: text("status", { enum: ["recruiting", "closed"] }).default("recruiting").notNull(),
+  isBlind: boolean("is_blind").default(false).notNull(),
+  blindName: text("blind_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 9.3 골프 코스 홀 정보 (Crowdsourced PAR Info)
+export const hiqCourseHoleInfo = pgTable("hiq_course_hole_info", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  courseId: text("course_id").notNull(),
+  courseName: text("course_name").notNull(),
+  subPathName: text("sub_path_name"),
+  holeNo: integer("hole_no").notNull(),
+  par: integer("par").notNull(),
+  voteCount: integer("vote_count").default(1).notNull(),
+  isVerified: boolean("is_verified").default(false).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.courseId, table.subPathName, table.holeNo)
+]);
+
+export const insertPartnerLeadSchema = createInsertSchema(partnerLeads).omit({ id: true, createdAt: true, status: true });
+export type PartnerLead = typeof partnerLeads.$inferSelect;
+export type InsertPartnerLead = z.infer<typeof insertPartnerLeadSchema>;
+
+export const insertGolfBookingSchema = createInsertSchema(golfBookings).omit({ id: true, createdAt: true });
+export type GolfBooking = typeof golfBookings.$inferSelect;
+export type InsertGolfBooking = z.infer<typeof insertGolfBookingSchema>;
+
+export const insertGolfJoinSchema = createInsertSchema(golfJoins).omit({ id: true, createdAt: true });
+export type GolfJoin = typeof golfJoins.$inferSelect;
+export type InsertGolfJoin = z.infer<typeof insertGolfJoinSchema>;
+
+// 10. 공지사항 (Admin Notice)
+export const notices = pgTable("notices", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  target: text("target", { enum: ["all", "owners"] }).default("all").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNoticeSchema = createInsertSchema(notices).omit({ id: true, createdAt: true });
+export type Notice = typeof notices.$inferSelect;
+export type InsertNotice = z.infer<typeof insertNoticeSchema>;
+
+// --- Existing Tables (Logs, History, Friendship, Invites) ---
+// (Minor updates to references if needed)
 
 export const hiqVisitLogs = pgTable("hiq_visit_logs", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  storeId: uuid("store_id").references(() => hiqStores.id), // Which store?
   visitedAt: timestamp("visited_at").defaultNow().notNull(),
 });
 
@@ -125,8 +559,11 @@ export const hiqGameHistory = pgTable("hiq_game_history", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
   gameId: uuid("game_id").references(() => hiqGames.id).notNull(),
-  gameMode: text("game_mode", { enum: ["match", "practice"] }).notNull(),
-  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  storeId: uuid("store_id").references(() => hiqStores.id), // Partition by store
+
+  gameMode: text("game_mode", { enum: ["match", "practice", "tournament"] }).notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c", "golf"] }).notNull(),
+
   score: integer("score").notNull(),
   innings: integer("innings").notNull(),
   average: text("average").notNull(),
@@ -136,6 +573,10 @@ export const hiqGameHistory = pgTable("hiq_game_history", {
   inningData: jsonb("inning_data"),
   earnedPoints: integer("earned_points").default(0).notNull(),
   opponentName: text("opponent_name"),
+  locationName: text("location_name"), // Added for Golf: Course name
+  subType: text("sub_type"), // Added for Golf: Course sub-type (e.g. "Castle")
+  scoreJson: jsonb("score_json"), // Added for Golf: Hole-by-hole scores
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -144,21 +585,97 @@ export const hiqFriendships = pgTable("hiq_friendships", {
   requesterId: uuid("requester_id").references(() => hiqMembers.id).notNull(),
   receiverId: uuid("receiver_id").references(() => hiqMembers.id).notNull(),
   status: text("status", { enum: ["pending", "accepted"] }).default("pending").notNull(),
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
-  unique().on(table.requesterId, table.receiverId),
+  unique().on(table.requesterId, table.receiverId, table.sportCategory),
 ]);
 
+export const hiqInvites = pgTable("hiq_invites", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  code: text("code").notNull(), // 6-digit code (Billiards) or 4-digit code (Golf)
+  hostId: uuid("host_id").references(() => hiqMembers.id).notNull(),
+  storeId: uuid("store_id"), // Context
+  guestId: uuid("guest_id").references(() => hiqMembers.id),
+  status: text("status", { enum: ["pending", "accepted", "expired"] }).default("pending").notNull(),
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 11. 골프 매치 세션 (PIN 기반 실시간 내기 매치)
+export const golfMatchSessions = pgTable("golf_match_sessions", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  pinCode: text("pin_code").notNull(), // 4-digit PIN
+  hostId: uuid("host_id").references(() => hiqMembers.id).notNull(),
+
+  courseId: text("course_id"),
+  courseName: text("course_name"),
+
+  gameMode: text("game_mode", { enum: ["stroke", "skins"] }).default("stroke").notNull(),
+  stake: integer("stake").default(1000).notNull(), // Per stroke/hole
+  useOecd: boolean("use_oecd").default(false).notNull(),
+  useDouble: boolean("use_double").default(false).notNull(),
+
+  status: text("status", { enum: ["waiting", "playing", "finished"] }).default("waiting").notNull(),
+  currentHole: integer("current_hole").default(1).notNull(),
+
+  // Player Data: Array of { memberId, name, scores: [18], penalties: [18] }
+  players: jsonb("players").$type<any[]>().default([]).notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertGolfMatchSessionSchema = createInsertSchema(golfMatchSessions).omit({ id: true, createdAt: true, updatedAt: true });
+export type GolfMatchSession = typeof golfMatchSessions.$inferSelect;
+export type InsertGolfMatchSession = z.infer<typeof insertGolfMatchSessionSchema>;
+
+export const hiqSimRecords = pgTable("hiq_sim_records", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  shotData: jsonb("shot_data").notNull(),
+  points: integer("points").notNull(),
+  difficulty: text("difficulty"),
+  cushionCount: integer("cushion_count"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const hiqLeaderboard = pgTable("hiq_leaderboard", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  score: integer("score").notNull(),
+  rank: integer("rank"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const hiqSuccessfulShots = pgTable("hiq_successful_shots", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  ballPositions: jsonb("ball_positions").notNull(),
+  shotParams: jsonb("shot_params").notNull(),
+  cushionCount: integer("cushion_count"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// --- Zod Insert Schemas ---
 export const insertHiqStoreSchema = createInsertSchema(hiqStores).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertHiqMemberSchema = createInsertSchema(hiqMembers, {
   phone: z.string().min(10, "전화번호 형식이 올바르지 않습니다."),
   name: z.string().min(2, "이름은 2글자 이상이어야 합니다."),
+}).extend({
+  password: z.string().optional(),
 }).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-  visitCount: true
+  visitCount: true,
+  totalSimPoints: true
 });
+
+export const insertHiqClubMemberSchema = createInsertSchema(hiqClubMembers).omit({ id: true, joinedAt: true });
+export const insertHiqTournamentSchema = createInsertSchema(hiqTournaments).omit({ id: true, createdAt: true });
+export const insertHiqTournamentParticipantSchema = createInsertSchema(hiqTournamentParticipants).omit({ id: true, registeredAt: true });
 
 export const insertHiqGameSchema = createInsertSchema(hiqGames).omit({
   id: true,
@@ -180,21 +697,23 @@ export const insertHiqFriendshipSchema = createInsertSchema(hiqFriendships).omit
   createdAt: true
 });
 
-export const hiqInvites = pgTable("hiq_invites", {
-  id: uuid("id").primaryKey().defaultRandom().notNull(),
-  code: text("code").notNull(), // 6-digit code
-  hostId: uuid("host_id").references(() => hiqMembers.id).notNull(),
-  guestId: uuid("guest_id").references(() => hiqMembers.id), // Filled when a member joins
-  status: text("status", { enum: ["pending", "accepted", "expired"] }).default("pending").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const insertHiqSimRecordSchema = createInsertSchema(hiqSimRecords).omit({ id: true, createdAt: true });
+export const insertHiqLeaderboardSchema = createInsertSchema(hiqLeaderboard).omit({ id: true, updatedAt: true });
+export const insertHiqSuccessfulShotSchema = createInsertSchema(hiqSuccessfulShots).omit({ id: true, createdAt: true });
 
+
+// --- Types Export ---
 export type Profile = typeof profiles.$inferSelect;
 export type HiqStore = typeof hiqStores.$inferSelect;
 export type InsertHiqStore = z.infer<typeof insertHiqStoreSchema>;
 export type HiqMember = typeof hiqMembers.$inferSelect;
 export type InsertHiqMember = z.infer<typeof insertHiqMemberSchema>;
+export type HiqClubMember = typeof hiqClubMembers.$inferSelect;
+export type InsertHiqClubMember = z.infer<typeof insertHiqClubMemberSchema>;
+export type HiqTournament = typeof hiqTournaments.$inferSelect;
+export type InsertHiqTournament = z.infer<typeof insertHiqTournamentSchema>;
+export type HiqTournamentParticipant = typeof hiqTournamentParticipants.$inferSelect;
+export type InsertHiqTournamentParticipant = z.infer<typeof insertHiqTournamentParticipantSchema>;
 export type HiqGame = typeof hiqGames.$inferSelect;
 export type InsertHiqGame = z.infer<typeof insertHiqGameSchema>;
 export type HiqVisitLog = typeof hiqVisitLogs.$inferSelect;
@@ -203,41 +722,70 @@ export type HiqGameHistory = typeof hiqGameHistory.$inferSelect;
 export type InsertHiqGameHistory = z.infer<typeof insertHiqGameHistorySchema>;
 export type HiqFriendship = typeof hiqFriendships.$inferSelect;
 export type InsertHiqFriendship = z.infer<typeof insertHiqFriendshipSchema>;
-export const hiqSimRecords = pgTable("hiq_sim_records", {
-  id: uuid("id").primaryKey().defaultRandom().notNull(),
-  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
-  shotData: jsonb("shot_data").notNull(), // The coordinates and params of the shot
-  points: integer("points").notNull(),
-  difficulty: text("difficulty"), // 'easy', 'normal', 'hard', 'pro'
-  cushionCount: integer("cushion_count"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const hiqLeaderboard = pgTable("hiq_leaderboard", {
-  id: uuid("id").primaryKey().defaultRandom().notNull(),
-  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
-  score: integer("score").notNull(),
-  rank: integer("rank"),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const hiqSuccessfulShots = pgTable("hiq_successful_shots", {
-  id: uuid("id").primaryKey().defaultRandom().notNull(),
-  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
-  // Initial Ball Positions
-  ballPositions: jsonb("ball_positions").notNull(), // { white: {x,y}, yellow: {x,y}, red: {x,y} }
-  // Winning Shot Parameters
-  shotParams: jsonb("shot_params").notNull(),     // { angle, power, spinX, spinY }
-  // Result Info
-  cushionCount: integer("cushion_count"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const insertHiqSimRecordSchema = createInsertSchema(hiqSimRecords).omit({ id: true, createdAt: true });
-export const insertHiqLeaderboardSchema = createInsertSchema(hiqLeaderboard).omit({ id: true, updatedAt: true });
-export const insertHiqSuccessfulShotSchema = createInsertSchema(hiqSuccessfulShots).omit({ id: true, createdAt: true });
-
 export type HiqSimRecord = typeof hiqSimRecords.$inferSelect;
 export type HiqLeaderboard = typeof hiqLeaderboard.$inferSelect;
 export type HiqSuccessfulShot = typeof hiqSuccessfulShots.$inferSelect;
 export type InsertHiqSuccessfulShot = z.infer<typeof insertHiqSuccessfulShotSchema>;
+
+export const insertHiqCrewActivitySchema = createInsertSchema(hiqCrewActivities).omit({ id: true, createdAt: true });
+export const insertHiqCrewActivityParticipantSchema = createInsertSchema(hiqCrewActivityParticipants).omit({ id: true, joinedAt: true });
+
+export type HiqCrewActivity = typeof hiqCrewActivities.$inferSelect;
+export type InsertHiqCrewActivity = z.infer<typeof insertHiqCrewActivitySchema>;
+export type HiqCrewActivityParticipant = typeof hiqCrewActivityParticipants.$inferSelect;
+export type InsertHiqCrewActivityParticipant = z.infer<typeof insertHiqCrewActivityParticipantSchema>;
+
+export const insertHiqCrewLikeSchema = createInsertSchema(hiqCrewLikes).omit({ id: true, createdAt: true });
+export type HiqCrewLike = typeof hiqCrewLikes.$inferSelect;
+export type InsertHiqCrewLike = z.infer<typeof insertHiqCrewLikeSchema>;
+export const insertHiqCrewPhotoLikeSchema = createInsertSchema(hiqCrewPhotoLikes);
+export const insertHiqCrewPhotoCommentSchema = createInsertSchema(hiqCrewPhotoComments);
+
+export const insertHiqSettlementSchema = createInsertSchema(hiqSettlements).omit({ id: true, createdAt: true, status: true });
+export const insertHiqSettlementItemSchema = createInsertSchema(hiqSettlementItems).omit({ id: true });
+export const insertHiqSettlementParticipantSchema = createInsertSchema(hiqSettlementParticipants).omit({ id: true });
+
+export type HiqSettlement = typeof hiqSettlements.$inferSelect;
+export type InsertHiqSettlement = z.infer<typeof insertHiqSettlementSchema>;
+export type HiqSettlementItem = typeof hiqSettlementItems.$inferSelect;
+export type InsertHiqSettlementItem = z.infer<typeof insertHiqSettlementItemSchema>;
+
+export type HiqSettlementParticipant = typeof hiqSettlementParticipants.$inferSelect;
+export type InsertHiqSettlementParticipant = z.infer<typeof insertHiqSettlementParticipantSchema>;
+
+export type HiqCrewPhotoLike = typeof hiqCrewPhotoLikes.$inferSelect;
+export type InsertHiqCrewPhotoLike = typeof hiqCrewPhotoLikes.$inferInsert;
+export type HiqCrewPhotoComment = typeof hiqCrewPhotoComments.$inferSelect;
+export type InsertHiqCrewPhotoComment = typeof hiqCrewPhotoComments.$inferInsert;
+
+// --- Settlement Relations ---
+
+export const hiqSettlementsRelations = relations(hiqSettlements, ({ many }) => ({
+  items: many(hiqSettlementItems),
+}));
+
+export const hiqSettlementItemsRelations = relations(hiqSettlementItems, ({ one, many }) => ({
+  settlement: one(hiqSettlements, {
+    fields: [hiqSettlementItems.settlementId],
+    references: [hiqSettlements.id],
+  }),
+  participants: many(hiqSettlementParticipants),
+  payer: one(hiqMembers, {
+    fields: [hiqSettlementItems.payerId],
+    references: [hiqMembers.id],
+  }),
+}));
+
+export const hiqSettlementParticipantsRelations = relations(hiqSettlementParticipants, ({ one }) => ({
+  item: one(hiqSettlementItems, {
+    fields: [hiqSettlementParticipants.itemId],
+    references: [hiqSettlementItems.id],
+  }),
+  member: one(hiqMembers, {
+    fields: [hiqSettlementParticipants.memberId],
+    references: [hiqMembers.id],
+  }),
+}));
+export const insertHiqCourseHoleInfoSchema = createInsertSchema(hiqCourseHoleInfo).omit({ id: true, updatedAt: true });
+export type HiqCourseHoleInfo = typeof hiqCourseHoleInfo.$inferSelect;
+export type InsertHiqCourseHoleInfo = z.infer<typeof insertHiqCourseHoleInfoSchema>;

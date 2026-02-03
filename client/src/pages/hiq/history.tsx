@@ -1,183 +1,41 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-    LucideChevronLeft,
-    LucideTrendingUp,
-    LucideCalendar,
-    LucideTarget,
-    LucideHistory,
-    LucideBarChart3,
-    LucideLayers,
-    LucideUsers,
-    LucideSwords,
-    LucideZap
-} from "lucide-react";
-import { HiqGameHistory, HiqMember, HiqGame } from "@shared/schema";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
+import { motion } from "framer-motion";
+import { LucideChevronLeft, LucideTarget, LucideBarChart3, LucideLayers } from "lucide-react";
+import { useSport } from "@/contexts/SportContext";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-} from "@/components/ui/dialog";
-import { ResponsiveContainer, LineChart, Line } from "recharts";
 
-type FilterType = "all" | "3c" | "4c";
+// Refactored Imports
+import { useGameStats } from "@/hooks/useGameStats";
+import { SPORT_CONFIG, FilterType } from "@/components/hiq/history/types";
+import { StatsOverviewCard } from "@/components/hiq/history/StatsOverviewCard";
+import { HistoryList } from "@/components/hiq/history/HistoryList";
+import { GameDetailDialog } from "@/components/hiq/history/GameDetailDialog";
+import { HiqMember } from "@shared/schema";
 
 export default function HiqHistory() {
     const [, setLocation] = useLocation();
+    const { currentSport } = useSport();
     const [filter, setFilter] = useState<FilterType>("all");
     const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
 
-    const { data: member } = useQuery<HiqMember>({
-        queryKey: ["/api/hiq/me"],
+    // 1. Data Fetching
+    const { data: member } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
+
+    // Using the same query key/fn as before
+    const { data: history = [], isLoading } = useQuery({
+        queryKey: ["/api/hiq/history", currentSport],
+        queryFn: async () => await apiRequest(`/api/hiq/history?sport=${currentSport}`)
     });
 
-    const { data: history, isLoading } = useQuery<HiqGameHistory[]>({
-        queryKey: ["/api/hiq/history"],
-    });
+    // 2. Custom Hook for logic
+    const stats = useGameStats(history, filter, currentSport, member);
 
-    const { data: selectedGameData, isLoading: isLoadingGame } = useQuery<HiqGame>({
-        queryKey: [`/api/hiq/game/${selectedGameId}`],
-        enabled: !!selectedGameId,
-    });
-
-    // Filter history to ONLY show official match games (member vs member)
-    const officialHistory = history?.filter(g =>
-        g.gameMode === "match" &&
-        (g as any).isRanked &&
-        (filter === "all" || g.gameType === filter)
-    ) || [];
-
-    // Calculate aggregated stats from official match data
-    const totalNormalizedScore = officialHistory.reduce((acc, g) => {
-        return acc + g.score;
-    }, 0);
-    const totalInnings = officialHistory.reduce((acc, g) => acc + g.innings, 0);
-    const cumulativeAverage = totalInnings > 0
-        ? (totalNormalizedScore / totalInnings).toFixed(3)
-        : "0.000";
-
-    // Additional stats for the enhanced card
-    const totalGames = officialHistory.length;
-    const wins = officialHistory.filter(g => (g as any).isWinner).length;
-    const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100).toString() : "0";
-    const bestHighRun = Math.max(...officialHistory.map(g => (g as any).highRun || 0), 0);
-
-    // 1. Best Average
-    const bestAverage = officialHistory.length > 0
-        ? Math.max(...officialHistory.map(g => parseFloat(g.average))).toFixed(3)
-        : "0.000";
-
-    // 2. Recent 10 Games Average
-    const recent10 = officialHistory.slice(0, 10);
-    const r10Score = recent10.reduce((acc, g) => acc + g.score, 0);
-    const r10Innings = recent10.reduce((acc, g) => acc + g.innings, 0);
-    const recent10Avg = r10Innings > 0
-        ? (r10Score / r10Innings).toFixed(3)
-        : "0.000";
-
-    // 3. Empty Inning Rate (공타율)
-    let totalEmptyInnings = 0;
-    let totalCalculatedInnings = 0;
-    officialHistory.forEach(g => {
-        const data = g.inningData as any;
-        if (Array.isArray(data)) {
-            if (data.length > 0 && typeof data[0] === 'number') {
-                totalEmptyInnings += data.filter(s => s === 0).length;
-                totalCalculatedInnings += data.length;
-            } else if (data.length > 0 && typeof data[0] === 'object') {
-                totalEmptyInnings += data.filter((s: any) => s.score === 0).length;
-                totalCalculatedInnings += data.length;
-            }
-        }
-    });
-    const emptyInningRate = totalCalculatedInnings > 0
-        ? ((totalEmptyInnings / totalCalculatedInnings) * 100).toFixed(1)
-        : "0.0";
-
-    // RP (Rankue Point) Calculation for "ALL" tab
-    const calculate3cAverage = () => {
-        const games3c = history?.filter(g => g.gameType === "3c" && g.gameMode === "match" && (g as any).isRanked) || [];
-        if (games3c.length === 0) return 0;
-        const totalScore = games3c.reduce((acc, g) => acc + g.score, 0);
-        const totalInnings = games3c.reduce((acc, g) => acc + g.innings, 0);
-        return totalInnings > 0 ? totalScore / totalInnings : 0;
-    };
-
-    const calculate4cAverage = () => {
-        const games4c = history?.filter(g => g.gameType === "4c" && g.gameMode === "match" && (g as any).isRanked) || [];
-        if (games4c.length === 0) return 0;
-        const totalScore = games4c.reduce((acc, g) => acc + g.score, 0);
-        const totalInnings = games4c.reduce((acc, g) => acc + g.innings, 0);
-        return totalInnings > 0 ? totalScore / totalInnings : 0;
-    };
-
-    const calculateRP = (): number => {
-        const avg3c = calculate3cAverage();
-        const avg4c = calculate4cAverage();
-        const allGames = history?.filter(g => g.gameMode === "match" && (g as any).isRanked) || [];
-        const totalWins = allGames.filter(g => (g as any).isWinner).length;
-
-        return Math.round((avg3c * 200) + (avg4c * 10) + (totalWins * 5));
-    };
-
-    // Combined stats for "ALL" tab
-    const allOfficialGames = history?.filter(g => g.gameMode === "match" && (g as any).isRanked) || [];
-    const totalAllGames = allOfficialGames.length;
-    const totalAllWins = allOfficialGames.filter(g => (g as any).isWinner).length;
-    const totalAllWinRate = totalAllGames > 0 ? Math.round((totalAllWins / totalAllGames) * 100).toString() : "0";
-    const games3cCount = allOfficialGames.filter(g => g.gameType === "3c").length;
-    const games4cCount = allOfficialGames.filter(g => g.gameType === "4c").length;
-    const mainMode = games3cCount >= games4cCount ? "3-Cushion" : "4-Ball";
-
-    // Tier calculation with Premium Dark palette
-    const getTier = (avg: number, is3c: boolean) => {
-        if (is3c) {
-            if (avg >= 0.90) return { label: "PLATINUM", color: "#00FFD1", icon: "💎", glow: "rgba(0, 255, 209, 0.15)" };
-            if (avg >= 0.56) return { label: "GOLD", color: "#FFD700", icon: "🥇", glow: "rgba(255, 215, 0, 0.15)" };
-            if (avg >= 0.36) return { label: "SILVER", color: "#E0E0E0", icon: "🥈", glow: "rgba(224, 224, 224, 0.15)" };
-            return { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.15)" };
-        } else {
-            if (avg >= 5.00) return { label: "PLATINUM", color: "#00FFD1", icon: "💎", glow: "rgba(0, 255, 209, 0.15)" };
-            if (avg >= 3.00) return { label: "GOLD", color: "#FFD700", icon: "🥇", glow: "rgba(255, 215, 0, 0.15)" };
-            if (avg >= 1.51) return { label: "SILVER", color: "#E0E0E0", icon: "🥈", glow: "rgba(224, 224, 224, 0.15)" };
-            return { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.15)" };
-        }
-    };
-
-    const currentTier = getTier(
-        parseFloat(cumulativeAverage),
-        filter === "3c"
-    );
-
-    // Last week comparison (comparing recent 3 games vs previous 3 games)
-    const recentGames = [...officialHistory].slice(0, 3);
-    const previousGames = [...officialHistory].slice(3, 6);
-    const recentAvg = recentGames.length > 0
-        ? recentGames.reduce((acc, g) => acc + parseFloat(g.average), 0) / recentGames.length
-        : 0;
-    const previousAvg = previousGames.length > 0
-        ? previousGames.reduce((acc, g) => acc + parseFloat(g.average), 0) / previousGames.length
-        : recentAvg;
-    const avgChange = recentAvg - previousAvg;
-
-    // Last 10 games for sparkline
-    const last10Games = [...officialHistory].slice(0, 10).reverse().map((g, idx) => ({
-        index: idx,
-        avg: parseFloat(g.average)
-    }));
-
-    // Mock rank percentage (would need real ranking data)
-    const rankPercentage = "15";
+    // 3. Config
+    const config = SPORT_CONFIG[currentSport] || SPORT_CONFIG.BILLIARDS;
 
     if (isLoading) {
         return (
@@ -185,7 +43,10 @@ export default function HiqHistory() {
                 <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-white/10 border-t-[#10b981] rounded-full"
+                    className={cn(
+                        "w-12 h-12 border-4 border-white/10 rounded-full",
+                        config.spinnerColor
+                    )}
                 />
             </div>
         );
@@ -194,7 +55,10 @@ export default function HiqHistory() {
     return (
         <div className="min-h-screen bg-[#0A0A0A] text-white p-6 pb-24 font-sans relative overflow-x-hidden">
             {/* Background Light Effect */}
-            <div className="absolute top-0 right-0 w-[80dvw] h-[40dvh] bg-[#10b981]/5 blur-[120px] rounded-full -mr-[30dvw] -mt-[10dvh] pointer-events-none" />
+            <div className={cn(
+                "absolute top-0 right-0 w-[80dvw] h-[40dvh] blur-[120px] rounded-full -mr-[30dvw] -mt-[10dvh] pointer-events-none transition-colors duration-1000",
+                config.bgLight
+            )} />
 
             {/* Header */}
             <div className="flex items-center gap-5 py-4 mb-6 relative z-10">
@@ -206,389 +70,66 @@ export default function HiqHistory() {
                     <LucideChevronLeft className="w-6 h-6" />
                 </motion.button>
                 <div>
-                    <h1 className="text-3xl font-black tracking-tighter text-white">공식 경기 성적표</h1>
-                    <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mt-0.5">Official Match Records</p>
+                    <h1 className="text-3xl font-black tracking-tighter text-white">
+                        {config.title}
+                    </h1>
+                    <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mt-0.5">
+                        {config.subtitle}
+                    </p>
                 </div>
             </div>
 
-            {/* Filter Tabs */}
-            <div className="flex p-1 bg-[#151515] rounded-2xl mb-8 border border-[#222]">
-                {[
-                    { id: "all", label: "전체", icon: LucideLayers },
-                    { id: "3c", label: "3구", icon: LucideTarget },
-                    { id: "4c", label: "4구", icon: LucideBarChart3 }
-                ].map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setFilter(tab.id as FilterType)}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${filter === tab.id
-                            ? "bg-[#10b981] text-black shadow-lg"
-                            : "text-gray-500 hover:text-gray-300"
-                            }`}
-                    >
-                        <tab.icon className={`w-4 h-4 ${filter === tab.id ? "text-black" : ""}`} />
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Cumulative Stats Card */}
-            <motion.div
-                key={filter} // Re-animate on filter change
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mb-8"
-            >
-                <Card
-                    className="rounded-3xl overflow-hidden relative"
-                    style={{
-                        background: 'linear-gradient(135deg, #111111 0%, #0a1f13 100%)',
-                        borderWidth: '1.5px',
-                        borderStyle: 'solid',
-                        borderColor: `${currentTier.color}44`,
-                        boxShadow: `0 0 15px ${currentTier.glow}, 0 10px 40px rgba(0,0,0,0.6)`
-                    }}
-                >
-
-                    {/* Sparkline Background Chart */}
-                    {last10Games.length > 1 && (
-                        <div className="absolute bottom-0 left-0 right-0 h-24 opacity-0 pointer-events-none z-0">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={last10Games}>
-                                    <Line
-                                        type="monotone"
-                                        dataKey="avg"
-                                        stroke={currentTier.color}
-                                        strokeWidth={3}
-                                        dot={false}
-                                        isAnimationActive={false}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
-
-
-
-                    <CardContent className="p-4 relative z-10">
-                        {/* TOP LAYER: Tier Badge */}
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="flex items-center gap-3">
-                                <span className="text-4xl">{currentTier.icon}</span>
-                                <div className="min-w-0">
-                                    <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-1">TIER</p>
-                                    <p
-                                        className="text-xl font-black uppercase tracking-wide truncate shadow-sm"
-                                        style={{
-                                            color: currentTier.color,
-                                            textShadow: `0 0 10px ${currentTier.glow}`
-                                        }}
-                                    >
-                                        {currentTier.label}
-                                    </p>
-                                    <p className="text-[10px] font-bold text-white/20 uppercase mt-0.5">상위 {rankPercentage}%</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* MIDDLE LAYER: Hero Average DISPLAY */}
-                        <div className="mb-6 text-center">
-                            <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.3em] mb-2 leading-none">CUMULATIVE AVERAGE</p>
-                            <h2
-                                className="text-7xl font-black leading-none tracking-tighter"
-                                style={{
-                                    background: `linear-gradient(135deg, ${currentTier.color} 0%, ${currentTier.color}CC 100%)`,
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    filter: `drop-shadow(0 0 20px ${currentTier.glow})`,
-                                    fontFeatureSettings: '"tnum"'
-                                }}
-                            >
-                                {cumulativeAverage}
-                            </h2>
-                        </div>
-
-                        {/* BOTTOM LAYER: 7 Stats in 4+3 Layout - FIXED PADDING & SPACING */}
-                        <div className="space-y-2">
-                            {filter === "all" && history?.some(g => g.gameType === "3c") && history?.some(g => g.gameType === "4c") ? (
-                                // Show combined stats for "ALL" tab
-                                <div className="grid grid-cols-4 gap-2 pt-4">
-                                    <div className="text-center px-2 py-3 rounded-xl bg-white/[0.02]">
-                                        <p className="text-white/30 text-[9px] font-black uppercase mb-2 tracking-[0.1em]">Total Games</p>
-                                        <p className="text-xl font-black text-white">{totalAllGames}</p>
-                                    </div>
-                                    <div className="text-center px-2 py-3 rounded-xl bg-white/[0.02]">
-                                        <p className="text-white/30 text-[9px] font-black uppercase mb-2 tracking-[0.1em]">Total Wins</p>
-                                        <p className="text-xl font-black text-white">{totalAllWins}</p>
-                                    </div>
-                                    <div className="text-center px-2 py-3 rounded-xl bg-white/[0.02]">
-                                        <p className="text-white/30 text-[9px] font-black uppercase mb-2 tracking-[0.1em]">Win Rate</p>
-                                        <p className="text-xl font-black text-emerald-400">{totalAllWinRate}%</p>
-                                    </div>
-                                    <div className="text-center px-2 py-3 rounded-xl bg-white/[0.02]">
-                                        <p className="text-white/30 text-[9px] font-black uppercase mb-2 tracking-[0.1em]">Main Mode</p>
-                                        <p className="text-xs font-black" style={{ color: currentTier.color }}>{mainMode}</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                // Show mode-specific stats (Combined Original + New - Fixed 4+3 Grid)
-                                <>
-                                    {/* Row 1: 4 Columns (Fundamental Stats) */}
-                                    <div className="grid grid-cols-4 gap-1">
-                                        <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
-                                            <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Games</p>
-                                            <p className="text-xs font-black text-white">{totalGames}</p>
-                                        </div>
-                                        <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
-                                            <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Points</p>
-                                            <p className="text-xs font-black text-white">{totalNormalizedScore}</p>
-                                        </div>
-                                        <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
-                                            <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Win %</p>
-                                            <p className="text-xs font-black text-emerald-400">{winRate}%</p>
-                                        </div>
-                                        <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
-                                            <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Best HR</p>
-                                            <p className="text-xs font-black text-[#00FFD1]">{bestHighRun}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Row 2: 3 Columns (Advanced Performance) */}
-                                    <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-white/10">
-                                        <div className="text-center py-2 rounded-xl bg-[#10b981]/10 border border-[#10b981]/30 min-w-0">
-                                            <p className="text-[#10b981] text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Best AVG</p>
-                                            <p className="text-xs font-black text-[#10b981]">{bestAverage}</p>
-                                        </div>
-                                        <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
-                                            <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">Recent 10</p>
-                                            <p className="text-xs font-black text-white">{recent10Avg}</p>
-                                        </div>
-                                        <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
-                                            <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">공타율</p>
-                                            <p className="text-xs font-black text-red-400">{emptyInningRate}%</p>
-                                        </div>
-                                    </div>
-                                </>
+            {/* Filter Tabs - Only show for Billiards */}
+            {currentSport !== "GOLF" && (
+                <div className="flex p-1 bg-[#151515] rounded-2xl mb-8 border border-[#222]">
+                    {[
+                        { id: "all", label: "전체", icon: LucideLayers },
+                        { id: "3c", label: "3구", icon: LucideTarget },
+                        { id: "4c", label: "4구", icon: LucideBarChart3 }
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setFilter(tab.id as FilterType)}
+                            className={cn(
+                                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all outline-none ring-0",
+                                filter === tab.id
+                                    ? "bg-[#10b981] text-black shadow-lg"
+                                    : "text-gray-500 hover:text-gray-300"
                             )}
-                        </div>
-                    </CardContent>
-                </Card>
-            </motion.div>
-
-
-            <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-white/50">
-                <LucideHistory className="w-5 h-5 text-[#10b981]" />
-                최근 공식 매치 리스트
-            </h3>
-            <div className="space-y-4">
-                <AnimatePresence mode="popLayout">
-                    {officialHistory.length > 0 ? (
-                        officialHistory.map((game, idx) => (
-                            <motion.div
-                                key={game.id}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                                transition={{ delay: idx * 0.05 }}
-                            >
-                                <Card
-                                    className="bg-[#151515] border-[#222] rounded-2xl overflow-hidden hover:border-[#10b981]/30 transition-all border-l-4 border-l-transparent hover:border-l-[#10b981] cursor-pointer"
-                                    onClick={() => setSelectedGameId(game.gameId)}
-                                >
-                                    <CardContent className="p-5">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex gap-2">
-                                                <span className="px-2 py-0.5 rounded-lg bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20 text-[9px] font-black uppercase flex items-center gap-1">
-                                                    <div className="w-1 h-1 rounded-full bg-[#10b981]" /> OFFICIAL
-                                                </span>
-                                                <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-lg text-[9px] font-black text-gray-400 uppercase">
-                                                    {game.gameType === "3c" ? "3구" : "4구"}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-1 text-gray-600 text-[10px] font-bold">
-                                                <LucideCalendar className="w-3 h-3" />
-                                                {format(new Date(game.createdAt), "yyyy.MM.dd HH:mm", { locale: ko })}
-                                            </div>
-                                        </div>
-
-                                        <div className="flex justify-between items-end">
-                                            <div className="flex items-baseline gap-4">
-                                                <div>
-                                                    <p className="text-gray-500 text-[9px] font-bold uppercase mb-0.5">득점</p>
-                                                    <p className="text-2xl font-black text-white">{game.score}</p>
-                                                </div>
-                                                <div className="w-px h-8 bg-white/5" />
-                                                <div>
-                                                    <p className="text-gray-500 text-[9px] font-bold uppercase mb-0.5">이닝</p>
-                                                    <p className="text-2xl font-black text-white">{game.innings}</p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[#10b981] text-xs font-black uppercase mb-0.5 tracking-wider">에버리지</p>
-                                                <p className="text-3xl font-black text-white leading-none tracking-tighter">
-                                                    {game.average}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </motion.div>
-                        ))
-                    ) : (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="py-24 text-center"
                         >
-                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
-                                <LucideHistory className="w-8 h-8 text-white/20" />
-                            </div>
-                            <p className="text-white font-black text-xl mb-2">인증된 경기 기록이 없습니다</p>
-                            <p className="text-gray-500 text-sm font-medium">실제 회원들과 대결하여<br />당신의 공식 에버리지를 기록해보세요!</p>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
+                            <tab.icon className={cn("w-4 h-4", filter === tab.id ? "text-black" : "")} />
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* Stats Overview Card */}
+            <StatsOverviewCard
+                stats={stats}
+                config={config}
+                filter={filter}
+                currentSport={currentSport}
+            />
+
+            {/* History List */}
+            <HistoryList
+                history={stats.officialHistory}
+                config={config}
+                onGameClick={setSelectedGameId}
+                currentSport={currentSport}
+            />
+
+            {/* Detail Dialog */}
+            <GameDetailDialog
+                gameId={selectedGameId}
+                onClose={() => setSelectedGameId(null)}
+                currentMemberId={member?.id}
+                config={config}
+                currentSport={currentSport}
+            />
+
             <HiqNavigation />
-
-            {/* Match Detail Dialog */}
-            <Dialog open={!!selectedGameId} onOpenChange={(open) => !open && setSelectedGameId(null)}>
-                <DialogContent className="bg-[#050505] border-[#222] text-white max-w-lg w-[95%] rounded-3xl p-0 overflow-hidden">
-                    <DialogHeader className="p-6 bg-gradient-to-b from-[#0e4d2a]/20 to-transparent border-b border-white/5">
-                        <div>
-                            <DialogTitle className="text-xl font-black flex items-center gap-2">
-                                <LucideSwords className="w-5 h-5 text-[#10b981]" />
-                                경기 상세 매치 리포트
-                            </DialogTitle>
-                            <DialogDescription className="text-white/40 text-[10px] uppercase font-bold tracking-widest mt-1">
-                                Official Match Breakdown
-                            </DialogDescription>
-                        </div>
-                    </DialogHeader>
-
-                    <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
-                        {isLoadingGame ? (
-                            <div className="py-12 flex justify-center">
-                                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-8 h-8 border-2 border-[#ffd700] border-t-transparent rounded-full" />
-                            </div>
-                        ) : selectedGameData ? (
-                            <>
-                                {/* Players Section (Dynamic 2-4 Players) */}
-                                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[10px] font-bold text-white/30 uppercase">PLAYERS</span>
-                                        <span className="text-[10px] font-bold text-[#10b981]">{selectedGameData.gameType === '4c' ? '4구' : '3구'}</span>
-                                    </div>
-                                    <div className={`grid gap-3 ${selectedGameData.player3Name ? (selectedGameData.player4Name ? 'grid-cols-4' : 'grid-cols-3') : 'grid-cols-2'}`}>
-                                        {[1, 2, 3, 4].map((idx) => {
-                                            const pId = selectedGameData[`player${idx}Id`];
-                                            const pName = selectedGameData[`player${idx}Name`];
-                                            const pTarget = selectedGameData[`player${idx}Target`];
-                                            const pScore = selectedGameData[`player${idx}Score`];
-                                            const isMe = member?.id && pId === member.id;
-
-                                            // Skip if player doesn't exist (e.g. P3/P4 in a 2p game)
-                                            if (idx > 2 && !pName) return null;
-
-                                            return (
-                                                <div key={idx} className="text-center bg-black/20 rounded-lg py-2 border border-white/5 relative overflow-hidden">
-                                                    {selectedGameData.winnerId === pId && <div className="absolute top-0 right-0 p-1"><div className="w-2 h-2 bg-[#ffd700] rounded-full shadow-[0_0_8px_rgba(255,215,0,0.6)]" /></div>}
-                                                    <p className={`text-[9px] font-bold mb-0.5 ${isMe ? 'text-blue-400' : 'text-gray-500'}`}>
-                                                        {isMe ? 'ME' : `P${idx}`}
-                                                    </p>
-                                                    <p className="text-sm font-black truncate px-1">{pName || (isMe ? member?.name : `Player ${idx}`)}</p>
-                                                    <div className={`text-lg font-black flex items-center justify-center gap-1 ${isMe ? 'text-[#10b981]' : 'text-white/60'}`}>
-                                                        <span>{pTarget || "-"}</span>
-                                                        <span className="text-white/20 text-sm">/</span>
-                                                        <span className={isMe ? 'text-white' : 'text-white/40'}>{pScore || 0}</span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Stat Grid */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                                        <div className="flex items-center gap-2 mb-2 text-[#10b981]">
-                                            <LucideZap className="w-4 h-4" />
-                                            <span className="text-[10px] font-black uppercase">하이런 (HR)</span>
-                                        </div>
-                                        <p className="text-2xl font-black">
-                                            {(() => {
-                                                // Display High Run for ME (if found) or Winner or P1? 
-                                                // Ideally, we should show "My High Run" if I participated, otherwise P1/Winner.
-                                                // Let's search for my slot.
-                                                const mySlot = [1, 2, 3, 4].find(i => selectedGameData[`player${i}Id`] === member?.id) || 1;
-                                                return selectedGameData[`player${mySlot}HighRun`] || 0;
-                                            })()}
-                                        </p>
-                                    </div>
-                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                                        <div className="flex items-center gap-2 mb-2 text-white/40">
-                                            <LucideCalendar className="w-4 h-4" />
-                                            <span className="text-[10px] font-black uppercase">총 이닝</span>
-                                        </div>
-                                        <p className="text-2xl font-black">{selectedGameData.totalInnings || 0}</p>
-                                    </div>
-                                </div>
-
-                                {/* Inning Table */}
-                                <div>
-                                    <h4 className="text-xs font-black uppercase text-white/30 mb-3 flex items-center gap-2">
-                                        <LucideUsers className="w-3 h-3" />
-                                        이닝별 득점 상세
-                                    </h4>
-                                    <div className="bg-[#151515] rounded-2xl border border-[#222] overflow-hidden">
-                                        <div
-                                            className="grid bg-white/5 border-b border-white/5 p-3 text-[10px] font-black text-white/40 uppercase gap-1"
-                                            style={{ gridTemplateColumns: `60px repeat(${selectedGameData.player4Name ? 4 : selectedGameData.player3Name ? 3 : 2}, 1fr)` }}
-                                        >
-                                            <div>이닝</div>
-                                            {[1, 2, 3, 4].map(idx => {
-                                                if (idx > 2 && !selectedGameData[`player${idx}Name`]) return null;
-                                                const isMe = member?.id && selectedGameData[`player${idx}Id`] === member.id;
-                                                return (
-                                                    <div key={idx} className={`text-center truncate px-1 ${isMe ? 'text-blue-400' : ''}`}>
-                                                        {isMe ? '나' : (selectedGameData[`player${idx}Name`] || `P${idx}`)}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                        <div className="max-h-[300px] overflow-y-auto">
-                                            {Array.from({ length: selectedGameData.totalInnings || 0 }).map((_, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="grid p-3 border-b border-white/[0.02] items-center gap-1"
-                                                    style={{ gridTemplateColumns: `60px repeat(${selectedGameData.player4Name ? 4 : selectedGameData.player3Name ? 3 : 2}, 1fr)` }}
-                                                >
-                                                    <div className="text-[10px] font-black text-white/20 italic">{i + 1}</div>
-
-                                                    {[1, 2, 3, 4].map(idx => {
-                                                        if (idx > 2 && !selectedGameData[`player${idx}Name`]) return null;
-                                                        const isMe = member?.id && selectedGameData[`player${idx}Id`] === member.id;
-                                                        const sc = (selectedGameData[`player${idx}Innings`] as number[])?.[i] || 0;
-                                                        const displayScore = selectedGameData.gameType === '4c' && sc >= 10 ? sc / 10 : sc;
-
-                                                        return (
-                                                            <div key={idx} className={`text-center font-bold text-sm ${isMe ? 'text-[#10b981]' : 'text-white/40'}`}>
-                                                                {displayScore}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="py-12 text-center text-white/40">데이터를 불러오는 중입니다...</div>
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </div >
+        </div>
     );
 }

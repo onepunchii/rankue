@@ -5,17 +5,26 @@ import { LucideTrophy, LucideMedal, LucideUsers } from "lucide-react";
 import { HiqMember } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { useSport } from "@/contexts/SportContext";
+
+import { cn } from "@/lib/utils";
 
 export default function HiqRanking() {
     const [rankingTab, setRankingTab] = useState<"3c" | "4c">("4c");
     const [rankingScope, setRankingScope] = useState<"national" | "store">("store");
+    const { currentSport } = useSport();
 
     const { data: member } = useQuery<HiqMember>({
         queryKey: ["/api/hiq/me"],
     });
 
     const { data: rankings, isLoading } = useQuery<HiqMember[]>({
-        queryKey: [`/api/hiq/rankings?scope=${rankingScope}`],
+        queryKey: [`/api/hiq/rankings`, rankingScope, currentSport],
+        queryFn: async () => {
+            const res = await fetch(`/api/hiq/rankings?scope=${rankingScope}&sport=${currentSport}`);
+            const data = await res.json();
+            return data.data;
+        }
     });
 
     return (
@@ -23,8 +32,8 @@ export default function HiqRanking() {
             {/* Ambient Background Glow */}
             <div className="absolute top-0 left-0 w-full h-[50dvh] pointer-events-none z-0 overflow-hidden">
                 <div
-                    className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full blur-[100px] opacity-20"
-                    style={{ background: 'var(--brand-primary)' }}
+                    className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full blur-[100px] opacity-20 transition-colors duration-1000"
+                    style={{ background: currentSport === "GOLF" ? "#84cc16" : 'var(--brand-primary)' }}
                 />
                 <div className="absolute inset-0 premium-vignette" />
                 <div className="absolute inset-0 premium-grid" />
@@ -34,10 +43,16 @@ export default function HiqRanking() {
                 <header className="mb-10 text-center">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-4">
                         <LucideUsers className="w-3 h-3 text-white/40" />
-                        <span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase">Club Leaderboard</span>
+                        <span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase">
+                            {currentSport === "GOLF" ? "Golf Leaderboard" : "Club Leaderboard"}
+                        </span>
                     </div>
-                    <h1 className="text-3xl font-black tracking-tighter mb-2">실시간 랭킹</h1>
-                    <p className="text-gray-500 text-sm">하이큐 당구클럽 최고 실력자들</p>
+                    <h1 className="text-3xl font-black tracking-tighter mb-2">
+                        {currentSport === "GOLF" ? "매장 공식 랭킹" : "실시간 랭킹"}
+                    </h1>
+                    <p className="text-gray-500 text-sm">
+                        {currentSport === "GOLF" ? "하이큐 골프클럽 최고 실력자들" : "하이큐 당구클럽 최고 실력자들"}
+                    </p>
                 </header>
 
                 {/* Scope Tabs */}
@@ -58,23 +73,31 @@ export default function HiqRanking() {
                     </Button>
                 </div>
 
-                {/* Ranking Tabs */}
-                <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl mb-8 border border-white/5">
-                    <Button
-                        variant="ghost"
-                        onClick={() => setRankingTab("4c")}
-                        className={`flex-1 h-12 rounded-xl font-black text-sm transition-all ${rankingTab === "4c" ? "bg-white/10 text-white shadow-lg border border-white/10" : "text-gray-500 hover:text-gray-300"}`}
-                    >
-                        🟡 4구 랭킹
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        onClick={() => setRankingTab("3c")}
-                        className={`flex-1 h-12 rounded-xl font-black text-sm transition-all ${rankingTab === "3c" ? "bg-white/10 text-white shadow-lg border border-white/10" : "text-gray-500 hover:text-gray-300"}`}
-                    >
-                        🔴 3구 랭킹
-                    </Button>
-                </div>
+                {/* Ranking Tabs - Only show for Billiards */}
+                {currentSport !== "GOLF" && (
+                    <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl mb-8 border border-white/5">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setRankingTab("4c")}
+                            className={cn(
+                                "flex-1 h-12 rounded-xl font-black text-sm transition-all",
+                                rankingTab === "4c" ? "bg-white/10 text-white shadow-lg border border-white/10" : "text-gray-500 hover:text-gray-300"
+                            )}
+                        >
+                            🟡 4구 랭킹
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setRankingTab("3c")}
+                            className={cn(
+                                "flex-1 h-12 rounded-xl font-black text-sm transition-all",
+                                rankingTab === "3c" ? "bg-white/10 text-white shadow-lg border border-white/10" : "text-gray-500 hover:text-gray-300"
+                            )}
+                        >
+                            🔴 3구 랭킹
+                        </Button>
+                    </div>
+                )}
 
                 <div className="space-y-3">
                     {isLoading ? (
@@ -87,10 +110,16 @@ export default function HiqRanking() {
                         </div>
                     ) : (
                         rankings?.filter((r: any) => {
+                            if (currentSport === "GOLF") return (r.totalGolfGames || 0) > 0;
                             const handi = rankingTab === "3c" ? r.handi3c : r.handi4c;
                             return handi > 0;
                         })
                             .sort((a: any, b: any) => {
+                                if (currentSport === "GOLF") {
+                                    // Lower handicap is better in golf
+                                    if (a.golfHandicap !== b.golfHandicap) return a.golfHandicap - b.golfHandicap;
+                                    return a.golfAvgScore - b.golfAvgScore;
+                                }
                                 const handiA = rankingTab === "3c" ? a.handi3c : a.handi4c;
                                 const handiB = rankingTab === "3c" ? b.handi3c : b.handi4c;
                                 if (handiB !== handiA) return handiB - handiA;
@@ -133,10 +162,14 @@ export default function HiqRanking() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-[9px] font-black text-white/30 tracking-[0.1em] uppercase mb-1">Target Score</div>
+                                        <div className="text-[9px] font-black text-white/30 tracking-[0.1em] uppercase mb-1">
+                                            {currentSport === "GOLF" ? "Golf Handicap" : "Target Score"}
+                                        </div>
                                         <div className="font-black text-2xl flex items-baseline gap-1">
-                                            {rankingTab === "3c" ? rank.handi3c : rank.handi4c}
-                                            <span className="text-[10px] text-white/20">pts</span>
+                                            {currentSport === "GOLF" ? (rank.golfHandicap || 0) : (rankingTab === "3c" ? rank.handi3c : rank.handi4c)}
+                                            <span className="text-[10px] text-white/20">
+                                                {currentSport === "GOLF" ? "H" : "pts"}
+                                            </span>
                                         </div>
                                     </div>
                                 </motion.div>

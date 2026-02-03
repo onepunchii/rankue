@@ -11,6 +11,9 @@ export default function Landing() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const [phone, setPhone] = useState("");
+    const [password, setPassword] = useState("");
+    const [requiresPassword, setRequiresPassword] = useState(false);
+    const [memberName, setMemberName] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [storeSlug, setStoreSlug] = useState("hiq");
 
@@ -29,7 +32,7 @@ export default function Landing() {
         checkAuth();
     }, [setLocation]);
 
-    const { store: brand, isLoading: isBrandLoading } = useStore();
+    const { store: brand, isLoading: isBrandLoading, error: brandError } = useStore();
 
     const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value.replace(/[^0-9]/g, "");
@@ -46,7 +49,7 @@ export default function Landing() {
     };
 
     const handleStart = async () => {
-        if (phone.length < 10) {
+        if (!requiresPassword && phone.length < 10) {
             toast({
                 variant: "destructive",
                 title: "입력 오류",
@@ -55,12 +58,28 @@ export default function Landing() {
             return;
         }
 
+        if (requiresPassword && password.length < 4) {
+            toast({
+                variant: "destructive",
+                title: "입력 오류",
+                description: "비밀번호를 4자리 이상 입력해주세요.",
+            });
+            return;
+        }
+
         setIsLoading(true);
         try {
             const res = await apiRequest("/api/hiq/login", {
                 method: "POST",
-                body: { phone, storeSlug },
+                body: { phone, storeSlug, password: requiresPassword ? password : undefined },
             });
+
+            if (res.requiresPassword) {
+                setRequiresPassword(true);
+                setMemberName(res.memberName);
+                setIsLoading(false);
+                return;
+            }
 
             if (res.isNew) {
                 toast({
@@ -75,12 +94,13 @@ export default function Landing() {
             }
             setTimeout(() => setLocation(res.redirectTo), 500);
 
-        } catch (error) {
+        } catch (error: any) {
             toast({
                 variant: "destructive",
                 title: "접속 실패",
-                description: "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
+                description: error.message || "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
             });
+            if (requiresPassword) setPassword("");
         } finally {
             setIsLoading(false);
         }
@@ -90,14 +110,20 @@ export default function Landing() {
         return (
             <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
                 <div className="text-white/20 font-black text-4xl animate-pulse tracking-tighter">RANKUE</div>
-                <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div
-                        initial={{ x: "-100%" }}
-                        animate={{ x: "100%" }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                        className="w-1/2 h-full bg-indigo-500"
-                    />
-                </div>
+                {brandError ? (
+                    <div className="text-red-500 font-bold bg-white/10 p-4 rounded-xl">
+                        Error: {brandError.message}
+                    </div>
+                ) : (
+                    <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                            initial={{ x: "-100%" }}
+                            animate={{ x: "100%" }}
+                            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                            className="w-1/2 h-full bg-indigo-500"
+                        />
+                    </div>
+                )}
             </div>
         );
     }
@@ -129,7 +155,7 @@ export default function Landing() {
                         <div className="flex items-center justify-center gap-2 mt-3">
                             <span className="h-[1px] w-4 bg-white/10" />
                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40">
-                                {brand?.subText || 'Premium Lounge'}
+                                {requiresPassword ? `${memberName} 확인 중` : (brand?.subText || 'Premium Lounge')}
                             </p>
                             <span className="h-[1px] w-4 bg-white/10" />
                         </div>
@@ -140,40 +166,58 @@ export default function Landing() {
                 <div className="px-8 py-10 flex flex-col items-center">
                     <div className="w-full relative group">
                         <input
-                            type="tel"
+                            type={requiresPassword ? "password" : "tel"}
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            autoComplete="tel"
-                            placeholder="휴대폰 번호 입력"
-                            value={formattedPhone(phone)}
-                            onChange={handlePhoneChange}
-                            className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-3xl font-black tracking-[0.2em] text-white placeholder:text-white/10 py-4 transition-all outline-none"
+                            autoComplete={requiresPassword ? "current-password" : "tel-national"}
+                            placeholder={requiresPassword ? "PIN 번호" : "휴대폰 번호 입력"}
+                            value={requiresPassword ? password : formattedPhone(phone)}
+                            onChange={requiresPassword
+                                ? (e) => setPassword(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))
+                                : handlePhoneChange}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !isLoading && (requiresPassword ? password.length >= 4 : phone.length >= 10)) {
+                                    handleStart();
+                                }
+                            }}
+                            className={`w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-3xl font-black text-white placeholder:text-white/10 py-4 transition-all outline-none ${requiresPassword ? "tracking-[0.5em]" : "tracking-[0.2em]"}`}
+                            autoFocus={requiresPassword}
                         />
                         {/* Tooltip hint */}
                         <p className="text-center text-[10px] text-white/20 mt-4 font-bold tracking-widest uppercase">
-                            Enter your phone number to login
+                            {requiresPassword ? "비밀번호를 입력하여 본인을 확인하세요" : "휴대폰 번호로 입장하세요"}
                         </p>
+
+                        {requiresPassword && (
+                            <button
+                                onClick={() => { setRequiresPassword(false); setPassword(""); }}
+                                className="w-full mt-6 text-[10px] font-black text-white/20 uppercase tracking-widest hover:text-[#10b981] transition-all active:scale-95 text-center"
+                            >
+                                [ 번호 다시 입력 (Back) ]
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 {/* Enter Button */}
                 <div className="px-8 pb-8">
                     <motion.button
-                        disabled={phone.length < 10 || isLoading}
+                        disabled={(requiresPassword ? password.length < 4 : phone.length < 10) || isLoading}
                         onClick={handleStart}
+                        title={requiresPassword ? "확인 및 입장" : "입장하기"}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         className="w-full h-18 py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-20 shadow-[0_20px_40px_rgba(0,0,0,0.4)] relative overflow-hidden group"
                         style={{
-                            background: phone.length === 11 ? "#10b981" : "#1a1a1a",
-                            color: phone.length === 11 ? "#000" : "#555"
+                            background: (requiresPassword ? password.length >= 4 : phone.length === 11) ? "#10b981" : "#1a1a1a",
+                            color: (requiresPassword ? password.length >= 4 : phone.length === 11) ? "#000" : "#555"
                         }}
                     >
                         {isLoading ? (
                             <div className="w-6 h-6 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                         ) : (
                             <>
-                                <span>입장하기</span>
+                                <span>{requiresPassword ? "확인 및 입장" : "입장하기"}</span>
                                 <LucideChevronRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
                             </>
                         )}

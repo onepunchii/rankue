@@ -15,9 +15,9 @@ import { useQuery } from "@tanstack/react-query";
 
 const STEPS = [
     { id: "personal", title: "본인 확인", desc: "당구장에서 사용할 이름을 알려주세요." },
+    { id: "password", title: "비밀번호 설정", desc: "내 점수를 보호하기 위해 비밀번호를 설정합니다." },
     { id: "gender", title: "성별 선택", desc: "성별에 맞는 랭킹 시스템이 적용됩니다." },
     { id: "birth", title: "출생년도", desc: "연령별 랭킹 산정에 활용됩니다." },
-    { id: "score", title: "실력 입력", desc: "평소 치시는 점수(수지)를 입력해주세요." },
     { id: "terms", title: "약관 동의", desc: "마지막 단계입니다!" }
 ];
 
@@ -56,11 +56,12 @@ export default function HiqRegister() {
             phone: phoneFromQuery,
             storeId: storeIdFromQuery,
             name: "",
+            password: "", // Default
             birthYear: 1980,
             gender: "male",
-            handi3c: 15,
-            handi4c: 15,
-            average: "0.5",
+            handi3c: 0,
+            handi4c: 0,
+            average: "0.000",
             marketingAgree: false
         },
         mode: "onChange"
@@ -216,6 +217,31 @@ export default function HiqRegister() {
 
                         {currentStep === 1 && (
                             <motion.div
+                                key="step1" // Password Step
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                className="space-y-4"
+                            >
+                                <div className="space-y-4">
+                                    <Label className="text-sm font-bold text-white/40 uppercase tracking-wider">비밀번호 (4자리 이상)</Label>
+                                    <input
+                                        type="password"
+                                        {...register("password")}
+                                        placeholder="비밀번호 입력"
+                                        autoFocus
+                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-3xl font-black tracking-[0.1em] text-white placeholder:text-white/10 py-4 transition-all outline-none"
+                                    />
+                                    {/* Warn if pwd is too short, but usually we just disable 'Next' */}
+                                    {formData.password && formData.password.length < 4 && (
+                                        <p className="text-red-400 text-sm font-bold text-center">4자리 이상 입력해주세요.</p>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {currentStep === 2 && (
+                            <motion.div
                                 key="step1"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -253,7 +279,7 @@ export default function HiqRegister() {
                             </motion.div>
                         )}
 
-                        {currentStep === 2 && (
+                        {currentStep === 3 && (
                             <motion.div
                                 key="step2"
                                 initial={{ opacity: 0, y: 20 }}
@@ -283,77 +309,7 @@ export default function HiqRegister() {
                             </motion.div>
                         )}
 
-                        {currentStep === 3 && (
-                            <motion.div
-                                key="step3"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                className="space-y-10"
-                            >
-                                <div className="space-y-4">
-                                    <Label className="text-sm font-bold text-white/40 tracking-wider uppercase flex justify-between">
-                                        <span>3구 수지</span>
-                                        <span className="text-white">{formData.handi3c} 점</span>
-                                    </Label>
-                                    <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-                                        {[10, 15, 20, 25, 30, 35, 40].map(val => (
-                                            <Button
-                                                key={val}
-                                                onClick={() => setValue("handi3c", val)}
-                                                variant={formData.handi3c === val ? "default" : "outline"}
-                                                className="flex-none px-5 h-12 text-base rounded-full transition-all"
-                                                style={{
-                                                    backgroundColor: formData.handi3c === val ? "#10b981" : "rgba(255,255,255,0.05)",
-                                                    color: formData.handi3c === val ? "#000" : "rgba(255,255,255,0.4)",
-                                                    border: "none"
-                                                }}
-                                            >
-                                                {val}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                    <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-4xl font-black py-4 transition-all outline-none text-white"
-                                        value={formData.handi3c ?? 0}
-                                        onChange={(e) => setValue("handi3c", parseInt(e.target.value) || 0)}
-                                    />
-                                </div>
 
-                                <div className="space-y-4">
-                                    <Label className="text-sm font-bold text-white/40 tracking-wider uppercase flex justify-between">
-                                        <span>4구 수지</span>
-                                        <span className="text-white">{formData.handi4c} 점</span>
-                                    </Label>
-                                    <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-                                        {[8, 10, 12, 15, 20, 25, 30, 40, 50].map(val => (
-                                            <Button
-                                                key={val}
-                                                onClick={() => setValue("handi4c", val)}
-                                                variant={formData.handi4c === val ? "default" : "outline"}
-                                                className="flex-none px-5 h-12 text-base rounded-full transition-all"
-                                                style={{
-                                                    backgroundColor: formData.handi4c === val ? "#10b981" : "rgba(255,255,255,0.05)",
-                                                    color: formData.handi4c === val ? "#000" : "rgba(255,255,255,0.4)",
-                                                    border: "none"
-                                                }}
-                                            >
-                                                {val}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                    <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-4xl font-black py-4 transition-all outline-none text-white"
-                                        value={formData.handi4c ?? 0}
-                                        onChange={(e) => setValue("handi4c", parseInt(e.target.value) || 0)}
-                                    />
-                                </div>
-                            </motion.div>
-                        )}
 
                         {currentStep === 4 && (
                             <motion.div
@@ -420,14 +376,18 @@ export default function HiqRegister() {
                             {isSubmitting ? "처리 중..." : "가입 완료"}
                         </Button>
                     ) : (
+
                         <Button
                             onClick={nextStep}
-                            disabled={currentStep === 0 && !formData.name}
+                            disabled={
+                                (currentStep === 0 && !(formData as any).name) ||
+                                (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4))
+                            }
                             title="다음 단계"
                             className="flex-[2] h-16 text-xl font-black rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all outline-none"
                             style={{
-                                backgroundColor: (currentStep === 0 && !formData.name) ? "#1a1a1a" : "#10b981",
-                                color: (currentStep === 0 && !formData.name) ? "#555" : "#000"
+                                backgroundColor: ((currentStep === 0 && !(formData as any).name) || (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4))) ? "#1a1a1a" : "#10b981",
+                                color: ((currentStep === 0 && !(formData as any).name) || (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4))) ? "#555" : "#000"
                             }}
                         >
                             다음 <LucideChevronRight className="w-6 h-6" />

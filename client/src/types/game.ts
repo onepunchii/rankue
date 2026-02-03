@@ -1,0 +1,28 @@
+export type GameState = {
+    p1Score: number;
+    p2Score: number;
+    p3Score: number;
+    p4Score: number;
+    p1FinishScore: number;
+    p2FinishScore: number;
+    p3FinishScore: number;
+    p4FinishScore: number;
+    innings: number;
+    p1FinishInnings: number;
+    p2FinishInnings: number;
+    p3FinishInnings: number;
+    p4FinishInnings: number;
+    p1Run: number;
+    p2Run: number;
+    p3Run: number;
+    p4Run: number;
+    p1HighRun: number;
+    p2HighRun: number;
+    p3HighRun: number;
+    p4HighRun: number;
+    currentTurn: 1 | 2 | 3 | 4;
+    p1Innings: number[];
+    p2Innings: number[];
+    p3Innings: number[];
+    p4Innings: number[];
+};

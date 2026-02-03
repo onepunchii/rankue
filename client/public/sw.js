@@ -40,12 +40,9 @@ self.addEventListener('fetch', (event) => {
                     return response;
                 }
                 return fetch(event.request).catch((error) => {
-                    console.warn('[sw.js] Network fetch failed for', event.request.url, error);
-                    // Return a 408 or similar if needed, or just let the browser handle the failure gracefully
-                    // throwing here is what causes "Uncaught (in promise)" if not handled, 
-                    // but we are inside evaluate respondWith.
-                    // Returning a safe specific offline response might be better for images/etc.
-                    throw error;
+                    console.warn('[sw.js] Network fetch failed for', event.request.url);
+                    // Return a fake 404 response to prevent "Uncaught (in promise)" error in console
+                    return new Response(null, { status: 404, statusText: 'Network Unavailable' });
                 });
             })
     );

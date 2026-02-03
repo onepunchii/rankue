@@ -16,10 +16,13 @@
       </feMerge>
     </filter>
   </defs>
+
+  <!-- Background Base -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#grad1)" filter="url(#shadow)" />
   
-  <rect x="32" y="32" width="448" height="448" rx="120" fill="url(#grad1)" filter="url(#shadow)" />
-  
-  <text x="50%" y="50%" font-family="'Inter', sans-serif" font-weight="900" font-size="280" fill="white" text-anchor="middle" dy=".35em">R</text>
-  
-  <path d="M330 330 L380 280 M330 330 L300 300" stroke="white" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+  <!-- Content Container -->
+  <g>
+    <!-- Large Premium R -->
+    <text x="50%" y="52%" font-family="'Inter', sans-serif" font-weight="900" font-size="320" fill="white" text-anchor="middle" dy=".35em" letter-spacing="-5" style="filter: drop-shadow(0px 10px 20px rgba(0,0,0,0.3));">R</text>
+  </g>
 </svg>
