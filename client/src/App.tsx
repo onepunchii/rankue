@@ -38,7 +38,56 @@ import CreateTournament from "@/pages/partner/create-tournament";
 import PartnerSubscription from "@/pages/partner/subscription";
 import AdminDashboard from "@/pages/admin/dashboard";
 
+import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+
 function Router() {
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const handleMessage = async (event: any) => {
+      try {
+        // 웹뷰 메시지 파싱
+        const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+        if (message?.type === 'FCM_TOKEN') {
+          const token = message?.payload?.token;
+          if (token) {
+            console.log("📲 FCM Token Received:", token);
+
+            // 토큰 저장 (나중에 사용할 수 있도록)
+            localStorage.setItem('fcm_token', token);
+
+            // 알림 표시
+            toast({
+              title: "🔔 푸시 알림 준비 완료",
+              description: "토큰이 클립보드에 복사되었습니다.",
+              duration: 5000,
+            });
+
+            // 클립보드 복사
+            try {
+              await navigator.clipboard.writeText(token);
+            } catch (err) {
+              console.error("클립보드 복사 실패:", err);
+            }
+          }
+        }
+      } catch (e) {
+        // 무시 (다른 메시지일 수 있음)
+      }
+    };
+
+    // 이벤트 리스너 등록
+    window.addEventListener("message", handleMessage);
+    document.addEventListener("message", handleMessage); // 일부 환경 호환성
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      document.removeEventListener("message", handleMessage);
+    };
+  }, []);
+
   return (
     <Switch>
       {/* 메인 랜딩 페이지 */}
