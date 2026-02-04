@@ -71,7 +71,7 @@ const useUserAgent = () => {
             try {
                 const systemUA = await Constants.getWebViewUserAgentAsync();
                 setUserAgent(`${systemUA} RankueApp`);
-            } catch (_) {
+            } catch {
                 setUserAgent('Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.50 Mobile Safari/537.36 RankueApp');
             }
         };
@@ -80,13 +80,73 @@ const useUserAgent = () => {
     return userAgent;
 };
 
+// 💎 New Hook: Handle Deep Linking & Notification Events
+interface NotificationData {
+    category?: 'GOLF' | 'BILLIARDS';
+    type?: 'CHAT' | 'NOTICE' | 'MEETING' | 'RANKING';
+    params?: {
+        crewId?: string | number;
+        tab?: string;
+        meetingId?: string | number;
+    };
+}
+
+const useNotificationListener = (sendToWeb: (type: string, payload: any) => void) => {
+    const notificationListener = useRef<Notifications.Subscription | null>(null);
+    const responseListener = useRef<Notifications.Subscription | null>(null);
+
+    useEffect(() => {
+        // 1. App in Foreground: Show custom alert/toast
+        notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+            const data = notification.request.content.data as NotificationData;
+            const title = notification.request.content.title;
+            const body = notification.request.content.body;
+
+            const categoryEmoji = data.category === 'GOLF' ? '⛳' : '🎱';
+            let formattedTitle = `${categoryEmoji} ${title}`;
+
+            if (data.type === 'CHAT') {
+                formattedTitle = `${categoryEmoji} [채팅] ${title}`;
+            }
+
+            Alert.alert(formattedTitle, body || '', [
+                {
+                    text: '보러가기',
+                    onPress: () => {
+                        if (data.params?.crewId) {
+                            const path = `/crew/${data.params.crewId}/${(data.params.tab || 'home').toLowerCase()}`;
+                            sendToWeb('NAVIGATE', { path, params: data.params });
+                        }
+                    }
+                },
+                { text: '닫기', style: 'cancel' }
+            ]);
+        });
+
+        // 2. Deep Linking: When user taps the notification
+        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+            const data = response.notification.request.content.data as NotificationData;
+            if (data?.params?.crewId) {
+                const tab = (data.params.tab || 'home').toLowerCase();
+                const path = `/crew/${data.params.crewId}/${tab}`;
+                console.log('🚀 [DeepLink] Routing to:', path);
+                sendToWeb('NAVIGATE', { path, params: data.params });
+            }
+        });
+
+        return () => {
+            if (notificationListener.current) notificationListener.current.remove();
+            if (responseListener.current) responseListener.current.remove();
+        };
+    }, [sendToWeb]);
+};
+
 // --- Main App ---
 
 export default function App() {
     const webViewRef = useRef<WebView>(null);
     const [initialScript, setInitialScript] = useState('');
 
-    // States
     const [isAppReady, setIsAppReady] = useState(false);
     const [isWebViewLoaded, setIsWebViewLoaded] = useState(false);
     const [canGoBack, setCanGoBack] = useState(false);
@@ -97,7 +157,6 @@ export default function App() {
     const fadeAnim = useRef(new Animated.Value(1)).current;
     const [isSplashVisible, setIsSplashVisible] = useState(true);
 
-    // Camera State
     const [isScanning, setIsScanning] = useState(false);
     const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
@@ -107,7 +166,8 @@ export default function App() {
         webViewRef.current?.postMessage(message);
     }, []);
 
-    // --- Handlers ---
+    // Push Listener Integration
+    useNotificationListener(sendToWeb);
 
     const handleLocation = async () => {
         try {
@@ -121,7 +181,7 @@ export default function App() {
                 lat: location.coords.latitude,
                 lng: location.coords.longitude
             });
-        } catch (_) {
+        } catch {
             sendToWeb('LOCATION_ERROR', { message: 'Failed to get location' });
         }
     };
@@ -140,9 +200,9 @@ export default function App() {
     const handleShare = async (payload: { title?: string, url?: string, message?: string }) => {
         try {
             const { title, url, message } = payload;
-            const shareMessage = message ? `${message} ${url || ''}` : url;
-            await Share.share({ title: title || 'Rankue', message: shareMessage || '', url: url });
-        } catch (_) { }
+            const shareMessage = message ? `${message} ${url || ''}` : (url || '');
+            await Share.share({ title: title || 'Rankue', message: shareMessage, url: url });
+        } catch { }
     };
 
     const handleBarCodeScanned = ({ type, data }: { type: string, data: string }) => {
@@ -153,24 +213,20 @@ export default function App() {
         sendToWeb('QR_SCANNED', { data, type });
     };
 
-    // --- Initialization ---
-
-    // 1. Android Navigation Bar
     useEffect(() => {
         async function configureAndroidNavigationBar() {
             if (Platform.OS === 'android') {
                 try {
-                    // 배경을 검정색으로 설정 및 상대적 위치 강제 (비침 방지)
                     await NavigationBar.setPositionAsync('relative');
                     await NavigationBar.setBackgroundColorAsync("#000000");
                     await NavigationBar.setButtonStyleAsync("light");
-                } catch (_) { }
+                    await NavigationBar.setVisibilityAsync('visible');
+                } catch { }
             }
         }
         configureAndroidNavigationBar();
     }, []);
 
-    // 2. Load Resources
     useEffect(() => {
         async function loadResources() {
             try {
@@ -179,7 +235,7 @@ export default function App() {
                     const script = `try { window.localStorage.setItem('hiq_auth_token', '${token}'); } catch (e) {} true;`;
                     setInitialScript(script);
                 }
-            } catch (_) {
+            } catch {
             } finally {
                 setIsAppReady(true);
             }
@@ -187,7 +243,6 @@ export default function App() {
         loadResources();
     }, []);
 
-    // 3. Splash logic
     useEffect(() => {
         if (isAppReady && isWebViewLoaded) {
             const hideSplash = async () => {
@@ -201,7 +256,6 @@ export default function App() {
         }
     }, [isAppReady, isWebViewLoaded, expoPushToken, sendToWeb, fadeAnim]);
 
-    // Back Handler
     useEffect(() => {
         const onBackPress = () => {
             if (isScanning) {
@@ -218,7 +272,6 @@ export default function App() {
         return () => subscription.remove();
     }, [isScanning, canGoBack]);
 
-    // Bridge Listener
     const handleMessage = async (event: any) => {
         try {
             const message = JSON.parse(event.nativeEvent.data);
@@ -252,17 +305,17 @@ export default function App() {
                     setIsScanning(true);
                     break;
             }
-        } catch (_) { }
+        } catch { }
     };
 
     if (!isAppReady) return null;
 
     return (
         <SafeAreaProvider>
-            {/* 핵심 수정: edges에 'bottom' 추가하여 시스템 바 영역과 확실히 분리 */}
+            {/* 🛡️ CRITICAL: 'bottom' edge must be included to prevent content from bleeding behind the Android navigation bar, 
+                especially since Android 15+ enforces edge-to-edge mode by default. */}
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
                 <StatusBar barStyle="light-content" backgroundColor="#000" />
-
                 <WebView
                     ref={webViewRef}
                     source={{ uri: WEB_URL }}
@@ -278,7 +331,6 @@ export default function App() {
                     androidLayerType="hardware"
                     overScrollMode="never"
                 />
-
                 {isScanning && (
                     <View style={styles.cameraContainer}>
                         <CameraView
@@ -307,7 +359,6 @@ export default function App() {
                         </CameraView>
                     </View>
                 )}
-
                 {isSplashVisible && (
                     <Animated.View style={[styles.splashContainer, { opacity: fadeAnim }]}>
                         <Image source={require('./assets/images/splash-icon.png')} style={styles.splashImage} resizeMode="contain" />

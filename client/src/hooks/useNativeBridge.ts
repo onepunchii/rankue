@@ -30,9 +30,15 @@ export function useNativeBridge() {
     const [scannedQr, setScannedQr] = useState<string | null>(null);
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && window.ReactNativeWebView) {
-            setIsApp(true);
-        }
+        const checkIsApp = () => {
+            const isWebView = typeof window !== 'undefined' && !!window.ReactNativeWebView;
+            const isCustomUA = typeof navigator !== 'undefined' && navigator.userAgent.includes('RankueApp');
+            if (isWebView || isCustomUA) {
+                setIsApp(true);
+            }
+        };
+
+        checkIsApp();
 
         const handleNativeMessage = (event: any) => {
             try {

@@ -1,0 +1,25 @@
+{
+    "cli": {
+        "appVersionSource": "remote"
+    },
+    "build": {
+        "development": {
+            "developmentClient": true,
+            "distribution": "internal"
+        },
+        "preview": {
+            "distribution": "internal",
+            "android": {
+                "buildType": "apk"
+            }
+        },
+        "production": {
+            "android": {
+                "gradleCommand": ":app:assembleRelease",
+                "cache": {
+                    "disabled": false
+                }
+            }
+        }
+    }
+}

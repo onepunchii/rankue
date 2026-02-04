@@ -32,6 +32,7 @@ export const profiles = pgTable("profiles", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   currentSport: text("current_sport", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
+  pushToken: text("push_token"), // Expo Push Token column added
 });
 
 // 2. 당구장 (Club/Store) - SaaS Tenant
@@ -789,3 +790,21 @@ export const hiqSettlementParticipantsRelations = relations(hiqSettlementPartici
 export const insertHiqCourseHoleInfoSchema = createInsertSchema(hiqCourseHoleInfo).omit({ id: true, updatedAt: true });
 export type HiqCourseHoleInfo = typeof hiqCourseHoleInfo.$inferSelect;
 export type InsertHiqCourseHoleInfo = z.infer<typeof insertHiqCourseHoleInfoSchema>;
+
+// 12. 알림함 (Notification Inbox)
+export const hiqNotifications = pgTable("hiq_notifications", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  category: text("category"), // BILLIARDS, GOLF
+  type: text("type"), // CHAT, NOTICE, MEETING, RANKING
+  params: jsonb("params"), // JSON structure for deep linking
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertHiqNotificationSchema = createInsertSchema(hiqNotifications).omit({ id: true, createdAt: true });
+export type HiqNotification = typeof hiqNotifications.$inferSelect;
+export type InsertHiqNotification = z.infer<typeof insertHiqNotificationSchema>;
+

@@ -6,7 +6,8 @@ import type {
     InsertHiqSettlement, InsertHiqSettlementItem, InsertHiqSettlementParticipant,
     HiqCrewActivity, HiqCrewActivityParticipant,
     GolfBooking, InsertGolfBooking,
-    GolfJoin, InsertGolfJoin
+    GolfJoin, InsertGolfJoin,
+    HiqNotification, InsertHiqNotification
 } from "../../shared/schema.js";
 
 export interface IStorage {
@@ -172,4 +173,10 @@ export interface IStorage {
     joinGolfMatchSession(pin: string, memberId: string, name: string): Promise<any>;
     updateGolfMatchScore(id: string, holeNo: number, playersData: any[]): Promise<any>;
     finishGolfMatchSession(id: string): Promise<any>;
+
+    // --- Notification Inbox ---
+    getNotifications(memberId: string): Promise<HiqNotification[]>;
+    createNotification(data: InsertHiqNotification): Promise<HiqNotification>;
+    markNotificationAsRead(id: string, memberId: string): Promise<void>;
+    deleteNotification(id: string, memberId: string): Promise<void>;
 }

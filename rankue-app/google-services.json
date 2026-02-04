@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "103447981482",
+    "project_id": "rankue-a0493",
+    "storage_bucket": "rankue-a0493.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:103447981482:android:c2e5bb23b045c0dabc4fd3",
+        "android_client_info": {
+          "package_name": "com.rankue.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPggcQuV2Z3BXGzvhGo-Msvp_ajuLoYLQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

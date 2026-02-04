@@ -4,6 +4,7 @@ import { hiqService } from "../services/hiqService.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { insertHiqMemberSchema, insertHiqCrewSchema, insertHiqCrewActivitySchema, insertHiqCrewPostSchema, insertHiqSettlementSchema, insertGolfBookingSchema, GolfBooking, insertGolfJoinSchema, GolfJoin } from "../../shared/schema.js";
 import { sendSuccess, sendError } from "../utils/response.js";
+import { notificationService } from "../services/notificationService.js";
 
 const router = Router();
 
@@ -339,6 +340,30 @@ router.post("/crews/:id/chats", async (req, res) => {
             crewId: req.params.id,
             senderId: userId
         });
+
+        // Background: Send notification to all crew members except sender
+        try {
+            const crewData = await storage.getCrew(req.params.id);
+            if (crewData) {
+                const membersToNotify = crewData.members.filter((m: any) => m.member.id !== userId);
+                const sender = crewData.members.find((m: any) => m.member.id === userId);
+                const senderName = sender?.member.name || "누군가";
+
+                for (const m of membersToNotify) {
+                    notificationService.sendAndSaveNotification({
+                        memberId: m.member.id,
+                        title: `💬 [${crewData.crew.name}] 새 메시지`,
+                        body: `${senderName}: ${chat.message}`,
+                        category: crewData.crew.sportCategory || "BILLIARDS",
+                        type: "CHAT",
+                        params: { crewId: req.params.id, tab: "Chat" }
+                    }).catch(err => console.error(`[ChatNotif] Failed for ${m.member.id}:`, err));
+                }
+            }
+        } catch (notifErr) {
+            console.error("[ChatNotif] Error getting crew members:", notifErr);
+        }
+
         return sendSuccess(res, chat);
     } catch (e: any) {
         return sendError(res, 500, e.message || "메시지 전송 실패");
@@ -1579,6 +1604,91 @@ router.post("/golf/match/:id/finish", async (req, res) => {
         return sendSuccess(res, session);
     } catch (e: any) {
         return sendError(res, 500, e.message);
+    }
+});
+
+// POST /api/hiq/push-token - Save/Update Expo Push Token
+router.post("/push-token", async (req, res) => {
+    try {
+        const userId = req.cookies.hiq_user_id;
+        const { token } = req.body;
+
+        if (!userId) return sendError(res, 401, "로그인이 필요합니다");
+        if (!token) return sendError(res, 400, "토큰이 없습니다");
+
+        // token이 프로필 스키마에 추가되었으므로 업데이트 가능
+        await storage.updateProfile(userId, { pushToken: token } as any);
+        console.log(`[Push] Token updated for user ${userId}`);
+
+        return sendSuccess(res, { success: true });
+    } catch (error: any) {
+        console.error("[Push] Update failed:", error);
+        return sendError(res, 500, "토큰 저장 실패");
+    }
+});
+
+// --- 알림함 관련 API ---
+
+// GET /api/hiq/notifications - 내 알림 목록 조회
+router.get("/notifications", async (req, res) => {
+    try {
+        const userId = req.cookies.hiq_user_id;
+        if (!userId) return sendError(res, 401, "로그인이 필요합니다");
+
+        const notifications = await storage.getNotifications(userId);
+        return sendSuccess(res, notifications);
+    } catch (e: any) {
+        return sendError(res, 500, e.message || "알림 조회 실패");
+    }
+});
+
+// PATCH /api/hiq/notifications/:id/read - 알림 읽음 처리
+router.patch("/notifications/:id/read", async (req, res) => {
+    try {
+        const userId = req.cookies.hiq_user_id;
+        if (!userId) return sendError(res, 401, "로그인이 필요합니다");
+
+        await storage.markNotificationAsRead(req.params.id, userId);
+        return sendSuccess(res, { success: true });
+    } catch (e: any) {
+        return sendError(res, 500, e.message || "읽음 처리 실패");
+    }
+});
+
+// DELETE /api/hiq/notifications/:id - 알림 삭제
+router.delete("/notifications/:id", async (req, res) => {
+    try {
+        const userId = req.cookies.hiq_user_id;
+        if (!userId) return sendError(res, 401, "로그인이 필요합니다");
+
+        await storage.deleteNotification(req.params.id, userId);
+        return sendSuccess(res, { success: true });
+    } catch (e: any) {
+        return sendError(res, 500, e.message || "알림 삭제 실패");
+    }
+});
+
+// POST /api/hiq/test-notification - Send a test push and save to DB
+router.post("/test-notification", async (req, res) => {
+    try {
+        const userId = req.cookies.hiq_user_id;
+        if (!userId) return sendError(res, 401, "로그인이 필요합니다");
+
+        const { title, body, category, type, params } = req.body;
+
+        await notificationService.sendAndSaveNotification({
+            memberId: userId,
+            title: title || "🔔 테스트 알림",
+            body: body || "알림함 기능 테스트입니다.",
+            category: category || "GOLF",
+            type: type || "NOTICE",
+            params: params || {}
+        });
+
+        return sendSuccess(res, { success: true, message: "알림이 발송 및 저장되었습니다." });
+    } catch (error: any) {
+        console.error("[TestPush] Failed:", error);
+        return sendError(res, 500, error.message || "알림 발송 실패");
     }
 });
 

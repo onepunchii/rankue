@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { hiqStores, hiqMembers, hiqGames, hiqVisitLogs, hiqGameHistory, hiqFriendships, hiqInvites, hiqSuccessfulShots, profiles, hiqTournaments, hiqCrews, hiqCrewMembers, hiqCrewActivities, hiqCrewActivityParticipants, hiqCrewPosts, hiqCrewComments, hiqCrewLikes, hiqCrewPhotos, hiqCrewChats, partnerLeads, notices, hiqCrewPhotoLikes, hiqCrewPhotoComments, hiqSettlements, hiqSettlementItems, hiqSettlementParticipants, golfBookings, golfJoins, hiqCourseHoleInfo, golfMatchSessions } from "../../shared/schema.js";
+import { hiqStores, hiqMembers, hiqGames, hiqVisitLogs, hiqGameHistory, hiqFriendships, hiqInvites, hiqSuccessfulShots, profiles, hiqTournaments, hiqCrews, hiqCrewMembers, hiqCrewActivities, hiqCrewActivityParticipants, hiqCrewPosts, hiqCrewComments, hiqCrewLikes, hiqCrewPhotos, hiqCrewChats, partnerLeads, notices, hiqCrewPhotoLikes, hiqCrewPhotoComments, hiqSettlements, hiqSettlementItems, hiqSettlementParticipants, golfBookings, golfJoins, hiqCourseHoleInfo, golfMatchSessions, hiqNotifications } from "../../shared/schema.js";
 import type {
     HiqStore, InsertHiqStore, HiqMember, InsertHiqMember, HiqGame, InsertHiqGame, HiqGameHistory, InsertHiqGameHistory,
     HiqFriendship, InsertHiqSuccessfulShot, HiqSuccessfulShot, Profile, HiqTournament, InsertHiqTournament, InsertHiqCrew, HiqCrew,
@@ -9,7 +9,8 @@ import type {
     GolfBooking, InsertGolfBooking,
     GolfJoin, InsertGolfJoin,
     HiqCourseHoleInfo, InsertHiqCourseHoleInfo,
-    GolfMatchSession, InsertGolfMatchSession
+    GolfMatchSession, InsertGolfMatchSession,
+    HiqNotification, InsertHiqNotification
 } from "../../shared/schema.js";
 import { eq, desc, asc, and, or, sql, gt, gte, isNull, inArray, like, lte } from "drizzle-orm";
 import { IStorage } from "./storage_interface.js";
@@ -1909,5 +1910,30 @@ export class HiqStorage implements IStorage {
         if (currentCourse.pars.length > 0) parsed.courses.push(currentCourse);
 
         return parsed;
+    }
+
+    // --- Notification Inbox ---
+    async getNotifications(memberId: string): Promise<HiqNotification[]> {
+        return await db.select()
+            .from(hiqNotifications)
+            .where(eq(hiqNotifications.memberId, memberId))
+            .orderBy(desc(hiqNotifications.createdAt))
+            .limit(50);
+    }
+
+    async createNotification(data: InsertHiqNotification): Promise<HiqNotification> {
+        const [notification] = await db.insert(hiqNotifications).values(data).returning();
+        return notification;
+    }
+
+    async markNotificationAsRead(id: string, memberId: string): Promise<void> {
+        await db.update(hiqNotifications)
+            .set({ isRead: true })
+            .where(and(eq(hiqNotifications.id, id), eq(hiqNotifications.memberId, memberId)));
+    }
+
+    async deleteNotification(id: string, memberId: string): Promise<void> {
+        await db.delete(hiqNotifications)
+            .where(and(eq(hiqNotifications.id, id), eq(hiqNotifications.memberId, memberId)));
     }
 }

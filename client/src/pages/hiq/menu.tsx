@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useSport } from "@/contexts/SportContext";
 import { getTier } from "@/lib/hiqUtils";
 import { InfoModal, InfoModalType } from "@/components/hiq/menu/InfoModal";
+import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
 
 export default function HiqMenu() {
     const [, setLocation] = useLocation();
@@ -32,6 +33,10 @@ export default function HiqMenu() {
 
     const [infoModal, setInfoModal] = useState<{ open: boolean, type: InfoModalType | null }>({ open: false, type: null });
     const openInfoModal = (type: InfoModalType) => setInfoModal({ open: true, type });
+
+    const [notifOpen, setNotifOpen] = useState(false);
+
+
 
     const { data: member } = useQuery<any>({
         queryKey: ["/api/hiq/me"],
@@ -131,9 +136,14 @@ export default function HiqMenu() {
                 <div className="flex flex-col">
                     <h1 className="text-3xl font-black tracking-tighter text-white">전체 메뉴</h1>
                     <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mt-0.5">Application Menu</span>
+
                 </div>
                 <div className="flex gap-3">
-                    <button title="알림" className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center backdrop-blur-md active:scale-95 transition-all">
+                    <button
+                        title="알림"
+                        onClick={() => setNotifOpen(true)}
+                        className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center backdrop-blur-md active:scale-95 transition-all"
+                    >
                         <LucideBell className="w-5 h-5 text-white/40" />
                     </button>
                     <button title="설정" className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center backdrop-blur-md active:scale-95 transition-all">
@@ -388,8 +398,12 @@ export default function HiqMenu() {
                 sport={currentSport as "BILLIARDS" | "GOLF"}
             />
 
+            <NotificationInbox
+                open={notifOpen}
+                onClose={() => setNotifOpen(false)}
+            />
+
             <HiqNavigation />
         </div>
     );
 }
-

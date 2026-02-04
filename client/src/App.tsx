@@ -1,8 +1,10 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, apiRequest } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
+import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 // HiQ Pages
 import HiqLanding from "@/pages/hiq/landing";
@@ -38,55 +40,63 @@ import CreateTournament from "@/pages/partner/create-tournament";
 import PartnerSubscription from "@/pages/partner/subscription";
 import AdminDashboard from "@/pages/admin/dashboard";
 
-import { useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { StoreProvider } from "./contexts/StoreContext";
+import { SportProvider } from "./contexts/SportContext";
 
-function Router() {
+function AppRoutes() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const handleMessage = async (event: any) => {
       try {
-        // 웹뷰 메시지 파싱
         const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        const { type, payload } = message || {};
 
-        if (message?.type === 'FCM_TOKEN') {
-          const token = message?.payload?.token;
+        if (type === 'FCM_TOKEN') {
+          const token = payload?.token;
           if (token) {
             console.log("📲 FCM Token Received:", token);
-
-            // 토큰 저장 (나중에 사용할 수 있도록)
             localStorage.setItem('fcm_token', token);
 
-            // 알림 표시
-            toast({
-              title: "🔔 푸시 알림 준비 완료",
-              description: "토큰이 클립보드에 복사되었습니다.",
-              duration: 5000,
-            });
-
             // 클립보드 복사
+            try { await navigator.clipboard.writeText(token); } catch { }
+
+            // 서버로 토큰 전송
             try {
-              await navigator.clipboard.writeText(token);
+              await apiRequest('/api/hiq/push-token', {
+                method: 'POST',
+                body: { token }
+              });
+              console.log("✅ 토큰 서버 저장 완료");
             } catch (err) {
-              console.error("클립보드 복사 실패:", err);
+              console.warn("⚠️ 토큰 서버 저장 실패:", err);
             }
           }
         }
+
+        // 🚀 Deep Linking Navigation Support
+        else if (type === 'NAVIGATE') {
+          if (payload?.path) {
+            console.log("🚀 Deep Link Navigation:", payload.path);
+            setLocation(payload.path);
+          }
+        }
+
       } catch (e) {
-        // 무시 (다른 메시지일 수 있음)
+        // JSON 파싱 에러 등 무시
       }
     };
 
-    // 이벤트 리스너 등록
+    // iOS/Android 및 Legacy WebView 대응
     window.addEventListener("message", handleMessage);
-    document.addEventListener("message", handleMessage); // 일부 환경 호환성
+    document.addEventListener("message", handleMessage as any);
 
     return () => {
       window.removeEventListener("message", handleMessage);
-      document.removeEventListener("message", handleMessage);
+      document.removeEventListener("message", handleMessage as any);
     };
-  }, []);
+  }, [toast, setLocation]);
 
   return (
     <Switch>
@@ -106,7 +116,6 @@ function Router() {
       <Route path="/golf/game/new" component={GolfNewGame} />
       <Route path="/golf/game/:id" component={GolfScorecard} />
       <Route path="/golf/game/:id/result" component={GameResult} />
-      {/* <Route path="/golf/booking" component={GolfBookingAndJoin} /> REMOVED */}
       <Route path="/golf/passport" component={GolfPassport} />
       <Route path="/golf/membership" component={MembershipExchange} />
       <Route path="/golf/membership/:id" component={MembershipDetail} />
@@ -125,12 +134,10 @@ function Router() {
       <Route path="/partner/dashboard" component={PartnerDashboard} />
       <Route path="/partner/settings" component={PartnerSettings} />
       <Route path="/partner/create-tournament" component={CreateTournament} />
-      <Route path="/partner/settings" component={PartnerSettings} />
-      <Route path="/partner/create-tournament" component={CreateTournament} />
       <Route path="/partner/subscription" component={PartnerSubscription} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
 
-      {/* 기존 /hiq 링크로 접속해도 작동하도록 호환성 유지 (선택사항) */}
+      {/* 호환성 라우트 */}
       <Route path="/hiq" component={HiqLanding} />
       <Route path="/hiq/dashboard" component={HiqDashboard} />
       <Route path="/online-game" component={HiqOnlineGame} />
@@ -141,15 +148,12 @@ function Router() {
   );
 }
 
-import { StoreProvider } from "./contexts/StoreContext";
-import { SportProvider } from "./contexts/SportContext";
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <StoreProvider>
         <SportProvider>
-          <Router />
+          <AppRoutes />
           <Toaster />
         </SportProvider>
       </StoreProvider>
