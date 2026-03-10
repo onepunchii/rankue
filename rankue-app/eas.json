@@ -15,10 +15,7 @@
         },
         "production": {
             "android": {
-                "gradleCommand": ":app:assembleRelease",
-                "cache": {
-                    "disabled": false
-                }
+                "buildType": "app-bundle"
             }
         }
     }

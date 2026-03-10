@@ -11,8 +11,11 @@ import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as NavigationBar from 'expo-navigation-bar';
+import * as Speech from 'expo-speech';
+import * as ScreenOrientation from 'expo-screen-orientation';
 
-const WEB_URL = 'https://rankue-pi.vercel.app';
+const WEB_URL = 'https://www.rankue.co.kr';
+
 
 SplashScreen.preventAutoHideAsync();
 
@@ -214,17 +217,27 @@ export default function App() {
     };
 
     useEffect(() => {
-        async function configureAndroidNavigationBar() {
+        async function configureSystemBars() {
             if (Platform.OS === 'android') {
                 try {
-                    await NavigationBar.setPositionAsync('relative');
+                    // 배경을 검정색으로 설정하여 웹뷰와 분리
                     await NavigationBar.setBackgroundColorAsync("#000000");
+                    // 아이콘 색상은 밝게
                     await NavigationBar.setButtonStyleAsync("light");
-                    await NavigationBar.setVisibilityAsync('visible');
-                } catch { }
+                    // 항상 보이게 설정 (숨김 해제)
+                    await NavigationBar.setVisibilityAsync("visible");
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+            // 기본은 세로 모드 고정 (게임 화면 깨짐 방지)
+            try {
+                await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+            } catch (e) {
+                console.warn(e);
             }
         }
-        configureAndroidNavigationBar();
+        configureSystemBars();
     }, []);
 
     useEffect(() => {
@@ -274,6 +287,7 @@ export default function App() {
 
     const handleMessage = async (event: any) => {
         try {
+            console.log("📨 [Native] Message Received:", event.nativeEvent.data);
             const message = JSON.parse(event.nativeEvent.data);
             switch (message.type) {
                 case 'LOGIN_SUCCESS':
@@ -304,18 +318,49 @@ export default function App() {
                     setScanned(false);
                     setIsScanning(true);
                     break;
+                case 'SPEAK':
+                    console.log("🗣️ [Native] Speaking:", message.payload.text);
+                    if (message.payload?.text) {
+                        Speech.speak(message.payload.text, {
+                            language: 'ko-KR',
+                            rate: 1.0,
+                            pitch: 1.0
+                        });
+                    }
+                    break;
+                case 'CHANGE_ORIENTATION':
+                    console.log("📱 [Native] Orientation Change Request:", message.payload?.mode);
+                    try {
+                        if (message.payload?.mode === 'LANDSCAPE') {
+                            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+                        } else {
+                            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+                        }
+                    } catch (e) {
+                        console.warn("Orientation Change Failed:", e);
+                    }
+                    break;
             }
-        } catch { }
+        } catch (e) {
+            console.error("❌ Message Error:", e);
+        }
     };
 
     if (!isAppReady) return null;
 
     return (
         <SafeAreaProvider>
-            {/* 🛡️ CRITICAL: 'bottom' edge must be included to prevent content from bleeding behind the Android navigation bar, 
-                especially since Android 15+ enforces edge-to-edge mode by default. */}
+            {/* 🛡️ 1. Safe Area 확보: edges를 다시 켜서 상단/하단 시스템 영역 침범 방지 */}
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
+
+                {/* 2. 상태바 표시: translucent={false}로 하여 웹뷰가 상태바 아래에서 시작하게 함 */}
+                <StatusBar
+                    barStyle="light-content"
+                    backgroundColor="#000000"
+                    translucent={false}
+                    hidden={false}
+                />
+
                 <WebView
                     ref={webViewRef}
                     source={{ uri: WEB_URL }}
@@ -324,12 +369,20 @@ export default function App() {
                     domStorageEnabled={true}
                     onMessage={handleMessage}
                     injectedJavaScriptBeforeContentLoaded={initialScript}
+                    // � [수정] 스크롤 허용 (기본값)
+                    scrollEnabled={true}
+                    overScrollMode="content" // 안드로이드 스크롤 효과 복구
+                    bounces={true}           // iOS 바운스 효과 복구
                     onNavigationStateChange={(navState) => setCanGoBack(navState.canGoBack)}
                     onLoadEnd={() => setIsWebViewLoaded(true)}
                     originWhitelist={['*']}
                     userAgent={userAgent}
                     androidLayerType="hardware"
-                    overScrollMode="never"
+                    allowsInlineMediaPlayback={true}
+                    mediaPlaybackRequiresUserAction={false}
+                    allowsFullscreenVideo={true}
+                    textInteractionEnabled={true}
+                    forceDarkOn={false}
                 />
                 {isScanning && (
                     <View style={styles.cameraContainer}>
