@@ -71,7 +71,7 @@ export function HiqInstallBanner() {
                                 <LucideDownload className="w-6 h-6 text-black" />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-white font-black text-sm">하이큐 앱 설치하기</span>
+                                <span className="text-white font-semibold text-sm">랭큐 앱 설치하기</span>
                                 <span className="text-gray-400 text-xs text-left">
                                     {isIOS ? "홈 화면에 추가하고 편하게 쓰세요!" : "홈 화면에 추가하고 더 편하게 접속하세요!"}
                                 </span>
@@ -99,7 +99,7 @@ export function HiqInstallBanner() {
             <Dialog open={showIOSGuide} onOpenChange={setShowIOSGuide}>
                 <DialogContent className="bg-[#111] border-[#222] text-white rounded-3xl max-w-xs">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-black text-center mb-2">
+                        <DialogTitle className="text-xl font-semibold text-center mb-2">
                             아이폰 홈 화면 추가
                         </DialogTitle>
                         <DialogDescription className="text-gray-400 text-center">

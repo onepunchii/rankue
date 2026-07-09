@@ -51,10 +51,10 @@ export const PinCodeModal = ({ open, onOpenChange }: PinCodeModalProps) => {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent hideClose className="w-[90vw] max-w-sm rounded-[2rem] border border-white/10 bg-[#121212] text-white p-6 flex flex-col items-center justify-center shadow-2xl focus:outline-none data-[state=open]:!zoom-in-95 data-[state=closed]:!zoom-out-95">
+            <DialogContent hideClose className="w-[90vw] max-w-sm rounded-card border border-white/10 bg-[#121212] text-white p-6 flex flex-col items-center justify-center shadow-2xl focus:outline-none data-[state=open]:!zoom-in-95 data-[state=closed]:!zoom-out-95">
                 <div className="w-full flex flex-col items-center">
-                    <h2 className="text-xl font-black text-white mb-1.5 tracking-tighter">게임 참여하기</h2>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-8">ENTER PIN CODE</p>
+                    <h2 className="text-xl font-semibold text-white mb-1.5 tracking-tight">게임 참여하기</h2>
+                    <p className="text-[12px] font-bold text-gray-500 uppercase tracking-normal mb-8">핀 코드 입력</p>
 
                     {/* PIN Display */}
                     <div className="flex gap-3 mb-8">
@@ -64,14 +64,14 @@ export const PinCodeModal = ({ open, onOpenChange }: PinCodeModalProps) => {
                                     <motion.div
                                         initial={{ scale: 0 }}
                                         animate={{ scale: 1 }}
-                                        className="absolute inset-0 bg-[#ffd700] rounded-full shadow-[0_0_8px_#ffd700]"
+                                        className="absolute inset-0 bg-[#ffd700] rounded-full"
                                     />
                                 )}
                             </div>
                         ))}
                     </div>
                     {/* Code Preview (Optional, helpful for debugging or trust) */}
-                    <div className="text-3xl font-mono font-black text-[#ffd700] tracking-[0.3em] h-10 mb-6 flex items-center justify-center min-w-[120px]">
+                    <div className="text-3xl font-mono font-semibold text-[#ffd700] tracking-[0.3em] h-10 mb-6 flex items-center justify-center min-w-[120px]">
                         {joinCode}
                     </div>
 
@@ -87,7 +87,7 @@ export const PinCodeModal = ({ open, onOpenChange }: PinCodeModalProps) => {
                             </button>
                         ))}
                         <button onClick={() => onOpenChange(false)} className="aspect-square rounded-2xl flex items-center justify-center text-gray-500 hover:text-white transition-colors group">
-                            <span className="text-[10px] font-black group-hover:scale-110 transition-transform">CANCEL</span>
+                            <span className="text-[12px] font-semibold group-hover:scale-110 transition-transform">취소</span>
                         </button>
                         <button
                             onClick={() => handleKeypadPress('0')}

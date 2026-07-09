@@ -13,9 +13,16 @@ interface ReviewCardProps {
         specs: { speed: number; fee: number; difficulty: string };
         tags: string[];
     };
+    category?: 'Golf' | 'Condo' | 'Fitness';
 }
 
-export function ReviewCard({ review }: ReviewCardProps) {
+export function ReviewCard({ review, category = 'Golf' }: ReviewCardProps) {
+    const labels = category === 'Condo'
+        ? { r1: '객실', r2: '부대시설', r3: '서비스' }
+        : category === 'Fitness'
+            ? { r1: '청결', r2: '시설', r3: '서비스' }
+            : { r1: '코스', r2: '그린', r3: '서비스' };
+
     return (
         <div className="bg-[#1E1E1E] rounded-[2rem] p-6 relative overflow-hidden border border-white/5 shadow-lg">
             <div className="flex items-center justify-between mb-6">
@@ -34,50 +41,56 @@ export function ReviewCard({ review }: ReviewCardProps) {
                         <div className="text-[10px] text-white/30 font-bold mt-0.5">{review.date} • 30대 남성</div>
                     </div>
                 </div>
-                <div className="text-2xl font-black text-[#64DD17] tracking-tighter leading-none flex items-center gap-1">
-                    🏆 {review.score}타
-                </div>
+                {category === 'Golf' && (
+                    <div className="text-2xl font-black text-[#64DD17] tracking-tighter leading-none flex items-center gap-1">
+                        🏆 {review.score}타
+                    </div>
+                )}
             </div>
 
-            <div className="grid grid-cols-2 gap-6 relative mb-6">
-                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/10 -translate-x-1/2" />
-                <div className="space-y-3 pr-2">
+            <div className={`grid ${category === 'Golf' ? 'grid-cols-2' : 'grid-cols-1'} gap-6 relative mb-6`}>
+                {category === 'Golf' && <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/10 -translate-x-1/2" />}
+
+                <div className={`space-y-3 ${category === 'Golf' ? 'pr-2' : ''}`}>
                     <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-white/40">코스</span>
+                        <span className="text-[10px] font-bold text-white/40">{labels.r1}</span>
                         <div className="flex items-center gap-1">
                             <LucideStar className="w-3 h-3 text-amber-400 fill-amber-400" />
                             <span className="text-xs font-black text-white">{review.ratings.course}.0</span>
                         </div>
                     </div>
                     <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-white/40">그린</span>
+                        <span className="text-[10px] font-bold text-white/40">{labels.r2}</span>
                         <div className="flex items-center gap-1">
                             <LucideStar className="w-3 h-3 text-amber-400 fill-amber-400" />
                             <span className="text-xs font-black text-white">{review.ratings.green}.0</span>
                         </div>
                     </div>
                     <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-white/40">서비스</span>
+                        <span className="text-[10px] font-bold text-white/40">{labels.r3}</span>
                         <div className="flex items-center gap-1">
                             <LucideStar className="w-3 h-3 text-amber-400 fill-amber-400" />
                             <span className="text-xs font-black text-white">{review.ratings.service}.0</span>
                         </div>
                     </div>
                 </div>
-                <div className="space-y-3 pl-2">
-                    <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-white/40">스피드</span>
-                        <span className="text-xs font-black text-white">{review.specs.speed}m</span>
+
+                {category === 'Golf' && (
+                    <div className="space-y-3 pl-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-white/40">스피드</span>
+                            <span className="text-xs font-black text-white">{review.specs.speed}m</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-white/40">그린피</span>
+                            <span className="text-xs font-black text-white">{review.specs.fee / 10000}만</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-white/40">난이도</span>
+                            <span className="text-xs font-black text-white">{review.specs.difficulty}</span>
+                        </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-white/40">그린피</span>
-                        <span className="text-xs font-black text-white">{review.specs.fee / 10000}만</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-white/40">난이도</span>
-                        <span className="text-xs font-black text-white">{review.specs.difficulty}</span>
-                    </div>
-                </div>
+                )}
             </div>
 
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">

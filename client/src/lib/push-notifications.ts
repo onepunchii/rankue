@@ -141,13 +141,13 @@ class PushNotificationService {
       // Use ServiceWorker registration to show notification (more reliable on Android)
       // Even in the foreground, PWA notifications often require SW registration to manifest
       navigator.serviceWorker.ready.then(registration => {
-        const iconUrl = 'https://www.polli.co.kr/polli_og_marketing_v1.png';
-        registration.showNotification(title || 'Polli', {
+        const iconUrl = 'https://www.rankue.co.kr/icon.svg';
+        registration.showNotification(title || 'RANKUE', {
           body: body || '',
           icon: iconUrl,
           badge: iconUrl,
           data: data,
-          tag: 'polli-notification',
+          tag: 'rankue-notification',
           renotify: true,
           vibrate: [200, 100, 200],
           requireInteraction: true,
@@ -225,14 +225,14 @@ export class WebPushService {
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         const registration = await navigator.serviceWorker.ready;
         registration.showNotification(title, {
-          icon: '/polli_og_marketing_v1.png',
-          badge: '/polli_og_marketing_v1.png',
+          icon: '/icon.svg',
+          badge: '/icon.svg',
           ...options
         });
       } else {
         new Notification(title, {
-          icon: '/polli_og_marketing_v1.png',
-          badge: '/polli_og_marketing_v1.png',
+          icon: '/icon.svg',
+          badge: '/icon.svg',
           ...options
         });
       }

@@ -68,29 +68,29 @@ export const ScoreCorrectionModal = ({ open, onOpenChange, member }: ScoreCorrec
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#1a1a1a] border-white/10 text-white max-w-sm rounded-3xl p-6">
+            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-sm rounded-card p-6">
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2">
-                        <Calculator className="w-5 h-5 text-[#ffd700]" />
+                        <Calculator className="w-5 h-5 text-brand" />
                         점수 보정
                     </h2>
-                    <button onClick={() => onOpenChange(false)} className="text-gray-400 hover:text-white">
+                    <button onClick={() => onOpenChange(false)} className="text-white/55 hover:text-white">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 <div className="space-y-6">
                     {/* Tab Switch */}
-                    <div className="flex bg-black/20 p-1 rounded-xl">
+                    <div className="flex bg-black/20 p-1 rounded-tile">
                         <button
                             onClick={() => handleTypeChange("4c")}
-                            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeEditType === "4c" ? "bg-[#10b981] text-black shadow" : "text-gray-500 hover:text-gray-300"}`}
+                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeEditType === "4c" ? "bg-brand text-brand-fg" : "text-white/55 hover:text-white"}`}
                         >
                             4구
                         </button>
                         <button
                             onClick={() => handleTypeChange("3c")}
-                            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeEditType === "3c" ? "bg-[#10b981] text-black shadow" : "text-gray-500 hover:text-gray-300"}`}
+                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeEditType === "3c" ? "bg-brand text-brand-fg" : "text-white/55 hover:text-white"}`}
                         >
                             3구
                         </button>
@@ -99,25 +99,25 @@ export const ScoreCorrectionModal = ({ open, onOpenChange, member }: ScoreCorrec
                     {/* Inputs */}
                     <div className="space-y-4">
                         <div>
-                            <label className="text-xs font-bold text-gray-500 mb-1 block">AVERAGE</label>
+                            <label className="text-xs font-medium text-white/55 mb-1 block">평균</label>
                             <input
                                 type="number"
                                 step="0.001"
                                 value={editAverage}
                                 onChange={(e) => handleAverageChange(e.target.value)}
-                                className="w-full bg-black/30 border border-white/5 rounded-xl px-4 py-3 text-lg font-bold text-white focus:outline-none focus:border-[#10b981]/50"
+                                className="w-full bg-black/30 border border-white/5 rounded-tile px-4 py-3 text-lg font-bold tabular-nums text-white focus:outline-none focus:border-brand/50"
                             />
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-gray-500 mb-1 block">HANDICAP</label>
-                            <div className="w-full bg-black/30 border border-white/5 rounded-xl px-4 py-3 text-lg font-bold text-[#ffd700]">
+                            <label className="text-xs font-medium text-white/55 mb-1 block">핸디캡</label>
+                            <div className="w-full bg-black/30 border border-white/5 rounded-tile px-4 py-3 text-lg font-bold tabular-nums text-brand">
                                 {activeEditType === "4c" ? editHandi4c : editHandi3c} 점
                             </div>
-                            <p className="text-[10px] text-gray-600 mt-1">※ 에버리지에 따라 자동 계산됩니다.</p>
+                            <p className="text-[12px] text-white/55 mt-1">※ 에버리지에 따라 자동 계산됩니다.</p>
                         </div>
                     </div>
 
-                    <Button onClick={confirmScoreUpdate} className="w-full h-12 bg-[#10b981] hover:bg-[#059669] text-black font-bold rounded-xl text-lg">
+                    <Button onClick={confirmScoreUpdate} className="rk-btn-primary w-full h-12 text-lg">
                         <Check className="w-5 h-5 mr-2" />
                         저장하기
                     </Button>

@@ -10,7 +10,6 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { useStore } from "@/contexts/StoreContext";
 import { useToast } from "@/hooks/use-toast";
 import { useSport } from "@/contexts/SportContext";
-import { cn } from "@/lib/utils";
 
 // Sub-components
 import { RecentOpponentsSlider } from "@/components/hiq/rivals/RecentOpponents";
@@ -93,41 +92,32 @@ export default function HiqRivals() {
         [friends, selectedFriendId]);
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white pb-32 px-6 relative overflow-x-hidden font-sans">
-            {/* Background Light Effect */}
-            <div className={cn(
-                "absolute top-0 right-0 w-[80dvw] h-[40dvh] blur-[120px] rounded-full -mr-[30dvw] -mt-[10dvh] pointer-events-none transition-colors duration-1000",
-                config.bgLight, "opacity-20"
-            )} />
-
-            {/* Premium Header */}
-            <div className="flex items-center justify-between py-10 relative z-10">
-                <div className="flex items-center gap-5">
+        <div className="min-h-screen bg-[#0A0A0A] text-white px-5 pt-6 pb-28 relative overflow-x-hidden font-sans">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8 relative z-10">
+                <div className="flex items-center gap-3">
                     <motion.button
                         whileTap={{ scale: 0.9 }}
                         onClick={() => setLocation("/menu")}
-                        className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center backdrop-blur-md active:scale-95 transition-all"
+                        className="w-11 h-11 rounded-full bg-surface-1 border border-surface-line flex items-center justify-center active:scale-95 transition-all"
                     >
-                        <LucideChevronLeft className="w-6 h-6 text-white/40" />
+                        <LucideChevronLeft className="w-6 h-6 text-white/55" />
                     </motion.button>
                     <div>
-                        <h1 className="text-3xl font-black tracking-tighter text-white">
+                        <h1 className="text-[26px] font-bold tracking-tight text-white leading-none">
                             {config.title}
                         </h1>
-                        <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mt-0.5">
-                            {config.subTitle}
+                        <p className="text-[13px] font-medium text-white/45 mt-1">
+                            함께 겨룰 상대를 관리하세요
                         </p>
                     </div>
                 </div>
                 <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setIsSearchOpen(true)}
-                    className={cn(
-                        "w-12 h-12 rounded-full border flex items-center justify-center backdrop-blur-md transition-all active:scale-95",
-                        config.bgColor, "bg-opacity-10", config.borderColor
-                    )}
+                    className="w-11 h-11 rounded-full bg-brand/12 border border-brand/20 flex items-center justify-center transition-all active:scale-95"
                 >
-                    <LucideSearch className={cn("w-5 h-5", config.themeColor)} />
+                    <LucideSearch className="w-5 h-5 text-brand" />
                 </motion.button>
             </div>
 

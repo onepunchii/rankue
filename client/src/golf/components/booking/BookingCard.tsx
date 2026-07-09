@@ -50,11 +50,17 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onSh
                     </div>
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                            <span className={cn(
-                                "text-base font-black leading-none transition-colors",
-                                isExpanded ? theme.text : "text-white group-hover:text-[#64DD17]"
-                            )}>
-                                {item.isBlind ? item.blindName : item.courseName}
+                            <span
+                                className={cn(
+                                    "text-base font-black leading-none transition-colors truncate max-w-[140px]",
+                                    isExpanded ? theme.text : "text-white group-hover:text-[#64DD17]"
+                                )}
+                                title={item.isBlind ? item.blindName : item.courseName}
+                            >
+                                {(() => {
+                                    const name = item.isBlind ? item.blindName : item.courseName;
+                                    return name.length > 6 ? name.substring(0, 6) + "..." : name;
+                                })()}
                             </span>
                             {item.isBlind && (
                                 <span className="px-1.5 py-0.5 rounded bg-white/10 text-white/60 text-[9px] font-black uppercase tracking-tighter border border-white/10">

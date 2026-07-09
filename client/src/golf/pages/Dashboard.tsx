@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { ScorecardScanner } from "../components/ScorecardScanner";
+import { apiRequest } from "@/lib/queryClient";
+import { useGameStats } from "@/hooks/useGameStats";
 
 // Components
 import { GolfHeader } from "../components/dashboard/GolfHeader";
@@ -19,15 +21,26 @@ import { useGolfStats } from "../hooks/useGolfStats";
 
 export default function GolfDashboard() {
     const queryClient = useQueryClient();
+    // 1. Identity & Profile
     const { data: me } = useQuery<any>({ queryKey: ["/api/hiq/me"] });
 
-    // UI State
+    // 2. UI State & Logic
     const [isGameModeOpen, setIsGameModeOpen] = useState(false);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
-
-    // Business Logic Hooks
     const matchLogic = useGolfMatch(me);
-    const { recentScores, stats } = useGolfStats(me);
+
+    // 3. Game History Data (Master Record)
+    const { data: history = [] } = useQuery({
+        // Key shape MUST match useGolfStats/usePassportData (["/api/hiq/history", { sport: "GOLF" }])
+        // so they share one cache entry and a single invalidation refreshes all of them.
+        queryKey: ["/api/hiq/history", { sport: "GOLF" }],
+        queryFn: async () => await apiRequest("/api/hiq/history?sport=GOLF")
+    });
+
+    // 4. Official Stats & Calculated Handicap
+    // This hook is what calculates the 82.0 in the History page
+    const officialStats = useGameStats(history, "all", "GOLF", me);
+    const { recentScores } = useGolfStats(me); // Legacy formatting for graph
 
     const handleScanComplete = () => {
         setIsScannerOpen(false);
@@ -35,6 +48,11 @@ export default function GolfDashboard() {
         queryClient.invalidateQueries({ queryKey: ["/api/hiq/history", { sport: "GOLF" }] });
         queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/passport-stats"] });
     };
+
+    // Calculate display score (derived from history first to match scorecard)
+    const effectiveAvg = officialStats.cumulativeAverage !== "0.0"
+        ? officialStats.cumulativeAverage
+        : (me?.golfAvgScore ? Number(me.golfAvgScore).toFixed(1) : "0.0");
 
     return (
         <div className="min-h-screen bg-[#0A0A0A] text-white p-6 pb-32 font-sans relative overflow-x-hidden">
@@ -46,7 +64,11 @@ export default function GolfDashboard() {
 
             {/* Header & Identity */}
             <GolfHeader member={me} />
-            <HandicapCard member={me} />
+            <Ticker />
+            <HandicapCard
+                member={me}
+                avgScore={effectiveAvg}
+            />
 
             {/* Main Actions */}
             <QuickActions
@@ -55,9 +77,15 @@ export default function GolfDashboard() {
             />
 
             {/* Dashboard Widgets */}
-            <StatsChart recentScores={recentScores} stats={stats} />
+            <StatsChart
+                recentScores={recentScores}
+                stats={{
+                    bestScore: officialStats.bestScore,
+                    totalRounds: officialStats.totalGames,
+                    avgScore: effectiveAvg
+                }}
+            />
             <MyCrewCard />
-            <Ticker />
 
             {/* Modals & Sheets */}
             <GameModeSheet

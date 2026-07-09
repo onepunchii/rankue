@@ -1,11 +1,14 @@
 
 export const getTier = (handi: number, is3c: boolean, sport: 'GOLF' | 'BILLIARDS' | string) => {
     if (sport === "GOLF") {
-        if (handi <= 0) return { label: "ALBATROSS", class: "tier-platinum", icon: "🏆", glow: "rgba(192, 192, 192, 0.2)" };
-        if (handi <= 9) return { label: "EAGLE", class: "tier-gold", icon: "🦅", glow: "rgba(255, 215, 0, 0.2)" };
-        if (handi <= 18) return { label: "BIRDIE", class: "tier-silver", icon: "🐦", glow: "rgba(16, 185, 129, 0.2)" };
-        if (handi <= 27) return { label: "PAR", class: "tier-gold", icon: "⭕", glow: "rgba(59, 130, 246, 0.2)" };
-        return { label: "BOGEY", class: "tier-bronze", icon: "⬜", glow: "rgba(148, 163, 184, 0.2)" };
+        if (!handi || handi <= 0) return { label: "ROOKIE", class: "tier-bronze", icon: "🏌️", glow: "rgba(148, 163, 184, 0.1)" };
+        // Based on score (strokes)
+        if (handi <= 72) return { label: "ALBATROSS", class: "tier-platinum", icon: "🏆", glow: "rgba(192, 192, 192, 0.2)" };
+        if (handi <= 79) return { label: "EAGLE", class: "tier-gold", icon: "🦅", glow: "rgba(255, 215, 0, 0.2)" };
+        if (handi <= 89) return { label: "BIRDIE", class: "tier-silver", icon: "🐦", glow: "rgba(16, 185, 129, 0.2)" };
+        if (handi <= 99) return { label: "PAR", class: "tier-gold", icon: "⭕", glow: "rgba(59, 130, 246, 0.2)" };
+        if (handi <= 109) return { label: "BOGEY", class: "tier-bronze", icon: "⬜", glow: "rgba(148, 163, 184, 0.2)" };
+        return { label: "ROOKIE", class: "tier-bronze", icon: "🏌️", glow: "rgba(148, 163, 184, 0.1)" };
     }
 
     // Billiards (is3c logic)

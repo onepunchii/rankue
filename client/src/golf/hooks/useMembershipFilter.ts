@@ -1,5 +1,29 @@
 import { useState, useMemo } from 'react';
-import { MembershipItem, calculateTrend, getRepresentativeMemberships } from '../data/membershipData';
+import { MembershipItem, calculateTrend, getRepresentativeMemberships, GolfMembership, CondoMembership, FitnessMembership } from '../data/membershipData';
+
+// Helper to safely get the 'type' or equivalent
+const getMembershipType = (item: MembershipItem): string => {
+    if (item.category === 'Golf') return (item as GolfMembership).golfSpec?.type || '';
+    if (item.category === 'Condo') return (item as CondoMembership).condoSpec?.roomType || '';
+    if (item.category === 'Fitness') return 'Fitness'; // Or specific field if added
+    return '';
+};
+
+const getMembershipAddress = (item: MembershipItem): string => {
+    return item.info.Address || '';
+};
+
+const getBenefitText = (item: MembershipItem): string => {
+    if (item.category === 'Golf') {
+        const spec = (item as GolfMembership).golfSpec?.privilege;
+        return (spec?.summary || '') + (spec?.usageLimit || '');
+    }
+    if (item.category === 'Condo') {
+        const spec = (item as CondoMembership).condoSpec?.benefits;
+        return (spec?.summary || '') + (spec?.waterParkDiscount ? '워터파크' : '');
+    }
+    return '';
+};
 
 export function useMembershipFilter(resaleList: MembershipItem[], useGrouping: boolean = true) {
     const [activeCategory, setActiveCategory] = useState("전체");
@@ -9,7 +33,7 @@ export function useMembershipFilter(resaleList: MembershipItem[], useGrouping: b
         prices: [],
         types: [],
         benefits: [],
-        categories: [] // 추가: Golf, Condo, Fitness
+        categories: []
     });
 
     const filteredResaleList = useMemo(() => {
@@ -20,8 +44,8 @@ export function useMembershipFilter(resaleList: MembershipItem[], useGrouping: b
             const lowerQuery = searchTerm.toLowerCase();
             result = result.filter(item =>
                 item.name.toLowerCase().includes(lowerQuery) ||
-                item.clubInfo.address.toLowerCase().includes(lowerQuery) ||
-                item.type.toLowerCase().includes(lowerQuery)
+                getMembershipAddress(item).toLowerCase().includes(lowerQuery) ||
+                getMembershipType(item).toLowerCase().includes(lowerQuery)
             );
         }
 
@@ -34,27 +58,25 @@ export function useMembershipFilter(resaleList: MembershipItem[], useGrouping: b
                 });
                 break;
             case '수도권':
-                result = result.filter(item =>
-                    item.clubInfo.address.includes('경기') ||
-                    item.clubInfo.address.includes('서울') ||
-                    item.clubInfo.address.includes('인천')
-                );
+                result = result.filter(item => {
+                    const addr = getMembershipAddress(item);
+                    return addr.includes('경기') || addr.includes('서울') || addr.includes('인천');
+                });
                 break;
             case '1억~3억':
                 result = result.filter(item => {
-                    const priceVal = item.priceValue / 10000; // 만원 단위
+                    const priceVal = item.price.current / 10000; // 만원 단위
                     return priceVal >= 10000 && priceVal <= 30000;
                 });
                 break;
             case '주말부킹':
-                result = result.filter(item =>
-                    item.type.includes('VIP') ||
-                    item.type.includes('우대') ||
-                    item.priceValue >= 500000000
-                );
+                result = result.filter(item => {
+                    const type = getMembershipType(item);
+                    return type.includes('VIP') || type.includes('우대') || item.price.current >= 500000000;
+                });
                 break;
             case '무기명':
-                result = result.filter(item => item.type.includes('무기명'));
+                result = result.filter(item => getMembershipType(item).includes('무기명'));
                 break;
             case '법인':
                 result = result.filter(item => item.tags.includes('법인'));
@@ -86,7 +108,7 @@ export function useMembershipFilter(resaleList: MembershipItem[], useGrouping: b
             const selectedRegions = detailedFilters.regions.filter(r => r !== 'GPS');
             if (selectedRegions.length > 0) {
                 result = result.filter(item =>
-                    selectedRegions.some(region => item.clubInfo.address.includes(region))
+                    selectedRegions.some(region => getMembershipAddress(item).includes(region))
                 );
             }
         }
@@ -94,7 +116,7 @@ export function useMembershipFilter(resaleList: MembershipItem[], useGrouping: b
         // Prices (in 만원 units)
         if (detailedFilters.prices.length > 0) {
             result = result.filter(item => {
-                const priceVal = item.priceValue / 10000; // 만원 단위
+                const priceVal = item.price.current / 10000; // 만원 단위
                 return detailedFilters.prices.some(range => {
                     if (range === '1억 미만') return priceVal < 10000;
                     if (range === '1억~3억') return priceVal >= 10000 && priceVal <= 30000;
@@ -109,15 +131,14 @@ export function useMembershipFilter(resaleList: MembershipItem[], useGrouping: b
         // Types
         if (detailedFilters.types.length > 0) {
             result = result.filter(item =>
-                detailedFilters.types.some(t => item.type.includes(t))
+                detailedFilters.types.some(t => getMembershipType(item).includes(t))
             );
         }
 
         // Benefits (실제 혜택 정보로 필터링)
         if (detailedFilters.benefits.length > 0) {
             result = result.filter(item => {
-                // usageLimit이나 summary에 키워드가 있는지 확인
-                const benefitText = (item.benefits.summary + item.benefits.usageLimit).toLowerCase();
+                const benefitText = getBenefitText(item).toLowerCase();
                 return detailedFilters.benefits.some(benefit =>
                     benefitText.includes(benefit.toLowerCase())
                 );
@@ -135,9 +156,9 @@ export function useMembershipFilter(resaleList: MembershipItem[], useGrouping: b
 
         // 정렬 적용
         if (activeCategory === '최고가') {
-            list.sort((a, b) => b.priceValue - a.priceValue);
+            list.sort((a, b) => b.price.current - a.price.current);
         } else if (activeCategory === '최저가') {
-            list.sort((a, b) => a.priceValue - b.priceValue);
+            list.sort((a, b) => a.price.current - b.price.current);
         }
 
         return list;

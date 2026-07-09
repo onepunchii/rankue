@@ -48,27 +48,22 @@ export const SearchUserDialog = ({
                 setKeyword("");
             }
         }}>
-            <DialogContent className="bg-[#0A0A0A]/95 backdrop-blur-xl border border-white/10 text-white max-w-lg w-[95%] rounded-[3rem] p-0 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)]">
-                <div className="p-10 bg-gradient-to-br from-white/[0.02] to-transparent">
-                    <DialogHeader className="mb-8">
+            <DialogContent className="bg-[#0A0A0A] border border-white/10 text-white max-w-lg w-[95%] rounded-card p-0 overflow-hidden">
+                <div className="p-6">
+                    <DialogHeader className="mb-6">
                         <div className="flex flex-col">
-                            <DialogTitle className="text-4xl font-black tracking-tighter text-white">
+                            <DialogTitle className="text-[26px] font-bold tracking-tight text-white">
                                 {config.label} 검색
                             </DialogTitle>
-                            <DialogDescription className={cn(
-                                "text-[10px] font-black uppercase tracking-[0.2em] mt-1",
-                                config.themeColor, "opacity-60"
-                            )}>Smart matching system</DialogDescription>
+                            <DialogDescription className="text-[13px] font-medium text-white/45 mt-1">
+                                닉네임이나 전화번호로 상대를 찾아보세요
+                            </DialogDescription>
                         </div>
                     </DialogHeader>
 
-                    <div className="relative group mb-6">
-                        <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
-                            <LucideSearch className={cn(
-                                "w-6 h-6 text-white/10 transition-colors",
-                                "group-focus-within:opacity-100",
-                                currentSport === "GOLF" ? "group-focus-within:text-[#84cc16]" : "group-focus-within:text-[#10b981]"
-                            )} />
+                    <div className="relative group mb-4">
+                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                            <LucideSearch className="w-5 h-5 text-white/45 transition-colors group-focus-within:text-brand" />
                         </div>
                         <Input
                             placeholder={config.searchPlaceholder}
@@ -78,10 +73,7 @@ export const SearchUserDialog = ({
                                 if (hasSearched) setHasSearched(false);
                             }}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                            className={cn(
-                                "h-20 pl-16 pr-8 bg-white/[0.03] border border-white/5 text-white placeholder:text-white/10 rounded-[2rem] text-xl font-bold transition-all shadow-inner outline-none ring-0 focus-visible:ring-0",
-                                currentSport === "GOLF" ? "focus:border-[#84cc16]/50" : "focus:border-[#10b981]/50"
-                            )}
+                            className="h-14 pl-12 pr-5 bg-surface-1 border border-surface-line text-white placeholder:text-white/45 rounded-tile text-[15px] font-medium transition-all outline-none ring-0 focus-visible:ring-0 focus:border-brand/50"
                         />
                     </div>
 
@@ -89,8 +81,7 @@ export const SearchUserDialog = ({
                         onClick={handleSearch}
                         disabled={!keyword.trim() || isSearching}
                         className={cn(
-                            "w-full h-16 text-black font-black rounded-2xl text-lg shadow-2xl transition-all active:scale-[0.98] outline-none ring-0",
-                            config.bgColor, "hover:opacity-90",
+                            "w-full h-14 rk-btn-primary rounded-tile text-[15px] active:scale-[0.98] outline-none ring-0",
                             isSearching ? 'opacity-50' : ''
                         )}
                     >
@@ -99,25 +90,26 @@ export const SearchUserDialog = ({
                                 <motion.div
                                     animate={{ rotate: 360 }}
                                     transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                                    className="w-6 h-6 border-2 border-black border-t-transparent rounded-full"
+                                    className="w-5 h-5 border-2 border-black border-t-transparent rounded-full"
                                 />
                                 <span>검색 중...</span>
                             </div>
-                        ) : (currentSport === "GOLF" ? "Find Friend" : "Match Me")}
+                        ) : (currentSport === "GOLF" ? "친구 찾기" : "상대 찾기")}
                     </Button>
                 </div>
 
-                <div className="px-10 pb-10 max-h-[45vh] overflow-y-auto scrollbar-hide space-y-4">
+                <div className="px-6 pb-6 max-h-[45vh] overflow-y-auto scrollbar-hide space-y-3">
                     {!isSearching && hasSearched && searchResults.length === 0 && (
                         <div className="py-16 text-center">
-                            <p className="text-[11px] font-black text-white/20 uppercase tracking-[0.3em]">해당하는 멤버가 없습니다</p>
+                            <p className="text-[13px] font-medium text-white/45">검색 결과가 없습니다</p>
                         </div>
                     )}
 
                     <AnimatePresence>
                         {searchResults.map((result, idx) => {
-                            const handi = currentSport === "GOLF" ? result.golfHandicap : result.handi4c;
-                            const tier = getTier(handi || 0, false, currentSport);
+                            const golfScore = Number((result.golfAvgScore || 0) > 0 ? result.golfAvgScore : (result.golfHandicap || 0) + 72);
+                            const handi = currentSport === "GOLF" ? golfScore : result.handi4c;
+                            const tier = getTier(Number(handi || 0), false, currentSport);
                             return (
                                 <motion.div
                                     key={result.id}
@@ -125,14 +117,22 @@ export const SearchUserDialog = ({
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: idx * 0.05 }}
                                 >
-                                    <div className="bg-white/[0.03] border border-white/5 rounded-[2rem] p-6 flex items-center justify-between group hover:bg-white/[0.08] transition-all">
-                                        <div className="flex items-center gap-5">
-                                            <div className="w-14 h-14 rounded-2xl bg-black/20 border border-white/10 flex items-center justify-center text-3xl">
-                                                {tier.icon}
+                                    <div className="rk-card p-4 flex items-center justify-between transition-colors hover:bg-surface-2">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-tile bg-black/20 border border-white/10 flex items-center justify-center text-2xl overflow-hidden">
+                                                {(result as any).profileImageUrl ? (
+                                                    <img
+                                                        src={(result as any).profileImageUrl}
+                                                        className="w-full h-full object-cover"
+                                                        alt={result.name}
+                                                    />
+                                                ) : (
+                                                    tier.icon
+                                                )}
                                             </div>
                                             <div>
-                                                <p className="font-black text-xl text-white tracking-tighter mb-0.5">{result.name}</p>
-                                                <p className={cn("text-[9px] font-black uppercase tracking-widest", tier.class)}>{tier.label} Tier</p>
+                                                <p className="font-semibold text-[17px] text-white tracking-tight mb-0.5">{result.name}</p>
+                                                <p className={cn("text-[12px] font-semibold", tier.class)}>{tier.label}</p>
                                             </div>
                                         </div>
 
@@ -145,10 +145,10 @@ export const SearchUserDialog = ({
                                             }}
                                             disabled={result.isFriend}
                                             className={cn(
-                                                "px-6 py-3 rounded-xl font-black text-xs transition-all shadow-xl",
+                                                "px-5 py-2.5 rounded-tile font-semibold text-[13px] transition-all",
                                                 result.isFriend
-                                                    ? 'bg-white/5 text-white/20'
-                                                    : 'bg-white text-black active:scale-95'
+                                                    ? 'bg-white/5 text-white/45'
+                                                    : 'rk-btn-primary active:scale-95'
                                             )}
                                         >
                                             {result.isFriend ? (currentSport === "GOLF" ? "친구" : "라이벌") : "추가하기"}

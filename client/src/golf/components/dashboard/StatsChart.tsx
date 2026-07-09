@@ -6,7 +6,7 @@ interface StatsChartProps {
     stats: {
         bestScore: number;
         totalRounds: number;
-        avgScore: number;
+        avgScore: string | number;
     };
 }
 
@@ -59,7 +59,7 @@ export function StatsChart({ recentScores, stats }: StatsChartProps) {
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-8 bg-white/10" />
                         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-px h-8 bg-white/10" />
 
-                        <span className="text-[9px] font-bold text-white/40 uppercase mb-1 tracking-wider">Avg Score</span>
+                        <span className="text-[9px] font-bold text-white/40 uppercase mb-1 tracking-wider">핸디캡 (HDCP)</span>
                         <span className="text-xl font-black text-[#64DD17]">
                             {stats.avgScore}
                         </span>

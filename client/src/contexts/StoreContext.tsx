@@ -45,9 +45,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Apply Global Theme
     useEffect(() => {
         if (store) {
-            document.documentElement.style.setProperty('--hiq-brand-color', store.themeColor || '#6366f1');
-            document.documentElement.style.setProperty('--hiq-neon-color', store.neonColor || '#818cf8');
-            document.title = store.name || "RANKUE";
+            document.documentElement.style.setProperty('--hiq-brand-color', store.themeColor || '#10B981');
+            document.documentElement.style.setProperty('--hiq-neon-color', store.neonColor || '#34D399');
+            // Keep the RANKUE product title for the main app (default "hiq" tenant). Only a
+            // genuine white-label tenant (its own slug/subdomain) overrides the browser title,
+            // so SEO/tab never shows a seeded store name like "하이큐 당구장".
+            const isDefaultTenant = !store.slug || store.slug === 'hiq' || store.slug === 'default';
+            document.title = isDefaultTenant
+                ? "랭큐 RANKUE · 당구 실력 랭킹 & 매칭"
+                : `${store.name} · 랭큐`;
         }
     }, [store]);
 

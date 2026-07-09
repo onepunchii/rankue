@@ -29,6 +29,8 @@ interface OptionSelectionSectionProps {
     setPolicyCustomText: (t: string) => void;
     selectedOptions: string[];
     toggleOption: (id: string) => void;
+    comment: string;
+    setComment: (v: string) => void;
 }
 
 export function OptionSelectionSection({
@@ -47,24 +49,26 @@ export function OptionSelectionSection({
     policyCustomText,
     setPolicyCustomText,
     selectedOptions,
-    toggleOption
+    toggleOption,
+    comment,
+    setComment
 }: OptionSelectionSectionProps) {
     return (
         <>
             {/* Section 2: Pricing */}
             <section className="space-y-6">
                 <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-[#64DD17]/10 flex items-center justify-center">
-                        <LucideCircleDollarSign className="w-4 h-4 text-[#64DD17]" />
+                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", listingType === 'JOIN' ? "bg-[#FF6B00]/10" : "bg-[#64DD17]/10")}>
+                        <LucideCircleDollarSign className={cn("w-4 h-4", listingType === 'JOIN' ? "text-[#FF6B00]" : "text-[#64DD17]")} />
                     </div>
                     <h3 className="text-sm font-black text-white uppercase tracking-widest">3. 요금 및 옵션 (1인 기준)</h3>
                 </div>
 
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1">그린피 (원)</label>
+                        <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] ml-1">그린피 (원)</label>
                         <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-white/20">₩</span>
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-white/60">₩</span>
                             <input
                                 type="text"
                                 inputMode="numeric"
@@ -75,7 +79,12 @@ export function OptionSelectionSection({
                                 }}
                                 placeholder="판매가 입력"
                                 title="그린피 입력"
-                                className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 pl-10 pr-4 text-sm font-extrabold text-[#64DD17] focus:outline-none focus:border-[#64DD17]/50 transition-all"
+                                className={cn(
+                                    "w-full bg-white/5 border border-white/5 rounded-2xl py-4 pl-10 pr-4 text-sm font-extrabold transition-all",
+                                    listingType === 'JOIN'
+                                        ? "text-[#FF6B00] focus:border-[#FF6B00]/50"
+                                        : "text-[#64DD17] focus:border-[#64DD17]/50"
+                                )}
                             />
                         </div>
                     </div>
@@ -111,8 +120,8 @@ export function OptionSelectionSection({
                             {/* Headcount */}
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-lg bg-[#64DD17]/10 flex items-center justify-center">
-                                        <LucideUsers className="w-4 h-4 text-[#64DD17]" />
+                                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", listingType === 'JOIN' ? "bg-[#FF6B00]/10" : "bg-[#64DD17]/10")}>
+                                        <LucideUsers className={cn("w-4 h-4", listingType === 'JOIN' ? "text-[#FF6B00]" : "text-[#64DD17]")} />
                                     </div>
                                     <h3 className="text-sm font-black text-white uppercase tracking-widest">필요 인원 (필수)</h3>
                                 </div>
@@ -125,7 +134,7 @@ export function OptionSelectionSection({
                                         <LucideMinus className="w-5 h-5" />
                                     </button>
                                     <div className="flex-1 text-center">
-                                        <div className="text-2xl font-black text-[#64DD17]">{joinHeadcount}명</div>
+                                        <div className={cn("text-2xl font-black", listingType === 'JOIN' ? "text-[#FF6B00]" : "text-[#64DD17]")}>{joinHeadcount}명</div>
                                         <div className="text-[10px] text-white/40 font-bold uppercase tracking-widest">모집 중</div>
                                     </div>
                                     <button
@@ -140,7 +149,7 @@ export function OptionSelectionSection({
 
                             {/* Conditions */}
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1">조인 조건</label>
+                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] ml-1">조인 조건</label>
                                 <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                                     {['남성', '여성', '부부/커플', '성별 무관'].map(cond => {
                                         const isSelected = joinCondition.includes(cond);
@@ -155,7 +164,7 @@ export function OptionSelectionSection({
                                                 className={cn(
                                                     "px-4 py-3 rounded-xl text-xs font-bold whitespace-nowrap border transition-all",
                                                     isSelected
-                                                        ? "bg-[#64DD17] border-[#64DD17] text-[#051907]"
+                                                        ? (listingType === 'JOIN' ? "bg-[#FF6B00] border-[#FF6B00] text-white" : "bg-[#64DD17] border-[#64DD17] text-[#051907]")
                                                         : "bg-white/5 border-white/5 text-white/60 hover:bg-white/10"
                                                 )}
                                             >
@@ -174,8 +183,8 @@ export function OptionSelectionSection({
             {isManager && (
                 <section className="space-y-6">
                     <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-[#64DD17]/10 flex items-center justify-center">
-                            <LucideCircleDollarSign className="w-4 h-4 text-[#64DD17]" />
+                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", listingType === 'JOIN' ? "bg-[#FF6B00]/10" : "bg-[#64DD17]/10")}>
+                            <LucideCircleDollarSign className={cn("w-4 h-4", listingType === 'JOIN' ? "text-[#FF6B00]" : "text-[#64DD17]")} />
                         </div>
                         <h3 className="text-sm font-black text-white uppercase tracking-widest">취소 및 환불 규정 (필수)</h3>
                     </div>
@@ -194,7 +203,9 @@ export function OptionSelectionSection({
                             <div className="flex items-center gap-3 mb-2">
                                 <div className={cn(
                                     "w-5 h-5 rounded-full border flex items-center justify-center",
-                                    policyType === "POLICY_STANDARD" ? "border-[#64DD17] bg-[#64DD17]" : "border-white/20"
+                                    policyType === "POLICY_STANDARD"
+                                        ? (listingType === 'JOIN' ? "border-[#FF6B00] bg-[#FF6B00]" : "border-[#64DD17] bg-[#64DD17]")
+                                        : "border-white/20"
                                 )}>
                                     {policyType === "POLICY_STANDARD" && <LucideCheck className="w-3 h-3 text-[#051907]" />}
                                 </div>
@@ -270,7 +281,10 @@ export function OptionSelectionSection({
                                         value={policyCustomText}
                                         onChange={(e) => setPolicyCustomText(e.target.value)}
                                         placeholder="취소 및 환불 규정을 직접 입력해주세요."
-                                        className="w-full bg-white/5 border border-white/5 rounded-2xl py-3 px-4 text-xs font-bold text-white focus:outline-none focus:border-[#64DD17]/50 h-24 resize-none"
+                                        className={cn(
+                                            "w-full bg-white/5 border border-white/5 rounded-2xl py-3 px-4 text-xs font-bold text-white focus:outline-none h-24 resize-none",
+                                            listingType === 'JOIN' ? "focus:border-[#FF6B00]/50" : "focus:border-[#64DD17]/50"
+                                        )}
                                     />
                                 </motion.div>
                             )}
@@ -282,8 +296,8 @@ export function OptionSelectionSection({
             {/* Section 3: Option Tags */}
             <section className="space-y-6">
                 <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-[#64DD17]/10 flex items-center justify-center">
-                        <LucideTag className="w-4 h-4 text-[#64DD17]" />
+                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", listingType === 'JOIN' ? "bg-[#FF6B00]/10" : "bg-[#64DD17]/10")}>
+                        <LucideTag className={cn("w-4 h-4", listingType === 'JOIN' ? "text-[#FF6B00]" : "text-[#64DD17]")} />
                     </div>
                     <h3 className="text-sm font-black text-white uppercase tracking-widest">4. 옵션 태그 (터치하여 선택)</h3>
                 </div>
@@ -296,7 +310,9 @@ export function OptionSelectionSection({
                             className={cn(
                                 "p-4 rounded-2xl border text-[11px] font-black uppercase tracking-tight transition-all flex items-center justify-center text-center",
                                 selectedOptions.includes(option.id)
-                                    ? "bg-[#64DD17] border-[#64DD17] text-[#051907]"
+                                    ? listingType === 'JOIN'
+                                        ? "bg-[#FF6B00] border-[#FF6B00] text-white"
+                                        : "bg-[#64DD17] border-[#64DD17] text-[#051907]"
                                     : "bg-white/5 border-white/5 text-white/40 hover:border-white/20"
                             )}
                         >
@@ -305,6 +321,29 @@ export function OptionSelectionSection({
                     ))}
                 </div>
             </section>
+
+            {/* Section 5: Manager Memo */}
+            {isManager && (
+                <section className="space-y-6">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", listingType === 'JOIN' ? "bg-[#FF6B00]/10" : "bg-[#64DD17]/10")}>
+                            <LucideTag className={cn("w-4 h-4", listingType === 'JOIN' ? "text-[#FF6B00]" : "text-[#64DD17]")} />
+                        </div>
+                        <h3 className="text-sm font-black text-white uppercase tracking-widest">5. 매니저 메모 (공개 노출)</h3>
+                    </div>
+                    <div className="relative">
+                        <textarea
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            placeholder="추가 전달 사항을 입력해주세요 (예: 카트비 포함, 점심 제공 등)"
+                            className={cn(
+                                "w-full bg-white/5 border border-white/5 rounded-2xl py-4 px-5 text-sm font-bold text-white focus:outline-none h-32 resize-none transition-all",
+                                listingType === 'JOIN' ? "focus:border-[#FF6B00]/50" : "focus:border-[#64DD17]/50"
+                            )}
+                        />
+                    </div>
+                </section>
+            )}
         </>
     );
 }

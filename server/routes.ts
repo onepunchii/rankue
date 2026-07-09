@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import hiqRouter from "./routes/hiq.js";
+import hiqRouter from "./routes/index.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("=== HiQ Billiards API Starting ===");

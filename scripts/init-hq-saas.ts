@@ -70,11 +70,11 @@ async function initSaaS() {
             console.log("Inserting default store 'hiq'...");
             await db.insert(hiqStores).values({
                 slug: 'hiq',
-                name: '하이큐 당구장 (본점)',
-                logoText: 'HiQ Billiards',
-                themeColor: '#6366f1',
-                neonColor: '#818cf8',
-                subText: 'Rankue SaaS Global Platform'
+                name: '랭큐',
+                logoText: 'RANKUE',
+                themeColor: '#10B981',
+                neonColor: '#34D399',
+                subText: '당구 실력 랭킹 & 매칭'
             });
             console.log("✅ Default store created!");
         }

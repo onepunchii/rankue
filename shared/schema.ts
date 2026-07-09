@@ -8,11 +8,21 @@ import {
   uuid,
   jsonb,
   doublePrecision,
-  date
+  date,
+  varchar
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// --- Regions Database ---
+export const regions = pgTable("regions", {
+  code: varchar("code", { length: 10 }).primaryKey().notNull(),
+  sido: varchar("sido", { length: 50 }),
+  sigungu: varchar("sigungu", { length: 50 }),
+  dong: varchar("dong", { length: 50 }),
+  fullName: varchar("full_name", { length: 150 }),
+});
 
 export const SUBSCRIPTION_TIERS = {
   BASIC: "BASIC",
@@ -33,6 +43,8 @@ export const profiles = pgTable("profiles", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   currentSport: text("current_sport", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
   pushToken: text("push_token"), // Expo Push Token column added
+  securityQuestion: text("security_question"),
+  securityAnswer: text("security_answer"),
 });
 
 // 2. 당구장 (Club/Store) - SaaS Tenant
@@ -128,6 +140,7 @@ export const hiqMembers = pgTable("hiq_members", {
   defaultAccountBank: text("default_account_bank"),
   defaultAccountNumber: text("default_account_number"),
   defaultAccountHolder: text("default_account_holder"),
+  introduction: text("introduction"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -294,6 +307,10 @@ export const hiqCrews = pgTable("hiq_crews", {
   meetingDay: text("meeting_day"), // e.g. "SAT"
   meetingTime: text("meeting_time"), // e.g. "14:00"
   sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "MIXED"] }).default("BILLIARDS").notNull(),
+  introQuestions: jsonb("intro_questions"),
+
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
 
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -320,6 +337,8 @@ export const hiqCrewActivities = pgTable("hiq_crew_activities", {
   locationName: text("location_name"), // If generic location
   maxParticipants: integer("max_participants").default(8),
   cost: text("cost"), // e.g. "Game fee Dutch pay"
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
+  category: text("category"), // REGULAR_ROUNDING, BLITZ_SCREEN, etc.
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -342,6 +361,7 @@ export const hiqCrewPosts = pgTable("hiq_crew_posts", {
   content: text("content").notNull(),
   category: text("category"), // 공지사항, 가입인사, 모임후기, 자유글
   isNotice: boolean("is_notice").default(false).notNull(),
+  images: jsonb("images").$type<string[]>(), // Array of image URLs
   sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -435,7 +455,37 @@ export const hiqCrewPhotoComments = pgTable("hiq_crew_photo_comments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// ... (other schemas)
+// 8.8 크루 투표 (Crew Polls)
+export const hiqPolls = pgTable("hiq_polls", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id, { onDelete: 'cascade' }).notNull(),
+  authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  isAnonymous: boolean("is_anonymous").default(false).notNull(),
+  allowMultiple: boolean("allow_multiple").default(false).notNull(),
+  status: text("status", { enum: ["active", "closed"] }).default("active").notNull(),
+  endTime: timestamp("end_time"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const hiqPollOptions = pgTable("hiq_poll_options", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  pollId: uuid("poll_id").references(() => hiqPolls.id, { onDelete: 'cascade' }).notNull(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const hiqPollVotes = pgTable("hiq_poll_votes", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  pollId: uuid("poll_id").references(() => hiqPolls.id, { onDelete: 'cascade' }).notNull(),
+  optionId: uuid("option_id").references(() => hiqPollOptions.id, { onDelete: 'cascade' }).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.optionId, table.memberId)
+]);
+
 
 export const insertHiqCrewSchema = createInsertSchema(hiqCrews).omit({ id: true, createdAt: true });
 export const insertHiqCrewMemberSchema = createInsertSchema(hiqCrewMembers).omit({ id: true, joinedAt: true });
@@ -549,6 +599,22 @@ export type InsertNotice = z.infer<typeof insertNoticeSchema>;
 // --- Existing Tables (Logs, History, Friendship, Invites) ---
 // (Minor updates to references if needed)
 
+// 11. 건의함 (Suggestion Box)
+export const suggestions = pgTable("suggestions", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  userId: uuid("user_id").references(() => profiles.id), // Login user if available
+  type: text("type").notNull(), // BUG, PARTNERSHIP, FEATURE, ETC
+  content: text("content").notNull(),
+  contact: text("contact"), // Email or Phone
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSuggestionSchema = createInsertSchema(suggestions).omit({ id: true, createdAt: true, isRead: true });
+export type Suggestion = typeof suggestions.$inferSelect;
+export type InsertSuggestion = z.infer<typeof insertSuggestionSchema>;
+
+
 export const hiqVisitLogs = pgTable("hiq_visit_logs", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
@@ -559,7 +625,7 @@ export const hiqVisitLogs = pgTable("hiq_visit_logs", {
 export const hiqGameHistory = pgTable("hiq_game_history", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
-  gameId: uuid("game_id").references(() => hiqGames.id).notNull(),
+  gameId: uuid("game_id").references(() => hiqGames.id),
   storeId: uuid("store_id").references(() => hiqStores.id), // Partition by store
 
   gameMode: text("game_mode", { enum: ["match", "practice", "tournament"] }).notNull(),
@@ -604,6 +670,64 @@ export const hiqInvites = pgTable("hiq_invites", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+
+// --- Golf Club & Course Database ---
+export const golfClubs = pgTable("golf_clubs", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  name: text("name").notNull(),
+  region: text("region"),
+  totalHoles: integer("total_holes").default(18),
+  address: text("address"),
+  imageUrl: text("image_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const golfClubCourses = pgTable("golf_club_courses", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  clubId: uuid("club_id").references(() => golfClubs.id).notNull(),
+  name: text("name").notNull(),
+  holeCount: integer("hole_count").default(9).notNull(),
+  index: integer("index").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertGolfClubSchema = createInsertSchema(golfClubs).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertGolfClubCourseSchema = createInsertSchema(golfClubCourses).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type GolfClub = typeof golfClubs.$inferSelect;
+export type InsertGolfClub = z.infer<typeof insertGolfClubSchema>;
+export type GolfClubCourse = typeof golfClubCourses.$inferSelect;
+export type InsertGolfClubCourse = z.infer<typeof insertGolfClubCourseSchema>;
+
+// --- Rankue Official Golf Database (Separate from user/store data) ---
+export const rankueGolfClubs = pgTable("rankue_golf_clubs", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  name: text("name").notNull(), // 골프장 이름
+  region: text("region"),
+  address: text("address"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const rankueGolfCourses = pgTable("rankue_golf_courses", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  clubId: uuid("club_id").references(() => rankueGolfClubs.id).notNull(),
+  name: text("name").notNull(), // 코스 이름 (e.g. "East", "West")
+  pars: jsonb("pars").$type<number[]>().notNull(), // [4, 4, 3, 5, 4, 3, 4, 5, 4]
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertRankueGolfClubSchema = createInsertSchema(rankueGolfClubs).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRankueGolfCourseSchema = createInsertSchema(rankueGolfCourses).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type RankueGolfClub = typeof rankueGolfClubs.$inferSelect;
+export type RankueGolfCourse = typeof rankueGolfCourses.$inferSelect;
+
 // 11. 골프 매치 세션 (PIN 기반 실시간 내기 매치)
 export const golfMatchSessions = pgTable("golf_match_sessions", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -624,6 +748,13 @@ export const golfMatchSessions = pgTable("golf_match_sessions", {
   // Player Data: Array of { memberId, name, scores: [18], penalties: [18] }
   players: jsonb("players").$type<any[]>().default([]).notNull(),
 
+  doublingMode: text("doubling_mode", { enum: ["none", "next"] }).default("next").notNull(),
+  nearHistory: jsonb("near_history").default({}).notNull(),
+  frontCourseName: text("front_course_name"),
+  backCourseName: text("back_course_name"),
+  birdieAmount: integer("birdie_amount").default(10000).notNull(),
+  eagleAmount: integer("eagle_amount").default(20000).notNull(),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -631,6 +762,22 @@ export const golfMatchSessions = pgTable("golf_match_sessions", {
 export const insertGolfMatchSessionSchema = createInsertSchema(golfMatchSessions).omit({ id: true, createdAt: true, updatedAt: true });
 export type GolfMatchSession = typeof golfMatchSessions.$inferSelect;
 export type InsertGolfMatchSession = z.infer<typeof insertGolfMatchSessionSchema>;
+
+// 12. 골프 회원권 거래 (Membership Orders)
+export const golfMembershipOrders = pgTable("golf_membership_orders", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  courseName: text("course_name").notNull(),
+  orderType: text("order_type", { enum: ["BUY", "SELL"] }).notNull(),
+  price: doublePrecision("price").notNull(), // Hope Price (Use doublePrecision for large numbers/safety, though integer is usually fine for KRW)
+  contact: text("contact").notNull(),
+  status: text("status", { enum: ["PENDING", "CONTACTED", "COMPLETED", "CANCELLED"] }).default("PENDING").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertGolfMembershipOrderSchema = createInsertSchema(golfMembershipOrders).omit({ id: true, createdAt: true, updatedAt: true });
+export type GolfMembershipOrder = typeof golfMembershipOrders.$inferSelect;
+export type InsertGolfMembershipOrder = z.infer<typeof insertGolfMembershipOrderSchema>;
 
 export const hiqSimRecords = pgTable("hiq_sim_records", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -666,6 +813,8 @@ export const insertHiqMemberSchema = createInsertSchema(hiqMembers, {
   name: z.string().min(2, "이름은 2글자 이상이어야 합니다."),
 }).extend({
   password: z.string().optional(),
+  securityQuestion: z.string().optional(),
+  securityAnswer: z.string().optional(),
 }).omit({
   id: true,
   createdAt: true,
@@ -759,6 +908,27 @@ export type InsertHiqCrewPhotoLike = typeof hiqCrewPhotoLikes.$inferInsert;
 export type HiqCrewPhotoComment = typeof hiqCrewPhotoComments.$inferSelect;
 export type InsertHiqCrewPhotoComment = typeof hiqCrewPhotoComments.$inferInsert;
 
+export const insertHiqCrewCommentSchema = createInsertSchema(hiqCrewComments).omit({ id: true, createdAt: true });
+export type InsertHiqCrewComment = z.infer<typeof insertHiqCrewCommentSchema>;
+
+export const insertHiqCrewPhotoSchema = createInsertSchema(hiqCrewPhotos).omit({ id: true, createdAt: true });
+export type InsertHiqCrewPhoto = z.infer<typeof insertHiqCrewPhotoSchema>;
+
+export const insertHiqCrewChatSchema = createInsertSchema(hiqCrewChats).omit({ id: true, createdAt: true });
+export type InsertHiqCrewChat = z.infer<typeof insertHiqCrewChatSchema>;
+
+export const insertHiqPollSchema = createInsertSchema(hiqPolls).omit({ id: true, createdAt: true, status: true });
+export const insertHiqPollOptionSchema = createInsertSchema(hiqPollOptions).omit({ id: true, createdAt: true });
+export const insertHiqPollVoteSchema = createInsertSchema(hiqPollVotes).omit({ id: true, createdAt: true });
+
+export type HiqPoll = typeof hiqPolls.$inferSelect;
+export type InsertHiqPoll = z.infer<typeof insertHiqPollSchema>;
+export type HiqPollOption = typeof hiqPollOptions.$inferSelect;
+export type InsertHiqPollOption = z.infer<typeof insertHiqPollOptionSchema>;
+export type HiqPollVote = typeof hiqPollVotes.$inferSelect;
+export type InsertHiqPollVote = z.infer<typeof insertHiqPollVoteSchema>;
+
+
 // --- Settlement Relations ---
 
 export const hiqSettlementsRelations = relations(hiqSettlements, ({ many }) => ({
@@ -807,4 +977,39 @@ export const hiqNotifications = pgTable("hiq_notifications", {
 export const insertHiqNotificationSchema = createInsertSchema(hiqNotifications).omit({ id: true, createdAt: true });
 export type HiqNotification = typeof hiqNotifications.$inferSelect;
 export type InsertHiqNotification = z.infer<typeof insertHiqNotificationSchema>;
+
+// --- Poll Relations ---
+
+export const hiqPollsRelations = relations(hiqPolls, ({ many, one }) => ({
+  options: many(hiqPollOptions),
+  votes: many(hiqPollVotes),
+  author: one(hiqMembers, {
+    fields: [hiqPolls.authorId],
+    references: [hiqMembers.id],
+  }),
+}));
+
+export const hiqPollOptionsRelations = relations(hiqPollOptions, ({ one, many }) => ({
+  poll: one(hiqPolls, {
+    fields: [hiqPollOptions.pollId],
+    references: [hiqPolls.id],
+  }),
+  votes: many(hiqPollVotes),
+}));
+
+export const hiqPollVotesRelations = relations(hiqPollVotes, ({ one }) => ({
+  poll: one(hiqPolls, {
+    fields: [hiqPollVotes.pollId],
+    references: [hiqPolls.id],
+  }),
+  option: one(hiqPollOptions, {
+    fields: [hiqPollVotes.optionId],
+    references: [hiqPollOptions.id],
+  }),
+  member: one(hiqMembers, {
+    fields: [hiqPollVotes.memberId],
+    references: [hiqMembers.id],
+  }),
+}));
+
 

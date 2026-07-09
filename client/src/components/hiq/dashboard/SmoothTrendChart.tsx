@@ -46,14 +46,14 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
     // 테마 설정
     const theme = color === 'green' ? {
         hex: '#64DD17',
-        bg: 'bg-[#64DD17]/10',
-        text: 'text-[#64DD17]',
-        shadow: 'shadow-[0_0_20px_rgba(100,221,23,0.6)]'
+        bg: 'bg-brand/10',
+        text: 'text-brand',
+        shadow: ''
     } : {
         hex: '#3b82f6',
         bg: 'bg-blue-500/10',
         text: 'text-blue-500',
-        shadow: 'shadow-[0_0_20px_rgba(59,130,246,0.6)]'
+        shadow: ''
     };
 
     const currentAvg = data[data.length - 1]?.value || 0;
@@ -102,7 +102,7 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
                     <p className="text-white/50 text-xs mt-1">{subTitle}</p>
                 </div>
                 <div className="text-right">
-                    <div className="text-3xl font-black text-white tracking-tighter animate-in slide-in-from-bottom-2">
+                    <div className="text-3xl font-semibold text-white tracking-tight animate-in slide-in-from-bottom-2">
                         {currentAvg.toFixed(2)}
                     </div>
                     <div className={cn("flex items-center justify-end gap-1 text-xs font-bold mt-1", isUp ? theme.text : "text-white/40")}>
@@ -175,8 +175,8 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
                                             )}
                                         >
                                             <div className={cn("px-3 py-1.5 rounded-xl text-xs font-bold text-white whitespace-nowrap shadow-xl flex flex-col items-center gap-0.5", theme.bg)}>
-                                                <span className="text-[10px] text-white/60 uppercase tracking-wider">{p.date}</span>
-                                                <span className="text-sm font-black tracking-tight">AVG {p.val.toFixed(2)}</span>
+                                                <span className="text-[12px] text-white/60 uppercase tracking-wider">{p.date}</span>
+                                                <span className="text-sm font-semibold tracking-tight">AVG {p.val.toFixed(2)}</span>
                                             </div>
                                             {/* Triail */}
                                             <div className={cn("w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] -mt-1",
@@ -196,7 +196,7 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
                 </div>
 
                 {/* X-Axis */}
-                <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-[10px] text-white/30 font-bold px-1 pointer-events-none">
+                <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-[12px] text-white/55 font-medium px-1 pointer-events-none">
                     <span>10게임 전</span>
                     <span>오늘</span>
                 </div>

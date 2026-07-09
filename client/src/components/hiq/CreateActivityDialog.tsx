@@ -1,4 +1,5 @@
 import { useForm } from "react-hook-form";
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
@@ -7,6 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { BilliardsCategorySelector, type BilliardsCategory } from "@/components/hiq/club/activity/BilliardsCategorySelector";
 import {
     Dialog,
     DialogContent,
@@ -37,9 +39,19 @@ interface CreateActivityDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     crewId: string;
+    sportCategory?: 'BILLIARDS' | 'GOLF';
+    initialData?: any; // For Edit Mode
 }
 
+const CATEGORY_TITLES: Record<string, string> = {
+    REGULAR_BILLIARDS: "정기 당구 모임",
+    BLITZ_BILLIARDS: "번개 당구",
+    BILLIARDS_TOURNAMENT: "당구 대회",
+    AFTER_PARTY: "뒷풀이",
+};
+
 const formSchema = z.object({
+    category: z.string().min(1, "카테고리를 선택해주세요"),
     title: z.string().min(1, "모임명을 입력해주세요"),
     description: z.string().optional(),
     activityDate: z.date({ required_error: "일시를 선택해주세요" }),
@@ -47,86 +59,169 @@ const formSchema = z.object({
     locationName: z.string().optional(),
     cost: z.string().optional(),
     maxParticipants: z.coerce.number().min(2, "최소 2명 이상이어야 합니다").optional().default(8),
+    sportCategory: z.enum(['BILLIARDS', 'GOLF']).default('BILLIARDS'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActivityDialogProps) {
+export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory, initialData }: CreateActivityDialogProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const isEditMode = !!initialData;
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
+            category: "",
             title: "",
             description: "",
             locationName: "",
             cost: "",
             maxParticipants: 8,
             time: "19:00",
+            sportCategory: sportCategory || 'BILLIARDS',
         },
     });
 
-    const createMutation = useMutation({
-        mutationFn: async (data: FormValues) => {
-            // Combine Date and Time
-            const dateTime = new Date(data.activityDate);
-            const [hours, minutes] = data.time.split(':').map(Number);
-            dateTime.setHours(hours, minutes);
+    // Reset form when initialData changes or dialog opens
+    useEffect(() => {
+        if (open) {
+            if (initialData) {
+                // Edit Mode: Populate form
+                const dt = new Date(initialData.activityDate);
+                const timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
 
-            const payload = {
-                crewId,
-                title: data.title,
-                description: data.description,
-                locationName: data.locationName,
-                cost: data.cost,
-                maxParticipants: Number(data.maxParticipants),
-                activityDate: dateTime.toISOString(),
-            };
+                form.reset({
+                    category: initialData.category || "",
+                    title: initialData.title || "",
+                    description: initialData.description || "",
+                    locationName: initialData.locationName || "",
+                    cost: initialData.cost || "",
+                    maxParticipants: initialData.maxParticipants || 8,
+                    sportCategory: sportCategory || 'BILLIARDS', // Keep current sport context
+                    activityDate: dt,
+                    time: timeStr,
+                });
+            } else {
+                // Create Mode: Reset to defaults
+                form.reset({
+                    category: "",
+                    title: "",
+                    description: "",
+                    locationName: "",
+                    cost: "",
+                    maxParticipants: 8,
+                    time: "19:00",
+                    sportCategory: sportCategory || 'BILLIARDS',
+                });
+            }
+        }
+    }, [open, initialData, sportCategory, form]);
 
+
+    // 카테고리 변경 시 자동 제목 생성 (생성 모드일 때만, 또는 제목이 비어있을 때)
+    const watchCategory = form.watch("category");
+    useEffect(() => {
+        if (!isEditMode && watchCategory && CATEGORY_TITLES[watchCategory]) {
+            const currentTitle = form.getValues("title");
+            const isSuggestedTitle = Object.values(CATEGORY_TITLES).includes(currentTitle) || !currentTitle;
+            if (isSuggestedTitle) {
+                form.setValue("title", CATEGORY_TITLES[watchCategory]);
+            }
+        }
+    }, [watchCategory, form, isEditMode]);
+
+    const mutationFn = async (data: FormValues) => {
+        // Combine Date and Time
+        const dateTime = new Date(data.activityDate);
+        const [hours, minutes] = data.time.split(':').map(Number);
+        dateTime.setHours(hours, minutes);
+
+        const payload = {
+            crewId,
+            title: data.title,
+            description: data.description,
+            locationName: data.locationName,
+            cost: data.cost,
+            maxParticipants: Number(data.maxParticipants),
+            activityDate: dateTime.toISOString(),
+            category: data.category,
+            sportCategory: data.sportCategory
+        };
+
+        if (isEditMode) {
+            return await apiRequest(`/api/hiq/crews/${crewId}/activities/${initialData.id}`, {
+                method: "PATCH",
+                body: payload,
+            });
+        } else {
             return await apiRequest(`/api/hiq/crews/${crewId}/activities`, {
                 method: "POST",
                 body: payload,
             });
-        },
+        }
+    };
+
+    const mutation = useMutation({
+        mutationFn,
         onSuccess: () => {
-            toast({ title: "모임 생성 완료", description: "새로운 정모가 등록되었습니다." });
+            toast({
+                title: isEditMode ? "모임 수정 완료" : "모임 생성 완료",
+                description: isEditMode ? "정모 정보가 수정되었습니다." : "새로운 정모가 등록되었습니다."
+            });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/activities`] });
             onOpenChange(false);
-            form.reset();
+            if (!isEditMode) form.reset();
         },
         onError: (err: Error) => {
-            toast({ title: "생성 실패", description: err.message, variant: "destructive" });
+            toast({ title: isEditMode ? "수정 실패" : "생성 실패", description: err.message, variant: "destructive" });
         },
     });
 
     const onSubmit = (data: FormValues) => {
-        createMutation.mutate(data);
+        mutation.mutate(data);
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#0A0A0A] border border-white/10 text-white w-[90%] max-w-[400px] rounded-[2rem] shadow-2xl p-6">
+            <DialogContent className="bg-[#141416] border border-white/10 text-white w-[90%] max-w-[400px] rounded-card p-6">
                 <DialogHeader className="mb-2">
-                    <DialogTitle className="text-lg font-bold tracking-tight text-center">새 정모 만들기</DialogTitle>
+                    <DialogTitle className="text-lg font-bold text-center">
+                        {isEditMode ? "정모 정보 수정" : "새 정모 만들기"}
+                    </DialogTitle>
                 </DialogHeader>
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        {/* 카테고리 선택 */}
+                        <FormField
+                            control={form.control}
+                            name="category"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <BilliardsCategorySelector
+                                        selected={field.value as BilliardsCategory}
+                                        onSelect={(cat) => field.onChange(cat)}
+                                    />
+                                    <FormMessage className="text-brand text-[12px] -mt-4" />
+                                </FormItem>
+                            )}
+                        />
+
                         <FormField
                             control={form.control}
                             name="title"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[10px] text-white/40 font-bold ml-1 uppercase">Event Title</FormLabel>
+                                    <FormLabel className="text-[12px] text-white/55 font-semibold ml-1">모임명</FormLabel>
                                     <FormControl>
                                         <Input
                                             placeholder="모임명을 입력하세요"
                                             {...field}
-                                            className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-sm focus-visible:ring-0 focus-visible:border-[#22c55e] transition-colors placeholder:text-white/20"
+                                            className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-sm focus-visible:ring-0 focus-visible:border-brand transition-colors placeholder:text-white/45"
                                         />
                                     </FormControl>
-                                    <FormMessage className="text-[#22c55e] text-[10px]" />
+                                    <FormMessage className="text-brand text-[12px]" />
                                 </FormItem>
                             )}
                         />
@@ -137,8 +232,8 @@ export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActiv
                                 name="activityDate"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1 flex flex-col">
-                                        <FormLabel className="text-[10px] text-white/40 font-bold ml-1 uppercase flex items-center gap-1">
-                                            <LucideCalendar className="w-3 h-3" /> Date
+                                        <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                            <LucideCalendar className="w-3 h-3" /> 모임 날짜
                                         </FormLabel>
                                         <Popover>
                                             <PopoverTrigger asChild>
@@ -147,7 +242,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActiv
                                                         variant={"ghost"}
                                                         className={cn(
                                                             "w-full pl-1 text-left font-normal border-b border-white/10 rounded-none h-10 hover:bg-transparent hover:text-white px-1 justify-start",
-                                                            !field.value && "text-white/20"
+                                                            !field.value && "text-white/45"
                                                         )}
                                                     >
                                                         {field.value ? (
@@ -158,18 +253,22 @@ export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActiv
                                                     </Button>
                                                 </FormControl>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0 bg-[#141414] border-white/10" align="start">
+                                            <PopoverContent className="w-auto p-0 bg-[#141416] border-white/10" align="start">
                                                 <Calendar
                                                     mode="single"
                                                     selected={field.value}
                                                     onSelect={field.onChange}
-                                                    disabled={(date) => date < new Date() || date < new Date("1900-01-01")}
+                                                    disabled={(date) => {
+                                                        const today = new Date();
+                                                        today.setHours(0, 0, 0, 0);
+                                                        return date < today || date < new Date("1900-01-01");
+                                                    }}
                                                     initialFocus
                                                     className="p-3 pointer-events-auto text-white dark:[color-scheme:dark]"
                                                 />
                                             </PopoverContent>
                                         </Popover>
-                                        <FormMessage className="text-[#22c55e] text-[10px]" />
+                                        <FormMessage className="text-brand text-[12px]" />
                                     </FormItem>
                                 )}
                             />
@@ -179,18 +278,18 @@ export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActiv
                                 name="time"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[10px] text-white/40 font-bold ml-1 uppercase flex items-center gap-1">
-                                            <LucideClock className="w-3 h-3" /> Time
+                                        <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                            <LucideClock className="w-3 h-3" /> 시간
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="time"
                                                 {...field}
                                                 style={{ colorScheme: "dark" }}
-                                                className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-sm focus-visible:ring-0 focus-visible:border-[#22c55e] transition-colors [&::-webkit-calendar-picker-indicator]:invert"
+                                                className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-sm focus-visible:ring-0 focus-visible:border-brand transition-colors [&::-webkit-calendar-picker-indicator]:invert"
                                             />
                                         </FormControl>
-                                        <FormMessage className="text-[#22c55e] text-[10px]" />
+                                        <FormMessage className="text-brand text-[12px]" />
                                     </FormItem>
                                 )}
                             />
@@ -202,18 +301,18 @@ export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActiv
                                 name="locationName"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[10px] text-white/40 font-bold ml-1 uppercase flex items-center gap-1">
-                                            <LucideMapPin className="w-3 h-3" /> Location
+                                        <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                            <LucideMapPin className="w-3 h-3" /> 장소 (당구장)
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 placeholder="모임 장소"
                                                 {...field}
                                                 value={field.value || ""}
-                                                className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-sm focus-visible:ring-0 focus-visible:border-[#22c55e] transition-colors placeholder:text-white/20"
+                                                className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-sm focus-visible:ring-0 focus-visible:border-brand transition-colors placeholder:text-white/45"
                                             />
                                         </FormControl>
-                                        <FormMessage className="text-[#22c55e] text-[10px]" />
+                                        <FormMessage className="text-brand text-[12px]" />
                                     </FormItem>
                                 )}
                             />
@@ -223,17 +322,18 @@ export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActiv
                                 name="maxParticipants"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[10px] text-white/40 font-bold ml-1 uppercase flex items-center gap-1">
-                                            <LucideUsers className="w-3 h-3" /> Max
+                                        <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                            <LucideUsers className="w-3 h-3" /> 정원 (최대 인원)
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="number"
+                                                min={2}
                                                 {...field}
-                                                className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-sm focus-visible:ring-0 focus-visible:border-[#22c55e] transition-colors"
+                                                className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-sm focus-visible:ring-0 focus-visible:border-brand transition-colors"
                                             />
                                         </FormControl>
-                                        <FormMessage className="text-[#22c55e] text-[10px]" />
+                                        <FormMessage className="text-brand text-[12px]" />
                                     </FormItem>
                                 )}
                             />
@@ -244,18 +344,20 @@ export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActiv
                             name="cost"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[10px] text-white/40 font-bold ml-1 uppercase flex items-center gap-1">
-                                        <LucideDollarSign className="w-3 h-3" /> Cost
+                                    <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                        <LucideDollarSign className="w-3 h-3" /> 비용 (참가비)
                                     </FormLabel>
                                     <FormControl>
                                         <Input
-                                            placeholder="참가 비용 (선택)"
+                                            type="text"
+                                            autoComplete="off"
+                                            placeholder="예: 게임비 1/N"
                                             {...field}
                                             value={field.value || ""}
-                                            className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-sm focus-visible:ring-0 focus-visible:border-[#22c55e] transition-colors placeholder:text-white/20"
+                                            className="bg-transparent border-t-0 border-x-0 border-b border-white/10 rounded-none px-1 h-10 text-base focus-visible:ring-0 focus-visible:border-brand transition-colors placeholder:text-white/45"
                                         />
                                     </FormControl>
-                                    <FormMessage className="text-[#22c55e] text-[10px]" />
+                                    <FormMessage className="text-brand text-[12px]" />
                                 </FormItem>
                             )}
                         />
@@ -265,16 +367,16 @@ export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActiv
                             name="description"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[10px] text-white/40 font-bold ml-1 uppercase">Details</FormLabel>
+                                    <FormLabel className="text-[12px] text-white/55 font-semibold ml-1">상세 내용</FormLabel>
                                     <FormControl>
                                         <Textarea
                                             placeholder="모임 상세 내용"
                                             {...field}
                                             value={field.value || ""}
-                                            className="bg-white/5 border-none rounded-xl p-3 resize-none h-20 focus-visible:ring-1 focus-visible:ring-[#22c55e] transition-all placeholder:text-white/20 text-xs leading-relaxed"
+                                            className="bg-surface-2 border border-surface-line rounded-tile p-3 resize-none h-20 focus-visible:ring-1 focus-visible:ring-brand transition-all placeholder:text-white/45 text-xs leading-relaxed"
                                         />
                                     </FormControl>
-                                    <FormMessage className="text-[#22c55e] text-[10px]" />
+                                    <FormMessage className="text-brand text-[12px]" />
                                 </FormItem>
                             )}
                         />
@@ -282,10 +384,10 @@ export function CreateActivityDialog({ open, onOpenChange, crewId }: CreateActiv
                         <DialogFooter className="pt-2">
                             <Button
                                 type="submit"
-                                className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold h-12 rounded-2xl text-base shadow-lg transition-all transform active:scale-95"
-                                disabled={createMutation.isPending}
+                                className="w-full bg-brand hover:bg-brand-strong text-brand-fg font-bold h-12 rounded-2xl text-base transition-all active:scale-95"
+                                disabled={mutation.isPending}
                             >
-                                {createMutation.isPending ? "생성 중..." : "정모 만들기"}
+                                {mutation.isPending ? (isEditMode ? "수정 중..." : "생성 중...") : (isEditMode ? "정모 정보 수정" : "정모 만들기")}
                             </Button>
                         </DialogFooter>
                     </form>

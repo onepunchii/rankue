@@ -17,20 +17,36 @@ export default function HiqScoreboard() {
     const id = params?.id;
     const [, setLocation] = useLocation();
 
-    if (!id) return null;
-
+    // NOTE: do NOT early-return before the hooks below — a conditional return here changes
+    // the hook count between renders (React "rendered fewer hooks" crash) when the route param
+    // is briefly undefined during navigation. The `if (!id)` guard lives after all hooks.
     const {
         game, isLoading, players, totalPlayers,
         gameState, canUndo, canRedo, undo, redo,
         playerOrder, handleDragEnd, handleCardTap, handleTurnChange,
         finishMutation, speak
-    } = useGameScore(id);
+    } = useGameScore(id || "");
 
     const [inningModalPlayer, setInningModalPlayer] = useState<number | null>(null);
 
-    // Orientation Cleanup
+    // Orientation & Fullscreen Control
     useEffect(() => {
+        const sendOrientation = (mode: 'LANDSCAPE' | 'PORTRAIT') => {
+            const rnWebView = (window as any).ReactNativeWebView;
+            if (rnWebView) {
+                rnWebView.postMessage(JSON.stringify({
+                    type: 'CHANGE_ORIENTATION',
+                    payload: { mode }
+                }));
+            }
+        };
+
+        // 점수판 진입 시 가로 모드 전환
+        sendOrientation('LANDSCAPE');
+
         return () => {
+            // 점수판 종료 시 세로 모드로 복구
+            sendOrientation('PORTRAIT');
             if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.unlock === 'function') {
                 try { screen.orientation.unlock(); } catch (e) { console.warn(e); }
             }
@@ -44,21 +60,17 @@ export default function HiqScoreboard() {
         useSensor(MouseSensor, {})
     );
 
+    if (!id) return null;
+
     const getAvg = (score: number) => (score / Math.max(1, gameState.innings)).toFixed(2);
 
     if (isLoading || !game) {
-        return <div className="min-h-screen bg-black flex items-center justify-center text-white">LOADING...</div>;
+        return <div className="min-h-screen bg-black flex items-center justify-center text-white">불러오는 중...</div>;
     }
 
     return (
         <LandscapeGuard>
             <div className="h-[100dvh] bg-[#050505] text-white font-sans overflow-hidden flex flex-col touch-none select-none relative">
-                {/* Background */}
-                <div className="absolute inset-0 pointer-events-none z-0">
-                    <div className="absolute inset-0 bg-premium-billiards opacity-10 grayscale brightness-50" />
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.6)_100%)]" />
-                </div>
-
                 <div className="flex-1 flex w-full relative z-0">
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                         <SortableContext items={playerOrder} strategy={horizontalListSortingStrategy}>

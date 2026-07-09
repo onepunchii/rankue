@@ -22,19 +22,29 @@ export const useGameStats = (
 
         // Calculate Cumulative Average
         const cumulativeAverage = totalInnings > 0
-            ? (totalNormalizedScore / totalInnings).toFixed(3)
-            : "0.000";
+            ? (currentSport === "GOLF"
+                ? ((totalNormalizedScore / totalInnings) * 18).toFixed(1)
+                : (totalNormalizedScore / totalInnings).toFixed(3))
+            : (currentSport === "GOLF" ? "0.0" : "0.000");
 
         // Stats
         const totalGames = officialHistory.length;
         const wins = officialHistory.filter(g => g.isWinner).length;
         const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100).toString() : "0";
         const bestHighRun = Math.max(...officialHistory.map(g => g.highRun || 0), 0);
-        const bestScore = officialHistory.length > 0 ? Math.max(...officialHistory.map(g => g.score)) : 0;
+        const bestScore = officialHistory.length > 0
+            ? (currentSport === "GOLF" ? Math.min(...officialHistory.map(g => g.score)) : Math.max(...officialHistory.map(g => g.score)))
+            : 0;
 
-        // Best Average
-        const bestAverage = officialHistory.length > 0
-            ? Math.max(...officialHistory.map(g => parseFloat(g.average))).toFixed(3)
+        // Best Average — filter out NaN (a null/blank `average` would otherwise poison
+        // Math.min/Math.max and render "NaN" in the UI).
+        const validAverages = officialHistory
+            .map(g => parseFloat(g.average))
+            .filter(v => !isNaN(v));
+        const bestAverage = validAverages.length > 0
+            ? (currentSport === "GOLF"
+                ? Math.min(...validAverages).toFixed(3)
+                : Math.max(...validAverages).toFixed(3))
             : "0.000";
 
         // Recent 10 Games Average
@@ -96,7 +106,7 @@ export const useGameStats = (
         // Last 10 games for sparkline
         const last10Games = [...officialHistory].slice(0, 10).reverse().map((g, idx) => ({
             index: idx,
-            avg: parseFloat(g.average)
+            avg: parseFloat(g.average) || 0
         }));
 
         // Main Mode calculation for "ALL" tab

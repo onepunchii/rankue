@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useLocation } from "wouter";
 import {
     Sheet,
@@ -7,9 +8,7 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 import {
-    LucideTrophy,
     LucideFlag,
-    LucideCamera,
 } from "lucide-react";
 
 interface GameModeSheetProps {
@@ -41,37 +40,19 @@ export function GameModeSheet({ open, onOpenChange, onOpenScanner }: GameModeShe
                         <div className="absolute inset-0 bg-gradient-to-b from-[#64DD17]/10 to-transparent opacity-50" />
 
                         <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center">
-                            <div className="w-20 h-20 rounded-full bg-[#64DD17]/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_30px_rgba(100,221,23,0.2)]">
-                                <LucideTrophy className="w-10 h-10 text-[#64DD17]" />
+                            <div className="w-[100px] h-[100px] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                                <DotLottieReact
+                                    src="https://lottie.host/3fbea7ec-66b6-4723-b294-e3e58e01ccd1/OY1OsEbf4v.lottie"
+                                    loop
+                                    autoplay
+                                    style={{ width: '100%', height: '100%' }}
+                                />
                             </div>
                         </div>
 
                         <div className="relative z-10 text-center">
-                            <h3 className="text-base font-extrabold text-[#64DD17] mb-1">랭큐 매치</h3>
-                            <p className="text-xs font-semibold text-white/60 leading-tight">내기 &<br />정산 자동화</p>
-                        </div>
-                    </motion.button>
-
-                    {/* 2. Solo Mode (Secondary - Neon Blue) */}
-                    <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => {
-                            onOpenChange(false);
-                            setLocation('/golf/game/new?mode=solo');
-                        }}
-                        className="snap-center min-w-[170px] relative flex flex-col justify-between p-5 h-60 rounded-[1.8rem] bg-[#1a1a1a] border border-[#29B6F6]/50 shadow-[0_0_15px_rgba(41,182,246,0.1)] hover:border-[#29B6F6] hover:shadow-[0_0_30px_rgba(41,182,246,0.3)] transition-all group overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-b from-[#29B6F6]/5 to-transparent opacity-30" />
-
-                        <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center">
-                            <div className="w-20 h-20 rounded-full bg-[#29B6F6]/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_20px_rgba(41,182,246,0.1)]">
-                                <LucideFlag className="w-10 h-10 text-[#29B6F6]" />
-                            </div>
-                        </div>
-
-                        <div className="relative z-10 text-center">
-                            <h3 className="text-base font-extrabold text-white group-hover:text-[#29B6F6] transition-colors mb-1">혼자 기록</h3>
-                            <p className="text-xs font-semibold text-white/50 leading-tight">연습 &<br />순수 기록</p>
+                            <h3 className="text-base font-extrabold text-[#64DD17] mb-1">새 게임 시작</h3>
+                            <p className="text-xs font-semibold text-white/60 leading-tight text-center">실시간 스코어 입력 &<br />내기 관리</p>
                         </div>
                     </motion.button>
 
@@ -87,14 +68,19 @@ export function GameModeSheet({ open, onOpenChange, onOpenScanner }: GameModeShe
                         <div className="absolute inset-0 bg-gradient-to-b from-[#FF4081]/5 to-transparent opacity-30" />
 
                         <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center">
-                            <div className="w-20 h-20 rounded-full bg-[#FF4081]/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_20px_rgba(255,64,129,0.1)]">
-                                <LucideCamera className="w-10 h-10 text-[#FF4081]" />
+                            <div className="w-20 h-20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                                <DotLottieReact
+                                    src="https://lottie.host/1c7d117c-412c-452a-9150-e0b3ed8b5e2d/cf8pvA7Grd.lottie"
+                                    loop
+                                    autoplay
+                                    style={{ width: '100%', height: '100%' }}
+                                />
                             </div>
                         </div>
 
                         <div className="relative z-10 text-center">
-                            <h3 className="text-base font-extrabold text-white group-hover:text-[#FF4081] transition-colors mb-1">기록 가져오기</h3>
-                            <p className="text-xs font-semibold text-white/50 leading-tight">스코어카드<br />AI 스캔</p>
+                            <h3 className="text-base font-extrabold text-white group-hover:text-[#FF4081] transition-colors mb-1 text-center">스코어카드 스캔</h3>
+                            <p className="text-xs font-semibold text-white/50 leading-tight text-center">종이 스코어카드를<br />사진으로 자동 입력</p>
                         </div>
                     </motion.button>
                 </div>

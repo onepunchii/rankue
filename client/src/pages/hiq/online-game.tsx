@@ -21,6 +21,7 @@ import { GameRuleEngine } from "@/lib/scoring-engine";
 import { VirtualJoystick } from "@/components/hiq/VirtualJoystick";
 import { Vector3, Quaternion } from "three";
 import { TableSpec, PRESETS } from "@/lib/physics-core";
+import { useGameAudio } from "@/hooks/useGameAudio";
 
 // Visual Constants - Increased for better visibility
 const CANVAS_W = 320;
@@ -38,6 +39,7 @@ export default function HiqOnlineGame() {
     const { toast } = useToast();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const engineRef = useRef<PhysicsEngine2D | null>(null);
+    const { speak, playEffect } = useGameAudio();
 
     // Game State
     const [isSimulating, setIsSimulating] = useState(false);
@@ -56,8 +58,50 @@ export default function HiqOnlineGame() {
     const [tableImage, setTableImage] = useState<HTMLImageElement | null>(null);
     const [activePanel, setActivePanel] = useState<'none' | 'spin' | 'power'>('none');
     const [isJoystickActive, setIsJoystickActive] = useState(false);
+    const [isGameStarted, setIsGameStarted] = useState(true);
     const [joystickOpacity, setJoystickOpacity] = useState(1);
     const joystickOpacityRef = useRef(1);
+
+    // 1. 실제 뷰포트 높이 계산 (주소창/하단바 제외)
+    const [viewportHeight, setViewportHeight] = useState('100vh');
+
+    useEffect(() => {
+        const updateHeight = () => {
+            // window.innerHeight를 직접 사용하여 정확한 높이 설정
+            setViewportHeight(`${window.innerHeight}px`);
+        };
+
+        // 초기 실행 및 리사이즈 이벤트 감지
+        updateHeight();
+        window.addEventListener('resize', updateHeight);
+        return () => window.removeEventListener('resize', updateHeight);
+    }, []);
+
+    // --- Screen Orientation & Fullscreen Control ---
+    useEffect(() => {
+        const sendOrientation = (mode: 'LANDSCAPE' | 'PORTRAIT') => {
+            const rnWebView = (window as any).ReactNativeWebView;
+            if (rnWebView) {
+                console.log(`[WebView] Requesting Orientation: ${mode}`);
+                rnWebView.postMessage(JSON.stringify({
+                    type: 'CHANGE_ORIENTATION',
+                    payload: { mode }
+                }));
+            }
+        };
+
+        // e빌리어드는 세로 모드 고정 (강제)
+        sendOrientation('PORTRAIT');
+
+        const timer = setTimeout(() => {
+            sendOrientation('PORTRAIT');
+        }, 100);
+
+        return () => {
+            clearTimeout(timer);
+            sendOrientation('PORTRAIT');
+        };
+    }, []);
 
     // --- Scoreboard State ---
     const [score, setScore] = useState(0);
@@ -109,18 +153,21 @@ export default function HiqOnlineGame() {
     // Load Table Image
     useEffect(() => {
         const img = new Image();
-        // Use encodeURI to handle Hangul characters safely
         img.src = encodeURI("/assets/images/당구대.png");
         img.onload = () => {
             console.log("🎱 online-game: Table image loaded successfully", img.width, img.height);
             setTableImage(img);
+            // Announce game start when ready
+            speak("당구 매칭이 시작되었습니다. 화이팅하세요!");
         };
         img.onerror = (e) => {
             console.error("🚨 online-game: Failed to load table image", e);
-            // Retry with unencoded just in case (local dev quirk sometimes)
             const fallbackImg = new Image();
             fallbackImg.src = "/assets/images/당구대.png";
-            fallbackImg.onload = () => setTableImage(fallbackImg);
+            fallbackImg.onload = () => {
+                setTableImage(fallbackImg);
+                speak("매칭이 시작되었습니다.");
+            };
         };
     }, []);
 
@@ -155,7 +202,10 @@ export default function HiqOnlineGame() {
                 setScore(s => s + normalizedChange);
                 setCurrentRun(r => {
                     const next = r + normalizedChange;
-                    if (next > highRun) setHighRun(next);
+                    // Functional update off the new run value — reading the closed-over `highRun`
+                    // (a stale value, since this effect only re-subscribes on isSimulating) could
+                    // miss a new high run across consecutive scoring shots in the same break.
+                    setHighRun(h => Math.max(h, next));
                     return next;
                 });
 
@@ -187,6 +237,8 @@ export default function HiqOnlineGame() {
                     title: "NICE SHOT! 🔥",
                     description: result.message,
                 });
+                speak("나이스 샷!");
+                playEffect('win');
             } else if (result.type === 'foul') {
                 setScore(s => s + result.scoreChange);
                 setCurrentRun(0);
@@ -207,6 +259,8 @@ export default function HiqOnlineGame() {
                     title: "FOUL! ⚠️",
                     description: result.message
                 });
+                speak(result.message || "파울입니다. 조심하세요.");
+                playEffect('finishing');
             } else {
                 // Missed
                 setCurrentRun(0);
@@ -222,6 +276,7 @@ export default function HiqOnlineGame() {
                 setInnings(i => i + 1);
                 if (result.message) {
                     toast({ title: "MISSED", description: result.message });
+                    speak("아쉽네요. 다음 이닝을 준비하세요.");
                 }
             }
         }
@@ -284,9 +339,9 @@ export default function HiqOnlineGame() {
             // Draw Table Width IS Table Visual Width (230)
             const DRAW_TABLE_W = TABLE_VISUAL_W;
 
-            // Perform Left Alignment (User Request: Move to Back Button Area)
-            const START_X = 16 + 20; // Shifted right by 20px
-            const START_Y = (CANVAS_H - PLAY_H) / 2 + 20; // Shifted down by 20px
+            // Perform Proper Aspect-Ratio Centering
+            const START_X = (CANVAS_W - PLAY_W) / 2;
+            const START_Y = (CANVAS_H - PLAY_H) / 2;
 
             // --- Background: Table Image ---
             // --- Background: Table Image REMOVED ---
@@ -931,9 +986,9 @@ export default function HiqOnlineGame() {
         const PLAY_W = TABLE_VISUAL_W * (1 - MARGIN_RATIO_X * 2);
         const PLAY_H = PLAY_W * 2.0;
 
-        const START_X = 16 + 20;
+        const START_X = (CANVAS_W - PLAY_W) / 2;
         const MARGIN_RATIO_Y = 0.054;
-        const START_Y = (CANVAS_H - PLAY_H) / 2 + 20;
+        const START_Y = (CANVAS_H - PLAY_H) / 2;
 
         const TABLE_W = spec.width;
         const TABLE_H = spec.height;
@@ -946,7 +1001,10 @@ export default function HiqOnlineGame() {
 
 
     return (
-        <div className="fixed inset-0 w-full h-[100dvh] bg-black overflow-hidden select-none touch-none overscroll-none">
+        <div
+            className="fixed inset-0 w-full bg-black overflow-hidden select-none touch-none overscroll-none"
+            style={{ height: viewportHeight }}
+        >
 
             {/* 1. Main Canvas Area */}
             <canvas
@@ -955,6 +1013,8 @@ export default function HiqOnlineGame() {
                 height={CANVAS_H * dpr}
                 className="block w-full h-full object-cover"
             />
+
+            {/* First Interaction Layer (Removed - Auto Start) */}
 
             {/* 2. Top Navigation & Scoreboard */}
             <div className="absolute top-0 left-0 right-0 p-4 z-40">
@@ -971,29 +1031,29 @@ export default function HiqOnlineGame() {
                         {/* Scoreboard */}
                         <div className="flex-1 h-12 premium-glass rounded-2xl flex items-center px-4 justify-between overflow-hidden shadow-2xl">
                             <div className="flex flex-col items-start leading-none min-w-[40px]">
-                                <span className="text-[9px] text-[#E0E0E0]/40 font-bold uppercase tracking-tighter">INN</span>
-                                <span className="text-xl font-black text-[#E0E0E0]/70">{innings}</span>
+                                <span className="text-[12px] text-[#E0E0E0]/40 font-bold uppercase tracking-tight">이닝</span>
+                                <span className="text-xl font-semibold text-[#E0E0E0]/70">{innings}</span>
                             </div>
 
                             <div className="h-6 w-[1px] bg-white/5" />
 
                             <div className="flex flex-col items-center leading-none min-w-[40px]">
-                                <span className="text-[9px] text-[#E0E0E0]/40 font-bold uppercase tracking-tighter">SCORE</span>
-                                <span className="text-xl font-black text-[#E0E0E0]">{score}</span>
+                                <span className="text-[12px] text-[#E0E0E0]/40 font-bold uppercase tracking-tight">점수</span>
+                                <span className="text-xl font-semibold text-[#E0E0E0]">{score}</span>
                             </div>
 
                             <div className="h-6 w-[1px] bg-white/5" />
 
                             <div className="flex flex-col items-center leading-none min-w-[50px]">
-                                <span className="text-[9px] text-[#E0E0E0]/40 font-bold uppercase tracking-tighter">AVG</span>
-                                <span className="text-xl font-black text-chrome">{avg}</span>
+                                <span className="text-[12px] text-[#E0E0E0]/40 font-bold uppercase tracking-tight">평균</span>
+                                <span className="text-xl font-semibold text-chrome">{avg}</span>
                             </div>
 
                             <div className="h-6 w-[1px] bg-white/5" />
 
                             <div className="flex flex-col items-end leading-none min-w-[50px]">
-                                <span className="text-[9px] text-[#E0E0E0]/40 font-bold uppercase tracking-tighter">HIGH</span>
-                                <span className="text-xl font-black text-matte-gold">{highRun}</span>
+                                <span className="text-[12px] text-[#E0E0E0]/40 font-bold uppercase tracking-tight">하이런</span>
+                                <span className="text-xl font-semibold text-matte-gold">{highRun}</span>
                             </div>
                         </div>
                     </div>
@@ -1001,7 +1061,7 @@ export default function HiqOnlineGame() {
                     {currentRun > 0 && (
                         <div className="flex justify-center">
                             <div className="px-4 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 backdrop-blur-sm animate-pulse">
-                                <span className="text-[10px] font-black text-indigo-300">HIGH RUN (+{currentRun}) 🔥</span>
+                                <span className="text-[12px] font-semibold text-indigo-300">HIGH RUN (+{currentRun}) 🔥</span>
                             </div>
                         </div>
                     )}
@@ -1020,7 +1080,7 @@ export default function HiqOnlineGame() {
                     className="w-12 h-12 rounded-full premium-glass flex items-center justify-center text-[#E0E0E0]/40 hover:text-matte-gold transition-all active:scale-90"
                 >
                     <LayoutList strokeWidth={1.5} size={24} />
-                    <span className="sr-only">Score Sheet</span>
+                    <span className="sr-only">점수표</span>
                 </button>
 
                 {/* Spin Control (Mini Ball Icon) */}
@@ -1036,8 +1096,9 @@ export default function HiqOnlineGame() {
                         <CircleDashed strokeWidth={1.5} size={24} />
                         <span className="sr-only">Spin</span>
                         {/* Dot indicating spin */}
+                        {/* eslint-disable-next-line react-dom/no-unsafe-styles */}
                         <div
-                            className="absolute bg-red-600 rounded-full w-1.5 h-1.5 shadow-[0_0_5px_rgba(220,38,38,0.5)]"
+                            className="absolute bg-red-600 rounded-full w-1.5 h-1.5"
                             style={{
                                 top: '50%', left: '50%',
                                 transform: `translate(-50%, -50%) translate(${cueSpin.x * 6}px, ${-cueSpin.y * 6}px)`
@@ -1098,32 +1159,32 @@ export default function HiqOnlineGame() {
                                 />
 
                                 {/* Perspective Guides (Fixed UI, Relative Logic) */}
-                                <div className="absolute inset-0 pointer-events-none p-2 text-[8px] font-black tracking-tighter">
+                                <div className="absolute inset-0 pointer-events-none p-2 text-[12px] font-semibold tracking-tight">
                                     {/* Top: Follow */}
                                     <div className="absolute top-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-red-400">
                                         <ChevronUp size={8} />
-                                        <span>FOLLOW</span>
+                                        <span>팔로우</span>
                                     </div>
                                     {/* Bottom: Draw */}
                                     <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-blue-400">
-                                        <span>DRAW</span>
+                                        <span>드로우</span>
                                         <ChevronDown size={8} />
                                     </div>
                                     {/* Left: Left English */}
                                     <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[#E0E0E0]/60 [writing-mode:vertical-lr] rotate-180">
                                         <ChevronLeft size={8} />
-                                        <span>LEFT</span>
+                                        <span>좌</span>
                                     </div>
                                     {/* Right: Right English */}
                                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[#E0E0E0]/60 [writing-mode:vertical-lr]">
-                                        <span>RIGHT</span>
+                                        <span>우</span>
                                         <ChevronRight size={8} />
                                     </div>
                                 </div>
 
                                 {/* Indicator */}
                                 <div
-                                    className="absolute w-4 h-4 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)] pointer-events-none transition-all duration-75"
+                                    className="absolute w-4 h-4 bg-red-500 rounded-full pointer-events-none transition-all duration-75"
                                     style={{
                                         left: `${(cueSpin.x + 1) * 50}%`,
                                         top: `${(-cueSpin.y + 1) * 50}%`,
@@ -1142,7 +1203,7 @@ export default function HiqOnlineGame() {
                     className="w-12 h-12 rounded-full premium-glass flex items-center justify-center text-[#E0E0E0]/40 hover:text-matte-gold transition-all active:scale-90"
                 >
                     <Crosshair strokeWidth={1.5} size={24} />
-                    <span className="sr-only">Auto Target</span>
+                    <span className="sr-only">자동 타겟</span>
                 </button>
 
 
@@ -1171,7 +1232,7 @@ export default function HiqOnlineGame() {
                     onClick={handleShot}
                     disabled={isSimulating}
                     title="스트로크"
-                    className="w-12 h-12 rounded-full flex items-center justify-center premium-glass border-white/10 text-matte-gold shadow-[0_0_20px_rgba(197,160,89,0.15)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed group relative mt-2"
+                    className="w-12 h-12 rounded-full flex items-center justify-center premium-glass border-white/10 text-matte-gold active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed group relative mt-2"
                 >
                     <Play className="w-5 h-5 fill-current ml-0.5" />
                     {/* Ripple/Glow effect ring */}
@@ -1186,7 +1247,7 @@ export default function HiqOnlineGame() {
                 <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
                     <div className="w-full max-w-sm premium-glass rounded-3xl border border-white/10 p-6 flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-black text-white tracking-tight">이닝별 기록표</h2>
+                            <h2 className="text-xl font-semibold text-white tracking-tight">이닝별 기록표</h2>
                             <button
                                 onClick={() => setIsScoreSheetOpen(false)}
                                 className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white"
@@ -1200,15 +1261,15 @@ export default function HiqOnlineGame() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-white/5">
-                                        <th className="py-2 text-[10px] font-bold text-white/40 uppercase">Inning</th>
-                                        <th className="py-2 text-[10px] font-bold text-white/40 uppercase text-center">Score</th>
-                                        <th className="py-2 text-[10px] font-bold text-white/40 uppercase text-right">Total</th>
+                                        <th className="py-2 text-[12px] font-medium text-white/40 uppercase">Inning</th>
+                                        <th className="py-2 text-[12px] font-medium text-white/40 uppercase text-center">Score</th>
+                                        <th className="py-2 text-[12px] font-medium text-white/40 uppercase text-right">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {inningRecords.length === 0 ? (
                                         <tr>
-                                            <td colSpan={3} className="py-8 text-center text-xs text-white/20 italic">
+                                            <td colSpan={3} className="py-8 text-center text-xs text-white/45 ">
                                                 기록된 이닝이 없습니다.
                                             </td>
                                         </tr>
@@ -1222,7 +1283,7 @@ export default function HiqOnlineGame() {
                                             return (
                                                 <tr key={r.inning} className="border-b border-white/5 last:border-0">
                                                     <td className="py-3 text-sm font-medium text-white/60">{r.inning}</td>
-                                                    <td className={`py-3 text-sm font-black text-center ${r.score > 0 ? 'text-indigo-400' : 'text-white/20'}`}>
+                                                    <td className={`py-3 text-sm font-semibold text-center ${r.score > 0 ? 'text-indigo-400' : 'text-white/45'}`}>
                                                         {r.score > 0 ? `+${r.score}` : r.score}
                                                     </td>
                                                     <td className="py-3 text-sm font-bold text-white text-right">{cumulative}</td>
@@ -1236,14 +1297,14 @@ export default function HiqOnlineGame() {
 
                         <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center">
                             <div>
-                                <span className="text-[10px] font-bold text-white/40 uppercase block leading-none">TOTAL SCORE</span>
-                                <span className="text-2xl font-black text-indigo-400">{score}</span>
+                                <span className="text-[12px] font-medium text-white/40 uppercase block leading-none">총점</span>
+                                <span className="text-2xl font-semibold text-indigo-400">{score}</span>
                             </div>
                             <div className="text-right flex flex-col items-end">
-                                <span className="text-[10px] font-bold text-white/40 uppercase block leading-none">
+                                <span className="text-[12px] font-medium text-white/40 uppercase block leading-none">
                                     {engineRef.current?.getSpec().name.split(' ')[0] || "대대"} 모드
                                 </span>
-                                <span className="text-xl font-black text-white">{avg}</span>
+                                <span className="text-xl font-semibold text-white">{avg}</span>
                             </div>
                         </div>
                     </div>
@@ -1294,6 +1355,6 @@ export default function HiqOnlineGame() {
                 </div>
             )}
 
-        </div >
+        </div>
     );
 }

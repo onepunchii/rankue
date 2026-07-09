@@ -383,6 +383,8 @@ export default function App() {
                     allowsFullscreenVideo={true}
                     textInteractionEnabled={true}
                     forceDarkOn={false}
+                    decelerationRate="normal"
+                    allowsBackForwardNavigationGestures={true}
                 />
                 {isScanning && (
                     <View style={styles.cameraContainer}>

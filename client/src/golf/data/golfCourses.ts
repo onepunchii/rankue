@@ -8464,7 +8464,7 @@ export const COURSES = [
         "area": "1640629",
         "holes": "27",
         "subType": "대중제",
-        "isRankue60": false,
+        "isRankue60": true,
         "rating": 4.5,
         "difficulty": "중",
         "speed": "보통",

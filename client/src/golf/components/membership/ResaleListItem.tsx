@@ -3,6 +3,9 @@ import { LucideMapPin, LucideTag, LucideChevronRight } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
     MembershipItem,
+    GolfMembership,
+    CondoMembership,
+    FitnessMembership,
     formatPrice,
     calculateTrend,
     extractClubName,
@@ -13,12 +16,18 @@ import {
 
 export const ResaleListItem = ({ item, useGrouping = true }: { item: MembershipItem, useGrouping?: boolean }) => {
     const trend = calculateTrend(item.id);
-    const priceFormatted = formatPrice(item.priceValue);
+    const priceFormatted = formatPrice(item.price.current);
 
     // Extract region from address (first part before space)
-    const region = item.clubInfo.address !== '-'
-        ? item.clubInfo.address.split(' ').slice(0, 2).join(' ')
+    const address = item.info.Address || '-';
+    const region = address !== '-'
+        ? address.split(' ').slice(0, 2).join(' ')
         : '정보 확인중';
+
+    // Helper to get type/roomType
+    const itemType = item.category === 'Golf' ? (item as GolfMembership).golfSpec?.type :
+        item.category === 'Condo' ? (item as CondoMembership).condoSpec?.roomType :
+            item.category;
 
     // 그룹화 정보
     const clubName = extractClubName(item.name);
@@ -54,7 +63,7 @@ export const ResaleListItem = ({ item, useGrouping = true }: { item: MembershipI
                             )}
                             {!useGrouping && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/40 border border-white/5 shrink-0">
-                                    {item.type}
+                                    {itemType}
                                 </span>
                             )}
                             {item.category !== 'Golf' && (

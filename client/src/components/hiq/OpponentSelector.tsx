@@ -47,22 +47,22 @@ export function OpponentSelector({ onSelect, gameType, selectedOpponentIds = [],
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className={`w-full justify-between bg-white/5 border-white/10 text-white hover:bg-white/10 rounded-xl ${compact ? "h-10 px-3" : "h-14 rounded-2xl"}`}
+                    className={`w-full justify-between bg-surface-2 border-surface-line text-white hover:bg-surface-3 rounded-tile ${compact ? "h-10 px-3" : "h-14 rounded-2xl"}`}
                 >
                     {selectedMember ? (
                         <div className="flex items-center gap-2">
                             <span className={`font-bold ${compact ? "text-xs" : ""}`}>{selectedMember.name}</span>
-                            <span className={`text-[#ffd700] ${compact ? "text-[10px]" : "text-xs"}`}>
+                            <span className={`text-[#ffd700] ${compact ? "text-[12px]" : "text-xs"}`}>
                                 {gameType === "4c" ? `4구 ${selectedMember.handi4c}` : `3구 ${selectedMember.handi3c}`}
                             </span>
                         </div>
                     ) : (
-                        <span className={`text-gray-500 ${compact ? "text-xs" : ""}`}>상대 선택</span>
+                        <span className={`text-white/45 ${compact ? "text-xs" : ""}`}>상대 선택</span>
                     )}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-[#111] border-[#222]">
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-[#141416] border-white/10">
                 <Command className="bg-transparent text-white">
                     <CommandInput placeholder="회원 이름 검색..." className="h-10 text-sm" />
                     <CommandList>
@@ -83,24 +83,24 @@ export function OpponentSelector({ onSelect, gameType, selectedOpponentIds = [],
                                         <div className="flex items-center gap-2">
                                             <div className="relative">
                                                 <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                                                    <User className="w-4 h-4 text-gray-400" />
+                                                    <User className="w-4 h-4 text-white/55" />
                                                 </div>
                                                 {isRecentlyVisited(opponent.updatedAt) && (
-                                                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#111]" />
+                                                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-brand rounded-full border-2 border-[#141416]" />
                                                 )}
                                             </div>
                                             <div className="flex flex-col">
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="font-bold text-sm text-white">{opponent.name}</span>
                                                     {isRecentlyVisited(opponent.updatedAt) && (
-                                                        <span className="text-[10px] text-green-500 font-bold px-1 py-0.5 bg-green-500/10 rounded tracking-tighter">접속중</span>
+                                                        <span className="text-[12px] text-brand font-bold px-1 py-0.5 bg-brand/10 rounded">접속중</span>
                                                     )}
                                                 </div>
-                                                <span className="text-[10px] text-gray-500">에버리지 {opponent.average || "0.00"}</span>
+                                                <span className="text-[12px] text-white/55">에버리지 {opponent.average || "0.00"}</span>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-xs font-black text-[#ffd700]">
+                                            <div className="text-xs font-semibold text-[#ffd700]">
                                                 {gameType === "4c" ? `4구 ${opponent.handi4c}` : `3구 ${opponent.handi3c}`}
                                             </div>
                                         </div>

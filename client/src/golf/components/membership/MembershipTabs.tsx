@@ -3,11 +3,14 @@ import { cn } from "@/lib/utils";
 interface MembershipTabsProps {
     activeTab: 'COURSE' | 'BENEFIT' | 'MARKET' | 'CALC';
     onChange: (tab: 'COURSE' | 'BENEFIT' | 'MARKET' | 'CALC') => void;
+    category?: 'Golf' | 'Condo' | 'Fitness';
 }
 
-export function MembershipTabs({ activeTab, onChange }: MembershipTabsProps) {
+export function MembershipTabs({ activeTab, onChange, category = 'Golf' }: MembershipTabsProps) {
+    const courseLabel = category === 'Condo' ? '콘도 소개' : (category === 'Fitness' ? '시설 안내' : '코스 가이드');
+
     const tabs = [
-        { id: 'COURSE', label: '코스 가이드' },
+        { id: 'COURSE', label: courseLabel },
         { id: 'BENEFIT', label: '회원권 혜택' },
         { id: 'MARKET', label: '실시간 시세' },
         { id: 'CALC', label: '비용 계산' }

@@ -106,36 +106,36 @@ export default function HiqGameResult() {
     };
 
     const PlayerStats = ({ name, score, target, avg, win, handicapUpdate, pNo, memberId, innings, highRun }: any) => (
-        <Card className={`bg-[#111] border-2 rounded-[2rem] overflow-hidden ${win ? 'border-[#ffd700] shadow-[0_0_30px_rgba(255,215,0,0.15)]' : 'border-[#222]'}`}>
+        <Card className={`rk-card overflow-hidden ${win ? 'border-brand' : ''}`}>
             <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${win ? 'text-[#ffd700]' : 'text-gray-500'}`}>
-                            {win ? 'Winner' : 'Points'}
+                        <p className={`text-[12px] font-semibold ${win ? 'text-brand' : 'text-white/55'}`}>
+                            {win ? '우승' : '점수'}
                         </p>
-                        <h3 className="text-xl font-black text-white truncate max-w-[120px]">{name || (pNo === 1 ? 'PLAYER 1' : `PLAYER ${pNo}`)}</h3>
+                        <h3 className="text-xl font-semibold text-white truncate max-w-[120px]">{name || `선수 ${pNo}`}</h3>
                     </div>
-                    {win && <LucideMedal className="w-8 h-8 text-[#ffd700]" strokeWidth={2.5} />}
+                    {win && <LucideMedal className="w-8 h-8 text-brand" strokeWidth={2.5} />}
                 </div>
 
                 <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-5xl font-black text-white">{score}</span>
-                    <span className="text-white/20 font-black text-xl">/ {target}</span>
+                    <span className="text-5xl font-bold tabular-nums text-white">{score}</span>
+                    <span className="text-white/45 font-medium text-xl tabular-nums">/ {target}</span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/5">
                     <div>
-                        <p className="text-[9px] font-black text-gray-500 uppercase mb-0.5">Average</p>
-                        <p className={`text-lg font-black ${win ? 'text-[#ffd700]' : 'text-white'}`}>{avg}</p>
+                        <p className="text-[12px] font-medium text-white/55 mb-0.5">평균</p>
+                        <p className={`text-lg font-bold tabular-nums ${win ? 'text-brand' : 'text-white'}`}>{avg}</p>
                     </div>
                     <div className="text-center border-x border-white/5">
-                        <p className="text-[9px] font-black text-gray-500 uppercase mb-0.5">High Run</p>
-                        <p className={`text-lg font-black ${win ? 'text-[#ffd700]' : 'text-white'}`}>{highRun}</p>
+                        <p className="text-[12px] font-medium text-white/55 mb-0.5">하이런</p>
+                        <p className={`text-lg font-bold tabular-nums ${win ? 'text-brand' : 'text-white'}`}>{highRun}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[9px] font-black text-gray-500 uppercase mb-0.5">Status</p>
-                        <p className={`text-lg font-black uppercase ${win ? 'text-[#ffd700]' : 'text-gray-600'}`}>
-                            {win ? 'W' : 'L'}
+                        <p className="text-[12px] font-medium text-white/55 mb-0.5">상태</p>
+                        <p className={`text-lg font-bold ${win ? 'text-brand' : 'text-white/55'}`}>
+                            {win ? '승' : '패'}
                         </p>
                     </div>
                 </div>
@@ -144,20 +144,20 @@ export default function HiqGameResult() {
                     <Button
                         variant="ghost"
                         onClick={() => {
-                            setViewingPlayer({ name: name || (pNo === 1 ? 'PLAYER 1' : `PLAYER ${pNo}`), score, target, avg, innings });
+                            setViewingPlayer({ name: name || `선수 ${pNo}`, score, target, avg, innings });
                             setIsInningModalOpen(true);
                         }}
-                        className="w-full h-10 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-black gap-2 border border-white/5"
+                        className="rk-btn-secondary w-full h-10 text-xs gap-2"
                     >
-                        <LucideLayoutGrid className="w-4 h-4 text-[#ffd700]" />
+                        <LucideLayoutGrid className="w-4 h-4 text-brand" />
                         이닝별 기록 보기
                     </Button>
                 </div>
 
                 {memberId && pNo > 1 && (
-                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-green-500/50 justify-center">
+                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-brand justify-center">
                         <LucideCheckCircle2 className="w-4 h-4" />
-                        <span className="text-[10px] font-black uppercase">Verified Member</span>
+                        <span className="text-[12px] font-semibold">인증 회원</span>
                     </div>
                 )}
 
@@ -165,14 +165,14 @@ export default function HiqGameResult() {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="mt-4 p-3 bg-[#ffd700] rounded-xl text-black"
+                        className="mt-4 p-3 bg-brand rounded-tile text-brand-fg"
                     >
                         <div className="flex items-center gap-2 mb-1">
-                            <LucideTrendingUp className="w-3 h-3 font-bold" />
-                            <span className="text-[10px] font-black uppercase">Handicap Up!</span>
+                            <LucideTrendingUp className="w-3 h-3" />
+                            <span className="text-[12px] font-semibold">핸디캡 상승!</span>
                         </div>
-                        <p className="text-[11px] font-bold leading-tight">{handicapUpdate.message}</p>
-                        <div className="flex items-center gap-1 mt-1 font-black text-sm">
+                        <p className="text-[12px] font-bold leading-tight">{handicapUpdate.message}</p>
+                        <div className="flex items-center gap-1 mt-1 font-semibold text-sm tabular-nums">
                             {handicapUpdate.oldHandi} <LucideArrowRight className="w-2 h-2" /> {handicapUpdate.newHandi}
                         </div>
                     </motion.div>
@@ -188,9 +188,9 @@ export default function HiqGameResult() {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center mb-10"
             >
-                <h1 className="text-5xl font-black mb-1 uppercase tracking-tighter text-[#ffd700]">GAME OVER</h1>
-                <p className="text-gray-500 font-black uppercase tracking-widest text-[10px] bg-white/5 px-3 py-1 rounded-full inline-block">
-                    {isPractice ? "Practice Session" : "Match Result"} • {game.totalInnings} Innings
+                <h1 className="text-5xl font-bold mb-1 text-brand">게임 종료</h1>
+                <p className="text-white/55 font-medium text-[12px] bg-white/5 px-3 py-1 rounded-full inline-block">
+                    {isPractice ? "연습 세션" : "경기 결과"} • {game.totalInnings}이닝
                 </p>
             </motion.div>
 
@@ -255,26 +255,26 @@ export default function HiqGameResult() {
                 <Button
                     variant="outline"
                     onClick={() => setLocation("/dashboard")}
-                    className="h-16 rounded-[1.5rem] border-[#222] bg-[#111] text-gray-400 hover:text-white font-black text-lg"
+                    className="rk-btn-secondary h-16 rounded-2xl text-lg"
                 >
                     홈으로
                 </Button>
                 <Button
                     onClick={() => setLocation("/dashboard")}
-                    className="h-16 rounded-[1.5rem] bg-[#ffd700] text-black hover:bg-[#ffea00] font-black text-lg shadow-[0_10px_20px_rgba(255,215,0,0.2)]"
+                    className="rk-btn-primary h-16 rounded-2xl text-lg"
                 >
                     다음 경기
                 </Button>
             </div>
 
             <Dialog open={isInningModalOpen} onOpenChange={setIsInningModalOpen}>
-                <DialogContent className="bg-[#111] border-[#222] text-white rounded-3xl max-w-sm">
+                <DialogContent className="bg-[#141416] border-white/10 text-white rounded-card max-w-sm">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-black flex items-center gap-2">
-                            <LucideLayoutGrid className="w-5 h-5 text-[#ffd700]" />
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            <LucideLayoutGrid className="w-5 h-5 text-brand" />
                             이닝별 기록
                         </DialogTitle>
-                        <DialogDescription className="text-gray-400">
+                        <DialogDescription className="text-white/55">
                             {viewingPlayer?.name} 님의 이번 경기 기록입니다.
                         </DialogDescription>
                     </DialogHeader>
@@ -283,15 +283,15 @@ export default function HiqGameResult() {
                         <div className="bg-black/40 rounded-2xl p-4 border border-white/5 max-h-[40vh] overflow-y-auto">
                             <div className="space-y-3">
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase">
-                                        <span>Inning Score Flow</span>
-                                        <span className="text-white/40">Total {game.totalInnings} Innings</span>
+                                    <div className="flex justify-between text-[12px] font-semibold text-white/55">
+                                        <span>이닝별 점수 추이</span>
+                                        <span className="text-white/55 tabular-nums">총 {game.totalInnings}이닝</span>
                                     </div>
                                     <div className="grid grid-cols-5 gap-2 mt-2">
                                         {(viewingPlayer?.innings || []).map((inningScore: number, i: number) => (
                                             <div key={i} className="flex flex-col items-center gap-1">
-                                                <span className="text-[8px] text-white/20">{i + 1}</span>
-                                                <div className="w-full h-10 flex items-center justify-center rounded-lg text-xs font-black bg-white/5 text-[#ffd700]">
+                                                <span className="text-[12px] text-white/45 tabular-nums">{i + 1}</span>
+                                                <div className="w-full h-10 flex items-center justify-center rounded-tile text-xs font-semibold tabular-nums bg-white/5 text-brand">
                                                     {inningScore}
                                                 </div>
                                             </div>
@@ -304,7 +304,7 @@ export default function HiqGameResult() {
                     <DialogFooter>
                         <Button
                             onClick={() => setIsInningModalOpen(false)}
-                            className="w-full h-12 bg-white/10 hover:bg-white/20 rounded-xl font-bold"
+                            className="rk-btn-secondary w-full h-12"
                         >
                             닫기
                         </Button>

@@ -16,8 +16,7 @@ export function HiqNavigation() {
     const { isApp } = useNativeBridge();
     const [location, setLocation] = useLocation();
     const { currentSport } = useSport();
-    const activeColor = currentSport === "GOLF" ? "#84cc16" : "#10B981";
-    const activeBgColor = currentSport === "GOLF" ? "bg-[#84cc16]/5" : "bg-[#10B981]/5";
+    const activeColor = "rgb(var(--brand))";
 
     const tabs = [
         { id: "home", label: "홈", icon: LucideHome, path: "/dashboard" },
@@ -32,7 +31,7 @@ export function HiqNavigation() {
     return (
         <nav
             className={cn(
-                "fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f] border-t border-white/10 pt-4 rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] bottom-navigation-container",
+                "fixed bottom-0 left-0 right-0 z-50 bg-[#0B0B0D]/95 backdrop-blur-2xl border-t border-white/10 pt-4 rounded-t-2xl bottom-navigation-container",
                 isApp ? "pb-4" : "pb-[env(safe-area-inset-bottom,1.5rem)]"
             )}
         >
@@ -46,19 +45,13 @@ export function HiqNavigation() {
                             onClick={() => setLocation(tab.path)}
                             className="flex-1 flex flex-col items-center justify-center py-2 gap-2 relative group"
                         >
-                            <div className={`relative transition-all duration-300 ${active ? 'scale-110' : 'opacity-40 group-hover:opacity-100'}`}>
+                            <div className={`relative transition-all duration-300 ${active ? 'scale-110' : 'opacity-55 group-hover:opacity-100'}`}>
                                 <tab.icon
                                     className="w-7 h-7 transition-all duration-300"
-                                    style={active ? { color: activeColor, filter: `drop-shadow(0 0 12px ${activeColor}66)` } : { color: 'white' }}
+                                    style={active ? { color: activeColor } : { color: 'white' }}
                                 />
-                                {active && (
-                                    <motion.div
-                                        layoutId="activeGlow"
-                                        className={cn("absolute -inset-2 blur-md rounded-full -z-10", activeBgColor)}
-                                    />
-                                )}
                             </div>
-                            <span className="text-[11px] font-black transition-all duration-300 tracking-tighter" style={active ? { color: activeColor } : { color: 'rgba(255, 255, 255, 0.2)' }}>
+                            <span className="text-[12px] font-semibold transition-all duration-300" style={active ? { color: activeColor } : { color: 'rgba(255, 255, 255, 0.55)' }}>
                                 {tab.label}
                             </span>
                         </motion.button>

@@ -51,14 +51,14 @@ export default function HiqDashboard() {
     }, [rankings, member, rankingTab]);
 
     const getTrend = useCallback(() => {
-        if (!analysis?.summary) return { label: "유지 중", color: "text-white/30", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
+        if (!analysis?.summary) return { label: "유지 중", color: "text-white/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
         const overall = parseFloat(analysis.summary.overallAvg || "0");
         const recent = parseFloat(analysis.summary.recentAvg || "0");
 
         if (overall === 0) return { label: "신규 기록", color: "text-blue-400", icon: <LucideZap className="w-3 h-3" /> };
         if (recent > overall * 1.05) return { label: "상승 중", color: "text-red-400", icon: <ChevronUp className="w-3 h-3" /> };
         if (recent < overall * 0.95) return { label: "하락 중", color: "text-gray-500", icon: <ChevronDown className="w-3 h-3" /> };
-        return { label: "유지 중", color: "text-white/30", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
+        return { label: "유지 중", color: "text-white/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
     }, [analysis]);
 
     // Live Avg Helpers
@@ -77,15 +77,15 @@ export default function HiqDashboard() {
 
     const getTier = (avg: number, is3c: boolean) => {
         // 1. Base Tier (Absolute Evaluation by Average)
-        let tier = { label: "BRONZE", class: "tier-bronze", icon: "🥉" };
+        let tier = { label: "브론즈", class: "tier-bronze", icon: "🥉" };
         if (is3c) {
-            if (avg >= 0.90) tier = { label: "PLATINUM", class: "tier-platinum", icon: "💎" };
-            else if (avg >= 0.56) tier = { label: "GOLD", class: "tier-gold", icon: "🥇" };
-            else if (avg >= 0.36) tier = { label: "SILVER", class: "tier-silver", icon: "🥈" };
+            if (avg >= 0.90) tier = { label: "플래티넘", class: "tier-platinum", icon: "💎" };
+            else if (avg >= 0.56) tier = { label: "골드", class: "tier-gold", icon: "🥇" };
+            else if (avg >= 0.36) tier = { label: "실버", class: "tier-silver", icon: "🥈" };
         } else {
-            if (avg >= 5.00) tier = { label: "PLATINUM", class: "tier-platinum", icon: "💎" };
-            else if (avg >= 3.00) tier = { label: "GOLD", class: "tier-gold", icon: "🥇" };
-            else if (avg >= 1.51) tier = { label: "SILVER", class: "tier-silver", icon: "🥈" };
+            if (avg >= 5.00) tier = { label: "플래티넘", class: "tier-platinum", icon: "💎" };
+            else if (avg >= 3.00) tier = { label: "골드", class: "tier-gold", icon: "🥇" };
+            else if (avg >= 1.51) tier = { label: "실버", class: "tier-silver", icon: "🥈" };
         }
         return tier;
     };

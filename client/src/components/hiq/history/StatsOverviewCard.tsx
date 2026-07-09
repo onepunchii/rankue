@@ -13,11 +13,11 @@ interface StatsOverviewCardProps {
 
 // 1. 하위 컴포넌트로 분리 (재사용성)
 const StatBox = ({ label, value, valueColor = "text-white" }: { label: string, value: string | number, valueColor?: string }) => (
-    <div className="text-center py-2 rounded-xl bg-white/[0.03] border border-white/5 min-w-0">
-        <p className="text-white/20 text-[7px] font-bold uppercase mb-0.5 leading-none truncate tracking-tighter">
+    <div className="text-center py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] min-w-0">
+        <p className="text-white/45 text-[12px] font-medium mb-1 leading-none truncate">
             {label}
         </p>
-        <p className={cn("text-xs font-black", valueColor)}>{value}</p>
+        <p className={cn("text-[15px] font-bold tabular-nums", valueColor)}>{value}</p>
     </div>
 );
 
@@ -67,25 +67,25 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                 animate={{ opacity: 1, scale: 1 }}
                 className="mb-8"
             >
-                <Card className="rounded-3xl overflow-hidden relative border-[#84cc1644] border-[1.5px] shadow-[0_0_15px_#84cc1622]"
+                <Card className="rounded-3xl overflow-hidden relative border-[#84cc1644] border-[1.5px]"
                     style={{ background: 'linear-gradient(135deg, #111111 0%, #0a1f13 100%)' }}>
                     <CardContent className="p-6 relative z-10">
                         {/* Tier Badge */}
                         <div className="flex items-center gap-3 mb-6">
                             <span className="text-4xl">{currentTier.icon}</span>
                             <div>
-                                <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-1">TIER</p>
-                                <p className="text-xl font-black uppercase text-[#84cc16] tracking-wide" style={{ textShadow: `0 0 10px #84cc1644` }}>
+                                <p className="text-[12px] font-medium text-white/55 uppercase tracking-[0.15em] mb-1">등급</p>
+                                <p className="text-xl font-semibold uppercase text-brand tracking-wide" style={{ textShadow: `0 0 10px #84cc1644` }}>
                                     {currentTier.label}
                                 </p>
-                                <p className="text-[10px] font-bold text-white/20 uppercase mt-0.5">상위 15%</p>
+                                <p className="text-[12px] font-medium text-white/45 uppercase mt-0.5">상위 15%</p>
                             </div>
                         </div>
 
                         {/* Average Score (Main) */}
                         <div className="mb-8 text-center">
-                            <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.3em] mb-2">AVERAGE SCORE</p>
-                            <h2 className="text-7xl font-black text-[#84cc16] tracking-tighter" style={{ textShadow: "0 0 20px rgba(132, 204, 22, 0.3)" }}>
+                            <p className="text-[12px] font-medium text-white/55 uppercase tracking-[0.3em] mb-2">평균 타수</p>
+                            <h2 className="text-7xl font-semibold text-brand tracking-tight" style={{ textShadow: "0 0 20px rgba(132, 204, 22, 0.3)" }}>
                                 {golfStats?.avgScore || "-"}
                             </h2>
                         </div>
@@ -93,20 +93,20 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                         {/* Sub Stats Grid */}
                         <div className="grid grid-cols-3 gap-3 pt-6 border-t border-white/10">
                             <div className="text-center">
-                                <p className="text-[9px] font-bold text-white/40 uppercase mb-1">BEST SCORE</p>
-                                <p className="text-xl font-black text-white">
-                                    {golfStats?.bestScore || "-"} <span className="text-xs text-[#84cc16]">타</span>
+                                <p className="text-[12px] font-medium text-white/40 uppercase mb-1">최고 점수</p>
+                                <p className="text-xl font-semibold text-white">
+                                    {golfStats?.bestScore || "-"} <span className="text-xs text-brand">타</span>
                                 </p>
                             </div>
                             <div className="text-center border-x border-white/5">
-                                <p className="text-[9px] font-bold text-white/40 uppercase mb-1">ROUNDS</p>
-                                <p className="text-xl font-black text-white">
+                                <p className="text-[12px] font-medium text-white/40 uppercase mb-1">라운드</p>
+                                <p className="text-xl font-semibold text-white">
                                     {golfStats?.totalRounds || 0} <span className="text-xs text-white/40">회</span>
                                 </p>
                             </div>
                             <div className="text-center">
-                                <p className="text-[9px] font-bold text-white/40 uppercase mb-1">LAST GAME</p>
-                                <p className="text-xl font-black text-white">{golfStats?.lastScore || "-"}</p>
+                                <p className="text-[12px] font-medium text-white/40 uppercase mb-1">최근 경기</p>
+                                <p className="text-xl font-semibold text-white">{golfStats?.lastScore || "-"}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -115,95 +115,57 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
         );
     }
 
-    // 3. 당구 UI 렌더링 (기존 로직 유지하되 안전하게)
+    // 3. 당구 UI 렌더링 — flat, refined card (no gradient wash / glow)
     return (
-        <motion.div key={filter} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mb-8">
-            <Card className="rounded-3xl overflow-hidden relative"
-                style={{
-                    background: 'linear-gradient(135deg, #111111 0%, #0a1f13 100%)',
-                    borderWidth: '1.5px', borderStyle: 'solid',
-                    borderColor: `${currentTier.color}44`,
-                    boxShadow: `0 0 15px ${currentTier.glow}, 0 10px 40px rgba(0, 0, 0, 0.6)`
-                }}>
-
-                <CardContent className="p-4 relative z-10">
-                    {/* Tier Badge */}
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="flex items-center gap-3">
-                            <span className="text-4xl">{currentTier.icon}</span>
-                            <div className="min-w-0">
-                                <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-1">TIER</p>
-                                <p
-                                    className="text-xl font-black uppercase tracking-wide truncate shadow-sm"
-                                    style={{
-                                        color: currentTier.color,
-                                        textShadow: `0 0 10px ${currentTier.glow}`
-                                    }}
-                                >
-                                    {currentTier.label}
-                                </p>
-                                <p className="text-[10px] font-bold text-white/20 uppercase mt-0.5">상위 15%</p>
-                            </div>
+        <motion.div key={filter} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+            <div className="rk-card p-5">
+                {/* Tier row */}
+                <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-3xl">{currentTier.icon}</span>
+                        <div className="min-w-0">
+                            <p className="text-[12px] font-medium text-white/45 mb-0.5">등급</p>
+                            <p className="text-[17px] font-bold tracking-tight truncate" style={{ color: currentTier.color }}>
+                                {currentTier.label}
+                            </p>
                         </div>
                     </div>
+                    <span className="rk-chip bg-white/[0.05] text-white/55 shrink-0">상위 15%</span>
+                </div>
 
-                    {/* Cumulative Average (Main) */}
-                    <div className="mb-6 text-center">
-                        <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.3em] mb-2">CUMULATIVE AVERAGE</p>
-                        <h2 className="text-7xl font-black leading-none tracking-tighter"
-                            style={{
-                                background: `linear-gradient(135deg, ${currentTier.color} 0%, ${currentTier.color}CC 100%)`,
-                                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                                filter: `drop-shadow(0 0 20px ${currentTier.glow})`,
-                                fontFeatureSettings: '"tnum"'
-                            }}>
-                            {cumulativeAverage}
-                        </h2>
+                {/* Cumulative Average — hero number */}
+                <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] py-5 text-center mb-4">
+                    <p className="text-[12px] font-medium text-white/45 mb-1.5">누적 평균</p>
+                    <p className="text-[52px] leading-none font-bold tabular-nums tracking-tight" style={{ color: currentTier.color }}>
+                        {cumulativeAverage}
+                    </p>
+                </div>
+
+                {/* Stats grid */}
+                {filter === "all" && hasMixedHistory ? (
+                    <div className="grid grid-cols-4 gap-2">
+                        <StatBox label="총 경기" value={totalAllGames} />
+                        <StatBox label="총 승리" value={totalAllWins} />
+                        <StatBox label="승률" value={`${totalAllWinRate}%`} valueColor="text-brand" />
+                        <StatBox label="주 종목" value={mainMode} />
                     </div>
-
-                    {/* Stats Grid */}
+                ) : (
                     <div className="space-y-2">
-                        {filter === "all" && hasMixedHistory ? (
-                            // Show combined stats for "ALL" tab
-                            <div className="grid grid-cols-4 gap-2 pt-4">
-                                <div className="text-center px-2 py-3 rounded-xl bg-white/[0.02]">
-                                    <p className="text-white/30 text-[9px] font-black uppercase mb-2 tracking-[0.1em]">Total Games</p>
-                                    <p className="text-xl font-black text-white">{totalAllGames}</p>
-                                </div>
-                                <div className="text-center px-2 py-3 rounded-xl bg-white/[0.02]">
-                                    <p className="text-white/30 text-[9px] font-black uppercase mb-2 tracking-[0.1em]">Total Wins</p>
-                                    <p className="text-xl font-black text-white">{totalAllWins}</p>
-                                </div>
-                                <div className="text-center px-2 py-3 rounded-xl bg-white/[0.02]">
-                                    <p className="text-white/30 text-[9px] font-black uppercase mb-2 tracking-[0.1em]">Win Rate</p>
-                                    <p className="text-xl font-black text-emerald-400">{totalAllWinRate}%</p>
-                                </div>
-                                <div className="text-center px-2 py-3 rounded-xl bg-white/[0.02]">
-                                    <p className="text-white/30 text-[9px] font-black uppercase mb-2 tracking-[0.1em]">Main Mode</p>
-                                    <p className="text-xs font-black" style={{ color: currentTier.color }}>{mainMode}</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Row 1 */}
-                                <div className="grid grid-cols-4 gap-1">
-                                    <StatBox label={config.statLabels.total} value={totalGames} />
-                                    <StatBox label={config.statLabels.score}
-                                        value={totalGames > 0 ? (parseFloat(totalNormalizedScore as any) / totalGames).toFixed(1) : "0.0"} />
-                                    <StatBox label={config.statLabels.best} value={`${winRate}%`} valueColor="text-emerald-400" />
-                                    <StatBox label={config.statLabels.extra3} value={bestHighRun} valueColor="text-[#00FFD1]" />
-                                </div>
-                                {/* Row 2 */}
-                                <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-white/10">
-                                    <StatBox label={config.statLabels.bestVal} value={bestAverage} valueColor="text-[#10b981]" />
-                                    <StatBox label={config.statLabels.extra1} value={recent10Avg} />
-                                    <StatBox label={config.statLabels.extra2} value={`${emptyInningRate}%`} valueColor="text-red-400" />
-                                </div>
-                            </>
-                        )}
+                        <div className="grid grid-cols-4 gap-2">
+                            <StatBox label={config.statLabels.total} value={totalGames} />
+                            <StatBox label={config.statLabels.score}
+                                value={totalGames > 0 ? (parseFloat(totalNormalizedScore as any) / totalGames).toFixed(1) : "0.0"} />
+                            <StatBox label={config.statLabels.best} value={`${winRate}%`} valueColor="text-brand" />
+                            <StatBox label={config.statLabels.extra3} value={bestHighRun} valueColor="text-cyan-400" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <StatBox label={config.statLabels.bestVal} value={bestAverage} valueColor="text-brand" />
+                            <StatBox label={config.statLabels.extra1} value={recent10Avg} />
+                            <StatBox label={config.statLabels.extra2} value={`${emptyInningRate}%`} valueColor="text-red-400" />
+                        </div>
                     </div>
-                </CardContent>
-            </Card>
+                )}
+            </div>
         </motion.div>
     );
 };

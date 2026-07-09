@@ -19,7 +19,6 @@ export function SortablePlayerWrapper({ id, children }: { id: UniqueIdentifier; 
         zIndex: isDragging ? 50 : 1,
         opacity: isDragging ? 0.8 : 1,
         scale: isDragging ? 1.05 : 1,
-        boxShadow: isDragging ? '0 20px 50px rgba(0,0,0,0.5)' : 'none',
         position: 'relative' as const,
         height: '100%',
         flex: 1,

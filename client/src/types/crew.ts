@@ -5,6 +5,7 @@ export interface MemberProfile {
     profileImageUrl: string | null;
     avg4c: number | null;
     golfHandicap: number | null;
+    golfAvgScore: number | null;
     phone: string | null;
 }
 
@@ -21,9 +22,10 @@ export interface CrewData {
     shortIntro: string | null;
     emblem: string | null;
     coverImage: string | null;
-    sportCategory: 'GOLF' | 'BILLIARDS';
-    maxMembers: number;
+    sportCategory: 'GOLF' | 'BILLIARDS' | 'MIXED';
+    maxMembers: number | null;
     meetingDay: string | null;
     meetingTime: string | null;
-    memberCount: number;
+    memberCount?: number;
+    introQuestions?: { id: string; text: string; required: boolean; }[];
 }

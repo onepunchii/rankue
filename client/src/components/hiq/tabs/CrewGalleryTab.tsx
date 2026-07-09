@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { compressImage } from "@/lib/imageUtils";
+import { uploadImage } from "@/lib/imageUtils";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { LucideImage, LucideLoader2 } from "lucide-react";
@@ -106,8 +106,8 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
         }
 
         try {
-            const compressedBase64 = await compressImage(file);
-            uploadPhotoMutation.mutate(compressedBase64);
+            const url = await uploadImage(file, 'crew-photo');
+            uploadPhotoMutation.mutate(url);
         } catch (error) {
             console.error("[CrewGalleryTab] Image compression failed:", error);
             toast({ title: "이미지 처리 실패", description: "사진을 압축하는 과정에서 오류가 발생했습니다.", variant: "destructive" });
@@ -148,7 +148,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
     return (
         <div className="pt-6">
             <header className="flex items-center justify-between mb-6 px-6">
-                <h2 className="text-xl font-extrabold tracking-tight text-white">사진첩</h2>
+                <h2 className="text-xl font-bold tracking-tight text-white">사진첩</h2>
                 {isMember && (
                     <div className="flex items-center gap-2">
                         <input
@@ -189,7 +189,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                             <div
                                 key={photo.id}
                                 className={cn(
-                                    "aspect-square bg-white/5 overflow-hidden relative group cursor-pointer outline-none focus:ring-2 focus:ring-[#10B981] z-0",
+                                    "aspect-square bg-white/5 overflow-hidden relative group cursor-pointer outline-none focus:ring-2 focus:ring-brand z-0",
                                     isOptimistic && "opacity-50 grayscale-[0.5]"
                                 )}
                                 role="button"
@@ -221,10 +221,10 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
             ) : (
                 <div className="py-32 text-center px-6">
                     <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6">
-                        <LucideImage className="w-8 h-8 text-white/10" />
+                        <LucideImage className="w-8 h-8 text-white/45" />
                     </div>
-                    <p className="text-[15px] font-bold text-white/40 mb-1">사진이 아직 없습니다</p>
-                    <p className="text-xs font-semibold text-white/10 uppercase tracking-widest">소중한 추억을 첫 번째로 남겨보세요</p>
+                    <p className="text-[15px] font-medium text-white/55 mb-1">사진이 아직 없습니다</p>
+                    <p className="text-xs font-medium text-white/45">소중한 추억을 첫 번째로 남겨보세요</p>
                 </div>
             )}
 

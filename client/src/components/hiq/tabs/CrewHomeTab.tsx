@@ -1,19 +1,20 @@
 import { useState, memo, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    LucideFlag, LucideTent, LucideCalendar, LucideMapPin
+    LucideFlag, LucideTent, LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { HiqCrew, HiqStore, HiqMember } from "@shared/schema";
-import { BilliardsRoomList } from "@/components/hiq/view/BilliardsRoomList";
-import { GolfRoomList } from "@/golf/components/GolfRoomList";
+import { ClubActivityList } from "@/components/hiq/view/ClubActivityList";
 import { CrewMemberList } from "@/components/hiq/CrewMemberList";
+import { useQuery } from "@tanstack/react-query";
+import { Progress } from "@/components/ui/progress";
 
 // Tailwind JIT 호환성을 위한 색상 매핑
 const COLOR_VARIANTS: Record<string, { bg: string, border: string, text: string }> = {
-    emerald: { bg: "bg-emerald-500/5", border: "border-emerald-500/10", text: "text-emerald-500" },
+    emerald: { bg: "bg-brand/5", border: "border-brand/10", text: "text-brand" },
     blue: { bg: "bg-blue-500/5", border: "border-blue-500/10", text: "text-blue-500" },
     pink: { bg: "bg-pink-500/5", border: "border-pink-500/10", text: "text-pink-500" },
 };
@@ -22,13 +23,13 @@ const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: str
     return (
         <div className="rounded-2xl p-5 flex flex-col items-center justify-center text-center relative overflow-hidden group transition-all duration-300">
             <div className="flex flex-col items-center gap-1.5 mb-2 relative z-10 transition-transform duration-300 group-hover:-translate-y-1">
-                <span className="text-white/40 text-[12px] font-bold uppercase tracking-[0.2em]">{title}</span>
+                <span className="text-white/55 text-xs font-semibold">{title}</span>
             </div>
             <div className="relative z-10">
                 {children}
             </div>
             {subTitle && (
-                <span className="text-white/20 text-[9px] font-semibold mt-2 uppercase tracking-wider relative z-10">{subTitle}</span>
+                <span className="text-white/55 text-xs font-semibold mt-2 relative z-10">{subTitle}</span>
             )}
         </div>
     );
@@ -45,15 +46,19 @@ interface CrewHomeTabProps {
     me: any;
     onJoin: () => void;
     onCreateActivity: () => void;
+    onCreatePoll: () => void;
     onShareToChat: (msg: string) => void;
+    onPollClick: () => void;
+    sportTab: 'BILLIARDS' | 'GOLF';
+    setSportTab: (tab: 'BILLIARDS' | 'GOLF') => void;
 }
 
 export const CrewHomeTab = memo(({
-    crew, baseStore, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onCreateActivity, onShareToChat
+    crew, baseStore, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onCreateActivity, onCreatePoll, onShareToChat,
+    onPollClick, sportTab, setSportTab
 }: CrewHomeTabProps) => {
     const [isRankingInfoOpen, setIsRankingInfoOpen] = useState(false);
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-    const [sportTab, setSportTab] = useState<'BILLIARDS' | 'GOLF'>(crew.sportCategory === 'GOLF' ? 'GOLF' : 'BILLIARDS');
 
     const activeMembers = useMemo(() => members.filter((m: any) => m.role !== 'pending'), [members]);
 
@@ -80,13 +85,18 @@ export const CrewHomeTab = memo(({
             ? (membersWith4c.reduce((a, b) => a + (b.member.avg4c || 0), 0) / membersWith4c.length).toFixed(2)
             : "0.00";
 
-        const membersWithGolfHandy = statsMembers.filter((m: any) => (m.member.golfHandicap || 0) > 0);
-        const membersWithGolfAvg = statsMembers.filter((m: any) => (m.member.golfAvgScore || 0) > 0);
-        const avgHdcp = membersWithGolfHandy.length > 0
-            ? (membersWithGolfHandy.reduce((a, b) => a + (b.member.golfHandicap || 0), 0) / membersWithGolfHandy.length).toFixed(1)
+        const golfers = statsMembers.filter((m: any) => (m.member.golfAvgScore || 0) > 0 || (m.member.golfHandicap || 0) > 0);
+        const avgHdcp = golfers.length > 0
+            ? (golfers.reduce((a, b) => {
+                const score = (b.member.golfAvgScore || 0) > 0 ? b.member.golfAvgScore : (b.member.golfHandicap || 0) + 72;
+                return a + (score - 72);
+            }, 0) / golfers.length).toFixed(1)
             : "0.0";
-        const avgGolfScore = membersWithGolfAvg.length > 0
-            ? Math.round(membersWithGolfAvg.reduce((a, b) => a + (b.member.golfAvgScore || 0), 0) / membersWithGolfAvg.length)
+        const avgGolfScore = golfers.length > 0
+            ? Math.round(golfers.reduce((a, b) => {
+                const score = (b.member.golfAvgScore || 0) > 0 ? b.member.golfAvgScore : (b.member.golfHandicap || 0) + 72;
+                return a + score;
+            }, 0) / golfers.length)
             : "0";
 
         const totalPoints = statsMembers.length * 1240 + 450;
@@ -100,7 +110,9 @@ export const CrewHomeTab = memo(({
             avg4c,
             avgHdcp,
             avgGolfScore,
-            pointsDisplay
+            pointsDisplay,
+            totalRounds,
+            totalPoints
         };
     }, [activeMembers, crew.sportCategory]);
 
@@ -119,7 +131,7 @@ export const CrewHomeTab = memo(({
                 </div>
 
                 <div className="px-6 -mt-10 relative z-10 flex items-end gap-4">
-                    <div className="w-20 h-20 rounded-[1.8rem] bg-[#141414] border-2 border-[#10B981]/20 overflow-hidden shadow-2xl">
+                    <div className="w-20 h-20 rounded-2xl bg-surface-2 border-2 border-brand/20 overflow-hidden">
                         <img
                             src={crew.emblem || "https://images.unsplash.com/photo-1511367461989-f85a21fda181?auto=format&fit=crop&q=80&w=200"}
                             className="w-full h-full object-cover"
@@ -128,11 +140,11 @@ export const CrewHomeTab = memo(({
                         />
                     </div>
                     <div className="pb-1">
-                        <h1 className="text-2xl font-semibold text-white leading-tight tracking-tight drop-shadow-md">
+                        <h1 className="text-2xl font-semibold text-white leading-tight tracking-tight">
                             {crew.name}
                         </h1>
-                        <p className="text-xs text-[#10B981] font-bold mt-1 drop-shadow-sm uppercase tracking-widest">
-                            {crew.shortIntro || crew.region || "광진구 하이큐"}
+                        <p className="text-[13px] text-white/65 font-medium mt-1">
+                            {crew.shortIntro || crew.region || "우리 크루"}
                         </p>
                     </div>
                 </div>
@@ -150,7 +162,7 @@ export const CrewHomeTab = memo(({
                     {(crew.description?.length || 0) > 60 && (
                         <button
                             onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                            className="text-[#10B981] text-xs font-semibold mt-3 uppercase tracking-widest hover:text-white transition-colors"
+                            className="text-brand text-xs font-semibold mt-3 hover:text-white transition-colors"
                         >
                             {isDescriptionExpanded ? "접기" : "더 보기 ∨"}
                         </button>
@@ -159,14 +171,14 @@ export const CrewHomeTab = memo(({
 
                 <div className="flex flex-wrap gap-2">
                     {crew.meetingDay && (
-                        <div className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-white/80 text-[11px] font-semibold uppercase tracking-widest">
-                            <LucideCalendar className="w-3.5 h-3.5 text-[#10B981]" />
+                        <div className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-white/80 text-xs font-semibold">
+                            <LucideCalendar className="w-3.5 h-3.5 text-brand" />
                             {crew.meetingDay} {crew.meetingTime}
                         </div>
                     )}
-                    <div className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-white/80 text-[11px] font-semibold uppercase tracking-widest">
-                        <LucideMapPin className="w-3.5 h-3.5 text-[#10B981]" />
-                        {crew.region || "서울 광진"}
+                    <div className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-white/80 text-xs font-semibold">
+                        <LucideMapPin className="w-3.5 h-3.5 text-brand" />
+                        {crew.region || "지역"}
                     </div>
                 </div>
 
@@ -176,29 +188,39 @@ export const CrewHomeTab = memo(({
                     <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-white/10 -translate-y-1/2" />
 
                     <StatCard title="랭킹" subTitle="지역 기준">
-                        <span className="text-3xl font-bold text-white tracking-tight">-- <span className="text-lg font-normal text-white/40">위</span></span>
+                        <span className="text-3xl font-bold text-white tracking-tight tabular-nums">-- <span className="text-lg font-normal text-white/55">위</span></span>
                     </StatCard>
 
                     <StatCard title={stats.isGolf ? "클럽 평균" : "팀 에버리지"}>
                         <div className="flex items-center gap-3 mt-1 px-2">
                             <div className="flex flex-col items-center">
-                                <span className="text-2xl font-extrabold text-white leading-none">{stats.isGolf ? stats.avgHdcp : stats.avg3c}</span>
-                                <span className="text-[9px] text-white/30 font-semibold mt-1 tracking-tighter">{stats.isGolf ? "HDCP" : "3C"}</span>
+                                <span className="text-2xl font-bold text-white leading-none tabular-nums">{stats.isGolf ? stats.avgGolfScore : stats.avg3c}</span>
+                                <span className="text-xs text-white/55 font-medium mt-1 tracking-tight">{stats.isGolf ? "HDCP" : "3C"}</span>
                             </div>
-                            <div className="h-8 w-px bg-white/10" />
-                            <div className="flex flex-col items-center">
-                                <span className="text-2xl font-extrabold text-white leading-none">{stats.isGolf ? stats.avgGolfScore : stats.avg4c}</span>
-                                <span className="text-[9px] text-white/30 font-semibold mt-1 tracking-tighter">{stats.isGolf ? "AVG" : "4B"}</span>
-                            </div>
+                            {!stats.isGolf && (
+                                <>
+                                    <div className="h-8 w-px bg-white/10" />
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-2xl font-bold text-white leading-none tabular-nums">{stats.avg4c}</span>
+                                        <span className="text-xs text-white/55 font-medium mt-1 tracking-tight">4B</span>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </StatCard>
 
                     <StatCard title={stats.isGolf ? "누적 라운드" : "누적 점수"}>
-                        <span className="text-3xl font-extrabold text-white tracking-tight">{stats.pointsDisplay}</span>
+                        <span className="text-3xl font-bold text-white tracking-tight tabular-nums">
+                            {stats.isGolf ? (
+                                <>{stats.totalRounds} <span className="text-lg font-normal text-white/55">회</span></>
+                            ) : (
+                                stats.totalPoints.toLocaleString()
+                            )}
+                        </span>
                     </StatCard>
 
                     <StatCard title="활동 멤버">
-                        <span className="text-3xl font-bold text-white tracking-tight">{stats.statsMembers.length} <span className="text-lg font-normal text-white/40">명</span></span>
+                        <span className="text-3xl font-bold text-white tracking-tight tabular-nums">{stats.statsMembers.length} <span className="text-lg font-normal text-white/55">명</span></span>
                     </StatCard>
                 </div>
 
@@ -206,21 +228,21 @@ export const CrewHomeTab = memo(({
                     {isRankingInfoOpen && (
                         <motion.div
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/80"
                             onClick={() => setIsRankingInfoOpen(false)}
                         >
                             <motion.div
                                 initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-                                className="w-full max-w-md bg-[#141414] border border-white/10 rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-8"
+                                className="w-full max-w-md bg-[#141416] border border-white/10 rounded-t-card sm:rounded-card p-8 space-y-8"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                <h2 className="text-xl font-extrabold uppercase tracking-tight text-white mb-6">크루 랭킹 시스템</h2>
+                                <h2 className="text-xl font-bold tracking-tight text-white mb-6">크루 랭킹 시스템</h2>
                                 <div className="space-y-4">
                                     <InfoItem title={stats.isGolf ? "클럽 평균" : "실력 점수 (30%)"} color="emerald" desc={stats.isGolf ? "평균 핸디캡 및 타수입니다." : "멤버들의 평균 에버리지입니다."} />
                                     <InfoItem title={stats.isGolf ? "누적 라운드" : "활동 점수 (50%)"} color="blue" desc={stats.isGolf ? "기록된 총 라운딩 합계입니다." : "월간 누적 득점 포인트입니다."} />
                                     <InfoItem title="규모 점수 (20%)" color="pink" desc="최근 30일간 활동한 실질 멤버 수입니다." />
                                 </div>
-                                <Button onClick={() => setIsRankingInfoOpen(false)} className="w-full bg-white/5 h-14 rounded-2xl border border-white/10 font-bold uppercase tracking-widest mt-4">확인</Button>
+                                <Button onClick={() => setIsRankingInfoOpen(false)} className="w-full bg-white/5 h-14 rounded-2xl border border-white/10 font-semibold mt-4">확인</Button>
                             </motion.div>
                         </motion.div>
                     )}
@@ -229,49 +251,70 @@ export const CrewHomeTab = memo(({
 
             {/* Activities Section */}
             <div className="px-6 space-y-4">
-                {crew.sportCategory === 'MIXED' ? (
-                    <div className="flex bg-[#1a1a1a] p-1 rounded-xl border border-white/5">
-                        <TabBtn label="🎱 당구" active={sportTab === 'BILLIARDS'} onClick={() => setSportTab('BILLIARDS')} />
-                        <TabBtn label="⛳️ 골프" active={sportTab === 'GOLF'} onClick={() => setSportTab('GOLF')} />
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-2 mb-2">
-                        <LucideTent className={cn("w-5 h-5", crew.sportCategory === 'GOLF' ? "text-[#84cc16]" : "text-[#10B981]")} />
-                        <h2 className="text-lg font-semibold">정모 / 일정</h2>
-                    </div>
-                )}
+                <div className="flex items-center gap-2 mb-4">
+                    <div className={cn("w-1.5 h-1.5 rounded-full", crew.sportCategory === 'GOLF' ? "bg-brand" : "bg-brand")} />
+                    <h2 className="text-xs font-semibold text-white/55">정모 / 일정</h2>
+                </div>
 
-                {(crew.sportCategory === 'GOLF' || (crew.sportCategory === 'MIXED' && sportTab === 'GOLF')) ? (
-                    <GolfRoomList crewId={crew.id} isMember={isMember} currentMemberId={me?.id} onCreateClick={onCreateActivity} />
-                ) : (
-                    <BilliardsRoomList crewId={crew.id} isMember={isMember} currentMemberId={me?.id} onCreateClick={onCreateActivity} onShareToChat={onShareToChat} />
-                )}
+                <ClubActivityList
+                    crewId={crew.id}
+                    isMember={isMember}
+                    currentMemberId={me?.id}
+                    sportType={crew.sportCategory === 'GOLF' ? 'GOLF' : 'BILLIARDS'}
+                    onCreateClick={onCreateActivity}
+                    onShareToChat={onShareToChat}
+                    isAdmin={isAdmin}
+                />
+            </div>
+
+            {/* Poll Preview Section */}
+            <div className="px-6 space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                        <h2 className="text-xs font-semibold text-white/55">진행 중인 투표</h2>
+                    </div>
+                    {isMember && (
+                        <Button
+                            variant="ghost"
+                            onClick={onCreatePoll}
+                            className="h-7 px-2 text-xs font-medium text-white/55 hover:text-brand flex items-center gap-1"
+                        >
+                            <LucidePlus className="w-3 h-3" />
+                            만들기
+                        </Button>
+                    )}
+                </div>
+
+                <div onClick={onPollClick} className="cursor-pointer active:scale-[0.98] transition-all">
+                    <PollPreview crewId={crew.id} isMember={isMember} />
+                </div>
             </div>
 
             {/* Base Camp Section */}
             <div className="px-6">
-                <div className="flex items-center gap-2 mb-4 opacity-40">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-white">베이스 캠프 / BASE CAMP</h2>
+                <div className="flex items-center gap-2 mb-4">
+                    <div className={cn("w-1.5 h-1.5 rounded-full", crew.sportCategory === 'GOLF' ? "bg-brand" : "bg-brand")} />
+                    <h2 className="text-xs font-semibold text-white/55">베이스 캠프</h2>
                 </div>
                 {baseStore ? (
-                    <Card className="bg-[#141414] border-white/5 rounded-[2rem] overflow-hidden group hover:border-[#10B981]/50 transition-all">
+                    <Card className="bg-surface-2 border-surface-line rounded-card overflow-hidden group hover:border-brand/50 transition-all">
                         <CardContent className="p-5">
                             <div className="flex items-center justify-between mb-4">
                                 <div>
                                     <h3 className="text-lg font-bold text-white tracking-tight">{baseStore.name}</h3>
-                                    <p className="text-xs text-white/40 mt-0.5">{baseStore.address}</p>
+                                    <p className="text-xs text-white/55 mt-0.5">{baseStore.address}</p>
                                 </div>
-                                <span className="bg-[#10B981]/10 text-[#10B981] text-[9px] font-bold px-2.5 py-1 rounded-full border border-[#10B981]/20 uppercase">Official</span>
+                                <span className="bg-brand/10 text-brand text-xs font-semibold px-2.5 py-1 rounded-full border border-brand/20">공식</span>
                             </div>
                             <div className="flex gap-2.5">
                                 <Button variant="outline" className="flex-1 rounded-xl text-xs h-10 border-white/10 text-white hover:bg-white/10">전화하기</Button>
-                                <Button className="flex-1 rounded-xl text-xs h-10 bg-[#10B981] text-black">위치보기</Button>
+                                <Button className="flex-1 rounded-xl text-xs h-10 bg-brand text-brand-fg">위치보기</Button>
                             </div>
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="py-14 text-center bg-white/5 rounded-[2.5rem] border border-dashed border-white/10 text-white/20 text-xs font-bold uppercase tracking-widest">
+                    <div className="py-14 text-center bg-white/5 rounded-card border border-dashed border-white/10 text-white/55 text-xs font-medium">
                         베이스 캠프 정보가 없습니다
                     </div>
                 )}
@@ -279,11 +322,11 @@ export const CrewHomeTab = memo(({
 
             {/* Members Section */}
             <div className="px-6 pb-20">
-                <div className="flex items-center gap-2 mb-6 opacity-40">
+                <div className="flex items-center gap-2 mb-6">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-white">멤버 <span className="ml-1">{members.length}</span></h2>
+                    <h2 className="text-xs font-semibold text-white/55">멤버 <span className="ml-1">{members.length}</span></h2>
                 </div>
-                <CrewMemberList members={activeMembers} currentMemberId={me?.id} sportCategory={crew.sportCategory} />
+                <CrewMemberList members={activeMembers} currentMemberId={me?.id} sportCategory={crew.sportCategory} crewId={crew.id} />
             </div>
 
             {/* Join CTA for non-members */}
@@ -293,11 +336,11 @@ export const CrewHomeTab = memo(({
                         onClick={onJoin}
                         disabled={isPending}
                         className={cn(
-                            "w-full h-14 rounded-[1.5rem] text-base font-black tracking-widest uppercase shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all active:scale-95 pointer-events-auto ring-1 ring-white/10",
-                            isPending ? "bg-white/5 text-white/20 border border-white/5" : "bg-white text-black hover:bg-neutral-200"
+                            "w-full h-14 rounded-2xl text-base font-semibold tracking-normal transition-all active:scale-95 pointer-events-auto ring-1 ring-white/10",
+                            isPending ? "bg-white/5 text-white/55 border border-white/5" : "bg-brand text-brand-fg hover:bg-brand/90"
                         )}
                     >
-                        {isPending ? "가입 승인 대기 중..." : "크루 가입하기 / JOIN NOW"}
+                        {isPending ? "가입 승인 대기 중..." : "크루 가입하기"}
                     </Button>
                 </div>
             )}
@@ -305,18 +348,104 @@ export const CrewHomeTab = memo(({
     );
 });
 
+const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }) => {
+    const { data: polls, isLoading } = useQuery<any[]>({
+        queryKey: [`/api/hiq/crews/${crewId}/polls`],
+        enabled: !!crewId,
+    });
+
+    if (isLoading) return <div className="h-24 bg-white/5 rounded-card animate-pulse" />;
+
+    if (!polls || polls.length === 0) return (
+        <div className="p-8 text-center bg-white/5 border border-dashed border-white/10 rounded-card">
+            <p className="text-xs font-medium text-white/55">등록된 투표가 없습니다</p>
+        </div>
+    );
+
+    // Show up to 3 polls
+    const recentPolls = polls.slice(0, 3);
+
+    return (
+        <div className="space-y-3">
+            {recentPolls.map((poll) => {
+                const totalVotes = poll.totalVotes || 0;
+                const topOption = poll.options?.[0]; // Assuming options are sorted by voteCount or index? 
+                // Using the first option in the list. To be safe, we might want to sort options by voteCount descending if we want "1st place".
+                // But the backend `getCrewPolls` sorts options by `createdAt` asc.
+                // Wait, the original code had: `const topOption = latestPoll.options?.[0];`
+                // And displayed "현재 1위: topOption.text". 
+                // This logic is flawed if options aren't sorted by votes. 
+                // Let's sort options relative to the UI display for "1st place".
+                const sortedOptions = [...(poll.options || [])].sort((a: any, b: any) => b.voteCount - a.voteCount);
+                const bestOption = sortedOptions[0];
+
+                return (
+                    <Card key={poll.id} className="bg-surface-2 border-surface-line rounded-card overflow-hidden group hover:border-brand/30 transition-all">
+                        <CardContent className="p-6">
+                            <div className="flex items-start justify-between gap-4 mb-4">
+                                <div className="flex-1 space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <span className={cn(
+                                            "text-xs font-semibold",
+                                            poll.status === 'active' ? "text-brand" : "text-white/55"
+                                        )}>{poll.status === 'active' ? '진행 중' : '종료'}</span>
+                                        {poll.isAnonymous && <span className="text-xs font-semibold text-blue-400"> 익명</span>}
+                                        {poll.allowMultiple && <span className="text-xs font-semibold text-purple-400"> 복수</span>}
+                                    </div>
+                                    <h3 className="text-base font-semibold text-white leading-tight tracking-tight">{poll.title}</h3>
+                                </div>
+                                <div className="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+                                    <LucideVote className="w-5 h-5 text-brand" />
+                                </div>
+                            </div>
+
+                            {bestOption && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-white/55 font-medium">현재 1위: {bestOption.text}</span>
+                                        <span className="text-white/70 font-semibold tabular-nums">{bestOption.voteCount}표</span>
+                                    </div>
+                                    <Progress value={totalVotes > 0 ? (bestOption.voteCount / totalVotes) * 100 : 0} className="h-1.5 bg-white/5" />
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between mt-5 pt-4 border-t border-white/5">
+                                <div className="flex items-center gap-2">
+                                    <div className="flex -space-x-2">
+                                        {[1, 2, 3].map(i => (
+                                            <div key={i} className="w-5 h-5 rounded-full border border-surface-2 bg-white/5 flex items-center justify-center">
+                                                <LucideUser className="w-2.5 h-2.5 text-white/45" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <span className="text-xs font-medium text-white/55 tabular-nums">{totalVotes}명 참여 중</span>
+                                </div>
+                                <LucideChevronRight className="w-4 h-4 text-white/45 group-hover:text-white transition-colors" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                );
+            })}
+        </div>
+    );
+};
+
 const InfoItem = ({ title, color, desc }: { title: string, color: 'emerald' | 'blue' | 'pink', desc: string }) => {
     const theme = COLOR_VARIANTS[color];
     return (
         <div className={cn("p-5 bg-white/5 border rounded-2xl", theme.border, theme.bg)}>
-            <h3 className={cn("text-sm font-bold uppercase tracking-widest", theme.text)}>{title}</h3>
-            <p className="text-xs text-white/40 mt-1">{desc}</p>
+            <h3 className={cn("text-sm font-bold", theme.text)}>{title}</h3>
+            <p className="text-xs text-white/55 mt-1">{desc}</p>
         </div>
     );
 };
 
 const TabBtn = ({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) => (
-    <button onClick={onClick} className={cn("flex-1 py-2 rounded-lg text-xs font-bold transition-all", active ? "bg-[#10B981] text-black shadow-lg" : "text-white/40")}>{label}</button>
+    <button onClick={onClick} className={cn("flex-1 py-2 rounded-lg text-xs font-semibold transition-all", active ? "bg-brand text-brand-fg" : "text-white/55")}>{label}</button>
 );
 
 CrewHomeTab.displayName = "CrewHomeTab";
+
+const LucideUser = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+);

@@ -2,8 +2,8 @@
 // Date: 2026-02-03 01:06:58
 // Source: Mship114
 
-import { MembershipItem, MembershipCategory } from './crawledMembershipData';
-export type { MembershipItem, MembershipCategory };
+import { MembershipItem, MembershipCategory, GolfMembership, CondoMembership, FitnessMembership } from './crawledMembershipData';
+export type { MembershipItem, MembershipCategory, GolfMembership, CondoMembership, FitnessMembership };
 
 
 
@@ -86,7 +86,7 @@ export const getRepresentativeMemberships = (memberships: MembershipItem[]): Mem
     grouped.forEach((variants) => {
         // 가장 저렴한 회원권을 대표로 선택
         const cheapest = variants.reduce((min, current) =>
-            current.priceValue < min.priceValue ? current : min
+            current.price.current < min.price.current ? current : min
         );
         representatives.push(cheapest);
     });
@@ -97,10 +97,10 @@ export const getRepresentativeMemberships = (memberships: MembershipItem[]): Mem
 // 가격 범위 표시 (최저가 ~ 최고가)
 export const getPriceRange = (variants: MembershipItem[]): string => {
     if (variants.length === 1) {
-        return formatPrice(variants[0].priceValue);
+        return formatPrice(variants[0].price.current);
     }
 
-    const prices = variants.map(v => v.priceValue);
+    const prices = variants.map(v => v.price.current);
     const min = Math.min(...prices);
     const max = Math.max(...prices);
 

@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 const STEPS = [
     { id: "personal", title: "본인 확인", desc: "당구장에서 사용할 이름을 알려주세요." },
     { id: "password", title: "비밀번호 설정", desc: "내 점수를 보호하기 위해 비밀번호를 설정합니다." },
+    { id: "security", title: "보안 질문", desc: "비밀번호를 잊었을 때 찾기 위한 질문입니다." },
     { id: "gender", title: "성별 선택", desc: "성별에 맞는 랭킹 시스템이 적용됩니다." },
     { id: "birth", title: "출생년도", desc: "연령별 랭킹 산정에 활용됩니다." },
     { id: "terms", title: "약관 동의", desc: "마지막 단계입니다!" }
@@ -112,11 +113,11 @@ export default function HiqRegister() {
 
     if (isCompleted) {
         return (
-            <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-6 text-center">
+            <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col items-center justify-center px-5 text-center">
                 <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(99,102,241,0.2)]"
+                    className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
                     style={{ backgroundColor: `${brand.themeColor}33`, borderColor: `${brand.themeColor}80`, borderWidth: 1 }}
                 >
                     <LucideCheckCircle2 className="w-16 h-16" style={{ color: brand.neonColor || brand.themeColor }} />
@@ -124,11 +125,11 @@ export default function HiqRegister() {
                 <motion.h1
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-4xl font-black mb-4 tracking-tighter"
+                    className="text-4xl font-bold mb-4"
                 >
                     환영합니다!
                 </motion.h1>
-                <p className="text-xl text-gray-400">당구장 멤버십이 활성화되었습니다.</p>
+                <p className="text-xl text-white/55">당구장 멤버십이 활성화되었습니다.</p>
                 <div className="mt-12 flex gap-2">
                     {[1, 2, 3, 4, 5].map(i => (
                         <motion.div
@@ -149,7 +150,7 @@ export default function HiqRegister() {
 
     return (
         <div
-            className="min-h-screen bg-[#050505] text-white flex flex-col font-sans overflow-hidden"
+            className="min-h-screen bg-[#0A0A0A] text-white flex flex-col font-sans overflow-hidden"
             style={{
                 ['--hiq-brand-color' as any]: brand.themeColor,
                 ['--hiq-brand-neon' as any]: brand.neonColor || brand.themeColor
@@ -161,7 +162,7 @@ export default function HiqRegister() {
                     <div
                         key={idx}
                         className="flex-1 transition-all duration-700 ease-out"
-                        style={{ backgroundColor: idx <= currentStep ? '#10b981' : "transparent" }}
+                        style={{ backgroundColor: idx <= currentStep ? 'rgb(var(--brand))' : "transparent" }}
                     />
                 ))}
             </div>
@@ -175,11 +176,11 @@ export default function HiqRegister() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                     >
-                        <span className="font-bold text-xs uppercase tracking-widest mb-2 block" style={{ color: "#10b981" }}>Step {currentStep + 1} of {STEPS.length}</span>
-                        <h1 className="text-4xl font-black mb-3 text-white leading-tight tracking-tighter">
+                        <span className="font-semibold text-[13px] mb-2 block text-brand tabular-nums">{currentStep + 1} / {STEPS.length} 단계</span>
+                        <h1 className="text-4xl font-bold mb-3 text-white leading-tight">
                             {STEPS[currentStep].title}
                         </h1>
-                        <p className="text-xl text-white/40 font-medium">
+                        <p className="text-xl text-white/55 font-medium">
                             {STEPS[currentStep].desc}
                         </p>
                     </motion.div>
@@ -197,18 +198,18 @@ export default function HiqRegister() {
                                 className="space-y-8"
                             >
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-bold text-white/40 uppercase tracking-wider">성함</Label>
+                                    <Label className="text-sm font-medium text-white/55">성함</Label>
                                     <input
                                         {...register("name")}
                                         placeholder="이름을 입력하세요"
                                         autoFocus
-                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-3xl font-black tracking-[0.1em] text-white placeholder:text-white/10 py-4 transition-all outline-none"
+                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-brand text-center text-3xl font-bold text-white placeholder:text-white/45 py-4 transition-all outline-none"
                                     />
                                     {errors.name && <p className="text-red-400 text-sm font-bold text-center">{errors.name.message}</p>}
                                 </div>
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-bold text-white/40 uppercase tracking-wider">휴대폰 번호</Label>
-                                    <div className="w-full border-b-2 border-white/5 py-4 flex items-center justify-center text-white/20 text-3xl font-black tracking-widest">
+                                    <Label className="text-sm font-medium text-white/55">휴대폰 번호</Label>
+                                    <div className="w-full border-b-2 border-white/5 py-4 flex items-center justify-center text-white/55 text-3xl font-bold tabular-nums">
                                         {phoneFromQuery}
                                     </div>
                                 </div>
@@ -224,13 +225,13 @@ export default function HiqRegister() {
                                 className="space-y-4"
                             >
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-bold text-white/40 uppercase tracking-wider">비밀번호 (4자리 이상)</Label>
+                                    <Label className="text-sm font-medium text-white/55">비밀번호 (4자리 이상)</Label>
                                     <input
                                         type="password"
                                         {...register("password")}
                                         placeholder="비밀번호 입력"
                                         autoFocus
-                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-3xl font-black tracking-[0.1em] text-white placeholder:text-white/10 py-4 transition-all outline-none"
+                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-brand text-center text-3xl font-bold text-white placeholder:text-white/45 py-4 transition-all outline-none"
                                     />
                                     {/* Warn if pwd is too short, but usually we just disable 'Next' */}
                                     {formData.password && formData.password.length < 4 && (
@@ -242,7 +243,54 @@ export default function HiqRegister() {
 
                         {currentStep === 2 && (
                             <motion.div
-                                key="step1"
+                                key="step_security"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                className="space-y-8"
+                            >
+                                <div className="space-y-4">
+                                    <Label className="text-sm font-medium text-white/55 text-center block">질문 선택</Label>
+                                    <div className="space-y-2 max-h-[240px] overflow-y-auto pr-2 custom-scrollbar">
+                                        {[
+                                            "내가 태어난 도시는 어디인가요?",
+                                            "가장 기억에 남는 반려동물의 이름은?",
+                                            "나의 보물 1호는 무엇인가요?",
+                                            "가장 좋아하는 스포츠 팀은?",
+                                            "부모님 함자 성함은?"
+                                        ].map((q) => (
+                                            <Button
+                                                key={q}
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    setValue("securityQuestion", q);
+                                                }}
+                                                className="w-full justify-start text-left py-6 rounded-tile border-white/5 bg-white/[0.02] hover:bg-white/[0.05]"
+                                                style={{
+                                                    borderColor: formData.securityQuestion === q ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
+                                                    color: formData.securityQuestion === q ? "rgb(var(--brand))" : "rgba(255,255,255,0.6)"
+                                                }}
+                                            >
+                                                {q}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <Label className="text-sm font-medium text-white/55 text-center block">정답 입력</Label>
+                                    <Input
+                                        {...register("securityAnswer")}
+                                        placeholder="정답을 입력하세요"
+                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-brand text-center text-2xl font-bold text-white placeholder:text-white/45 py-4 transition-all outline-none h-auto rounded-none border-t-0 border-x-0"
+                                    />
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {currentStep === 3 && (
+                            <motion.div
+                                key="step_gender"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
@@ -251,55 +299,52 @@ export default function HiqRegister() {
                                 <Button
                                     onClick={() => setValue("gender", "male")}
                                     variant={formData.gender === "male" ? "default" : "outline"}
-                                    className="flex-1 h-32 rounded-[2rem] flex flex-col gap-3 transition-all"
+                                    className="flex-1 h-20 rounded-2xl flex flex-row items-center justify-center gap-3 transition-all"
                                     style={{
-                                        backgroundColor: formData.gender === "male" ? "#10b981" : "rgba(255,255,255,0.05)",
-                                        color: formData.gender === "male" ? "#000" : "rgba(255,255,255,0.4)",
-                                        border: formData.gender === "male" ? "none" : "1px solid rgba(255,255,255,0.1)",
-                                        boxShadow: formData.gender === "male" ? `0 10px 30px rgba(16, 185, 129, 0.4)` : "none"
+                                        backgroundColor: formData.gender === "male" ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
+                                        color: formData.gender === "male" ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.55)",
+                                        border: formData.gender === "male" ? "none" : "1px solid rgba(255,255,255,0.1)"
                                     }}
                                 >
-                                    <span className="text-4xl">♂️</span>
-                                    <span className="font-black text-xl">남성</span>
+                                    <span className="text-2xl">♂️</span>
+                                    <span className="font-bold text-lg">남성</span>
                                 </Button>
                                 <Button
                                     onClick={() => setValue("gender", "female")}
                                     variant={formData.gender === "female" ? "default" : "outline"}
-                                    className="flex-1 h-32 rounded-[2rem] flex flex-col gap-3 transition-all"
+                                    className="flex-1 h-20 rounded-2xl flex flex-row items-center justify-center gap-3 transition-all"
                                     style={{
-                                        backgroundColor: formData.gender === "female" ? "#10b981" : "rgba(255,255,255,0.05)",
-                                        color: formData.gender === "female" ? "#000" : "rgba(255,255,255,0.4)",
-                                        border: formData.gender === "female" ? "none" : "1px solid rgba(255,255,255,0.1)",
-                                        boxShadow: formData.gender === "female" ? `0 10px 30px rgba(16, 185, 129, 0.4)` : "none"
+                                        backgroundColor: formData.gender === "female" ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
+                                        color: formData.gender === "female" ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.55)",
+                                        border: formData.gender === "female" ? "none" : "1px solid rgba(255,255,255,0.1)"
                                     }}
                                 >
-                                    <span className="text-4xl">♀️</span>
-                                    <span className="font-black text-xl">여성</span>
+                                    <span className="text-2xl">♀️</span>
+                                    <span className="font-bold text-lg">여성</span>
                                 </Button>
                             </motion.div>
                         )}
 
-                        {currentStep === 3 && (
+                        {currentStep === 4 && (
                             <motion.div
-                                key="step2"
+                                key="step_birth"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
                                 className="space-y-6 text-center"
                             >
-                                <div className="grid grid-cols-4 gap-3 max-h-[440px] overflow-y-auto p-4 bg-white/5 rounded-[2rem] border border-white/10 scrollbar-hide">
-                                    {Array.from({ length: 71 }, (_, i) => 1950 + i).reverse().map(year => (
+                                <div className="grid grid-cols-4 gap-3 max-h-[440px] overflow-y-auto p-4 bg-white/5 rounded-2xl border border-white/10 scrollbar-hide">
+                                    {Array.from({ length: new Date().getFullYear() - 1950 + 1 }, (_, i) => 1950 + i).reverse().map(year => (
                                         <Button
                                             key={year}
                                             variant={formData.birthYear === year ? "default" : "outline"}
                                             onClick={() => setValue("birthYear", year)}
                                             title={`${year}년생`}
-                                            className="h-14 text-lg rounded-xl transition-all"
+                                            className="h-14 text-lg rounded-tile transition-all tabular-nums"
                                             style={{
-                                                backgroundColor: formData.birthYear === year ? "#10b981" : "transparent",
-                                                color: formData.birthYear === year ? "#000" : "rgba(255,255,255,0.4)",
-                                                border: formData.birthYear === year ? "none" : "1px solid rgba(255,255,255,0.1)",
-                                                boxShadow: formData.birthYear === year ? `0 0 20px rgba(16, 185, 129, 0.4)` : "none"
+                                                backgroundColor: formData.birthYear === year ? "rgb(var(--brand))" : "transparent",
+                                                color: formData.birthYear === year ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.55)",
+                                                border: formData.birthYear === year ? "none" : "1px solid rgba(255,255,255,0.1)"
                                             }}
                                         >
                                             {year}
@@ -311,25 +356,25 @@ export default function HiqRegister() {
 
 
 
-                        {currentStep === 4 && (
+                        {currentStep === 5 && (
                             <motion.div
-                                key="step4"
+                                key="step_terms"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
                                 className="space-y-10"
                             >
-                                <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/10 space-y-8">
+                                <div className="bg-white/5 p-8 rounded-card border border-white/10 space-y-8">
                                     <div className="flex items-start gap-4">
                                         <Checkbox
                                             id="essential"
                                             className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:border-none"
-                                            style={{ backgroundColor: "#10b981" }}
+                                            style={{ backgroundColor: "rgb(var(--brand))" }}
                                             checked={true}
                                             disabled={true}
                                         />
                                         <Label htmlFor="essential" className="text-lg text-white/60 leading-tight">
-                                            <span className="text-white font-black block mb-1">[필수] 개인정보 수집 동의</span>
+                                            <span className="text-white font-bold block mb-1">[필수] 개인정보 수집 동의</span>
                                             서비스 이용을 위해 최소한의 정보를 수집합니다.
                                         </Label>
                                     </div>
@@ -337,7 +382,7 @@ export default function HiqRegister() {
                                         <Checkbox
                                             id="marketing"
                                             className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:border-none"
-                                            style={{ backgroundColor: "#10b981" }}
+                                            style={{ backgroundColor: "rgb(var(--brand))" }}
                                             onCheckedChange={(checked) => setValue("marketingAgree", !!checked)}
                                         />
                                         <Label htmlFor="marketing" className="text-lg text-white/60 leading-tight">
@@ -356,7 +401,7 @@ export default function HiqRegister() {
                     <Button
                         variant="ghost"
                         onClick={prevStep}
-                        className="flex-1 h-16 text-lg font-bold bg-white/5 text-white/40 hover:text-white rounded-2xl border border-white/5 active:scale-95 transition-all"
+                        className="flex-1 h-16 text-lg font-bold bg-white/5 text-white/55 hover:text-white rounded-2xl border border-white/10 active:scale-95 transition-all"
                     >
                         이전
                     </Button>
@@ -366,12 +411,7 @@ export default function HiqRegister() {
                             onClick={handleSubmit(onSubmit)}
                             disabled={isSubmitting}
                             title="가입 완료"
-                            className="flex-[2] h-16 text-xl font-black text-white rounded-2xl active:scale-95 transition-all"
-                            style={{
-                                backgroundColor: '#10b981',
-                                boxShadow: `0 10px 30px rgba(16, 185, 129, 0.2)`,
-                                color: '#000'
-                            }}
+                            className="flex-[2] h-16 text-xl font-semibold rk-btn-primary rounded-2xl active:scale-95 transition-all"
                         >
                             {isSubmitting ? "처리 중..." : "가입 완료"}
                         </Button>
@@ -381,13 +421,22 @@ export default function HiqRegister() {
                             onClick={nextStep}
                             disabled={
                                 (currentStep === 0 && !(formData as any).name) ||
-                                (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4))
+                                (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4)) ||
+                                (currentStep === 2 && (!(formData as any).securityQuestion || !(formData as any).securityAnswer))
                             }
                             title="다음 단계"
-                            className="flex-[2] h-16 text-xl font-black rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all outline-none"
+                            className="flex-[2] h-16 text-xl font-semibold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all outline-none"
                             style={{
-                                backgroundColor: ((currentStep === 0 && !(formData as any).name) || (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4))) ? "#1a1a1a" : "#10b981",
-                                color: ((currentStep === 0 && !(formData as any).name) || (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4))) ? "#555" : "#000"
+                                backgroundColor: (
+                                    (currentStep === 0 && !(formData as any).name) ||
+                                    (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4)) ||
+                                    (currentStep === 2 && (!(formData as any).securityQuestion || !(formData as any).securityAnswer))
+                                ) ? "rgba(255,255,255,0.05)" : "rgb(var(--brand))",
+                                color: (
+                                    (currentStep === 0 && !(formData as any).name) ||
+                                    (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4)) ||
+                                    (currentStep === 2 && (!(formData as any).securityQuestion || !(formData as any).securityAnswer))
+                                ) ? "rgba(255,255,255,0.45)" : "rgb(var(--brand-fg))"
                             }}
                         >
                             다음 <LucideChevronRight className="w-6 h-6" />
@@ -395,12 +444,6 @@ export default function HiqRegister() {
                     )}
                 </div>
             </div>
-
-            {/* Ambient Background Glow */}
-            <div
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vw] h-[100vw] rounded-full blur-[120px] pointer-events-none z-0 opacity-[0.05]"
-                style={{ backgroundColor: 'var(--hiq-brand-color)' }}
-            />
         </div>
     );
 }

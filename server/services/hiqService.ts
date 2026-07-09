@@ -1,5 +1,6 @@
 import { storage } from "../storage/index.js";
 import { HiqStore, HiqMember, InsertHiqMember } from "../../shared/schema.js";
+import { unauthorized, notFound, badRequest } from "../utils/errors.js";
 
 export class HiqService {
     async getBranding(slug: string) {
@@ -9,11 +10,11 @@ export class HiqService {
             // Default branding
             return {
                 slug: "default",
-                name: "RANKUE",
+                name: "랭큐",
                 logoText: "RANKUE",
-                themeColor: "#6366f1",
-                neonColor: "#818cf8",
-                subText: "Global Billiards Solution"
+                themeColor: "#10B981",
+                neonColor: "#34D399",
+                subText: "당구 실력 랭킹 & 매칭"
             };
         }
         return store;
@@ -74,7 +75,7 @@ export class HiqService {
 
     async login(phone: string, storeSlug: string, password?: string) {
         const store = await storage.getStoreBySlug(storeSlug);
-        if (!store) throw new Error("STORE_NOT_FOUND");
+        if (!store) throw notFound("STORE_NOT_FOUND");
 
         const member = await storage.getMemberByPhone(store.id, phone);
         if (member) {
@@ -88,7 +89,7 @@ export class HiqService {
                     }
                     // Password provided but incorrect
                     if (password !== profile.password) {
-                        throw new Error("INVALID_PASSWORD");
+                        throw unauthorized("INVALID_PASSWORD");
                     }
                 }
             }
@@ -107,28 +108,69 @@ export class HiqService {
         if (data.password) {
             // Check if profile exists by phone
             let profile = await storage.getProfileByPhone(data.phone);
+
+            // Normalize security answer if provided
+            const normalizedAnswer = data.securityAnswer
+                ? data.securityAnswer.trim().replace(/\s+/g, '').toLowerCase()
+                : undefined;
+
             if (!profile) {
                 profile = await storage.createProfile({
                     phone: data.phone,
                     password: data.password,
                     role: 'user',
-                    nickname: data.name
+                    nickname: data.name,
+                    securityQuestion: data.securityQuestion,
+                    securityAnswer: normalizedAnswer
                 });
             } else if (!profile.password) {
-                // If profile exists but has no password (e.g. legacy), set it
-                profile = await storage.updateProfile(profile.id, { password: data.password });
+                // SECURITY: /register is unauthenticated. Only backfill credentials for a legacy
+                // passwordless profile. NEVER overwrite an existing account's password/security
+                // Q&A here — otherwise anyone who knows a phone number could reset the PIN and
+                // take over the account. An already-protected profile is reused as-is.
+                profile = await storage.updateProfile(profile.id, {
+                    password: data.password,
+                    securityQuestion: data.securityQuestion,
+                    securityAnswer: normalizedAnswer
+                });
             }
             profileId = profile.id;
         }
 
         // 2. Create HiqMember linked to Profile
         const memberData = { ...data, profileId };
-        // Remove password field from memberData as it's not in hiqMembers table
+        // Remove profile-specific fields from memberData as they're not in hiqMembers table
         delete (memberData as any).password;
+        delete (memberData as any).securityQuestion;
+        delete (memberData as any).securityAnswer;
 
         const newMember = await storage.createMember(memberData as any);
         await storage.incrementVisitCount(newMember.id);
         return { member: newMember, redirectTo: '/dashboard' };
+    }
+
+    async getSecurityQuestion(phone: string) {
+        const profile = await storage.getProfileByPhone(phone);
+        if (!profile) throw notFound("USER_NOT_FOUND");
+        if (!profile.securityQuestion) throw badRequest("NO_SECURITY_QUESTION");
+
+        return { question: profile.securityQuestion };
+    }
+
+    async resetPinBySecurityAnswer(phone: string, answer: string, newPin: string) {
+        const profile = await storage.getProfileByPhone(phone);
+        if (!profile) throw notFound("USER_NOT_FOUND");
+        if (!profile.securityAnswer) throw badRequest("NO_SECURITY_ANSWER");
+
+        const normalizedInput = answer.trim().replace(/\s+/g, '').toLowerCase();
+        const normalizedStored = profile.securityAnswer.trim().replace(/\s+/g, '').toLowerCase();
+
+        if (normalizedInput !== normalizedStored) {
+            throw unauthorized("INVALID_ANSWER");
+        }
+
+        await storage.updateProfile(profile.id, { password: newPin });
+        return { success: true };
     }
 }
 

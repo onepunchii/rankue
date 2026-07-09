@@ -1,25 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
-    LucideChevronLeft,
+    LucideX,
     LucideShare2,
-    LucideSettings,
+    LucideMoreVertical,
     LucideLoader2,
+    LucideHome,
+    LucideFileText,
+    LucideImage,
+    LucideMessageCircle,
+    LucideVote
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { HiqMember, HiqCrew, HiqStore } from "@shared/schema";
 import { ClubSettingsDialog } from "@/components/hiq/ClubSettingsDialog";
 import { CreateActivityDialog } from "@/components/hiq/CreateActivityDialog";
+import { CreateGolfActivityModal } from "@/components/hiq/club/activity/CreateGolfActivityModal";
 import { CreatePostDialog } from "@/components/hiq/CreatePostDialog";
-import { CrewChatTab } from "@/components/hiq/tabs/CrewChatTab";
-import { CrewGalleryTab } from "@/components/hiq/tabs/CrewGalleryTab";
-import { CrewHomeTab } from "@/components/hiq/tabs/CrewHomeTab";
-import { CrewBoardTab } from "@/components/hiq/tabs/CrewBoardTab";
+import { CrewBoardTab, CrewChatTab, CrewGalleryTab, CrewHomeTab, CrewPollTab } from "@/components/hiq/tabs";
+import { CreatePollDialog } from "@/components/hiq/CreatePollDialog";
 import { CreateSettlementDialog } from "@/components/hiq/settlement/CreateSettlementDialog";
 import { SettlementDetailDialog } from "@/components/hiq/settlement/SettlementDetailDialog";
 import { PostDetailDialog } from "@/components/hiq/PostDetailDialog";
@@ -33,17 +37,27 @@ export default function HiqClubDetail() {
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isCreateActivityOpen, setIsCreateActivityOpen] = useState(false);
+    const [isCreatePollOpen, setIsCreatePollOpen] = useState(false);
     const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'home' | 'board' | 'gallery' | 'chat'>('home');
+    const [activeTab, setActiveTab] = useState<'home' | 'board' | 'gallery' | 'chat' | 'poll'>('home');
     const [boardCategory, setBoardCategory] = useState("전체");
     const [isCreateSettlementOpen, setIsCreateSettlementOpen] = useState(false);
     const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
     const [selectedPost, setSelectedPost] = useState<any>(null);
+    const [sportTab, setSportTab] = useState<'BILLIARDS' | 'GOLF'>('BILLIARDS');
 
-    // Swipe Navigation Logic
+    // Swipe Navigation Logic (Removed 'poll' from direct swipe)
     const TABS: Array<'home' | 'board' | 'gallery' | 'chat'> = ['home', 'board', 'gallery', 'chat'];
+    // Force refresh on mount to ensure fresh data after the fix
+    useEffect(() => {
+        if (id) {
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}`] });
+        }
+    }, [id]);
+
     const handleSwipe = (direction: number) => {
-        const currentIndex = TABS.indexOf(activeTab);
+        if (activeTab === 'poll') return; // Disable swipe when in poll tab if navigated via home
+        const currentIndex = TABS.indexOf(activeTab as any);
         const nextIndex = currentIndex + direction;
         if (nextIndex >= 0 && nextIndex < TABS.length) {
             setActiveTab(TABS[nextIndex]);
@@ -80,6 +94,13 @@ export default function HiqClubDetail() {
         enabled: !!id,
     });
 
+    // Set initial sportTab based on crew category - Move above conditional returns
+    useEffect(() => {
+        if (crewData?.crew?.sportCategory) {
+            setSportTab(crewData.crew.sportCategory as 'BILLIARDS' | 'GOLF');
+        }
+    }, [crewData?.crew?.sportCategory]);
+
     const joinMutation = useMutation({
         mutationFn: async () => {
             return await apiRequest(`/api/hiq/crews/${id}/join`, { method: "POST" });
@@ -114,11 +135,11 @@ export default function HiqClubDetail() {
         }
     });
 
-    if (isLoading) return <div className="h-[100dvh] bg-[#0f0f0f] flex items-center justify-center text-white/20"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
-    if (!crewData) return <div className="h-[100dvh] bg-[#0f0f0f] flex items-center justify-center text-white/20">데이터를 찾을 수 없습니다.</div>;
+    if (isLoading) return <div className="h-[100dvh] bg-surface-1 flex items-center justify-center text-ink-3"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
+    if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-surface-1 flex items-center justify-center text-ink-3">데이터를 찾을 수 없습니다.</div>;
 
-    const { crew, baseStore, members } = crewData;
-    const myMemberData = members.find((m: any) => m.member.id === me?.id);
+    const { crew, baseStore, members = [] } = crewData;
+    const myMemberData = members.find((m: any) => m.member?.id === me?.id);
     const isMember = !!myMemberData && myMemberData.role !== 'pending';
     const isPending = !!myMemberData && myMemberData.role === 'pending';
     const isNotMember = !myMemberData;
@@ -126,54 +147,39 @@ export default function HiqClubDetail() {
     const hasPending = members.some((m: any) => m.role === 'pending');
 
     return (
-        <div className="h-[100dvh] bg-[#0f0f0f] text-white font-sans flex flex-col overflow-hidden relative">
-            {/* 1. 고정 헤더 영역 */}
-            <div className="shrink-0 z-30 bg-[#0A0A0A]/90 backdrop-blur-xl border-b border-white/5">
-                <div className="px-6 py-3 flex items-center justify-between">
-                    <Button variant="ghost" className="p-0 h-auto text-white" onClick={() => setLocation("/club")}>
-                        <LucideChevronLeft className="w-7 h-7" />
+        <div className="h-[100dvh] bg-[#0A0A0A] text-ink-1 font-sans flex flex-col overflow-hidden relative">
+            {/* 1. 고정 헤더 영역 (4+2 구조 중 상단 +2) */}
+            <div className="shrink-0 z-30 bg-[#0B0B0D]/90 backdrop-blur-2xl border-b border-white/10 safe-area-top">
+                <div className="px-6 py-4 flex items-center justify-between">
+                    {/* 좌측: 메인으로 가기 */}
+                    <Button
+                        variant="ghost"
+                        className="p-3 -ml-3 h-auto text-ink-2 hover:text-ink-1 transition-colors"
+                        onClick={() => setLocation("/dashboard")}
+                    >
+                        <LucideX className="w-7 h-7" strokeWidth={2.5} />
                     </Button>
-                    <div className="text-lg font-bold text-white tracking-tight line-clamp-1 max-w-[220px]">
-                        {crew.name}
+
+                    {/* 중앙: 타이틀 */}
+                    <div className="text-lg font-bold text-ink-1 line-clamp-1 max-w-[200px] text-center">
+                        {crew?.name}
                     </div>
+
+                    {/* 우측: 관리자/설정 */}
                     {isAdmin ? (
-                        <Button variant="ghost" className="p-0 h-auto text-white relative" onClick={() => setIsSettingsOpen(true)}>
-                            <LucideSettings className="w-6 h-6" />
-                            {hasPending && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#10B981] border-2 border-[#0A0A0A]" />}
+                        <Button
+                            variant="ghost"
+                            className="p-0 h-auto text-ink-2 hover:text-ink-1 transition-colors relative"
+                            onClick={() => setIsSettingsOpen(true)}
+                        >
+                            <LucideMoreVertical className="w-8 h-8" />
+                            {hasPending && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-brand border-2 border-surface-1" />}
                         </Button>
                     ) : (
-                        <Button variant="ghost" className="p-0 h-auto text-white">
+                        <Button variant="ghost" className="p-0 h-auto text-ink-2 hover:text-ink-1 transition-colors">
                             <LucideShare2 className="w-6 h-6" />
                         </Button>
                     )}
-                </div>
-
-                <div className="px-6 flex items-center">
-                    {[
-                        { id: 'home', label: '홈' },
-                        { id: 'board', label: '게시판' },
-                        { id: 'gallery', label: '사진첩' },
-                        { id: 'chat', label: '채팅' }
-                    ].map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className="flex-1 py-3 relative group"
-                        >
-                            <span className={cn(
-                                "text-[15px] font-semibold transition-all duration-300 tracking-tight",
-                                activeTab === tab.id ? "text-[#10B981]" : "text-white/20 group-hover:text-white/40"
-                            )}>
-                                {tab.label}
-                            </span>
-                            {activeTab === tab.id && (
-                                <motion.div
-                                    layoutId="crew-tab-active"
-                                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#10B981]"
-                                />
-                            )}
-                        </button>
-                    ))}
                 </div>
             </div>
 
@@ -196,7 +202,7 @@ export default function HiqClubDetail() {
                                 if (swipe < -100 || velocity < -500) handleSwipe(1);
                                 else if (swipe > 100 || velocity > 500) handleSwipe(-1);
                             }}
-                            className="h-full overflow-y-auto custom-scrollbar"
+                            className="h-full overflow-y-auto custom-scrollbar pb-32"
                         >
                             <CrewHomeTab
                                 crew={crew}
@@ -209,7 +215,11 @@ export default function HiqClubDetail() {
                                 me={me}
                                 onJoin={() => joinMutation.mutate()}
                                 onCreateActivity={() => setIsCreateActivityOpen(true)}
+                                onCreatePoll={() => setIsCreatePollOpen(true)}
                                 onShareToChat={(msg) => shareToChatMutation.mutate(msg)}
+                                onPollClick={() => setActiveTab('poll')}
+                                sportTab={sportTab}
+                                setSportTab={setSportTab}
                             />
                         </motion.div>
                     )}
@@ -230,7 +240,7 @@ export default function HiqClubDetail() {
                                 if (swipe < -100 || velocity < -500) handleSwipe(1);
                                 else if (swipe > 100 || velocity > 500) handleSwipe(-1);
                             }}
-                            className="h-full overflow-y-auto custom-scrollbar"
+                            className="h-full overflow-y-auto custom-scrollbar pb-32"
                         >
                             <CrewBoardTab
                                 posts={posts || []}
@@ -299,19 +309,91 @@ export default function HiqClubDetail() {
                             />
                         </motion.div>
                     )}
+
+                    {activeTab === 'poll' && (
+                        <motion.div
+                            key="poll"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            drag="x"
+                            dragDirectionLock
+                            dragConstraints={{ left: 0, right: 0 }}
+                            dragElastic={0.2}
+                            onDragEnd={(_, info) => {
+                                const swipe = info.offset.x;
+                                const velocity = info.velocity.x;
+                                if (swipe < -100 || velocity < -500) handleSwipe(1);
+                                else if (swipe > 100 || velocity > 500) handleSwipe(-1);
+                            }}
+                            className="h-full overflow-y-auto custom-scrollbar pb-32"
+                        >
+                            <CrewPollTab
+                                crewId={id as string}
+                                isAdmin={isAdmin}
+                                isMember={isMember}
+                            />
+                        </motion.div>
+                    )}
                 </AnimatePresence>
             </main>
 
-            {/* 하단 내비게이션 (채팅이 아닐 때만 표시) */}
-            {activeTab !== 'chat' && <HiqNavigation />}
+            {/* 3. 인앱 하단 네비게이션 (전용 4버튼 레이아웃) */}
+            <nav className="fixed bottom-0 w-full bg-[#0B0B0D]/95 backdrop-blur-2xl border-t border-white/10 flex items-center h-20 safe-area-bottom z-50">
+                {[
+                    { id: 'home', label: '홈', icon: LucideHome },
+                    { id: 'board', label: '게시판', icon: LucideFileText },
+                    { id: 'gallery', label: '사진첩', icon: LucideImage },
+                    { id: 'chat', label: '채팅', icon: LucideMessageCircle },
+                ].map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={cn(
+                                "flex-1 flex flex-col items-center justify-center h-full transition-all active:scale-95 relative",
+                                isActive ? "text-brand" : "text-ink-3 hover:text-ink-2"
+                            )}
+                        >
+                            <tab.icon size={24} strokeWidth={isActive ? 2.5 : 1.5} />
+                            <span className="text-[12px] mt-1.5 font-semibold">
+                                {tab.label}
+                            </span>
+                            {isActive && (
+                                <div className="absolute top-0 inset-x-0 flex justify-center">
+                                    <motion.div
+                                        layoutId="bottom-nav-active"
+                                        className="w-10 h-0.5 bg-brand"
+                                    />
+                                </div>
+                            )}
+                        </button>
+                    );
+                })}
+            </nav>
 
             {/* 다이얼로그 모달 모음 */}
             {isAdmin && <ClubSettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} crew={crew} members={members} me={me} />}
             {isAdmin && <CreateSettlementDialog open={isCreateSettlementOpen} onOpenChange={setIsCreateSettlementOpen} crewId={id as string} members={members} me={me} onSubmit={(data) => createSettlementMutation.mutate(data)} isPending={createSettlementMutation.isPending} />}
             <SettlementDetailDialog open={!!selectedSettlementId} onOpenChange={(open) => !open && setSelectedSettlementId(null)} settlement={selectedSettlement} meId={me?.id} />
             <PostDetailDialog open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)} post={selectedPost} isAdmin={isAdmin} currentMemberId={me?.id} />
-            <CreateActivityDialog open={isCreateActivityOpen} onOpenChange={setIsCreateActivityOpen} crewId={id as string} />
-            <CreatePostDialog open={isCreatePostOpen} onOpenChange={setIsCreatePostOpen} crewId={id as string} isAdmin={isAdmin} />
+            {crew.sportCategory === 'GOLF' ? (
+                <CreateGolfActivityModal
+                    open={isCreateActivityOpen}
+                    onOpenChange={setIsCreateActivityOpen}
+                    crewId={id as string}
+                />
+            ) : (
+                <CreateActivityDialog
+                    open={isCreateActivityOpen}
+                    onOpenChange={setIsCreateActivityOpen}
+                    crewId={id as string}
+                    sportCategory={crew.sportCategory as any}
+                />
+            )}
+            <CreatePostDialog open={isCreatePostOpen} onOpenChange={setIsCreatePostOpen} crewId={id as string} isAdmin={isAdmin} crew={crew as any} />
+            <CreatePollDialog open={isCreatePollOpen} onOpenChange={setIsCreatePollOpen} crewId={id as string} />
         </div>
     );
 }

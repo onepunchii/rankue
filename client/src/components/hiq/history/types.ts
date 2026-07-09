@@ -31,51 +31,51 @@ export interface SportConfig {
 export const SPORT_CONFIG: Record<string, SportConfig> = {
     GOLF: {
         title: "라운딩 리포트",
-        subtitle: "OFFICIAL ROUNDING RECORDS",
+        subtitle: "공식 라운딩 기록",
         label: "라운딩",
         unit: "타수",
-        themeColor: "text-[#84cc16]",
-        borderColor: "hover:border-[#84cc16]/30",
-        bgLight: "bg-[#84cc16]/5",
+        themeColor: "text-brand",
+        borderColor: "hover:border-brand/30",
+        bgLight: "bg-brand/5",
         mainIcon: LucideHistory,
         listTitle: "최근 공식 라운딩 리스트",
         detailTitle: "라운딩 상세 리포트",
-        detailSubtitle: "OFFICIAL ROUND BREAKDOWN",
+        detailSubtitle: "라운딩 상세 분석",
         statLabels: {
-            total: "Total Rounds",
-            score: "Avg. Score",
-            best: "Best Score",
+            total: "총 라운드",
+            score: "평균 타수",
+            best: "베스트 스코어",
             bestVal: "G.I.R %",
-            extra1: "Recent 5",
-            extra2: "Par Save",
-            extra3: "Avg. Putts"
+            extra1: "최근 5R",
+            extra2: "파 세이브",
+            extra3: "버디+"
         },
         tierLogic: 'handicap',
-        spinnerColor: "border-t-[#84cc16]"
+        spinnerColor: "border-t-brand"
     },
     BILLIARDS: {
         title: "공식 경기 성적표",
-        subtitle: "OFFICIAL MATCH RECORDS",
+        subtitle: "공식 경기 기록",
         label: "경기",
         unit: "득점",
-        themeColor: "text-[#10b981]",
-        borderColor: "hover:border-[#10b981]/30",
-        bgLight: "bg-[#10b981]/5",
+        themeColor: "text-brand",
+        borderColor: "hover:border-brand/30",
+        bgLight: "bg-brand/5",
         mainIcon: LucideSwords,
         listTitle: "최근 공식 매치 리스트",
         detailTitle: "경기 상세 매치 리포트",
-        detailSubtitle: "OFFICIAL MATCH BREAKDOWN",
+        detailSubtitle: "경기 상세 분석",
         statLabels: {
-            total: "Games",
-            score: "Points",
-            best: "Win %",
-            bestVal: "Best AVG",
-            extra1: "Recent 10",
+            total: "경기수",
+            score: "평균 득점",
+            best: "승률",
+            bestVal: "최고 에버",
+            extra1: "최근 10",
             extra2: "공타율",
-            extra3: "Best HR"
+            extra3: "최고 HR"
         },
         tierLogic: 'average',
-        spinnerColor: "border-t-[#10b981]"
+        spinnerColor: "border-t-brand"
     }
 };
 

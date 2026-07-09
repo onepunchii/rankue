@@ -3,9 +3,10 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LucideChevronRight, LucideDelete } from "lucide-react";
+import { LucideChevronRight, LucideDelete, LucideShieldQuestion } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@/contexts/StoreContext";
+import { PinResetDialog } from "@/components/hiq/PinResetDialog";
 
 export default function Landing() {
     const [, setLocation] = useLocation();
@@ -16,6 +17,7 @@ export default function Landing() {
     const [memberName, setMemberName] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [storeSlug, setStoreSlug] = useState("hiq");
+    const [isResetOpen, setIsResetOpen] = useState(false);
 
     // Check if already logged in
     useEffect(() => {
@@ -108,11 +110,11 @@ export default function Landing() {
 
     if (isBrandLoading || !brand) {
         return (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
-                <div className="text-white/20 font-black text-4xl animate-pulse tracking-tighter">RANKUE</div>
+            <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center gap-4">
+                <div className="text-white/55 font-bold text-4xl animate-pulse">RANKUE</div>
                 {brandError ? (
-                    <div className="text-red-500 font-bold bg-white/10 p-4 rounded-xl">
-                        Error: {brandError.message}
+                    <div className="text-red-500 font-semibold bg-white/10 p-4 rounded-tile">
+                        오류: {brandError.message}
                     </div>
                 ) : (
                     <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
@@ -120,7 +122,7 @@ export default function Landing() {
                             initial={{ x: "-100%" }}
                             animate={{ x: "100%" }}
                             transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                            className="w-1/2 h-full bg-indigo-500"
+                            className="w-1/2 h-full bg-brand"
                         />
                     </div>
                 )}
@@ -129,18 +131,12 @@ export default function Landing() {
     }
 
     return (
-        <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-[#050505] font-sans">
-            {/* Background Layers */}
-            <div className="absolute inset-0 z-0">
-                <div className="absolute inset-0 bg-premium-billiards opacity-20 grayscale brightness-50" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.8)_100%)]" />
-            </div>
-
-            {/* Main Glass Container */}
+        <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-5 relative overflow-hidden bg-[#0A0A0A] font-sans">
+            {/* Main Container */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="relative z-10 w-full max-w-[400px] premium-glass rounded-[3rem] overflow-hidden flex flex-col shadow-[0_0_80px_rgba(0,0,0,0.8)]"
+                className="relative z-10 w-full max-w-[400px] rk-card overflow-hidden flex flex-col"
             >
                 {/* Header Section */}
                 <div className="pt-12 pb-8 text-center bg-white/[0.02]">
@@ -149,13 +145,13 @@ export default function Landing() {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                     >
-                        <h1 className="text-4xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                            {brand?.logoText || 'RANKUE'}
+                        <h1 className="text-4xl font-bold text-white">
+                            RANKUE
                         </h1>
                         <div className="flex items-center justify-center gap-2 mt-3">
                             <span className="h-[1px] w-4 bg-white/10" />
-                            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40">
-                                {requiresPassword ? `${memberName} 확인 중` : (brand?.subText || 'Premium Lounge')}
+                            <p className="text-[12px] font-medium text-white/55">
+                                {requiresPassword ? `${memberName} 확인 중` : '스포츠 소셜 클럽'}
                             </p>
                             <span className="h-[1px] w-4 bg-white/10" />
                         </div>
@@ -180,20 +176,21 @@ export default function Landing() {
                                     handleStart();
                                 }
                             }}
-                            className={`w-full bg-transparent border-b-2 border-white/10 focus:border-[#10b981] text-center text-3xl font-black text-white placeholder:text-white/10 py-4 transition-all outline-none ${requiresPassword ? "tracking-[0.5em]" : "tracking-[0.2em]"}`}
+                            className={`w-full bg-transparent border-b-2 border-white/10 focus:border-brand text-center text-3xl font-bold tabular-nums text-white placeholder:text-white/45 py-4 transition-all outline-none`}
                             autoFocus={requiresPassword}
                         />
                         {/* Tooltip hint */}
-                        <p className="text-center text-[10px] text-white/20 mt-4 font-bold tracking-widest uppercase">
+                        <p className="text-center text-[12px] text-white/55 mt-4 font-medium">
                             {requiresPassword ? "비밀번호를 입력하여 본인을 확인하세요" : "휴대폰 번호로 입장하세요"}
                         </p>
 
                         {requiresPassword && (
                             <button
-                                onClick={() => { setRequiresPassword(false); setPassword(""); }}
-                                className="w-full mt-6 text-[10px] font-black text-white/20 uppercase tracking-widest hover:text-[#10b981] transition-all active:scale-95 text-center"
+                                onClick={() => setIsResetOpen(true)}
+                                className="w-full mt-6 py-4 px-4 bg-white/5 border border-white/10 rounded-tile text-[12px] font-medium text-white/55 hover:text-brand hover:border-brand/50 transition-all active:scale-95 text-center flex items-center justify-center gap-2 group"
                             >
-                                [ 번호 다시 입력 (Back) ]
+                                <LucideShieldQuestion className="w-4 h-4 text-white/40 group-hover:text-brand transition-colors" />
+                                <span>PIN을 잊으셨나요?</span>
                             </button>
                         )}
                     </div>
@@ -207,10 +204,10 @@ export default function Landing() {
                         title={requiresPassword ? "확인 및 입장" : "입장하기"}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className="w-full h-18 py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-20 shadow-[0_20px_40px_rgba(0,0,0,0.4)] relative overflow-hidden group"
+                        className="w-full h-18 py-5 rounded-tile font-bold text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-20 relative overflow-hidden group"
                         style={{
-                            background: (requiresPassword ? password.length >= 4 : phone.length === 11) ? "#10b981" : "#1a1a1a",
-                            color: (requiresPassword ? password.length >= 4 : phone.length === 11) ? "#000" : "#555"
+                            background: (requiresPassword ? password.length >= 4 : phone.length === 11) ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
+                            color: (requiresPassword ? password.length >= 4 : phone.length === 11) ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.45)"
                         }}
                     >
                         {isLoading ? (
@@ -221,16 +218,20 @@ export default function Landing() {
                                 <LucideChevronRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
                             </>
                         )}
-                        {/* Edge Highlight */}
-                        <div className="absolute inset-0 border border-white/20 rounded-2xl pointer-events-none" />
                     </motion.button>
                 </div>
 
                 {/* Footer */}
-                <div className="text-center pb-6 opacity-30">
-                    <p className="text-[10px] font-bold tracking-widest text-white">POLISHED BY RANKUE</p>
+                <div className="text-center pb-6">
+                    <p className="text-[12px] font-medium text-white/55">RANKUE 제공</p>
                 </div>
             </motion.div>
+
+            <PinResetDialog
+                open={isResetOpen}
+                onOpenChange={setIsResetOpen}
+                initialPhone={phone}
+            />
         </div>
     );
 }

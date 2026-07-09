@@ -12,7 +12,7 @@ export function useGolfMatch(member: any) {
 
     const joinMatch = useMutation({
         mutationFn: async (pin: string) => {
-            const res = await apiRequest("/api/hiq/golf/match/join", {
+            const data = await apiRequest("/api/hiq/golf/match/join", {
                 method: "POST",
                 body: {
                     pin,
@@ -20,7 +20,7 @@ export function useGolfMatch(member: any) {
                     name: member?.name
                 }
             });
-            return res.json();
+            return data;
         },
         onSuccess: (data) => {
             toast({ title: "입장 성공!", description: "대기실로 이동합니다.. 🚀" });

@@ -53,27 +53,21 @@ export default function HiqHistory() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white p-6 pb-24 font-sans relative overflow-x-hidden">
-            {/* Background Light Effect */}
-            <div className={cn(
-                "absolute top-0 right-0 w-[80dvw] h-[40dvh] blur-[120px] rounded-full -mr-[30dvw] -mt-[10dvh] pointer-events-none transition-colors duration-1000",
-                config.bgLight
-            )} />
-
+        <div className="min-h-screen bg-[#0A0A0A] text-white px-5 pt-5 pb-28 font-sans relative overflow-x-hidden">
             {/* Header */}
-            <div className="flex items-center gap-5 py-4 mb-6 relative z-10">
+            <div className="flex items-center gap-3 mb-7 relative z-10">
                 <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setLocation("/dashboard")}
-                    className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center backdrop-blur-md active:scale-95 transition-all text-white/40"
+                    className="w-11 h-11 rounded-full bg-surface-1 border border-surface-line flex items-center justify-center active:scale-95 transition-transform text-white/55 shrink-0"
                 >
-                    <LucideChevronLeft className="w-6 h-6" />
+                    <LucideChevronLeft className="w-5 h-5" />
                 </motion.button>
                 <div>
-                    <h1 className="text-3xl font-black tracking-tighter text-white">
+                    <h1 className="text-[26px] font-bold tracking-tight text-white leading-none">
                         {config.title}
                     </h1>
-                    <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mt-0.5">
+                    <p className="text-[13px] font-medium text-white/45 mt-1.5">
                         {config.subtitle}
                     </p>
                 </div>
@@ -81,7 +75,7 @@ export default function HiqHistory() {
 
             {/* Filter Tabs - Only show for Billiards */}
             {currentSport !== "GOLF" && (
-                <div className="flex p-1 bg-[#151515] rounded-2xl mb-8 border border-[#222]">
+                <div className="flex p-1 bg-white/[0.04] rounded-2xl mb-6 border border-white/[0.06]">
                     {[
                         { id: "all", label: "전체", icon: LucideLayers },
                         { id: "3c", label: "3구", icon: LucideTarget },
@@ -91,13 +85,13 @@ export default function HiqHistory() {
                             key={tab.id}
                             onClick={() => setFilter(tab.id as FilterType)}
                             className={cn(
-                                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all outline-none ring-0",
+                                "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
                                 filter === tab.id
-                                    ? "bg-[#10b981] text-black shadow-lg"
-                                    : "text-gray-500 hover:text-gray-300"
+                                    ? "bg-brand text-brand-fg"
+                                    : "text-white/45 hover:text-white/70"
                             )}
                         >
-                            <tab.icon className={cn("w-4 h-4", filter === tab.id ? "text-black" : "")} />
+                            <tab.icon className="w-4 h-4" />
                             {tab.label}
                         </button>
                     ))}

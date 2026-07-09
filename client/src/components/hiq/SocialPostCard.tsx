@@ -38,6 +38,7 @@ interface Post {
     likeCount: number;
     commentCount: number;
     isLiked: boolean;
+    images?: string[];
 }
 
 interface SocialPostCardProps {
@@ -138,7 +139,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
     };
 
     return (
-        <article className="p-5 bg-white/5 border border-white/5 rounded-2xl group hover:border-white/10 transition-all flex flex-col gap-3">
+        <article className="rk-card p-5 group hover:border-surface-line-strong transition-all flex flex-col gap-3">
             {/* Header: Author + Time */}
             <header className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -150,7 +151,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                                 alt={`${post.author.name}의 프로필`}
                             />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-[10px] font-extrabold uppercase text-white/20">
+                            <div className="w-full h-full flex items-center justify-center text-[12px] font-bold text-white/45">
                                 {post.author?.name?.charAt(0)}
                             </div>
                         )}
@@ -168,21 +169,21 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <time className="text-[10px] font-semibold text-white/20 uppercase tracking-widest">
+                    <time className="text-[12px] font-medium text-white/55">
                         {post.createdAt ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ko }) : '--'}
                     </time>
                     {canDelete && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <button
-                                    className="p-1.5 text-white/20 hover:text-red-500 transition-colors"
+                                    className="p-1.5 text-white/45 hover:text-red-500 transition-colors"
                                     disabled={deleteMutation.isPending}
                                     title="게시글 삭제"
                                 >
                                     <LucideTrash2 className="w-3.5 h-3.5" />
                                 </button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-[#1a1a1a] border-white/10">
+                            <AlertDialogContent className="bg-[#141416] border-white/10 rounded-card">
                                 <AlertDialogHeader>
                                     <AlertDialogTitle className="text-white">게시글 삭제</AlertDialogTitle>
                                     <AlertDialogDescription className="text-white/60">
@@ -211,7 +212,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     onKeyDown={(e) => { if (e.key === 'Enter') handleActionClick(() => setIsDetailOpen(true)) }}
                     role="button"
                     tabIndex={0}
-                    className="text-base font-extrabold text-white group-hover:text-[#10B981] cursor-pointer transition-colors line-clamp-1 outline-none focus:text-[#10B981]"
+                    className="text-base font-bold text-white group-hover:text-brand cursor-pointer transition-colors line-clamp-1 outline-none focus:text-brand"
                 >
                     {post.title}
                 </h3>
@@ -240,14 +241,36 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     >
                         {content}
                     </p>
+
+                    {post.images && post.images.length > 0 && !isExpanded && (
+                        <div className={cn(
+                            "mt-3 grid gap-1 rounded-xl overflow-hidden",
+                            post.images.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                        )}>
+                            {post.images.slice(0, post.images.length === 3 ? 3 : 4).map((img, idx) => (
+                                <div key={idx} className={cn(
+                                    "relative aspect-square bg-white/5",
+                                    post.images?.length === 3 && idx === 0 && "row-span-2 aspect-auto"
+                                )}>
+                                    <img src={img} className="w-full h-full object-cover" alt="post content" />
+                                    {idx === 3 && post.images!.length > 4 && (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                            <span className="text-sm font-bold text-white">+{post.images!.length - 4}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {isLongText && !isExpanded && (
-                        <span className="mt-1 block text-xs font-semibold text-white/30 hover:text-[#10B981] transition-colors italic">
+                        <span className="mt-1 block text-xs font-medium text-white/55 hover:text-brand transition-colors ">
                             ... 더 보기
                         </span>
                     )}
                     {isExpanded && (
-                        <span className="mt-2 block text-xs font-semibold text-white/20 hover:text-white/40 transition-colors uppercase tracking-widest">
-                            [접기]
+                        <span className="mt-2 block text-xs font-medium text-white/55 hover:text-white/70 transition-colors">
+                            접기
                         </span>
                     )}
                 </div>
@@ -267,11 +290,11 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     >
                         <LucideHeart className={cn(
                             "w-4 h-4 transition-colors",
-                            post.isLiked ? "text-red-500 fill-red-500" : "text-white/20 group-hover/like:text-red-500"
+                            post.isLiked ? "text-red-500 fill-red-500" : "text-white/45 group-hover/like:text-red-500"
                         )} />
                         <span className={cn(
-                            "text-xs font-semibold transition-colors",
-                            post.isLiked ? "text-red-500" : "text-white/20 group-hover/like:text-white/40"
+                            "text-xs font-semibold tabular-nums transition-colors",
+                            post.isLiked ? "text-red-500" : "text-white/55 group-hover/like:text-white/70"
                         )}>
                             {post.likeCount || 0}
                         </span>
@@ -281,12 +304,12 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                         className="flex items-center gap-1.5 group/comment"
                         aria-label={`댓글 ${post.commentCount || 0}개`}
                     >
-                        <LucideMessageSquare className="w-4 h-4 text-white/20 group-hover/comment:text-[#10B981] transition-colors" />
-                        <span className="text-xs font-semibold text-white/20 group-hover/comment:text-white/40">{post.commentCount || 0}</span>
+                        <LucideMessageSquare className="w-4 h-4 text-white/45 group-hover/comment:text-brand transition-colors" />
+                        <span className="text-xs font-medium tabular-nums text-white/55 group-hover/comment:text-white/70">{post.commentCount || 0}</span>
                     </button>
                 </div>
                 {post.category && post.category !== "자유글" && (
-                    <span className="text-[10px] font-extrabold text-[#10B981] opacity-40 uppercase tracking-widest">
+                    <span className="text-[12px] font-bold text-brand/70">
                         #{post.category}
                     </span>
                 )}
@@ -313,7 +336,7 @@ function Badge({ variant, children }: { variant: 'leader' | 'manage', children: 
     return (
         <div className={cn("flex items-center gap-1 px-1.5 py-0.5 border rounded-md", styles[variant])}>
             {variant === 'leader' ? <LucideCrown className="w-2.5 h-2.5 fill-current" /> : <LucideShield className="w-2.5 h-2.5 fill-current" />}
-            <span className="text-[8px] font-extrabold uppercase tracking-tighter leading-none">{children}</span>
+            <span className="text-[12px] font-bold leading-none">{children}</span>
         </div>
     );
 }

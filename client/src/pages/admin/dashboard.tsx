@@ -10,7 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideArrowRight, LucideCheckCircle, LucideLogOut,
-    LucideSearch, LucideTrendingUp, LucideBell, LucideCreditCard, LucideSettings, LucideShieldAlert, LucideMenu, LucideX, LucideUsersRound
+    LucideSearch, LucideTrendingUp, LucideBell, LucideCreditCard, LucideSettings, LucideShieldAlert, LucideMenu, LucideX, LucideUsersRound, LucideMail, LucideFlag
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -65,10 +65,20 @@ type AdminCrew = {
     id: string;
     name: string;
     description: string;
+    sportCategory: "BILLIARDS" | "GOLF" | "MIXED";
     memberCount: number;
     leaderName: string;
     storeName: string;
     createdAt: string;
+};
+
+type Suggestion = {
+    id: string;
+    type: string;
+    content: string;
+    contact: string | null;
+    createdAt: string;
+    isRead: boolean;
 };
 
 // --- Left Sidebar Component ---
@@ -78,8 +88,10 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
         { id: "dashboard", label: "Dashboard", icon: LucideLayoutDashboard },
         { id: "leads", label: "입점 문의", icon: LucidePhone },
         { id: "stores", label: "매장 리스트", icon: LucideStore },
-        { id: "crews", label: "크루 현황", icon: LucideUsersRound }, // New
+        { id: "crews", label: "크루 현황", icon: LucideUsersRound },
+        { id: "golf-orders", label: "골프 회원권", icon: LucideFlag }, // New
         { id: "billing", label: "결제 관리", icon: LucideCreditCard },
+        { id: "suggestions", label: "건의함", icon: LucideMail },
         { id: "notices", label: "공지사항", icon: LucideBell },
         { id: "moderation", label: "신고/제재", icon: LucideShieldAlert },
     ];
@@ -133,7 +145,8 @@ export default function AdminDashboard() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [tab, setTab] = useState<"dashboard" | "leads" | "stores" | "crews" | "billing" | "notices" | "moderation">("dashboard");
+    const [tab, setTab] = useState<"dashboard" | "leads" | "stores" | "crews" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders">("dashboard");
+    const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
     // Queries
     const { data: stats } = useQuery<GlobalStats>({ queryKey: ["/api/hiq/admin/stats"] });
@@ -142,6 +155,13 @@ export default function AdminDashboard() {
     const { data: crews = [] } = useQuery<AdminCrew[]>({ queryKey: ["/api/hiq/admin/crews"] });
     const { data: notices = [] } = useQuery<Notice[]>({ queryKey: ["/api/hiq/admin/notices"] });
     const { data: reports = [] } = useQuery<ReportedUser[]>({ queryKey: ["/api/hiq/admin/reports"] });
+    const { data: suggestions = [] } = useQuery<Suggestion[]>({ queryKey: ["/api/hiq/admin/suggestions"] });
+
+    // Filter crews
+    const filteredCrews = crews.filter(crew => {
+        if (crewSportFilter === "ALL") return true;
+        return crew.sportCategory === crewSportFilter || crew.sportCategory === "MIXED";
+    });
 
     // Mutations
     const updateLeadStatusMutation = useMutation({
@@ -255,6 +275,32 @@ export default function AdminDashboard() {
                                                     <Badge variant={lead.status === 'NEW' ? 'destructive' : 'secondary'}>{lead.status}</Badge>
                                                 </div>
                                             ))}
+                                            {leads.length === 0 && <div className="text-center text-white/20 py-4 text-xs">문의 내역이 없습니다.</div>}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-[#111] p-6 rounded-2xl border border-white/5">
+                                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                            <LucideMail size={18} className="text-yellow-500" /> 최근 건의사항
+                                        </h3>
+                                        <div className="space-y-3">
+                                            {suggestions.slice(0, 3).map(suggestion => (
+                                                <div key={suggestion.id} className="p-3 bg-white/5 rounded-xl text-xs space-y-1">
+                                                    <div className="flex justify-between items-center">
+                                                        <Badge variant={suggestion.type === 'BUG' ? 'destructive' : 'secondary'} className="scale-75 origin-left">
+                                                            {suggestion.type}
+                                                        </Badge>
+                                                        <span className="text-white/30">{new Date(suggestion.createdAt).toLocaleDateString()}</span>
+                                                    </div>
+                                                    <p className="text-white/70 line-clamp-1">{suggestion.content}</p>
+                                                </div>
+                                            ))}
+                                            {suggestions.length === 0 && <div className="text-center text-white/20 py-4 text-xs">건의사항이 없습니다.</div>}
+                                            {suggestions.length > 0 && (
+                                                <Button variant="ghost" className="w-full text-xs text-white/40 h-8 mt-2 hover:bg-white/5" onClick={() => setTab("suggestions")}>
+                                                    모두 보기
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -312,6 +358,60 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
+                    {tab === "crews" && (
+                        <div className="space-y-6">
+                            <div className="flex gap-2 mb-6 bg-white/5 p-1 rounded-xl w-fit">
+                                <button
+                                    onClick={() => setCrewSportFilter("ALL")}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${crewSportFilter === "ALL" ? "bg-indigo-600 text-white" : "text-white/40 hover:text-white"}`}
+                                >
+                                    전체
+                                </button>
+                                <button
+                                    onClick={() => setCrewSportFilter("BILLIARDS")}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${crewSportFilter === "BILLIARDS" ? "bg-indigo-600 text-white" : "text-white/40 hover:text-white"}`}
+                                >
+                                    당구
+                                </button>
+                                <button
+                                    onClick={() => setCrewSportFilter("GOLF")}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${crewSportFilter === "GOLF" ? "bg-indigo-600 text-white" : "text-white/40 hover:text-white"}`}
+                                >
+                                    골프
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {filteredCrews.map((crew) => (
+                                    <div key={crew.id} className="bg-[#111] p-5 rounded-2xl border border-white/5 hover:border-white/10 transition">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <Badge variant={crew.sportCategory === 'GOLF' ? 'default' : 'secondary'} className={crew.sportCategory === 'GOLF' ? 'bg-emerald-600' : 'bg-blue-600'}>
+                                                {crew.sportCategory === 'GOLF' ? 'GOLF' : '당구'}
+                                            </Badge>
+                                            <span className="text-[10px] text-white/30">{new Date(crew.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                        <h3 className="text-lg font-bold mb-1">{crew.name}</h3>
+                                        <p className="text-white/40 text-sm mb-4 line-clamp-2 h-10">{crew.description}</p>
+                                        <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
+                                                    <LucideUsers size={12} className="text-white/60" />
+                                                </div>
+                                                <span className="text-xs font-bold">{crew.memberCount}명</span>
+                                            </div>
+                                            <span className="text-xs text-white/40">리더: {crew.leaderName}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                                {filteredCrews.length === 0 && (
+                                    <div className="col-span-full text-center py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
+                                        <p className="text-white/20">등록된 크루가 없습니다.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {tab === "billing" && (
                         <div className="space-y-6">
                             <div className="bg-indigo-900/10 border border-indigo-500/20 p-6 rounded-2xl mb-8">
@@ -358,6 +458,47 @@ export default function AdminDashboard() {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    )}
+
+                    {tab === "suggestions" && (
+                        <div className="grid gap-4">
+                            {suggestions.map((suggestion) => (
+                                <div key={suggestion.id} className="bg-[#111] p-5 rounded-2xl border border-white/5 flex flex-col gap-3">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant={suggestion.type === 'BUG' ? 'destructive' : suggestion.type === 'PARTNERSHIP' ? 'default' : 'secondary'}>
+                                                {suggestion.type}
+                                            </Badge>
+                                            <span className="text-xs text-white/30">{new Date(suggestion.createdAt).toLocaleString()}</span>
+                                        </div>
+                                        {suggestion.contact && (
+                                            <div className="text-right text-xs text-white/50 bg-white/5 px-2 py-1 rounded-md">
+                                                연락처: {suggestion.contact}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-white/80 whitespace-pre-wrap text-sm leading-relaxed p-3 bg-white/[0.02] rounded-xl border border-white/5">
+                                        {suggestion.content}
+                                    </p>
+                                    <div className="flex justify-end gap-2">
+                                        {suggestion.contact && (
+                                            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                                                if (suggestion.contact?.includes('@')) {
+                                                    window.location.href = `mailto:${suggestion.contact}`;
+                                                } else {
+                                                    window.location.href = `tel:${suggestion.contact}`;
+                                                }
+                                            }}>
+                                                <LucideMail className="w-3 h-3 mr-1" /> 답변하기
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {suggestions.length === 0 && (
+                                <div className="text-center text-white/30 py-10">접수된 건의사항이 없습니다.</div>
+                            )}
                         </div>
                     )}
 
@@ -438,6 +579,8 @@ export default function AdminDashboard() {
                             {reports.length === 0 && <div className="col-span-3 text-center text-white/30 py-10">신고된 유저가 없습니다. 클린합니다! ✨</div>}
                         </div>
                     )}
+
+                    {tab === "golf-orders" && <GolfOrdersView />}
                 </div>
             </main>
         </div>
@@ -450,8 +593,10 @@ function getTabTitle(tab: string) {
         case "leads": return "입점 문의 관리";
         case "stores": return "가맹점 리스트";
         case "billing": return "결제 및 정산";
+        case "suggestions": return "건의함 (고객 의견)";
         case "notices": return "공지사항 관리";
         case "moderation": return "신고/제재 센터";
+        case "golf-orders": return "골프 회원권 접수 현황";
         default: return "Admin";
     }
 }
@@ -465,6 +610,105 @@ function StatCard({ label, value, icon, sub, highlight = false }: any) {
             </div>
             <div className="text-3xl font-black text-white mb-1">{value}</div>
             <div className="text-xs text-white/30">{sub}</div>
+        </div>
+    );
+}
+
+function GolfOrdersView() {
+    const { toast } = useToast();
+    const { data: orders, isLoading, refetch } = useQuery<any[]>({
+        queryKey: ["/api/hiq/admin/membership/orders"],
+    });
+
+    const updateStatusMutation = useMutation({
+        mutationFn: async ({ id, status }: { id: string, status: string }) => {
+            return await apiRequest(`/api/hiq/admin/membership/orders/${id}/status`, {
+                method: "PATCH",
+                body: { status }
+            });
+        },
+        onSuccess: () => {
+            toast({ title: "상태 변경 완료" });
+            refetch();
+        },
+        onError: () => {
+            toast({ title: "오류", description: "상태 변경에 실패했습니다.", variant: "destructive" });
+        }
+    });
+
+    if (isLoading) return <div className="text-center py-20 text-gray-500">Loading...</div>;
+
+    const sortedOrders = orders ? [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [];
+
+    return (
+        <div className="bg-[#111] border border-white/5 overflow-hidden rounded-2xl shadow-2xl">
+            <div className="overflow-x-auto">
+                <table className="w-full text-left bg-[#111]">
+                    <thead>
+                        <tr className="bg-[#1a1a1a] border-b border-[#222]">
+                            <th className="p-5 font-black text-gray-400">날짜</th>
+                            <th className="p-5 font-black text-gray-400">구분</th>
+                            <th className="p-5 font-black text-gray-400">회원권 / 구장</th>
+                            <th className="p-5 font-black text-gray-400 text-right">희망가격</th>
+                            <th className="p-5 font-black text-gray-400">연락처</th>
+                            <th className="p-5 font-black text-gray-400 text-center">상태</th>
+                            <th className="p-5 font-black text-gray-400 text-center">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sortedOrders.map((order) => (
+                            <tr key={order.id} className="border-b border-[#1a1a1a] hover:bg-white/5 transition-colors">
+                                <td className="p-5 text-gray-500 font-mono text-sm max-w-[120px]">
+                                    <div className="font-bold text-white">{new Date(order.createdAt).toLocaleDateString()}</div>
+                                    <div className="text-xs">{new Date(order.createdAt).toLocaleTimeString()}</div>
+                                </td>
+                                <td className="p-5">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${order.orderType === 'BUY' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
+                                        {order.orderType === 'BUY' ? '매수' : '매도'}
+                                    </span>
+                                </td>
+                                <td className="p-5">
+                                    <div className="font-bold text-lg text-white">{order.courseName}</div>
+                                </td>
+                                <td className="p-5 text-right font-mono font-bold text-white text-lg">
+                                    {new Intl.NumberFormat('ko-KR').format(order.price)}원
+                                </td>
+                                <td className="p-5 font-mono text-blue-400 font-bold">{order.contact}</td>
+                                <td className="p-5 text-center">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-black ${order.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
+                                        order.status === 'CONTACTED' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                                            order.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border border-green-500/20' :
+                                                'bg-gray-500/10 text-gray-500 border border-gray-500/20'
+                                        }`}>
+                                        {order.status === 'PENDING' ? '대기중' :
+                                            order.status === 'CONTACTED' ? '연락됨' :
+                                                order.status === 'COMPLETED' ? '완료' : '취소'}
+                                    </span>
+                                </td>
+                                <td className="p-5 text-center">
+                                    <select
+                                        className="bg-[#050505] border border-[#333] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#64DD17] text-gray-300 font-medium cursor-pointer hover:bg-[#1a1a1a] transition-colors"
+                                        value={order.status}
+                                        onChange={(e) => updateStatusMutation.mutate({ id: order.id, status: e.target.value })}
+                                        title="주문 상태 변경"
+                                    >
+                                        <option value="PENDING">대기중</option>
+                                        <option value="CONTACTED">연락됨</option>
+                                        <option value="COMPLETED">거래완료</option>
+                                        <option value="CANCELLED">취소</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {!orders?.length && (
+                    <div className="py-20 text-center text-gray-600">
+                        <LucideSearch className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                        <p className="font-bold">신규 접수된 내역이 없습니다.</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

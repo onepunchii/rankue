@@ -12,6 +12,7 @@ interface TimeSelectionSectionProps {
     setCurrentTime: (t: string) => void;
     timeList: string[];
     setTimeList: React.Dispatch<React.SetStateAction<string[]>>;
+    listingType: 'BOOKING' | 'JOIN';
 }
 
 export function TimeSelectionSection({
@@ -20,7 +21,8 @@ export function TimeSelectionSection({
     currentTime,
     setCurrentTime,
     timeList,
-    setTimeList
+    setTimeList,
+    listingType
 }: TimeSelectionSectionProps) {
     const { toast } = useToast();
     const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -75,11 +77,22 @@ export function TimeSelectionSection({
         setTimeList(prev => prev.filter(item => item !== t));
     };
 
+    const activeColor = listingType === 'JOIN' ? 'text-[#FF6B00]' : 'text-[#64DD17]';
+    const activeBg = listingType === 'JOIN' ? 'bg-[#FF6B00]/10' : 'bg-[#64DD17]/10';
+    const activeBorder = listingType === 'JOIN' ? 'focus:border-[#FF6B00]/50' : 'focus:border-[#64DD17]/50';
+    const activeText = listingType === 'JOIN' ? 'text-[#FF6B00]' : 'text-[#64DD17]';
+    const activeButtonBg = listingType === 'JOIN' ? 'bg-[#FF6B00]' : 'bg-[#64DD17]';
+    const activeButtonBorder = listingType === 'JOIN' ? 'border-[#FF6B00]/20' : 'border-[#64DD17]/20';
+    const activeButtonHover = listingType === 'JOIN' ? 'hover:bg-[#FF6B00]/90' : 'hover:bg-[#64DD17]/90';
+    const activeShadow = listingType === 'JOIN' ? 'shadow-[0_0_20px_rgba(255,107,0,0.3)]' : 'shadow-[0_0_20px_rgba(100,221,23,0.3)]';
+    const activeBgLight = listingType === 'JOIN' ? 'bg-[#FF6B00]/20' : 'bg-[#64DD17]/20';
+    const activeStaticBorder = listingType === 'JOIN' ? 'border-[#FF6B00]/30' : 'border-[#64DD17]/30';
+
     return (
         <section className="space-y-6">
             <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-[#64DD17]/10 flex items-center justify-center">
-                    <LucideClock className="w-4 h-4 text-[#64DD17]" />
+                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", activeBg)}>
+                    <LucideClock className={cn("w-4 h-4", activeColor)} />
                 </div>
                 <h3 className="text-sm font-black text-white uppercase tracking-widest">2. 날짜 및 시간</h3>
             </div>
@@ -87,15 +100,18 @@ export function TimeSelectionSection({
             <div className="space-y-6">
                 {/* Date Field */}
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1">날짜 선택</label>
+                    <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] ml-1">날짜 선택</label>
                     <div className="relative">
-                        <LucideCalendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                        <LucideCalendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
                         <input
                             type="date"
                             value={date}
                             onChange={(e) => setDate(e.target.value)}
                             title="날짜 선택"
-                            className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-white focus:outline-none focus:border-[#64DD17]/50 transition-all [color-scheme:dark]"
+                            className={cn(
+                                "w-full bg-white/5 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-white focus:outline-none transition-all [color-scheme:dark]",
+                                activeBorder
+                            )}
                         />
                     </div>
                 </div>
@@ -104,10 +120,10 @@ export function TimeSelectionSection({
                 <div className="space-y-2">
                     <div className="flex items-end justify-between ml-1 mb-1">
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] block">티오프 시간</label>
-                            <p className="text-[9px] font-bold text-white/10 uppercase tracking-tight">요금이 동일한 경우, 여러 타임을 추가하여 일괄 등록하세요</p>
+                            <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] block">티오프 시간</label>
+                            <p className="text-[9px] font-bold text-white/40 uppercase tracking-tight">요금이 동일한 경우, 여러 타임을 추가하여 일괄 등록하세요</p>
                         </div>
-                        <span className="text-[10px] font-black text-[#64DD17] uppercase tracking-widest">
+                        <span className={cn("text-[10px] font-black uppercase tracking-widest", activeText)}>
                             총 {timeList.length}개 시간 선택됨
                         </span>
                     </div>
@@ -118,7 +134,7 @@ export function TimeSelectionSection({
                             className="flex-1 relative flex items-center justify-between bg-white/5 border border-white/5 rounded-2xl py-4 px-5 text-sm font-bold text-white hover:bg-white/10 transition-all active:scale-[0.98]"
                         >
                             <div className="flex items-center gap-3">
-                                <LucideClock className="w-4 h-4 text-[#64DD17]" />
+                                <LucideClock className={cn("w-4 h-4", activeColor)} />
                                 <span>{currentTime || "-- : --"}</span>
                             </div>
                             <div className="text-[10px] font-black text-white/20 uppercase tracking-widest">시간 선택</div>
@@ -127,7 +143,10 @@ export function TimeSelectionSection({
                             onClick={addTime}
                             type="button"
                             title="시간 추가"
-                            className="px-6 rounded-2xl bg-[#64DD17] text-[#051907] border border-[#64DD17]/20 hover:bg-[#64DD17]/90 transition-all active:scale-95 shadow-[0_0_20px_rgba(100,221,23,0.3)]"
+                            className={cn(
+                                "px-6 rounded-2xl text-[#051907] border transition-all active:scale-95",
+                                activeButtonBg, activeButtonBorder, activeButtonHover, activeShadow
+                            )}
                         >
                             <LucidePlus className="w-5 h-5" />
                         </button>
@@ -135,8 +154,8 @@ export function TimeSelectionSection({
 
                     {/* Custom Time Picker Sheet */}
                     <Sheet open={isPickerOpen} onOpenChange={setIsPickerOpen}>
-                        <SheetContent side="bottom" className="bg-[#121212] border-t border-white/10 rounded-t-[2.5rem] p-0 h-[45vh] overflow-hidden">
-                            <div className="flex flex-col h-full">
+                        <SheetContent side="bottom" className="bg-[#121212] border-t border-white/10 rounded-t-[2.5rem] p-0 h-auto min-h-[50vh] focus:outline-none">
+                            <div className="flex flex-col h-full pb-8">
                                 <div className="px-8 pt-8 pb-4 flex items-center justify-between">
                                     <div className="space-y-1">
                                         <h3 className="text-lg font-black text-white uppercase tracking-tight">티오프 시간 설정</h3>
@@ -144,66 +163,65 @@ export function TimeSelectionSection({
                                     </div>
                                     <button
                                         onClick={handleConfirm}
-                                        className="bg-[#64DD17] text-[#051907] px-5 py-2.5 rounded-full text-xs font-black shadow-[0_0_20px_rgba(100,221,23,0.3)] active:scale-95 transition-all"
+                                        className={cn(
+                                            "min-w-[50px] px-5 py-2.5 rounded-full text-xs font-black active:scale-95 transition-all",
+                                            listingType === 'JOIN' ? "bg-[#FF6B00] text-white shadow-[0_0_20px_rgba(255,107,0,0.3)]" : "bg-[#64DD17] text-[#051907] shadow-[0_0_20px_rgba(100,221,23,0.3)]"
+                                        )}
                                     >
                                         확인
                                     </button>
                                 </div>
 
-                                <div className="flex-1 flex relative mb-8">
+                                <div className="flex relative mb-4 h-[240px] w-full px-8">
                                     {/* Selection Overlay */}
-                                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-12 bg-white/5 border-y border-white/5 pointer-events-none" />
+                                    <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-12 bg-white/5 border-y border-white/5 pointer-events-none rounded-lg" />
 
                                     {/* Hour Wheel */}
                                     <div
                                         ref={hourRef}
-                                        className="flex-1 overflow-y-auto scroll-smooth no-scrollbar snap-y snap-mandatory"
+                                        className="flex-1 overflow-y-auto scroll-smooth scrollbar-hide snap-y snap-mandatory py-[96px]"
                                         onScroll={(e) => {
                                             const scrollTop = (e.target as HTMLDivElement).scrollTop;
                                             const idx = Math.round(scrollTop / 48);
                                             if (hours[idx] && hours[idx] !== tempHour) setTempHour(hours[idx]);
                                         }}
                                     >
-                                        <div className="h-[calc(50%-24px)]" /> {/* Top Spacer */}
                                         {hours.map(h => (
                                             <div
                                                 key={h}
                                                 className={cn(
                                                     "h-12 flex items-center justify-center text-2xl font-black transition-all snap-center",
-                                                    tempHour === h ? "text-[#64DD17] scale-125" : "text-white/20"
+                                                    tempHour === h ? cn(activeText, "scale-125") : "text-white/30"
                                                 )}
                                             >
                                                 {h}
                                             </div>
                                         ))}
-                                        <div className="h-[calc(50%-24px)]" /> {/* Bottom Spacer */}
                                     </div>
 
-                                    <div className="flex items-center text-2xl font-black text-white/10">:</div>
+                                    <div className="flex items-center justify-center text-2xl font-black text-white/20 pb-1">:</div>
 
                                     {/* Minute Wheel */}
                                     <div
                                         ref={minuteRef}
-                                        className="flex-1 overflow-y-auto scroll-smooth no-scrollbar snap-y snap-mandatory"
+                                        className="flex-1 overflow-y-auto scroll-smooth scrollbar-hide snap-y snap-mandatory py-[96px]"
                                         onScroll={(e) => {
                                             const scrollTop = (e.target as HTMLDivElement).scrollTop;
                                             const idx = Math.round(scrollTop / 48);
                                             if (minutes[idx] && minutes[idx] !== tempMinute) setTempMinute(minutes[idx]);
                                         }}
                                     >
-                                        <div className="h-[calc(50%-24px)]" /> {/* Top Spacer */}
                                         {minutes.map(m => (
                                             <div
                                                 key={m}
                                                 className={cn(
                                                     "h-12 flex items-center justify-center text-2xl font-black transition-all snap-center",
-                                                    tempMinute === m ? "text-[#64DD17] scale-125" : "text-white/20"
+                                                    tempMinute === m ? cn(activeText, "scale-125") : "text-white/30"
                                                 )}
                                             >
                                                 {m}
                                             </div>
                                         ))}
-                                        <div className="h-[calc(50%-24px)]" /> {/* Bottom Spacer */}
                                     </div>
                                 </div>
                             </div>
@@ -219,15 +237,15 @@ export function TimeSelectionSection({
                                     initial={{ scale: 0.8, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
                                     exit={{ scale: 0.8, opacity: 0 }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-[#64DD17]/10 border border-[#64DD17]/20 rounded-xl"
+                                    className={cn("flex items-center gap-2 px-4 py-2 border rounded-xl", activeBgLight, activeStaticBorder)}
                                 >
-                                    <span className="text-sm font-black text-[#64DD17]">{t}</span>
+                                    <span className={cn("text-sm font-black", activeText)}>{t}</span>
                                     <button
                                         onClick={() => removeTime(t)}
-                                        className="p-1 hover:bg-[#64DD17]/20 rounded-full transition-colors"
+                                        className={cn("p-1 rounded-full transition-colors", listingType === 'JOIN' ? "hover:bg-[#FF6B00]/20" : "hover:bg-[#64DD17]/20")}
                                         title="삭제"
                                     >
-                                        <LucideX className="w-3.5 h-3.5 text-[#64DD17]" />
+                                        <LucideX className={cn("w-3.5 h-3.5", activeColor)} />
                                     </button>
                                 </motion.div>
                             ))}
@@ -238,6 +256,6 @@ export function TimeSelectionSection({
                     </div>
                 </div>
             </div>
-        </section>
+        </section >
     );
 }

@@ -313,7 +313,7 @@ export default function HiqSimulation() {
                     >
                         <ChevronDown className="w-6 h-6 rotate-90 text-white/40" />
                     </button>
-                    <h1 className="text-white font-black tracking-tight">RANKUE AI SOLUTION</h1>
+                    <h1 className="text-white font-semibold tracking-tight">랭큐 AI 솔루션</h1>
                 </div>
                 <div className="w-20" /> {/* Spacer for Title Centering */}
             </header>
@@ -560,9 +560,9 @@ export default function HiqSimulation() {
                                                 {/* Clean Button Label */}
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setActiveBall(c); }}
-                                                    className={`px-4 py-1.5 rounded-xl text-[11px] font-black transition-all duration-300 ${isActive
-                                                        ? 'bg-[#10b981] text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                                                        : 'bg-white/5 text-white/30 border border-white/5'
+                                                    className={`px-4 py-1.5 rounded-xl text-[12px] font-semibold transition-all duration-300 ${isActive
+                                                        ? 'bg-brand text-black'
+                                                        : 'bg-white/5 text-white/55 border border-white/5'
                                                         }`}
                                                 >
                                                     {label}
@@ -572,13 +572,13 @@ export default function HiqSimulation() {
                                     })}
                                 </div>
                                 <div className="text-center flex flex-col items-center">
-                                    <p className="text-white/40 text-[11px] font-medium mb-3 tracking-tight">
+                                    <p className="text-white/40 text-[12px] font-medium mb-3 tracking-tight">
                                         현재 배치에서 3,000개의 족보 데이터를 기반으로<br />가장 높은 확률의 정답을 찾아냅니다.
                                     </p>
                                     <Button
                                         onClick={(e) => { e.stopPropagation(); runAISolution(); }}
                                         disabled={isAnalyzing}
-                                        className="h-16 px-16 bg-[#10b981] text-black hover:bg-[#10b981]/90 rounded-3xl text-lg font-black shadow-[0_20px_40px_rgba(16,185,129,0.1)] active:scale-95 transition-all"
+                                        className="h-16 px-16 bg-brand text-black hover:bg-brand/90 rounded-3xl text-lg font-semibold shadow-[0_20px_40px_rgba(16,185,129,0.1)] active:scale-95 transition-all"
                                     >
                                         {isAnalyzing ? <LucideRefreshCw className="animate-spin w-6 h-6 mr-3" /> : <Target className="w-6 h-6 mr-3" />}
                                         최적 공략 검색
@@ -587,7 +587,7 @@ export default function HiqSimulation() {
 
                                 {/* Central Instruction Text */}
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
-                                    <p className="text-white/20 text-[11px] uppercase font-bold tracking-[0.2em] whitespace-nowrap opacity-60">
+                                    <p className="text-white/45 text-[12px] uppercase font-bold tracking-[0.2em] whitespace-nowrap opacity-60">
                                         빈 공간을 드래그하여 공을 옮기세요
                                     </p>
                                 </div>
@@ -598,19 +598,19 @@ export default function HiqSimulation() {
                                 className="absolute inset-0 bg-[#1A1A1A] p-8 flex flex-col"
                             >
                                 <div className="flex flex-col mb-6">
-                                    <p className="text-[#10b981] text-[10px] uppercase font-black tracking-[0.2em] mb-4">AI Recommended Strategies</p>
+                                    <p className="text-brand text-[12px] uppercase font-semibold tracking-[0.2em] mb-4">AI 추천 전략</p>
                                     <div className="flex gap-3">
                                         {recommendedSolutions.map((sol, i) => (
                                             <button
                                                 key={i}
                                                 onClick={() => selectSolution(sol, i)}
                                                 className={`flex-1 py-3 px-4 rounded-xl border transition-all duration-300 flex flex-col items-center justify-center gap-1 ${activeSolutionIndex === i
-                                                    ? 'bg-[#10b981] border-[#10b981] text-black shadow-[0_0_20px_rgba(16,185,129,0.2)]'
+                                                    ? 'bg-brand border-brand text-black'
                                                     : 'bg-white/5 border-white/5 hover:bg-white/10'
                                                     }`}
                                             >
-                                                <span className={`text-[10px] font-black uppercase tracking-widest ${activeSolutionIndex === i ? 'text-black/40' : 'text-white/20'}`}>Option {i + 1}</span>
-                                                <span className={`text-[11px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-black' : 'text-white/40'}`}>
+                                                <span className={`text-[12px] font-semibold uppercase tracking-normal ${activeSolutionIndex === i ? 'text-black/40' : 'text-white/45'}`}>Option {i + 1}</span>
+                                                <span className={`text-[12px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-black' : 'text-white/40'}`}>
                                                     {(!sol.title || sol.title === 'Unknown') ? '추천 공략' : sol.title}
                                                 </span>
                                             </button>
@@ -620,10 +620,10 @@ export default function HiqSimulation() {
 
                                 <div className="flex justify-between items-end mb-6">
                                     <div className="flex-1 min-w-0 pr-4">
-                                        <h2 className="text-2xl font-black text-white tracking-tighter truncate leading-tight">
+                                        <h2 className="text-2xl font-semibold text-white tracking-tight truncate leading-tight">
                                             {simulationData?.title || 'AI 추천 공략'}
                                         </h2>
-                                        <p className="text-white/40 text-[11px] mt-1 font-medium">{simulationData?.description || '해당 배치에 대한 정석 데이터 분석 결과입니다.'}</p>
+                                        <p className="text-white/40 text-[12px] mt-1 font-medium">{simulationData?.description || '해당 배치에 대한 정석 데이터 분석 결과입니다.'}</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <button
@@ -636,7 +636,7 @@ export default function HiqSimulation() {
                                         <button
                                             onClick={() => setActiveMode("setup")}
                                             title="배치 수정으로 돌아가기"
-                                            className="h-12 px-6 bg-[#10b981] rounded-xl text-black font-black whitespace-nowrap active:scale-95 transition-all shadow-[0_5px_15px_rgba(16,185,129,0.1)]"
+                                            className="h-12 px-6 bg-brand rounded-xl text-black font-semibold whitespace-nowrap active:scale-95 transition-all shadow-[0_5px_15px_rgba(16,185,129,0.1)]"
                                         >
                                             배치 수정
                                         </button>
@@ -671,10 +671,10 @@ const SpinVisualizer = ({ spin }: { spin: any }) => {
     return (
         <div className="relative w-16 h-16 rounded-full border-2 border-white/10 bg-gradient-to-br from-white/5 to-transparent flex items-center justify-center">
             <div
-                className="absolute w-3 h-3 bg-red-600 rounded-full shadow-[0_0_10px_red]"
+                className="absolute w-3 h-3 bg-red-600 rounded-full"
                 style={{ transform: `translate(${x}%, ${-y}%)` } as any}
             />
-            <div className="text-[7px] font-black text-white/20 mt-10 tracking-widest">SPIN</div>
+            <div className="text-[11px] font-medium text-white/45 mt-10 tracking-normal">스핀</div>
         </div>
     );
 };
@@ -688,7 +688,7 @@ const ThicknessVisualizer = ({ thickness }: { thickness: number }) => (
                 style={{ '--thickness-offset': `${(thickness || 0) * 32}px`, left: 'var(--thickness-offset)' } as any}
             />
         </div>
-        <span className="text-[7px] font-black text-white/20 mt-2 tracking-widest">THICKNESS {Math.round((thickness || 0) * 8)}/8</span>
+        <span className="text-[11px] font-medium text-white/45 mt-2 tracking-normal">THICKNESS {Math.round((thickness || 0) * 8)}/8</span>
     </div>
 );
 
@@ -698,11 +698,11 @@ const PowerGauge = ({ power }: { power: number }) => (
             {[1, 2, 3, 4, 5].map(i => (
                 <div
                     key={i}
-                    className={`w-2 rounded-sm ${power >= i * 20 ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-white/5'}`}
+                    className={`w-2 rounded-sm ${power >= i * 20 ? 'bg-amber-400' : 'bg-white/5'}`}
                     style={{ '--bar-height': `${i * 20}%`, height: 'var(--bar-height)' } as any}
                 />
             ))}
         </div>
-        <span className="text-[7px] font-black text-white/20 mt-2 tracking-widest uppercase">Power {power}%</span>
+        <span className="text-[11px] font-medium text-white/45 mt-2 tracking-normal uppercase">Power {power}%</span>
     </div>
 );

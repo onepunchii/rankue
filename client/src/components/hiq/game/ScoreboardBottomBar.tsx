@@ -34,8 +34,8 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
             {/* Left Section: Time */}
             <div className="flex items-center gap-6 w-1/4">
                 <div className="flex flex-col">
-                    <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em]">Session Time</span>
-                    <span className="text-xl font-black text-white font-mono tracking-tighter">{formatTime(elapsedTime)}</span>
+                    <span className="text-[12px] font-medium text-white/45">진행 시간</span>
+                    <span className="text-xl font-bold text-white tabular-nums">{formatTime(elapsedTime)}</span>
                 </div>
             </div>
 
@@ -53,12 +53,10 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
 
                 {/* Billiard Ball Style Inning Display */}
                 <div className="relative group">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#1a1a1a] to-[#000000] border-4 border-[#ffd700] flex flex-col items-center justify-center shadow-[0_0_40px_rgba(255,215,0,0.2)] -mt-16 bg-black z-50">
-                        <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] leading-none mb-1">Inning</span>
-                        <span className="text-4xl font-black text-[#ffd700] tabular-nums leading-none drop-shadow-[0_0_10px_rgba(255,215,0,0.5)]">{innings}</span>
+                    <div className="w-24 h-24 rounded-full border-4 border-brand flex flex-col items-center justify-center -mt-16 bg-[#141416] z-50">
+                        <span className="text-[12px] font-medium text-white/55 leading-none mb-1">이닝</span>
+                        <span className="text-4xl font-bold text-brand tabular-nums leading-none">{innings}</span>
                     </div>
-                    {/* Glow effect back shadow */}
-                    <div className="absolute inset-0 rounded-full blur-2xl bg-[#ffd700]/10 -mt-16 -z-10" />
                 </div>
 
                 <Button
@@ -76,7 +74,7 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
             <div className="flex items-center justify-end gap-3 w-1/4">
                 <Button
                     onClick={onExit}
-                    className="h-10 px-6 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-black tracking-widest"
+                    className="h-10 px-6 rounded-tile bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-semibold"
                 >
                     종료하기
                 </Button>

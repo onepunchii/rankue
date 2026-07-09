@@ -34,7 +34,7 @@ export interface PassportStats {
 
 export interface Stamp {
     id: number;
-    dbId: number;
+    dbId: number | string;
     name: string;
     date: string;
     score: number | null;

@@ -19,7 +19,7 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-export async function setupVite(app: Express, server: Server) {
+export async function setupVite(app: Express, server: Server, port: number) {
   const { createServer: createViteServer, createLogger } = await import("vite");
   // Use explicit .ts extension for local development with tsx
   const viteConfig = (await import("../vite.config.ts")).default;
@@ -27,7 +27,7 @@ export async function setupVite(app: Express, server: Server) {
 
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server },
+    hmr: { server, clientPort: port },
     allowedHosts: true as const,
   };
 

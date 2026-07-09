@@ -29,7 +29,8 @@ const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERC
 
 if (!isProduction) {
   const { setupVite } = await import("./vite.js");
-  await setupVite(app, server);
+  const port = process.env.PORT ? parseInt(process.env.PORT) : 5001;
+  await setupVite(app, server, port);
 } else {
   serveStatic(app);
 }

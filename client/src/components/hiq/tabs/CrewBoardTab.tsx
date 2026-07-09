@@ -58,8 +58,8 @@ export const CrewBoardTab = memo(({
                         className={cn(
                             "px-5 py-2.5 rounded-full text-[13px] font-semibold transition-all whitespace-nowrap",
                             category === cat
-                                ? "bg-[#10B981] text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                                : "bg-white/5 text-white/40 hover:bg-white/10"
+                                ? "bg-brand text-brand-fg"
+                                : "bg-white/5 text-white/55 hover:bg-white/10"
                         )}
                     >
                         {cat}
@@ -70,17 +70,17 @@ export const CrewBoardTab = memo(({
             {/* Pinned Notices Section */}
             {notices.length > 0 && (
                 <div className="px-6 space-y-2">
-                    <h4 className="text-[10px] font-extrabold text-white/20 uppercase tracking-widest pl-1">필독 공지</h4>
-                    <div className="bg-[#10B981]/5 border border-[#10B981]/10 rounded-2xl overflow-hidden">
+                    <h4 className="text-[12px] font-medium text-white/55 pl-1">필독 공지</h4>
+                    <div className="bg-brand/12 border border-brand/25 rounded-tile overflow-hidden">
                         {notices.map((notice) => (
                             <div
                                 key={notice.id}
-                                className="px-4 py-3 flex items-center gap-3 border-b border-[#10B981]/5 last:border-0 hover:bg-[#10B981]/10 transition-colors cursor-pointer"
+                                className="px-4 py-3 flex items-center gap-3 border-b border-brand/25 last:border-0 hover:bg-brand/12 transition-colors cursor-pointer"
                                 onClick={() => onPostClick(notice)}
                             >
-                                <LucidePin className="w-3.5 h-3.5 text-[#10B981] rotate-45" />
+                                <LucidePin className="w-3.5 h-3.5 text-brand rotate-45" />
                                 <span className="text-xs font-semibold text-white/80 flex-1 truncate">{notice.title || "제목 없음"}</span>
-                                <span className="text-[10px] font-semibold text-white/20">
+                                <span className="text-[12px] font-medium text-white/55 tabular-nums">
                                     {notice.createdAt ? format(new Date(notice.createdAt), "MM.dd") : "--.--"}
                                 </span>
                             </div>
@@ -103,8 +103,8 @@ export const CrewBoardTab = memo(({
                     ))
                 ) : (
                     <div className="py-24 text-center">
-                        <LucideLayoutList className="w-12 h-12 text-white/5 mx-auto mb-4" />
-                        <p className="text-sm font-bold text-white/20">아직 등록된 게시글이 없습니다</p>
+                        <LucideLayoutList className="w-12 h-12 text-white/45 mx-auto mb-4" />
+                        <p className="text-sm font-medium text-white/55">아직 등록된 게시글이 없습니다</p>
                     </div>
                 )}
             </div>
@@ -115,7 +115,7 @@ export const CrewBoardTab = memo(({
                     {isAdmin && (
                         <button
                             onClick={onCreateSettlement}
-                            className="w-14 h-14 bg-[#333] text-white border border-white/20 rounded-full shadow-lg flex items-center justify-center hover:bg-[#444] active:scale-95 transition-all"
+                            className="w-14 h-14 bg-surface-3 text-white border border-white/20 rounded-full shadow-lg flex items-center justify-center hover:bg-surface-2 active:scale-95 transition-all"
                             title="정산 요청 생성"
                             aria-label="정산 요청 생성"
                         >
@@ -124,7 +124,7 @@ export const CrewBoardTab = memo(({
                     )}
                     <button
                         onClick={onCreatePost}
-                        className="w-14 h-14 bg-white text-black rounded-full shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center justify-center hover:bg-white/90 active:scale-95 transition-all"
+                        className="w-14 h-14 bg-brand text-brand-fg rounded-full shadow-lg flex items-center justify-center hover:bg-brand/90 active:scale-95 transition-all"
                         title="새 게시글 작성"
                         aria-label="새 게시글 작성"
                     >

@@ -25,6 +25,17 @@ export function useGameAudio() {
     }, []);
 
     const speak = useCallback((text: string) => {
+        // 1. Bridge to Native (Expo) if running in WebView
+        if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+            console.log("📢 [Web] Sending SPEAK to Native:", text);
+            (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'SPEAK',
+                payload: { text }
+            }));
+            return;
+        }
+
+        // 2. Standard Web fallback
         if (isMuted || !synthRef.current) return;
 
         // Cancel previous utterance for snappiness
@@ -50,9 +61,6 @@ export function useGameAudio() {
             utterance.voice = korVoice;
             utterance.lang = 'ko-KR';
         } else {
-            // Fallback: Use default voice (better English/strange accent than silence)
-            // Ideally we hint 'ko-KR', but if the browser strictly checks lang vs voice supported langs, 
-            // it might silence it. Let's try to set lang, but if it fails, the default voice usually works.
             utterance.lang = 'ko-KR';
             console.warn("Korean voice not found, using system default.");
         }

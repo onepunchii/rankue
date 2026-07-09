@@ -24,8 +24,30 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // Rankue design tokens
+        tile: "var(--r-md)",   // 16px — buttons, small cards
+        card: "var(--r-lg)",   // 24px — cards, sheets
+        pill: "var(--r-pill)",
       },
       colors: {
+        // Rankue design tokens — single brand accent + layered surfaces + text ramp.
+        brand: {
+          DEFAULT: "rgb(var(--brand) / <alpha-value>)",
+          strong: "rgb(var(--brand-strong) / <alpha-value>)",
+          fg: "rgb(var(--brand-fg) / <alpha-value>)",
+        },
+        surface: {
+          1: "var(--surface-1)",
+          2: "var(--surface-2)",
+          3: "var(--surface-3)",
+          line: "var(--surface-line)",
+        },
+        ink: {
+          1: "var(--ink-1)",
+          2: "var(--ink-2)",
+          3: "var(--ink-3)",
+          4: "var(--ink-4)",
+        },
         background: "var(--background)",
         foreground: "var(--foreground)",
         card: {
@@ -78,6 +100,10 @@ export default {
         },
       },
       keyframes: {
+        marquee: {
+          "0%": { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(-100%)" },
+        },
         "accordion-down": {
           from: {
             height: "0",
@@ -96,6 +122,7 @@ export default {
         },
       },
       animation: {
+        marquee: "marquee 25s linear infinite",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },

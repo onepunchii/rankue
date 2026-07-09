@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -9,7 +10,7 @@ interface Props {
     savedImage: string | undefined;
 }
 
-export const EliteCourseCard = ({ course, conqueredInfo, savedImage }: Props) => {
+export const EliteCourseCard = forwardRef<HTMLDivElement, Props>(({ course, conqueredInfo, savedImage }, ref) => {
     const isC = !!conqueredInfo;
 
     // Badge Configuration
@@ -24,25 +25,34 @@ export const EliteCourseCard = ({ course, conqueredInfo, savedImage }: Props) =>
 
     const Icon = badgeConfig.icon;
 
+    // Dynamic styles via CSS variables to avoid inline style lint errors
+    const dynamicStyles = {
+        '--badge-color': badgeConfig.color,
+        '--badge-color-muted': `${badgeConfig.color}40`,
+        '--course-image': savedImage ? `url(${savedImage})` : 'none',
+    } as React.CSSProperties;
+
     return (
         <motion.div
+            ref={ref}
             layout
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             className="relative group"
+            style={dynamicStyles}
         >
             <Link href={`/golf/course/${course.id}`} className="block h-full">
                 <div className={cn(
                     "flex flex-col items-center justify-center p-6 rounded-[2rem] border transition-all duration-300 h-full relative overflow-hidden",
                     isC ? "border-white/10" : "bg-[#0A0A0A] border-white/5 opacity-60"
                 )}
-                    style={isC ? {
-                        backgroundImage: savedImage ? `url(${savedImage})` : 'none',
+                    style={{
+                        backgroundImage: isC && savedImage ? 'var(--course-image)' : 'none',
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
-                        backgroundColor: savedImage ? 'transparent' : '#141414'
-                    } : {}}
+                        backgroundColor: isC && savedImage ? 'transparent' : '#141414'
+                    }}
                 >
                     {/* Dark Overlay for Image */}
                     {isC && savedImage && (
@@ -61,7 +71,7 @@ export const EliteCourseCard = ({ course, conqueredInfo, savedImage }: Props) =>
                                 cy="60"
                                 r="57"
                                 fill="none"
-                                stroke={isC ? badgeConfig.color : "#333"}
+                                stroke={isC ? 'var(--badge-color)' : "#333"}
                                 strokeWidth="1.5"
                                 strokeDasharray="4 3"
                                 className="transition-all duration-500"
@@ -73,13 +83,13 @@ export const EliteCourseCard = ({ course, conqueredInfo, savedImage }: Props) =>
                                 cy="60"
                                 r="42"
                                 fill="none"
-                                stroke={isC ? badgeConfig.color : "#333"}
+                                stroke={isC ? 'var(--badge-color)' : "#333"}
                                 strokeWidth="1"
                                 opacity="0.2"
                             />
                             {/* Date Text on Curve */}
                             {isC && (
-                                <text fontSize="7.5" fontWeight="900" fill={badgeConfig.color} letterSpacing="1px" opacity="0.6">
+                                <text fontSize="7.5" fontWeight="900" fill="var(--badge-color)" letterSpacing="1px" opacity="0.6">
                                     <textPath href={`#curve-${course.id}`} startOffset="50%" textAnchor="middle">
                                         {conqueredInfo.date}
                                     </textPath>
@@ -92,10 +102,10 @@ export const EliteCourseCard = ({ course, conqueredInfo, savedImage }: Props) =>
                             <div className={cn(
                                 "w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-500",
                                 isC ? "bg-black/50 backdrop-blur-sm" : "bg-white/5 border-white/10"
-                            )} style={{ borderColor: isC ? `${badgeConfig.color}40` : '' }}>
+                            )} style={{ borderColor: isC ? 'var(--badge-color-muted)' : '' }}>
                                 <Icon
                                     className={cn("w-7 h-7 transition-all duration-500", isC ? "drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]" : "text-white/20")}
-                                    style={{ color: isC ? badgeConfig.color : '' }}
+                                    style={{ color: isC ? 'var(--badge-color)' : '' }}
                                 />
                             </div>
                         </div>
@@ -107,7 +117,7 @@ export const EliteCourseCard = ({ course, conqueredInfo, savedImage }: Props) =>
                             {course.name}
                         </h3>
                         {isC ? (
-                            <div className="text-xs font-black tracking-wider uppercase" style={{ color: badgeConfig.color }}>
+                            <div className="text-xs font-black tracking-wider uppercase" style={{ color: 'var(--badge-color)' }}>
                                 베스트 {conqueredInfo.score}타
                             </div>
                         ) : (
@@ -121,11 +131,13 @@ export const EliteCourseCard = ({ course, conqueredInfo, savedImage }: Props) =>
                     {isC && (
                         <div
                             className="absolute inset-0 opacity-10 blur-2xl pointer-events-none"
-                            style={{ background: `radial-gradient(circle at 50% 40%, ${badgeConfig.color}, transparent 70%)` }}
+                            style={{ background: `radial-gradient(circle at 50% 40%, var(--badge-color), transparent 70%)` }}
                         />
                     )}
                 </div>
             </Link>
         </motion.div>
     );
-};
+});
+
+EliteCourseCard.displayName = "EliteCourseCard";

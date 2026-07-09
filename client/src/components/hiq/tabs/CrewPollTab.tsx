@@ -1,0 +1,330 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+    LucideVote,
+    LucidePlus,
+    LucideClock,
+    LucideUser,
+    LucideCheckCircle2,
+    LucideMoreVertical,
+    LucideX,
+    LucideShieldCheck,
+    LucideUsers,
+    LucideChevronRight,
+    LucideInfo,
+    LucideLoader2,
+    LucideChevronDown,
+    LucideTrash2,
+    LucideSparkles
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { CreatePollDialog } from "@/components/hiq/CreatePollDialog";
+import { format, formatDistanceToNow } from "date-fns";
+import { ko } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
+
+interface CrewPollTabProps {
+    crewId: string;
+    isAdmin: boolean;
+    isMember: boolean;
+}
+
+export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [displayLimit, setDisplayLimit] = useState(3);
+
+    const { data: me } = useQuery<any>({
+        queryKey: ["/api/hiq/me"],
+    });
+
+    const { data: polls, isLoading } = useQuery<any[]>({
+        queryKey: [`/api/hiq/crews/${crewId}/polls`],
+        enabled: !!crewId,
+    });
+
+    const voteMutation = useMutation({
+        mutationFn: async ({ pollId, optionId }: { pollId: string; optionId: string }) => {
+            return await apiRequest(`/api/hiq/crews/${crewId}/polls/${pollId}/vote`, {
+                method: "POST",
+                body: JSON.stringify({ optionId })
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
+        },
+        onError: (err: any) => {
+            toast({ title: "투표 실패", description: err.message, variant: "destructive" });
+        }
+    });
+
+    const deletePollMutation = useMutation({
+        mutationFn: async (pollId: string) => {
+            return await apiRequest(`/api/hiq/crews/${crewId}/polls/${pollId}`, {
+                method: "DELETE"
+            });
+        },
+        onSuccess: () => {
+            toast({ title: "투표가 삭제되었습니다." });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
+        },
+        onError: (err: any) => {
+            toast({ title: "삭제 실패", description: err.message, variant: "destructive" });
+        }
+    });
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-white/45 gap-3">
+                <LucideLoader2 className="w-8 h-8 animate-spin" />
+                <p className="text-xs font-medium text-white/45">투표 목록을 불러오는 중...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8 pb-20">
+            {/* Header / CTA */}
+            <div className="px-6 flex items-center justify-between">
+                <div>
+                    <h2 className="text-xl font-semibold text-white tracking-tight">크루 투표</h2>
+                    <p className="text-xs text-white/55 mt-1 font-semibold flex items-center gap-1.5 tabular-nums">
+                        <LucideVote className="w-3 h-3" />
+                        총 {polls?.length || 0}개의 투표
+                    </p>
+                </div>
+                {isMember && (
+                    <Button
+                        onClick={() => setIsCreateOpen(true)}
+                        className="h-10 px-4 bg-brand hover:bg-brand/90 text-brand-fg font-bold rounded-xl flex items-center gap-2"
+                    >
+                        <LucidePlus className="w-4 h-4" />
+                        투표 만들기
+                    </Button>
+                )}
+            </div>
+
+            {/* Poll List */}
+            <div className="px-6 space-y-4">
+                {(!polls || polls.length === 0) ? (
+                    <div className="py-20 text-center bg-white/[0.02] border border-dashed border-white/5 rounded-card space-y-4">
+                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto">
+                            <LucideVote className="w-8 h-8 text-white/45" />
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium text-white/55">진행 중인 투표가 없습니다</p>
+                            <p className="text-xs text-white/45">멤버들과 새로운 의견을 나눠보세요</p>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {polls.slice(0, displayLimit).map((poll) => (
+                            <PollCard
+                                key={poll.id}
+                                poll={poll}
+                                isVoting={voteMutation.isPending}
+                                onVote={(optionId) => {
+                                    if (voteMutation.isPending) return; // block double-submit / vote race
+                                    voteMutation.mutate({ pollId: poll.id, optionId });
+                                }}
+                                onDelete={() => {
+                                    if (confirm("정말로 이 투표를 삭제하시겠습니까?")) {
+                                        deletePollMutation.mutate(poll.id);
+                                    }
+                                }}
+                                isMember={isMember}
+                                currentUserId={me?.id}
+                                isAdmin={isAdmin}
+                            />
+                        ))}
+
+                        {polls.length > displayLimit && displayLimit < 10 && (
+                            <Button
+                                variant="ghost"
+                                onClick={() => setDisplayLimit(10)}
+                                className="w-full h-12 bg-white/[0.02] hover:bg-white/[0.05] text-white/40 hover:text-white/60 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition-all"
+                            >
+                                더보기
+                                <LucideChevronDown className="w-4 h-4" />
+                            </Button>
+                        )}
+                    </>
+                )}
+            </div>
+
+            <CreatePollDialog
+                open={isCreateOpen}
+                onOpenChange={setIsCreateOpen}
+                crewId={crewId}
+            />
+        </div >
+    );
+}
+
+function PollCard({ poll, onVote, onDelete, isMember, currentUserId, isAdmin, isVoting }: {
+    poll: any;
+    onVote: (id: string) => void;
+    onDelete: () => void;
+    isMember: boolean;
+    currentUserId?: string;
+    isAdmin: boolean;
+    isVoting?: boolean;
+}) {
+    const isClosed = poll.status === 'closed' || (poll.endTime && new Date(poll.endTime) < new Date());
+    const totalVotes = poll.totalVotes || 0;
+
+    return (
+        <motion.div
+            layout
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="group relative bg-[#141414] border border-white/5 rounded-card overflow-hidden hover:border-white/10 transition-all duration-300"
+        >
+            <div className="p-6 pb-5">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                    <div className="space-y-1.5 flex-1 pr-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                            <Badge className={cn(
+                                "h-5 px-2 text-xs font-semibold border-none",
+                                isClosed ? "bg-white/10 text-white/55" : "bg-brand/10 text-brand"
+                            )}>
+                                {isClosed ? "마감됨" : "진행 중"}
+                            </Badge>
+                            {poll.isAnonymous && (
+                                <Badge className="h-5 px-2 bg-blue-500/10 text-blue-400 text-xs font-semibold border-none">
+                                    <LucideShieldCheck className="w-3 h-3 mr-1" /> 익명
+                                </Badge>
+                            )}
+                            {poll.allowMultiple && (
+                                <Badge className="h-5 px-2 bg-purple-500/10 text-purple-400 text-xs font-semibold border-none">
+                                    복수 선택
+                                </Badge>
+                            )}
+                        </div>
+                        <h3 className="text-lg font-semibold text-white leading-tight tracking-tight">{poll.title}</h3>
+                        {poll.description && (
+                            <p className="text-xs text-white/55 font-medium leading-relaxed mt-2 line-clamp-2">
+                                {poll.description}
+                            </p>
+                        )}
+                    </div>
+                    {/* Right Side: Time & Delete */}
+                    <div className="flex flex-col items-end gap-2">
+                        {poll.endTime && !isClosed && (
+                            <span className="text-xs font-bold text-brand bg-brand/10 px-2 py-1 rounded-full tabular-nums">
+                                {new Date(poll.endTime) > new Date()
+                                    ? `${formatDistanceToNow(new Date(poll.endTime), { locale: ko })} 남음`
+                                    : "마감됨"}
+                            </span>
+                        )}
+                        {isAdmin && (
+                            <button
+                                onClick={onDelete}
+                                className="p-1.5 rounded-full hover:bg-red-500/10 text-white/45 hover:text-red-500 transition-colors"
+                                title="투표 삭제"
+                            >
+                                <LucideTrash2 className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Options */}
+                <div className="space-y-2.5 mt-5">
+                    {poll.options.map((option: any) => {
+                        const isMyVote = poll.myVoteIds?.includes(option.id);
+                        const progress = totalVotes > 0 ? (option.voteCount / totalVotes) * 100 : 0;
+                        const isWinner = totalVotes > 0 && poll.options.every((o: any) => o.voteCount <= option.voteCount) && option.voteCount > 0;
+
+                        return (
+                            <button
+                                key={option.id}
+                                disabled={isClosed || !isMember || isVoting}
+                                onClick={() => onVote(option.id)}
+                                className={cn(
+                                    "relative w-full text-left p-4 rounded-2xl group/opt transition-all duration-300 overflow-hidden",
+                                    isMyVote
+                                        ? "bg-white/5 border border-white/10"
+                                        : "bg-white/[0.02] border border-white/[0.03] hover:border-white/10"
+                                )}
+                            >
+                                {/* Progress Background */}
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${progress}%` }}
+                                    transition={{ duration: 0.8, ease: "easeOut" }}
+                                    className={cn(
+                                        "absolute inset-y-0 left-0 opacity-[0.07]",
+                                        isMyVote ? "bg-brand" : "bg-white"
+                                    )}
+                                />
+
+                                <div className="relative flex items-center justify-between z-10">
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                                            isMyVote
+                                                ? "border-brand bg-brand"
+                                                : "border-white/10 bg-transparent group-hover/opt:border-white/30"
+                                        )}>
+                                            {isMyVote && <LucideCheckCircle2 className="w-3.5 h-3.5 text-black" />}
+                                        </div>
+                                        <span className={cn(
+                                            "text-sm font-semibold transition-colors",
+                                            isMyVote ? "text-white" : "text-white/60 group-hover/opt:text-white"
+                                        )}>
+                                            {option.text}
+                                        </span>
+                                        {isWinner && totalVotes > 0 && (
+                                            <LucideSparkles className="w-3.5 h-3.5 text-yellow-500/50 animate-pulse" />
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={cn(
+                                            "text-xs font-semibold tabular-nums",
+                                            isMyVote ? "text-brand" : "text-white/45"
+                                        )}>
+                                            {option.voteCount}
+                                        </span>
+                                        <span className="text-xs font-medium text-white/45 tabular-nums">({Math.round(progress)}%)</span>
+                                    </div>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-white/[0.02] border-t border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <Avatar className="w-5 h-5 border border-white/10">
+                        <AvatarImage src={poll.author?.profileImageUrl} />
+                        <AvatarFallback className="bg-white/10 text-xs font-semibold">
+                            {poll.author?.name?.[0]}
+                        </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                        <span className="text-xs font-medium text-white/55">{poll.author?.name}</span>
+                        <span className="text-xs text-white/45 font-medium tabular-nums">
+                            {format(new Date(poll.createdAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 text-white/45">
+                    <LucideUsers className="w-3 h-3" />
+                    <span className="text-xs font-semibold tabular-nums">{totalVotes}명 참여</span>
+                </div>
+            </div>
+        </motion.div>
+    );
+}

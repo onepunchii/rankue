@@ -24,29 +24,29 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
     const displayRankings = sortedRankings.filter(r => (activeTab === '3c' ? r.rating3c : r.rating4c) !== undefined).slice(0, 10);
 
     return (
-        <div className="space-y-4 mb-10 px-2 sm:px-0">
-            <header className="mb-2 px-2 flex items-center justify-between">
+        <div className="space-y-4 mb-10">
+            <header className="mb-2 flex items-end justify-between">
                 <div>
-                    <h1 className="text-xl font-black italic tracking-tighter text-white">CLUB RANKING</h1>
-                    <p className="text-white/50 text-xs mt-1 flex items-center gap-1 font-bold">
-                        <LucideTrophy className="w-3 h-3 text-[#ffd700]" /> 실시간 매장 랭킹 TOP 10
+                    <h2 className="text-[19px] font-bold tracking-tight text-white">매장 랭킹</h2>
+                    <p className="text-white/45 text-[13px] mt-1 flex items-center gap-1.5 font-medium">
+                        <LucideTrophy className="w-3.5 h-3.5 text-[#ffd700]" /> 실시간 상위 10명
                     </p>
                 </div>
 
                 {/* Minimal Tab Switch */}
-                <div className="flex bg-[#18181b] p-1 rounded-xl border border-white/10 relative h-9">
+                <div className="flex bg-white/[0.04] p-1 rounded-xl border border-white/[0.06] relative h-9">
                     <div className={cn(
                         "absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg transition-all duration-300 ease-out z-0",
-                        activeTab === '3c' ? "left-1 bg-[#64DD17]/20 border border-[#64DD17]/30" : "left-[calc(50%+2px)] bg-blue-500/20 border border-blue-500/30"
+                        activeTab === '3c' ? "left-1 bg-brand/15 border border-brand/25" : "left-[calc(50%+2px)] bg-blue-500/15 border border-blue-500/25"
                     )} />
                     <button
                         onClick={() => onTabChange('3c')}
-                        className={cn("px-3 rounded-lg text-xs font-bold relative z-10 transition-colors", activeTab === '3c' ? "text-[#64DD17]" : "text-white/40")}
-                    >3C</button>
+                        className={cn("px-3.5 rounded-lg text-[13px] font-semibold relative z-10 transition-colors", activeTab === '3c' ? "text-brand" : "text-white/45")}
+                    >3쿠션</button>
                     <button
                         onClick={() => onTabChange('4c')}
-                        className={cn("px-3 rounded-lg text-xs font-bold relative z-10 transition-colors", activeTab === '4c' ? "text-blue-500" : "text-white/40")}
-                    >4B</button>
+                        className={cn("px-3.5 rounded-lg text-[13px] font-semibold relative z-10 transition-colors", activeTab === '4c' ? "text-blue-400" : "text-white/45")}
+                    >4구</button>
                 </div>
             </header>
 
@@ -75,33 +75,31 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                                 transition={{ duration: 0.2, delay: idx * 0.05 }}
                                 className={cn(
                                     "flex items-center p-3 rounded-2xl border transition-all relative overflow-hidden group",
-                                    isMe ? "bg-[#10b981]/10 border-[#10b981]/30" : "bg-white/[0.03] border-white/5"
+                                    isMe ? "bg-brand/10 border-brand/30" : "bg-white/[0.03] border-white/5"
                                 )}
                             >
                                 {/* Rank Badge */}
-                                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg border", rankStyle)}>
+                                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center font-bold text-[17px] tabular-nums border", rankStyle)}>
                                     {rank}
                                 </div>
 
                                 {/* Info */}
-                                <div className="ml-4 flex-1">
+                                <div className="ml-3.5 flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <span className={cn("font-bold text-sm", isMe ? "text-white" : "text-white/80")}>
+                                        <span className={cn("font-semibold text-[15px] truncate", isMe ? "text-white" : "text-white/85")}>
                                             {member.name}
                                         </span>
-                                        {isMe && <span className="text-[9px] font-black bg-[#10b981] text-black px-1.5 rounded-md">ME</span>}
+                                        {isMe && <span className="text-[12px] font-bold bg-brand text-black px-1.5 py-0.5 rounded-md shrink-0">나</span>}
                                     </div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-[10px] font-bold text-white/30">AVG {member.average}</span>
-                                    </div>
+                                    <span className="block text-[12px] font-medium text-white/40 mt-0.5">평균 {member.average}</span>
                                 </div>
 
                                 {/* Score (RP) */}
-                                <div className="text-right px-2">
-                                    <span className={cn("block font-black text-xl tracking-tighter", activeTab === '3c' ? "text-[#64DD17]" : "text-blue-500")}>
+                                <div className="text-right pl-2 shrink-0">
+                                    <span className={cn("block font-bold text-[21px] tabular-nums tracking-tight leading-none", activeTab === '3c' ? "text-brand" : "text-blue-400")}>
                                         {rp || 0}
                                     </span>
-                                    <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">RP</span>
+                                    <span className="text-[12px] font-semibold text-white/35 mt-0.5 inline-block">RP</span>
                                 </div>
                             </motion.div>
                         );
@@ -109,8 +107,8 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                 </AnimatePresence>
 
                 {displayRankings.length === 0 && (
-                    <div className="py-10 text-center text-white/20 text-xs font-bold">
-                        랭킹 데이터가 없습니다.
+                    <div className="py-12 text-center text-white/40 text-[14px] font-medium">
+                        아직 랭킹 데이터가 없습니다
                     </div>
                 )}
             </div>

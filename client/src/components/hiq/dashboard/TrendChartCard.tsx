@@ -31,28 +31,28 @@ export const TrendChartCard = ({ history }: TrendChartCardProps) => {
     const trend4c = useMemo(() => getTrendData('4c'), [history]);
 
     return (
-        <div className="space-y-4 mb-10 px-2 sm:px-0">
-            <header className="mb-2 px-2">
-                <h1 className="text-xl font-black italic tracking-tighter text-white">AVG TREND</h1>
-                <p className="text-white/50 text-xs mt-1 flex items-center gap-1 font-bold">
-                    <LucideInfo className="w-3 h-3" /> 최근 10경기 에버리지 변화 추이
+        <div className="space-y-4 mb-10">
+            <header className="mb-1">
+                <h2 className="text-[19px] font-bold tracking-tight text-white">평균 추이</h2>
+                <p className="text-white/45 text-[13px] mt-1 flex items-center gap-1.5 font-medium">
+                    <LucideInfo className="w-3.5 h-3.5" /> 최근 10경기 평균 변화
                 </p>
             </header>
 
             {/* Sliding Toggle Switch */}
-            <div className="bg-[#18181b] p-1 rounded-2xl flex mb-6 border border-white/10 relative h-12">
+            <div className="bg-white/[0.04] p-1 rounded-2xl flex mb-6 border border-white/[0.06] relative h-11">
                 <div className={cn(
-                    "absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 ease-out z-0 filter drop-shadow-md",
-                    activeTrendTab === '3C' ? "left-1 bg-[#64DD17]/20 border border-[#64DD17]/30" : "left-[calc(50%+2px)] bg-blue-500/20 border border-blue-500/30"
+                    "absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 ease-out z-0",
+                    activeTrendTab === '3C' ? "left-1 bg-brand/15 border border-brand/25" : "left-[calc(50%+2px)] bg-blue-500/15 border border-blue-500/25"
                 )} />
-                <button onClick={() => setActiveTrendTab('3C')} className={cn("flex-1 rounded-xl text-sm font-bold relative z-10 transition-colors bg-transparent border-none outline-none", activeTrendTab === '3C' ? "text-[#64DD17]" : "text-white/40")}>3-Cushion</button>
-                <button onClick={() => setActiveTrendTab('4B')} className={cn("flex-1 rounded-xl text-sm font-bold relative z-10 transition-colors bg-transparent border-none outline-none", activeTrendTab === '4B' ? "text-blue-500" : "text-white/40")}>4-Ball</button>
+                <button onClick={() => setActiveTrendTab('3C')} className={cn("flex-1 rounded-xl text-[14px] font-semibold relative z-10 transition-colors bg-transparent border-none outline-none", activeTrendTab === '3C' ? "text-brand" : "text-white/45")}>3쿠션</button>
+                <button onClick={() => setActiveTrendTab('4B')} className={cn("flex-1 rounded-xl text-[14px] font-semibold relative z-10 transition-colors bg-transparent border-none outline-none", activeTrendTab === '4B' ? "text-blue-400" : "text-white/45")}>4구</button>
             </div>
 
             {activeTrendTab === '3C' ? (
                 <SmoothTrendChart
                     key="3c-chart"
-                    title="3-Cushion AVG"
+                    title="3쿠션 평균"
                     subTitle="대대 3쿠션"
                     data={trend3c as ChartDataPoint[]}
                     color="green"
@@ -60,7 +60,7 @@ export const TrendChartCard = ({ history }: TrendChartCardProps) => {
             ) : (
                 <SmoothTrendChart
                     key="4c-chart"
-                    title="4-Ball AVG"
+                    title="4구 평균"
                     subTitle="중대 4구"
                     data={trend4c as ChartDataPoint[]}
                     color="blue"

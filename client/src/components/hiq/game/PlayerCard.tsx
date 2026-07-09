@@ -54,18 +54,15 @@ export function PlayerCard({
     const displayHighRun = highRun;
     const displayRemaining = Math.max(0, target - score);
 
-    const bgTone = isTurn ? "bg-[#1c1c2e]" : "bg-[#000000]";
-    const glowStyle = isTurn
-        ? {
-            boxShadow: `inset 0 0 100px ${themeColor}10, 0 0 60px ${themeColor}30`,
-            border: `6px solid ${themeColor}`,
-        }
+    const bgTone = isTurn ? "bg-[#141416]" : "bg-[#000000]";
+    const turnBorderStyle = isTurn
+        ? { border: `6px solid ${themeColor}`, borderTopColor: themeColor }
         : { border: "6px solid transparent" };
 
     return (
         <div
-            className={`relative flex-1 flex flex-col h-full border-x transition-all duration-500 overflow-hidden ${bgTone} ${isTurn ? 'z-10 scale-[1.02] border-t-8 shadow-2xl' : 'z-0 grayscale'}`}
-            style={isTurn ? { ...glowStyle, borderTopColor: themeColor } : {}}
+            className={`relative flex-1 flex flex-col h-full border-x transition-all duration-500 overflow-hidden ${bgTone} ${isTurn ? 'z-10 scale-[1.02] border-t-8' : 'z-0 grayscale'}`}
+            style={isTurn ? turnBorderStyle : {}}
         >
             {/* Header (15%) - Symmetric & Clean - DRAG HANDLE */}
             <div
@@ -79,20 +76,20 @@ export function PlayerCard({
             >
                 {/* Content Container - Capture Drag Here */}
                 <div className="flex items-center gap-3 pointer-events-auto cursor-grab active:cursor-grabbing">
-                    <h2 className={`text-3xl lg:text-4xl font-extrabold tracking-tighter ${isTurn ? 'text-white' : 'text-white/60'}`}>
-                        {player?.name || "Player"}
+                    <h2 className={`text-3xl lg:text-4xl font-bold ${isTurn ? 'text-white' : 'text-white/60'}`}>
+                        {player?.name || "선수"}
                     </h2>
                     {isSolo && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-md border border-white/10 text-white/20 font-black uppercase tracking-widest">
-                            SOLO
+                        <span className="text-[12px] px-2 py-0.5 rounded-tile border border-white/10 text-white/55 font-medium">
+                            솔로
                         </span>
                     )}
                 </div>
 
                 <div className="flex items-center gap-3 pointer-events-auto">
                     <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Target</span>
-                        <span className={`text-xl font-black italic ${isTurn ? 'text-white/60' : 'text-white/40'}`}>{target}</span>
+                        <span className="text-[12px] font-medium text-white/45">목표</span>
+                        <span className={`text-xl font-semibold tabular-nums ${isTurn ? 'text-white/60' : 'text-white/40'}`}>{target}</span>
                     </div>
                 </div>
             </div>
@@ -112,7 +109,7 @@ export function PlayerCard({
                 />
 
                 {/* Visual Divider - Enhanced Visibility */}
-                <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-white/20 pointer-events-none shadow-[0_0_10px_rgba(255,255,255,0.2)]" />
+                <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-white/20 pointer-events-none" />
             </div>
 
             {/* Score Body (Flex-1) */}
@@ -130,7 +127,7 @@ export function PlayerCard({
                             className="flex flex-col items-center"
                         >
                             <h1
-                                className="text-[12vw] lg:text-[190px] leading-none font-black tabular-nums tracking-tighter italic filter drop-shadow-[0_15px_40px_rgba(0,0,0,0.6)]"
+                                className="text-[12vw] lg:text-[190px] leading-none font-bold tabular-nums"
                                 style={{ color: isTurn ? themeColor : '#e5e7eb' }}
                             >
                                 {displayScore}
@@ -143,9 +140,9 @@ export function PlayerCard({
                                         initial={{ opacity: 0, y: -20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -10 }}
-                                        className="mt-[-20px] px-4 py-1.5 rounded-2xl bg-gradient-to-r from-orange-500 to-yellow-500 shadow-[0_10px_30px_rgba(255,165,0,0.5)] border border-white/20 flex items-center gap-2"
+                                        className="mt-[-20px] px-4 py-1.5 rounded-2xl bg-orange-500 border border-white/20 flex items-center gap-2"
                                     >
-                                        <span className="text-xs font-black text-white tracking-tight">🔥 +{displayRun} RUN</span>
+                                        <span className="text-xs font-semibold text-white">🔥 +{displayRun} 연속</span>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -161,9 +158,9 @@ export function PlayerCard({
                                         onTurnClick && onTurnClick();
                                     }}
                                 >
-                                    <div className="bg-red-500/20 backdrop-blur-sm px-8 py-4 rounded-3xl border border-red-500/50 animate-pulse">
-                                        <span className="text-[8vw] font-black italic text-red-500 tracking-tighter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]">
-                                            FINISH
+                                    <div className="bg-red-500/20 px-8 py-4 rounded-card border border-red-500/50 animate-pulse">
+                                        <span className="text-[8vw] font-bold text-red-500">
+                                            피니시
                                         </span>
                                     </div>
                                 </motion.div>
@@ -175,7 +172,7 @@ export function PlayerCard({
 
             {/* Info Footer (15%) - Symmetric & Clean */}
             <div
-                className="flex-[0_0_15%] flex items-center justify-between px-5 relative z-50 border-t transition-all duration-300 pointer-events-none bg-black/30 backdrop-blur-md"
+                className="flex-[0_0_15%] flex items-center justify-between px-5 relative z-50 border-t transition-all duration-300 pointer-events-none"
                 style={{
                     backgroundColor: 'rgba(0, 0, 0, 0.3)',
                     borderColor: isTurn ? themeColor : 'rgba(255, 255, 255, 0.1)'
@@ -184,19 +181,19 @@ export function PlayerCard({
                 {/* Left Section: Average (Top) & High Run (Bottom) */}
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
-                        <span className="text-[9px] font-black text-white/50 uppercase tracking-widest w-10 text-right">AVG</span>
-                        <span className={`text-2xl font-black font-mono tracking-tighter ${isTurn ? 'text-white' : 'text-white/50'}`}>{avg}</span>
+                        <span className="text-[12px] font-medium text-white/55 w-12 text-right">평균</span>
+                        <span className={`text-2xl font-bold tabular-nums ${isTurn ? 'text-white' : 'text-white/55'}`}>{avg}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                        <span className="text-[9px] font-black text-white/50 uppercase tracking-widest w-10 text-right">H.R</span>
-                        <span className={`text-2xl font-black font-mono tracking-tighter ${isTurn ? 'text-white' : 'text-white/50'}`}>{displayHighRun}</span>
+                        <span className="text-[12px] font-medium text-white/55 w-12 text-right">하이런</span>
+                        <span className={`text-2xl font-bold tabular-nums ${isTurn ? 'text-white' : 'text-white/55'}`}>{displayHighRun}</span>
                     </div>
                 </div>
 
                 {/* Right Section: To Go & Button */}
                 <div className="flex items-center gap-10">
                     <div className="flex flex-col items-end">
-                        <span className={`text-6xl lg:text-7xl font-black italic tabular-nums leading-none ${isTurn ? 'text-[#ffff00]' : 'text-white/20'}`}>
+                        <span className={`text-6xl lg:text-7xl font-bold tabular-nums leading-none ${isTurn ? 'text-brand' : 'text-white/45'}`}>
                             {displayRemaining === 0 ? (
                                 <span className="text-transparent">0</span>
                             ) : displayRemaining}
@@ -214,10 +211,10 @@ export function PlayerCard({
                                     e.stopPropagation();
                                     onTurnClick && onTurnClick();
                                 }}
-                                className="h-16 px-8 rounded-2xl flex items-center justify-center gap-3 shadow-[0_15px_30px_rgba(0,0,0,0.4)] border border-white/10 transition-all pointer-events-auto relative z-50 bg-white text-black"
+                                className="h-16 px-8 rounded-2xl flex items-center justify-center gap-3 border border-white/10 transition-all pointer-events-auto relative z-50 bg-white text-black"
                             >
-                                <span className="text-sm font-black tracking-widest">
-                                    END INNING
+                                <span className="text-sm font-semibold">
+                                    이닝 종료
                                 </span>
                                 <ArrowRight className="w-4 h-4 text-black/40" />
                             </motion.button>
@@ -230,7 +227,6 @@ export function PlayerCard({
             {isFinishMode && isTurn && (
                 <div className="absolute inset-0 pointer-events-none z-0">
                     <div className="absolute inset-0 border-[12px] border-red-500/20 animate-pulse" />
-                    <div className="absolute inset-0 bg-red-500/5 mix-blend-overlay" />
                 </div>
             )}
         </div>

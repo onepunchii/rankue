@@ -51,8 +51,8 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
         }
     };
 
-    const themeColor = crew.sportCategory === 'GOLF' ? 'text-[#84cc16]' : 'text-[#10b981]';
-    const themeBg = crew.sportCategory === 'GOLF' ? 'bg-[#84cc16]' : 'bg-[#10b981]';
+    const themeColor = crew.sportCategory === 'GOLF' ? 'text-brand' : 'text-brand';
+    const themeBg = crew.sportCategory === 'GOLF' ? 'bg-brand' : 'bg-brand';
 
     return (
         <div className="space-y-8 pb-10 pt-2">
@@ -66,8 +66,8 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                     >
                         <div className="flex items-center gap-2 px-1">
                             <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", themeBg)} />
-                            <h3 className={cn("text-[10px] font-black uppercase tracking-[0.2em]", themeColor)}>
-                                Pending Requests ({pendingMembers.length})
+                            <h3 className={cn("text-xs font-semibold", themeColor)}>
+                                가입 대기 ({pendingMembers.length})
                             </h3>
                         </div>
                         <div className="space-y-2">
@@ -82,7 +82,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                                 size="sm"
                                                 variant="ghost"
                                                 disabled={processingMemberId === m.member.id}
-                                                className="h-10 w-10 p-0 text-white/10 hover:text-red-400 hover:bg-red-400/10 rounded-xl"
+                                                className="h-10 w-10 p-0 text-white/55 hover:text-red-400 hover:bg-red-400/10 rounded-tile"
                                                 onClick={() => handleAction(m.member.id, () => onKick(m.member.id))}
                                             >
                                                 <LucideUserX className="w-5 h-5" />
@@ -90,7 +90,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                             <Button
                                                 size="sm"
                                                 disabled={processingMemberId === m.member.id}
-                                                className={cn("h-10 w-10 p-0 text-black rounded-xl shadow-lg transition-all", themeBg)}
+                                                className={cn("h-10 w-10 p-0 text-brand-fg rounded-tile transition-colors", themeBg)}
                                                 onClick={() => handleAction(m.member.id, () => onApprove(m.member.id))}
                                             >
                                                 {processingMemberId === m.member.id ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : <LucideCheck className="w-5 h-5" />}
@@ -106,8 +106,8 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
 
             <div className="space-y-5">
                 <div className="px-1">
-                    <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">
-                        Active Members ({activeMembers.length})
+                    <h3 className="text-xs font-semibold text-white/55">
+                        활동 중인 멤버 ({activeMembers.length})
                     </h3>
                 </div>
                 <div className="space-y-3">
@@ -132,8 +132,8 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                                 variant="secondary"
                                                 disabled={processingMemberId === m.member.id}
                                                 className={cn(
-                                                    "h-9 px-4 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-white/5",
-                                                    m.role === 'manage' ? "bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
+                                                    "h-9 px-4 text-xs font-semibold rounded-tile transition-colors border border-surface-line",
+                                                    m.role === 'manage' ? "bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20" : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
                                                 )}
                                                 onClick={() => {
                                                     const newRole = m.role === 'manage' ? 'member' : 'manage';
@@ -148,7 +148,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                                 size="sm"
                                                 variant="ghost"
                                                 disabled={processingMemberId === m.member.id}
-                                                className="h-10 w-10 p-0 text-white/10 hover:text-red-400 hover:bg-red-400/10 rounded-xl"
+                                                className="h-10 w-10 p-0 text-white/55 hover:text-red-400 hover:bg-red-400/10 rounded-tile"
                                                 onClick={() => setKickConfirmId(m.member.id)}
                                             >
                                                 <LucideUserX className="w-5 h-5" />
@@ -163,7 +163,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
             </div>
 
             <AlertDialog open={!!kickConfirmId} onOpenChange={(open) => !open && setKickConfirmId(null)}>
-                <AlertDialogContent className="bg-[#121212] border-white/10 text-white">
+                <AlertDialogContent className="bg-[#141416] border-white/10 text-white rounded-card">
                     <AlertDialogHeader>
                         <AlertDialogTitle>멤버 내보내기</AlertDialogTitle>
                         <AlertDialogDescription className="text-white/60">
@@ -186,19 +186,19 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
 }
 
 function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: CrewData, isMe?: boolean, action?: React.ReactNode }) {
-    const themeHoverBorder = crew.sportCategory === 'GOLF' ? 'hover:border-[#84cc16]/20' : 'hover:border-[#10b981]/20';
-    const themeText = crew.sportCategory === 'GOLF' ? 'text-[#84cc16]' : 'text-[#10b981]';
+    const themeHoverBorder = crew.sportCategory === 'GOLF' ? 'hover:border-brand/20' : 'hover:border-brand/20';
+    const themeText = crew.sportCategory === 'GOLF' ? 'text-brand' : 'text-brand';
 
     return (
         <motion.div
             layout
             className={cn(
-                "flex items-center justify-between p-4 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all duration-500 group",
+                "flex items-center justify-between p-4 rounded-tile bg-surface-2 border border-surface-line hover:bg-surface-3 transition-colors group",
                 themeHoverBorder
             )}
         >
             <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-sm font-black text-white/30 overflow-hidden shadow-sm shadow-black/40">
+                <div className="w-12 h-12 rounded-tile bg-white/5 border border-surface-line flex items-center justify-center text-sm font-medium text-white/55 overflow-hidden">
                     {member.member.profileImageUrl ? (
                         <img src={member.member.profileImageUrl} className="w-full h-full object-cover" alt="Profile" />
                     ) : (
@@ -208,17 +208,17 @@ function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: 
 
                 <div>
                     <div className="font-bold text-sm flex items-center gap-2">
-                        <span className={cn("tracking-tight", isMe ? themeText : "text-white/90")}>
+                        <span className={cn(isMe ? themeText : "text-white/90")}>
                             {member.member.nickname}
                         </span>
                         {member.role === 'leader' && <RoleBadge icon={LucideCrown} color="text-yellow-500" label="크루장" />}
                         {member.role === 'manage' && <RoleBadge icon={LucideShield} color="text-blue-400" label="부크루장" />}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                        <div className="px-2 py-0.5 rounded-lg bg-white/5 text-[9px] font-black text-white/30 uppercase tracking-[0.1em]">
-                            {crew.sportCategory === "GOLF" ? `H ${member.member.golfHandicap || 0}` : `AVG ${(member.member.avg4c || 0).toFixed(1)}`}
+                        <div className="px-2 py-0.5 rounded-lg bg-white/5 text-xs font-medium text-white/55 tabular-nums">
+                            {crew.sportCategory === "GOLF" ? `핸디 ${(member.member.golfAvgScore || 0).toFixed(1)}` : `평균 ${(member.member.avg4c || 0).toFixed(1)}`}
                         </div>
-                        {isMe && <span className={cn("text-[9px] font-black uppercase tracking-widest", themeText)}>YOU</span>}
+                        {isMe && <span className={cn("text-xs font-semibold", themeText)}>나</span>}
                     </div>
                 </div>
             </div>
@@ -231,9 +231,9 @@ function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: 
 }
 
 const RoleBadge = ({ icon: Icon, color, label }: any) => (
-    <div className={cn("flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 rounded-lg", color)}>
-        <Icon className="w-2.5 h-2.5 fill-current" />
-        <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
+    <div className={cn("flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-surface-line rounded-lg", color)}>
+        <Icon className="w-3 h-3 fill-current" />
+        <span className="text-xs font-semibold">{label}</span>
     </div>
 );
 

@@ -61,10 +61,13 @@ html {
 }
 
 body {
-  /* 모바일에서 텍스트 렌더링 최적화 */
+  /* 모바일에서 텍스트 렌더링 최적화 - 깍두기 현상 방지 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  font-variant-ligatures: none;
+  -webkit-font-feature-settings: "lnum";
+  font-feature-settings: "lnum";
 
   /* 기본 라인 높이 일관성 */
   line-height: 1.5;
@@ -72,8 +75,8 @@ body {
   /* 모바일에서 텍스트 선택 최적화 */
   -webkit-tap-highlight-color: transparent;
 
-  /* 기본 폰트 패밀리 */
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* 기본 폰트 패밀리 - Apple 시스템 폰트 및 고딕 네오 우선 적용 */
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 /* 반응형 폰트 크기 시스템 */
@@ -411,10 +414,12 @@ body {
 
   /* Enforce Dark Mode for Browser UI elements */
   color-scheme: dark;
+  forced-color-adjust: none;
+  /* 시스템 강제 색상 적용 방지 */
 
-  /* RANGKUE Design Guide v1.1 Enforced */
-  --background: #0A0A0A;
-  --foreground: #FFFFFF;
+  /* RANGKUE Design Guide v1.1 Enforced (Force Dark Prevention Trick) */
+  --background: rgba(10, 10, 10, 0.99);
+  --foreground: rgba(255, 255, 255, 0.99);
 
   --muted: rgba(255, 255, 255, 0.1);
   --muted-foreground: rgba(255, 255, 255, 0.6);
@@ -435,15 +440,46 @@ body {
   --destructive: hsl(0, 62.8%, 30.6%);
   --destructive-foreground: hsl(0, 0%, 98%);
   --ring: #10B981;
-  --radius: 2.5rem;
-  /* Bento Large Radius */
+  --radius: 1rem;
+  /* Control radius (16px). Cards/sheets use larger literal values via tokens below. */
 
-  /* Custom Rankue Utilities */
+  /* ============================================================
+     RANKUE DESIGN TOKENS — single source of truth.
+     Tune the brand accent here and it propagates to every screen.
+     ============================================================ */
+
+  /* Brand accent — one signal color. RGB channels so we can compose
+     alpha variants (bg tints, borders) without extra hex definitions. */
+  --brand: 16 185 129;            /* #10B981 emerald */
+  --brand-strong: 5 150 105;      /* #059669 pressed / hover */
+  --brand-fg: 3 25 18;            /* text/icon color on a solid brand fill */
+
+  /* Layered surfaces (dark). 0 = page, rising = closer to viewer. */
+  --surface-0: #0A0A0A;
+  --surface-1: rgba(255, 255, 255, 0.035);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --surface-3: rgba(255, 255, 255, 0.09);
+  --surface-line: rgba(255, 255, 255, 0.08);
+  --surface-line-strong: rgba(255, 255, 255, 0.14);
+
+  /* Text ramp — meaningful text never goes below /55. */
+  --ink-1: rgba(255, 255, 255, 0.95);  /* primary */
+  --ink-2: rgba(255, 255, 255, 0.72);  /* secondary */
+  --ink-3: rgba(255, 255, 255, 0.55);  /* tertiary / captions */
+  --ink-4: rgba(255, 255, 255, 0.38);  /* disabled / hints only */
+
+  /* Radius scale — 3 steps. No more 40px blobs. */
+  --r-sm: 0.75rem;   /* 12px — inputs, chips */
+  --r-md: 1rem;      /* 16px — buttons, small cards */
+  --r-lg: 1.5rem;    /* 24px — cards, sheets */
+  --r-pill: 999px;
+
+  /* Legacy aliases (kept for existing class references) */
   --rankue-green: #10B981;
   --rankue-surface: #141414;
-  --rankue-text-main: #FFFFFF;
-  --rankue-text-sub: rgba(255, 255, 255, 0.6);
-  --rankue-text-desc: rgba(255, 255, 255, 0.4);
+  --rankue-text-main: rgba(255, 255, 255, 0.95);
+  --rankue-text-sub: rgba(255, 255, 255, 0.72);
+  --rankue-text-desc: rgba(255, 255, 255, 0.55);
 }
 
 @layer base {
@@ -460,7 +496,9 @@ body {
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    /* 폰트 스택 통일 및 한글 최적화 */
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Inter", "Segoe UI", 'Roboto', sans-serif;
+    -webkit-text-size-adjust: 100%;
   }
 }
 
@@ -485,6 +523,66 @@ body {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+  }
+
+  /* ===== Rankue design primitives — reusable across screens ===== */
+  .rk-card {
+    background: var(--surface-1);
+    border: 1px solid var(--surface-line);
+    border-radius: var(--r-lg);
+  }
+  .rk-card-2 {
+    background: var(--surface-2);
+    border: 1px solid var(--surface-line);
+    border-radius: var(--r-lg);
+  }
+  .rk-title {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink-1);
+  }
+  .rk-subtitle {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+  .rk-num {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .rk-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: var(--r-pill);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .rk-btn-primary {
+    background: rgb(var(--brand));
+    color: rgb(var(--brand-fg));
+    font-weight: 600;
+    border-radius: var(--r-md);
+    transition: background .15s ease, transform .1s ease;
+  }
+  .rk-btn-primary:active {
+    background: rgb(var(--brand-strong));
+    transform: scale(0.98);
+  }
+  .rk-btn-secondary {
+    background: var(--surface-2);
+    color: var(--ink-1);
+    border: 1px solid var(--surface-line);
+    font-weight: 600;
+    border-radius: var(--r-md);
+    transition: background .15s ease, transform .1s ease;
+  }
+  .rk-btn-secondary:active {
+    background: var(--surface-3);
+    transform: scale(0.98);
   }
 }
 
@@ -604,6 +702,11 @@ body {
 
   .animate-float {
     animation: float 6s ease-in-out infinite;
+  }
+
+  .no-dark {
+    color-scheme: dark !important;
+    forced-color-adjust: none !important;
   }
 }
 

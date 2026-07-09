@@ -50,14 +50,14 @@ const PlayerCard = ({
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-base shrink-0 shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-colors ${isSelf ? 'bg-[#ffd700] text-black' : 'bg-white text-black'}`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-base shrink-0 transition-colors ${isSelf ? 'bg-[#ffd700] text-black' : 'bg-white text-black'}`}>
                         P{idx + 1}
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
                             {isSelf && <span className="text-sm font-bold text-[#ffd700]">나 (Me)</span>}
                             {!isSelf && <span className="text-sm font-bold text-gray-400">상대방 {idx + 1}</span>}
-                            {isSelf && <div className="text-[10px] font-bold text-black bg-[#ffd700] px-2 py-0.5 rounded-full">HOST</div>}
+                            {isSelf && <div className="text-[12px] font-bold text-black bg-[#ffd700] px-2 py-0.5 rounded-full">방장</div>}
                         </div>
 
                         {/* Reorder Buttons */}
@@ -88,14 +88,14 @@ const PlayerCard = ({
                         <button
                             onClick={() => onUpdate(idx, { type: 'member', target: 0, name: '' })}
                             title="회원으로 전환"
-                            className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${!isGuest ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
+                            className={`px-3 py-1.5 rounded-md text-[12px] font-bold transition-all ${!isGuest ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
                         >
                             회원
                         </button>
                         <button
                             onClick={() => onUpdate(idx, { type: 'guest', target: 0, name: '' })}
                             title="게스트로 전환"
-                            className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${isGuest ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
+                            className={`px-3 py-1.5 rounded-md text-[12px] font-bold transition-all ${isGuest ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
                         >
                             게스트
                         </button>
@@ -118,7 +118,7 @@ const PlayerCard = ({
                 <div className="h-12 w-full flex items-center bg-black/20 rounded-xl px-4 border border-white/5 justify-between">
                     {player.member ? (
                         <>
-                            <span className="font-black text-white text-lg truncate">
+                            <span className="font-semibold text-white text-lg truncate">
                                 {player.member.name}
                             </span>
                             <span className="text-xs font-bold text-gray-400 bg-black/30 px-2 py-1 rounded-lg">
@@ -126,7 +126,7 @@ const PlayerCard = ({
                             </span>
                         </>
                     ) : (
-                        <span className="font-bold text-white/20 text-sm animate-pulse">
+                        <span className="font-medium text-white/45 text-sm animate-pulse">
                             {isSelf ? "나" : "PIN입력 대기 중..."}
                         </span>
                     )}
@@ -141,7 +141,7 @@ const PlayerCard = ({
                 >
                     <ChevronDown className="w-6 h-6 text-white" />
                 </button>
-                <div className={`h-14 min-w-[90px] flex items-center justify-center bg-black/40 rounded-xl border border-white/5 font-black text-3xl ${textColor} tracking-tighter shadow-inner`}>
+                <div className={`h-14 min-w-[90px] flex items-center justify-center bg-black/40 rounded-xl border border-white/5 font-semibold text-3xl ${textColor} tracking-tight shadow-inner`}>
                     {player.target}
                 </div>
                 <button
@@ -155,8 +155,8 @@ const PlayerCard = ({
             {/* Simple Stats Display (Optional, kept minimal) */}
             {player.member && winRate !== null && (
                 <div className="mt-2 border-t border-white/5 pt-2 flex justify-between items-center px-1">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase">WIN RATE</span>
-                    <span className="text-xs font-black text-[#6366f1]">
+                    <span className="text-[12px] font-bold text-gray-500 uppercase">승률</span>
+                    <span className="text-xs font-semibold text-[#6366f1]">
                         {winRate}%
                     </span>
                 </div>
@@ -208,7 +208,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                     >
                         <ChevronDown className="w-6 h-6 rotate-90" />
                     </button>
-                    <span className="font-black text-lg">{gameMode === "practice" ? "혼자 연습하기" : "매칭대결하기"}</span>
+                    <span className="font-semibold text-lg">{gameMode === "practice" ? "혼자 연습하기" : "매칭대결하기"}</span>
                     <div className="w-10">
                         {/* Placeholder for symmetry or save button */}
                     </div>
@@ -227,7 +227,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                     </div>
                                     <div className="p-8 rounded-3xl bg-[#ffd700] flex flex-col items-center justify-center shadow-[0_20px_40px_rgba(255,215,0,0.1)] border-4 border-black/5">
                                         {inviteCode ? (
-                                            <span className="text-5xl font-black text-black tracking-[0.2em] font-mono drop-shadow-sm">{inviteCode}</span>
+                                            <span className="text-5xl font-semibold text-black tracking-[0.2em] font-mono drop-shadow-sm">{inviteCode}</span>
                                         ) : (
                                             <div className="flex flex-col items-center gap-3">
                                                 <div className="flex items-center gap-3">
@@ -235,7 +235,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                                     <div className="w-3 h-3 bg-black/20 rounded-full animate-bounce [animation-duration:1s] [animation-delay:0.2s]" />
                                                     <div className="w-3 h-3 bg-black/20 rounded-full animate-bounce [animation-duration:1s] [animation-delay:0.4s]" />
                                                 </div>
-                                                <span className="text-[10px] font-black text-black/40 uppercase tracking-[0.3em]">Generating PIN...</span>
+                                                <span className="text-[12px] font-semibold text-black/40 uppercase tracking-[0.3em]">핀 생성 중...</span>
                                             </div>
                                         )}
                                     </div>
@@ -247,13 +247,13 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                         <div className="grid grid-cols-2 gap-3 mb-4">
                             <Button
                                 onClick={() => changeGameType("4c")}
-                                className={`h-14 text-xl font-black rounded-2xl ${gameType === "4c" ? "bg-[#0e4d2a] text-white" : "bg-white/5 text-gray-400"}`}
+                                className={`h-14 text-xl font-semibold rounded-2xl ${gameType === "4c" ? "bg-[#0e4d2a] text-white" : "bg-white/5 text-gray-400"}`}
                             >
                                 4구
                             </Button>
                             <Button
                                 onClick={() => changeGameType("3c")}
-                                className={`h-14 text-xl font-black rounded-2xl ${gameType === "3c" ? "bg-[#0e4d2a] text-white" : "bg-white/5 text-gray-400"}`}
+                                className={`h-14 text-xl font-semibold rounded-2xl ${gameType === "3c" ? "bg-[#0e4d2a] text-white" : "bg-white/5 text-gray-400"}`}
                             >
                                 3구
                             </Button>
@@ -266,7 +266,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                     <button
                                         key={count}
                                         onClick={() => setNumberOfPlayers(count)}
-                                        className={`flex-1 py-3 rounded-lg font-black text-sm transition-all ${numberOfPlayers === count ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                                        className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-all ${numberOfPlayers === count ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
                                     >
                                         {count}인
                                     </button>
@@ -346,7 +346,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                 <div className="p-4 border-t border-white/10 bg-[#0a0a0a] shrink-0 safe-area-pb">
                     <Button
                         onClick={confirmStart}
-                        className="w-full h-14 bg-[#0e4d2a] hover:bg-[#156f3d] text-white rounded-2xl text-lg font-black shadow-lg shadow-[#0e4d2a]/20"
+                        className="w-full h-14 bg-[#0e4d2a] hover:bg-[#156f3d] text-white rounded-2xl text-lg font-semibold shadow-lg shadow-[#0e4d2a]/20"
                     >
                         START GAME
                     </Button>

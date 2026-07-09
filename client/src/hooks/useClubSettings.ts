@@ -1,10 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from "wouter";
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 import { CrewMember, CrewData } from '@/types/crew';
 
 export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) => {
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const [_, setLocation] = useLocation();
 
     // 1. Members Query
     const membersQuery = useQuery<CrewMember[]>({
@@ -16,13 +19,10 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
     // 2. Update Crew Info Mutation
     const updateCrew = useMutation({
         mutationFn: async (data: Partial<CrewData>) => {
-            const res = await fetch(`/api/hiq/crews/${crewId}`, {
+            return await apiRequest(`/api/hiq/crews/${crewId}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: data
             });
-            if (!res.ok) throw new Error(await res.text());
-            return res.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
@@ -36,13 +36,10 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
     // 3. Update Member Role Mutation
     const updateRole = useMutation({
         mutationFn: async ({ memberId, role }: { memberId: string, role: string }) => {
-            const res = await fetch(`/api/hiq/crews/${crewId}/members/${memberId}/role`, {
+            return await apiRequest(`/api/hiq/crews/${crewId}/members/${memberId}/role`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ role })
+                body: { role }
             });
-            if (!res.ok) throw new Error(await res.text());
-            return res.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
@@ -53,23 +50,22 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
     // 4. Approve Member Mutation
     const approveMember = useMutation({
         mutationFn: async (memberId: string) => {
-            const res = await fetch(`/api/hiq/crews/${crewId}/members/${memberId}/approve`, { method: 'POST' });
-            if (!res.ok) throw new Error(await res.text());
-            return res.json();
+            return await apiRequest(`/api/hiq/crews/${crewId}/members/${memberId}/approve`, { method: 'POST' });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
             toast({ title: "가입이 승인되었습니다" });
+        },
+        onError: (err: Error) => {
+            toast({ title: "승인 실패", description: err.message, variant: "destructive" });
         }
     });
 
     // 5. Kick Member Mutation
     const kickMember = useMutation({
         mutationFn: async (memberId: string) => {
-            const res = await fetch(`/api/hiq/crews/${crewId}/members/${memberId}`, { method: 'DELETE' });
-            if (!res.ok) throw new Error(await res.text());
-            return res.json();
+            return await apiRequest(`/api/hiq/crews/${crewId}/members/${memberId}`, { method: 'DELETE' });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
@@ -81,17 +77,22 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
     // 6. Delete Crew Mutation
     const deleteCrew = useMutation({
         mutationFn: async () => {
-            const res = await fetch(`/api/hiq/crews/${crewId}`, { method: 'DELETE' });
-            if (!res.ok) throw new Error(await res.text());
-            return res.json();
+            return await apiRequest(`/api/hiq/crews/${crewId}`, { method: 'DELETE' });
         },
-        onSuccess: () => {
-            window.location.href = '/hiq/menu';
+        onSuccess: async () => {
+            // Navigate away first, then drop this crew's cached queries. Using removeQueries
+            // (not invalidate) avoids an active observer on the still-mounting settings screen
+            // refetching the just-deleted crew and flashing a 404 before the route transitions.
+            setLocation('/club');
+            queryClient.removeQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
+            queryClient.removeQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
+            await queryClient.invalidateQueries({ queryKey: ["/api/hiq/crews"] });
+            await queryClient.invalidateQueries({ queryKey: ["/api/hiq/crews/mine"] });
         }
     });
 
     return {
-        members: membersQuery.data || [],
+        members: Array.isArray(membersQuery.data) ? membersQuery.data : [],
         isLoading: membersQuery.isLoading,
         updateCrew,
         updateRole,

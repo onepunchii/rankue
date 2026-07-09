@@ -1,15 +1,33 @@
 {
     "version": 2,
-    "buildCommand": "npm run build",
-    "outputDirectory": "dist/public",
-    "rewrites": [
+    "builds": [
         {
-            "source": "/api/(.*)",
-            "destination": "/api/index"
+            "src": "api/index.ts",
+            "use": "@vercel/node"
         },
         {
-            "source": "/(.*)",
-            "destination": "/index.html"
+            "src": "package.json",
+            "use": "@vercel/static-build",
+            "config": {
+                "distDir": "dist/public"
+            }
         }
-    ]
+    ],
+    "routes": [
+        {
+            "src": "/api/(.*)",
+            "dest": "/api/index.ts"
+        },
+        {
+            "handle": "filesystem"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/index.html"
+        }
+    ],
+    "env": {
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0",
+        "VERCEL": "true"
+    }
 }

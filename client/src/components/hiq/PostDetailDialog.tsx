@@ -96,9 +96,9 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg bg-[#141414] border-white/5 p-0 overflow-hidden flex flex-col max-h-[85vh]">
+            <DialogContent className="max-w-lg bg-[#141416] border-white/10 p-0 overflow-hidden flex flex-col max-h-[85vh]">
                 <DialogHeader className="px-8 py-6 border-b border-white/5">
-                    <DialogTitle className="text-xl font-black text-white">{post?.title}</DialogTitle>
+                    <DialogTitle className="text-xl font-semibold text-white">{post?.title}</DialogTitle>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
@@ -109,24 +109,34 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                 {post?.author?.profileImageUrl ? (
                                     <img src={post.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-xs font-black uppercase text-white/20">
+                                    <div className="w-full h-full flex items-center justify-center text-xs font-semibold text-white/45">
                                         {post?.author?.name?.charAt(0)}
                                     </div>
                                 )}
                             </div>
-                            <span className="text-[15px] font-bold text-white tracking-tight">{post?.author?.name}</span>
+                            <span className="text-[15px] font-bold text-white">{post?.author?.name}</span>
                         </div>
                         <p className="text-[15px] text-white/70 leading-relaxed whitespace-pre-wrap font-medium">{post?.content}</p>
+
+                        {post?.images && post.images.length > 0 && (
+                            <div className="space-y-3 pt-2">
+                                {post.images.map((img: string, idx: number) => (
+                                    <div key={idx} className="rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                                        <img src={img} className="w-full h-auto" alt={`post content ${idx}`} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* Comments Section */}
                     <div className="space-y-5">
-                        <h4 className="text-[10px] font-black text-white/20 uppercase tracking-widest flex items-center gap-2">
-                            <span className="w-1 h-1 rounded-full bg-[#10B981]" />
+                        <h4 className="text-[12px] font-semibold text-white/55 flex items-center gap-2">
+                            <span className="w-1 h-1 rounded-full bg-brand" />
                             댓글 {comments?.length || 0}
                         </h4>
                         {isLoading ? (
-                            <div className="py-12 text-center text-white/20 text-[11px] font-black uppercase tracking-widest">불러오는 중...</div>
+                            <div className="py-12 text-center text-white/55 text-[12px] font-semibold">불러오는 중...</div>
                         ) : comments && comments.length > 0 ? (
                             <div className="space-y-6">
                                 {comments.map((comment) => (
@@ -135,7 +145,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                             {comment.author.profileImageUrl ? (
                                                 <img src={comment.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-[10px] font-black text-white/20 uppercase">
+                                                <div className="w-full h-full flex items-center justify-center text-[12px] font-medium text-white/45">
                                                     {comment.author.name.charAt(0)}
                                                 </div>
                                             )}
@@ -143,7 +153,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                         <div className="flex-1 space-y-1.5">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[13px] font-bold text-white/90">{comment.author.name}</span>
-                                                <span className="text-[10px] font-black text-white/20 uppercase tracking-tighter">
+                                                <span className="text-[12px] font-medium text-white/55">
                                                     {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: ko })}
                                                 </span>
                                             </div>
@@ -156,7 +166,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                                         deleteCommentMutation.mutate(comment.id);
                                                     }
                                                 }}
-                                                className="p-1 text-white/10 hover:text-red-500 transition-colors self-start mt-1 opacity-0 group-hover/comment:opacity-100"
+                                                className="p-1 text-white/45 hover:text-red-500 transition-colors self-start mt-1 opacity-0 group-hover/comment:opacity-100"
                                                 title="댓글 삭제"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -166,8 +176,8 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                 ))}
                             </div>
                         ) : (
-                            <div className="py-16 text-center text-white/10 text-[11px] font-black uppercase tracking-widest italic flex flex-col items-center gap-2">
-                                <div className="w-8 h-px bg-white/5" />
+                            <div className="py-16 text-center text-white/55 text-[12px] font-semibold flex flex-col items-center gap-2">
+                                <div className="w-8 h-px bg-white/10" />
                                 첫 댓글을 남겨보세요
                             </div>
                         )}
@@ -175,7 +185,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                 </div>
 
                 {/* Comment Input Footer */}
-                <div className="p-4 bg-[#141414] border-t border-white/5">
+                <div className="p-4 bg-[#141416] border-t border-white/10">
                     <div className="relative flex items-center gap-2">
                         <input
                             type="text"
@@ -188,13 +198,13 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                     handleSubmitComment();
                                 }
                             }}
-                            className="flex-1 bg-white/5 border border-white/5 text-white text-sm rounded-full h-10 px-4 focus:outline-none focus:border-[#10B981]/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                            className="flex-1 bg-white/5 border border-white/5 text-white text-sm rounded-full h-10 px-4 focus:outline-none focus:border-brand/50 focus:bg-white/10 transition-all placeholder:text-white/45"
                         />
                         <Button
                             disabled={!commentContent.trim() || commentMutation.isPending}
                             onClick={handleSubmitComment}
                             size="icon"
-                            className="w-10 h-10 rounded-full bg-[#10B981] hover:bg-[#059669] text-black transition-all shadow-lg shadow-[#10B981]/10 flex-shrink-0"
+                            className="w-10 h-10 rounded-full bg-brand hover:bg-brand-strong text-brand-fg transition-all flex-shrink-0"
                         >
                             {commentMutation.isPending ? (
                                 <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />

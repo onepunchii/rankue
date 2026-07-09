@@ -122,8 +122,8 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-black/5 mb-3">
                             <LucidePiggyBank className="w-6 h-6" />
                         </div>
-                        <h2 className="text-xl font-black mb-1">{settlement.title}</h2>
-                        <p className="text-xs text-black/40 font-bold uppercase tracking-widest">
+                        <h2 className="text-[19px] font-bold tracking-tight mb-1">{settlement.title}</h2>
+                        <p className="text-[12px] text-black/40 font-semibold tabular-nums">
                             {format(new Date(settlement.createdAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
                         </p>
                     </div>
@@ -173,7 +173,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                                             {isSending ? "송금" : "입금"}
                                                         </span>
                                                     </div>
-                                                    <div className="text-3xl font-black tracking-tighter">
+                                                    <div className="text-3xl font-semibold tracking-tight">
                                                         {t.amount.toLocaleString()}
                                                         <span className="text-lg font-bold text-black/40 ml-1">원</span>
                                                     </div>
@@ -183,9 +183,9 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                     </div>
                                 ) : (
                                     <div className="py-8">
-                                        <LucideCheckCircle2 className="w-12 h-12 text-[#22c55e] mx-auto mb-3" />
-                                        <p className="font-bold text-lg">정산 완료!</p>
-                                        <p className="text-xs text-black/40">주고 받을 돈이 없습니다.</p>
+                                        <LucideCheckCircle2 className="w-12 h-12 text-brand mx-auto mb-3" />
+                                        <p className="font-bold text-[17px]">정산 완료!</p>
+                                        <p className="text-[12px] text-black/40 font-medium">주고 받을 돈이 없습니다.</p>
                                     </div>
                                 )}
 
@@ -195,7 +195,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                         className="flex items-center justify-between bg-black/5 p-4 rounded-xl cursor-pointer active:scale-95 transition-transform mt-4"
                                     >
                                         <div className="text-left">
-                                            <div className="text-[10px] font-bold text-black/40 mb-0.5">총무 계좌 (참고용)</div>
+                                            <div className="text-[12px] font-bold text-black/40 mb-0.5">총무 계좌 (참고용)</div>
                                             <div className="font-bold text-sm flex items-center gap-1.5">
                                                 <span>{settlement.accountBank}</span>
                                                 <span className="tabular-nums tracking-tight">{settlement.accountNumber}</span>
@@ -216,7 +216,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                             >
                                 <div className="flex justify-between items-end border-b border-black/10 pb-4">
                                     <span className="font-bold text-sm">총 지출 금액</span>
-                                    <span className="font-black text-xl">{totalAmount.toLocaleString()}원</span>
+                                    <span className="font-semibold text-xl">{totalAmount.toLocaleString()}원</span>
                                 </div>
                                 <div className="space-y-3">
                                     {settlement.items.map((item: any) => (
@@ -227,7 +227,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                             </div>
                                             <div className="flex items-center justify-between text-xs text-black/50">
                                                 <div className="flex items-center gap-1">
-                                                    <span className="bg-black text-white px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                                    <span className="bg-black text-white px-1.5 py-0.5 rounded text-[12px] font-bold">
                                                         {item.payer?.name || "결제자"} 결제
                                                     </span>
                                                 </div>
@@ -241,7 +241,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                 </div>
 
                                 <div className="mt-6 pt-4 border-t-2 border-black">
-                                    <p className="text-xs font-bold text-black/40 mb-3 uppercase tracking-widest text-center">전체 송금 리스트</p>
+                                    <p className="text-[12px] font-semibold text-black/40 mb-3 text-center">전체 송금 리스트</p>
                                     <div className="space-y-2">
                                         {allTransfers.map((t, idx) => (
                                             <div key={idx} className="flex items-center justify-between text-xs bg-black/5 px-3 py-2 rounded-lg">
@@ -250,7 +250,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                                     <LucideChevronRight className="w-3 h-3 text-black/30" />
                                                     <span className="font-bold">{t.toName}</span>
                                                 </div>
-                                                <span className="font-black tabular-nums">{t.amount.toLocaleString()}원</span>
+                                                <span className="font-semibold tabular-nums">{t.amount.toLocaleString()}원</span>
                                             </div>
                                         ))}
                                     </div>
@@ -264,7 +264,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                 </div>
 
                 <div className="p-6">
-                    <Button className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-black h-14 text-lg font-bold rounded-xl" onClick={() => onOpenChange(false)}>
+                    <Button className="w-full rk-btn-primary h-14 text-[16px] rounded-tile" onClick={() => onOpenChange(false)}>
                         확인
                     </Button>
                 </div>

@@ -15,6 +15,7 @@ interface CourseSearchSectionProps {
     setIsBlind: (b: boolean) => void;
     blindName: string;
     setBlindName: (n: string) => void;
+    listingType: 'BOOKING' | 'JOIN';
 }
 
 export function CourseSearchSection({
@@ -26,7 +27,8 @@ export function CourseSearchSection({
     isBlind,
     setIsBlind,
     blindName,
-    setBlindName
+    setBlindName,
+    listingType
 }: CourseSearchSectionProps) {
 
     // Filter logic moved here internally or passed? Passed logic was better but simple filter can be here.
@@ -43,20 +45,26 @@ export function CourseSearchSection({
         setSearchQuery(course.name);
     };
 
+    const activeColor = listingType === 'JOIN' ? 'text-[#FF6B00]' : 'text-[#64DD17]';
+    const activeBg = listingType === 'JOIN' ? 'bg-[#FF6B00]/10' : 'bg-[#64DD17]/10';
+    const activeBorder = listingType === 'JOIN' ? 'border-[#FF6B00]/30' : 'border-[#64DD17]/30';
+    const activeBgLight = listingType === 'JOIN' ? 'bg-[#FF6B00]/20' : 'bg-[#64DD17]/20';
+    const activeText = listingType === 'JOIN' ? 'text-[#FF6B00]' : 'text-[#64DD17]';
+
     return (
         <section className="space-y-6">
             <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-[#64DD17]/10 flex items-center justify-center">
-                    <LucideMap className="w-4 h-4 text-[#64DD17]" />
+                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", activeBg)}>
+                    <LucideMap className={cn("w-4 h-4", activeColor)} />
                 </div>
                 <h3 className="text-sm font-black text-white uppercase tracking-widest">1. 골프장 선택</h3>
             </div>
 
             <div className="space-y-4">
                 <div className="relative">
-                    <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 block ml-1">골프장 검색</label>
+                    <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] mb-2 block ml-1">골프장 검색</label>
                     <div className="relative">
-                        <LucideSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                        <LucideSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
                         <input
                             type="text"
                             value={searchQuery}
@@ -66,11 +74,14 @@ export function CourseSearchSection({
                             }}
                             placeholder="골프장명 입력 (예: 88, 한양)"
                             title="골프장 검색"
-                            className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-white focus:outline-none focus:border-[#64DD17]/50 focus:bg-white/[0.08] transition-all"
+                            className={cn(
+                                "w-full bg-white/5 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-white focus:outline-none focus:bg-white/[0.08] transition-all",
+                                listingType === 'JOIN' ? "focus:border-[#FF6B00]/50" : "focus:border-[#64DD17]/50"
+                            )}
                         />
                         {selectedCourse && (
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 px-2 py-1 rounded bg-[#64DD17]/20 border border-[#64DD17]/30">
-                                <span className="text-[10px] font-black text-[#64DD17] uppercase tracking-tighter">{selectedCourse.region}</span>
+                            <div className={cn("absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 px-2 py-1 rounded border", activeBgLight, activeBorder)}>
+                                <span className={cn("text-[10px] font-black uppercase tracking-tighter", activeText)}>{selectedCourse.region}</span>
                             </div>
                         )}
                     </div>
@@ -94,7 +105,7 @@ export function CourseSearchSection({
                                             <div className="text-sm font-bold text-white">{course.name}</div>
                                             <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{course.address}</div>
                                         </div>
-                                        <span className="text-[10px] font-black text-[#64DD17] uppercase bg-[#64DD17]/10 px-2 py-1 rounded">{course.region}</span>
+                                        <span className={cn("text-[10px] font-black uppercase px-2 py-1 rounded", activeText, activeBg)}>{course.region}</span>
                                     </button>
                                 ))}
                             </motion.div>
@@ -126,7 +137,7 @@ export function CourseSearchSection({
                             exit={{ height: 0, opacity: 0 }}
                             className="overflow-hidden space-y-2"
                         >
-                            <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1">노출할 가명 선택</label>
+                            <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] ml-1">노출할 가명 선택</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {[
                                     `${selectedCourse.region.substring(0, 2)}권 명문`,
@@ -140,7 +151,7 @@ export function CourseSearchSection({
                                         className={cn(
                                             "p-3 rounded-xl border text-xs font-bold transition-all",
                                             blindName === alias
-                                                ? "bg-[#64DD17]/20 border-[#64DD17] text-[#64DD17]"
+                                                ? cn(activeBgLight, activeBorder, activeText)
                                                 : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10"
                                         )}
                                     >
@@ -154,7 +165,10 @@ export function CourseSearchSection({
                                     value={blindName}
                                     onChange={(e) => setBlindName(e.target.value)}
                                     placeholder="직접 입력"
-                                    className="w-full bg-white/5 border border-white/5 rounded-xl py-3 px-4 text-xs font-bold text-white focus:outline-none focus:border-[#64DD17]/50"
+                                    className={cn(
+                                        "w-full bg-white/5 border border-white/5 rounded-xl py-3 px-4 text-xs font-bold text-white focus:outline-none transition-all",
+                                        listingType === 'JOIN' ? "focus:border-[#FF6B00]/50" : "focus:border-[#64DD17]/50"
+                                    )}
                                 />
                             </div>
                         </motion.div>

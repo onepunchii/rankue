@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COURSES } from "@/golf/data/golfCourses";
-import { compressImage } from "@/lib/image-utils";
+import { uploadImage } from "@/lib/imageUtils";
 
 // Components
 import { CourseHero } from "../components/course/CourseHero";
@@ -78,10 +78,10 @@ export default function GolfCourseDetail() {
         if (!file) return;
 
         try {
-            const compressed = await compressImage(file, 1200, 0.7);
-            setCourseImage(compressed);
-            localStorage.setItem(`course-${courseId}-image`, compressed);
-            alert("사진이 압축되어 저장되었습니다!");
+            const url = await uploadImage(file, 'course', { maxSize: 1200, quality: 0.7 });
+            setCourseImage(url);
+            localStorage.setItem(`course-${courseId}-image`, url);
+            alert("사진이 저장되었습니다!");
         } catch (err) {
             console.error("Compression/Storage error:", err);
             alert("이미지 저장 중 오류가 발생했습니다.");

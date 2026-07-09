@@ -1,0 +1,2 @@
+Lines 431-519 should be deleted (duplicate Handicap Pace Maker)
+Then add ScoreCard component for solo mode

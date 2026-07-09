@@ -31,6 +31,7 @@ export default function BookingList() {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isBookingManager, setIsBookingManager] = useState(false);
+    const [showOnlyMyBookings, setShowOnlyMyBookings] = useState(false);
 
     // Custom Hooks
     const { selectedFilters, toggleFilter, clearFilter } = useBookingFilters();
@@ -45,24 +46,59 @@ export default function BookingList() {
     } = useShare();
 
     // Generate next 30 days
+    // Generate next 30 days (KST based)
     const weekDates = useMemo(() => Array.from({ length: 30 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() + i);
+        const now = new Date();
+        const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // Convert to KST
+        kstNow.setDate(kstNow.getDate() + i);
+
         const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
-        const dayOfWeek = dayNames[date.getDay()];
-        const month = date.getMonth() + 1;
-        const dateNum = date.getDate();
+        const dayOfWeek = dayNames[kstNow.getUTCDay()];
+        const month = kstNow.getUTCMonth() + 1;
+        const dateNum = kstNow.getUTCDate();
+        const fullDate = `${kstNow.getUTCFullYear()}-${String(kstNow.getUTCMonth() + 1).padStart(2, '0')}-${String(kstNow.getUTCDate()).padStart(2, '0')}`;
 
         return {
             dayName: i === 0 ? "오늘" : dayOfWeek,
             dateNum: dateNum,
             displayDate: `${month}/${dateNum} ${dayOfWeek}요일`,
-            fullDate: date.toISOString().split('T')[0]
+            fullDate: fullDate
         };
     }), []);
 
+    // Handle deep linking from URL
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const dateParam = params.get('date');
+        const viewParam = params.get('view');
+
+        if (viewParam === 'JOIN' || viewParam === 'BOOKING' || viewParam === 'ALL') {
+            setViewType(viewParam);
+        }
+
+        if (dateParam && weekDates.length > 0) {
+            const idx = weekDates.findIndex(d => d.fullDate === dateParam);
+            if (idx !== -1) {
+                setSelectedDate(idx);
+            }
+        }
+    }, [weekDates]);
+
     const { bookingCounts, bookings, isLoading, isError } = useBookingData(weekDates, selectedDate, viewType, selectedFilters);
     const { expandedBookingId, setExpandedBookingId } = useDeepLink(bookings);
+
+    // Handle 'highlight' query param
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const highlightId = params.get('highlight');
+        if (highlightId && bookings && bookings.length > 0) {
+            setExpandedBookingId(highlightId);
+            // Scroll to item
+            requestAnimationFrame(() => {
+                document.getElementById(`booking-${highlightId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+        }
+    }, [bookings, setExpandedBookingId]);
 
     // Auth check
     const { data: user } = useQuery<any>({ queryKey: ["/api/hiq/me"] });
@@ -75,7 +111,10 @@ export default function BookingList() {
 
     // My Crews for sharing
     const { data: myCrewsData } = useQuery<any[]>({ queryKey: ["/api/hiq/crews/mine"] });
-    const myCrews = useMemo(() => myCrewsData?.map(item => item.crew) || [], [myCrewsData]);
+    const myCrews = useMemo(() => {
+        if (!myCrewsData) return [];
+        return myCrewsData.map(item => item?.crew).filter(Boolean);
+    }, [myCrewsData]);
 
     const theme = viewType === 'JOIN' ? THEME_COLORS.JOIN : THEME_COLORS.BOOKING;
 
@@ -83,16 +122,29 @@ export default function BookingList() {
     const filteredTimes = useMemo(() => {
         if (!bookings) return [];
 
-        return bookings.filter(item => {
+        return (bookings as any[]).filter(item => {
+            // 1. Date matching (KST based)
+            const itemDate = new Date(item.datetime);
+            const kstDate = new Date(itemDate.getTime() + (9 * 60 * 60 * 1000));
+            const itemDateStr = `${kstDate.getUTCFullYear()}-${String(kstDate.getUTCMonth() + 1).padStart(2, '0')}-${String(kstDate.getUTCDate()).padStart(2, '0')}`;
+            if (itemDateStr !== weekDates[selectedDate].fullDate) return false;
+
+            // 2. Type filtering
             if (viewType === 'BOOKING' && item.listingType === 'JOIN') return false;
             if (viewType === 'JOIN' && item.listingType !== 'JOIN') return false;
 
+            // 3. User specific filtering
+            if (showOnlyMyBookings && user) {
+                if (item.managerPhone !== user.phone) return false;
+            }
+
+            // 4. Time filtering
             const timeFilters = selectedFilters.time;
             if (timeFilters.length > 0 && !timeFilters.includes('all')) {
-                const hour = new Date(item.datetime).getHours();
+                const kstHour = (itemDate.getUTCHours() + 9) % 24;
                 let category = 'night';
-                if (hour < 12) category = 'morning';
-                else if (hour < 17) category = 'afternoon';
+                if (kstHour < 12) category = 'morning';
+                else if (kstHour < 17) category = 'afternoon';
                 if (!timeFilters.includes(category)) return false;
             }
 
@@ -126,12 +178,17 @@ export default function BookingList() {
             }
             return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
         });
-    }, [bookings, viewType, selectedFilters]);
+    }, [bookings, viewType, selectedFilters, selectedDate, weekDates]);
 
     const handleReserve = useCallback((item: any) => {
         const phoneNumber = item.managerPhone || "010-1234-5678";
         const dateStr = weekDates[selectedDate].displayDate;
-        const timeStr = new Date(item.datetime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const timeStr = new Date(item.datetime).toLocaleTimeString('ko-KR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+            timeZone: 'Asia/Seoul'
+        });
         const displayName = item.isBlind ? item.blindName : item.courseName;
         const actionText = item.listingType === 'JOIN' ? "조인 신청 가능한가요?" : "예약 가능한가요?";
         const messageBody = `안녕하세요! [랭큐] 보고 연락드립니다.\n${displayName} / ${dateStr} / ${timeStr} / ${item.greenFee.toLocaleString()}원\n${actionText}`;
@@ -170,10 +227,13 @@ export default function BookingList() {
                                 </button>
                             ))}
                         </div>
+
                     </div>
-                    <button onClick={() => setIsSearchOpen(true)} className="p-2 -mr-2 rounded-full hover:bg-white/5 transition-colors" title="검색">
-                        <LucideSearch className="w-5 h-5 opacity-40 hover:opacity-100 transition-opacity" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setIsSearchOpen(true)} className="p-2 rounded-full hover:bg-white/5 transition-colors" title="검색">
+                            <LucideSearch className="w-5 h-5 opacity-40 hover:opacity-100 transition-opacity" />
+                        </button>
+                    </div>
                 </div>
 
                 <DateSelector
@@ -236,32 +296,34 @@ export default function BookingList() {
                 )}
             </main>
 
-            {isBookingManager && (
-                <AnimatePresence>
-                    {!isCreateModalOpen && (
-                        <motion.button
-                            initial={{ scale: 0, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0, opacity: 0, y: 20 }}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setIsCreateModalOpen(true)}
-                            className={cn(
-                                "fixed bottom-8 right-6 z-[60] px-6 py-4 rounded-full font-black text-sm uppercase tracking-widest flex items-center gap-2 transition-all",
-                                theme.bg, theme.shadow,
-                                viewType === 'JOIN' ? 'text-white' : 'text-[#051907]'
-                            )}
-                        >
-                            <LucidePlus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
-                            <span>{viewType === 'JOIN' ? "조인 만들기" : "부킹 만들기"}</span>
-                        </motion.button>
-                    )}
-                </AnimatePresence>
-            )}
+            {
+                isBookingManager && (
+                    <AnimatePresence>
+                        {!isCreateModalOpen && (
+                            <motion.button
+                                initial={{ scale: 0, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0, opacity: 0, y: 20 }}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setIsCreateModalOpen(true)}
+                                className={cn(
+                                    "fixed bottom-8 right-6 z-[60] px-6 py-4 rounded-full font-black text-sm uppercase tracking-widest flex items-center gap-2 transition-all",
+                                    theme.bg, theme.shadow,
+                                    viewType === 'JOIN' ? 'text-white' : 'text-[#051907]'
+                                )}
+                            >
+                                <LucidePlus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
+                                <span>{viewType === 'JOIN' ? "조인 만들기" : "부킹 만들기"}</span>
+                            </motion.button>
+                        )}
+                    </AnimatePresence>
+                )
+            }
 
             <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                 <DialogContent className="p-0 border-none bg-transparent max-w-md w-full h-[90vh] overflow-hidden flex flex-col" hideClose={true}>
-                    <BookingCreateForm onClose={() => setIsCreateModalOpen(false)} initialMode={viewType === 'ALL' ? 'BOOKING' : viewType} />
+                    <BookingCreateForm onClose={() => setIsCreateModalOpen(false)} initialMode={viewType === 'ALL' ? 'BOOKING' : viewType as 'BOOKING' | 'JOIN'} />
                 </DialogContent>
             </Dialog>
 
@@ -292,6 +354,6 @@ export default function BookingList() {
                     }
                 }}
             />
-        </div>
+        </div >
     );
 }

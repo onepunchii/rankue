@@ -41,14 +41,14 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
         }
     });
 
-    if (isLoading) return <div className="text-center py-8 text-white/20">Loading activities...</div>;
+    if (isLoading) return <div className="text-center py-8 text-white/45">활동 불러오는 중...</div>;
 
     const upcomingActivities: any[] = Array.isArray(activities) ? activities : [];
 
     return (
         <div className="space-y-4 px-6 pt-0 pb-6">
             <div className="flex items-center gap-2 mb-2">
-                <LucideTent className="w-5 h-5 text-[#22c55e]" />
+                <LucideTent className="w-5 h-5 text-brand" />
                 <h2 className="text-lg font-semibold">정모 / 일정</h2>
             </div>
 
@@ -60,24 +60,24 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                 // D-Day Calculation
                 const diff = differenceInDays(startOfDay(new Date(activity.activityDate)), startOfDay(new Date()));
                 const dDayText = diff === 0 ? "D-Day" : diff > 0 ? `D-${diff}` : "종료";
-                const dDayColor = diff === 0 ? "bg-red-500 text-white" : diff > 0 && diff <= 3 ? "bg-orange-500 text-white" : "bg-[#22c55e] text-black";
+                const dDayColor = diff === 0 ? "bg-red-500 text-white" : diff > 0 && diff <= 3 ? "bg-orange-500 text-white" : "bg-brand text-brand-fg";
 
                 return (
-                    <Card key={activity.id} className="bg-[#1a1a1a]/80 backdrop-blur-xl border-white/5 overflow-hidden shadow-2xl rounded-[1.5rem] group hover:border-[#22c55e]/30 transition-all duration-500">
+                    <Card key={activity.id} className="rk-card overflow-hidden rounded-card group hover:border-brand/30 transition-colors">
                         <CardContent className="p-5">
                             <div className="flex justify-between items-start mb-4">
                                 <div className="space-y-0.5">
                                     <div className="flex items-center gap-2">
-                                        <div className={cn("px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider shadow-md", dDayColor)}>
+                                        <div className={cn("px-2 py-0.5 rounded-md text-xs font-bold tabular-nums", dDayColor)}>
                                             {dDayText}
                                         </div>
-                                        <h3 className="font-extrabold text-lg text-white tracking-tight">{activity.title}</h3>
+                                        <h3 className="font-bold text-lg text-white">{activity.title}</h3>
                                     </div>
-                                    <p className="text-[10px] text-white/20 font-semibold uppercase tracking-[0.2em] ml-0.5">Official Meeting</p>
+                                    <p className="text-xs text-white/55 font-medium ml-0.5">공식 모임</p>
                                 </div>
                                 {isJoined && (
-                                    <div className="flex items-center gap-1 text-[9px] font-semibold text-[#22c55e] bg-[#22c55e]/10 px-2 py-1 rounded-full border border-[#22c55e]/20">
-                                        <span className="w-1 h-1 rounded-full bg-[#22c55e] animate-pulse" />
+                                    <div className="flex items-center gap-1 text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded-pill border border-brand/20">
+                                        <span className="w-1 h-1 rounded-full bg-brand animate-pulse" />
                                         참여중
                                     </div>
                                 )}
@@ -86,43 +86,43 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                             <div className="grid grid-cols-1 gap-2.5 mb-5 text-[13px]">
                                 {/* Info Items */}
                                 <div className="flex items-center">
-                                    <div className="w-10 shrink-0 text-[10px] font-extrabold text-white/20 uppercase tracking-widest">일시</div>
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-white/55">일시</div>
                                     <div className="font-semibold text-white/80">
                                         {format(new Date(activity.activityDate), "M월 d일 (E) a h:mm", { locale: ko })}
                                     </div>
                                 </div>
                                 <div className="flex items-start">
-                                    <div className="w-10 shrink-0 text-[10px] font-extrabold text-white/20 uppercase tracking-widest mt-0.5">위치</div>
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-white/55 mt-0.5">위치</div>
                                     <div className="font-semibold text-white/80">
                                         {activity.locationName || "장소 미정"}
                                     </div>
                                 </div>
                                 <div className="flex items-center">
-                                    <div className="w-10 shrink-0 text-[10px] font-extrabold text-white/20 uppercase tracking-widest">비용</div>
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-white/55">비용</div>
                                     <div className="font-semibold text-white/80">
                                         {activity.cost || "협의 / n분의 1"}
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between pt-1">
                                     <div className="flex items-center">
-                                        <div className="w-10 shrink-0 text-[10px] font-extrabold text-white/20 uppercase tracking-widest">참석</div>
+                                        <div className="w-10 shrink-0 text-xs font-semibold text-white/55">참석</div>
                                         <div className="flex items-center gap-2">
                                             <div className="flex -space-x-1.5">
                                                 {(activity.participants || []).slice(0, 3).map((p: any, idx: number) => (
-                                                    <Avatar key={idx} className="w-5 h-5 border-2 border-[#1a1a1a] shadow-lg">
+                                                    <Avatar key={idx} className="w-5 h-5 border-2 border-[#1a1a1a]">
                                                         <AvatarImage src={p.member?.profileImageUrl} />
-                                                        <AvatarFallback className="bg-[#2a2a2a] text-[9px] font-semibold text-white/40">
+                                                        <AvatarFallback className="bg-[#2a2a2a] text-xs font-medium text-white/55">
                                                             {p.member?.name?.[0] || "?"}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                 ))}
                                                 {(activity.participants?.length || 0) > 3 && (
-                                                    <div className="w-5 h-5 rounded-full bg-[#2a2a2a] border-2 border-[#1a1a1a] flex items-center justify-center text-[8px] font-semibold text-white/40 shadow-lg relative z-10">
+                                                    <div className="w-5 h-5 rounded-full bg-[#2a2a2a] border-2 border-[#1a1a1a] flex items-center justify-center text-xs font-medium text-white/55 relative z-10">
                                                         +{activity.participants.length - 3}
                                                     </div>
                                                 )}
                                             </div>
-                                            <span className="text-[11px] font-extrabold text-white/40">
+                                            <span className="text-xs font-bold tabular-nums text-white/55">
                                                 {activity.participants?.length || 0} / {activity.maxParticipants}명
                                             </span>
                                         </div>
@@ -132,7 +132,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
 
                             {activity.description && (
                                 <div className="mb-5 pl-2 border-l-2 border-white/5">
-                                    <p className="text-[11px] text-white/50 leading-relaxed line-clamp-1">
+                                    <p className="text-xs text-white/55 leading-relaxed line-clamp-1">
                                         {activity.description}
                                     </p>
                                 </div>
@@ -140,12 +140,12 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
 
                             {isMember && !isJoined && (
                                 <Button
-                                    className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-black font-extrabold h-11 rounded-xl text-xs shadow-lg shadow-[#22c55e]/10 group/btn"
+                                    className="w-full bg-brand hover:bg-brand text-brand-fg font-bold h-11 rounded-tile text-xs group/btn"
                                     onClick={() => joinMutation.mutate(activity.id)}
                                     disabled={isFull || joinMutation.isPending}
                                 >
                                     {isFull ? "인원 마감" : (
-                                        <span className="flex items-center gap-2 font-extrabold">
+                                        <span className="flex items-center gap-2 font-bold">
                                             참여하기 <LucideChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                                         </span>
                                     )}
@@ -153,7 +153,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                             )}
 
                             {isMember && isJoined && (
-                                <div className="w-full bg-white/5 border border-white/5 py-2.5 rounded-xl text-center text-[10px] font-extrabold text-white/20 uppercase tracking-widest">
+                                <div className="w-full bg-white/5 border border-white/5 py-2.5 rounded-tile text-center text-xs font-semibold text-white/55">
                                     참여 중인 정모입니다
                                 </div>
                             )}
@@ -165,15 +165,15 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
             {/* Create Activity Trigger Card */}
             {isMember && (
                 <Card
-                    className="bg-[#1a1a1a]/50 border-white/5 border-dashed border-2 hover:border-[#22c55e] hover:bg-[#22c55e]/5 transition-all cursor-pointer group rounded-[2rem]"
+                    className="bg-surface-1 border-surface-line border-dashed border-2 hover:border-brand hover:bg-brand/5 transition-colors cursor-pointer group rounded-card"
                     onClick={onCreateClick}
                 >
                     <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
-                        <div className="w-12 h-12 rounded-full bg-[#22c55e]/10 group-hover:bg-[#22c55e] flex items-center justify-center transition-colors">
-                            <LucidePlus className="w-6 h-6 text-[#22c55e] group-hover:text-black transition-colors" />
+                        <div className="w-12 h-12 rounded-full bg-brand/10 group-hover:bg-brand flex items-center justify-center transition-colors">
+                            <LucidePlus className="w-6 h-6 text-brand group-hover:text-brand-fg transition-colors" />
                         </div>
-                        <h3 className="text-white font-semibold group-hover:text-[#22c55e] transition-colors">새로운 정모 만들기</h3>
-                        <p className="text-xs text-white/40 font-medium">언제든 자유롭게 모임을 시작해보세요!</p>
+                        <h3 className="text-white font-semibold group-hover:text-brand transition-colors">새로운 정모 만들기</h3>
+                        <p className="text-xs text-white/55 font-medium">언제든 자유롭게 모임을 시작해보세요!</p>
                     </CardContent>
                 </Card>
             )}

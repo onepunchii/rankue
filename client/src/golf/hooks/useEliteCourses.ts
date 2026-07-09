@@ -1,15 +1,8 @@
 import { useState, useMemo } from 'react';
 import { COURSES } from "@/golf/data/golfCourses";
-
-// Mock stamps for demo
-const MOCK_STAMPS = [
-    { id: 1, name: "남서울 CC", date: "2026.01.27", score: 82, region: "경기", color: "#64DD17" },
-    { id: 2, name: "스카이72(하늘)", date: "2026.01.15", score: 85, region: "인천", color: "#00E5FF" },
-    { id: 3, name: "안양 CC", date: "2025.12.14", score: 79, region: "경기", color: "#FFD600" },
-    { id: 4, name: "설해원", date: "2025.11.12", score: 88, region: "강원", color: "#AA00FF" },
-    { id: 5, name: "나인브릿지", date: "2025.10.05", score: 81, region: "제주", color: "#FF4081" },
-    { id: 6, name: "해슬리 나인브릿지", date: "2025.09.20", score: 83, region: "경기", color: "#FF6D00" }
-];
+import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import { format } from 'date-fns';
 
 export type MainTab = 'Membership' | 'Public';
 export type SubFilter = 'All' | 'Conquered' | 'Locked' | 'Region';
@@ -19,8 +12,52 @@ export function useEliteCourses() {
     const [subFilter, setSubFilter] = useState<SubFilter>('All');
     const [searchQuery, setSearchQuery] = useState("");
 
-    const isConquered = (courseName: string) => MOCK_STAMPS.some(s => s.name === courseName);
-    const getConqueredInfo = (courseName: string) => MOCK_STAMPS.find(s => s.name === courseName);
+    // Fetch real golf game history instead of using MOCK_STAMPS
+    const { data: historyData = [] } = useQuery<any[]>({
+        queryKey: ['/api/hiq/history', { sport: 'GOLF' }],
+        // apiRequest already returns parsed+unwrapped JSON (the array), NOT a Response.
+        // Calling .json() on it threw and left realStamps empty, silently breaking the
+        // entire "conquered courses" / passport-stamp feature.
+        queryFn: async () => await apiRequest('/api/hiq/history?sport=GOLF')
+    });
+
+    const realStamps = useMemo(() => {
+        const courseMap: Record<string, any> = {};
+
+        historyData.forEach(game => {
+            const name = game.locationName;
+            if (!name) return;
+
+            const score = game.score || 0;
+            const parsedDate = game.createdAt ? new Date(game.createdAt) : null;
+            const date = parsedDate && !isNaN(parsedDate.getTime()) ? format(parsedDate, "yyyy.MM.dd") : "";
+
+            // Clean name for better matching (remove spaces, CC, etc.)
+            const cleanName = name.replace(/\s/g, '').replace(/CC|컨트리클럽|골프클럽|GC/g, '');
+
+            // Track the best score for each course
+            if (!courseMap[cleanName] || score < courseMap[cleanName].score) {
+                courseMap[cleanName] = {
+                    name,
+                    cleanName,
+                    date,
+                    score,
+                    region: game.region || "경기",
+                    color: score < 85 ? "#64DD17" : score < 95 ? "#00E5FF" : "#FFD600"
+                };
+            }
+        });
+
+        return Object.values(courseMap);
+    }, [historyData]);
+
+    const findMatch = (courseName: string) => {
+        const cleanTarget = courseName.replace(/\s/g, '').replace(/CC|컨트리클럽|골프클럽|GC/g, '');
+        return realStamps.find(s => s.cleanName === cleanTarget || cleanTarget.includes(s.cleanName) || s.cleanName.includes(cleanTarget));
+    };
+
+    const isConquered = (courseName: string) => !!findMatch(courseName);
+    const getConqueredInfo = (courseName: string) => findMatch(courseName);
 
     const eliteCourses = useMemo(() => {
         return COURSES.filter(c => c.isRankue60 && c.type === mainTab)
@@ -34,14 +71,14 @@ export function useEliteCourses() {
                 if (subFilter === 'Region') return a.region.localeCompare(b.region);
                 return b.rating - a.rating;
             });
-    }, [mainTab, subFilter, searchQuery]);
+    }, [mainTab, subFilter, searchQuery, realStamps]);
 
     const stats = useMemo(() => {
         const total = COURSES.filter(c => c.isRankue60).length;
         const conquered = COURSES.filter(c => c.isRankue60 && isConquered(c.name)).length;
         const progress = (conquered / total) * 100;
         return { total, conquered, progress };
-    }, []);
+    }, [realStamps]);
 
     return {
         mainTab, setMainTab,

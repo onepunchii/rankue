@@ -64,6 +64,7 @@ export default function MembershipDetail() {
             <MembershipTabs
                 activeTab={activeTab}
                 onChange={handleTabChange}
+                category={hybridData.category}
             />
 
             <main className="px-6 py-6 min-h-[50vh] animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -123,7 +124,7 @@ export default function MembershipDetail() {
                                                     {isCorp && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />}
                                                 </div>
                                                 <div className="text-xs font-bold text-[#64DD17]">
-                                                    {formatPrice(variant.priceValue)}
+                                                    {formatPrice(variant.price.current)}
                                                 </div>
                                             </button>
                                         );
@@ -195,6 +196,7 @@ export default function MembershipDetail() {
                 onClose={() => setIsOrderModalOpen(false)}
                 type={orderType}
                 defaultPrice={hybridData.currentPrice}
+                courseName={hybridData.name}
             />
         </div>
     );
