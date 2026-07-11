@@ -614,6 +614,19 @@ export const insertSuggestionSchema = createInsertSchema(suggestions).omit({ id:
 export type Suggestion = typeof suggestions.$inferSelect;
 export type InsertSuggestion = z.infer<typeof insertSuggestionSchema>;
 
+// 12. 에러 수집함 (Client Error Logs)
+// 클라이언트 window.onerror / unhandledrejection 에서 익명 전송된 에러를 저장
+export const errorLogs = pgTable("error_logs", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  message: text("message").notNull(),
+  stack: text("stack"),
+  url: text("url"), // 발생 페이지 경로 (쿼리스트링 제외)
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ErrorLog = typeof errorLogs.$inferSelect;
+
 
 export const hiqVisitLogs = pgTable("hiq_visit_logs", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),

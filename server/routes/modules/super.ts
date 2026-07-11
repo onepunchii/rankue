@@ -6,9 +6,10 @@ import {
     hiqMembers,
     hiqVisitLogs,
     partnerLeads,
-    suggestions
+    suggestions,
+    errorLogs
 } from "../../../shared/schema.js";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -24,8 +25,17 @@ async function safeCount(label: string, query: Promise<{ count: number }[]>): Pr
     }
 }
 
+// 개인 식별정보 마스킹 — 건의 내용에 이메일·전화번호가 섞여 들어오는 경우 대비
+// (통합 대시보드로 나가는 응답이므로 식별정보는 내보내지 않는다)
+function redactPII(text: string): string {
+    return text
+        .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "(이메일)")
+        .replace(/01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}/g, "(전화번호)");
+}
+
 // --- 슈퍼관리자 요약 ---
-// GET /api/super-summary
+// GET /api/super-summary            → 카운트 요약
+// GET /api/super-summary?detail=1   → 요약 + 건의함·에러함 최근 10건 목록
 // 인증: Authorization: Bearer <SUPER_ADMIN_SECRET> (외부 모니터링용이라 쿠키 세션 대신 시크릿 헤더 사용)
 router.get("/super-summary", async (req, res) => {
     const secret = process.env.SUPER_ADMIN_SECRET;
@@ -44,7 +54,8 @@ router.get("/super-summary", async (req, res) => {
         storeMembersTotal,
         visits24h,
         newLeads,
-        unreadSuggestions
+        unreadSuggestions,
+        errors24h
     ] = await Promise.all([
         safeCount("회원 전체", db.select({ count: sql<number>`count(*)` })
             .from(profiles).where(eq(profiles.role, 'user'))),
@@ -59,7 +70,10 @@ router.get("/super-summary", async (req, res) => {
         safeCount("신규 파트너 문의", db.select({ count: sql<number>`count(*)` })
             .from(partnerLeads).where(eq(partnerLeads.status, 'NEW'))),
         safeCount("미확인 건의", db.select({ count: sql<number>`count(*)` })
-            .from(suggestions).where(eq(suggestions.isRead, false)))
+            .from(suggestions).where(eq(suggestions.isRead, false))),
+        safeCount("에러 24h", db.select({ count: sql<number>`count(*)` })
+            .from(errorLogs)
+            .where(sql`${errorLogs.createdAt} >= now() - interval '1 day'`))
     ]);
 
     // 서비스 특성 지표 (쿼리 실패분은 제외)
@@ -75,15 +89,59 @@ router.get("/super-summary", async (req, res) => {
         { label: "미확인 건의", count: unreadSuggestions }
     ].filter((p): p is { label: string; count: number } => p.count !== null && p.count > 0);
 
-    return res.json({
+    const body: Record<string, unknown> = {
         ts: new Date().toISOString(),
         members: {
             total: membersTotal ?? 0,
             today: membersToday ?? 0
         },
         metrics,
-        pending
-    });
+        pending,
+        errors24h: errors24h ?? 0
+    };
+
+    // detail=1 — 통합 대시보드 드로어용 건의함·에러함 최근 목록 (실패해도 요약은 살린다)
+    if (req.query.detail === "1") {
+        try {
+            const rows = await db.select({
+                when: suggestions.createdAt,
+                text: suggestions.content,
+                done: suggestions.isRead
+            }).from(suggestions)
+                .orderBy(desc(suggestions.createdAt))
+                .limit(10);
+            body.feedbackRecent = rows.map((r) => ({
+                when: r.when.toISOString(),
+                text: redactPII(r.text).slice(0, 120),
+                done: r.done
+            }));
+        } catch (error) {
+            console.error("[SuperSummary] 건의 목록 조회 실패:", error);
+            body.feedbackRecent = [];
+        }
+
+        try {
+            // 같은 메시지(앞 120자 기준)는 그룹핑해서 발생 횟수와 최근 발생 시각만 노출
+            const rows = await db.select({
+                when: sql<string>`to_char(max(${errorLogs.createdAt}), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`,
+                message: sql<string>`left(${errorLogs.message}, 120)`,
+                count: sql<number>`count(*)::int`
+            }).from(errorLogs)
+                .groupBy(sql`left(${errorLogs.message}, 120)`)
+                .orderBy(sql`max(${errorLogs.createdAt}) desc`)
+                .limit(10);
+            body.errorRecent = rows.map((r) => ({
+                when: r.when,
+                message: redactPII(r.message),
+                count: Number(r.count)
+            }));
+        } catch (error) {
+            console.error("[SuperSummary] 에러 목록 조회 실패:", error);
+            body.errorRecent = [];
+        }
+    }
+
+    return res.json(body);
 });
 
 export default router;

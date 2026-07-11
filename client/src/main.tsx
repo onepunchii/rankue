@@ -1,6 +1,10 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { initErrorReporter } from "./lib/errorReporter";
+
+// 클라이언트 에러 수집기 마운트 (프로덕션에서 /api/errors 로 익명 전송)
+initErrorReporter();
 
 // Suppress AbortError from showing Vite error overlay
 // This error occurs during React component cleanup and is harmless
