@@ -84,6 +84,13 @@ router.get("/suggestions", checkSuperAdmin, asyncHandler(async (req: any, res: a
     return sendSuccess(res, suggestions);
 }));
 
+router.patch("/suggestions/:id", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { isRead } = req.body;
+    const suggestion = await storage.markSuggestionRead(req.params.id, isRead === true);
+    if (!suggestion) return sendError(res, 404, "건의사항을 찾을 수 없습니다.");
+    return sendSuccess(res, suggestion);
+}));
+
 // --- Golf Membership Order Routes ---
 router.get("/membership/orders", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const orders = await storage.getGolfMembershipOrders();

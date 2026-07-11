@@ -270,4 +270,12 @@ export class AdminRepository {
     async getSuggestions(): Promise<Suggestion[]> {
         return await db.select().from(suggestions).orderBy(desc(suggestions.createdAt));
     }
+
+    async markSuggestionRead(id: string, isRead: boolean): Promise<Suggestion> {
+        const [updated] = await db.update(suggestions)
+            .set({ isRead })
+            .where(eq(suggestions.id, id))
+            .returning();
+        return updated;
+    }
 }

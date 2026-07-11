@@ -151,6 +151,7 @@ class Storage {
     async createTournament(d: any) { return this.admin.createTournament(d); }
     async createSuggestion(d: any) { return this.admin.createSuggestion(d); }
     async getSuggestions() { return this.admin.getSuggestions(); }
+    async markSuggestionRead(id: string, isRead: boolean) { return this.admin.markSuggestionRead(id, isRead); }
 
     // Notifications
     async getNotifications(id: string) { return this.notifs.getNotifications(id); }

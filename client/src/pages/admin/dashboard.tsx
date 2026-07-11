@@ -206,6 +206,31 @@ export default function AdminDashboard() {
         }
     });
 
+    const toggleSuggestionReadMutation = useMutation({
+        mutationFn: async ({ id, isRead }: { id: string, isRead: boolean }) => {
+            return apiRequest(`/api/hiq/admin/suggestions/${id}`, { method: "PATCH", body: { isRead } });
+        },
+        // Optimistic update
+        onMutate: async ({ id, isRead }) => {
+            await queryClient.cancelQueries({ queryKey: ["/api/hiq/admin/suggestions"] });
+            const previous = queryClient.getQueryData<Suggestion[]>(["/api/hiq/admin/suggestions"]);
+            queryClient.setQueryData<Suggestion[]>(["/api/hiq/admin/suggestions"], (old) =>
+                (old ?? []).map((s) => (s.id === id ? { ...s, isRead } : s))
+            );
+            return { previous };
+        },
+        onError: (_err, _vars, context) => {
+            // Rollback
+            if (context?.previous) {
+                queryClient.setQueryData(["/api/hiq/admin/suggestions"], context.previous);
+            }
+            toast({ title: "처리에 실패했습니다", variant: "destructive" });
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/suggestions"] });
+        }
+    });
+
     const handleLogout = () => {
         document.cookie = "hiq_partner_auth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         document.cookie = "hiq_user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
@@ -464,12 +489,17 @@ export default function AdminDashboard() {
                     {tab === "suggestions" && (
                         <div className="grid gap-4">
                             {suggestions.map((suggestion) => (
-                                <div key={suggestion.id} className="bg-[#111] p-5 rounded-2xl border border-white/5 flex flex-col gap-3">
+                                <div key={suggestion.id} className={`bg-[#111] p-5 rounded-2xl border flex flex-col gap-3 transition-opacity ${suggestion.isRead ? 'border-white/5 opacity-50' : 'border-white/5'}`}>
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-2">
                                             <Badge variant={suggestion.type === 'BUG' ? 'destructive' : suggestion.type === 'PARTNERSHIP' ? 'default' : 'secondary'}>
                                                 {suggestion.type}
                                             </Badge>
+                                            {suggestion.isRead && (
+                                                <Badge variant="outline" className="border-emerald-500/30 text-emerald-400">
+                                                    <LucideCheckCircle className="w-3 h-3 mr-1" /> 완료
+                                                </Badge>
+                                            )}
                                             <span className="text-xs text-white/30">{new Date(suggestion.createdAt).toLocaleString()}</span>
                                         </div>
                                         {suggestion.contact && (
@@ -482,6 +512,17 @@ export default function AdminDashboard() {
                                         {suggestion.content}
                                     </p>
                                     <div className="flex justify-end gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant={suggestion.isRead ? "ghost" : "outline"}
+                                            className="h-8 text-xs"
+                                            disabled={toggleSuggestionReadMutation.isPending}
+                                            onClick={() => toggleSuggestionReadMutation.mutate({ id: suggestion.id, isRead: !suggestion.isRead })}
+                                        >
+                                            {suggestion.isRead
+                                                ? <><LucideMail className="w-3 h-3 mr-1" /> 안읽음으로</>
+                                                : <><LucideCheckCircle className="w-3 h-3 mr-1" /> 읽음 처리</>}
+                                        </Button>
                                         {suggestion.contact && (
                                             <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
                                                 if (suggestion.contact?.includes('@')) {
