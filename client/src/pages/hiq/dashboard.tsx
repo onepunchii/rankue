@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 
 // New Components
 import { DashboardHeader } from "@/components/hiq/dashboard/DashboardHeader";
-import { TrendChartCard } from "@/components/hiq/dashboard/TrendChartCard";
 import { PerformanceCard } from "@/components/hiq/dashboard/PerformanceCard";
 import { RankingListCard } from "@/components/hiq/dashboard/RankingListCard";
 import { QuickActions } from "@/components/hiq/dashboard/QuickActions";
@@ -141,9 +140,6 @@ export default function HiqDashboard() {
 
             {/* 전적 (승률 게이지 + 최근 폼) */}
             <PerformanceCard history={history} />
-
-            {/* AVG Chart */}
-            <TrendChartCard history={history} />
 
             {/* Action Buttons */}
             <QuickActions
