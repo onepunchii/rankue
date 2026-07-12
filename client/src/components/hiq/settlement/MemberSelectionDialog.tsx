@@ -53,7 +53,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#1a1a1a] border-white/10 text-white max-w-md p-0 flex flex-col max-h-[80vh] overflow-hidden z-[110]">
+            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-md p-0 flex flex-col max-h-[80vh] overflow-hidden z-[110] rounded-card">
                 <DialogHeader className="p-4 border-b border-white/5 shrink-0">
                     <DialogTitle className="flex items-center gap-2 text-[19px] font-bold tracking-tight">
                         <LucideUsers className="w-5 h-5 text-brand" />

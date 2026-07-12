@@ -7,6 +7,8 @@ import { ko } from "date-fns/locale";
 import { HiqGame, HiqMember } from "@shared/schema";
 import { HiqMemberWithH2H } from "./types";
 import { Button } from "@/components/ui/button";
+import { RadialGauge } from "@/components/hiq/ui/RadialGauge";
+import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
 
 interface VsHistoryDialogProps {
     friendId: string | null;
@@ -27,11 +29,23 @@ export const VsHistoryDialog = ({
     isLoading,
     me
 }: VsHistoryDialogProps) => {
+    const myId = me?.id;
+    const games = vsGames ?? [];
+    const totalVs = games.length;
+    const vsWins = games.filter((g) => g.winnerId === myId).length;
+    const vsLosses = games.filter((g) => g.winnerId === friendId).length;
+    const vsDraws = totalVs - vsWins - vsLosses;
+    const vsWinRate = totalVs ? Math.round((vsWins / totalVs) * 100) : 0;
+    // vsGames is newest-first
+    const vsForm: MatchResult[] = games
+        .slice(0, 5)
+        .map((g) => (g.winnerId === myId ? "W" : g.winnerId === friendId ? "L" : "D"));
+
     return (
         <Dialog open={!!friendId} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="bg-[#0A0A0A] border border-white/10 text-white max-w-lg w-[95%] rounded-card p-0 overflow-hidden">
+            <DialogContent className="bg-[#141416] border border-white/10 text-white max-w-lg w-[95%] rounded-card p-0 overflow-hidden">
                 <DialogHeader className="p-6 border-b border-white/5">
-                    <DialogTitle className="text-[19px] font-bold tracking-tight flex items-center gap-2">
+                    <DialogTitle className="text-[20px] font-bold tracking-tight flex items-center gap-2">
                         {currentSport === "GOLF" ? <LucideFlag className="w-5 h-5 text-brand" /> : <LucideSword className="w-5 h-5 text-brand" />}
                         VS {friend?.name}
                     </DialogTitle>
@@ -39,6 +53,47 @@ export const VsHistoryDialog = ({
                         상대와의 맞대결 전적
                     </DialogDescription>
                 </DialogHeader>
+
+                {!isLoading && totalVs > 0 && (
+                    <div className="px-6 pt-5 pb-1">
+                        <div className="rk-card p-5 flex items-center gap-5">
+                            <RadialGauge value={vsWinRate} size={92} stroke={8}>
+                                <div className="text-center leading-none">
+                                    <div className="text-[22px] font-bold text-white tabular-nums">
+                                        {vsWinRate}<span className="text-[13px] font-semibold text-white/60">%</span>
+                                    </div>
+                                    <div className="text-[12px] font-medium text-white/45 mt-1">승률</div>
+                                </div>
+                            </RadialGauge>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-4 mb-3.5">
+                                    <div>
+                                        <div className="text-[20px] font-bold text-brand tabular-nums leading-none">{vsWins}</div>
+                                        <div className="text-[12px] text-white/45 font-medium mt-1">승</div>
+                                    </div>
+                                    <div className="w-px h-8 bg-white/10" />
+                                    <div>
+                                        <div className="text-[20px] font-bold text-red-400 tabular-nums leading-none">{vsLosses}</div>
+                                        <div className="text-[12px] text-white/45 font-medium mt-1">패</div>
+                                    </div>
+                                    {vsDraws > 0 && (
+                                        <>
+                                            <div className="w-px h-8 bg-white/10" />
+                                            <div>
+                                                <div className="text-[20px] font-bold text-white/60 tabular-nums leading-none">{vsDraws}</div>
+                                                <div className="text-[12px] text-white/45 font-medium mt-1">무</div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="text-[12px] font-medium text-white/45 mb-1.5">최근 {vsForm.length}경기</div>
+                                    <FormBadges results={vsForm} size={24} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto scrollbar-hide">
                     {isLoading ? (
@@ -51,7 +106,6 @@ export const VsHistoryDialog = ({
                         </div>
                     ) : vsGames && vsGames.length > 0 ? (
                         vsGames.map((game) => {
-                            const myId = me?.id;
                             const myScore = game.player1Id === myId ? game.player1Score :
                                 game.player2Id === myId ? game.player2Score :
                                     game.player3Id === myId ? game.player3Score :

@@ -208,7 +208,7 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                         <LucideSparkles className="w-5 h-5 text-white/45" />
                     </div>
                     <div>
-                        <h3 className="text-[15px] font-bold text-white/60">{stats.persona.title}</h3>
+                        <h3 className="text-[15px] font-semibold text-white/60">{stats.persona.title}</h3>
                         <p className="text-xs text-white/55 mt-1 max-w-[200px] mx-auto leading-relaxed">
                             {stats.persona.desc}
                         </p>
@@ -222,32 +222,23 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
         <div className="space-y-4">
             {/* 1. Persona Card */}
             <div className={cn(
-                "p-5 rounded-card border relative overflow-hidden transition-all duration-300",
+                "p-5 rounded-card border",
                 stats.persona.bg,
                 stats.persona.border
             )}>
-                <div className="flex items-start gap-4 relative z-10">
-                    <div className={cn(
-                        "w-12 h-12 rounded-tile flex items-center justify-center border border-white/10",
-                        "bg-[#1a1a1a]"
-                    )}>
+                <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-tile flex items-center justify-center border border-white/10 bg-[#1a1a1a]">
                         <stats.persona.icon className={cn("w-6 h-6", stats.persona.color)} />
                     </div>
                     <div className="pt-0.5">
                         <h3 className={cn("text-base font-semibold tracking-tight flex items-center gap-2", stats.persona.color)}>
                             {stats.persona.title}
                         </h3>
-                        <p className="text-xs text-white/50 mt-1 font-medium leading-relaxed">
+                        <p className="text-[13px] text-white/50 mt-1 font-medium leading-relaxed">
                             {stats.persona.desc}
                         </p>
                     </div>
                 </div>
-
-                {/* Background Deco */}
-                <stats.persona.icon className={cn(
-                    "absolute -right-4 -bottom-4 w-24 h-24 opacity-[0.07] rotate-[-15deg]",
-                    stats.persona.color.replace('text-', 'text-')
-                )} />
             </div>
 
             {/* 2. Visual Stat Bar */}

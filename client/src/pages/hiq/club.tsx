@@ -23,7 +23,7 @@ export default function HiqClub() {
                     {/* My Crews Section */}
                     <section>
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-bold text-ink-1">내 크루</h2>
+                            <h2 className="text-[15px] font-semibold text-white/55">내 크루</h2>
                             <Button
                                 variant="ghost"
                                 className={cn(
@@ -43,7 +43,7 @@ export default function HiqClub() {
                     {/* Search & Discovery Section */}
                     <section>
                         <div className="mb-3">
-                            <h2 className="text-lg font-bold text-ink-1 mb-3">둘러보기</h2>
+                            <h2 className="text-[15px] font-semibold text-white/55 mb-3">둘러보기</h2>
                             <div className={cn(
                                 "relative group flex items-center px-4 h-11 rounded-tile bg-surface-2 border border-surface-line transition-all duration-300",
                                 currentSport === "GOLF" ? "focus-within:border-brand/30" : "focus-within:border-brand/25"

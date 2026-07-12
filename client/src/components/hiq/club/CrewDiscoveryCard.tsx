@@ -28,11 +28,11 @@ export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDisc
 
             {/* 오른쪽 정보 */}
             <div className="flex-1 min-w-0 py-0.5">
-                <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-bold text-sm text-white truncate">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                    <h3 className="font-semibold text-[15px] text-white truncate">
                         {crew.name}
                     </h3>
-                    <span className="text-[12px] font-semibold px-2 py-0.5 rounded-full border border-brand/25 text-brand bg-brand/12">
+                    <span className="shrink-0 text-[12px] font-semibold px-2 py-0.5 rounded-full border border-brand/25 text-brand bg-brand/12">
                         {crew.gameType === 'any' ? '전체' : crew.gameType.toUpperCase()}
                     </span>
                 </div>
@@ -41,7 +41,7 @@ export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDisc
                     {crew.shortIntro || crew.description || "새로 만들어진 크루입니다."}
                 </p>
 
-                <div className="flex items-center gap-3 text-[12px] text-ink-2 font-semibold tabular-nums">
+                <div className="flex items-center gap-3 text-[12px] text-ink-3 font-medium tabular-nums">
                     <div className="flex items-center gap-1">
                         <LucideMapPin className="w-3 h-3" />
                         <span>{crew.region || "서울"}</span>

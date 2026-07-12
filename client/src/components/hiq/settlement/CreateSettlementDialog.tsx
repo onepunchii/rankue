@@ -123,8 +123,8 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#1a1a1a] border-white/10 text-white max-w-md max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
-                <div className="shrink-0 bg-[#1a1a1a] border-b border-white/5 p-4 flex items-center justify-between z-10">
+            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-md max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-card">
+                <div className="shrink-0 bg-[#141416] border-b border-white/5 p-4 flex items-center justify-between z-10">
                     <h2 className="font-bold text-[19px] tracking-tight">새 정산 만들기</h2>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-white/45" onClick={() => onOpenChange(false)}>
                         <LucideX className="w-5 h-5" />
@@ -216,7 +216,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                                             <LucideCalendar className="w-3 h-3" />
                                                             모임 가져오기
                                                         </SelectTrigger>
-                                                        <SelectContent className="bg-[#1a1a1a] border-white/10 text-white rounded-tile">
+                                                        <SelectContent className="bg-[#141416] border-white/10 text-white rounded-tile">
                                                             {recentActivities.map((act: any) => (
                                                                 <SelectItem key={act.id} value={act.id} className="text-xs">
                                                                     {format(new Date(act.activityDate), "MM/dd")} {act.title}
@@ -321,7 +321,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                     }}
                 />
 
-                <div className="shrink-0 p-4 bg-[#1a1a1a] border-t border-white/10 z-20">
+                <div className="shrink-0 p-4 bg-[#141416] border-t border-white/10 z-20">
                     <Button
                         className="w-full h-14 rk-btn-primary text-[16px] rounded-tile"
                         onClick={handleSubmit}

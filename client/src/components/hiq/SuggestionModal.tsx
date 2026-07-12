@@ -89,11 +89,11 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md rounded-card bg-[#141416] border-white/10 text-white">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+                    <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
                         <LucideMail className="w-5 h-5 text-brand" />
                         건의함 / 제휴 문의
                     </DialogTitle>
-                    <DialogDescription className="text-white/60">
+                    <DialogDescription className="text-white/55">
                         Rankue 팀에게 바라는 점이나 궁금한 점을 남겨주세요.
                     </DialogDescription>
                 </DialogHeader>
@@ -105,10 +105,10 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             name="type"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>분류</FormLabel>
+                                    <FormLabel className="text-xs font-semibold text-white/55">분류</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
-                                            <SelectTrigger className="bg-black/20 border-white/10 text-white rounded-tile">
+                                            <SelectTrigger className="bg-surface-2 border-surface-line text-white rounded-tile">
                                                 <SelectValue placeholder="카테고리 선택" />
                                             </SelectTrigger>
                                         </FormControl>
@@ -129,11 +129,11 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             name="content"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>내용</FormLabel>
+                                    <FormLabel className="text-xs font-semibold text-white/55">내용</FormLabel>
                                     <FormControl>
                                         <Textarea
                                             placeholder="내용을 입력해주세요 (500자 이내)"
-                                            className="resize-none h-32 bg-black/20 border-white/10 text-white rounded-tile"
+                                            className="resize-none h-32 bg-surface-2 border-surface-line text-white rounded-tile"
                                             {...field}
                                         />
                                     </FormControl>
@@ -147,11 +147,11 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             name="contact"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>연락처 (선택)</FormLabel>
+                                    <FormLabel className="text-xs font-semibold text-white/55">연락처 (선택)</FormLabel>
                                     <FormControl>
                                         <Input
                                             placeholder="답변 받을 이메일 또는 전화번호"
-                                            className="bg-black/20 border-white/10 text-white rounded-tile"
+                                            className="bg-surface-2 border-surface-line text-white rounded-tile"
                                             {...field}
                                         />
                                     </FormControl>
@@ -162,7 +162,7 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
 
                         <Button
                             type="submit"
-                            className="w-full bg-brand text-brand-fg hover:bg-brand-strong font-bold rounded-tile"
+                            className="w-full bg-brand text-brand-fg hover:bg-brand-strong font-semibold rounded-tile"
                             disabled={mutation.isPending}
                         >
                             {mutation.isPending ? "전송 중..." : "보내기"}

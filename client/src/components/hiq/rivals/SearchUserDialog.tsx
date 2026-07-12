@@ -48,7 +48,7 @@ export const SearchUserDialog = ({
                 setKeyword("");
             }
         }}>
-            <DialogContent className="bg-[#0A0A0A] border border-white/10 text-white max-w-lg w-[95%] rounded-card p-0 overflow-hidden">
+            <DialogContent className="bg-[#141416] border border-white/10 text-white max-w-lg w-[95%] rounded-card p-0 overflow-hidden">
                 <div className="p-6">
                     <DialogHeader className="mb-6">
                         <div className="flex flex-col">

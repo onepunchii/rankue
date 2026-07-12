@@ -674,7 +674,7 @@ const SpinVisualizer = ({ spin }: { spin: any }) => {
                 className="absolute w-3 h-3 bg-red-600 rounded-full"
                 style={{ transform: `translate(${x}%, ${-y}%)` } as any}
             />
-            <div className="text-[11px] font-medium text-white/45 mt-10 tracking-normal">스핀</div>
+            <div className="text-[12px] font-medium text-white/45 mt-10 tracking-normal">스핀</div>
         </div>
     );
 };
@@ -688,7 +688,7 @@ const ThicknessVisualizer = ({ thickness }: { thickness: number }) => (
                 style={{ '--thickness-offset': `${(thickness || 0) * 32}px`, left: 'var(--thickness-offset)' } as any}
             />
         </div>
-        <span className="text-[11px] font-medium text-white/45 mt-2 tracking-normal">THICKNESS {Math.round((thickness || 0) * 8)}/8</span>
+        <span className="text-[12px] font-medium text-white/45 mt-2 tracking-normal">THICKNESS {Math.round((thickness || 0) * 8)}/8</span>
     </div>
 );
 
@@ -703,6 +703,6 @@ const PowerGauge = ({ power }: { power: number }) => (
                 />
             ))}
         </div>
-        <span className="text-[11px] font-medium text-white/45 mt-2 tracking-normal uppercase">Power {power}%</span>
+        <span className="text-[12px] font-medium text-white/45 mt-2 tracking-normal uppercase">Power {power}%</span>
     </div>
 );

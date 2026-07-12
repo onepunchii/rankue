@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { LucideTrophy, LucideMedal, LucideUsers } from "lucide-react";
+import { LucideMedal } from "lucide-react";
 import { HiqMember } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
@@ -28,16 +28,10 @@ export default function HiqRanking() {
     });
 
     return (
-        <div className="min-h-screen premium-bg text-white px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-[#0A0A0A] text-white px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">
             <div className="relative z-10">
-                <header className="mb-8 text-center">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-4">
-                        <LucideUsers className="w-3 h-3 text-white/40" />
-                        <span className="text-[12px] font-medium text-white/55">
-                            {currentSport === "GOLF" ? "골프 리더보드" : "클럽 리더보드"}
-                        </span>
-                    </div>
-                    <h1 className="text-[28px] font-bold tracking-tight mb-2">
+                <header className="mb-7">
+                    <h1 className="text-[26px] font-bold tracking-tight mb-1.5">
                         {currentSport === "GOLF" ? "매장 공식 랭킹" : "실시간 랭킹"}
                     </h1>
                     <p className="text-white/50 text-[13px] font-medium">
@@ -89,7 +83,7 @@ export default function HiqRanking() {
                     </div>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                     {isLoading ? (
                         <div className="py-20 flex justify-center">
                             <motion.div
@@ -126,21 +120,21 @@ export default function HiqRanking() {
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ delay: idx * 0.05 }}
-                                    className={`flex items-center justify-between p-4 rounded-2xl border transition-colors ${rank.id === member?.id
+                                    className={`flex items-center justify-between p-4 rounded-tile border transition-colors ${rank.id === member?.id
                                         ? "bg-brand/10 border-brand/30"
                                         : "bg-white/[0.03] border-white/[0.06]"
                                         }`}
                                 >
-                                    <div className="flex items-center gap-5">
+                                    <div className="flex items-center gap-4">
                                         <div className="relative">
                                             {idx < 3 ? (
-                                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center rotate-45 ${idx === 0 ? "bg-[#ffd700]" :
+                                                <div className={`w-10 h-10 rounded-tile flex items-center justify-center rotate-45 ${idx === 0 ? "bg-[#ffd700]" :
                                                     idx === 1 ? "bg-gray-300" : "bg-amber-600"
                                                     }`}>
-                                                    <LucideMedal className={`w-6 h-6 -rotate-45 ${idx === 0 ? 'text-black' : 'text-white'}`} />
+                                                    <LucideMedal className={`w-5 h-5 -rotate-45 ${idx === 0 ? 'text-black' : 'text-white'}`} />
                                                 </div>
                                             ) : (
-                                                <span className="w-10 h-10 flex items-center justify-center font-medium text-white/45 text-lg ">
+                                                <span className="w-10 h-10 flex items-center justify-center font-semibold text-white/40 text-[17px] tabular-nums">
                                                     {idx + 1}
                                                 </span>
                                             )}
@@ -152,7 +146,7 @@ export default function HiqRanking() {
                                             </div>
                                             <div className="flex items-center gap-1.5 mt-1">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                                                <span className="text-white/45 text-[12px] font-medium">Lv.{Math.floor((rank.visitCount || 0) / 5) + 1}</span>
+                                                <span className="text-white/45 text-[12px] font-medium tabular-nums">Lv.{Math.floor((rank.visitCount || 0) / 5) + 1}</span>
                                             </div>
                                         </div>
                                     </div>

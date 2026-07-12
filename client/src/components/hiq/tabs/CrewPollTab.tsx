@@ -94,7 +94,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
             {/* Header / CTA */}
             <div className="px-6 flex items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-semibold text-white tracking-tight">크루 투표</h2>
+                    <h2 className="text-2xl font-bold text-white tracking-tight">크루 투표</h2>
                     <p className="text-xs text-white/55 mt-1 font-semibold flex items-center gap-1.5 tabular-nums">
                         <LucideVote className="w-3 h-3" />
                         총 {polls?.length || 0}개의 투표
@@ -103,7 +103,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                 {isMember && (
                     <Button
                         onClick={() => setIsCreateOpen(true)}
-                        className="h-10 px-4 bg-brand hover:bg-brand/90 text-brand-fg font-bold rounded-xl flex items-center gap-2"
+                        className="h-10 px-4 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl flex items-center gap-2"
                     >
                         <LucidePlus className="w-4 h-4" />
                         투표 만들기
@@ -149,7 +149,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                             <Button
                                 variant="ghost"
                                 onClick={() => setDisplayLimit(10)}
-                                className="w-full h-12 bg-white/[0.02] hover:bg-white/[0.05] text-white/40 hover:text-white/60 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition-all"
+                                className="w-full h-12 bg-white/[0.02] hover:bg-white/[0.05] text-white/45 hover:text-white/60 text-[13px] font-semibold rounded-2xl flex items-center justify-center gap-2 transition-all"
                             >
                                 더보기
                                 <LucideChevronDown className="w-4 h-4" />
@@ -219,7 +219,7 @@ function PollCard({ poll, onVote, onDelete, isMember, currentUserId, isAdmin, is
                     {/* Right Side: Time & Delete */}
                     <div className="flex flex-col items-end gap-2">
                         {poll.endTime && !isClosed && (
-                            <span className="text-xs font-bold text-brand bg-brand/10 px-2 py-1 rounded-full tabular-nums">
+                            <span className="text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded-full tabular-nums">
                                 {new Date(poll.endTime) > new Date()
                                     ? `${formatDistanceToNow(new Date(poll.endTime), { locale: ko })} 남음`
                                     : "마감됨"}

@@ -147,7 +147,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                             setCategory(val);
                             if (val === "공지사항") setIsNotice(true);
                         }}>
-                            <SelectTrigger className="bg-black/20 border-white/10 h-12 rounded-xl">
+                            <SelectTrigger className="bg-surface-2 border-surface-line h-12 rounded-xl">
                                 <SelectValue placeholder="카테고리 선택" />
                             </SelectTrigger>
                             <SelectContent className="bg-[#141416] border-white/10 text-white rounded-tile">
@@ -164,7 +164,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                             placeholder="제목을 입력하세요"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            className="bg-black/20 border-white/10 h-12 rounded-xl"
+                            className="bg-surface-2 border-surface-line h-12 rounded-xl"
                         />
                     </div>
 
@@ -192,7 +192,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                                 placeholder="내용을 입력하세요"
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
-                                className="bg-black/20 border-white/10 min-h-[150px] resize-none rounded-xl"
+                                className="bg-surface-2 border-surface-line min-h-[150px] resize-none rounded-xl"
                             />
                         )}
                     </div>

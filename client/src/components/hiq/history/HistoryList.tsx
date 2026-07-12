@@ -39,6 +39,16 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                                         <span className="px-2 py-0.5 bg-white/[0.05] border border-white/10 rounded-lg text-[12px] font-semibold text-white/55">
                                             {game.gameType === "3c" ? "3구" : (currentSport === "GOLF" ? "18H" : "4구")}
                                         </span>
+                                        {currentSport !== "GOLF" && (game.isWinner === true || game.isWinner === false) && (
+                                            <span className={
+                                                "px-2 py-0.5 rounded-lg border text-[12px] font-bold " +
+                                                (game.isWinner
+                                                    ? "bg-brand/12 text-brand border-brand/20"
+                                                    : "bg-red-500/12 text-red-400 border-red-500/20")
+                                            }>
+                                                {game.isWinner ? "승" : "패"}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-1 text-white/40 text-[12px] font-medium">
                                         <LucideCalendar className="w-3 h-3" />

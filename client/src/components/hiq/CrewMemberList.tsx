@@ -452,8 +452,21 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
                     </div>
                 </div>
             </div>
-            <div className="text-white/45 group-hover:text-white/55 transition-colors">
-                <LucideChevronRight className="w-5 h-5" />
+            <div className="flex items-center gap-3 pl-2">
+                {sportCategory === 'GOLF'
+                    ? golfScore > 0 && (
+                        <div className="flex flex-col items-end leading-none">
+                            <span className="text-[17px] font-bold text-white tabular-nums tracking-tight">{golfScore.toFixed(0)}</span>
+                            <span className="text-[12px] font-medium text-white/45 mt-1">평균</span>
+                        </div>
+                    )
+                    : (m.avg4c && m.avg4c > 0) && (
+                        <div className="flex flex-col items-end leading-none">
+                            <span className="text-[17px] font-bold text-white tabular-nums tracking-tight">{avg4c}</span>
+                            <span className="text-[12px] font-medium text-white/45 mt-1">4구</span>
+                        </div>
+                    )}
+                <LucideChevronRight className="w-5 h-5 text-white/45 group-hover:text-white/55 transition-colors" />
             </div>
         </div>
     );

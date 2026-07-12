@@ -113,11 +113,9 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#0f0f0f] border-white/10 text-white max-w-sm max-h-[90vh] overflow-y-auto p-0 gap-0">
+            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-sm max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-card">
                 {/* Header Receipt Style */}
-                <div className="bg-white text-black p-6 rounded-t-lg relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-2 bg-[linear-gradient(45deg,transparent,transparent,2px,#0f0f0f,4px)] opacity-10"></div>
-
+                <div className="bg-white text-black p-6 rounded-t-card relative overflow-hidden">
                     <div className="text-center mb-6">
                         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-black/5 mb-3">
                             <LucidePiggyBank className="w-6 h-6" />
@@ -173,7 +171,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                                             {isSending ? "송금" : "입금"}
                                                         </span>
                                                     </div>
-                                                    <div className="text-3xl font-semibold tracking-tight">
+                                                    <div className="text-3xl font-bold tracking-tight tabular-nums">
                                                         {t.amount.toLocaleString()}
                                                         <span className="text-lg font-bold text-black/40 ml-1">원</span>
                                                     </div>
@@ -216,14 +214,14 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                             >
                                 <div className="flex justify-between items-end border-b border-black/10 pb-4">
                                     <span className="font-bold text-sm">총 지출 금액</span>
-                                    <span className="font-semibold text-xl">{totalAmount.toLocaleString()}원</span>
+                                    <span className="font-bold text-xl tabular-nums">{totalAmount.toLocaleString()}원</span>
                                 </div>
                                 <div className="space-y-3">
                                     {settlement.items.map((item: any) => (
                                         <div key={item.id} className="text-sm border-b border-dashed border-black/10 pb-3 last:border-0">
                                             <div className="flex justify-between mb-1">
                                                 <span className="font-bold">{item.title}</span>
-                                                <span className="font-bold">{item.amount.toLocaleString()}원</span>
+                                                <span className="font-bold tabular-nums">{item.amount.toLocaleString()}원</span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs text-black/50">
                                                 <div className="flex items-center gap-1">
@@ -233,7 +231,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <LucideUsers className="w-3 h-3" />
-                                                    <span>{item.participants.length}명 (인당 {Math.ceil((item.amount / item.participants.length) / 10) * 10}원)</span>
+                                                    <span className="tabular-nums">{item.participants.length}명 (인당 {Math.ceil((item.amount / item.participants.length) / 10) * 10}원)</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -260,7 +258,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                     </AnimatePresence>
 
                     {/* Receipt Jagged Edge Bottom */}
-                    <div className="absolute bottom-0 left-0 w-full h-3 bg-[#0f0f0f] [clip-path:polygon(0%_0%,5%_100%,10%_0%,15%_100%,20%_0%,25%_100%,30%_0%,35%_100%,40%_0%,45%_100%,50%_0%,55%_100%,60%_0%,65%_100%,70%_0%,75%_100%,80%_0%,85%_100%,90%_0%,95%_100%,100%_0%)]"></div>
+                    <div className="absolute bottom-0 left-0 w-full h-3 bg-[#141416] [clip-path:polygon(0%_0%,5%_100%,10%_0%,15%_100%,20%_0%,25%_100%,30%_0%,35%_100%,40%_0%,45%_100%,50%_0%,55%_100%,60%_0%,65%_100%,70%_0%,75%_100%,80%_0%,85%_100%,90%_0%,95%_100%,100%_0%)]"></div>
                 </div>
 
                 <div className="p-6">

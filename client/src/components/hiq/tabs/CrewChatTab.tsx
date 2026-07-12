@@ -130,8 +130,8 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                 <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
                     <LucideMessageSquare className="w-10 h-10 text-white/45" />
                 </div>
-                <h3 className="text-lg font-bold text-white/80 mb-2">채팅은 멤버 전용입니다</h3>
-                <p className="text-sm text-white/55 leading-relaxed">
+                <h3 className="text-[17px] font-semibold text-white/80 mb-2">채팅은 멤버 전용입니다</h3>
+                <p className="text-sm font-medium text-white/55 leading-relaxed">
                     크루에 가입하여 멤버들과<br />새로운 대화를 시작해보세요!
                 </p>
             </div>

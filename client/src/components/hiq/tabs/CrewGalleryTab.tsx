@@ -148,7 +148,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
     return (
         <div className="pt-6">
             <header className="flex items-center justify-between mb-6 px-6">
-                <h2 className="text-xl font-bold tracking-tight text-white">사진첩</h2>
+                <h2 className="text-2xl font-bold tracking-tight text-white">사진첩</h2>
                 {isMember && (
                     <div className="flex items-center gap-2">
                         <input
@@ -205,7 +205,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                             >
                                 <img
                                     src={photo.url}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                     alt={photo.author ? `${photo.author.name}님이 올린 사진` : "크루 활동 사진"}
                                     loading="lazy"
                                 />

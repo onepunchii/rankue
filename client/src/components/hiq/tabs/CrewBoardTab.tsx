@@ -115,7 +115,7 @@ export const CrewBoardTab = memo(({
                     {isAdmin && (
                         <button
                             onClick={onCreateSettlement}
-                            className="w-14 h-14 bg-surface-3 text-white border border-white/20 rounded-full shadow-lg flex items-center justify-center hover:bg-surface-2 active:scale-95 transition-all"
+                            className="w-14 h-14 bg-surface-3 text-white border border-white/20 rounded-full flex items-center justify-center hover:bg-surface-2 active:scale-95 transition-all"
                             title="정산 요청 생성"
                             aria-label="정산 요청 생성"
                         >
@@ -124,7 +124,7 @@ export const CrewBoardTab = memo(({
                     )}
                     <button
                         onClick={onCreatePost}
-                        className="w-14 h-14 bg-brand text-brand-fg rounded-full shadow-lg flex items-center justify-center hover:bg-brand/90 active:scale-95 transition-all"
+                        className="w-14 h-14 bg-brand text-brand-fg rounded-full flex items-center justify-center hover:bg-brand/90 active:scale-95 transition-all"
                         title="새 게시글 작성"
                         aria-label="새 게시글 작성"
                     >

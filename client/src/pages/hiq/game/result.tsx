@@ -10,6 +10,7 @@ import { HiqMember } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
 
 export default function HiqGameResult() {
     const search = useSearch();
@@ -113,13 +114,13 @@ export default function HiqGameResult() {
                         <p className={`text-[12px] font-semibold ${win ? 'text-brand' : 'text-white/55'}`}>
                             {win ? '우승' : '점수'}
                         </p>
-                        <h3 className="text-xl font-semibold text-white truncate max-w-[120px]">{name || `선수 ${pNo}`}</h3>
+                        <h3 className="text-[17px] font-semibold text-white truncate max-w-[120px]">{name || `선수 ${pNo}`}</h3>
                     </div>
                     {win && <LucideMedal className="w-8 h-8 text-brand" strokeWidth={2.5} />}
                 </div>
 
                 <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-5xl font-bold tabular-nums text-white">{score}</span>
+                    <span className="text-[44px] leading-none font-bold tabular-nums tracking-tight text-white">{score}</span>
                     <span className="text-white/45 font-medium text-xl tabular-nums">/ {target}</span>
                 </div>
 
@@ -133,10 +134,10 @@ export default function HiqGameResult() {
                         <p className={`text-lg font-bold tabular-nums ${win ? 'text-brand' : 'text-white'}`}>{highRun}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[12px] font-medium text-white/55 mb-0.5">상태</p>
-                        <p className={`text-lg font-bold ${win ? 'text-brand' : 'text-white/55'}`}>
-                            {win ? '승' : '패'}
-                        </p>
+                        <p className="text-[12px] font-medium text-white/55 mb-1.5">상태</p>
+                        <div className="flex justify-end">
+                            <FormBadges results={[win ? "W" : "L"] as MatchResult[]} size={26} />
+                        </div>
                     </div>
                 </div>
 
@@ -188,7 +189,7 @@ export default function HiqGameResult() {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center mb-10"
             >
-                <h1 className="text-5xl font-bold mb-1 text-brand">게임 종료</h1>
+                <h1 className="text-[26px] font-bold tracking-tight mb-1 text-brand">게임 종료</h1>
                 <p className="text-white/55 font-medium text-[12px] bg-white/5 px-3 py-1 rounded-full inline-block">
                     {isPractice ? "연습 세션" : "경기 결과"} • {game.totalInnings}이닝
                 </p>

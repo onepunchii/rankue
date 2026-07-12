@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { HiqMemberWithH2H, SportConfig } from "./types";
 import { getTier } from "@/lib/hiqUtils";
 import { Button } from "@/components/ui/button";
+import { RadialGauge } from "@/components/hiq/ui/RadialGauge";
 
 interface FriendListProps {
     friends: HiqMemberWithH2H[];
@@ -56,6 +57,8 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                             const displayHandi = golfScore - 72;
                             const handi = currentSport === "GOLF" ? golfScore : friend.handi4c;
                             const tier = getTier(Number(handi || 0), false, currentSport);
+                            const h2hTotal = friend.h2h ? friend.h2h.wins + friend.h2h.losses + friend.h2h.draws : 0;
+                            const h2hRate = h2hTotal ? Math.round((friend.h2h!.wins / h2hTotal) * 100) : 0;
                             return (
                                 <motion.div
                                     key={friend.id}
@@ -90,7 +93,7 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/40 border border-white/10">
                                                                     <span className="text-[12px] font-semibold text-brand">{friend.h2h.wins}승</span>
                                                                     <div className="w-0.5 h-2 bg-white/10 rounded-full" />
-                                                                    <span className="text-[12px] font-semibold text-[#ef4444]">{friend.h2h.losses}패</span>
+                                                                    <span className="text-[12px] font-semibold text-red-400">{friend.h2h.losses}패</span>
                                                                 </div>
                                                             ) : (
                                                                 <div className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/5">
@@ -113,13 +116,22 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                 </div>
                                             </div>
                                             {currentSport !== "GOLF" && (
-                                                <motion.button
-                                                    whileTap={{ scale: 0.92 }}
-                                                    onClick={() => onSelectFriend(friend.id)}
-                                                    className="w-12 h-12 rounded-tile bg-white/5 border border-white/10 flex items-center justify-center transition-all hover:bg-brand/10 hover:border-brand/30 group/btn"
-                                                >
-                                                    <LucideTarget className="w-5 h-5 text-white/45 transition-colors group-hover/btn:text-brand" />
-                                                </motion.button>
+                                                <div className="flex items-center gap-3 shrink-0">
+                                                    {h2hTotal > 0 && (
+                                                        <RadialGauge value={h2hRate} size={48} stroke={5}>
+                                                            <span className="text-[13px] font-bold text-white tabular-nums leading-none">
+                                                                {h2hRate}%
+                                                            </span>
+                                                        </RadialGauge>
+                                                    )}
+                                                    <motion.button
+                                                        whileTap={{ scale: 0.92 }}
+                                                        onClick={() => onSelectFriend(friend.id)}
+                                                        className="w-12 h-12 rounded-tile bg-white/5 border border-white/10 flex items-center justify-center transition-all hover:bg-brand/10 hover:border-brand/30 group/btn"
+                                                    >
+                                                        <LucideTarget className="w-5 h-5 text-white/45 transition-colors group-hover/btn:text-brand" />
+                                                    </motion.button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>

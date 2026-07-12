@@ -1,9 +1,10 @@
 
 import { motion, AnimatePresence } from "framer-motion";
-import { LucideZap, LucideTrophy, LucideTarget, LucideUserPlus } from "lucide-react";
+import { LucideZap, LucideUserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RecentOpponent, SportConfig } from "./types";
 import { getTier } from "@/lib/hiqUtils";
+import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
 
 interface RecentOpponentsSliderProps {
     opponents: RecentOpponent[];
@@ -28,6 +29,7 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                         const golfScore = Number((opponent.golfAvgScore || 0) > 0 ? opponent.golfAvgScore : (opponent.golfHandicap || 0) + 72);
                         const handi = currentSport === "GOLF" ? golfScore : opponent.handi4c;
                         const tier = getTier(Number(handi || 0), false, currentSport);
+                        const lastForm: MatchResult = opponent.lastGameResult === 'win' ? 'W' : opponent.lastGameResult === 'loss' ? 'L' : 'D';
                         return (
                             <motion.div
                                 key={opponent.id}
@@ -66,9 +68,7 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                                                     {opponent.lastGameResult === 'win' ? '승' : '패'} {opponent.lastGameScore}
                                                 </span>
                                             </div>
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${opponent.lastGameResult === 'win' ? 'bg-brand/12 text-brand' : 'bg-white/5 text-white/40'}`}>
-                                                {opponent.lastGameResult === 'win' ? <LucideTrophy className="w-4 h-4" /> : <LucideTarget className="w-4 h-4" />}
-                                            </div>
+                                            <FormBadges results={[lastForm]} size={32} />
                                         </div>
 
                                         <motion.button

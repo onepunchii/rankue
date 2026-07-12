@@ -21,15 +21,15 @@ const COLOR_VARIANTS: Record<string, { bg: string, border: string, text: string 
 
 const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: string, children: React.ReactNode }) => {
     return (
-        <div className="rounded-2xl p-5 flex flex-col items-center justify-center text-center relative overflow-hidden group transition-all duration-300">
-            <div className="flex flex-col items-center gap-1.5 mb-2 relative z-10 transition-transform duration-300 group-hover:-translate-y-1">
-                <span className="text-white/55 text-xs font-semibold">{title}</span>
+        <div className="rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+            <div className="flex flex-col items-center gap-1.5 mb-2">
+                <span className="text-white/55 text-[12px] font-medium">{title}</span>
             </div>
-            <div className="relative z-10">
+            <div>
                 {children}
             </div>
             {subTitle && (
-                <span className="text-white/55 text-xs font-semibold mt-2 relative z-10">{subTitle}</span>
+                <span className="text-white/45 text-[12px] font-medium mt-2">{subTitle}</span>
             )}
         </div>
     );
@@ -253,7 +253,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6 space-y-4">
                 <div className="flex items-center gap-2 mb-4">
                     <div className={cn("w-1.5 h-1.5 rounded-full", crew.sportCategory === 'GOLF' ? "bg-brand" : "bg-brand")} />
-                    <h2 className="text-xs font-semibold text-white/55">정모 / 일정</h2>
+                    <h2 className="text-[15px] font-semibold text-white/55">정모 / 일정</h2>
                 </div>
 
                 <ClubActivityList
@@ -272,7 +272,7 @@ export const CrewHomeTab = memo(({
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                        <h2 className="text-xs font-semibold text-white/55">진행 중인 투표</h2>
+                        <h2 className="text-[15px] font-semibold text-white/55">진행 중인 투표</h2>
                     </div>
                     {isMember && (
                         <Button
@@ -295,7 +295,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6">
                 <div className="flex items-center gap-2 mb-4">
                     <div className={cn("w-1.5 h-1.5 rounded-full", crew.sportCategory === 'GOLF' ? "bg-brand" : "bg-brand")} />
-                    <h2 className="text-xs font-semibold text-white/55">베이스 캠프</h2>
+                    <h2 className="text-[15px] font-semibold text-white/55">베이스 캠프</h2>
                 </div>
                 {baseStore ? (
                     <Card className="bg-surface-2 border-surface-line rounded-card overflow-hidden group hover:border-brand/50 transition-all">
@@ -324,7 +324,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6 pb-20">
                 <div className="flex items-center gap-2 mb-6">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                    <h2 className="text-xs font-semibold text-white/55">멤버 <span className="ml-1">{members.length}</span></h2>
+                    <h2 className="text-[15px] font-semibold text-white/55">멤버 <span className="ml-1 tabular-nums">{members.length}</span></h2>
                 </div>
                 <CrewMemberList members={activeMembers} currentMemberId={me?.id} sportCategory={crew.sportCategory} crewId={crew.id} />
             </div>
@@ -434,8 +434,8 @@ const InfoItem = ({ title, color, desc }: { title: string, color: 'emerald' | 'b
     const theme = COLOR_VARIANTS[color];
     return (
         <div className={cn("p-5 bg-white/5 border rounded-2xl", theme.border, theme.bg)}>
-            <h3 className={cn("text-sm font-bold", theme.text)}>{title}</h3>
-            <p className="text-xs text-white/55 mt-1">{desc}</p>
+            <h3 className={cn("text-sm font-semibold", theme.text)}>{title}</h3>
+            <p className="text-[13px] text-white/55 mt-1 leading-relaxed">{desc}</p>
         </div>
     );
 };

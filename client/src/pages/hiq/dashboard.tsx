@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 // New Components
 import { DashboardHeader } from "@/components/hiq/dashboard/DashboardHeader";
 import { TrendChartCard } from "@/components/hiq/dashboard/TrendChartCard";
+import { PerformanceCard } from "@/components/hiq/dashboard/PerformanceCard";
 import { RankingListCard } from "@/components/hiq/dashboard/RankingListCard";
 import { QuickActions } from "@/components/hiq/dashboard/QuickActions";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
@@ -137,6 +138,9 @@ export default function HiqDashboard() {
                 getTrend={getTrend}
                 tier={getTier(parseFloat(analysis?.summary?.avg4c || "0"), false)}
             />
+
+            {/* 전적 (승률 게이지 + 최근 폼) */}
+            <PerformanceCard history={history} />
 
             {/* AVG Chart */}
             <TrendChartCard history={history} />

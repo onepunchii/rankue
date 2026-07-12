@@ -286,7 +286,7 @@ export function TournamentBanner() {
                                         <p className="text-xs text-white/55 mt-1">{t.storeName}</p>
                                     </div>
                                     <div className="flex items-center gap-4 text-xs pt-2 border-t border-white/10 text-white/70">
-                                        <span className="font-bold text-[#ffd700]">1등 {(t.prizes as any)?.first}</span>
+                                        <span className="font-bold text-yellow-400">1등 {(t.prizes as any)?.first}</span>
                                         <span>마감 {new Date(t.recruitEnd || t.startDate).toLocaleDateString()}</span>
                                     </div>
                                 </div>
@@ -357,14 +357,14 @@ export function TournamentBanner() {
                                     </div>
                                     <div className="flex items-center justify-between py-2 border-b border-white/10">
                                         <span className="text-white/55">참가비</span>
-                                        <span className="font-bold text-[#ffd700]">{selectedTournament.entryFee?.toLocaleString()}원</span>
+                                        <span className="font-bold text-yellow-400">{selectedTournament.entryFee?.toLocaleString()}원</span>
                                     </div>
                                     <div className="py-2">
                                         <span className="text-white/55 block mb-2">상금</span>
                                         <div className="bg-surface-2 rounded-tile p-3 space-y-2 border border-surface-line">
                                             <div className="flex justify-between">
                                                 <span className="text-white/55">1등</span>
-                                                <span className="font-bold text-[#ffd700]">{(selectedTournament.prizes as any)?.first}</span>
+                                                <span className="font-bold text-yellow-400">{(selectedTournament.prizes as any)?.first}</span>
                                             </div>
                                             {(selectedTournament.prizes as any)?.second && (
                                                 <div className="flex justify-between text-xs">

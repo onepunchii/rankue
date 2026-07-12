@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { RadialGauge } from "../ui/RadialGauge";
+import { FormBadges, MatchResult } from "../ui/FormBadges";
 import { SportConfig, FilterType } from "./types";
 
 interface StatsOverviewCardProps {
@@ -116,6 +118,15 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
     }
 
     // 3. 당구 UI 렌더링 — flat, refined card (no gradient wash / glow)
+    // 승률 게이지 · 최근 폼 배지에 쓸 표시용 파생값 (officialHistory는 최신순)
+    const billiardsMatches: any[] = stats?.officialHistory || [];
+    const winRateNum = Number(winRate) || 0;
+    const wins = billiardsMatches.filter((g: any) => g.isWinner).length;
+    const losses = Math.max(0, totalGames - wins);
+    const recentForm: MatchResult[] = billiardsMatches
+        .slice(0, 5)
+        .map((g: any) => (g.isWinner ? "W" : "L"));
+
     return (
         <motion.div key={filter} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
             <div className="rk-card p-5">
@@ -133,12 +144,43 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                     <span className="rk-chip bg-white/[0.05] text-white/55 shrink-0">상위 15%</span>
                 </div>
 
-                {/* Cumulative Average — hero number */}
-                <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] py-5 text-center mb-4">
-                    <p className="text-[12px] font-medium text-white/45 mb-1.5">누적 평균</p>
-                    <p className="text-[52px] leading-none font-bold tabular-nums tracking-tight" style={{ color: currentTier.color }}>
-                        {cumulativeAverage}
-                    </p>
+                {/* Hero — 승률 게이지 + 누적 평균 + 승/패 */}
+                <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] p-5 mb-4">
+                    <div className="flex items-center gap-5">
+                        <RadialGauge value={winRateNum} size={104} stroke={9}>
+                            <div className="text-center leading-none">
+                                <div className="text-[26px] font-bold text-white tabular-nums tracking-tight">
+                                    {winRateNum}<span className="text-[14px] font-semibold text-white/55">%</span>
+                                </div>
+                                <div className="text-[12px] font-medium text-white/45 mt-1">승률</div>
+                            </div>
+                        </RadialGauge>
+
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-medium text-white/45 mb-1">누적 평균</p>
+                            <p className="text-[36px] leading-none font-bold tabular-nums tracking-tight mb-3.5" style={{ color: currentTier.color }}>
+                                {cumulativeAverage}
+                            </p>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-[20px] font-bold text-brand tabular-nums leading-none">{wins}</span>
+                                    <span className="text-[12px] font-medium text-white/45">승</span>
+                                </div>
+                                <div className="w-px h-4 bg-white/10" />
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-[20px] font-bold text-red-400 tabular-nums leading-none">{losses}</span>
+                                    <span className="text-[12px] font-medium text-white/45">패</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {recentForm.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-white/[0.06]">
+                            <p className="text-[12px] font-medium text-white/45 mb-2">최근 5경기</p>
+                            <FormBadges results={recentForm} size={24} />
+                        </div>
+                    )}
                 </div>
 
                 {/* Stats grid */}

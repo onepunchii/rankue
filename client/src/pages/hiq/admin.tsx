@@ -159,12 +159,12 @@ export default function HiqAdmin() {
                     <Card className="rk-card">
                         <CardContent className="p-6">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="p-3 bg-emerald-500/10 rounded-2xl">
-                                    <LucideTrendingUp className="w-6 h-6 text-emerald-500" />
+                                <div className="p-3 bg-brand/10 rounded-2xl">
+                                    <LucideTrendingUp className="w-6 h-6 text-brand" />
                                 </div>
                                 {stats && (
                                     <span className={`text-xs font-semibold px-2 py-1 rounded-lg tabular-nums ${stats.visitsToday >= stats.visitsYesterday
-                                        ? "text-emerald-500 bg-emerald-500/10"
+                                        ? "text-brand bg-brand/10"
                                         : "text-red-500 bg-red-500/10"
                                         }`}>
                                         {stats.visitsToday >= stats.visitsYesterday ? "+" : "-"}
