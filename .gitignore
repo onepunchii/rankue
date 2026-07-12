@@ -48,3 +48,6 @@ server/check_stats.ts
 server/debug_history.ts
 server/debug_recent.ts
 server/test_recent_logic.ts
+
+# @capacitor/assets PWA output (regenerated)
+icons/
