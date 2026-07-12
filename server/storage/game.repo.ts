@@ -63,6 +63,10 @@ export class GameRepository {
         const currentGame = await this.getHiqGameById(id);
         if (!currentGame) throw notFound("Game not found");
 
+        // Idempotency guard: a double-tap / retry must not insert duplicate history rows or
+        // double-apply rating points. If the game is already finished, return it as-is.
+        if (currentGame.status === "finished") return currentGame;
+
         const isRanked = currentGame.gameMode === "match" && !!currentGame.player2Id;
 
         const [game] = await db.update(hiqGames).set({

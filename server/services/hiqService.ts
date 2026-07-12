@@ -35,9 +35,14 @@ export class HiqService {
             }
         }
 
-        // Verify Password if profile exists
+        // Verify password. A partner account MUST have a password and it MUST match — a
+        // missing/omitted password is a hard reject (previously an omitted password
+        // short-circuited the check and logged the caller in with phone number only).
         if (profile) {
-            if (profile.password && password && password !== profile.password) {
+            if (!profile.password) {
+                return { success: false, message: "비밀번호가 설정되지 않은 계정입니다. 관리자에게 문의하세요." };
+            }
+            if (!password || password !== profile.password) {
                 return { success: false, message: "비밀번호가 일치하지 않습니다." };
             }
         } else {
@@ -138,11 +143,18 @@ export class HiqService {
         }
 
         // 2. Create HiqMember linked to Profile
-        const memberData = { ...data, profileId };
-        // Remove profile-specific fields from memberData as they're not in hiqMembers table
-        delete (memberData as any).password;
-        delete (memberData as any).securityQuestion;
-        delete (memberData as any).securityAnswer;
+        const memberData: any = { ...data, profileId };
+        // Remove profile-specific fields (not in hiqMembers table)
+        delete memberData.password;
+        delete memberData.securityQuestion;
+        delete memberData.securityAnswer;
+        // SECURITY: never accept skill/rating fields from the client at registration —
+        // otherwise a new user could self-assign a top rating and manipulate leaderboards.
+        // These start at their DB defaults and are computed from real game history.
+        for (const k of ['rating3c', 'rating4c', 'handi3c', 'handi4c', 'average',
+            'golfAvgScore', 'golfHandicap', 'golfBestScore', 'totalGolfGames', 'visitCount', 'role']) {
+            delete memberData[k];
+        }
 
         const newMember = await storage.createMember(memberData as any);
         await storage.incrementVisitCount(newMember.id);

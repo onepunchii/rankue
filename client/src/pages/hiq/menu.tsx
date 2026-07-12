@@ -117,8 +117,11 @@ export default function HiqMenu() {
         }
     };
 
-    const handleLogout = () => {
-        document.cookie = "hiq_user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    const handleLogout = async () => {
+        // The auth cookie is httpOnly+signed, so client JS cannot clear it — the server must.
+        try { await apiRequest("/api/hiq/logout", { method: "POST" }); } catch { /* ignore */ }
+        // Clear all cached data so the next user on this device sees nothing from this account.
+        queryClient.clear();
         setLocation("/");
     };
 

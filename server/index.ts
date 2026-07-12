@@ -8,7 +8,13 @@ import { errorHandler } from "./middleware/error.js";
 const log = (message: string, context: string = "Express") => console.log(`[${context}] ${message}`);
 
 const app = express();
-app.use(cookieParser());
+// Signed cookies: the auth identity (hiq_user_id / hiq_partner_auth) is signed with an
+// HMAC secret so a forged cookie value is rejected. Without this, the cookie is just a
+// member UUID and anyone who learns a UUID can impersonate that account.
+if (!process.env.COOKIE_SECRET) {
+  console.warn("⚠️ COOKIE_SECRET is not set — auth cookies will NOT be signed. Set it in the environment.");
+}
+app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

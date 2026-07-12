@@ -17,6 +17,9 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
         res.cookie('hiq_partner_auth', result.profileId, {
             maxAge: 30 * 24 * 60 * 60 * 1000,
             httpOnly: true,
+            signed: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
             path: '/'
         });
         return sendSuccess(res, result);
@@ -24,9 +27,9 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
     return sendError(res, 401, "로그인에 실패했습니다.");
 }));
 
-// Helper for protected partner routes
+// Helper for protected partner routes — trust only the SIGNED partner cookie.
 const requirePartner = asyncHandler(async (req: any, res: any, next: any) => {
-    const profileId = req.cookies.hiq_partner_auth;
+    const profileId = req.signedCookies?.hiq_partner_auth;
     if (!profileId) return sendError(res, 401, "로그인이 필요합니다 (Partner)");
     req.partnerProfileId = profileId;
     next();
@@ -39,59 +42,33 @@ router.get("/store", requirePartner, asyncHandler(async (req: any, res: any) => 
     return sendSuccess(res, store);
 }));
 
-// PATCH /partner/store
+// PATCH /partner/store — allowlisted fields only. Billing/subscription/ownership are
+// NEVER accepted from the client here (they are set by the payment flow), preventing a
+// partner from self-granting a PREMIUM subscription or reassigning ownership.
+const STORE_EDITABLE = new Set([
+    'name', 'region', 'address', 'phone', 'themeColor', 'neonColor',
+    'logoText', 'subText', 'description', 'notice', 'openTime', 'closeTime',
+    'pricePer10Min', 'priceLarge', 'priceMedium', 'tableCount', 'latitude', 'longitude',
+]);
 router.patch("/store", requirePartner, asyncHandler(async (req: any, res: any) => {
     const store = await hiqService.getPartnerStore(req.partnerProfileId);
     if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
 
-    const updated = await hiqService.updateStore(store.id, req.body);
+    const patch: any = {};
+    for (const [k, v] of Object.entries(req.body || {})) {
+        if (STORE_EDITABLE.has(k)) patch[k] = v;
+    }
+    const updated = await hiqService.updateStore(store.id, patch);
     return sendSuccess(res, updated);
 }));
 
-// POST /partner/inquiry - Partner Lead Gen (Auto Register)
+// POST /partner/inquiry - Partner lead submission (UNAUTHENTICATED, public).
+// This ONLY records a lead. It must NOT create/escalate a profile or issue a session
+// cookie — doing so previously let anyone take over a store/admin account by phone number.
+// Actual partner onboarding happens through /partner/login (password-verified).
 router.post("/inquiry", asyncHandler(async (req: any, res: any) => {
-    const data = req.body;
-
-    // 1. Create Lead Record (Log)
-    await storage.createPartnerLead(data);
-
-    // 2. Auto Register: Create Profile
-    let profile = await storage.getProfileByPhone(data.phoneNumber);
-    if (!profile) {
-        profile = await storage.createProfile({
-            phone: data.phoneNumber,
-            password: data.password || "1234",
-            role: 'store_owner',
-            nickname: data.ownerName
-        });
-    } else {
-        if (profile.role === 'user') {
-            profile = await storage.updateProfile(profile.id, { role: 'store_owner' });
-        }
-    }
-
-    // 3. Auto Register: Create Store
-    let store = await storage.getStoreByOwnerProfileId(profile.id);
-    if (!store) {
-        store = await storage.createStore({
-            slug: 'store-' + Math.random().toString(36).substring(7),
-            name: data.storeName || `${data.ownerName}님의 당구장`,
-            ownerId: profile.id,
-            themeColor: '#10b981',
-            neonColor: '#34d399',
-            region: data.region,
-            address: data.regionDetail,
-        });
-    }
-
-    // 4. Auto Login (Issue Cookie)
-    res.cookie('hiq_partner_auth', profile.id, {
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        path: '/'
-    });
-
-    return sendSuccess(res, { success: true, message: "입점 신청 및 자동 로그인 완료" });
+    await storage.createPartnerLead(req.body);
+    return sendSuccess(res, { success: true, message: "입점 신청이 접수되었습니다. 담당자가 확인 후 연락드립니다." });
 }));
 
 // POST /partner/subscription

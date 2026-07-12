@@ -17,6 +17,9 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
         res.cookie('hiq_user_id', result.member.id, {
             maxAge: 30 * 24 * 60 * 60 * 1000,
             httpOnly: true,
+            signed: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
             path: '/'
         });
     }
@@ -35,6 +38,9 @@ router.post("/register", asyncHandler(async (req: any, res: any) => {
     res.cookie('hiq_user_id', result.member.id, {
         maxAge: 30 * 24 * 60 * 60 * 1000,
         httpOnly: true,
+        signed: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
         path: '/'
     });
 

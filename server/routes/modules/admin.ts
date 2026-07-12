@@ -7,7 +7,8 @@ const router = Router();
 
 // --- Admin Middleware ---
 const checkSuperAdmin = asyncHandler(async (req: any, res: any, next: any) => {
-    const profileId = req.cookies.hiq_partner_auth;
+    // Trust only the SIGNED partner cookie (a forged value is rejected).
+    const profileId = req.signedCookies?.hiq_partner_auth;
     if (!profileId) return sendError(res, 401, "로그인이 필요합니다 (Admin)");
 
     const profile = await storage.getProfile(profileId);

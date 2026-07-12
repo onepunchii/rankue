@@ -103,7 +103,7 @@ router.get("/activities/member/:memberId", asyncHandler(async (req: any, res: an
 
 // GET /posts
 router.get("/:id/posts", asyncHandler(async (req: any, res: any) => {
-    const userId = req.cookies.hiq_user_id;
+    const userId = req.signedCookies?.hiq_user_id;
     const posts = await storage.getCrewPosts(req.params.id, userId);
     console.log(`[GET] Found ${posts.length} posts for crew ${req.params.id}`);
     return sendSuccess(res, posts);
@@ -175,7 +175,7 @@ router.delete("/:id/comments/:commentId", requireAuth, asyncHandler(async (req: 
 
 // GET /crews/:id/photos
 router.get("/:id/photos", asyncHandler(async (req: any, res: any) => {
-    const userId = req.cookies.hiq_user_id;
+    const userId = req.signedCookies?.hiq_user_id;
     const photos = await storage.getCrewPhotos(req.params.id, userId);
     return sendSuccess(res, photos);
 }));
@@ -299,7 +299,7 @@ router.delete("/:id/chats/:chatId", requireAuth, asyncHandler(async (req: AuthRe
 
 // GET /polls - List crew polls
 router.get("/:id/polls", asyncHandler(async (req: any, res: any) => {
-    const userId = req.cookies.hiq_user_id;
+    const userId = req.signedCookies?.hiq_user_id;
     const polls = await storage.getCrewPolls(req.params.id, userId);
     return sendSuccess(res, polls);
 }));

@@ -100,14 +100,25 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
     return sendSuccess(res, game);
 }));
 
+// Only a participant of the game may score/finish it.
+const assertParticipant = async (gameId: string, userId: string, res: any) => {
+    const g = await storage.getHiqGameById(gameId);
+    if (!g) { sendError(res, 404, "경기를 찾을 수 없습니다"); return null; }
+    const players = [g.player1Id, g.player2Id, g.player3Id, g.player4Id].filter(Boolean);
+    if (!players.includes(userId)) { sendError(res, 403, "이 경기의 참가자가 아닙니다"); return null; }
+    return g;
+};
+
 // PATCH /game/:id/score
-router.patch("/game/:id/score", asyncHandler(async (req: any, res: any) => {
+router.patch("/game/:id/score", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!(await assertParticipant(req.params.id, req.userId!, res))) return;
     await storage.updateHiqGameScore(req.params.id, req.body);
     return sendSuccess(res, { success: true });
 }));
 
 // POST /game/:id/finish
-router.post("/game/:id/finish", asyncHandler(async (req: any, res: any) => {
+router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!(await assertParticipant(req.params.id, req.userId!, res))) return;
     const game = await storage.finishHiqGame(req.params.id, req.body);
 
     let handicapUpdate1: any = null;
