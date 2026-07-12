@@ -39,3 +39,12 @@ yarn-error.log*
 android/
 ios/
 www/
+
+# secrets / local debug artifacts (do not commit)
+*cookies*.txt
+.env*.bak*
+debug_db.ts
+server/check_stats.ts
+server/debug_history.ts
+server/debug_recent.ts
+server/test_recent_logic.ts
