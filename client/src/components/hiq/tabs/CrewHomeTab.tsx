@@ -1,23 +1,15 @@
 import { useState, memo, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
-    LucideFlag, LucideTent, LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus
+    LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { HiqCrew, HiqStore, HiqMember } from "@shared/schema";
+import { HiqCrew, HiqStore } from "@shared/schema";
 import { ClubActivityList } from "@/components/hiq/view/ClubActivityList";
 import { CrewMemberList } from "@/components/hiq/CrewMemberList";
 import { useQuery } from "@tanstack/react-query";
 import { Progress } from "@/components/ui/progress";
-
-// Tailwind JIT 호환성을 위한 색상 매핑
-const COLOR_VARIANTS: Record<string, { bg: string, border: string, text: string }> = {
-    emerald: { bg: "bg-brand/5", border: "border-brand/10", text: "text-brand" },
-    blue: { bg: "bg-blue-500/5", border: "border-blue-500/10", text: "text-blue-500" },
-    pink: { bg: "bg-pink-500/5", border: "border-pink-500/10", text: "text-pink-500" },
-};
 
 const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: string, children: React.ReactNode }) => {
     return (
@@ -49,15 +41,15 @@ interface CrewHomeTabProps {
     onCreatePoll: () => void;
     onShareToChat: (msg: string) => void;
     onPollClick: () => void;
-    sportTab: 'BILLIARDS' | 'GOLF';
-    setSportTab: (tab: 'BILLIARDS' | 'GOLF') => void;
+    // Received from parent for API symmetry but not used in this view.
+    sportTab?: 'BILLIARDS' | 'GOLF';
+    setSportTab?: (tab: 'BILLIARDS' | 'GOLF') => void;
 }
 
 export const CrewHomeTab = memo(({
     crew, baseStore, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onCreateActivity, onCreatePoll, onShareToChat,
-    onPollClick, sportTab, setSportTab
+    onPollClick
 }: CrewHomeTabProps) => {
-    const [isRankingInfoOpen, setIsRankingInfoOpen] = useState(false);
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
     const activeMembers = useMemo(() => members.filter((m: any) => m.role !== 'pending'), [members]);
@@ -99,9 +91,8 @@ export const CrewHomeTab = memo(({
             }, 0) / golfers.length)
             : "0";
 
-        const totalPoints = statsMembers.length * 1240 + 450;
+        const totalPoints = statsMembers.reduce((acc, m) => acc + (m.member.totalSimPoints || 0), 0);
         const totalRounds = statsMembers.reduce((acc, m) => acc + (m.member.totalGolfGames || 0), 0);
-        const pointsDisplay = isGolf ? `${totalRounds} 회` : totalPoints.toLocaleString();
 
         return {
             statsMembers,
@@ -110,7 +101,6 @@ export const CrewHomeTab = memo(({
             avg4c,
             avgHdcp,
             avgGolfScore,
-            pointsDisplay,
             totalRounds,
             totalPoints
         };
@@ -183,12 +173,12 @@ export const CrewHomeTab = memo(({
                 </div>
 
                 {/* Team Performance Dashboard */}
-                <div onClick={() => setIsRankingInfoOpen(true)} className="grid grid-cols-2 gap-3 mt-6 relative cursor-pointer">
+                <div className="grid grid-cols-2 gap-3 mt-6 relative">
                     <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-white/10 -translate-x-1/2" />
                     <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-white/10 -translate-y-1/2" />
 
-                    <StatCard title="랭킹" subTitle="지역 기준">
-                        <span className="text-3xl font-bold text-white tracking-tight tabular-nums">-- <span className="text-lg font-normal text-white/55">위</span></span>
+                    <StatCard title="랭킹">
+                        <span className="text-base font-medium text-white/38">순위 집계 전</span>
                     </StatCard>
 
                     <StatCard title={stats.isGolf ? "클럽 평균" : "팀 에버리지"}>
@@ -223,36 +213,12 @@ export const CrewHomeTab = memo(({
                         <span className="text-3xl font-bold text-white tracking-tight tabular-nums">{stats.statsMembers.length} <span className="text-lg font-normal text-white/55">명</span></span>
                     </StatCard>
                 </div>
-
-                <AnimatePresence>
-                    {isRankingInfoOpen && (
-                        <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/80"
-                            onClick={() => setIsRankingInfoOpen(false)}
-                        >
-                            <motion.div
-                                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-                                className="w-full max-w-md bg-[#141416] border border-white/10 rounded-t-card sm:rounded-card p-8 space-y-8"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <h2 className="text-xl font-bold tracking-tight text-white mb-6">크루 랭킹 시스템</h2>
-                                <div className="space-y-4">
-                                    <InfoItem title={stats.isGolf ? "클럽 평균" : "실력 점수 (30%)"} color="emerald" desc={stats.isGolf ? "평균 핸디캡 및 타수입니다." : "멤버들의 평균 에버리지입니다."} />
-                                    <InfoItem title={stats.isGolf ? "누적 라운드" : "활동 점수 (50%)"} color="blue" desc={stats.isGolf ? "기록된 총 라운딩 합계입니다." : "월간 누적 득점 포인트입니다."} />
-                                    <InfoItem title="규모 점수 (20%)" color="pink" desc="최근 30일간 활동한 실질 멤버 수입니다." />
-                                </div>
-                                <Button onClick={() => setIsRankingInfoOpen(false)} className="w-full bg-white/5 h-14 rounded-2xl border border-white/10 font-semibold mt-4">확인</Button>
-                            </motion.div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             </div>
 
             {/* Activities Section */}
             <div className="px-6 space-y-4">
                 <div className="flex items-center gap-2 mb-4">
-                    <div className={cn("w-1.5 h-1.5 rounded-full", crew.sportCategory === 'GOLF' ? "bg-brand" : "bg-brand")} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand" />
                     <h2 className="text-[15px] font-semibold text-white/55">정모 / 일정</h2>
                 </div>
 
@@ -278,9 +244,9 @@ export const CrewHomeTab = memo(({
                         <Button
                             variant="ghost"
                             onClick={onCreatePoll}
-                            className="h-7 px-2 text-xs font-medium text-white/55 hover:text-brand flex items-center gap-1"
+                            className="h-10 px-3 text-[13px] font-medium text-white/55 hover:text-brand flex items-center gap-1.5"
                         >
-                            <LucidePlus className="w-3 h-3" />
+                            <LucidePlus className="w-4 h-4" />
                             만들기
                         </Button>
                     )}
@@ -294,7 +260,7 @@ export const CrewHomeTab = memo(({
             {/* Base Camp Section */}
             <div className="px-6">
                 <div className="flex items-center gap-2 mb-4">
-                    <div className={cn("w-1.5 h-1.5 rounded-full", crew.sportCategory === 'GOLF' ? "bg-brand" : "bg-brand")} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand" />
                     <h2 className="text-[15px] font-semibold text-white/55">베이스 캠프</h2>
                 </div>
                 {baseStore ? (
@@ -369,13 +335,8 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
         <div className="space-y-3">
             {recentPolls.map((poll) => {
                 const totalVotes = poll.totalVotes || 0;
-                const topOption = poll.options?.[0]; // Assuming options are sorted by voteCount or index? 
-                // Using the first option in the list. To be safe, we might want to sort options by voteCount descending if we want "1st place".
-                // But the backend `getCrewPolls` sorts options by `createdAt` asc.
-                // Wait, the original code had: `const topOption = latestPoll.options?.[0];`
-                // And displayed "현재 1위: topOption.text". 
-                // This logic is flawed if options aren't sorted by votes. 
-                // Let's sort options relative to the UI display for "1st place".
+                // Sort options by voteCount desc so the displayed "현재 1위" reflects the actual leader
+                // (backend returns options ordered by createdAt).
                 const sortedOptions = [...(poll.options || [])].sort((a: any, b: any) => b.voteCount - a.voteCount);
                 const bestOption = sortedOptions[0];
 
@@ -429,20 +390,6 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
         </div>
     );
 };
-
-const InfoItem = ({ title, color, desc }: { title: string, color: 'emerald' | 'blue' | 'pink', desc: string }) => {
-    const theme = COLOR_VARIANTS[color];
-    return (
-        <div className={cn("p-5 bg-white/5 border rounded-2xl", theme.border, theme.bg)}>
-            <h3 className={cn("text-sm font-semibold", theme.text)}>{title}</h3>
-            <p className="text-[13px] text-white/55 mt-1 leading-relaxed">{desc}</p>
-        </div>
-    );
-};
-
-const TabBtn = ({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) => (
-    <button onClick={onClick} className={cn("flex-1 py-2 rounded-lg text-xs font-semibold transition-all", active ? "bg-brand text-brand-fg" : "text-white/55")}>{label}</button>
-);
 
 CrewHomeTab.displayName = "CrewHomeTab";
 

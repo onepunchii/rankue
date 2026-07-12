@@ -66,7 +66,13 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
             <div className="space-y-4">
                 {/* Emblem & Cover Upload */}
                 <div className="space-y-4">
-                    <div className="relative group/cover h-[140px] rounded-tile bg-surface-2 border border-surface-line overflow-hidden">
+                    <div
+                        onClick={() => isLeader && document.getElementById('settings-cover-upload')?.click()}
+                        className={cn(
+                            "relative group/cover h-[140px] rounded-tile bg-surface-2 border border-surface-line overflow-hidden",
+                            isLeader && "cursor-pointer"
+                        )}
+                    >
                         {formData.coverImage ? (
                             <img src={formData.coverImage} className="w-full h-full object-cover opacity-80" alt="Cover" />
                         ) : (
@@ -76,24 +82,29 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                             </div>
                         )}
                         {isLeader && (
-                            <div
-                                onClick={() => document.getElementById('settings-cover-upload')?.click()}
-                                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/cover:opacity-100 transition-opacity cursor-pointer"
-                            >
-                                <div className="flex flex-col items-center gap-2">
-                                    <LucideImagePlus className="w-6 h-6 text-white" />
+                            <>
+                                {/* Desktop: hover-reveal overlay */}
+                                <div className="absolute inset-0 bg-black/40 hidden md:flex items-center justify-center opacity-0 group-hover/cover:opacity-100 transition-opacity pointer-events-none">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <LucideImagePlus className="w-6 h-6 text-white" />
+                                        <span className="text-xs font-bold text-white">커버 변경</span>
+                                    </div>
+                                </div>
+                                {/* Touch: persistent affordance */}
+                                <div className="md:hidden absolute bottom-2 right-2 flex items-center gap-1.5 h-9 px-3 rounded-pill bg-black/60 border border-white/10 pointer-events-none">
+                                    <LucideImagePlus className="w-4 h-4 text-white" />
                                     <span className="text-xs font-bold text-white">커버 변경</span>
                                 </div>
-                            </div>
+                            </>
                         )}
                     </div>
 
                     <div className="flex items-center gap-4 -mt-10 px-4 relative z-10">
-                        <div className="relative group/logo flex-shrink-0">
-                            <div className={cn(
-                                "w-20 h-20 rounded-tile bg-surface-3 border-2 overflow-hidden relative",
-                                crew?.sportCategory === "GOLF" ? "border-brand/30 group-hover/logo:border-brand" : "border-brand/30 group-hover/logo:border-brand"
-                            )}>
+                        <div
+                            onClick={(e) => { e.stopPropagation(); if (isLeader) document.getElementById('settings-logo-upload')?.click(); }}
+                            className={cn("relative group/logo flex-shrink-0", isLeader && "cursor-pointer")}
+                        >
+                            <div className="w-20 h-20 rounded-tile bg-surface-3 border-2 overflow-hidden relative border-brand/30 group-hover/logo:border-brand transition-colors">
                                 {formData.emblem ? (
                                     <img src={formData.emblem} className="w-full h-full object-cover" alt="Emblem" />
                                 ) : (
@@ -102,14 +113,16 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                                     </div>
                                 )}
                                 {isLeader && (
-                                    <div
-                                        onClick={(e) => { e.stopPropagation(); document.getElementById('settings-logo-upload')?.click(); }}
-                                        className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity cursor-pointer"
-                                    >
+                                    <div className="absolute inset-0 bg-black/40 hidden md:flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity pointer-events-none">
                                         <LucideCamera className="w-5 h-5 text-white" />
                                     </div>
                                 )}
                             </div>
+                            {isLeader && (
+                                <div className="md:hidden absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand border-2 border-[#141416] flex items-center justify-center pointer-events-none">
+                                    <LucideCamera className="w-3.5 h-3.5 text-brand-fg" />
+                                </div>
+                            )}
                         </div>
                         <div className="pb-1">
                             <h3 className="text-sm font-bold text-white">크루 엠블럼</h3>
@@ -142,10 +155,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                         disabled={!isLeader}
                         placeholder="동호회 이름"
-                        className={cn(
-                            "bg-surface-2 border-surface-line h-10 text-sm font-bold rounded-tile focus:ring-0 focus-visible:ring-0 placeholder:text-white/45",
-                            crew?.sportCategory === "GOLF" ? "focus:border-brand/30" : "focus:border-brand/30"
-                        )}
+                        className="bg-surface-2 border-surface-line h-10 text-sm font-bold rounded-tile focus:ring-0 focus-visible:ring-0 focus:border-brand/30 placeholder:text-white/45"
                     />
                 </div>
 
@@ -156,10 +166,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         onChange={e => setFormData(prev => ({ ...prev, shortIntro: e.target.value }))}
                         disabled={!isLeader}
                         placeholder={crew?.sportCategory === "GOLF" ? "예: 매주 라운딩 나가는 직장인 크루 ⛳️" : "예: 광진구 2030 즐겜 크루! 🎱"}
-                        className={cn(
-                            "bg-surface-2 border-surface-line h-10 text-sm font-medium rounded-tile focus:ring-0 focus-visible:ring-0 placeholder:text-white/45",
-                            crew?.sportCategory === "GOLF" ? "focus:border-brand/30" : "focus:border-brand/30"
-                        )}
+                        className="bg-surface-2 border-surface-line h-10 text-sm font-medium rounded-tile focus:ring-0 focus-visible:ring-0 focus:border-brand/30 placeholder:text-white/45"
                     />
                 </div>
 
@@ -191,10 +198,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
                         disabled={!isLeader}
                         placeholder="크루에 대해 소개해 주세요..."
-                        className={cn(
-                            "bg-surface-2 border-surface-line resize-none min-h-[100px] text-sm leading-relaxed rounded-tile focus:ring-0 focus-visible:ring-0 placeholder:text-white/45 custom-scrollbar",
-                            crew?.sportCategory === "GOLF" ? "focus:border-brand/30" : "focus:border-brand/30"
-                        )}
+                        className="bg-surface-2 border-surface-line resize-none min-h-[100px] text-sm leading-relaxed rounded-tile focus:ring-0 focus-visible:ring-0 focus:border-brand/30 placeholder:text-white/45 custom-scrollbar"
                     />
                 </div>
 
@@ -226,12 +230,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         <Button
                             onClick={handleSave}
                             disabled={!isDirty || isUpdating || isUploading}
-                            className={cn(
-                                "w-full h-12 text-brand-fg rounded-tile font-bold text-sm transition-colors active:scale-[0.98] disabled:opacity-30",
-                                crew?.sportCategory === "GOLF"
-                                    ? "bg-brand hover:bg-brand/90"
-                                    : "bg-brand hover:bg-brand/90"
-                            )}
+                            className="w-full h-12 text-brand-fg rounded-tile font-bold text-sm transition-colors active:scale-[0.98] disabled:opacity-30 bg-brand hover:bg-brand/90"
                         >
                             {isUpdating || isUploading ? (
                                 <LucideLoader2 className="w-5 h-5 animate-spin" />

@@ -39,13 +39,15 @@ export const CrewBoardTab = memo(({
     posts, category, onCategoryChange, onPostClick, isMember, isAdmin, currentMemberId, onCreatePost, onCreateSettlement
 }: CrewBoardTabProps) => {
 
-    const filteredPosts = useMemo(() => {
-        return posts?.filter(p => category === "전체" || p.category === category) || [];
-    }, [posts, category]);
-
     const notices = useMemo(() => {
         return posts?.filter(p => p.isNotice).slice(0, 3) || [];
     }, [posts]);
+
+    const filteredPosts = useMemo(() => {
+        // Exclude notices already surfaced in the pinned section so they don't render twice.
+        const pinnedIds = new Set(notices.map(n => n.id));
+        return posts?.filter(p => (category === "전체" || p.category === category) && !pinnedIds.has(p.id)) || [];
+    }, [posts, category, notices]);
 
     return (
         <div className="h-full space-y-6 pt-6">
@@ -75,7 +77,7 @@ export const CrewBoardTab = memo(({
                         {notices.map((notice) => (
                             <div
                                 key={notice.id}
-                                className="px-4 py-3 flex items-center gap-3 border-b border-brand/25 last:border-0 hover:bg-brand/12 transition-colors cursor-pointer"
+                                className="px-4 py-3 flex items-center gap-3 border-b border-brand/25 last:border-0 hover:bg-brand/20 transition-colors cursor-pointer"
                                 onClick={() => onPostClick(notice)}
                             >
                                 <LucidePin className="w-3.5 h-3.5 text-brand rotate-45" />

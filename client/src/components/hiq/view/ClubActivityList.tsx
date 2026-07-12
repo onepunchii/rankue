@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { generateTeams, getSportTerminology, SportType, GenderDist } from "@/lib/teamGenerator";
 import { CreateActivityDialog } from "../CreateActivityDialog";
+import { CreateGolfActivityModal } from "../club/activity/CreateGolfActivityModal";
 
 interface ClubActivityListProps {
     crewId: string;
@@ -124,9 +125,9 @@ export function ClubActivityList({
     };
 
     const runGeneration = async (activityId: string, participants: any[], isRandom: boolean = false) => {
+        if (isGenerating) return;
         setIsGenerating(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 800));
             const config = teamData[activityId];
 
             // Parse manual names
@@ -425,15 +426,29 @@ export function ClubActivityList({
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <button
                                                         onClick={() => runGeneration(activity.id, activity.participants)}
-                                                        className="bg-surface-2 hover:bg-brand border border-surface-line hover:border-brand rounded-tile p-4 flex items-center justify-center transition-all group"
+                                                        disabled={isGenerating}
+                                                        className="bg-surface-2 hover:bg-brand border border-surface-line hover:border-brand rounded-tile p-4 flex items-center justify-center transition-all group disabled:opacity-50 disabled:pointer-events-none"
                                                     >
-                                                        <span className="text-sm font-semibold text-white group-hover:text-brand-fg">실력 밸런스</span>
+                                                        {isGenerating ? (
+                                                            <span className="flex items-center gap-1.5 text-sm font-semibold text-white/55">
+                                                                <LucideRefreshCw className="w-3.5 h-3.5 animate-spin" /> 편성 중
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-sm font-semibold text-white group-hover:text-brand-fg">실력 밸런스</span>
+                                                        )}
                                                     </button>
                                                     <button
                                                         onClick={() => runGeneration(activity.id, activity.participants, true)}
-                                                        className="bg-surface-2 hover:bg-brand border border-surface-line hover:border-brand rounded-tile p-4 flex items-center justify-center transition-all group"
+                                                        disabled={isGenerating}
+                                                        className="bg-surface-2 hover:bg-brand border border-surface-line hover:border-brand rounded-tile p-4 flex items-center justify-center transition-all group disabled:opacity-50 disabled:pointer-events-none"
                                                     >
-                                                        <span className="text-sm font-semibold text-white group-hover:text-brand-fg">완전 랜덤</span>
+                                                        {isGenerating ? (
+                                                            <span className="flex items-center gap-1.5 text-sm font-semibold text-white/55">
+                                                                <LucideRefreshCw className="w-3.5 h-3.5 animate-spin" /> 편성 중
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-sm font-semibold text-white group-hover:text-brand-fg">완전 랜덤</span>
+                                                        )}
                                                     </button>
                                                 </div>
                                             </div>
@@ -450,10 +465,7 @@ export function ClubActivityList({
 
                                             <div className="p-4 relative">
                                                 {/* Results Display */}
-                                                <div className={cn(
-                                                    "grid gap-3",
-                                                    currentTeamData.teams.length === 2 ? "grid-cols-2" : "grid-cols-2"
-                                                )}>
+                                                <div className="grid gap-3 grid-cols-2">
                                                     {currentTeamData.teams.map((team, idx) => (
                                                         <div key={idx} className="bg-surface-3 border border-surface-line rounded-tile p-3">
                                                             <div className="flex items-center justify-between mb-2 pb-2 border-b border-surface-line">
@@ -613,16 +625,28 @@ export function ClubActivityList({
                 )
             }
 
-            <CreateActivityDialog
-                open={isEditOpen}
-                onOpenChange={(open) => {
-                    setIsEditOpen(open);
-                    if (!open) setEditingActivity(null);
-                }}
-                crewId={crewId}
-                sportCategory={sportType === 'GOLF' ? 'GOLF' : 'BILLIARDS'}
-                initialData={editingActivity}
-            />
+            {sportType === 'GOLF' ? (
+                <CreateGolfActivityModal
+                    open={isEditOpen}
+                    onOpenChange={(open) => {
+                        setIsEditOpen(open);
+                        if (!open) setEditingActivity(null);
+                    }}
+                    crewId={crewId}
+                    initialData={editingActivity}
+                />
+            ) : (
+                <CreateActivityDialog
+                    open={isEditOpen}
+                    onOpenChange={(open) => {
+                        setIsEditOpen(open);
+                        if (!open) setEditingActivity(null);
+                    }}
+                    crewId={crewId}
+                    sportCategory={'BILLIARDS'}
+                    initialData={editingActivity}
+                />
+            )}
         </div >
     );
 }

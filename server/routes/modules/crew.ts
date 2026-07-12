@@ -8,6 +8,17 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 
 const router = Router();
 
+// Membership gate: returns the member's role, or sends a 403/404 and returns null.
+// Non-members and pending (승인 대기) members are rejected from writing crew content.
+async function requireCrewMember(req: AuthRequest, res: any): Promise<string | null> {
+    const membership = await storage.getCrewMembership(req.params.id, req.userId!);
+    if (!membership || membership.role === 'pending') {
+        sendError(res, 403, "크루 멤버만 이용할 수 있습니다");
+        return null;
+    }
+    return membership.role;
+}
+
 
 // --- Activities ---
 
@@ -19,6 +30,7 @@ router.get("/:id/activities", asyncHandler(async (req: any, res: any) => {
 
 // POST /activities - Create activity
 router.post("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
     const data = {
         ...req.body,
         crewId: req.params.id,
@@ -111,6 +123,7 @@ router.get("/:id/posts", asyncHandler(async (req: any, res: any) => {
 
 // POST /posts
 router.post("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
     const data = {
         ...req.body,
         crewId: req.params.id,
@@ -206,6 +219,7 @@ router.delete("/:id/photo-comments/:commentId", requireAuth, asyncHandler(async 
 
 // POST /crews/:id/photos
 router.post("/:id/photos", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
     const photo = await storage.createCrewPhoto({
         ...req.body,
         crewId: req.params.id,
@@ -243,6 +257,12 @@ router.get("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res:
 
 // POST /crews/:id/chats
 router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+
+    if (!req.body?.message || typeof req.body.message !== 'string' || !req.body.message.trim()) {
+        return sendError(res, 400, "메시지를 입력해주세요");
+    }
+
     const chat = await storage.createCrewChat({
         ...req.body,
         crewId: req.params.id,
@@ -306,6 +326,7 @@ router.get("/:id/polls", asyncHandler(async (req: any, res: any) => {
 
 // POST /polls - Create poll
 router.post("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
     const { options, ...rest } = req.body;
     const data = {
         ...rest,
@@ -329,6 +350,7 @@ router.post("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res
 
 // POST /polls/:pollId/vote - Vote/Toggle vote
 router.post("/:id/polls/:pollId/vote", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
     const { optionId } = req.body;
     if (!optionId) return sendError(res, 400, "선택지 ID가 필요합니다");
 
@@ -362,8 +384,22 @@ router.delete("/:id/polls/:pollId", requireAuth, asyncHandler(async (req: AuthRe
 
 // GET /polls/options/:optionId/votes - Get voters for an option
 router.get("/:id/polls/options/:optionId/votes", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    // Note: In a real app, we should check if isAnonymous is true before showing voters
-    // For now, storage method will be called, but we can add check here if needed.
+    // Resolve the poll from the option itself — never trust the :id path param for authorization.
+    const poll = await storage.getPollByOptionId(req.params.optionId);
+    if (!poll) return sendError(res, 404, "선택지를 찾을 수 없습니다");
+
+    // Only members of the poll's OWN crew may inspect voters.
+    const membership = await storage.getCrewMembership(poll.crewId, req.userId!);
+    if (!membership || membership.role === 'pending') {
+        return sendError(res, 403, "크루 멤버만 이용할 수 있습니다");
+    }
+
+    // Anonymous polls: expose the aggregate count only, never voter identities.
+    if (poll.isAnonymous) {
+        const votes = await storage.getPollVotes(req.params.optionId);
+        return sendSuccess(res, { anonymous: true, count: votes.length });
+    }
+
     const votes = await storage.getPollVotes(req.params.optionId);
     return sendSuccess(res, votes);
 }));
@@ -378,7 +414,8 @@ router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =>
         return sendError(res, 400, validation.error.errors[0].message);
     }
 
-    const crew = await storage.createCrew(validation.data);
+    // Ownership is set from the authenticated session — never trust a client-supplied leaderId.
+    const crew = await storage.createCrew({ ...validation.data, leaderId: req.userId! });
     return sendSuccess(res, crew);
 }));
 
@@ -428,7 +465,17 @@ router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any
         return sendError(res, 403, "권한이 없습니다");
     }
 
-    const crew = await storage.updateCrew(crewId, req.body);
+    // Whitelist editable fields only. Ownership/immutable fields (leaderId, id, createdAt,
+    // sportCategory) are deliberately excluded to prevent mass-assignment / ownership hijack.
+    const EDITABLE = ['name', 'description', 'emblem', 'gameType', 'region', 'tags', 'joinType',
+        'maxMembers', 'coverImage', 'shortIntro', 'meetingDay', 'meetingTime', 'introQuestions',
+        'latitude', 'longitude', 'baseStoreId'] as const;
+    const updateData: any = {};
+    for (const key of EDITABLE) {
+        if (req.body[key] !== undefined) updateData[key] = req.body[key];
+    }
+
+    const crew = await storage.updateCrew(crewId, updateData);
     return sendSuccess(res, crew);
 }));
 
@@ -529,6 +576,7 @@ router.patch("/:id/members/:memberId/role", requireAuth, asyncHandler(async (req
 
 // POST /crews/:id/settlements
 router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
     const data = {
         ...req.body, // title, date, totalAmount, etc.
         crewId: req.params.id,

@@ -115,22 +115,22 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="bg-[#141416] border-white/10 text-white max-w-sm max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-card">
                 {/* Header Receipt Style */}
-                <div className="bg-white text-black p-6 rounded-t-card relative overflow-hidden">
+                <div className="bg-surface-3 text-white p-6 rounded-t-card relative overflow-hidden">
                     <div className="text-center mb-6">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-black/5 mb-3">
-                            <LucidePiggyBank className="w-6 h-6" />
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/8 mb-3">
+                            <LucidePiggyBank className="w-6 h-6 text-white/72" />
                         </div>
-                        <h2 className="text-[19px] font-bold tracking-tight mb-1">{settlement.title}</h2>
-                        <p className="text-[12px] text-black/40 font-semibold tabular-nums">
+                        <h2 className="text-[19px] font-bold mb-1">{settlement.title}</h2>
+                        <p className="text-[12px] text-white/45 font-semibold tabular-nums">
                             {format(new Date(settlement.createdAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
                         </p>
                     </div>
 
-                    <div className="flex bg-black/5 rounded-xl p-1 mb-6">
+                    <div className="flex bg-black/25 rounded-tile p-1 mb-6">
                         <button
                             className={cn(
-                                "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
-                                activeTab === 'my' ? "bg-white shadow-sm text-black" : "text-black/40"
+                                "flex-1 py-2 text-xs font-bold rounded-tile transition-all",
+                                activeTab === 'my' ? "bg-white/12 text-white" : "text-white/45"
                             )}
                             onClick={() => setActiveTab('my')}
                         >
@@ -138,8 +138,8 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                         </button>
                         <button
                             className={cn(
-                                "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
-                                activeTab === 'all' ? "bg-white shadow-sm text-black" : "text-black/40"
+                                "flex-1 py-2 text-xs font-bold rounded-tile transition-all",
+                                activeTab === 'all' ? "bg-white/12 text-white" : "text-white/45"
                             )}
                             onClick={() => setActiveTab('all')}
                         >
@@ -161,19 +161,19 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                         {myTransfers.map((t, idx) => {
                                             const isSending = t.fromId === meId;
                                             return (
-                                                <div key={idx} className="bg-black/5 p-4 rounded-xl">
-                                                    <p className="text-xs font-bold text-black/40 mb-1">
+                                                <div key={idx} className="bg-white/5 p-4 rounded-tile">
+                                                    <p className="text-xs font-bold text-white/45 mb-1">
                                                         {isSending ? `에게 보낼 금액` : `에게 받을 금액`}
                                                     </p>
                                                     <div className="flex items-center justify-center gap-2 mb-2">
-                                                        <span className="font-bold text-lg">{isSending ? t.toName : t.fromName}</span>
-                                                        <span className={cn("text-xs px-2 py-0.5 rounded-full font-bold", isSending ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600")}>
+                                                        <span className="font-bold text-lg text-white">{isSending ? t.toName : t.fromName}</span>
+                                                        <span className={cn("text-xs px-2 py-0.5 rounded-pill font-bold", isSending ? "bg-rose-400/10 text-rose-400" : "bg-blue-400/10 text-blue-400")}>
                                                             {isSending ? "송금" : "입금"}
                                                         </span>
                                                     </div>
-                                                    <div className="text-3xl font-bold tracking-tight tabular-nums">
+                                                    <div className="text-3xl font-bold tabular-nums text-white">
                                                         {t.amount.toLocaleString()}
-                                                        <span className="text-lg font-bold text-black/40 ml-1">원</span>
+                                                        <span className="text-lg font-bold text-white/45 ml-1">원</span>
                                                     </div>
                                                 </div>
                                             );
@@ -182,25 +182,25 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                 ) : (
                                     <div className="py-8">
                                         <LucideCheckCircle2 className="w-12 h-12 text-brand mx-auto mb-3" />
-                                        <p className="font-bold text-[17px]">정산 완료!</p>
-                                        <p className="text-[12px] text-black/40 font-medium">주고 받을 돈이 없습니다.</p>
+                                        <p className="font-bold text-[17px] text-white">정산 완료!</p>
+                                        <p className="text-[12px] text-white/45 font-medium">주고 받을 돈이 없습니다.</p>
                                     </div>
                                 )}
 
                                 {(settlement.accountBank || settlement.accountNumber) && (
                                     <div
                                         onClick={handleCopyAccount}
-                                        className="flex items-center justify-between bg-black/5 p-4 rounded-xl cursor-pointer active:scale-95 transition-transform mt-4"
+                                        className="flex items-center justify-between bg-white/5 p-4 rounded-tile cursor-pointer active:scale-95 transition-transform mt-4"
                                     >
                                         <div className="text-left">
-                                            <div className="text-[12px] font-bold text-black/40 mb-0.5">총무 계좌 (참고용)</div>
-                                            <div className="font-bold text-sm flex items-center gap-1.5">
+                                            <div className="text-[12px] font-bold text-white/45 mb-0.5">총무 계좌 (참고용)</div>
+                                            <div className="font-bold text-sm flex items-center gap-1.5 text-white">
                                                 <span>{settlement.accountBank}</span>
-                                                <span className="tabular-nums tracking-tight">{settlement.accountNumber}</span>
-                                                {settlement.accountHolder && <span className="text-black/60 font-medium ml-1">({settlement.accountHolder})</span>}
+                                                <span className="tabular-nums">{settlement.accountNumber}</span>
+                                                {settlement.accountHolder && <span className="text-white/55 font-medium ml-1">({settlement.accountHolder})</span>}
                                             </div>
                                         </div>
-                                        <LucideCopy className="w-4 h-4 text-black/40" />
+                                        <LucideCopy className="w-4 h-4 text-white/45" />
                                     </div>
                                 )}
                             </motion.div>
@@ -212,43 +212,48 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                 exit={{ opacity: 0, y: -10 }}
                                 className="space-y-4"
                             >
-                                <div className="flex justify-between items-end border-b border-black/10 pb-4">
-                                    <span className="font-bold text-sm">총 지출 금액</span>
-                                    <span className="font-bold text-xl tabular-nums">{totalAmount.toLocaleString()}원</span>
+                                <div className="flex justify-between items-end border-b border-surface-line pb-4">
+                                    <span className="font-bold text-sm text-white">총 지출 금액</span>
+                                    <span className="font-bold text-xl tabular-nums text-white">{totalAmount.toLocaleString()}원</span>
                                 </div>
                                 <div className="space-y-3">
                                     {settlement.items.map((item: any) => (
-                                        <div key={item.id} className="text-sm border-b border-dashed border-black/10 pb-3 last:border-0">
+                                        <div key={item.id} className="text-sm border-b border-dashed border-surface-line pb-3 last:border-0">
                                             <div className="flex justify-between mb-1">
-                                                <span className="font-bold">{item.title}</span>
-                                                <span className="font-bold tabular-nums">{item.amount.toLocaleString()}원</span>
+                                                <span className="font-bold text-white">{item.title}</span>
+                                                <span className="font-bold tabular-nums text-white">{item.amount.toLocaleString()}원</span>
                                             </div>
-                                            <div className="flex items-center justify-between text-xs text-black/50">
+                                            <div className="flex items-center justify-between text-xs text-white/45">
                                                 <div className="flex items-center gap-1">
-                                                    <span className="bg-black text-white px-1.5 py-0.5 rounded text-[12px] font-bold">
+                                                    <span className="bg-white/10 text-white px-1.5 py-0.5 rounded-md text-[12px] font-bold">
                                                         {item.payer?.name || "결제자"} 결제
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <LucideUsers className="w-3 h-3" />
-                                                    <span className="tabular-nums">{item.participants.length}명 (인당 {Math.ceil((item.amount / item.participants.length) / 10) * 10}원)</span>
+                                                    <span className="tabular-nums">
+                                                        {item.participants.length}명
+                                                        {item.participants.length > 0
+                                                            ? ` (인당 ${(Math.ceil((item.amount / item.participants.length) / 10) * 10).toLocaleString()}원)`
+                                                            : ""}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
 
-                                <div className="mt-6 pt-4 border-t-2 border-black">
-                                    <p className="text-[12px] font-semibold text-black/40 mb-3 text-center">전체 송금 리스트</p>
+                                <div className="mt-6 pt-4 border-t border-white/15">
+                                    <p className="text-[12px] font-semibold text-white/45 mb-3 text-center">전체 송금 리스트</p>
                                     <div className="space-y-2">
                                         {allTransfers.map((t, idx) => (
-                                            <div key={idx} className="flex items-center justify-between text-xs bg-black/5 px-3 py-2 rounded-lg">
+                                            <div key={idx} className="flex items-center justify-between text-xs bg-white/5 px-3 py-2 rounded-tile">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-bold">{t.fromName}</span>
-                                                    <LucideChevronRight className="w-3 h-3 text-black/30" />
-                                                    <span className="font-bold">{t.toName}</span>
+                                                    <span className="font-bold text-white">{t.fromName}</span>
+                                                    <LucideChevronRight className="w-3 h-3 text-white/30" />
+                                                    <span className="font-bold text-white">{t.toName}</span>
                                                 </div>
-                                                <span className="font-semibold tabular-nums">{t.amount.toLocaleString()}원</span>
+                                                <span className="font-semibold tabular-nums text-white/72">{t.amount.toLocaleString()}원</span>
                                             </div>
                                         ))}
                                     </div>

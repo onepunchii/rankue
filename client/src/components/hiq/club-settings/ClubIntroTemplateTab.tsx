@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { cn } from '@/lib/utils';
 import { CrewData } from '@/types/crew';
 
 interface ClubIntroTemplateTabProps {
@@ -101,13 +100,22 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                         </div>
                     ))}
 
+                    {questions.length === 0 && !isLeader && (
+                        <div className="p-6 bg-surface-2 border border-surface-line rounded-tile flex flex-col items-center justify-center gap-2 text-center">
+                            <LucideLayout className="w-6 h-6 text-white/38" />
+                            <p className="text-xs font-medium text-white/38">등록된 가입 질문이 없습니다</p>
+                        </div>
+                    )}
+
                     {isLeader && (
                         <button
                             onClick={addQuestion}
                             className="w-full h-14 rounded-tile border-2 border-dashed border-surface-line flex items-center justify-center gap-2 hover:bg-white/5 transition-colors text-white/55 hover:text-white/80 group active:scale-[0.98]"
                         >
                             <LucidePlus className="w-4 h-4" />
-                            <span className="text-xs font-semibold">질문 추가하기</span>
+                            <span className="text-xs font-semibold">
+                                {questions.length === 0 ? "첫 질문 추가하기" : "질문 추가하기"}
+                            </span>
                         </button>
                     )}
                 </div>
@@ -117,12 +125,7 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                         <Button
                             onClick={handleSave}
                             disabled={!isDirty || isUpdating}
-                            className={cn(
-                                "w-full h-12 text-brand-fg rounded-tile font-bold text-sm transition-colors",
-                                crew?.sportCategory === "GOLF"
-                                    ? "bg-brand hover:bg-brand/90"
-                                    : "bg-brand hover:bg-brand/90"
-                            )}
+                            className="w-full h-12 text-brand-fg rounded-tile font-bold text-sm transition-colors bg-brand hover:bg-brand/90"
                         >
                             {isUpdating ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : "양식 저장하기"}
                         </Button>

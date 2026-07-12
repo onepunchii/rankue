@@ -48,6 +48,7 @@ interface CreateGolfActivityModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     crewId: string;
+    initialData?: any; // For Edit Mode
 }
 
 const formSchema = z.object({
@@ -66,10 +67,11 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function CreateGolfActivityModal({ open, onOpenChange, crewId }: CreateGolfActivityModalProps) {
+export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialData }: CreateGolfActivityModalProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [selectedCategory, setSelectedCategory] = useState<ActivityCategory | null>(null);
+    const isEditMode = !!initialData;
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -84,6 +86,31 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId }: CreateGo
 
         },
     });
+
+    // Pre-fill the form when opening in edit mode; reset to blank for create.
+    useEffect(() => {
+        if (!open) return;
+        if (initialData) {
+            const dt = new Date(initialData.activityDate);
+            setSelectedCategory((initialData.category as ActivityCategory) || null);
+            form.reset({
+                category: initialData.category || "",
+                title: initialData.title || "",
+                description: initialData.description || "",
+                locationName: initialData.locationName || "",
+                cost: initialData.cost || "",
+                maxParticipants: initialData.maxParticipants || 4,
+                startDate: dt,
+                time: format(dt, "HH:mm"),
+            });
+        } else {
+            setSelectedCategory(null);
+            form.reset({
+                title: "", description: "", locationName: "", cost: "",
+                maxParticipants: 4, time: "19:00", startDate: new Date(),
+            });
+        }
+    }, [open, initialData, form]);
 
     // Smart Auto-Fill Logic
     const handleCategorySelect = (category: ActivityCategory) => {
@@ -154,20 +181,31 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId }: CreateGo
                 sportCategory: "GOLF" // Always GOLF for this modal
             };
 
+            if (isEditMode) {
+                return await apiRequest(`/api/hiq/crews/${crewId}/activities/${initialData.id}`, {
+                    method: "PATCH",
+                    body: payload,
+                });
+            }
             return await apiRequest(`/api/hiq/crews/${crewId}/activities`, {
                 method: "POST",
                 body: payload,
             });
         },
         onSuccess: () => {
-            toast({ title: "모임 생성 완료", description: "새로운 골프 정모가 등록되었습니다." });
+            toast({
+                title: isEditMode ? "모임 수정 완료" : "모임 생성 완료",
+                description: isEditMode ? "골프 정모 정보가 수정되었습니다." : "새로운 골프 정모가 등록되었습니다.",
+            });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/activities`] });
             onOpenChange(false);
-            form.reset();
-            setSelectedCategory(null);
+            if (!isEditMode) {
+                form.reset();
+                setSelectedCategory(null);
+            }
         },
         onError: (err: Error) => {
-            toast({ title: "생성 실패", description: err.message, variant: "destructive" });
+            toast({ title: isEditMode ? "수정 실패" : "생성 실패", description: err.message, variant: "destructive" });
         },
     });
 
@@ -183,7 +221,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId }: CreateGo
             <DialogContent className="bg-[#141416] border border-white/10 text-white w-[95%] max-w-[420px] rounded-card p-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <DialogHeader className="mb-4">
                     <DialogTitle className="text-xl font-semibold text-center">
-                        <span className="text-[#3B82F6]">골프</span> 정모 만들기
+                        <span className="text-[#3B82F6]">골프</span> 정모 {isEditMode ? "수정" : "만들기"}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -434,7 +472,9 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId }: CreateGo
                                 )}
                                 disabled={createMutation.isPending || !selectedCategory}
                             >
-                                {createMutation.isPending ? "생성 중..." : "정모 만들기"}
+                                {createMutation.isPending
+                                    ? (isEditMode ? "수정 중..." : "생성 중...")
+                                    : (isEditMode ? "정모 수정" : "정모 만들기")}
                             </Button>
                         </DialogFooter>
                     </form>

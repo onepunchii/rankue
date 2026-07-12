@@ -19,9 +19,9 @@ interface ClubMemberTabProps {
     crew: CrewData;
     members: CrewMember[];
     me: any;
-    onUpdateRole: (memberId: string, role: string) => void;
-    onKick: (memberId: string) => void;
-    onApprove: (memberId: string) => void;
+    onUpdateRole: (memberId: string, role: string) => Promise<any> | void;
+    onKick: (memberId: string) => Promise<any> | void;
+    onApprove: (memberId: string) => Promise<any> | void;
 }
 
 export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onApprove }: ClubMemberTabProps) {
@@ -46,13 +46,15 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
         setProcessingMemberId(memberId);
         try {
             await action();
+        } catch {
+            /* surfaced via mutation onError toast */
         } finally {
             setProcessingMemberId(null);
         }
     };
 
-    const themeColor = crew.sportCategory === 'GOLF' ? 'text-brand' : 'text-brand';
-    const themeBg = crew.sportCategory === 'GOLF' ? 'bg-brand' : 'bg-brand';
+    const themeColor = 'text-brand';
+    const themeBg = 'bg-brand';
 
     return (
         <div className="space-y-8 pb-10 pt-2">
@@ -186,16 +188,12 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
 }
 
 function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: CrewData, isMe?: boolean, action?: React.ReactNode }) {
-    const themeHoverBorder = crew.sportCategory === 'GOLF' ? 'hover:border-brand/20' : 'hover:border-brand/20';
-    const themeText = crew.sportCategory === 'GOLF' ? 'text-brand' : 'text-brand';
+    const themeText = 'text-brand';
 
     return (
         <motion.div
             layout
-            className={cn(
-                "flex items-center justify-between p-4 rounded-tile bg-surface-2 border border-surface-line hover:bg-surface-3 transition-colors group",
-                themeHoverBorder
-            )}
+            className="flex items-center justify-between p-4 rounded-tile bg-surface-2 border border-surface-line hover:bg-surface-3 hover:border-brand/20 transition-colors group"
         >
             <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-tile bg-white/5 border border-surface-line flex items-center justify-center text-sm font-medium text-white/55 overflow-hidden">
@@ -223,7 +221,7 @@ function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: 
                 </div>
             </div>
 
-            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
+            <div className="md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
                 {action}
             </div>
         </motion.div>

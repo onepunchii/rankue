@@ -78,7 +78,37 @@ export class CrewRepository {
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
             .where(eq(hiqCrewMembers.crewId, id));
 
-        // 4. Enrich Golf Stats from Game History (Real-time calculation)
+        // 4a. Batch activity counts for ALL members in ONE grouped query (avoids N+1).
+        const isGolfCrew = crew.sportCategory === 'GOLF';
+        const activityCountRows = await db.select({
+            memberId: hiqCrewActivityParticipants.memberId,
+            group1Count: isGolfCrew
+                ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_ROUNDING', 'BLITZ_ROUNDING', 'GOLF_TOUR') THEN 1 ELSE 0 END)`
+                : sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_BILLIARDS', 'BLITZ_BILLIARDS') THEN 1 ELSE 0 END)`,
+            group2Count: isGolfCrew
+                ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_SCREEN', 'BLITZ_SCREEN') THEN 1 ELSE 0 END)`
+                : sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('BILLIARDS_TOURNAMENT') THEN 1 ELSE 0 END)`,
+            group3Count: sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('AFTER_PARTY', 'SOCIAL') THEN 1 ELSE 0 END)`,
+        })
+            .from(hiqCrewActivityParticipants)
+            .innerJoin(hiqCrewActivities, eq(hiqCrewActivityParticipants.activityId, hiqCrewActivities.id))
+            .where(and(
+                eq(hiqCrewActivities.crewId, id),
+                eq(hiqCrewActivityParticipants.status, 'joined'),
+                sql`${hiqCrewActivities.activityDate} <= NOW()`
+            ))
+            .groupBy(hiqCrewActivityParticipants.memberId);
+
+        const countsByMember = new Map<string, { group1: number; group2: number; group3: number }>();
+        for (const r of activityCountRows) {
+            countsByMember.set(r.memberId, {
+                group1: Number(r.group1Count || 0),
+                group2: Number(r.group2Count || 0),
+                group3: Number(r.group3Count || 0),
+            });
+        }
+
+        // 4b. Enrich members (golf stats only computed for golf/mixed crews).
         const enrichedMembers = await Promise.all(membersData.map(async (data) => {
             const memberObj = { ...data.member };
 
@@ -112,32 +142,32 @@ export class CrewRepository {
                 },
                 role: data.role,
                 joinedAt: data.joinedAt,
-                activityCounts: await db.select({
-                    group1Count: crew.sportCategory === 'GOLF'
-                        ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_ROUNDING', 'BLITZ_ROUNDING', 'GOLF_TOUR') THEN 1 ELSE 0 END)`
-                        : sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_BILLIARDS', 'BLITZ_BILLIARDS') THEN 1 ELSE 0 END)`,
-                    group2Count: crew.sportCategory === 'GOLF'
-                        ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_SCREEN', 'BLITZ_SCREEN') THEN 1 ELSE 0 END)`
-                        : sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('BILLIARDS_TOURNAMENT') THEN 1 ELSE 0 END)`,
-                    group3Count: sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('AFTER_PARTY', 'SOCIAL') THEN 1 ELSE 0 END)`,
-                })
-                    .from(hiqCrewActivityParticipants)
-                    .innerJoin(hiqCrewActivities, eq(hiqCrewActivityParticipants.activityId, hiqCrewActivities.id))
-                    .where(and(
-                        eq(hiqCrewActivities.crewId, id),
-                        eq(hiqCrewActivityParticipants.memberId, data.member.id),
-                        eq(hiqCrewActivityParticipants.status, 'joined'),
-                        sql`${hiqCrewActivities.activityDate} <= NOW()`
-                    ))
-                    .then(res => ({
-                        group1: Number(res[0]?.group1Count || 0),
-                        group2: Number(res[0]?.group2Count || 0),
-                        group3: Number(res[0]?.group3Count || 0),
-                    }))
+                activityCounts: countsByMember.get(data.member.id) || { group1: 0, group2: 0, group3: 0 },
             };
         }));
 
         return { crew, baseStore, members: enrichedMembers };
+    }
+
+    // Lightweight membership check — single indexed lookup, avoids loading the full enriched crew.
+    async getCrewMembership(crewId: string, memberId: string): Promise<{ role: string } | null> {
+        const [row] = await db.select({ role: hiqCrewMembers.role })
+            .from(hiqCrewMembers)
+            .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
+        return row || null;
+    }
+
+    // Resolve a poll (id, crewId, isAnonymous) from one of its option ids — for authorization/anonymity checks.
+    async getPollByOptionId(optionId: string): Promise<{ id: string; crewId: string; isAnonymous: boolean } | null> {
+        const [row] = await db.select({
+            id: hiqPolls.id,
+            crewId: hiqPolls.crewId,
+            isAnonymous: hiqPolls.isAnonymous,
+        })
+            .from(hiqPollOptions)
+            .innerJoin(hiqPolls, eq(hiqPollOptions.pollId, hiqPolls.id))
+            .where(eq(hiqPollOptions.id, optionId));
+        return row || null;
     }
 
     async joinCrew(crewId: string, memberId: string, role?: string) {

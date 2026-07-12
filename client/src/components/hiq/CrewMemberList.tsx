@@ -12,13 +12,8 @@ import { Button } from "@/components/ui/button";
 import {
     LucideCrown,
     LucideShield,
-    LucideFlame,
-    LucideSnowflake,
     LucideSwords,
     LucideMessageCircle,
-    LucideTrophy,
-    LucideTrendingUp,
-    LucideClock,
     LucideChevronRight,
     LucideLoader2,
     LucideEdit2,
@@ -58,11 +53,6 @@ interface CrewMemberListProps {
 }
 
 
-const fetchAnalysis = async (memberId: string, category: string) => {
-    const type = category === 'GOLF' ? 'golf' : '4c';
-    return await apiRequest(`/api/hiq/stats/analysis?memberId=${memberId}&type=${type}`, { method: "GET" });
-};
-
 export function CrewMemberList({ members, currentMemberId, sportCategory = "BILLIARDS", crewId }: CrewMemberListProps) {
     const [selectedMember, setSelectedMember] = useState<CrewMemberItemType | null>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -95,7 +85,10 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
             });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/hiq/crews"] }); // Invalidate crew members
+            // The member roster is bundled in the crew-detail query, so invalidate that exact key
+            // (a prefix like ["/api/hiq/crews"] does not match [`/api/hiq/crews/${crewId}`]).
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
             setIsEditingBio(false);
             if (selectedMember) {
                 setSelectedMember({
@@ -113,12 +106,6 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     };
 
 
-    const { data: analysis, isLoading: isAnalysisLoading } = useQuery({
-        queryKey: [`/api/hiq/stats/analysis`, selectedMember?.member?.id, sportCategory],
-        queryFn: () => fetchAnalysis(selectedMember!.member.id, sportCategory),
-        enabled: isSheetOpen && !!selectedMember
-    });
-
     const { data: memberActivities } = useQuery({
         queryKey: [`/api/hiq/crews/activities/member`, selectedMember?.member?.id, crewId],
         queryFn: async () => {
@@ -126,21 +113,6 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
         },
         enabled: isSheetOpen && !!selectedMember
     });
-
-    const trend = useMemo(() => {
-        if (!analysis?.summary) return null;
-        const overall = parseFloat(analysis.summary.overallAvg || "0");
-        const recent = parseFloat(analysis.summary.recentAvg || "0");
-        const matchCount = analysis.summary.matchCount || 0;
-
-        if (matchCount === 0) return { label: "신규 멤버", color: "text-blue-400", icon: <LucideTrophy className="w-4 h-4 text-blue-400" /> };
-        if (overall === 0) return { label: "기록 없음", color: "text-white/40", icon: <LucideClock className="w-4 h-4 text-white/40" /> };
-
-        if (recent > overall * 1.05) return { label: "HOT (상승세)", color: "text-red-400", icon: <LucideFlame className="w-4 h-4 text-red-500" /> };
-        if (recent < overall * 0.95) return { label: "COLD (하락세)", color: "text-blue-300", icon: <LucideSnowflake className="w-4 h-4 text-blue-300" /> };
-
-        return { label: "STABLE (유지)", color: "text-green-400", icon: <LucideTrendingUp className="w-4 h-4 text-green-400" /> };
-    }, [analysis]);
 
     const sheetData = useMemo(() => {
         if (!selectedMember) return null;
@@ -303,7 +275,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                     </div>
                                     {/* 활동 카운트 3칸 */}
                                     <div className="grid grid-cols-3 gap-2">
-                                        <div className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl ${sportCategory === 'GOLF' ? 'bg-brand/[0.06] border border-brand/10' : 'bg-brand/[0.06] border border-brand/10'}`}>
+                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-brand/[0.06] border border-brand/10">
                                             <span className="text-lg">{sportCategory === 'GOLF' ? '⛳️' : '🎱'}</span>
                                             <span className="text-[17px] font-bold text-brand tabular-nums">
                                                 {selectedMember.activityCounts?.group1 || 0}
@@ -471,13 +443,6 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
         </div>
     );
 }
-
-const StatsBadge = ({ label, value, colorClass, subLabelColor = "text-white/55" }: any) => (
-    <div className="bg-white/[0.03] border border-white/5 rounded-lg px-2 py-1 flex items-center gap-1.5">
-        <span className={cn("text-[12px] font-semibold", subLabelColor)}>{label}</span>
-        <span className={cn("text-xs font-semibold tabular-nums", colorClass)}>{value}</span>
-    </div>
-);
 
 const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => (
     <div className="flex items-center justify-center gap-8 w-full max-w-sm py-4">

@@ -21,7 +21,7 @@ import { format } from "date-fns";
 export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateClick }: ClubActivityListProps) {
     const { toast } = useToast();
 
-    const { data: activities, isLoading } = useQuery({
+    const { data: activities, isLoading, isError, refetch } = useQuery({
         queryKey: [`/api/hiq/crews/${crewId}/activities`],
         enabled: !!crewId,
     });
@@ -161,6 +161,40 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                     </Card>
                 );
             })}
+
+            {/* Error State */}
+            {isError && (
+                <Card className="rk-card rounded-card">
+                    <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+                            <LucideTent className="w-6 h-6 text-white/38" />
+                        </div>
+                        <p className="text-sm font-semibold text-white/72">일정을 불러오지 못했습니다</p>
+                        <Button
+                            variant="ghost"
+                            onClick={() => refetch()}
+                            className="h-10 px-5 rounded-pill bg-surface-2 hover:bg-surface-3 text-white/72 text-xs font-semibold"
+                        >
+                            다시 시도
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Empty State */}
+            {!isError && upcomingActivities.length === 0 && (
+                <Card className="rk-card rounded-card">
+                    <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-2">
+                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-1">
+                            <LucideTent className="w-6 h-6 text-white/38" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-white/72">예정된 정모가 없습니다</h3>
+                        <p className="text-xs text-white/55 font-medium">
+                            {isMember ? "첫 정모를 만들어 멤버들과 모여보세요." : "곧 새로운 모임이 열릴 예정이에요."}
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Create Activity Trigger Card */}
             {isMember && (

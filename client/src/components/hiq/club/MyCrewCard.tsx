@@ -38,7 +38,7 @@ export const MyCrewCard = memo(({ crew, role, onClick }: MyCrewCardProps) => {
                         <span className="tabular-nums">{crew.memberCount || 1} / {crew.maxMembers || 50}</span>
                     </div>
                     <span className="w-0.5 h-0.5 rounded-full bg-white/30" />
-                    <span>{crew.region || "서울"}</span>
+                    <span className={cn(!crew.region && "text-ink-4")}>{crew.region || "지역 미설정"}</span>
                 </div>
             </div>
 

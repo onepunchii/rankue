@@ -4,7 +4,6 @@ import {
     DialogDescription
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
 import { CrewMember } from '@/types/crew';
 import { useClubSettings } from '@/hooks/useClubSettings';
 import { ClubGeneralTab } from './club-settings/ClubGeneralTab';
@@ -40,14 +39,14 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                 <div className="p-5 pb-0">
                     <DialogHeader className="mb-4">
                         <div className="flex items-center gap-3">
-                            <div className={cn(
-                                "w-10 h-10 rounded-tile flex items-center justify-center border transition-colors",
-                                crew?.sportCategory === "GOLF" ? "bg-brand/10 border-brand/20" : "bg-brand/10 border-brand/20"
-                            )}>
-                                <LucideSettings2 className={cn("w-5 h-5", crew?.sportCategory === "GOLF" ? "text-brand" : "text-brand")} />
+                            <div className="w-10 h-10 rounded-tile flex items-center justify-center border bg-brand/10 border-brand/20 transition-colors">
+                                <LucideSettings2 className="w-5 h-5 text-brand" />
                             </div>
-                            <div className="flex flex-col">
+                            <div className="flex flex-col gap-1">
                                 <DialogTitle className="text-lg font-bold text-white leading-none">크루 관리</DialogTitle>
+                                <DialogDescription className="text-xs font-medium text-white/55 leading-none">
+                                    크루 정보와 멤버를 관리합니다
+                                </DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
@@ -56,33 +55,21 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                         <TabsList className="grid w-full grid-cols-3 bg-surface-2 border border-surface-line p-1 mb-5 rounded-tile h-10 relative overflow-hidden">
                             <TabsTrigger
                                 value="general"
-                                className={cn(
-                                    "rounded-lg h-full text-xs font-semibold transition-colors z-10",
-                                    "data-[state=active]:text-brand-fg",
-                                    crew?.sportCategory === "GOLF" ? "data-[state=active]:bg-brand" : "data-[state=active]:bg-brand"
-                                )}
+                                className="rounded-lg h-full text-xs font-semibold transition-colors z-10 data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
                             >
                                 <LucideSettings2 className="w-3.5 h-3.5 mr-1" />
                                 정보
                             </TabsTrigger>
                             <TabsTrigger
                                 value="template"
-                                className={cn(
-                                    "rounded-lg h-full text-xs font-semibold transition-colors z-10",
-                                    "data-[state=active]:text-brand-fg",
-                                    crew?.sportCategory === "GOLF" ? "data-[state=active]:bg-brand" : "data-[state=active]:bg-brand"
-                                )}
+                                className="rounded-lg h-full text-xs font-semibold transition-colors z-10 data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
                             >
                                 <LucideFileText className="w-3.5 h-3.5 mr-1" />
                                 양식
                             </TabsTrigger>
                             <TabsTrigger
                                 value="members"
-                                className={cn(
-                                    "rounded-lg h-full text-xs font-semibold transition-colors z-10 relative",
-                                    "data-[state=active]:text-brand-fg",
-                                    crew?.sportCategory === "GOLF" ? "data-[state=active]:bg-brand" : "data-[state=active]:bg-brand"
-                                )}
+                                className="rounded-lg h-full text-xs font-semibold transition-colors z-10 relative data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
                             >
                                 <LucideUsers2 className="w-3.5 h-3.5 mr-1" />
                                 멤버
@@ -119,9 +106,9 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                                 crew={crew}
                                 members={members}
                                 me={me}
-                                onUpdateRole={(memberId, role) => updateRole.mutate({ memberId, role })}
-                                onKick={(id) => kickMember.mutate(id)}
-                                onApprove={(id) => approveMember.mutate(id)}
+                                onUpdateRole={(memberId, role) => updateRole.mutateAsync({ memberId, role })}
+                                onKick={(id) => kickMember.mutateAsync(id)}
+                                onApprove={(id) => approveMember.mutateAsync(id)}
                             />
                         </TabsContent>
                     </Tabs>

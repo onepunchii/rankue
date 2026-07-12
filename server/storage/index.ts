@@ -86,6 +86,8 @@ class Storage {
 
     // Crew
     async getCrew(id: string) { return this.crews.getCrew(id); }
+    async getCrewMembership(crewId: string, memberId: string) { return this.crews.getCrewMembership(crewId, memberId); }
+    async getPollByOptionId(optionId: string) { return this.crews.getPollByOptionId(optionId); }
     async createCrew(data: any) { return this.crews.createCrew(data); }
     async getUserCrews(id: string, sport?: string) { return this.crews.getUserCrews(id, sport); }
     async getCrewPosts(id: string, mid?: string) { return this.crews.getCrewPosts(id, mid); }

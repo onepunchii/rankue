@@ -146,6 +146,31 @@ export default function HiqClubDetail() {
     const isAdmin = !!myMemberData && (myMemberData.role === 'leader' || myMemberData.role === 'manage');
     const hasPending = members.some((m: any) => m.role === 'pending');
 
+    const handleShare = async () => {
+        const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+        const shareData = {
+            title: crew?.name ?? '크루',
+            text: `${crew?.name} 크루를 확인해보세요`,
+            url: shareUrl,
+        };
+        try {
+            if (typeof navigator !== 'undefined' && navigator.share) {
+                await navigator.share(shareData);
+                return;
+            }
+            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                await navigator.clipboard.writeText(shareUrl);
+                toast({ title: "링크가 복사되었습니다." });
+                return;
+            }
+            toast({ title: "공유를 지원하지 않는 환경입니다.", variant: "destructive" });
+        } catch (err) {
+            // 사용자가 공유 시트를 취소한 경우는 조용히 무시
+            if (err instanceof DOMException && err.name === 'AbortError') return;
+            toast({ title: "공유에 실패했습니다.", variant: "destructive" });
+        }
+    };
+
     return (
         <div className="h-[100dvh] bg-[#0A0A0A] text-ink-1 font-sans flex flex-col overflow-hidden relative">
             {/* 1. 고정 헤더 영역 (4+2 구조 중 상단 +2) */}
@@ -176,7 +201,11 @@ export default function HiqClubDetail() {
                             {hasPending && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-brand border-2 border-surface-1" />}
                         </Button>
                     ) : (
-                        <Button variant="ghost" className="p-0 h-auto text-ink-2 hover:text-ink-1 transition-colors">
+                        <Button
+                            variant="ghost"
+                            className="p-3 -mr-3 h-auto text-ink-2 hover:text-ink-1 transition-colors"
+                            onClick={handleShare}
+                        >
                             <LucideShare2 className="w-6 h-6" />
                         </Button>
                     )}

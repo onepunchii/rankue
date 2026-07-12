@@ -55,7 +55,7 @@ export function LocationSearch({ value, onChange, placeholder = "참여 골프�
                 >
                     {value ? (
                         <span className="flex items-center gap-2 truncate">
-                            <LucideMapPin className="w-4 h-4 text-[#3B82F6]" />
+                            <LucideMapPin className="w-4 h-4 text-brand" />
                             {value}
                         </span>
                     ) : (
@@ -79,11 +79,11 @@ export function LocationSearch({ value, onChange, placeholder = "참여 골프�
                                         onChange(course.label);
                                         setOpen(false);
                                     }}
-                                    className="text-white hover:bg-white/10 cursor-pointer py-3"
+                                    className="text-white rounded-xl aria-selected:bg-brand/15 data-[selected=true]:bg-brand/15 cursor-pointer py-3"
                                 >
                                     <LucideCheck
                                         className={cn(
-                                            "mr-2 h-4 w-4 text-[#3B82F6]",
+                                            "mr-2 h-4 w-4 text-brand",
                                             value === course.label ? "opacity-100" : "opacity-0"
                                         )}
                                     />

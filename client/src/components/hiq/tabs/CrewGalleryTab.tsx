@@ -37,6 +37,8 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
     const { toast } = useToast();
     const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
     const [isPhotoDetailOpen, setIsPhotoDetailOpen] = useState(false);
+    // Tracks the compression + blob-upload phase (before the metadata POST mutation runs).
+    const [isProcessing, setIsProcessing] = useState(false);
 
     // 1. Fetch Photo Gallery
     const { data: photos, isLoading } = useQuery<Photo[]>({
@@ -105,6 +107,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
             return;
         }
 
+        setIsProcessing(true);
         try {
             const url = await uploadImage(file, 'crew-photo');
             uploadPhotoMutation.mutate(url);
@@ -112,6 +115,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
             console.error("[CrewGalleryTab] Image compression failed:", error);
             toast({ title: "이미지 처리 실패", description: "사진을 압축하는 과정에서 오류가 발생했습니다.", variant: "destructive" });
         } finally {
+            setIsProcessing(false);
             e.target.value = "";
         }
     };
@@ -158,21 +162,21 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                             className="hidden"
                             accept="image/*"
                             onChange={handlePhotoUpload}
-                            disabled={uploadPhotoMutation.isPending}
+                            disabled={isProcessing || uploadPhotoMutation.isPending}
                         />
                         <Button
                             size="sm"
                             variant="outline"
                             className="border-white/10 text-white font-semibold text-xs rounded-xl h-9 px-4 flex items-center gap-2 bg-transparent hover:bg-white/10"
                             onClick={() => document.getElementById('gallery-upload')?.click()}
-                            disabled={uploadPhotoMutation.isPending}
+                            disabled={isProcessing || uploadPhotoMutation.isPending}
                         >
-                            {uploadPhotoMutation.isPending ? (
+                            {(isProcessing || uploadPhotoMutation.isPending) ? (
                                 <LucideLoader2 className="w-3 h-3 animate-spin" />
                             ) : (
                                 <LucideImage className="w-3.5 h-3.5" />
                             )}
-                            {uploadPhotoMutation.isPending ? "압축 중..." : "업로드"}
+                            {(isProcessing || uploadPhotoMutation.isPending) ? "업로드 중..." : "업로드"}
                         </Button>
                     </div>
                 )}

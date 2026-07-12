@@ -41,10 +41,6 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [displayLimit, setDisplayLimit] = useState(3);
 
-    const { data: me } = useQuery<any>({
-        queryKey: ["/api/hiq/me"],
-    });
-
     const { data: polls, isLoading } = useQuery<any[]>({
         queryKey: [`/api/hiq/crews/${crewId}/polls`],
         enabled: !!crewId,
@@ -80,15 +76,6 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
         }
     });
 
-    if (isLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20 text-white/45 gap-3">
-                <LucideLoader2 className="w-8 h-8 animate-spin" />
-                <p className="text-xs font-medium text-white/45">투표 목록을 불러오는 중...</p>
-            </div>
-        );
-    }
-
     return (
         <div className="space-y-8 pb-20">
             {/* Header / CTA */}
@@ -113,7 +100,31 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
 
             {/* Poll List */}
             <div className="px-6 space-y-4">
-                {(!polls || polls.length === 0) ? (
+                {isLoading ? (
+                    <>
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <div
+                                key={i}
+                                className="bg-[#141414] border border-white/5 rounded-card overflow-hidden animate-pulse"
+                            >
+                                <div className="p-6 pb-5 space-y-5">
+                                    <div className="space-y-2">
+                                        <div className="h-5 w-16 bg-white/5 rounded-full" />
+                                        <div className="h-5 w-2/3 bg-white/5 rounded-lg" />
+                                    </div>
+                                    <div className="space-y-2.5">
+                                        <div className="h-14 bg-white/[0.03] rounded-2xl" />
+                                        <div className="h-14 bg-white/[0.03] rounded-2xl" />
+                                    </div>
+                                </div>
+                                <div className="px-6 py-4 bg-white/[0.02] border-t border-white/5 flex items-center gap-3">
+                                    <div className="w-5 h-5 rounded-full bg-white/5" />
+                                    <div className="h-3 w-24 bg-white/5 rounded-full" />
+                                </div>
+                            </div>
+                        ))}
+                    </>
+                ) : (!polls || polls.length === 0) ? (
                     <div className="py-20 text-center bg-white/[0.02] border border-dashed border-white/5 rounded-card space-y-4">
                         <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto">
                             <LucideVote className="w-8 h-8 text-white/45" />
@@ -129,7 +140,11 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                             <PollCard
                                 key={poll.id}
                                 poll={poll}
-                                isVoting={voteMutation.isPending}
+                                votingOptionId={
+                                    voteMutation.isPending && voteMutation.variables?.pollId === poll.id
+                                        ? voteMutation.variables?.optionId
+                                        : undefined
+                                }
                                 onVote={(optionId) => {
                                     if (voteMutation.isPending) return; // block double-submit / vote race
                                     voteMutation.mutate({ pollId: poll.id, optionId });
@@ -140,15 +155,14 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                                     }
                                 }}
                                 isMember={isMember}
-                                currentUserId={me?.id}
                                 isAdmin={isAdmin}
                             />
                         ))}
 
-                        {polls.length > displayLimit && displayLimit < 10 && (
+                        {polls.length > displayLimit && (
                             <Button
                                 variant="ghost"
-                                onClick={() => setDisplayLimit(10)}
+                                onClick={() => setDisplayLimit((d) => d + 10)}
                                 className="w-full h-12 bg-white/[0.02] hover:bg-white/[0.05] text-white/45 hover:text-white/60 text-[13px] font-semibold rounded-2xl flex items-center justify-center gap-2 transition-all"
                             >
                                 더보기
@@ -168,17 +182,20 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
     );
 }
 
-function PollCard({ poll, onVote, onDelete, isMember, currentUserId, isAdmin, isVoting }: {
+function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }: {
     poll: any;
     onVote: (id: string) => void;
     onDelete: () => void;
     isMember: boolean;
-    currentUserId?: string;
     isAdmin: boolean;
-    isVoting?: boolean;
+    votingOptionId?: string;
 }) {
     const isClosed = poll.status === 'closed' || (poll.endTime && new Date(poll.endTime) < new Date());
     const totalVotes = poll.totalVotes || 0;
+    // Strict, unique leader only — a tie must not light up multiple "winners".
+    const maxVoteCount = poll.options.reduce((max: number, o: any) => Math.max(max, o.voteCount || 0), 0);
+    const hasUniqueWinner = maxVoteCount > 0
+        && poll.options.filter((o: any) => o.voteCount === maxVoteCount).length === 1;
 
     return (
         <motion.div
@@ -220,9 +237,7 @@ function PollCard({ poll, onVote, onDelete, isMember, currentUserId, isAdmin, is
                     <div className="flex flex-col items-end gap-2">
                         {poll.endTime && !isClosed && (
                             <span className="text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded-full tabular-nums">
-                                {new Date(poll.endTime) > new Date()
-                                    ? `${formatDistanceToNow(new Date(poll.endTime), { locale: ko })} 남음`
-                                    : "마감됨"}
+                                {`${formatDistanceToNow(new Date(poll.endTime), { locale: ko })} 남음`}
                             </span>
                         )}
                         {isAdmin && (
@@ -242,12 +257,13 @@ function PollCard({ poll, onVote, onDelete, isMember, currentUserId, isAdmin, is
                     {poll.options.map((option: any) => {
                         const isMyVote = poll.myVoteIds?.includes(option.id);
                         const progress = totalVotes > 0 ? (option.voteCount / totalVotes) * 100 : 0;
-                        const isWinner = totalVotes > 0 && poll.options.every((o: any) => o.voteCount <= option.voteCount) && option.voteCount > 0;
+                        const isWinner = hasUniqueWinner && option.voteCount === maxVoteCount;
+                        const isOptionVoting = votingOptionId === option.id;
 
                         return (
                             <button
                                 key={option.id}
-                                disabled={isClosed || !isMember || isVoting}
+                                disabled={isClosed || !isMember || isOptionVoting}
                                 onClick={() => onVote(option.id)}
                                 className={cn(
                                     "relative w-full text-left p-4 rounded-2xl group/opt transition-all duration-300 overflow-hidden",
@@ -283,11 +299,14 @@ function PollCard({ poll, onVote, onDelete, isMember, currentUserId, isAdmin, is
                                         )}>
                                             {option.text}
                                         </span>
-                                        {isWinner && totalVotes > 0 && (
+                                        {isWinner && (
                                             <LucideSparkles className="w-3.5 h-3.5 text-yellow-500/50 animate-pulse" />
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        {isOptionVoting && (
+                                            <LucideLoader2 className="w-3.5 h-3.5 text-white/45 animate-spin" />
+                                        )}
                                         <span className={cn(
                                             "text-xs font-semibold tabular-nums",
                                             isMyVote ? "text-brand" : "text-white/45"

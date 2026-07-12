@@ -9,7 +9,6 @@ import {
     DialogTitle
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucideSend } from "lucide-react";
@@ -34,12 +33,11 @@ interface PostDetailDialogProps {
 }
 
 export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMemberId }: PostDetailDialogProps) {
-    console.log("[PostDetailDialog] Render - open:", open, "post:", post);
     const [commentContent, setCommentContent] = useState("");
     const { toast } = useToast();
 
     // Fetch Comments
-    const { data: comments, isLoading } = useQuery<Comment[]>({
+    const { data: comments, isLoading, isError, refetch } = useQuery<Comment[]>({
         queryKey: [`/api/hiq/posts/${post?.id}/comments`],
         enabled: !!open && !!post?.id
     });
@@ -137,6 +135,17 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                         </h4>
                         {isLoading ? (
                             <div className="py-12 text-center text-white/55 text-[12px] font-semibold">불러오는 중...</div>
+                        ) : isError ? (
+                            <div className="py-16 text-center flex flex-col items-center gap-3">
+                                <p className="text-white/55 text-[12px] font-semibold">댓글을 불러오지 못했습니다</p>
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => refetch()}
+                                    className="h-9 px-4 rounded-pill bg-surface-2 hover:bg-surface-3 text-white/72 text-[12px] font-semibold"
+                                >
+                                    다시 시도
+                                </Button>
+                            </div>
                         ) : comments && comments.length > 0 ? (
                             <div className="space-y-6">
                                 {comments.map((comment) => (

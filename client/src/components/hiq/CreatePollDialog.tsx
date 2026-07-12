@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
-import { LucidePlus, LucideX, LucideClock, LucideUserCheck, LucideShieldCheck, LucideCalendarClock } from "lucide-react";
+import { LucidePlus, LucideX, LucideClock } from "lucide-react";
 import { addDays, format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -107,7 +107,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
             <DialogContent className="bg-[#141416] border-white/10 text-white max-w-md p-0 overflow-hidden rounded-card">
                 <div className="py-6 space-y-6">
                     <DialogHeader className="px-6">
-                        <DialogTitle className="text-xl font-bold">새 투표 만들기</DialogTitle>
+                        <DialogTitle className="text-xl font-semibold">새 투표 만들기</DialogTitle>
                         <DialogDescription className="text-white/55">
                             크루 멤버들의 의견을 모아보세요.
                         </DialogDescription>

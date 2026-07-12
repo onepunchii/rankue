@@ -1,7 +1,6 @@
 import { memo } from "react";
 import { HiqCrew } from "@shared/schema";
-import { cn } from "@/lib/utils";
-import { LucideMapPin, LucideUsers } from "lucide-react";
+import { LucideMapPin, LucideUsers, LucideFlag, LucideTarget } from "lucide-react";
 
 interface CrewDiscoveryCardProps {
     crew: HiqCrew & { memberCount?: number, distance?: number };
@@ -10,10 +9,9 @@ interface CrewDiscoveryCardProps {
 }
 
 export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDiscoveryCardProps) => {
-    // 썸네일 이미지 (엠블럼이 있으면 엠블럼, 없으면 커버이미지, 둘다 없으면 기본)
-    const thumbnail = crew.coverImage || (crew.sportCategory === 'GOLF'
-        ? "https://images.unsplash.com/photo-1535131749006-b7f58c9903fe?q=80&w=200&auto=format&fit=crop"
-        : "https://images.unsplash.com/photo-1628771065518-0d82f1938462?q=80&w=200&auto=format&fit=crop");
+    // 커버 이미지가 없으면 외부 스톡 사진 대신 크루 이니셜 + 종목 아이콘 타일로 대체
+    const initial = crew.name?.trim().charAt(0).toUpperCase() || "?";
+    const SportIcon = crew.sportCategory === 'GOLF' ? LucideFlag : LucideTarget;
 
     return (
         <div
@@ -22,8 +20,17 @@ export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDisc
         >
             {/* 왼쪽 썸네일 */}
             <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-surface-line">
-                <img src={thumbnail} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt={crew.name} />
-                <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent" />
+                {crew.coverImage ? (
+                    <>
+                        <img src={crew.coverImage} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt={crew.name} />
+                        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent" />
+                    </>
+                ) : (
+                    <div className="w-full h-full bg-surface-3 flex flex-col items-center justify-center gap-0.5">
+                        <span className="text-[22px] font-bold text-brand leading-none">{initial}</span>
+                        <SportIcon className="w-3 h-3 text-ink-4" />
+                    </div>
+                )}
             </div>
 
             {/* 오른쪽 정보 */}
@@ -44,7 +51,7 @@ export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDisc
                 <div className="flex items-center gap-3 text-[12px] text-ink-3 font-medium tabular-nums">
                     <div className="flex items-center gap-1">
                         <LucideMapPin className="w-3 h-3" />
-                        <span>{crew.region || "서울"}</span>
+                        <span className={crew.region ? undefined : "text-ink-4"}>{crew.region || "지역 미설정"}</span>
                     </div>
                     {crew.distance !== undefined ? (
                         <div className="flex items-center gap-1 text-brand">

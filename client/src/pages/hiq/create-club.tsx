@@ -28,38 +28,16 @@ import {
     LucideCheck,
     LucideSearch,
     LucideMapPin,
-    LucideTrophy,
-    LucideStar,
-    LucideZap,
-    LucideCrown,
-    LucideTarget,
-    LucideSwords,
-    LucideFlag,
     LucideUsers,
-    LucideGhost,
-    LucideSmile,
     LucideTent,
     LucideCamera,
     LucideImagePlus,
+    LucideLoader2,
     ChevronsUpDown
 } from "lucide-react";
 import { InsertHiqCrew, HiqMember } from "@shared/schema";
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
-
-const EMBLEMS = [
-    { id: "trophy", icon: LucideTrophy, color: "text-yellow-400" },
-    { id: "crown", icon: LucideCrown, color: "text-orange-400" },
-    { id: "star", icon: LucideStar, color: "text-purple-400" },
-    { id: "zap", icon: LucideZap, color: "text-blue-400" },
-    { id: "target", icon: LucideTarget, color: "text-red-400" },
-    { id: "swords", icon: LucideSwords, color: "text-slate-400" },
-    { id: "flag", icon: LucideFlag, color: "text-green-400" },
-    { id: "tent", icon: LucideTent, color: "text-emerald-400" },
-    { id: "users", icon: LucideUsers, color: "text-pink-400" },
-    { id: "ghost", icon: LucideGhost, color: "text-indigo-400" },
-    { id: "smile", icon: LucideSmile, color: "text-cyan-400" },
-];
 
 const STEPS = [
     { id: 1, title: "크루 정체성", subtitle: "우리 크루의 이름과 얼굴을 정해주세요" },
@@ -134,8 +112,9 @@ export default function CreateClub() {
 
     // Validations
     const isStep1Valid = (formData.name?.trim().length ?? 0) > 0;
-    const isStep2Valid = true; // Optional
-    const isStep3Valid = (formData.region?.trim().length ?? 0) > 0; // Simple check
+    const isRegionValid = (formData.region?.trim().length ?? 0) > 0;
+    const isStep2Valid = isRegionValid; // 주 활동 지역 is required (field lives on step 2)
+    const isStep3Valid = isRegionValid; // Backstop before submit
 
     // Handlers
     const handleNext = () => {
@@ -143,10 +122,15 @@ export default function CreateClub() {
             toast({ title: "크루 이름을 입력해주세요", variant: "destructive" });
             return;
         }
+        // Validate the required region on the screen that actually contains the field (step 2).
+        if (step === 2 && !isStep2Valid) {
+            toast({ title: "활동 지역을 입력해주세요", variant: "destructive" });
+            return;
+        }
         if (step < 3) {
             setStep(step + 1);
         } else {
-            // Enforce required region before submitting (it was only computed, never checked).
+            // Backstop: enforce required region before submitting.
             if (!isStep3Valid) {
                 toast({ title: "활동 지역을 입력해주세요", variant: "destructive" });
                 return;
@@ -218,7 +202,7 @@ export default function CreateClub() {
                 {/* Progress Bar */}
                 <div className="h-1 bg-white/10 rounded-full mb-8">
                     <motion.div
-                        className={cn("h-full rounded-full", currentSport === "GOLF" ? "bg-brand" : "bg-brand")}
+                        className="h-full rounded-full bg-brand"
                         initial={{ width: "33%" }}
                         animate={{ width: `${(step / 3) * 100}%` }}
                     />
@@ -240,7 +224,7 @@ export default function CreateClub() {
                         >
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-white/55">크루 이름 <span className={currentSport === "GOLF" ? "text-brand" : "text-brand"}>*</span></Label>
+                                    <Label className="text-xs font-semibold text-white/55">크루 이름 <span className="text-brand">*</span></Label>
                                     <Input
                                         placeholder={currentSport === "GOLF" ? "예: 버디찬스, 72홀 골프회" : "예: 죽방전설, 서초당구클럽"}
                                         className="bg-surface-2 border-white/10 h-14 text-xl font-semibold placeholder:text-white/45 rounded-2xl"
@@ -281,17 +265,22 @@ export default function CreateClub() {
                                             }}
                                         />
                                         <div
-                                            onClick={() => document.getElementById('logo-upload')?.click()}
+                                            onClick={() => { if (uploadingField !== 'emblem') document.getElementById('logo-upload')?.click(); }}
                                             className={cn(
-                                                "aspect-square rounded-2xl bg-surface-2 border border-white/5 flex flex-col items-center justify-center cursor-pointer transition-all group overflow-hidden relative",
-                                                currentSport === "GOLF" ? "hover:border-brand/50" : "hover:border-brand/50"
+                                                "aspect-square rounded-2xl bg-surface-2 border border-white/5 flex flex-col items-center justify-center transition-all group overflow-hidden relative",
+                                                uploadingField === 'emblem' ? "cursor-wait" : "cursor-pointer hover:border-brand/50"
                                             )}
                                         >
-                                            {formData.emblem ? (
+                                            {uploadingField === 'emblem' ? (
+                                                <>
+                                                    <LucideLoader2 className="w-6 h-6 text-brand animate-spin mb-2" />
+                                                    <span className="text-[12px] font-medium text-white/45">업로드 중...</span>
+                                                </>
+                                            ) : formData.emblem ? (
                                                 <img src={formData.emblem} className="w-full h-full object-cover" alt="Logo Preview" />
                                             ) : (
                                                 <>
-                                                    <LucideCamera className={cn("w-6 h-6 text-white/45 transition-colors mb-2", currentSport === "GOLF" ? "group-hover:text-brand" : "group-hover:text-brand")} />
+                                                    <LucideCamera className="w-6 h-6 text-white/45 transition-colors mb-2 group-hover:text-brand" />
                                                     <span className="text-[12px] font-medium text-white/45">사진 업로드</span>
                                                 </>
                                             )}
@@ -311,17 +300,22 @@ export default function CreateClub() {
                                             }}
                                         />
                                         <div
-                                            onClick={() => document.getElementById('cover-upload')?.click()}
+                                            onClick={() => { if (uploadingField !== 'coverImage') document.getElementById('cover-upload')?.click(); }}
                                             className={cn(
-                                                "aspect-square rounded-2xl bg-surface-2 border border-white/5 flex flex-col items-center justify-center cursor-pointer transition-all group overflow-hidden relative",
-                                                currentSport === "GOLF" ? "hover:border-brand/50" : "hover:border-brand/50"
+                                                "aspect-square rounded-2xl bg-surface-2 border border-white/5 flex flex-col items-center justify-center transition-all group overflow-hidden relative",
+                                                uploadingField === 'coverImage' ? "cursor-wait" : "cursor-pointer hover:border-brand/50"
                                             )}
                                         >
-                                            {formData.coverImage ? (
+                                            {uploadingField === 'coverImage' ? (
+                                                <>
+                                                    <LucideLoader2 className="w-6 h-6 text-brand animate-spin mb-2" />
+                                                    <span className="text-[12px] font-medium text-white/45">업로드 중...</span>
+                                                </>
+                                            ) : formData.coverImage ? (
                                                 <img src={formData.coverImage} className="w-full h-full object-cover" alt="Cover Preview" />
                                             ) : (
                                                 <>
-                                                    <LucideImagePlus className={cn("w-6 h-6 text-white/45 transition-colors mb-2", currentSport === "GOLF" ? "group-hover:text-brand" : "group-hover:text-brand")} />
+                                                    <LucideImagePlus className="w-6 h-6 text-white/45 transition-colors mb-2 group-hover:text-brand" />
                                                     <span className="text-[12px] font-medium text-white/45">사진 업로드</span>
                                                 </>
                                             )}
@@ -342,31 +336,34 @@ export default function CreateClub() {
                         >
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-white/55">주 활동 지역 <span className={currentSport === "GOLF" ? "text-brand" : "text-brand"}>*</span></Label>
+                                    <Label className="text-xs font-semibold text-white/55">주 활동 지역 <span className="text-brand">*</span></Label>
                                     <Popover open={isRegionOpen} onOpenChange={setIsRegionOpen}>
                                         <PopoverTrigger asChild>
                                             <Button
                                                 variant="outline"
                                                 role="combobox"
                                                 aria-expanded={isRegionOpen}
-                                                className="w-full justify-between bg-surface-2 border-white/10 h-14 text-base font-bold text-white hover:bg-surface-2 hover:text-white"
+                                                className={cn(
+                                                    "w-full justify-between bg-surface-2 border-white/10 h-14 text-[15px] font-medium hover:bg-surface-2 hover:text-white",
+                                                    formData.region ? "text-white" : "text-white/40"
+                                                )}
                                             >
                                                 {formData.region
                                                     ? formData.region
-                                                    : "지역 검색 (예: 강남구, 역삼동)..."}
+                                                    : "지역 검색 (예: 강남구, 역삼동)"}
                                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                             </Button>
                                         </PopoverTrigger>
-                                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-surface-2 border-white/10 text-white rounded-none">
-                                            <Command shouldFilter={false} className="bg-surface-2 text-white rounded-none">
+                                        <PopoverContent align="start" sideOffset={6} className="w-[var(--radix-popover-trigger-width)] p-0 bg-[#141416] border border-white/10 text-white rounded-2xl shadow-2xl shadow-black/60 overflow-hidden z-[60]">
+                                            <Command shouldFilter={false} className="bg-transparent text-white rounded-2xl [&_[cmdk-input-wrapper]]:border-white/10">
                                                 <CommandInput
-                                                    placeholder="지역 검색..."
-                                                    className="h-9 border-none focus:ring-0 text-white placeholder:text-white/45"
+                                                    placeholder="지역 검색 (예: 강남구)"
+                                                    className="h-11 border-none focus:ring-0 text-[15px] text-white placeholder:text-white/40"
                                                     value={regionSearchQuery}
                                                     onValueChange={setRegionSearchQuery}
                                                 />
-                                                <CommandList>
-                                                    <CommandEmpty className="py-6 text-center text-sm text-white/45">
+                                                <CommandList className="max-h-[240px] overflow-y-auto overscroll-contain">
+                                                    <CommandEmpty className="py-8 text-center text-[13px] text-white/40">
                                                         {regionSearchQuery ? "검색 결과가 없습니다" : "지역을 검색해주세요"}
                                                     </CommandEmpty>
                                                     <CommandGroup>
@@ -379,7 +376,7 @@ export default function CreateClub() {
                                                                     setRegionSearchQuery(region.fullName); // Update input to show selection if needed, but display handles it
                                                                     setIsRegionOpen(false);
                                                                 }}
-                                                                className="text-white hover:bg-white/10 cursor-pointer"
+                                                                className="text-[15px] text-white/90 rounded-xl aria-selected:bg-brand/15 aria-selected:text-white data-[selected=true]:bg-brand/15 cursor-pointer py-2.5"
                                                             >
                                                                 <LucideCheck
                                                                     className={cn(
@@ -410,7 +407,7 @@ export default function CreateClub() {
                                     <Card className="bg-brand/10 border-brand/50">
                                         <CardContent className="p-4 flex items-center justify-between">
                                             <div>
-                                                <div className={cn("font-bold", currentSport === "GOLF" ? "text-brand" : "text-brand")}>{selectedStore.name}</div>
+                                                <div className="font-bold text-brand">{selectedStore.name}</div>
                                                 <div className="text-xs text-white/60">{selectedStore.address}</div>
                                             </div>
                                             <Button variant="ghost" size="sm" onClick={() => setSelectedStore(null)}>
@@ -436,10 +433,10 @@ export default function CreateClub() {
                                                     className="p-4 border-b border-white/5 last:border-0 hover:bg-white/5 active:bg-white/10 cursor-pointer flex items-center justify-between group"
                                                 >
                                                     <div>
-                                                        <div className={cn("font-bold text-sm transition-colors", currentSport === "GOLF" ? "group-hover:text-brand" : "group-hover:text-brand")}>{store.name}</div>
+                                                        <div className="font-bold text-sm transition-colors group-hover:text-brand">{store.name}</div>
                                                         <div className="text-xs text-white/45">{store.address}</div>
                                                     </div>
-                                                    <LucideCheck className={cn("w-4 h-4 text-white/45 opacity-0 group-hover:opacity-100 transition-all", currentSport === "GOLF" ? "group-hover:text-brand" : "group-hover:text-brand")} />
+                                                    <LucideCheck className="w-4 h-4 text-white/45 opacity-0 group-hover:opacity-100 transition-all group-hover:text-brand" />
                                                 </div>
                                             ))
                                         ) : (
@@ -455,7 +452,7 @@ export default function CreateClub() {
 
                                 <div className="p-4 bg-white/5 rounded-xl border border-white/5">
                                     <h4 className="font-bold flex items-center gap-2 mb-2 text-sm">
-                                        <LucideTent className={cn("w-4 h-4", currentSport === "GOLF" ? "text-brand" : "text-brand")} />
+                                        <LucideTent className="w-4 h-4 text-brand" />
                                         베이스 캠프란?
                                     </h4>
                                     <p className="text-xs text-white/45 leading-relaxed">
@@ -516,7 +513,7 @@ export default function CreateClub() {
                                                 key={type.id}
                                                 onClick={() => setFormData({ ...formData, gameType: type.id as any })}
                                                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${formData.gameType === type.id
-                                                    ? (currentSport === "GOLF" ? "bg-brand text-brand-fg" : "bg-brand text-brand-fg")
+                                                    ? "bg-brand text-brand-fg"
                                                     : "bg-surface-2 text-white/55 hover:text-white"
                                                     }`}
                                             >
@@ -537,7 +534,7 @@ export default function CreateClub() {
                                                 key={tag}
                                                 onClick={() => toggleTag(tag)}
                                                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${(formData.tags as string[])?.includes(tag)
-                                                    ? "bg-white text-black"
+                                                    ? "bg-brand text-brand-fg"
                                                     : "bg-surface-2 text-white/55 border border-white/5"
                                                     }`}
                                             >
@@ -553,21 +550,21 @@ export default function CreateClub() {
                                         <button
                                             onClick={() => setFormData({ ...formData, joinType: "auto" })}
                                             className={`p-3 rounded-xl border text-left space-y-1 ${formData.joinType === "auto"
-                                                ? (currentSport === "GOLF" ? "border-brand bg-brand/5" : "border-brand bg-brand/5")
+                                                ? "border-brand bg-brand/5"
                                                 : "border-white/5 bg-surface-2"
                                                 }`}
                                         >
-                                            <div className={`font-bold text-sm ${formData.joinType === "auto" ? (currentSport === "GOLF" ? "text-brand" : "text-brand") : "text-white"}`}>바로 가입</div>
+                                            <div className={`font-bold text-sm ${formData.joinType === "auto" ? "text-brand" : "text-white"}`}>바로 가입</div>
                                             <div className="text-[12px] text-white/45">누구나 즉시 가입 가능</div>
                                         </button>
                                         <button
                                             onClick={() => setFormData({ ...formData, joinType: "approval" })}
                                             className={`p-3 rounded-xl border text-left space-y-1 ${formData.joinType === "approval"
-                                                ? (currentSport === "GOLF" ? "border-brand bg-brand/5" : "border-brand bg-brand/5")
+                                                ? "border-brand bg-brand/5"
                                                 : "border-white/5 bg-surface-2"
                                                 }`}
                                         >
-                                            <div className={`font-bold text-sm ${formData.joinType === "approval" ? (currentSport === "GOLF" ? "text-brand" : "text-brand") : "text-white"}`}>승인 후 가입</div>
+                                            <div className={`font-bold text-sm ${formData.joinType === "approval" ? "text-brand" : "text-white"}`}>승인 후 가입</div>
                                             <div className="text-[12px] text-white/45">크루장 승인 필요</div>
                                         </button>
                                     </div>
@@ -582,8 +579,8 @@ export default function CreateClub() {
                                             <button
                                                 key={num}
                                                 onClick={() => setFormData({ ...formData, maxMembers: num })}
-                                                className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${formData.maxMembers === num
-                                                    ? (currentSport === "GOLF" ? "bg-brand text-brand-fg border-brand" : "bg-brand text-brand-fg border-brand")
+                                                className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all tabular-nums ${formData.maxMembers === num
+                                                    ? "bg-brand text-brand-fg border-brand"
                                                     : "bg-surface-2 text-white/55 border-white/5"
                                                     }`}
                                             >

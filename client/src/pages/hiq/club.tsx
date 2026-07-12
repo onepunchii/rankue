@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { LucideSearch } from "lucide-react";
 import { useSport } from "@/contexts/SportContext";
-import { cn } from "@/lib/utils";
 
 // Sub-components
 import { MyCrewList } from "@/components/hiq/club/MyCrewList";
@@ -26,12 +25,7 @@ export default function HiqClub() {
                             <h2 className="text-[15px] font-semibold text-white/55">내 크루</h2>
                             <Button
                                 variant="ghost"
-                                className={cn(
-                                    "h-7 px-3 text-[12px] font-semibold rounded-full transition-all",
-                                    currentSport === "GOLF"
-                                        ? "bg-brand/10 text-brand hover:bg-brand/20"
-                                        : "bg-brand/12 text-brand hover:bg-brand/20"
-                                )}
+                                className="h-7 px-3 text-[12px] font-semibold rounded-full transition-all bg-brand/10 text-brand hover:bg-brand/20"
                                 onClick={() => setLocation("/club/create")}
                             >
                                 + 만들기
@@ -44,14 +38,8 @@ export default function HiqClub() {
                     <section>
                         <div className="mb-3">
                             <h2 className="text-[15px] font-semibold text-white/55 mb-3">둘러보기</h2>
-                            <div className={cn(
-                                "relative group flex items-center px-4 h-11 rounded-tile bg-surface-2 border border-surface-line transition-all duration-300",
-                                currentSport === "GOLF" ? "focus-within:border-brand/30" : "focus-within:border-brand/25"
-                            )}>
-                                <LucideSearch className={cn(
-                                    "w-4 h-4 text-ink-3 mr-2.5 transition-colors duration-300",
-                                    currentSport === "GOLF" ? "group-focus-within:text-brand" : "group-focus-within:text-brand"
-                                )} />
+                            <div className="relative group flex items-center px-4 h-11 rounded-tile bg-surface-2 border border-surface-line transition-all duration-300 focus-within:border-brand/30">
+                                <LucideSearch className="w-4 h-4 text-ink-3 mr-2.5 transition-colors duration-300 group-focus-within:text-brand" />
                                 <input
                                     type="text"
                                     placeholder="크루 이름 또는 지역 검색..."

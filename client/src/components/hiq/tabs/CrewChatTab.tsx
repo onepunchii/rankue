@@ -233,6 +233,11 @@ const ChatMessageItem = memo(({
     setLocation: (url: string) => void
 }) => {
     const isTemp = chat.id.startsWith('temp-');
+    // Server-shaped metadata is untrusted: only treat as a booking card when the
+    // required fields exist, otherwise fall through to plain text (no crash).
+    const isGolfBooking = chat.metadata?.type === 'GOLF_BOOKING' && chat.metadata?.greenFee != null;
+    const bookingDate = isGolfBooking ? new Date(chat.metadata?.datetime) : null;
+    const hasValidBookingDate = !!bookingDate && !Number.isNaN(bookingDate.getTime());
 
     return (
         <div className={cn("flex w-full mb-1 group", isMe ? "justify-end" : "justify-start")}>
@@ -254,7 +259,7 @@ const ChatMessageItem = memo(({
                         <div className={cn(
                             "px-4 py-2.5 rounded-2xl text-sm font-medium break-all leading-relaxed relative",
                             isMe ? "bg-brand text-brand-fg rounded-tr-none" : "bg-white/10 text-white rounded-tl-none border border-white/5",
-                            (chat.type === 'settlement' || chat.metadata?.type === 'GOLF_BOOKING') && "bg-transparent p-0 shadow-none border-none",
+                            (chat.type === 'settlement' || isGolfBooking) && "bg-transparent p-0 shadow-none border-none",
                             isTemp && "opacity-60"
                         )}>
                             {chat.type === 'settlement' ? (
@@ -280,7 +285,7 @@ const ChatMessageItem = memo(({
                                         </Button>
                                     </div>
                                 </div>
-                            ) : chat.metadata?.type === 'GOLF_BOOKING' ? (
+                            ) : isGolfBooking ? (
                                 <div className="bg-[#1A1A1A] border border-white/10 rounded-2xl overflow-hidden w-64">
                                     <div className="bg-blue-500 px-4 py-2.5 flex items-center gap-2">
                                         <span className="text-sm">⛳️</span>
@@ -288,23 +293,27 @@ const ChatMessageItem = memo(({
                                     </div>
                                     <div className="p-5 space-y-4">
                                         <div>
-                                            <h3 className="font-semibold text-white text-base line-clamp-1 leading-tight">{chat.metadata.courseName}</h3>
-                                            <div className="flex items-center gap-2 mt-1.5 text-white/55 text-xs font-medium tabular-nums">
-                                                <span>{new Date(chat.metadata.datetime).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</span>
-                                                <span className="w-1 h-1 rounded-full bg-white/10" />
-                                                <span>{new Date(chat.metadata.datetime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
-                                            </div>
+                                            <h3 className="font-semibold text-white text-base line-clamp-1 leading-tight">{chat.metadata?.courseName ?? '골프장'}</h3>
+                                            {hasValidBookingDate && (
+                                                <div className="flex items-center gap-2 mt-1.5 text-white/55 text-xs font-medium tabular-nums">
+                                                    <span>{bookingDate!.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</span>
+                                                    <span className="w-1 h-1 rounded-full bg-white/10" />
+                                                    <span>{bookingDate!.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="text-xl font-semibold text-blue-400 tracking-tight tabular-nums">
-                                            {chat.metadata.greenFee.toLocaleString()}<span className="text-xs ml-0.5 text-blue-400/60">원</span>
+                                            {chat.metadata?.greenFee?.toLocaleString() ?? '-'}<span className="text-xs ml-0.5 text-blue-400/60">원</span>
                                         </div>
-                                        <Button
-                                            size="sm" variant="ghost"
-                                            className="w-full bg-white/5 hover:bg-white/10 text-white font-semibold h-10 rounded-xl text-xs border border-white/5 transition-all active:scale-95"
-                                            onClick={() => setLocation(`/golf/booking-list/${chat.metadata.bookingId}`)}
-                                        >
-                                            자세히 보기
-                                        </Button>
+                                        {chat.metadata?.bookingId != null && (
+                                            <Button
+                                                size="sm" variant="ghost"
+                                                className="w-full bg-white/5 hover:bg-white/10 text-white font-semibold h-10 rounded-xl text-xs border border-white/5 transition-all active:scale-95"
+                                                onClick={() => setLocation(`/golf/booking-list/${chat.metadata.bookingId}`)}
+                                            >
+                                                자세히 보기
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             ) : (
