@@ -365,6 +365,11 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
         ? getTier(golfScore, false, 'GOLF')
         : getTier(Number(m.handi4c || 0), false, 'BILLIARDS');
 
+    const tierColor = TIER_COLOR[tier.label] || "text-white/55";
+    const hasStat = sportCategory === 'GOLF' ? golfScore > 0 : !!(m.avg4c && m.avg4c > 0);
+    const statValue = sportCategory === 'GOLF' ? golfScore.toFixed(0) : avg4c;
+    const statUnit = sportCategory === 'GOLF' ? '평균' : '4구';
+
     return (
         <div
             onClick={onClick}
@@ -372,86 +377,75 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onClick()}
             className={cn(
-                "flex items-center justify-between p-4 mb-2 rounded-tile border transition-all duration-300 cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-brand",
+                "flex items-center gap-3.5 px-4 py-3.5 mb-2 rounded-tile border transition-colors cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-brand",
                 isMe
                     ? "bg-brand/[0.06] border-brand/20"
-                    : "bg-surface-2 border-surface-line hover:border-white/10"
+                    : "bg-surface-1 border-surface-line hover:border-white/10"
             )}
         >
-            <div className="flex items-center gap-4">
-                <div className="relative">
-                    <Avatar className={cn(
-                        "w-14 h-14 border-2 transition-transform duration-500 group-hover:scale-105",
-                        isMe ? "border-brand/30" : "border-surface-line"
-                    )}>
-                        <AvatarImage
-                            src={m.profileImageUrl}
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            className="object-cover"
-                        />
-                        <AvatarFallback className="bg-surface-3 text-white/40 text-lg font-semibold">
-                            {m.nickname?.[0] || m.name?.[0]}
-                        </AvatarFallback>
-                    </Avatar>
+            {/* Avatar */}
+            <div className="relative shrink-0">
+                <Avatar className={cn(
+                    "w-12 h-12 border",
+                    isMe ? "border-brand/40" : "border-surface-line"
+                )}>
+                    <AvatarImage
+                        src={m.profileImageUrl}
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        className="object-cover"
+                    />
+                    <AvatarFallback className="bg-surface-3 text-white/40 text-base font-semibold">
+                        {m.nickname?.[0] || m.name?.[0]}
+                    </AvatarFallback>
+                </Avatar>
+                {isMe && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-brand rounded-full border-2 border-[#0A0A0A]" />
+                )}
+            </div>
+
+            {/* Identity */}
+            <div className="flex flex-col min-w-0 flex-1 gap-1">
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-white font-semibold text-[16px] leading-tight tracking-tight truncate">
+                        {m.nickname || m.name}
+                    </span>
+                    {isLeader && <LucideCrown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                    {isAdmin && <LucideShield className="w-3.5 h-3.5 text-white/40 shrink-0" />}
                     {isMe && (
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-brand rounded-full border-2 border-surface-2 flex items-center justify-center">
-                            <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                        </div>
+                        <span className="shrink-0 px-1.5 py-px rounded-full text-[11px] font-semibold text-brand bg-brand/12">나</span>
                     )}
                 </div>
-
-                <div className="flex flex-col justify-center gap-1.5">
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-white font-semibold text-[17px] leading-tight tracking-tight">
-                            {m.nickname || m.name}
-                        </span>
-                        {isLeader && <LucideCrown className="w-3.5 h-3.5 text-yellow-500" />}
-                        {isAdmin && <LucideShield className="w-3.5 h-3.5 text-blue-400" />}
-
-                        <div className={cn(
-                            "flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-white/5 border border-white/5 ml-1",
-                            tier.class
-                        )}>
-                            <span className="text-[12px] font-semibold">{tier.label}</span>
-                        </div>
-                        <div className="flex items-center gap-1 ml-1">
-                            {isMe && <Badge variant="secondary" className="px-1.5 py-0.5 h-auto text-[12px] bg-brand/12 text-brand border-0">나</Badge>}
-                            {isNewbie && <Badge variant="secondary" className="px-1.5 py-0.5 h-auto text-[12px] bg-rose-500/10 text-rose-500 border-0">New</Badge>}
-                            <Badge variant="secondary" className={cn(
-                                "px-1.5 py-0.5 h-auto text-[12px] border-0",
-                                m.gender === 'female' ? "bg-pink-500/10 text-pink-500" : "bg-blue-500/10 text-blue-400"
-                            )}>
-                                {m.gender === 'female' ? '여' : '남'}
-                            </Badge>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                        <p className="text-[13px] text-white/50 leading-tight line-clamp-1">
-                            {m.introduction || (sportCategory === 'GOLF' ? "골프를 즐기는 랭커" : "당구를 즐기는 랭커")}
-                        </p>
-                    </div>
+                <div className="flex items-center gap-1.5 min-w-0 text-[12px] leading-none">
+                    <span className={cn("font-semibold shrink-0", tierColor)}>{tier.label}</span>
+                    {isNewbie && <><span className="text-white/20">·</span><span className="text-brand/80 font-medium shrink-0">신입</span></>}
+                    <span className="text-white/20 shrink-0">·</span>
+                    <span className="text-white/40 font-medium truncate">
+                        {m.introduction || (sportCategory === 'GOLF' ? "골프를 즐기는 랭커" : "당구를 즐기는 랭커")}
+                    </span>
                 </div>
             </div>
-            <div className="flex items-center gap-3 pl-2">
-                {sportCategory === 'GOLF'
-                    ? golfScore > 0 && (
-                        <div className="flex flex-col items-end leading-none">
-                            <span className="text-[17px] font-bold text-white tabular-nums tracking-tight">{golfScore.toFixed(0)}</span>
-                            <span className="text-[12px] font-medium text-white/45 mt-1">평균</span>
-                        </div>
-                    )
-                    : (m.avg4c && m.avg4c > 0) && (
-                        <div className="flex flex-col items-end leading-none">
-                            <span className="text-[17px] font-bold text-white tabular-nums tracking-tight">{avg4c}</span>
-                            <span className="text-[12px] font-medium text-white/45 mt-1">4구</span>
-                        </div>
-                    )}
-                <LucideChevronRight className="w-5 h-5 text-white/45 group-hover:text-white/55 transition-colors" />
+
+            {/* Stat */}
+            <div className="flex items-center gap-2.5 shrink-0">
+                {hasStat && (
+                    <div className="flex flex-col items-end leading-none">
+                        <span className="text-[18px] font-bold text-white tabular-nums tracking-tight">{statValue}</span>
+                        <span className="text-[11px] font-medium text-white/40 mt-1">{statUnit}</span>
+                    </div>
+                )}
+                <LucideChevronRight className="w-4 h-4 text-white/30 group-hover:text-white/50 transition-colors" />
             </div>
         </div>
     );
 }
+
+// Tier label → refined accent color (medal metals, tokenized to the dark theme).
+const TIER_COLOR: Record<string, string> = {
+    "플래티넘": "text-cyan-300",
+    "골드": "text-amber-400",
+    "실버": "text-slate-300",
+    "브론즈": "text-orange-400/90",
+};
 
 const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => (
     <div className="flex items-center justify-center gap-8 w-full max-w-sm py-4">

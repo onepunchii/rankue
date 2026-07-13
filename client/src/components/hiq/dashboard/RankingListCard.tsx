@@ -56,14 +56,12 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                         const isMe = String(member.id) === String(currentMemberId);
                         const rank = idx + 1;
                         const rp = activeTab === '3c' ? member.rating3c : member.rating4c;
-                        const avg = member.average || "0.000"; // Note: Average might be overall, not specific to type here unless schema supports separate averages well. Using generic average for now or specific if available.
-                        // Ideally we show type specific stats. Let's assume average is general or we just show RP.
-
-                        // Style for top 3
-                        let rankStyle = "bg-white/5 text-gray-500";
-                        if (rank === 1) rankStyle = "bg-yellow-500/20 text-yellow-500 border-yellow-500/50";
-                        if (rank === 2) rankStyle = "bg-gray-300/20 text-gray-300 border-gray-300/50";
-                        if (rank === 3) rankStyle = "bg-amber-700/20 text-amber-700 border-amber-700/50";
+                        const isTop3 = rank <= 3;
+                        // Refined medal accents for the podium; plain muted numerals below.
+                        const medal = rank === 1 ? "bg-amber-400/15 text-amber-400"
+                            : rank === 2 ? "bg-slate-300/15 text-slate-200"
+                                : "bg-orange-400/15 text-orange-400";
+                        const rpColor = activeTab === '3c' ? "text-brand" : "text-blue-400";
 
                         return (
                             <motion.div
@@ -74,32 +72,38 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                                 exit={{ opacity: 0, x: 10 }}
                                 transition={{ duration: 0.2, delay: idx * 0.05 }}
                                 className={cn(
-                                    "flex items-center p-3 rounded-2xl border transition-all relative overflow-hidden group",
-                                    isMe ? "bg-brand/10 border-brand/30" : "bg-white/[0.03] border-white/5"
+                                    "flex items-center gap-3.5 px-3.5 py-3 rounded-2xl border transition-colors",
+                                    isMe ? "bg-brand/[0.08] border-brand/25" : "bg-surface-1 border-surface-line"
                                 )}
                             >
-                                {/* Rank Badge */}
-                                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center font-bold text-[17px] tabular-nums border", rankStyle)}>
-                                    {rank}
+                                {/* Rank */}
+                                <div className="w-9 flex justify-center shrink-0">
+                                    {isTop3 ? (
+                                        <div className={cn("w-9 h-9 rounded-tile flex items-center justify-center font-bold text-[16px] tabular-nums", medal)}>
+                                            {rank}
+                                        </div>
+                                    ) : (
+                                        <span className="font-semibold text-[16px] tabular-nums text-white/30">{rank}</span>
+                                    )}
                                 </div>
 
                                 {/* Info */}
-                                <div className="ml-3.5 flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
                                         <span className={cn("font-semibold text-[15px] truncate", isMe ? "text-white" : "text-white/85")}>
                                             {member.name}
                                         </span>
-                                        {isMe && <span className="text-[12px] font-bold bg-brand text-black px-1.5 py-0.5 rounded-md shrink-0">나</span>}
+                                        {isMe && <span className="shrink-0 px-1.5 py-px rounded-full text-[11px] font-semibold text-brand bg-brand/12">나</span>}
                                     </div>
-                                    <span className="block text-[12px] font-medium text-white/40 mt-0.5">평균 {member.average}</span>
+                                    <span className="block text-[12px] font-medium text-white/40 tabular-nums mt-0.5">평균 {member.average || "0.000"}</span>
                                 </div>
 
                                 {/* Score (RP) */}
-                                <div className="text-right pl-2 shrink-0">
-                                    <span className={cn("block font-bold text-[21px] tabular-nums tracking-tight leading-none", activeTab === '3c' ? "text-brand" : "text-blue-400")}>
+                                <div className="flex items-baseline gap-1 shrink-0">
+                                    <span className={cn("font-bold text-[20px] tabular-nums tracking-tight", rpColor)}>
                                         {rp || 0}
                                     </span>
-                                    <span className="text-[12px] font-semibold text-white/35 mt-0.5 inline-block">RP</span>
+                                    <span className="text-[11px] font-semibold text-white/35">RP</span>
                                 </div>
                             </motion.div>
                         );
