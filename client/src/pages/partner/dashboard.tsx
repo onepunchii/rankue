@@ -13,7 +13,7 @@ import {
 import { HiqStore } from "../../../../shared/schema";
 import { useRef, useState, useMemo } from "react";
 import * as XLSX from 'xlsx';
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import html2canvas from "html2canvas";
 import { LucideLock as LockIcon } from "lucide-react";
 
@@ -66,8 +66,16 @@ export default function PartnerDashboard() {
 
     const [copied, setCopied] = useState(false);
 
-    const handleLogout = () => {
-        document.cookie = "hiq_partner_auth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    const handleLogout = async () => {
+        // The session cookie is httpOnly, so client JS cannot clear it — the server must.
+        try {
+            await apiRequest("/api/hiq/logout", { method: "POST" });
+        } catch {
+            /* proceed even if offline */
+        }
+        // Wipe cached member PII from memory and the throttled localStorage persister.
+        queryClient.clear();
+        localStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
         setLocation("/partner/login");
     };
 

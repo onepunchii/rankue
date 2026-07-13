@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { LucideCheckCircle2, LucideXCircle, LucideLoader2 } from "lucide-react";
 import { HiqMember } from "@shared/schema";
 import { useStore } from "@/contexts/StoreContext";
+import { useToast } from "@/hooks/use-toast";
 
 export default function HiqJoin() {
     const [, params] = useRoute("/join/:code");
     const code = params?.code;
     const [, setLocation] = useLocation();
     const { store } = useStore();
+    const { toast } = useToast();
 
     // Check login status
     const { data: me, isLoading: meLoading, error: meError } = useQuery<HiqMember>({
@@ -32,6 +34,13 @@ export default function HiqJoin() {
         },
         onSuccess: () => {
             // Joined successfully
+        },
+        onError: () => {
+            toast({
+                variant: "destructive",
+                title: "입장 실패",
+                description: "만료되었거나 유효하지 않은 초대입니다.",
+            });
         }
     });
 
@@ -58,7 +67,7 @@ export default function HiqJoin() {
                 </p>
                 <Button
                     className="w-full h-14 text-lg font-bold rk-btn-primary rounded-tile"
-                    onClick={() => setLocation("/login?redirect=" + encodeURIComponent(`/join/${code}`))}
+                    onClick={() => setLocation("/?redirect=" + encodeURIComponent(`/join/${code}`))}
                 >
                     로그인 하러 가기
                 </Button>
@@ -66,7 +75,9 @@ export default function HiqJoin() {
         );
     }
 
-    if (invite?.status !== 'pending') {
+    const isExpired = !!invite?.expiresAt && new Date(invite.expiresAt).getTime() < Date.now();
+
+    if (invite?.status !== 'pending' || isExpired) {
         return (
             <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col items-center justify-center px-5 text-center">
                 <LucideXCircle className="w-16 h-16 text-red-500 mb-4" />

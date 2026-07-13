@@ -50,12 +50,18 @@ router.post("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest
 
 // POST /activities/:activityId/join - Join activity
 router.post("/:id/activities/:activityId/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const activity = await storage.getCrewActivity(req.params.activityId);
+    if (!activity || activity.crewId !== req.params.id) return sendError(res, 404, "정모를 찾을 수 없습니다");
     await storage.joinCrewActivity(req.params.activityId, req.userId!);
     return sendSuccess(res, { success: true });
 }));
 
 // DELETE /activities/:activityId/join - Leave activity
 router.delete("/:id/activities/:activityId/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const activity = await storage.getCrewActivity(req.params.activityId);
+    if (!activity || activity.crewId !== req.params.id) return sendError(res, 404, "정모를 찾을 수 없습니다");
     await storage.leaveCrewActivity(req.params.activityId, req.userId!);
     return sendSuccess(res, { success: true });
 }));
@@ -71,7 +77,7 @@ router.patch("/:id/activities/:activityId", requireAuth, asyncHandler(async (req
     }
 
     const activity = await storage.getCrewActivity(req.params.activityId);
-    if (!activity) return sendError(res, 404, "정모를 찾을 수 없습니다");
+    if (!activity || activity.crewId !== req.params.id) return sendError(res, 404, "정모를 찾을 수 없습니다");
 
     const updateData: any = {};
     if (req.body.title !== undefined) updateData.title = req.body.title;
@@ -97,7 +103,7 @@ router.delete("/:id/activities/:activityId", requireAuth, asyncHandler(async (re
     }
 
     const activity = await storage.getCrewActivity(req.params.activityId);
-    if (!activity) return sendError(res, 404, "정모를 찾을 수 없습니다");
+    if (!activity || activity.crewId !== req.params.id) return sendError(res, 404, "정모를 찾을 수 없습니다");
 
     await storage.deleteCrewActivity(req.params.activityId);
     return sendSuccess(res, { success: true });
@@ -142,7 +148,7 @@ router.post("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res
 // DELETE /posts/:postId
 router.delete("/:id/posts/:postId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const post = await storage.getCrewPost(req.params.postId);
-    if (!post) return sendError(res, 404, "게시글을 찾을 수 없습니다");
+    if (!post || post.crewId !== req.params.id) return sendError(res, 404, "게시글을 찾을 수 없습니다");
 
     // Auth Check: Author or Admin
     const crewData = await storage.getCrew(req.params.id);
@@ -165,10 +171,37 @@ router.post("/:id/posts/:postId/like", requireAuth, asyncHandler(async (req: Aut
 
 // --- Comments ---
 
+// GET /crews/:id/posts/:postId/comments - list comments
+router.get("/:id/posts/:postId/comments", asyncHandler(async (req: any, res: any) => {
+    const post = await storage.getCrewPost(req.params.postId);
+    if (!post || post.crewId !== req.params.id) return sendError(res, 404, "게시글을 찾을 수 없습니다");
+    const comments = await storage.getCrewPostComments(req.params.postId);
+    return sendSuccess(res, comments);
+}));
+
+// POST /crews/:id/posts/:postId/comments - add comment (members only)
+router.post("/:id/posts/:postId/comments", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const post = await storage.getCrewPost(req.params.postId);
+    if (!post || post.crewId !== req.params.id) return sendError(res, 404, "게시글을 찾을 수 없습니다");
+    const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+    if (!content) return sendError(res, 400, "댓글 내용을 입력해주세요");
+    const comment = await storage.createCrewPostComment({
+        postId: req.params.postId,
+        authorId: req.userId!,
+        content,
+    } as any);
+    return sendSuccess(res, comment);
+}));
+
 // DELETE /crews/:id/comments/:commentId
 router.delete("/:id/comments/:commentId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const comment = await storage.getCrewComment(req.params.commentId);
     if (!comment) return sendError(res, 404, "댓글을 찾을 수 없습니다");
+
+    // Verify the comment's parent post belongs to crew :id (comments have no crewId column).
+    const parentPost = await storage.getCrewPost(comment.postId);
+    if (!parentPost || parentPost.crewId !== req.params.id) return sendError(res, 404, "댓글을 찾을 수 없습니다");
 
     // Auth Check: Author or Admin
     const crewData = await storage.getCrew(req.params.id);
@@ -199,10 +232,37 @@ router.post("/:id/photos/:photoId/like", requireAuth, asyncHandler(async (req: A
     return sendSuccess(res, result);
 }));
 
+// GET /crews/:id/photos/:photoId/comments - list photo comments
+router.get("/:id/photos/:photoId/comments", asyncHandler(async (req: any, res: any) => {
+    const photo = await storage.getCrewPhoto(req.params.photoId);
+    if (!photo || photo.crewId !== req.params.id) return sendError(res, 404, "사진을 찾을 수 없습니다");
+    const comments = await storage.getCrewPhotoComments(req.params.photoId);
+    return sendSuccess(res, comments);
+}));
+
+// POST /crews/:id/photos/:photoId/comments - add photo comment (members only)
+router.post("/:id/photos/:photoId/comments", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const photo = await storage.getCrewPhoto(req.params.photoId);
+    if (!photo || photo.crewId !== req.params.id) return sendError(res, 404, "사진을 찾을 수 없습니다");
+    const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+    if (!content) return sendError(res, 400, "댓글 내용을 입력해주세요");
+    const comment = await storage.createCrewPhotoComment({
+        photoId: req.params.photoId,
+        authorId: req.userId!,
+        content,
+    } as any);
+    return sendSuccess(res, comment);
+}));
+
 // DELETE /crews/:id/photo-comments/:commentId
 router.delete("/:id/photo-comments/:commentId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const comment = await storage.getCrewPhotoComment(req.params.commentId);
     if (!comment) return sendError(res, 404, "댓글을 찾을 수 없습니다");
+
+    // Verify the comment's parent photo belongs to crew :id (photo-comments have no crewId column).
+    const parentPhoto = await storage.getCrewPhoto(comment.photoId);
+    if (!parentPhoto || parentPhoto.crewId !== req.params.id) return sendError(res, 404, "댓글을 찾을 수 없습니다");
 
     // Auth Check: Author or Admin
     const crewData = await storage.getCrew(req.params.id);
@@ -231,7 +291,7 @@ router.post("/:id/photos", requireAuth, asyncHandler(async (req: AuthRequest, re
 // DELETE /crews/:id/photos/:photoId
 router.delete("/:id/photos/:photoId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const photo = await storage.getCrewPhoto(req.params.photoId);
-    if (!photo) return sendError(res, 404, "사진을 찾을 수 없습니다");
+    if (!photo || photo.crewId !== req.params.id) return sendError(res, 404, "사진을 찾을 수 없습니다");
 
     // Auth Check: Author or Admin
     const crewData = await storage.getCrew(req.params.id);
@@ -251,6 +311,8 @@ router.delete("/:id/photos/:photoId", requireAuth, asyncHandler(async (req: Auth
 
 // GET /crews/:id/chats
 router.get("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    // Members only — a pending (승인 대기) applicant must not read the crew's private chat.
+    if (await requireCrewMember(req, res) === null) return;
     const chats = await storage.getCrewChats(req.params.id, req.userId);
     return sendSuccess(res, chats);
 }));
@@ -299,7 +361,7 @@ router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res
 // DELETE /crews/:id/chats/:chatId
 router.delete("/:id/chats/:chatId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const chat = await storage.getCrewChat(req.params.chatId);
-    if (!chat) return sendError(res, 404, "메시지를 찾을 수 없습니다");
+    if (!chat || chat.crewId !== req.params.id) return sendError(res, 404, "메시지를 찾을 수 없습니다");
 
     // Auth Check: Author or Admin
     const crewData = await storage.getCrew(req.params.id);
@@ -353,6 +415,12 @@ router.post("/:id/polls/:pollId/vote", requireAuth, asyncHandler(async (req: Aut
     if (await requireCrewMember(req, res) === null) return;
     const { optionId } = req.body;
     if (!optionId) return sendError(res, 400, "선택지 ID가 필요합니다");
+
+    // Scope check: the option must belong to :pollId, which must belong to crew :id.
+    const poll = await storage.getPollByOptionId(optionId);
+    if (!poll || poll.id !== req.params.pollId || poll.crewId !== req.params.id) {
+        return sendError(res, 404, "투표를 찾을 수 없습니다");
+    }
 
     const result = await storage.votePoll(req.params.pollId, optionId, req.userId!);
     return sendSuccess(res, result);
@@ -591,6 +659,27 @@ router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthReques
     }
 
     const settlement = await storage.createSettlement(validation.data, items, participants);
+
+    // Broadcast a settlement card into the crew chat so members can see and open it.
+    // (The client sends sendToChat: true; without this the settlement dead-ends after creation.)
+    if (req.body.sendToChat) {
+        const totalAmount = Array.isArray(items)
+            ? items.reduce((sum: number, it: any) => sum + (Number(it?.amount) || 0), 0)
+            : 0;
+        try {
+            await storage.createCrewChat({
+                crewId: req.params.id,
+                senderId: req.userId,
+                message: `정산 요청: ${settlement.title}`,
+                type: 'settlement',
+                metadata: { settlementId: settlement.id, title: settlement.title, totalAmount },
+            } as any);
+        } catch (chatErr) {
+            // Settlement already committed; a failed chat card must not fail the request.
+            console.error("[Settlement] chat card creation failed:", chatErr);
+        }
+    }
+
     return sendSuccess(res, settlement);
 }));
 

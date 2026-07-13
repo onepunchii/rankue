@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Flag, Zap, Plane, Monitor, MonitorPlay, Beer } from "lucide-react";
 
 
 
@@ -19,50 +20,37 @@ export const CategorySelector = ({ selected, onSelect }: CategorySelectorProps) 
 
     const categories = [
         // Row 1: Field / Tour
-        {
-            id: "REGULAR_ROUNDING", label: "정규 라운딩", desc: "월례회",
-            classes: { border: "border-[#2563EB]", text: "text-[#2563EB]", bg: "bg-[#2563EB]" }
-        },
-        {
-            id: "BLITZ_ROUNDING", label: "번개 라운딩", desc: "조인/급구",
-            classes: { border: "border-[#EAB308]", text: "text-[#EAB308]", bg: "bg-[#EAB308]" }
-        },
-        {
-            id: "GOLF_TOUR", label: "골프 투어", desc: "여행",
-            classes: { border: "border-[#F97316]", text: "text-[#F97316]", bg: "bg-[#F97316]" }
-        },
+        { id: "REGULAR_ROUNDING", label: "정규 라운딩", desc: "월례회", icon: Flag },
+        { id: "BLITZ_ROUNDING", label: "번개 라운딩", desc: "조인/급구", icon: Zap },
+        { id: "GOLF_TOUR", label: "골프 투어", desc: "여행", icon: Plane },
 
         // Row 2: Screen / Social
-        {
-            id: "REGULAR_SCREEN", label: "정규 스크린", desc: "대회",
-            classes: { border: "border-[#00E3CC]", text: "text-[#00E3CC]", bg: "bg-[#00E3CC]" }
-        },
-        {
-            id: "BLITZ_SCREEN", label: "번개 스크린", desc: "한게임",
-            classes: { border: "border-[#3B82F6]", text: "text-[#3B82F6]", bg: "bg-[#3B82F6]" }
-        },
-        {
-            id: "AFTER_PARTY", label: "뒷풀이", desc: "회식",
-            classes: { border: "border-[#EC4899]", text: "text-[#EC4899]", bg: "bg-[#EC4899]" }
-        }
+        { id: "REGULAR_SCREEN", label: "정규 스크린", desc: "대회", icon: Monitor },
+        { id: "BLITZ_SCREEN", label: "번개 스크린", desc: "한게임", icon: MonitorPlay },
+        { id: "AFTER_PARTY", label: "뒷풀이", desc: "회식", icon: Beer },
     ] as const;
 
     return (
         <div className="grid grid-cols-3 gap-2 mb-6">
             {categories.map((cat) => {
                 const isSelected = selected === cat.id;
+                const Icon = cat.icon;
                 return (
                     <button
                         key={cat.id}
                         type="button"
                         onClick={() => onSelect(cat.id)}
                         className={cn(
-                            "flex flex-col items-center justify-center p-3 rounded-tile border transition-colors h-[70px]",
+                            "flex flex-col items-center justify-center gap-1 p-3 rounded-tile border transition-colors h-[70px]",
                             isSelected
-                                ? cn("bg-white/[0.08]", cat.classes.border)
+                                ? "border-brand bg-brand/10"
                                 : "bg-surface-2 border-surface-line hover:bg-surface-3 hover:border-white/10"
                         )}
                     >
+                        <Icon className={cn(
+                            "w-4 h-4 transition-colors",
+                            isSelected ? "text-brand" : "text-white/45"
+                        )} />
                         <span className={cn(
                             "text-xs font-semibold text-center leading-tight transition-colors",
                             isSelected ? "text-white" : "text-white/55"
@@ -70,8 +58,8 @@ export const CategorySelector = ({ selected, onSelect }: CategorySelectorProps) 
                             {cat.label}
                         </span>
                         <span className={cn(
-                            "text-xs font-medium mt-0.5",
-                            isSelected ? cat.classes.text : "text-white/45"
+                            "text-xs font-medium transition-colors",
+                            isSelected ? "text-brand" : "text-white/45"
                         )}>
                             {cat.desc}
                         </span>

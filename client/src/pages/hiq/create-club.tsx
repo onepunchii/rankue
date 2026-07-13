@@ -99,6 +99,7 @@ export default function CreateClub() {
                 description: "새로운 크루가 시작되었습니다.",
             });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/crews"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/crews/mine"] });
             setLocation("/club");
         },
         onError: (error: Error) => {
@@ -186,7 +187,7 @@ export default function CreateClub() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white font-sans pb-10">
+        <div className="min-h-screen bg-[#0A0A0A] text-white font-sans pb-36">
             {/* Header */}
             <div className="sticky top-0 z-10 bg-[#0A0A0A] border-b border-surface-line px-5 py-4 flex items-center justify-between">
                 <Button variant="ghost" className="p-0 h-auto text-white/60 hover:text-white" onClick={() => step > 1 ? setStep(step - 1) : setLocation("/club")}>
@@ -227,7 +228,7 @@ export default function CreateClub() {
                                     <Label className="text-xs font-semibold text-white/55">크루 이름 <span className="text-brand">*</span></Label>
                                     <Input
                                         placeholder={currentSport === "GOLF" ? "예: 버디찬스, 72홀 골프회" : "예: 죽방전설, 서초당구클럽"}
-                                        className="bg-surface-2 border-white/10 h-14 text-xl font-semibold placeholder:text-white/45 rounded-2xl"
+                                        className="bg-surface-2 border-white/10 h-14 text-xl font-semibold placeholder:text-white/45 rounded-tile"
                                         value={formData.name || ""}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                                     />
@@ -236,7 +237,7 @@ export default function CreateClub() {
                                     <Label className="text-xs font-semibold text-white/55">간판 문구</Label>
                                     <Input
                                         placeholder={currentSport === "GOLF" ? "예: 매주 라운딩 나가는 직장인 크루 ⛳️" : "예: 광진구 2030 즐겜 크루! 🎱"}
-                                        className="bg-surface-2 border-white/10 h-14 text-sm font-bold placeholder:text-white/45 rounded-2xl"
+                                        className="bg-surface-2 border-white/10 h-12 text-[15px] font-medium placeholder:text-white/45 rounded-tile"
                                         value={formData.shortIntro || ""}
                                         onChange={e => setFormData({ ...formData, shortIntro: e.target.value })}
                                     />
@@ -245,7 +246,7 @@ export default function CreateClub() {
                                     <Label className="text-xs font-semibold text-white/55">상세 소개</Label>
                                     <Textarea
                                         placeholder={currentSport === "GOLF" ? "회비, 라운딩 주기, 실력 제한 등 상세 정보를 입력해주세요." : "회비, 규칙, 정모 시간 등 상세한 정보를 마음껏 입력해주세요."}
-                                        className="bg-surface-2 border-white/10 min-h-[160px] text-sm font-medium placeholder:text-white/45 resize-none rounded-2xl p-4 leading-relaxed"
+                                        className="bg-surface-2 border-white/10 min-h-[160px] text-[15px] font-medium placeholder:text-white/45 resize-none rounded-tile p-4 leading-relaxed"
                                         value={formData.description || ""}
                                         onChange={e => setFormData({ ...formData, description: e.target.value })}
                                     />
@@ -267,7 +268,7 @@ export default function CreateClub() {
                                         <div
                                             onClick={() => { if (uploadingField !== 'emblem') document.getElementById('logo-upload')?.click(); }}
                                             className={cn(
-                                                "aspect-square rounded-2xl bg-surface-2 border border-white/5 flex flex-col items-center justify-center transition-all group overflow-hidden relative",
+                                                "aspect-square rounded-tile bg-surface-2 border border-white/5 flex flex-col items-center justify-center transition-all group overflow-hidden relative",
                                                 uploadingField === 'emblem' ? "cursor-wait" : "cursor-pointer hover:border-brand/50"
                                             )}
                                         >
@@ -302,7 +303,7 @@ export default function CreateClub() {
                                         <div
                                             onClick={() => { if (uploadingField !== 'coverImage') document.getElementById('cover-upload')?.click(); }}
                                             className={cn(
-                                                "aspect-square rounded-2xl bg-surface-2 border border-white/5 flex flex-col items-center justify-center transition-all group overflow-hidden relative",
+                                                "aspect-square rounded-tile bg-surface-2 border border-white/5 flex flex-col items-center justify-center transition-all group overflow-hidden relative",
                                                 uploadingField === 'coverImage' ? "cursor-wait" : "cursor-pointer hover:border-brand/50"
                                             )}
                                         >
@@ -344,7 +345,7 @@ export default function CreateClub() {
                                                 role="combobox"
                                                 aria-expanded={isRegionOpen}
                                                 className={cn(
-                                                    "w-full justify-between bg-surface-2 border-white/10 h-14 text-[15px] font-medium hover:bg-surface-2 hover:text-white",
+                                                    "w-full justify-between bg-surface-2 border-white/10 h-12 rounded-tile text-[15px] font-medium hover:bg-surface-2 hover:text-white",
                                                     formData.region ? "text-white" : "text-white/40"
                                                 )}
                                             >
@@ -354,8 +355,8 @@ export default function CreateClub() {
                                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                             </Button>
                                         </PopoverTrigger>
-                                        <PopoverContent align="start" sideOffset={6} className="w-[var(--radix-popover-trigger-width)] p-0 bg-[#141416] border border-white/10 text-white rounded-2xl shadow-2xl shadow-black/60 overflow-hidden z-[60]">
-                                            <Command shouldFilter={false} className="bg-transparent text-white rounded-2xl [&_[cmdk-input-wrapper]]:border-white/10">
+                                        <PopoverContent align="start" sideOffset={6} className="w-[var(--radix-popover-trigger-width)] p-0 bg-[#141416] border border-white/10 text-white rounded-tile shadow-2xl shadow-black/60 overflow-hidden z-[60]">
+                                            <Command shouldFilter={false} className="bg-transparent text-white rounded-tile [&_[cmdk-input-wrapper]]:border-white/10">
                                                 <CommandInput
                                                     placeholder="지역 검색 (예: 강남구)"
                                                     className="h-11 border-none focus:ring-0 text-[15px] text-white placeholder:text-white/40"
@@ -397,7 +398,7 @@ export default function CreateClub() {
                                     <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/45" />
                                     <Input
                                         placeholder="매장 이름 또는 주소 검색"
-                                        className="bg-surface-2 border-white/10 h-12 pl-10 text-base placeholder:text-white/45"
+                                        className="bg-surface-2 border-white/10 h-12 rounded-tile pl-10 text-[15px] font-medium placeholder:text-white/45"
                                         value={searchQuery}
                                         onChange={e => setSearchQuery(e.target.value)}
                                     />
@@ -416,7 +417,7 @@ export default function CreateClub() {
                                         </CardContent>
                                     </Card>
                                 ) : (
-                                    <div className="bg-surface-2 rounded-xl border border-white/5 overflow-hidden min-h-[200px]">
+                                    <div className="bg-surface-2 rounded-tile border border-white/5 overflow-hidden min-h-[200px]">
                                         {storeResults?.length > 0 ? (
                                             storeResults.map((store: any) => (
                                                 <div
@@ -450,7 +451,7 @@ export default function CreateClub() {
                                     </div>
                                 )}
 
-                                <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                                <div className="p-4 bg-white/5 rounded-tile border border-white/5">
                                     <h4 className="font-bold flex items-center gap-2 mb-2 text-sm">
                                         <LucideTent className="w-4 h-4 text-brand" />
                                         베이스 캠프란?
@@ -479,7 +480,7 @@ export default function CreateClub() {
                                         <Label className="text-xs font-semibold text-white/55">정모 요일</Label>
                                         <Input
                                             placeholder="예: 매주 토요일"
-                                            className="bg-surface-2 border-white/10 h-12 rounded-xl text-sm"
+                                            className="bg-surface-2 border-white/10 h-12 rounded-tile text-[15px] font-medium"
                                             value={formData.meetingDay || ""}
                                             onChange={e => setFormData({ ...formData, meetingDay: e.target.value })}
                                         />
@@ -488,7 +489,7 @@ export default function CreateClub() {
                                         <Label className="text-xs font-semibold text-white/55">정모 시간</Label>
                                         <Input
                                             placeholder="예: 오후 2시"
-                                            className="bg-surface-2 border-white/10 h-12 rounded-xl text-sm"
+                                            className="bg-surface-2 border-white/10 h-12 rounded-tile text-[15px] font-medium"
                                             value={formData.meetingTime || ""}
                                             onChange={e => setFormData({ ...formData, meetingTime: e.target.value })}
                                         />
@@ -496,7 +497,7 @@ export default function CreateClub() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>주 종목</Label>
+                                    <Label className="text-xs font-semibold text-white/55">주 종목</Label>
                                     <div className="flex gap-2">
                                         {(currentSport === "GOLF" ? [
                                             { id: "any", label: "상관없음" },
@@ -512,7 +513,7 @@ export default function CreateClub() {
                                             <button
                                                 key={type.id}
                                                 onClick={() => setFormData({ ...formData, gameType: type.id as any })}
-                                                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${formData.gameType === type.id
+                                                className={`flex-1 py-2 rounded-tile text-sm font-medium transition-colors ${formData.gameType === type.id
                                                     ? "bg-brand text-brand-fg"
                                                     : "bg-surface-2 text-white/55 hover:text-white"
                                                     }`}
@@ -524,7 +525,7 @@ export default function CreateClub() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>분위기 (최대 3개)</Label>
+                                    <Label className="text-xs font-semibold text-white/55">분위기 (최대 3개)</Label>
                                     <div className="flex flex-wrap gap-2">
                                         {(currentSport === "GOLF"
                                             ? ["#매너골프", "#싱글목표", "#명랑골프", "#라운딩", "#스크린", "#초보환영", "#고수환영", "#2030", "#4050", "#주말골퍼"]
@@ -533,7 +534,7 @@ export default function CreateClub() {
                                             <button
                                                 key={tag}
                                                 onClick={() => toggleTag(tag)}
-                                                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${(formData.tags as string[])?.includes(tag)
+                                                className={`px-3 py-1.5 rounded-pill text-xs font-medium transition-all ${(formData.tags as string[])?.includes(tag)
                                                     ? "bg-brand text-brand-fg"
                                                     : "bg-surface-2 text-white/55 border border-white/5"
                                                     }`}
@@ -545,11 +546,11 @@ export default function CreateClub() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>가입 방식</Label>
+                                    <Label className="text-xs font-semibold text-white/55">가입 방식</Label>
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             onClick={() => setFormData({ ...formData, joinType: "auto" })}
-                                            className={`p-3 rounded-xl border text-left space-y-1 ${formData.joinType === "auto"
+                                            className={`p-3 rounded-tile border text-left space-y-1 ${formData.joinType === "auto"
                                                 ? "border-brand bg-brand/5"
                                                 : "border-white/5 bg-surface-2"
                                                 }`}
@@ -559,7 +560,7 @@ export default function CreateClub() {
                                         </button>
                                         <button
                                             onClick={() => setFormData({ ...formData, joinType: "approval" })}
-                                            className={`p-3 rounded-xl border text-left space-y-1 ${formData.joinType === "approval"
+                                            className={`p-3 rounded-tile border text-left space-y-1 ${formData.joinType === "approval"
                                                 ? "border-brand bg-brand/5"
                                                 : "border-white/5 bg-surface-2"
                                                 }`}
@@ -579,7 +580,7 @@ export default function CreateClub() {
                                             <button
                                                 key={num}
                                                 onClick={() => setFormData({ ...formData, maxMembers: num })}
-                                                className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all tabular-nums ${formData.maxMembers === num
+                                                className={`px-4 py-2 rounded-tile text-sm font-bold border transition-all tabular-nums ${formData.maxMembers === num
                                                     ? "bg-brand text-brand-fg border-brand"
                                                     : "bg-surface-2 text-white/55 border-white/5"
                                                     }`}
@@ -597,10 +598,10 @@ export default function CreateClub() {
             </div>
 
             {/* Bottom Button */}
-            <div className="fixed bottom-0 left-0 right-0 px-5 py-6 bg-[#0A0A0A] border-t border-surface-line z-20">
+            <div className="fixed bottom-0 left-0 right-0 px-5 py-6 bg-[#0A0A0A] border-t border-surface-line safe-area-bottom z-20">
                 <Button
                     className={cn(
-                        "w-full h-14 text-lg font-bold rounded-2xl bg-brand text-brand-fg hover:bg-brand/90 transition-all"
+                        "w-full h-14 text-lg font-bold rounded-tile bg-brand text-brand-fg hover:bg-brand/90 transition-all"
                     )}
                     onClick={handleNext}
                     disabled={createCrewMutation.isPending}

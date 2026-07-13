@@ -1,5 +1,7 @@
 import { Router } from "express";
+import { z } from "zod";
 import { storage } from "../../storage/index.js";
+import { insertHiqSuccessfulShotSchema } from "../../../shared/schema.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { hiqService } from "../../services/hiqService.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
@@ -60,37 +62,49 @@ router.get("/game/:id", asyncHandler(async (req: any, res: any) => {
 // POST /game/start
 router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
-    const { player2Id, player3Id, player4Id } = req.body;
-    // Ranked if at least one other verified member is playing
+    if (!member) return sendError(res, 404, "회원 정보를 찾을 수 없습니다");
+
+    // The creator ALWAYS occupies player slot 1, forced from the session — never trust a
+    // body-supplied player1Id (which would let an attacker fabricate ranked games "for"
+    // another member and manipulate their rating/history).
+    const player1Id = req.userId!;
+
+    // Consent gate: bind a member to slots 2-4 ONLY if they accepted an invite from this
+    // host (the real join flow, see joinInvite / getConsentedGuestIds). Any player{N}Id
+    // that is not a consented guest is demoted to a name-only guest slot, so finishHiqGame
+    // never applies RP / handicap / history rows to a non-consenting member.
+    const consented = await storage.games.getConsentedGuestIds(player1Id);
+    const gateId = (id: any): string | null => (id && consented.has(id)) ? id : null;
+    const player2Id = gateId(req.body.player2Id);
+    const player3Id = gateId(req.body.player3Id);
+    const player4Id = gateId(req.body.player4Id);
+
+    // Ranked only if at least one CONSENTED verified member is playing.
     const isRanked = !!(player2Id || player3Id || player4Id);
 
-    // Ensure names are populated for all members
-    let p1Name = req.body.player1Name;
-    let p2Name = req.body.player2Name;
-    let p3Name = req.body.player3Name;
-    let p4Name = req.body.player4Name;
+    // Resolve display names. For a bound member, prefer the DB name; for a demoted or
+    // guest slot, keep the client-supplied name.
+    const resolveName = async (id: string | null, provided: any): Promise<any> => {
+        if (id) {
+            if (provided) return provided;
+            const m = await storage.getMemberById(id);
+            return m?.name;
+        }
+        return provided;
+    };
 
-    // Auto-fill names from DB if IDs are provided and names are missing
-    if (req.body.player1Id && !p1Name) {
-        const p1 = await storage.getMemberById(req.body.player1Id);
-        if (p1) p1Name = p1.name;
-    }
-    if (player2Id && !p2Name) {
-        const p2 = await storage.getMemberById(player2Id);
-        if (p2) p2Name = p2.name;
-    }
-    if (player3Id && !p3Name) {
-        const p3 = await storage.getMemberById(player3Id);
-        if (p3) p3Name = p3.name;
-    }
-    if (player4Id && !p4Name) {
-        const p4 = await storage.getMemberById(player4Id);
-        if (p4) p4Name = p4.name;
-    }
+    const p1Name = req.body.player1Name || member.name;
+    const p2Name = await resolveName(player2Id, req.body.player2Name);
+    const p3Name = await resolveName(player3Id, req.body.player3Name);
+    const p4Name = await resolveName(player4Id, req.body.player4Name);
 
     const game = await storage.startHiqGame({
         ...req.body,
-        storeId: member!.storeId,
+        storeId: member.storeId,
+        player1Id,
+        player2Id,
+        player3Id,
+        player4Id,
         player1Name: p1Name,
         player2Name: p2Name,
         player3Name: p3Name,
@@ -112,7 +126,26 @@ const assertParticipant = async (gameId: string, userId: string, res: any) => {
 // PATCH /game/:id/score
 router.patch("/game/:id/score", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!(await assertParticipant(req.params.id, req.userId!, res))) return;
-    await storage.updateHiqGameScore(req.params.id, req.body);
+
+    // Whitelist only score/inning/high-run columns. Never let a participant set winnerId,
+    // isRanked, playerNId (slot reassignment), playerNTarget, storeId, or status:'finished'
+    // through this direct-write path — finishHiqGame owns the history/rating flow.
+    const ALLOWED_KEYS = [
+        "player1Score", "player2Score", "player3Score", "player4Score",
+        "player1Innings", "player2Innings", "player3Innings", "player4Innings",
+        "player1HighRun", "player2HighRun", "player3HighRun", "player4HighRun",
+        "totalInnings",
+    ];
+    const updateData: any = {};
+    for (const key of ALLOWED_KEYS) {
+        if (req.body[key] !== undefined) updateData[key] = req.body[key];
+    }
+    // status may only move within the in-progress states; 'finished' must go via /finish.
+    if (req.body.status === "playing_base" || req.body.status === "playing_finish") {
+        updateData.status = req.body.status;
+    }
+
+    await storage.updateHiqGameScore(req.params.id, updateData);
     return sendSuccess(res, { success: true });
 }));
 
@@ -159,11 +192,15 @@ router.get("/history", requireAuth, asyncHandler(async (req: AuthRequest, res: a
     return sendSuccess(res, history);
 }));
 
-router.get("/history/:id/detail", asyncHandler(async (req: any, res: any) => {
+router.get("/history/:id/detail", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const historyId = req.params.id;
     const history = await storage.getGameHistoryById(historyId);
 
     if (!history) return sendError(res, 404, "기록을 찾을 수 없습니다.");
+
+    // Ownership: hiqGameHistory has one row per participant (memberId). Only the owner of
+    // the history row may read its detail. Return 404 to avoid an id-existence oracle.
+    if (history.memberId !== req.userId) return sendError(res, 404, "기록을 찾을 수 없습니다.");
 
     let gameData: any = null;
 
@@ -193,12 +230,29 @@ router.get("/stats/h2h/:id", requireAuth, asyncHandler(async (req: AuthRequest, 
 
 // --- AI / Simulation ---
 
-router.post("/successful-shot", asyncHandler(async (req: any, res: any) => {
-    const shot = await storage.recordSuccessfulShot(req.body);
+// Strict shot payload validation. createInsertSchema types jsonb columns as unknown, so
+// insertHiqSuccessfulShotSchema.parse alone accepts garbage jsonb — extend with concrete
+// shapes so the AI-solution dataset cannot be poisoned.
+const shotCoord = z.object({ x: z.number().finite(), y: z.number().finite() });
+const successfulShotSchema = insertHiqSuccessfulShotSchema.extend({
+    ballPositions: z.record(z.string(), shotCoord).refine(p => "white" in p, "white ball required"),
+    shotParams: z.object({
+        angle: z.number().finite(),
+        power: z.number().finite(),
+        spinX: z.number().finite(),
+        spinY: z.number().finite(),
+    }),
+    cushionCount: z.number().int().min(0).optional(),
+});
+
+router.post("/successful-shot", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const parsed = successfulShotSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, "유효하지 않은 샷 데이터입니다");
+    const shot = await storage.recordSuccessfulShot(parsed.data as any);
     return sendSuccess(res, shot);
 }));
 
-router.post("/ai-solutions", asyncHandler(async (req: any, res: any) => {
+router.post("/ai-solutions", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const { gameType, ballPositions } = req.body;
     const solutions = await storage.searchSuccessfulShots(gameType, ballPositions);
     return sendSuccess(res, solutions);
@@ -221,9 +275,15 @@ router.get("/tournaments/:id", asyncHandler(async (req: any, res: any) => {
 
 
 // --- Misc / Settlements ---
-router.get("/settlements/:id", asyncHandler(async (req: any, res: any) => {
+router.get("/settlements/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const settlement = await storage.getSettlement(req.params.id);
     if (!settlement) return sendError(res, 404, "정산 내역 없음");
+    // Only members of the settlement's crew may view it (it leaks bank account + member
+    // phone numbers). Mirror the hardened crew-membership gate.
+    const membership = await storage.getCrewMembership(settlement.crewId, req.userId!);
+    if (!membership || membership.role === "pending") {
+        return sendError(res, 403, "크루 멤버만 이용할 수 있습니다");
+    }
     return sendSuccess(res, settlement);
 }));
 
@@ -233,7 +293,7 @@ router.post("/invite", requireAuth, asyncHandler(async (req: AuthRequest, res: a
     return sendSuccess(res, { code });
 }));
 
-router.get("/invite/:code", asyncHandler(async (req: any, res: any) => {
+router.get("/invite/:code", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const invite = await storage.getInviteStatus(req.params.code);
     if (!invite) return sendError(res, 404, "존재하지 않는 코드");
     return sendSuccess(res, invite);

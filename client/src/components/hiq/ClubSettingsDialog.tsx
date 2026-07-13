@@ -74,7 +74,7 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                                 <LucideUsers2 className="w-3.5 h-3.5 mr-1" />
                                 멤버
                                 {pendingMembers.length > 0 && (
-                                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold tabular-nums border-2 border-[#141416]">
+                                    <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold tabular-nums border-2 border-[#141416]">
                                         {pendingMembers.length}
                                     </span>
                                 )}

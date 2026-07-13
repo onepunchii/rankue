@@ -125,7 +125,7 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                         <Button
                             onClick={handleSave}
                             disabled={!isDirty || isUpdating}
-                            className="w-full h-12 text-brand-fg rounded-tile font-bold text-sm transition-colors bg-brand hover:bg-brand/90"
+                            className="w-full h-12 text-brand-fg rounded-tile font-bold text-sm transition-colors active:scale-[0.98] disabled:opacity-30 bg-brand hover:bg-brand-strong"
                         >
                             {isUpdating ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : "양식 저장하기"}
                         </Button>

@@ -28,7 +28,7 @@ export default function HiqAdmin() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     const { data: members, isLoading: membersLoading } = useQuery<HiqMember[]>({
-        queryKey: ["/api/hiq/admin/members"],
+        queryKey: ["/api/hiq/partner/members"],
     });
 
     const { data: stats, isLoading: statsLoading } = useQuery<{
@@ -37,32 +37,22 @@ export default function HiqAdmin() {
         visitsYesterday: number;
         newToday: number;
     }>({
-        queryKey: ["/api/hiq/admin/stats"],
+        queryKey: ["/api/hiq/partner/stats"],
     });
 
-    const smsMutation = useMutation({
-        mutationFn: async () => {
-            return await apiRequest("/api/hiq/admin/send-sms", {
-                method: "POST",
-                body: { memberIds: selectedIds, message: smsMessage },
-            });
-        },
-        onSuccess: (data) => {
-            toast({
-                title: "발송 완료",
-                description: `${data.sentCount}명에게 메시지를 전송했습니다.`,
-            });
-            setSmsMessage("");
-            setSelectedIds([]);
-        },
-        onError: () => {
-            toast({
-                variant: "destructive",
-                title: "오류",
-                description: "메시지 발송 실패",
-            });
-        },
-    });
+    // No bulk-SMS backend exists yet; the marketing center runs in demo mode
+    // rather than POSTing to a nonexistent /send-sms route (which always 404'd).
+    const [isSendingSms, setIsSendingSms] = useState(false);
+    const handleSendSms = () => {
+        setIsSendingSms(true);
+        toast({
+            title: "준비 중인 기능입니다",
+            description: "단체 메시지 발송은 곧 제공될 예정입니다. (데모 모드)",
+        });
+        setSmsMessage("");
+        setSelectedIds([]);
+        setIsSendingSms(false);
+    };
 
     const filteredMembers = members?.filter(m =>
         m.name.includes(searchTerm) || m.phone.includes(searchTerm)
@@ -311,10 +301,10 @@ export default function HiqAdmin() {
 
                                     <Button
                                         className="w-full h-16 rounded-2xl rk-btn-primary text-xl"
-                                        disabled={selectedIds.length === 0 || !smsMessage || smsMutation.isPending}
-                                        onClick={() => smsMutation.mutate()}
+                                        disabled={selectedIds.length === 0 || !smsMessage || isSendingSms}
+                                        onClick={handleSendSms}
                                     >
-                                        {smsMutation.isPending ? "발송 중..." : "전체 발송하기"}
+                                        {isSendingSms ? "발송 중..." : "전체 발송하기"}
                                     </Button>
                                 </div>
                             </Card>

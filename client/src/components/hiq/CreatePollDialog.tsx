@@ -117,7 +117,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                         {/* Title & Description */}
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-white/60">질문</Label>
+                                <Label className="text-xs font-semibold text-white/55">질문</Label>
                                 <Input
                                     placeholder="무엇을 정할까요?"
                                     value={title}
@@ -126,7 +126,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-white/60">설명</Label>
+                                <Label className="text-xs font-semibold text-white/55">설명</Label>
                                 <Textarea
                                     placeholder="상세 내용을 입력하세요 (선택)"
                                     value={description}
@@ -139,7 +139,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                         {/* Options */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <Label className="text-xs font-semibold text-white/60">선택지</Label>
+                                <Label className="text-xs font-semibold text-white/55">선택지</Label>
                                 <span className="text-[12px] font-medium tabular-nums text-white/55">{options.length} / 10</span>
                             </div>
                             <div className="space-y-2">
@@ -206,7 +206,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                             </div>
 
                             <div className="space-y-2 pb-4">
-                                <Label className="text-xs font-semibold text-white/60 pl-1">마감 기한 설정</Label>
+                                <Label className="text-xs font-semibold text-white/55 pl-1">마감 기한 설정</Label>
                                 <Select value={duration} onValueChange={setDuration}>
                                     <SelectTrigger className="w-full h-12 bg-surface-2 border-surface-line rounded-tile text-sm px-4 focus:ring-1 focus:ring-brand/50">
                                         <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                     <Button
                         onClick={handleSubmit}
                         disabled={createPollMutation.isPending}
-                        className="w-full h-14 bg-brand hover:bg-brand-strong text-brand-fg font-bold text-base rounded-2xl"
+                        className="w-full h-12 rk-btn-primary rounded-tile font-semibold text-[15px]"
                     >
                         {createPollMutation.isPending ? "생성 중..." : "투표 생성하기"}
                     </Button>

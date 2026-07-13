@@ -17,7 +17,11 @@ import {
     LucideChevronRight,
     LucideLoader2,
     LucideEdit2,
-    LucideCheck
+    LucideCheck,
+    LucideCalendarCheck,
+    LucideTrophy,
+    LucideMonitor,
+    LucideBeer
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -147,13 +151,13 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
             </div>
 
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent side="bottom" className="h-[75vh] rounded-t-[2rem] bg-[#0f0f0f] border-t border-white/10 p-0 overflow-hidden">
+                <SheetContent side="bottom" className="h-[75vh] rounded-t-[2rem] bg-[#141416] border-t border-white/10 p-0 overflow-hidden">
                     <SheetTitle className="sr-only">멤버 상세 정보</SheetTitle>
                     <SheetDescription className="sr-only">선택한 멤버의 상세 통계와 정보를 확인합니다.</SheetDescription>
 
                     {selectedMember && sheetData && (
                         <div className="h-full flex flex-col overflow-y-auto pb-safe">
-                            <div className="relative pt-12 pb-8 px-6 flex flex-col items-center bg-[#0f0f0f]">
+                            <div className="relative pt-12 pb-8 px-6 flex flex-col items-center bg-[#141416]">
                                 <div className="absolute top-3 w-12 h-1 bg-white/10 rounded-full left-1/2 -translate-x-1/2" />
                                 <Avatar className={cn(
                                     "w-24 h-24 mb-4 border-4",
@@ -163,7 +167,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                         src={selectedMember.member.profileImageUrl}
                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                     />
-                                    <AvatarFallback className="text-2xl font-semibold bg-[#262626] text-white/45">
+                                    <AvatarFallback className="text-2xl font-semibold bg-surface-3 text-white/45">
                                         {selectedMember.member.nickname?.[0] || selectedMember.member.name?.[0]}
                                     </AvatarFallback>
                                 </Avatar>
@@ -175,12 +179,12 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                     <div className="flex items-center gap-1.5">
                                         {selectedMember.role === 'leader' && (
                                             <Badge variant="outline" className="bg-yellow-500/10 border-yellow-500/20 text-yellow-500 gap-1 px-2">
-                                                <span>👑</span> 크루장
+                                                <LucideCrown className="w-3 h-3" /> 크루장
                                             </Badge>
                                         )}
                                         {selectedMember.role === 'manage' && (
                                             <Badge variant="outline" className="bg-blue-500/10 border-blue-500/20 text-blue-400 gap-1 px-2">
-                                                <span>⭐️</span> 운영진
+                                                <LucideShield className="w-3 h-3" /> 운영진
                                             </Badge>
                                         )}
                                     </div>
@@ -275,50 +279,55 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                     </div>
                                     {/* 활동 카운트 3칸 */}
                                     <div className="grid grid-cols-3 gap-2">
-                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-brand/[0.06] border border-brand/10">
-                                            <span className="text-lg">{sportCategory === 'GOLF' ? '⛳️' : '🎱'}</span>
-                                            <span className="text-[17px] font-bold text-brand tabular-nums">
+                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-white/[0.04] border border-surface-line">
+                                            <LucideCalendarCheck className="w-4 h-4 text-brand" />
+                                            <span className="text-[17px] font-bold text-white tabular-nums">
                                                 {selectedMember.activityCounts?.group1 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-brand/50">회</span>
+                                                <span className="text-[12px] ml-0.5 font-medium text-white/38">회</span>
                                             </span>
-                                            <span className="text-[12px] font-medium text-white/55">{sportCategory === 'GOLF' ? '라운딩' : '모임'}</span>
+                                            <span className="text-[12px] font-medium text-white/45">{sportCategory === 'GOLF' ? '라운딩' : '모임'}</span>
                                         </div>
-                                        <div className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl ${sportCategory === 'GOLF' ? 'bg-[#00E3CC]/5 border border-[#00E3CC]/10' : 'bg-[#F97316]/5 border border-[#F97316]/10'}`}>
-                                            <span className="text-lg">{sportCategory === 'GOLF' ? '📺' : '🏆'}</span>
-                                            <span className={`text-[17px] font-bold tabular-nums ${sportCategory === 'GOLF' ? 'text-[#00E3CC]' : 'text-[#F97316]'}`}>
+                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-white/[0.04] border border-surface-line">
+                                            {sportCategory === 'GOLF' ? <LucideMonitor className="w-4 h-4 text-brand" /> : <LucideTrophy className="w-4 h-4 text-brand" />}
+                                            <span className="text-[17px] font-bold text-white tabular-nums">
                                                 {selectedMember.activityCounts?.group2 || 0}
-                                                <span className={`text-[12px] ml-0.5 font-medium ${sportCategory === 'GOLF' ? 'text-[#00E3CC]/50' : 'text-[#F97316]/50'}`}>회</span>
+                                                <span className="text-[12px] ml-0.5 font-medium text-white/38">회</span>
                                             </span>
-                                            <span className="text-[12px] font-medium text-white/55">{sportCategory === 'GOLF' ? '스크린' : '대회'}</span>
+                                            <span className="text-[12px] font-medium text-white/45">{sportCategory === 'GOLF' ? '스크린' : '대회'}</span>
                                         </div>
-                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-[#EC4899]/5 border border-[#EC4899]/10">
-                                            <span className="text-lg">🍺</span>
-                                            <span className="text-[17px] font-bold text-[#EC4899] tabular-nums">
+                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-white/[0.04] border border-surface-line">
+                                            <LucideBeer className="w-4 h-4 text-brand" />
+                                            <span className="text-[17px] font-bold text-white tabular-nums">
                                                 {selectedMember.activityCounts?.group3 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-[#EC4899]/50">회</span>
+                                                <span className="text-[12px] ml-0.5 font-medium text-white/38">회</span>
                                             </span>
-                                            <span className="text-[12px] font-medium text-white/55">뒷풀이</span>
+                                            <span className="text-[12px] font-medium text-white/45">뒷풀이</span>
                                         </div>
                                     </div>
                                 </div>
 
                             </div>
 
-                            <div className="mt-4 p-6 bg-[#0f0f0f] border-t border-white/5 flex gap-3 pb-safe">
-                                <Button
-                                    className="flex-1 h-12 rk-btn-primary rounded-tile"
-                                    title="대결 신청"
-                                >
-                                    <LucideSwords className="w-4 h-4 mr-2" />
-                                    대결 신청
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className="h-12 w-12 rounded-xl border-white/10 bg-white/5 p-0 hover:bg-white/10 hover:text-white"
-                                    title="메시지 보내기"
-                                >
-                                    <LucideMessageCircle className="w-5 h-5" />
-                                </Button>
+                            <div className="mt-4 p-6 bg-[#141416] border-t border-white/5 flex flex-col gap-2 pb-safe">
+                                <div className="flex gap-3">
+                                    <Button
+                                        disabled
+                                        className="flex-1 h-12 rk-btn-primary rounded-tile disabled:opacity-40"
+                                        title="대결 신청 (준비 중)"
+                                    >
+                                        <LucideSwords className="w-4 h-4 mr-2" />
+                                        대결 신청
+                                    </Button>
+                                    <Button
+                                        disabled
+                                        variant="outline"
+                                        className="h-12 w-12 rounded-xl border-white/10 bg-white/5 p-0 disabled:opacity-40"
+                                        title="메시지 보내기 (준비 중)"
+                                    >
+                                        <LucideMessageCircle className="w-5 h-5" />
+                                    </Button>
+                                </div>
+                                <p className="text-[12px] font-medium text-white/38 text-center">준비 중인 기능입니다</p>
                             </div>
                         </div>
                     )}
@@ -363,29 +372,29 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onClick()}
             className={cn(
-                "flex items-center justify-between p-4 mb-2 rounded-card border transition-all duration-300 cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-brand",
+                "flex items-center justify-between p-4 mb-2 rounded-tile border transition-all duration-300 cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-brand",
                 isMe
                     ? "bg-brand/[0.06] border-brand/20"
-                    : "bg-[#1a1a1a] border-white/5 hover:border-white/10"
+                    : "bg-surface-2 border-surface-line hover:border-white/10"
             )}
         >
             <div className="flex items-center gap-4">
                 <div className="relative">
                     <Avatar className={cn(
                         "w-14 h-14 border-2 transition-transform duration-500 group-hover:scale-105",
-                        isMe ? "border-brand/30" : "border-[#262626]"
+                        isMe ? "border-brand/30" : "border-surface-line"
                     )}>
                         <AvatarImage
                             src={m.profileImageUrl}
                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             className="object-cover"
                         />
-                        <AvatarFallback className="bg-[#262626] text-white/40 text-lg font-semibold">
+                        <AvatarFallback className="bg-surface-3 text-white/40 text-lg font-semibold">
                             {m.nickname?.[0] || m.name?.[0]}
                         </AvatarFallback>
                     </Avatar>
                     {isMe && (
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-brand rounded-full border-2 border-[#1a1a1a] flex items-center justify-center">
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-brand rounded-full border-2 border-surface-2 flex items-center justify-center">
                             <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                         </div>
                     )}

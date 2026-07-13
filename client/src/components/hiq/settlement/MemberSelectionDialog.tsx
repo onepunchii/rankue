@@ -68,12 +68,12 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                             placeholder="멤버 이름 검색..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-black/40 border-white/10 pl-10 h-10"
+                            className="bg-surface-2 border-surface-line pl-10 h-10 rounded-tile"
                         />
                     </div>
 
                     <div className="flex items-center justify-between px-1">
-                        <span className="text-[12px] font-medium text-white/45">멤버 리스트</span>
+                        <span className="text-xs font-semibold text-white/55">멤버 리스트</span>
                         <button
                             onClick={toggleAll}
                             className="text-[12px] text-brand font-semibold hover:underline"
@@ -108,7 +108,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                                         "w-5 h-5 rounded-md border flex items-center justify-center transition-colors",
                                         isSelected ? "bg-brand border-brand" : "border-white/20"
                                     )}>
-                                        {isSelected && <LucideCheck className="w-3 h-3 text-black" />}
+                                        {isSelected && <LucideCheck className="w-3 h-3 text-brand-fg" />}
                                     </div>
                                 </div>
                             );

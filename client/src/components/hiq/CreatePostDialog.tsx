@@ -132,7 +132,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-md rounded-card">
+            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-md rounded-card p-0 gap-0">
                 <DialogHeader className="p-6 pb-0">
                     <DialogTitle className="text-xl font-semibold">게시글 작성</DialogTitle>
                     <DialogDescription className="text-white/55">
@@ -147,7 +147,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                             setCategory(val);
                             if (val === "공지사항") setIsNotice(true);
                         }}>
-                            <SelectTrigger className="bg-surface-2 border-surface-line h-12 rounded-xl">
+                            <SelectTrigger className="bg-surface-2 border-surface-line h-12 rounded-tile">
                                 <SelectValue placeholder="카테고리 선택" />
                             </SelectTrigger>
                             <SelectContent className="bg-[#141416] border-white/10 text-white rounded-tile">
@@ -164,7 +164,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                             placeholder="제목을 입력하세요"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            className="bg-surface-2 border-surface-line h-12 rounded-xl"
+                            className="bg-surface-2 border-surface-line h-12 rounded-tile"
                         />
                     </div>
 
@@ -192,7 +192,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                                 placeholder="내용을 입력하세요"
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
-                                className="bg-surface-2 border-surface-line min-h-[150px] resize-none rounded-xl"
+                                className="bg-surface-2 border-surface-line min-h-[150px] resize-none rounded-tile"
                             />
                         )}
                     </div>
@@ -201,7 +201,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                         <Label className="text-xs font-semibold text-white/55">사진 ({images.length}/5)</Label>
                         <div className="flex flex-wrap gap-2">
                             {images.map((img, idx) => (
-                                <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-white/10">
+                                <div key={idx} className="relative w-20 h-20 rounded-tile overflow-hidden border border-white/10">
                                     <img src={img} alt="preview" className="w-full h-full object-cover" />
                                     <button
                                         onClick={() => removeImage(idx)}
@@ -217,7 +217,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={isCompressing}
-                                    className="w-20 h-20 rounded-lg border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-1 hover:bg-white/5 transition-colors disabled:opacity-50"
+                                    className="w-20 h-20 rounded-tile border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-1 hover:bg-white/5 transition-colors disabled:opacity-50"
                                 >
                                     {isCompressing ? (
                                         <div className="w-4 h-4 border-2 border-brand border-t-transparent animate-spin rounded-full" />
@@ -257,7 +257,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                     <Button
                         onClick={handleSubmit}
                         disabled={createPostMutation.isPending}
-                        className="w-full h-12 bg-brand hover:bg-brand-strong text-brand-fg font-semibold rounded-tile"
+                        className="w-full h-12 rk-btn-primary rounded-tile font-semibold text-[15px]"
                     >
                         {createPostMutation.isPending ? "등록 중..." : "등록하기"}
                     </Button>

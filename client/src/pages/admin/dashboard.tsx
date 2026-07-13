@@ -231,9 +231,16 @@ export default function AdminDashboard() {
         }
     });
 
-    const handleLogout = () => {
-        document.cookie = "hiq_partner_auth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        document.cookie = "hiq_user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    const handleLogout = async () => {
+        // Session cookies are httpOnly, so client JS cannot clear them — the server must.
+        try {
+            await apiRequest("/api/hiq/logout", { method: "POST" });
+        } catch {
+            /* proceed even if offline */
+        }
+        // Wipe cached PII from memory and the throttled localStorage persister.
+        queryClient.clear();
+        localStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
         setLocation("/partner/login");
     };
 

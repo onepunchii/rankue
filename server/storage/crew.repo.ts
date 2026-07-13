@@ -65,9 +65,33 @@ export class CrewRepository {
             [baseStore] = await db.select().from(hiqStores).where(eq(hiqStores.id, crew.baseStoreId));
         }
 
-        // 3. Get Members with Role and Profile
+        // 3. Get Members with Role and Profile.
+        // SECURITY: whitelist only non-sensitive columns — these two endpoints (GET /crews/:id
+        // and /crews/:id/members) are public, so NEVER expose phone, profileId, storeId,
+        // marketingAgree, visit/lastVisited, or defaultAccount* (bank/number/holder).
         const membersData = await db.select({
-            member: hiqMembers,
+            member: {
+                id: hiqMembers.id,
+                name: hiqMembers.name,
+                birthYear: hiqMembers.birthYear,
+                gender: hiqMembers.gender,
+                handi3c: hiqMembers.handi3c,
+                handi4c: hiqMembers.handi4c,
+                average: hiqMembers.average,
+                rating3c: hiqMembers.rating3c,
+                rating4c: hiqMembers.rating4c,
+                avg3c: hiqMembers.avg3c,
+                avg4c: hiqMembers.avg4c,
+                golfHandicap: hiqMembers.golfHandicap,
+                golfBestScore: hiqMembers.golfBestScore,
+                golfAvgScore: hiqMembers.golfAvgScore,
+                golfGrade: hiqMembers.golfGrade,
+                golfGradeVerified: hiqMembers.golfGradeVerified,
+                totalGolfGames: hiqMembers.totalGolfGames,
+                totalSimPoints: hiqMembers.totalSimPoints,
+                introduction: hiqMembers.introduction,
+                createdAt: hiqMembers.createdAt,
+            },
             profileNickname: profiles.nickname,
             profileImageUrl: profiles.profileImageUrl,
             role: hiqCrewMembers.role,
@@ -589,7 +613,13 @@ export class CrewRepository {
     }
 
     async deleteCrewPost(postId: string) {
-        await db.delete(hiqCrewPosts).where(eq(hiqCrewPosts.id, postId));
+        // Child rows (likes, comments) have no ON DELETE CASCADE, so remove them first
+        // inside a transaction — otherwise deleting an engaged post throws an FK violation.
+        await db.transaction(async (tx) => {
+            await tx.delete(hiqCrewLikes).where(eq(hiqCrewLikes.postId, postId));
+            await tx.delete(hiqCrewComments).where(eq(hiqCrewComments.postId, postId));
+            await tx.delete(hiqCrewPosts).where(eq(hiqCrewPosts.id, postId));
+        });
     }
 
     async createCrewPost(data: InsertHiqCrewPost) {
@@ -855,15 +885,13 @@ export class CrewRepository {
         const [poll] = await db.select().from(hiqPolls).where(eq(hiqPolls.id, pollId));
         if (!poll) throw notFound("Poll not found");
         if (poll.status === 'closed') throw conflict("Poll is closed");
+        // Enforce the deadline server-side — 'status' is never flipped to 'closed' anywhere,
+        // so endTime is the real source of truth for whether voting is open.
+        if (poll.endTime && poll.endTime < new Date()) throw conflict("Poll is closed");
 
         return await db.transaction(async (tx) => {
-            // If not multiple choice, remove existing votes for this poll
-            if (!poll.allowMultiple) {
-                await tx.delete(hiqPollVotes)
-                    .where(and(eq(hiqPollVotes.pollId, pollId), eq(hiqPollVotes.memberId, memberId)));
-            }
-
-            // check if already voted for THIS option
+            // Check whether the member already voted for THIS option FIRST (before any delete),
+            // so a single-choice re-tap on the same option correctly toggles OFF.
             const [existing] = await tx.select().from(hiqPollVotes)
                 .where(and(eq(hiqPollVotes.optionId, optionId), eq(hiqPollVotes.memberId, memberId)));
 
@@ -871,15 +899,15 @@ export class CrewRepository {
                 // Toggle OFF
                 await tx.delete(hiqPollVotes).where(eq(hiqPollVotes.id, existing.id));
                 return { voted: false };
-            } else {
-                // Toggle ON
-                await tx.insert(hiqPollVotes).values({
-                    pollId,
-                    optionId,
-                    memberId
-                });
-                return { voted: true };
             }
+
+            // Toggle ON. For single-choice polls, clear the member's other votes first.
+            if (!poll.allowMultiple) {
+                await tx.delete(hiqPollVotes)
+                    .where(and(eq(hiqPollVotes.pollId, pollId), eq(hiqPollVotes.memberId, memberId)));
+            }
+            await tx.insert(hiqPollVotes).values({ pollId, optionId, memberId });
+            return { voted: true };
         });
     }
 

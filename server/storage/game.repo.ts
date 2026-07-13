@@ -352,10 +352,62 @@ export class GameRepository {
     }
 
     async claimGameRecord(gameId: string, memberId: string, slotIndex: number): Promise<boolean> {
-        const field = `player${slotIndex}Id` as any;
-        await db.update(hiqGames)
-            .set({ [field]: memberId })
-            .where(eq(hiqGames.id, gameId));
+        // Slot 1 is always the host/creator and must never be claimable.
+        if (!Number.isInteger(slotIndex) || slotIndex < 2 || slotIndex > 4) return false;
+
+        const game = await this.getHiqGameById(gameId);
+        if (!game) return false;
+
+        const idField = `player${slotIndex}Id`;
+        const nameField = `player${slotIndex}Name`;
+        const g = game as any;
+
+        // Target slot must be an unclaimed guest: no bound member id but a name present.
+        if (g[idField] !== null || !g[nameField]) return false;
+
+        // Reject if this member already occupies any player slot in this game
+        // (prevents claiming two slots / self-duplication in head-to-head).
+        const occupied = [game.player1Id, game.player2Id, game.player3Id, game.player4Id];
+        if (occupied.includes(memberId)) return false;
+
+        await db.transaction(async (tx) => {
+            await tx.update(hiqGames)
+                .set({ [idField]: memberId })
+                .where(eq(hiqGames.id, gameId));
+
+            // Backfill a hiqGameHistory row so the claimed game surfaces in the
+            // claimer's own history / head-to-head reads (both keyed by memberId).
+            // Only finished games have derivable score/inning data.
+            if (game.status === "finished") {
+                const score = g[`player${slotIndex}Score`] ?? 0;
+                const innings = game.totalInnings ?? 0;
+                const highRun = g[`player${slotIndex}HighRun`] ?? 0;
+                const inningData = g[`player${slotIndex}Innings`] ?? null;
+                const average = (score / (innings || 1)).toFixed(2);
+
+                // Winner derivation for a claimed slot: highest score among filled slots.
+                const slotScores = [game.player1Score, game.player2Score, game.player3Score, game.player4Score]
+                    .filter((s): s is number => typeof s === "number");
+                const maxScore = slotScores.length > 0 ? Math.max(...slotScores) : 0;
+
+                await tx.insert(hiqGameHistory).values({
+                    memberId,
+                    gameId: game.id,
+                    gameMode: game.gameMode,
+                    gameType: game.gameType,
+                    score,
+                    innings,
+                    average,
+                    isRanked: game.isRanked,
+                    isWinner: score === maxScore,
+                    highRun,
+                    inningData,
+                    opponentName: game.player1Name || "상대방",
+                    sportCategory: game.sportCategory,
+                });
+            }
+        });
+
         return true;
     }
 
@@ -365,10 +417,66 @@ export class GameRepository {
     }
 
     async searchSuccessfulShots(gameType: "3c" | "4c", currentPositions: any, limit: number = 5): Promise<any[]> {
-        return await db.select().from(hiqSuccessfulShots)
+        // Fetch a bounded pool of recent candidates, then rank by how closely their
+        // stored ball layout matches the user's current layout. Distance math is done
+        // in Node (ball-position keys are free-form jsonb entries, so summed-distance
+        // SQL over jsonb would be brittle). Both sides are already in meters.
+        const CANDIDATE_CAP = 300;
+        const candidates = await db.select().from(hiqSuccessfulShots)
             .where(eq(hiqSuccessfulShots.gameType, gameType))
-            .limit(limit)
-            .orderBy(desc(hiqSuccessfulShots.createdAt));
+            .orderBy(desc(hiqSuccessfulShots.createdAt))
+            .limit(CANDIDATE_CAP);
+
+        // If the client sent no usable layout, fall back to the newest shots.
+        if (!currentPositions || typeof currentPositions !== "object") {
+            return candidates.slice(0, limit);
+        }
+
+        // Summed Euclidean distance over the ball keys common to both layouts.
+        const layoutDistance = (a: any, b: any): number => {
+            if (!a || !b || typeof a !== "object" || typeof b !== "object") return Infinity;
+            let sum = 0;
+            let matched = 0;
+            for (const key of Object.keys(a)) {
+                const pa = a[key];
+                const pb = b[key];
+                if (!pa || !pb) continue;
+                if (typeof pa.x !== "number" || typeof pa.y !== "number") continue;
+                if (typeof pb.x !== "number" || typeof pb.y !== "number") continue;
+                const dx = pa.x - pb.x;
+                const dy = pa.y - pb.y;
+                sum += Math.sqrt(dx * dx + dy * dy);
+                matched++;
+            }
+            return matched > 0 ? sum : Infinity;
+        };
+
+        // Summed-distance threshold (meters). Genuinely unrelated layouts are excluded;
+        // the client shows a "조회 결과 없음" toast for an empty result.
+        const MAX_DISTANCE = 1.5;
+
+        return candidates
+            .map(shot => ({ shot, distance: layoutDistance(currentPositions, (shot as any).ballPositions) }))
+            .filter(entry => Number.isFinite(entry.distance) && entry.distance <= MAX_DISTANCE)
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, limit)
+            .map(entry => entry.shot);
+    }
+
+    // Set of member ids who accepted an invite from this host and whose invite is still
+    // valid — the consent primitive used to gate binding members into game slots.
+    async getConsentedGuestIds(hostId: string): Promise<Set<string>> {
+        const rows = await db
+            .select({ guestId: hiqInvites.guestId })
+            .from(hiqInvites)
+            .where(
+                and(
+                    eq(hiqInvites.hostId, hostId),
+                    eq(hiqInvites.status, "accepted"),
+                    gt(hiqInvites.expiresAt, new Date())
+                )
+            );
+        return new Set(rows.map(r => r.guestId).filter((id): id is string => id !== null));
     }
 
     async getGameHistoryById(id: string): Promise<HiqGameHistory | undefined> {
@@ -396,7 +504,12 @@ export class GameRepository {
 
         const guestIds = invites.map(inv => inv.guestId).filter(id => id !== null) as string[];
         if (guestIds.length > 0) {
-            const guests = await db.select().from(hiqMembers).where(inArray(hiqMembers.id, guestIds));
+            // Only project non-sensitive fields the join UI needs — never leak phone,
+            // birthYear, gender, or default settlement bank account fields.
+            const guests = await db
+                .select({ id: hiqMembers.id, name: hiqMembers.name })
+                .from(hiqMembers)
+                .where(inArray(hiqMembers.id, guestIds));
             result.guests = guests;
         }
 

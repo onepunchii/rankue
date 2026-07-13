@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { HiqMember } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,9 +40,14 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
         }
     }, [open, me]);
 
+    // Pending applicants never attended, so they must not be seeded into any round's
+    // participant set (they corrupt the per-person split). Declared before the useState
+    // initializer that reads it to avoid a temporal-dead-zone ReferenceError.
+    const activeMembers = members.filter(m => m.role !== 'pending');
+
     // Rounds: [{ id: 1, title: '1차', amount: 0, payerId: '...', participants: ['id1', 'id2'] }]
     const [rounds, setRounds] = useState<any[]>([
-        { id: 1, title: "1차", amount: "", payerId: "", participants: members.map(m => m.member.id) }
+        { id: 1, title: "1차", amount: "", payerId: "", participants: activeMembers.map(m => m.member.id) }
     ]);
     const [isMemberSelectOpen, setIsMemberSelectOpen] = useState(false);
     const [activeRoundId, setActiveRoundId] = useState<number | null>(null);
@@ -65,8 +70,6 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
         }
     };
 
-    const activeMembers = members.filter(m => m.role !== 'pending');
-
     const handleAddRound = () => {
         const nextId = rounds.length + 1;
         setRounds([...rounds, {
@@ -74,7 +77,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
             title: `${nextId}차`,
             amount: "",
             payerId: "", // Default empty, user selects
-            participants: members.map(m => m.member.id) // Default all
+            participants: activeMembers.map(m => m.member.id) // Default all active members
         }]);
     };
 
@@ -93,12 +96,19 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
     };
 
     const handleSubmit = () => {
+        // Guard against any non-active (e.g. pending) ids sneaking into a round's participant
+        // set — via the "모임 가져오기" import path or a stale seed — before they reach the server.
+        const activeIds = new Set(activeMembers.map(m => m.member.id));
+        const sanitizedRounds = rounds.map(r => ({
+            ...r,
+            participants: r.participants.filter((mid: string) => activeIds.has(mid))
+        }));
         const payload = {
             title,
             accountBank,
             accountNumber,
             accountHolder,
-            items: rounds.map((r, idx) => {
+            items: sanitizedRounds.map((r, idx) => {
                 // The payer must be one of the round's participants. If the selected payer was
                 // removed from the participant set (e.g. via "모임 가져오기" or toggling members),
                 // fall back to the first participant rather than an arbitrary non-participant.
@@ -112,7 +122,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                     payerId
                 };
             }),
-            participants: rounds.flatMap((r, idx) => r.participants.map((mid: string) => ({
+            participants: sanitizedRounds.flatMap((r, idx) => r.participants.map((mid: string) => ({
                 roundOrder: idx + 1,
                 memberId: mid
             }))),
@@ -123,9 +133,9 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-md max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-card">
+            <DialogContent hideClose className="bg-[#141416] border-white/10 text-white max-w-md max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-card">
                 <div className="shrink-0 bg-[#141416] border-b border-white/5 p-4 flex items-center justify-between z-10">
-                    <h2 className="font-bold text-[19px] tracking-tight">새 정산 만들기</h2>
+                    <DialogTitle className="font-bold text-[19px] tracking-tight">새 정산 만들기</DialogTitle>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-white/45" onClick={() => onOpenChange(false)}>
                         <LucideX className="w-5 h-5" />
                     </Button>
@@ -135,40 +145,40 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                     {/* Basic Info */}
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label className="text-[12px] font-medium text-white/45">정산 제목</Label>
+                            <Label className="text-xs font-semibold text-white/55">정산 제목</Label>
                             <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                className="bg-black/20 border-white/10 h-12 font-bold"
+                                className="bg-surface-2 border-surface-line h-12 rounded-tile font-bold"
                             />
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                             <div className="space-y-2 col-span-1">
-                                <Label className="text-[12px] font-medium text-white/45">은행</Label>
+                                <Label className="text-xs font-semibold text-white/55">은행</Label>
                                 <Input
                                     value={accountBank}
                                     onChange={(e) => setAccountBank(e.target.value)}
                                     placeholder="은행명"
-                                    className="bg-black/20 border-white/10 h-12 text-base"
+                                    className="bg-surface-2 border-surface-line h-12 rounded-tile text-base"
                                 />
                             </div>
                             <div className="space-y-2 col-span-2">
-                                <Label className="text-[12px] font-medium text-white/45">계좌번호</Label>
+                                <Label className="text-xs font-semibold text-white/55">계좌번호</Label>
                                 <Input
                                     value={accountNumber}
                                     onChange={(e) => setAccountNumber(e.target.value)}
                                     placeholder="- 없이 입력"
-                                    className="bg-black/20 border-white/10 h-12 text-base"
+                                    className="bg-surface-2 border-surface-line h-12 rounded-tile text-base"
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-[12px] font-medium text-white/45">예금주</Label>
+                            <Label className="text-xs font-semibold text-white/55">예금주</Label>
                             <Input
                                 value={accountHolder}
                                 onChange={(e) => setAccountHolder(e.target.value)}
                                 placeholder="예금주명"
-                                className="bg-black/20 border-white/10 h-12 text-base"
+                                className="bg-surface-2 border-surface-line h-12 rounded-tile text-base"
                             />
                         </div>
                     </div>
@@ -185,22 +195,22 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
 
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label className="text-[12px] font-medium text-white/45">차수 이름</Label>
+                                        <Label className="text-xs font-semibold text-white/55">차수 이름</Label>
                                         <Input
                                             value={round.title}
                                             onChange={(e) => handleRoundChange(round.id, 'title', e.target.value)}
-                                            className="bg-black/20 border-white/10 h-12 text-base font-bold"
+                                            className="bg-surface-2 border-surface-line h-12 rounded-tile text-base font-bold"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-[12px] font-medium text-white/45">결제 금액</Label>
+                                        <Label className="text-xs font-semibold text-white/55">결제 금액</Label>
                                         <div className="relative">
                                             <Input
                                                 type="number"
                                                 value={round.amount}
                                                 onChange={(e) => handleRoundChange(round.id, 'amount', e.target.value)}
                                                 placeholder="0"
-                                                className="bg-black/20 border-white/10 h-12 text-lg font-bold pl-4 pr-8"
+                                                className="bg-surface-2 border-surface-line h-12 rounded-tile text-lg font-bold pl-4 pr-8"
                                             />
                                             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-white/40">원</span>
                                         </div>
@@ -208,7 +218,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
 
                                     <div className="space-y-4 pt-2">
                                         <div className="flex items-center justify-between px-1">
-                                            <Label className="text-[12px] font-medium text-white/45">참석자 관리</Label>
+                                            <Label className="text-xs font-semibold text-white/55">참석자 관리</Label>
                                             <div className="flex items-center gap-2">
                                                 {recentActivities.length > 0 && (
                                                     <Select onValueChange={(val) => handleImportActivity(val, round.id)}>
@@ -274,25 +284,27 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label className="text-[12px] font-medium text-white/45">계산한 사람</Label>
-                                        <div className="relative">
-                                            <select
-                                                className="w-full h-12 bg-black/20 border border-white/10 rounded-md pl-3 pr-10 text-base font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand appearance-none"
-                                                value={round.payerId}
-                                                onChange={(e) => handleRoundChange(round.id, 'payerId', e.target.value)}
+                                        <Label className="text-xs font-semibold text-white/55">계산한 사람</Label>
+                                        <Select
+                                            value={round.payerId}
+                                            onValueChange={(val) => handleRoundChange(round.id, 'payerId', val)}
+                                        >
+                                            <SelectTrigger
                                                 aria-label="Payer select"
+                                                className="w-full h-12 bg-surface-2 border-surface-line rounded-tile px-3 text-base font-bold text-white"
                                             >
-                                                <option value="" disabled className="text-black bg-white text-base">선택하세요</option>
+                                                <SelectValue placeholder="선택하세요" />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-[#141416] border-white/10 text-white rounded-tile">
                                                 {activeMembers
                                                     .filter(m => round.participants.includes(m.member.id))
                                                     .map(m => (
-                                                        <option key={m.member.id} value={m.member.id} className="text-black bg-white text-base">
+                                                        <SelectItem key={m.member.id} value={m.member.id} className="text-base">
                                                             {m.member.name}
-                                                        </option>
+                                                        </SelectItem>
                                                     ))}
-                                            </select>
-                                            <LucideChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 pointer-events-none" />
-                                        </div>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
                             </div>

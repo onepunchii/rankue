@@ -81,8 +81,8 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
             {/* Header / CTA */}
             <div className="px-6 flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-white tracking-tight">크루 투표</h2>
-                    <p className="text-xs text-white/55 mt-1 font-semibold flex items-center gap-1.5 tabular-nums">
+                    <h2 className="text-[15px] font-semibold text-white/55">크루 투표</h2>
+                    <p className="text-xs text-white/38 mt-1 font-medium flex items-center gap-1.5 tabular-nums">
                         <LucideVote className="w-3 h-3" />
                         총 {polls?.length || 0}개의 투표
                     </p>
@@ -105,7 +105,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                         {Array.from({ length: 3 }).map((_, i) => (
                             <div
                                 key={i}
-                                className="bg-[#141414] border border-white/5 rounded-card overflow-hidden animate-pulse"
+                                className="bg-surface-2 border border-surface-line rounded-card overflow-hidden animate-pulse"
                             >
                                 <div className="p-6 pb-5 space-y-5">
                                     <div className="space-y-2">
@@ -125,14 +125,12 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                         ))}
                     </>
                 ) : (!polls || polls.length === 0) ? (
-                    <div className="py-20 text-center bg-white/[0.02] border border-dashed border-white/5 rounded-card space-y-4">
-                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto">
-                            <LucideVote className="w-8 h-8 text-white/45" />
+                    <div className="py-24 text-center">
+                        <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+                            <LucideVote className="w-7 h-7 text-white/45" />
                         </div>
-                        <div className="space-y-1">
-                            <p className="text-sm font-medium text-white/55">진행 중인 투표가 없습니다</p>
-                            <p className="text-xs text-white/45">멤버들과 새로운 의견을 나눠보세요</p>
-                        </div>
+                        <p className="text-[15px] font-medium text-ink-2 mb-1">진행 중인 투표가 없습니다</p>
+                        <p className="text-[13px] text-ink-4">멤버들과 새로운 의견을 나눠보세요</p>
                     </div>
                 ) : (
                     <>
@@ -202,7 +200,7 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
             layout
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="group relative bg-[#141414] border border-white/5 rounded-card overflow-hidden hover:border-white/10 transition-all duration-300"
+            className="group relative bg-surface-2 border border-surface-line rounded-card overflow-hidden hover:border-brand/30 transition-all duration-300"
         >
             <div className="p-6 pb-5">
                 {/* Header */}

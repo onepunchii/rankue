@@ -109,9 +109,10 @@ export default function HiqSimulation() {
             const TABLE_H = 2.844;
             const ballPositionsInMeters: any = {};
             Object.entries(userPositions).forEach(([id, pos]) => {
+                // Orientation-preserving 90-deg rotation: UI (long x, short y) -> physics (short x, long y)
                 ballPositionsInMeters[id] = {
-                    x: (pos.x / 500) * TABLE_W,
-                    y: (pos.y / 250) * TABLE_H
+                    x: (1 - pos.y / 250) * TABLE_W,
+                    y: (pos.x / 500) * TABLE_H
                 };
             });
 
@@ -155,6 +156,32 @@ export default function HiqSimulation() {
         setActiveSolutionIndex(index);
         setActiveMode("result");
 
+        // Sync rendered balls to the DB shot's recorded layout so the recommended
+        // path starts at the displayed cue ball (finding [2]). Uses the same
+        // orientation-preserving mapping as runReplay.
+        if (dimensions.width > 0 && shot.ballPositions) {
+            const TABLE_W = 1.422;
+            const TABLE_H = 2.844;
+
+            const hPadding = dimensions.width * 0.054;
+            const vPadding = dimensions.height * 0.112;
+            const playW = dimensions.width * 0.892;
+            const playH = dimensions.height * 0.776;
+            const ballRadius = playW / 96.0;
+
+            const mapX = (x: number) => hPadding + ballRadius + (x / 500) * (playW - 2 * ballRadius);
+            const mapY = (y: number) => vPadding + ballRadius + (y / 250) * (playH - 2 * ballRadius);
+
+            const newPos: Record<string, BallPos> = {};
+            Object.entries(shot.ballPositions).forEach(([id, m]: [string, any]) => {
+                newPos[id] = {
+                    x: mapX((m.y / TABLE_H) * 500),
+                    y: mapY((1 - m.x / TABLE_W) * 250)
+                };
+            });
+            setBallPositions(newPos);
+        }
+
         if (engineRef.current) {
             // Dry Run Trajectory using Unified Physics
             engineRef.current.initFromPositions(shot.ballPositions);
@@ -179,8 +206,8 @@ export default function HiqSimulation() {
             const mappedPaths: Record<string, any[]> = {};
             Object.entries(trajectory).forEach(([id, path]) => {
                 mappedPaths[id] = path.map(p => ({
-                    x: (p.x / TABLE_W) * 500,
-                    y: (p.y / TABLE_H) * 250
+                    x: (p.y / TABLE_H) * 500,
+                    y: (1 - p.x / TABLE_W) * 250
                 }));
             });
 
@@ -212,8 +239,8 @@ export default function HiqSimulation() {
         // 2. Animate Cue Stick
         const { angle, power, spinX, spinY } = sol.shotParams;
         const whitePos = sol.ballPositions.white;
-        const startVisualX = mapX((whitePos.x / TABLE_W) * 500);
-        const startVisualY = mapY((whitePos.y / TABLE_H) * 250);
+        const startVisualX = mapX((whitePos.y / TABLE_H) * 500);
+        const startVisualY = mapY((1 - whitePos.x / TABLE_W) * 250);
 
         let sequenceStart = performance.now();
         const sequenceStep = () => {
@@ -221,7 +248,10 @@ export default function HiqSimulation() {
             if (elapsed < 300) {
                 const progress = elapsed / 300;
                 const swing = Math.sin(progress * Math.PI) * 40;
-                setCueStick({ show: true, x: startVisualX, y: startVisualY, angle: angle + Math.PI, offset: 15 + swing });
+                // Under the orientation-preserving rotation, physics angle Θ maps to
+                // screen angle Θ - π/2; the cue-stick renderer adds π, so pass angle + π/2
+                // to align the drawn stick with the corrected screen mapping.
+                setCueStick({ show: true, x: startVisualX, y: startVisualY, angle: angle + Math.PI / 2, offset: 15 + swing });
                 requestAnimationFrame(sequenceStep);
             } else {
                 setCueStick(prev => ({ ...prev, show: false }));
@@ -246,8 +276,8 @@ export default function HiqSimulation() {
                         const updateUI: Record<string, { x: number, y: number }> = {};
                         currentBalls.forEach(b => {
                             updateUI[b.id] = {
-                                x: mapX((b.pos.x / TABLE_W) * 500),
-                                y: mapY((b.pos.y / TABLE_H) * 250)
+                                x: mapX((b.pos.y / TABLE_H) * 500),
+                                y: mapY((1 - b.pos.x / TABLE_W) * 250)
                             };
                         });
                         setBallPositions(updateUI);

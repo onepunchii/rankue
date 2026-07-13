@@ -175,15 +175,16 @@ export class AdminRepository {
     }
 
     // --- User Moderation ---
-    async getReportedUsers() {
-        // MOCK: In real app, we would join reported_content tables.
-        const users = await db.select().from(profiles).where(eq(profiles.role, 'user')).limit(5);
-
-        return users.map(u => ({
-            ...u,
-            reportCount: Math.floor(Math.random() * 5) + 1,
-            reason: "비매너 채팅 신고"
-        }));
+    async getReportedUsers(): Promise<Array<{ id: string; nickname: string | null; reportCount: number; reason: string }>> {
+        // No real reports table exists yet. The previous implementation was a MOCK that
+        // (a) selected full `profiles` rows — leaking plaintext password, securityAnswer,
+        //     phone, email and pushToken into the admin API response and its localStorage cache, and
+        // (b) fabricated random reportCounts for innocent users while the UI's Ban button
+        //     fires the REAL, irreversible POST /admin/users/:id/ban.
+        // Pairing mock data with a destructive real mutation is unsafe, so return no rows
+        // until a genuine reports/moderation table is available. The moderation UI already
+        // renders a clean empty state.
+        return [];
     }
 
     async banUser(userId: string): Promise<void> {

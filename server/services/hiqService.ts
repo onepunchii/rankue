@@ -138,6 +138,17 @@ export class HiqService {
                     securityQuestion: data.securityQuestion,
                     securityAnswer: normalizedAnswer
                 });
+            } else {
+                // SECURITY: the profile already exists AND is password-protected. /register is
+                // unauthenticated, so before linking this new member row to that existing global
+                // profile we MUST verify the supplied PIN matches (mirrors login() above).
+                // Without this, anyone who knows a phone number could register it at any store
+                // (store id is attacker-controlled) and hijack the victim's global profile —
+                // reading and overwriting their nickname / image / role across every store.
+                // A legitimate cross-store user supplying the correct PIN still links correctly.
+                if (!data.password || data.password !== profile.password) {
+                    throw unauthorized("INVALID_PASSWORD");
+                }
             }
             profileId = profile.id;
         }

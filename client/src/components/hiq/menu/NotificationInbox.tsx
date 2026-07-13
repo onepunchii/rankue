@@ -44,15 +44,13 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
             readMutation.mutate(notif.id);
         }
 
-        // Deep linking logic
+        // Deep linking logic — 크루 상세는 /club/:id 에 마운트되어 있고, 탭은 ?tab= 쿼리로 전달한다.
         if (notif.params && notif.params.crewId) {
-            const tab = notif.params.tab?.toLowerCase() || 'chat';
-            setLocation(`/crew/${notif.params.crewId}/${tab}`);
-            onClose();
-        } else if (notif.type === 'NOTICE') {
-            setLocation('/hiq/notice');
+            const tab = notif.params.tab?.toLowerCase();
+            setLocation(`/club/${notif.params.crewId}${tab ? `?tab=${tab}` : ''}`);
             onClose();
         }
+        // NOTICE 등 목적지 페이지가 없는 알림은 읽음 처리만 하고 이동하지 않는다 (전용 페이지 부재).
     };
 
     return (

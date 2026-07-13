@@ -40,7 +40,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
 
     // Fetch Comments
     const { data: comments, isLoading: isCommentsLoading } = useQuery<Comment[]>({
-        queryKey: [`/api/hiq/photos/${photo?.id}/comments`],
+        queryKey: [`/api/hiq/crews/${photo?.crewId}/photos/${photo?.id}/comments`],
         enabled: !!photo?.id && open
     });
 
@@ -66,14 +66,14 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
     // Create Comment Mutation
     const commentMutation = useMutation({
         mutationFn: async (content: string) => {
-            return await apiRequest(`/api/hiq/photos/${photo.id}/comments`, {
+            return await apiRequest(`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/comments`, {
                 method: "POST",
                 body: JSON.stringify({ content })
             });
         },
         onSuccess: () => {
             setCommentContent("");
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/photos/${photo.id}/comments`] });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/comments`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos`] });
         },
         onError: (error: any) => {
@@ -115,7 +115,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
         },
         onSuccess: () => {
             toast({ title: "댓글이 삭제되었습니다." });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/photos/${photo.id}/comments`] });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/comments`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos`] });
         },
         onError: (error: any) => {

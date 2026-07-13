@@ -105,8 +105,11 @@ export const CrewBoardTab = memo(({
                     ))
                 ) : (
                     <div className="py-24 text-center">
-                        <LucideLayoutList className="w-12 h-12 text-white/45 mx-auto mb-4" />
-                        <p className="text-sm font-medium text-white/55">아직 등록된 게시글이 없습니다</p>
+                        <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+                            <LucideLayoutList className="w-7 h-7 text-white/45" />
+                        </div>
+                        <p className="text-[15px] font-medium text-ink-2 mb-1">아직 등록된 게시글이 없습니다</p>
+                        <p className="text-[13px] text-ink-4">첫 번째 이야기를 남겨보세요</p>
                     </div>
                 )}
             </div>

@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { LucideSend } from "lucide-react";
+import { LucideSend, LucideTrash2 } from "lucide-react";
 
 interface Comment {
     id: string;
@@ -38,7 +38,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
 
     // Fetch Comments
     const { data: comments, isLoading, isError, refetch } = useQuery<Comment[]>({
-        queryKey: [`/api/hiq/posts/${post?.id}/comments`],
+        queryKey: [`/api/hiq/crews/${post?.crewId}/posts/${post?.id}/comments`],
         enabled: !!open && !!post?.id
     });
 
@@ -46,14 +46,15 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
     const commentMutation = useMutation({
         mutationFn: async (content: string) => {
             if (!post?.id) throw new Error("Post ID is missing");
-            return await apiRequest(`/api/hiq/posts/${post.id}/comments`, {
+            if (!post?.crewId) throw new Error("Crew ID is missing");
+            return await apiRequest(`/api/hiq/crews/${post.crewId}/posts/${post.id}/comments`, {
                 method: "POST",
                 body: JSON.stringify({ content })
             });
         },
         onSuccess: () => {
             setCommentContent("");
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/posts/${post?.id}/comments`] });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts/${post?.id}/comments`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts`] });
         },
         onError: (error: any) => {
@@ -75,7 +76,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
         },
         onSuccess: () => {
             toast({ title: "댓글이 삭제되었습니다." });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/posts/${post?.id}/comments`] });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts/${post?.id}/comments`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts`] });
         },
         onError: (error: any) => {
@@ -94,7 +95,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg bg-[#141416] border-white/10 p-0 overflow-hidden flex flex-col max-h-[85vh]">
+            <DialogContent className="max-w-lg bg-[#141416] border-white/10 rounded-card p-0 overflow-hidden flex flex-col max-h-[85vh]">
                 <DialogHeader className="px-8 py-6 border-b border-white/5">
                     <DialogTitle className="text-xl font-semibold text-white">{post?.title}</DialogTitle>
                 </DialogHeader>
@@ -175,10 +176,11 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                                         deleteCommentMutation.mutate(comment.id);
                                                     }
                                                 }}
-                                                className="p-1 text-white/45 hover:text-red-500 transition-colors self-start mt-1 opacity-0 group-hover/comment:opacity-100"
+                                                className="shrink-0 self-start -mr-2 flex items-center justify-center min-w-[44px] min-h-[44px] text-white/45 hover:text-red-500 transition-colors md:opacity-0 md:group-hover/comment:opacity-100"
                                                 title="댓글 삭제"
+                                                aria-label="댓글 삭제"
                                             >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                                <LucideTrash2 className="w-4 h-4" />
                                             </button>
                                         )}
                                     </div>

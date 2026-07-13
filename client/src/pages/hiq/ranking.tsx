@@ -19,9 +19,9 @@ export default function HiqRanking() {
     });
 
     const { data: rankings, isLoading } = useQuery<HiqMember[]>({
-        queryKey: [`/api/hiq/rankings`, rankingScope, currentSport],
+        queryKey: [`/api/hiq/rankings`, rankingScope, currentSport, rankingTab],
         queryFn: async () => {
-            const res = await fetch(`/api/hiq/rankings?scope=${rankingScope}&sport=${currentSport}`);
+            const res = await fetch(`/api/hiq/rankings?scope=${rankingScope}&type=${rankingTab}&sport=${currentSport}`);
             const data = await res.json();
             return data.data;
         }

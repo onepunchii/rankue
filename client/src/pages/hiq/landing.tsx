@@ -16,8 +16,21 @@ export default function Landing() {
     const [requiresPassword, setRequiresPassword] = useState(false);
     const [memberName, setMemberName] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [storeSlug, setStoreSlug] = useState("hiq");
     const [isResetOpen, setIsResetOpen] = useState(false);
+
+    // Resolve the tenant slug from the URL exactly as StoreContext does, so a
+    // white-label tenant logs into its OWN store rather than a hardcoded "hiq".
+    const resolveStoreSlug = () => {
+        const searchParams = new URLSearchParams(window.location.search);
+        const storeParam = searchParams.get("store");
+        if (window.location.pathname.startsWith("/hiq")) return "hiq";
+        if (storeParam) return storeParam;
+        const host = window.location.hostname;
+        if (host.includes(".") && !host.startsWith("www") && host.split(".").length > 2) {
+            return host.split(".")[0];
+        }
+        return "hiq";
+    };
 
     // Check if already logged in
     useEffect(() => {
@@ -73,7 +86,7 @@ export default function Landing() {
         try {
             const res = await apiRequest("/api/hiq/login", {
                 method: "POST",
-                body: { phone, storeSlug, password: requiresPassword ? password : undefined },
+                body: { phone, storeSlug: resolveStoreSlug(), password: requiresPassword ? password : undefined },
             });
 
             if (res.requiresPassword) {
@@ -94,7 +107,12 @@ export default function Landing() {
                     description: "오늘도 즐거운 게임 되세요.",
                 });
             }
-            setTimeout(() => setLocation(res.redirectTo), 500);
+            // Honor a ?redirect= return url (e.g. from the QR invite flow) ONLY for
+            // existing members — new members must complete registration (res.redirectTo
+            // points at /register). startsWith("/") guards against open-redirect.
+            const redirect = new URLSearchParams(window.location.search).get("redirect");
+            const dest = !res.isNew && redirect && redirect.startsWith("/") ? redirect : res.redirectTo;
+            setTimeout(() => setLocation(dest), 500);
 
         } catch (error: any) {
             toast({

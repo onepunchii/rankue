@@ -35,7 +35,9 @@ interface CrewGalleryTabProps {
 
 export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: CrewGalleryTabProps) {
     const { toast } = useToast();
-    const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+    // Track only the id, then re-derive the photo from the live list cache so the detail
+    // dialog reflects fresh like/comment counts after invalidation (a snapshot would go stale).
+    const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
     const [isPhotoDetailOpen, setIsPhotoDetailOpen] = useState(false);
     // Tracks the compression + blob-upload phase (before the metadata POST mutation runs).
     const [isProcessing, setIsProcessing] = useState(false);
@@ -129,7 +131,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
             });
             return;
         }
-        setSelectedPhoto(photo);
+        setSelectedPhotoId(photo.id);
         setIsPhotoDetailOpen(true);
     };
 
@@ -137,7 +139,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
         return (
             <div className="pt-6">
                 <div className="flex items-center justify-between mb-6 px-6">
-                    <Skeleton className="h-7 w-20 bg-white/5" />
+                    <Skeleton className="h-5 w-16 bg-white/5" />
                     <Skeleton className="h-9 w-24 rounded-xl bg-white/5" />
                 </div>
                 <div className="grid grid-cols-3 gap-[1px]">
@@ -152,7 +154,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
     return (
         <div className="pt-6">
             <header className="flex items-center justify-between mb-6 px-6">
-                <h2 className="text-2xl font-bold tracking-tight text-white">사진첩</h2>
+                <h2 className="text-[15px] font-semibold text-white/55">사진첩</h2>
                 {isMember && (
                     <div className="flex items-center gap-2">
                         <input
@@ -224,11 +226,11 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                 </div>
             ) : (
                 <div className="py-32 text-center px-6">
-                    <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6">
-                        <LucideImage className="w-8 h-8 text-white/45" />
+                    <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+                        <LucideImage className="w-7 h-7 text-white/45" />
                     </div>
-                    <p className="text-[15px] font-medium text-white/55 mb-1">사진이 아직 없습니다</p>
-                    <p className="text-xs font-medium text-white/45">소중한 추억을 첫 번째로 남겨보세요</p>
+                    <p className="text-[15px] font-medium text-ink-2 mb-1">사진이 아직 없습니다</p>
+                    <p className="text-[13px] text-ink-4">소중한 추억을 첫 번째로 남겨보세요</p>
                 </div>
             )}
 
@@ -236,7 +238,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
             <PhotoDetailDialog
                 open={isPhotoDetailOpen}
                 onOpenChange={setIsPhotoDetailOpen}
-                photo={selectedPhoto}
+                photo={photos?.find(p => p.id === selectedPhotoId) ?? null}
                 isAdmin={isAdmin}
                 currentMemberId={currentMemberId}
             />

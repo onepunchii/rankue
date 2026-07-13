@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LucideMessageSquare, LucideSend, LucideLoader2, LucideTrash2 } from "lucide-react";
+import { LucideMessageSquare, LucideSend, LucideLoader2, LucideTrash2, LucideReceipt, LucideFlag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 
@@ -127,19 +127,19 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
     if (!isMember) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-10">
-                <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
-                    <LucideMessageSquare className="w-10 h-10 text-white/45" />
+                <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                    <LucideMessageSquare className="w-7 h-7 text-white/45" />
                 </div>
-                <h3 className="text-[17px] font-semibold text-white/80 mb-2">채팅은 멤버 전용입니다</h3>
-                <p className="text-sm font-medium text-white/55 leading-relaxed">
-                    크루에 가입하여 멤버들과<br />새로운 대화를 시작해보세요!
+                <p className="text-[15px] font-medium text-ink-2 mb-1">채팅은 멤버 전용입니다</p>
+                <p className="text-[13px] text-ink-4 leading-relaxed">
+                    크루에 가입하여 멤버들과<br />새로운 대화를 시작해보세요
                 </p>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-full flex-1 relative bg-[#0f0f0f]">
+        <div className="flex flex-col h-full flex-1 relative bg-[#0A0A0A]">
             {/* Messages Area */}
             <div
                 ref={scrollContainerRef}
@@ -177,8 +177,11 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                     })
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center">
-                        <LucideMessageSquare className="w-12 h-12 mb-4 text-white/45" />
-                        <p className="text-sm font-medium text-white/45">대화를 시작해보세요</p>
+                        <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                            <LucideMessageSquare className="w-7 h-7 text-white/45" />
+                        </div>
+                        <p className="text-[15px] font-medium text-ink-2 mb-1">아직 대화가 없습니다</p>
+                        <p className="text-[13px] text-ink-4">첫 메시지를 남겨 대화를 시작해보세요</p>
                     </div>
                 )}
                 <div ref={messagesEndRef} />
@@ -186,7 +189,7 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
 
             {/* Input Area - 하단 탭(h-20) 위에 위치하도록 bottom-20 설정 */}
             {isMember && (
-                <div className="absolute bottom-20 left-0 right-0 p-6 bg-[#0f0f0f] pt-10 z-50">
+                <div className="absolute bottom-20 left-0 right-0 p-6 bg-[#0A0A0A] pt-10 z-50">
                     <div className="relative flex items-center gap-2 max-w-4xl mx-auto mb-4">
                         <input
                             type="text"
@@ -255,7 +258,7 @@ const ChatMessageItem = memo(({
                         <span className="text-[12px] font-medium text-white/55 ml-1 mb-1">{chat.sender?.name}</span>
                     )}
 
-                    <div className="flex items-end gap-1.5 flex-row-reverse group-hover:flex-row">
+                    <div className="flex items-end gap-1.5 flex-row-reverse">
                         <div className={cn(
                             "px-4 py-2.5 rounded-2xl text-sm font-medium break-all leading-relaxed relative",
                             isMe ? "bg-brand text-brand-fg rounded-tr-none" : "bg-white/10 text-white rounded-tl-none border border-white/5",
@@ -263,22 +266,22 @@ const ChatMessageItem = memo(({
                             isTemp && "opacity-60"
                         )}>
                             {chat.type === 'settlement' ? (
-                                <div className="bg-white text-black rounded-2xl overflow-hidden w-64 border border-white/10">
-                                    <div className="bg-brand px-4 py-3 flex items-center justify-between">
+                                <div className="bg-[#141416] border border-white/10 rounded-2xl overflow-hidden w-64">
+                                    <div className="bg-brand text-brand-fg px-4 py-3 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-lg">💰</span>
+                                            <LucideReceipt className="w-4 h-4" />
                                             <span className="font-semibold text-xs">정산 요청</span>
                                         </div>
                                         <span className="text-xs font-semibold bg-black/10 px-2 py-0.5 rounded-full">분할</span>
                                     </div>
                                     <div className="p-5">
-                                        <h3 className="font-bold text-sm mb-2 opacity-80">{chat.metadata?.title}</h3>
-                                        <div className="text-2xl font-semibold mb-5 tracking-tight tabular-nums">
+                                        <h3 className="font-medium text-xs mb-2 text-white/55 line-clamp-1">{chat.metadata?.title}</h3>
+                                        <div className="text-2xl font-semibold mb-5 tracking-tight tabular-nums text-white">
                                             {chat.metadata?.totalAmount?.toLocaleString()}<span className="text-sm font-bold ml-0.5">원</span>
                                         </div>
                                         <Button
                                             size="sm"
-                                            className="w-full bg-black text-white hover:bg-neutral-800 font-bold h-10 rounded-xl text-xs transition-all active:scale-[0.98]"
+                                            className="w-full bg-white/5 hover:bg-white/10 text-white font-semibold h-10 rounded-xl text-xs border border-white/5 transition-all active:scale-[0.98]"
                                             onClick={() => chat.metadata?.settlementId && onSettlementClick?.(chat.metadata.settlementId)}
                                         >
                                             상세 내역 확인하기
@@ -286,10 +289,10 @@ const ChatMessageItem = memo(({
                                     </div>
                                 </div>
                             ) : isGolfBooking ? (
-                                <div className="bg-[#1A1A1A] border border-white/10 rounded-2xl overflow-hidden w-64">
-                                    <div className="bg-blue-500 px-4 py-2.5 flex items-center gap-2">
-                                        <span className="text-sm">⛳️</span>
-                                        <span className="font-semibold text-xs text-white">부킹 공유</span>
+                                <div className="bg-[#141416] border border-white/10 rounded-2xl overflow-hidden w-64">
+                                    <div className="bg-brand text-brand-fg px-4 py-3 flex items-center gap-2">
+                                        <LucideFlag className="w-4 h-4" />
+                                        <span className="font-semibold text-xs">부킹 공유</span>
                                     </div>
                                     <div className="p-5 space-y-4">
                                         <div>
@@ -302,8 +305,8 @@ const ChatMessageItem = memo(({
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="text-xl font-semibold text-blue-400 tracking-tight tabular-nums">
-                                            {chat.metadata?.greenFee?.toLocaleString() ?? '-'}<span className="text-xs ml-0.5 text-blue-400/60">원</span>
+                                        <div className="text-xl font-semibold text-white tracking-tight tabular-nums">
+                                            {chat.metadata?.greenFee?.toLocaleString() ?? '-'}<span className="text-xs ml-0.5 text-white/55">원</span>
                                         </div>
                                         {chat.metadata?.bookingId != null && (
                                             <Button
@@ -330,9 +333,9 @@ const ChatMessageItem = memo(({
                                         }
                                     }}
                                     title="메시지 삭제"
-                                    className="opacity-0 group-hover:opacity-100 p-1 text-white/45 hover:text-red-500 transition-all mb-1"
+                                    className="p-2.5 -m-1 text-white/45 hover:text-red-500 transition-colors mb-0.5"
                                 >
-                                    <LucideTrash2 className="w-3 h-3" />
+                                    <LucideTrash2 className="w-4 h-4" />
                                 </button>
                             )}
                             <span className="text-xs font-medium text-white/45 whitespace-nowrap px-0.5 tabular-nums">

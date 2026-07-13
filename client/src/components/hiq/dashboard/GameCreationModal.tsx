@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp, LucideUsers, LucideZap } from "lucide-react";
 import { HiqMember, HiqGameHistory } from "@shared/schema";
 import { useGameCreation, PlayerType } from "@/hooks/useGameCreation";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 interface GameCreationModalProps {
@@ -39,7 +39,7 @@ const PlayerCard = ({
 
     // Calculate Win Rate if history is available (only for self/host usually)
     const winRate = history ? (() => {
-        const myGames = history.filter(g => g.gameMode === 'match'); // Only count match games
+        const myGames = history.filter(g => g.gameMode === 'match' && g.sportCategory === 'BILLIARDS'); // Only count billiards match games
         if (myGames.length === 0) return null;
         const wins = myGames.filter(g => g.isWinner).length;
         return Math.round((wins / myGames.length) * 100);
@@ -181,13 +181,26 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
         confirmStart
     } = useGameCreation({ member, history, initialMode });
 
-    // Initialize when modal opens
+    // Keep a live ref to initializeGame so the open-effect can invoke the latest version
+    // WITHOUT depending on it (initializeGame is recreated whenever gameType / numberOfPlayers
+    // change, and re-running it mid-session would wipe joined opponents and regenerate the PIN).
+    const initializeGameRef = useRef(initializeGame);
+    initializeGameRef.current = initializeGame;
+
+    // Initialize exactly once per open transition, and only after the member query resolves
+    // (initializeGame no-ops while member is undefined, so we must wait for it).
+    const initRef = useRef(false);
     useEffect(() => {
-        if (open) {
-            if (initialMode) setGameMode(initialMode);
-            initializeGame();
+        if (!open) {
+            initRef.current = false;
+            return;
         }
-    }, [open, initialMode, initializeGame, setGameMode]);
+        if (!initRef.current && member) {
+            initRef.current = true;
+            if (initialMode) setGameMode(initialMode);
+            initializeGameRef.current();
+        }
+    }, [open, member]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

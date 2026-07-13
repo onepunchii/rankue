@@ -12,8 +12,7 @@ import {
     LucideHome,
     LucideFileText,
     LucideImage,
-    LucideMessageCircle,
-    LucideVote
+    LucideMessageCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -31,9 +30,11 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 
 export default function HiqClubDetail() {
     const [match, params] = useRoute("/club/:id");
+    // 호환 별칭: 이미 발송된 푸시 페이로드가 /crew/:id/:tab 로 진입할 수 있다.
+    const [, crewParams] = useRoute("/crew/:id/:tab?");
     const [_, setLocation] = useLocation();
     const { toast } = useToast();
-    const id = params?.id;
+    const id = params?.id ?? crewParams?.id;
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isCreateActivityOpen, setIsCreateActivityOpen] = useState(false);
@@ -54,6 +55,19 @@ export default function HiqClubDetail() {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}`] });
         }
     }, [id]);
+
+    // 딥링크로 전달된 탭(?tab= 또는 /crew/:id/:tab 별칭)을 초기 활성 탭으로 반영한다.
+    useEffect(() => {
+        const validTabs = ['home', 'board', 'gallery', 'chat', 'poll'];
+        let tab: string | null | undefined = crewParams?.tab;
+        if (!tab && typeof window !== 'undefined') {
+            tab = new URLSearchParams(window.location.search).get('tab');
+        }
+        const normalized = tab?.toLowerCase();
+        if (normalized && validTabs.includes(normalized)) {
+            setActiveTab(normalized as 'home' | 'board' | 'gallery' | 'chat' | 'poll');
+        }
+    }, [id, crewParams?.tab]);
 
     const handleSwipe = (direction: number) => {
         if (activeTab === 'poll') return; // Disable swipe when in poll tab if navigated via home
@@ -111,6 +125,9 @@ export default function HiqClubDetail() {
                 description: data.role === 'pending' ? "크루장의 승인을 기다려주세요." : "크루 멤버가 되었습니다."
             });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}`] });
+            // 내 크루 목록 및 디스커버리(멤버 수) 리스트 갱신 — 가입 즉시 반영
+            queryClient.invalidateQueries({ queryKey: ['/api/hiq/crews/mine'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/hiq/crews'] });
         },
         onError: (err: Error) => {
             toast({ title: "가입 실패", description: err.message, variant: "destructive" });
@@ -135,8 +152,8 @@ export default function HiqClubDetail() {
         }
     });
 
-    if (isLoading) return <div className="h-[100dvh] bg-surface-1 flex items-center justify-center text-ink-3"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
-    if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-surface-1 flex items-center justify-center text-ink-3">데이터를 찾을 수 없습니다.</div>;
+    if (isLoading) return <div className="h-[100dvh] bg-[#0A0A0A] flex items-center justify-center text-ink-3"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
+    if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-[#0A0A0A] flex items-center justify-center text-ink-3">데이터를 찾을 수 없습니다.</div>;
 
     const { crew, baseStore, members = [] } = crewData;
     const myMemberData = members.find((m: any) => m.member?.id === me?.id);
@@ -182,7 +199,7 @@ export default function HiqClubDetail() {
                         className="p-3 -ml-3 h-auto text-ink-2 hover:text-ink-1 transition-colors"
                         onClick={() => setLocation("/dashboard")}
                     >
-                        <LucideX className="w-7 h-7" strokeWidth={2.5} />
+                        <LucideX className="w-6 h-6" />
                     </Button>
 
                     {/* 중앙: 타이틀 */}
@@ -194,11 +211,11 @@ export default function HiqClubDetail() {
                     {isAdmin ? (
                         <Button
                             variant="ghost"
-                            className="p-0 h-auto text-ink-2 hover:text-ink-1 transition-colors relative"
+                            className="p-3 -mr-3 h-auto text-ink-2 hover:text-ink-1 transition-colors relative"
                             onClick={() => setIsSettingsOpen(true)}
                         >
-                            <LucideMoreVertical className="w-8 h-8" />
-                            {hasPending && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-brand border-2 border-surface-1" />}
+                            <LucideMoreVertical className="w-6 h-6" />
+                            {hasPending && <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-brand ring-2 ring-[#0B0B0D]" />}
                         </Button>
                     ) : (
                         <Button

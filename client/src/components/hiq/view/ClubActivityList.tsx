@@ -11,8 +11,12 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
     LucidePlus, LucideChevronRight, LucideZap, LucideCrown,
     LucideRefreshCw, LucideX, LucideMessageCircle, LucideShare2,
-    LucideMinus, LucidePencil, LucideTrash2
+    LucideMinus, LucidePencil, LucideTrash2, LucideTent
 } from "lucide-react";
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { generateTeams, getSportTerminology, SportType, GenderDist } from "@/lib/teamGenerator";
 import { CreateActivityDialog } from "../CreateActivityDialog";
 import { CreateGolfActivityModal } from "../club/activity/CreateGolfActivityModal";
@@ -53,10 +57,13 @@ export function ClubActivityList({
 
     const terms = getSportTerminology(sportType);
 
-    const { data: activities, isLoading } = useQuery({
+    const { data: activities, isLoading, isError, refetch } = useQuery({
         queryKey: [`/api/hiq/crews/${crewId}/activities`],
         enabled: !!crewId,
     });
+
+    const [leaveConfirmId, setLeaveConfirmId] = useState<string | null>(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     const joinMutation = useMutation({
         mutationFn: async (activityId: string) => {
@@ -457,7 +464,7 @@ export function ClubActivityList({
                                         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                                             <div className="bg-surface-3 px-4 py-2 flex items-center justify-between border-b border-surface-line">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-lg">{terms.emoji}</span>
+                                                    <LucideZap className="w-4 h-4 text-brand" />
                                                     <span className="text-xs font-bold text-ink-1">{terms.teamLabel} 편성 결과 ({currentTeamData.teams.length}개 {terms.teamLabel})</span>
                                                 </div>
                                                 <span className="text-xs font-semibold text-brand bg-brand/10 px-1.5 py-0.5 rounded-pill border border-brand/20">AI 최적화</span>
@@ -570,7 +577,7 @@ export function ClubActivityList({
                                     <Button
                                         variant="ghost"
                                         className="w-full text-white/55 hover:text-red-500 hover:bg-red-500/5 text-xs font-semibold h-8"
-                                        onClick={() => { if (confirm("정모 참여를 취소하시겠습니까?")) leaveMutation.mutate(activity.id); }}
+                                        onClick={() => setLeaveConfirmId(activity.id)}
                                         disabled={leaveMutation.isPending}
                                     >
                                         참여 취소하기
@@ -593,11 +600,7 @@ export function ClubActivityList({
                                     <Button
                                         variant="outline"
                                         className="flex-1 bg-white/5 border-surface-line text-white/55 hover:text-red-500 hover:bg-red-500/10 text-xs font-semibold h-9 rounded-tile"
-                                        onClick={() => {
-                                            if (confirm("정말 이 정모를 삭제하시겠습니까?")) {
-                                                deleteMutation.mutate(activity.id);
-                                            }
-                                        }}
+                                        onClick={() => setDeleteConfirmId(activity.id)}
                                     >
                                         <LucideTrash2 className="w-3 h-3 mr-1.5" /> 삭제하기
                                     </Button>
@@ -607,6 +610,38 @@ export function ClubActivityList({
                     </Card >
                 );
             })}
+
+            {isError && (
+                <Card className="rk-card rounded-card">
+                    <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+                            <LucideTent className="w-6 h-6 text-white/38" />
+                        </div>
+                        <p className="text-sm font-semibold text-white/72">일정을 불러오지 못했습니다</p>
+                        <Button
+                            variant="ghost"
+                            onClick={() => refetch()}
+                            className="h-10 px-5 rounded-pill bg-surface-2 hover:bg-surface-3 text-white/72 text-xs font-semibold"
+                        >
+                            <LucideRefreshCw className="w-3.5 h-3.5 mr-1.5" /> 다시 시도
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {!isError && filteredActivities.length === 0 && (
+                <Card className="rk-card rounded-card">
+                    <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-2">
+                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-1">
+                            <LucideTent className="w-6 h-6 text-white/38" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-white/72">예정된 정모가 없습니다</h3>
+                        <p className="text-xs text-white/55 font-medium">
+                            {isMember ? "첫 정모를 만들어 멤버들과 모여보세요." : "곧 새로운 모임이 열릴 예정이에요."}
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
 
             {
                 isMember && (
@@ -647,6 +682,46 @@ export function ClubActivityList({
                     initialData={editingActivity}
                 />
             )}
+
+            <AlertDialog open={!!leaveConfirmId} onOpenChange={(open) => !open && setLeaveConfirmId(null)}>
+                <AlertDialogContent className="bg-[#141416] border-white/10 text-white rounded-card">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>참여 취소</AlertDialogTitle>
+                        <AlertDialogDescription className="text-white/60">
+                            정모 참여를 취소하시겠습니까?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">돌아가기</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => { if (leaveConfirmId) leaveMutation.mutate(leaveConfirmId); }}
+                            className="bg-red-500 text-white hover:bg-red-600"
+                        >
+                            참여 취소
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+                <AlertDialogContent className="bg-[#141416] border-white/10 text-white rounded-card">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>정모 삭제</AlertDialogTitle>
+                        <AlertDialogDescription className="text-white/60">
+                            정말 이 정모를 삭제하시겠습니까?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">취소</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => { if (deleteConfirmId) deleteMutation.mutate(deleteConfirmId); }}
+                            className="bg-red-500 text-white hover:bg-red-600"
+                        >
+                            삭제하기
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div >
     );
 }

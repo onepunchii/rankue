@@ -149,9 +149,10 @@ router.post("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: 
 
 // GET /friends/search
 router.get("/friends/search", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const query = req.query.q as string;
+    const query = (req.query.keyword ?? req.query.q) as string;
     if (!query) return sendSuccess(res, []);
-    const users = await searchUsers(query, req.userId!);
+    const sport = (req.query.sport as string) === "GOLF" ? "GOLF" : "BILLIARDS";
+    const users = await searchUsers(query, req.userId!, sport);
     return sendSuccess(res, users);
 }));
 

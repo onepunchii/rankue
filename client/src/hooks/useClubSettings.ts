@@ -43,7 +43,11 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
             toast({ title: "권한이 변경되었습니다" });
+        },
+        onError: (err: Error) => {
+            toast({ title: "처리 실패", description: err.message, variant: "destructive" });
         }
     });
 
@@ -71,6 +75,9 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
             toast({ title: "처리되었습니다" });
+        },
+        onError: (err: Error) => {
+            toast({ title: "처리 실패", description: err.message, variant: "destructive" });
         }
     });
 

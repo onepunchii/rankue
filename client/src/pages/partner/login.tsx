@@ -157,14 +157,11 @@ function PartnerInquiryDialog() {
     const [isOpen, setIsOpen] = useState(false);
     const [step, setStep] = useState<"form" | "success">("form");
     const { toast } = useToast();
-    const [, setLocation] = useLocation(); // Added location hook
-    const { sendMessage } = useNativeBridge();
 
     // Form State
     const [formData, setFormData] = useState({
         ownerName: "",
         phoneNumber: "",
-        password: "",
         storeName: "",
         region: "",
         regionGu: "",
@@ -183,8 +180,8 @@ function PartnerInquiryDialog() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.ownerName || !formData.phoneNumber || !formData.password) {
-            toast({ title: "필수 정보 누락", description: "성함, 연락처, 비밀번호를 모두 입력해주세요.", variant: "destructive" });
+        if (!formData.ownerName || !formData.phoneNumber) {
+            toast({ title: "필수 정보 누락", description: "성함과 연락처를 모두 입력해주세요.", variant: "destructive" });
             return;
         }
 
@@ -205,21 +202,6 @@ function PartnerInquiryDialog() {
                 body: payload
             });
             setStep("success");
-
-            // Auto Redirect after short delay
-            setTimeout(() => {
-                setIsOpen(false);
-                setLocation("/partner/dashboard");
-
-                // Notify Native App
-                sendMessage({
-                    type: 'LOGIN_SUCCESS',
-                    payload: {
-                        token: 'cookie-session',
-                        user: { name: formData.ownerName, phone: formData.phoneNumber }
-                    }
-                });
-            }, 2000);
         } catch (error: any) {
             console.error("Inquiry Error:", error);
             toast({
@@ -237,7 +219,7 @@ function PartnerInquiryDialog() {
         setStep("form");
         setStep("form");
         setFormData({
-            ownerName: "", phoneNumber: "", password: "", storeName: "", region: "",
+            ownerName: "", phoneNumber: "", storeName: "", region: "",
             regionGu: "", regionDong: "", businessNumber: "", businessLicenseFile: null
         });
     };
@@ -255,7 +237,7 @@ function PartnerInquiryDialog() {
                         {step === "form" ? "내 매장 무료 등록" : "신청 완료!"}
                     </DialogTitle>
                     <DialogDescription className="text-center text-white/50 text-base font-medium">
-                        {step === "form" ? "30초면 등록 끝! 즉시 이용 가능합니다." : "환영합니다! 매장 관리 페이지로 이동합니다."}
+                        {step === "form" ? "담당자 확인 후 연락드립니다." : "입점 문의가 정상 접수되었습니다."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -285,19 +267,6 @@ function PartnerInquiryDialog() {
                                     value={formData.phoneNumber}
                                     onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })}
                                     className="bg-white/5 border-white/10 h-10 rounded-xl focus:border-[#10b981]"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest pl-1 mb-1 block">
-                                    비밀번호 <span className="text-red-500">*</span>
-                                </label>
-                                <Input
-                                    required
-                                    type="password"
-                                    placeholder="비밀번호 설정"
-                                    value={formData.password}
-                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                    className="bg-white/5 border-white/10 h-14 rounded-2xl px-5 text-lg font-bold focus:border-[#10b981] transition-all"
                                 />
                             </div>
                             <div>
@@ -421,14 +390,14 @@ function PartnerInquiryDialog() {
                             <LucideCheckCircle2 className="w-8 h-8 text-[#10b981]" />
                         </div>
                         <p className="text-center text-sm text-gray-300 font-medium mb-6 leading-relaxed">
-                            사장님, 현명한 선택이십니다.<br />
-                            잠시 후 매장 대시보드로 이동합니다! 🚀
+                            입점 문의가 접수되었습니다.<br />
+                            담당자가 확인 후 연락드리겠습니다. 🙌
                         </p>
                         <Button
-                            onClick={() => setLocation("/partner/dashboard")}
+                            onClick={handleClose}
                             className="w-full h-12 bg-white text-black font-bold rounded-xl"
                         >
-                            바로 입장하기
+                            확인
                         </Button>
                     </div>
                 )

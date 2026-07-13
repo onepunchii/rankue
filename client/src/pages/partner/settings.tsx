@@ -97,8 +97,9 @@ export default function PartnerSettings() {
                 ...values,
                 description: values.intro, // Map intro to description
             };
-            const res = await apiRequest("/api/hiq/partner/store", { method: "PATCH", body: payload });
-            return res.json();
+            // apiRequest already parses JSON and unwraps the {success,data} envelope,
+            // returning the plain store object — do NOT call res.json() on it.
+            return apiRequest("/api/hiq/partner/store", { method: "PATCH", body: payload });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/partner/store"] });

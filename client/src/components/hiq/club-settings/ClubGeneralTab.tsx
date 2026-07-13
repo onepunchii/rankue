@@ -230,7 +230,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         <Button
                             onClick={handleSave}
                             disabled={!isDirty || isUpdating || isUploading}
-                            className="w-full h-12 text-brand-fg rounded-tile font-bold text-sm transition-colors active:scale-[0.98] disabled:opacity-30 bg-brand hover:bg-brand/90"
+                            className="w-full h-12 text-brand-fg rounded-tile font-bold text-sm transition-colors active:scale-[0.98] disabled:opacity-30 bg-brand hover:bg-brand-strong"
                         >
                             {isUpdating || isUploading ? (
                                 <LucideLoader2 className="w-5 h-5 animate-spin" />

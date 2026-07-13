@@ -110,6 +110,10 @@ class Storage {
     async toggleCrewPostLike(id: string, mid: string) { return this.crews.toggleCrewPostLike(id, mid); }
     async getCrewComment(id: string) { return this.crews.getCrewComment(id); }
     async deleteCrewComment(id: string) { return this.crews.deleteCrewComment(id); }
+    async getCrewPostComments(postId: string) { return this.crews.getCrewPostComments(postId); }
+    async createCrewPostComment(data: any) { return this.crews.createCrewPostComment(data); }
+    async getCrewPhotoComments(photoId: string) { return this.crews.getCrewPhotoComments(photoId); }
+    async createCrewPhotoComment(data: any) { return this.crews.createCrewPhotoComment(data); }
     async getCrewPhotos(id: string, mid?: string) { return this.crews.getCrewPhotos(id, mid); }
     async toggleCrewPhotoLike(id: string, mid: string) { return this.crews.toggleCrewPhotoLike(id, mid); }
     async getCrewPhotoComment(id: string) { return this.crews.getCrewPhotoComment(id); }

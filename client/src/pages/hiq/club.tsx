@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
-import { LucideSearch } from "lucide-react";
+import { LucideSearch, LucidePlus } from "lucide-react";
 import { useSport } from "@/contexts/SportContext";
 
 // Sub-components
@@ -25,10 +25,11 @@ export default function HiqClub() {
                             <h2 className="text-[15px] font-semibold text-white/55">내 크루</h2>
                             <Button
                                 variant="ghost"
-                                className="h-7 px-3 text-[12px] font-semibold rounded-full transition-all bg-brand/10 text-brand hover:bg-brand/20"
+                                className="h-9 px-3.5 text-[13px] font-semibold rounded-full transition-all bg-brand/10 text-brand hover:bg-brand/20"
                                 onClick={() => setLocation("/club/create")}
                             >
-                                + 만들기
+                                <LucidePlus className="w-3.5 h-3.5 mr-1" />
+                                만들기
                             </Button>
                         </div>
                         <MyCrewList currentSport={currentSport} />

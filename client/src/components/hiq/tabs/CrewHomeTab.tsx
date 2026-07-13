@@ -1,6 +1,7 @@
 import { useState, memo, useMemo } from "react";
 import {
-    LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus
+    LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus,
+    LucideChevronDown, LucideUsers, LucideFlag, LucideTarget
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -54,14 +55,9 @@ export const CrewHomeTab = memo(({
 
     const activeMembers = useMemo(() => members.filter((m: any) => m.role !== 'pending'), [members]);
 
-    // 이미지 에러 핸들러
-    const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-        e.currentTarget.src = "https://images.unsplash.com/photo-1544178178-5034a9269043?auto=format&fit=crop&q=80&w=1000";
-    };
-
-    const handleLogoError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-        e.currentTarget.src = "https://images.unsplash.com/photo-1511367461989-f85a21fda181?auto=format&fit=crop&q=80&w=200";
-    };
+    // 커버/엠블럼 이미지가 없으면 외부 스톡 사진 대신 크루 이니셜 + 종목 아이콘 타일로 대체
+    const crewInitial = crew.name?.trim().charAt(0).toUpperCase() || "?";
+    const SportIcon = crew.sportCategory === 'GOLF' ? LucideFlag : LucideTarget;
 
     // 통계 계산 (useMemo 최적화)
     const stats = useMemo(() => {
@@ -111,23 +107,34 @@ export const CrewHomeTab = memo(({
             {/* Hero Section */}
             <div className="relative">
                 <div className="relative w-full overflow-hidden">
-                    <img
-                        src={crew.coverImage || "https://images.unsplash.com/photo-1544178178-5034a9269043?auto=format&fit=crop&q=80&w=1000"}
-                        className="w-full h-[240px] object-cover"
-                        alt="Crew Cover"
-                        onError={handleImageError}
-                    />
+                    {crew.coverImage ? (
+                        <img
+                            src={crew.coverImage}
+                            className="w-full h-[240px] object-cover"
+                            alt="Crew Cover"
+                        />
+                    ) : (
+                        <div className="w-full h-[240px] bg-surface-2 flex items-center justify-center">
+                            <span className="text-[72px] font-bold text-brand/40 leading-none tracking-tight">{crewInitial}</span>
+                        </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] to-transparent opacity-60" />
                 </div>
 
                 <div className="px-6 -mt-10 relative z-10 flex items-end gap-4">
                     <div className="w-20 h-20 rounded-2xl bg-surface-2 border-2 border-brand/20 overflow-hidden">
-                        <img
-                            src={crew.emblem || "https://images.unsplash.com/photo-1511367461989-f85a21fda181?auto=format&fit=crop&q=80&w=200"}
-                            className="w-full h-full object-cover"
-                            alt="Crew Logo"
-                            onError={handleLogoError}
-                        />
+                        {crew.emblem ? (
+                            <img
+                                src={crew.emblem}
+                                className="w-full h-full object-cover"
+                                alt="Crew Logo"
+                            />
+                        ) : (
+                            <div className="w-full h-full bg-surface-3 flex flex-col items-center justify-center gap-0.5">
+                                <span className="text-[26px] font-bold text-brand leading-none">{crewInitial}</span>
+                                <SportIcon className="w-3.5 h-3.5 text-ink-4" />
+                            </div>
+                        )}
                     </div>
                     <div className="pb-1">
                         <h1 className="text-2xl font-semibold text-white leading-tight tracking-tight">
@@ -152,9 +159,10 @@ export const CrewHomeTab = memo(({
                     {(crew.description?.length || 0) > 60 && (
                         <button
                             onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                            className="text-brand text-xs font-semibold mt-3 hover:text-white transition-colors"
+                            className="text-brand text-xs font-semibold mt-3 hover:text-white transition-colors inline-flex items-center gap-1"
                         >
-                            {isDescriptionExpanded ? "접기" : "더 보기 ∨"}
+                            {isDescriptionExpanded ? "접기" : "더 보기"}
+                            <LucideChevronDown className={cn("w-3.5 h-3.5 transition-transform", isDescriptionExpanded && "rotate-180")} />
                         </button>
                     )}
                 </div>
@@ -237,7 +245,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6 space-y-4">
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-brand" />
                         <h2 className="text-[15px] font-semibold text-white/55">진행 중인 투표</h2>
                     </div>
                     {isMember && (
@@ -289,8 +297,8 @@ export const CrewHomeTab = memo(({
             {/* Members Section */}
             <div className="px-6 pb-20">
                 <div className="flex items-center gap-2 mb-6">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                    <h2 className="text-[15px] font-semibold text-white/55">멤버 <span className="ml-1 tabular-nums">{members.length}</span></h2>
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand" />
+                    <h2 className="text-[15px] font-semibold text-white/55">멤버 <span className="ml-1 tabular-nums">{activeMembers.length}</span></h2>
                 </div>
                 <CrewMemberList members={activeMembers} currentMemberId={me?.id} sportCategory={crew.sportCategory} crewId={crew.id} />
             </div>
@@ -371,15 +379,9 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
                             )}
 
                             <div className="flex items-center justify-between mt-5 pt-4 border-t border-white/5">
-                                <div className="flex items-center gap-2">
-                                    <div className="flex -space-x-2">
-                                        {[1, 2, 3].map(i => (
-                                            <div key={i} className="w-5 h-5 rounded-full border border-surface-2 bg-white/5 flex items-center justify-center">
-                                                <LucideUser className="w-2.5 h-2.5 text-white/45" />
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <span className="text-xs font-medium text-white/55 tabular-nums">{totalVotes}명 참여 중</span>
+                                <div className="flex items-center gap-1.5 text-white/55">
+                                    <LucideUsers className="w-3.5 h-3.5" />
+                                    <span className="text-xs font-medium tabular-nums">{totalVotes}명 참여</span>
                                 </div>
                                 <LucideChevronRight className="w-4 h-4 text-white/45 group-hover:text-white transition-colors" />
                             </div>
@@ -392,7 +394,3 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
 };
 
 CrewHomeTab.displayName = "CrewHomeTab";
-
-const LucideUser = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-);

@@ -6,7 +6,7 @@ import { FormBadges, MatchResult } from "../ui/FormBadges";
  * The new "pro sports app" performance summary (flat card, no gradient/glow).
  */
 export function PerformanceCard({ history }: { history?: any[] }) {
-    const matches = (history || []).filter((g: any) => g.gameMode === "match" && g.isRanked);
+    const matches = (history || []).filter((g: any) => g.gameMode === "match" && g.isRanked && g.sportCategory === "BILLIARDS");
     const total = matches.length;
     const wins = matches.filter((g: any) => g.isWinner).length;
     const losses = total - wins;

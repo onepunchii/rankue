@@ -107,7 +107,8 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
             </AnimatePresence>
 
             <div className="space-y-5">
-                <div className="px-1">
+                <div className="flex items-center gap-2 px-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-white/25" />
                     <h3 className="text-xs font-semibold text-white/55">
                         활동 중인 멤버 ({activeMembers.length})
                     </h3>
@@ -210,7 +211,7 @@ function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: 
                             {member.member.nickname}
                         </span>
                         {member.role === 'leader' && <RoleBadge icon={LucideCrown} color="text-yellow-500" label="크루장" />}
-                        {member.role === 'manage' && <RoleBadge icon={LucideShield} color="text-blue-400" label="부크루장" />}
+                        {member.role === 'manage' && <RoleBadge icon={LucideShield} color="text-blue-400" label="운영진" />}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                         <div className="px-2 py-0.5 rounded-lg bg-white/5 text-xs font-medium text-white/55 tabular-nums">

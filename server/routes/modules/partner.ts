@@ -49,6 +49,7 @@ const STORE_EDITABLE = new Set([
     'name', 'region', 'address', 'phone', 'themeColor', 'neonColor',
     'logoText', 'subText', 'description', 'notice', 'openTime', 'closeTime',
     'pricePer10Min', 'priceLarge', 'priceMedium', 'tableCount', 'latitude', 'longitude',
+    'tableLarge', 'tableMedium', 'parkingDescription',
 ]);
 router.patch("/store", requirePartner, asyncHandler(async (req: any, res: any) => {
     const store = await hiqService.getPartnerStore(req.partnerProfileId);
@@ -72,12 +73,51 @@ router.post("/inquiry", asyncHandler(async (req: any, res: any) => {
 }));
 
 // POST /partner/subscription
+// SECURITY: Never trust the client-supplied tier. A billingKey alone does not prove
+// payment — it must be verified against PortOne V2 before we grant PREMIUM, otherwise any
+// authenticated partner could self-upgrade with an arbitrary string.
 router.post("/subscription", requirePartner, asyncHandler(async (req: any, res: any) => {
     const { billingKey, paymentMethod } = req.body;
-    if (!billingKey) return sendError(res, 400, "Billing key required");
+    if (!billingKey || typeof billingKey !== "string") return sendError(res, 400, "Billing key required");
 
     const store = await hiqService.getPartnerStore(req.partnerProfileId);
     if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+
+    // Server-side billing key verification via PortOne V2.
+    const portoneSecret = process.env.PORTONE_V2_SECRET;
+    if (!portoneSecret) {
+        // Fail closed: without the verification secret we cannot confirm payment.
+        return sendError(res, 501, "결제 검증 미구성");
+    }
+
+    let verified: any;
+    try {
+        const resp = await fetch(
+            `https://api.portone.io/billing-keys/${encodeURIComponent(billingKey)}`,
+            { headers: { Authorization: `PortOne ${portoneSecret}` } }
+        );
+        if (!resp.ok) {
+            return sendError(res, 402, "결제 수단 검증에 실패했습니다.");
+        }
+        verified = await resp.json();
+    } catch {
+        return sendError(res, 502, "결제 검증 서버에 연결할 수 없습니다.");
+    }
+
+    // Confirm the billing key is actually issued (active) before upgrading.
+    if (!verified || verified.status !== "ISSUED") {
+        return sendError(res, 402, "유효하지 않은 결제 수단입니다.");
+    }
+
+    // If our own PortOne store/channel are configured, confirm the key belongs to them.
+    const expectedStoreId = process.env.PORTONE_STORE_ID;
+    const expectedChannelKey = process.env.PORTONE_CHANNEL_KEY;
+    if (expectedStoreId && verified.storeId && verified.storeId !== expectedStoreId) {
+        return sendError(res, 402, "유효하지 않은 결제 수단입니다.");
+    }
+    if (expectedChannelKey && verified.channelKey && verified.channelKey !== expectedChannelKey) {
+        return sendError(res, 402, "유효하지 않은 결제 수단입니다.");
+    }
 
     const nextBillingAt = new Date();
     nextBillingAt.setMonth(nextBillingAt.getMonth() + 1);
@@ -109,6 +149,40 @@ router.get("/members", requirePartner, asyncHandler(async (req: any, res: any) =
 
     const members = await storage.getStoreMembersWithStats(store.id);
     return sendSuccess(res, members);
+}));
+
+// POST /partner/tournaments - Create a tournament for the partner's own store
+router.post("/tournaments", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+
+    const b = req.body || {};
+    if (!b.title || typeof b.title !== 'string' || !b.title.trim()) {
+        return sendError(res, 400, "대회명을 입력해주세요.");
+    }
+    if (!b.startDate) return sendError(res, 400, "시작 날짜를 선택해주세요.");
+
+    // Whitelist fields (storeId is set from the authenticated partner, never the client);
+    // date strings -> Date for Drizzle timestamp columns.
+    const data = {
+        title: b.title,
+        content: b.content ?? null,
+        startDate: new Date(b.startDate),
+        endDate: b.endDate ? new Date(b.endDate) : null,
+        recruitEnd: b.recruitEnd ? new Date(b.recruitEnd) : null,
+        gameType: b.gameType,
+        matchMethod: b.matchMethod,
+        handicapRate: b.handicapRate ?? 100,
+        targetScore: b.targetScore ?? null,
+        bankShotPoint: b.bankShotPoint ?? 2,
+        timeLimit: b.timeLimit ?? 40,
+        maxPlayers: b.maxPlayers ?? 32,
+        entryFee: b.entryFee ?? 20000,
+        prizes: b.prizes ?? null,
+    };
+
+    const tournament = await hiqService.createTournament(store.id, data);
+    return sendSuccess(res, tournament);
 }));
 
 export default router;

@@ -163,10 +163,10 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                             return (
                                                 <div key={idx} className="bg-white/5 p-4 rounded-tile">
                                                     <p className="text-xs font-bold text-white/45 mb-1">
-                                                        {isSending ? `에게 보낼 금액` : `에게 받을 금액`}
+                                                        {isSending ? `보낼 금액` : `받을 금액`}
                                                     </p>
                                                     <div className="flex items-center justify-center gap-2 mb-2">
-                                                        <span className="font-bold text-lg text-white">{isSending ? t.toName : t.fromName}</span>
+                                                        <span className="font-bold text-lg text-white">{isSending ? `${t.toName}에게` : `${t.fromName}에게서`}</span>
                                                         <span className={cn("text-xs px-2 py-0.5 rounded-pill font-bold", isSending ? "bg-rose-400/10 text-rose-400" : "bg-blue-400/10 text-blue-400")}>
                                                             {isSending ? "송금" : "입금"}
                                                         </span>

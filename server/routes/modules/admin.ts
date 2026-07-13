@@ -70,10 +70,16 @@ router.post("/impersonate/:storeId", checkSuperAdmin, asyncHandler(async (req: a
     const store = await storage.getStoreById(req.params.storeId);
     if (!store || !store.ownerId) return sendError(res, 404, "매장 또는 소유자를 찾을 수 없습니다.");
 
-    // Impersonation: Set cookie to Owner's Profile ID
+    // Impersonation: Set cookie to Owner's Profile ID.
+    // Must be SIGNED with the same options as /partner/login — every guard reads
+    // req.signedCookies.hiq_partner_auth, so an unsigned cookie would fail signature
+    // verification everywhere (breaking impersonation AND clobbering the admin's own session).
     res.cookie('hiq_partner_auth', store.ownerId, {
         maxAge: 30 * 24 * 60 * 60 * 1000,
         httpOnly: true,
+        signed: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
         path: '/'
     });
 

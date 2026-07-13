@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -13,7 +13,7 @@ export function useGameScore(id: string) {
     const { speak, playEffect } = useGameAudio();
 
     // Game State with History
-    const { state: gameState, set: setGameState, undo, redo, canUndo, canRedo } = useGameHistory<GameState>({
+    const { state: gameState, set: setGameState, undo, redo, canUndo, canRedo, reset: resetGameState } = useGameHistory<GameState>({
         p1Score: 0,
         p2Score: 0,
         p3Score: 0,
@@ -41,6 +41,10 @@ export function useGameScore(id: string) {
         p3Innings: [],
         p4Innings: []
     });
+
+    // Hydration guard: ensures we copy server state into gameState exactly once,
+    // and prevents auto-save from firing (and clobbering saved scores) before that.
+    const hydratedRef = useRef(false);
 
     // Queries
     const { data: game, isLoading } = useQuery<HiqGame>({
@@ -124,7 +128,15 @@ export function useGameScore(id: string) {
                     player2Score: gameState.p2Score,
                     player3Score: gameState.p3Score,
                     player4Score: gameState.p4Score,
-                    innings: gameState.innings,
+                    totalInnings: gameState.innings,
+                    player1HighRun: gameState.p1HighRun,
+                    player2HighRun: gameState.p2HighRun,
+                    player3HighRun: gameState.p3HighRun,
+                    player4HighRun: gameState.p4HighRun,
+                    player1Innings: gameState.p1Innings,
+                    player2Innings: gameState.p2Innings,
+                    player3Innings: gameState.p3Innings,
+                    player4Innings: gameState.p4Innings,
                     status: "playing_base"
                 },
             });
@@ -132,8 +144,66 @@ export function useGameScore(id: string) {
         onError: (e) => console.error(e)
     });
 
-    // Auto-save logic
+    // Hydrate gameState from the server row once, so a mid-game refresh
+    // recovers scores/innings/high-runs instead of showing (and re-saving) zeros.
     useEffect(() => {
+        if (hydratedRef.current || !game || game.status === "finished") return;
+
+        const p1Innings = (game.player1Innings as number[]) ?? [];
+        const p2Innings = (game.player2Innings as number[]) ?? [];
+        const p3Innings = (game.player3Innings as number[]) ?? [];
+        const p4Innings = (game.player4Innings as number[]) ?? [];
+
+        // Derive whose turn it is: among active players, the one with the
+        // shortest inning-history array is currently up (fallback: player 1).
+        const activeCount = 1
+            + ((game.player2Id || game.player2Name) ? 1 : 0)
+            + ((game.player3Id || game.player3Name) ? 1 : 0)
+            + ((game.player4Id || game.player4Name) ? 1 : 0);
+        const inningArrays = [p1Innings, p2Innings, p3Innings, p4Innings];
+        let derivedTurn = 1;
+        let minLen = Infinity;
+        for (let i = 0; i < activeCount; i++) {
+            if (inningArrays[i].length < minLen) {
+                minLen = inningArrays[i].length;
+                derivedTurn = i + 1;
+            }
+        }
+
+        resetGameState({
+            p1Score: game.player1Score ?? 0,
+            p2Score: game.player2Score ?? 0,
+            p3Score: game.player3Score ?? 0,
+            p4Score: game.player4Score ?? 0,
+            p1FinishScore: 0,
+            p2FinishScore: 0,
+            p3FinishScore: 0,
+            p4FinishScore: 0,
+            innings: Math.max(1, game.totalInnings ?? 0),
+            p1FinishInnings: 0,
+            p2FinishInnings: 0,
+            p3FinishInnings: 0,
+            p4FinishInnings: 0,
+            p1Run: 0,
+            p2Run: 0,
+            p3Run: 0,
+            p4Run: 0,
+            p1HighRun: game.player1HighRun ?? 0,
+            p2HighRun: game.player2HighRun ?? 0,
+            p3HighRun: game.player3HighRun ?? 0,
+            p4HighRun: game.player4HighRun ?? 0,
+            currentTurn: derivedTurn as 1 | 2 | 3 | 4,
+            p1Innings,
+            p2Innings,
+            p3Innings,
+            p4Innings
+        });
+        hydratedRef.current = true;
+    }, [game]);
+
+    // Auto-save logic — gated on hydration so we never PATCH zeros over saved scores.
+    useEffect(() => {
+        if (!hydratedRef.current) return;
         if (gameState.innings > 1 || gameState.p1Score > 0) {
             updateScoreMutation.mutate();
         }
