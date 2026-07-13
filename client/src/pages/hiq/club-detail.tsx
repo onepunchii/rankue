@@ -134,6 +134,23 @@ export default function HiqClubDetail() {
         }
     });
 
+    // Leave crew / cancel a pending join request (self only). Server rejects a leader leaving.
+    const leaveMutation = useMutation({
+        mutationFn: async () => {
+            return await apiRequest(`/api/hiq/crews/${id}/members/${me?.id}`, { method: "DELETE" });
+        },
+        onSuccess: () => {
+            toast({ title: "크루에서 나왔습니다." });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}`] });
+            queryClient.invalidateQueries({ queryKey: ['/api/hiq/crews/mine'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/hiq/crews'] });
+            setLocation("/club");
+        },
+        onError: (err: Error) => {
+            toast({ title: "처리 실패", description: err.message, variant: "destructive" });
+        }
+    });
+
     const createSettlementMutation = useMutation({
         mutationFn: async (data: any) => {
             return await apiRequest(`/api/hiq/crews/${id}/settlements`, {
@@ -260,6 +277,9 @@ export default function HiqClubDetail() {
                                 isAdmin={isAdmin}
                                 me={me}
                                 onJoin={() => joinMutation.mutate()}
+                                onLeave={() => leaveMutation.mutate()}
+                                isLeaving={leaveMutation.isPending}
+                                isLeader={myMemberData?.role === 'leader'}
                                 onCreateActivity={() => setIsCreateActivityOpen(true)}
                                 onCreatePoll={() => setIsCreatePollOpen(true)}
                                 onShareToChat={(msg) => shareToChatMutation.mutate(msg)}

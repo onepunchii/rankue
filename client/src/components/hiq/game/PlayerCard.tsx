@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { HiqMember } from "@shared/schema";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Flame } from "lucide-react";
 
 interface Props {
     player?: HiqMember | { name: string };
@@ -140,9 +140,10 @@ export function PlayerCard({
                                         initial={{ opacity: 0, y: -20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -10 }}
-                                        className="mt-[-20px] px-4 py-1.5 rounded-2xl bg-orange-500 border border-white/20 flex items-center gap-2"
+                                        className="mt-[-20px] inline-flex items-center gap-1.5 px-4 py-1.5 rounded-pill bg-brand/15 border border-brand/25"
                                     >
-                                        <span className="text-xs font-semibold text-white">🔥 +{displayRun} 연속</span>
+                                        <Flame className="w-3.5 h-3.5 text-brand" />
+                                        <span className="text-[13px] font-semibold text-brand">+{displayRun} 연속</span>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -211,12 +212,12 @@ export function PlayerCard({
                                     e.stopPropagation();
                                     onTurnClick && onTurnClick();
                                 }}
-                                className="h-16 px-8 rounded-2xl flex items-center justify-center gap-3 border border-white/10 transition-all pointer-events-auto relative z-50 bg-white text-black"
+                                className="rk-btn-primary h-16 px-8 rounded-2xl flex items-center justify-center gap-3 transition-all pointer-events-auto relative z-50"
                             >
                                 <span className="text-sm font-semibold">
                                     이닝 종료
                                 </span>
-                                <ArrowRight className="w-4 h-4 text-black/40" />
+                                <ArrowRight className="w-4 h-4 text-brand-fg/50" />
                             </motion.button>
                         )}
                     </AnimatePresence>

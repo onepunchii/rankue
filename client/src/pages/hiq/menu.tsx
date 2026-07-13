@@ -17,7 +17,9 @@ import {
     LucideCheck,
     LucideX,
     LucideMail,
-    LucideCrown
+    LucideCrown,
+    LucideCircle,
+    LucideFlag
 } from "lucide-react";
 import { SuggestionModal } from "@/components/hiq/SuggestionModal";
 import { HiqMember } from "@shared/schema";
@@ -135,7 +137,7 @@ export default function HiqMenu() {
     const sportGlowClass = currentSport === "GOLF" ? "" : "";
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white p-6 pb-40 font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-[#0A0A0A] text-white px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">
             {/* Background Light Effect */}
             <div
                 className="absolute top-0 right-0 w-[80dvw] h-[50dvh] blur-[120px] rounded-full -mr-[30dvw] -mt-[10dvh] pointer-events-none transition-colors duration-700"
@@ -178,6 +180,14 @@ export default function HiqMenu() {
                                     )}
                                 </div>
                             </div>
+                            {/* Persistent tap affordance (mobile — hover overlay is enhancement only) */}
+                            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-surface-3 border border-surface-line flex items-center justify-center">
+                                {isUploading || updateProfileMutation.isPending ? (
+                                    <LucideLoader2 className="w-3.5 h-3.5 text-white/70 animate-spin" />
+                                ) : (
+                                    <LucideCamera className="w-3.5 h-3.5 text-white/70" />
+                                )}
+                            </div>
                             <input
                                 type="file"
                                 id="profile-upload"
@@ -202,10 +212,10 @@ export default function HiqMenu() {
                                             if (e.key === 'Enter') handleSaveName();
                                         }}
                                     />
-                                    <button title="저장" disabled={updateProfileMutation.isPending} onClick={handleSaveName} className="p-1 hover:bg-white/10 rounded-full shrink-0 disabled:opacity-40">
+                                    <button title="저장" disabled={updateProfileMutation.isPending} onClick={handleSaveName} className="w-10 h-10 -m-2 flex items-center justify-center rounded-full active:bg-white/10 shrink-0 disabled:opacity-40">
                                         <LucideCheck className="w-4 h-4 text-brand" />
                                     </button>
-                                    <button title="취소" onClick={() => setIsEditingName(false)} className="p-1 hover:bg-white/10 rounded-full shrink-0">
+                                    <button title="취소" onClick={() => setIsEditingName(false)} className="w-10 h-10 -m-2 flex items-center justify-center rounded-full active:bg-white/10 shrink-0">
                                         <LucideX className="w-4 h-4 text-red-400" />
                                     </button>
                                 </div>
@@ -215,7 +225,7 @@ export default function HiqMenu() {
                                         {member?.nickname || member?.name || "사용자"}
                                         <span className="text-[15px] font-medium text-white/40 ml-0.5">님</span>
                                     </h2>
-                                    <button title="이름 수정" onClick={() => setIsEditingName(true)} className="text-white/55 hover:text-white/70 transition-colors shrink-0">
+                                    <button title="이름 수정" onClick={() => setIsEditingName(true)} className="w-10 h-10 -m-2 flex items-center justify-center rounded-full text-white/55 active:bg-white/10 transition-colors shrink-0">
                                         <LucidePencil className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -240,7 +250,7 @@ export default function HiqMenu() {
             </div>
 
             {/* Section: Sports Mode Switcher (Icon Only Style) */}
-            <div className="relative z-10 mb-10 px-4">
+            <div className="relative z-10 mb-10">
                 <div className="flex items-center gap-3">
                     <div className="flex flex-col gap-2 items-center">
                         <button
@@ -253,15 +263,18 @@ export default function HiqMenu() {
                                 "w-16 h-16 rounded-2xl flex items-center justify-center transition-all active:scale-90",
                                 currentSport === "BILLIARDS"
                                     ? "bg-brand border border-brand/50"
-                                    : "bg-white/[0.03] border border-white/10 opacity-40 grayscale"
+                                    : "bg-white/[0.03] border border-white/10"
                             )}
                         >
-                            <span className="text-2xl">🎱</span>
+                            <LucideCircle className={cn(
+                                "w-7 h-7",
+                                currentSport === "BILLIARDS" ? "text-brand-fg" : "text-white/35"
+                            )} />
                         </button>
                         <span className={cn(
-                            "text-[12px] font-semibold uppercase tracking-tight",
+                            "text-[12px] font-semibold tracking-tight",
                             currentSport === "BILLIARDS" ? "text-brand" : "text-white/45"
-                        )}>Billiards</span>
+                        )}>당구</span>
                     </div>
 
                     {GOLF_ENABLED && (
@@ -276,21 +289,21 @@ export default function HiqMenu() {
                                         toast({ title: "스포츠 모드 변경", description: "골프 모드로 전환되었습니다." });
                                     }}
                                     className={cn(
-                                        "w-16 h-16 rounded-2xl flex items-center justify-center transition-all active:scale-90 group",
+                                        "w-16 h-16 rounded-2xl flex items-center justify-center transition-all active:scale-90",
                                         currentSport === "GOLF"
                                             ? "bg-brand border border-brand/50"
-                                            : "bg-white/[0.03] border border-white/10 opacity-40 grayscale"
+                                            : "bg-white/[0.03] border border-white/10"
                                     )}
                                 >
-                                    <span className={cn(
-                                        "text-2xl transition-opacity",
-                                        currentSport === "GOLF" ? "opacity-100" : "opacity-40 group-hover:opacity-100"
-                                    )}>⛳️</span>
+                                    <LucideFlag className={cn(
+                                        "w-7 h-7",
+                                        currentSport === "GOLF" ? "text-brand-fg" : "text-white/35"
+                                    )} />
                                 </button>
                                 <span className={cn(
-                                    "text-[12px] font-semibold uppercase tracking-tight",
+                                    "text-[12px] font-semibold tracking-tight",
                                     currentSport === "GOLF" ? "text-brand" : "text-white/45"
-                                )}>Golf</span>
+                                )}>골프</span>
                             </div>
                         </>
                     )}
@@ -299,7 +312,7 @@ export default function HiqMenu() {
 
             {/* Section B: Menu list */}
             <div className="relative z-10 mb-10">
-                <h3 className="text-[13px] font-medium text-white/40 mb-3 px-1">관리 · 안내</h3>
+                <h3 className="text-[15px] font-semibold text-white/55 mb-3 px-1">관리 · 안내</h3>
                 <div className="flex flex-col gap-2.5">
                     {[
                         { icon: LucideMail, label: "건의함 · 제휴 문의", desc: "무엇이든 말씀해주세요", onClick: () => setSuggestionOpen(true) },
@@ -355,7 +368,7 @@ export default function HiqMenu() {
 
             {/* Section: Family services */}
             <div className="relative z-10 mb-12">
-                <h3 className="text-[13px] font-medium text-white/40 mb-3 px-1">패밀리 서비스</h3>
+                <h3 className="text-[15px] font-semibold text-white/55 mb-3 px-1">패밀리 서비스</h3>
                 <div className="flex flex-col gap-2.5">
                     <a href="https://www.tohk.co.kr" target="_blank" rel="noopener noreferrer" className="block rk-card p-5 hover:bg-surface-2 transition-colors group">
                         <span className="rk-chip bg-purple-500/12 text-purple-300 mb-2.5">무료 운세 · 꿈해몽</span>

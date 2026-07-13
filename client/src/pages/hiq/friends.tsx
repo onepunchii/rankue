@@ -99,9 +99,9 @@ export default function HiqRivals() {
                     <motion.button
                         whileTap={{ scale: 0.9 }}
                         onClick={() => setLocation("/menu")}
-                        className="w-11 h-11 rounded-full bg-surface-1 border border-surface-line flex items-center justify-center active:scale-95 transition-all"
+                        className="w-11 h-11 rounded-full bg-surface-1 border border-surface-line flex items-center justify-center transition-transform text-white/55"
                     >
-                        <LucideChevronLeft className="w-6 h-6 text-white/55" />
+                        <LucideChevronLeft className="w-5 h-5" />
                     </motion.button>
                     <div>
                         <h1 className="text-[26px] font-bold tracking-tight text-white leading-none">
@@ -115,7 +115,7 @@ export default function HiqRivals() {
                 <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setIsSearchOpen(true)}
-                    className="w-11 h-11 rounded-full bg-brand/12 border border-brand/20 flex items-center justify-center transition-all active:scale-95"
+                    className="w-11 h-11 rounded-full bg-brand/12 border border-brand/20 flex items-center justify-center transition-transform"
                 >
                     <LucideSearch className="w-5 h-5 text-brand" />
                 </motion.button>

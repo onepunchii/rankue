@@ -39,7 +39,7 @@ export default function HiqHistory() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+            <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
                 <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
@@ -59,7 +59,7 @@ export default function HiqHistory() {
                 <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setLocation("/dashboard")}
-                    className="w-11 h-11 rounded-full bg-surface-1 border border-surface-line flex items-center justify-center active:scale-95 transition-transform text-white/55 shrink-0"
+                    className="w-11 h-11 rounded-full bg-surface-1 border border-surface-line flex items-center justify-center transition-transform text-white/55 shrink-0"
                 >
                     <LucideChevronLeft className="w-5 h-5" />
                 </motion.button>
@@ -78,7 +78,7 @@ export default function HiqHistory() {
                 <div className="flex p-1 bg-white/[0.04] rounded-2xl mb-6 border border-white/[0.06]">
                     {[
                         { id: "all", label: "전체", icon: LucideLayers },
-                        { id: "3c", label: "3구", icon: LucideTarget },
+                        { id: "3c", label: "3쿠션", icon: LucideTarget },
                         { id: "4c", label: "4구", icon: LucideBarChart3 }
                     ].map((tab) => (
                         <button

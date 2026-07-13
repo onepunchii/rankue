@@ -249,10 +249,12 @@ export class AdminRepository {
             with: {
                 items: {
                     with: {
-                        payer: true,
+                        // SECURITY: narrow member rows to non-sensitive fields only —
+                        // never expose phone / default account numbers via the settlement detail.
+                        payer: { columns: { id: true, name: true } },
                         participants: {
                             with: {
-                                member: true
+                                member: { columns: { id: true, name: true } }
                             }
                         }
                     }

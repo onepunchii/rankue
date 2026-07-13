@@ -1,7 +1,7 @@
 import { useState, memo, useMemo } from "react";
 import {
     LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus,
-    LucideChevronDown, LucideUsers, LucideFlag, LucideTarget
+    LucideChevronDown, LucideUsers, LucideFlag, LucideTarget, LucideLogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,10 @@ import { ClubActivityList } from "@/components/hiq/view/ClubActivityList";
 import { CrewMemberList } from "@/components/hiq/CrewMemberList";
 import { useQuery } from "@tanstack/react-query";
 import { Progress } from "@/components/ui/progress";
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: string, children: React.ReactNode }) => {
     return (
@@ -38,6 +42,9 @@ interface CrewHomeTabProps {
     isAdmin: boolean;
     me: any;
     onJoin: () => void;
+    onLeave?: () => void;
+    isLeaving?: boolean;
+    isLeader?: boolean;
     onCreateActivity: () => void;
     onCreatePoll: () => void;
     onShareToChat: (msg: string) => void;
@@ -48,7 +55,7 @@ interface CrewHomeTabProps {
 }
 
 export const CrewHomeTab = memo(({
-    crew, baseStore, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onCreateActivity, onCreatePoll, onShareToChat,
+    crew, baseStore, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onLeave, isLeaving, isLeader, onCreateActivity, onCreatePoll, onShareToChat,
     onPollClick
 }: CrewHomeTabProps) => {
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -303,19 +310,62 @@ export const CrewHomeTab = memo(({
                 <CrewMemberList members={activeMembers} currentMemberId={me?.id} sportCategory={crew.sportCategory} crewId={crew.id} />
             </div>
 
-            {/* Join CTA for non-members */}
+            {/* 크루 탈퇴 (일반 멤버 · 크루장 제외) */}
+            {isMember && !isLeader && onLeave && (
+                <div className="px-6 pt-2 pb-4 flex justify-center">
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <button
+                                disabled={isLeaving}
+                                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-white/40 hover:text-red-400 transition-colors disabled:opacity-40"
+                            >
+                                <LucideLogOut className="w-4 h-4" />
+                                크루 탈퇴
+                            </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="bg-[#141416] border border-white/10 text-white rounded-card">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="text-white">크루에서 나가시겠어요?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-white/55">
+                                    탈퇴하면 이 크루의 활동·채팅에 더 이상 참여할 수 없어요. 다시 가입할 수 있습니다.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white">취소</AlertDialogCancel>
+                                <AlertDialogAction onClick={onLeave} className="bg-red-500 text-white hover:bg-red-600">탈퇴하기</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            )}
+
+            {/* Join CTA for non-members / pending */}
             {(isNotMember || isPending) && (
                 <div className="fixed bottom-[5.5rem] left-0 right-0 px-6 py-2 z-50 pointer-events-none">
-                    <Button
-                        onClick={onJoin}
-                        disabled={isPending}
-                        className={cn(
-                            "w-full h-14 rounded-2xl text-base font-semibold tracking-normal transition-all active:scale-95 pointer-events-auto ring-1 ring-white/10",
-                            isPending ? "bg-white/5 text-white/55 border border-white/5" : "bg-brand text-brand-fg hover:bg-brand/90"
-                        )}
-                    >
-                        {isPending ? "가입 승인 대기 중..." : "크루 가입하기"}
-                    </Button>
+                    {isPending ? (
+                        <div className="flex items-center gap-2 pointer-events-auto">
+                            <div className="flex-1 h-14 rounded-2xl flex items-center justify-center text-base font-semibold bg-white/5 text-white/55 border border-white/5 ring-1 ring-white/10">
+                                가입 승인 대기 중...
+                            </div>
+                            {onLeave && (
+                                <Button
+                                    onClick={onLeave}
+                                    disabled={isLeaving}
+                                    variant="outline"
+                                    className="h-14 px-5 rounded-2xl text-sm font-semibold bg-transparent border-white/10 text-white/60 hover:bg-white/5 hover:text-white disabled:opacity-40"
+                                >
+                                    신청 취소
+                                </Button>
+                            )}
+                        </div>
+                    ) : (
+                        <Button
+                            onClick={onJoin}
+                            className="w-full h-14 rounded-2xl text-base font-semibold tracking-normal transition-all active:scale-95 pointer-events-auto ring-1 ring-white/10 bg-brand text-brand-fg hover:bg-brand/90"
+                        >
+                            크루 가입하기
+                        </Button>
+                    )}
                 </div>
             )}
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, LucideRefreshCw, LucidePlay, Sparkles, Zap, Target } from "lucide-react";
+import { ChevronDown, LucideRefreshCw, LucidePlay, Target } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -142,13 +142,13 @@ export default function HiqSimulation() {
         // Normalize data structure (handle DB format vs Legacy format)
         const shot = {
             ...rawShot,
-            title: rawShot.title || `AI Solution #${index + 1}`,
-            description: rawShot.description || `Optimized path based on ${rawShot.cushionCount || 3}-Cushion logic.`,
+            title: rawShot.title || `AI 추천 #${index + 1}`,
+            description: rawShot.description || `실전 데이터 기반 ${rawShot.cushionCount || 3}쿠션 공략입니다.`,
             solution: rawShot.solution || {
                 spin: { x: rawShot.shotParams?.spinX || 0, y: rawShot.shotParams?.spinY || 0 },
                 power: rawShot.shotParams?.power || 0,
                 thickness: 0,
-                tip: "Follow the guide above for precise control."
+                tip: "위 가이드에 따라 샷을 구사하세요."
             }
         };
 
@@ -590,8 +590,8 @@ export default function HiqSimulation() {
                                                 {/* Clean Button Label */}
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setActiveBall(c); }}
-                                                    className={`px-4 py-1.5 rounded-xl text-[12px] font-semibold transition-all duration-300 ${isActive
-                                                        ? 'bg-brand text-black'
+                                                    className={`px-4 py-1.5 rounded-pill text-[12px] font-semibold transition-all duration-300 ${isActive
+                                                        ? 'bg-brand text-brand-fg'
                                                         : 'bg-white/5 text-white/55 border border-white/5'
                                                         }`}
                                                 >
@@ -608,7 +608,7 @@ export default function HiqSimulation() {
                                     <Button
                                         onClick={(e) => { e.stopPropagation(); runAISolution(); }}
                                         disabled={isAnalyzing}
-                                        className="h-16 px-16 bg-brand text-black hover:bg-brand/90 rounded-3xl text-lg font-semibold shadow-[0_20px_40px_rgba(16,185,129,0.1)] active:scale-95 transition-all"
+                                        className="rk-btn-primary h-16 px-16 rounded-pill text-lg shadow-[0_20px_40px_rgba(16,185,129,0.1)]"
                                     >
                                         {isAnalyzing ? <LucideRefreshCw className="animate-spin w-6 h-6 mr-3" /> : <Target className="w-6 h-6 mr-3" />}
                                         최적 공략 검색
@@ -617,7 +617,7 @@ export default function HiqSimulation() {
 
                                 {/* Central Instruction Text */}
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
-                                    <p className="text-white/45 text-[12px] uppercase font-bold tracking-[0.2em] whitespace-nowrap opacity-60">
+                                    <p className="text-[13px] font-medium text-white/38 whitespace-nowrap">
                                         빈 공간을 드래그하여 공을 옮기세요
                                     </p>
                                 </div>
@@ -625,22 +625,22 @@ export default function HiqSimulation() {
                         ) : (
                             <motion.div
                                 key="result" initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }}
-                                className="absolute inset-0 bg-[#1A1A1A] p-8 flex flex-col"
+                                className="absolute inset-0 bg-[#141416] p-8 flex flex-col"
                             >
                                 <div className="flex flex-col mb-6">
-                                    <p className="text-brand text-[12px] uppercase font-semibold tracking-[0.2em] mb-4">AI 추천 전략</p>
+                                    <p className="text-brand text-[12px] font-semibold mb-4">AI 추천 전략</p>
                                     <div className="flex gap-3">
                                         {recommendedSolutions.map((sol, i) => (
                                             <button
                                                 key={i}
                                                 onClick={() => selectSolution(sol, i)}
-                                                className={`flex-1 py-3 px-4 rounded-xl border transition-all duration-300 flex flex-col items-center justify-center gap-1 ${activeSolutionIndex === i
-                                                    ? 'bg-brand border-brand text-black'
+                                                className={`flex-1 py-3 px-4 rounded-tile border transition-all duration-300 flex flex-col items-center justify-center gap-1 ${activeSolutionIndex === i
+                                                    ? 'bg-brand border-brand text-brand-fg'
                                                     : 'bg-white/5 border-white/5 hover:bg-white/10'
                                                     }`}
                                             >
-                                                <span className={`text-[12px] font-semibold uppercase tracking-normal ${activeSolutionIndex === i ? 'text-black/40' : 'text-white/45'}`}>Option {i + 1}</span>
-                                                <span className={`text-[12px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-black' : 'text-white/40'}`}>
+                                                <span className={`text-[12px] font-semibold ${activeSolutionIndex === i ? 'text-brand-fg/60' : 'text-white/45'}`}>옵션 {i + 1}</span>
+                                                <span className={`text-[12px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-brand-fg' : 'text-white/40'}`}>
                                                     {(!sol.title || sol.title === 'Unknown') ? '추천 공략' : sol.title}
                                                 </span>
                                             </button>
@@ -659,14 +659,14 @@ export default function HiqSimulation() {
                                         <button
                                             onClick={() => runReplay()}
                                             title="시뮬레이션 재생"
-                                            className="w-12 h-12 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center text-white"
+                                            className="w-12 h-12 bg-white/5 rounded-tile border border-white/10 flex items-center justify-center text-white"
                                         >
                                             <LucidePlay className="w-5 h-5 fill-current" />
                                         </button>
                                         <button
                                             onClick={() => setActiveMode("setup")}
                                             title="배치 수정으로 돌아가기"
-                                            className="h-12 px-6 bg-brand rounded-xl text-black font-semibold whitespace-nowrap active:scale-95 transition-all shadow-[0_5px_15px_rgba(16,185,129,0.1)]"
+                                            className="rk-btn-primary h-12 px-6 whitespace-nowrap shadow-[0_5px_15px_rgba(16,185,129,0.1)]"
                                         >
                                             배치 수정
                                         </button>
@@ -683,7 +683,7 @@ export default function HiqSimulation() {
                                     </Card>
                                 </div>
 
-                                <div className="flex-1 bg-white/5 rounded-2xl p-6 border border-white/5 overflow-y-auto">
+                                <div className="flex-1 bg-white/5 rounded-tile p-6 border border-white/5 overflow-y-auto">
                                     <p className="text-sm text-white/70 leading-relaxed font-medium">{simulationData?.tip || simulationData?.solution?.tip}</p>
                                 </div>
                             </motion.div>
@@ -718,7 +718,7 @@ const ThicknessVisualizer = ({ thickness }: { thickness: number }) => (
                 style={{ '--thickness-offset': `${(thickness || 0) * 32}px`, left: 'var(--thickness-offset)' } as any}
             />
         </div>
-        <span className="text-[12px] font-medium text-white/45 mt-2 tracking-normal">THICKNESS {Math.round((thickness || 0) * 8)}/8</span>
+        <span className="text-[12px] font-medium text-white/45 mt-2 tracking-normal">두께 {Math.round((thickness || 0) * 8)}/8</span>
     </div>
 );
 
@@ -733,6 +733,6 @@ const PowerGauge = ({ power }: { power: number }) => (
                 />
             ))}
         </div>
-        <span className="text-[12px] font-medium text-white/45 mt-2 tracking-normal uppercase">Power {power}%</span>
+        <span className="text-[12px] font-medium text-white/45 mt-2 tracking-normal">파워 {power}%</span>
     </div>
 );

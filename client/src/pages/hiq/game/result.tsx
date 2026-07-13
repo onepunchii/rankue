@@ -65,7 +65,23 @@ export default function HiqGameResult() {
         }
     }, [gameId]);
 
-    if (!result) return <div className="min-h-screen bg-black flex items-center justify-center text-white">결과를 불러올 수 없습니다.</div>;
+    if (!result) return (
+        <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-6">
+            <Card className="rk-card w-full max-w-sm">
+                <CardContent className="p-8 flex flex-col items-center text-center gap-2">
+                    <LucideX className="w-8 h-8 text-white/38 mb-2" strokeWidth={2} />
+                    <p className="text-[15px] font-medium text-white/55">결과를 불러올 수 없습니다.</p>
+                    <p className="text-[12px] font-medium text-white/38 mb-4">경기 기록이 만료되었거나 존재하지 않습니다.</p>
+                    <Button
+                        onClick={() => setLocation("/dashboard")}
+                        className="rk-btn-secondary w-full h-12"
+                    >
+                        홈으로
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+    );
 
     const { game, handicapUpdate1, handicapUpdate2 } = result;
     const isPractice = game.gameMode === "practice";
@@ -183,7 +199,7 @@ export default function HiqGameResult() {
     );
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white p-6 flex flex-col items-center justify-center font-sans">
+        <div className="min-h-screen bg-[#0A0A0A] text-white p-6 flex flex-col items-center justify-center font-sans">
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -252,19 +268,13 @@ export default function HiqGameResult() {
                 )}
             </div>
 
-            <div className="w-full max-w-md grid grid-cols-2 gap-3">
+            <div className="w-full max-w-md">
                 <Button
-                    variant="outline"
                     onClick={() => setLocation("/dashboard")}
-                    className="rk-btn-secondary h-16 rounded-2xl text-lg"
+                    className="rk-btn-primary w-full h-16 rounded-2xl text-lg gap-2"
                 >
+                    <LucideArrowRight className="w-5 h-5" />
                     홈으로
-                </Button>
-                <Button
-                    onClick={() => setLocation("/dashboard")}
-                    className="rk-btn-primary h-16 rounded-2xl text-lg"
-                >
-                    다음 경기
                 </Button>
             </div>
 

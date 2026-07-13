@@ -604,8 +604,15 @@ router.post("/:id/members/:memberId/approve", requireAuth, asyncHandler(async (r
 router.delete("/:id/members/:memberId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const { id: crewId, memberId } = req.params;
 
-    // If kicking other, check admin
-    if (req.userId !== memberId) {
+    if (req.userId === memberId) {
+        // Self leave / cancel pending request. The leader cannot abandon the crew —
+        // they must transfer leadership or delete the crew first (else it becomes ownerless).
+        const membership = await storage.getCrewMembership(crewId, memberId);
+        if (membership?.role === 'leader') {
+            return sendError(res, 400, "크루장은 탈퇴할 수 없습니다. 크루를 삭제하거나 리더를 위임해주세요.");
+        }
+    } else {
+        // Kicking another member — check admin permissions.
         const data = await storage.getCrew(crewId);
         const me = data?.members.find((m: any) => m.member.id === req.userId);
         const target = data?.members.find((m: any) => m.member.id === memberId);

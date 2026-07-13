@@ -46,7 +46,7 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
                     size="icon"
                     onClick={onUndo}
                     disabled={!canUndo}
-                    className={`w-14 h-14 rounded-2xl bg-white/5 border border-white/5 ${canUndo ? 'text-white hover:bg-white/10' : 'text-white/5'}`}
+                    className={`w-14 h-14 rounded-2xl bg-white/5 border border-white/5 ${canUndo ? 'text-white hover:bg-white/10' : 'text-white/20'}`}
                 >
                     <LucideUndo2 className="w-6 h-6" />
                 </Button>
@@ -64,7 +64,7 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
                     size="icon"
                     onClick={onRedo}
                     disabled={!canRedo}
-                    className={`w-14 h-14 rounded-2xl bg-white/5 border border-white/5 ${canRedo ? 'text-white hover:bg-white/10' : 'text-white/5'}`}
+                    className={`w-14 h-14 rounded-2xl bg-white/5 border border-white/5 ${canRedo ? 'text-white hover:bg-white/10' : 'text-white/20'}`}
                 >
                     <LucideRedo2 className="w-6 h-6" />
                 </Button>
@@ -74,7 +74,7 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
             <div className="flex items-center justify-end gap-3 w-1/4">
                 <Button
                     onClick={onExit}
-                    className="h-10 px-6 rounded-tile bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-semibold"
+                    className="h-12 px-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-semibold"
                 >
                     종료하기
                 </Button>

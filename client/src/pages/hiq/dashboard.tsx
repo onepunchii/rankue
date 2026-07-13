@@ -5,7 +5,6 @@ import { HiqMember } from "@shared/schema";
 import { useSport } from "@/contexts/SportContext";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import GolfDashboard from "@/golf/pages/Dashboard";
-import { motion } from "framer-motion";
 
 // New Components
 import { DashboardHeader } from "@/components/hiq/dashboard/DashboardHeader";
@@ -69,8 +68,8 @@ export default function HiqDashboard() {
         const recent = parseFloat(analysis.summary.recentAvg || "0");
 
         if (overall === 0) return { label: "신규 기록", color: "text-blue-400", icon: <LucideZap className="w-3 h-3" /> };
-        if (recent > overall * 1.05) return { label: "상승 중", color: "text-red-400", icon: <ChevronUp className="w-3 h-3" /> };
-        if (recent < overall * 0.95) return { label: "하락 중", color: "text-gray-500", icon: <ChevronDown className="w-3 h-3" /> };
+        if (recent > overall * 1.05) return { label: "상승 중", color: "text-brand", icon: <ChevronUp className="w-3 h-3" /> };
+        if (recent < overall * 0.95) return { label: "하락 중", color: "text-white/40", icon: <ChevronDown className="w-3 h-3" /> };
         return { label: "유지 중", color: "text-white/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
     }, [analysis]);
 
@@ -125,12 +124,8 @@ export default function HiqDashboard() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-black flex items-center justify-center">
-                <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-[#0e4d2a] border-t-[#ffd700] rounded-full"
-                />
+            <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-white/10 border-t-brand rounded-full animate-spin" />
             </div>
         );
     }

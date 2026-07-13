@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { LucideMedal } from "lucide-react";
+import { LucideMedal, LucideStore, LucideGlobe, LucideTarget, LucideBarChart3, LucideTrophy } from "lucide-react";
 import { HiqMember } from "@shared/schema";
-import { Button } from "@/components/ui/button";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { useSport } from "@/contexts/SportContext";
 
@@ -27,6 +26,29 @@ export default function HiqRanking() {
         }
     });
 
+    const rankedMembers = (rankings ?? [])
+        .filter((r: any) => {
+            if (currentSport === "GOLF") return (r.totalGolfGames || 0) > 0 || (r.golfHandicap || 0) > 0;
+            const handi = rankingTab === "3c" ? r.handi3c : r.handi4c;
+            return handi > 0;
+        })
+        .sort((a: any, b: any) => {
+            if (currentSport === "GOLF") {
+                const scoreA = (a.golfAvgScore || 0) > 0 ? a.golfAvgScore : (a.golfHandicap || 0) + 72;
+                const scoreB = (b.golfAvgScore || 0) > 0 ? b.golfAvgScore : (b.golfHandicap || 0) + 72;
+
+                if (scoreA === 0 && scoreB === 0) return 0;
+                if (scoreA === 0) return 1;
+                if (scoreB === 0) return -1;
+
+                return scoreA - scoreB;
+            }
+            const handiA = rankingTab === "3c" ? a.handi3c : a.handi4c;
+            const handiB = rankingTab === "3c" ? b.handi3c : b.handi4c;
+            if (handiB !== handiA) return handiB - handiA;
+            return parseFloat(b.average || "0") - parseFloat(a.average || "0");
+        });
+
     return (
         <div className="min-h-screen bg-[#0A0A0A] text-white px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">
             <div className="relative z-10">
@@ -40,46 +62,52 @@ export default function HiqRanking() {
                 </header>
 
                 {/* Scope Tabs */}
-                <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl mb-4 border border-white/5 mx-auto">
-                    <Button
-                        variant="ghost"
+                <div className="flex p-1 bg-white/[0.04] rounded-2xl mb-4 border border-white/[0.06]">
+                    <button
                         onClick={() => setRankingScope("store")}
-                        className={`flex-1 h-12 rounded-xl font-semibold text-sm transition-all ${rankingScope === "store" ? "bg-white/10 text-white border border-white/10" : "text-white/45 hover:text-white/70"}`}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
+                            rankingScope === "store" ? "bg-brand text-brand-fg" : "text-white/45 hover:text-white/70"
+                        )}
                     >
-                        🏢 매장 랭킹
-                    </Button>
-                    <Button
-                        variant="ghost"
+                        <LucideStore className="w-4 h-4" />
+                        매장 랭킹
+                    </button>
+                    <button
                         onClick={() => setRankingScope("national")}
-                        className={`flex-1 h-12 rounded-xl font-semibold text-sm transition-all ${rankingScope === "national" ? "bg-white/10 text-white border border-white/10" : "text-white/45 hover:text-white/70"}`}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
+                            rankingScope === "national" ? "bg-brand text-brand-fg" : "text-white/45 hover:text-white/70"
+                        )}
                     >
-                        🇰🇷 전국 랭킹
-                    </Button>
+                        <LucideGlobe className="w-4 h-4" />
+                        전국 랭킹
+                    </button>
                 </div>
 
                 {/* Ranking Tabs - Only show for Billiards */}
                 {currentSport !== "GOLF" && (
-                    <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl mb-8 border border-white/5">
-                        <Button
-                            variant="ghost"
+                    <div className="flex p-1 bg-white/[0.04] rounded-2xl mb-8 border border-white/[0.06]">
+                        <button
                             onClick={() => setRankingTab("4c")}
                             className={cn(
-                                "flex-1 h-12 rounded-xl font-semibold text-sm transition-all",
-                                rankingTab === "4c" ? "bg-white/10 text-white border border-white/10" : "text-white/45 hover:text-white/70"
+                                "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
+                                rankingTab === "4c" ? "bg-brand text-brand-fg" : "text-white/45 hover:text-white/70"
                             )}
                         >
-                            🟡 4구 랭킹
-                        </Button>
-                        <Button
-                            variant="ghost"
+                            <LucideBarChart3 className="w-4 h-4" />
+                            4구
+                        </button>
+                        <button
                             onClick={() => setRankingTab("3c")}
                             className={cn(
-                                "flex-1 h-12 rounded-xl font-semibold text-sm transition-all",
-                                rankingTab === "3c" ? "bg-white/10 text-white border border-white/10" : "text-white/45 hover:text-white/70"
+                                "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
+                                rankingTab === "3c" ? "bg-brand text-brand-fg" : "text-white/45 hover:text-white/70"
                             )}
                         >
-                            🔴 3구 랭킹
-                        </Button>
+                            <LucideTarget className="w-4 h-4" />
+                            3쿠션
+                        </button>
                     </div>
                 )}
 
@@ -92,46 +120,39 @@ export default function HiqRanking() {
                                 className="w-8 h-8 border-2 border-white/10 border-t-white rounded-full"
                             />
                         </div>
+                    ) : rankedMembers.length === 0 ? (
+                        <div className="rk-card p-8 text-center">
+                            <LucideTrophy className="w-10 h-10 text-white/15 mx-auto mb-3" />
+                            <div className="text-[15px] font-semibold text-white">아직 랭킹이 없습니다</div>
+                            <p className="text-[13px] text-white/45 mt-1">
+                                {currentSport === "GOLF" ? "라운드 기록이 쌓이면 순위가 표시됩니다" : "경기 기록이 쌓이면 순위가 표시됩니다"}
+                            </p>
+                        </div>
                     ) : (
-                        rankings?.filter((r: any) => {
-                            if (currentSport === "GOLF") return (r.totalGolfGames || 0) > 0 || (r.golfHandicap || 0) > 0;
-                            const handi = rankingTab === "3c" ? r.handi3c : r.handi4c;
-                            return handi > 0;
-                        })
-                            .sort((a: any, b: any) => {
-                                if (currentSport === "GOLF") {
-                                    const scoreA = (a.golfAvgScore || 0) > 0 ? a.golfAvgScore : (a.golfHandicap || 0) + 72;
-                                    const scoreB = (b.golfAvgScore || 0) > 0 ? b.golfAvgScore : (b.golfHandicap || 0) + 72;
-
-                                    if (scoreA === 0 && scoreB === 0) return 0;
-                                    if (scoreA === 0) return 1;
-                                    if (scoreB === 0) return -1;
-
-                                    return scoreA - scoreB;
-                                }
-                                const handiA = rankingTab === "3c" ? a.handi3c : a.handi4c;
-                                const handiB = rankingTab === "3c" ? b.handi3c : b.handi4c;
-                                if (handiB !== handiA) return handiB - handiA;
-                                return parseFloat(b.average || "0") - parseFloat(a.average || "0");
-                            })
+                        rankedMembers
                             .map((rank: any, idx: number) => (
                                 <motion.div
                                     key={rank.id}
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ delay: idx * 0.05 }}
-                                    className={`flex items-center justify-between p-4 rounded-tile border transition-colors ${rank.id === member?.id
-                                        ? "bg-brand/10 border-brand/30"
-                                        : "bg-white/[0.03] border-white/[0.06]"
-                                        }`}
+                                    className={cn(
+                                        "flex items-center justify-between p-4 rounded-tile border transition-colors",
+                                        rank.id === member?.id
+                                            ? "bg-brand/10 border-brand/30"
+                                            : "bg-surface-1 border-surface-line"
+                                    )}
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className="relative">
                                             {idx < 3 ? (
-                                                <div className={`w-10 h-10 rounded-tile flex items-center justify-center rotate-45 ${idx === 0 ? "bg-[#ffd700]" :
-                                                    idx === 1 ? "bg-gray-300" : "bg-amber-600"
-                                                    }`}>
-                                                    <LucideMedal className={`w-5 h-5 -rotate-45 ${idx === 0 ? 'text-black' : 'text-white'}`} />
+                                                <div className={cn(
+                                                    "w-10 h-10 rounded-tile flex items-center justify-center",
+                                                    idx === 0 ? "bg-amber-400/15 text-amber-400" :
+                                                        idx === 1 ? "bg-white/10 text-white/70" :
+                                                            "bg-orange-700/20 text-orange-400"
+                                                )}>
+                                                    <LucideMedal className="w-5 h-5" />
                                                 </div>
                                             ) : (
                                                 <span className="w-10 h-10 flex items-center justify-center font-semibold text-white/40 text-[17px] tabular-nums">

@@ -126,6 +126,10 @@ export default function Landing() {
         }
     };
 
+    // One predicate drives both the disabled state and the active styling so a
+    // valid number can never render as an inert-looking button.
+    const canSubmit = requiresPassword ? password.length >= 4 : phone.length >= 10;
+
     if (isBrandLoading || !brand) {
         return (
             <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center gap-4">
@@ -217,15 +221,15 @@ export default function Landing() {
                 {/* Enter Button */}
                 <div className="px-8 pb-8">
                     <motion.button
-                        disabled={(requiresPassword ? password.length < 4 : phone.length < 10) || isLoading}
+                        disabled={!canSubmit || isLoading}
                         onClick={handleStart}
                         title={requiresPassword ? "확인 및 입장" : "입장하기"}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className="w-full h-18 py-5 rounded-tile font-bold text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-20 relative overflow-hidden group"
+                        className="w-full h-16 rounded-tile font-bold text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-20 relative overflow-hidden group"
                         style={{
-                            background: (requiresPassword ? password.length >= 4 : phone.length === 11) ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
-                            color: (requiresPassword ? password.length >= 4 : phone.length === 11) ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.45)"
+                            background: canSubmit ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
+                            color: canSubmit ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.45)"
                         }}
                     >
                         {isLoading ? (

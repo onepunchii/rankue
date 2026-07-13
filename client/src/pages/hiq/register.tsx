@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { insertHiqMemberSchema, type InsertHiqMember } from "../../../../shared/schema";
 import { LucideChevronRight, LucideCheckCircle2, LucideSparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 const STEPS = [
     { id: "personal", title: "본인 확인", desc: "당구장에서 사용할 이름을 알려주세요." },
@@ -47,8 +48,8 @@ export default function HiqRegister() {
     });
 
     const brand = brandResponse?.data || {
-        themeColor: "#6366f1",
-        neonColor: "#818cf8"
+        themeColor: "#10b981",
+        neonColor: "#10b981"
     };
 
     const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<InsertHiqMember>({
@@ -69,6 +70,14 @@ export default function HiqRegister() {
     });
 
     const formData = watch();
+
+    // Single source of truth for whether the current step may advance — drives
+    // both the disabled prop and the button styling so they can never disagree.
+    const stepValid = !(
+        (currentStep === 0 && !(formData as any).name) ||
+        (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4)) ||
+        (currentStep === 2 && (!(formData as any).securityQuestion || !(formData as any).securityAnswer))
+    );
 
     useEffect(() => {
         if (!phoneFromQuery || !storeIdFromQuery) {
@@ -117,26 +126,25 @@ export default function HiqRegister() {
                 <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
-                    style={{ backgroundColor: `${brand.themeColor}33`, borderColor: `${brand.themeColor}80`, borderWidth: 1 }}
+                    className="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-brand/20 border border-brand/50"
                 >
-                    <LucideCheckCircle2 className="w-16 h-16" style={{ color: brand.neonColor || brand.themeColor }} />
+                    <LucideCheckCircle2 className="w-16 h-16 text-brand" />
                 </motion.div>
                 <motion.h1
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-4xl font-bold mb-4"
+                    className="text-[26px] font-bold tracking-tight mb-4"
                 >
                     환영합니다!
                 </motion.h1>
-                <p className="text-xl text-white/55">당구장 멤버십이 활성화되었습니다.</p>
+                <p className="text-[15px] font-medium text-white/55">당구장 멤버십이 활성화되었습니다.</p>
                 <div className="mt-12 flex gap-2">
                     {[1, 2, 3, 4, 5].map(i => (
                         <motion.div
                             key={i}
                             animate={{ y: [0, -20, 0], opacity: [0, 1, 0] }}
                             transition={{ repeat: Infinity, duration: 2, delay: i * 0.3 }}
-                            style={{ color: brand.neonColor || brand.themeColor }}
+                            className="text-brand"
                         >
                             <LucideSparkles className="w-6 h-6" />
                         </motion.div>
@@ -177,10 +185,10 @@ export default function HiqRegister() {
                         exit={{ opacity: 0, x: -20 }}
                     >
                         <span className="font-semibold text-[13px] mb-2 block text-brand tabular-nums">{currentStep + 1} / {STEPS.length} 단계</span>
-                        <h1 className="text-4xl font-bold mb-3 text-white leading-tight">
+                        <h1 className="text-[26px] font-bold tracking-tight mb-3 text-white leading-tight">
                             {STEPS[currentStep].title}
                         </h1>
-                        <p className="text-xl text-white/55 font-medium">
+                        <p className="text-[15px] text-white/55 font-medium">
                             {STEPS[currentStep].desc}
                         </p>
                     </motion.div>
@@ -368,12 +376,11 @@ export default function HiqRegister() {
                                     <div className="flex items-start gap-4">
                                         <Checkbox
                                             id="essential"
-                                            className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:border-none"
-                                            style={{ backgroundColor: "rgb(var(--brand))" }}
+                                            className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                                             checked={true}
                                             disabled={true}
                                         />
-                                        <Label htmlFor="essential" className="text-lg text-white/60 leading-tight">
+                                        <Label htmlFor="essential" className="text-[15px] text-white/60 leading-tight">
                                             <span className="text-white font-bold block mb-1">[필수] 개인정보 수집 동의</span>
                                             서비스 이용을 위해 최소한의 정보를 수집합니다.
                                         </Label>
@@ -381,11 +388,10 @@ export default function HiqRegister() {
                                     <div className="flex items-start gap-4">
                                         <Checkbox
                                             id="marketing"
-                                            className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:border-none"
-                                            style={{ backgroundColor: "rgb(var(--brand))" }}
+                                            className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                                             onCheckedChange={(checked) => setValue("marketingAgree", !!checked)}
                                         />
-                                        <Label htmlFor="marketing" className="text-lg text-white/60 leading-tight">
+                                        <Label htmlFor="marketing" className="text-[15px] text-white/60 leading-tight">
                                             <span className="text-white/80 font-bold block mb-1">[선택] 마케팅 정보 수신</span>
                                             매장 이벤트 및 혜택 정보를 보내드려요.
                                         </Label>
@@ -419,25 +425,12 @@ export default function HiqRegister() {
 
                         <Button
                             onClick={nextStep}
-                            disabled={
-                                (currentStep === 0 && !(formData as any).name) ||
-                                (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4)) ||
-                                (currentStep === 2 && (!(formData as any).securityQuestion || !(formData as any).securityAnswer))
-                            }
+                            disabled={!stepValid}
                             title="다음 단계"
-                            className="flex-[2] h-16 text-xl font-semibold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all outline-none"
-                            style={{
-                                backgroundColor: (
-                                    (currentStep === 0 && !(formData as any).name) ||
-                                    (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4)) ||
-                                    (currentStep === 2 && (!(formData as any).securityQuestion || !(formData as any).securityAnswer))
-                                ) ? "rgba(255,255,255,0.05)" : "rgb(var(--brand))",
-                                color: (
-                                    (currentStep === 0 && !(formData as any).name) ||
-                                    (currentStep === 1 && (!(formData as any).password || (formData as any).password.length < 4)) ||
-                                    (currentStep === 2 && (!(formData as any).securityQuestion || !(formData as any).securityAnswer))
-                                ) ? "rgba(255,255,255,0.45)" : "rgb(var(--brand-fg))"
-                            }}
+                            className={cn(
+                                "flex-[2] h-16 text-xl font-semibold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all outline-none",
+                                stepValid ? "rk-btn-primary" : "bg-white/5 text-white/45"
+                            )}
                         >
                             다음 <LucideChevronRight className="w-6 h-6" />
                         </Button>

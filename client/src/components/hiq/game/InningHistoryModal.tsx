@@ -1,4 +1,4 @@
-import { LucideLayoutGrid } from "lucide-react";
+import { LucideLayoutGrid, LucideBarChart3 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -23,28 +23,15 @@ export function InningHistoryModal({ player, innings, onClose }: Props) {
                 </DialogHeader>
 
                 <div className="py-4 space-y-4">
-                    <div className="bg-black/40 rounded-2xl p-4 border border-white/5 max-h-[40vh] overflow-y-auto">
-                        <div className="space-y-3">
-                            <div className="space-y-1">
-                                <div className="flex justify-between text-[12px] font-semibold text-white/55">
-                                    <span>이닝별 점수 추이</span>
-                                </div>
-                                <div className="grid grid-cols-5 gap-2">
-                                    {Array.from({ length: innings }).map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className="flex flex-col items-center gap-1"
-                                        >
-                                            <span className="text-[12px] text-white/45 tabular-nums">{i + 1}</span>
-                                            <div
-                                                className="w-full h-10 flex items-center justify-center rounded-tile text-xs font-semibold bg-white/5 text-white/55"
-                                            >
-                                                -
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                    <div className="bg-black/40 rounded-2xl p-4 border border-white/5">
+                        <div className="flex justify-between text-[12px] font-semibold text-white/55 mb-4">
+                            <span>이닝별 점수 추이</span>
+                            <span className="text-white/45 tabular-nums">총 {innings}이닝</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center text-center gap-2 py-8">
+                            <LucideBarChart3 className="w-8 h-8 text-white/38" strokeWidth={1.5} />
+                            <p className="text-[13px] font-medium text-white/55">이닝별 상세 기록은 경기 종료 후</p>
+                            <p className="text-[13px] font-medium text-white/55">결과 화면에서 확인할 수 있습니다.</p>
                         </div>
                     </div>
                 </div>
