@@ -51,3 +51,8 @@ server/test_recent_logic.ts
 
 # @capacitor/assets PWA output (regenerated)
 icons/
+
+# 네이티브 서명키·비밀 — 절대 커밋 금지 (shell-kit)
+android/key.properties
+android/keystore/
+android/app/google-services.json

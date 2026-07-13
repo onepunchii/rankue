@@ -1,39 +1,20 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import type { CapacitorConfig } from "@capacitor/cli";
 
+// 랭큐 네이티브 쉘 — mapix 표준(원격 URL 모드, shell-kit 생성).
+// 웹뷰가 프로덕션을 직접 로드 → 앱 내용은 git push 배포만으로 갱신, 스토어 재심사 불필요.
 const config: CapacitorConfig = {
-  appId: 'kr.co.rankue',
-  appName: 'RANKUE',
-  // Required by the CLI even when loading a remote URL; the built web assets live here.
-  webDir: 'dist/public',
+  appId: "com.rankue.app",
+  appName: "랭큐",
+  webDir: "native-shell",
   server: {
-    androidScheme: 'https',
-    iosScheme: 'https',
-    // ── Interim scaffolding approach ──────────────────────────────────────────
-    // Load the live web app so the existing signed-cookie auth (SameSite=Lax)
-    // works first-party inside the WebView with zero server changes.
-    // Productionization path (bundle dist/public offline + native-optimized auth,
-    // i.e. token or SameSite=None + CORS) is deferred to the push/build phase.
-    url: 'https://www.rankue.co.kr',
-    cleartext: false,
+    url: "https://www.rankue.co.kr",
+    androidScheme: "https",
   },
   ios: {
-    contentInset: 'always',
-    backgroundColor: '#0A0A0A',
+    contentInset: "never", // safe-area는 웹 CSS의 env(safe-area-inset-*)가 직접 처리
   },
   android: {
-    backgroundColor: '#0A0A0A',
-  },
-  plugins: {
-    SplashScreen: {
-      launchShowDuration: 800,
-      backgroundColor: '#0A0A0A',
-      androidScaleType: 'CENTER_CROP',
-      showSpinner: false,
-    },
-    // Push wiring (FCM/APNs) is added in the push phase; the plugin is already installed.
-    PushNotifications: {
-      presentationOptions: ['badge', 'sound', 'alert'],
-    },
+    allowMixedContent: false,
   },
 };
 
