@@ -39,6 +39,8 @@ import PartnerSettings from "@/pages/partner/settings";
 import CreateTournament from "@/pages/partner/create-tournament";
 import PartnerSubscription from "@/pages/partner/subscription";
 import AdminDashboard from "@/pages/admin/dashboard";
+import Privacy from "@/pages/privacy";
+import AccountDelete from "@/pages/account-delete";
 
 import { StoreProvider } from "./contexts/StoreContext";
 import { SportProvider } from "./contexts/SportContext";
@@ -122,6 +124,9 @@ function AppRoutes() {
     <Switch>
       {/* 메인 랜딩 페이지 */}
       <Route path="/" component={HiqLanding} />
+      {/* 공개 정책 문서 — 스토어 심사용, 로그인 불필요 */}
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/account-delete" component={AccountDelete} />
 
       {/* HiQ 기능 페이지들 */}
       <Route path="/register" component={HiqRegister} />
