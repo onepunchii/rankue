@@ -6,7 +6,7 @@ import { useGameCreation, PlayerType } from "@/hooks/useGameCreation";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BilliardBall, BallColor } from "../ui/BilliardBall";
+import { BilliardBall, BallCluster, BallColor } from "../ui/BilliardBall";
 
 // Player slot → billiard ball color (white 수구, yellow, red, red — the 4구 set).
 const SLOT_BALL: BallColor[] = ["white", "yellow", "red", "red"];
@@ -274,14 +274,16 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                         <div className="grid grid-cols-2 gap-3 mb-4">
                             <Button
                                 onClick={() => changeGameType("4c")}
-                                className={`h-14 text-xl font-semibold rounded-2xl ${gameType === "4c" ? "bg-brand text-white" : "bg-white text-black/60"}`}
+                                className={`h-14 text-xl font-semibold rounded-2xl gap-2.5 ${gameType === "4c" ? "bg-brand text-white" : "bg-white text-black/60"}`}
                             >
+                                <BallCluster colors={["white", "yellow", "red", "red"]} size={18} />
                                 4구
                             </Button>
                             <Button
                                 onClick={() => changeGameType("3c")}
-                                className={`h-14 text-xl font-semibold rounded-2xl ${gameType === "3c" ? "bg-brand text-white" : "bg-white text-black/60"}`}
+                                className={`h-14 text-xl font-semibold rounded-2xl gap-2.5 ${gameType === "3c" ? "bg-brand text-white" : "bg-white text-black/60"}`}
                             >
+                                <BallCluster colors={["white", "yellow", "red"]} size={18} />
                                 3구
                             </Button>
                         </div>
