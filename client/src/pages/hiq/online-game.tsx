@@ -349,20 +349,78 @@ export default function HiqOnlineGame() {
             ctx.fillStyle = "#000000";
             ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
+            // Rounded-rect helper (fallback if ctx.roundRect is unavailable)
+            const rr = (x: number, y: number, w: number, h: number, r: number) => {
+                ctx.beginPath();
+                if ((ctx as any).roundRect) { (ctx as any).roundRect(x, y, w, h, r); return; }
+                ctx.moveTo(x + r, y);
+                ctx.arcTo(x + w, y, x + w, y + h, r);
+                ctx.arcTo(x + w, y + h, x, y + h, r);
+                ctx.arcTo(x, y + h, x, y, r);
+                ctx.arcTo(x, y, x + w, y, r);
+                ctx.closePath();
+            };
 
+            // --- Wooden rail frame (real-table feel) ---
+            const railW = 13;
+            const woodGrad = ctx.createLinearGradient(0, START_Y - railW, 0, START_Y + PLAY_H + railW);
+            woodGrad.addColorStop(0, "#5c3b23");
+            woodGrad.addColorStop(0.5, "#3e2716");
+            woodGrad.addColorStop(1, "#24160c");
+            rr(START_X - railW, START_Y - railW, PLAY_W + railW * 2, PLAY_H + railW * 2, 12);
+            ctx.fillStyle = woodGrad;
+            ctx.fill();
+            // top highlight + bottom shadow line on the wood
+            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
 
-            // --- Green Felt Overlay (Premium Design) ---
+            // --- Green Felt (radial vignette) ---
             const cx = START_X + PLAY_W / 2;
             const cy = START_Y + PLAY_H / 2;
-            const bgRadius = Math.hypot(PLAY_W, PLAY_H) * 0.6;
+            const bgRadius = Math.hypot(PLAY_W, PLAY_H) * 0.62;
 
             const feltGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, bgRadius);
-            feltGrad.addColorStop(0, "#2E7D32");
-            feltGrad.addColorStop(0.7, "#1B5E20");
-            feltGrad.addColorStop(1, "#0A3311");
+            feltGrad.addColorStop(0, "#2f9152");
+            feltGrad.addColorStop(0.62, "#176b3c");
+            feltGrad.addColorStop(1, "#0a3a20");
 
-            ctx.fillStyle = feltGrad; // Apply premium gradient
-            ctx.fillRect(START_X, START_Y, PLAY_W, PLAY_H);
+            rr(START_X, START_Y, PLAY_W, PLAY_H, 4);
+            ctx.fillStyle = feltGrad;
+            ctx.fill();
+
+            // Cushion inner shadow — darkens the felt edges for depth
+            ctx.save();
+            rr(START_X, START_Y, PLAY_W, PLAY_H, 4);
+            ctx.clip();
+            ctx.shadowColor = "rgba(0,0,0,0.55)";
+            ctx.shadowBlur = 14;
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "rgba(0,0,0,0.6)";
+            rr(START_X - 2, START_Y - 2, PLAY_W + 4, PLAY_H + 4, 4);
+            ctx.stroke();
+            ctx.restore();
+
+            // --- Diamond sights on the rails ---
+            const diamond = (dx: number, dy: number, s: number) => {
+                ctx.beginPath();
+                ctx.moveTo(dx, dy - s); ctx.lineTo(dx + s, dy);
+                ctx.lineTo(dx, dy + s); ctx.lineTo(dx - s, dy);
+                ctx.closePath(); ctx.fill();
+            };
+            ctx.fillStyle = "rgba(238,232,214,0.9)";
+            const ds = 2.1;
+            const railMid = railW / 2;
+            for (let i = 1; i < 8; i++) {
+                const y = START_Y + (PLAY_H * i) / 8;
+                diamond(START_X - railMid, y, ds);
+                diamond(START_X + PLAY_W + railMid, y, ds);
+            }
+            for (let i = 1; i < 4; i++) {
+                const x = START_X + (PLAY_W * i) / 4;
+                diamond(x, START_Y - railMid, ds);
+                diamond(x, START_Y + PLAY_H + railMid, ds);
+            }
 
             // --- Grid Overlay (User Requested: Dual Layer) ---
             if (showGrid) {
