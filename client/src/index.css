@@ -1130,6 +1130,12 @@ body {
   .fixed.bottom-0 {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* 일반 플로우 페이지 헤더(대시보드·크루 등 비고정 상단)도 상태바 아래에서 시작 —
+     루트를 통째로 내려 모든 페이지를 한 번에 커버. fixed 요소는 뷰포트 기준이라 영향 없음(위 규칙이 담당). */
+  #root {
+    padding-top: env(safe-area-inset-top);
+  }
 }
 
 /* 3D Floating Animations for Lotto Banner */
