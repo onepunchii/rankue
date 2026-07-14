@@ -5,6 +5,7 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { notificationService } from "../../services/notificationService.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { deleteBlobs } from "../../utils/blob.js";
 
 const router = Router();
 
@@ -160,6 +161,7 @@ router.delete("/:id/posts/:postId", requireAuth, asyncHandler(async (req: AuthRe
     }
 
     await storage.deleteCrewPost(req.params.postId);
+    await deleteBlobs((post as any).images);
     return sendSuccess(res, { success: true });
 }));
 
@@ -303,6 +305,7 @@ router.delete("/:id/photos/:photoId", requireAuth, asyncHandler(async (req: Auth
     }
 
     await storage.deleteCrewPhoto(req.params.photoId);
+    await deleteBlobs((photo as any).url);
     return sendSuccess(res, { success: true });
 }));
 
@@ -543,7 +546,17 @@ router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any
         if (req.body[key] !== undefined) updateData[key] = req.body[key];
     }
 
+    const oldCrew = data?.crew;
     const crew = await storage.updateCrew(crewId, updateData);
+
+    // A replaced cover/emblem leaves the old Blob orphaned — delete it. emblem may be an
+    // emoji (ignored by deleteBlobs). Only when the field was actually changed to a new value.
+    if ('coverImage' in updateData && updateData.coverImage !== oldCrew?.coverImage) {
+        await deleteBlobs(oldCrew?.coverImage);
+    }
+    if ('emblem' in updateData && updateData.emblem !== oldCrew?.emblem) {
+        await deleteBlobs(oldCrew?.emblem);
+    }
     return sendSuccess(res, crew);
 }));
 
@@ -560,7 +573,18 @@ router.delete("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: an
         return sendError(res, 403, "권한이 없습니다 (리더만 가능)");
     }
 
+    // Collect every Blob this crew owns BEFORE the cascade delete wipes the rows.
+    const [photos, posts] = await Promise.all([
+        storage.getCrewPhotos(crewId).catch(() => [] as any[]),
+        storage.getCrewPosts(crewId).catch(() => [] as any[]),
+    ]);
     await storage.deleteCrew(crewId);
+    await deleteBlobs([
+        crew.crew?.coverImage,
+        crew.crew?.emblem,
+        ...photos.map((p: any) => p?.url),
+        ...posts.flatMap((p: any) => p?.images ?? []),
+    ]);
     return sendSuccess(res, { success: true });
 }));
 

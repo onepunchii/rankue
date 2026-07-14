@@ -3,81 +3,100 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 export function useGameAudio() {
     const [isMuted, setIsMuted] = useState(false);
     const synthRef = useRef<SpeechSynthesis | null>(null);
+    const audioCtxRef = useRef<AudioContext | null>(null);
+    const unlockedRef = useRef(false);
+
+    // One shared AudioContext, created lazily. Mobile webviews cap the number of contexts
+    // and start each one 'suspended' until a user gesture resumes it — so the old code that
+    // did `new AudioContext()` on every beep would eventually fail. Reuse a single one.
+    const getCtx = useCallback((): AudioContext | null => {
+        if (typeof window === 'undefined') return null;
+        if (!audioCtxRef.current) {
+            const AC = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AC) return null;
+            audioCtxRef.current = new AC();
+        }
+        return audioCtxRef.current;
+    }, []);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
             synthRef.current = window.speechSynthesis;
-            // Clear any stuck state on mount
             window.speechSynthesis.cancel();
-        }
-    }, []);
-
-    // Ensure voices are loaded (especially for mobile/Chrome)
-    useEffect(() => {
-        if (typeof window !== 'undefined' && window.speechSynthesis) {
-            const loadVoices = () => {
-                // Just calling this populates the list in some browsers
-                window.speechSynthesis.getVoices();
-            };
+            const loadVoices = () => window.speechSynthesis.getVoices();
             loadVoices();
             window.speechSynthesis.onvoiceschanged = loadVoices;
         }
     }, []);
 
+    // Audio on mobile webviews (iOS WKWebView / Android) stays locked until the user
+    // interacts. Prime speechSynthesis + AudioContext on the first gesture so the later
+    // game callbacks (score/inning/turn), which don't originate from a direct tap, can
+    // actually produce sound. This is why match TTS was silent after the Capacitor move.
+    useEffect(() => {
+        const unlock = () => {
+            if (unlockedRef.current) return;
+            unlockedRef.current = true;
+            const synth = synthRef.current;
+            if (synth) {
+                try {
+                    synth.resume();
+                    const prime = new SpeechSynthesisUtterance(' ');
+                    prime.volume = 0;
+                    synth.speak(prime);
+                } catch { /* noop */ }
+            }
+            try { getCtx()?.resume(); } catch { /* noop */ }
+        };
+        window.addEventListener('pointerdown', unlock);
+        window.addEventListener('touchend', unlock);
+        window.addEventListener('click', unlock);
+        return () => {
+            window.removeEventListener('pointerdown', unlock);
+            window.removeEventListener('touchend', unlock);
+            window.removeEventListener('click', unlock);
+        };
+    }, [getCtx]);
+
     const speak = useCallback((text: string) => {
-        // 1. Bridge to Native (Expo) if running in WebView
+        // Bridge to a native TTS handler if one is present (legacy Expo/React Native shell).
+        // The Capacitor shell has none, so we fall through to Web Speech below.
         if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-            console.log("📢 [Web] Sending SPEAK to Native:", text);
-            (window as any).ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'SPEAK',
-                payload: { text }
-            }));
+            (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'SPEAK', payload: { text } }));
             return;
         }
 
-        // 2. Standard Web fallback
         if (isMuted || !synthRef.current) return;
+        const synth = synthRef.current;
 
-        // Cancel previous utterance for snappiness
-        synthRef.current.cancel();
+        // iOS WKWebView leaves the queue 'paused' after cancel(); without resume() nothing
+        // is ever spoken.
+        try { synth.resume(); } catch { /* noop */ }
+        synth.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 1.1; // Slightly faster for game pacing
         utterance.pitch = 1.0;
+        utterance.lang = 'ko-KR';
 
-        // 1. Get voices
-        let voices = synthRef.current.getVoices();
+        let voices = synth.getVoices();
+        if (voices.length === 0) voices = synth.getVoices();
+        const korVoice = voices.find(v => v.lang?.includes('ko') || v.lang?.includes('KR'));
+        if (korVoice) utterance.voice = korVoice;
 
-        // 2. Retry loading voices if empty (common issue)
-        if (voices.length === 0) {
-            window.speechSynthesis.getVoices();
-            voices = synthRef.current.getVoices();
-        }
-
-        // 3. Try to find Korean voice, but DON'T fail if missing
-        const korVoice = voices.find(v => v.lang.includes('ko') || v.lang.includes('KR'));
-
-        if (korVoice) {
-            utterance.voice = korVoice;
-            utterance.lang = 'ko-KR';
-        } else {
-            utterance.lang = 'ko-KR';
-            console.warn("Korean voice not found, using system default.");
-        }
-
-        // 4. Speak
-        synthRef.current.speak(utterance);
+        synth.speak(utterance);
+        try { synth.resume(); } catch { /* noop */ }
     }, [isMuted]);
 
-    // Simple beep effect using Web Audio API
+    // Simple beep effect using the shared Web Audio context.
     const playEffect = useCallback((type: 'click' | 'turn' | 'win' | 'finishing') => {
-        if (isMuted || typeof window === 'undefined') return;
+        if (isMuted) return;
 
         try {
-            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-            if (!AudioContext) return;
+            const ctx = getCtx();
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
 
-            const ctx = new AudioContext();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
 
@@ -122,11 +141,10 @@ export function useGameAudio() {
                 osc.start(now);
                 osc.stop(now + 0.3);
             }
-
         } catch (e) {
             console.error("Audio play failed", e);
         }
-    }, [isMuted]);
+    }, [isMuted, getCtx]);
 
     return { speak, playEffect, isMuted, setIsMuted };
 }
