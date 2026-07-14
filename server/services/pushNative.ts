@@ -125,10 +125,15 @@ async function sendApns(token: string, payload: PushPayload): Promise<'ok' | 'de
   return (res.status === 410 || (res.status === 400 && res.body.includes('BadDeviceToken'))) ? 'dead' : 'skip';
 }
 
-// 단일 토큰 발송 — 토큰 형식으로 FCM/APNs 자동 선택. 반환 'dead'면 호출부에서 토큰 정리 권장.
-export async function sendPushNative(token: string, payload: PushPayload): Promise<'ok' | 'dead' | 'skip'> {
+// 단일 토큰 발송 — 플랫폼 판별 후 FCM/APNs 선택. 반환 'dead'면 호출부에서 토큰 정리 권장.
+// 랭큐 클라는 'fcm:'/'apns:' 프리픽스로 플랫폼을 태깅한다. 프리픽스 없으면 형식(64 hex=APNs)으로 판별.
+export async function sendPushNative(rawToken: string, payload: PushPayload): Promise<'ok' | 'dead' | 'skip'> {
   try {
-    const isApns = /^[0-9a-fA-F]{64}$/.test(token); // APNs device token = 64 hex
+    let token = rawToken;
+    let isApns: boolean;
+    if (rawToken.startsWith('apns:')) { token = rawToken.slice(5); isApns = true; }
+    else if (rawToken.startsWith('fcm:')) { token = rawToken.slice(4); isApns = false; }
+    else { isApns = /^[0-9a-fA-F]{64}$/.test(rawToken); } // 프리픽스 없으면 형식 판별
     return isApns ? await sendApns(token, payload) : await sendFcm(token, payload);
   } catch (e) {
     console.error('[pushNative]', (e as Error)?.message);
