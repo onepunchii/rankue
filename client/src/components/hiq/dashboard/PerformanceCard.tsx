@@ -22,30 +22,31 @@ export function PerformanceCard({ history }: { history?: any[] }) {
             </div>
 
             <div className="flex items-center gap-5">
-                <RadialGauge value={winRate} size={92} stroke={8}>
+                <RadialGauge value={winRate} size={82} stroke={8}>
                     <div className="text-center leading-none">
-                        <div className="text-[22px] font-bold text-ink-1 tabular-nums">
-                            {winRate}<span className="text-[13px] font-semibold text-black/60">%</span>
+                        <div className="text-[21px] font-bold text-ink-1 tabular-nums">
+                            {winRate}<span className="text-[12px] font-semibold text-black/50">%</span>
                         </div>
-                        <div className="text-[12px] font-medium text-black/55 mt-1">승률</div>
+                        <div className="text-[11px] font-medium text-black/45 mt-1">승률</div>
                     </div>
                 </RadialGauge>
 
+                <div className="w-px h-16 bg-black/[0.07] shrink-0" />
+
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-4 mb-3.5">
+                    <div className="flex items-center gap-5 mb-4">
                         <div>
-                            <div className="text-[20px] font-bold text-brand tabular-nums leading-none">{wins}</div>
-                            <div className="text-[12px] text-black/55 font-medium mt-1">승</div>
+                            <div className="text-[22px] font-bold text-brand tabular-nums leading-none">{wins}</div>
+                            <div className="text-[12px] text-black/50 font-medium mt-1">승</div>
                         </div>
-                        <div className="w-px h-8 bg-black/10" />
                         <div>
-                            <div className="text-[20px] font-bold text-red-500 tabular-nums leading-none">{losses}</div>
-                            <div className="text-[12px] text-black/55 font-medium mt-1">패</div>
+                            <div className="text-[22px] font-bold text-red-500 tabular-nums leading-none">{losses}</div>
+                            <div className="text-[12px] text-black/50 font-medium mt-1">패</div>
                         </div>
                     </div>
                     <div>
-                        <div className="text-[12px] font-medium text-black/55 mb-1.5">최근 5경기</div>
-                        <FormBadges results={form} size={24} />
+                        <div className="text-[11px] font-medium text-black/40 mb-2">최근 5경기</div>
+                        <FormBadges results={form} size={22} />
                     </div>
                 </div>
             </div>

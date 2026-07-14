@@ -22,7 +22,18 @@ export function FormBadges({
     className?: string;
 }) {
     if (!results.length) {
-        return <span className="text-[12px] font-medium text-black/40">기록 없음</span>;
+        // Designed empty state — 5 hollow placeholders instead of bare text.
+        return (
+            <div className={cn("flex items-center gap-1.5", className)}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                    <span
+                        key={i}
+                        className="inline-flex rounded-full bg-black/[0.04] ring-1 ring-black/[0.05]"
+                        style={{ width: size, height: size }}
+                    />
+                ))}
+            </div>
+        );
     }
     return (
         <div className={cn("flex items-center gap-1.5", className)}>

@@ -38,7 +38,7 @@ export const DashboardHeader = ({
     return (
         <header className="pt-7 pb-2">
             {/* Top bar: greeting + profile */}
-            <div className="flex items-end justify-between mb-7">
+            <div className="flex items-center justify-between mb-7 gap-3">
                 <div className="min-w-0">
                     <div className="inline-flex items-center gap-1.5 mb-2.5 px-2.5 py-1 rounded-full bg-brand/10">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand" />
@@ -52,13 +52,13 @@ export const DashboardHeader = ({
 
                 <div className="flex items-center gap-2.5 shrink-0">
                     <div className={cn(
-                        "flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[12px] font-semibold",
+                        "flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[12px] font-bold",
                         tierStyle.bg, tierStyle.text
                     )}>
-                        <Award className="w-3.5 h-3.5" strokeWidth={2.2} />
+                        <Award className="w-3.5 h-3.5" strokeWidth={2.4} />
                         <span>{tier.label}</span>
                     </div>
-                    <Avatar className="w-11 h-11 rounded-2xl">
+                    <Avatar className="w-12 h-12 rounded-2xl ring-2 ring-brand/15">
                         <AvatarImage src={member?.profileImageUrl || undefined} className="object-cover" />
                         <AvatarFallback className="rounded-2xl bg-brand/10 text-brand font-bold text-lg">
                             {member?.name?.[0]}

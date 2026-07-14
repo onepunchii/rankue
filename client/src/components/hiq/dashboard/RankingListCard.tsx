@@ -56,13 +56,6 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                         const isMe = String(member.id) === String(currentMemberId);
                         const rank = idx + 1;
                         const rp = activeTab === '3c' ? member.rating3c : member.rating4c;
-                        const isTop3 = rank <= 3;
-                        // Refined medal accents for the podium; plain muted numerals below.
-                        const medal = rank === 1 ? "bg-[#cba258]/12 text-[#cba258]"
-                            : rank === 2 ? "bg-slate-400/15 text-slate-500"
-                                : "bg-orange-400/15 text-orange-500";
-                        const rpColor = activeTab === '3c' ? "text-brand" : "text-brand";
-
                         return (
                             <motion.div
                                 key={member.id}
@@ -72,38 +65,38 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                                 exit={{ opacity: 0, x: 10 }}
                                 transition={{ duration: 0.2, delay: idx * 0.05 }}
                                 className={cn(
-                                    "flex items-center gap-3.5 px-3.5 py-3 rounded-2xl transition-colors",
-                                    isMe ? "bg-brand/[0.07]" : "bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                                    "flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-colors",
+                                    isMe ? "bg-brand/[0.12]" : "bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                                 )}
                             >
-                                {/* Rank */}
-                                <div className="w-9 flex justify-center shrink-0">
-                                    {isTop3 ? (
-                                        <div className={cn("w-9 h-9 rounded-tile flex items-center justify-center font-bold text-[16px] tabular-nums", medal)}>
-                                            {rank}
+                                {/* Rank — only #1 gets a gold badge; the rest are clean numerals */}
+                                <div className="w-8 flex justify-center shrink-0">
+                                    {rank === 1 ? (
+                                        <div className="w-8 h-8 rounded-full bg-[#cba258] flex items-center justify-center font-bold text-[15px] tabular-nums text-white shadow-[0_1px_3px_rgba(203,162,88,0.4)]">
+                                            1
                                         </div>
                                     ) : (
-                                        <span className="font-semibold text-[16px] tabular-nums text-black/40">{rank}</span>
+                                        <span className={cn("font-bold text-[16px] tabular-nums", isMe ? "text-brand" : "text-black/45")}>{rank}</span>
                                     )}
                                 </div>
 
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5">
-                                        <span className={cn("font-semibold text-[15px] truncate", isMe ? "text-ink-1" : "text-black/70")}>
+                                        <span className={cn("font-semibold text-[15px] truncate", isMe ? "text-brand" : "text-ink-1")}>
                                             {member.name}
                                         </span>
-                                        {isMe && <span className="shrink-0 px-1.5 py-px rounded-full text-[12px] font-semibold text-brand bg-brand/12">나</span>}
+                                        {isMe && <span className="shrink-0 px-1.5 py-px rounded-full text-[11px] font-bold text-white bg-brand">나</span>}
                                     </div>
                                     <span className="block text-[12px] font-medium text-black/40 tabular-nums mt-0.5">평균 {member.average || "0.000"}</span>
                                 </div>
 
                                 {/* Score (RP) */}
                                 <div className="flex items-baseline gap-1 shrink-0">
-                                    <span className={cn("font-bold text-[20px] tabular-nums tracking-tight", rpColor)}>
+                                    <span className="font-bold text-[19px] tabular-nums tracking-tight text-brand">
                                         {rp || 0}
                                     </span>
-                                    <span className="text-[12px] font-semibold text-black/40">RP</span>
+                                    <span className="text-[12px] font-semibold text-brand/50">RP</span>
                                 </div>
                             </motion.div>
                         );
