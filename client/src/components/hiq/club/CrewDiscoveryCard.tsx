@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { HiqCrew } from "@shared/schema";
-import { LucideMapPin, LucideUsers, LucideFlag, LucideTarget } from "@/lib/icons";
+import { LucideMapPin, LucideUsers } from "@/lib/icons";
 
 interface CrewDiscoveryCardProps {
     crew: HiqCrew & { memberCount?: number, distance?: number };
@@ -11,7 +11,6 @@ interface CrewDiscoveryCardProps {
 export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDiscoveryCardProps) => {
     // 커버 이미지가 없으면 외부 스톡 사진 대신 크루 이니셜 + 종목 아이콘 타일로 대체
     const initial = crew.name?.trim().charAt(0).toUpperCase() || "?";
-    const SportIcon = crew.sportCategory === 'GOLF' ? LucideFlag : LucideTarget;
 
     return (
         <div
@@ -26,9 +25,8 @@ export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDisc
                         <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent" />
                     </>
                 ) : (
-                    <div className="w-full h-full bg-surface-3 flex flex-col items-center justify-center gap-0.5">
-                        <span className="text-[22px] font-bold text-brand leading-none">{initial}</span>
-                        <SportIcon className="w-3 h-3 text-ink-4" />
+                    <div className="w-full h-full bg-brand/10 flex items-center justify-center">
+                        <span className="text-[26px] font-bold text-brand leading-none">{initial}</span>
                     </div>
                 )}
             </div>

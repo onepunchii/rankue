@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { MyCrewCard } from "./MyCrewCard";
 import { Button } from "@/components/ui/button";
-import { LucideTent, LucidePlus } from "@/lib/icons";
+import { LucideUsers, LucidePlus } from "@/lib/icons";
 
 interface MyCrewListProps {
     currentSport: string;
@@ -26,8 +26,8 @@ export const MyCrewList = memo(({ currentSport }: MyCrewListProps) => {
     if (!myCrews || myCrews.length === 0) {
         return (
             <div className="rk-card flex flex-col items-center justify-center py-12 px-6 text-center">
-                <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mb-4">
-                    <LucideTent className="w-7 h-7 text-black/40" />
+                <div className="w-14 h-14 rounded-full bg-brand/10 flex items-center justify-center mb-4">
+                    <LucideUsers className="w-7 h-7 text-brand" />
                 </div>
                 <p className="text-ink-1 font-semibold text-[16px] mb-1">크루가 없으신가요?</p>
                 <p className="text-ink-3 text-[13px] font-medium mb-5">새로운 크루를 만들어 시작해보세요</p>

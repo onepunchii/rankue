@@ -17,7 +17,7 @@ export default function HiqClub() {
     return (
         <div className="min-h-screen bg-[#f2f0eb] text-ink-1 font-sans pb-28 relative overflow-hidden">
             <div className="relative z-10 max-w-md mx-auto px-5 pt-6">
-                <h1 className="text-[26px] font-bold tracking-tight text-brand mb-7">크루</h1>
+                <h1 className="text-[26px] font-bold tracking-tight text-ink-1 mb-7">크루</h1>
                 <div className="space-y-8">
                     {/* My Crews Section */}
                     <section>
