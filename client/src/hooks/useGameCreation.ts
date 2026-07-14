@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { HiqMember, HiqGameHistory } from "@shared/schema";
@@ -19,6 +19,9 @@ interface GameCreationProps {
     history: HiqGameHistory[] | undefined;
     initialMode?: "practice" | "match";
     initialType?: "3c" | "4c";
+    /** Whether the lobby is on screen. The modal is never unmounted, so without this the
+     *  PIN poll would keep hitting the server every 3s forever after the user closes it. */
+    open?: boolean;
 }
 
 // Helper to calculate target score based on average and game type
@@ -33,6 +36,13 @@ const calculateTargetScore = (avg: string | number | null | undefined, type: '3c
         const calculated = Math.round(average * 20);
         return Math.max(1, calculated);
     }
+};
+
+// 3쿠션과 4구의 평균은 완전히 다른 스케일이라, 특정 종목의 목표 점수를 뽑을 때
+// 범용 `average` 컬럼을 그대로 쓰면 안 된다. 종목별 평균을 우선 사용한다.
+const memberAvgForType = (m: any, type: '3c' | '4c'): string | number | null | undefined => {
+    const typed = type === '3c' ? m?.avg3c : m?.avg4c;
+    return (typed ?? null) !== null && typed !== 0 ? typed : m?.average;
 };
 
 // Helper to calculate Record Average from history
@@ -53,7 +63,7 @@ const calculateRecordAverage = (history: HiqGameHistory[] | undefined, type: '3c
     return totalInnings > 0 ? (totalScore / totalInnings).toFixed(3) : (defaultAvg || "0.000");
 };
 
-export const useGameCreation = ({ member, history, initialMode = "practice", initialType = "4c" }: GameCreationProps) => {
+export const useGameCreation = ({ member, history, initialMode = "practice", initialType = "4c", open = true }: GameCreationProps) => {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
 
@@ -67,6 +77,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
 
     // Invite State
     const [inviteCode, setInviteCode] = useState<string | null>(null);
+    const [inviteError, setInviteError] = useState<string | null>(null);
 
     // Additional Rules
     const [useFinishRule, setUseFinishRule] = useState(false);
@@ -84,16 +95,49 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                 ...Array(numberOfPlayers - 1).fill({ type: 'guest', target: 0, name: '' })
             ]);
 
-            // Generate Invite Code if match mode
-            if (gameMode === "match") {
-                apiRequest("/api/hiq/invite", { method: "POST" })
-                    .then(res => setInviteCode(res.code))
-                    .catch(e => console.error("Failed to create invite code", e));
-            } else {
-                setInviteCode(null);
-            }
+            // Drop any previous PIN so each new session mints a fresh one.
+            // NOTE: the invite code is NOT created here — the caller (GameCreationModal) invokes
+            // this in the same tick as setGameMode(initialMode), so `gameMode` in this closure is
+            // still the PREVIOUS value. Reading it here silently skipped PIN creation for match
+            // games. The effect below owns creation and reacts to the settled gameMode instead.
+            setInviteCode(null);
         }
-    }, [member, history, gameMode, gameType, numberOfPlayers]);
+    }, [member, history, gameType, numberOfPlayers]);
+
+    // Mint the match PIN whenever we're in match mode without one.
+    // Keyed on the settled gameMode, so it works even when the mode is set in the same tick
+    // the modal initializes. A ref guards against duplicate in-flight requests.
+    const invitePendingRef = useRef(false);
+    useEffect(() => {
+        if (!open || !member) return;
+
+        if (gameMode !== "match") {
+            setInviteCode(null);
+            setInviteError(null);
+            invitePendingRef.current = false;
+            return;
+        }
+
+        // While an error is showing, wait for an explicit 다시 시도 (retryInvite) instead of
+        // silently re-minting in a loop.
+        if (inviteCode || inviteError || invitePendingRef.current) return;
+
+        invitePendingRef.current = true;
+        apiRequest("/api/hiq/invite", { method: "POST" })
+            .then(res => setInviteCode(res.code))
+            .catch(e => {
+                console.error("Failed to create invite code", e);
+                // Surface it — the host used to sit on "핀 생성 중..." forever with no way out.
+                setInviteError("핀 코드를 만들지 못했습니다. 다시 시도해주세요.");
+            })
+            .finally(() => { invitePendingRef.current = false; });
+    }, [open, gameMode, member, inviteCode, inviteError]);
+
+    // Clearing the code + error re-triggers the mint effect above.
+    const retryInvite = useCallback(() => {
+        setInviteError(null);
+        setInviteCode(null);
+    }, []);
 
     // Update Player Count
     useEffect(() => {
@@ -122,7 +166,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                     return { ...p, target: calculateTargetScore(recordAvg, newType) };
                 }
                 // For other members (polling guests) use their average
-                return { ...p, target: calculateTargetScore(p.member.average, newType) };
+                return { ...p, target: calculateTargetScore(memberAvgForType(p.member, newType), newType) };
             }
             return p;
         }));
@@ -148,9 +192,9 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
         });
     };
 
-    // Polling Logic
+    // Polling Logic — only while the lobby is actually on screen.
     useEffect(() => {
-        if (inviteCode && gameMode === "match") {
+        if (open && inviteCode && gameMode === "match") {
             const interval = setInterval(async () => {
                 try {
                     const res = await apiRequest(`/api/hiq/invite/${inviteCode}`);
@@ -179,7 +223,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                                         ...currentPlayers[emptySlotIdx],
                                         type: 'member',
                                         member: guest,
-                                        target: calculateTargetScore(guest.average, gameType),
+                                        target: calculateTargetScore(memberAvgForType(guest, gameType), gameType),
                                         name: guest.name
                                     };
                                 } else {
@@ -190,7 +234,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                                             ...currentPlayers[guestSlotIdx],
                                             type: 'member',
                                             member: guest,
-                                            target: calculateTargetScore(guest.average, gameType),
+                                            target: calculateTargetScore(memberAvgForType(guest, gameType), gameType),
                                             name: guest.name
                                         };
                                     }
@@ -199,17 +243,32 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                             return currentPlayers;
                         });
                     }
-                } catch (e) {
+                } catch (e: any) {
+                    // The server 404s a code that no longer exists / has expired. Keep showing a
+                    // dead PIN as if it were live and the host waits forever for a guest who can
+                    // never join — surface it and let them mint a fresh one.
+                    const msg = String(e?.message || "");
+                    if (msg.includes("존재하지") || msg.includes("404")) {
+                        setInviteError("핀이 만료되었습니다. 새 핀을 발급해주세요.");
+                        setInviteCode(null);
+                        return;
+                    }
                     console.warn("Polling warning", e);
                 }
             }, 3000);
             return () => clearInterval(interval);
         }
-    }, [inviteCode, gameMode, gameType]);
+    }, [open, inviteCode, gameMode, gameType]);
 
     // Confirm Start
+    const startingRef = useRef(false);
+    const [isStarting, setIsStarting] = useState(false);
     const confirmStart = async () => {
         if (!member) return;
+        // Double-tap guard: without this, two rapid taps create two separate games.
+        if (startingRef.current) return;
+        startingRef.current = true;
+        setIsStarting(true);
 
         // Try Landscape Lock
         try {
@@ -261,6 +320,9 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                 description: "잠시 후 다시 시도해주세요.",
                 variant: "destructive"
             });
+            // Only release the guard on failure — on success we navigate away.
+            startingRef.current = false;
+            setIsStarting(false);
         }
     };
 
@@ -269,11 +331,11 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
         gameType, changeGameType,
         numberOfPlayers, setNumberOfPlayers,
         players, updatePlayer, movePlayer,
-        inviteCode,
+        inviteCode, inviteError, retryInvite,
         useFinishRule, setUseFinishRule,
         finishTargetCount, setFinishTargetCount,
         usePbaRule, setUsePbaRule,
         initializeGame,
-        confirmStart
+        confirmStart, isStarting
     };
 };

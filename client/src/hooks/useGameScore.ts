@@ -300,7 +300,10 @@ export function useGameScore(id: string) {
             return;
         }
 
-        if (currentScore >= target) {
+        // A slot with no target (player{N}Target defaults to 0 — e.g. an unfilled guest slot)
+        // has NO win condition. Without the `target > 0` guard, `0 >= 0` was true on the very
+        // first tap, instantly finishing the match and crowning that player.
+        if (target > 0 && currentScore >= target) {
             playEffect('win');
             let winnerId: string | undefined | null = undefined;
             if (playerIndex === 1) winnerId = game.player1Id;
@@ -308,6 +311,7 @@ export function useGameScore(id: string) {
             else if (playerIndex === 3) winnerId = game.player3Id;
             else if (playerIndex === 4) winnerId = game.player4Id;
 
+            if (finishMutation.isPending) return; // guard against a double-tap firing two finishes
             finishMutation.mutate({ winnerId: winnerId || undefined, winnerIndex: playerIndex });
             return;
         }

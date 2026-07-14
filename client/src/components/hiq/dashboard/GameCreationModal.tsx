@@ -86,14 +86,14 @@ const PlayerCard = ({
                 {!isSelf && (
                     <div className="flex items-center bg-black/40 rounded-lg p-1 border border-white/5">
                         <button
-                            onClick={() => onUpdate(idx, { type: 'member', target: 0, name: '' })}
+                            onClick={() => onUpdate(idx, { type: 'member', member: undefined, target: 0, name: '' })}
                             title="회원으로 전환"
                             className={`px-3 py-1.5 rounded-md text-[12px] font-bold transition-all ${!isGuest ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
                         >
                             회원
                         </button>
                         <button
-                            onClick={() => onUpdate(idx, { type: 'guest', target: 0, name: '' })}
+                            onClick={() => onUpdate(idx, { type: 'guest', member: undefined, target: 0, name: '' })}
                             title="게스트로 전환"
                             className={`px-3 py-1.5 rounded-md text-[12px] font-bold transition-all ${isGuest ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
                         >
@@ -173,13 +173,13 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
         gameType, changeGameType,
         numberOfPlayers, setNumberOfPlayers,
         players, updatePlayer, movePlayer,
-        inviteCode,
+        inviteCode, inviteError, retryInvite,
         useFinishRule, setUseFinishRule,
         finishTargetCount, setFinishTargetCount,
         usePbaRule, setUsePbaRule,
         initializeGame,
-        confirmStart
-    } = useGameCreation({ member, history, initialMode });
+        confirmStart, isStarting
+    } = useGameCreation({ member, history, initialMode, open });
 
     // Keep a live ref to initializeGame so the open-effect can invoke the latest version
     // WITHOUT depending on it (initializeGame is recreated whenever gameType / numberOfPlayers
@@ -241,6 +241,16 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                     <div className="p-8 rounded-3xl bg-[#ffd700] flex flex-col items-center justify-center shadow-[0_20px_40px_rgba(255,215,0,0.1)] border-4 border-black/5">
                                         {inviteCode ? (
                                             <span className="text-5xl font-semibold text-black tracking-[0.2em] font-mono drop-shadow-sm">{inviteCode}</span>
+                                        ) : inviteError ? (
+                                            <div className="flex flex-col items-center gap-3">
+                                                <span className="text-[13px] font-semibold text-black/70 text-center">{inviteError}</span>
+                                                <button
+                                                    onClick={retryInvite}
+                                                    className="px-4 h-9 rounded-full bg-black/80 text-white text-[13px] font-semibold active:scale-95 transition-transform"
+                                                >
+                                                    다시 시도
+                                                </button>
+                                            </div>
                                         ) : (
                                             <div className="flex flex-col items-center gap-3">
                                                 <div className="flex items-center gap-3">
@@ -248,7 +258,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                                     <div className="w-3 h-3 bg-black/20 rounded-full animate-bounce [animation-duration:1s] [animation-delay:0.2s]" />
                                                     <div className="w-3 h-3 bg-black/20 rounded-full animate-bounce [animation-duration:1s] [animation-delay:0.4s]" />
                                                 </div>
-                                                <span className="text-[12px] font-semibold text-black/40 uppercase tracking-[0.3em]">핀 생성 중...</span>
+                                                <span className="text-[12px] font-semibold text-black/40 tracking-[0.2em]">핀 생성 중...</span>
                                             </div>
                                         )}
                                     </div>
@@ -359,9 +369,10 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                 <div className="p-4 border-t border-white/10 bg-[#0a0a0a] shrink-0 safe-area-pb">
                     <Button
                         onClick={confirmStart}
-                        className="w-full h-14 bg-[#0e4d2a] hover:bg-[#156f3d] text-white rounded-2xl text-lg font-semibold shadow-lg shadow-[#0e4d2a]/20"
+                        disabled={isStarting}
+                        className="w-full h-14 bg-[#0e4d2a] hover:bg-[#156f3d] text-white rounded-2xl text-lg font-semibold shadow-lg shadow-[#0e4d2a]/20 disabled:opacity-60"
                     >
-                        START GAME
+                        {isStarting ? "게임 준비 중..." : "게임 시작"}
                     </Button>
                 </div>
             </DialogContent>

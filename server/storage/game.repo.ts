@@ -15,7 +15,7 @@ import type {
     InsertHiqSuccessfulShot,
     HiqMember
 } from "../../shared/schema.js";
-import { eq, desc, asc, and, or, sql, gt, inArray } from "drizzle-orm";
+import { eq, ne, desc, asc, and, or, sql, gt, inArray } from "drizzle-orm";
 import { notFound } from "../utils/errors.js";
 
 const HANDICAP_MAP_4C = [
@@ -63,17 +63,36 @@ export class GameRepository {
         const currentGame = await this.getHiqGameById(id);
         if (!currentGame) throw notFound("Game not found");
 
-        // Idempotency guard: a double-tap / retry must not insert duplicate history rows or
-        // double-apply rating points. If the game is already finished, return it as-is.
+        // Fast path: already finished.
         if (currentGame.status === "finished") return currentGame;
 
-        const isRanked = currentGame.gameMode === "match" && !!currentGame.player2Id;
+        // Ranked status is decided ONCE at start by the consent gate (startHiqGame), which
+        // accounts for consented members in ANY slot (2, 3 or 4). Recomputing it here from
+        // player2Id alone silently un-ranked legit 1v2 / 1v3 matches, so we keep the persisted
+        // decision instead of second-guessing it.
+        const isRanked = currentGame.gameMode === "match" && !!currentGame.isRanked;
 
+        // winnerId must be one of THIS game's players — never an arbitrary member id.
+        const playerIds = [currentGame.player1Id, currentGame.player2Id, currentGame.player3Id, currentGame.player4Id]
+            .filter((pid): pid is string => !!pid);
+        const submittedWinner = (finalData as any).winnerId;
+        const winnerId = submittedWinner && playerIds.includes(submittedWinner) ? submittedWinner : null;
+
+        // Atomic finish: the status guard lives INSIDE the UPDATE, so two concurrent finish
+        // requests can't both pass a read-then-write check and double-insert history / double-apply RP.
         const [game] = await db.update(hiqGames).set({
             ...finalData,
+            winnerId,
             status: "finished",
             isRanked
-        }).where(eq(hiqGames.id, id)).returning();
+        }).where(and(eq(hiqGames.id, id), ne(hiqGames.status, "finished"))).returning();
+
+        // Lost the race — another request finished it first. Return that result untouched.
+        if (!game) {
+            const existing = await this.getHiqGameById(id);
+            if (!existing) throw notFound("Game not found");
+            return existing;
+        }
 
         // Save history for Player 1
         const p1Average = (game.player1Score / (game.totalInnings || 1)).toFixed(2);
@@ -172,30 +191,25 @@ export class GameRepository {
         };
 
         if (game.isRanked) {
-            const [p1] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, game.player1Id));
-            if (p1) {
-                const delta = calculateRpDelta(game.winnerId === game.player1Id, p1[handiField] || 0);
+            // Apply RP to EVERY bound member slot, not just 1 and 2 — a consented member in
+            // slot 3 or 4 was getting a ranked history row while their rating never moved.
+            const rankedIds = [game.player1Id, game.player2Id, game.player3Id, game.player4Id]
+                .filter((pid): pid is string => !!pid);
+
+            for (const pid of rankedIds) {
+                const [p] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, pid));
+                if (!p) continue;
+                const delta = calculateRpDelta(game.winnerId === pid, p[handiField] || 0);
                 await db.update(hiqMembers)
                     .set({ [ratingField]: sql`GREATEST(0, ${hiqMembers[ratingField]} + ${delta})` })
-                    .where(eq(hiqMembers.id, game.player1Id));
-            }
-
-            if (game.player2Id) {
-                const [p2] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, game.player2Id));
-                if (p2) {
-                    const delta = calculateRpDelta(game.winnerId === game.player2Id, p2[handiField] || 0);
-                    await db.update(hiqMembers)
-                        .set({ [ratingField]: sql`GREATEST(0, ${hiqMembers[ratingField]} + ${delta})` })
-                        .where(eq(hiqMembers.id, game.player2Id));
-                }
+                    .where(eq(hiqMembers.id, pid));
             }
         }
 
-        // Update Cached Averages
-        await this._updateUserAverage(game.player1Id, game.gameType as "3c" | "4c");
-        if (game.player2Id) await this._updateUserAverage(game.player2Id, game.gameType as "3c" | "4c");
-        if (game.player3Id) await this._updateUserAverage(game.player3Id, game.gameType as "3c" | "4c");
-        if (game.player4Id) await this._updateUserAverage(game.player4Id, game.gameType as "3c" | "4c");
+        // Update Cached Averages (every bound member, so the lobby's target-score input stays fresh)
+        for (const pid of [game.player1Id, game.player2Id, game.player3Id, game.player4Id]) {
+            if (pid) await this._updateUserAverage(pid, game.gameType as "3c" | "4c");
+        }
 
         return game;
     }
@@ -495,8 +509,25 @@ export class GameRepository {
         return code;
     }
 
+    // Mark the accepted invites this host used to build a ranked game as consumed, so a single
+    // PIN can't authorize an unlimited stream of ranked games until it naturally expires.
+    async consumeInvites(hostId: string, guestIds: string[]): Promise<void> {
+        if (guestIds.length === 0) return;
+        await db.update(hiqInvites)
+            .set({ status: "expired" })
+            .where(and(
+                eq(hiqInvites.hostId, hostId),
+                eq(hiqInvites.status, "accepted"),
+                inArray(hiqInvites.guestId, guestIds)
+            ));
+    }
+
     async getInviteStatus(code: string): Promise<any> {
-        const invites = await db.select().from(hiqInvites).where(eq(hiqInvites.code, code));
+        // Only live invites: an expired code must not keep showing the opponent in the lobby
+        // (the host would then start a match that the consent gate silently un-ranks).
+        const invites = await db.select().from(hiqInvites).where(
+            and(eq(hiqInvites.code, code), gt(hiqInvites.expiresAt, new Date()))
+        );
         if (invites.length === 0) return null;
 
         const base = invites[0];
@@ -504,10 +535,21 @@ export class GameRepository {
 
         const guestIds = invites.map(inv => inv.guestId).filter(id => id !== null) as string[];
         if (guestIds.length > 0) {
-            // Only project non-sensitive fields the join UI needs — never leak phone,
-            // birthYear, gender, or default settlement bank account fields.
+            // Project the fields the match lobby actually needs (identity + the skill stats used
+            // to compute each opponent's target score / displayed average) and nothing more —
+            // never leak phone, birthYear, gender, or default settlement bank account fields.
             const guests = await db
-                .select({ id: hiqMembers.id, name: hiqMembers.name })
+                .select({
+                    id: hiqMembers.id,
+                    name: hiqMembers.name,
+                    average: hiqMembers.average,
+                    avg3c: hiqMembers.avg3c,
+                    avg4c: hiqMembers.avg4c,
+                    handi3c: hiqMembers.handi3c,
+                    handi4c: hiqMembers.handi4c,
+                    rating3c: hiqMembers.rating3c,
+                    rating4c: hiqMembers.rating4c,
+                })
                 .from(hiqMembers)
                 .where(inArray(hiqMembers.id, guestIds));
             result.guests = guests;
@@ -526,27 +568,38 @@ export class GameRepository {
 
         if (invites.length === 0) return false;
 
+        // The host cannot join their own PIN — otherwise they'd be bound into an opponent slot
+        // and collect RP twice from a single "match" against themselves.
+        if (invites[0].hostId === guestId) return false;
+
         const alreadyJoined = invites.some(inv => inv.guestId === guestId);
         if (alreadyJoined) return true;
 
+        const base = invites[0];
         const pendingInvite = invites.find(inv => inv.status === 'pending');
 
         if (pendingInvite) {
-            await db.update(hiqInvites)
+            // Claim the pending row ATOMICALLY. Previously this was a read-then-write, so two
+            // guests entering the same PIN concurrently both saw it as 'pending' and the second
+            // UPDATE overwrote the first — silently dropping one guest's consent.
+            const claimed = await db.update(hiqInvites)
                 .set({ guestId, status: 'accepted' })
-                .where(eq(hiqInvites.id, pendingInvite.id));
-        } else {
-            const base = invites[0];
-            await db.insert(hiqInvites).values({
-                code: base.code,
-                hostId: base.hostId,
-                storeId: base.storeId,
-                status: 'accepted',
-                guestId: guestId,
-                expiresAt: base.expiresAt,
-                sportCategory: base.sportCategory
-            });
+                .where(and(eq(hiqInvites.id, pendingInvite.id), eq(hiqInvites.status, 'pending')))
+                .returning();
+
+            if (claimed.length > 0) return true;
+            // Lost the race — fall through and add our own accepted row instead.
         }
+
+        await db.insert(hiqInvites).values({
+            code: base.code,
+            hostId: base.hostId,
+            storeId: base.storeId,
+            status: 'accepted',
+            guestId: guestId,
+            expiresAt: base.expiresAt,
+            sportCategory: base.sportCategory
+        });
 
         return true;
     }
@@ -560,8 +613,11 @@ export class GameRepository {
         const totalAvg = filtered.reduce((acc, h) => acc + parseFloat(h.average), 0) / filtered.length;
         const avgField = type === "3c" ? "avg3c" : "avg4c";
 
+        // Also refresh the generic `average` column. It was never written here, yet it is the
+        // field the match lobby and the ranking cards read — which is why every opponent was
+        // handicapped off a stale default and rankings showed "평균 0.000".
         await db.update(hiqMembers)
-            .set({ [avgField]: totalAvg, updatedAt: new Date() })
+            .set({ [avgField]: totalAvg, average: totalAvg.toFixed(3), updatedAt: new Date() })
             .where(eq(hiqMembers.id, memberId));
     }
 }

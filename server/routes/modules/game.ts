@@ -98,8 +98,31 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
     const p3Name = await resolveName(player3Id, req.body.player3Name);
     const p4Name = await resolveName(player4Id, req.body.player4Name);
 
+    // Whitelist the start body. `status`, `isRanked`, `storeId` and every player{N}Id are
+    // server-owned; spreading the raw body let a client declare its own isRanked/status and
+    // inject arbitrary hiq_games columns.
+    const START_EDITABLE = [
+        "gameMode", "gameType", "sportCategory",
+        "player1Target", "player2Target", "player3Target", "player4Target",
+        "ruleFinishType", "finishTargetCount", "usePbaRule", "targetScore",
+    ] as const;
+    const startData: any = {};
+    for (const key of START_EDITABLE) {
+        if (req.body?.[key] !== undefined) startData[key] = req.body[key];
+    }
+
+    // Sanity-bound the handicap targets so a malformed/hostile body can't produce a game that
+    // is instantly won (target 0 — see the client's `target > 0` win guard) or unwinnable.
+    for (const k of ["player1Target", "player2Target", "player3Target", "player4Target", "targetScore"]) {
+        if (startData[k] !== undefined) {
+            const n = Number(startData[k]);
+            startData[k] = Number.isFinite(n) ? Math.min(999, Math.max(0, Math.round(n))) : 0;
+        }
+    }
+
     const game = await storage.startHiqGame({
-        ...req.body,
+        ...startData,
+        status: "playing_base",
         storeId: member.storeId,
         player1Id,
         player2Id,
@@ -111,6 +134,15 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
         player4Name: p4Name,
         isRanked
     });
+
+    // Anti-farm: a ranked game CONSUMES the accepted invites it was built from. Otherwise one
+    // PIN authorized unlimited ranked games for its whole 30-minute lifetime, letting a host
+    // repeatedly start+finish matches and mint RP at will.
+    if (isRanked) {
+        const boundGuests = [player2Id, player3Id, player4Id].filter((x): x is string => !!x);
+        await storage.games.consumeInvites(player1Id, boundGuests);
+    }
+
     return sendSuccess(res, game);
 }));
 
@@ -149,23 +181,46 @@ router.patch("/game/:id/score", requireAuth, asyncHandler(async (req: AuthReques
     return sendSuccess(res, { success: true });
 }));
 
+// Columns a participant may submit when finishing a game. Everything else — most importantly
+// player{N}Id, isRanked, gameMode, status, targets — is server-owned. Spreading the raw body
+// here previously let a participant rewrite player2Id/winnerId at finish time and bypass the
+// start-time consent gate entirely.
+const FINISH_EDITABLE = [
+    "player1Score", "player2Score", "player3Score", "player4Score",
+    "player1HighRun", "player2HighRun", "player3HighRun", "player4HighRun",
+    "player1Innings", "player2Innings", "player3Innings", "player4Innings",
+    "totalInnings", "winnerId",
+] as const;
+
 // POST /game/:id/finish
 router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!(await assertParticipant(req.params.id, req.userId!, res))) return;
-    const game = await storage.finishHiqGame(req.params.id, req.body);
 
-    let handicapUpdate1: any = null;
-    let handicapUpdate2: any = null;
-
-    if (game.gameType === "golf") {
-        handicapUpdate1 = await storage.updateGolfStats(game.player1Id);
-        if (game.player2Id) handicapUpdate2 = await storage.updateGolfStats(game.player2Id);
-    } else {
-        handicapUpdate1 = await storage.checkAndUpdateHandicap(game.player1Id, game.gameType as any);
-        if (game.player2Id) handicapUpdate2 = await storage.checkAndUpdateHandicap(game.player2Id, game.gameType as any);
+    const finalData: any = {};
+    for (const key of FINISH_EDITABLE) {
+        if (req.body?.[key] !== undefined) finalData[key] = req.body[key];
     }
 
-    return sendSuccess(res, { game, handicapUpdate1, handicapUpdate2 });
+    const game = await storage.finishHiqGame(req.params.id, finalData);
+
+    // Recheck handicaps for EVERY bound member slot — slots 3 and 4 were previously skipped,
+    // so members in those slots never had their handicap updated after a match.
+    const boundIds = [game.player1Id, game.player2Id, game.player3Id, game.player4Id]
+        .filter((pid): pid is string => !!pid);
+
+    const handicapUpdates = await Promise.all(boundIds.map(pid =>
+        game.gameType === "golf"
+            ? storage.updateGolfStats(pid)
+            : storage.checkAndUpdateHandicap(pid, game.gameType as any)
+    ));
+
+    // Keep the existing response shape (the client reads handicapUpdate1 / handicapUpdate2).
+    return sendSuccess(res, {
+        game,
+        handicapUpdate1: handicapUpdates[0] ?? null,
+        handicapUpdate2: handicapUpdates[1] ?? null,
+        handicapUpdates,
+    });
 }));
 
 // POST /game/:id/claim
