@@ -1,0 +1,18 @@
+{
+  "slides": [
+    { "file": "01.png", "key": "rating" },
+    { "file": "02.png", "key": "record" },
+    { "file": "03.png", "key": "ranking" },
+    { "file": "04.png", "key": "rival" },
+    { "file": "05.png", "key": "solution" }
+  ],
+  "captions": {
+    "ko": {
+      "rating": "3쿠션·4구 RP 레이팅,\n내 당구 실력 증명",
+      "record": "경기 끝나면 자동 정리,\n전적·애버리지 기록",
+      "ranking": "매장 랭킹 실시간 경쟁,\n실력 맞는 상대와 매칭",
+      "rival": "라이벌 등록,\n상대 전적 한눈에",
+      "solution": "AI 솔루션으로\n최적 공략 검색"
+    }
+  }
+}
