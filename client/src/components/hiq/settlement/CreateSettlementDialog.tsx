@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { LucideUser, LucideX, LucideChevronDown, LucideCalendar, LucideUsers, LucideSettings2 } from "lucide-react";
+import { LucideUser, LucideX, LucideChevronDown, LucideCalendar, LucideUsers, LucideSettings2 } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { MemberSelectionDialog } from "./MemberSelectionDialog";
 import { useQuery } from "@tanstack/react-query";

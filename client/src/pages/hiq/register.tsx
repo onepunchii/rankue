@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { insertHiqMemberSchema, type InsertHiqMember } from "../../../../shared/schema";
-import { LucideChevronRight, LucideCheckCircle2, LucideSparkles } from "lucide-react";
+import { LucideChevronRight, LucideCheckCircle2, LucideSparkles } from "@/lib/icons";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 

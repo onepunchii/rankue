@@ -21,7 +21,7 @@ import {
     LucideChevronDown,
     LucideTrash2,
     LucideSparkles
-} from "lucide-react";
+} from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { CreatePollDialog } from "@/components/hiq/CreatePollDialog";

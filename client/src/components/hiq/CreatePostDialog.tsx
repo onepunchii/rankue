@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { LucideImage, LucideX, LucideCamera } from "lucide-react";
+import { LucideImage, LucideX, LucideCamera } from "@/lib/icons";
 import { uploadImage } from "@/lib/imageUtils";
 import { useRef } from "react";
 

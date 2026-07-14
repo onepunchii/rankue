@@ -34,7 +34,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import { LucideCalendar, LucideMapPin, LucideCoins, LucideUsers, LucideClock } from "lucide-react";
+import { LucideCalendar, LucideMapPin, LucideCoins, LucideUsers, LucideClock } from "@/lib/icons";
 
 interface CreateActivityDialogProps {
     open: boolean;

@@ -3,7 +3,7 @@ import { useSearch, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LucideTrophy, LucideTrendingUp, LucideArrowRight, LucideX, LucideMedal, LucideCheckCircle2, LucideRefreshCw, LucideLayoutGrid } from "lucide-react";
+import { LucideTrophy, LucideTrendingUp, LucideArrowRight, LucideX, LucideMedal, LucideCheckCircle2, LucideRefreshCw, LucideLayoutGrid } from "@/lib/icons";
 import confetti from "canvas-confetti";
 import { useQuery } from "@tanstack/react-query";
 import { HiqMember } from "@shared/schema";

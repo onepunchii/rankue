@@ -19,7 +19,7 @@ import {
     LucideLayoutDashboard,
     LucideDownload,
     LucideCheckCircle2
-} from "lucide-react";
+} from "@/lib/icons";
 
 export default function HiqAdmin() {
     const { toast } = useToast();

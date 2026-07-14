@@ -2,7 +2,7 @@ import { useState, memo, useMemo } from "react";
 import {
     LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus,
     LucideChevronDown, LucideUsers, LucideFlag, LucideTarget, LucideLogOut
-} from "lucide-react";
+} from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

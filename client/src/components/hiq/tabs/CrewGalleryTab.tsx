@@ -4,7 +4,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { uploadImage } from "@/lib/imageUtils";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LucideImage, LucideLoader2 } from "lucide-react";
+import { LucideImage, LucideLoader2 } from "@/lib/icons";
 import { PhotoDetailDialog } from "@/components/hiq/PhotoDetailDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";

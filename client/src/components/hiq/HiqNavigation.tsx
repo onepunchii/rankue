@@ -7,7 +7,7 @@ import {
     LucideMenu,
     LucideUsers,
     LucideFlag
-} from "lucide-react";
+} from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
 import { useNativeBridge } from "@/hooks/useNativeBridge";

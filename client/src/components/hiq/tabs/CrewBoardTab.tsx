@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { format } from "date-fns";
-import { LucidePin, LucideLayoutList, LucideReceipt, LucidePlus } from "lucide-react";
+import { LucidePin, LucideLayoutList, LucideReceipt, LucidePlus } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { SocialPostCard } from "@/components/hiq/SocialPostCard";
 

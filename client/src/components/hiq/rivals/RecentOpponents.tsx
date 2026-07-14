@@ -1,6 +1,6 @@
 
 import { motion, AnimatePresence } from "framer-motion";
-import { LucideZap, LucideUserPlus } from "lucide-react";
+import { LucideZap, LucideUserPlus } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { RecentOpponent, SportConfig } from "./types";
 import { getTier } from "@/lib/hiqUtils";

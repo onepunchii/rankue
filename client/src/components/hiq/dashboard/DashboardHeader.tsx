@@ -1,4 +1,4 @@
-import { ChevronsUp, HelpCircle, Bell, MessageSquare } from "lucide-react";
+import { ChevronsUp, HelpCircle, Bell, MessageSquare } from "@/lib/icons";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { BallCluster } from "../ui/BilliardBall";

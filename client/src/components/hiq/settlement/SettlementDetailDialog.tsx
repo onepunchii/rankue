@@ -3,7 +3,7 @@ import { HiqSettlement, HiqSettlementItem } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { LucideChevronRight, LucideCopy, LucidePiggyBank, LucideShare2, LucideCheckCircle2, LucideUsers } from "lucide-react";
+import { LucideChevronRight, LucideCopy, LucidePiggyBank, LucideShare2, LucideCheckCircle2, LucideUsers } from "@/lib/icons";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";

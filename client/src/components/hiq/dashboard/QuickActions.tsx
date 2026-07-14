@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ChevronDown, Target, Swords, LogIn, Cpu } from "lucide-react";
+import { ChevronDown, Target, Swords, LogIn, Cpu } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useState } from "react";

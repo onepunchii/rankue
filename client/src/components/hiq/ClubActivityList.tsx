@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { LucidePlus, LucideTent, LucideChevronRight } from "lucide-react";
+import { LucidePlus, LucideTent, LucideChevronRight } from "@/lib/icons";
 
 interface ClubActivityListProps {
     crewId: string;

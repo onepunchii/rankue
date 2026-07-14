@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
-import { LucideHeart, LucideMessageSquare, LucideCrown, LucideShield, LucideTrash2 } from "lucide-react";
+import { LucideHeart, LucideMessageSquare, LucideCrown, LucideShield, LucideTrash2 } from "@/lib/icons";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";

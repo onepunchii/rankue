@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LucideMessageSquare, LucideSend, LucideLoader2, LucideTrash2, LucideReceipt, LucideFlag } from "lucide-react";
+import { LucideMessageSquare, LucideSend, LucideLoader2, LucideTrash2, LucideReceipt, LucideFlag } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 

@@ -16,7 +16,7 @@ import {
 import {
     LucideArrowLeft, LucideCalendar, LucideTrophy, LucideUsers,
     LucideDollarSign, LucideCheckCircle, LucideSparkles, LucideClock
-} from "lucide-react";
+} from "@/lib/icons";
 import {
     Popover,
     PopoverContent,

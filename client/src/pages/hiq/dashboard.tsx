@@ -16,7 +16,7 @@ import { PinCodeModal } from "@/components/hiq/dashboard/PinCodeModal";
 import { ScoreCorrectionModal } from "@/components/hiq/dashboard/ScoreCorrectionModal";
 import { RPGuideModal } from "@/components/hiq/dashboard/RPGuideModal";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
-import { LucideRefreshCw, LucideZap, ChevronUp, ChevronDown } from "lucide-react";
+import { LucideRefreshCw, LucideZap, ChevronUp, ChevronDown } from "@/lib/icons";
 
 export default function HiqDashboard() {
     const { currentSport } = useSport();

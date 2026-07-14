@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { LucideMedal, LucideStore, LucideGlobe, LucideTarget, LucideBarChart3, LucideTrophy } from "lucide-react";
+import { LucideMedal, LucideStore, LucideGlobe, LucideTarget, LucideBarChart3, LucideTrophy } from "@/lib/icons";
 import { HiqMember } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { useSport } from "@/contexts/SportContext";

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { LucideX, LucideBell, LucideCheck, LucideTrash2, LucideChevronRight } from "lucide-react";
+import { LucideX, LucideBell, LucideCheck, LucideTrash2, LucideChevronRight } from "@/lib/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";

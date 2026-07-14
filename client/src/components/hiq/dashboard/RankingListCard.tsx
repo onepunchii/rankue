@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { HiqMember } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { LucideTrophy, LucideTrendingUp, LucideInfo } from "lucide-react";
+import { LucideTrophy, LucideTrendingUp, LucideInfo } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface RankingListCardProps {

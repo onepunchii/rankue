@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Flag, Zap, Plane, Monitor, MonitorPlay, Beer } from "lucide-react";
+import { Flag, Zap, Plane, Monitor, MonitorPlay, Beer } from "@/lib/icons";
 
 
 

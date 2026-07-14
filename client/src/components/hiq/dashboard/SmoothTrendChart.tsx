@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { LucideTrendingUp, LucideTrendingDown } from "lucide-react";
+import { LucideTrendingUp, LucideTrendingDown } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 

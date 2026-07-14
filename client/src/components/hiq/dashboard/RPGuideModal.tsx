@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { LucideTrophy, LucideTrendingUp, LucideInfo } from "lucide-react";
+import { LucideTrophy, LucideTrendingUp, LucideInfo } from "@/lib/icons";
 
 interface RPGuideModalProps {
     open: boolean;

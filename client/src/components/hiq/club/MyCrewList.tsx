@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { MyCrewCard } from "./MyCrewCard";
 import { Button } from "@/components/ui/button";
-import { LucideTent, LucidePlus } from "lucide-react";
+import { LucideTent, LucidePlus } from "@/lib/icons";
 
 interface MyCrewListProps {
     currentSport: string;

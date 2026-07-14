@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon } from "@/lib/icons";
 
 interface ActionMiniButtonProps {
     icon: LucideIcon;

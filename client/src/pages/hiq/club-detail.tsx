@@ -13,7 +13,7 @@ import {
     LucideFileText,
     LucideImage,
     LucideMessageCircle
-} from "lucide-react";
+} from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { HiqMember, HiqCrew, HiqStore } from "@shared/schema";

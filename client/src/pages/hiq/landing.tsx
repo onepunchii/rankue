@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LucideChevronRight, LucideDelete, LucideShieldQuestion } from "lucide-react";
+import { LucideChevronRight, LucideDelete, LucideShieldQuestion } from "@/lib/icons";
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@/contexts/StoreContext";
 import { PinResetDialog } from "@/components/hiq/PinResetDialog";

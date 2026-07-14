@@ -22,7 +22,7 @@ import {
     LucideTrophy,
     LucideMonitor,
     LucideBeer
-} from "lucide-react";
+} from "@/lib/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { getTier } from "@/lib/hiqUtils";

@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { LucideSend, LucideTrash2 } from "lucide-react";
+import { LucideSend, LucideTrash2 } from "@/lib/icons";
 
 interface Comment {
     id: string;

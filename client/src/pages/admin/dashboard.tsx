@@ -11,7 +11,7 @@ import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideArrowRight, LucideCheckCircle, LucideLogOut,
     LucideSearch, LucideTrendingUp, LucideBell, LucideCreditCard, LucideSettings, LucideShieldAlert, LucideMenu, LucideX, LucideUsersRound, LucideMail, LucideFlag
-} from "lucide-react";
+} from "@/lib/icons";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";

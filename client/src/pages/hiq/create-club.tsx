@@ -34,7 +34,7 @@ import {
     LucideImagePlus,
     LucideLoader2,
     ChevronsUpDown
-} from "lucide-react";
+} from "@/lib/icons";
 import { InsertHiqCrew, HiqMember } from "@shared/schema";
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";

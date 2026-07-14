@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { LucideInfo, LucideTrendingUp, LucideTrendingDown } from "lucide-react";
+import { LucideInfo, LucideTrendingUp, LucideTrendingDown } from "@/lib/icons";
 import { ChartDataPoint, SmoothTrendChart } from "./SmoothTrendChart";
 import { HiqGameHistory } from "@shared/schema";
 import { cn } from "@/lib/utils";

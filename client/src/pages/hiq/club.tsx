@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
-import { LucideSearch, LucidePlus } from "lucide-react";
+import { LucideSearch, LucidePlus } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 
 // Sub-components

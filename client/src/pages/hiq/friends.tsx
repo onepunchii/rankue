@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useState, useMemo, useCallback } from "react";
-import { LucideChevronLeft, LucideSearch } from "lucide-react";
+import { LucideChevronLeft, LucideSearch } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { HiqMember, HiqGame } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";

@@ -4,7 +4,7 @@ import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { LucideCheckCircle2, LucideXCircle, LucideLoader2 } from "lucide-react";
+import { LucideCheckCircle2, LucideXCircle, LucideLoader2 } from "@/lib/icons";
 import { HiqMember } from "@shared/schema";
 import { useStore } from "@/contexts/StoreContext";
 import { useToast } from "@/hooks/use-toast";

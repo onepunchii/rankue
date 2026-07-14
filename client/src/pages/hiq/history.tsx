@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { LucideChevronLeft, LucideTarget, LucideBarChart3, LucideLayers } from "lucide-react";
+import { LucideChevronLeft, LucideTarget, LucideBarChart3, LucideLayers } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { cn } from "@/lib/utils";

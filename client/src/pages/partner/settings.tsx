@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
     Form, FormControl, FormField, FormItem, FormLabel, FormMessage
 } from "@/components/ui/form";
-import { LucideArrowLeft, LucideSave, LucideStore } from "lucide-react";
+import { LucideArrowLeft, LucideSave, LucideStore } from "@/lib/icons";
 import { HiqStore } from "../../../../shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useEffect } from "react";

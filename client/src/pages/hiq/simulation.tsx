@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, LucideRefreshCw, LucidePlay, Target } from "lucide-react";
+import { ChevronDown, LucideRefreshCw, LucidePlay, Target } from "@/lib/icons";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";

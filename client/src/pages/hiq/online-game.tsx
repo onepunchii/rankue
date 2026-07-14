@@ -13,7 +13,7 @@ import {
     ChevronDown,
     Flame,
     X
-} from "lucide-react";
+} from "@/lib/icons";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { PhysicsEngine2D } from "@/lib/physics-engine-2d";

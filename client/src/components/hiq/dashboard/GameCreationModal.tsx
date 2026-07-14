@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, LucideUsers, LucideZap } from "lucide-react";
+import { ChevronDown, ChevronUp, LucideUsers, LucideZap } from "@/lib/icons";
 import { HiqMember, HiqGameHistory } from "@shared/schema";
 import { useGameCreation, PlayerType } from "@/hooks/useGameCreation";
 import { useQuery } from "@tanstack/react-query";

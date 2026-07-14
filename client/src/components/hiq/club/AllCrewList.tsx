@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { CrewDiscoveryCard } from "./CrewDiscoveryCard";
 import { useDebounce } from "@/hooks/use-debounce";
-import { LucideSearch, LucideUsers } from "lucide-react";
+import { LucideSearch, LucideUsers } from "@/lib/icons";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 
 interface AllCrewListProps {

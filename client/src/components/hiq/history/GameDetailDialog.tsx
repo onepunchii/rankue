@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { LucideSwords, LucideZap, LucideCalendar, LucideUsers } from "lucide-react";
+import { LucideSwords, LucideZap, LucideCalendar, LucideUsers } from "@/lib/icons";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";

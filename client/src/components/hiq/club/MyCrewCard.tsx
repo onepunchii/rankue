@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { LucideCrown, LucideUsers, LucideChevronRight } from "lucide-react";
+import { LucideCrown, LucideUsers, LucideChevronRight } from "@/lib/icons";
 import { HiqCrew } from "@shared/schema";
 import { cn } from "@/lib/utils";
 

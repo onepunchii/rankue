@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { HiqCrew } from "@shared/schema";
-import { LucideMapPin, LucideUsers, LucideFlag, LucideTarget } from "lucide-react";
+import { LucideMapPin, LucideUsers, LucideFlag, LucideTarget } from "@/lib/icons";
 
 interface CrewDiscoveryCardProps {
     crew: HiqCrew & { memberCount?: number, distance?: number };

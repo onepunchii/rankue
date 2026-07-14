@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { LucideInfo, LucideBriefcase, LucideTrophy, LucideTrendingUp, LucideInfo as LucideInfoSmall } from "lucide-react";
+import { LucideInfo, LucideBriefcase, LucideTrophy, LucideTrendingUp, LucideInfo as LucideInfoSmall } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 export type InfoModalType = "announcement" | "guide" | "ranking";

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { LucideHeart, LucideMessageSquare, LucideUser, LucideSend } from "lucide-react";
+import { LucideHeart, LucideMessageSquare, LucideUser, LucideSend } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 interface Comment {

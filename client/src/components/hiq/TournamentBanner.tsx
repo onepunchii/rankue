@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { LucideTrophy, ChevronRight, LucideCalendar, LucideUsers, LucideCoins, MapPin, Search, LucideFlag } from "lucide-react";
+import { LucideTrophy, ChevronRight, LucideCalendar, LucideUsers, LucideCoins, MapPin, Search, LucideFlag } from "@/lib/icons";
 import { HiqTournament } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

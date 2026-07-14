@@ -40,7 +40,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { LucideCalendar, LucideMapPin, LucideCoins, LucideUsers, LucideClock, LucideCar } from "lucide-react";
+import { LucideCalendar, LucideMapPin, LucideCoins, LucideUsers, LucideClock, LucideCar } from "@/lib/icons";
 import { CategorySelector, ActivityCategory } from "./CategorySelector";
 import { LocationSearch } from "./LocationSearch";
 

@@ -20,7 +20,7 @@ import {
     LucideCrown,
     LucideCircle,
     LucideFlag
-} from "lucide-react";
+} from "@/lib/icons";
 import { SuggestionModal } from "@/components/hiq/SuggestionModal";
 import { HiqMember } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";

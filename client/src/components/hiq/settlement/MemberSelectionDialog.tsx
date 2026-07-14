@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { LucideSearch, LucideCheck, LucideUsers } from "lucide-react";
+import { LucideSearch, LucideCheck, LucideUsers } from "@/lib/icons";
 import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 

@@ -2,7 +2,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { HiqMember } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
-import { X, Check, Calculator } from "lucide-react";
+import { X, Check, Calculator } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 
 interface ScoreCorrectionModalProps {

@@ -7,7 +7,7 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
-import { LucideCheckCircle2, LucideAlertCircle, LucideInfo } from "lucide-react"
+import { LucideCheckCircle2, LucideAlertCircle, LucideInfo } from "@/lib/icons"
 
 export function Toaster() {
   const { toasts } = useToast()

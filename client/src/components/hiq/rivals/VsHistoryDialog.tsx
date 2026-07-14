@@ -1,6 +1,6 @@
 
 import { motion } from "framer-motion";
-import { LucideFlag, LucideSword, LucideCalendar } from "lucide-react";
+import { LucideFlag, LucideSword, LucideCalendar } from "@/lib/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";

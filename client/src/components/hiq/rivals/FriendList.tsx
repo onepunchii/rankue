@@ -1,6 +1,6 @@
 
 import { motion, AnimatePresence } from "framer-motion";
-import { LucideUsers, LucideTarget } from "lucide-react";
+import { LucideUsers, LucideTarget } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { HiqMemberWithH2H, SportConfig } from "./types";
 import { getTier } from "@/lib/hiqUtils";

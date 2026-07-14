@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LucideUndo2, LucideRedo2 } from "lucide-react";
+import { LucideUndo2, LucideRedo2 } from "@/lib/icons";
 
 interface Props {
     innings: number;

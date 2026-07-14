@@ -2,7 +2,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Delete, Star } from "lucide-react";
+import { ChevronLeft, Delete, Star } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface PinCodeModalProps {

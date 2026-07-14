@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LucideShieldCheck, LucideCreditCard, LucideCheckCircle2, LucideLock, LucideArrowLeft } from "lucide-react";
+import { LucideShieldCheck, LucideCreditCard, LucideCheckCircle2, LucideLock, LucideArrowLeft } from "@/lib/icons";
 import * as PortOne from "@portone/browser-sdk/v2";
 
 export default function PartnerSubscription() {

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { LucideCalendar, LucideHistory } from "lucide-react";
+import { LucideCalendar, LucideHistory } from "@/lib/icons";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { SportConfig, ExtendedGameHistory } from "./types";

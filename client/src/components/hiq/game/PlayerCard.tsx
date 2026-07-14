@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { HiqMember } from "@shared/schema";
-import { ArrowRight, Flame } from "lucide-react";
+import { ArrowRight, Flame } from "@/lib/icons";
 
 interface Props {
     player?: HiqMember | { name: string };

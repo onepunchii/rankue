@@ -12,7 +12,7 @@ import {
     LucidePlus, LucideChevronRight, LucideZap, LucideCrown,
     LucideRefreshCw, LucideX, LucideMessageCircle, LucideShare2,
     LucideMinus, LucidePencil, LucideTrash2, LucideTent
-} from "lucide-react";
+} from "@/lib/icons";
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,

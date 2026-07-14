@@ -14,7 +14,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { LucideCheck, LucideMapPin, LucideChevronsUpDown } from "lucide-react";
+import { LucideCheck, LucideMapPin, LucideChevronsUpDown } from "@/lib/icons";
 
 import { COURSES } from "@/golf/data/golfCourses";
 

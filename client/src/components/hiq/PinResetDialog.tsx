@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LucideShieldQuestion, LucideKeyRound, LucideCheckCircle2, LucideLoader2 } from "lucide-react";
+import { LucideShieldQuestion, LucideKeyRound, LucideCheckCircle2, LucideLoader2 } from "@/lib/icons";
 
 interface PinResetDialogProps {
     open: boolean;

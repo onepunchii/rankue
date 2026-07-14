@@ -9,13 +9,13 @@ import {
     LucideStore, LucideLogOut, LucideUserPlus, LucideUsers,
     LucideDownload, LucideMessageSquare, LucideTrophy,
     LucideSearch, LucidePhone, LucideTrendingUp, LucideEdit, LucideCopy, LucideCheck
-} from "lucide-react";
+} from "@/lib/icons";
 import { HiqStore } from "../../../../shared/schema";
 import { useRef, useState, useMemo } from "react";
 import * as XLSX from 'xlsx';
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import html2canvas from "html2canvas";
-import { LucideLock as LockIcon } from "lucide-react";
+import { LucideLock as LockIcon } from "@/lib/icons";
 
 type MemberWithStats = {
     id: string;

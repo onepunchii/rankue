@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LucideSmartphone } from "lucide-react";
+import { LucideSmartphone } from "@/lib/icons";
 
 export function LandscapeGuard({ children }: { children: React.ReactNode }) {
     const [isPortrait, setIsPortrait] = useState(false);
