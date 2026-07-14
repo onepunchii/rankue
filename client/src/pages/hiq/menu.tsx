@@ -146,7 +146,7 @@ export default function HiqMenu() {
 
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between mb-8 pt-5">
-                <h1 className="text-[26px] font-bold tracking-tight text-brand">전체 메뉴</h1>
+                <h1 className="text-[26px] font-bold tracking-tight text-ink-1">전체 메뉴</h1>
                 <div className="flex gap-2.5">
                     <button
                         title="알림"

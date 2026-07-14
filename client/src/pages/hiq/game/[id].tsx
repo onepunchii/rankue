@@ -70,7 +70,7 @@ export default function HiqScoreboard() {
 
     return (
         <LandscapeGuard>
-            <div className="h-[100dvh] bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
+            <div className="h-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
                 <div className="flex-1 flex w-full relative z-0">
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                         <SortableContext items={playerOrder} strategy={horizontalListSortingStrategy}>

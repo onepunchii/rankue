@@ -64,7 +64,7 @@ export default function HiqHistory() {
                     <LucideChevronLeft className="w-5 h-5" />
                 </motion.button>
                 <div>
-                    <h1 className="text-[26px] font-bold tracking-tight text-brand leading-none">
+                    <h1 className="text-[26px] font-bold tracking-tight text-ink-1 leading-none">
                         {config.title}
                     </h1>
                     <p className="text-[13px] font-medium text-black/55 mt-1.5">

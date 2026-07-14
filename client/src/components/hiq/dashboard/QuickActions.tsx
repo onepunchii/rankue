@@ -41,8 +41,8 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
         },
         {
             icon: Cpu,
-            title: "온라인 대전",
-            desc: "시뮬레이터 당구대에서 원격으로 겨루는 대결이에요. 3구·4구, 중대·대대를 골라 시작해요.",
+            title: "시뮬레이터",
+            desc: "화면 위 가상 당구대에서 혼자 치는 연습이에요. 3구·4구, 중대·대대를 골라 시작해요.",
             highlight: false,
         },
     ];
@@ -109,7 +109,7 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
 
-                {/* 온라인 대전 (1x1) */}
+                {/* 시뮬레이터 (1x1) */}
                 <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={handleOnlineGameClick}
@@ -119,8 +119,8 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                         <Cpu className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">온라인 대전</span>
-                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">시뮬레이터 대결</span>
+                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">시뮬레이터</span>
+                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">화면으로 즐기는 당구</span>
                     </div>
                 </motion.button>
             </div>
@@ -139,7 +139,7 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                             <div className="flex flex-col items-center text-center">
                                 <DialogTitle className="text-[24px] font-bold tracking-tight text-ink-1 mb-1.5">게임 모드 선택</DialogTitle>
                                 <DialogDescription className="text-[13px] font-medium text-black/55">
-                                    온라인으로 상대와 겨뤄보세요
+                                    화면 위 당구대에서 플레이해요
                                 </DialogDescription>
                             </div>
                         </DialogHeader>
