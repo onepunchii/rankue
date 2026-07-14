@@ -16,15 +16,15 @@ export default function Privacy() {
         <ul className="mt-2 list-disc pl-5 text-sm text-gray-700 space-y-1">
           <li>휴대폰 번호 — 계정 식별 및 로그인</li>
           <li>이름/닉네임 — 프로필 표시</li>
-          <li>골프 라운드 기록(스코어, 이용 구장) — 기록·랭킹·파스포트 기능 제공</li>
-          <li>스코어카드 사진(선택) — 사용자가 기록 동기화를 위해 직접 업로드하는 경우에만</li>
+          <li>당구 경기 기록(점수, 이용 매장) — 경기 기록·RP 레이팅·랭킹 기능 제공</li>
+          <li>사진(선택) — 사용자가 프로필 등에 직접 업로드하는 경우에만</li>
           <li>푸시 토큰(FCM) — 알림 수신에 동의한 경우에만</li>
         </ul>
 
         <h2 className="mt-8 text-lg font-bold">2. 이용 목적</h2>
         <ul className="mt-2 list-disc pl-5 text-sm text-gray-700 space-y-1">
           <li>계정 생성·관리 및 본인 식별</li>
-          <li>스코어 기록, 전국 구장 파스포트, 랭킹 등 핵심 기능 제공</li>
+          <li>경기 기록, RP 레이팅, 랭킹, 크루 매칭 등 핵심 기능 제공</li>
           <li>서비스 관련 푸시 알림 발송(동의 시)</li>
         </ul>
 

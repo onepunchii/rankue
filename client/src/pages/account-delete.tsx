@@ -29,8 +29,8 @@ export default function AccountDelete() {
         <h2 className="mt-8 text-lg font-bold">삭제되는 데이터</h2>
         <ul className="mt-2 list-disc pl-5 text-sm text-gray-700 space-y-1">
           <li>계정 정보(휴대폰 번호, 이름/닉네임) — 즉시 삭제</li>
-          <li>골프 라운드 기록·파스포트·랭킹 데이터 — 즉시 삭제</li>
-          <li>업로드한 스코어카드 사진 — 즉시 삭제</li>
+          <li>당구 경기 기록·RP 레이팅·랭킹 데이터 — 즉시 삭제</li>
+          <li>업로드한 사진 — 즉시 삭제</li>
           <li>푸시 토큰 — 즉시 삭제</li>
         </ul>
 
