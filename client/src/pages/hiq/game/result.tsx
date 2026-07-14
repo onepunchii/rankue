@@ -57,7 +57,7 @@ export default function HiqGameResult() {
                             particleCount: 150,
                             spread: 70,
                             origin: { y: 0.6 },
-                            colors: ['#0e4d2a', '#ffd700', '#ffffff']
+                            colors: ['#006241', '#cba258', '#ffffff']
                         });
                     }, 500);
                 }
@@ -66,12 +66,12 @@ export default function HiqGameResult() {
     }, [gameId]);
 
     if (!result) return (
-        <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center p-6">
             <Card className="rk-card w-full max-w-sm">
                 <CardContent className="p-8 flex flex-col items-center text-center gap-2">
-                    <LucideX className="w-8 h-8 text-white/38 mb-2" strokeWidth={2} />
-                    <p className="text-[15px] font-medium text-white/55">결과를 불러올 수 없습니다.</p>
-                    <p className="text-[12px] font-medium text-white/38 mb-4">경기 기록이 만료되었거나 존재하지 않습니다.</p>
+                    <LucideX className="w-8 h-8 text-black/40 mb-2" strokeWidth={2} />
+                    <p className="text-[15px] font-medium text-black/55">결과를 불러올 수 없습니다.</p>
+                    <p className="text-[12px] font-medium text-black/40 mb-4">경기 기록이 만료되었거나 존재하지 않습니다.</p>
                     <Button
                         onClick={() => setLocation("/dashboard")}
                         className="rk-btn-secondary w-full h-12"
@@ -127,37 +127,37 @@ export default function HiqGameResult() {
             <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className={`text-[12px] font-semibold ${win ? 'text-brand' : 'text-white/55'}`}>
+                        <p className={`text-[12px] font-semibold ${win ? 'text-brand' : 'text-black/55'}`}>
                             {win ? '우승' : '점수'}
                         </p>
-                        <h3 className="text-[17px] font-semibold text-white truncate max-w-[120px]">{name || `선수 ${pNo}`}</h3>
+                        <h3 className="text-[17px] font-semibold text-[rgba(0,0,0,0.87)] truncate max-w-[120px]">{name || `선수 ${pNo}`}</h3>
                     </div>
                     {win && <LucideMedal className="w-8 h-8 text-brand" strokeWidth={2.5} />}
                 </div>
 
                 <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-[44px] leading-none font-bold tabular-nums tracking-tight text-white">{score}</span>
-                    <span className="text-white/45 font-medium text-xl tabular-nums">/ {target}</span>
+                    <span className="text-[44px] leading-none font-bold tabular-nums tracking-tight text-[rgba(0,0,0,0.87)]">{score}</span>
+                    <span className="text-black/40 font-medium text-xl tabular-nums">/ {target}</span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/5">
+                <div className="grid grid-cols-3 gap-2 pt-4 border-t border-black/10">
                     <div>
-                        <p className="text-[12px] font-medium text-white/55 mb-0.5">평균</p>
-                        <p className={`text-lg font-bold tabular-nums ${win ? 'text-brand' : 'text-white'}`}>{avg}</p>
+                        <p className="text-[12px] font-medium text-black/55 mb-0.5">평균</p>
+                        <p className={`text-lg font-bold tabular-nums ${win ? 'text-brand' : 'text-[rgba(0,0,0,0.87)]'}`}>{avg}</p>
                     </div>
-                    <div className="text-center border-x border-white/5">
-                        <p className="text-[12px] font-medium text-white/55 mb-0.5">하이런</p>
-                        <p className={`text-lg font-bold tabular-nums ${win ? 'text-brand' : 'text-white'}`}>{highRun}</p>
+                    <div className="text-center border-x border-black/10">
+                        <p className="text-[12px] font-medium text-black/55 mb-0.5">하이런</p>
+                        <p className={`text-lg font-bold tabular-nums ${win ? 'text-brand' : 'text-[rgba(0,0,0,0.87)]'}`}>{highRun}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[12px] font-medium text-white/55 mb-1.5">상태</p>
+                        <p className="text-[12px] font-medium text-black/55 mb-1.5">상태</p>
                         <div className="flex justify-end">
                             <FormBadges results={[win ? "W" : "L"] as MatchResult[]} size={26} />
                         </div>
                     </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="mt-4 pt-4 border-t border-black/10">
                     <Button
                         variant="ghost"
                         onClick={() => {
@@ -172,7 +172,7 @@ export default function HiqGameResult() {
                 </div>
 
                 {memberId && pNo > 1 && (
-                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-brand justify-center">
+                    <div className="mt-4 pt-4 border-t border-black/10 flex items-center gap-2 text-brand justify-center">
                         <LucideCheckCircle2 className="w-4 h-4" />
                         <span className="text-[12px] font-semibold">인증 회원</span>
                     </div>
@@ -199,14 +199,14 @@ export default function HiqGameResult() {
     );
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white p-6 flex flex-col items-center justify-center font-sans">
+        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] p-6 flex flex-col items-center justify-center font-sans">
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center mb-10"
             >
                 <h1 className="text-[26px] font-bold tracking-tight mb-1 text-brand">게임 종료</h1>
-                <p className="text-white/55 font-medium text-[12px] bg-white/5 px-3 py-1 rounded-full inline-block">
+                <p className="text-black/55 font-medium text-[12px] bg-black/[0.04] px-3 py-1 rounded-full inline-block">
                     {isPractice ? "연습 세션" : "경기 결과"} • {game.totalInnings}이닝
                 </p>
             </motion.div>
@@ -279,30 +279,30 @@ export default function HiqGameResult() {
             </div>
 
             <Dialog open={isInningModalOpen} onOpenChange={setIsInningModalOpen}>
-                <DialogContent className="bg-[#141416] border-white/10 text-white rounded-card max-w-sm">
+                <DialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] rounded-card max-w-sm">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold flex items-center gap-2">
                             <LucideLayoutGrid className="w-5 h-5 text-brand" />
                             이닝별 기록
                         </DialogTitle>
-                        <DialogDescription className="text-white/55">
+                        <DialogDescription className="text-black/55">
                             {viewingPlayer?.name} 님의 이번 경기 기록입니다.
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="py-4 space-y-4">
-                        <div className="bg-black/40 rounded-2xl p-4 border border-white/5 max-h-[40vh] overflow-y-auto">
+                        <div className="bg-black/[0.04] rounded-2xl p-4 max-h-[40vh] overflow-y-auto">
                             <div className="space-y-3">
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-[12px] font-semibold text-white/55">
+                                    <div className="flex justify-between text-[12px] font-semibold text-black/55">
                                         <span>이닝별 점수 추이</span>
-                                        <span className="text-white/55 tabular-nums">총 {game.totalInnings}이닝</span>
+                                        <span className="text-black/55 tabular-nums">총 {game.totalInnings}이닝</span>
                                     </div>
                                     <div className="grid grid-cols-5 gap-2 mt-2">
                                         {(viewingPlayer?.innings || []).map((inningScore: number, i: number) => (
                                             <div key={i} className="flex flex-col items-center gap-1">
-                                                <span className="text-[12px] text-white/45 tabular-nums">{i + 1}</span>
-                                                <div className="w-full h-10 flex items-center justify-center rounded-tile text-xs font-semibold tabular-nums bg-white/5 text-brand">
+                                                <span className="text-[12px] text-black/40 tabular-nums">{i + 1}</span>
+                                                <div className="w-full h-10 flex items-center justify-center rounded-tile text-xs font-semibold tabular-nums bg-white text-brand">
                                                     {inningScore}
                                                 </div>
                                             </div>

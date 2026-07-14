@@ -69,37 +69,37 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="fixed top-0 right-0 bottom-0 w-full max-w-[400px] bg-[#0B0B0D] border-l border-white/10 z-[101] shadow-2xl flex flex-col"
+                        className="fixed top-0 right-0 bottom-0 w-full max-w-[400px] bg-white border-l border-black/10 z-[101] shadow-[0_0_40px_rgba(0,0,0,0.12)] flex flex-col text-ink-1"
                     >
                         {/* Header */}
-                        <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                        <div className="p-6 border-b border-black/10 flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-tile bg-white/5 flex items-center justify-center border border-white/10">
-                                    <LucideBell className="w-5 h-5 text-white/60" />
+                                <div className="w-10 h-10 rounded-tile bg-black/[0.04] flex items-center justify-center ">
+                                    <LucideBell className="w-5 h-5 text-brand" />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold">알림함</h2>
-                                    <p className="text-[12px] text-white/55">받은 알림을 모아봅니다</p>
+                                    <h2 className="text-lg font-bold text-ink-1">알림함</h2>
+                                    <p className="text-[12px] text-black/55">받은 알림을 모아봅니다</p>
                                 </div>
                             </div>
                             <button
                                 onClick={onClose}
                                 title="닫기"
-                                className="w-10 h-10 rounded-full hover:bg-white/5 flex items-center justify-center transition-colors"
+                                className="w-10 h-10 rounded-full hover:bg-black/[0.04] flex items-center justify-center transition-colors"
                             >
-                                <LucideX className="w-5 h-5 text-white/40" />
+                                <LucideX className="w-5 h-5 text-black/40" />
                             </button>
                         </div>
 
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                             {isLoading ? (
-                                <div className="flex flex-col items-center justify-center py-20 opacity-20">
-                                    <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin mb-4" />
+                                <div className="flex flex-col items-center justify-center py-20 text-black/40">
+                                    <div className="w-8 h-8 rounded-full border-2 border-black/15 border-t-brand animate-spin mb-4" />
                                     <p className="text-sm">알림을 불러오는 중...</p>
                                 </div>
                             ) : notifications?.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                                <div className="flex flex-col items-center justify-center py-20 text-black/30">
                                     <LucideBell className="w-12 h-12 mb-4" />
                                     <p className="text-sm">알림 내역이 없습니다</p>
                                 </div>
@@ -111,41 +111,41 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         className={cn(
-                                            "relative group bg-white/[0.03] border border-white/5 rounded-2xl p-5 overflow-hidden transition-all active:scale-[0.98]",
-                                            !notif.isRead && "bg-white/[0.06] border-white/10"
+                                            "relative group bg-black/[0.02] rounded-2xl p-5 overflow-hidden transition-all active:scale-[0.98]",
+                                            !notif.isRead && "bg-white border-black/10 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                                         )}
                                         onClick={() => handleItemClick(notif)}
                                     >
                                         {!notif.isRead && (
-                                            <div className="absolute top-5 right-5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                            <div className="absolute top-5 right-5 w-1.5 h-1.5 rounded-full bg-brand" />
                                         )}
 
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-[12px] font-bold text-emerald-500 uppercase tracking-wider">
+                                                <span className="text-[12px] font-bold text-brand uppercase tracking-wider">
                                                     {notif.type || '알림'}
                                                 </span>
-                                                <span className="text-[12px] text-white/45">
+                                                <span className="text-[12px] text-black/40">
                                                     {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true, locale: ko })}
                                                 </span>
                                             </div>
-                                            <h3 className="text-sm font-bold text-white/90">{notif.title}</h3>
-                                            <p className="text-xs text-white/50 leading-relaxed mt-1">{notif.body}</p>
+                                            <h3 className="text-sm font-bold text-ink-1">{notif.title}</h3>
+                                            <p className="text-xs text-black/55 leading-relaxed mt-1">{notif.body}</p>
                                         </div>
 
-                                        <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-white/5">
+                                        <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-black/10">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     deleteMutation.mutate(notif.id);
                                                 }}
                                                 title="삭제"
-                                                className="p-2 rounded-lg hover:bg-red-500/10 text-white/45 hover:text-red-400 transition-all"
+                                                className="p-2 rounded-lg hover:bg-red-500/10 text-black/40 hover:text-red-500 transition-all"
                                             >
                                                 <LucideTrash2 className="w-4 h-4" />
                                             </button>
                                             <div className="flex-1" />
-                                            <LucideChevronRight className="w-4 h-4 text-white/45 group-hover:translate-x-1 transition-transform" />
+                                            <LucideChevronRight className="w-4 h-4 text-black/40 group-hover:translate-x-1 transition-transform" />
                                         </div>
                                     </motion.div>
                                 ))
@@ -169,7 +169,7 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                             console.error("Test push failed", e);
                                         }
                                     }}
-                                    className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[12px] text-white/40 hover:bg-white/10 transition-colors"
+                                    className="px-4 py-2 rounded-full bg-black/[0.04] text-[12px] text-black/55 hover:bg-black/[0.06] transition-colors"
                                 >
                                     테스트 알림 받기
                                 </button>

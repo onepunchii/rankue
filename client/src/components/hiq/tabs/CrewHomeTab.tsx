@@ -20,13 +20,13 @@ const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: str
     return (
         <div className="rounded-2xl p-5 flex flex-col items-center justify-center text-center">
             <div className="flex flex-col items-center gap-1.5 mb-2">
-                <span className="text-white/55 text-[12px] font-medium">{title}</span>
+                <span className="text-black/55 text-[12px] font-medium">{title}</span>
             </div>
             <div>
                 {children}
             </div>
             {subTitle && (
-                <span className="text-white/45 text-[12px] font-medium mt-2">{subTitle}</span>
+                <span className="text-black/40 text-[12px] font-medium mt-2">{subTitle}</span>
             )}
         </div>
     );
@@ -125,7 +125,7 @@ export const CrewHomeTab = memo(({
                             <span className="text-[72px] font-bold text-brand/40 leading-none tracking-tight">{crewInitial}</span>
                         </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] to-transparent opacity-60" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#f2f0eb] to-transparent opacity-90" />
                 </div>
 
                 <div className="px-6 -mt-10 relative z-10 flex items-end gap-4">
@@ -144,10 +144,10 @@ export const CrewHomeTab = memo(({
                         )}
                     </div>
                     <div className="pb-1">
-                        <h1 className="text-2xl font-semibold text-white leading-tight tracking-tight">
+                        <h1 className="text-2xl font-semibold text-[rgba(0,0,0,0.87)] leading-tight tracking-tight">
                             {crew.name}
                         </h1>
-                        <p className="text-[13px] text-white/65 font-medium mt-1">
+                        <p className="text-[13px] text-black/60 font-medium mt-1">
                             {crew.shortIntro || crew.region || "우리 크루"}
                         </p>
                     </div>
@@ -158,7 +158,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6 space-y-5">
                 <div className="relative">
                     <div className={cn(
-                        "text-white/60 text-[15px] leading-relaxed font-normal transition-all duration-300 whitespace-pre-wrap",
+                        "text-black/60 text-[15px] leading-relaxed font-normal transition-all duration-300 whitespace-pre-wrap",
                         !isDescriptionExpanded && "line-clamp-3"
                     )}>
                         {crew.description || "크루 소개글이 없습니다."}
@@ -166,7 +166,7 @@ export const CrewHomeTab = memo(({
                     {(crew.description?.length || 0) > 60 && (
                         <button
                             onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                            className="text-brand text-xs font-semibold mt-3 hover:text-white transition-colors inline-flex items-center gap-1"
+                            className="text-brand text-xs font-semibold mt-3 hover:text-brand/70 transition-colors inline-flex items-center gap-1"
                         >
                             {isDescriptionExpanded ? "접기" : "더 보기"}
                             <LucideChevronDown className={cn("w-3.5 h-3.5 transition-transform", isDescriptionExpanded && "rotate-180")} />
@@ -176,12 +176,12 @@ export const CrewHomeTab = memo(({
 
                 <div className="flex flex-wrap gap-2">
                     {crew.meetingDay && (
-                        <div className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-white/80 text-xs font-semibold">
+                        <div className="flex items-center gap-1.5 px-4 py-2 bg-black/[0.04] rounded-full text-black/70 text-xs font-semibold">
                             <LucideCalendar className="w-3.5 h-3.5 text-brand" />
                             {crew.meetingDay} {crew.meetingTime}
                         </div>
                     )}
-                    <div className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-white/80 text-xs font-semibold">
+                    <div className="flex items-center gap-1.5 px-4 py-2 bg-black/[0.04] rounded-full text-black/70 text-xs font-semibold">
                         <LucideMapPin className="w-3.5 h-3.5 text-brand" />
                         {crew.region || "지역"}
                     </div>
@@ -189,25 +189,25 @@ export const CrewHomeTab = memo(({
 
                 {/* Team Performance Dashboard */}
                 <div className="grid grid-cols-2 gap-3 mt-6 relative">
-                    <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-white/10 -translate-x-1/2" />
-                    <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-white/10 -translate-y-1/2" />
+                    <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-black/10 -translate-x-1/2" />
+                    <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-black/10 -translate-y-1/2" />
 
                     <StatCard title="랭킹">
-                        <span className="text-base font-medium text-white/38">순위 집계 전</span>
+                        <span className="text-base font-medium text-black/40">순위 집계 전</span>
                     </StatCard>
 
                     <StatCard title={stats.isGolf ? "클럽 평균" : "팀 에버리지"}>
                         <div className="flex items-center gap-3 mt-1 px-2">
                             <div className="flex flex-col items-center">
-                                <span className="text-2xl font-bold text-white leading-none tabular-nums">{stats.isGolf ? stats.avgGolfScore : stats.avg3c}</span>
-                                <span className="text-xs text-white/55 font-medium mt-1 tracking-tight">{stats.isGolf ? "HDCP" : "3C"}</span>
+                                <span className="text-2xl font-bold text-[rgba(0,0,0,0.87)] leading-none tabular-nums">{stats.isGolf ? stats.avgGolfScore : stats.avg3c}</span>
+                                <span className="text-xs text-black/55 font-medium mt-1 tracking-tight">{stats.isGolf ? "HDCP" : "3C"}</span>
                             </div>
                             {!stats.isGolf && (
                                 <>
-                                    <div className="h-8 w-px bg-white/10" />
+                                    <div className="h-8 w-px bg-black/10" />
                                     <div className="flex flex-col items-center">
-                                        <span className="text-2xl font-bold text-white leading-none tabular-nums">{stats.avg4c}</span>
-                                        <span className="text-xs text-white/55 font-medium mt-1 tracking-tight">4B</span>
+                                        <span className="text-2xl font-bold text-[rgba(0,0,0,0.87)] leading-none tabular-nums">{stats.avg4c}</span>
+                                        <span className="text-xs text-black/55 font-medium mt-1 tracking-tight">4B</span>
                                     </div>
                                 </>
                             )}
@@ -215,9 +215,9 @@ export const CrewHomeTab = memo(({
                     </StatCard>
 
                     <StatCard title={stats.isGolf ? "누적 라운드" : "누적 점수"}>
-                        <span className="text-3xl font-bold text-white tracking-tight tabular-nums">
+                        <span className="text-3xl font-bold text-[rgba(0,0,0,0.87)] tracking-tight tabular-nums">
                             {stats.isGolf ? (
-                                <>{stats.totalRounds} <span className="text-lg font-normal text-white/55">회</span></>
+                                <>{stats.totalRounds} <span className="text-lg font-normal text-black/55">회</span></>
                             ) : (
                                 stats.totalPoints.toLocaleString()
                             )}
@@ -225,7 +225,7 @@ export const CrewHomeTab = memo(({
                     </StatCard>
 
                     <StatCard title="활동 멤버">
-                        <span className="text-3xl font-bold text-white tracking-tight tabular-nums">{stats.statsMembers.length} <span className="text-lg font-normal text-white/55">명</span></span>
+                        <span className="text-3xl font-bold text-[rgba(0,0,0,0.87)] tracking-tight tabular-nums">{stats.statsMembers.length} <span className="text-lg font-normal text-black/55">명</span></span>
                     </StatCard>
                 </div>
             </div>
@@ -234,7 +234,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6 space-y-4">
                 <div className="flex items-center gap-2 mb-4">
                     <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                    <h2 className="text-[15px] font-semibold text-white/55">정모 / 일정</h2>
+                    <h2 className="text-[15px] font-semibold text-black/55">정모 / 일정</h2>
                 </div>
 
                 <ClubActivityList
@@ -253,13 +253,13 @@ export const CrewHomeTab = memo(({
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                        <h2 className="text-[15px] font-semibold text-white/55">진행 중인 투표</h2>
+                        <h2 className="text-[15px] font-semibold text-black/55">진행 중인 투표</h2>
                     </div>
                     {isMember && (
                         <Button
                             variant="ghost"
                             onClick={onCreatePoll}
-                            className="h-10 px-3 text-[13px] font-medium text-white/55 hover:text-brand flex items-center gap-1.5"
+                            className="h-10 px-3 text-[13px] font-medium text-black/55 hover:text-brand flex items-center gap-1.5"
                         >
                             <LucidePlus className="w-4 h-4" />
                             만들기
@@ -276,26 +276,26 @@ export const CrewHomeTab = memo(({
             <div className="px-6">
                 <div className="flex items-center gap-2 mb-4">
                     <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                    <h2 className="text-[15px] font-semibold text-white/55">베이스 캠프</h2>
+                    <h2 className="text-[15px] font-semibold text-black/55">베이스 캠프</h2>
                 </div>
                 {baseStore ? (
                     <Card className="bg-surface-2 border-surface-line rounded-card overflow-hidden group hover:border-brand/50 transition-all">
                         <CardContent className="p-5">
                             <div className="flex items-center justify-between mb-4">
                                 <div>
-                                    <h3 className="text-lg font-bold text-white tracking-tight">{baseStore.name}</h3>
-                                    <p className="text-xs text-white/55 mt-0.5">{baseStore.address}</p>
+                                    <h3 className="text-lg font-bold text-[rgba(0,0,0,0.87)] tracking-tight">{baseStore.name}</h3>
+                                    <p className="text-xs text-black/55 mt-0.5">{baseStore.address}</p>
                                 </div>
                                 <span className="bg-brand/10 text-brand text-xs font-semibold px-2.5 py-1 rounded-full border border-brand/20">공식</span>
                             </div>
                             <div className="flex gap-2.5">
-                                <Button variant="outline" className="flex-1 rounded-xl text-xs h-10 border-white/10 text-white hover:bg-white/10">전화하기</Button>
+                                <Button variant="outline" className="flex-1 rounded-xl text-xs h-10 border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04]">전화하기</Button>
                                 <Button className="flex-1 rounded-xl text-xs h-10 bg-brand text-brand-fg">위치보기</Button>
                             </div>
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="py-14 text-center bg-white/5 rounded-card border border-dashed border-white/10 text-white/55 text-xs font-medium">
+                    <div className="py-14 text-center bg-black/[0.04] rounded-card border border-dashed border-black/10 text-black/55 text-xs font-medium">
                         베이스 캠프 정보가 없습니다
                     </div>
                 )}
@@ -305,7 +305,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6 pb-20">
                 <div className="flex items-center gap-2 mb-6">
                     <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                    <h2 className="text-[15px] font-semibold text-white/55">멤버 <span className="ml-1 tabular-nums">{activeMembers.length}</span></h2>
+                    <h2 className="text-[15px] font-semibold text-black/55">멤버 <span className="ml-1 tabular-nums">{activeMembers.length}</span></h2>
                 </div>
                 <CrewMemberList members={activeMembers} currentMemberId={me?.id} sportCategory={crew.sportCategory} crewId={crew.id} />
             </div>
@@ -317,21 +317,21 @@ export const CrewHomeTab = memo(({
                         <AlertDialogTrigger asChild>
                             <button
                                 disabled={isLeaving}
-                                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-white/40 hover:text-red-400 transition-colors disabled:opacity-40"
+                                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-black/40 hover:text-red-500 transition-colors disabled:opacity-40"
                             >
                                 <LucideLogOut className="w-4 h-4" />
                                 크루 탈퇴
                             </button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-[#141416] border border-white/10 text-white rounded-card">
+                        <AlertDialogContent className="bg-white text-[rgba(0,0,0,0.87)] rounded-card">
                             <AlertDialogHeader>
-                                <AlertDialogTitle className="text-white">크루에서 나가시겠어요?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-white/55">
+                                <AlertDialogTitle className="text-[rgba(0,0,0,0.87)]">크루에서 나가시겠어요?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-black/55">
                                     탈퇴하면 이 크루의 활동·채팅에 더 이상 참여할 수 없어요. 다시 가입할 수 있습니다.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                                <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white">취소</AlertDialogCancel>
+                                <AlertDialogCancel className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06] hover:text-[rgba(0,0,0,0.87)]">취소</AlertDialogCancel>
                                 <AlertDialogAction onClick={onLeave} className="bg-red-500 text-white hover:bg-red-600">탈퇴하기</AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
@@ -344,7 +344,7 @@ export const CrewHomeTab = memo(({
                 <div className="fixed bottom-[5.5rem] left-0 right-0 px-6 py-2 z-50 pointer-events-none">
                     {isPending ? (
                         <div className="flex items-center gap-2 pointer-events-auto">
-                            <div className="flex-1 h-14 rounded-2xl flex items-center justify-center text-base font-semibold bg-white/5 text-white/55 border border-white/5 ring-1 ring-white/10">
+                            <div className="flex-1 h-14 rounded-2xl flex items-center justify-center text-base font-semibold bg-white text-black/55 ring-1 ring-black/10 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                                 가입 승인 대기 중...
                             </div>
                             {onLeave && (
@@ -352,7 +352,7 @@ export const CrewHomeTab = memo(({
                                     onClick={onLeave}
                                     disabled={isLeaving}
                                     variant="outline"
-                                    className="h-14 px-5 rounded-2xl text-sm font-semibold bg-transparent border-white/10 text-white/60 hover:bg-white/5 hover:text-white disabled:opacity-40"
+                                    className="h-14 px-5 rounded-2xl text-sm font-semibold bg-white border-black/10 text-black/60 hover:bg-black/[0.04] hover:text-[rgba(0,0,0,0.87)] shadow-[0_1px_2px_rgba(0,0,0,0.06)] disabled:opacity-40"
                                 >
                                     신청 취소
                                 </Button>
@@ -361,7 +361,7 @@ export const CrewHomeTab = memo(({
                     ) : (
                         <Button
                             onClick={onJoin}
-                            className="w-full h-14 rounded-2xl text-base font-semibold tracking-normal transition-all active:scale-95 pointer-events-auto ring-1 ring-white/10 bg-brand text-brand-fg hover:bg-brand/90"
+                            className="w-full h-14 rounded-2xl text-base font-semibold tracking-normal transition-all active:scale-95 pointer-events-auto shadow-[0_1px_2px_rgba(0,0,0,0.06)] bg-brand text-brand-fg hover:bg-brand/90"
                         >
                             크루 가입하기
                         </Button>
@@ -378,11 +378,11 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
         enabled: !!crewId,
     });
 
-    if (isLoading) return <div className="h-24 bg-white/5 rounded-card animate-pulse" />;
+    if (isLoading) return <div className="h-24 bg-black/[0.04] rounded-card animate-pulse" />;
 
     if (!polls || polls.length === 0) return (
-        <div className="p-8 text-center bg-white/5 border border-dashed border-white/10 rounded-card">
-            <p className="text-xs font-medium text-white/55">등록된 투표가 없습니다</p>
+        <div className="p-8 text-center bg-black/[0.04] border border-dashed border-black/10 rounded-card">
+            <p className="text-xs font-medium text-black/55">등록된 투표가 없습니다</p>
         </div>
     );
 
@@ -406,12 +406,12 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
                                     <div className="flex items-center gap-2">
                                         <span className={cn(
                                             "text-xs font-semibold",
-                                            poll.status === 'active' ? "text-brand" : "text-white/55"
+                                            poll.status === 'active' ? "text-brand" : "text-black/55"
                                         )}>{poll.status === 'active' ? '진행 중' : '종료'}</span>
-                                        {poll.isAnonymous && <span className="text-xs font-semibold text-blue-400"> 익명</span>}
-                                        {poll.allowMultiple && <span className="text-xs font-semibold text-purple-400"> 복수</span>}
+                                        {poll.isAnonymous && <span className="text-xs font-semibold text-brand"> 익명</span>}
+                                        {poll.allowMultiple && <span className="text-xs font-semibold text-purple-500"> 복수</span>}
                                     </div>
-                                    <h3 className="text-base font-semibold text-white leading-tight tracking-tight">{poll.title}</h3>
+                                    <h3 className="text-base font-semibold text-[rgba(0,0,0,0.87)] leading-tight tracking-tight">{poll.title}</h3>
                                 </div>
                                 <div className="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
                                     <LucideVote className="w-5 h-5 text-brand" />
@@ -421,19 +421,19 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
                             {bestOption && (
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between text-xs">
-                                        <span className="text-white/55 font-medium">현재 1위: {bestOption.text}</span>
-                                        <span className="text-white/70 font-semibold tabular-nums">{bestOption.voteCount}표</span>
+                                        <span className="text-black/55 font-medium">현재 1위: {bestOption.text}</span>
+                                        <span className="text-black/70 font-semibold tabular-nums">{bestOption.voteCount}표</span>
                                     </div>
-                                    <Progress value={totalVotes > 0 ? (bestOption.voteCount / totalVotes) * 100 : 0} className="h-1.5 bg-white/5" />
+                                    <Progress value={totalVotes > 0 ? (bestOption.voteCount / totalVotes) * 100 : 0} className="h-1.5 bg-black/[0.06]" />
                                 </div>
                             )}
 
-                            <div className="flex items-center justify-between mt-5 pt-4 border-t border-white/5">
-                                <div className="flex items-center gap-1.5 text-white/55">
+                            <div className="flex items-center justify-between mt-5 pt-4 border-t border-black/[0.08]">
+                                <div className="flex items-center gap-1.5 text-black/55">
                                     <LucideUsers className="w-3.5 h-3.5" />
                                     <span className="text-xs font-medium tabular-nums">{totalVotes}명 참여</span>
                                 </div>
-                                <LucideChevronRight className="w-4 h-4 text-white/45 group-hover:text-white transition-colors" />
+                                <LucideChevronRight className="w-4 h-4 text-black/40 group-hover:text-[rgba(0,0,0,0.87)] transition-colors" />
                             </div>
                         </CardContent>
                     </Card>

@@ -44,22 +44,22 @@ export const CategorySelector = ({ selected, onSelect }: CategorySelectorProps) 
                             "flex flex-col items-center justify-center gap-1 p-3 rounded-tile border transition-colors h-[70px]",
                             isSelected
                                 ? "border-brand bg-brand/10"
-                                : "bg-surface-2 border-surface-line hover:bg-surface-3 hover:border-white/10"
+                                : "bg-surface-2 border-surface-line hover:bg-surface-3 hover:border-black/10"
                         )}
                     >
                         <Icon className={cn(
                             "w-4 h-4 transition-colors",
-                            isSelected ? "text-brand" : "text-white/45"
+                            isSelected ? "text-brand" : "text-ink-4"
                         )} />
                         <span className={cn(
                             "text-xs font-semibold text-center leading-tight transition-colors",
-                            isSelected ? "text-white" : "text-white/55"
+                            isSelected ? "text-ink-1" : "text-ink-3"
                         )}>
                             {cat.label}
                         </span>
                         <span className={cn(
                             "text-xs font-medium transition-colors",
-                            isSelected ? "text-brand" : "text-white/45"
+                            isSelected ? "text-brand" : "text-ink-3"
                         )}>
                             {cat.desc}
                         </span>

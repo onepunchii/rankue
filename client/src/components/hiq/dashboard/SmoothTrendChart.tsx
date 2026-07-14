@@ -45,14 +45,14 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
 
     // 테마 설정
     const theme = color === 'green' ? {
-        hex: '#64DD17',
+        hex: '#006241',
         bg: 'bg-brand/10',
         text: 'text-brand',
         shadow: ''
     } : {
-        hex: '#3b82f6',
-        bg: 'bg-blue-500/10',
-        text: 'text-blue-500',
+        hex: '#006241',
+        bg: 'bg-brand/10',
+        text: 'text-brand',
         shadow: ''
     };
 
@@ -94,18 +94,18 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
     }, [data]);
 
     return (
-        <div className="bg-[#18181b] rounded-3xl p-6 border border-white/5 relative overflow-hidden animate-in fade-in select-none">
+        <div className="bg-white rounded-3xl p-6 shadow-[0_1px_2px_rgba(0,0,0,0.06)] relative overflow-hidden animate-in fade-in select-none">
             {/* Header Info */}
             <div className="flex justify-between items-start mb-4 relative z-10">
                 <div>
-                    <h3 className="text-white font-bold text-lg">{title}</h3>
-                    <p className="text-white/50 text-xs mt-1">{subTitle}</p>
+                    <h3 className="text-ink-1 font-bold text-lg">{title}</h3>
+                    <p className="text-black/55 text-xs mt-1">{subTitle}</p>
                 </div>
                 <div className="text-right">
-                    <div className="text-3xl font-semibold text-white tracking-tight animate-in slide-in-from-bottom-2">
+                    <div className="text-3xl font-semibold text-ink-1 tracking-tight animate-in slide-in-from-bottom-2">
                         {currentAvg.toFixed(2)}
                     </div>
-                    <div className={cn("flex items-center justify-end gap-1 text-xs font-bold mt-1", isUp ? theme.text : "text-white/40")}>
+                    <div className={cn("flex items-center justify-end gap-1 text-xs font-bold mt-1", isUp ? theme.text : "text-black/40")}>
                         {isUp ? <LucideTrendingUp className="w-3.5 h-3.5" /> : <LucideTrendingDown className="w-3.5 h-3.5" />}
                         <span>직전 대비 {isUp ? '+' : '-'}{diff.toFixed(2)}</span>
                     </div>
@@ -156,9 +156,12 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
                                 {/* Dot Visuals */}
                                 <div className={cn(
                                     "w-2 h-2 rounded-full bg-white transition-all duration-300",
-                                    (isSelected || isLast) ? "w-3 h-3 border-2" : "opacity-50 group-hover:opacity-100 group-hover:scale-125"
+                                    (isSelected || isLast) ? "w-3 h-3 border-2" : "opacity-70 group-hover:opacity-100 group-hover:scale-125"
                                 )}
-                                    style={{ borderColor: (isSelected || isLast) ? theme.hex : 'transparent' }}
+                                    style={{
+                                        backgroundColor: (isSelected || isLast) ? '#ffffff' : theme.hex,
+                                        borderColor: (isSelected || isLast) ? theme.hex : 'transparent'
+                                    }}
                                 />
 
                                 {/* ✨ Tooltip Popup */}
@@ -174,8 +177,8 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
                                                     (i === htmlPoints.length - 1 ? "items-end right-[-8px]" : "items-center left-1/2 -translate-x-1/2")
                                             )}
                                         >
-                                            <div className={cn("px-3 py-1.5 rounded-xl text-xs font-bold text-white whitespace-nowrap shadow-xl flex flex-col items-center gap-0.5", theme.bg)}>
-                                                <span className="text-[12px] text-white/60 uppercase tracking-wider">{p.date}</span>
+                                            <div className={cn("px-3 py-1.5 rounded-xl text-xs font-bold text-ink-1 whitespace-nowrap shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex flex-col items-center gap-0.5", theme.bg)}>
+                                                <span className="text-[12px] text-black/55 uppercase tracking-wider">{p.date}</span>
                                                 <span className="text-sm font-semibold tracking-tight">AVG {p.val.toFixed(2)}</span>
                                             </div>
                                             {/* Triail */}
@@ -196,7 +199,7 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
                 </div>
 
                 {/* X-Axis */}
-                <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-[12px] text-white/55 font-medium px-1 pointer-events-none">
+                <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-[12px] text-black/55 font-medium px-1 pointer-events-none">
                     <span>10게임 전</span>
                     <span>오늘</span>
                 </div>

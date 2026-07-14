@@ -61,7 +61,7 @@ export const CrewBoardTab = memo(({
                             "px-5 py-2.5 rounded-full text-[13px] font-semibold transition-all whitespace-nowrap",
                             category === cat
                                 ? "bg-brand text-brand-fg"
-                                : "bg-white/5 text-white/55 hover:bg-white/10"
+                                : "bg-black/[0.04] text-black/55 hover:bg-black/[0.06]"
                         )}
                     >
                         {cat}
@@ -72,7 +72,7 @@ export const CrewBoardTab = memo(({
             {/* Pinned Notices Section */}
             {notices.length > 0 && (
                 <div className="px-6 space-y-2">
-                    <h4 className="text-[12px] font-medium text-white/55 pl-1">필독 공지</h4>
+                    <h4 className="text-[12px] font-medium text-black/55 pl-1">필독 공지</h4>
                     <div className="bg-brand/12 border border-brand/25 rounded-tile overflow-hidden">
                         {notices.map((notice) => (
                             <div
@@ -81,8 +81,8 @@ export const CrewBoardTab = memo(({
                                 onClick={() => onPostClick(notice)}
                             >
                                 <LucidePin className="w-3.5 h-3.5 text-brand rotate-45" />
-                                <span className="text-xs font-semibold text-white/80 flex-1 truncate">{notice.title || "제목 없음"}</span>
-                                <span className="text-[12px] font-medium text-white/55 tabular-nums">
+                                <span className="text-xs font-semibold text-[rgba(0,0,0,0.87)] flex-1 truncate">{notice.title || "제목 없음"}</span>
+                                <span className="text-[12px] font-medium text-black/55 tabular-nums">
                                     {notice.createdAt ? format(new Date(notice.createdAt), "MM.dd") : "--.--"}
                                 </span>
                             </div>
@@ -105,8 +105,8 @@ export const CrewBoardTab = memo(({
                     ))
                 ) : (
                     <div className="py-24 text-center">
-                        <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-                            <LucideLayoutList className="w-7 h-7 text-white/45" />
+                        <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mx-auto mb-4">
+                            <LucideLayoutList className="w-7 h-7 text-black/40" />
                         </div>
                         <p className="text-[15px] font-medium text-ink-2 mb-1">아직 등록된 게시글이 없습니다</p>
                         <p className="text-[13px] text-ink-4">첫 번째 이야기를 남겨보세요</p>
@@ -120,7 +120,7 @@ export const CrewBoardTab = memo(({
                     {isAdmin && (
                         <button
                             onClick={onCreateSettlement}
-                            className="w-14 h-14 bg-surface-3 text-white border border-white/20 rounded-full flex items-center justify-center hover:bg-surface-2 active:scale-95 transition-all"
+                            className="w-14 h-14 bg-white text-brand rounded-full flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-black/[0.04] active:scale-95 transition-all"
                             title="정산 요청 생성"
                             aria-label="정산 요청 생성"
                         >
@@ -129,7 +129,7 @@ export const CrewBoardTab = memo(({
                     )}
                     <button
                         onClick={onCreatePost}
-                        className="w-14 h-14 bg-brand text-brand-fg rounded-full flex items-center justify-center hover:bg-brand/90 active:scale-95 transition-all"
+                        className="w-14 h-14 bg-brand text-brand-fg rounded-full flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-brand/90 active:scale-95 transition-all"
                         title="새 게시글 작성"
                         aria-label="새 게시글 작성"
                     >

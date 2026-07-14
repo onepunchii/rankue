@@ -48,8 +48,8 @@ export default function HiqRegister() {
     });
 
     const brand = brandResponse?.data || {
-        themeColor: "#10b981",
-        neonColor: "#10b981"
+        themeColor: "#006241",
+        neonColor: "#006241"
     };
 
     const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<InsertHiqMember>({
@@ -122,7 +122,7 @@ export default function HiqRegister() {
 
     if (isCompleted) {
         return (
-            <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col items-center justify-center px-5 text-center">
+            <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center px-5 text-center">
                 <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
@@ -137,7 +137,7 @@ export default function HiqRegister() {
                 >
                     환영합니다!
                 </motion.h1>
-                <p className="text-[15px] font-medium text-white/55">당구장 멤버십이 활성화되었습니다.</p>
+                <p className="text-[15px] font-medium text-black/55">당구장 멤버십이 활성화되었습니다.</p>
                 <div className="mt-12 flex gap-2">
                     {[1, 2, 3, 4, 5].map(i => (
                         <motion.div
@@ -158,14 +158,14 @@ export default function HiqRegister() {
 
     return (
         <div
-            className="min-h-screen bg-[#0A0A0A] text-white flex flex-col font-sans overflow-hidden"
+            className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col font-sans overflow-hidden"
             style={{
                 ['--hiq-brand-color' as any]: brand.themeColor,
                 ['--hiq-brand-neon' as any]: brand.neonColor || brand.themeColor
             }}
         >
             {/* ProgressBar */}
-            <div className="flex w-full h-1 bg-white/5">
+            <div className="flex w-full h-1 bg-black/[0.06]">
                 {STEPS.map((_, idx) => (
                     <div
                         key={idx}
@@ -185,10 +185,10 @@ export default function HiqRegister() {
                         exit={{ opacity: 0, x: -20 }}
                     >
                         <span className="font-semibold text-[13px] mb-2 block text-brand tabular-nums">{currentStep + 1} / {STEPS.length} 단계</span>
-                        <h1 className="text-[26px] font-bold tracking-tight mb-3 text-white leading-tight">
+                        <h1 className="text-[26px] font-bold tracking-tight mb-3 text-[rgba(0,0,0,0.87)] leading-tight">
                             {STEPS[currentStep].title}
                         </h1>
-                        <p className="text-[15px] text-white/55 font-medium">
+                        <p className="text-[15px] text-black/55 font-medium">
                             {STEPS[currentStep].desc}
                         </p>
                     </motion.div>
@@ -206,18 +206,18 @@ export default function HiqRegister() {
                                 className="space-y-8"
                             >
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-white/55">성함</Label>
+                                    <Label className="text-sm font-medium text-black/55">성함</Label>
                                     <input
                                         {...register("name")}
                                         placeholder="이름을 입력하세요"
                                         autoFocus
-                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-brand text-center text-3xl font-bold text-white placeholder:text-white/45 py-4 transition-all outline-none"
+                                        className="w-full bg-transparent border-b-2 border-black/10 focus:border-brand text-center text-3xl font-bold text-[rgba(0,0,0,0.87)] placeholder:text-black/40 py-4 transition-all outline-none"
                                     />
-                                    {errors.name && <p className="text-red-400 text-sm font-bold text-center">{errors.name.message}</p>}
+                                    {errors.name && <p className="text-red-500 text-sm font-bold text-center">{errors.name.message}</p>}
                                 </div>
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-white/55">휴대폰 번호</Label>
-                                    <div className="w-full border-b-2 border-white/5 py-4 flex items-center justify-center text-white/55 text-3xl font-bold tabular-nums">
+                                    <Label className="text-sm font-medium text-black/55">휴대폰 번호</Label>
+                                    <div className="w-full border-b-2 border-black/10 py-4 flex items-center justify-center text-black/55 text-3xl font-bold tabular-nums">
                                         {phoneFromQuery}
                                     </div>
                                 </div>
@@ -233,17 +233,17 @@ export default function HiqRegister() {
                                 className="space-y-4"
                             >
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-white/55">비밀번호 (4자리 이상)</Label>
+                                    <Label className="text-sm font-medium text-black/55">비밀번호 (4자리 이상)</Label>
                                     <input
                                         type="password"
                                         {...register("password")}
                                         placeholder="비밀번호 입력"
                                         autoFocus
-                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-brand text-center text-3xl font-bold text-white placeholder:text-white/45 py-4 transition-all outline-none"
+                                        className="w-full bg-transparent border-b-2 border-black/10 focus:border-brand text-center text-3xl font-bold text-[rgba(0,0,0,0.87)] placeholder:text-black/40 py-4 transition-all outline-none"
                                     />
                                     {/* Warn if pwd is too short, but usually we just disable 'Next' */}
                                     {formData.password && formData.password.length < 4 && (
-                                        <p className="text-red-400 text-sm font-bold text-center">4자리 이상 입력해주세요.</p>
+                                        <p className="text-red-500 text-sm font-bold text-center">4자리 이상 입력해주세요.</p>
                                     )}
                                 </div>
                             </motion.div>
@@ -258,7 +258,7 @@ export default function HiqRegister() {
                                 className="space-y-8"
                             >
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-white/55 text-center block">질문 선택</Label>
+                                    <Label className="text-sm font-medium text-black/55 text-center block">질문 선택</Label>
                                     <div className="space-y-2 max-h-[240px] overflow-y-auto pr-2 custom-scrollbar">
                                         {[
                                             "내가 태어난 도시는 어디인가요?",
@@ -274,10 +274,10 @@ export default function HiqRegister() {
                                                 onClick={() => {
                                                     setValue("securityQuestion", q);
                                                 }}
-                                                className="w-full justify-start text-left py-6 rounded-tile border-white/5 bg-white/[0.02] hover:bg-white/[0.05]"
+                                                className="w-full justify-start text-left py-6 rounded-tile border-black/[0.08] bg-black/[0.04] hover:bg-black/[0.06]"
                                                 style={{
-                                                    borderColor: formData.securityQuestion === q ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
-                                                    color: formData.securityQuestion === q ? "rgb(var(--brand))" : "rgba(255,255,255,0.6)"
+                                                    borderColor: formData.securityQuestion === q ? "rgb(var(--brand))" : "rgba(0,0,0,0.10)",
+                                                    color: formData.securityQuestion === q ? "rgb(var(--brand))" : "rgba(0,0,0,0.6)"
                                                 }}
                                             >
                                                 {q}
@@ -286,11 +286,11 @@ export default function HiqRegister() {
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-white/55 text-center block">정답 입력</Label>
+                                    <Label className="text-sm font-medium text-black/55 text-center block">정답 입력</Label>
                                     <Input
                                         {...register("securityAnswer")}
                                         placeholder="정답을 입력하세요"
-                                        className="w-full bg-transparent border-b-2 border-white/10 focus:border-brand text-center text-2xl font-bold text-white placeholder:text-white/45 py-4 transition-all outline-none h-auto rounded-none border-t-0 border-x-0"
+                                        className="w-full bg-transparent border-b-2 border-black/10 focus:border-brand text-center text-2xl font-bold text-[rgba(0,0,0,0.87)] placeholder:text-black/40 py-4 transition-all outline-none h-auto rounded-none border-t-0 border-x-0"
                                     />
                                 </div>
                             </motion.div>
@@ -309,9 +309,9 @@ export default function HiqRegister() {
                                     variant={formData.gender === "male" ? "default" : "outline"}
                                     className="flex-1 h-20 rounded-2xl flex flex-row items-center justify-center gap-3 transition-all"
                                     style={{
-                                        backgroundColor: formData.gender === "male" ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
-                                        color: formData.gender === "male" ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.55)",
-                                        border: formData.gender === "male" ? "none" : "1px solid rgba(255,255,255,0.1)"
+                                        backgroundColor: formData.gender === "male" ? "rgb(var(--brand))" : "rgba(0,0,0,0.04)",
+                                        color: formData.gender === "male" ? "rgb(var(--brand-fg))" : "rgba(0,0,0,0.55)",
+                                        border: formData.gender === "male" ? "none" : "1px solid rgba(0,0,0,0.10)"
                                     }}
                                 >
                                     <span className="text-2xl">♂️</span>
@@ -322,9 +322,9 @@ export default function HiqRegister() {
                                     variant={formData.gender === "female" ? "default" : "outline"}
                                     className="flex-1 h-20 rounded-2xl flex flex-row items-center justify-center gap-3 transition-all"
                                     style={{
-                                        backgroundColor: formData.gender === "female" ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
-                                        color: formData.gender === "female" ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.55)",
-                                        border: formData.gender === "female" ? "none" : "1px solid rgba(255,255,255,0.1)"
+                                        backgroundColor: formData.gender === "female" ? "rgb(var(--brand))" : "rgba(0,0,0,0.04)",
+                                        color: formData.gender === "female" ? "rgb(var(--brand-fg))" : "rgba(0,0,0,0.55)",
+                                        border: formData.gender === "female" ? "none" : "1px solid rgba(0,0,0,0.10)"
                                     }}
                                 >
                                     <span className="text-2xl">♀️</span>
@@ -341,7 +341,7 @@ export default function HiqRegister() {
                                 exit={{ opacity: 0, y: -20 }}
                                 className="space-y-6 text-center"
                             >
-                                <div className="grid grid-cols-4 gap-3 max-h-[440px] overflow-y-auto p-4 bg-white/5 rounded-2xl border border-white/10 scrollbar-hide">
+                                <div className="grid grid-cols-4 gap-3 max-h-[440px] overflow-y-auto p-4 bg-black/[0.04] rounded-2xl scrollbar-hide">
                                     {Array.from({ length: new Date().getFullYear() - 1950 + 1 }, (_, i) => 1950 + i).reverse().map(year => (
                                         <Button
                                             key={year}
@@ -351,8 +351,8 @@ export default function HiqRegister() {
                                             className="h-14 text-lg rounded-tile transition-all tabular-nums"
                                             style={{
                                                 backgroundColor: formData.birthYear === year ? "rgb(var(--brand))" : "transparent",
-                                                color: formData.birthYear === year ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.55)",
-                                                border: formData.birthYear === year ? "none" : "1px solid rgba(255,255,255,0.1)"
+                                                color: formData.birthYear === year ? "rgb(var(--brand-fg))" : "rgba(0,0,0,0.55)",
+                                                border: formData.birthYear === year ? "none" : "1px solid rgba(0,0,0,0.10)"
                                             }}
                                         >
                                             {year}
@@ -372,27 +372,27 @@ export default function HiqRegister() {
                                 exit={{ opacity: 0, y: -20 }}
                                 className="space-y-10"
                             >
-                                <div className="bg-white/5 p-8 rounded-card border border-white/10 space-y-8">
+                                <div className="bg-white p-8 rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.06)] space-y-8">
                                     <div className="flex items-start gap-4">
                                         <Checkbox
                                             id="essential"
-                                            className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:bg-brand data-[state=checked]:border-brand"
+                                            className="w-7 h-7 rounded-lg mt-0.5 border-black/20 data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                                             checked={true}
                                             disabled={true}
                                         />
-                                        <Label htmlFor="essential" className="text-[15px] text-white/60 leading-tight">
-                                            <span className="text-white font-bold block mb-1">[필수] 개인정보 수집 동의</span>
+                                        <Label htmlFor="essential" className="text-[15px] text-black/60 leading-tight">
+                                            <span className="text-[rgba(0,0,0,0.87)] font-bold block mb-1">[필수] 개인정보 수집 동의</span>
                                             서비스 이용을 위해 최소한의 정보를 수집합니다.
                                         </Label>
                                     </div>
                                     <div className="flex items-start gap-4">
                                         <Checkbox
                                             id="marketing"
-                                            className="w-7 h-7 rounded-lg mt-0.5 border-white/20 data-[state=checked]:bg-brand data-[state=checked]:border-brand"
+                                            className="w-7 h-7 rounded-lg mt-0.5 border-black/20 data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                                             onCheckedChange={(checked) => setValue("marketingAgree", !!checked)}
                                         />
-                                        <Label htmlFor="marketing" className="text-[15px] text-white/60 leading-tight">
-                                            <span className="text-white/80 font-bold block mb-1">[선택] 마케팅 정보 수신</span>
+                                        <Label htmlFor="marketing" className="text-[15px] text-black/60 leading-tight">
+                                            <span className="text-black/70 font-bold block mb-1">[선택] 마케팅 정보 수신</span>
                                             매장 이벤트 및 혜택 정보를 보내드려요.
                                         </Label>
                                     </div>
@@ -407,7 +407,7 @@ export default function HiqRegister() {
                     <Button
                         variant="ghost"
                         onClick={prevStep}
-                        className="flex-1 h-16 text-lg font-bold bg-white/5 text-white/55 hover:text-white rounded-2xl border border-white/10 active:scale-95 transition-all"
+                        className="flex-1 h-16 text-lg font-bold bg-black/[0.04] text-black/55 hover:text-[rgba(0,0,0,0.87)] rounded-2xl active:scale-95 transition-all"
                     >
                         이전
                     </Button>
@@ -429,7 +429,7 @@ export default function HiqRegister() {
                             title="다음 단계"
                             className={cn(
                                 "flex-[2] h-16 text-xl font-semibold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all outline-none",
-                                stepValid ? "rk-btn-primary" : "bg-white/5 text-white/45"
+                                stepValid ? "rk-btn-primary" : "bg-black/[0.06] text-black/40"
                             )}
                         >
                             다음 <LucideChevronRight className="w-6 h-6" />

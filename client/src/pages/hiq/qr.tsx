@@ -10,14 +10,14 @@ export default function HiqQrPoster() {
     };
 
     return (
-        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4 print:p-0 print:bg-white print:text-black">
+        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center p-4 print:p-0 print:bg-white print:text-black">
             {/* Poster Container */}
-            <div className="max-w-md w-full aspect-[1/1.414] bg-surface-1 relative overflow-hidden rounded-card border border-surface-line flex flex-col items-center justify-between p-12 print:shadow-none print:border-none print:rounded-none print:w-full print:h-full print:bg-white print:text-black">
+            <div className="max-w-md w-full aspect-[1/1.414] bg-surface-1 relative overflow-hidden rounded-card flex flex-col items-center justify-between p-12 print:shadow-none print:border-none print:rounded-none print:w-full print:h-full print:bg-white print:text-black">
 
                 {/* Background Text Pattern */}
                 <div className="absolute inset-0 z-0 opacity-5 pointer-events-none select-none overflow-hidden flex flex-wrap content-start gap-4 p-4 transform -rotate-12 scale-150">
                     {Array.from({ length: 100 }).map((_, i) => (
-                        <span key={i} className="text-4xl font-bold text-white whitespace-nowrap">랭큐</span>
+                        <span key={i} className="text-4xl font-bold text-brand whitespace-nowrap">랭큐</span>
                     ))}
                 </div>
 
@@ -27,7 +27,7 @@ export default function HiqQrPoster() {
                     {/* Header */}
                     <div className="space-y-2 mt-8">
                         <h1 className="text-6xl font-bold text-brand print:text-black">랭큐</h1>
-                        <p className="text-2xl font-semibold text-white print:text-black">
+                        <p className="text-2xl font-semibold text-[rgba(0,0,0,0.87)] print:text-black">
                             프리미엄 디지털 점수판
                         </p>
                     </div>
@@ -58,11 +58,11 @@ export default function HiqQrPoster() {
                     {/* Footer Text */}
                     <div className="space-y-4 mb-8">
                         <div className="space-y-1">
-                            <h2 className="text-3xl font-bold text-white print:text-black">스캔하여 게임 시작</h2>
+                            <h2 className="text-3xl font-bold text-[rgba(0,0,0,0.87)] print:text-black">스캔하여 게임 시작</h2>
                             <p className="text-ink-3 font-medium print:text-gray-600">카메라를 켜고 QR코드를 비춰주세요</p>
                         </div>
 
-                        <div className="pt-6 border-t border-white/10 w-full print:border-black/10">
+                        <div className="pt-6 border-t border-black/10 w-full print:border-black/10">
                             <p className="text-brand font-semibold text-lg print:text-black">www.rankue.co.kr</p>
                         </div>
                     </div>
@@ -75,7 +75,7 @@ export default function HiqQrPoster() {
                     <LucidePrinter className="w-5 h-5 mr-2" />
                     프린트 / PDF로 저장
                 </Button>
-                <Button variant="outline" className="rounded-full px-6 border-surface-line text-white/55 hover:text-white bg-transparent hover:bg-surface-2">
+                <Button variant="outline" className="rounded-full px-6 border-[#006241] text-[#006241] bg-transparent hover:bg-[#006241]/[0.06] hover:text-[#006241]">
                     <LucideShare2 className="w-5 h-5 mr-2" />
                     공유하기
                 </Button>

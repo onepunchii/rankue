@@ -19,8 +19,8 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
     return (
         <div className="mb-10 relative z-10">
             <div className="flex items-center justify-between px-1 mb-4">
-                <h2 className="text-[15px] font-semibold text-white/55">최근 매칭 상대</h2>
-                <span className="text-[12px] font-medium text-white/45">최근 플레이어</span>
+                <h2 className="text-[15px] font-semibold text-black/60">최근 매칭 상대</h2>
+                <span className="text-[12px] font-medium text-black/55">최근 플레이어</span>
             </div>
 
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-5 px-5">
@@ -42,13 +42,13 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                                     <div>
                                         <div className="flex justify-between items-start mb-5">
                                             <div>
-                                                <h3 className="text-[22px] font-bold text-white mb-1.5 tracking-tight">{opponent.name}</h3>
-                                                <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-white/5", tier.class)}>
+                                                <h3 className="text-[22px] font-bold text-ink-1 mb-1.5 tracking-tight">{opponent.name}</h3>
+                                                <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-black/[0.04]", tier.class)}>
                                                     <span className="text-xs">{tier.icon}</span>
                                                     <span className="text-[12px] font-semibold">{tier.label}</span>
                                                 </div>
                                             </div>
-                                            <div className="w-10 h-10 rounded-tile bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                                            <div className="w-10 h-10 rounded-tile bg-black/[0.04] flex items-center justify-center overflow-hidden text-black/40">
                                                 {(opponent as any).profileImageUrl ? (
                                                     <img
                                                         src={(opponent as any).profileImageUrl}
@@ -61,10 +61,10 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                                             </div>
                                         </div>
 
-                                        <div className="mb-6 p-4 rounded-tile bg-surface-2 border border-surface-line flex items-center justify-between">
+                                        <div className="mb-6 p-4 rounded-tile bg-black/[0.04] flex items-center justify-between">
                                             <div className="flex flex-col">
-                                                <span className="text-[12px] font-medium text-white/45 mb-1">최근 경기</span>
-                                                <span className={`text-[15px] font-bold tabular-nums ${opponent.lastGameResult === 'win' ? 'text-brand' : 'text-white/60'}`}>
+                                                <span className="text-[12px] font-medium text-black/55 mb-1">최근 경기</span>
+                                                <span className={`text-[15px] font-bold tabular-nums ${opponent.lastGameResult === 'win' ? 'text-brand' : 'text-black/60'}`}>
                                                     {opponent.lastGameResult === 'win' ? '승' : '패'} {opponent.lastGameScore}
                                                 </span>
                                             </div>

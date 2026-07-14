@@ -21,29 +21,29 @@ export const MyCrewCard = memo(({ crew, role, onClick }: MyCrewCardProps) => {
                 <div className="flex items-center gap-2 mb-1.5">
                     <span className={cn(
                         "px-1.5 py-0.5 rounded text-[12px] font-semibold",
-                        isLeader ? "bg-yellow-500/15 text-yellow-400" : "bg-white/10 text-white/55"
+                        isLeader ? "bg-[#cba258]/12 text-[#cba258]" : "bg-black/[0.06] text-black/55"
                     )}>
                         {isLeader ? '리더' : '멤버'}
                     </span>
-                    {isLeader && <LucideCrown className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />}
+                    {isLeader && <LucideCrown className="w-3.5 h-3.5 text-[#cba258] fill-[#cba258]" />}
                 </div>
 
-                <h3 className="font-semibold text-[17px] text-white tracking-tight truncate mb-1.5">
+                <h3 className="font-semibold text-[17px] text-ink-1 tracking-tight truncate mb-1.5">
                     {crew.name}
                 </h3>
 
-                <div className="flex items-center gap-2 text-white/45 text-[12px] font-medium">
+                <div className="flex items-center gap-2 text-ink-3 text-[12px] font-medium">
                     <div className="flex items-center gap-1">
                         <LucideUsers className="w-3 h-3" />
                         <span className="tabular-nums">{crew.memberCount || 1} / {crew.maxMembers || 50}</span>
                     </div>
-                    <span className="w-0.5 h-0.5 rounded-full bg-white/30" />
+                    <span className="w-0.5 h-0.5 rounded-full bg-black/25" />
                     <span className={cn(!crew.region && "text-ink-4")}>{crew.region || "지역 미설정"}</span>
                 </div>
             </div>
 
-            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors">
-                <LucideChevronRight className="w-4 h-4 text-white/45" />
+            <div className="w-8 h-8 rounded-full bg-black/[0.04] flex items-center justify-center shrink-0 group-hover:bg-black/[0.06] transition-colors">
+                <LucideChevronRight className="w-4 h-4 text-black/40" />
             </div>
         </div>
     );

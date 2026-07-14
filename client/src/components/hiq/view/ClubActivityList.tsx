@@ -173,7 +173,7 @@ export function ClubActivityList({
         }
     };
 
-    if (isLoading) return <div className="text-center py-8 text-white/55">데이터를 불러오는 중...</div>;
+    if (isLoading) return <div className="text-center py-8 text-black/55">데이터를 불러오는 중...</div>;
 
     const allActivities: any[] = Array.isArray(activities) ? activities : [];
     const filteredActivities = allActivities.filter(a => a.sportCategory === sportType || (!a.sportCategory && sportType === 'BILLIARDS'));
@@ -259,18 +259,18 @@ export function ClubActivityList({
                                                 {(activity.participants || []).slice(0, 5).map((p: any, idx: number) => (
                                                     <Avatar key={idx} className="w-6 h-6 border-2 border-surface-1 transition-transform hover:scale-110 hover:z-20">
                                                         <AvatarImage src={p.member?.profileImageUrl} />
-                                                        <AvatarFallback className="bg-surface-3 text-xs font-medium text-white/55">
+                                                        <AvatarFallback className="bg-surface-3 text-xs font-medium text-black/55">
                                                             {p.member?.name?.[0] || "?"}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                 ))}
                                                 {(activity.participants?.length || 0) > 5 && (
-                                                    <div className="w-6 h-6 rounded-full bg-surface-3 border-2 border-surface-1 flex items-center justify-center text-xs font-medium text-white/55 relative z-10">
+                                                    <div className="w-6 h-6 rounded-full bg-surface-3 border-2 border-surface-1 flex items-center justify-center text-xs font-medium text-black/55 relative z-10">
                                                         +{activity.participants.length - 5}
                                                     </div>
                                                 )}
                                             </div>
-                                            <span className="text-xs font-bold tabular-nums text-white/55">
+                                            <span className="text-xs font-bold tabular-nums text-black/55">
                                                 {activity.participants?.length || 0} / {activity.maxParticipants}명
                                             </span>
                                         </div>
@@ -293,7 +293,7 @@ export function ClubActivityList({
                             </div>
 
                             {isExpanded && currentTeamData && (
-                                <div className="mb-5 bg-surface-2 rounded-2xl overflow-hidden border border-surface-line animate-in slide-in-from-top-4 fade-in duration-500">
+                                <div className="mb-5 bg-surface-3 rounded-2xl overflow-hidden animate-in slide-in-from-top-4 fade-in duration-500">
                                     {currentTeamData.step === 'setup' ? (
                                         <div className="p-5">
                                             <div className="flex items-center justify-between mb-5">
@@ -307,7 +307,7 @@ export function ClubActivityList({
                                                 </div>
                                                 <button
                                                     onClick={() => setExpandedActivityId(null)}
-                                                    className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                                                    className="w-8 h-8 rounded-full bg-black/[0.06] flex items-center justify-center text-black/40 hover:text-ink-1 transition-colors"
                                                     title="닫기"
                                                     aria-label="Close"
                                                 >
@@ -316,17 +316,17 @@ export function ClubActivityList({
                                             </div>
 
                                             <div className="mb-6 space-y-4">
-                                                <div className="bg-surface-3 rounded-2xl p-5 border border-surface-line space-y-5">
-                                                    <div className="flex flex-col items-center gap-1 pb-2 border-b border-surface-line">
-                                                        <span className="text-xs font-medium text-white/55">현재 참여 인원</span>
+                                                <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-5">
+                                                    <div className="flex flex-col items-center gap-1 pb-2 border-b border-black/10">
+                                                        <span className="text-xs font-medium text-black/55">현재 참여 인원</span>
                                                         <div className="flex items-center gap-3">
                                                             <span className="text-2xl font-bold tabular-nums text-ink-1">{totalCount}</span>
                                                             <span className="text-sm font-semibold text-brand">참가자</span>
                                                         </div>
                                                         {(totalCount > 0) && (
                                                             <div className="flex items-center gap-2 mt-1">
-                                                                <span className="text-xs font-semibold tabular-nums text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded-full">남 {malesCount}</span>
-                                                                <span className="text-xs font-semibold tabular-nums text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded-full">여 {femalesCount}</span>
+                                                                <span className="text-xs font-semibold tabular-nums text-brand bg-brand/10 px-2 py-0.5 rounded-full">남 {malesCount}</span>
+                                                                <span className="text-xs font-semibold tabular-nums text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-full">여 {femalesCount}</span>
                                                             </div>
                                                         )}
                                                     </div>
@@ -334,7 +334,7 @@ export function ClubActivityList({
                                                     {/* Manual Name Input Feature */}
                                                     <div className="space-y-2">
                                                         <div className="flex items-center justify-between px-1">
-                                                            <label className="text-xs font-medium text-white/55">명단 직접 입력 (붙여넣기)</label>
+                                                            <label className="text-xs font-medium text-black/55">명단 직접 입력 (붙여넣기)</label>
                                                             <button
                                                                 onClick={() => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], showManualInput: !prev[activity.id].showManualInput } }))}
                                                                 className="text-xs font-semibold text-brand hover:underline"
@@ -348,9 +348,9 @@ export function ClubActivityList({
                                                                     value={currentTeamData.manualInput}
                                                                     onChange={(e) => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], manualInput: e.target.value } }))}
                                                                     placeholder="이름을 입력하세요 (엔터나 콤마로 구분)&#13;&#10;예: 김철수, 이영희(여), 박지민여, 유니♀"
-                                                                    className="w-full h-32 bg-black/40 border border-surface-line rounded-tile p-3 text-xs text-white placeholder:text-white/45 focus:border-brand/50 focus:outline-none transition-all"
+                                                                    className="w-full h-32 bg-surface-3 rounded-tile p-3 text-xs text-ink-1 placeholder:text-black/40 focus:border-brand/50 focus:outline-none transition-all"
                                                                 />
-                                                                <p className="text-xs text-white/45 px-1">
+                                                                <p className="text-xs text-black/45 px-1">
                                                                     * 이름 뒤에 ♀ 또는 '여'를 붙이면 여성으로 인식됩니다. (예: 영희여, 영희(여))
                                                                 </p>
                                                             </div>
@@ -359,7 +359,7 @@ export function ClubActivityList({
 
                                                     {/* Quick Setup Buttons */}
                                                     <div className="flex flex-col gap-2">
-                                                        <label className="text-xs font-medium text-white/45 ml-1">빠른 설정 (추천)</label>
+                                                        <label className="text-xs font-medium text-black/45 ml-1">빠른 설정 (추천)</label>
                                                         <div className="grid grid-cols-3 gap-2">
                                                             {[2, 3, 4].map(n => (
                                                                 <button
@@ -372,7 +372,7 @@ export function ClubActivityList({
                                                                             [activity.id]: { ...prev[activity.id], count }
                                                                         }));
                                                                     }}
-                                                                    className="bg-white/5 hover:bg-white/10 border border-surface-line py-2 rounded-tile text-xs font-semibold text-white/60 hover:text-white transition-all"
+                                                                    className="bg-black/[0.04] hover:bg-black/[0.06] py-2 rounded-tile text-xs font-semibold text-black/60 hover:text-ink-1 transition-all"
                                                                 >
                                                                     {n}인 {terms.teamLabel}
                                                                 </button>
@@ -381,20 +381,20 @@ export function ClubActivityList({
                                                     </div>
 
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-xs text-white/60 font-medium">{terms.teamLabel} 개수</span>
+                                                        <span className="text-xs text-black/60 font-medium">{terms.teamLabel} 개수</span>
                                                         <div className="flex items-center gap-3">
                                                             <button
                                                                 onClick={() => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], count: Math.max(1, prev[activity.id].count - 1) } }))}
-                                                                className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center hover:bg-white/10 text-white"
+                                                                className="w-8 h-8 rounded-full bg-black/[0.06] flex items-center justify-center hover:bg-black/[0.1] text-ink-1"
                                                                 title="감소"
                                                                 aria-label="Decrease"
                                                             >
                                                                 <LucideMinus className="w-3 h-3" />
                                                             </button>
-                                                            <span className="text-sm font-semibold tabular-nums text-white w-14 text-center">{currentTeamData.count}개 {terms.teamLabel}</span>
+                                                            <span className="text-sm font-semibold tabular-nums text-ink-1 w-14 text-center">{currentTeamData.count}개 {terms.teamLabel}</span>
                                                             <button
                                                                 onClick={() => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], count: Math.min(activity.participants?.length || 50, prev[activity.id].count + 1) } }))}
-                                                                className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center hover:bg-white/10 text-white"
+                                                                className="w-8 h-8 rounded-full bg-black/[0.06] flex items-center justify-center hover:bg-black/[0.1] text-ink-1"
                                                                 title="증가"
                                                                 aria-label="Increase"
                                                             >
@@ -405,14 +405,14 @@ export function ClubActivityList({
                                                 </div>
 
                                                 {femalesCount > 0 && (
-                                                    <div className="bg-surface-2 rounded-tile p-1 flex relative">
+                                                    <div className="bg-surface-3 rounded-tile p-1 flex relative">
                                                         {(['random', 'spread', 'group'] as GenderDist[]).map((mode) => (
                                                             <button
                                                                 key={mode}
                                                                 onClick={() => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], genderDist: mode } }))}
                                                                 className={cn(
                                                                     "flex-1 py-2 text-xs font-semibold rounded-tile transition-all z-10 relative",
-                                                                    currentTeamData.genderDist === mode ? "text-brand-fg" : "text-white/55 hover:text-white/80"
+                                                                    currentTeamData.genderDist === mode ? "text-brand-fg" : "text-black/55 hover:text-black/80"
                                                                 )}
                                                             >
                                                                 {mode === 'random' && "랜덤"}
@@ -434,27 +434,27 @@ export function ClubActivityList({
                                                     <button
                                                         onClick={() => runGeneration(activity.id, activity.participants)}
                                                         disabled={isGenerating}
-                                                        className="bg-surface-2 hover:bg-brand border border-surface-line hover:border-brand rounded-tile p-4 flex items-center justify-center transition-all group disabled:opacity-50 disabled:pointer-events-none"
+                                                        className="bg-surface-3 hover:bg-brand hover:border-brand rounded-tile p-4 flex items-center justify-center transition-all group disabled:opacity-50 disabled:pointer-events-none"
                                                     >
                                                         {isGenerating ? (
-                                                            <span className="flex items-center gap-1.5 text-sm font-semibold text-white/55">
+                                                            <span className="flex items-center gap-1.5 text-sm font-semibold text-black/55">
                                                                 <LucideRefreshCw className="w-3.5 h-3.5 animate-spin" /> 편성 중
                                                             </span>
                                                         ) : (
-                                                            <span className="text-sm font-semibold text-white group-hover:text-brand-fg">실력 밸런스</span>
+                                                            <span className="text-sm font-semibold text-ink-1 group-hover:text-brand-fg">실력 밸런스</span>
                                                         )}
                                                     </button>
                                                     <button
                                                         onClick={() => runGeneration(activity.id, activity.participants, true)}
                                                         disabled={isGenerating}
-                                                        className="bg-surface-2 hover:bg-brand border border-surface-line hover:border-brand rounded-tile p-4 flex items-center justify-center transition-all group disabled:opacity-50 disabled:pointer-events-none"
+                                                        className="bg-surface-3 hover:bg-brand hover:border-brand rounded-tile p-4 flex items-center justify-center transition-all group disabled:opacity-50 disabled:pointer-events-none"
                                                     >
                                                         {isGenerating ? (
-                                                            <span className="flex items-center gap-1.5 text-sm font-semibold text-white/55">
+                                                            <span className="flex items-center gap-1.5 text-sm font-semibold text-black/55">
                                                                 <LucideRefreshCw className="w-3.5 h-3.5 animate-spin" /> 편성 중
                                                             </span>
                                                         ) : (
-                                                            <span className="text-sm font-semibold text-white group-hover:text-brand-fg">완전 랜덤</span>
+                                                            <span className="text-sm font-semibold text-ink-1 group-hover:text-brand-fg">완전 랜덤</span>
                                                         )}
                                                     </button>
                                                 </div>
@@ -462,7 +462,7 @@ export function ClubActivityList({
                                         </div>
                                     ) : (
                                         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                            <div className="bg-surface-3 px-4 py-2 flex items-center justify-between border-b border-surface-line">
+                                            <div className="bg-white px-4 py-2 flex items-center justify-between border-b border-black/10">
                                                 <div className="flex items-center gap-2">
                                                     <LucideZap className="w-4 h-4 text-brand" />
                                                     <span className="text-xs font-bold text-ink-1">{terms.teamLabel} 편성 결과 ({currentTeamData.teams.length}개 {terms.teamLabel})</span>
@@ -474,10 +474,10 @@ export function ClubActivityList({
                                                 {/* Results Display */}
                                                 <div className="grid gap-3 grid-cols-2">
                                                     {currentTeamData.teams.map((team, idx) => (
-                                                        <div key={idx} className="bg-surface-3 border border-surface-line rounded-tile p-3">
-                                                            <div className="flex items-center justify-between mb-2 pb-2 border-b border-surface-line">
+                                                        <div key={idx} className="bg-white rounded-tile p-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                                                            <div className="flex items-center justify-between mb-2 pb-2 border-b border-black/10">
                                                                 <h4 className="text-xs font-semibold" style={{ color: team.color }}>{team.name}</h4>
-                                                                <span className="text-xs tabular-nums text-white/55">{team.avg} {terms.unit}</span>
+                                                                <span className="text-xs tabular-nums text-black/55">{team.avg} {terms.unit}</span>
                                                             </div>
                                                             <div className="space-y-1.5">
                                                                 {team.members.map((m: any, mIdx: number) => {
@@ -485,8 +485,8 @@ export function ClubActivityList({
                                                                     return (
                                                                         <div key={mIdx} className="flex items-center gap-1.5">
                                                                             <div className={cn("w-1.5 h-1.5 rounded-full", isMe && "animate-pulse")} style={{ backgroundColor: isMe ? 'rgb(var(--brand))' : team.color }} />
-                                                                            <span className={cn("text-xs", isMe ? "text-brand font-bold" : "text-white/70")}>
-                                                                                {m.member?.name} {m.member?.gender === 'F' && <span className="text-rose-400 text-xs">♀</span>}
+                                                                            <span className={cn("text-xs", isMe ? "text-brand font-bold" : "text-black/70")}>
+                                                                                {m.member?.name} {m.member?.gender === 'F' && <span className="text-rose-500 text-xs">♀</span>}
                                                                             </span>
                                                                         </div>
                                                                     );
@@ -498,8 +498,8 @@ export function ClubActivityList({
 
                                                 <div className="mt-6 space-y-3">
                                                     <div className="px-1 flex items-center justify-between">
-                                                        <label htmlFor={`result-text-${activity.id}`} className="text-xs font-medium text-white/55">편성 전체 결과 (텍스트)</label>
-                                                        <span className="text-xs text-white/45">채팅방 공유 전 수정 가능합니다</span>
+                                                        <label htmlFor={`result-text-${activity.id}`} className="text-xs font-medium text-black/55">편성 전체 결과 (텍스트)</label>
+                                                        <span className="text-xs text-black/45">채팅방 공유 전 수정 가능합니다</span>
                                                     </div>
                                                     <textarea
                                                         readOnly={false}
@@ -513,14 +513,14 @@ export function ClubActivityList({
                                                             return `[${terms.emoji} ${terms.teamLabel} 편성 결과]\n--------------------------\n📌 모임: ${activity.title}\n📅 일시: ${dateStr}\n📍 장소: ${locStr}\n--------------------------\n\n${tStr}`;
                                                         })()}
                                                         id={`result-text-${activity.id}`}
-                                                        className="w-full h-32 bg-black/40 border border-surface-line rounded-tile p-3 text-xs text-white/70 focus:outline-none focus:border-brand/30 transition-all font-mono leading-relaxed"
+                                                        className="w-full h-32 bg-white rounded-tile p-3 text-xs text-black/70 focus:outline-none focus:border-brand/30 transition-all font-mono leading-relaxed"
                                                     />
                                                 </div>
 
                                                 <div className="flex flex-col sm:flex-row justify-center mt-6 gap-3">
                                                     <button
                                                         onClick={() => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], step: 'setup' } }))}
-                                                        className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-tile text-xs text-white/55 hover:text-white bg-white/5 hover:bg-white/10 transition-all border border-surface-line"
+                                                        className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-tile text-xs text-black/55 hover:text-ink-1 bg-black/[0.04] hover:bg-black/[0.06] transition-all "
                                                     >
                                                         <LucideRefreshCw className="w-3.5 h-3.5" /> 다시 설정
                                                     </button>
@@ -558,7 +558,7 @@ export function ClubActivityList({
                                     </Button>
                                     <Button
                                         variant="outline"
-                                        className="w-11 h-11 p-0 border-surface-line bg-white/5 hover:bg-white/10 text-white/60 rounded-tile"
+                                        className="w-11 h-11 p-0 border-black/10 bg-black/[0.04] hover:bg-black/[0.06] text-black/60 rounded-tile"
                                         onClick={() => {
                                             const dateStr = format(new Date(activity.activityDate), "M월 d일 (E) a h:mm", { locale: ko });
                                             const fullMsg = `[${terms.emoji} 정모 안내]\n--------------------------\n📍 장소: ${activity.locationName || "장소 미정"}\n📅 일시: ${dateStr}\n👥 인원: ${activity.participants?.length || 0} / ${activity.maxParticipants}명\n--------------------------`;
@@ -576,7 +576,7 @@ export function ClubActivityList({
                                 <div className="mt-2">
                                     <Button
                                         variant="ghost"
-                                        className="w-full text-white/55 hover:text-red-500 hover:bg-red-500/5 text-xs font-semibold h-8"
+                                        className="w-full text-black/55 hover:text-red-500 hover:bg-red-500/5 text-xs font-semibold h-8"
                                         onClick={() => setLeaveConfirmId(activity.id)}
                                         disabled={leaveMutation.isPending}
                                     >
@@ -586,10 +586,10 @@ export function ClubActivityList({
                             )}
 
                             {isAdmin && (
-                                <div className="mt-4 pt-4 border-t border-surface-line flex gap-2">
+                                <div className="mt-4 pt-4 border-t border-black/10 flex gap-2">
                                     <Button
                                         variant="outline"
-                                        className="flex-1 bg-white/5 border-surface-line text-white/55 hover:text-white hover:bg-white/10 text-xs font-semibold h-9 rounded-tile"
+                                        className="flex-1 bg-black/[0.04] border-black/10 text-black/55 hover:text-ink-1 hover:bg-black/[0.06] text-xs font-semibold h-9 rounded-tile"
                                         onClick={() => {
                                             setEditingActivity(activity);
                                             setIsEditOpen(true);
@@ -599,7 +599,7 @@ export function ClubActivityList({
                                     </Button>
                                     <Button
                                         variant="outline"
-                                        className="flex-1 bg-white/5 border-surface-line text-white/55 hover:text-red-500 hover:bg-red-500/10 text-xs font-semibold h-9 rounded-tile"
+                                        className="flex-1 bg-black/[0.04] border-black/10 text-black/55 hover:text-red-500 hover:bg-red-500/10 text-xs font-semibold h-9 rounded-tile"
                                         onClick={() => setDeleteConfirmId(activity.id)}
                                     >
                                         <LucideTrash2 className="w-3 h-3 mr-1.5" /> 삭제하기
@@ -614,14 +614,14 @@ export function ClubActivityList({
             {isError && (
                 <Card className="rk-card rounded-card">
                     <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
-                            <LucideTent className="w-6 h-6 text-white/38" />
+                        <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
+                            <LucideTent className="w-6 h-6 text-black/40" />
                         </div>
-                        <p className="text-sm font-semibold text-white/72">일정을 불러오지 못했습니다</p>
+                        <p className="text-sm font-semibold text-black/70">일정을 불러오지 못했습니다</p>
                         <Button
                             variant="ghost"
                             onClick={() => refetch()}
-                            className="h-10 px-5 rounded-pill bg-surface-2 hover:bg-surface-3 text-white/72 text-xs font-semibold"
+                            className="h-10 px-5 rounded-pill bg-surface-3 hover:bg-black/[0.06] text-black/70 text-xs font-semibold"
                         >
                             <LucideRefreshCw className="w-3.5 h-3.5 mr-1.5" /> 다시 시도
                         </Button>
@@ -632,11 +632,11 @@ export function ClubActivityList({
             {!isError && filteredActivities.length === 0 && (
                 <Card className="rk-card rounded-card">
                     <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-2">
-                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-1">
-                            <LucideTent className="w-6 h-6 text-white/38" />
+                        <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center mb-1">
+                            <LucideTent className="w-6 h-6 text-black/40" />
                         </div>
-                        <h3 className="text-sm font-semibold text-white/72">예정된 정모가 없습니다</h3>
-                        <p className="text-xs text-white/55 font-medium">
+                        <h3 className="text-sm font-semibold text-black/70">예정된 정모가 없습니다</h3>
+                        <p className="text-xs text-black/55 font-medium">
                             {isMember ? "첫 정모를 만들어 멤버들과 모여보세요." : "곧 새로운 모임이 열릴 예정이에요."}
                         </p>
                     </CardContent>
@@ -646,15 +646,15 @@ export function ClubActivityList({
             {
                 isMember && (
                     <Card
-                        className="bg-surface-2 border-surface-line border-dashed border hover:border-brand hover:bg-brand/5 transition-all cursor-pointer group rounded-card"
+                        className="bg-surface-1 border-black/10 border-dashed border hover:border-brand hover:bg-brand/5 transition-all cursor-pointer group rounded-card"
                         onClick={onCreateClick}
                     >
                         <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
-                            <div className="w-12 h-12 rounded-full bg-white/5 group-hover:bg-brand flex items-center justify-center transition-colors">
-                                <LucidePlus className="w-6 h-6 text-white/55 group-hover:text-brand-fg transition-colors" />
+                            <div className="w-12 h-12 rounded-full bg-brand/10 group-hover:bg-brand flex items-center justify-center transition-colors">
+                                <LucidePlus className="w-6 h-6 text-brand group-hover:text-brand-fg transition-colors" />
                             </div>
                             <h3 className="text-ink-1 font-semibold group-hover:text-brand transition-colors">새로운 정모 만들기</h3>
-                            <p className="text-xs text-white/55 font-medium">언제든 자유롭게 모임을 시작해보세요!</p>
+                            <p className="text-xs text-black/55 font-medium">언제든 자유롭게 모임을 시작해보세요!</p>
                         </CardContent>
                     </Card>
                 )
@@ -684,15 +684,15 @@ export function ClubActivityList({
             )}
 
             <AlertDialog open={!!leaveConfirmId} onOpenChange={(open) => !open && setLeaveConfirmId(null)}>
-                <AlertDialogContent className="bg-[#141416] border-white/10 text-white rounded-card">
+                <AlertDialogContent className="bg-white border-black/[0.08] text-ink-1 rounded-card">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>참여 취소</AlertDialogTitle>
-                        <AlertDialogDescription className="text-white/60">
+                        <AlertDialogTitle className="text-ink-1">참여 취소</AlertDialogTitle>
+                        <AlertDialogDescription className="text-black/60">
                             정모 참여를 취소하시겠습니까?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">돌아가기</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-surface-3 border-black/10 text-ink-1 hover:bg-black/[0.06]">돌아가기</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => { if (leaveConfirmId) leaveMutation.mutate(leaveConfirmId); }}
                             className="bg-red-500 text-white hover:bg-red-600"
@@ -704,15 +704,15 @@ export function ClubActivityList({
             </AlertDialog>
 
             <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
-                <AlertDialogContent className="bg-[#141416] border-white/10 text-white rounded-card">
+                <AlertDialogContent className="bg-white border-black/[0.08] text-ink-1 rounded-card">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>정모 삭제</AlertDialogTitle>
-                        <AlertDialogDescription className="text-white/60">
+                        <AlertDialogTitle className="text-ink-1">정모 삭제</AlertDialogTitle>
+                        <AlertDialogDescription className="text-black/60">
                             정말 이 정모를 삭제하시겠습니까?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">취소</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-surface-3 border-black/10 text-ink-1 hover:bg-black/[0.06]">취소</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => { if (deleteConfirmId) deleteMutation.mutate(deleteConfirmId); }}
                             className="bg-red-500 text-white hover:bg-red-600"

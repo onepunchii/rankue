@@ -39,12 +39,12 @@ export default function HiqHistory() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
                 <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
                     className={cn(
-                        "w-12 h-12 border-4 border-white/10 rounded-full",
+                        "w-12 h-12 border-4 border-black/10 rounded-full",
                         config.spinnerColor
                     )}
                 />
@@ -53,21 +53,21 @@ export default function HiqHistory() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white px-5 pt-5 pb-28 font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] px-5 pt-5 pb-28 font-sans relative overflow-x-hidden">
             {/* Header */}
             <div className="flex items-center gap-3 mb-7 relative z-10">
                 <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setLocation("/dashboard")}
-                    className="w-11 h-11 rounded-full bg-surface-1 border border-surface-line flex items-center justify-center transition-transform text-white/55 shrink-0"
+                    className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center transition-transform text-black/55 shrink-0"
                 >
                     <LucideChevronLeft className="w-5 h-5" />
                 </motion.button>
                 <div>
-                    <h1 className="text-[26px] font-bold tracking-tight text-white leading-none">
+                    <h1 className="text-[26px] font-bold tracking-tight text-brand leading-none">
                         {config.title}
                     </h1>
-                    <p className="text-[13px] font-medium text-white/45 mt-1.5">
+                    <p className="text-[13px] font-medium text-black/55 mt-1.5">
                         {config.subtitle}
                     </p>
                 </div>
@@ -75,7 +75,7 @@ export default function HiqHistory() {
 
             {/* Filter Tabs - Only show for Billiards */}
             {currentSport !== "GOLF" && (
-                <div className="flex p-1 bg-white/[0.04] rounded-2xl mb-6 border border-white/[0.06]">
+                <div className="flex p-1 bg-black/[0.04] rounded-2xl mb-6 ">
                     {[
                         { id: "all", label: "전체", icon: LucideLayers },
                         { id: "3c", label: "3쿠션", icon: LucideTarget },
@@ -88,7 +88,7 @@ export default function HiqHistory() {
                                 "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
                                 filter === tab.id
                                     ? "bg-brand text-brand-fg"
-                                    : "text-white/45 hover:text-white/70"
+                                    : "text-black/55 hover:text-black/70"
                             )}
                         >
                             <tab.icon className="w-4 h-4" />

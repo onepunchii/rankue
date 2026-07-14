@@ -5,7 +5,7 @@ export type MatchResult = "W" | "L" | "D";
 const STYLES: Record<MatchResult, { bg: string; fg: string; label: string }> = {
     W: { bg: "bg-brand", fg: "text-brand-fg", label: "승" },
     L: { bg: "bg-red-500", fg: "text-white", label: "패" },
-    D: { bg: "bg-white/15", fg: "text-white/70", label: "무" },
+    D: { bg: "bg-black/[0.06]", fg: "text-black/60", label: "무" },
 };
 
 /**
@@ -22,7 +22,7 @@ export function FormBadges({
     className?: string;
 }) {
     if (!results.length) {
-        return <span className="text-[12px] font-medium text-white/40">기록 없음</span>;
+        return <span className="text-[12px] font-medium text-black/40">기록 없음</span>;
     }
     return (
         <div className={cn("flex items-center gap-1.5", className)}>

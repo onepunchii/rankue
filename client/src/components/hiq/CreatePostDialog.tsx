@@ -132,25 +132,25 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-md rounded-card p-0 gap-0">
+            <DialogContent className="bg-white border-black/[0.08] text-ink-1 max-w-md rounded-card p-0 gap-0">
                 <DialogHeader className="p-6 pb-0">
-                    <DialogTitle className="text-xl font-semibold">게시글 작성</DialogTitle>
-                    <DialogDescription className="text-white/55">
+                    <DialogTitle className="text-xl font-semibold text-brand">게시글 작성</DialogTitle>
+                    <DialogDescription className="text-black/55">
                         크루 멤버들과 공유할 내용을 작성해주세요.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar max-h-[60vh] md:max-h-[70vh]">
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-white/55">카테고리</Label>
+                        <Label className="text-xs font-semibold text-black/55">카테고리</Label>
                         <Select value={category} onValueChange={(val) => {
                             setCategory(val);
                             if (val === "공지사항") setIsNotice(true);
                         }}>
-                            <SelectTrigger className="bg-surface-2 border-surface-line h-12 rounded-tile">
+                            <SelectTrigger className="bg-surface-3 border-black/10 h-12 rounded-tile">
                                 <SelectValue placeholder="카테고리 선택" />
                             </SelectTrigger>
-                            <SelectContent className="bg-[#141416] border-white/10 text-white rounded-tile">
+                            <SelectContent className="bg-white border-black/[0.08] text-ink-1 rounded-tile">
                                 {categories.map(c => (
                                     <SelectItem key={c} value={c}>{c}</SelectItem>
                                 ))}
@@ -159,30 +159,30 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-white/55">제목</Label>
+                        <Label className="text-xs font-semibold text-black/55">제목</Label>
                         <Input
                             placeholder="제목을 입력하세요"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            className="bg-surface-2 border-surface-line h-12 rounded-tile"
+                            className="bg-surface-3 border-black/10 h-12 rounded-tile placeholder:text-black/40"
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-white/55">내용</Label>
+                        <Label className="text-xs font-semibold text-black/55">내용</Label>
                         {category === "가입인사" && crew?.introQuestions && crew.introQuestions.length > 0 ? (
-                            <div className="space-y-4 p-4 bg-surface-2 border border-surface-line rounded-tile">
+                            <div className="space-y-4 p-4 bg-surface-3 rounded-tile">
                                 {crew.introQuestions.map((q) => (
                                     <div key={q.id} className="space-y-2">
                                         <div className="flex items-center gap-1.5">
-                                            <Label className="text-[12px] font-semibold text-white/90">{q.text}</Label>
+                                            <Label className="text-[12px] font-semibold text-black/70">{q.text}</Label>
                                             {q.required && <span className="text-brand text-[12px] font-semibold">필수</span>}
                                         </div>
                                         <Input
                                             value={answers[q.id] || ""}
                                             onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
                                             placeholder="답변을 입력하세요"
-                                            className="bg-black/20 border-white/5 h-10 text-sm rounded-lg"
+                                            className="bg-white border-black/10 h-10 text-sm rounded-lg placeholder:text-black/40"
                                         />
                                     </div>
                                 ))}
@@ -192,16 +192,16 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                                 placeholder="내용을 입력하세요"
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
-                                className="bg-surface-2 border-surface-line min-h-[150px] resize-none rounded-tile"
+                                className="bg-surface-3 border-black/10 min-h-[150px] resize-none rounded-tile placeholder:text-black/40"
                             />
                         )}
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-white/55">사진 ({images.length}/5)</Label>
+                        <Label className="text-xs font-semibold text-black/55">사진 ({images.length}/5)</Label>
                         <div className="flex flex-wrap gap-2">
                             {images.map((img, idx) => (
-                                <div key={idx} className="relative w-20 h-20 rounded-tile overflow-hidden border border-white/10">
+                                <div key={idx} className="relative w-20 h-20 rounded-tile overflow-hidden ">
                                     <img src={img} alt="preview" className="w-full h-full object-cover" />
                                     <button
                                         onClick={() => removeImage(idx)}
@@ -217,14 +217,14 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={isCompressing}
-                                    className="w-20 h-20 rounded-tile border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-1 hover:bg-white/5 transition-colors disabled:opacity-50"
+                                    className="w-20 h-20 rounded-tile border-2 border-dashed border-black/10 flex flex-col items-center justify-center gap-1 hover:bg-black/[0.04] transition-colors disabled:opacity-50"
                                 >
                                     {isCompressing ? (
                                         <div className="w-4 h-4 border-2 border-brand border-t-transparent animate-spin rounded-full" />
                                     ) : (
                                         <>
-                                            <LucideCamera className="w-6 h-6 text-white/45" />
-                                            <span className="text-[12px] font-medium text-white/55">추가</span>
+                                            <LucideCamera className="w-6 h-6 text-black/40" />
+                                            <span className="text-[12px] font-medium text-black/55">추가</span>
                                         </>
                                     )}
                                 </button>
@@ -243,10 +243,10 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                     </div>
 
                     {isAdmin && category !== "공지사항" && (
-                        <div className="flex items-center justify-between p-3 rounded-tile bg-surface-2 border border-surface-line">
+                        <div className="flex items-center justify-between p-3 rounded-tile bg-surface-3 ">
                             <div className="space-y-0.5">
-                                <Label className="text-sm font-semibold">공지사항으로 등록</Label>
-                                <p className="text-[12px] text-white/55">게시판 상단에 고정됩니다.</p>
+                                <Label className="text-sm font-semibold text-ink-1">공지사항으로 등록</Label>
+                                <p className="text-[12px] text-black/55">게시판 상단에 고정됩니다.</p>
                             </div>
                             <Switch checked={isNotice} onCheckedChange={setIsNotice} />
                         </div>

@@ -87,13 +87,13 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md rounded-card bg-[#141416] border-white/10 text-white">
+            <DialogContent className="max-w-md rounded-card bg-white border-black/10 text-ink-1">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
                         <LucideMail className="w-5 h-5 text-brand" />
                         건의함 / 제휴 문의
                     </DialogTitle>
-                    <DialogDescription className="text-white/55">
+                    <DialogDescription className="text-black/55">
                         Rankue 팀에게 바라는 점이나 궁금한 점을 남겨주세요.
                     </DialogDescription>
                 </DialogHeader>
@@ -105,14 +105,14 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             name="type"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xs font-semibold text-white/55">분류</FormLabel>
+                                    <FormLabel className="text-xs font-semibold text-black/55">분류</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
-                                            <SelectTrigger className="bg-surface-2 border-surface-line text-white rounded-tile">
+                                            <SelectTrigger className="bg-black/[0.04] border-black/10 text-ink-1 rounded-tile">
                                                 <SelectValue placeholder="카테고리 선택" />
                                             </SelectTrigger>
                                         </FormControl>
-                                        <SelectContent className="bg-[#141416] border-white/10 text-white rounded-tile">
+                                        <SelectContent className="bg-white border-black/10 text-ink-1 rounded-tile">
                                             <SelectItem value="BUG">🚫 버그 신고</SelectItem>
                                             <SelectItem value="PARTNERSHIP">🤝 제휴 문의</SelectItem>
                                             <SelectItem value="FEATURE">💡 기능 제안</SelectItem>
@@ -129,11 +129,11 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             name="content"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xs font-semibold text-white/55">내용</FormLabel>
+                                    <FormLabel className="text-xs font-semibold text-black/55">내용</FormLabel>
                                     <FormControl>
                                         <Textarea
                                             placeholder="내용을 입력해주세요 (500자 이내)"
-                                            className="resize-none h-32 bg-surface-2 border-surface-line text-white rounded-tile"
+                                            className="resize-none h-32 bg-black/[0.04] border-black/10 text-ink-1 placeholder:text-black/40 rounded-tile"
                                             {...field}
                                         />
                                     </FormControl>
@@ -147,11 +147,11 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             name="contact"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xs font-semibold text-white/55">연락처 (선택)</FormLabel>
+                                    <FormLabel className="text-xs font-semibold text-black/55">연락처 (선택)</FormLabel>
                                     <FormControl>
                                         <Input
                                             placeholder="답변 받을 이메일 또는 전화번호"
-                                            className="bg-surface-2 border-surface-line text-white rounded-tile"
+                                            className="bg-black/[0.04] border-black/10 text-ink-1 placeholder:text-black/40 rounded-tile"
                                             {...field}
                                         />
                                     </FormControl>

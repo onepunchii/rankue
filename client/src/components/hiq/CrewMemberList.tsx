@@ -151,45 +151,45 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
             </div>
 
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent side="bottom" className="h-[75vh] rounded-t-[2rem] bg-[#141416] border-t border-white/10 p-0 overflow-hidden">
+                <SheetContent side="bottom" className="h-[75vh] rounded-t-[2rem] bg-white border-t border-black/10 p-0 overflow-hidden">
                     <SheetTitle className="sr-only">멤버 상세 정보</SheetTitle>
                     <SheetDescription className="sr-only">선택한 멤버의 상세 통계와 정보를 확인합니다.</SheetDescription>
 
                     {selectedMember && sheetData && (
                         <div className="h-full flex flex-col overflow-y-auto pb-safe">
-                            <div className="relative pt-12 pb-8 px-6 flex flex-col items-center bg-[#141416]">
-                                <div className="absolute top-3 w-12 h-1 bg-white/10 rounded-full left-1/2 -translate-x-1/2" />
+                            <div className="relative pt-12 pb-8 px-6 flex flex-col items-center bg-white">
+                                <div className="absolute top-3 w-12 h-1 bg-black/10 rounded-full left-1/2 -translate-x-1/2" />
                                 <Avatar className={cn(
                                     "w-24 h-24 mb-4 border-4",
-                                    selectedMember.member.gender === 'female' ? "border-pink-500/30" : "border-white/5"
+                                    selectedMember.member.gender === 'female' ? "border-pink-500/30" : "border-black/10"
                                 )}>
                                     <AvatarImage
                                         src={selectedMember.member.profileImageUrl}
                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                     />
-                                    <AvatarFallback className="text-2xl font-semibold bg-surface-3 text-white/45">
+                                    <AvatarFallback className="text-2xl font-semibold bg-surface-3 text-black/40">
                                         {selectedMember.member.nickname?.[0] || selectedMember.member.name?.[0]}
                                     </AvatarFallback>
                                 </Avatar>
 
                                 <div className="flex items-center gap-3 mb-1">
-                                    <h2 className="text-3xl font-semibold text-white tracking-tight">
+                                    <h2 className="text-3xl font-semibold text-ink-1 tracking-tight">
                                         {selectedMember.member.nickname || selectedMember.member.name}
                                     </h2>
                                     <div className="flex items-center gap-1.5">
                                         {selectedMember.role === 'leader' && (
-                                            <Badge variant="outline" className="bg-yellow-500/10 border-yellow-500/20 text-yellow-500 gap-1 px-2">
+                                            <Badge variant="outline" className="bg-[#cba258]/12 border-[#cba258]/25 text-[#cba258] gap-1 px-2">
                                                 <LucideCrown className="w-3 h-3" /> 크루장
                                             </Badge>
                                         )}
                                         {selectedMember.role === 'manage' && (
-                                            <Badge variant="outline" className="bg-blue-500/10 border-blue-500/20 text-blue-400 gap-1 px-2">
+                                            <Badge variant="outline" className="bg-brand/10 border-brand/25 text-brand gap-1 px-2">
                                                 <LucideShield className="w-3 h-3" /> 운영진
                                             </Badge>
                                         )}
                                     </div>
                                 </div>
-                                <p className="text-[13px] font-medium text-white/45 mb-6">
+                                <p className="text-[13px] font-medium text-black/55 mb-6">
                                     {selectedMember.member.birthYear ? `${Math.floor((new Date().getFullYear() - selectedMember.member.birthYear) / 10) * 10}대` : '연령 미입력'}
                                     {' • '}
                                     {selectedMember.member.gender === 'female' ? '여성' : '남성'}
@@ -207,7 +207,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                 <div className="px-6 pb-4">
                                     <div className="flex items-center gap-2 mb-3">
                                         <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                                        <h2 className="text-[15px] font-semibold text-white/55">활동 성향</h2>
+                                        <h2 className="text-[15px] font-semibold text-black/55">활동 성향</h2>
                                     </div>
                                     <MemberActivityStats
                                         activities={memberActivities.activities || []}
@@ -221,17 +221,17 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                 {/* 소갯말 카드 */}
                                 <div className="p-5 rk-card flex flex-col gap-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[12px] font-medium text-white/45">소개글</span>
+                                        <span className="text-[12px] font-medium text-black/55">소개글</span>
                                         {currentMemberId === selectedMember.member.id && !isEditingBio && (
                                             <button
                                                 onClick={() => {
                                                     setNewBio(selectedMember.member.introduction || "");
                                                     setIsEditingBio(true);
                                                 }}
-                                                className="p-1 hover:bg-white/5 rounded"
+                                                className="p-1 hover:bg-black/[0.04] rounded"
                                                 title="소개글 수정"
                                             >
-                                                <LucideEdit2 className="w-3 h-3 text-white/40" />
+                                                <LucideEdit2 className="w-3 h-3 text-black/40" />
                                             </button>
                                         )}
                                     </div>
@@ -240,7 +240,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                         <div className="flex flex-col gap-3">
                                             <textarea
                                                 autoFocus
-                                                className="w-full bg-white/5 border border-white/10 rounded-tile p-4 text-sm text-white focus:outline-none focus:border-brand/50 min-h-[80px] resize-none"
+                                                className="w-full bg-black/[0.04] rounded-tile p-4 text-sm text-ink-1 placeholder:text-black/40 focus:outline-none focus:border-brand/50 min-h-[80px] resize-none"
                                                 value={newBio}
                                                 onChange={(e) => setNewBio(e.target.value)}
                                                 placeholder="자신을 한 줄로 소개해 보세요!"
@@ -249,7 +249,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                                 <Button
                                                     onClick={() => setIsEditingBio(false)}
                                                     variant="ghost"
-                                                    className="flex-1 h-9 text-white/40 text-xs"
+                                                    className="flex-1 h-9 text-black/55 text-xs"
                                                 >
                                                     취소
                                                 </Button>
@@ -263,7 +263,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                             </div>
                                         </div>
                                     ) : (
-                                        <p className="text-white/80 text-sm leading-relaxed font-medium">
+                                        <p className="text-black/70 text-sm leading-relaxed font-medium">
                                             {selectedMember.member.introduction || "아직 소갯말이 없습니다."}
                                         </p>
                                     )}
@@ -272,43 +272,43 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                 <div className="p-5 rk-card space-y-4">
                                     {/* 가입일 */}
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[12px] font-medium text-white/45">크루 가입일</span>
-                                        <span className="text-[13px] font-semibold text-white/60 tabular-nums">
+                                        <span className="text-[12px] font-medium text-black/55">크루 가입일</span>
+                                        <span className="text-[13px] font-semibold text-black/60 tabular-nums">
                                             {new Date(selectedMember.joinedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '')}
                                         </span>
                                     </div>
                                     {/* 활동 카운트 3칸 */}
                                     <div className="grid grid-cols-3 gap-2">
-                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-white/[0.04] border border-surface-line">
+                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-black/[0.04] ">
                                             <LucideCalendarCheck className="w-4 h-4 text-brand" />
-                                            <span className="text-[17px] font-bold text-white tabular-nums">
+                                            <span className="text-[17px] font-bold text-ink-1 tabular-nums">
                                                 {selectedMember.activityCounts?.group1 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-white/38">회</span>
+                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">회</span>
                                             </span>
-                                            <span className="text-[12px] font-medium text-white/45">{sportCategory === 'GOLF' ? '라운딩' : '모임'}</span>
+                                            <span className="text-[12px] font-medium text-black/55">{sportCategory === 'GOLF' ? '라운딩' : '모임'}</span>
                                         </div>
-                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-white/[0.04] border border-surface-line">
+                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-black/[0.04] ">
                                             {sportCategory === 'GOLF' ? <LucideMonitor className="w-4 h-4 text-brand" /> : <LucideTrophy className="w-4 h-4 text-brand" />}
-                                            <span className="text-[17px] font-bold text-white tabular-nums">
+                                            <span className="text-[17px] font-bold text-ink-1 tabular-nums">
                                                 {selectedMember.activityCounts?.group2 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-white/38">회</span>
+                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">회</span>
                                             </span>
-                                            <span className="text-[12px] font-medium text-white/45">{sportCategory === 'GOLF' ? '스크린' : '대회'}</span>
+                                            <span className="text-[12px] font-medium text-black/55">{sportCategory === 'GOLF' ? '스크린' : '대회'}</span>
                                         </div>
-                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-white/[0.04] border border-surface-line">
+                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-black/[0.04] ">
                                             <LucideBeer className="w-4 h-4 text-brand" />
-                                            <span className="text-[17px] font-bold text-white tabular-nums">
+                                            <span className="text-[17px] font-bold text-ink-1 tabular-nums">
                                                 {selectedMember.activityCounts?.group3 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-white/38">회</span>
+                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">회</span>
                                             </span>
-                                            <span className="text-[12px] font-medium text-white/45">뒷풀이</span>
+                                            <span className="text-[12px] font-medium text-black/55">뒷풀이</span>
                                         </div>
                                     </div>
                                 </div>
 
                             </div>
 
-                            <div className="mt-4 p-6 bg-[#141416] border-t border-white/5 flex flex-col gap-2 pb-safe">
+                            <div className="mt-4 p-6 bg-white border-t border-black/10 flex flex-col gap-2 pb-safe">
                                 <div className="flex gap-3">
                                     <Button
                                         disabled
@@ -321,13 +321,13 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                     <Button
                                         disabled
                                         variant="outline"
-                                        className="h-12 w-12 rounded-xl border-white/10 bg-white/5 p-0 disabled:opacity-40"
+                                        className="h-12 w-12 rounded-xl border-black/10 bg-black/[0.04] text-black/60 p-0 disabled:opacity-40"
                                         title="메시지 보내기 (준비 중)"
                                     >
                                         <LucideMessageCircle className="w-5 h-5" />
                                     </Button>
                                 </div>
-                                <p className="text-[12px] font-medium text-white/38 text-center">준비 중인 기능입니다</p>
+                                <p className="text-[12px] font-medium text-black/40 text-center">준비 중인 기능입니다</p>
                             </div>
                         </div>
                     )}
@@ -365,7 +365,7 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
         ? getTier(golfScore, false, 'GOLF')
         : getTier(Number(m.handi4c || 0), false, 'BILLIARDS');
 
-    const tierColor = TIER_COLOR[tier.label] || "text-white/55";
+    const tierColor = TIER_COLOR[tier.label] || "text-black/55";
     const hasStat = sportCategory === 'GOLF' ? golfScore > 0 : !!(m.avg4c && m.avg4c > 0);
     const statValue = sportCategory === 'GOLF' ? golfScore.toFixed(0) : avg4c;
     const statUnit = sportCategory === 'GOLF' ? '평균' : '4구';
@@ -380,7 +380,7 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
                 "flex items-center gap-3.5 px-4 py-3.5 mb-2 rounded-tile border transition-colors cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-brand",
                 isMe
                     ? "bg-brand/[0.06] border-brand/20"
-                    : "bg-surface-1 border-surface-line hover:border-white/10"
+                    : "bg-surface-1 border-surface-line hover:border-black/10"
             )}
         >
             {/* Avatar */}
@@ -394,32 +394,32 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         className="object-cover"
                     />
-                    <AvatarFallback className="bg-surface-3 text-white/40 text-base font-semibold">
+                    <AvatarFallback className="bg-surface-3 text-black/40 text-base font-semibold">
                         {m.nickname?.[0] || m.name?.[0]}
                     </AvatarFallback>
                 </Avatar>
                 {isMe && (
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-brand rounded-full border-2 border-[#0A0A0A]" />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-brand rounded-full border-2 border-white" />
                 )}
             </div>
 
             {/* Identity */}
             <div className="flex flex-col min-w-0 flex-1 gap-1">
                 <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-white font-semibold text-[16px] leading-tight tracking-tight truncate">
+                    <span className="text-ink-1 font-semibold text-[16px] leading-tight tracking-tight truncate">
                         {m.nickname || m.name}
                     </span>
-                    {isLeader && <LucideCrown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                    {isAdmin && <LucideShield className="w-3.5 h-3.5 text-white/40 shrink-0" />}
+                    {isLeader && <LucideCrown className="w-3.5 h-3.5 text-[#cba258] shrink-0" />}
+                    {isAdmin && <LucideShield className="w-3.5 h-3.5 text-black/40 shrink-0" />}
                     {isMe && (
-                        <span className="shrink-0 px-1.5 py-px rounded-full text-[11px] font-semibold text-brand bg-brand/12">나</span>
+                        <span className="shrink-0 px-1.5 py-px rounded-full text-[12px] font-semibold text-brand bg-brand/12">나</span>
                     )}
                 </div>
                 <div className="flex items-center gap-1.5 min-w-0 text-[12px] leading-none">
                     <span className={cn("font-semibold shrink-0", tierColor)}>{tier.label}</span>
-                    {isNewbie && <><span className="text-white/20">·</span><span className="text-brand/80 font-medium shrink-0">신입</span></>}
-                    <span className="text-white/20 shrink-0">·</span>
-                    <span className="text-white/40 font-medium truncate">
+                    {isNewbie && <><span className="text-black/20">·</span><span className="text-brand/80 font-medium shrink-0">신입</span></>}
+                    <span className="text-black/20 shrink-0">·</span>
+                    <span className="text-black/40 font-medium truncate">
                         {m.introduction || (sportCategory === 'GOLF' ? "골프를 즐기는 랭커" : "당구를 즐기는 랭커")}
                     </span>
                 </div>
@@ -429,22 +429,22 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
             <div className="flex items-center gap-2.5 shrink-0">
                 {hasStat && (
                     <div className="flex flex-col items-end leading-none">
-                        <span className="text-[18px] font-bold text-white tabular-nums tracking-tight">{statValue}</span>
-                        <span className="text-[11px] font-medium text-white/40 mt-1">{statUnit}</span>
+                        <span className="text-[18px] font-bold text-ink-1 tabular-nums tracking-tight">{statValue}</span>
+                        <span className="text-[12px] font-medium text-black/40 mt-1">{statUnit}</span>
                     </div>
                 )}
-                <LucideChevronRight className="w-4 h-4 text-white/30 group-hover:text-white/50 transition-colors" />
+                <LucideChevronRight className="w-4 h-4 text-black/30 group-hover:text-black/50 transition-colors" />
             </div>
         </div>
     );
 }
 
-// Tier label → refined accent color (medal metals, tokenized to the dark theme).
+// Tier label → refined accent color (medal metals, tuned for the warm light theme).
 const TIER_COLOR: Record<string, string> = {
-    "플래티넘": "text-cyan-300",
-    "골드": "text-amber-400",
-    "실버": "text-slate-300",
-    "브론즈": "text-orange-400/90",
+    "플래티넘": "text-cyan-600",
+    "골드": "text-[#cba258]",
+    "실버": "text-slate-500",
+    "브론즈": "text-orange-600",
 };
 
 const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => (
@@ -455,36 +455,36 @@ const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => (
                     <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded-full mb-1 border", sheetData.tier.class)}>
                         <span className="text-[12px] font-semibold">{sheetData.tier.label}</span>
                     </div>
-                    <span className="text-4xl font-bold text-white tracking-tight tabular-nums">
+                    <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
                         {sheetData.golfScore > 0 ? sheetData.golfScore.toFixed(0) : "-"}
                     </span>
-                    <span className="text-[12px] text-white/45 font-medium">평균 점수</span>
+                    <span className="text-[12px] text-black/55 font-medium">평균 점수</span>
                 </div>
-                <div className="w-px h-16 bg-white/10" />
+                <div className="w-px h-16 bg-black/10" />
                 <div className="flex flex-col items-center gap-1">
-                    <span className="text-[12px] text-blue-500 font-semibold bg-blue-500/10 px-2 py-0.5 rounded-full mb-1">최고 점수</span>
-                    <span className="text-4xl font-bold text-white tracking-tight tabular-nums">
+                    <span className="text-[12px] text-brand font-semibold bg-brand/10 px-2 py-0.5 rounded-full mb-1">최고 점수</span>
+                    <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
                         {member.golfBestScore && member.golfBestScore > 0 ? member.golfBestScore : "-"}
                     </span>
-                    <span className="text-[12px] text-white/45 font-medium">최고</span>
+                    <span className="text-[12px] text-black/55 font-medium">최고</span>
                 </div>
             </>
         ) : (
             <>
                 <div className="flex flex-col items-center gap-1">
                     <span className="text-[12px] text-brand font-semibold bg-brand/12 px-2 py-0.5 rounded-full mb-1">3C</span>
-                    <span className="text-4xl font-bold text-white tracking-tight tabular-nums">
+                    <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
                         {member.avg3c ? member.avg3c.toFixed(3) : "0.000"}
                     </span>
-                    <span className="text-[12px] text-white/45 font-medium">평균</span>
+                    <span className="text-[12px] text-black/55 font-medium">평균</span>
                 </div>
-                <div className="w-px h-16 bg-white/10" />
+                <div className="w-px h-16 bg-black/10" />
                 <div className="flex flex-col items-center gap-1">
-                    <span className="text-[12px] text-blue-500 font-semibold bg-blue-500/10 px-2 py-0.5 rounded-full mb-1">4C</span>
-                    <span className="text-4xl font-bold text-white tracking-tight tabular-nums">
+                    <span className="text-[12px] text-brand font-semibold bg-brand/10 px-2 py-0.5 rounded-full mb-1">4C</span>
+                    <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
                         {member.avg4c ? member.avg4c.toFixed(3) : "0.000"}
                     </span>
-                    <span className="text-[12px] text-white/45 font-medium">평균</span>
+                    <span className="text-[12px] text-black/55 font-medium">평균</span>
                 </div>
             </>
         )}

@@ -132,14 +132,14 @@ export default function Landing() {
 
     if (isBrandLoading || !brand) {
         return (
-            <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center gap-4">
-                <div className="text-white/55 font-bold text-4xl animate-pulse">RANKUE</div>
+            <div className="min-h-screen bg-[#f2f0eb] flex flex-col items-center justify-center gap-4">
+                <div className="text-brand font-bold text-4xl animate-pulse">RANKUE</div>
                 {brandError ? (
-                    <div className="text-red-500 font-semibold bg-white/10 p-4 rounded-tile">
+                    <div className="text-red-500 font-semibold bg-black/[0.04] p-4 rounded-tile">
                         오류: {brandError.message}
                     </div>
                 ) : (
-                    <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className="w-48 h-1 bg-black/[0.06] rounded-full overflow-hidden">
                         <motion.div
                             initial={{ x: "-100%" }}
                             animate={{ x: "100%" }}
@@ -153,7 +153,7 @@ export default function Landing() {
     }
 
     return (
-        <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-5 relative overflow-hidden bg-[#0A0A0A] font-sans">
+        <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-5 relative overflow-hidden bg-[#f2f0eb] font-sans">
             {/* Main Container */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -161,21 +161,21 @@ export default function Landing() {
                 className="relative z-10 w-full max-w-[400px] rk-card overflow-hidden flex flex-col"
             >
                 {/* Header Section */}
-                <div className="pt-12 pb-8 text-center bg-white/[0.02]">
+                <div className="pt-12 pb-8 text-center bg-black/[0.03]">
                     <motion.div
                         key={brand?.logoText}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                     >
-                        <h1 className="text-4xl font-bold text-white">
+                        <h1 className="text-4xl font-bold text-brand">
                             RANKUE
                         </h1>
                         <div className="flex items-center justify-center gap-2 mt-3">
-                            <span className="h-[1px] w-4 bg-white/10" />
-                            <p className="text-[12px] font-medium text-white/55">
+                            <span className="h-[1px] w-4 bg-black/10" />
+                            <p className="text-[12px] font-medium text-black/55">
                                 {requiresPassword ? `${memberName} 확인 중` : '스포츠 소셜 클럽'}
                             </p>
-                            <span className="h-[1px] w-4 bg-white/10" />
+                            <span className="h-[1px] w-4 bg-black/10" />
                         </div>
                     </motion.div>
                 </div>
@@ -198,20 +198,20 @@ export default function Landing() {
                                     handleStart();
                                 }
                             }}
-                            className={`w-full bg-transparent border-b-2 border-white/10 focus:border-brand text-center text-3xl font-bold tabular-nums text-white placeholder:text-white/45 py-4 transition-all outline-none`}
+                            className={`w-full bg-transparent border-b-2 border-black/10 focus:border-brand text-center text-3xl font-bold tabular-nums text-[rgba(0,0,0,0.87)] placeholder:text-black/40 py-4 transition-all outline-none`}
                             autoFocus={requiresPassword}
                         />
                         {/* Tooltip hint */}
-                        <p className="text-center text-[12px] text-white/55 mt-4 font-medium">
+                        <p className="text-center text-[12px] text-black/55 mt-4 font-medium">
                             {requiresPassword ? "비밀번호를 입력하여 본인을 확인하세요" : "휴대폰 번호로 입장하세요"}
                         </p>
 
                         {requiresPassword && (
                             <button
                                 onClick={() => setIsResetOpen(true)}
-                                className="w-full mt-6 py-4 px-4 bg-white/5 border border-white/10 rounded-tile text-[12px] font-medium text-white/55 hover:text-brand hover:border-brand/50 transition-all active:scale-95 text-center flex items-center justify-center gap-2 group"
+                                className="w-full mt-6 py-4 px-4 bg-black/[0.04] rounded-tile text-[12px] font-medium text-black/55 hover:text-brand hover:border-brand/50 transition-all active:scale-95 text-center flex items-center justify-center gap-2 group"
                             >
-                                <LucideShieldQuestion className="w-4 h-4 text-white/40 group-hover:text-brand transition-colors" />
+                                <LucideShieldQuestion className="w-4 h-4 text-black/40 group-hover:text-brand transition-colors" />
                                 <span>PIN을 잊으셨나요?</span>
                             </button>
                         )}
@@ -228,12 +228,12 @@ export default function Landing() {
                         whileTap={{ scale: 0.98 }}
                         className="w-full h-16 rounded-tile font-bold text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-20 relative overflow-hidden group"
                         style={{
-                            background: canSubmit ? "rgb(var(--brand))" : "rgba(255,255,255,0.05)",
-                            color: canSubmit ? "rgb(var(--brand-fg))" : "rgba(255,255,255,0.45)"
+                            background: canSubmit ? "rgb(var(--brand))" : "rgba(0,0,0,0.04)",
+                            color: canSubmit ? "rgb(var(--brand-fg))" : "rgba(0,0,0,0.40)"
                         }}
                     >
                         {isLoading ? (
-                            <div className="w-6 h-6 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                            <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                         ) : (
                             <>
                                 <span>{requiresPassword ? "확인 및 입장" : "입장하기"}</span>
@@ -245,7 +245,7 @@ export default function Landing() {
 
                 {/* Footer */}
                 <div className="text-center pb-6">
-                    <p className="text-[12px] font-medium text-white/55">RANKUE 제공</p>
+                    <p className="text-[12px] font-medium text-black/55">RANKUE 제공</p>
                 </div>
             </motion.div>
 
@@ -265,7 +265,7 @@ function KeypadButton({ value, onClick, brandColor }: { value: string, onClick: 
                 whileTap={{ scale: 0.85, shadow: `0 0 20px ${brandColor || '#6366f1'}44` }}
                 onClick={() => onClick(value)}
                 title={value}
-                className="w-16 h-16 rounded-full flex items-center justify-center text-3xl font-light text-white/80 transition-all bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05]"
+                className="w-16 h-16 rounded-full flex items-center justify-center text-3xl font-light text-black/70 transition-all bg-black/[0.04] hover:bg-black/[0.06] "
             >
                 {value}
             </motion.button>

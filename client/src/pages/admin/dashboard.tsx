@@ -97,15 +97,15 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
     ];
 
     return (
-        <div className="flex flex-col h-full bg-[#111] border-r border-white/10">
-            <div className="p-6 border-b border-white/10">
+        <div className="flex flex-col h-full bg-white border-r border-black/10">
+            <div className="p-6 border-b border-black/10">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(79,70,229,0.3)]">
+                    <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                         <LucideGlobe className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-lg font-black tracking-tight text-white">ADMIN</h1>
-                        <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest block">Control Tower</span>
+                        <h1 className="text-lg font-black tracking-tight text-brand">ADMIN</h1>
+                        <span className="text-[10px] text-black/40 font-bold uppercase tracking-widest block">Control Tower</span>
                     </div>
                 </div>
             </div>
@@ -119,8 +119,8 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
                             if (closeMobileMenu) closeMobileMenu();
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${tab === item.id
-                            ? "bg-indigo-600 text-white shadow-lg"
-                            : "text-white/40 hover:bg-white/5 hover:text-white"
+                            ? "bg-brand text-white shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                            : "text-black/60 hover:bg-black/[0.04] hover:text-[rgba(0,0,0,0.87)]"
                             }`}
                     >
                         <item.icon size={18} />
@@ -129,8 +129,8 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
                 ))}
             </nav>
 
-            <div className="p-4 border-t border-white/10">
-                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-400 hover:bg-red-500/10 transition">
+            <div className="p-4 border-t border-black/10">
+                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-500/10 transition">
                     <LucideLogOut size={18} />
                     로그아웃
                 </button>
@@ -245,22 +245,22 @@ export default function AdminDashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col md:flex-row">
+        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans flex flex-col md:flex-row">
             {/* Mobile Header */}
-            <div className="md:hidden bg-[#111] border-b border-white/10 p-4 sticky top-0 z-30 flex items-center justify-between">
+            <div className="md:hidden bg-white border-b border-black/10 p-4 sticky top-0 z-30 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
                         <LucideGlobe className="w-4 h-4 text-white" />
                     </div>
-                    <span className="font-black text-white">ADMIN</span>
+                    <span className="font-black text-brand">ADMIN</span>
                 </div>
                 <Sheet>
                     <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-white">
+                        <Button variant="ghost" size="icon" className="text-[rgba(0,0,0,0.87)]">
                             <LucideMenu />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="p-0 border-r border-white/10 w-72 bg-[#111]">
+                    <SheetContent side="left" className="p-0 border-r border-black/10 w-72 bg-white">
                         <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} />
                     </SheetContent>
                 </Sheet>
@@ -276,8 +276,8 @@ export default function AdminDashboard() {
             <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto">
                 {/* Header Title */}
                 <header className="mb-8">
-                    <h2 className="text-3xl font-black text-white mb-2">{getTabTitle(tab)}</h2>
-                    <p className="text-white/40 text-sm">시스템 운영 및 관리</p>
+                    <h2 className="text-3xl font-black text-[rgba(0,0,0,0.87)] mb-2">{getTabTitle(tab)}</h2>
+                    <p className="text-black/55 text-sm">시스템 운영 및 관리</p>
                 </header>
 
                 <div className="max-w-6xl">
@@ -285,51 +285,51 @@ export default function AdminDashboard() {
                         <div className="space-y-8">
                             <div className="space-y-8">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <StatCard label="Total Stores" value={stats?.totalStores || 0} icon={<LucideStore className="text-indigo-400" />} sub="가맹점" />
-                                    <StatCard label="New Leads" value={stats?.newLeads || 0} icon={<LucidePhone className="text-emerald-400" />} sub="신규 문의" highlight={!!stats?.newLeads} />
-                                    <StatCard label="Today Traffic" value={stats?.totalVisitsToday || 0} icon={<LucideTrendingUp className="text-orange-400" />} sub="방문객" />
-                                    <StatCard label="Total Users" value={stats?.totalUsers || 0} icon={<LucideUsers className="text-blue-400" />} sub="회원수" />
+                                    <StatCard label="Total Stores" value={stats?.totalStores || 0} icon={<LucideStore className="text-brand" />} sub="가맹점" />
+                                    <StatCard label="New Leads" value={stats?.newLeads || 0} icon={<LucidePhone className="text-brand" />} sub="신규 문의" highlight={!!stats?.newLeads} />
+                                    <StatCard label="Today Traffic" value={stats?.totalVisitsToday || 0} icon={<LucideTrendingUp className="text-orange-500" />} sub="방문객" />
+                                    <StatCard label="Total Users" value={stats?.totalUsers || 0} icon={<LucideUsers className="text-brand" />} sub="회원수" />
                                 </div>
 
                                 {/* Recent Activity Brief */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-[#111] p-6 rounded-2xl border border-white/5">
+                                    <div className="bg-white p-6 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                            <LucidePhone size={18} className="text-emerald-500" /> 최근 입점 문의
+                                            <LucidePhone size={18} className="text-brand" /> 최근 입점 문의
                                         </h3>
                                         <div className="space-y-3">
                                             {leads.slice(0, 3).map(lead => (
-                                                <div key={lead.id} className="flex justify-between items-center text-sm p-3 bg-white/5 rounded-xl">
+                                                <div key={lead.id} className="flex justify-between items-center text-sm p-3 bg-black/[0.04] rounded-xl">
                                                     <div>
                                                         <span className="font-bold">{lead.ownerName}</span>
-                                                        <span className="text-white/40 text-xs ml-2">{lead.region}</span>
+                                                        <span className="text-black/55 text-xs ml-2">{lead.region}</span>
                                                     </div>
                                                     <Badge variant={lead.status === 'NEW' ? 'destructive' : 'secondary'}>{lead.status}</Badge>
                                                 </div>
                                             ))}
-                                            {leads.length === 0 && <div className="text-center text-white/20 py-4 text-xs">문의 내역이 없습니다.</div>}
+                                            {leads.length === 0 && <div className="text-center text-black/40 py-4 text-xs">문의 내역이 없습니다.</div>}
                                         </div>
                                     </div>
 
-                                    <div className="bg-[#111] p-6 rounded-2xl border border-white/5">
+                                    <div className="bg-white p-6 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                            <LucideMail size={18} className="text-yellow-500" /> 최근 건의사항
+                                            <LucideMail size={18} className="text-brand" /> 최근 건의사항
                                         </h3>
                                         <div className="space-y-3">
                                             {suggestions.slice(0, 3).map(suggestion => (
-                                                <div key={suggestion.id} className="p-3 bg-white/5 rounded-xl text-xs space-y-1">
+                                                <div key={suggestion.id} className="p-3 bg-black/[0.04] rounded-xl text-xs space-y-1">
                                                     <div className="flex justify-between items-center">
                                                         <Badge variant={suggestion.type === 'BUG' ? 'destructive' : 'secondary'} className="scale-75 origin-left">
                                                             {suggestion.type}
                                                         </Badge>
-                                                        <span className="text-white/30">{new Date(suggestion.createdAt).toLocaleDateString()}</span>
+                                                        <span className="text-black/40">{new Date(suggestion.createdAt).toLocaleDateString()}</span>
                                                     </div>
-                                                    <p className="text-white/70 line-clamp-1">{suggestion.content}</p>
+                                                    <p className="text-black/70 line-clamp-1">{suggestion.content}</p>
                                                 </div>
                                             ))}
-                                            {suggestions.length === 0 && <div className="text-center text-white/20 py-4 text-xs">건의사항이 없습니다.</div>}
+                                            {suggestions.length === 0 && <div className="text-center text-black/40 py-4 text-xs">건의사항이 없습니다.</div>}
                                             {suggestions.length > 0 && (
-                                                <Button variant="ghost" className="w-full text-xs text-white/40 h-8 mt-2 hover:bg-white/5" onClick={() => setTab("suggestions")}>
+                                                <Button variant="ghost" className="w-full text-xs text-black/55 h-8 mt-2 hover:bg-black/[0.04]" onClick={() => setTab("suggestions")}>
                                                     모두 보기
                                                 </Button>
                                             )}
@@ -343,23 +343,23 @@ export default function AdminDashboard() {
                     {tab === "leads" && (
                         <div className="grid gap-4">
                             {leads.map((lead) => (
-                                <div key={lead.id} className="bg-[#111] p-5 rounded-2xl border border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:border-white/10 transition">
+                                <div key={lead.id} className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:border-black/10 transition">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
                                             <Badge variant={lead.status === 'NEW' ? 'destructive' : lead.status === 'REGISTERED' ? 'default' : 'secondary'}>
                                                 {lead.status}
                                             </Badge>
-                                            <span className="text-xs text-white/30">{new Date(lead.createdAt).toLocaleDateString()}</span>
+                                            <span className="text-xs text-black/40">{new Date(lead.createdAt).toLocaleDateString()}</span>
                                         </div>
-                                        <h3 className="text-lg font-bold">{lead.ownerName} <span className="text-sm font-normal text-white/40">사장님</span></h3>
-                                        <div className="text-white/50 text-sm mt-1">
+                                        <h3 className="text-lg font-bold">{lead.ownerName} <span className="text-sm font-normal text-black/55">사장님</span></h3>
+                                        <div className="text-black/60 text-sm mt-1">
                                             {lead.phoneNumber} | {lead.region} {lead.storeName}
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
                                         <Button size="sm" variant="outline" onClick={() => window.open(`tel:${lead.phoneNumber}`)}>전화</Button>
                                         {lead.status !== 'REGISTERED' && (
-                                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => updateLeadStatusMutation.mutate({ id: lead.id, status: "REGISTERED" })}>승인</Button>
+                                            <Button size="sm" className="bg-brand hover:bg-brand/90 text-white" onClick={() => updateLeadStatusMutation.mutate({ id: lead.id, status: "REGISTERED" })}>승인</Button>
                                         )}
                                     </div>
                                 </div>
@@ -370,17 +370,17 @@ export default function AdminDashboard() {
                     {tab === "stores" && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {stores.map((store) => (
-                                <div key={store.id} className="bg-[#111] p-5 rounded-2xl border border-white/5 group hover:border-indigo-500/50 transition-all">
+                                <div key={store.id} className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] group hover:border-brand/50 transition-all">
                                     <div className="flex justify-between items-start mb-4">
-                                        <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
-                                            <LucideStore className="w-5 h-5 text-indigo-400" />
+                                        <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center">
+                                            <LucideStore className="w-5 h-5 text-brand" />
                                         </div>
-                                        <Badge variant="outline" className="border-white/10 text-white/60">{store.region || "지역 미설정"}</Badge>
+                                        <Badge variant="outline" className="border-black/10 text-black/60">{store.region || "지역 미설정"}</Badge>
                                     </div>
                                     <h3 className="text-xl font-bold mb-1 truncate">{store.name}</h3>
-                                    <p className="text-white/40 text-sm mb-6">점주: {store.ownerName}</p>
+                                    <p className="text-black/55 text-sm mb-6">점주: {store.ownerName}</p>
                                     <Button
-                                        className="w-full bg-white/5 hover:bg-indigo-600 hover:text-white transition-all"
+                                        className="w-full bg-black/[0.04] hover:bg-brand hover:text-white transition-all"
                                         onClick={() => impersonateMutation.mutate(store.id)}
                                     >
                                         관리자 접속 <LucideArrowRight className="w-4 h-4 ml-2" />
@@ -392,22 +392,22 @@ export default function AdminDashboard() {
 
                     {tab === "crews" && (
                         <div className="space-y-6">
-                            <div className="flex gap-2 mb-6 bg-white/5 p-1 rounded-xl w-fit">
+                            <div className="flex gap-2 mb-6 bg-black/[0.04] p-1 rounded-xl w-fit">
                                 <button
                                     onClick={() => setCrewSportFilter("ALL")}
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${crewSportFilter === "ALL" ? "bg-indigo-600 text-white" : "text-white/40 hover:text-white"}`}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${crewSportFilter === "ALL" ? "bg-brand text-white" : "text-black/55 hover:text-[rgba(0,0,0,0.87)]"}`}
                                 >
                                     전체
                                 </button>
                                 <button
                                     onClick={() => setCrewSportFilter("BILLIARDS")}
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${crewSportFilter === "BILLIARDS" ? "bg-indigo-600 text-white" : "text-white/40 hover:text-white"}`}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${crewSportFilter === "BILLIARDS" ? "bg-brand text-white" : "text-black/55 hover:text-[rgba(0,0,0,0.87)]"}`}
                                 >
                                     당구
                                 </button>
                                 <button
                                     onClick={() => setCrewSportFilter("GOLF")}
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${crewSportFilter === "GOLF" ? "bg-indigo-600 text-white" : "text-white/40 hover:text-white"}`}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${crewSportFilter === "GOLF" ? "bg-brand text-white" : "text-black/55 hover:text-[rgba(0,0,0,0.87)]"}`}
                                 >
                                     골프
                                 </button>
@@ -415,29 +415,29 @@ export default function AdminDashboard() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {filteredCrews.map((crew) => (
-                                    <div key={crew.id} className="bg-[#111] p-5 rounded-2xl border border-white/5 hover:border-white/10 transition">
+                                    <div key={crew.id} className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:border-black/10 transition">
                                         <div className="flex justify-between items-start mb-3">
-                                            <Badge variant={crew.sportCategory === 'GOLF' ? 'default' : 'secondary'} className={crew.sportCategory === 'GOLF' ? 'bg-emerald-600' : 'bg-blue-600'}>
+                                            <Badge variant={crew.sportCategory === 'GOLF' ? 'default' : 'secondary'} className={crew.sportCategory === 'GOLF' ? 'bg-brand' : 'bg-blue-600'}>
                                                 {crew.sportCategory === 'GOLF' ? 'GOLF' : '당구'}
                                             </Badge>
-                                            <span className="text-[10px] text-white/30">{new Date(crew.createdAt).toLocaleDateString()}</span>
+                                            <span className="text-[10px] text-black/40">{new Date(crew.createdAt).toLocaleDateString()}</span>
                                         </div>
                                         <h3 className="text-lg font-bold mb-1">{crew.name}</h3>
-                                        <p className="text-white/40 text-sm mb-4 line-clamp-2 h-10">{crew.description}</p>
-                                        <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                                        <p className="text-black/55 text-sm mb-4 line-clamp-2 h-10">{crew.description}</p>
+                                        <div className="flex justify-between items-center pt-4 border-t border-black/10">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
-                                                    <LucideUsers size={12} className="text-white/60" />
+                                                <div className="w-6 h-6 rounded-full bg-black/[0.06] flex items-center justify-center">
+                                                    <LucideUsers size={12} className="text-black/60" />
                                                 </div>
                                                 <span className="text-xs font-bold">{crew.memberCount}명</span>
                                             </div>
-                                            <span className="text-xs text-white/40">리더: {crew.leaderName}</span>
+                                            <span className="text-xs text-black/55">리더: {crew.leaderName}</span>
                                         </div>
                                     </div>
                                 ))}
                                 {filteredCrews.length === 0 && (
-                                    <div className="col-span-full text-center py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
-                                        <p className="text-white/20">등록된 크루가 없습니다.</p>
+                                    <div className="col-span-full text-center py-20 bg-black/[0.03] rounded-3xl border border-dashed border-black/10">
+                                        <p className="text-black/40">등록된 크루가 없습니다.</p>
                                     </div>
                                 )}
                             </div>
@@ -446,14 +446,14 @@ export default function AdminDashboard() {
 
                     {tab === "billing" && (
                         <div className="space-y-6">
-                            <div className="bg-indigo-900/10 border border-indigo-500/20 p-6 rounded-2xl mb-8">
-                                <h3 className="text-xl font-bold text-indigo-400 mb-2">💰 Revenue Management (Mockup)</h3>
-                                <p className="text-indigo-200/60 mb-0">현재는 Mock Data를 기반으로 표시됩니다.</p>
+                            <div className="bg-brand/[0.06] border border-brand/20 p-6 rounded-2xl mb-8">
+                                <h3 className="text-xl font-bold text-brand mb-2">💰 Revenue Management (Mockup)</h3>
+                                <p className="text-black/60 mb-0">현재는 Mock Data를 기반으로 표시됩니다.</p>
                             </div>
 
-                            <div className="bg-[#111] rounded-2xl border border-white/5 overflow-x-auto">
+                            <div className="bg-white rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] overflow-x-auto">
                                 <table className="w-full text-left text-sm">
-                                    <thead className="bg-white/5 text-white/40 text-xs uppercase font-bold">
+                                    <thead className="bg-black/[0.04] text-black/55 text-xs uppercase font-bold">
                                         <tr>
                                             <th className="p-4">Store Name</th>
                                             <th className="p-4">Plan</th>
@@ -462,26 +462,26 @@ export default function AdminDashboard() {
                                             <th className="p-4 text-right">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-white/5">
+                                    <tbody className="divide-y divide-black/[0.06]">
                                         {stores.map(store => (
-                                            <tr key={store.id} className="hover:bg-white/[0.02]">
+                                            <tr key={store.id} className="hover:bg-black/[0.03]">
                                                 <td className="p-4 font-bold">{store.name}</td>
                                                 <td className="p-4">
-                                                    <Badge variant={store.plan === 'premium' ? 'default' : 'outline'} className={store.plan === 'premium' ? 'bg-indigo-600' : 'text-white/60'}>
+                                                    <Badge variant={store.plan === 'premium' ? 'default' : 'outline'} className={store.plan === 'premium' ? 'bg-brand' : 'text-black/60'}>
                                                         {store.plan.toUpperCase()}
                                                     </Badge>
                                                 </td>
-                                                <td className="p-4 text-white/50">{store.nextBillingDate ? new Date(store.nextBillingDate).toLocaleDateString() : '-'}</td>
+                                                <td className="p-4 text-black/60">{store.nextBillingDate ? new Date(store.nextBillingDate).toLocaleDateString() : '-'}</td>
                                                 <td className="p-4">
-                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${store.subscriptionStatus === 'active' ? 'bg-emerald-500/10 text-emerald-400' :
-                                                        store.subscriptionStatus === 'overdue' ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-white/40'
+                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${store.subscriptionStatus === 'active' ? 'bg-brand/10 text-brand' :
+                                                        store.subscriptionStatus === 'overdue' ? 'bg-red-500/10 text-red-600' : 'bg-black/[0.04] text-black/40'
                                                         }`}>
-                                                        <div className={`w-1.5 h-1.5 rounded-full ${store.subscriptionStatus === 'active' ? 'bg-emerald-400' : store.subscriptionStatus === 'overdue' ? 'bg-red-400' : 'bg-gray-400'}`} />
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${store.subscriptionStatus === 'active' ? 'bg-brand' : store.subscriptionStatus === 'overdue' ? 'bg-red-500' : 'bg-gray-400'}`} />
                                                         {store.subscriptionStatus.toUpperCase()}
                                                     </span>
                                                 </td>
                                                 <td className="p-4 text-right">
-                                                    <Button size="sm" variant="ghost" className="h-8 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-400/10">
+                                                    <Button size="sm" variant="ghost" className="h-8 text-brand hover:text-brand/80 hover:bg-brand/10">
                                                         Send Invoice
                                                     </Button>
                                                 </td>
@@ -496,26 +496,26 @@ export default function AdminDashboard() {
                     {tab === "suggestions" && (
                         <div className="grid gap-4">
                             {suggestions.map((suggestion) => (
-                                <div key={suggestion.id} className={`bg-[#111] p-5 rounded-2xl border flex flex-col gap-3 transition-opacity ${suggestion.isRead ? 'border-white/5 opacity-50' : 'border-white/5'}`}>
+                                <div key={suggestion.id} className={`bg-white p-5 rounded-2xl border shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex flex-col gap-3 transition-opacity ${suggestion.isRead ? 'border-black/[0.07] opacity-50' : 'border-black/[0.07]'}`}>
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-2">
                                             <Badge variant={suggestion.type === 'BUG' ? 'destructive' : suggestion.type === 'PARTNERSHIP' ? 'default' : 'secondary'}>
                                                 {suggestion.type}
                                             </Badge>
                                             {suggestion.isRead && (
-                                                <Badge variant="outline" className="border-emerald-500/30 text-emerald-400">
+                                                <Badge variant="outline" className="border-brand/30 text-brand">
                                                     <LucideCheckCircle className="w-3 h-3 mr-1" /> 완료
                                                 </Badge>
                                             )}
-                                            <span className="text-xs text-white/30">{new Date(suggestion.createdAt).toLocaleString()}</span>
+                                            <span className="text-xs text-black/40">{new Date(suggestion.createdAt).toLocaleString()}</span>
                                         </div>
                                         {suggestion.contact && (
-                                            <div className="text-right text-xs text-white/50 bg-white/5 px-2 py-1 rounded-md">
+                                            <div className="text-right text-xs text-black/60 bg-black/[0.04] px-2 py-1 rounded-md">
                                                 연락처: {suggestion.contact}
                                             </div>
                                         )}
                                     </div>
-                                    <p className="text-white/80 whitespace-pre-wrap text-sm leading-relaxed p-3 bg-white/[0.02] rounded-xl border border-white/5">
+                                    <p className="text-black/70 whitespace-pre-wrap text-sm leading-relaxed p-3 bg-black/[0.03] rounded-xl ">
                                         {suggestion.content}
                                     </p>
                                     <div className="flex justify-end gap-2">
@@ -545,7 +545,7 @@ export default function AdminDashboard() {
                                 </div>
                             ))}
                             {suggestions.length === 0 && (
-                                <div className="text-center text-white/30 py-10">접수된 건의사항이 없습니다.</div>
+                                <div className="text-center text-black/40 py-10">접수된 건의사항이 없습니다.</div>
                             )}
                         </div>
                     )}
@@ -555,32 +555,32 @@ export default function AdminDashboard() {
                             <div className="flex justify-end">
                                 <Dialog open={newNoticeOpen} onOpenChange={setNewNoticeOpen}>
                                     <DialogTrigger asChild>
-                                        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                                        <Button className="bg-brand hover:bg-brand/90 text-white">
                                             + 새 공지사항 작성
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent className="bg-[#1a1a1a] border-white/10 text-white">
+                                    <DialogContent className="bg-white border-black/10 text-[rgba(0,0,0,0.87)]">
                                         <h3 className="text-xl font-bold mb-4">Create Notice</h3>
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="text-xs text-white/40 font-bold uppercase block mb-1">Title</label>
-                                                <Input value={noticeForm.title} onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })} className="bg-white/5 border-white/10 text-white" />
+                                                <label className="text-xs text-black/55 font-bold uppercase block mb-1">Title</label>
+                                                <Input value={noticeForm.title} onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })} className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)]" />
                                             </div>
                                             <div>
-                                                <label className="text-xs text-white/40 font-bold uppercase block mb-1">Content</label>
-                                                <Textarea value={noticeForm.content} onChange={e => setNoticeForm({ ...noticeForm, content: e.target.value })} className="bg-white/5 border-white/10 text-white h-32" />
+                                                <label className="text-xs text-black/55 font-bold uppercase block mb-1">Content</label>
+                                                <Textarea value={noticeForm.content} onChange={e => setNoticeForm({ ...noticeForm, content: e.target.value })} className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] h-32" />
                                             </div>
                                             <div className="flex gap-4">
-                                                <label className="flex items-center gap-2 text-sm text-white/60">
+                                                <label className="flex items-center gap-2 text-sm text-black/60">
                                                     <input type="radio" checked={noticeForm.target === 'all'} onChange={() => setNoticeForm({ ...noticeForm, target: 'all' })} />
                                                     전체 사용자
                                                 </label>
-                                                <label className="flex items-center gap-2 text-sm text-white/60">
+                                                <label className="flex items-center gap-2 text-sm text-black/60">
                                                     <input type="radio" checked={noticeForm.target === 'owners'} onChange={() => setNoticeForm({ ...noticeForm, target: 'owners' })} />
                                                     사장님 전용
                                                 </label>
                                             </div>
-                                            <Button onClick={() => createNoticeMutation.mutate(noticeForm)} className="w-full bg-indigo-600 mt-2">등록하기</Button>
+                                            <Button onClick={() => createNoticeMutation.mutate(noticeForm)} className="w-full bg-brand text-white mt-2">등록하기</Button>
                                         </div>
                                     </DialogContent>
                                 </Dialog>
@@ -588,13 +588,13 @@ export default function AdminDashboard() {
 
                             <div className="grid gap-4">
                                 {notices.map(notice => (
-                                    <div key={notice.id} className="bg-[#111] p-5 rounded-2xl border border-white/5">
+                                    <div key={notice.id} className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                                         <div className="flex justify-between items-start mb-2">
                                             <h3 className="font-bold text-lg">{notice.title}</h3>
-                                            <Badge variant="outline" className="border-white/10">{notice.target === 'all' ? 'Users' : 'Owners'}</Badge>
+                                            <Badge variant="outline" className="border-black/10">{notice.target === 'all' ? 'Users' : 'Owners'}</Badge>
                                         </div>
-                                        <p className="text-white/60 text-sm whitespace-pre-wrap">{notice.content}</p>
-                                        <div className="mt-4 text-xs text-white/30 text-right">
+                                        <p className="text-black/60 text-sm whitespace-pre-wrap">{notice.content}</p>
+                                        <div className="mt-4 text-xs text-black/40 text-right">
                                             {new Date(notice.createdAt).toLocaleString()}
                                         </div>
                                     </div>
@@ -606,13 +606,13 @@ export default function AdminDashboard() {
                     {tab === "moderation" && (
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {reports.map((user) => (
-                                <div key={user.id} className="bg-red-500/5 p-6 rounded-2xl border border-red-500/20 text-center">
+                                <div key={user.id} className="bg-red-500/[0.05] p-6 rounded-2xl border border-red-500/20 shadow-[0_1px_2px_rgba(0,0,0,0.06)] text-center">
                                     <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <LucideShieldAlert className="w-8 h-8 text-red-500" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-white mb-1">{user.nickname}</h3>
-                                    <div className="text-red-400 font-bold mb-4">누적 신고: {user.reportCount}건</div>
-                                    <div className="text-white/40 text-sm mb-6 bg-black/20 py-2 rounded-lg">
+                                    <h3 className="text-lg font-bold text-[rgba(0,0,0,0.87)] mb-1">{user.nickname}</h3>
+                                    <div className="text-red-600 font-bold mb-4">누적 신고: {user.reportCount}건</div>
+                                    <div className="text-black/60 text-sm mb-6 bg-black/[0.04] py-2 rounded-lg">
                                         사유: {user.reason}
                                     </div>
                                     <Button
@@ -624,7 +624,7 @@ export default function AdminDashboard() {
                                     </Button>
                                 </div>
                             ))}
-                            {reports.length === 0 && <div className="col-span-3 text-center text-white/30 py-10">신고된 유저가 없습니다. 클린합니다! ✨</div>}
+                            {reports.length === 0 && <div className="col-span-3 text-center text-black/55 py-10">신고된 유저가 없습니다. 클린합니다! ✨</div>}
                         </div>
                     )}
 
@@ -651,13 +651,13 @@ function getTabTitle(tab: string) {
 
 function StatCard({ label, value, icon, sub, highlight = false }: any) {
     return (
-        <div className={`p-5 rounded-2xl border ${highlight ? 'bg-emerald-900/10 border-emerald-500/30' : 'bg-[#111] border-white/5'}`}>
+        <div className={`p-5 rounded-2xl border shadow-[0_1px_2px_rgba(0,0,0,0.06)] ${highlight ? 'bg-brand/[0.06] border-brand/30' : 'bg-white border-black/[0.07]'}`}>
             <div className="flex justify-between items-start mb-2">
-                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{label}</span>
+                <span className="text-[10px] font-bold text-black/55 uppercase tracking-widest">{label}</span>
                 <div className="opacity-80">{icon}</div>
             </div>
-            <div className="text-3xl font-black text-white mb-1">{value}</div>
-            <div className="text-xs text-white/30">{sub}</div>
+            <div className="text-3xl font-black text-[rgba(0,0,0,0.87)] mb-1">{value}</div>
+            <div className="text-xs text-black/40">{sub}</div>
         </div>
     );
 }
@@ -684,47 +684,47 @@ function GolfOrdersView() {
         }
     });
 
-    if (isLoading) return <div className="text-center py-20 text-gray-500">Loading...</div>;
+    if (isLoading) return <div className="text-center py-20 text-black/40">Loading...</div>;
 
     const sortedOrders = orders ? [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [];
 
     return (
-        <div className="bg-[#111] border border-white/5 overflow-hidden rounded-2xl shadow-2xl">
+        <div className="bg-white overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
             <div className="overflow-x-auto">
-                <table className="w-full text-left bg-[#111]">
+                <table className="w-full text-left bg-white">
                     <thead>
-                        <tr className="bg-[#1a1a1a] border-b border-[#222]">
-                            <th className="p-5 font-black text-gray-400">날짜</th>
-                            <th className="p-5 font-black text-gray-400">구분</th>
-                            <th className="p-5 font-black text-gray-400">회원권 / 구장</th>
-                            <th className="p-5 font-black text-gray-400 text-right">희망가격</th>
-                            <th className="p-5 font-black text-gray-400">연락처</th>
-                            <th className="p-5 font-black text-gray-400 text-center">상태</th>
-                            <th className="p-5 font-black text-gray-400 text-center">관리</th>
+                        <tr className="bg-black/[0.04] border-b border-black/10">
+                            <th className="p-5 font-black text-black/55">날짜</th>
+                            <th className="p-5 font-black text-black/55">구분</th>
+                            <th className="p-5 font-black text-black/55">회원권 / 구장</th>
+                            <th className="p-5 font-black text-black/55 text-right">희망가격</th>
+                            <th className="p-5 font-black text-black/55">연락처</th>
+                            <th className="p-5 font-black text-black/55 text-center">상태</th>
+                            <th className="p-5 font-black text-black/55 text-center">관리</th>
                         </tr>
                     </thead>
                     <tbody>
                         {sortedOrders.map((order) => (
-                            <tr key={order.id} className="border-b border-[#1a1a1a] hover:bg-white/5 transition-colors">
-                                <td className="p-5 text-gray-500 font-mono text-sm max-w-[120px]">
-                                    <div className="font-bold text-white">{new Date(order.createdAt).toLocaleDateString()}</div>
+                            <tr key={order.id} className="border-b border-black/[0.06] hover:bg-black/[0.03] transition-colors">
+                                <td className="p-5 text-black/55 font-mono text-sm max-w-[120px]">
+                                    <div className="font-bold text-[rgba(0,0,0,0.87)]">{new Date(order.createdAt).toLocaleDateString()}</div>
                                     <div className="text-xs">{new Date(order.createdAt).toLocaleTimeString()}</div>
                                 </td>
                                 <td className="p-5">
-                                    <span className={`px-2 py-1 rounded text-xs font-bold ${order.orderType === 'BUY' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${order.orderType === 'BUY' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-brand/10 text-brand border border-brand/20'}`}>
                                         {order.orderType === 'BUY' ? '매수' : '매도'}
                                     </span>
                                 </td>
                                 <td className="p-5">
-                                    <div className="font-bold text-lg text-white">{order.courseName}</div>
+                                    <div className="font-bold text-lg text-[rgba(0,0,0,0.87)]">{order.courseName}</div>
                                 </td>
-                                <td className="p-5 text-right font-mono font-bold text-white text-lg">
+                                <td className="p-5 text-right font-mono font-bold text-[rgba(0,0,0,0.87)] text-lg">
                                     {new Intl.NumberFormat('ko-KR').format(order.price)}원
                                 </td>
-                                <td className="p-5 font-mono text-blue-400 font-bold">{order.contact}</td>
+                                <td className="p-5 font-mono text-brand font-bold">{order.contact}</td>
                                 <td className="p-5 text-center">
                                     <span className={`px-3 py-1 rounded-full text-xs font-black ${order.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
-                                        order.status === 'CONTACTED' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                                        order.status === 'CONTACTED' ? 'bg-brand/10 text-brand border border-brand/20' :
                                             order.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border border-green-500/20' :
                                                 'bg-gray-500/10 text-gray-500 border border-gray-500/20'
                                         }`}>
@@ -735,7 +735,7 @@ function GolfOrdersView() {
                                 </td>
                                 <td className="p-5 text-center">
                                     <select
-                                        className="bg-[#050505] border border-[#333] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#64DD17] text-gray-300 font-medium cursor-pointer hover:bg-[#1a1a1a] transition-colors"
+                                        className="bg-white rounded-lg px-3 py-2 text-sm outline-none focus:border-brand text-[rgba(0,0,0,0.87)] font-medium cursor-pointer hover:bg-black/[0.04] transition-colors"
                                         value={order.status}
                                         onChange={(e) => updateStatusMutation.mutate({ id: order.id, status: e.target.value })}
                                         title="주문 상태 변경"
@@ -751,8 +751,8 @@ function GolfOrdersView() {
                     </tbody>
                 </table>
                 {!orders?.length && (
-                    <div className="py-20 text-center text-gray-600">
-                        <LucideSearch className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                    <div className="py-20 text-center text-black/40">
+                        <LucideSearch className="w-12 h-12 mx-auto mb-4 opacity-40" />
                         <p className="font-bold">신규 접수된 내역이 없습니다.</p>
                     </div>
                 )}

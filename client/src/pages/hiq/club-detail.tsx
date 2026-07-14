@@ -169,8 +169,8 @@ export default function HiqClubDetail() {
         }
     });
 
-    if (isLoading) return <div className="h-[100dvh] bg-[#0A0A0A] flex items-center justify-center text-ink-3"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
-    if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-[#0A0A0A] flex items-center justify-center text-ink-3">데이터를 찾을 수 없습니다.</div>;
+    if (isLoading) return <div className="h-[100dvh] bg-[#f2f0eb] flex items-center justify-center text-ink-3"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
+    if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-[#f2f0eb] flex items-center justify-center text-ink-3">데이터를 찾을 수 없습니다.</div>;
 
     const { crew, baseStore, members = [] } = crewData;
     const myMemberData = members.find((m: any) => m.member?.id === me?.id);
@@ -206,9 +206,9 @@ export default function HiqClubDetail() {
     };
 
     return (
-        <div className="h-[100dvh] bg-[#0A0A0A] text-ink-1 font-sans flex flex-col overflow-hidden relative">
+        <div className="h-[100dvh] bg-[#f2f0eb] text-ink-1 font-sans flex flex-col overflow-hidden relative">
             {/* 1. 고정 헤더 영역 (4+2 구조 중 상단 +2) */}
-            <div className="shrink-0 z-30 bg-[#0B0B0D]/90 backdrop-blur-2xl border-b border-white/10 safe-area-top">
+            <div className="shrink-0 z-30 bg-white/90 border-b border-black/10 safe-area-top">
                 <div className="px-6 py-4 flex items-center justify-between">
                     {/* 좌측: 메인으로 가기 */}
                     <Button
@@ -232,7 +232,7 @@ export default function HiqClubDetail() {
                             onClick={() => setIsSettingsOpen(true)}
                         >
                             <LucideMoreVertical className="w-6 h-6" />
-                            {hasPending && <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-brand ring-2 ring-[#0B0B0D]" />}
+                            {hasPending && <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-brand ring-2 ring-white" />}
                         </Button>
                     ) : (
                         <Button
@@ -405,7 +405,7 @@ export default function HiqClubDetail() {
             </main>
 
             {/* 3. 인앱 하단 네비게이션 (전용 4버튼 레이아웃) */}
-            <nav className="fixed bottom-0 w-full bg-[#0B0B0D]/95 backdrop-blur-2xl border-t border-white/10 flex items-center h-20 safe-area-bottom z-50">
+            <nav className="fixed bottom-0 w-full bg-white/95 border-t border-black/10 flex items-center h-20 safe-area-bottom z-50">
                 {[
                     { id: 'home', label: '홈', icon: LucideHome },
                     { id: 'board', label: '게시판', icon: LucideFileText },

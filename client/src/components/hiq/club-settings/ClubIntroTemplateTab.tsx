@@ -51,14 +51,14 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
             <div className="space-y-4">
                 <div className="flex items-center justify-between px-1">
                     <div className="space-y-0.5">
-                        <h3 className="text-sm font-bold text-white">가입인사 양식</h3>
-                        <p className="text-xs text-white/55 font-medium">새 멤버를 위한 질문지 설정</p>
+                        <h3 className="text-sm font-bold text-[rgba(0,0,0,0.87)]">가입인사 양식</h3>
+                        <p className="text-xs text-black/55 font-medium">새 멤버를 위한 질문지 설정</p>
                     </div>
                 </div>
 
                 <div className="space-y-3">
                     {questions.map((q, idx) => (
-                        <div key={q.id} className="group relative bg-surface-2 border border-surface-line p-4 rounded-tile flex flex-col gap-3">
+                        <div key={q.id} className="group relative bg-surface-3 p-4 rounded-tile flex flex-col gap-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-semibold text-brand flex items-center gap-1.5">
                                     <LucideLayout className="w-3.5 h-3.5" />
@@ -67,7 +67,7 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                                 {isLeader && (
                                     <button
                                         onClick={() => removeQuestion(q.id)}
-                                        className="p-1 px-2 text-xs font-bold text-red-400/70 hover:text-red-400 transition-colors"
+                                        className="p-1 px-2 text-xs font-bold text-red-600/80 hover:text-red-600 transition-colors"
                                     >
                                         삭제
                                     </button>
@@ -79,7 +79,7 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                                 onChange={(e) => updateQuestion(q.id, e.target.value)}
                                 disabled={!isLeader}
                                 placeholder="예: 거주 지역과 구력은 어떻게 되시나요?"
-                                className="bg-transparent border-surface-line h-10 text-sm font-medium rounded-tile focus:ring-0 placeholder:text-white/45"
+                                className="bg-white border-surface-line h-10 text-sm font-medium rounded-tile focus:ring-0 placeholder:text-black/40"
                             />
 
                             <div className="flex items-center gap-2 px-1">
@@ -88,11 +88,11 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                                     checked={q.required}
                                     onCheckedChange={() => toggleRequired(q.id)}
                                     disabled={!isLeader}
-                                    className="border-white/20 data-[state=checked]:bg-brand data-[state=checked]:border-brand"
+                                    className="border-black/20 data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                                 />
                                 <Label
                                     htmlFor={`req-${q.id}`}
-                                    className="text-xs font-medium text-white/55 cursor-pointer select-none"
+                                    className="text-xs font-medium text-black/55 cursor-pointer select-none"
                                 >
                                     필수 답변 항목
                                 </Label>
@@ -101,16 +101,16 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                     ))}
 
                     {questions.length === 0 && !isLeader && (
-                        <div className="p-6 bg-surface-2 border border-surface-line rounded-tile flex flex-col items-center justify-center gap-2 text-center">
-                            <LucideLayout className="w-6 h-6 text-white/38" />
-                            <p className="text-xs font-medium text-white/38">등록된 가입 질문이 없습니다</p>
+                        <div className="p-6 bg-surface-3 rounded-tile flex flex-col items-center justify-center gap-2 text-center">
+                            <LucideLayout className="w-6 h-6 text-black/40" />
+                            <p className="text-xs font-medium text-black/40">등록된 가입 질문이 없습니다</p>
                         </div>
                     )}
 
                     {isLeader && (
                         <button
                             onClick={addQuestion}
-                            className="w-full h-14 rounded-tile border-2 border-dashed border-surface-line flex items-center justify-center gap-2 hover:bg-white/5 transition-colors text-white/55 hover:text-white/80 group active:scale-[0.98]"
+                            className="w-full h-14 rounded-tile border-2 border-dashed border-surface-line flex items-center justify-center gap-2 hover:bg-black/[0.04] transition-colors text-black/55 hover:text-[rgba(0,0,0,0.87)] group active:scale-[0.98]"
                         >
                             <LucidePlus className="w-4 h-4" />
                             <span className="text-xs font-semibold">
@@ -130,7 +130,7 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                             {isUpdating ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : "양식 저장하기"}
                         </Button>
                     ) : (
-                        <div className="p-4 bg-surface-2 border border-surface-line rounded-tile text-center text-xs font-medium text-white/55 leading-relaxed">
+                        <div className="p-4 bg-surface-3 rounded-tile text-center text-xs font-medium text-black/55 leading-relaxed">
                             가입인사 양식 수정 권한은 크루장에게만 있습니다
                         </div>
                     )}

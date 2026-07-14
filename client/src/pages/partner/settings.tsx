@@ -122,13 +122,13 @@ export default function PartnerSettings() {
         mutation.mutate(values);
     };
 
-    if (isLoading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center text-white/50">Loading...</div>;
+    if (isLoading) return <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-black/55">Loading...</div>;
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white font-sans pb-24">
+        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans pb-24">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-white/5 bg-[#050505] sticky top-0 z-10">
-                <Button variant="ghost" className="text-white p-0 hover:bg-transparent" onClick={() => setLocation("/partner/dashboard")}>
+            <div className="flex items-center justify-between p-6 border-b border-black/10 bg-[#f2f0eb] sticky top-0 z-10">
+                <Button variant="ghost" className="text-[rgba(0,0,0,0.87)] p-0 hover:bg-transparent" onClick={() => setLocation("/partner/dashboard")}>
                     <LucideArrowLeft className="w-6 h-6" />
                 </Button>
                 <h1 className="text-lg font-bold">매장 정보 수정</h1>
@@ -141,10 +141,10 @@ export default function PartnerSettings() {
 
                         {/* 1. 기본 정보 */}
                         <div className="space-y-4">
-                            <h2 className="text-emerald-500 font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+                            <h2 className="text-[#006241] font-bold text-sm uppercase tracking-wider flex items-center gap-2">
                                 <LucideStore size={14} /> 기본 정보
                             </h2>
-                            <div className="bg-[#111] p-5 rounded-2xl border border-white/5 space-y-4">
+                            <div className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-4">
                                 <FormField
                                     control={form.control}
                                     name="name"
@@ -152,7 +152,7 @@ export default function PartnerSettings() {
                                         <FormItem>
                                             <FormLabel>매장명</FormLabel>
                                             <FormControl>
-                                                <Input {...field} className="bg-[#050505] border-white/10" />
+                                                <Input {...field} className="bg-black/[0.04] border-black/[0.08]" />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -165,7 +165,7 @@ export default function PartnerSettings() {
                                         <FormItem>
                                             <FormLabel>한줄 소개</FormLabel>
                                             <FormControl>
-                                                <Input {...field} placeholder="예: 깔끔하고 쾌적한 랭큐 당구장입니다." className="bg-[#050505] border-white/10" />
+                                                <Input {...field} placeholder="예: 깔끔하고 쾌적한 랭큐 당구장입니다." className="bg-black/[0.04] border-black/[0.08]" />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -178,7 +178,7 @@ export default function PartnerSettings() {
                                         <FormItem>
                                             <FormLabel>공지사항</FormLabel>
                                             <FormControl>
-                                                <Textarea {...field} placeholder="회원들에게 알릴 공지사항을 입력하세요." className="bg-[#050505] border-white/10 min-h-[80px]" />
+                                                <Textarea {...field} placeholder="회원들에게 알릴 공지사항을 입력하세요." className="bg-black/[0.04] border-black/[0.08] min-h-[80px]" />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -189,17 +189,17 @@ export default function PartnerSettings() {
 
                         {/* 2. 요금 및 시설 */}
                         <div className="space-y-4">
-                            <h2 className="text-emerald-500 font-bold text-sm uppercase tracking-wider">요금 및 테이블</h2>
-                            <div className="bg-[#111] p-5 rounded-2xl border border-white/5 space-y-4">
+                            <h2 className="text-[#006241] font-bold text-sm uppercase tracking-wider">요금 및 테이블</h2>
+                            <div className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <FormField
                                         control={form.control}
                                         name="priceLarge"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel className="text-xs text-white/60">대대 요금 (10분)</FormLabel>
+                                                <FormLabel className="text-xs text-black/60">대대 요금 (10분)</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} className="bg-[#050505] border-white/10" />
+                                                    <Input type="number" {...field} className="bg-black/[0.04] border-black/[0.08]" />
                                                 </FormControl>
                                             </FormItem>
                                         )}
@@ -209,9 +209,9 @@ export default function PartnerSettings() {
                                         name="tableLarge"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel className="text-xs text-white/60">대대 수량</FormLabel>
+                                                <FormLabel className="text-xs text-black/60">대대 수량</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} className="bg-[#050505] border-white/10" />
+                                                    <Input type="number" {...field} className="bg-black/[0.04] border-black/[0.08]" />
                                                 </FormControl>
                                             </FormItem>
                                         )}
@@ -223,9 +223,9 @@ export default function PartnerSettings() {
                                         name="priceMedium"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel className="text-xs text-white/60">중대 요금 (10분)</FormLabel>
+                                                <FormLabel className="text-xs text-black/60">중대 요금 (10분)</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} className="bg-[#050505] border-white/10" />
+                                                    <Input type="number" {...field} className="bg-black/[0.04] border-black/[0.08]" />
                                                 </FormControl>
                                             </FormItem>
                                         )}
@@ -235,9 +235,9 @@ export default function PartnerSettings() {
                                         name="tableMedium"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel className="text-xs text-white/60">중대 수량</FormLabel>
+                                                <FormLabel className="text-xs text-black/60">중대 수량</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} className="bg-[#050505] border-white/10" />
+                                                    <Input type="number" {...field} className="bg-black/[0.04] border-black/[0.08]" />
                                                 </FormControl>
                                             </FormItem>
                                         )}
@@ -248,8 +248,8 @@ export default function PartnerSettings() {
 
                         {/* 3. 운영 정보 */}
                         <div className="space-y-4">
-                            <h2 className="text-emerald-500 font-bold text-sm uppercase tracking-wider">운영 정보</h2>
-                            <div className="bg-[#111] p-5 rounded-2xl border border-white/5 space-y-4">
+                            <h2 className="text-[#006241] font-bold text-sm uppercase tracking-wider">운영 정보</h2>
+                            <div className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <FormField
                                         control={form.control}
@@ -258,7 +258,7 @@ export default function PartnerSettings() {
                                             <FormItem>
                                                 <FormLabel>오픈 시간</FormLabel>
                                                 <FormControl>
-                                                    <Input type="time" {...field} className="bg-[#050505] border-white/10" />
+                                                    <Input type="time" {...field} className="bg-black/[0.04] border-black/[0.08]" />
                                                 </FormControl>
                                             </FormItem>
                                         )}
@@ -270,7 +270,7 @@ export default function PartnerSettings() {
                                             <FormItem>
                                                 <FormLabel>마감 시간</FormLabel>
                                                 <FormControl>
-                                                    <Input type="time" {...field} className="bg-[#050505] border-white/10" />
+                                                    <Input type="time" {...field} className="bg-black/[0.04] border-black/[0.08]" />
                                                 </FormControl>
                                             </FormItem>
                                         )}
@@ -283,7 +283,7 @@ export default function PartnerSettings() {
                                         <FormItem>
                                             <FormLabel>매장 전화번호</FormLabel>
                                             <FormControl>
-                                                <Input {...field} className="bg-[#050505] border-white/10" />
+                                                <Input {...field} className="bg-black/[0.04] border-black/[0.08]" />
                                             </FormControl>
                                         </FormItem>
                                     )}
@@ -295,7 +295,7 @@ export default function PartnerSettings() {
                                         <FormItem>
                                             <FormLabel>주소</FormLabel>
                                             <FormControl>
-                                                <Input {...field} className="bg-[#050505] border-white/10" />
+                                                <Input {...field} className="bg-black/[0.04] border-black/[0.08]" />
                                             </FormControl>
                                         </FormItem>
                                     )}
@@ -307,7 +307,7 @@ export default function PartnerSettings() {
                                         <FormItem>
                                             <FormLabel>주차 안내</FormLabel>
                                             <FormControl>
-                                                <Input {...field} placeholder="예: 건물 지하주차장 무료 이용" className="bg-[#050505] border-white/10" />
+                                                <Input {...field} placeholder="예: 건물 지하주차장 무료 이용" className="bg-black/[0.04] border-black/[0.08]" />
                                             </FormControl>
                                         </FormItem>
                                     )}
@@ -317,7 +317,7 @@ export default function PartnerSettings() {
 
                         <Button
                             type="submit"
-                            className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-lg rounded-xl shadow-lg shadow-emerald-900/20"
+                            className="w-full h-14 bg-[#006241] hover:bg-[#00553a] text-white font-bold text-lg rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
                             disabled={mutation.isPending}
                         >
                             {mutation.isPending ? "저장 중..." : "저장하기"}

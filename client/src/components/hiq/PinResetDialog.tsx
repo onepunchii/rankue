@@ -95,7 +95,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-md rounded-card p-0 overflow-hidden">
+            <DialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] max-w-md rounded-card p-0 overflow-hidden">
                 <div className="p-8">
                     <DialogHeader className="mb-8">
                         <DialogTitle className="text-2xl font-semibold flex items-center gap-3">
@@ -114,7 +114,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                 className="space-y-6"
                             >
                                 <div className="space-y-2">
-                                    <Label className="text-white/55 font-semibold text-xs">휴대폰 번호</Label>
+                                    <Label className="text-black/55 font-semibold text-xs">휴대폰 번호</Label>
                                     <Input
                                         placeholder="01012345678"
                                         value={phone}
@@ -125,7 +125,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                 <Button
                                     onClick={handleFetchQuestion}
                                     disabled={isLoading || phone.length < 10}
-                                    className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 transition-all"
+                                    className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 active:scale-95 transition-all"
                                 >
                                     {isLoading ? <LucideLoader2 className="animate-spin" /> : "질문 확인하기"}
                                 </Button>
@@ -140,12 +140,12 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                 exit={{ opacity: 0, x: -20 }}
                                 className="space-y-6"
                             >
-                                <div className="p-6 bg-surface-2 rounded-2xl border border-surface-line text-center">
-                                    <p className="text-white/55 text-sm font-semibold mb-2">보안 질문</p>
-                                    <h3 className="text-xl font-semibold text-white">{question}</h3>
+                                <div className="p-6 bg-surface-2 rounded-2xl text-center">
+                                    <p className="text-black/55 text-sm font-semibold mb-2">보안 질문</p>
+                                    <h3 className="text-xl font-semibold text-[rgba(0,0,0,0.87)]">{question}</h3>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-white/55 font-semibold text-xs">정답</Label>
+                                    <Label className="text-black/55 font-semibold text-xs">정답</Label>
                                     <Input
                                         placeholder="정답을 입력하세요"
                                         value={answer}
@@ -156,11 +156,11 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                 <Button
                                     onClick={() => setStep(3)}
                                     disabled={!answer}
-                                    className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 transition-all"
+                                    className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 active:scale-95 transition-all"
                                 >
                                     다음 단계
                                 </Button>
-                                <button onClick={() => setStep(1)} className="w-full text-white/55 text-[12px] font-semibold hover:text-white transition-all">뒤로가기</button>
+                                <button onClick={() => setStep(1)} className="w-full text-black/55 text-[12px] font-semibold hover:text-[rgba(0,0,0,0.87)] transition-all">뒤로가기</button>
                             </motion.div>
                         )}
 
@@ -174,7 +174,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                             >
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label className="text-white/55 font-semibold text-xs">새 PIN 설정 (4자리)</Label>
+                                        <Label className="text-black/55 font-semibold text-xs">새 PIN 설정 (4자리)</Label>
                                         <Input
                                             type="password"
                                             maxLength={4}
@@ -185,7 +185,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-white/55 font-semibold text-xs">PIN 확인</Label>
+                                        <Label className="text-black/55 font-semibold text-xs">PIN 확인</Label>
                                         <Input
                                             type="password"
                                             maxLength={4}
@@ -199,11 +199,11 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                 <Button
                                     onClick={handleVerifyAndReset}
                                     disabled={isLoading || newPin.length < 4 || newPin !== confirmPin}
-                                    className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 transition-all"
+                                    className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 active:scale-95 transition-all"
                                 >
                                     {isLoading ? <LucideLoader2 className="animate-spin" /> : "PIN 변경 완료"}
                                 </Button>
-                                <button onClick={() => setStep(2)} className="w-full text-white/55 text-[12px] font-semibold hover:text-white transition-all">뒤로가기</button>
+                                <button onClick={() => setStep(2)} className="w-full text-black/55 text-[12px] font-semibold hover:text-[rgba(0,0,0,0.87)] transition-all">뒤로가기</button>
                             </motion.div>
                         )}
 
@@ -218,10 +218,10 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                     <LucideCheckCircle2 className="w-12 h-12 text-brand" />
                                 </div>
                                 <h3 className="text-2xl font-semibold mb-2">변경 완료!</h3>
-                                <p className="text-white/55 mb-8 leading-relaxed">새로운 PIN 번호로<br />로그인하실 수 있습니다.</p>
+                                <p className="text-black/55 mb-8 leading-relaxed">새로운 PIN 번호로<br />로그인하실 수 있습니다.</p>
                                 <Button
                                     onClick={handleClose}
-                                    className="w-full h-14 bg-white text-black font-semibold text-lg rounded-tile hover:bg-white/90 transition-all"
+                                    className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 active:scale-95 transition-all"
                                 >
                                     확인
                                 </Button>

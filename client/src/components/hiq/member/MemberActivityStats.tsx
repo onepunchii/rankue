@@ -72,17 +72,17 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
             ? {
                 title: "새싹 큐잡이 🌱",
                 desc: "무한한 잠재력! 첫 큐를 잡고 모임에 참여해보세요.",
-                color: "text-white/40",
-                bg: "bg-white/5",
-                border: "border-white/10",
+                color: "text-black/40",
+                bg: "bg-black/[0.04]",
+                border: "border-black/10",
                 icon: LucideSparkles
             }
             : {
                 title: "새싹 골퍼 🌱",
                 desc: "아직 보여줄 잠재력이 무궁무진합니다! 첫 모임을 시작해보세요.",
-                color: "text-white/40",
-                bg: "bg-white/5",
-                border: "border-white/10",
+                color: "text-black/40",
+                bg: "bg-black/[0.04]",
+                border: "border-black/10",
                 icon: LucideSparkles
             };
 
@@ -156,9 +156,9 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                     persona = {
                         title: "골프존의 지배자 📺",
                         desc: "오차 없는 샷! 스크린을 평정하고 다니는 정교한 고수입니다.",
-                        color: "text-[#00E3CC]",
-                        bg: "bg-[#00E3CC]/10",
-                        border: "border-[#00E3CC]/20",
+                        color: "text-brand",
+                        bg: "bg-brand/12",
+                        border: "border-brand/20",
                         icon: LucideMonitor
                     };
                 } else {
@@ -181,7 +181,7 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
 
         const colors = isBilliards
             ? { group1: 'bg-brand', group2: 'bg-[#F97316]', social: 'bg-[#EC4899]' }
-            : { group1: 'bg-brand', group2: 'bg-[#00E3CC]', social: 'bg-[#F59E0B]' };
+            : { group1: 'bg-brand', group2: 'bg-[#F97316]', social: 'bg-[#F59E0B]' };
 
         return {
             group1: group1Count,
@@ -204,12 +204,12 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
         return (
             <div className="p-5 rk-card flex items-center justify-center min-h-[120px]">
                 <div className="text-center space-y-2">
-                    <div className="inline-flex p-3 rounded-full bg-white/5 mb-1">
-                        <LucideSparkles className="w-5 h-5 text-white/45" />
+                    <div className="inline-flex p-3 rounded-full bg-black/[0.04] mb-1">
+                        <LucideSparkles className="w-5 h-5 text-black/40" />
                     </div>
                     <div>
-                        <h3 className="text-[15px] font-semibold text-white/60">{stats.persona.title}</h3>
-                        <p className="text-xs text-white/55 mt-1 max-w-[200px] mx-auto leading-relaxed">
+                        <h3 className="text-[15px] font-semibold text-black/60">{stats.persona.title}</h3>
+                        <p className="text-xs text-black/55 mt-1 max-w-[200px] mx-auto leading-relaxed">
                             {stats.persona.desc}
                         </p>
                     </div>
@@ -227,14 +227,14 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                 stats.persona.border
             )}>
                 <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-tile flex items-center justify-center border border-white/10 bg-[#1a1a1a]">
+                    <div className="w-12 h-12 rounded-tile flex items-center justify-center bg-black/[0.04]">
                         <stats.persona.icon className={cn("w-6 h-6", stats.persona.color)} />
                     </div>
                     <div className="pt-0.5">
                         <h3 className={cn("text-base font-semibold tracking-tight flex items-center gap-2", stats.persona.color)}>
                             {stats.persona.title}
                         </h3>
-                        <p className="text-[13px] text-white/50 mt-1 font-medium leading-relaxed">
+                        <p className="text-[13px] text-black/55 mt-1 font-medium leading-relaxed">
                             {stats.persona.desc}
                         </p>
                     </div>
@@ -243,7 +243,7 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
 
             {/* 2. Visual Stat Bar */}
             <div className="space-y-2 px-1">
-                <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden flex">
+                <div className="h-3 w-full bg-black/[0.06] rounded-full overflow-hidden flex">
                     {/* Group 1 Segment */}
                     {stats.group1 > 0 && (
                         <motion.div
@@ -274,7 +274,7 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                 </div>
 
                 {/* Legend / Metrics */}
-                <div className="flex items-center justify-between text-[12px] font-medium text-white/45 pt-1">
+                <div className="flex items-center justify-between text-[12px] font-medium text-black/55 pt-1">
                     {stats.group1 > 0 && (
                         <div className="flex items-center gap-1.5">
                             <div className={cn("w-1.5 h-1.5 rounded-full", stats.colors.group1)} />

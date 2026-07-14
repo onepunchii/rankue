@@ -176,31 +176,31 @@ export default function PartnerDashboard() {
         }
     }, [members, rankingTab]);
 
-    if (isStoreLoading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center text-white/50">Loading...</div>;
-    if (!store) return <div className="min-h-screen bg-[#050505] text-white p-6">Store not found</div>;
+    if (isStoreLoading) return <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-black/55">Loading...</div>;
+    if (!store) return <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] p-6">Store not found</div>;
 
     const joinUrl = `${window.location.origin}/join?store=${store.id}`;
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white font-sans pb-24">
+        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans pb-24">
             {/* 1. Header & Pulse */}
-            <div className="bg-gradient-to-b from-emerald-900/20 to-[#050505] p-6 pb-2 rounded-b-[2rem]">
+            <div className="bg-gradient-to-b from-[#006241]/[0.08] to-[#f2f0eb] p-6 pb-2 rounded-b-[2rem]">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#10b981] rounded-xl flex items-center justify-center shadow-lg shadow-emerald-900/20">
-                            <LucideStore className="w-5 h-5 text-black" />
+                        <div className="w-10 h-10 bg-[#006241] rounded-xl flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                            <LucideStore className="w-5 h-5 text-white" />
                         </div>
                         <div>
                             <h1 className="text-lg font-black tracking-tight">{store.name}</h1>
-                            <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider block">Owner Dashboard</span>
+                            <span className="text-[10px] text-[#006241] font-bold uppercase tracking-wider block">Owner Dashboard</span>
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <button onClick={() => setLocation("/partner/settings")} className="p-2 bg-white/5 rounded-full hover:bg-white/10" aria-label="매장 정보 수정">
-                            <LucideEdit className="w-4 h-4 text-white/40" />
+                        <button onClick={() => setLocation("/partner/settings")} className="p-2 bg-black/[0.04] rounded-full hover:bg-black/[0.06]" aria-label="매장 정보 수정">
+                            <LucideEdit className="w-4 h-4 text-black/40" />
                         </button>
-                        <button onClick={handleLogout} className="p-2 bg-white/5 rounded-full hover:bg-white/10" aria-label="로그아웃">
-                            <LucideLogOut className="w-4 h-4 text-white/40" />
+                        <button onClick={handleLogout} className="p-2 bg-black/[0.04] rounded-full hover:bg-black/[0.06]" aria-label="로그아웃">
+                            <LucideLogOut className="w-4 h-4 text-black/40" />
                         </button>
                     </div>
                 </div>
@@ -209,25 +209,25 @@ export default function PartnerDashboard() {
                 <div className="grid grid-cols-2 gap-3 mb-4">
                     <motion.div
                         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                        className="bg-[#1a1a1a] p-5 rounded-[1.5rem] border border-white/5 relative overflow-hidden"
+                        className="bg-white p-5 rounded-[1.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)] relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 p-3 opacity-10"><LucideUsers size={40} /></div>
-                        <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Today Visitors</span>
+                        <div className="absolute top-0 right-0 p-3 opacity-[0.06]"><LucideUsers size={40} /></div>
+                        <span className="text-[10px] text-black/55 font-bold uppercase tracking-widest">Today Visitors</span>
                         <div className="mt-2 flex items-baseline gap-1">
-                            <span className="text-3xl font-black text-white">{stats?.visitsToday || 0}</span>
-                            <span className="text-xs text-white/30">명</span>
+                            <span className="text-3xl font-black text-[rgba(0,0,0,0.87)]">{stats?.visitsToday || 0}</span>
+                            <span className="text-xs text-black/40">명</span>
                         </div>
                     </motion.div>
 
                     <motion.div
                         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                        className="bg-[#1a1a1a] p-5 rounded-[1.5rem] border border-white/5 relative overflow-hidden"
+                        className="bg-white p-5 rounded-[1.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)] relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 p-3 opacity-10"><LucideUserPlus size={40} /></div>
-                        <span className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-widest">New Signups</span>
+                        <div className="absolute top-0 right-0 p-3 opacity-[0.06] text-[#006241]"><LucideUserPlus size={40} /></div>
+                        <span className="text-[10px] text-[#006241]/80 font-bold uppercase tracking-widest">New Signups</span>
                         <div className="mt-2 flex items-baseline gap-1">
-                            <span className="text-3xl font-black text-emerald-400">{stats?.newToday || 0}</span>
-                            <span className="text-xs text-emerald-500/50">명</span>
+                            <span className="text-3xl font-black text-[#006241]">{stats?.newToday || 0}</span>
+                            <span className="text-xs text-[#006241]/60">명</span>
                         </div>
                     </motion.div>
                 </div>
@@ -237,12 +237,12 @@ export default function PartnerDashboard() {
             <div className="px-6 mt-4 mb-6">
                 <button
                     onClick={() => setLocation("/partner/create-tournament")}
-                    className="w-full relative overflow-hidden group rounded-[2.5rem] shadow-2xl shadow-emerald-900/40"
+                    className="w-full relative overflow-hidden group rounded-[2.5rem] shadow-[0_4px_16px_rgba(0,98,65,0.18)]"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-500 transition-all duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#006241] to-[#00754A] transition-all duration-500 group-hover:scale-105" />
                     <div className="relative z-10 p-7 flex items-center justify-between">
                         <div className="text-left space-y-3">
-                            <div className="inline-block bg-white/20 backdrop-blur-md border border-white/10 rounded-lg px-3 py-1 text-[11px] font-bold text-white tracking-wide">
+                            <div className="inline-block bg-white/20 rounded-lg px-3 py-1 text-[11px] font-bold text-white tracking-wide">
                                 우리 매장 이벤트
                             </div>
                             <div>
@@ -250,8 +250,8 @@ export default function PartnerDashboard() {
                                 <p className="text-sm text-white/90 font-medium">3분 만에 대회 만들고 대진표 자동 생성!</p>
                             </div>
                         </div>
-                        <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-inner">
-                            <LucideTrophy className="w-8 h-8 text-yellow-300 drop-shadow-md" />
+                        <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center shadow-inner">
+                            <LucideTrophy className="w-8 h-8 text-[#cba258] drop-shadow-md" />
                         </div>
                     </div>
                 </button>
@@ -261,20 +261,20 @@ export default function PartnerDashboard() {
             <div className="px-6 py-4">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-bold flex items-center gap-2">
-                        <span className="w-1 h-4 bg-emerald-500 rounded-full" />
+                        <span className="w-1 h-4 bg-[#006241] rounded-full" />
                         회원 관리
                     </h2>
-                    <span className="text-xs text-white/40 font-mono">Total: {stats?.totalMembers || 0}</span>
+                    <span className="text-xs text-black/55 font-mono">Total: {stats?.totalMembers || 0}</span>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="grid grid-cols-2 gap-3 mb-6">
                     <Button
                         onClick={handleDownloadExcel}
-                        className="h-12 bg-[#1a1a1a] hover:bg-[#252525] text-white border border-white/10 rounded-xl flex items-center justify-center gap-2"
+                        className="h-12 bg-white hover:bg-black/[0.04] text-[rgba(0,0,0,0.87)] rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center justify-center gap-2"
                     >
-                        {store.subscriptionTier === "BASIC" ? <LockIcon className="w-4 h-4 text-white/20" /> : <LucideDownload className="w-4 h-4 text-emerald-500" />}
-                        <span className={`text-sm font-bold ${store.subscriptionTier === "BASIC" ? 'text-white/40' : ''}`}>엑셀 저장</span>
+                        {store.subscriptionTier === "BASIC" ? <LockIcon className="w-4 h-4 text-black/40" /> : <LucideDownload className="w-4 h-4 text-[#006241]" />}
+                        <span className={`text-sm font-bold ${store.subscriptionTier === "BASIC" ? 'text-black/40' : ''}`}>엑셀 저장</span>
                     </Button>
                     <Button
                         onClick={() => {
@@ -288,52 +288,52 @@ export default function PartnerDashboard() {
                             }
                             setShowSmsModal(true);
                         }}
-                        className="h-12 bg-[#1a1a1a] hover:bg-[#252525] text-white border border-white/10 rounded-xl flex items-center justify-center gap-2"
+                        className="h-12 bg-white hover:bg-black/[0.04] text-[rgba(0,0,0,0.87)] rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center justify-center gap-2"
                     >
-                        {store.subscriptionTier === "BASIC" ? <LockIcon className="w-4 h-4 text-white/20" /> : <LucideMessageSquare className="w-4 h-4 text-emerald-500" />}
-                        <span className={`text-sm font-bold ${store.subscriptionTier === "BASIC" ? 'text-white/40' : ''}`}>단체 문자</span>
+                        {store.subscriptionTier === "BASIC" ? <LockIcon className="w-4 h-4 text-black/40" /> : <LucideMessageSquare className="w-4 h-4 text-[#006241]" />}
+                        <span className={`text-sm font-bold ${store.subscriptionTier === "BASIC" ? 'text-black/40' : ''}`}>단체 문자</span>
                     </Button>
                 </div>
 
                 {/* Member List */}
-                <div className="bg-[#111] rounded-[1.5rem] border border-white/5 overflow-hidden">
-                    <div className="p-4 border-b border-white/5">
+                <div className="bg-white rounded-[1.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)] overflow-hidden">
+                    <div className="p-4 border-b border-black/10">
                         <div className="relative">
-                            <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                            <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40" />
                             <Input
                                 placeholder="이름 또는 전화번호 뒷자리"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 bg-[#050505] border-white/10 text-white placeholder:text-white/20 h-10 rounded-lg focus:ring-emerald-500/50"
+                                className="pl-10 bg-black/[0.04] border-black/[0.08] text-[rgba(0,0,0,0.87)] placeholder:text-black/40 h-10 rounded-lg focus:ring-[#006241]/40"
                             />
                         </div>
                     </div>
 
                     <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                         {filteredMembers.length === 0 ? (
-                            <div className="p-8 text-center text-white/20 text-sm">검색 결과가 없습니다.</div>
+                            <div className="p-8 text-center text-black/40 text-sm">검색 결과가 없습니다.</div>
                         ) : (
                             filteredMembers.slice(0, 50).map((member) => (
-                                <div key={member.id} className="p-4 border-b border-white/5 last:border-0 flex items-center justify-between hover:bg-white/5 transition-colors">
+                                <div key={member.id} className="p-4 border-b border-black/10 last:border-0 flex items-center justify-between hover:bg-black/[0.04] transition-colors">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-bold text-white">{member.name}</span>
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${member.rating4c >= 1000 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-white/10 text-white/50'
+                                            <span className="font-bold text-[rgba(0,0,0,0.87)]">{member.name}</span>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${member.rating4c >= 1000 ? 'bg-[#cba258]/[0.12] text-[#cba258]' : 'bg-black/[0.06] text-black/55'
                                                 }`}>
                                                 {getTierName(member.rating4c)}
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-3 text-xs text-white/30">
+                                        <div className="flex items-center gap-3 text-xs text-black/55">
                                             <span>{member.phone.replace(/(\d{3})(\d{4})(\d{4})/, '$1-****-$3')}</span>
                                             <span>•</span>
                                             <span>Avg {Number(member.average).toFixed(2)}</span>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <a href={`tel:${member.phone}`} aria-label={`${member.name}에게 전화 걸기`} className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors">
+                                        <a href={`tel:${member.phone}`} aria-label={`${member.name}에게 전화 걸기`} className="w-8 h-8 rounded-full bg-[#006241]/10 flex items-center justify-center text-[#006241] hover:bg-[#006241] hover:text-white transition-colors">
                                             <LucidePhone size={14} />
                                         </a>
-                                        <a href={`sms:${member.phone}`} aria-label={`${member.name}에게 문자 보내기`} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/60 hover:bg-white/20 hover:text-white transition-colors">
+                                        <a href={`sms:${member.phone}`} aria-label={`${member.name}에게 문자 보내기`} className="w-8 h-8 rounded-full bg-black/[0.04] flex items-center justify-center text-black/60 hover:bg-black/[0.08] hover:text-[rgba(0,0,0,0.87)] transition-colors">
                                             <LucideMessageSquare size={14} />
                                         </a>
                                     </div>
@@ -348,23 +348,23 @@ export default function PartnerDashboard() {
             <div className="px-6 py-4">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-bold flex items-center gap-2">
-                        <span className="w-1 h-4 bg-emerald-500 rounded-full" />
+                        <span className="w-1 h-4 bg-[#006241] rounded-full" />
                         우리 매장 랭킹
                     </h2>
                 </div>
 
-                <div className="bg-[#111] rounded-[1.5rem] border border-white/5 p-1">
-                    <div className="grid grid-cols-2 p-1 gap-1 mb-2 bg-[#050505] rounded-2xl">
+                <div className="bg-white rounded-[1.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-1">
+                    <div className="grid grid-cols-2 p-1 gap-1 mb-2 bg-black/[0.04] rounded-2xl">
                         <button
                             onClick={() => setRankingTab("visit")}
-                            className={`py-2 text-xs font-bold rounded-xl transition-all ${rankingTab === "visit" ? "bg-[#1a1a1a] text-white shadow" : "text-white/30 hover:text-white/60"
+                            className={`py-2 text-xs font-bold rounded-xl transition-all ${rankingTab === "visit" ? "bg-white text-[rgba(0,0,0,0.87)] shadow-[0_1px_2px_rgba(0,0,0,0.06)]" : "text-black/40 hover:text-black/70"
                                 }`}
                         >
                             방문 랭킹 (VIP)
                         </button>
                         <button
                             onClick={() => setRankingTab("skill")}
-                            className={`py-2 text-xs font-bold rounded-xl transition-all ${rankingTab === "skill" ? "bg-[#1a1a1a] text-emerald-400 shadow" : "text-white/30 hover:text-white/60"
+                            className={`py-2 text-xs font-bold rounded-xl transition-all ${rankingTab === "skill" ? "bg-white text-[#006241] shadow-[0_1px_2px_rgba(0,0,0,0.06)]" : "text-black/40 hover:text-black/70"
                                 }`}
                         >
                             실력 랭킹 (Avg)
@@ -373,48 +373,48 @@ export default function PartnerDashboard() {
 
                     <div className="px-3 pb-3">
                         {rankedMembers.map((member, idx) => (
-                            <div key={member.id} className="flex items-center py-3 border-b border-white/5 last:border-0">
-                                <span className={`w-6 text-center font-black text-sm ${idx === 0 ? "text-yellow-500" :
-                                    idx === 1 ? "text-slate-400" :
-                                        idx === 2 ? "text-amber-700" : "text-white/20"
+                            <div key={member.id} className="flex items-center py-3 border-b border-black/10 last:border-0">
+                                <span className={`w-6 text-center font-black text-sm ${idx === 0 ? "text-[#cba258]" :
+                                    idx === 1 ? "text-slate-500" :
+                                        idx === 2 ? "text-amber-700" : "text-black/40"
                                     }`}>
                                     {idx + 1}
                                 </span>
                                 <div className="ml-3 flex-1">
-                                    <div className="text-sm font-bold text-white">{member.name}</div>
-                                    <div className="text-[10px] text-white/30">
+                                    <div className="text-sm font-bold text-[rgba(0,0,0,0.87)]">{member.name}</div>
+                                    <div className="text-[10px] text-black/55">
                                         {rankingTab === "visit" ? `이번 달 ${member.monthlyGameCount}게임` : `Average ${Number(member.average).toFixed(3)}`}
                                     </div>
                                 </div>
                                 <div className="text-right">
                                     {rankingTab === "visit" ? (
-                                        <div className="px-2 py-1 rounded bg-white/5 text-xs font-bold text-white/70">
+                                        <div className="px-2 py-1 rounded bg-black/[0.04] text-xs font-bold text-black/70">
                                             {member.visitCount}회 누적
                                         </div>
                                     ) : (
-                                        <div className="px-2 py-1 rounded bg-emerald-500/10 text-xs font-bold text-emerald-500">
+                                        <div className="px-2 py-1 rounded bg-[#006241]/10 text-xs font-bold text-[#006241]">
                                             {member.handi4c}점
                                         </div>
                                     )}
                                 </div>
                             </div>
                         ))}
-                        {rankedMembers.length === 0 && <div className="text-center py-6 text-white/20 text-xs">데이터가 없습니다</div>}
+                        {rankedMembers.length === 0 && <div className="text-center py-6 text-black/40 text-xs">데이터가 없습니다</div>}
                     </div>
                 </div>
             </div>
 
             {/* QR Code Mini Access */}
             <div className="px-6 py-4 mb-8">
-                <div className="bg-white rounded-[1.5rem] p-6 text-center text-black shadow-xl relative overflow-hidden">
+                <div className="bg-white rounded-[1.5rem] p-6 text-center text-black shadow-[0_1px_2px_rgba(0,0,0,0.06)] relative overflow-hidden">
                     <div ref={qrRef} className="flex flex-col items-center bg-white p-2">
                         <QRCodeSVG
                             value={joinUrl}
                             size={160}
                         />
                         <div className="mt-4">
-                            <h3 className="font-bold text-lg leading-tight">매장 QR 코드</h3>
-                            <p className="text-xs text-gray-500 mt-1">고객 등록용</p>
+                            <h3 className="font-bold text-lg leading-tight text-[rgba(0,0,0,0.87)]">매장 QR 코드</h3>
+                            <p className="text-xs text-black/55 mt-1">고객 등록용</p>
                         </div>
                     </div>
 
@@ -422,7 +422,7 @@ export default function PartnerDashboard() {
                         <Button
                             onClick={handleDownloadPoster}
                             disabled={isGeneratingPoster}
-                            className="flex-1 bg-black text-white hover:bg-gray-800 h-10 rounded-xl text-xs font-bold"
+                            className="flex-1 bg-[#006241] text-white hover:bg-[#00553a] h-10 rounded-full text-xs font-bold"
                         >
                             <LucideDownload className="w-3 h-3 mr-1.5" />
                             {isGeneratingPoster ? "생성 중..." : "포스터 저장"}
@@ -430,9 +430,9 @@ export default function PartnerDashboard() {
                         <Button
                             onClick={handleCopyLink}
                             variant="outline"
-                            className="flex-1 border-gray-200 hover:bg-gray-50 h-10 rounded-xl text-xs font-bold"
+                            className="flex-1 bg-transparent border border-[#006241] text-[#006241] hover:bg-[#006241]/[0.06] h-10 rounded-full text-xs font-bold"
                         >
-                            {copied ? <LucideCheck className="w-3 h-3 mr-1.5 text-green-600" /> : <LucideCopy className="w-3 h-3 mr-1.5" />}
+                            {copied ? <LucideCheck className="w-3 h-3 mr-1.5 text-[#006241]" /> : <LucideCopy className="w-3 h-3 mr-1.5" />}
                             {copied ? "복사됨" : "링크 복사"}
                         </Button>
                     </div>
@@ -441,21 +441,21 @@ export default function PartnerDashboard() {
 
             {/* Premium Gating Banner */}
             <div className="px-6 mb-8">
-                <div className="rounded-[3rem] bg-[#141414] border border-white/5 p-8 relative overflow-hidden shadow-2xl">
-                    {/* Neon Glow Accents */}
-                    <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-[#10b981] opacity-[0.08] blur-[100px] rounded-full" />
-                    <div className="absolute bottom-[-50px] left-[-50px] w-64 h-64 bg-[#10b981] opacity-[0.05] blur-[100px] rounded-full" />
+                <div className="rounded-[3rem] bg-[#1E3932] p-8 relative overflow-hidden shadow-[0_8px_30px_rgba(30,57,50,0.25)]">
+                    {/* Warm Glow Accents */}
+                    <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-[#cba258] opacity-[0.10] blur-[100px] rounded-full" />
+                    <div className="absolute bottom-[-50px] left-[-50px] w-64 h-64 bg-[#006241] opacity-[0.25] blur-[100px] rounded-full" />
 
                     <div className="relative z-10">
                         <div className="flex items-center justify-between mb-8">
                             <div className="flex flex-col">
-                                <span className="text-[#10b981] text-[10px] font-black tracking-[0.2em] uppercase mb-1">Rankue Membership</span>
+                                <span className="text-[#cba258] text-[10px] font-black tracking-[0.2em] uppercase mb-1">Rankue Membership</span>
                                 <h3 className="text-2xl font-black text-white leading-tight">
                                     프리미엄 멤버십
                                 </h3>
                             </div>
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-                                <LucideTrophy className="w-6 h-6 text-[#10b981]" />
+                            <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
+                                <LucideTrophy className="w-6 h-6 text-[#cba258]" />
                             </div>
                         </div>
 
@@ -466,15 +466,15 @@ export default function PartnerDashboard() {
                                 { title: "상세 분석 리포트", sub: "STORE INSIGHTS", desc: "매장별 방문 패턴 및 매출 추이 정밀 분석" }
                             ].map((item, i) => (
                                 <div key={i} className="flex gap-4">
-                                    <div className="mt-1 w-5 h-5 rounded-full bg-[#10b981]/10 flex items-center justify-center flex-shrink-0">
-                                        <LucideCheck className="w-3 h-3 text-[#10b981]" />
+                                    <div className="mt-1 w-5 h-5 rounded-full bg-[#cba258]/[0.15] flex items-center justify-center flex-shrink-0">
+                                        <LucideCheck className="w-3 h-3 text-[#cba258]" />
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2 mb-0.5">
                                             <span className="text-sm font-bold text-white">{item.title}</span>
-                                            <span className="text-[9px] font-bold text-white/20 tracking-wider uppercase">{item.sub}</span>
+                                            <span className="text-[9px] font-bold text-white/40 tracking-wider uppercase">{item.sub}</span>
                                         </div>
-                                        <p className="text-xs text-white/40 leading-relaxed font-medium">{item.desc}</p>
+                                        <p className="text-xs text-white/60 leading-relaxed font-medium">{item.desc}</p>
                                     </div>
                                 </div>
                             ))}
@@ -483,11 +483,11 @@ export default function PartnerDashboard() {
                         <div className="space-y-3">
                             <Button
                                 onClick={() => setLocation("/partner/subscription")}
-                                className="w-full h-16 bg-white hover:bg-white/90 text-black text-lg font-black rounded-3xl transition-all shadow-xl active:scale-[0.97]"
+                                className="w-full h-16 bg-white hover:bg-white/90 text-[#006241] text-lg font-black rounded-full transition-all shadow-[0_2px_8px_rgba(0,0,0,0.12)] active:scale-[0.97]"
                             >
                                 프리미엄 1개월 무료 체험 🎁
                             </Button>
-                            <p className="text-[10px] text-center text-white/30 font-medium">
+                            <p className="text-[10px] text-center text-white/50 font-medium">
                                 지금 신청하면 30일 무료 체험 제공 • 언제든 해지 가능
                             </p>
                         </div>
@@ -579,33 +579,33 @@ export default function PartnerDashboard() {
                 {showSmsModal && (
                     <motion.div
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+                        className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6"
                     >
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
-                            className="bg-[#1a1a1a] rounded-2xl w-full max-w-sm p-6 border border-white/10"
+                            className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-[0_8px_30px_rgba(0,0,0,0.12)]"
                         >
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-white">단체 문자 발송</h3>
-                                <button onClick={() => setShowSmsModal(false)} className="text-white/40 hover:text-white">✕</button>
+                                <h3 className="text-lg font-bold text-[rgba(0,0,0,0.87)]">단체 문자 발송</h3>
+                                <button onClick={() => setShowSmsModal(false)} className="text-black/40 hover:text-[rgba(0,0,0,0.87)]">✕</button>
                             </div>
 
                             <div className="space-y-3 mb-6">
-                                <Button variant="outline" className="w-full justify-start h-12 border-white/10 text-white hover:bg-white/5">
+                                <Button variant="outline" className="w-full justify-start h-12 border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04]">
                                     <LucideUsers className="w-4 h-4 mr-2" />
                                     전체 회원 ({stats?.totalMembers}명)
                                 </Button>
-                                <Button variant="outline" className="w-full justify-start h-12 border-white/10 text-white hover:bg-white/5">
+                                <Button variant="outline" className="w-full justify-start h-12 border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04]">
                                     <LucideTrendingUp className="w-4 h-4 mr-2" />
                                     최근 미방문자 (30일+)
                                 </Button>
                             </div>
 
-                            <div className="bg-yellow-500/10 p-3 rounded-lg mb-4">
-                                <p className="text-xs text-yellow-500 font-medium">⚠️ 실제 발송은 포인트가 필요합니다.<br />현재는 데모 모드입니다.</p>
+                            <div className="bg-amber-500/10 p-3 rounded-lg mb-4">
+                                <p className="text-xs text-amber-600 font-medium">⚠️ 실제 발송은 포인트가 필요합니다.<br />현재는 데모 모드입니다.</p>
                             </div>
 
-                            <Button className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-black font-bold" onClick={() => setShowSmsModal(false)}>
+                            <Button className="w-full h-12 bg-[#006241] hover:bg-[#00553a] text-white font-bold rounded-full" onClick={() => setShowSmsModal(false)}>
                                 닫기
                             </Button>
                         </motion.div>

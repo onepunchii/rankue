@@ -100,22 +100,22 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
     return (
         <div
             ref={containerRef}
-            className={`relative w-24 h-24 flex items-center justify-center rounded-full bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl touch-none ${className}`}
+            className={`relative w-24 h-24 flex items-center justify-center rounded-full bg-white/5 shadow-2xl touch-none ${className}`}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
         >
             {/* Outer Ring */}
-            <div className="absolute inset-2 rounded-full border border-white/5 pointer-events-none" />
+            <div className="absolute inset-2 rounded-full pointer-events-none" />
 
             {/* Joystick Stick */}
             <div
                 ref={stickRef}
-                className="w-10 h-10 rounded-full bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-md border border-white/20 shadow-xl transition-transform duration-75 ease-out flex items-center justify-center pointer-events-none"
+                className="w-10 h-10 rounded-full bg-gradient-to-br from-white/30 to-white/10 shadow-xl transition-transform duration-75 ease-out flex items-center justify-center pointer-events-none"
             >
                 {/* Thumb Detail */}
-                <div className="w-4 h-4 rounded-full bg-white/20 border border-white/20" />
+                <div className="w-4 h-4 rounded-full bg-white/20 " />
             </div>
 
             {/* Hint Arrows */}

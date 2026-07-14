@@ -84,7 +84,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                                 size="sm"
                                                 variant="ghost"
                                                 disabled={processingMemberId === m.member.id}
-                                                className="h-10 w-10 p-0 text-white/55 hover:text-red-400 hover:bg-red-400/10 rounded-tile"
+                                                className="h-10 w-10 p-0 text-black/55 hover:text-red-500 hover:bg-red-500/10 rounded-tile"
                                                 onClick={() => handleAction(m.member.id, () => onKick(m.member.id))}
                                             >
                                                 <LucideUserX className="w-5 h-5" />
@@ -108,8 +108,8 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
 
             <div className="space-y-5">
                 <div className="flex items-center gap-2 px-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/25" />
-                    <h3 className="text-xs font-semibold text-white/55">
+                    <div className="w-1.5 h-1.5 rounded-full bg-black/25" />
+                    <h3 className="text-xs font-semibold text-black/55">
                         활동 중인 멤버 ({activeMembers.length})
                     </h3>
                 </div>
@@ -135,8 +135,8 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                                 variant="secondary"
                                                 disabled={processingMemberId === m.member.id}
                                                 className={cn(
-                                                    "h-9 px-4 text-xs font-semibold rounded-tile transition-colors border border-surface-line",
-                                                    m.role === 'manage' ? "bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20" : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
+                                                    "h-9 px-4 text-xs font-semibold rounded-tile transition-colors ",
+                                                    m.role === 'manage' ? "bg-brand/10 text-brand border-brand/20 hover:bg-brand/15" : "bg-black/[0.04] text-black/55 hover:bg-black/[0.06] hover:text-[rgba(0,0,0,0.87)]"
                                                 )}
                                                 onClick={() => {
                                                     const newRole = m.role === 'manage' ? 'member' : 'manage';
@@ -151,7 +151,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                                 size="sm"
                                                 variant="ghost"
                                                 disabled={processingMemberId === m.member.id}
-                                                className="h-10 w-10 p-0 text-white/55 hover:text-red-400 hover:bg-red-400/10 rounded-tile"
+                                                className="h-10 w-10 p-0 text-black/55 hover:text-red-500 hover:bg-red-500/10 rounded-tile"
                                                 onClick={() => setKickConfirmId(m.member.id)}
                                             >
                                                 <LucideUserX className="w-5 h-5" />
@@ -166,15 +166,15 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
             </div>
 
             <AlertDialog open={!!kickConfirmId} onOpenChange={(open) => !open && setKickConfirmId(null)}>
-                <AlertDialogContent className="bg-[#141416] border-white/10 text-white rounded-card">
+                <AlertDialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] rounded-card">
                     <AlertDialogHeader>
                         <AlertDialogTitle>멤버 내보내기</AlertDialogTitle>
-                        <AlertDialogDescription className="text-white/60">
+                        <AlertDialogDescription className="text-black/60">
                             정말로 이 멤버를 크루에서 내보내시겠습니까?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">취소</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]">취소</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => kickConfirmId && handleAction(kickConfirmId, () => onKick(kickConfirmId))}
                             className="bg-red-500 text-white hover:bg-red-600"
@@ -194,10 +194,10 @@ function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: 
     return (
         <motion.div
             layout
-            className="flex items-center justify-between p-4 rounded-tile bg-surface-2 border border-surface-line hover:bg-surface-3 hover:border-brand/20 transition-colors group"
+            className="flex items-center justify-between p-4 rounded-tile bg-surface-2 hover:bg-surface-3 hover:border-brand/20 transition-colors group"
         >
             <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-tile bg-white/5 border border-surface-line flex items-center justify-center text-sm font-medium text-white/55 overflow-hidden">
+                <div className="w-12 h-12 rounded-tile bg-black/[0.04] flex items-center justify-center text-sm font-medium text-black/55 overflow-hidden">
                     {member.member.profileImageUrl ? (
                         <img src={member.member.profileImageUrl} className="w-full h-full object-cover" alt="Profile" />
                     ) : (
@@ -207,14 +207,14 @@ function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: 
 
                 <div>
                     <div className="font-bold text-sm flex items-center gap-2">
-                        <span className={cn(isMe ? themeText : "text-white/90")}>
+                        <span className={cn(isMe ? themeText : "text-[rgba(0,0,0,0.87)]")}>
                             {member.member.nickname}
                         </span>
-                        {member.role === 'leader' && <RoleBadge icon={LucideCrown} color="text-yellow-500" label="크루장" />}
-                        {member.role === 'manage' && <RoleBadge icon={LucideShield} color="text-blue-400" label="운영진" />}
+                        {member.role === 'leader' && <RoleBadge icon={LucideCrown} color="text-[#cba258]" label="크루장" />}
+                        {member.role === 'manage' && <RoleBadge icon={LucideShield} color="text-brand" label="운영진" />}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                        <div className="px-2 py-0.5 rounded-lg bg-white/5 text-xs font-medium text-white/55 tabular-nums">
+                        <div className="px-2 py-0.5 rounded-lg bg-black/[0.04] text-xs font-medium text-black/55 tabular-nums">
                             {crew.sportCategory === "GOLF" ? `핸디 ${(member.member.golfAvgScore || 0).toFixed(1)}` : `평균 ${(member.member.avg4c || 0).toFixed(1)}`}
                         </div>
                         {isMe && <span className={cn("text-xs font-semibold", themeText)}>나</span>}
@@ -230,7 +230,7 @@ function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: 
 }
 
 const RoleBadge = ({ icon: Icon, color, label }: any) => (
-    <div className={cn("flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-surface-line rounded-lg", color)}>
+    <div className={cn("flex items-center gap-1.5 px-2 py-0.5 bg-black/[0.04] rounded-lg", color)}>
         <Icon className="w-3 h-3 fill-current" />
         <span className="text-xs font-semibold">{label}</span>
     </div>

@@ -48,8 +48,8 @@ export function LocationSearch({ value, onChange, placeholder = "참여 골프�
                     role="combobox"
                     aria-expanded={open}
                     className={cn(
-                        "w-full justify-between h-12 bg-transparent border-b border-t-0 border-x-0 border-white/10 rounded-none px-1 text-sm font-normal hover:bg-transparent hover:text-white",
-                        !value && "text-white/45",
+                        "w-full justify-between h-12 bg-transparent border-b border-t-0 border-x-0 border-black/10 rounded-none px-1 text-sm font-normal hover:bg-transparent hover:text-ink-1",
+                        !value && "text-black/40",
                         className
                     )}
                 >
@@ -64,11 +64,11 @@ export function LocationSearch({ value, onChange, placeholder = "참여 골프�
                     <LucideChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-[#141416] border-white/10 text-white rounded-card">
-                <Command className="bg-[#141416] text-white rounded-card">
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-white border-black/10 text-ink-1 rounded-card">
+                <Command className="bg-white text-ink-1 rounded-card">
                     <CommandInput placeholder="골프장 이름 검색..." className="h-11 border-none focus:ring-0" />
                     <CommandList>
-                        <CommandEmpty className="py-4 text-center text-xs text-white/55">검색 결과가 없습니다.</CommandEmpty>
+                        <CommandEmpty className="py-4 text-center text-xs text-ink-3">검색 결과가 없습니다.</CommandEmpty>
                         <CommandGroup>
                             {GOLF_COURSES.map((course) => (
                                 <CommandItem
@@ -79,7 +79,7 @@ export function LocationSearch({ value, onChange, placeholder = "참여 골프�
                                         onChange(course.label);
                                         setOpen(false);
                                     }}
-                                    className="text-white rounded-xl aria-selected:bg-brand/15 data-[selected=true]:bg-brand/15 cursor-pointer py-3"
+                                    className="text-ink-1 rounded-xl aria-selected:bg-brand/15 data-[selected=true]:bg-brand/15 cursor-pointer py-3"
                                 >
                                     <LucideCheck
                                         className={cn(
@@ -88,8 +88,8 @@ export function LocationSearch({ value, onChange, placeholder = "참여 골프�
                                         )}
                                     />
                                     <div className="flex flex-col gap-0.5">
-                                        <span className="font-semibold text-sm text-white/90">{course.label}</span>
-                                        <span className="text-xs text-white/55">{course.address}</span>
+                                        <span className="font-semibold text-sm text-ink-1">{course.label}</span>
+                                        <span className="text-xs text-ink-3">{course.address}</span>
                                     </div>
                                 </CommandItem>
                             ))}

@@ -15,11 +15,11 @@ export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDisc
 
     return (
         <div
-            className="group flex items-center gap-4 p-3 rounded-tile bg-surface-2 border border-surface-line cursor-pointer hover:bg-surface-3 transition-all active:scale-[0.98]"
+            className="group flex items-center gap-4 p-3 rounded-tile bg-surface-2 cursor-pointer hover:bg-surface-3 transition-all active:scale-[0.98]"
             onClick={onClick}
         >
             {/* 왼쪽 썸네일 */}
-            <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-surface-line">
+            <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden ">
                 {crew.coverImage ? (
                     <>
                         <img src={crew.coverImage} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt={crew.name} />
@@ -36,7 +36,7 @@ export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDisc
             {/* 오른쪽 정보 */}
             <div className="flex-1 min-w-0 py-0.5">
                 <div className="flex items-center justify-between gap-2 mb-1">
-                    <h3 className="font-semibold text-[15px] text-white truncate">
+                    <h3 className="font-semibold text-[15px] text-ink-1 truncate">
                         {crew.name}
                     </h3>
                     <span className="shrink-0 text-[12px] font-semibold px-2 py-0.5 rounded-full border border-brand/25 text-brand bg-brand/12">

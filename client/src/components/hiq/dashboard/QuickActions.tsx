@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ChevronDown, LucideGamepad2, LucideHash, LucideMapPin, LucideTrophy, LucideUsers } from "lucide-react";
+import { ChevronDown, Target, Swords, LogIn, Cpu, LucideMapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -22,8 +22,8 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
     return (
         <div className="mb-12 relative z-10">
             <header className="mb-4">
-                <h2 className="text-[19px] font-bold text-white tracking-tight">빠른 실행</h2>
-                <p className="text-[13px] font-medium text-white/45 mt-1">게임을 시작하거나 참여하세요</p>
+                <h2 className="text-[19px] font-bold text-ink-1 tracking-tight">빠른 실행</h2>
+                <p className="text-[13px] font-medium text-black/55 mt-1">게임을 시작하거나 참여하세요</p>
             </header>
 
             <div className="grid grid-cols-2 gap-3 auto-rows-min">
@@ -31,14 +31,14 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                 <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={() => onStartGame("practice")}
-                    className="h-[132px] rounded-3xl bg-white/[0.04] border border-white/[0.08] flex flex-col justify-between p-5 text-left transition-colors hover:bg-white/[0.06]"
+                    className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
                 >
-                    <div className="w-11 h-11 rounded-2xl bg-white/[0.06] flex items-center justify-center">
-                        <LucideTrophy className="w-5 h-5 text-white/70" />
+                    <div className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center">
+                        <Target className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[15px] font-semibold text-white leading-tight">혼자 연습</span>
-                        <span className="block text-[12.5px] font-medium text-white/45 mt-0.5">기록 없이 연습</span>
+                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">혼자 연습</span>
+                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">기록 없이 연습</span>
                     </div>
                 </motion.button>
 
@@ -46,15 +46,14 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                 <motion.button
                     whileTap={{ scale: 0.98 }}
                     onClick={() => onStartGame("match")}
-                    className="row-span-2 h-[276px] rounded-3xl bg-gradient-to-b from-brand/[0.14] to-brand/[0.02] border border-brand/25 flex flex-col justify-between p-6 text-left relative overflow-hidden"
+                    className="row-span-2 h-[276px] rounded-3xl bg-brand flex flex-col justify-between p-6 text-left shadow-[0_6px_20px_rgba(0,98,65,0.18)]"
                 >
-                    <div className="absolute -top-16 -right-12 w-40 h-40 rounded-full bg-brand/10 blur-3xl pointer-events-none" />
-                    <div className="w-16 h-16 rounded-3xl bg-brand/15 border border-brand/20 flex items-center justify-center relative">
-                        <LucideUsers className="w-8 h-8 text-brand" />
+                    <div className="w-16 h-16 rounded-3xl bg-white/15 flex items-center justify-center">
+                        <Swords className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
-                    <div className="relative">
+                    <div>
                         <span className="block text-[20px] font-bold text-white leading-tight">매칭 대결</span>
-                        <span className="block text-[13px] font-medium text-white/60 mt-1.5 leading-snug">실력이 맞는 상대와<br />1:1 랭킹 경기</span>
+                        <span className="block text-[13px] font-medium text-white/80 mt-1.5 leading-snug">실력이 맞는 상대와<br />1:1 랭킹 경기</span>
                     </div>
                 </motion.button>
 
@@ -62,14 +61,14 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                 <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={onJoinGame}
-                    className="h-[132px] rounded-3xl bg-white/[0.04] border border-white/[0.08] flex flex-col justify-between p-5 text-left transition-colors hover:bg-white/[0.06]"
+                    className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
                 >
-                    <div className="w-11 h-11 rounded-2xl bg-brand/12 flex items-center justify-center">
-                        <LucideHash className="w-5 h-5 text-brand" />
+                    <div className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center">
+                        <LogIn className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[15px] font-semibold text-white leading-tight">핀 참여</span>
-                        <span className="block text-[12.5px] font-medium text-white/45 mt-0.5">코드로 입장</span>
+                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">핀 참여</span>
+                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">코드로 입장</span>
                     </div>
                 </motion.button>
 
@@ -77,14 +76,14 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                 <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={handleOnlineGameClick}
-                    className="h-[132px] rounded-3xl bg-white/[0.04] border border-white/[0.08] flex flex-col justify-between p-5 text-left transition-colors hover:bg-white/[0.06]"
+                    className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
                 >
-                    <div className="w-11 h-11 rounded-2xl bg-white/[0.06] flex items-center justify-center">
-                        <LucideGamepad2 className="w-5 h-5 text-white/70" />
+                    <div className="w-11 h-11 rounded-2xl bg-black/[0.05] flex items-center justify-center">
+                        <Cpu className="w-[22px] h-[22px] text-black/55" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[15px] font-semibold text-white leading-tight">온라인 대전</span>
-                        <span className="block text-[12.5px] font-medium text-white/45 mt-0.5">시뮬레이터 대결</span>
+                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">온라인 대전</span>
+                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">시뮬레이터 대결</span>
                     </div>
                 </motion.button>
 
@@ -92,14 +91,14 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                 <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={() => toast({ title: "서비스 준비 중", description: "가까운 매장 찾기 기능이 곧 추가됩니다." })}
-                    className="h-[132px] rounded-3xl bg-white/[0.02] border border-white/[0.05] flex flex-col justify-between p-5 text-left"
+                    className="h-[132px] rounded-3xl bg-black/[0.03] flex flex-col justify-between p-5 text-left"
                 >
-                    <div className="w-11 h-11 rounded-2xl bg-white/[0.04] flex items-center justify-center">
-                        <LucideMapPin className="w-5 h-5 text-white/55" />
+                    <div className="w-11 h-11 rounded-2xl bg-black/[0.05] flex items-center justify-center">
+                        <LucideMapPin className="w-5 h-5 text-black/40" />
                     </div>
                     <div>
-                        <span className="block text-[15px] font-medium text-white/50 leading-tight">매장 찾기</span>
-                        <span className="block text-[12.5px] font-medium text-white/55 mt-0.5">준비 중</span>
+                        <span className="block text-[15px] font-medium text-black/40 leading-tight">매장 찾기</span>
+                        <span className="block text-[12.5px] font-medium text-black/40 mt-0.5">준비 중</span>
                     </div>
                 </motion.button>
             </div>
@@ -112,12 +111,12 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     if (!open) setThreeBallSelectionMode(false);
                 }}
             >
-                <DialogContent hideClose className="bg-[#0F0F0F] border border-white/10 text-white max-w-md w-[92%] rounded-[32px] p-0 overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.7)] focus:outline-none">
+                <DialogContent hideClose className="bg-white text-ink-1 max-w-md w-[92%] rounded-[32px] p-0 overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.18)] focus:outline-none">
                     <div className="p-7">
                         <DialogHeader className="mb-7">
                             <div className="flex flex-col items-center text-center">
-                                <DialogTitle className="text-[24px] font-bold tracking-tight text-white mb-1.5">게임 모드 선택</DialogTitle>
-                                <DialogDescription className="text-[13px] font-medium text-white/50">
+                                <DialogTitle className="text-[24px] font-bold tracking-tight text-ink-1 mb-1.5">게임 모드 선택</DialogTitle>
+                                <DialogDescription className="text-[13px] font-medium text-black/55">
                                     온라인으로 상대와 겨뤄보세요
                                 </DialogDescription>
                             </div>
@@ -126,25 +125,25 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                         <button
                             onClick={() => setIsOnlineGameModalOpen(false)}
                             title="닫기"
-                            className="absolute top-6 right-6 w-9 h-9 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all"
+                            className="absolute top-6 right-6 w-9 h-9 rounded-full bg-black/[0.04] flex items-center justify-center hover:bg-black/[0.08] transition-all"
                         >
-                            <span className="text-xl text-white/40 leading-none">&times;</span>
+                            <span className="text-xl text-black/40 leading-none">&times;</span>
                         </button>
 
                         <div className={`grid ${threeBallSelectionMode ? 'grid-cols-1' : 'grid-cols-2'} gap-3.5 min-h-[200px]`}>
                             {/* 3-BALL */}
                             <motion.div
                                 layout
-                                className={`relative flex flex-col items-center justify-center p-6 rounded-3xl transition-all duration-400 border overflow-hidden cursor-pointer ${threeBallSelectionMode
-                                    ? "bg-brand/[0.08] border-brand/30 col-span-1 h-[260px]"
-                                    : "bg-white/[0.04] hover:bg-white/[0.07] border-white/[0.08] active:scale-[0.98]"
+                                className={`relative flex flex-col items-center justify-center p-6 rounded-3xl transition-all duration-400 overflow-hidden cursor-pointer ${threeBallSelectionMode
+                                    ? "bg-brand/[0.06] col-span-1 h-[260px]"
+                                    : "bg-black/[0.04] hover:bg-black/[0.06] active:scale-[0.98]"
                                     }`}
                                 onClick={() => !threeBallSelectionMode && setThreeBallSelectionMode(true)}
                             >
                                 {!threeBallSelectionMode ? (
                                     <div className="flex flex-col items-center gap-4">
-                                        <div className="w-16 h-16 rounded-3xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-3xl">🎱</div>
-                                        <span className="text-[18px] font-bold text-white">3구</span>
+                                        <div className="w-14 h-14 rounded-full bg-white ring-1 ring-black/5 shadow-[inset_-3px_-3px_7px_rgba(0,0,0,0.10),0_2px_6px_rgba(0,0,0,0.12)]" />
+                                        <span className="text-[18px] font-bold text-ink-1">3구</span>
                                     </div>
                                 ) : (
                                     <motion.div
@@ -153,30 +152,30 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                                         className="w-full h-full flex flex-col justify-between"
                                     >
                                         <div className="flex items-center justify-between mb-6">
-                                            <span className="text-[16px] font-bold text-white">테이블 규격</span>
+                                            <span className="text-[16px] font-bold text-ink-1">테이블 규격</span>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); setThreeBallSelectionMode(false); }}
-                                                className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all"
+                                                className="w-8 h-8 rounded-full bg-black/[0.04] flex items-center justify-center hover:bg-black/[0.08] transition-all"
                                             >
-                                                <ChevronDown className="w-4 h-4 text-white/40 rotate-90" />
+                                                <ChevronDown className="w-4 h-4 text-black/40 rotate-90" />
                                             </button>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <motion.button
                                                 whileTap={{ scale: 0.96 }}
                                                 onClick={(e) => { e.stopPropagation(); setLocation("/online-game?mode=3ball&table=medium"); }}
-                                                className="flex flex-col items-center p-5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 transition-all"
+                                                className="flex flex-col items-center p-5 rounded-2xl bg-white hover:bg-black/[0.02] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-all"
                                             >
-                                                <span className="text-[17px] font-bold text-white/85 mb-0.5">중대</span>
-                                                <span className="text-[12px] font-medium text-white/40">국내식</span>
+                                                <span className="text-[17px] font-bold text-ink-1 mb-0.5">중대</span>
+                                                <span className="text-[12px] font-medium text-black/55">국내식</span>
                                             </motion.button>
                                             <motion.button
                                                 whileTap={{ scale: 0.96 }}
                                                 onClick={(e) => { e.stopPropagation(); setLocation("/online-game?mode=3ball&table=large"); }}
-                                                className="flex flex-col items-center p-5 rounded-2xl bg-brand/15 hover:bg-brand/25 border border-brand/30 transition-all"
+                                                className="flex flex-col items-center p-5 rounded-2xl bg-brand hover:bg-brand/90 border border-brand transition-all"
                                             >
                                                 <span className="text-[17px] font-bold text-white mb-0.5">대대</span>
-                                                <span className="text-[12px] font-medium text-white/60">국제식</span>
+                                                <span className="text-[12px] font-medium text-white/80">국제식</span>
                                             </motion.button>
                                         </div>
                                     </motion.div>
@@ -192,11 +191,11 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                                         exit={{ opacity: 0, scale: 0.9, x: 20 }}
                                         onClick={() => setLocation("/online-game?mode=4ball&table=medium")}
                                         title="4구 게임 시작"
-                                        className="relative flex flex-col items-center justify-center p-6 rounded-3xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.08] transition-all active:scale-[0.98] h-full"
+                                        className="relative flex flex-col items-center justify-center p-6 rounded-3xl bg-black/[0.04] hover:bg-black/[0.06] transition-all active:scale-[0.98] h-full"
                                     >
                                         <div className="flex flex-col items-center gap-4">
-                                            <div className="w-16 h-16 rounded-3xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-3xl">🔴</div>
-                                            <span className="text-[18px] font-bold text-white">4구</span>
+                                            <div className="w-14 h-14 rounded-full bg-red-500 ring-1 ring-black/5 shadow-[inset_-3px_-3px_7px_rgba(0,0,0,0.22),0_2px_6px_rgba(0,0,0,0.15)]" />
+                                            <span className="text-[18px] font-bold text-ink-1">4구</span>
                                         </div>
                                     </motion.button>
                                 )}

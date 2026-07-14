@@ -185,12 +185,12 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#141416] border border-white/10 text-white w-[90%] max-w-[400px] rounded-card p-6">
+            <DialogContent className="bg-white text-ink-1 w-[90%] max-w-[400px] rounded-card p-6">
                 <DialogHeader className="mb-2">
-                    <DialogTitle className="text-xl font-semibold">
+                    <DialogTitle className="text-xl font-semibold text-brand">
                         {isEditMode ? "정모 정보 수정" : "새 정모 만들기"}
                     </DialogTitle>
-                    <DialogDescription className="text-white/55">
+                    <DialogDescription className="text-black/55">
                         {isEditMode ? "정모 정보를 수정해주세요." : "크루원들과 함께할 정모를 만들어보세요."}
                     </DialogDescription>
                 </DialogHeader>
@@ -217,12 +217,12 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                             name="title"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[12px] text-white/55 font-semibold ml-1">모임명</FormLabel>
+                                    <FormLabel className="text-[12px] text-black/55 font-semibold ml-1">모임명</FormLabel>
                                     <FormControl>
                                         <Input
                                             placeholder="모임명을 입력하세요"
                                             {...field}
-                                            className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-sm placeholder:text-white/45 focus-visible:ring-1 focus-visible:ring-brand/30"
+                                            className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
                                         />
                                     </FormControl>
                                     <FormMessage className="text-brand text-[12px]" />
@@ -236,7 +236,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 name="activityDate"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1 flex flex-col">
-                                        <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                        <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
                                             <LucideCalendar className="w-3 h-3" /> 모임 날짜
                                         </FormLabel>
                                         <Popover>
@@ -245,8 +245,8 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                                     <Button
                                                         variant={"ghost"}
                                                         className={cn(
-                                                            "w-full text-left font-normal bg-surface-2 border border-surface-line rounded-tile h-12 px-4 justify-start hover:bg-surface-3 hover:text-white",
-                                                            !field.value && "text-white/45"
+                                                            "w-full text-left font-normal bg-surface-3 rounded-tile h-12 px-4 justify-start hover:bg-black/[0.06] hover:text-ink-1",
+                                                            !field.value && "text-black/40"
                                                         )}
                                                     >
                                                         {field.value ? (
@@ -257,7 +257,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                                     </Button>
                                                 </FormControl>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0 bg-[#141416] border-white/10" align="start">
+                                            <PopoverContent className="w-auto p-0 bg-white border-black/[0.08]" align="start">
                                                 <Calendar
                                                     mode="single"
                                                     selected={field.value}
@@ -268,7 +268,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                                         return date < today || date < new Date("1900-01-01");
                                                     }}
                                                     initialFocus
-                                                    className="p-3 pointer-events-auto text-white dark:[color-scheme:dark]"
+                                                    className="p-3 pointer-events-auto text-ink-1"
                                                 />
                                             </PopoverContent>
                                         </Popover>
@@ -282,15 +282,15 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 name="time"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                        <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
                                             <LucideClock className="w-3 h-3" /> 시간
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="time"
                                                 {...field}
-                                                style={{ colorScheme: "dark" }}
-                                                className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-sm focus-visible:ring-1 focus-visible:ring-brand/30 [&::-webkit-calendar-picker-indicator]:invert"
+                                                style={{ colorScheme: "light" }}
+                                                className="bg-surface-3 h-12 rounded-tile px-4 text-sm focus-visible:ring-1 focus-visible:ring-brand/30"
                                             />
                                         </FormControl>
                                         <FormMessage className="text-brand text-[12px]" />
@@ -305,7 +305,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 name="locationName"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                        <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
                                             <LucideMapPin className="w-3 h-3" /> 장소 (당구장)
                                         </FormLabel>
                                         <FormControl>
@@ -313,7 +313,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                                 placeholder="모임 장소"
                                                 {...field}
                                                 value={field.value || ""}
-                                                className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-sm placeholder:text-white/45 focus-visible:ring-1 focus-visible:ring-brand/30"
+                                                className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
                                             />
                                         </FormControl>
                                         <FormMessage className="text-brand text-[12px]" />
@@ -326,7 +326,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 name="maxParticipants"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                        <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
                                             <LucideUsers className="w-3 h-3" /> 정원 (최대 인원)
                                         </FormLabel>
                                         <FormControl>
@@ -334,7 +334,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                                 type="number"
                                                 min={2}
                                                 {...field}
-                                                className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-sm focus-visible:ring-1 focus-visible:ring-brand/30"
+                                                className="bg-surface-3 h-12 rounded-tile px-4 text-sm focus-visible:ring-1 focus-visible:ring-brand/30"
                                             />
                                         </FormControl>
                                         <FormMessage className="text-brand text-[12px]" />
@@ -348,7 +348,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                             name="cost"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[12px] text-white/55 font-semibold ml-1 flex items-center gap-1">
+                                    <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
                                         <LucideCoins className="w-3 h-3" /> 비용 (참가비)
                                     </FormLabel>
                                     <FormControl>
@@ -358,7 +358,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                             placeholder="예: 게임비 1/N"
                                             {...field}
                                             value={field.value || ""}
-                                            className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-sm placeholder:text-white/45 focus-visible:ring-1 focus-visible:ring-brand/30"
+                                            className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
                                         />
                                     </FormControl>
                                     <FormMessage className="text-brand text-[12px]" />
@@ -371,13 +371,13 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                             name="description"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[12px] text-white/55 font-semibold ml-1">상세 내용</FormLabel>
+                                    <FormLabel className="text-[12px] text-black/55 font-semibold ml-1">상세 내용</FormLabel>
                                     <FormControl>
                                         <Textarea
                                             placeholder="모임 상세 내용"
                                             {...field}
                                             value={field.value || ""}
-                                            className="bg-surface-2 border border-surface-line rounded-tile p-3 resize-none h-20 focus-visible:ring-1 focus-visible:ring-brand transition-all placeholder:text-white/45 text-sm leading-relaxed"
+                                            className="bg-surface-3 rounded-tile p-3 resize-none h-20 focus-visible:ring-1 focus-visible:ring-brand transition-all placeholder:text-black/40 text-sm leading-relaxed"
                                         />
                                     </FormControl>
                                     <FormMessage className="text-brand text-[12px]" />

@@ -44,19 +44,19 @@ export const BilliardsCategorySelector = ({ selected, onSelect }: BilliardsCateg
                         className={cn(
                             "flex flex-col items-center justify-center p-3 rounded-tile border transition-colors h-[70px]",
                             isSelected
-                                ? cn("bg-white/[0.08]", cat.classes.border)
-                                : "bg-surface-2 border-surface-line hover:bg-surface-3 hover:border-white/10"
+                                ? cn("bg-black/[0.04]", cat.classes.border)
+                                : "bg-surface-2 border-surface-line hover:bg-surface-3 hover:border-black/10"
                         )}
                     >
                         <span className={cn(
                             "text-xs font-semibold text-center leading-tight transition-colors",
-                            isSelected ? "text-white" : "text-white/55"
+                            isSelected ? "text-ink-1" : "text-ink-3"
                         )}>
                             {cat.label}
                         </span>
                         <span className={cn(
                             "text-xs font-medium mt-0.5",
-                            isSelected ? cat.classes.text : "text-white/45"
+                            isSelected ? cat.classes.text : "text-ink-3"
                         )}>
                             {cat.desc}
                         </span>

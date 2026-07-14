@@ -65,12 +65,12 @@ export default function HiqScoreboard() {
     const getAvg = (score: number) => (score / Math.max(1, gameState.innings)).toFixed(2);
 
     if (isLoading || !game) {
-        return <div className="min-h-screen bg-black flex items-center justify-center text-white">불러오는 중...</div>;
+        return <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-[rgba(0,0,0,0.87)]">불러오는 중...</div>;
     }
 
     return (
         <LandscapeGuard>
-            <div className="h-[100dvh] bg-[#050505] text-white font-sans overflow-hidden flex flex-col touch-none select-none relative">
+            <div className="h-[100dvh] bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
                 <div className="flex-1 flex w-full relative z-0">
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                         <SortableContext items={playerOrder} strategy={horizontalListSortingStrategy}>

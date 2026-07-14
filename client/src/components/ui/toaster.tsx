@@ -20,8 +20,8 @@ export function Toaster() {
             <div className="flex gap-4">
               <div className="mt-0.5 shrink-0">
                 {variant === "destructive" && <LucideAlertCircle className="w-5 h-5 text-red-500" />}
-                {variant === "success" && <LucideCheckCircle2 className="w-5 h-5 text-[#10B981]" />}
-                {(!variant || variant === "default") && <LucideInfo className="w-5 h-5 text-[#10B981]" />}
+                {variant === "success" && <LucideCheckCircle2 className="w-5 h-5 text-[#006241]" />}
+                {(!variant || variant === "default") && <LucideInfo className="w-5 h-5 text-[#006241]" />}
               </div>
               <div className="grid gap-1">
                 {title && <ToastTitle>{title}</ToastTitle>}

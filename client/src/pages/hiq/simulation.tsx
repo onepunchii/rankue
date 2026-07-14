@@ -323,7 +323,7 @@ export default function HiqSimulation() {
 
     return (
         <div
-            className="fixed inset-0 bg-[#050505] flex flex-col font-sans overflow-hidden select-none"
+            className="fixed inset-0 bg-[#f2f0eb] flex flex-col font-sans overflow-hidden select-none"
             onMouseMove={(e) => handleDrag(e.clientX, e.clientY)}
             onMouseUp={() => setIsDragging(false)}
             onMouseLeave={() => setIsDragging(false)}
@@ -334,16 +334,16 @@ export default function HiqSimulation() {
             onTouchEnd={() => setIsDragging(false)}
         >
             {/* Header */}
-            <header className="h-16 flex items-center justify-between px-6 bg-white/5 border-b border-white/10 z-50">
+            <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-black/10 z-50">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => setLocation('/')}
-                        className="p-2 hover:bg-white/5 rounded-full"
+                        className="p-2 hover:bg-black/[0.04] rounded-full"
                         title="홈으로 돌아가기"
                     >
-                        <ChevronDown className="w-6 h-6 rotate-90 text-white/40" />
+                        <ChevronDown className="w-6 h-6 rotate-90 text-black/40" />
                     </button>
-                    <h1 className="text-white font-semibold tracking-tight">랭큐 AI 솔루션</h1>
+                    <h1 className="text-[rgba(0,0,0,0.87)] font-semibold tracking-tight">랭큐 AI 솔루션</h1>
                 </div>
                 <div className="w-20" /> {/* Spacer for Title Centering */}
             </header>
@@ -353,7 +353,7 @@ export default function HiqSimulation() {
                 <motion.div
                     animate={isShaking ? { x: [0, -2, 2, -2, 0], y: [0, 2, -2, 2, 0] } : {}}
                     transition={{ duration: 0.1 }}
-                    className="w-full max-w-[900px] relative mt-4 shadow-2xl"
+                    className="w-full max-w-[900px] relative mt-4 shadow-[0_10px_30px_rgba(0,0,0,0.15)]"
                 >
                     {/* Cue Stick Graphic */}
                     <AnimatePresence>
@@ -416,7 +416,7 @@ export default function HiqSimulation() {
                     {/* Optional Grid Overlay */}
                     {showGrid && (
                         <div
-                            className="absolute pointer-events-none border border-white/10 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:12.5%_25%]"
+                            className="absolute pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:12.5%_25%]"
                             style={{
                                 left: dimensions.width * 0.054,
                                 top: dimensions.height * 0.112,
@@ -545,7 +545,7 @@ export default function HiqSimulation() {
 
                 {/* Touchpad Area */}
                 <div
-                    className="flex-1 w-full max-w-[900px] mt-4 relative bg-white/5 border border-white/5 overflow-hidden cursor-move touch-none"
+                    className="flex-1 w-full max-w-[900px] mt-4 relative bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] overflow-hidden cursor-move touch-none"
                     onMouseDown={(e) => {
                         setIsDragging(true);
                         setDragCurrent({ x: e.clientX, y: e.clientY });
@@ -592,7 +592,7 @@ export default function HiqSimulation() {
                                                     onClick={(e) => { e.stopPropagation(); setActiveBall(c); }}
                                                     className={`px-4 py-1.5 rounded-pill text-[12px] font-semibold transition-all duration-300 ${isActive
                                                         ? 'bg-brand text-brand-fg'
-                                                        : 'bg-white/5 text-white/55 border border-white/5'
+                                                        : 'bg-black/[0.04] text-black/55 '
                                                         }`}
                                                 >
                                                     {label}
@@ -602,13 +602,13 @@ export default function HiqSimulation() {
                                     })}
                                 </div>
                                 <div className="text-center flex flex-col items-center">
-                                    <p className="text-white/40 text-[12px] font-medium mb-3 tracking-tight">
+                                    <p className="text-black/55 text-[12px] font-medium mb-3 tracking-tight">
                                         현재 배치에서 3,000개의 족보 데이터를 기반으로<br />가장 높은 확률의 정답을 찾아냅니다.
                                     </p>
                                     <Button
                                         onClick={(e) => { e.stopPropagation(); runAISolution(); }}
                                         disabled={isAnalyzing}
-                                        className="rk-btn-primary h-16 px-16 rounded-pill text-lg shadow-[0_20px_40px_rgba(16,185,129,0.1)]"
+                                        className="rk-btn-primary h-16 px-16 rounded-pill text-lg shadow-[0_20px_40px_rgba(0,98,65,0.12)]"
                                     >
                                         {isAnalyzing ? <LucideRefreshCw className="animate-spin w-6 h-6 mr-3" /> : <Target className="w-6 h-6 mr-3" />}
                                         최적 공략 검색
@@ -617,7 +617,7 @@ export default function HiqSimulation() {
 
                                 {/* Central Instruction Text */}
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
-                                    <p className="text-[13px] font-medium text-white/38 whitespace-nowrap">
+                                    <p className="text-[13px] font-medium text-black/40 whitespace-nowrap">
                                         빈 공간을 드래그하여 공을 옮기세요
                                     </p>
                                 </div>
@@ -625,7 +625,7 @@ export default function HiqSimulation() {
                         ) : (
                             <motion.div
                                 key="result" initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }}
-                                className="absolute inset-0 bg-[#141416] p-8 flex flex-col"
+                                className="absolute inset-0 bg-white p-8 flex flex-col"
                             >
                                 <div className="flex flex-col mb-6">
                                     <p className="text-brand text-[12px] font-semibold mb-4">AI 추천 전략</p>
@@ -636,11 +636,11 @@ export default function HiqSimulation() {
                                                 onClick={() => selectSolution(sol, i)}
                                                 className={`flex-1 py-3 px-4 rounded-tile border transition-all duration-300 flex flex-col items-center justify-center gap-1 ${activeSolutionIndex === i
                                                     ? 'bg-brand border-brand text-brand-fg'
-                                                    : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                                    : 'bg-black/[0.04] border-black/[0.08] hover:bg-black/[0.06]'
                                                     }`}
                                             >
-                                                <span className={`text-[12px] font-semibold ${activeSolutionIndex === i ? 'text-brand-fg/60' : 'text-white/45'}`}>옵션 {i + 1}</span>
-                                                <span className={`text-[12px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-brand-fg' : 'text-white/40'}`}>
+                                                <span className={`text-[12px] font-semibold ${activeSolutionIndex === i ? 'text-brand-fg/60' : 'text-black/55'}`}>옵션 {i + 1}</span>
+                                                <span className={`text-[12px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-brand-fg' : 'text-black/70'}`}>
                                                     {(!sol.title || sol.title === 'Unknown') ? '추천 공략' : sol.title}
                                                 </span>
                                             </button>
@@ -650,23 +650,23 @@ export default function HiqSimulation() {
 
                                 <div className="flex justify-between items-end mb-6">
                                     <div className="flex-1 min-w-0 pr-4">
-                                        <h2 className="text-2xl font-semibold text-white tracking-tight truncate leading-tight">
+                                        <h2 className="text-2xl font-semibold text-[rgba(0,0,0,0.87)] tracking-tight truncate leading-tight">
                                             {simulationData?.title || 'AI 추천 공략'}
                                         </h2>
-                                        <p className="text-white/40 text-[12px] mt-1 font-medium">{simulationData?.description || '해당 배치에 대한 정석 데이터 분석 결과입니다.'}</p>
+                                        <p className="text-black/55 text-[12px] mt-1 font-medium">{simulationData?.description || '해당 배치에 대한 정석 데이터 분석 결과입니다.'}</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => runReplay()}
                                             title="시뮬레이션 재생"
-                                            className="w-12 h-12 bg-white/5 rounded-tile border border-white/10 flex items-center justify-center text-white"
+                                            className="w-12 h-12 bg-black/[0.04] rounded-tile flex items-center justify-center text-[rgba(0,0,0,0.87)]"
                                         >
                                             <LucidePlay className="w-5 h-5 fill-current" />
                                         </button>
                                         <button
                                             onClick={() => setActiveMode("setup")}
                                             title="배치 수정으로 돌아가기"
-                                            className="rk-btn-primary h-12 px-6 whitespace-nowrap shadow-[0_5px_15px_rgba(16,185,129,0.1)]"
+                                            className="rk-btn-primary h-12 px-6 whitespace-nowrap shadow-[0_5px_15px_rgba(0,98,65,0.12)]"
                                         >
                                             배치 수정
                                         </button>
@@ -674,17 +674,17 @@ export default function HiqSimulation() {
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-4 mb-8">
-                                    <Card className="bg-black/40 border-none p-4 h-24 flex items-center justify-center">
+                                    <Card className="bg-black/[0.04] p-4 h-24 flex items-center justify-center">
                                         <SpinVisualizer spin={simulationData?.solution.spin} />
                                     </Card>
-                                    <Card className="bg-black/40 border-none p-4 h-24 col-span-2 flex items-center justify-between px-8">
+                                    <Card className="bg-black/[0.04] p-4 h-24 col-span-2 flex items-center justify-between px-8">
                                         <ThicknessVisualizer thickness={simulationData?.solution.thickness} />
                                         <PowerGauge power={simulationData?.solution.power} />
                                     </Card>
                                 </div>
 
-                                <div className="flex-1 bg-white/5 rounded-tile p-6 border border-white/5 overflow-y-auto">
-                                    <p className="text-sm text-white/70 leading-relaxed font-medium">{simulationData?.tip || simulationData?.solution?.tip}</p>
+                                <div className="flex-1 bg-black/[0.04] rounded-tile p-6 overflow-y-auto">
+                                    <p className="text-sm text-black/70 leading-relaxed font-medium">{simulationData?.tip || simulationData?.solution?.tip}</p>
                                 </div>
                             </motion.div>
                         )}
@@ -699,12 +699,12 @@ const SpinVisualizer = ({ spin }: { spin: any }) => {
     const x = spin ? (spin.x / 12) * 100 : 0;
     const y = spin ? (spin.y / 12) * 100 : 0;
     return (
-        <div className="relative w-16 h-16 rounded-full border-2 border-white/10 bg-gradient-to-br from-white/5 to-transparent flex items-center justify-center">
+        <div className="relative w-16 h-16 rounded-full border-2 border-black/10 bg-gradient-to-br from-black/[0.04] to-transparent flex items-center justify-center">
             <div
                 className="absolute w-3 h-3 bg-red-600 rounded-full"
                 style={{ transform: `translate(${x}%, ${-y}%)` } as any}
             />
-            <div className="text-[12px] font-medium text-white/45 mt-10 tracking-normal">스핀</div>
+            <div className="text-[12px] font-medium text-black/55 mt-10 tracking-normal">스핀</div>
         </div>
     );
 };
@@ -712,13 +712,13 @@ const SpinVisualizer = ({ spin }: { spin: any }) => {
 const ThicknessVisualizer = ({ thickness }: { thickness: number }) => (
     <div className="flex flex-col items-center">
         <div className="relative w-24 h-8 flex items-center">
-            <div className="absolute w-8 h-8 rounded-full border border-white/20 bg-white/5" style={{ left: 0 } as any} />
+            <div className="absolute w-8 h-8 rounded-full bg-black/[0.04]" style={{ left: 0 } as any} />
             <div
                 className="absolute w-8 h-8 rounded-full border border-blue-500 bg-blue-500/30"
                 style={{ '--thickness-offset': `${(thickness || 0) * 32}px`, left: 'var(--thickness-offset)' } as any}
             />
         </div>
-        <span className="text-[12px] font-medium text-white/45 mt-2 tracking-normal">두께 {Math.round((thickness || 0) * 8)}/8</span>
+        <span className="text-[12px] font-medium text-black/55 mt-2 tracking-normal">두께 {Math.round((thickness || 0) * 8)}/8</span>
     </div>
 );
 
@@ -728,11 +728,11 @@ const PowerGauge = ({ power }: { power: number }) => (
             {[1, 2, 3, 4, 5].map(i => (
                 <div
                     key={i}
-                    className={`w-2 rounded-sm ${power >= i * 20 ? 'bg-amber-400' : 'bg-white/5'}`}
+                    className={`w-2 rounded-sm ${power >= i * 20 ? 'bg-amber-400' : 'bg-black/[0.08]'}`}
                     style={{ '--bar-height': `${i * 20}%`, height: 'var(--bar-height)' } as any}
                 />
             ))}
         </div>
-        <span className="text-[12px] font-medium text-white/45 mt-2 tracking-normal">파워 {power}%</span>
+        <span className="text-[12px] font-medium text-black/55 mt-2 tracking-normal">파워 {power}%</span>
     </div>
 );

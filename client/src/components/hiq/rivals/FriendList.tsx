@@ -19,10 +19,10 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
     return (
         <div className="space-y-4 relative z-10">
             <div className="flex items-center justify-between px-1">
-                <h2 className="text-[15px] font-semibold text-white/55">
+                <h2 className="text-[15px] font-semibold text-black/60">
                     {config.label} 리스트
                 </h2>
-                <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[12px] font-medium text-white/55 tabular-nums">
+                <div className="px-3 py-1 rounded-full bg-black/[0.04] text-[12px] font-medium text-black/55 tabular-nums">
                     {friends.length}명
                 </div>
             </div>
@@ -33,13 +33,13 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                     animate={{ opacity: 1, y: 0 }}
                     className="py-20 flex flex-col items-center text-center rk-card"
                 >
-                    <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-                        <LucideUsers className="w-9 h-9 text-white/40" />
+                    <div className="w-20 h-20 rounded-2xl bg-black/[0.04] flex items-center justify-center mb-6">
+                        <LucideUsers className="w-9 h-9 text-black/40" />
                     </div>
-                    <h3 className="text-[19px] font-bold mb-2 text-white tracking-tight">
+                    <h3 className="text-[19px] font-bold mb-2 text-ink-1 tracking-tight">
                         {config.emptyTitle}
                     </h3>
-                    <p className="text-[13px] text-white/55 font-medium mb-8 leading-relaxed">
+                    <p className="text-[13px] text-black/55 font-medium mb-8 leading-relaxed">
                         함께 플레이할 상대를<br />찾아보세요
                     </p>
                     <Button
@@ -70,7 +70,7 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className="relative">
-                                                    <div className="w-14 h-14 rounded-tile bg-black/20 border border-white/10 flex items-center justify-center text-2xl overflow-hidden">
+                                                    <div className="w-14 h-14 rounded-tile bg-black/[0.04] flex items-center justify-center text-2xl overflow-hidden">
                                                         {(friend as any).profileImageUrl ? (
                                                             <img
                                                                 src={(friend as any).profileImageUrl}
@@ -81,33 +81,33 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                             tier.icon
                                                         )}
                                                     </div>
-                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#0A0A0A] flex items-center justify-center p-0.5 border border-white/5">
+                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center p-0.5 ">
                                                         <div className="w-full h-full rounded-full bg-brand" />
                                                     </div>
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1.5">
-                                                        <h3 className="text-[17px] font-semibold text-white tracking-tight">{friend.name}</h3>
+                                                        <h3 className="text-[17px] font-semibold text-ink-1 tracking-tight">{friend.name}</h3>
                                                         {currentSport !== "GOLF" && (
                                                             friend.h2h ? (
-                                                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/40 border border-white/10">
+                                                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/[0.04] ">
                                                                     <span className="text-[12px] font-semibold text-brand">{friend.h2h.wins}승</span>
-                                                                    <div className="w-0.5 h-2 bg-white/10 rounded-full" />
-                                                                    <span className="text-[12px] font-semibold text-red-400">{friend.h2h.losses}패</span>
+                                                                    <div className="w-0.5 h-2 bg-black/10 rounded-full" />
+                                                                    <span className="text-[12px] font-semibold text-red-500">{friend.h2h.losses}패</span>
                                                                 </div>
                                                             ) : (
-                                                                <div className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/5">
-                                                                    <span className="text-[12px] font-medium text-white/45">전적 없음</span>
+                                                                <div className="px-2 py-0.5 rounded-lg bg-black/[0.04] ">
+                                                                    <span className="text-[12px] font-medium text-black/55">전적 없음</span>
                                                                 </div>
                                                             )
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2.5">
-                                                        <div className={cn("px-2.5 py-0.5 rounded-full border bg-white/5 text-[12px] font-semibold", tier.class)}>
+                                                        <div className={cn("px-2.5 py-0.5 rounded-full border bg-black/[0.04] text-[12px] font-semibold", tier.class)}>
                                                             {tier.label}
                                                         </div>
-                                                        <div className="w-1 h-1 rounded-full bg-white/10" />
-                                                        <span className="text-[12px] font-medium text-white/55 tabular-nums">
+                                                        <div className="w-1 h-1 rounded-full bg-black/20" />
+                                                        <span className="text-[12px] font-medium text-black/55 tabular-nums">
                                                             {currentSport === "GOLF"
                                                                 ? `HDCP ${(displayHandi || 0).toFixed(1)}`
                                                                 : `AVG ${((friend as any).avg3c || 0) > 0 ? (friend as any).avg3c?.toFixed(2) : ((friend as any).avg4c || 0)?.toFixed(2)}`}
@@ -119,7 +119,7 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                 <div className="flex items-center gap-3 shrink-0">
                                                     {h2hTotal > 0 && (
                                                         <RadialGauge value={h2hRate} size={48} stroke={5}>
-                                                            <span className="text-[13px] font-bold text-white tabular-nums leading-none">
+                                                            <span className="text-[13px] font-bold text-ink-1 tabular-nums leading-none">
                                                                 {h2hRate}%
                                                             </span>
                                                         </RadialGauge>
@@ -127,9 +127,9 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                     <motion.button
                                                         whileTap={{ scale: 0.92 }}
                                                         onClick={() => onSelectFriend(friend.id)}
-                                                        className="w-12 h-12 rounded-tile bg-white/5 border border-white/10 flex items-center justify-center transition-all hover:bg-brand/10 hover:border-brand/30 group/btn"
+                                                        className="w-12 h-12 rounded-tile bg-black/[0.04] flex items-center justify-center transition-all hover:bg-brand/10 hover:border-brand/30 group/btn"
                                                     >
-                                                        <LucideTarget className="w-5 h-5 text-white/45 transition-colors group-hover/btn:text-brand" />
+                                                        <LucideTarget className="w-5 h-5 text-black/55 transition-colors group-hover/btn:text-brand" />
                                                     </motion.button>
                                                 </div>
                                             )}

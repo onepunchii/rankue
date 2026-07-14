@@ -63,14 +63,14 @@ export default function HiqDashboard() {
     }, [rankings, rankings3c, member, rankingTab]);
 
     const getTrend = useCallback(() => {
-        if (!analysis?.summary) return { label: "유지 중", color: "text-white/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
+        if (!analysis?.summary) return { label: "유지 중", color: "text-black/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
         const overall = parseFloat(analysis.summary.overallAvg || "0");
         const recent = parseFloat(analysis.summary.recentAvg || "0");
 
-        if (overall === 0) return { label: "신규 기록", color: "text-blue-400", icon: <LucideZap className="w-3 h-3" /> };
+        if (overall === 0) return { label: "신규 기록", color: "text-brand", icon: <LucideZap className="w-3 h-3" /> };
         if (recent > overall * 1.05) return { label: "상승 중", color: "text-brand", icon: <ChevronUp className="w-3 h-3" /> };
-        if (recent < overall * 0.95) return { label: "하락 중", color: "text-white/40", icon: <ChevronDown className="w-3 h-3" /> };
-        return { label: "유지 중", color: "text-white/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
+        if (recent < overall * 0.95) return { label: "하락 중", color: "text-black/40", icon: <ChevronDown className="w-3 h-3" /> };
+        return { label: "유지 중", color: "text-black/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
     }, [analysis]);
 
     // Live Avg Helpers
@@ -124,8 +124,8 @@ export default function HiqDashboard() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-white/10 border-t-brand rounded-full animate-spin" />
+            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-black/10 border-t-brand rounded-full animate-spin" />
             </div>
         );
     }
@@ -133,7 +133,7 @@ export default function HiqDashboard() {
     if (!member) return null; // Or redirect
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] px-5 pb-32">
+        <div className="min-h-screen bg-[#f2f0eb] px-5 pb-32">
 
             {/* Header / Profile */}
             <DashboardHeader

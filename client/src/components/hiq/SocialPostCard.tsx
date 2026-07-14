@@ -143,7 +143,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
             {/* Header: Author + Time */}
             <header className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 overflow-hidden border border-white/5">
+                    <div className="w-8 h-8 rounded-full bg-black/[0.06] overflow-hidden ">
                         {post.author?.profileImageUrl ? (
                             <img
                                 src={post.author.profileImageUrl}
@@ -151,14 +151,14 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                                 alt={`${post.author.name}의 프로필`}
                             />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-[12px] font-bold text-white/45">
+                            <div className="w-full h-full flex items-center justify-center text-[12px] font-bold text-black/40">
                                 {post.author?.name?.charAt(0)}
                             </div>
                         )}
                     </div>
                     <div className="flex flex-col">
                         <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-semibold text-white leading-none">{post.author?.name}</span>
+                            <span className="text-sm font-semibold text-ink-1 leading-none">{post.author?.name}</span>
                             {post.author?.role === 'leader' && (
                                 <Badge variant="leader">방장</Badge>
                             )}
@@ -169,29 +169,29 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <time className="text-[12px] font-medium text-white/55">
+                    <time className="text-[12px] font-medium text-black/55">
                         {post.createdAt ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ko }) : '--'}
                     </time>
                     {canDelete && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <button
-                                    className="p-1.5 text-white/45 hover:text-red-500 transition-colors"
+                                    className="p-1.5 text-black/40 hover:text-red-500 transition-colors"
                                     disabled={deleteMutation.isPending}
                                     title="게시글 삭제"
                                 >
                                     <LucideTrash2 className="w-3.5 h-3.5" />
                                 </button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-[#141416] border-white/10 rounded-card">
+                            <AlertDialogContent className="bg-white border-black/[0.08] rounded-card">
                                 <AlertDialogHeader>
-                                    <AlertDialogTitle className="text-white">게시글 삭제</AlertDialogTitle>
-                                    <AlertDialogDescription className="text-white/60">
+                                    <AlertDialogTitle className="text-ink-1">게시글 삭제</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-black/60">
                                         정말로 이 게시글을 삭제하시겠습니까? 삭제된 게시글은 복구할 수 없습니다.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-white/5 text-white border-white/10 hover:bg-white/10">취소</AlertDialogCancel>
+                                    <AlertDialogCancel className="bg-surface-3 text-ink-1 border-black/10 hover:bg-black/[0.06]">취소</AlertDialogCancel>
                                     <AlertDialogAction
                                         onClick={() => deleteMutation.mutate()}
                                         className="bg-red-500 hover:bg-red-600 text-white"
@@ -212,7 +212,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     onKeyDown={(e) => { if (e.key === 'Enter') handleActionClick(() => setIsDetailOpen(true)) }}
                     role="button"
                     tabIndex={0}
-                    className="text-base font-bold text-white group-hover:text-brand cursor-pointer transition-colors line-clamp-1 outline-none focus:text-brand"
+                    className="text-base font-bold text-ink-1 group-hover:text-brand cursor-pointer transition-colors line-clamp-1 outline-none focus:text-brand"
                 >
                     {post.title}
                 </h3>
@@ -235,7 +235,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                 >
                     <p
                         className={cn(
-                            "text-sm text-white/60 leading-relaxed whitespace-pre-wrap transition-all duration-300",
+                            "text-sm text-black/70 leading-relaxed whitespace-pre-wrap transition-all duration-300",
                             !isExpanded && "line-clamp-3"
                         )}
                     >
@@ -249,7 +249,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                         )}>
                             {post.images.slice(0, post.images.length === 3 ? 3 : 4).map((img, idx) => (
                                 <div key={idx} className={cn(
-                                    "relative aspect-square bg-white/5",
+                                    "relative aspect-square bg-black/[0.04]",
                                     post.images?.length === 3 && idx === 0 && "row-span-2 aspect-auto"
                                 )}>
                                     <img src={img} className="w-full h-full object-cover" alt="post content" />
@@ -264,12 +264,12 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     )}
 
                     {isLongText && !isExpanded && (
-                        <span className="mt-1 block text-xs font-medium text-white/55 hover:text-brand transition-colors ">
+                        <span className="mt-1 block text-xs font-medium text-black/55 hover:text-brand transition-colors ">
                             ... 더 보기
                         </span>
                     )}
                     {isExpanded && (
-                        <span className="mt-2 block text-xs font-medium text-white/55 hover:text-white/70 transition-colors">
+                        <span className="mt-2 block text-xs font-medium text-black/55 hover:text-ink-1 transition-colors">
                             접기
                         </span>
                     )}
@@ -277,7 +277,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
             </div>
 
             {/* Footer: Engagement & Tag */}
-            <footer className="flex items-center justify-between pt-3 border-t border-white/5">
+            <footer className="flex items-center justify-between pt-3 border-t border-black/10">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => handleActionClick(() => likeMutation.mutate())}
@@ -290,11 +290,11 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     >
                         <LucideHeart className={cn(
                             "w-4 h-4 transition-colors",
-                            post.isLiked ? "text-red-500 fill-red-500" : "text-white/45 group-hover/like:text-red-500"
+                            post.isLiked ? "text-red-500 fill-red-500" : "text-black/40 group-hover/like:text-red-500"
                         )} />
                         <span className={cn(
                             "text-xs font-semibold tabular-nums transition-colors",
-                            post.isLiked ? "text-red-500" : "text-white/55 group-hover/like:text-white/70"
+                            post.isLiked ? "text-red-500" : "text-black/55 group-hover/like:text-ink-1"
                         )}>
                             {post.likeCount || 0}
                         </span>
@@ -304,8 +304,8 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                         className="flex items-center gap-1.5 group/comment"
                         aria-label={`댓글 ${post.commentCount || 0}개`}
                     >
-                        <LucideMessageSquare className="w-4 h-4 text-white/45 group-hover/comment:text-brand transition-colors" />
-                        <span className="text-xs font-medium tabular-nums text-white/55 group-hover/comment:text-white/70">{post.commentCount || 0}</span>
+                        <LucideMessageSquare className="w-4 h-4 text-black/40 group-hover/comment:text-brand transition-colors" />
+                        <span className="text-xs font-medium tabular-nums text-black/55 group-hover/comment:text-ink-1">{post.commentCount || 0}</span>
                     </button>
                 </div>
                 {post.category && post.category !== "자유글" && (
@@ -329,8 +329,8 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
 // Helper Components
 function Badge({ variant, children }: { variant: 'leader' | 'manage', children: React.ReactNode }) {
     const styles = {
-        leader: "bg-yellow-500/10 border-yellow-500/20 text-yellow-500",
-        manage: "bg-blue-500/10 border-blue-500/20 text-blue-400"
+        leader: "bg-[#cba258]/12 border-[#cba258]/25 text-[#a97f3d]",
+        manage: "bg-brand/10 border-brand/20 text-brand"
     };
 
     return (

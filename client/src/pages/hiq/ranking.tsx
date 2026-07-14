@@ -50,24 +50,24 @@ export default function HiqRanking() {
         });
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">
             <div className="relative z-10">
                 <header className="mb-7">
                     <h1 className="text-[26px] font-bold tracking-tight mb-1.5">
                         {currentSport === "GOLF" ? "매장 공식 랭킹" : "실시간 랭킹"}
                     </h1>
-                    <p className="text-white/50 text-[13px] font-medium">
+                    <p className="text-black/55 text-[13px] font-medium">
                         {currentSport === "GOLF" ? "골프 최고 실력자들" : "당구 최고 실력자들"}
                     </p>
                 </header>
 
                 {/* Scope Tabs */}
-                <div className="flex p-1 bg-white/[0.04] rounded-2xl mb-4 border border-white/[0.06]">
+                <div className="flex p-1 bg-black/[0.04] rounded-2xl mb-4 ">
                     <button
                         onClick={() => setRankingScope("store")}
                         className={cn(
                             "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
-                            rankingScope === "store" ? "bg-brand text-brand-fg" : "text-white/45 hover:text-white/70"
+                            rankingScope === "store" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-black/70"
                         )}
                     >
                         <LucideStore className="w-4 h-4" />
@@ -77,7 +77,7 @@ export default function HiqRanking() {
                         onClick={() => setRankingScope("national")}
                         className={cn(
                             "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
-                            rankingScope === "national" ? "bg-brand text-brand-fg" : "text-white/45 hover:text-white/70"
+                            rankingScope === "national" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-black/70"
                         )}
                     >
                         <LucideGlobe className="w-4 h-4" />
@@ -87,12 +87,12 @@ export default function HiqRanking() {
 
                 {/* Ranking Tabs - Only show for Billiards */}
                 {currentSport !== "GOLF" && (
-                    <div className="flex p-1 bg-white/[0.04] rounded-2xl mb-8 border border-white/[0.06]">
+                    <div className="flex p-1 bg-black/[0.04] rounded-2xl mb-8 ">
                         <button
                             onClick={() => setRankingTab("4c")}
                             className={cn(
                                 "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
-                                rankingTab === "4c" ? "bg-brand text-brand-fg" : "text-white/45 hover:text-white/70"
+                                rankingTab === "4c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-black/70"
                             )}
                         >
                             <LucideBarChart3 className="w-4 h-4" />
@@ -102,7 +102,7 @@ export default function HiqRanking() {
                             onClick={() => setRankingTab("3c")}
                             className={cn(
                                 "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
-                                rankingTab === "3c" ? "bg-brand text-brand-fg" : "text-white/45 hover:text-white/70"
+                                rankingTab === "3c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-black/70"
                             )}
                         >
                             <LucideTarget className="w-4 h-4" />
@@ -117,14 +117,14 @@ export default function HiqRanking() {
                             <motion.div
                                 animate={{ rotate: 360 }}
                                 transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                                className="w-8 h-8 border-2 border-white/10 border-t-white rounded-full"
+                                className="w-8 h-8 border-2 border-black/10 border-t-brand rounded-full"
                             />
                         </div>
                     ) : rankedMembers.length === 0 ? (
                         <div className="rk-card p-8 text-center">
-                            <LucideTrophy className="w-10 h-10 text-white/15 mx-auto mb-3" />
-                            <div className="text-[15px] font-semibold text-white">아직 랭킹이 없습니다</div>
-                            <p className="text-[13px] text-white/45 mt-1">
+                            <LucideTrophy className="w-10 h-10 text-black/25 mx-auto mb-3" />
+                            <div className="text-[15px] font-semibold text-[rgba(0,0,0,0.87)]">아직 랭킹이 없습니다</div>
+                            <p className="text-[13px] text-black/55 mt-1">
                                 {currentSport === "GOLF" ? "라운드 기록이 쌓이면 순위가 표시됩니다" : "경기 기록이 쌓이면 순위가 표시됩니다"}
                             </p>
                         </div>
@@ -148,14 +148,14 @@ export default function HiqRanking() {
                                             {idx < 3 ? (
                                                 <div className={cn(
                                                     "w-10 h-10 rounded-tile flex items-center justify-center",
-                                                    idx === 0 ? "bg-amber-400/15 text-amber-400" :
-                                                        idx === 1 ? "bg-white/10 text-white/70" :
-                                                            "bg-orange-700/20 text-orange-400"
+                                                    idx === 0 ? "bg-[#cba258]/12 text-[#cba258]" :
+                                                        idx === 1 ? "bg-black/[0.06] text-black/60" :
+                                                            "bg-orange-500/12 text-orange-700"
                                                 )}>
                                                     <LucideMedal className="w-5 h-5" />
                                                 </div>
                                             ) : (
-                                                <span className="w-10 h-10 flex items-center justify-center font-semibold text-white/40 text-[17px] tabular-nums">
+                                                <span className="w-10 h-10 flex items-center justify-center font-semibold text-black/40 text-[17px] tabular-nums">
                                                     {idx + 1}
                                                 </span>
                                             )}
@@ -167,12 +167,12 @@ export default function HiqRanking() {
                                             </div>
                                             <div className="flex items-center gap-1.5 mt-1">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                                                <span className="text-white/45 text-[12px] font-medium tabular-nums">Lv.{Math.floor((rank.visitCount || 0) / 5) + 1}</span>
+                                                <span className="text-black/55 text-[12px] font-medium tabular-nums">Lv.{Math.floor((rank.visitCount || 0) / 5) + 1}</span>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-[12px] font-medium text-white/45 mb-1">
+                                        <div className="text-[12px] font-medium text-black/55 mb-1">
                                             {currentSport === "GOLF" ? "평균 타수" : "핸디"}
                                         </div>
                                         <div className="font-bold text-[22px] tabular-nums flex items-baseline gap-1 justify-end">
@@ -182,7 +182,7 @@ export default function HiqRanking() {
                                                     return score > 0 ? score.toFixed(0) : "-";
                                                 })()
                                                 : (rankingTab === "3c" ? rank.handi3c : rank.handi4c)}
-                                            <span className="text-[12px] font-medium text-white/45">
+                                            <span className="text-[12px] font-medium text-black/55">
                                                 {currentSport === "GOLF" ? "" : "점"}
                                             </span>
                                         </div>

@@ -45,8 +45,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Apply Global Theme
     useEffect(() => {
         if (store) {
-            document.documentElement.style.setProperty('--hiq-brand-color', store.themeColor || '#10B981');
-            document.documentElement.style.setProperty('--hiq-neon-color', store.neonColor || '#34D399');
+            document.documentElement.style.setProperty('--hiq-brand-color', store.themeColor || '#006241');
+            document.documentElement.style.setProperty('--hiq-neon-color', store.neonColor || '#006241');
             // Keep the RANKUE product title for the main app (default "hiq" tenant). Only a
             // genuine white-label tenant (its own slug/subdomain) overrides the browser title,
             // so SEO/tab never shows a seeded store name like "하이큐 당구장".

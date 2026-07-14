@@ -46,7 +46,7 @@ export default function HiqJoin() {
 
     if (meLoading || inviteLoading) {
         return (
-            <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center text-white">
+            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-[rgba(0,0,0,0.87)]">
                 <LucideLoader2 className="w-10 h-10 animate-spin text-brand" />
             </div>
         );
@@ -56,12 +56,12 @@ export default function HiqJoin() {
         // Not logged in -> Redirect to login (or landing) with return url
         // For MVP, just show message
         return (
-            <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col items-center justify-center px-5 text-center space-y-6">
+            <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center px-5 text-center space-y-6">
                 <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                     <LucideXCircle className="w-10 h-10 text-red-500" />
                 </div>
                 <h2 className="text-[22px] font-bold">로그인이 필요합니다</h2>
-                <p className="text-[14px] text-white/55 leading-relaxed">
+                <p className="text-[14px] text-black/55 leading-relaxed">
                     게임을 함께 하려면 먼저 로그인이 필요합니다.<br />
                     로그인 후 다시 QR코드를 스캔해주세요.
                 </p>
@@ -79,24 +79,24 @@ export default function HiqJoin() {
 
     if (invite?.status !== 'pending' || isExpired) {
         return (
-            <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col items-center justify-center px-5 text-center space-y-6">
+            <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center px-5 text-center space-y-6">
                 <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                     <LucideXCircle className="w-10 h-10 text-red-500" />
                 </div>
                 <h2 className="text-[22px] font-bold">유효하지 않은 초대</h2>
-                <p className="text-[14px] text-white/55 leading-relaxed">이미 만료되었거나 완료된 초대입니다.</p>
+                <p className="text-[14px] text-black/55 leading-relaxed">이미 만료되었거나 완료된 초대입니다.</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white px-5 flex flex-col items-center justify-center text-center">
+        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] px-5 flex flex-col items-center justify-center text-center">
             <div className="mb-10">
                 <div className="w-24 h-24 mx-auto bg-brand rounded-card flex items-center justify-center mb-6">
                     <span className="text-4xl">🎱</span>
                 </div>
                 <h1 className="text-[26px] font-bold tracking-tight mb-2">게임 입장하기</h1>
-                <p className="text-[15px] text-white/55 leading-relaxed">
+                <p className="text-[15px] text-black/55 leading-relaxed">
                     <span className="text-brand font-bold">{me.name}</span>님, <br />
                     방장의 게임에 참여하시겠습니까?
                 </p>
@@ -107,7 +107,7 @@ export default function HiqJoin() {
                     <div className="p-6 bg-brand/10 border border-brand/20 rounded-tile animate-in zoom-in">
                         <LucideCheckCircle2 className="w-12 h-12 text-brand mx-auto mb-2" />
                         <h3 className="text-xl font-bold text-brand">참여 완료!</h3>
-                        <p className="text-sm text-white/55 mt-1">방장의 화면을 확인해주세요.</p>
+                        <p className="text-sm text-black/55 mt-1">방장의 화면을 확인해주세요.</p>
                     </div>
                 ) : (
                     <Button
@@ -124,7 +124,7 @@ export default function HiqJoin() {
                     <Button
                         variant="ghost"
                         onClick={() => setLocation("/dashboard")}
-                        className="text-white/55 text-[14px] font-medium h-12"
+                        className="text-black/55 text-[14px] font-medium h-12"
                     >
                         취소
                     </Button>

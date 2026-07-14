@@ -133,10 +133,10 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent hideClose className="bg-[#141416] border-white/10 text-white max-w-md max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-card">
-                <div className="shrink-0 bg-[#141416] border-b border-white/5 p-4 flex items-center justify-between z-10">
-                    <DialogTitle className="font-bold text-[19px] tracking-tight">새 정산 만들기</DialogTitle>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-white/45" onClick={() => onOpenChange(false)}>
+            <DialogContent hideClose className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] max-w-md max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-card">
+                <div className="shrink-0 bg-white border-b border-black/[0.08] p-4 flex items-center justify-between z-10">
+                    <DialogTitle className="font-bold text-[19px] tracking-tight text-brand">새 정산 만들기</DialogTitle>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-black/40" onClick={() => onOpenChange(false)}>
                         <LucideX className="w-5 h-5" />
                     </Button>
                 </div>
@@ -145,7 +145,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                     {/* Basic Info */}
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-white/55">정산 제목</Label>
+                            <Label className="text-xs font-semibold text-black/55">정산 제목</Label>
                             <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
@@ -154,7 +154,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                             <div className="space-y-2 col-span-1">
-                                <Label className="text-xs font-semibold text-white/55">은행</Label>
+                                <Label className="text-xs font-semibold text-black/55">은행</Label>
                                 <Input
                                     value={accountBank}
                                     onChange={(e) => setAccountBank(e.target.value)}
@@ -163,7 +163,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                 />
                             </div>
                             <div className="space-y-2 col-span-2">
-                                <Label className="text-xs font-semibold text-white/55">계좌번호</Label>
+                                <Label className="text-xs font-semibold text-black/55">계좌번호</Label>
                                 <Input
                                     value={accountNumber}
                                     onChange={(e) => setAccountNumber(e.target.value)}
@@ -173,7 +173,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-white/55">예금주</Label>
+                            <Label className="text-xs font-semibold text-black/55">예금주</Label>
                             <Input
                                 value={accountHolder}
                                 onChange={(e) => setAccountHolder(e.target.value)}
@@ -183,7 +183,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                         </div>
                     </div>
 
-                    <div className="h-px bg-white/5 my-2" />
+                    <div className="h-px bg-black/[0.06] my-2" />
 
                     {/* Rounds */}
                     <div className="space-y-6">
@@ -195,7 +195,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
 
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-white/55">차수 이름</Label>
+                                        <Label className="text-xs font-semibold text-black/55">차수 이름</Label>
                                         <Input
                                             value={round.title}
                                             onChange={(e) => handleRoundChange(round.id, 'title', e.target.value)}
@@ -203,7 +203,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-white/55">결제 금액</Label>
+                                        <Label className="text-xs font-semibold text-black/55">결제 금액</Label>
                                         <div className="relative">
                                             <Input
                                                 type="number"
@@ -212,21 +212,21 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                                 placeholder="0"
                                                 className="bg-surface-2 border-surface-line h-12 rounded-tile text-lg font-bold pl-4 pr-8"
                                             />
-                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-white/40">원</span>
+                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-black/40">원</span>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4 pt-2">
                                         <div className="flex items-center justify-between px-1">
-                                            <Label className="text-xs font-semibold text-white/55">참석자 관리</Label>
+                                            <Label className="text-xs font-semibold text-black/55">참석자 관리</Label>
                                             <div className="flex items-center gap-2">
                                                 {recentActivities.length > 0 && (
                                                     <Select onValueChange={(val) => handleImportActivity(val, round.id)}>
-                                                        <SelectTrigger className="h-8 bg-white/5 border-white/10 text-[12px] font-semibold text-brand px-3 rounded-full w-auto gap-1">
+                                                        <SelectTrigger className="h-8 bg-black/[0.04] border-black/10 text-[12px] font-semibold text-brand px-3 rounded-full w-auto gap-1">
                                                             <LucideCalendar className="w-3 h-3" />
                                                             모임 가져오기
                                                         </SelectTrigger>
-                                                        <SelectContent className="bg-[#141416] border-white/10 text-white rounded-tile">
+                                                        <SelectContent className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] rounded-tile">
                                                             {recentActivities.map((act: any) => (
                                                                 <SelectItem key={act.id} value={act.id} className="text-xs">
                                                                     {format(new Date(act.activityDate), "MM/dd")} {act.title}
@@ -240,7 +240,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                                         setActiveRoundId(round.id);
                                                         setIsMemberSelectOpen(true);
                                                     }}
-                                                    className="flex items-center gap-1 h-8 text-[12px] font-semibold text-white bg-white/10 px-3 rounded-full hover:bg-white/20 transition-colors"
+                                                    className="flex items-center gap-1 h-8 text-[12px] font-semibold text-[rgba(0,0,0,0.87)] bg-black/[0.06] px-3 rounded-full hover:bg-black/[0.10] transition-colors"
                                                 >
                                                     <LucideSettings2 className="w-3 h-3" />
                                                     멤버 편집
@@ -253,49 +253,49 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                                 setActiveRoundId(round.id);
                                                 setIsMemberSelectOpen(true);
                                             }}
-                                            className="bg-black/40 border border-white/5 rounded-tile p-4 flex items-center justify-between cursor-pointer hover:border-white/20 transition-all group"
+                                            className="bg-black/[0.03] rounded-tile p-4 flex items-center justify-between cursor-pointer hover:border-black/20 transition-all group"
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div className="flex -space-x-2">
                                                     {round.participants.slice(0, 5).map((mid: string) => {
                                                         const m = activeMembers.find(am => am.member.id === mid);
                                                         return (
-                                                            <Avatar key={mid} className="w-8 h-8 border-2 border-[#202020]">
+                                                            <Avatar key={mid} className="w-8 h-8 border-2 border-white">
                                                                 <AvatarImage src={m?.member.profileImageUrl} />
-                                                                <AvatarFallback className="bg-[#333] text-[12px] font-semibold">{m?.member.name[0]}</AvatarFallback>
+                                                                <AvatarFallback className="bg-black/[0.08] text-[rgba(0,0,0,0.87)] text-[12px] font-semibold">{m?.member.name[0]}</AvatarFallback>
                                                             </Avatar>
                                                         );
                                                     })}
                                                     {round.participants.length > 5 && (
-                                                        <div className="w-8 h-8 rounded-full bg-[#333] border-2 border-[#202020] flex items-center justify-center text-[12px] font-medium text-white/45 relative z-10">
+                                                        <div className="w-8 h-8 rounded-full bg-black/[0.08] border-2 border-white flex items-center justify-center text-[12px] font-medium text-black/55 relative z-10">
                                                             +{round.participants.length - 5}
                                                         </div>
                                                     )}
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-[15px] font-semibold text-white group-hover:text-brand transition-colors tabular-nums">
+                                                    <span className="text-[15px] font-semibold text-[rgba(0,0,0,0.87)] group-hover:text-brand transition-colors tabular-nums">
                                                         {round.participants.length}명 선택됨
                                                     </span>
-                                                    <p className="text-[12px] text-white/55 font-medium">참석자 목록을 편집하려면 클릭하세요</p>
+                                                    <p className="text-[12px] text-black/55 font-medium">참석자 목록을 편집하려면 클릭하세요</p>
                                                 </div>
                                             </div>
-                                            <LucideChevronDown className="w-5 h-5 text-white/45 group-hover:text-white transition-colors" />
+                                            <LucideChevronDown className="w-5 h-5 text-black/40 group-hover:text-[rgba(0,0,0,0.87)] transition-colors" />
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-white/55">계산한 사람</Label>
+                                        <Label className="text-xs font-semibold text-black/55">계산한 사람</Label>
                                         <Select
                                             value={round.payerId}
                                             onValueChange={(val) => handleRoundChange(round.id, 'payerId', val)}
                                         >
                                             <SelectTrigger
                                                 aria-label="Payer select"
-                                                className="w-full h-12 bg-surface-2 border-surface-line rounded-tile px-3 text-base font-bold text-white"
+                                                className="w-full h-12 bg-surface-2 border-surface-line rounded-tile px-3 text-base font-bold text-[rgba(0,0,0,0.87)]"
                                             >
                                                 <SelectValue placeholder="선택하세요" />
                                             </SelectTrigger>
-                                            <SelectContent className="bg-[#141416] border-white/10 text-white rounded-tile">
+                                            <SelectContent className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] rounded-tile">
                                                 {activeMembers
                                                     .filter(m => round.participants.includes(m.member.id))
                                                     .map(m => (
@@ -313,7 +313,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
 
                     <Button
                         variant="outline"
-                        className="w-full border-dashed border-white/20 h-12 text-white/55 hover:text-white hover:bg-white/5 rounded-tile"
+                        className="w-full border-dashed border-black/20 h-12 text-black/55 hover:text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04] rounded-tile"
                         onClick={handleAddRound}
                     >
                         + 차수 추가하기 (2차, 3차...)
@@ -333,7 +333,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                     }}
                 />
 
-                <div className="shrink-0 p-4 bg-[#141416] border-t border-white/10 z-20">
+                <div className="shrink-0 p-4 bg-white border-t border-black/[0.08] z-20">
                     <Button
                         className="w-full h-14 rk-btn-primary text-[16px] rounded-tile"
                         onClick={handleSubmit}

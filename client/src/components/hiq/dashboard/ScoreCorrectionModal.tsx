@@ -68,29 +68,29 @@ export const ScoreCorrectionModal = ({ open, onOpenChange, member }: ScoreCorrec
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-sm rounded-card p-6">
+            <DialogContent className="bg-white border-black/[0.08] text-ink-1 max-w-sm rounded-card p-6">
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <Calculator className="w-5 h-5 text-brand" />
                         점수 보정
                     </h2>
-                    <button onClick={() => onOpenChange(false)} className="text-white/55 hover:text-white">
+                    <button onClick={() => onOpenChange(false)} className="text-black/55 hover:text-ink-1">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 <div className="space-y-6">
                     {/* Tab Switch */}
-                    <div className="flex bg-black/20 p-1 rounded-tile">
+                    <div className="flex bg-black/[0.04] p-1 rounded-tile">
                         <button
                             onClick={() => handleTypeChange("4c")}
-                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeEditType === "4c" ? "bg-brand text-brand-fg" : "text-white/55 hover:text-white"}`}
+                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeEditType === "4c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-ink-1"}`}
                         >
                             4구
                         </button>
                         <button
                             onClick={() => handleTypeChange("3c")}
-                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeEditType === "3c" ? "bg-brand text-brand-fg" : "text-white/55 hover:text-white"}`}
+                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeEditType === "3c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-ink-1"}`}
                         >
                             3구
                         </button>
@@ -99,21 +99,21 @@ export const ScoreCorrectionModal = ({ open, onOpenChange, member }: ScoreCorrec
                     {/* Inputs */}
                     <div className="space-y-4">
                         <div>
-                            <label className="text-xs font-medium text-white/55 mb-1 block">평균</label>
+                            <label className="text-xs font-medium text-black/55 mb-1 block">평균</label>
                             <input
                                 type="number"
                                 step="0.001"
                                 value={editAverage}
                                 onChange={(e) => handleAverageChange(e.target.value)}
-                                className="w-full bg-black/30 border border-white/5 rounded-tile px-4 py-3 text-lg font-bold tabular-nums text-white focus:outline-none focus:border-brand/50"
+                                className="w-full bg-black/[0.04] rounded-tile px-4 py-3 text-lg font-bold tabular-nums text-ink-1 focus:outline-none focus:border-brand/50"
                             />
                         </div>
                         <div>
-                            <label className="text-xs font-medium text-white/55 mb-1 block">핸디캡</label>
-                            <div className="w-full bg-black/30 border border-white/5 rounded-tile px-4 py-3 text-lg font-bold tabular-nums text-brand">
+                            <label className="text-xs font-medium text-black/55 mb-1 block">핸디캡</label>
+                            <div className="w-full bg-black/[0.04] rounded-tile px-4 py-3 text-lg font-bold tabular-nums text-brand">
                                 {activeEditType === "4c" ? editHandi4c : editHandi3c} 점
                             </div>
-                            <p className="text-[12px] text-white/55 mt-1">※ 에버리지에 따라 자동 계산됩니다.</p>
+                            <p className="text-[12px] text-black/55 mt-1">※ 에버리지에 따라 자동 계산됩니다.</p>
                         </div>
                     </div>
 

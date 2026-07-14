@@ -53,8 +53,8 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#141416] border-white/10 text-white max-w-md p-0 flex flex-col max-h-[80vh] overflow-hidden z-[110] rounded-card">
-                <DialogHeader className="p-4 border-b border-white/5 shrink-0">
+            <DialogContent className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] max-w-md p-0 flex flex-col max-h-[80vh] overflow-hidden z-[110] rounded-card">
+                <DialogHeader className="p-4 border-b border-black/[0.08] shrink-0">
                     <DialogTitle className="flex items-center gap-2 text-[19px] font-bold tracking-tight">
                         <LucideUsers className="w-5 h-5 text-brand" />
                         참석자 선택 ({tempSelectedIds.length}명)
@@ -63,7 +63,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
 
                 <div className="p-4 space-y-4 flex-1 flex flex-col min-h-0">
                     <div className="relative">
-                        <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/45" />
+                        <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40" />
                         <Input
                             placeholder="멤버 이름 검색..."
                             value={searchQuery}
@@ -73,7 +73,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                     </div>
 
                     <div className="flex items-center justify-between px-1">
-                        <span className="text-xs font-semibold text-white/55">멤버 리스트</span>
+                        <span className="text-xs font-semibold text-black/55">멤버 리스트</span>
                         <button
                             onClick={toggleAll}
                             className="text-[12px] text-brand font-semibold hover:underline"
@@ -91,13 +91,13 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                                     onClick={() => toggleMember(m.member.id)}
                                     className={cn(
                                         "flex items-center justify-between p-3 rounded-tile cursor-pointer transition-all",
-                                        isSelected ? "bg-brand/12 border border-brand/20" : "hover:bg-white/5 border border-transparent"
+                                        isSelected ? "bg-brand/12 border border-brand/20" : "hover:bg-black/[0.04] border border-transparent"
                                     )}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <Avatar className="w-8 h-8 border border-white/10">
+                                        <Avatar className="w-8 h-8 ">
                                             <AvatarImage src={m.member.profileImageUrl} />
-                                            <AvatarFallback className="bg-white/5 text-[12px]">{m.member.name[0]}</AvatarFallback>
+                                            <AvatarFallback className="bg-black/[0.06] text-black/70 text-[12px]">{m.member.name[0]}</AvatarFallback>
                                         </Avatar>
                                         <div className="flex flex-col">
                                             <span className="text-[15px] font-semibold">{m.member.name}</span>
@@ -106,7 +106,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                                     </div>
                                     <div className={cn(
                                         "w-5 h-5 rounded-md border flex items-center justify-center transition-colors",
-                                        isSelected ? "bg-brand border-brand" : "border-white/20"
+                                        isSelected ? "bg-brand border-brand" : "border-black/20"
                                     )}>
                                         {isSelected && <LucideCheck className="w-3 h-3 text-brand-fg" />}
                                     </div>
@@ -114,14 +114,14 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                             );
                         })}
                         {filteredMembers.length === 0 && (
-                            <div className="py-10 text-center text-white/45 text-[13px] font-medium">
+                            <div className="py-10 text-center text-black/40 text-[13px] font-medium">
                                 검색 결과가 없습니다
                             </div>
                         )}
                     </div>
                 </div>
 
-                <DialogFooter className="p-4 border-t border-white/5 bg-black/20 shrink-0">
+                <DialogFooter className="p-4 border-t border-black/[0.08] bg-black/[0.03] shrink-0">
                     <Button
                         onClick={() => {
                             onConfirm(tempSelectedIds);

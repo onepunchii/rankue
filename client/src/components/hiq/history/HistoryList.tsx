@@ -14,7 +14,7 @@ interface HistoryListProps {
 export const HistoryList = ({ history, config, onGameClick, currentSport }: HistoryListProps) => {
     return (
         <>
-            <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2 text-white/55">
+            <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2 text-black/55">
                 <config.mainIcon className="w-4 h-4 text-brand" />
                 {config.listTitle}
             </h3>
@@ -36,7 +36,7 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand/12 text-brand border border-brand/20 text-[12px] font-semibold">
                                             <span className="w-1 h-1 rounded-full bg-brand" /> 공식
                                         </span>
-                                        <span className="px-2 py-0.5 bg-white/[0.05] border border-white/10 rounded-lg text-[12px] font-semibold text-white/55">
+                                        <span className="px-2 py-0.5 bg-black/[0.04] rounded-lg text-[12px] font-semibold text-black/55">
                                             {game.gameType === "3c" ? "3구" : (currentSport === "GOLF" ? "18H" : "4구")}
                                         </span>
                                         {currentSport !== "GOLF" && (game.isWinner === true || game.isWinner === false) && (
@@ -44,13 +44,13 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                                                 "px-2 py-0.5 rounded-lg border text-[12px] font-bold " +
                                                 (game.isWinner
                                                     ? "bg-brand/12 text-brand border-brand/20"
-                                                    : "bg-red-500/12 text-red-400 border-red-500/20")
+                                                    : "bg-red-500/12 text-red-600 border-red-500/20")
                                             }>
                                                 {game.isWinner ? "승" : "패"}
                                             </span>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-1 text-white/40 text-[12px] font-medium">
+                                    <div className="flex items-center gap-1 text-black/40 text-[12px] font-medium">
                                         <LucideCalendar className="w-3 h-3" />
                                         {format(new Date(game.createdAt), "yyyy.MM.dd HH:mm", { locale: ko })}
                                     </div>
@@ -59,10 +59,10 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                                 {/* Golf Course Name Display */}
                                 {currentSport === "GOLF" && game.locationName && (
                                     <div className="mb-2">
-                                        <h4 className="text-white font-semibold text-[17px] leading-tight flex items-end gap-2">
+                                        <h4 className="text-[rgba(0,0,0,0.87)] font-semibold text-[17px] leading-tight flex items-end gap-2">
                                             {game.locationName}
                                             {game.subType && (
-                                                <span className="text-[12px] text-white/50 font-medium mb-0.5">{game.subType}</span>
+                                                <span className="text-[12px] text-black/55 font-medium mb-0.5">{game.subType}</span>
                                             )}
                                         </h4>
                                     </div>
@@ -71,18 +71,18 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                                 <div className="flex justify-between items-end">
                                     <div className="flex items-center gap-5">
                                         <div>
-                                            <p className="text-white/45 text-[12px] font-medium mb-0.5">{config.unit}</p>
-                                            <p className="text-[22px] font-bold text-white tabular-nums leading-none">{game.score}</p>
+                                            <p className="text-black/55 text-[12px] font-medium mb-0.5">{config.unit}</p>
+                                            <p className="text-[22px] font-bold text-[rgba(0,0,0,0.87)] tabular-nums leading-none">{game.score}</p>
                                         </div>
-                                        <div className="w-px h-6 bg-white/10" />
+                                        <div className="w-px h-6 bg-black/10" />
                                         <div>
-                                            <p className="text-white/45 text-[12px] font-medium mb-0.5">{currentSport === "GOLF" ? "홀" : "이닝"}</p>
-                                            <p className="text-[22px] font-bold text-white tabular-nums leading-none">{game.innings}</p>
+                                            <p className="text-black/55 text-[12px] font-medium mb-0.5">{currentSport === "GOLF" ? "홀" : "이닝"}</p>
+                                            <p className="text-[22px] font-bold text-[rgba(0,0,0,0.87)] tabular-nums leading-none">{game.innings}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-brand text-[12px] font-semibold mb-0.5">{currentSport === "GOLF" ? "평균 타수" : "평균"}</p>
-                                        <p className="text-[28px] font-bold text-white leading-none tracking-tight tabular-nums">
+                                        <p className="text-[28px] font-bold text-[rgba(0,0,0,0.87)] leading-none tracking-tight tabular-nums">
                                             {currentSport === "GOLF" ? game.score : game.average}
                                         </p>
                                     </div>
@@ -95,11 +95,11 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                             animate={{ opacity: 1 }}
                             className="py-24 text-center"
                         >
-                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-5 border border-white/10">
-                                <LucideHistory className="w-8 h-8 text-white/45" />
+                            <div className="w-16 h-16 bg-black/[0.04] rounded-full flex items-center justify-center mx-auto mb-5 ">
+                                <LucideHistory className="w-8 h-8 text-black/40" />
                             </div>
-                            <p className="text-white font-semibold text-[17px] mb-1.5">인증된 경기 기록이 없습니다</p>
-                            <p className="text-white/45 text-[13px] font-medium leading-relaxed">실제 회원들과 대결하여<br />공식 기록을 남겨보세요</p>
+                            <p className="text-[rgba(0,0,0,0.87)] font-semibold text-[17px] mb-1.5">인증된 경기 기록이 없습니다</p>
+                            <p className="text-black/55 text-[13px] font-medium leading-relaxed">실제 회원들과 대결하여<br />공식 기록을 남겨보세요</p>
                         </motion.div>
                     )}
                 </AnimatePresence>

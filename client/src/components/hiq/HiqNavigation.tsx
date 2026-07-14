@@ -31,7 +31,7 @@ export function HiqNavigation() {
     return (
         <nav
             className={cn(
-                "fixed bottom-0 left-0 right-0 z-50 bg-[#0B0B0D]/95 backdrop-blur-2xl border-t border-white/10 pt-4 rounded-t-2xl bottom-navigation-container",
+                "fixed bottom-0 left-0 right-0 z-50 bg-white/95 border-t border-black/10 pt-4 rounded-t-2xl bottom-navigation-container",
                 isApp ? "pb-4" : "pb-[env(safe-area-inset-bottom,1.5rem)]"
             )}
         >
@@ -48,10 +48,10 @@ export function HiqNavigation() {
                             <div className={`relative transition-all duration-300 ${active ? 'scale-110' : 'opacity-55 group-hover:opacity-100'}`}>
                                 <tab.icon
                                     className="w-7 h-7 transition-all duration-300"
-                                    style={active ? { color: activeColor } : { color: 'white' }}
+                                    style={active ? { color: activeColor } : { color: 'rgba(0, 0, 0, 0.55)' }}
                                 />
                             </div>
-                            <span className="text-[12px] font-semibold transition-all duration-300" style={active ? { color: activeColor } : { color: 'rgba(255, 255, 255, 0.55)' }}>
+                            <span className="text-[12px] font-semibold transition-all duration-300" style={active ? { color: activeColor } : { color: 'rgba(0, 0, 0, 0.55)' }}>
                                 {tab.label}
                             </span>
                         </motion.button>

@@ -218,7 +218,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#141416] border border-white/10 text-white w-[95%] max-w-[420px] rounded-card p-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <DialogContent className="bg-white text-ink-1 w-[95%] max-w-[420px] rounded-card p-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <DialogHeader className="mb-4">
                     <DialogTitle className="text-xl font-semibold text-center">
                         <span className="text-brand">골프</span> 정모 {isEditMode ? "수정" : "만들기"}
@@ -230,15 +230,15 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
 
                         {/* 1. Category Selector */}
                         <div className="space-y-2">
-                            <FormLabel className="text-xs text-white/55 font-medium ml-1">모임 성격 선택</FormLabel>
+                            <FormLabel className="text-xs text-ink-3 font-medium ml-1">모임 성격 선택</FormLabel>
                             <CategorySelector selected={selectedCategory} onSelect={handleCategorySelect} />
                         </div>
 
                         {selectedCategory && (
                             <div className="space-y-4 animate-in slide-in-from-bottom-2 fade-in duration-300">
 
-                                <div className="space-y-4 p-4 bg-white/[0.03] rounded-tile border border-white/5">
-                                    <div className="text-xs text-white/55 font-medium mb-2">상세 정보 입력</div>
+                                <div className="space-y-4 p-4 bg-black/[0.03] rounded-tile ">
+                                    <div className="text-xs text-ink-3 font-medium mb-2">상세 정보 입력</div>
 
                                     {/* Title */}
                                     <FormField
@@ -250,7 +250,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                     <Input
                                                         placeholder="모임명을 입력하세요"
                                                         {...field}
-                                                        className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-base font-bold text-white placeholder:text-white/45 placeholder:font-normal focus-visible:ring-1 focus-visible:ring-brand/30"
+                                                        className="bg-surface-2 h-12 rounded-tile px-4 text-base font-bold text-ink-1 placeholder:text-black/40 placeholder:font-normal focus-visible:ring-1 focus-visible:ring-brand/30"
                                                     />
                                                 </FormControl>
                                                 <FormMessage className="text-brand text-[12px]" />
@@ -265,7 +265,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             name="startDate"
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1 flex flex-col">
-                                                    <FormLabel className="text-xs text-white/55 font-medium ml-1 flex items-center gap-1">
+                                                    <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
                                                         <LucideCalendar className="w-3 h-3" /> {isTour ? "시작 일시" : "모임 날짜"}
                                                     </FormLabel>
                                                     <Popover>
@@ -274,8 +274,8 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                                 <Button
                                                                     variant={"ghost"}
                                                                     className={cn(
-                                                                        "w-full text-left font-normal bg-surface-2 border border-surface-line rounded-tile h-12 px-4 justify-start hover:bg-surface-3 hover:text-white",
-                                                                        !field.value && "text-white/45"
+                                                                        "w-full text-left font-normal bg-surface-2 rounded-tile h-12 px-4 justify-start hover:bg-surface-3 hover:text-ink-1",
+                                                                        !field.value && "text-black/40"
                                                                     )}
                                                                 >
                                                                     {field.value ? (
@@ -286,14 +286,14 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                                 </Button>
                                                             </FormControl>
                                                         </PopoverTrigger>
-                                                        <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-white/10" align="start">
+                                                        <PopoverContent className="w-auto p-0 bg-white border-black/10" align="start">
                                                             <Calendar
                                                                 mode="single"
                                                                 selected={field.value}
                                                                 onSelect={field.onChange}
                                                                 disabled={(date) => date < new Date("1900-01-01")}
                                                                 initialFocus
-                                                                className="p-3 pointer-events-auto text-white dark:[color-scheme:dark]"
+                                                                className="p-3 pointer-events-auto text-ink-1"
                                                             />
                                                         </PopoverContent>
                                                     </Popover>
@@ -306,15 +306,15 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             name="time"
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1">
-                                                    <FormLabel className="text-xs text-white/55 font-medium ml-1 flex items-center gap-1">
+                                                    <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
                                                         <LucideClock className="w-3 h-3" /> 시간 (티오프)
                                                     </FormLabel>
                                                     <FormControl>
                                                         <Input
                                                             type="time"
                                                             {...field}
-                                                            style={{ colorScheme: "dark" }}
-                                                            className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-sm focus-visible:ring-1 focus-visible:ring-brand/30 [&::-webkit-calendar-picker-indicator]:invert"
+                                                            style={{ colorScheme: "light" }}
+                                                            className="bg-surface-2 h-12 rounded-tile px-4 text-sm text-ink-1 focus-visible:ring-1 focus-visible:ring-brand/30"
                                                         />
                                                     </FormControl>
                                                 </FormItem>
@@ -329,7 +329,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             name="endDate"
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1 flex flex-col">
-                                                    <FormLabel className="text-xs text-white/55 font-medium ml-1 flex items-center gap-1">
+                                                    <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
                                                         <LucideCalendar className="w-3 h-3" /> 종료 일시 (투어)
                                                     </FormLabel>
                                                     <Popover>
@@ -338,8 +338,8 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                                 <Button
                                                                     variant={"ghost"}
                                                                     className={cn(
-                                                                        "w-full text-left font-normal bg-surface-2 border border-surface-line rounded-tile h-12 px-4 justify-start hover:bg-surface-3 hover:text-white",
-                                                                        !field.value && "text-white/45"
+                                                                        "w-full text-left font-normal bg-surface-2 rounded-tile h-12 px-4 justify-start hover:bg-surface-3 hover:text-ink-1",
+                                                                        !field.value && "text-black/40"
                                                                     )}
                                                                 >
                                                                     {field.value ? (
@@ -350,14 +350,14 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                                 </Button>
                                                             </FormControl>
                                                         </PopoverTrigger>
-                                                        <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-white/10" align="start">
+                                                        <PopoverContent className="w-auto p-0 bg-white border-black/10" align="start">
                                                             <Calendar
                                                                 mode="single"
                                                                 selected={field.value}
                                                                 onSelect={field.onChange}
                                                                 disabled={(date) => date < form.getValues('startDate')}
                                                                 initialFocus
-                                                                className="p-3 pointer-events-auto text-white dark:[color-scheme:dark]"
+                                                                className="p-3 pointer-events-auto text-ink-1"
                                                             />
                                                         </PopoverContent>
                                                     </Popover>
@@ -373,7 +373,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             name="locationName"
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1">
-                                                    <FormLabel className="text-xs text-white/55 font-medium ml-1 flex items-center gap-1">
+                                                    <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
                                                         <LucideMapPin className="w-3 h-3" /> 장소 (골프장/매장)
                                                     </FormLabel>
                                                     <FormControl>
@@ -388,7 +388,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                                 placeholder="장소 / 매장명"
                                                                 {...field}
                                                                 value={field.value || ""}
-                                                                className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-sm placeholder:text-white/45 focus-visible:ring-1 focus-visible:ring-brand/30"
+                                                                className="bg-surface-2 h-12 rounded-tile px-4 text-sm text-ink-1 placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
                                                             />
                                                         )}
                                                     </FormControl>
@@ -401,7 +401,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             name="maxParticipants"
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1">
-                                                    <FormLabel className="text-xs text-white/55 font-medium ml-1 flex items-center gap-1">
+                                                    <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
                                                         <LucideUsers className="w-3 h-3" /> 정원 (최대 인원)
                                                     </FormLabel>
                                                     <FormControl>
@@ -409,7 +409,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                             type="number"
                                                             min={2}
                                                             {...field}
-                                                            className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-sm focus-visible:ring-1 focus-visible:ring-brand/30"
+                                                            className="bg-surface-2 h-12 rounded-tile px-4 text-sm focus-visible:ring-1 focus-visible:ring-brand/30"
                                                         />
                                                     </FormControl>
                                                 </FormItem>
@@ -425,7 +425,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                         name="cost"
                                         render={({ field }) => (
                                             <FormItem className="space-y-1">
-                                                <FormLabel className="text-xs text-white/55 font-medium ml-1 flex items-center gap-1">
+                                                <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
                                                     <LucideCoins className="w-3 h-3" /> 비용 (참가비)
                                                 </FormLabel>
                                                 <FormControl>
@@ -435,7 +435,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                         placeholder="예: 그린피 25, 카트/캐디 1/N"
                                                         {...field}
                                                         value={field.value || ""}
-                                                        className="bg-surface-2 border border-surface-line h-12 rounded-tile px-4 text-sm placeholder:text-white/45 focus-visible:ring-1 focus-visible:ring-brand/30"
+                                                        className="bg-surface-2 h-12 rounded-tile px-4 text-sm text-ink-1 placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
                                                     />
                                                 </FormControl>
                                             </FormItem>
@@ -453,7 +453,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                         placeholder="추가 전달사항 (준비물, 드레스코드 등)"
                                                         {...field}
                                                         value={field.value || ""}
-                                                        className="bg-surface-2 border border-surface-line rounded-tile p-3 resize-none h-24 focus-visible:ring-1 focus-visible:ring-brand/30 transition-all placeholder:text-white/45 text-sm leading-relaxed"
+                                                        className="bg-surface-2 rounded-tile p-3 resize-none h-24 focus-visible:ring-1 focus-visible:ring-brand/30 transition-all text-ink-1 placeholder:text-black/40 text-sm leading-relaxed"
                                                     />
                                                 </FormControl>
                                             </FormItem>

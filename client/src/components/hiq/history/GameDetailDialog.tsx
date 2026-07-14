@@ -52,15 +52,15 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
 
     return (
         <Dialog open={!!gameId} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="bg-[#050505] border-[#222] text-white max-w-lg w-[95%] rounded-3xl p-0 overflow-hidden">
-                <DialogHeader className="p-6 bg-gradient-to-b from-[#0e4d2a]/20 to-transparent border-b border-white/5">
+            <DialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] max-w-lg w-[95%] rounded-3xl p-0 overflow-hidden">
+                <DialogHeader className="p-6 bg-gradient-to-b from-[#006241]/[0.06] to-transparent border-b border-black/[0.08]">
                     <div>
                         <div>
                             <DialogTitle className="text-xl font-semibold flex items-center gap-2">
                                 <config.mainIcon className={cn("w-5 h-5", config.themeColor)} />
                                 {config.detailTitle}
                             </DialogTitle>
-                            <DialogDescription className="text-white/40 text-[12px] uppercase font-bold tracking-normal mt-1">
+                            <DialogDescription className="text-black/55 text-[12px] uppercase font-bold tracking-normal mt-1">
                                 {config.detailSubtitle}
                             </DialogDescription>
                         </div>
@@ -70,14 +70,14 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                 <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
                     {isLoading ? (
                         <div className="py-12 flex justify-center">
-                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-8 h-8 border-2 border-[#ffd700] border-t-transparent rounded-full" />
+                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full" />
                         </div>
                     ) : game ? (
                         <>
                             {/* Players Section (Dynamic 2-4 Players) */}
-                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                            <div className="p-4 bg-black/[0.03] rounded-2xl ">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[12px] font-medium text-white/55 uppercase">참가자</span>
+                                    <span className="text-[12px] font-medium text-black/55 uppercase">참가자</span>
                                     <span className={cn("text-[12px] font-bold", config.themeColor)}>
                                         {game.gameType === '4c' ? '4구' : (currentSport === "GOLF" ? "18H" : "3구")}
                                     </span>
@@ -94,20 +94,20 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                                         if (idx > 2 && !pName) return null;
 
                                         return (
-                                            <div key={idx} className="text-center bg-black/20 rounded-lg py-2 border border-white/5 relative overflow-hidden">
-                                                {game.winnerId === pId && <div className="absolute top-0 right-0 p-1"><div className="w-2 h-2 bg-[#ffd700] rounded-full" /></div>}
-                                                <p className={`text-[12px] font-bold mb-0.5 ${isMe ? 'text-blue-400' : 'text-gray-500'}`}>
+                                            <div key={idx} className="text-center bg-white rounded-lg py-2 relative overflow-hidden">
+                                                {game.winnerId === pId && <div className="absolute top-0 right-0 p-1"><div className="w-2 h-2 bg-[#cba258] rounded-full" /></div>}
+                                                <p className={`text-[12px] font-bold mb-0.5 ${isMe ? 'text-brand' : 'text-black/55'}`}>
                                                     {isMe ? 'ME' : `P${idx}`}
                                                 </p>
                                                 <p className="text-sm font-semibold truncate px-1">{pName || (isMe ? "나" : `Player ${idx}`)}</p>
-                                                <div className={`text-lg font-semibold flex items-center justify-center gap-1 ${isMe ? config.themeColor : 'text-white/60'}`}>
+                                                <div className={`text-lg font-semibold flex items-center justify-center gap-1 ${isMe ? config.themeColor : 'text-black/60'}`}>
                                                     {currentSport === "GOLF" ? (
                                                         <span>{pScore || 0}</span>
                                                     ) : (
                                                         <>
                                                             <span>{pTarget || "-"}</span>
-                                                            <span className="text-white/45 text-sm">/</span>
-                                                            <span className={isMe ? 'text-white' : 'text-white/40'}>{pScore || 0}</span>
+                                                            <span className="text-black/40 text-sm">/</span>
+                                                            <span className={isMe ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/40'}>{pScore || 0}</span>
                                                         </>
                                                     )}
                                                 </div>
@@ -119,7 +119,7 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
 
                             {/* Stat Grid */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                <div className="p-4 bg-black/[0.03] rounded-2xl ">
                                     <div className={cn(
                                         "flex items-center gap-2 mb-2",
                                         config.themeColor
@@ -136,8 +136,8 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                                         })()}
                                     </p>
                                 </div>
-                                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                                    <div className="flex items-center gap-2 mb-2 text-white/40">
+                                <div className="p-4 bg-black/[0.03] rounded-2xl ">
+                                    <div className="flex items-center gap-2 mb-2 text-black/55">
                                         <LucideCalendar className="w-4 h-4" />
                                         <span className="text-[12px] font-semibold uppercase">
                                             {currentSport === "GOLF" ? "총 홀" : "총 이닝"}
@@ -149,14 +149,14 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
 
                             {/* Inning Table */}
                             <div>
-                                <h4 className="text-xs font-semibold uppercase text-white/55 mb-3 flex items-center gap-2">
+                                <h4 className="text-xs font-semibold uppercase text-black/55 mb-3 flex items-center gap-2">
                                     <LucideUsers className="w-3 h-3" />
                                     {currentSport === "GOLF" ? "홀별 스코어 상세" : "이닝별 득점 상세"}
                                 </h4>
-                                <div className="bg-[#151515] rounded-2xl border border-[#222] overflow-hidden">
+                                <div className="bg-white rounded-2xl overflow-hidden">
                                     <div
                                         className={cn(
-                                            "grid bg-white/5 border-b border-white/5 p-3 text-[12px] font-medium text-white/40 uppercase gap-1",
+                                            "grid bg-black/[0.04] border-b border-black/[0.08] p-3 text-[12px] font-medium text-black/55 uppercase gap-1",
                                             game.player4Name ? "grid-cols-[60px_repeat(4,1fr)]" :
                                                 game.player3Name ? "grid-cols-[60px_repeat(3,1fr)]" :
                                                     "grid-cols-[60px_repeat(2,1fr)]"
@@ -167,7 +167,7 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                                             if (idx > 2 && !(game as any)[`player${idx}Name`]) return null;
                                             const isMe = currentMemberId && (game as any)[`player${idx}Id`] === currentMemberId;
                                             return (
-                                                <div key={idx} className={`text-center truncate px-1 ${isMe ? 'text-blue-400' : ''}`}>
+                                                <div key={idx} className={`text-center truncate px-1 ${isMe ? 'text-brand' : ''}`}>
                                                     {isMe ? '나' : ((game as any)[`player${idx}Name`] || `P${idx}`)}
                                                 </div>
                                             );
@@ -178,13 +178,13 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                                             <div
                                                 key={i}
                                                 className={cn(
-                                                    "grid p-3 border-b border-white/[0.02] items-center gap-1",
+                                                    "grid p-3 border-b border-black/[0.05] items-center gap-1",
                                                     game.player4Name ? "grid-cols-[60px_repeat(4,1fr)]" :
                                                         game.player3Name ? "grid-cols-[60px_repeat(3,1fr)]" :
                                                             "grid-cols-[60px_repeat(2,1fr)]"
                                                 )}
                                             >
-                                                <div className="text-[12px] font-medium text-white/45 ">{i + 1}</div>
+                                                <div className="text-[12px] font-medium text-black/55 ">{i + 1}</div>
 
                                                 {[1, 2, 3, 4].map(idx => {
                                                     if (idx > 2 && !(game as any)[`player${idx}Name`]) return null;
@@ -195,7 +195,7 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                                                     return (
                                                         <div key={idx} className={cn(
                                                             "text-center font-bold text-sm",
-                                                            isMe ? config.themeColor : "text-white/40"
+                                                            isMe ? config.themeColor : "text-black/40"
                                                         )}>
                                                             {displayScore}
                                                         </div>
@@ -208,7 +208,7 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                             </div>
                         </>
                     ) : (
-                        <div className="py-12 text-center text-white/40">데이터를 불러오는 중입니다...</div>
+                        <div className="py-12 text-center text-black/55">데이터를 불러오는 중입니다...</div>
                     )}
                 </div>
             </DialogContent>

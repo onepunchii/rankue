@@ -30,12 +30,12 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
     };
 
     return (
-        <div className="h-16 bg-[#0a0a0a] border-t border-white/5 flex items-center justify-between px-8 shrink-0 z-50">
+        <div className="h-16 bg-white border-t border-black/10 flex items-center justify-between px-8 shrink-0 z-50">
             {/* Left Section: Time */}
             <div className="flex items-center gap-6 w-1/4">
                 <div className="flex flex-col">
-                    <span className="text-[12px] font-medium text-white/45">진행 시간</span>
-                    <span className="text-xl font-bold text-white tabular-nums">{formatTime(elapsedTime)}</span>
+                    <span className="text-[12px] font-medium text-black/40">진행 시간</span>
+                    <span className="text-xl font-bold text-[rgba(0,0,0,0.87)] tabular-nums">{formatTime(elapsedTime)}</span>
                 </div>
             </div>
 
@@ -46,15 +46,15 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
                     size="icon"
                     onClick={onUndo}
                     disabled={!canUndo}
-                    className={`w-14 h-14 rounded-2xl bg-white/5 border border-white/5 ${canUndo ? 'text-white hover:bg-white/10' : 'text-white/20'}`}
+                    className={`w-14 h-14 rounded-2xl bg-black/[0.04] ${canUndo ? 'text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]' : 'text-black/25'}`}
                 >
                     <LucideUndo2 className="w-6 h-6" />
                 </Button>
 
                 {/* Billiard Ball Style Inning Display */}
                 <div className="relative group">
-                    <div className="w-24 h-24 rounded-full border-4 border-brand flex flex-col items-center justify-center -mt-16 bg-[#141416] z-50">
-                        <span className="text-[12px] font-medium text-white/55 leading-none mb-1">이닝</span>
+                    <div className="w-24 h-24 rounded-full border-4 border-brand flex flex-col items-center justify-center -mt-16 bg-white z-50 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                        <span className="text-[12px] font-medium text-black/55 leading-none mb-1">이닝</span>
                         <span className="text-4xl font-bold text-brand tabular-nums leading-none">{innings}</span>
                     </div>
                 </div>
@@ -64,7 +64,7 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
                     size="icon"
                     onClick={onRedo}
                     disabled={!canRedo}
-                    className={`w-14 h-14 rounded-2xl bg-white/5 border border-white/5 ${canRedo ? 'text-white hover:bg-white/10' : 'text-white/20'}`}
+                    className={`w-14 h-14 rounded-2xl bg-black/[0.04] ${canRedo ? 'text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]' : 'text-black/25'}`}
                 >
                     <LucideRedo2 className="w-6 h-6" />
                 </Button>

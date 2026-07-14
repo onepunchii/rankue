@@ -41,7 +41,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
         }
     });
 
-    if (isLoading) return <div className="text-center py-8 text-white/45">활동 불러오는 중...</div>;
+    if (isLoading) return <div className="text-center py-8 text-black/40">활동 불러오는 중...</div>;
 
     const upcomingActivities: any[] = Array.isArray(activities) ? activities : [];
 
@@ -49,7 +49,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
         <div className="space-y-4 px-6 pt-0 pb-6">
             <div className="flex items-center gap-2 mb-2">
                 <LucideTent className="w-5 h-5 text-brand" />
-                <h2 className="text-lg font-semibold">정모 / 일정</h2>
+                <h2 className="text-lg font-semibold text-ink-1">정모 / 일정</h2>
             </div>
 
             {/* Existing Activities */}
@@ -71,9 +71,9 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                                         <div className={cn("px-2 py-0.5 rounded-md text-xs font-bold tabular-nums", dDayColor)}>
                                             {dDayText}
                                         </div>
-                                        <h3 className="font-bold text-lg text-white">{activity.title}</h3>
+                                        <h3 className="font-bold text-lg text-ink-1">{activity.title}</h3>
                                     </div>
-                                    <p className="text-xs text-white/55 font-medium ml-0.5">공식 모임</p>
+                                    <p className="text-xs text-black/55 font-medium ml-0.5">공식 모임</p>
                                 </div>
                                 {isJoined && (
                                     <div className="flex items-center gap-1 text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded-pill border border-brand/20">
@@ -86,43 +86,43 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                             <div className="grid grid-cols-1 gap-2.5 mb-5 text-[13px]">
                                 {/* Info Items */}
                                 <div className="flex items-center">
-                                    <div className="w-10 shrink-0 text-xs font-semibold text-white/55">일시</div>
-                                    <div className="font-semibold text-white/80">
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-black/55">일시</div>
+                                    <div className="font-semibold text-black/70">
                                         {format(new Date(activity.activityDate), "M월 d일 (E) a h:mm", { locale: ko })}
                                     </div>
                                 </div>
                                 <div className="flex items-start">
-                                    <div className="w-10 shrink-0 text-xs font-semibold text-white/55 mt-0.5">위치</div>
-                                    <div className="font-semibold text-white/80">
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-black/55 mt-0.5">위치</div>
+                                    <div className="font-semibold text-black/70">
                                         {activity.locationName || "장소 미정"}
                                     </div>
                                 </div>
                                 <div className="flex items-center">
-                                    <div className="w-10 shrink-0 text-xs font-semibold text-white/55">비용</div>
-                                    <div className="font-semibold text-white/80">
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-black/55">비용</div>
+                                    <div className="font-semibold text-black/70">
                                         {activity.cost || "협의 / n분의 1"}
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between pt-1">
                                     <div className="flex items-center">
-                                        <div className="w-10 shrink-0 text-xs font-semibold text-white/55">참석</div>
+                                        <div className="w-10 shrink-0 text-xs font-semibold text-black/55">참석</div>
                                         <div className="flex items-center gap-2">
                                             <div className="flex -space-x-1.5">
                                                 {(activity.participants || []).slice(0, 3).map((p: any, idx: number) => (
-                                                    <Avatar key={idx} className="w-5 h-5 border-2 border-[#1a1a1a]">
+                                                    <Avatar key={idx} className="w-5 h-5 border-2 border-white">
                                                         <AvatarImage src={p.member?.profileImageUrl} />
-                                                        <AvatarFallback className="bg-[#2a2a2a] text-xs font-medium text-white/55">
+                                                        <AvatarFallback className="bg-surface-3 text-xs font-medium text-black/55">
                                                             {p.member?.name?.[0] || "?"}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                 ))}
                                                 {(activity.participants?.length || 0) > 3 && (
-                                                    <div className="w-5 h-5 rounded-full bg-[#2a2a2a] border-2 border-[#1a1a1a] flex items-center justify-center text-xs font-medium text-white/55 relative z-10">
+                                                    <div className="w-5 h-5 rounded-full bg-surface-3 border-2 border-white flex items-center justify-center text-xs font-medium text-black/55 relative z-10">
                                                         +{activity.participants.length - 3}
                                                     </div>
                                                 )}
                                             </div>
-                                            <span className="text-xs font-bold tabular-nums text-white/55">
+                                            <span className="text-xs font-bold tabular-nums text-black/55">
                                                 {activity.participants?.length || 0} / {activity.maxParticipants}명
                                             </span>
                                         </div>
@@ -131,8 +131,8 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                             </div>
 
                             {activity.description && (
-                                <div className="mb-5 pl-2 border-l-2 border-white/5">
-                                    <p className="text-xs text-white/55 leading-relaxed line-clamp-1">
+                                <div className="mb-5 pl-2 border-l-2 border-black/10">
+                                    <p className="text-xs text-black/55 leading-relaxed line-clamp-1">
                                         {activity.description}
                                     </p>
                                 </div>
@@ -153,7 +153,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                             )}
 
                             {isMember && isJoined && (
-                                <div className="w-full bg-white/5 border border-white/5 py-2.5 rounded-tile text-center text-xs font-semibold text-white/55">
+                                <div className="w-full bg-brand/[0.06] border border-brand/15 py-2.5 rounded-tile text-center text-xs font-semibold text-brand">
                                     참여 중인 정모입니다
                                 </div>
                             )}
@@ -166,14 +166,14 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
             {isError && (
                 <Card className="rk-card rounded-card">
                     <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
-                            <LucideTent className="w-6 h-6 text-white/38" />
+                        <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
+                            <LucideTent className="w-6 h-6 text-black/40" />
                         </div>
-                        <p className="text-sm font-semibold text-white/72">일정을 불러오지 못했습니다</p>
+                        <p className="text-sm font-semibold text-black/70">일정을 불러오지 못했습니다</p>
                         <Button
                             variant="ghost"
                             onClick={() => refetch()}
-                            className="h-10 px-5 rounded-pill bg-surface-2 hover:bg-surface-3 text-white/72 text-xs font-semibold"
+                            className="h-10 px-5 rounded-pill bg-surface-3 hover:bg-black/[0.06] text-black/70 text-xs font-semibold"
                         >
                             다시 시도
                         </Button>
@@ -185,11 +185,11 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
             {!isError && upcomingActivities.length === 0 && (
                 <Card className="rk-card rounded-card">
                     <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-2">
-                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-1">
-                            <LucideTent className="w-6 h-6 text-white/38" />
+                        <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center mb-1">
+                            <LucideTent className="w-6 h-6 text-black/40" />
                         </div>
-                        <h3 className="text-sm font-semibold text-white/72">예정된 정모가 없습니다</h3>
-                        <p className="text-xs text-white/55 font-medium">
+                        <h3 className="text-sm font-semibold text-black/70">예정된 정모가 없습니다</h3>
+                        <p className="text-xs text-black/55 font-medium">
                             {isMember ? "첫 정모를 만들어 멤버들과 모여보세요." : "곧 새로운 모임이 열릴 예정이에요."}
                         </p>
                     </CardContent>
@@ -206,8 +206,8 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                         <div className="w-12 h-12 rounded-full bg-brand/10 group-hover:bg-brand flex items-center justify-center transition-colors">
                             <LucidePlus className="w-6 h-6 text-brand group-hover:text-brand-fg transition-colors" />
                         </div>
-                        <h3 className="text-white font-semibold group-hover:text-brand transition-colors">새로운 정모 만들기</h3>
-                        <p className="text-xs text-white/55 font-medium">언제든 자유롭게 모임을 시작해보세요!</p>
+                        <h3 className="text-ink-1 font-semibold group-hover:text-brand transition-colors">새로운 정모 만들기</h3>
+                        <p className="text-xs text-black/55 font-medium">언제든 자유롭게 모임을 시작해보세요!</p>
                     </CardContent>
                 </Card>
             )}

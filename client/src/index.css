@@ -412,34 +412,33 @@ body {
   height: 100dvh;
   /* Dynamic viewport height */
 
-  /* Enforce Dark Mode for Browser UI elements */
-  color-scheme: dark;
+  /* Starbucks-inspired warm light theme. */
+  color-scheme: light;
   forced-color-adjust: none;
   /* 시스템 강제 색상 적용 방지 */
 
-  /* RANGKUE Design Guide v1.1 Enforced (Force Dark Prevention Trick) */
-  --background: rgba(10, 10, 10, 0.99);
-  --foreground: rgba(255, 255, 255, 0.99);
+  /* shadcn UI tokens — warm cream canvas, white cards, deep green brand. */
+  --background: #f2f0eb;                    /* Neutral Warm — page canvas */
+  --foreground: rgba(0, 0, 0, 0.87);        /* Text Black */
 
-  --muted: rgba(255, 255, 255, 0.1);
-  --muted-foreground: rgba(255, 255, 255, 0.6);
-  --popover: rgba(20, 20, 20, 0.8);
-  --popover-foreground: #FFFFFF;
-  --card: rgba(20, 20, 20, 0.5);
-  --card-foreground: #FFFFFF;
-  --border: rgba(255, 255, 255, 0.1);
-  --input: rgba(255, 255, 255, 0.1);
-  --primary: #10B981;
-  /* Rankue Green */
-  --primary-foreground: #000000;
+  --muted: rgba(0, 0, 0, 0.045);
+  --muted-foreground: rgba(0, 0, 0, 0.55);  /* Text Black Soft */
+  --popover: #ffffff;                        /* opaque white — dropdowns / dialogs */
+  --popover-foreground: rgba(0, 0, 0, 0.87);
+  --card: #ffffff;                           /* white card surface */
+  --card-foreground: rgba(0, 0, 0, 0.87);
+  --border: rgba(0, 0, 0, 0.10);
+  --input: rgba(0, 0, 0, 0.14);
+  --primary: #006241;                        /* Starbucks Green */
+  --primary-foreground: #ffffff;             /* white on green */
 
-  --secondary: hsla(240, 3.7%, 15.9%, 0.8);
-  --secondary-foreground: hsl(0, 0%, 98%);
-  --accent: rgba(255, 255, 255, 0.05);
-  --accent-foreground: #FFFFFF;
-  --destructive: hsl(0, 62.8%, 30.6%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --ring: #10B981;
+  --secondary: #edebe9;                      /* Ceramic */
+  --secondary-foreground: rgba(0, 0, 0, 0.87);
+  --accent: rgba(0, 0, 0, 0.045);
+  --accent-foreground: rgba(0, 0, 0, 0.87);
+  --destructive: #c82014;                    /* Red */
+  --destructive-foreground: #ffffff;
+  --ring: #00754A;                           /* Green Accent — focus */
   --radius: 1rem;
   /* Control radius (16px). Cards/sheets use larger literal values via tokens below. */
 
@@ -448,45 +447,53 @@ body {
      Tune the brand accent here and it propagates to every screen.
      ============================================================ */
 
-  /* Brand accent — one signal color. RGB channels so we can compose
-     alpha variants (bg tints, borders) without extra hex definitions. */
-  --brand: 16 185 129;            /* #10B981 emerald */
-  --brand-strong: 5 150 105;      /* #059669 pressed / hover */
-  --brand-fg: 3 25 18;            /* text/icon color on a solid brand fill */
+  /* Brand green — Starbucks Green as the primary signal. RGB channels so we
+     can compose alpha variants (bg tints, borders) without extra hex. */
+  --brand: 0 98 65;               /* #006241 Starbucks Green — headings + fills */
+  --brand-strong: 0 84 55;        /* #005437 pressed / hover */
+  --brand-fg: 255 255 255;        /* white text/icon on a solid green fill */
 
-  /* Layered surfaces (dark). 0 = page, rising = closer to viewer. */
-  --surface-0: #0A0A0A;
-  --surface-1: rgba(255, 255, 255, 0.035);
-  --surface-2: rgba(255, 255, 255, 0.06);
-  --surface-3: rgba(255, 255, 255, 0.09);
-  --surface-line: rgba(255, 255, 255, 0.08);
-  --surface-line-strong: rgba(255, 255, 255, 0.14);
+  /* Deeper brand greens for immersive bands (game screen, feature strips). */
+  --house-green: #1E3932;         /* near-black brand green — deep surfaces */
+  --green-accent: #00754A;        /* luminous CTA green */
+  --gold: #cba258;                /* Rewards / tier ceremony only */
 
-  /* Text ramp — meaningful text never goes below /55. */
-  --ink-1: rgba(255, 255, 255, 0.95);  /* primary */
-  --ink-2: rgba(255, 255, 255, 0.72);  /* secondary */
-  --ink-3: rgba(255, 255, 255, 0.55);  /* tertiary / captions */
-  --ink-4: rgba(255, 255, 255, 0.38);  /* disabled / hints only */
+  /* Layered surfaces (light). 0 = cream page, 1/2 = white cards, 3 = inset tint. */
+  --surface-0: #f2f0eb;                    /* Neutral Warm — page canvas */
+  --surface-1: #ffffff;                    /* white card */
+  --surface-2: #ffffff;                    /* white panel */
+  --surface-3: rgba(0, 0, 0, 0.05);        /* subtle inset (chips, hover, active) */
+  --surface-line: rgba(0, 0, 0, 0.09);     /* hairline that defines white cards on cream */
+  --surface-line-strong: rgba(0, 0, 0, 0.16);
 
-  /* Radius scale — 3 steps. No more 40px blobs. */
+  /* Text ramp — warm blacks (never pure #000). */
+  --ink-1: rgba(0, 0, 0, 0.87);   /* primary — Text Black */
+  --ink-2: rgba(0, 0, 0, 0.68);   /* secondary */
+  --ink-3: rgba(0, 0, 0, 0.55);   /* tertiary / captions — Text Black Soft */
+  --ink-4: rgba(0, 0, 0, 0.40);   /* disabled / hints only */
+
+  /* Radius scale. Buttons go full-pill (Starbucks signature). */
   --r-sm: 0.75rem;   /* 12px — inputs, chips */
-  --r-md: 1rem;      /* 16px — buttons, small cards */
-  --r-lg: 1.5rem;    /* 24px — cards, sheets */
+  --r-md: 1rem;      /* 16px — small cards */
+  --r-lg: 0.75rem;   /* 12px — cards, sheets (Starbucks card radius) */
   --r-pill: 999px;
 
+  /* Whisper-soft layered card shadow (Starbucks elevation). */
+  --shadow-card: 0 0 0.5px rgba(0,0,0,0.14), 0 1px 2px rgba(0,0,0,0.10);
+
   /* Legacy aliases (kept for existing class references) */
-  --rankue-green: #10B981;
-  --rankue-surface: #141414;
-  --rankue-text-main: rgba(255, 255, 255, 0.95);
-  --rankue-text-sub: rgba(255, 255, 255, 0.72);
-  --rankue-text-desc: rgba(255, 255, 255, 0.55);
+  --rankue-green: #006241;
+  --rankue-surface: #ffffff;
+  --rankue-text-main: rgba(0, 0, 0, 0.87);
+  --rankue-text-sub: rgba(0, 0, 0, 0.68);
+  --rankue-text-desc: rgba(0, 0, 0, 0.55);
 }
 
 @layer base {
 
   html,
   body {
-    background-color: #000000;
+    background-color: #f2f0eb;
     overscroll-behavior-y: none;
   }
 
@@ -528,13 +535,13 @@ body {
   /* ===== Rankue design primitives — reusable across screens ===== */
   .rk-card {
     background: var(--surface-1);
-    border: 1px solid var(--surface-line);
     border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
   }
   .rk-card-2 {
     background: var(--surface-2);
-    border: 1px solid var(--surface-line);
     border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
   }
   .rk-title {
     font-size: 19px;
@@ -565,24 +572,27 @@ body {
     background: rgb(var(--brand));
     color: rgb(var(--brand-fg));
     font-weight: 600;
-    border-radius: var(--r-md);
-    transition: background .15s ease, transform .1s ease;
+    letter-spacing: -0.01em;
+    border-radius: var(--r-pill);
+    transition: background .2s ease, transform .1s ease;
   }
   .rk-btn-primary:active {
     background: rgb(var(--brand-strong));
-    transform: scale(0.98);
+    transform: scale(0.95);
   }
   .rk-btn-secondary {
-    background: var(--surface-2);
-    color: var(--ink-1);
-    border: 1px solid var(--surface-line);
+    background: transparent;
+    color: var(--brand-fg, #006241);
+    color: #006241;
+    border: 1px solid #006241;
     font-weight: 600;
-    border-radius: var(--r-md);
-    transition: background .15s ease, transform .1s ease;
+    letter-spacing: -0.01em;
+    border-radius: var(--r-pill);
+    transition: background .2s ease, transform .1s ease;
   }
   .rk-btn-secondary:active {
-    background: var(--surface-3);
-    transform: scale(0.98);
+    background: rgba(0, 98, 65, 0.06);
+    transform: scale(0.95);
   }
 }
 

@@ -1,4 +1,4 @@
-import { ChevronsUp, HelpCircle } from "lucide-react";
+import { ChevronsUp, HelpCircle, Award } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,14 @@ interface DashboardHeaderProps {
     tier: { label: string, class: string, icon: string };
 }
 
+// Flat, tasteful tier accents (no gloss, no emoji) — text + tint pair per tier.
+const TIER_STYLE: Record<string, { text: string; bg: string }> = {
+    "플래티넘": { text: "text-[#0f766e]", bg: "bg-[#0f766e]/10" },
+    "골드": { text: "text-[#b8860b]", bg: "bg-[#cba258]/15" },
+    "실버": { text: "text-[#64748b]", bg: "bg-[#64748b]/12" },
+    "브론즈": { text: "text-[#a56a3a]", bg: "bg-[#a56a3a]/12" },
+};
+
 export const DashboardHeader = ({
     member,
     onOpenRpGuide,
@@ -24,6 +32,7 @@ export const DashboardHeader = ({
 }: DashboardHeaderProps) => {
     const pct3c = getPercentile('3c');
     const trend = getTrend();
+    const tierStyle = TIER_STYLE[tier.label] || TIER_STYLE["브론즈"];
 
     return (
         <header className="pt-7 pb-2">
@@ -32,95 +41,96 @@ export const DashboardHeader = ({
                 <div className="min-w-0">
                     <div className="flex items-center gap-1.5 mb-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-                        <span className="text-[12px] font-medium text-white/45 tracking-wide">당구 모드</span>
+                        <span className="text-[12px] font-medium text-black/55 tracking-wide">당구 모드</span>
                     </div>
-                    <h1 className="text-[26px] leading-none font-bold text-white tracking-tight truncate">
+                    <h1 className="text-[26px] leading-none font-bold text-ink-1 tracking-tight truncate">
                         {member?.nickname || member?.name}
-                        <span className="text-[15px] font-medium text-white/35 ml-1">님</span>
+                        <span className="text-[15px] font-medium text-black/40 ml-1">님</span>
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2.5 shrink-0">
                     <div className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[13px] font-semibold",
-                        tier.class
+                        "flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[12px] font-semibold",
+                        tierStyle.bg, tierStyle.text
                     )}>
-                        <span className="text-[13px]">{tier.icon}</span>
+                        <Award className="w-3.5 h-3.5" strokeWidth={2.2} />
                         <span>{tier.label}</span>
                     </div>
-                    <Avatar className="w-12 h-12 rounded-2xl border border-white/10 ring-2 ring-white/[0.04]">
+                    <Avatar className="w-11 h-11 rounded-2xl">
                         <AvatarImage src={member?.profileImageUrl || undefined} className="object-cover" />
-                        <AvatarFallback className="rounded-2xl bg-[#1a1a1a] text-white/70 font-bold text-lg">
+                        <AvatarFallback className="rounded-2xl bg-brand/10 text-brand font-bold text-lg">
                             {member?.name?.[0]}
                         </AvatarFallback>
                     </Avatar>
                 </div>
             </div>
 
-            {/* Rating cards */}
+            {/* Rating cards — clean flat white, single green accent */}
             <div className="grid grid-cols-2 gap-3">
-                {/* 3-Cushion — primary */}
+                {/* 3-Cushion */}
                 <motion.div
                     whileTap={{ scale: 0.98 }}
-                    className="relative overflow-hidden rounded-[28px] p-5 border border-brand/20 bg-gradient-to-b from-brand/[0.08] to-white/[0.015]"
-                >
-                    <div className="absolute -top-14 -right-10 w-32 h-32 rounded-full bg-brand/10 blur-2xl pointer-events-none" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="text-[14px] font-bold text-brand">3쿠션</span>
-                            <div className="text-right">
-                                <span className="block text-[12px] font-semibold text-white/35 leading-none">평균</span>
-                                <span className="block text-[17px] font-bold text-white/90 tabular-nums leading-tight mt-0.5">{liveAvg3c}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-baseline gap-1.5">
-                            <span className="text-[44px] leading-[0.9] font-bold text-white tabular-nums tracking-tight">{member.rating3c || 0}</span>
-                            <span className="text-[15px] font-bold text-brand">RP</span>
-                            <button onClick={onOpenRpGuide} className="ml-0.5 text-white/25 hover:text-brand transition-colors">
-                                <HelpCircle className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        <div className="mt-4">
-                            {pct3c ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand/12 border border-brand/20 text-[12px] font-bold text-brand">
-                                    <ChevronsUp className="w-3.5 h-3.5" />
-                                    상위 {pct3c}%
-                                </span>
-                            ) : (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-white/[0.04] text-[12px] font-medium text-white/40">
-                                    분석 중
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </motion.div>
-
-                {/* 4-Ball — secondary */}
-                <motion.div
-                    whileTap={{ scale: 0.98 }}
-                    className="relative overflow-hidden rounded-[28px] p-5 border border-white/[0.08] bg-white/[0.025]"
+                    className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                 >
                     <div className="flex items-center justify-between mb-4">
-                        <span className="text-[14px] font-bold text-white/70">4구</span>
+                        <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-brand">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand" />3쿠션
+                        </span>
                         <div className="text-right">
-                            <span className="block text-[12px] font-semibold text-white/35 leading-none">평균</span>
-                            <span className="block text-[17px] font-bold text-white/90 tabular-nums leading-tight mt-0.5">{liveAvg4c}</span>
+                            <span className="block text-[11px] font-medium text-black/40 leading-none">평균</span>
+                            <span className="block text-[16px] font-semibold text-ink-1 tabular-nums leading-tight mt-0.5">{liveAvg3c}</span>
                         </div>
                     </div>
 
                     <div className="flex items-baseline gap-1.5">
-                        <span className="text-[44px] leading-[0.9] font-bold text-white tabular-nums tracking-tight">{member.rating4c || 0}</span>
-                        <span className="text-[15px] font-medium text-white/40">RP</span>
-                        <button onClick={onOpenRpGuide} className="ml-0.5 text-white/45 hover:text-white/60 transition-colors">
+                        <span className="text-[42px] leading-[0.9] font-bold text-ink-1 tabular-nums tracking-tight">{member.rating3c || 0}</span>
+                        <span className="text-[14px] font-semibold text-brand">RP</span>
+                        <button onClick={onOpenRpGuide} className="ml-0.5 text-black/25 hover:text-brand transition-colors">
+                            <HelpCircle className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div className="mt-4">
+                        {pct3c ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
+                                <ChevronsUp className="w-3.5 h-3.5" />
+                                상위 {pct3c}%
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-black/[0.04] text-[12px] font-medium text-black/40">
+                                분석 중
+                            </span>
+                        )}
+                    </div>
+                </motion.div>
+
+                {/* 4-Ball */}
+                <motion.div
+                    whileTap={{ scale: 0.98 }}
+                    className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                >
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-black/70">
+                            <span className="w-1.5 h-1.5 rounded-full bg-black/25" />4구
+                        </span>
+                        <div className="text-right">
+                            <span className="block text-[11px] font-medium text-black/40 leading-none">평균</span>
+                            <span className="block text-[16px] font-semibold text-ink-1 tabular-nums leading-tight mt-0.5">{liveAvg4c}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-baseline gap-1.5">
+                        <span className="text-[42px] leading-[0.9] font-bold text-ink-1 tabular-nums tracking-tight">{member.rating4c || 0}</span>
+                        <span className="text-[14px] font-medium text-black/40">RP</span>
+                        <button onClick={onOpenRpGuide} className="ml-0.5 text-black/25 hover:text-black/50 transition-colors">
                             <HelpCircle className="w-4 h-4" />
                         </button>
                     </div>
 
                     <div className="mt-4">
                         <span className={cn(
-                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/[0.06] text-[12px] font-bold",
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/[0.04] text-[12px] font-semibold",
                             trend.color
                         )}>
                             {trend.icon}

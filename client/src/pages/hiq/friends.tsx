@@ -92,22 +92,22 @@ export default function HiqRivals() {
         [friends, selectedFriendId]);
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white px-5 pt-6 pb-28 relative overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-28 relative overflow-x-hidden font-sans">
             {/* Header */}
             <div className="flex items-center justify-between mb-8 relative z-10">
                 <div className="flex items-center gap-3">
                     <motion.button
                         whileTap={{ scale: 0.9 }}
                         onClick={() => setLocation("/menu")}
-                        className="w-11 h-11 rounded-full bg-surface-1 border border-surface-line flex items-center justify-center transition-transform text-white/55"
+                        className="w-11 h-11 rounded-full bg-white flex items-center justify-center transition-transform text-black/60 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
                     >
                         <LucideChevronLeft className="w-5 h-5" />
                     </motion.button>
                     <div>
-                        <h1 className="text-[26px] font-bold tracking-tight text-white leading-none">
+                        <h1 className="text-[26px] font-bold tracking-tight text-ink-1 leading-none">
                             {config.title}
                         </h1>
-                        <p className="text-[13px] font-medium text-white/45 mt-1">
+                        <p className="text-[13px] font-medium text-black/55 mt-1">
                             함께 겨룰 상대를 관리하세요
                         </p>
                     </div>

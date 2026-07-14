@@ -43,13 +43,13 @@ export const VsHistoryDialog = ({
 
     return (
         <Dialog open={!!friendId} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="bg-[#141416] border border-white/10 text-white max-w-lg w-[95%] rounded-card p-0 overflow-hidden">
-                <DialogHeader className="p-6 border-b border-white/5">
-                    <DialogTitle className="text-[20px] font-bold tracking-tight flex items-center gap-2">
+            <DialogContent className="bg-white text-ink-1 max-w-lg w-[95%] rounded-card p-0 overflow-hidden">
+                <DialogHeader className="p-6 border-b border-black/10">
+                    <DialogTitle className="text-[20px] font-bold tracking-tight flex items-center gap-2 text-brand">
                         {currentSport === "GOLF" ? <LucideFlag className="w-5 h-5 text-brand" /> : <LucideSword className="w-5 h-5 text-brand" />}
                         VS {friend?.name}
                     </DialogTitle>
-                    <DialogDescription className="text-white/45 text-[13px] font-medium mt-1">
+                    <DialogDescription className="text-black/55 text-[13px] font-medium mt-1">
                         상대와의 맞대결 전적
                     </DialogDescription>
                 </DialogHeader>
@@ -59,35 +59,35 @@ export const VsHistoryDialog = ({
                         <div className="rk-card p-5 flex items-center gap-5">
                             <RadialGauge value={vsWinRate} size={92} stroke={8}>
                                 <div className="text-center leading-none">
-                                    <div className="text-[22px] font-bold text-white tabular-nums">
-                                        {vsWinRate}<span className="text-[13px] font-semibold text-white/60">%</span>
+                                    <div className="text-[22px] font-bold text-ink-1 tabular-nums">
+                                        {vsWinRate}<span className="text-[13px] font-semibold text-black/60">%</span>
                                     </div>
-                                    <div className="text-[12px] font-medium text-white/45 mt-1">승률</div>
+                                    <div className="text-[12px] font-medium text-black/55 mt-1">승률</div>
                                 </div>
                             </RadialGauge>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-4 mb-3.5">
                                     <div>
                                         <div className="text-[20px] font-bold text-brand tabular-nums leading-none">{vsWins}</div>
-                                        <div className="text-[12px] text-white/45 font-medium mt-1">승</div>
+                                        <div className="text-[12px] text-black/55 font-medium mt-1">승</div>
                                     </div>
-                                    <div className="w-px h-8 bg-white/10" />
+                                    <div className="w-px h-8 bg-black/10" />
                                     <div>
-                                        <div className="text-[20px] font-bold text-red-400 tabular-nums leading-none">{vsLosses}</div>
-                                        <div className="text-[12px] text-white/45 font-medium mt-1">패</div>
+                                        <div className="text-[20px] font-bold text-red-500 tabular-nums leading-none">{vsLosses}</div>
+                                        <div className="text-[12px] text-black/55 font-medium mt-1">패</div>
                                     </div>
                                     {vsDraws > 0 && (
                                         <>
-                                            <div className="w-px h-8 bg-white/10" />
+                                            <div className="w-px h-8 bg-black/10" />
                                             <div>
-                                                <div className="text-[20px] font-bold text-white/60 tabular-nums leading-none">{vsDraws}</div>
-                                                <div className="text-[12px] text-white/45 font-medium mt-1">무</div>
+                                                <div className="text-[20px] font-bold text-black/60 tabular-nums leading-none">{vsDraws}</div>
+                                                <div className="text-[12px] text-black/55 font-medium mt-1">무</div>
                                             </div>
                                         </>
                                     )}
                                 </div>
                                 <div>
-                                    <div className="text-[12px] font-medium text-white/45 mb-1.5">최근 {vsForm.length}경기</div>
+                                    <div className="text-[12px] font-medium text-black/55 mb-1.5">최근 {vsForm.length}경기</div>
                                     <FormBadges results={vsForm} size={24} />
                                 </div>
                             </div>
@@ -119,8 +119,8 @@ export const VsHistoryDialog = ({
                             const isWin = game.winnerId === myId;
                             const isLoss = game.winnerId === friendId;
                             const resultLabel = isWin ? '승' : (isLoss ? '패' : '무');
-                            const resultColor = isWin ? 'text-brand' : (isLoss ? 'text-red-500' : 'text-gray-400');
-                            const resultBg = isWin ? 'bg-brand/20' : (isLoss ? 'bg-red-500/20' : 'bg-white/10');
+                            const resultColor = isWin ? 'text-brand' : (isLoss ? 'text-red-500' : 'text-black/40');
+                            const resultBg = isWin ? 'bg-brand/12' : (isLoss ? 'bg-red-500/12' : 'bg-black/[0.06]');
 
                             return (
                                 <div key={game.id} className="rk-card p-4 flex items-center justify-between">
@@ -129,19 +129,19 @@ export const VsHistoryDialog = ({
                                             <span className={`text-[12px] font-semibold px-2 py-0.5 rounded-lg ${resultBg} ${resultColor}`}>
                                                 {resultLabel}
                                             </span>
-                                            <span className="text-[12px] font-medium text-white/45 flex items-center gap-1">
+                                            <span className="text-[12px] font-medium text-black/55 flex items-center gap-1">
                                                 <LucideCalendar className="w-3 h-3" />
                                                 {format(new Date(game.playedAt), "yyyy.MM.dd", { locale: ko })}
                                             </span>
                                         </div>
                                         <div className="flex items-baseline gap-1">
-                                            <span className="text-[13px] font-semibold text-white/60">{game.gameType === '3c' ? '3구' : '4구'}</span>
+                                            <span className="text-[13px] font-semibold text-black/60">{game.gameType === '3c' ? '3구' : '4구'}</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <div className="text-right">
-                                            <p className="text-[12px] font-medium text-white/45">점수 (나 : 상대)</p>
-                                            <p className="text-[20px] font-bold text-white tabular-nums">
+                                            <p className="text-[12px] font-medium text-black/55">점수 (나 : 상대)</p>
+                                            <p className="text-[20px] font-bold text-ink-1 tabular-nums">
                                                 {myScore} : {friendScore}
                                             </p>
                                         </div>
@@ -150,13 +150,13 @@ export const VsHistoryDialog = ({
                             );
                         })
                     ) : (
-                        <div className="py-12 text-center text-white/45">
+                        <div className="py-12 text-center text-black/55">
                             <p className="text-[13px] font-medium">대결 기록이 없습니다</p>
                         </div>
                     )}
                 </div>
 
-                <div className="p-6 border-t border-white/5">
+                <div className="p-6 border-t border-black/10">
                     <Button
                         onClick={onClose}
                         className="w-full h-14 rk-btn-secondary rounded-tile active:scale-95"

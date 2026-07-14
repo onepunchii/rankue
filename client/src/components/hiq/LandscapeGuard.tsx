@@ -18,7 +18,7 @@ export function LandscapeGuard({ children }: { children: React.ReactNode }) {
     if (isPortrait) {
         return (
             <div
-                className="fixed top-1/2 left-1/2 bg-black overflow-hidden origin-center"
+                className="fixed top-1/2 left-1/2 bg-[#f2f0eb] overflow-hidden origin-center"
                 style={{
                     width: '100vh',
                     height: '100vw',

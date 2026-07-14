@@ -136,20 +136,20 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg bg-[#141416] border-white/10 p-0 overflow-hidden flex flex-col max-h-[90vh]">
-                <DialogHeader className="pl-6 pr-16 py-4 border-b border-white/5 flex flex-row items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 overflow-hidden border border-white/5">
+            <DialogContent className="max-w-lg bg-white border-black/[0.08] p-0 overflow-hidden flex flex-col max-h-[90vh]">
+                <DialogHeader className="pl-6 pr-16 py-4 border-b border-black/10 flex flex-row items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-black/[0.06] overflow-hidden ">
                         {photo.author?.profileImageUrl ? (
                             <img src={photo.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-[12px] font-semibold text-white/45">
+                            <div className="w-full h-full flex items-center justify-center text-[12px] font-semibold text-black/40">
                                 {photo.author?.name?.charAt(0)}
                             </div>
                         )}
                     </div>
                     <div className="flex-1">
-                        <DialogTitle className="text-sm font-bold text-white">{photo.author?.name}</DialogTitle>
-                        <p className="text-[12px] font-medium text-white/55">
+                        <DialogTitle className="text-sm font-bold text-ink-1">{photo.author?.name}</DialogTitle>
+                        <p className="text-[12px] font-medium text-black/55">
                             {formatDistanceToNow(new Date(photo.createdAt), { addSuffix: true, locale: ko })}
                         </p>
                     </div>
@@ -160,7 +160,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                                     deletePhotoMutation.mutate();
                                 }
                             }}
-                            className="p-2 text-white/45 hover:text-red-500 transition-colors"
+                            className="p-2 text-black/40 hover:text-red-500 transition-colors"
                             title="사진 삭제"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -170,7 +170,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
 
                 <div className="flex-1 overflow-y-auto">
                     {/* Photo Display */}
-                    <div className="bg-black aspect-square flex items-center justify-center overflow-hidden">
+                    <div className="bg-surface-3 aspect-square flex items-center justify-center overflow-hidden">
                         <img src={photo.url} className="w-full h-full object-contain" alt="" />
                     </div>
 
@@ -186,50 +186,50 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                         >
                             <LucideHeart className={cn(
                                 "w-6 h-6 transition-colors",
-                                photo.isLiked ? "text-red-500 fill-red-500" : "text-white/45 hover:text-red-500"
+                                photo.isLiked ? "text-red-500 fill-red-500" : "text-black/40 hover:text-red-500"
                             )} />
                             <span className={cn(
                                 "text-sm font-bold tabular-nums transition-colors",
-                                photo.isLiked ? "text-red-500" : "text-white/55"
+                                photo.isLiked ? "text-red-500" : "text-black/55"
                             )}>
                                 {photo.likeCount || 0}
                             </span>
                         </button>
                         <div className="flex items-center gap-1.5">
-                            <LucideMessageSquare className="w-6 h-6 text-white/45" />
-                            <span className="text-sm font-medium tabular-nums text-white/55">{photo.commentCount || 0}</span>
+                            <LucideMessageSquare className="w-6 h-6 text-black/40" />
+                            <span className="text-sm font-medium tabular-nums text-black/55">{photo.commentCount || 0}</span>
                         </div>
                     </div>
 
                     {/* Comments List */}
                     <div className="px-6 pb-6 space-y-5">
-                        <h4 className="text-[12px] font-semibold text-white/55 flex items-center gap-2">
+                        <h4 className="text-[12px] font-semibold text-black/55 flex items-center gap-2">
                             <span className="w-1 h-1 rounded-full bg-brand" />
                             댓글 {comments?.length || 0}
                         </h4>
                         {isCommentsLoading ? (
-                            <div className="py-8 text-center text-white/55 text-[12px] font-semibold">불러오는 중...</div>
+                            <div className="py-8 text-center text-black/55 text-[12px] font-semibold">불러오는 중...</div>
                         ) : comments && comments.length > 0 ? (
                             <div className="space-y-5">
                                 {comments.map((comment) => (
                                     <div key={comment.id} className="flex gap-3 group/comment">
-                                        <div className="w-7 h-7 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+                                        <div className="w-7 h-7 rounded-full bg-black/[0.06] overflow-hidden flex-shrink-0">
                                             {comment.author.profileImageUrl ? (
                                                 <img src={comment.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-[12px] font-medium text-white/45">
+                                                <div className="w-full h-full flex items-center justify-center text-[12px] font-medium text-black/40">
                                                     {comment.author.name.charAt(0)}
                                                 </div>
                                             )}
                                         </div>
                                         <div className="flex-1 space-y-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-xs font-bold text-white/90">{comment.author.name}</span>
-                                                <span className="text-[12px] font-medium text-white/55">
+                                                <span className="text-xs font-bold text-ink-1">{comment.author.name}</span>
+                                                <span className="text-[12px] font-medium text-black/55">
                                                     {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: ko })}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-white/60 leading-relaxed font-medium">{comment.content}</p>
+                                            <p className="text-xs text-black/70 leading-relaxed font-medium">{comment.content}</p>
                                         </div>
                                         {(isAdmin || comment.authorId === currentMemberId) && (
                                             <button
@@ -238,7 +238,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                                                         deleteCommentMutation.mutate(comment.id);
                                                     }
                                                 }}
-                                                className="p-1 text-white/45 hover:text-red-500 transition-colors self-start mt-1 opacity-0 group-hover/comment:opacity-100"
+                                                className="p-1 text-black/40 hover:text-red-500 transition-colors self-start mt-1 opacity-0 group-hover/comment:opacity-100"
                                                 title="댓글 삭제"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -248,7 +248,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                                 ))}
                             </div>
                         ) : (
-                            <div className="py-12 text-center text-white/55 text-[12px] font-semibold">
+                            <div className="py-12 text-center text-black/55 text-[12px] font-semibold">
                                 첫 댓글을 남겨보세요
                             </div>
                         )}
@@ -256,7 +256,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                 </div>
 
                 {/* Comment Input */}
-                <div className="p-4 bg-[#141416] border-t border-white/10">
+                <div className="p-4 bg-white border-t border-black/10">
                     <div className="relative flex items-center gap-2">
                         <input
                             type="text"
@@ -269,7 +269,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                                     handleSubmitComment();
                                 }
                             }}
-                            className="flex-1 bg-white/5 border border-white/5 text-white text-sm rounded-full h-10 px-4 focus:outline-none focus:border-brand/50 focus:bg-white/10 transition-all placeholder:text-white/45"
+                            className="flex-1 bg-surface-3 text-ink-1 text-sm rounded-full h-10 px-4 focus:outline-none focus:border-brand/50 focus:bg-black/[0.06] transition-all placeholder:text-black/40"
                         />
                         <Button
                             disabled={!commentContent.trim() || commentMutation.isPending}

@@ -1025,13 +1025,13 @@ export default function HiqOnlineGame() {
                         <button
                             onClick={() => setLocation("/hiq/dashboard")}
                             title="돌아가기"
-                            className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-md border border-white/10 active:scale-90 transition-transform pointer-events-auto"
+                            className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
                         >
                             <ChevronLeft className="w-6 h-6 text-white" />
                         </button>
 
                         {/* Scoreboard */}
-                        <div className="flex-1 h-12 bg-[#141416]/80 border border-surface-line backdrop-blur-md rounded-2xl flex items-center px-4 justify-between overflow-hidden shadow-2xl">
+                        <div className="flex-1 h-12 bg-[#141416]/80 rounded-2xl flex items-center px-4 justify-between overflow-hidden shadow-2xl">
                             <div className="flex flex-col items-start leading-none min-w-[40px]">
                                 <span className="text-[12px] font-medium text-white/45">이닝</span>
                                 <span className="text-xl font-semibold tabular-nums text-white/72">{innings}</span>
@@ -1062,7 +1062,7 @@ export default function HiqOnlineGame() {
 
                     {currentRun > 0 && (
                         <div className="flex justify-center">
-                            <div className="inline-flex items-center gap-1.5 px-4 py-1 rounded-pill bg-brand/15 border border-brand/25 backdrop-blur-sm animate-pulse">
+                            <div className="inline-flex items-center gap-1.5 px-4 py-1 rounded-pill bg-brand/15 border border-brand/25 animate-pulse">
                                 <Flame className="w-3.5 h-3.5 text-brand" />
                                 <span className="text-[12px] font-semibold text-brand">연속 득점 +{currentRun}</span>
                             </div>
@@ -1110,8 +1110,8 @@ export default function HiqOnlineGame() {
                     </button>
                     {/* Spin Popover */}
                     {showSpinPanel && (
-                        <div className="absolute right-12 top-1/2 -translate-y-1/2 w-48 h-48 bg-[#141416] rounded-card border border-white/10 p-4 shadow-2xl flex items-center justify-center">
-                            <div className="relative w-full h-full rounded-full border border-white/20 bg-white/5">
+                        <div className="absolute right-12 top-1/2 -translate-y-1/2 w-48 h-48 bg-[#141416] rounded-card p-4 shadow-2xl flex items-center justify-center">
+                            <div className="relative w-full h-full rounded-full bg-white/5">
                                 {/* Concentric Guide Lines (10% intervals) */}
                                 {[...Array(9)].map((_, i) => (
                                     <div
@@ -1169,7 +1169,7 @@ export default function HiqOnlineGame() {
                                         <span>팔로우</span>
                                     </div>
                                     {/* Bottom: Draw */}
-                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-blue-400">
+                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-brand">
                                         <span>드로우</span>
                                         <ChevronDown size={8} />
                                     </div>
@@ -1247,13 +1247,13 @@ export default function HiqOnlineGame() {
 
             {/* 5. Inning Record Modal */}
             {isScoreSheetOpen && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
-                    <div className="w-full max-w-sm premium-glass rounded-3xl border border-white/10 p-6 flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
+                <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/60">
+                    <div className="w-full max-w-sm bg-white rounded-3xl p-6 flex flex-col shadow-[0_12px_40px_rgba(0,0,0,0.28)] animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-semibold text-white tracking-tight">이닝별 기록표</h2>
+                            <h2 className="text-xl font-semibold text-[rgba(0,0,0,0.87)] tracking-tight">이닝별 기록표</h2>
                             <button
                                 onClick={() => setIsScoreSheetOpen(false)}
-                                className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white"
+                                className="w-11 h-11 rounded-full bg-black/[0.04] flex items-center justify-center text-black/60 hover:text-[rgba(0,0,0,0.87)]"
                                 title="닫기"
                             >
                                 <X size={18} />
@@ -1263,16 +1263,16 @@ export default function HiqOnlineGame() {
                         <div className="flex-1 overflow-y-auto max-h-[60vh] space-y-2 pr-2 custom-scrollbar">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="border-b border-white/5">
-                                        <th className="py-2 text-[12px] font-medium text-white/40">이닝</th>
-                                        <th className="py-2 text-[12px] font-medium text-white/40 text-center">득점</th>
-                                        <th className="py-2 text-[12px] font-medium text-white/40 text-right">누계</th>
+                                    <tr className="border-b border-black/10">
+                                        <th className="py-2 text-[12px] font-medium text-black/40">이닝</th>
+                                        <th className="py-2 text-[12px] font-medium text-black/40 text-center">득점</th>
+                                        <th className="py-2 text-[12px] font-medium text-black/40 text-right">누계</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {inningRecords.length === 0 ? (
                                         <tr>
-                                            <td colSpan={3} className="py-8 text-center text-xs text-white/45 ">
+                                            <td colSpan={3} className="py-8 text-center text-xs text-black/55 ">
                                                 기록된 이닝이 없습니다.
                                             </td>
                                         </tr>
@@ -1284,12 +1284,12 @@ export default function HiqOnlineGame() {
                                                 .reduce((sum, item) => sum + item.score, 0);
 
                                             return (
-                                                <tr key={r.inning} className="border-b border-white/5 last:border-0">
-                                                    <td className="py-3 text-sm font-medium text-white/60">{r.inning}</td>
-                                                    <td className={`py-3 text-sm font-semibold text-center tabular-nums ${r.score > 0 ? 'text-brand' : 'text-white/45'}`}>
+                                                <tr key={r.inning} className="border-b border-black/10 last:border-0">
+                                                    <td className="py-3 text-sm font-medium text-black/60">{r.inning}</td>
+                                                    <td className={`py-3 text-sm font-semibold text-center tabular-nums ${r.score > 0 ? 'text-brand' : 'text-black/40'}`}>
                                                         {r.score > 0 ? `+${r.score}` : r.score}
                                                     </td>
-                                                    <td className="py-3 text-sm font-bold text-white text-right tabular-nums">{cumulative}</td>
+                                                    <td className="py-3 text-sm font-bold text-[rgba(0,0,0,0.87)] text-right tabular-nums">{cumulative}</td>
                                                 </tr>
                                             );
                                         })
@@ -1298,16 +1298,16 @@ export default function HiqOnlineGame() {
                             </table>
                         </div>
 
-                        <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center">
+                        <div className="mt-6 pt-4 border-t border-black/10 flex justify-between items-center">
                             <div>
-                                <span className="text-[12px] font-medium text-white/40 block leading-none">총점</span>
+                                <span className="text-[12px] font-medium text-black/40 block leading-none">총점</span>
                                 <span className="text-2xl font-semibold tabular-nums text-brand">{score}</span>
                             </div>
                             <div className="text-right flex flex-col items-end">
-                                <span className="text-[12px] font-medium text-white/40 block leading-none">
+                                <span className="text-[12px] font-medium text-black/40 block leading-none">
                                     {engineRef.current?.getSpec().name.split(' ')[0] || "대대"} 모드
                                 </span>
-                                <span className="text-xl font-semibold tabular-nums text-white">{avg}</span>
+                                <span className="text-xl font-semibold tabular-nums text-[rgba(0,0,0,0.87)]">{avg}</span>
                             </div>
                         </div>
                     </div>

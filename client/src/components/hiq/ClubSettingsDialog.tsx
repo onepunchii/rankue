@@ -35,7 +35,7 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#141416] border-white/10 rounded-card text-white max-w-md max-h-[90vh] overflow-y-auto p-0 gap-0 custom-scrollbar">
+            <DialogContent className="bg-white border-black/[0.08] rounded-card text-[rgba(0,0,0,0.87)] max-w-md max-h-[90vh] overflow-y-auto p-0 gap-0 custom-scrollbar">
                 <div className="p-5 pb-0">
                     <DialogHeader className="mb-4">
                         <div className="flex items-center gap-3">
@@ -43,8 +43,8 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                                 <LucideSettings2 className="w-5 h-5 text-brand" />
                             </div>
                             <div className="flex flex-col gap-1">
-                                <DialogTitle className="text-lg font-bold text-white leading-none">크루 관리</DialogTitle>
-                                <DialogDescription className="text-xs font-medium text-white/55 leading-none">
+                                <DialogTitle className="text-lg font-bold text-[rgba(0,0,0,0.87)] leading-none">크루 관리</DialogTitle>
+                                <DialogDescription className="text-xs font-medium text-black/55 leading-none">
                                     크루 정보와 멤버를 관리합니다
                                 </DialogDescription>
                             </div>
@@ -52,29 +52,29 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                     </DialogHeader>
 
                     <Tabs defaultValue="general" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3 bg-surface-2 border border-surface-line p-1 mb-5 rounded-tile h-10 relative overflow-hidden">
+                        <TabsList className="grid w-full grid-cols-3 bg-surface-3 p-1 mb-5 rounded-tile h-10 relative overflow-hidden">
                             <TabsTrigger
                                 value="general"
-                                className="rounded-lg h-full text-xs font-semibold transition-colors z-10 data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
+                                className="rounded-lg h-full text-xs font-semibold text-black/55 transition-colors z-10 data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
                             >
                                 <LucideSettings2 className="w-3.5 h-3.5 mr-1" />
                                 정보
                             </TabsTrigger>
                             <TabsTrigger
                                 value="template"
-                                className="rounded-lg h-full text-xs font-semibold transition-colors z-10 data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
+                                className="rounded-lg h-full text-xs font-semibold text-black/55 transition-colors z-10 data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
                             >
                                 <LucideFileText className="w-3.5 h-3.5 mr-1" />
                                 양식
                             </TabsTrigger>
                             <TabsTrigger
                                 value="members"
-                                className="rounded-lg h-full text-xs font-semibold transition-colors z-10 relative data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
+                                className="rounded-lg h-full text-xs font-semibold text-black/55 transition-colors z-10 relative data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
                             >
                                 <LucideUsers2 className="w-3.5 h-3.5 mr-1" />
                                 멤버
                                 {pendingMembers.length > 0 && (
-                                    <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold tabular-nums border-2 border-[#141416]">
+                                    <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold tabular-nums border-2 border-white">
                                         {pendingMembers.length}
                                     </span>
                                 )}

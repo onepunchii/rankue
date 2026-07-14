@@ -81,8 +81,8 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
             {/* Header / CTA */}
             <div className="px-6 flex items-center justify-between">
                 <div>
-                    <h2 className="text-[15px] font-semibold text-white/55">크루 투표</h2>
-                    <p className="text-xs text-white/38 mt-1 font-medium flex items-center gap-1.5 tabular-nums">
+                    <h2 className="text-[15px] font-semibold text-black/55">크루 투표</h2>
+                    <p className="text-xs text-black/40 mt-1 font-medium flex items-center gap-1.5 tabular-nums">
                         <LucideVote className="w-3 h-3" />
                         총 {polls?.length || 0}개의 투표
                     </p>
@@ -105,29 +105,29 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                         {Array.from({ length: 3 }).map((_, i) => (
                             <div
                                 key={i}
-                                className="bg-surface-2 border border-surface-line rounded-card overflow-hidden animate-pulse"
+                                className="bg-surface-2 rounded-card overflow-hidden animate-pulse"
                             >
                                 <div className="p-6 pb-5 space-y-5">
                                     <div className="space-y-2">
-                                        <div className="h-5 w-16 bg-white/5 rounded-full" />
-                                        <div className="h-5 w-2/3 bg-white/5 rounded-lg" />
+                                        <div className="h-5 w-16 bg-black/[0.04] rounded-full" />
+                                        <div className="h-5 w-2/3 bg-black/[0.04] rounded-lg" />
                                     </div>
                                     <div className="space-y-2.5">
-                                        <div className="h-14 bg-white/[0.03] rounded-2xl" />
-                                        <div className="h-14 bg-white/[0.03] rounded-2xl" />
+                                        <div className="h-14 bg-black/[0.04] rounded-2xl" />
+                                        <div className="h-14 bg-black/[0.04] rounded-2xl" />
                                     </div>
                                 </div>
-                                <div className="px-6 py-4 bg-white/[0.02] border-t border-white/5 flex items-center gap-3">
-                                    <div className="w-5 h-5 rounded-full bg-white/5" />
-                                    <div className="h-3 w-24 bg-white/5 rounded-full" />
+                                <div className="px-6 py-4 bg-black/[0.02] border-t border-black/[0.08] flex items-center gap-3">
+                                    <div className="w-5 h-5 rounded-full bg-black/[0.04]" />
+                                    <div className="h-3 w-24 bg-black/[0.04] rounded-full" />
                                 </div>
                             </div>
                         ))}
                     </>
                 ) : (!polls || polls.length === 0) ? (
                     <div className="py-24 text-center">
-                        <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-                            <LucideVote className="w-7 h-7 text-white/45" />
+                        <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mx-auto mb-4">
+                            <LucideVote className="w-7 h-7 text-black/40" />
                         </div>
                         <p className="text-[15px] font-medium text-ink-2 mb-1">진행 중인 투표가 없습니다</p>
                         <p className="text-[13px] text-ink-4">멤버들과 새로운 의견을 나눠보세요</p>
@@ -161,7 +161,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                             <Button
                                 variant="ghost"
                                 onClick={() => setDisplayLimit((d) => d + 10)}
-                                className="w-full h-12 bg-white/[0.02] hover:bg-white/[0.05] text-white/45 hover:text-white/60 text-[13px] font-semibold rounded-2xl flex items-center justify-center gap-2 transition-all"
+                                className="w-full h-12 bg-black/[0.04] hover:bg-black/[0.06] text-black/55 hover:text-[rgba(0,0,0,0.87)] text-[13px] font-semibold rounded-2xl flex items-center justify-center gap-2 transition-all"
                             >
                                 더보기
                                 <LucideChevronDown className="w-4 h-4" />
@@ -200,7 +200,7 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
             layout
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="group relative bg-surface-2 border border-surface-line rounded-card overflow-hidden hover:border-brand/30 transition-all duration-300"
+            className="group relative bg-surface-2 rounded-card overflow-hidden hover:border-brand/30 transition-all duration-300"
         >
             <div className="p-6 pb-5">
                 {/* Header */}
@@ -209,24 +209,24 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
                         <div className="flex items-center gap-2 mb-1.5">
                             <Badge className={cn(
                                 "h-5 px-2 text-xs font-semibold border-none",
-                                isClosed ? "bg-white/10 text-white/55" : "bg-brand/10 text-brand"
+                                isClosed ? "bg-black/[0.06] text-black/55" : "bg-brand/10 text-brand"
                             )}>
                                 {isClosed ? "마감됨" : "진행 중"}
                             </Badge>
                             {poll.isAnonymous && (
-                                <Badge className="h-5 px-2 bg-blue-500/10 text-blue-400 text-xs font-semibold border-none">
+                                <Badge className="h-5 px-2 bg-brand/10 text-brand text-xs font-semibold border-none">
                                     <LucideShieldCheck className="w-3 h-3 mr-1" /> 익명
                                 </Badge>
                             )}
                             {poll.allowMultiple && (
-                                <Badge className="h-5 px-2 bg-purple-500/10 text-purple-400 text-xs font-semibold border-none">
+                                <Badge className="h-5 px-2 bg-purple-500/10 text-purple-500 text-xs font-semibold border-none">
                                     복수 선택
                                 </Badge>
                             )}
                         </div>
-                        <h3 className="text-lg font-semibold text-white leading-tight tracking-tight">{poll.title}</h3>
+                        <h3 className="text-lg font-semibold text-[rgba(0,0,0,0.87)] leading-tight tracking-tight">{poll.title}</h3>
                         {poll.description && (
-                            <p className="text-xs text-white/55 font-medium leading-relaxed mt-2 line-clamp-2">
+                            <p className="text-xs text-black/55 font-medium leading-relaxed mt-2 line-clamp-2">
                                 {poll.description}
                             </p>
                         )}
@@ -241,7 +241,7 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
                         {isAdmin && (
                             <button
                                 onClick={onDelete}
-                                className="p-1.5 rounded-full hover:bg-red-500/10 text-white/45 hover:text-red-500 transition-colors"
+                                className="p-1.5 rounded-full hover:bg-red-500/10 text-black/40 hover:text-red-500 transition-colors"
                                 title="투표 삭제"
                             >
                                 <LucideTrash2 className="w-4 h-4" />
@@ -266,8 +266,8 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
                                 className={cn(
                                     "relative w-full text-left p-4 rounded-2xl group/opt transition-all duration-300 overflow-hidden",
                                     isMyVote
-                                        ? "bg-white/5 border border-white/10"
-                                        : "bg-white/[0.02] border border-white/[0.03] hover:border-white/10"
+                                        ? "bg-brand/[0.06] border border-brand/20"
+                                        : "bg-black/[0.03] hover:border-black/10"
                                 )}
                             >
                                 {/* Progress Background */}
@@ -276,8 +276,8 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
                                     animate={{ width: `${progress}%` }}
                                     transition={{ duration: 0.8, ease: "easeOut" }}
                                     className={cn(
-                                        "absolute inset-y-0 left-0 opacity-[0.07]",
-                                        isMyVote ? "bg-brand" : "bg-white"
+                                        "absolute inset-y-0 left-0",
+                                        isMyVote ? "bg-brand opacity-[0.1]" : "bg-black opacity-[0.05]"
                                     )}
                                 />
 
@@ -287,31 +287,31 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
                                             "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
                                             isMyVote
                                                 ? "border-brand bg-brand"
-                                                : "border-white/10 bg-transparent group-hover/opt:border-white/30"
+                                                : "border-black/20 bg-transparent group-hover/opt:border-black/40"
                                         )}>
-                                            {isMyVote && <LucideCheckCircle2 className="w-3.5 h-3.5 text-black" />}
+                                            {isMyVote && <LucideCheckCircle2 className="w-3.5 h-3.5 text-white" />}
                                         </div>
                                         <span className={cn(
                                             "text-sm font-semibold transition-colors",
-                                            isMyVote ? "text-white" : "text-white/60 group-hover/opt:text-white"
+                                            isMyVote ? "text-[rgba(0,0,0,0.87)]" : "text-black/60 group-hover/opt:text-[rgba(0,0,0,0.87)]"
                                         )}>
                                             {option.text}
                                         </span>
                                         {isWinner && (
-                                            <LucideSparkles className="w-3.5 h-3.5 text-yellow-500/50 animate-pulse" />
+                                            <LucideSparkles className="w-3.5 h-3.5 text-[#cba258] animate-pulse" />
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {isOptionVoting && (
-                                            <LucideLoader2 className="w-3.5 h-3.5 text-white/45 animate-spin" />
+                                            <LucideLoader2 className="w-3.5 h-3.5 text-black/40 animate-spin" />
                                         )}
                                         <span className={cn(
                                             "text-xs font-semibold tabular-nums",
-                                            isMyVote ? "text-brand" : "text-white/45"
+                                            isMyVote ? "text-brand" : "text-black/40"
                                         )}>
                                             {option.voteCount}
                                         </span>
-                                        <span className="text-xs font-medium text-white/45 tabular-nums">({Math.round(progress)}%)</span>
+                                        <span className="text-xs font-medium text-black/40 tabular-nums">({Math.round(progress)}%)</span>
                                     </div>
                                 </div>
                             </button>
@@ -321,23 +321,23 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 bg-white/[0.02] border-t border-white/5 flex items-center justify-between">
+            <div className="px-6 py-4 bg-black/[0.02] border-t border-black/[0.08] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Avatar className="w-5 h-5 border border-white/10">
+                    <Avatar className="w-5 h-5 ">
                         <AvatarImage src={poll.author?.profileImageUrl} />
-                        <AvatarFallback className="bg-white/10 text-xs font-semibold">
+                        <AvatarFallback className="bg-black/[0.06] text-[rgba(0,0,0,0.87)] text-xs font-semibold">
                             {poll.author?.name?.[0]}
                         </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                        <span className="text-xs font-medium text-white/55">{poll.author?.name}</span>
-                        <span className="text-xs text-white/45 font-medium tabular-nums">
+                        <span className="text-xs font-medium text-black/55">{poll.author?.name}</span>
+                        <span className="text-xs text-black/40 font-medium tabular-nums">
                             {format(new Date(poll.createdAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
                         </span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-white/45">
+                <div className="flex items-center gap-1.5 text-black/40">
                     <LucideUsers className="w-3 h-3" />
                     <span className="text-xs font-semibold tabular-nums">{totalVotes}명 참여</span>
                 </div>

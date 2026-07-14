@@ -139,12 +139,12 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
         return (
             <div className="pt-6">
                 <div className="flex items-center justify-between mb-6 px-6">
-                    <Skeleton className="h-5 w-16 bg-white/5" />
-                    <Skeleton className="h-9 w-24 rounded-xl bg-white/5" />
+                    <Skeleton className="h-5 w-16 bg-black/[0.04]" />
+                    <Skeleton className="h-9 w-24 rounded-xl bg-black/[0.04]" />
                 </div>
                 <div className="grid grid-cols-3 gap-[1px]">
                     {Array.from({ length: 9 }).map((_, i) => (
-                        <Skeleton key={i} className="aspect-square bg-white/5" />
+                        <Skeleton key={i} className="aspect-square bg-black/[0.04]" />
                     ))}
                 </div>
             </div>
@@ -154,7 +154,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
     return (
         <div className="pt-6">
             <header className="flex items-center justify-between mb-6 px-6">
-                <h2 className="text-[15px] font-semibold text-white/55">사진첩</h2>
+                <h2 className="text-[15px] font-semibold text-black/55">사진첩</h2>
                 {isMember && (
                     <div className="flex items-center gap-2">
                         <input
@@ -169,7 +169,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                         <Button
                             size="sm"
                             variant="outline"
-                            className="border-white/10 text-white font-semibold text-xs rounded-xl h-9 px-4 flex items-center gap-2 bg-transparent hover:bg-white/10"
+                            className="border-black/10 text-[rgba(0,0,0,0.87)] font-semibold text-xs rounded-xl h-9 px-4 flex items-center gap-2 bg-transparent hover:bg-black/[0.04]"
                             onClick={() => document.getElementById('gallery-upload')?.click()}
                             disabled={isProcessing || uploadPhotoMutation.isPending}
                         >
@@ -195,7 +195,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                             <div
                                 key={photo.id}
                                 className={cn(
-                                    "aspect-square bg-white/5 overflow-hidden relative group cursor-pointer outline-none focus:ring-2 focus:ring-brand z-0",
+                                    "aspect-square bg-black/[0.04] overflow-hidden relative group cursor-pointer outline-none focus:ring-2 focus:ring-brand z-0",
                                     isOptimistic && "opacity-50 grayscale-[0.5]"
                                 )}
                                 role="button"
@@ -217,7 +217,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                                 />
                                 {isOptimistic && (
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                        <LucideLoader2 className="w-6 h-6 text-white/40 animate-spin" />
+                                        <LucideLoader2 className="w-6 h-6 text-black/40 animate-spin" />
                                     </div>
                                 )}
                             </div>
@@ -226,8 +226,8 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                 </div>
             ) : (
                 <div className="py-32 text-center px-6">
-                    <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-                        <LucideImage className="w-7 h-7 text-white/45" />
+                    <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mx-auto mb-4">
+                        <LucideImage className="w-7 h-7 text-black/40" />
                     </div>
                     <p className="text-[15px] font-medium text-ink-2 mb-1">사진이 아직 없습니다</p>
                     <p className="text-[13px] text-ink-4">소중한 추억을 첫 번째로 남겨보세요</p>
