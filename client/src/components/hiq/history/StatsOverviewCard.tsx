@@ -4,7 +4,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { RadialGauge } from "../ui/RadialGauge";
 import { FormBadges, MatchResult } from "../ui/FormBadges";
+import { BilliardBall, BallColor } from "../ui/BilliardBall";
 import { SportConfig, FilterType } from "./types";
+
+// Tier → billiard-ball color (replaces the emoji medal with our ball motif).
+const tierBall = (label: string): BallColor => {
+    const t = (label || "").toUpperCase();
+    if (t.includes("골드") || t.includes("GOLD")) return "yellow";
+    if (t.includes("플래티넘") || t.includes("PLATINUM") || t.includes("실버") || t.includes("SILVER") || t.includes("DIAMOND")) return "white";
+    return "red";
+};
 
 interface StatsOverviewCardProps {
     stats: any;
@@ -74,7 +83,7 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                     <CardContent className="p-6 relative z-10">
                         {/* Tier Badge */}
                         <div className="flex items-center gap-3 mb-6">
-                            <span className="text-4xl">{currentTier.icon}</span>
+                            <BilliardBall color={tierBall(currentTier.label)} size={40} />
                             <div>
                                 <p className="text-[12px] font-medium text-black/55 uppercase tracking-[0.15em] mb-1">등급</p>
                                 <p className="text-xl font-semibold uppercase text-brand tracking-wide">
@@ -133,15 +142,15 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                 {/* Tier row */}
                 <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-3xl">{currentTier.icon}</span>
+                        <BilliardBall color={tierBall(currentTier.label)} size={36} />
                         <div className="min-w-0">
-                            <p className="text-[12px] font-medium text-black/55 mb-0.5">등급</p>
-                            <p className="text-[17px] font-bold tracking-tight truncate" style={{ color: currentTier.color }}>
+                            <p className="text-[12px] font-medium text-black/45 mb-0.5">등급</p>
+                            <p className="text-[17px] font-bold tracking-tight truncate text-ink-1">
                                 {currentTier.label}
                             </p>
                         </div>
                     </div>
-                    <span className="rk-chip bg-black/[0.04] text-black/55 shrink-0">상위 15%</span>
+                    <span className="rk-chip bg-brand/10 text-brand shrink-0">상위 15%</span>
                 </div>
 
                 {/* Hero — 승률 게이지 + 누적 평균 + 승/패 */}
