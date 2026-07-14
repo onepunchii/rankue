@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { LucidePlus, LucideTent, LucideChevronRight } from "@/lib/icons";
+import { LucidePlus, LucideCalendarDays, LucideChevronRight } from "@/lib/icons";
 
 interface ClubActivityListProps {
     crewId: string;
@@ -48,7 +48,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
     return (
         <div className="space-y-4 px-6 pt-0 pb-6">
             <div className="flex items-center gap-2 mb-2">
-                <LucideTent className="w-5 h-5 text-brand" />
+                <LucideCalendarDays className="w-5 h-5 text-brand" />
                 <h2 className="text-lg font-semibold text-ink-1">정모 / 일정</h2>
             </div>
 
@@ -167,7 +167,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                 <Card className="rk-card rounded-card">
                     <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-3">
                         <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
-                            <LucideTent className="w-6 h-6 text-black/40" />
+                            <LucideCalendarDays className="w-6 h-6 text-black/40" />
                         </div>
                         <p className="text-sm font-semibold text-black/70">일정을 불러오지 못했습니다</p>
                         <Button
@@ -186,7 +186,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                 <Card className="rk-card rounded-card">
                     <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-2">
                         <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center mb-1">
-                            <LucideTent className="w-6 h-6 text-black/40" />
+                            <LucideCalendarDays className="w-6 h-6 text-black/40" />
                         </div>
                         <h3 className="text-sm font-semibold text-black/70">예정된 정모가 없습니다</h3>
                         <p className="text-xs text-black/55 font-medium">

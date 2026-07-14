@@ -377,29 +377,26 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onClick()}
             className={cn(
-                "flex items-center gap-3.5 px-4 py-3.5 mb-2 rounded-tile border transition-colors cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-brand",
+                "flex items-center gap-3.5 px-4 py-3.5 mb-2.5 rounded-2xl transition-all cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-brand active:scale-[0.99]",
                 isMe
-                    ? "bg-brand/[0.06] border-brand/20"
-                    : "bg-surface-1 border-surface-line hover:border-black/10"
+                    ? "bg-brand/[0.09]"
+                    : "bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.06)]"
             )}
         >
             {/* Avatar */}
             <div className="relative shrink-0">
-                <Avatar className={cn(
-                    "w-12 h-12 border",
-                    isMe ? "border-brand/40" : "border-surface-line"
-                )}>
+                <Avatar className="w-12 h-12">
                     <AvatarImage
                         src={m.profileImageUrl}
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         className="object-cover"
                     />
-                    <AvatarFallback className="bg-surface-3 text-black/40 text-base font-semibold">
+                    <AvatarFallback className="bg-brand/10 text-brand text-base font-bold">
                         {m.nickname?.[0] || m.name?.[0]}
                     </AvatarFallback>
                 </Avatar>
                 {isMe && (
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-brand rounded-full border-2 border-white" />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-brand rounded-full border-2 border-[#f2f0eb]" />
                 )}
             </div>
 

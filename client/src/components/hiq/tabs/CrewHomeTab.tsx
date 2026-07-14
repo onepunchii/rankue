@@ -62,9 +62,8 @@ export const CrewHomeTab = memo(({
 
     const activeMembers = useMemo(() => members.filter((m: any) => m.role !== 'pending'), [members]);
 
-    // 커버/엠블럼 이미지가 없으면 외부 스톡 사진 대신 크루 이니셜 + 종목 아이콘 타일로 대체
+    // 커버/엠블럼 이미지가 없으면 크루 이니셜 타일로 대체
     const crewInitial = crew.name?.trim().charAt(0).toUpperCase() || "?";
-    const SportIcon = crew.sportCategory === 'GOLF' ? LucideFlag : LucideTarget;
 
     // 통계 계산 (useMemo 최적화)
     const stats = useMemo(() => {
@@ -125,7 +124,8 @@ export const CrewHomeTab = memo(({
                             <span className="text-[72px] font-bold text-brand/40 leading-none tracking-tight">{crewInitial}</span>
                         </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#f2f0eb] to-transparent opacity-90" />
+                    {/* Fade only the bottom edge into the page — keep the photo vivid. */}
+                    <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#f2f0eb] via-[#f2f0eb]/50 to-transparent" />
                 </div>
 
                 <div className="px-6 -mt-10 relative z-10 flex items-end gap-4">
@@ -137,9 +137,8 @@ export const CrewHomeTab = memo(({
                                 alt="Crew Logo"
                             />
                         ) : (
-                            <div className="w-full h-full bg-surface-3 flex flex-col items-center justify-center gap-0.5">
-                                <span className="text-[26px] font-bold text-brand leading-none">{crewInitial}</span>
-                                <SportIcon className="w-3.5 h-3.5 text-ink-4" />
+                            <div className="w-full h-full bg-brand/10 flex items-center justify-center">
+                                <span className="text-[30px] font-bold text-brand leading-none">{crewInitial}</span>
                             </div>
                         )}
                     </div>

@@ -11,7 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
     LucidePlus, LucideChevronRight, LucideZap, LucideCrown,
     LucideRefreshCw, LucideX, LucideMessageCircle, LucideShare2,
-    LucideMinus, LucidePencil, LucideTrash2, LucideTent
+    LucideMinus, LucidePencil, LucideTrash2, LucideCalendarDays
 } from "@/lib/icons";
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -615,7 +615,7 @@ export function ClubActivityList({
                 <Card className="rk-card rounded-card">
                     <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-3">
                         <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
-                            <LucideTent className="w-6 h-6 text-black/40" />
+                            <LucideCalendarDays className="w-6 h-6 text-black/40" />
                         </div>
                         <p className="text-sm font-semibold text-black/70">일정을 불러오지 못했습니다</p>
                         <Button
@@ -633,7 +633,7 @@ export function ClubActivityList({
                 <Card className="rk-card rounded-card">
                     <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-2">
                         <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center mb-1">
-                            <LucideTent className="w-6 h-6 text-black/40" />
+                            <LucideCalendarDays className="w-6 h-6 text-black/40" />
                         </div>
                         <h3 className="text-sm font-semibold text-black/70">예정된 정모가 없습니다</h3>
                         <p className="text-xs text-black/55 font-medium">
