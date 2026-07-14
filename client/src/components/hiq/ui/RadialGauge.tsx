@@ -20,7 +20,7 @@ export function RadialGauge({
     size = 76,
     stroke = 7,
     color = "rgb(var(--brand))",
-    trackColor = "rgba(255,255,255,0.08)",
+    trackColor = "rgba(0,0,0,0.08)",
     children,
 }: RadialGaugeProps) {
     const r = (size - stroke) / 2;

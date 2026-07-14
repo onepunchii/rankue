@@ -17,8 +17,8 @@ export function PerformanceCard({ history }: { history?: any[] }) {
     return (
         <div className="rk-card p-5 mb-6">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[15px] font-semibold text-black/55">전적</h3>
-                <span className="text-[12px] font-medium text-black/40 tabular-nums">{total}전</span>
+                <h3 className="text-[15px] font-bold text-ink-1 tracking-tight">전적</h3>
+                <span className="text-[12px] font-semibold text-black/40 tabular-nums">{total}전</span>
             </div>
 
             <div className="flex items-center gap-5">

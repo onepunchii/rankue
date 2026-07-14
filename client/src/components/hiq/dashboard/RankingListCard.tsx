@@ -33,19 +33,19 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                     </p>
                 </div>
 
-                {/* Minimal Tab Switch */}
-                <div className="flex bg-black/[0.04] p-1 rounded-xl relative h-9">
+                {/* Segmented switch — solid green active pill on a light green track */}
+                <div className="flex bg-brand/[0.08] p-1 rounded-full relative h-9">
                     <div className={cn(
-                        "absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg transition-all duration-300 ease-out z-0",
-                        activeTab === '3c' ? "left-1 bg-brand/15 border border-brand/25" : "left-[calc(50%+2px)] bg-brand/12 border border-brand/25"
+                        "absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-brand transition-all duration-300 ease-out z-0 shadow-[0_1px_3px_rgba(0,98,65,0.25)]",
+                        activeTab === '3c' ? "left-1" : "left-[calc(50%+2px)]"
                     )} />
                     <button
                         onClick={() => onTabChange('3c')}
-                        className={cn("px-3.5 rounded-lg text-[13px] font-semibold relative z-10 transition-colors", activeTab === '3c' ? "text-brand" : "text-black/55")}
+                        className={cn("px-3.5 rounded-full text-[13px] font-bold relative z-10 transition-colors", activeTab === '3c' ? "text-white" : "text-brand/60")}
                     >3쿠션</button>
                     <button
                         onClick={() => onTabChange('4c')}
-                        className={cn("px-3.5 rounded-lg text-[13px] font-semibold relative z-10 transition-colors", activeTab === '4c' ? "text-brand" : "text-black/55")}
+                        className={cn("px-3.5 rounded-full text-[13px] font-bold relative z-10 transition-colors", activeTab === '4c' ? "text-white" : "text-brand/60")}
                     >4구</button>
                 </div>
             </header>

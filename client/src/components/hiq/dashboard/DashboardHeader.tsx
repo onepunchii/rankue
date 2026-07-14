@@ -39,9 +39,9 @@ export const DashboardHeader = ({
             {/* Top bar: greeting + profile */}
             <div className="flex items-end justify-between mb-7">
                 <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 mb-2">
+                    <div className="inline-flex items-center gap-1.5 mb-2.5 px-2.5 py-1 rounded-full bg-brand/10">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-                        <span className="text-[12px] font-medium text-black/55 tracking-wide">당구 모드</span>
+                        <span className="text-[11px] font-bold text-brand tracking-tight">당구 모드</span>
                     </div>
                     <h1 className="text-[26px] leading-none font-bold text-ink-1 tracking-tight truncate">
                         {member?.nickname || member?.name}
@@ -74,9 +74,7 @@ export const DashboardHeader = ({
                     className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                 >
                     <div className="flex items-center justify-between mb-4">
-                        <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-brand">
-                            <span className="w-1.5 h-1.5 rounded-full bg-brand" />3쿠션
-                        </span>
+                        <span className="text-[14px] font-bold text-brand tracking-tight">3쿠션</span>
                         <div className="text-right">
                             <span className="block text-[11px] font-medium text-black/40 leading-none">평균</span>
                             <span className="block text-[16px] font-semibold text-ink-1 tabular-nums leading-tight mt-0.5">{liveAvg3c}</span>
@@ -85,8 +83,8 @@ export const DashboardHeader = ({
 
                     <div className="flex items-baseline gap-1.5">
                         <span className="text-[42px] leading-[0.9] font-bold text-ink-1 tabular-nums tracking-tight">{member.rating3c || 0}</span>
-                        <span className="text-[14px] font-semibold text-brand">RP</span>
-                        <button onClick={onOpenRpGuide} className="ml-0.5 text-black/25 hover:text-brand transition-colors">
+                        <span className="text-[14px] font-bold text-brand">RP</span>
+                        <button onClick={onOpenRpGuide} className="ml-0.5 text-brand/40 hover:text-brand transition-colors">
                             <HelpCircle className="w-4 h-4" />
                         </button>
                     </div>
@@ -98,7 +96,7 @@ export const DashboardHeader = ({
                                 상위 {pct3c}%
                             </span>
                         ) : (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-black/[0.04] text-[12px] font-medium text-black/40">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
                                 분석 중
                             </span>
                         )}
@@ -111,9 +109,7 @@ export const DashboardHeader = ({
                     className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                 >
                     <div className="flex items-center justify-between mb-4">
-                        <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-black/70">
-                            <span className="w-1.5 h-1.5 rounded-full bg-black/25" />4구
-                        </span>
+                        <span className="text-[14px] font-bold text-ink-1 tracking-tight">4구</span>
                         <div className="text-right">
                             <span className="block text-[11px] font-medium text-black/40 leading-none">평균</span>
                             <span className="block text-[16px] font-semibold text-ink-1 tabular-nums leading-tight mt-0.5">{liveAvg4c}</span>
@@ -122,15 +118,15 @@ export const DashboardHeader = ({
 
                     <div className="flex items-baseline gap-1.5">
                         <span className="text-[42px] leading-[0.9] font-bold text-ink-1 tabular-nums tracking-tight">{member.rating4c || 0}</span>
-                        <span className="text-[14px] font-medium text-black/40">RP</span>
-                        <button onClick={onOpenRpGuide} className="ml-0.5 text-black/25 hover:text-black/50 transition-colors">
+                        <span className="text-[14px] font-bold text-brand">RP</span>
+                        <button onClick={onOpenRpGuide} className="ml-0.5 text-brand/40 hover:text-brand transition-colors">
                             <HelpCircle className="w-4 h-4" />
                         </button>
                     </div>
 
                     <div className="mt-4">
                         <span className={cn(
-                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/[0.04] text-[12px] font-semibold",
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand/[0.07] text-[12px] font-semibold",
                             trend.color
                         )}>
                             {trend.icon}

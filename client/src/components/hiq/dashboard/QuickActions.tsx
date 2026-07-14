@@ -1,8 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ChevronDown, Target, Swords, LogIn, Cpu, LucideMapPin } from "lucide-react";
+import { ChevronDown, Target, Swords, LogIn, Cpu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
 interface QuickActionsProps {
@@ -12,7 +11,6 @@ interface QuickActionsProps {
 
 export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => {
     const [, setLocation] = useLocation();
-    const { toast } = useToast();
 
     const [isOnlineGameModalOpen, setIsOnlineGameModalOpen] = useState(false);
     const [threeBallSelectionMode, setThreeBallSelectionMode] = useState(false);
@@ -42,18 +40,18 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
 
-                {/* 매칭 대결 (1x2, primary) */}
+                {/* 매칭 대결 (hero, spans full column) */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
                     onClick={() => onStartGame("match")}
-                    className="row-span-2 h-[276px] rounded-3xl bg-brand flex flex-col justify-between p-6 text-left shadow-[0_6px_20px_rgba(0,98,65,0.18)]"
+                    className="row-span-3 h-[420px] rounded-3xl bg-brand flex flex-col justify-between p-6 text-left shadow-[0_8px_24px_rgba(0,98,65,0.20)]"
                 >
                     <div className="w-16 h-16 rounded-3xl bg-white/15 flex items-center justify-center">
                         <Swords className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[20px] font-bold text-white leading-tight">매칭 대결</span>
-                        <span className="block text-[13px] font-medium text-white/80 mt-1.5 leading-snug">실력이 맞는 상대와<br />1:1 랭킹 경기</span>
+                        <span className="block text-[22px] font-bold text-white leading-tight">매칭 대결</span>
+                        <span className="block text-[13px] font-medium text-white/80 mt-2 leading-snug">실력이 맞는 상대와<br />1:1 랭킹 경기</span>
                     </div>
                 </motion.button>
 
@@ -78,27 +76,12 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     onClick={handleOnlineGameClick}
                     className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
                 >
-                    <div className="w-11 h-11 rounded-2xl bg-black/[0.05] flex items-center justify-center">
-                        <Cpu className="w-[22px] h-[22px] text-black/55" strokeWidth={2} />
+                    <div className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center">
+                        <Cpu className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
                     </div>
                     <div>
                         <span className="block text-[15px] font-semibold text-ink-1 leading-tight">온라인 대전</span>
                         <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">시뮬레이터 대결</span>
-                    </div>
-                </motion.button>
-
-                {/* 가까운 매장 (1x1, 준비중) */}
-                <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => toast({ title: "서비스 준비 중", description: "가까운 매장 찾기 기능이 곧 추가됩니다." })}
-                    className="h-[132px] rounded-3xl bg-black/[0.03] flex flex-col justify-between p-5 text-left"
-                >
-                    <div className="w-11 h-11 rounded-2xl bg-black/[0.05] flex items-center justify-center">
-                        <LucideMapPin className="w-5 h-5 text-black/40" />
-                    </div>
-                    <div>
-                        <span className="block text-[15px] font-medium text-black/40 leading-tight">매장 찾기</span>
-                        <span className="block text-[12.5px] font-medium text-black/40 mt-0.5">준비 중</span>
                     </div>
                 </motion.button>
             </div>
