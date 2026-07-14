@@ -1033,28 +1033,28 @@ export default function HiqOnlineGame() {
                         {/* Scoreboard */}
                         <div className="flex-1 h-12 bg-[#141416]/80 rounded-2xl flex items-center px-4 justify-between overflow-hidden shadow-2xl">
                             <div className="flex flex-col items-start leading-none min-w-[40px]">
-                                <span className="text-[12px] font-medium text-white/45">이닝</span>
+                                <span className="text-[12px] font-medium text-white/60">이닝</span>
                                 <span className="text-xl font-semibold tabular-nums text-white/72">{innings}</span>
                             </div>
 
                             <div className="h-6 w-[1px] bg-white/5" />
 
                             <div className="flex flex-col items-center leading-none min-w-[40px]">
-                                <span className="text-[12px] font-medium text-white/45">점수</span>
+                                <span className="text-[12px] font-medium text-white/60">점수</span>
                                 <span className="text-xl font-semibold tabular-nums text-white">{score}</span>
                             </div>
 
                             <div className="h-6 w-[1px] bg-white/5" />
 
                             <div className="flex flex-col items-center leading-none min-w-[50px]">
-                                <span className="text-[12px] font-medium text-white/45">평균</span>
+                                <span className="text-[12px] font-medium text-white/60">평균</span>
                                 <span className="text-xl font-semibold tabular-nums text-white/72">{avg}</span>
                             </div>
 
                             <div className="h-6 w-[1px] bg-white/5" />
 
                             <div className="flex flex-col items-end leading-none min-w-[50px]">
-                                <span className="text-[12px] font-medium text-white/45">하이런</span>
+                                <span className="text-[12px] font-medium text-white/60">하이런</span>
                                 <span className="text-xl font-semibold tabular-nums text-brand">{highRun}</span>
                             </div>
                         </div>

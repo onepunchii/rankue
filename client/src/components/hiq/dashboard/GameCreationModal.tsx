@@ -6,6 +6,10 @@ import { useGameCreation, PlayerType } from "@/hooks/useGameCreation";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { BilliardBall, BallColor } from "../ui/BilliardBall";
+
+// Player slot → billiard ball color (white 수구, yellow, red, red — the 4구 set).
+const SLOT_BALL: BallColor[] = ["white", "yellow", "red", "red"];
 
 interface GameCreationModalProps {
     open: boolean;
@@ -50,8 +54,8 @@ const PlayerCard = ({
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-base shrink-0 transition-colors ${isSelf ? 'bg-brand text-white' : 'bg-black/[0.06] text-ink-1'}`}>
-                        P{idx + 1}
+                    <div className="shrink-0 flex items-center justify-center">
+                        <BilliardBall color={SLOT_BALL[idx] || "red"} size={46} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
