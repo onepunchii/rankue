@@ -52,19 +52,19 @@ export const DashboardHeader = ({
                     <button
                         onClick={() => setNotifOpen(true)}
                         title="알림"
-                        className="relative w-11 h-11 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-95 transition-transform"
+                        className="relative w-11 h-11 rounded-full bg-brand/10 flex items-center justify-center active:scale-95 transition-transform"
                     >
-                        <Bell className="w-[21px] h-[21px] text-ink-1" strokeWidth={2} />
+                        <Bell className="w-[21px] h-[21px] text-brand" />
                         {unread > 0 && (
-                            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
+                            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#f2f0eb]" />
                         )}
                     </button>
                     <button
                         onClick={() => setLocation("/club")}
                         title="메세지"
-                        className="w-11 h-11 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-95 transition-transform"
+                        className="w-11 h-11 rounded-full bg-brand/10 flex items-center justify-center active:scale-95 transition-transform"
                     >
-                        <MessageSquare className="w-[21px] h-[21px] text-ink-1" strokeWidth={2} />
+                        <MessageSquare className="w-[21px] h-[21px] text-brand" />
                     </button>
                 </div>
             </div>
