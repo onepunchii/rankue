@@ -1,8 +1,11 @@
-import { ChevronsUp, HelpCircle, Award } from "lucide-react";
+import { ChevronsUp, HelpCircle, Bell, MessageSquare } from "lucide-react";
 import { motion } from "framer-motion";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { BallCluster } from "../ui/BilliardBall";
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
 
 interface DashboardHeaderProps {
     member: any;
@@ -13,14 +16,6 @@ interface DashboardHeaderProps {
     getTrend: () => { label: string, color: string, icon: React.ReactNode };
     tier: { label: string, class: string, icon: string };
 }
-
-// Flat, tasteful tier accents (no gloss, no emoji) — text + tint pair per tier.
-const TIER_STYLE: Record<string, { text: string; bg: string }> = {
-    "플래티넘": { text: "text-[#0f766e]", bg: "bg-[#0f766e]/10" },
-    "골드": { text: "text-[#b8860b]", bg: "bg-[#cba258]/15" },
-    "실버": { text: "text-[#64748b]", bg: "bg-[#64748b]/12" },
-    "브론즈": { text: "text-[#a56a3a]", bg: "bg-[#a56a3a]/12" },
-};
 
 export const DashboardHeader = ({
     member,
@@ -33,7 +28,10 @@ export const DashboardHeader = ({
 }: DashboardHeaderProps) => {
     const pct3c = getPercentile('3c');
     const trend = getTrend();
-    const tierStyle = TIER_STYLE[tier.label] || TIER_STYLE["브론즈"];
+    const [, setLocation] = useLocation();
+    const [notifOpen, setNotifOpen] = useState(false);
+    const { data: notifs } = useQuery<any[]>({ queryKey: ["/api/hiq/notifications"] });
+    const unread = notifs?.filter((n) => !n.isRead).length || 0;
 
     return (
         <header className="pt-7 pb-2">
@@ -50,22 +48,28 @@ export const DashboardHeader = ({
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-2.5 shrink-0">
-                    <div className={cn(
-                        "flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[12px] font-bold",
-                        tierStyle.bg, tierStyle.text
-                    )}>
-                        <Award className="w-3.5 h-3.5" strokeWidth={2.4} />
-                        <span>{tier.label}</span>
-                    </div>
-                    <Avatar className="w-12 h-12 rounded-2xl ring-2 ring-brand/15">
-                        <AvatarImage src={member?.profileImageUrl || undefined} className="object-cover" />
-                        <AvatarFallback className="rounded-2xl bg-brand/10 text-brand font-bold text-lg">
-                            {member?.name?.[0]}
-                        </AvatarFallback>
-                    </Avatar>
+                <div className="flex items-center gap-2 shrink-0">
+                    <button
+                        onClick={() => setNotifOpen(true)}
+                        title="알림"
+                        className="relative w-11 h-11 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-95 transition-transform"
+                    >
+                        <Bell className="w-[21px] h-[21px] text-ink-1" strokeWidth={2} />
+                        {unread > 0 && (
+                            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setLocation("/club")}
+                        title="메세지"
+                        className="w-11 h-11 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-95 transition-transform"
+                    >
+                        <MessageSquare className="w-[21px] h-[21px] text-ink-1" strokeWidth={2} />
+                    </button>
                 </div>
             </div>
+
+            <NotificationInbox open={notifOpen} onClose={() => setNotifOpen(false)} />
 
             {/* Rating cards — clean flat white, single green accent */}
             <div className="grid grid-cols-2 gap-3">
