@@ -1030,41 +1030,41 @@ export default function HiqOnlineGame() {
                             <ChevronLeft className="w-6 h-6 text-white" />
                         </button>
 
-                        {/* Scoreboard */}
-                        <div className="flex-1 h-12 bg-[#141416]/80 rounded-2xl flex items-center px-4 justify-between overflow-hidden shadow-2xl">
+                        {/* Scoreboard — opaque + high-contrast for a dark immersive screen */}
+                        <div className="flex-1 h-14 bg-[#1c1c1f] rounded-2xl flex items-center px-4 justify-between overflow-hidden shadow-[0_6px_20px_rgba(0,0,0,0.45)] ring-1 ring-white/10">
                             <div className="flex flex-col items-start leading-none min-w-[40px]">
-                                <span className="text-[12px] font-medium text-white/60">이닝</span>
-                                <span className="text-xl font-semibold tabular-nums text-white/72">{innings}</span>
+                                <span className="text-[11px] font-medium text-white/50">이닝</span>
+                                <span className="text-[22px] font-bold tabular-nums text-white mt-0.5">{innings}</span>
                             </div>
 
-                            <div className="h-6 w-[1px] bg-white/5" />
+                            <div className="h-7 w-[1px] bg-white/10" />
 
                             <div className="flex flex-col items-center leading-none min-w-[40px]">
-                                <span className="text-[12px] font-medium text-white/60">점수</span>
-                                <span className="text-xl font-semibold tabular-nums text-white">{score}</span>
+                                <span className="text-[11px] font-medium text-white/50">점수</span>
+                                <span className="text-[22px] font-bold tabular-nums text-white mt-0.5">{score}</span>
                             </div>
 
-                            <div className="h-6 w-[1px] bg-white/5" />
+                            <div className="h-7 w-[1px] bg-white/10" />
 
                             <div className="flex flex-col items-center leading-none min-w-[50px]">
-                                <span className="text-[12px] font-medium text-white/60">평균</span>
-                                <span className="text-xl font-semibold tabular-nums text-white/72">{avg}</span>
+                                <span className="text-[11px] font-medium text-white/50">평균</span>
+                                <span className="text-[22px] font-bold tabular-nums text-white mt-0.5">{avg}</span>
                             </div>
 
-                            <div className="h-6 w-[1px] bg-white/5" />
+                            <div className="h-7 w-[1px] bg-white/10" />
 
                             <div className="flex flex-col items-end leading-none min-w-[50px]">
-                                <span className="text-[12px] font-medium text-white/60">하이런</span>
-                                <span className="text-xl font-semibold tabular-nums text-brand">{highRun}</span>
+                                <span className="text-[11px] font-medium text-white/50">하이런</span>
+                                <span className="text-[22px] font-bold tabular-nums text-emerald-400 mt-0.5">{highRun}</span>
                             </div>
                         </div>
                     </div>
 
                     {currentRun > 0 && (
                         <div className="flex justify-center">
-                            <div className="inline-flex items-center gap-1.5 px-4 py-1 rounded-pill bg-brand/15 border border-brand/25 animate-pulse">
-                                <Flame className="w-3.5 h-3.5 text-brand" />
-                                <span className="text-[12px] font-semibold text-brand">연속 득점 +{currentRun}</span>
+                            <div className="inline-flex items-center gap-1.5 px-4 py-1 rounded-pill bg-emerald-500/20 border border-emerald-400/30 animate-pulse">
+                                <Flame className="w-3.5 h-3.5 text-emerald-400" />
+                                <span className="text-[12px] font-semibold text-emerald-400">연속 득점 +{currentRun}</span>
                             </div>
                         </div>
                     )}
@@ -1080,7 +1080,7 @@ export default function HiqOnlineGame() {
                 <button
                     onClick={() => setIsScoreSheetOpen(true)}
                     title="이닝별 기록표"
-                    className="w-12 h-12 rounded-full premium-glass flex items-center justify-center text-white/45 hover:text-brand transition-all active:scale-90"
+                    className="w-12 h-12 rounded-full premium-glass flex items-center justify-center text-white/45 hover:text-emerald-400 transition-all active:scale-90"
                 >
                     <LayoutList strokeWidth={1.5} size={24} />
                     <span className="sr-only">점수표</span>
@@ -1092,7 +1092,7 @@ export default function HiqOnlineGame() {
                         onClick={() => setShowSpinPanel(!showSpinPanel)}
                         title="당점 설정"
                         className={`w-12 h-12 rounded-full premium-glass transition-all active:scale-95 flex items-center justify-center relative ${showSpinPanel
-                            ? 'text-brand border-white/30'
+                            ? 'text-emerald-400 border-white/30'
                             : 'text-white/45 border-white/5'
                             }`}
                     >
@@ -1169,7 +1169,7 @@ export default function HiqOnlineGame() {
                                         <span>팔로우</span>
                                     </div>
                                     {/* Bottom: Draw */}
-                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-brand">
+                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-emerald-400">
                                         <span>드로우</span>
                                         <ChevronDown size={8} />
                                     </div>
@@ -1203,7 +1203,7 @@ export default function HiqOnlineGame() {
                 <button
                     onClick={handleAutoTarget}
                     title="가까운 공 자동 조준"
-                    className="w-12 h-12 rounded-full premium-glass flex items-center justify-center text-white/45 hover:text-brand transition-all active:scale-90"
+                    className="w-12 h-12 rounded-full premium-glass flex items-center justify-center text-white/45 hover:text-emerald-400 transition-all active:scale-90"
                 >
                     <Crosshair strokeWidth={1.5} size={24} />
                     <span className="sr-only">자동 타겟</span>
@@ -1340,7 +1340,7 @@ export default function HiqOnlineGame() {
                         onPointerDown={() => startFineAdjust(-1)}
                         onPointerUp={stopFineAdjust}
                         onPointerLeave={stopFineAdjust}
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-white/45 hover:text-brand active:scale-90 transition-all pointer-events-auto"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white/45 hover:text-emerald-400 active:scale-90 transition-all pointer-events-auto"
                         title="미세조절 (좌)"
                     >
                         <ChevronLeft strokeWidth={2.5} size={20} />
@@ -1350,7 +1350,7 @@ export default function HiqOnlineGame() {
                         onPointerDown={() => startFineAdjust(1)}
                         onPointerUp={stopFineAdjust}
                         onPointerLeave={stopFineAdjust}
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-white/45 hover:text-brand active:scale-90 transition-all pointer-events-auto"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white/45 hover:text-emerald-400 active:scale-90 transition-all pointer-events-auto"
                         title="미세조절 (우)"
                     >
                         <ChevronRight strokeWidth={2.5} size={20} />
