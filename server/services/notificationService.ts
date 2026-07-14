@@ -1,8 +1,14 @@
-import { Expo, ExpoPushMessage } from 'expo-server-sdk';
 import { storage } from '../storage/index.js';
 import { InsertHiqNotification } from '../../shared/schema.js';
+import { sendPushNative } from './pushNative.js';
 
-const expo = new Expo();
+// 딥링크 URL 구성 — 알림 탭 시 이동. 카테고리/타입 기반 최소 매핑(없으면 홈).
+function deepLinkUrl(category?: string, type?: string, params?: any): string {
+    if (params?.url && typeof params.url === 'string' && params.url.startsWith('/')) return params.url;
+    if (category === 'crew' && params?.crewId) return `/crew/${params.crewId}`;
+    if (category === 'match' || type === 'match') return '/history';
+    return '/';
+}
 
 export class NotificationService {
     /**
@@ -38,29 +44,18 @@ export class NotificationService {
         };
         await storage.createNotification(notificationData);
 
-        // 3. 실제 푸시 발송 (토큰이 있는 경우에만)
-        if (pushToken && Expo.isExpoPushToken(pushToken)) {
-            const message: ExpoPushMessage = {
-                to: pushToken,
-                sound: 'default',
-                title,
-                body,
-                data: { category, type, params: deepLinkParams },
-                priority: 'high',
-                channelId: 'default',
-            };
-
-            try {
-                const chunks = expo.chunkPushNotifications([message]);
-                for (let chunk of chunks) {
-                    await expo.sendPushNotificationsAsync(chunk);
-                }
-                console.log(`[Push] Sent to member ${memberId}`);
-            } catch (error) {
-                console.error(`[Push] Failed to send to member ${memberId}:`, error);
-            }
+        // 3. 실제 푸시 발송 — FCM(안드로이드·웹)/APNs(iOS) 자동 판별. 토큰 없으면 DB만.
+        if (pushToken) {
+            const url = deepLinkUrl(category, type, deepLinkParams);
+            const r = await sendPushNative(pushToken, { title, body, url, tag: category ?? undefined });
+            if (r === 'ok') console.log(`[Push] Sent to member ${memberId}`);
+            else if (r === 'dead') {
+                // 만료·무효 토큰 정리(빈 값 → 다음 등록 때 갱신)
+                await storage.updatePushToken(memberId, '').catch(() => {});
+                console.log(`[Push] Dead token cleared for member ${memberId}`);
+            } else console.log(`[Push] Skipped (no push env) for member ${memberId}, saved to DB.`);
         } else {
-            console.log(`[Push] No valid token for member ${memberId}, saved to DB only.`);
+            console.log(`[Push] No token for member ${memberId}, saved to DB only.`);
         }
     }
 }
