@@ -509,12 +509,14 @@ export class GameRepository {
         return code;
     }
 
-    // Mark the accepted invites this host used to build a ranked game as consumed, so a single
-    // PIN can't authorize an unlimited stream of ranked games until it naturally expires.
+    // Consume the accepted invites a completed ranked game was built from, so a single PIN can't
+    // authorize an endless stream of ranked results. expiresAt is pulled back to now as well as
+    // flipping the status — otherwise the guest could simply re-enter the still-live code and
+    // mint a fresh 'accepted' row, reopening the farm loop.
     async consumeInvites(hostId: string, guestIds: string[]): Promise<void> {
         if (guestIds.length === 0) return;
         await db.update(hiqInvites)
-            .set({ status: "expired" })
+            .set({ status: "expired", expiresAt: new Date() })
             .where(and(
                 eq(hiqInvites.hostId, hostId),
                 eq(hiqInvites.status, "accepted"),
@@ -523,10 +525,14 @@ export class GameRepository {
     }
 
     async getInviteStatus(code: string): Promise<any> {
-        // Only live invites: an expired code must not keep showing the opponent in the lobby
-        // (the host would then start a match that the consent gate silently un-ranks).
+        // Only LIVE invites: a code that has timed out OR been consumed must not keep showing the
+        // opponent in the lobby (the host would sit on a phantom joiner that can no longer be bound).
         const invites = await db.select().from(hiqInvites).where(
-            and(eq(hiqInvites.code, code), gt(hiqInvites.expiresAt, new Date()))
+            and(
+                eq(hiqInvites.code, code),
+                ne(hiqInvites.status, "expired"),
+                gt(hiqInvites.expiresAt, new Date())
+            )
         );
         if (invites.length === 0) return null;
 
@@ -572,7 +578,10 @@ export class GameRepository {
         // and collect RP twice from a single "match" against themselves.
         if (invites[0].hostId === guestId) return false;
 
-        const alreadyJoined = invites.some(inv => inv.guestId === guestId);
+        // Only a LIVE accepted row counts as already-joined. Scoping this to 'accepted' means a
+        // guest whose row was consumed by a finished game doesn't get a false "참여 완료" while
+        // their consent is actually gone.
+        const alreadyJoined = invites.some(inv => inv.guestId === guestId && inv.status === 'accepted');
         if (alreadyJoined) return true;
 
         const base = invites[0];

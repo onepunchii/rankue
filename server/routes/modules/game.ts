@@ -74,6 +74,16 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
     // that is not a consented guest is demoted to a name-only guest slot, so finishHiqGame
     // never applies RP / handicap / history rows to a non-consenting member.
     const consented = await storage.games.getConsentedGuestIds(player1Id);
+
+    // A member id the client supplied that has NOT consented is a hard error, not something to
+    // silently drop: nulling it out produced a game with no opponent at all (empty slot, solo
+    // unranked scoreboard) and the host had no idea why. Fail loudly so they can re-issue a PIN.
+    for (const raw of [req.body.player2Id, req.body.player3Id, req.body.player4Id]) {
+        if (raw && !consented.has(raw)) {
+            return sendError(res, 400, "상대의 참가 확인이 만료되었습니다. 새 핀으로 다시 참가해주세요.");
+        }
+    }
+
     const gateId = (id: any): string | null => (id && consented.has(id)) ? id : null;
     const player2Id = gateId(req.body.player2Id);
     const player3Id = gateId(req.body.player3Id);
@@ -135,14 +145,10 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
         isRanked
     });
 
-    // Anti-farm: a ranked game CONSUMES the accepted invites it was built from. Otherwise one
-    // PIN authorized unlimited ranked games for its whole 30-minute lifetime, letting a host
-    // repeatedly start+finish matches and mint RP at will.
-    if (isRanked) {
-        const boundGuests = [player2Id, player3Id, player4Id].filter((x): x is string => !!x);
-        await storage.games.consumeInvites(player1Id, boundGuests);
-    }
-
+    // NOTE: the invite is deliberately NOT consumed here. Consuming it at start meant a retry
+    // after a dropped response (or an app backgrounding) hit an already-expired invite, and the
+    // opponent silently vanished from the retried game. Consumption happens at FINISH instead —
+    // one PIN still yields at most one completed ranked game, but starts stay retry-safe.
     return sendSuccess(res, game);
 }));
 
@@ -202,6 +208,15 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
     }
 
     const game = await storage.finishHiqGame(req.params.id, finalData);
+
+    // Anti-farm: a COMPLETED ranked game consumes the invites it was built from, so one PIN
+    // yields at most one ranked result. (Doing this at start instead made retries lose the
+    // opponent.) finishHiqGame is idempotent, so a repeat finish won't double-consume anything.
+    if (game.isRanked) {
+        const boundGuests = [game.player2Id, game.player3Id, game.player4Id]
+            .filter((x): x is string => !!x);
+        await storage.games.consumeInvites(game.player1Id, boundGuests);
+    }
 
     // Recheck handicaps for EVERY bound member slot — slots 3 and 4 were previously skipped,
     // so members in those slots never had their handicap updated after a match.

@@ -38,15 +38,16 @@ const calculateTargetScore = (avg: string | number | null | undefined, type: '3c
     }
 };
 
-// 3쿠션과 4구의 평균은 완전히 다른 스케일이라, 특정 종목의 목표 점수를 뽑을 때
-// 범용 `average` 컬럼을 그대로 쓰면 안 된다. 종목별 평균을 우선 사용한다.
-const memberAvgForType = (m: any, type: '3c' | '4c'): string | number | null | undefined => {
+// 3쿠션과 4구의 평균은 완전히 다른 스케일이다. 범용 `average` 컬럼은 "마지막으로 끝낸 종목"의
+// 평균이 덮어써지므로, 종목별 핸디를 뽑을 때 절대 폴백으로 쓰면 안 된다 (4구 평균 1.2가
+// 3쿠션 목표 42점으로 둔갑한다). 해당 종목 기록이 없으면 undefined → 기본 목표(15)로 간다.
+const memberAvgForType = (m: any, type: '3c' | '4c'): number | undefined => {
     const typed = type === '3c' ? m?.avg3c : m?.avg4c;
-    return (typed ?? null) !== null && typed !== 0 ? typed : m?.average;
+    return typeof typed === 'number' && typed > 0 ? typed : undefined;
 };
 
 // Helper to calculate Record Average from history
-const calculateRecordAverage = (history: HiqGameHistory[] | undefined, type: '3c' | '4c', defaultAvg: string | undefined | null) => {
+const calculateRecordAverage = (history: HiqGameHistory[] | undefined, type: '3c' | '4c', defaultAvg: string | number | undefined | null) => {
     if (!history) return defaultAvg || "0.000";
 
     const validGames = history.filter(g =>
@@ -75,6 +76,11 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
     // Players State
     const [players, setPlayers] = useState<PlayerInfo[]>([]);
 
+    // Members the host deliberately cleared out of a slot (회원/게스트 토글). The 3s invite poll
+    // must not resurrect them — otherwise a joined opponent can never be demoted and the guest
+    // name the host types gets overwritten every tick.
+    const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+
     // Invite State
     const [inviteCode, setInviteCode] = useState<string | null>(null);
     const [inviteError, setInviteError] = useState<string | null>(null);
@@ -87,7 +93,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
     // Initialize logic
     const initializeGame = useCallback(() => {
         if (member) {
-            const recordAvg = calculateRecordAverage(history, gameType, member.average);
+            const recordAvg = calculateRecordAverage(history, gameType, memberAvgForType(member, gameType));
             const initialTarget = calculateTargetScore(recordAvg, gameType);
 
             setPlayers([
@@ -101,6 +107,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             // still the PREVIOUS value. Reading it here silently skipped PIN creation for match
             // games. The effect below owns creation and reacts to the settled gameMode instead.
             setInviteCode(null);
+            setDismissedIds([]);
         }
     }, [member, history, gameType, numberOfPlayers]);
 
@@ -162,7 +169,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             if (p.type === 'member' && p.member) {
                 // For Host (Me)
                 if (p.isHost && member) {
-                    const recordAvg = calculateRecordAverage(history, newType, member.average);
+                    const recordAvg = calculateRecordAverage(history, newType, memberAvgForType(member, newType));
                     return { ...p, target: calculateTargetScore(recordAvg, newType) };
                 }
                 // For other members (polling guests) use their average
@@ -174,6 +181,11 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
 
     // Player Management Actions
     const updatePlayer = (index: number, updates: Partial<PlayerInfo>) => {
+        const clearedMemberId = ('member' in updates && !updates.member) ? players[index]?.member?.id : undefined;
+        if (clearedMemberId) {
+            setDismissedIds(prev => prev.includes(clearedMemberId) ? prev : [...prev, clearedMemberId]);
+        }
+
         setPlayers(prev => {
             const newPlayers = [...prev];
             newPlayers[index] = { ...newPlayers[index], ...updates };
@@ -215,7 +227,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                             const existingIds = new Set(currentPlayers.filter(p => p.member).map(p => p.member!.id));
 
                             res.guests.forEach((guest: any) => {
-                                if (existingIds.has(guest.id)) return;
+                                if (existingIds.has(guest.id) || dismissedIds.includes(guest.id)) return;
 
                                 const emptySlotIdx = currentPlayers.findIndex(p => !p.isHost && !p.member && (!p.name || p.name === ''));
                                 if (emptySlotIdx !== -1) {
@@ -258,7 +270,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             }, 3000);
             return () => clearInterval(interval);
         }
-    }, [open, inviteCode, gameMode, gameType]);
+    }, [open, inviteCode, gameMode, gameType, dismissedIds]);
 
     // Confirm Start
     const startingRef = useRef(false);

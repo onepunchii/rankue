@@ -100,11 +100,15 @@ export default function HiqScoreboard() {
                                             highRun={highRun}
                                             avg={getAvg(score)}
                                             isTurn={gameState.currentTurn === playerId}
-                                            isFinishMode={score >= target}
+                                            isFinishMode={target > 0 && score >= target}
                                             theme={theme}
                                             onTap={(zone) => handleCardTap(playerId as 1 | 2 | 3 | 4, zone)}
                                             onTurnClick={() => {
-                                                if (score >= target) {
+                                                // A slot with no target (0 — e.g. a guest whose target was never
+                                                // raised) has NO win condition. Without `target > 0`, `0 >= 0`
+                                                // was true and the very first tap ended the match 0-0.
+                                                if (target > 0 && score >= target) {
+                                                    if (finishMutation.isPending) return;
                                                     finishMutation.mutate({
                                                         winnerId: (player as HiqMember)?.id || undefined,
                                                         winnerIndex: playerId
