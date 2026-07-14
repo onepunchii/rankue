@@ -2,6 +2,7 @@ import { ChevronsUp, HelpCircle, Award } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { BallCluster } from "../ui/BilliardBall";
 
 interface DashboardHeaderProps {
     member: any;
@@ -73,12 +74,9 @@ export const DashboardHeader = ({
                     whileTap={{ scale: 0.98 }}
                     className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                 >
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-start justify-between mb-3">
                         <span className="text-[14px] font-bold text-brand tracking-tight">3쿠션</span>
-                        <div className="text-right">
-                            <span className="block text-[11px] font-medium text-black/40 leading-none">평균</span>
-                            <span className="block text-[16px] font-semibold text-ink-1 tabular-nums leading-tight mt-0.5">{liveAvg3c}</span>
-                        </div>
+                        <BallCluster colors={["white", "yellow", "red"]} size={22} />
                     </div>
 
                     <div className="flex items-baseline gap-1.5">
@@ -89,14 +87,15 @@ export const DashboardHeader = ({
                         </button>
                     </div>
 
-                    <div className="mt-4">
+                    <div className="mt-4 flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">평균 {liveAvg3c}</span>
                         {pct3c ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
+                            <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
                                 <ChevronsUp className="w-3.5 h-3.5" />
                                 상위 {pct3c}%
                             </span>
                         ) : (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
                                 분석 중
                             </span>
                         )}
@@ -108,12 +107,9 @@ export const DashboardHeader = ({
                     whileTap={{ scale: 0.98 }}
                     className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                 >
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-start justify-between mb-3">
                         <span className="text-[14px] font-bold text-ink-1 tracking-tight">4구</span>
-                        <div className="text-right">
-                            <span className="block text-[11px] font-medium text-black/40 leading-none">평균</span>
-                            <span className="block text-[16px] font-semibold text-ink-1 tabular-nums leading-tight mt-0.5">{liveAvg4c}</span>
-                        </div>
+                        <BallCluster colors={["white", "yellow", "red", "red"]} size={22} />
                     </div>
 
                     <div className="flex items-baseline gap-1.5">
@@ -124,9 +120,10 @@ export const DashboardHeader = ({
                         </button>
                     </div>
 
-                    <div className="mt-4">
+                    <div className="mt-4 flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">평균 {liveAvg4c}</span>
                         <span className={cn(
-                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand/[0.07] text-[12px] font-semibold",
+                            "inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-brand/[0.07] text-[12px] font-semibold",
                             trend.color
                         )}>
                             {trend.icon}

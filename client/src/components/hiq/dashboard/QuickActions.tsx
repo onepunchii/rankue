@@ -3,6 +3,7 @@ import { ChevronDown, Target, Swords, LogIn, Cpu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useState } from "react";
+import { BallCluster } from "../ui/BilliardBall";
 
 interface QuickActionsProps {
     onStartGame: (mode: "practice" | "match") => void;
@@ -125,7 +126,7 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                             >
                                 {!threeBallSelectionMode ? (
                                     <div className="flex flex-col items-center gap-4">
-                                        <div className="w-14 h-14 rounded-full bg-white ring-1 ring-black/5 shadow-[inset_-3px_-3px_7px_rgba(0,0,0,0.10),0_2px_6px_rgba(0,0,0,0.12)]" />
+                                        <BallCluster colors={["white", "yellow", "red"]} size={30} />
                                         <span className="text-[18px] font-bold text-ink-1">3구</span>
                                     </div>
                                 ) : (
@@ -177,7 +178,7 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                                         className="relative flex flex-col items-center justify-center p-6 rounded-3xl bg-black/[0.04] hover:bg-black/[0.06] transition-all active:scale-[0.98] h-full"
                                     >
                                         <div className="flex flex-col items-center gap-4">
-                                            <div className="w-14 h-14 rounded-full bg-red-500 ring-1 ring-black/5 shadow-[inset_-3px_-3px_7px_rgba(0,0,0,0.22),0_2px_6px_rgba(0,0,0,0.15)]" />
+                                            <BallCluster colors={["white", "yellow", "red", "red"]} size={30} />
                                             <span className="text-[18px] font-bold text-ink-1">4구</span>
                                         </div>
                                     </motion.button>
