@@ -1,4 +1,6 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { TextToSpeech } from '@capacitor-community/text-to-speech';
 
 export function useGameAudio() {
     const [isMuted, setIsMuted] = useState(false);
@@ -58,15 +60,11 @@ export function useGameAudio() {
         };
     }, [getCtx]);
 
-    const speak = useCallback((text: string) => {
-        // Bridge to a native TTS handler if one is present (legacy Expo/React Native shell).
-        // The Capacitor shell has none, so we fall through to Web Speech below.
-        if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-            (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'SPEAK', payload: { text } }));
-            return;
-        }
-
-        if (isMuted || !synthRef.current) return;
+    // Web Speech path — used on the browser and as a fallback. Android WebView barely
+    // supports this (that's why native TTS below exists); iOS WKWebView needs the gesture
+    // unlock + resume() handled above/here.
+    const speakWeb = useCallback((text: string) => {
+        if (!synthRef.current) return;
         const synth = synthRef.current;
 
         // iOS WKWebView leaves the queue 'paused' after cancel(); without resume() nothing
@@ -86,7 +84,31 @@ export function useGameAudio() {
 
         synth.speak(utterance);
         try { synth.resume(); } catch { /* noop */ }
-    }, [isMuted]);
+    }, []);
+
+    const speak = useCallback((text: string) => {
+        if (isMuted) return;
+
+        // Bridge to a native TTS handler if the legacy Expo/React Native shell is present.
+        if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+            (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'SPEAK', payload: { text } }));
+            return;
+        }
+
+        // Native app (Capacitor): use the OS text-to-speech engine. Web Speech doesn't work
+        // in the Android WebView, so this is the only reliable path there. If the installed
+        // APK predates the plugin, the call rejects → fall back to Web Speech.
+        if (Capacitor.isNativePlatform()) {
+            try {
+                TextToSpeech.speak({ text, lang: 'ko-KR', rate: 1.1 }).catch(() => speakWeb(text));
+            } catch {
+                speakWeb(text);
+            }
+            return;
+        }
+
+        speakWeb(text);
+    }, [isMuted, speakWeb]);
 
     // Simple beep effect using the shared Web Audio context.
     const playEffect = useCallback((type: 'click' | 'turn' | 'win' | 'finishing') => {
