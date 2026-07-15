@@ -239,6 +239,8 @@ export default function HiqMenu() {
                         </div>
                     </div>
 
+                    {/* 숨김 처리 — 추후 재노출 시 false → true */}
+                    {false && (
                     <Button
                         onClick={() => toast({ title: "서비스 준비 중", description: "프리미엄 멤버십 결제 기능은 추후 업데이트될 예정입니다." })}
                         className="w-full h-12 mt-6 rounded-tile font-semibold text-[15px] bg-brand text-brand-fg hover:bg-brand active:scale-[0.98] transition-transform border-none shadow-none"
@@ -246,6 +248,7 @@ export default function HiqMenu() {
                         <LucideCrown className="w-4 h-4 mr-2" />
                         프리미엄 멤버십 시작하기
                     </Button>
+                    )}
                 </div>
             </div>
 
@@ -348,7 +351,8 @@ export default function HiqMenu() {
                 </div>
             </div>
 
-            {/* Section C: Partner promo */}
+            {/* Section C: Partner promo — 숨김 처리 (추후 재노출 시 false → true) */}
+            {false && (
             <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setLocation("/partner/login")}
@@ -365,6 +369,7 @@ export default function HiqMenu() {
                     </div>
                 </div>
             </motion.button>
+            )}
 
             {/* Section: Family services */}
             <div className="relative z-10 mb-12">
