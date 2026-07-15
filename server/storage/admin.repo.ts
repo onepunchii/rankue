@@ -117,6 +117,27 @@ export class AdminRepository {
         };
     }
 
+    // 전역 회원 목록 (관리자 전용) — 매장 무관 전체 hiqMembers, 최신 가입순.
+    // 계좌번호 등 민감 필드는 제외하고 관리 화면에 필요한 표시용 컬럼만 선택.
+    async getAllMembersForAdmin() {
+        return await db.select({
+            id: hiqMembers.id,
+            name: hiqMembers.name,
+            phone: hiqMembers.phone,
+            storeId: hiqMembers.storeId,
+            gender: hiqMembers.gender,
+            birthYear: hiqMembers.birthYear,
+            rating3c: hiqMembers.rating3c,
+            rating4c: hiqMembers.rating4c,
+            avg3c: hiqMembers.avg3c,
+            avg4c: hiqMembers.avg4c,
+            visitCount: hiqMembers.visitCount,
+            lastVisitedAt: hiqMembers.lastVisitedAt,
+            createdAt: hiqMembers.createdAt,
+            profileId: hiqMembers.profileId,
+        }).from(hiqMembers).orderBy(sql`${hiqMembers.createdAt} DESC`);
+    }
+
     async getAdminStats(storeId: string): Promise<{
         totalMembers: number;
         visitsToday: number;

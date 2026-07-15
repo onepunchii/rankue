@@ -25,6 +25,11 @@ router.get("/stats", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     return sendSuccess(res, stats);
 }));
 
+router.get("/members", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const members = await storage.getAllMembersForAdmin();
+    return sendSuccess(res, members);
+}));
+
 router.get("/leads", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const leads = await storage.getPartnerLeads();
     return sendSuccess(res, leads);

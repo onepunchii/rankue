@@ -89,6 +89,7 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
         { id: "leads", label: "입점 문의", icon: LucidePhone },
         { id: "stores", label: "매장 리스트", icon: LucideStore },
         { id: "crews", label: "크루 현황", icon: LucideUsersRound },
+        { id: "members", label: "회원 관리", icon: LucideUsers },
         { id: "golf-orders", label: "골프 회원권", icon: LucideFlag }, // New
         { id: "billing", label: "결제 관리", icon: LucideCreditCard },
         { id: "suggestions", label: "건의함", icon: LucideMail },
@@ -145,7 +146,8 @@ export default function AdminDashboard() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [tab, setTab] = useState<"dashboard" | "leads" | "stores" | "crews" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders">("dashboard");
+    const [tab, setTab] = useState<"dashboard" | "leads" | "stores" | "crews" | "members" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders">("dashboard");
+    const [memberSearch, setMemberSearch] = useState("");
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
     // Queries
@@ -156,6 +158,7 @@ export default function AdminDashboard() {
     const { data: notices = [] } = useQuery<Notice[]>({ queryKey: ["/api/hiq/admin/notices"] });
     const { data: reports = [] } = useQuery<ReportedUser[]>({ queryKey: ["/api/hiq/admin/reports"] });
     const { data: suggestions = [] } = useQuery<Suggestion[]>({ queryKey: ["/api/hiq/admin/suggestions"] });
+    const { data: members = [] } = useQuery<any[]>({ queryKey: ["/api/hiq/admin/members"] });
 
     // Filter crews
     const filteredCrews = crews.filter(crew => {
@@ -628,6 +631,53 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
+                    {tab === "members" && (
+                        <div>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                                <p className="text-sm font-bold text-black/55">총 <span className="text-brand">{members.length}</span>명</p>
+                                <input
+                                    value={memberSearch}
+                                    onChange={(e) => setMemberSearch(e.target.value)}
+                                    placeholder="이름 또는 전화번호 검색"
+                                    className="w-full sm:w-72 h-11 px-4 rounded-xl bg-white border border-black/10 text-sm outline-none focus:border-brand/40"
+                                />
+                            </div>
+                            <div className="rounded-2xl overflow-hidden border border-black/10 overflow-x-auto">
+                                <table className="w-full text-left bg-white text-sm whitespace-nowrap">
+                                    <thead>
+                                        <tr className="border-b border-black/10 bg-black/[0.02]">
+                                            <th className="p-4 font-black text-black/55">이름</th>
+                                            <th className="p-4 font-black text-black/55">연락처</th>
+                                            <th className="p-4 font-black text-black/55 text-center">성별</th>
+                                            <th className="p-4 font-black text-black/55 text-right">3쿠션 RP</th>
+                                            <th className="p-4 font-black text-black/55 text-right">4구 RP</th>
+                                            <th className="p-4 font-black text-black/55 text-right">방문</th>
+                                            <th className="p-4 font-black text-black/55">가입일</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {members
+                                            .filter((m) => !memberSearch || m.name?.includes(memberSearch) || m.phone?.includes(memberSearch))
+                                            .map((m) => (
+                                                <tr key={m.id} className="border-b border-black/[0.06] hover:bg-black/[0.02]">
+                                                    <td className="p-4 font-bold text-[rgba(0,0,0,0.87)]">{m.name}</td>
+                                                    <td className="p-4 text-black/60 font-mono">{m.phone}</td>
+                                                    <td className="p-4 text-center text-black/60">{m.gender === "male" ? "남" : m.gender === "female" ? "여" : "-"}</td>
+                                                    <td className="p-4 text-right font-mono font-bold text-brand">{m.rating3c ?? 0}</td>
+                                                    <td className="p-4 text-right font-mono font-bold text-brand">{m.rating4c ?? 0}</td>
+                                                    <td className="p-4 text-right text-black/60 font-mono">{m.visitCount ?? 0}</td>
+                                                    <td className="p-4 text-black/50 font-mono">{m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "-"}</td>
+                                                </tr>
+                                            ))}
+                                        {members.length === 0 && (
+                                            <tr><td colSpan={7} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                     {tab === "golf-orders" && <GolfOrdersView />}
                 </div>
             </main>
@@ -638,6 +688,7 @@ export default function AdminDashboard() {
 function getTabTitle(tab: string) {
     switch (tab) {
         case "dashboard": return "Dashboard";
+        case "members": return "회원 관리";
         case "leads": return "입점 문의 관리";
         case "stores": return "가맹점 리스트";
         case "billing": return "결제 및 정산";

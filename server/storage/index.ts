@@ -140,6 +140,7 @@ class Storage {
     async updateStore(id: string, data: any) { return this.admin.updateStore(id, data); }
     async getAdminStats(id: string) { return this.admin.getAdminStats(id); }
     async getGlobalStats() { return this.admin.getGlobalStats(); }
+    async getAllMembersForAdmin() { return this.admin.getAllMembersForAdmin(); }
     async createPartnerLead(data: any) { return this.admin.createPartnerLead(data); }
     async searchStores(q: string) { return this.admin.searchStores(q); }
     async getPartnerLeads() { return this.admin.getPartnerLeads(); }
