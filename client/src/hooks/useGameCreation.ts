@@ -282,18 +282,12 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
         startingRef.current = true;
         setIsStarting(true);
 
-        // Try Landscape Lock
-        try {
-            if (document.documentElement.requestFullscreen) {
-                await document.documentElement.requestFullscreen();
-            }
-            if (screen.orientation && 'lock' in screen.orientation) {
-                // @ts-ignore
-                await screen.orientation.lock('landscape');
-            }
-        } catch (e) {
-            console.warn("Screen lock failed", e);
-        }
+        // NOTE: 예전엔 여기서 requestFullscreen() + orientation.lock('landscape')를 호출했으나 제거함.
+        // - 네이티브 쉘(Capacitor)은 브라우저 크롬이 없어 전체화면이 불필요.
+        // - iOS 전체화면(Fullscreen API)은 env(safe-area-inset-*)를 0으로 만들어 스코어보드가
+        //   노치/다이나믹 아일랜드를 침범하게 하는 원인이었음(전체화면 아니면 62px 정상).
+        // - 가로 전환은 LandscapeGuard의 CSS rotate(90deg)가 처리하므로 orientation.lock도 불필요
+        //   (iOS WebKit은 screen.orientation.lock 미지원 → throw만 함).
 
         const ruleFinishType = !useFinishRule ? "none" : (gameType === "4c" ? "3c" : "bank");
 

@@ -217,7 +217,10 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                     {gameMode === "practice" ? "연습 세션을 시작합니다." : "매칭 대결을 시작합니다."}
                 </DialogDescription>
 
-                <div className="h-14 flex items-center justify-between px-4 border-b border-black/10 bg-[#f2f0eb] shrink-0">
+                <div
+                    className="flex items-center justify-between px-4 py-2 border-b border-black/10 bg-[#f2f0eb] shrink-0"
+                    style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}
+                >
                     <button
                         onClick={() => onOpenChange(false)}
                         title="뒤로 가기"
@@ -372,7 +375,10 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                 </div>
 
                 {/* Footer Config Buttons */}
-                <div className="p-4 border-t border-black/10 bg-[#f2f0eb] shrink-0 safe-area-pb">
+                <div
+                    className="p-4 border-t border-black/10 bg-[#f2f0eb] shrink-0"
+                    style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+                >
                     <Button
                         onClick={confirmStart}
                         disabled={isStarting}

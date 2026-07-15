@@ -1076,8 +1076,9 @@ export default function HiqOnlineGame() {
 
             {/* First Interaction Layer (Removed - Auto Start) */}
 
-            {/* 2. Top Navigation & Scoreboard */}
-            <div className="absolute top-0 left-0 right-0 p-4 z-40">
+            {/* 2. Top Navigation & Scoreboard — fixed inset-0 컨테이너라 #root 패딩이 안 걸린다.
+                세로 고정 화면이므로 노치/다이나믹아일랜드는 상단 → pt에 env(top)을 더해 X버튼·스코어보드를 그 아래로 내린다. */}
+            <div className="absolute top-0 left-0 right-0 px-4 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] z-40">
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-3">
                         <button
@@ -1129,8 +1130,9 @@ export default function HiqOnlineGame() {
                 </div>
             </div>
 
-            {/* 3. Right Sidebar Toolbar & Main Action (Top-Right Alignment) */}
-            <div className="absolute right-4 top-24 flex flex-col gap-5 items-center z-30 pointer-events-auto">
+            {/* 3. Right Sidebar Toolbar & Main Action (Top-Right Alignment)
+                상단 스코어보드가 env(top)만큼 내려갔으므로, 사이드바도 같은 인셋만큼 내려 기존 간격을 유지한다(레이아웃 불변). */}
+            <div className="absolute right-4 top-[calc(6rem+env(safe-area-inset-top))] flex flex-col gap-5 items-center z-30 pointer-events-auto">
 
 
 

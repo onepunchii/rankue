@@ -205,10 +205,13 @@ export default function HiqClubDetail() {
         }
     };
 
+    // fixed inset-0 = 뷰포트(초기 컨테이닝블록) 기준이라 #root의 padding-top(env)과 무관해진다.
+    // (App/Router 래퍼를 거쳐 렌더돼 음수 marginTop이 #root 패딩을 상쇄하지 못하던 이중 인셋 문제 해소.)
+    // 노치 상단 인셋은 이제 아래 헤더의 pt-[env]가 유일하게 담당한다.
     return (
-        <div className="h-[100dvh] bg-[#f2f0eb] text-ink-1 font-sans flex flex-col overflow-hidden relative">
-            {/* 1. 고정 헤더 영역 (4+2 구조 중 상단 +2) */}
-            <div className="shrink-0 z-30 bg-white/90 border-b border-black/10 safe-area-top">
+        <div className="fixed inset-0 z-0 bg-[#f2f0eb] text-ink-1 font-sans flex flex-col overflow-hidden">
+            {/* 1. 고정 헤더 영역 (4+2 구조 중 상단 +2) — 흰 배경이 노치까지 차오르고 본문은 상태바 아래에서 시작 */}
+            <div className="shrink-0 z-30 bg-white/90 border-b border-black/10 pt-[env(safe-area-inset-top)]">
                 <div className="px-6 py-4 flex items-center justify-between">
                     {/* 좌측: 메인으로 가기 */}
                     <Button
@@ -247,7 +250,7 @@ export default function HiqClubDetail() {
             </div>
 
             {/* 2. 가변 컨텐츠 영역 */}
-            <main className="flex-1 overflow-hidden relative">
+            <main className="flex-1 min-h-0 overflow-hidden relative">
                 <AnimatePresence mode="wait">
                     {activeTab === 'home' && (
                         <motion.div
@@ -405,7 +408,8 @@ export default function HiqClubDetail() {
             </main>
 
             {/* 3. 인앱 하단 네비게이션 (전용 4버튼 레이아웃) */}
-            <nav className="fixed bottom-0 w-full bg-white/95 border-t border-black/10 flex items-center h-20 safe-area-bottom z-50">
+            <nav className="fixed bottom-0 w-full bg-white/95 border-t border-black/10 z-50 pb-[env(safe-area-inset-bottom)]">
+                <div className="flex items-center h-20">
                 {[
                     { id: 'home', label: '홈', icon: LucideHome },
                     { id: 'board', label: '게시판', icon: LucideFileText },
@@ -437,6 +441,7 @@ export default function HiqClubDetail() {
                         </button>
                     );
                 })}
+                </div>
             </nav>
 
             {/* 다이얼로그 모달 모음 */}

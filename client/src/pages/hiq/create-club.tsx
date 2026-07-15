@@ -598,7 +598,13 @@ export default function CreateClub() {
             </div>
 
             {/* Bottom Button */}
-            <div className="fixed bottom-0 left-0 right-0 px-5 py-6 bg-[#f2f0eb] border-t border-surface-line safe-area-bottom z-20">
+            <div
+                className="fixed bottom-0 left-0 right-0 px-5 py-6 bg-[#f2f0eb] border-t border-surface-line z-20"
+                // 전역 `.fixed.bottom-0 { padding-bottom: env(...) }`가 py-6의 하단 1.5rem을 덮어써
+                // 웹에선 하단 여백이 사라지고 시뮬에선 인셋이 py-6 안으로 파고든다. 인라인으로 전역 규칙을
+                // 이겨, base(1.5rem)는 유지하고 홈인디케이터 인셋을 그 아래에 얹는다.
+                style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+            >
                 <Button
                     className={cn(
                         "w-full h-14 text-lg font-bold rounded-tile bg-brand text-brand-fg hover:bg-brand/90 transition-all"

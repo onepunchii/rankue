@@ -122,6 +122,11 @@ export default function GolfScorecard() {
 
     return (
         <div className="min-h-screen bg-[#050505] text-white font-sans overflow-hidden flex flex-col relative">
+            {/* iOS 상태바 검은 막 — #root의 padding-top(env)이 노치에 비추는 body 크림색을 게임 배경색으로 덮어
+                몰입(노치까지 검정)을 유지한다. 화면 전체를 위로 당기지 않으므로 게임 UI는 노치 아래에서 시작하고
+                (노치 점령 완화), 홈 이탈 시 흰 띠 잔재도 없다. 노치 높이(env)만큼의 top 스트립이라 콘텐츠는 안 가림. */}
+            <div className="fixed top-0 left-0 right-0 h-[env(safe-area-inset-top)] bg-[#050505] z-50" aria-hidden />
+
             {/* Money Overlay (Toggle) */}
             <AnimatePresence>
                 {showMoney && (
@@ -223,7 +228,7 @@ export default function GolfScorecard() {
             </AnimatePresence>
 
             {/* Header with Integrated Hole Nav */}
-            <header className="px-4 py-3 flex items-center justify-between relative z-20 safe-area-top">
+            <header className="px-4 py-3 flex items-center justify-between relative z-20">
                 <button
                     onClick={async () => {
                         if (currentHole > 0) {
@@ -576,7 +581,7 @@ export default function GolfScorecard() {
 
 
             {/* Bottom Action Bar */}
-            <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent z-40">
+            <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent z-40" style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}>
                 <div className="max-w-md mx-auto flex gap-3">
                     <Button
                         variant="ghost"
