@@ -91,7 +91,7 @@ export const DashboardHeader = ({
                         </button>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-2">
+                    <div className="mt-4 flex flex-col items-start gap-2">
                         <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">평균 {liveAvg3c}</span>
                         {pct3c ? (
                             <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
@@ -124,7 +124,7 @@ export const DashboardHeader = ({
                         </button>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-2">
+                    <div className="mt-4 flex flex-col items-start gap-2">
                         <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">평균 {liveAvg4c}</span>
                         <span className={cn(
                             "inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-brand/[0.07] text-[12px] font-semibold",
