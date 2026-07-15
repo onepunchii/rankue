@@ -21,8 +21,9 @@ const password = process.argv[3];
 const storeSlug = process.argv[4];
 
 async function main() {
-    if (!phone || !password) {
-        console.error("사용법: npx tsx server/scripts/grant-admin.ts <전화번호> <비밀번호> [매장slug]");
+    if (!phone) {
+        console.error("사용법: npx tsx server/scripts/grant-admin.ts <전화번호> [비밀번호] [매장slug]");
+        console.error("  비밀번호를 생략하면 기존 비밀번호를 유지합니다(role·매장연결만 갱신).");
         process.exit(1);
     }
 
@@ -45,12 +46,20 @@ async function main() {
         process.exit(1);
     }
 
-    // 3. 프로필 승격(super_admin) + 비밀번호 설정, 매장 소유자 연결
-    await db.update(profiles).set({ role: "super_admin", password }).where(eq(profiles.id, profile.id));
+    // 3. 프로필 승격(super_admin) + (비밀번호 인자 있으면 새로 설정, 없으면 기존 유지), 매장 소유자 연결
+    const profileUpdate: { role: "super_admin"; password?: string } = { role: "super_admin" };
+    if (password) {
+        profileUpdate.password = password;
+    } else if (!profile.password) {
+        console.error("❌ 이 계정에 비밀번호가 없습니다. 비밀번호를 인자로 넣어 실행하세요:");
+        console.error("   npx tsx server/scripts/grant-admin.ts <전화번호> <비밀번호>");
+        process.exit(1);
+    }
+    await db.update(profiles).set(profileUpdate).where(eq(profiles.id, profile.id));
     await db.update(hiqStores).set({ ownerId: profile.id }).where(eq(hiqStores.id, store.id));
 
     console.log("✅ 완료");
-    console.log(`  프로필: ${profile.nickname ?? phone} → role=super_admin, 비밀번호 설정됨`);
+    console.log(`  프로필: ${profile.nickname ?? phone} → role=super_admin, 비밀번호 ${password ? "새로 설정됨" : "기존 유지"}`);
     console.log(`  매장: ${store.name} (${store.slug}) → 소유자=이 계정`);
     console.log("");
     console.log("다음: https://www.rankue.co.kr/partner/login 에서 전화번호+비밀번호로 로그인");
