@@ -5,7 +5,12 @@ import {
     hiqGameHistory,
     hiqFriendships,
     hiqVisitLogs,
-    hiqGames
+    hiqGames,
+    hiqInvites,
+    hiqNotifications,
+    hiqCrewMembers,
+    hiqStores,
+    suggestions
 } from "../../shared/schema.js";
 import type {
     Profile,
@@ -303,5 +308,59 @@ export class UserRepository {
             friendWins: total - myWins, // Simple loss calculation
             winRate: total > 0 ? Math.round((myWins / total) * 100) : 0
         };
+    }
+
+    // 계정 삭제 (App Store 5.1.1(v) 인앱 계정 삭제) — 개인정보는 완전 삭제하고,
+    // 상대방 전적 보존을 위해 경기 기록이 FK로 참조하는 hiqMembers 행만 "탈퇴회원"으로
+    // 익명화해 남긴다. 반환된 프로필 이미지 URL의 Blob 정리는 호출부 책임.
+    async deleteAccount(memberId: string): Promise<{ profileImageUrl: string | null }> {
+        const [member] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, memberId));
+        if (!member) throw new Error("회원을 찾을 수 없습니다");
+
+        let profileImageUrl: string | null = null;
+        const profileId = member.profileId;
+        if (profileId) {
+            const [profile] = await db.select().from(profiles).where(eq(profiles.id, profileId));
+            profileImageUrl = profile?.profileImageUrl ?? null;
+        }
+
+        await db.transaction(async (tx) => {
+            // 1. 소셜/알림/초대/크루 멤버십 삭제
+            await tx.delete(hiqFriendships).where(or(eq(hiqFriendships.requesterId, memberId), eq(hiqFriendships.receiverId, memberId)));
+            await tx.delete(hiqInvites).where(or(eq(hiqInvites.hostId, memberId), eq(hiqInvites.guestId, memberId)));
+            await tx.delete(hiqNotifications).where(eq(hiqNotifications.memberId, memberId));
+            await tx.delete(hiqCrewMembers).where(eq(hiqCrewMembers.memberId, memberId));
+
+            // 2. 회원 행 익명화 — phone은 notNull+unique(storeId,phone)이라 고유 placeholder로 대체.
+            //    레이팅/평균/방문 0 초기화로 랭킹·상대 검색에서 실질적으로 사라진다.
+            await tx.update(hiqMembers).set({
+                name: "탈퇴회원",
+                phone: `del-${memberId.slice(0, 12)}`,
+                birthYear: null,
+                gender: null,
+                average: null,
+                introduction: null,
+                marketingAgree: false,
+                defaultAccountBank: null,
+                defaultAccountNumber: null,
+                defaultAccountHolder: null,
+                rating3c: 0,
+                rating4c: 0,
+                avg3c: 0,
+                avg4c: 0,
+                visitCount: 0,
+                profileId: null,
+            }).where(eq(hiqMembers.id, memberId));
+
+            // 3. 프로필(전화·비밀번호·이메일·푸시토큰) 하드 삭제 — nullable FK를 먼저 끊는다.
+            if (profileId) {
+                await tx.update(hiqStores).set({ ownerId: null }).where(eq(hiqStores.ownerId, profileId));
+                await tx.update(hiqMembers).set({ profileId: null }).where(eq(hiqMembers.profileId, profileId));
+                await tx.update(suggestions).set({ userId: null }).where(eq(suggestions.userId, profileId));
+                await tx.delete(profiles).where(eq(profiles.id, profileId));
+            }
+        });
+
+        return { profileImageUrl };
     }
 }

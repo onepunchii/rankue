@@ -24,6 +24,7 @@ class Storage {
     async getProfile(id: string) { return this.users.getProfile(id); }
     async createProfile(data: any) { return this.users.createProfile(data); }
     async getProfileByPhone(phone: string) { return this.users.getProfileByPhone(phone); }
+    async deleteAccount(memberId: string) { return this.users.deleteAccount(memberId); }
     async updateProfile(id: string, data: any) { return this.users.updateProfile(id, data); }
     async getFriends(id: string, sport?: string) { return this.users.getFriends(id, sport); }
     async requestFriend(reqId: string, recId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS") { return this.users.requestFriend(reqId, recId, sport); }

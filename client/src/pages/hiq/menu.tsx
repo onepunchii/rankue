@@ -19,8 +19,10 @@ import {
     LucideMail,
     LucideCrown,
     LucideCircle,
-    LucideFlag
+    LucideFlag,
+    LucideUserX
 } from "@/lib/icons";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { SuggestionModal } from "@/components/hiq/SuggestionModal";
 import { HiqMember } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
@@ -48,6 +50,11 @@ export default function HiqMenu() {
 
     const [notifOpen, setNotifOpen] = useState(false);
     const [suggestionOpen, setSuggestionOpen] = useState(false);
+
+    // 계정 삭제 (App Store 5.1.1(v)) — '삭제' 입력 확인 후 영구 삭제
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState("");
+    const [isDeleting, setIsDeleting] = useState(false);
 
 
     const [isEditingName, setIsEditingName] = useState(false);
@@ -125,6 +132,21 @@ export default function HiqMenu() {
         // Clear all cached data so the next user on this device sees nothing from this account.
         queryClient.clear();
         setLocation("/");
+    };
+
+    // 계정 영구 삭제 — 서버가 개인정보 삭제 + 세션 쿠키 무효화까지 처리한다.
+    const handleDeleteAccount = async () => {
+        if (deleteConfirm !== "삭제" || isDeleting) return;
+        setIsDeleting(true);
+        try {
+            await apiRequest("/api/hiq/me", { method: "DELETE" });
+            queryClient.clear();
+            toast({ title: "계정이 삭제되었습니다", description: "이용해 주셔서 감사합니다." });
+            setLocation("/");
+        } catch {
+            toast({ title: "삭제에 실패했습니다", description: "잠시 후 다시 시도해주세요.", variant: "destructive" });
+            setIsDeleting(false);
+        }
     };
 
     const tier = currentSport === "GOLF"
@@ -329,6 +351,13 @@ export default function HiqMenu() {
                             onClick: handleLogout,
                             danger: true
                         },
+                        {
+                            icon: LucideUserX,
+                            label: "계정 삭제",
+                            desc: "계정과 개인정보를 영구 삭제",
+                            onClick: () => { setDeleteConfirm(""); setDeleteOpen(true); },
+                            danger: true
+                        },
                     ].map((item, idx) => (
                         <motion.button
                             key={idx}
@@ -405,6 +434,55 @@ export default function HiqMenu() {
                 open={suggestionOpen}
                 onOpenChange={setSuggestionOpen}
             />
+
+            {/* 계정 삭제 확인 다이얼로그 — App Store 5.1.1(v) 인앱 계정 삭제 */}
+            <Dialog open={deleteOpen} onOpenChange={(open) => { if (!isDeleting) setDeleteOpen(open); }}>
+                <DialogContent className="bg-white text-ink-1 max-w-md w-[92%] rounded-[28px] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
+                    <DialogHeader className="text-left">
+                        <DialogTitle className="text-[20px] font-bold text-ink-1">계정을 삭제할까요?</DialogTitle>
+                        <DialogDescription className="text-[13px] font-medium text-black/55 mt-1">
+                            이 작업은 되돌릴 수 없습니다.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="mt-2 rounded-2xl bg-red-500/[0.06] p-4">
+                        <ul className="text-[13px] font-medium text-black/70 space-y-1.5 list-disc pl-4">
+                            <li>이름·전화번호·프로필 사진 등 개인정보가 <b>즉시 영구 삭제</b>됩니다.</li>
+                            <li>레이팅(RP)·랭킹·친구·크루 멤버십이 삭제됩니다.</li>
+                            <li>상대방의 전적 보존을 위해 경기 기록은 <b>"탈퇴회원"</b>으로 익명 처리됩니다.</li>
+                        </ul>
+                    </div>
+
+                    <div className="mt-4">
+                        <p className="text-[13px] font-medium text-black/55 mb-2">
+                            계속하려면 아래에 <b className="text-red-500">삭제</b>를 입력하세요.
+                        </p>
+                        <input
+                            value={deleteConfirm}
+                            onChange={(e) => setDeleteConfirm(e.target.value)}
+                            placeholder="삭제"
+                            className="w-full h-12 px-4 rounded-xl bg-black/[0.04] text-[15px] font-semibold text-ink-1 outline-none focus:ring-2 focus:ring-red-500/30"
+                        />
+                    </div>
+
+                    <div className="mt-5 flex gap-2.5">
+                        <button
+                            onClick={() => setDeleteOpen(false)}
+                            disabled={isDeleting}
+                            className="flex-1 h-12 rounded-full bg-black/[0.05] text-[15px] font-bold text-ink-1 active:scale-[0.98] transition-transform"
+                        >
+                            취소
+                        </button>
+                        <button
+                            onClick={handleDeleteAccount}
+                            disabled={deleteConfirm !== "삭제" || isDeleting}
+                            className="flex-1 h-12 rounded-full bg-red-500 text-white text-[15px] font-bold disabled:opacity-35 active:scale-[0.98] transition-transform"
+                        >
+                            {isDeleting ? "삭제 중..." : "영구 삭제"}
+                        </button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <HiqNavigation />
         </div>

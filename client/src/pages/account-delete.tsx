@@ -10,8 +10,19 @@ export default function AccountDelete() {
         </p>
 
         <div className="mt-8 rounded-xl border-2 border-emerald-500 bg-emerald-50 p-5">
-          <h2 className="text-lg font-bold text-emerald-900">계정 삭제 요청 방법</h2>
+          <h2 className="text-lg font-bold text-emerald-900">앱에서 바로 삭제하기</h2>
           <ol className="mt-3 list-decimal pl-5 text-sm text-emerald-900 space-y-2">
+            <li>랭큐 앱에 로그인합니다.</li>
+            <li>
+              하단 탭 <b>전체</b> → <b>관리 · 안내</b> → <b>계정 삭제</b>를 선택합니다.
+            </li>
+            <li>안내를 확인하고 <b>"삭제"</b>를 입력하면 즉시 영구 삭제됩니다.</li>
+          </ol>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-5">
+          <h2 className="text-base font-bold text-gray-900">앱을 이용할 수 없는 경우 (이메일 요청)</h2>
+          <ol className="mt-3 list-decimal pl-5 text-sm text-gray-700 space-y-2">
             <li>
               <a className="font-bold underline" href="mailto:petudy@kakao.com">
                 petudy@kakao.com

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { put } from "@vercel/blob";
+import { deleteBlobs } from "../../utils/blob.js";
 import { storage, getRecentOpponents, searchUsers } from "../../storage/index.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
@@ -194,6 +195,16 @@ router.post("/suggestions", requireAuth, asyncHandler(async (req: AuthRequest, r
         contact
     });
     return sendSuccess(res, suggestion);
+}));
+
+// DELETE /me - 계정 삭제 (App Store 5.1.1(v): 인앱 계정 삭제 필수)
+// 개인정보(프로필·전화·비밀번호·푸시토큰·아바타)는 즉시 삭제, 경기 기록은 "탈퇴회원"으로 익명화.
+router.delete("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { profileImageUrl } = await storage.deleteAccount(req.userId!);
+    await deleteBlobs(profileImageUrl);
+    res.clearCookie('hiq_user_id', { path: '/' });
+    res.clearCookie('hiq_partner_auth', { path: '/' });
+    return sendSuccess(res, { success: true });
 }));
 
 export default router;
