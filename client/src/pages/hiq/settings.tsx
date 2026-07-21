@@ -91,13 +91,16 @@ export default function HiqSettings() {
                                 placeholder="handle"
                             />
                         </div>
+                        {/* 아이콘 버튼(정사각 고정) — 버튼 텍스트가 언어마다 길어져 입력창을
+                            밀어내던 문제 제거. 입력창이 항상 넓게 확보됨. 접근성은 aria-label로. */}
                         <button
                             onClick={saveHandle}
                             disabled={handleSaving || !handleInput || handleInput === currentHandle}
-                            className="h-12 px-5 shrink-0 whitespace-nowrap rounded-tile bg-brand text-brand-fg text-[14px] font-bold disabled:opacity-25 flex items-center gap-1.5"
+                            aria-label={t("settings.change")}
+                            title={t("settings.change")}
+                            className="h-12 w-12 shrink-0 rounded-tile bg-brand text-brand-fg disabled:opacity-25 flex items-center justify-center"
                         >
-                            {handleSaving ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <LucideCheck className="w-4 h-4" />}
-                            {t("settings.change")}
+                            {handleSaving ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : <LucideCheck className="w-5 h-5" />}
                         </button>
                     </div>
                 </section>
