@@ -418,6 +418,11 @@ export default function App() {
                     style={styles.webview}
                     javaScriptEnabled={true}
                     domStorageEnabled={true}
+                    // 세션 유지 핵심 — 서버가 httpOnly 쿠키(hiq_user_id)로 세션을 관리하므로
+                    // 웹뷰가 쿠키를 앱 쿠키스토어와 공유해야 로그인 후 인증이 유지된다.
+                    // 이게 없으면 로그인해도 다음 요청에 쿠키가 안 실려 401(=앱 로그인 안 먹힘).
+                    sharedCookiesEnabled={true}        // iOS WKWebView
+                    thirdPartyCookiesEnabled={true}    // Android
                     onMessage={handleMessage}
                     injectedJavaScriptBeforeContentLoaded={initialScript}
                     // � [수정] 스크롤 허용 (기본값)
