@@ -2,25 +2,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
+import { isNativeApp } from "@/lib/nativeBridge";
+import { nativeSocialIdToken } from "@/lib/nativeSignIn";
 
 // 소셜 로그인(구글·애플) — 글로벌(비한국어) 유저의 기본 진입.
-// 웹:  구글 GIS + 애플 SIWA JS(Services ID) → id_token → 서버(/api/hiq/social) JWKS 재검증.
-// 앱:  웹뷰에선 구글 OAuth가 정책상 막히므로 네이티브 브릿지(App.tsx)로 로그인 →
-//      SOCIAL_TOKEN 메시지로 id_token 수신 → 같은 /api/hiq/social 검증 (RQ-4b).
+// 웹:          구글 GIS + 애플 SIWA JS(Services ID) → id_token → 서버(/api/hiq/social) JWKS 재검증.
+// 앱(Capacitor): @capgo/capacitor-social-login 네이티브 플러그인으로 id_token 획득 → 같은 /api/hiq/social.
+//   (웹뷰에서 구글 OAuth 리다이렉트는 정책상 차단되므로 네이티브 플러그인 사용 — mapix 표준)
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const APPLE_SERVICES_ID = import.meta.env.VITE_APPLE_SERVICES_ID as string | undefined;
 
 const APPLE_LOCALE: Record<string, string> = { ko: "ko_KR", en: "en_US", vi: "vi_VN", tr: "tr_TR", es: "es_ES" };
 
-/** Expo 래퍼(웹뷰) 안인가 — App.tsx가 주입하는 ReactNativeWebView 존재로 판별 */
-export function isInAppWebView(): boolean {
-  return typeof window !== "undefined" && !!(window as unknown as { ReactNativeWebView?: unknown }).ReactNativeWebView;
-}
-
-/** 소셜 로그인 노출 가능 여부 — 앱(네이티브 브릿지) 또는 웹(키 배포됨) */
+/** 소셜 로그인 노출 가능 여부 — 앱(네이티브 플러그인) 또는 웹(키 배포됨) */
 export function socialLoginAvailable(): boolean {
-  return isInAppWebView() || !!GOOGLE_CLIENT_ID;
+  return isNativeApp() || !!GOOGLE_CLIENT_ID;
 }
 
 declare global {
@@ -73,7 +70,7 @@ export default function SocialLogin() {
   const googleBtnRef = useRef<HTMLDivElement>(null);
   const [gisReady, setGisReady] = useState(false);
   const [appleReady, setAppleReady] = useState(false);
-  const inApp = isInAppWebView();
+  const inApp = isNativeApp();
 
   const submitToken = useCallback(async (provider: "google" | "apple", idToken: string, name?: string) => {
     setBusy(true);
@@ -94,34 +91,19 @@ export default function SocialLogin() {
     }
   }, [setLocation, toast, t]);
 
-  // 앱: 네이티브 로그인 트리거(App.tsx가 GPS·QR과 같은 postMessage 프로토콜로 처리)
-  const nativeSignIn = useCallback((provider: "google" | "apple") => {
+  // 앱(Capacitor): 네이티브 플러그인 → id_token → 서버. 취소 시 조용히 종료.
+  const nativeSignIn = useCallback(async (provider: "google" | "apple") => {
+    if (busy) return;
     setBusy(true);
-    (window as unknown as { ReactNativeWebView?: { postMessage: (m: string) => void } })
-      .ReactNativeWebView?.postMessage(JSON.stringify({ type: provider === "google" ? "GOOGLE_SIGN_IN" : "APPLE_SIGN_IN" }));
-  }, []);
-
-  // 앱 → SOCIAL_TOKEN(성공)·SOCIAL_ERROR(실패) 수신
-  useEffect(() => {
-    if (!inApp) return;
-    const handler = (e: MessageEvent) => {
-      try {
-        const msg = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
-        if (msg?.type === "SOCIAL_TOKEN" && msg.payload?.idToken) {
-          void submitToken(msg.payload.provider, msg.payload.idToken, msg.payload.name);
-        } else if (msg?.type === "SOCIAL_ERROR") {
-          setBusy(false);
-          toast({ title: t("login.failedTitle"), description: t("login.socialFailed"), variant: "destructive" });
-        }
-      } catch { /* ignore */ }
-    };
-    window.addEventListener("message", handler);
-    document.addEventListener("message", handler as EventListener); // Android
-    return () => {
-      window.removeEventListener("message", handler);
-      document.removeEventListener("message", handler as EventListener);
-    };
-  }, [inApp, submitToken, toast, t]);
+    try {
+      const idToken = await nativeSocialIdToken(provider);
+      if (!idToken) { setBusy(false); return; } // 사용자 취소
+      await submitToken(provider, idToken); // 성공/실패 토스트·busy 해제는 submitToken이 처리
+    } catch {
+      setBusy(false);
+      toast({ title: t("login.failedTitle"), description: t("login.socialFailed"), variant: "destructive" });
+    }
+  }, [busy, submitToken, toast, t]);
 
   // 웹 전용: GIS 스크립트 로드 + 공식 구글 버튼(브랜드 가이드 준수)
   useEffect(() => {
@@ -179,7 +161,7 @@ export default function SocialLogin() {
     } catch { /* 유저 취소 등 무시 */ }
   }, [submitToken]);
 
-  // ── 앱(웹뷰): 네이티브 브릿지 버튼 ──
+  // ── 앱(Capacitor): 네이티브 플러그인 버튼 ──
   if (inApp) {
     return (
       <div className="w-full flex flex-col items-center gap-3">
