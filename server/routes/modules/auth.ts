@@ -114,7 +114,12 @@ router.post("/social", asyncHandler(async (req: any, res: any) => {
         return sendError(res, 401, "토큰 검증에 실패했습니다");
     }
 
-    const result = await hiqService.socialLogin(provider, identity, typeof name === "string" ? name.slice(0, 40) : undefined);
+    // Vercel이 붙여주는 IP 국가 헤더 — 국가 랭킹의 축(유저 입력 없이 자동 수집)
+    const countryCode = typeof req.headers["x-vercel-ip-country"] === "string"
+        ? (req.headers["x-vercel-ip-country"] as string).toUpperCase().slice(0, 2)
+        : undefined;
+
+    const result = await hiqService.socialLogin(provider, identity, typeof name === "string" ? name.slice(0, 40) : undefined, countryCode);
     clearAttempts(key);
 
     res.cookie('hiq_user_id', result.member.id, {

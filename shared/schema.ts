@@ -48,6 +48,13 @@ export const profiles = pgTable("profiles", {
   // 소셜 로그인 식별자 — 글로벌(비한국) 유저는 구글·애플로 가입 (한국은 기존 전화번호 유지)
   googleSub: text("google_sub").unique(),
   appleSub: text("apple_sub").unique(),
+  // 글로벌 신원 — 동명이인 문제 해결 + 지역·국가 단위 랭킹 확장 기반.
+  // handle: 유니크 @아이디(소문자 영숫자·_ 3~20자). 가입 시 자동 생성, 프로필에서 변경.
+  // countryCode: ISO 3166-1 alpha-2(KR·VN·TR…) — 가입 시 IP 헤더로 자동. 국가 랭킹의 축.
+  // regionCode: 국가 하위 지역(예: KR-11 서울) — 지역 랭킹용 예비(지금은 미수집).
+  handle: text("handle").unique(),
+  countryCode: text("country_code"),
+  regionCode: text("region_code"),
 });
 
 // 2. 당구장 (Club/Store) - SaaS Tenant

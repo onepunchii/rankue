@@ -55,8 +55,35 @@ router.get("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =
         ...member,
         role: profile?.role?.trim() || 'user',
         profileImageUrl: profile?.profileImageUrl,
-        nickname: profile?.nickname || member.name
+        nickname: profile?.nickname || member.name,
+        handle: profile?.handle ?? null,
+        countryCode: profile?.countryCode ?? null
     });
+}));
+
+// PATCH /me/handle — @핸들 변경 (유니크·형식 검사. 글로벌 신원의 기본 식별자)
+router.patch("/me/handle", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const member = await storage.getMemberById(req.userId!);
+    if (!member?.profileId) return sendError(res, 404, "프로필 없음");
+
+    const { normalizeHandle, isHandleTaken } = await import("../../lib/handle.js");
+    const handle = normalizeHandle(String(req.body?.handle ?? ""));
+    if (!handle) return sendError(res, 400, "핸들은 영문 소문자·숫자·_ 3~20자여야 합니다 (숫자 시작 불가)");
+
+    const current = await storage.getProfile(member.profileId);
+    if (current?.handle === handle) return sendSuccess(res, { handle });
+    if (await isHandleTaken(handle)) return sendError(res, 409, "이미 사용 중인 핸들입니다");
+
+    await storage.updateProfile(member.profileId, { handle } as any);
+    return sendSuccess(res, { handle });
+}));
+
+// GET /handle-check?h=xxx — 가입·변경 UI의 실시간 중복 확인
+router.get("/handle-check", asyncHandler(async (req: any, res: any) => {
+    const { normalizeHandle, isHandleTaken } = await import("../../lib/handle.js");
+    const handle = normalizeHandle(String(req.query?.h ?? ""));
+    if (!handle) return sendSuccess(res, { valid: false, available: false });
+    return sendSuccess(res, { valid: true, available: !(await isHandleTaken(handle)), handle });
 }));
 
 // PATCH /me - Update profile/member info

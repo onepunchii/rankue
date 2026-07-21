@@ -131,7 +131,11 @@ export const SearchUserDialog = ({
                                                 )}
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-[17px] text-ink-1 tracking-tight mb-0.5">{result.name}</p>
+                                                <p className="font-semibold text-[17px] text-ink-1 tracking-tight mb-0.5">
+                                                    {result.name}
+                                                    {/* @핸들 — 동명이인 구분 (글로벌 유저 대비) */}
+                                                    {(result as any).handle && <span className="ml-1.5 text-[13px] font-medium text-black/40">@{(result as any).handle}</span>}
+                                                </p>
                                                 <p className={cn("text-[12px] font-semibold", tier.class)}>{tier.label}</p>
                                             </div>
                                         </div>

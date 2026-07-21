@@ -2,6 +2,7 @@ import { storage } from "../storage/index.js";
 import { HiqStore, HiqMember, InsertHiqMember } from "../../shared/schema.js";
 import { unauthorized, notFound, badRequest } from "../utils/errors.js";
 import type { SocialIdentity } from "../lib/socialAuth.js";
+import { generateHandle } from "../lib/handle.js";
 
 // 글로벌(비매장) 유저의 소속 스토어 — 마이그레이션에서 시드됨. 소셜 가입 유저는 여기 속한다.
 const GLOBAL_STORE_SLUG = "global";
@@ -112,7 +113,7 @@ export class HiqService {
 
     // 소셜 로그인(구글·애플) — 검증된 identity로 프로필·멤버 find-or-create.
     // 전화번호 로그인과 완전 분리된 경로: 기존 매장 멤버 흐름은 건드리지 않는다.
-    async socialLogin(provider: "google" | "apple", identity: SocialIdentity, displayName?: string) {
+    async socialLogin(provider: "google" | "apple", identity: SocialIdentity, displayName?: string, countryCode?: string) {
         // 1) 프로필(신원) find-or-create — sub가 유일키
         let profile = await storage.getProfileBySocialSub(provider, identity.sub);
         let isNew = false;
@@ -123,6 +124,9 @@ export class HiqService {
                 nickname,
                 email: identity.email ?? undefined,
                 role: "user",
+                // 글로벌 신원 — 유니크 @핸들 자동 생성 + IP 기반 국가(국가 랭킹 축)
+                handle: await generateHandle(identity.email ?? nickname),
+                countryCode: countryCode || undefined,
                 ...(provider === "google" ? { googleSub: identity.sub } : { appleSub: identity.sub }),
             } as any);
         }
@@ -164,6 +168,8 @@ export class HiqService {
                     password: data.password,
                     role: 'user',
                     nickname: data.name,
+                    // 전화 가입도 @핸들 자동 부여(한글 이름은 정규화에서 걸러져 player_#### 폴백)
+                    handle: await generateHandle(data.name),
                     securityQuestion: data.securityQuestion,
                     securityAnswer: normalizedAnswer
                 });

@@ -27,7 +27,9 @@ export async function searchUsers(keyword: string, currentUserId: string, sport:
 
     // Build search conditions
     const searchConditions: any[] = [
-        sql`${hiqMembers.name} ILIKE ${'%' + keyword + '%'}` // Nickname
+        sql`${hiqMembers.name} ILIKE ${'%' + keyword + '%'}`, // Nickname
+        // @핸들 검색 — 동명이인 구분용 유니크 아이디('@' 붙여 검색해도 매칭)
+        sql`${profiles.handle} ILIKE ${'%' + keyword.replace(/^@/, '') + '%'}`
     ];
 
     // Only search by ID if keyword is a valid UUID (prevents 22P02 error)
@@ -47,7 +49,9 @@ export async function searchUsers(keyword: string, currentUserId: string, sport:
     const users = await db.select({
         member: hiqMembers,
         profileImageUrl: profiles.profileImageUrl,
-        nickname: profiles.nickname
+        nickname: profiles.nickname,
+        handle: profiles.handle,
+        countryCode: profiles.countryCode
     })
         .from(hiqMembers)
         .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
@@ -60,7 +64,9 @@ export async function searchUsers(keyword: string, currentUserId: string, sport:
         const user = {
             ...u.member,
             profileImageUrl: u.profileImageUrl,
-            nickname: u.nickname || u.member.name
+            nickname: u.nickname || u.member.name,
+            handle: u.handle ?? null,
+            countryCode: u.countryCode ?? null
         };
 
         if (sport === "GOLF") {

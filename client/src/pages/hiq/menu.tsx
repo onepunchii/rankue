@@ -254,6 +254,13 @@ export default function HiqMenu() {
                             )}
 
                             <div className="flex items-center gap-2">
+                                {/* @핸들 — 동명이인 구분용 유니크 아이디 (검색·초대에 사용) */}
+                                {(member as any)?.handle && (
+                                    <>
+                                        <span className="text-[13px] font-medium text-brand">@{(member as any).handle}</span>
+                                        <span className="w-1 h-1 rounded-full bg-black/25" />
+                                    </>
+                                )}
                                 <span className="text-[13px] font-medium text-black/55">일반 회원</span>
                                 <span className="w-1 h-1 rounded-full bg-black/25" />
                                 <span className="text-[13px] font-medium text-black/40">Lv.{Math.floor((member?.visitCount || 0) / 5) + 1}</span>
