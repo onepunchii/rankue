@@ -23,6 +23,7 @@ import {
     LucideUserX
 } from "@/lib/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { flagEmoji } from "@/lib/flag";
 import { SuggestionModal } from "@/components/hiq/SuggestionModal";
 import { HiqMember } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
@@ -244,6 +245,7 @@ export default function HiqMenu() {
                             ) : (
                                 <div className="flex items-center gap-2 mb-1.5">
                                     <h2 className="text-[19px] font-bold text-ink-1 tracking-tight truncate">
+                                        {flagEmoji(member?.countryCode) && <span className="mr-1 text-[17px]">{flagEmoji(member?.countryCode)}</span>}
                                         {member?.nickname || member?.name || "사용자"}
                                         <span className="text-[15px] font-medium text-black/40 ml-0.5">님</span>
                                     </h2>

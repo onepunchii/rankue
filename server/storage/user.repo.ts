@@ -123,15 +123,23 @@ export class UserRepository {
         }
     }
 
-    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c'): Promise<HiqMember[]> {
+    // 랭킹 — 매장(하이퍼로컬)·국가·글로벌을 같은 쿼리 축으로. countryCode 지정 시 국가 랭킹.
+    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c', countryCode?: string): Promise<HiqMember[]> {
         const field = type === '3c' ? hiqMembers.rating3c : hiqMembers.rating4c;
-        let query = db.select().from(hiqMembers);
+        let query = db.select({
+            member: hiqMembers,
+            handle: profiles.handle,
+            countryCode: profiles.countryCode,
+        }).from(hiqMembers).leftJoin(profiles, eq(hiqMembers.profileId, profiles.id));
 
         if (storeId) {
             query.where(eq(hiqMembers.storeId, storeId));
+        } else if (countryCode) {
+            query.where(eq(profiles.countryCode, countryCode));
         }
 
-        const members = await query.orderBy(desc(field)).limit(limit);
+        const rows = await query.orderBy(desc(field)).limit(limit);
+        const members = rows.map((r) => ({ ...r.member, handle: r.handle, countryCode: r.countryCode } as any));
 
         // Calculate Official AVG for each member based on Game History
         const enhancedMembers = await Promise.all(members.map(async (member) => {

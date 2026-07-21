@@ -7,21 +7,30 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { useSport } from "@/contexts/SportContext";
 
 import { cn } from "@/lib/utils";
+import { flagEmoji } from "@/lib/flag";
 
 export default function HiqRanking() {
     const [rankingTab, setRankingTab] = useState<"3c" | "4c">("4c");
-    const [rankingScope, setRankingScope] = useState<"national" | "store">("store");
+    // 매장(하이퍼로컬) → 국가 → 글로벌 3계층 랭킹
+    const [rankingScope, setRankingScope] = useState<"store" | "country" | "national">("store");
     const { currentSport } = useSport();
 
     const { data: member } = useQuery<HiqMember>({
         queryKey: ["/api/hiq/me"],
     });
 
+    const [rankingCountry, setRankingCountry] = useState<string | null>(null);
     const { data: rankings, isLoading } = useQuery<HiqMember[]>({
         queryKey: [`/api/hiq/rankings`, rankingScope, currentSport, rankingTab],
         queryFn: async () => {
             const res = await fetch(`/api/hiq/rankings?scope=${rankingScope}&type=${rankingTab}&sport=${currentSport}`);
             const data = await res.json();
+            // country 스코프는 {country, rankings} 형태로 옴 — 표시용 국가 저장
+            if (rankingScope === "country" && data.data?.rankings) {
+                setRankingCountry(data.data.country ?? null);
+                return data.data.rankings;
+            }
+            setRankingCountry(null);
             return data.data;
         }
     });
@@ -74,6 +83,17 @@ export default function HiqRanking() {
                         매장 랭킹
                     </button>
                     <button
+                        onClick={() => setRankingScope("country")}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
+                            rankingScope === "country" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-black/70"
+                        )}
+                    >
+                        {/* 국가 랭킹 — 내 국가 기준 (3쿠션 국가 대항 정서) */}
+                        <span className="text-[15px] leading-none">{flagEmoji(rankingCountry || (member as any)?.countryCode) || "🏳️"}</span>
+                        국가 랭킹
+                    </button>
+                    <button
                         onClick={() => setRankingScope("national")}
                         className={cn(
                             "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold transition-colors outline-none ring-0",
@@ -81,7 +101,7 @@ export default function HiqRanking() {
                         )}
                     >
                         <LucideGlobe className="w-4 h-4" />
-                        전국 랭킹
+                        글로벌
                     </button>
                 </div>
 
@@ -162,7 +182,10 @@ export default function HiqRanking() {
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
+                                                {/* 글로벌·국가 랭킹에서 국기로 소속 표시 */}
+                                                {rankingScope !== "store" && flagEmoji(rank.countryCode) && <span className="text-[15px]">{flagEmoji(rank.countryCode)}</span>}
                                                 <span className="font-semibold text-[16px]">{rank.name}</span>
+                                                {rank.handle && <span className="text-[12px] font-medium text-black/40">@{rank.handle}</span>}
                                                 {rank.id === member?.id && <span className="px-1.5 py-0.5 bg-brand/15 rounded text-[12px] font-semibold text-brand border border-brand/25">내 순위</span>}
                                             </div>
                                             <div className="flex items-center gap-1.5 mt-1">

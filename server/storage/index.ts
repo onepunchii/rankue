@@ -31,7 +31,7 @@ class Storage {
     async getFriends(id: string, sport?: string) { return this.users.getFriends(id, sport); }
     async requestFriend(reqId: string, recId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS") { return this.users.requestFriend(reqId, recId, sport); }
     async getStoreMembersWithStats(id: string) { return this.users.getStoreMembersWithStats(id); }
-    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c') { return this.users.getTopRankings(storeId, limit, type); }
+    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c', countryCode?: string) { return this.users.getTopRankings(storeId, limit, type, countryCode); }
     async getAvailableOpponents(storeId: string, currentUserId: string, sport: 'BILLIARDS' | 'GOLF' = 'BILLIARDS') { return this.users.getAvailableOpponents(storeId, currentUserId, sport); }
     async getAllMembers(storeId: string) { return this.users.getAllMembers(storeId); }
     async updatePushToken(memberId: string, token: string) { return this.users.updatePushToken(memberId, token); }

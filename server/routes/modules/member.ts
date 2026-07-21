@@ -192,20 +192,31 @@ router.get("/friends/recent-opponents", requireAuth, asyncHandler(async (req: Au
 }));
 
 // GET /rankings
+// 랭킹 — 매장(하이퍼로컬) → 국가 → 글로벌 3계층. country 미지정 시 내 국가.
 router.get("/rankings", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
-    const scope = req.query.scope as string; // 'national' | 'store'
+    const scope = req.query.scope as string; // 'store' | 'country' | 'national'(=global)
     const type = (req.query.type as '3c' | '4c') || '4c';
 
-    // Default to store if not specified
     if (!scope || scope === 'store') {
-        const storeId = member?.storeId; // User's store
-        const rankings = await storage.getTopRankings(storeId, 20, type);
-        return sendSuccess(res, rankings);
-    } else {
-        const rankings = await storage.getTopRankings(undefined, 20, type);
+        const rankings = await storage.getTopRankings(member?.storeId, 20, type);
         return sendSuccess(res, rankings);
     }
+
+    if (scope === 'country') {
+        // 파라미터 우선, 없으면 내 프로필의 국가 (없으면 KR 기본)
+        let country = typeof req.query.country === "string" ? req.query.country.toUpperCase().slice(0, 2) : "";
+        if (!country && member?.profileId) {
+            const profile = await storage.getProfile(member.profileId);
+            country = (profile as any)?.countryCode || "";
+        }
+        const rankings = await storage.getTopRankings(undefined, 20, type, country || "KR");
+        return sendSuccess(res, { country: country || "KR", rankings });
+    }
+
+    // national(레거시 명칭) = 글로벌 전체
+    const rankings = await storage.getTopRankings(undefined, 20, type);
+    return sendSuccess(res, rankings);
 }));
 
 // POST /suggestions - Submit a suggestion

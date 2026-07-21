@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SearchResult, SportConfig } from "./types";
 import { getTier } from "@/lib/hiqUtils";
+import { flagEmoji } from "@/lib/flag";
 
 interface SearchUserDialogProps {
     open: boolean;
@@ -132,6 +133,8 @@ export const SearchUserDialog = ({
                                             </div>
                                             <div>
                                                 <p className="font-semibold text-[17px] text-ink-1 tracking-tight mb-0.5">
+                                                    {/* 국기 — 국가 단위 랭킹·글로벌 매칭의 시각 축 */}
+                                                    {flagEmoji((result as any).countryCode) && <span className="mr-1">{flagEmoji((result as any).countryCode)}</span>}
                                                     {result.name}
                                                     {/* @핸들 — 동명이인 구분 (글로벌 유저 대비) */}
                                                     {(result as any).handle && <span className="ml-1.5 text-[13px] font-medium text-black/40">@{(result as any).handle}</span>}
