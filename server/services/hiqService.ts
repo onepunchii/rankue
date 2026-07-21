@@ -1,6 +1,10 @@
 import { storage } from "../storage/index.js";
 import { HiqStore, HiqMember, InsertHiqMember } from "../../shared/schema.js";
 import { unauthorized, notFound, badRequest } from "../utils/errors.js";
+import type { SocialIdentity } from "../lib/socialAuth.js";
+
+// 글로벌(비매장) 유저의 소속 스토어 — 마이그레이션에서 시드됨. 소셜 가입 유저는 여기 속한다.
+const GLOBAL_STORE_SLUG = "global";
 
 export class HiqService {
     async getBranding(slug: string) {
@@ -104,6 +108,41 @@ export class HiqService {
         } else {
             return { phone, storeId: store.id, isNew: true, redirectTo: `/register?phone=${phone}&store=${store.id}` };
         }
+    }
+
+    // 소셜 로그인(구글·애플) — 검증된 identity로 프로필·멤버 find-or-create.
+    // 전화번호 로그인과 완전 분리된 경로: 기존 매장 멤버 흐름은 건드리지 않는다.
+    async socialLogin(provider: "google" | "apple", identity: SocialIdentity, displayName?: string) {
+        // 1) 프로필(신원) find-or-create — sub가 유일키
+        let profile = await storage.getProfileBySocialSub(provider, identity.sub);
+        let isNew = false;
+        if (!profile) {
+            isNew = true;
+            const nickname = displayName || identity.name || identity.email?.split("@")[0] || "Player";
+            profile = await storage.createProfile({
+                nickname,
+                email: identity.email ?? undefined,
+                role: "user",
+                ...(provider === "google" ? { googleSub: identity.sub } : { appleSub: identity.sub }),
+            } as any);
+        }
+
+        // 2) 멤버 find-or-create — 글로벌 스토어 소속(매장 무관 개인 유저)
+        let member = await storage.getMemberByProfileId(profile.id);
+        if (!member) {
+            const globalStore = await storage.getStoreBySlug(GLOBAL_STORE_SLUG);
+            if (!globalStore) throw notFound("GLOBAL_STORE_NOT_SEEDED");
+            member = await storage.createMember({
+                storeId: globalStore.id,
+                // phone은 notNull+unique(storeId,phone) — 소셜 유저는 sub 기반 플레이스홀더(실전화 아님)
+                phone: `social:${provider}:${identity.sub}`,
+                name: profile.nickname || "Player",
+                profileId: profile.id,
+            } as any);
+        }
+
+        await storage.incrementVisitCount(member.id);
+        return { member, isNew, redirectTo: "/dashboard" };
     }
 
     async register(data: InsertHiqMember) {

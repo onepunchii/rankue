@@ -28,6 +28,22 @@ export class UserRepository {
         return profile;
     }
 
+    // 소셜 로그인 식별자(sub)로 프로필 조회 — 글로벌 유저(비한국) 가입 경로
+    async getProfileBySocialSub(provider: "google" | "apple", sub: string): Promise<Profile | undefined> {
+        const col = provider === "google" ? profiles.googleSub : profiles.appleSub;
+        const [profile] = await db.select().from(profiles).where(eq(col, sub));
+        return profile;
+    }
+
+    // 프로필에 연결된 멤버 조회(글로벌 스토어 우선) — 소셜 로그인 세션 발급용
+    async getMemberByProfileId(profileId: string): Promise<HiqMember | undefined> {
+        const [member] = await db.select().from(hiqMembers)
+            .where(eq(hiqMembers.profileId, profileId))
+            .orderBy(asc(hiqMembers.createdAt))
+            .limit(1);
+        return member;
+    }
+
     async getProfileByPhone(phone: string): Promise<Profile | undefined> {
         const [profile] = await db.select().from(profiles).where(eq(profiles.phone, phone));
         return profile;

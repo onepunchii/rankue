@@ -45,6 +45,9 @@ export const profiles = pgTable("profiles", {
   pushToken: text("push_token"), // Expo Push Token column added
   securityQuestion: text("security_question"),
   securityAnswer: text("security_answer"),
+  // 소셜 로그인 식별자 — 글로벌(비한국) 유저는 구글·애플로 가입 (한국은 기존 전화번호 유지)
+  googleSub: text("google_sub").unique(),
+  appleSub: text("apple_sub").unique(),
 });
 
 // 2. 당구장 (Club/Store) - SaaS Tenant

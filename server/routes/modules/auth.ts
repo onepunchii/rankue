@@ -5,6 +5,7 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { storage } from "../../storage/index.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { verifyGoogleIdToken, verifyAppleIdToken } from "../../lib/socialAuth.js";
 
 const router = Router();
 
@@ -86,6 +87,44 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
             path: '/'
         });
     }
+
+    return sendSuccess(res, result);
+}));
+
+// POST /social - 구글·애플 소셜 로그인 (글로벌 유저 경로. 한국 전화 로그인과 별개)
+// body: { provider: 'google'|'apple', idToken, name? } — idToken은 서버에서 JWKS로 재검증(위조 불가)
+router.post("/social", asyncHandler(async (req: any, res: any) => {
+    const { provider, idToken, name } = req.body ?? {};
+    if ((provider !== "google" && provider !== "apple") || typeof idToken !== "string" || !idToken) {
+        return sendError(res, 400, "provider와 idToken이 필요합니다");
+    }
+
+    // 무차별 시도 방어 — 로그인과 같은 레이트리밋 재사용(키는 ip 기준)
+    const key = attemptKey('social', provider, req.ip);
+    const rl = checkRateLimit(key);
+    if (rl.limited) {
+        return sendError(res, 429, `시도가 너무 많습니다. ${rl.retryAfterSec}초 후 다시 시도해주세요.`);
+    }
+
+    const identity = provider === "google"
+        ? await verifyGoogleIdToken(idToken)
+        : await verifyAppleIdToken(idToken);
+    if (!identity) {
+        registerFailure(key);
+        return sendError(res, 401, "토큰 검증에 실패했습니다");
+    }
+
+    const result = await hiqService.socialLogin(provider, identity, typeof name === "string" ? name.slice(0, 40) : undefined);
+    clearAttempts(key);
+
+    res.cookie('hiq_user_id', result.member.id, {
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        signed: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
+        path: '/'
+    });
 
     return sendSuccess(res, result);
 }));
