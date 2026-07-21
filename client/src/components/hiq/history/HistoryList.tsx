@@ -18,7 +18,7 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
         <>
             <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2 text-black/55">
                 <config.mainIcon className="w-4 h-4 text-brand" />
-                {config.listTitle}
+                {t(config.listTitle)}
             </h3>
             <div className="space-y-2.5">
                 <AnimatePresence mode="popLayout">

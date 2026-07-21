@@ -43,16 +43,16 @@ export interface SportConfig {
 
 export const SPORT_CONFIGS: Record<string, SportConfig> = {
     BILLIARDS: {
-        label: "라이벌",
-        title: "라이벌 리스트",
+        label: "rivalsConfig.label",
+        title: "rivalsConfig.title",
         subTitle: "Competitors Arena",
         themeColor: "text-brand",
         bgColor: "bg-brand",
         bgLight: "bg-brand/5",
         borderColor: "border-brand/20",
-        searchPlaceholder: "닉네임 또는 전화번호 입력...",
-        actionText: "라이벌 추가하기",
-        emptyTitle: "아직 라이벌이 없네요",
+        searchPlaceholder: "rivalsConfig.searchPlaceholder",
+        actionText: "rivalsConfig.actionText",
+        emptyTitle: "rivalsConfig.emptyTitle",
         emptyDesc: "rivals",
         glowColor: "rgba(16, 185, 129, 0.1)"
     },

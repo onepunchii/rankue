@@ -205,16 +205,16 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                 ) : (
                     <div className="space-y-2">
                         <div className="grid grid-cols-4 gap-2">
-                            <StatBox label={config.statLabels.total} value={totalGames} />
-                            <StatBox label={config.statLabels.score}
+                            <StatBox label={t(config.statLabels.total)} value={totalGames} />
+                            <StatBox label={t(config.statLabels.score)}
                                 value={totalGames > 0 ? (parseFloat(totalNormalizedScore as any) / totalGames).toFixed(1) : "0.0"} />
-                            <StatBox label={config.statLabels.best} value={`${winRate}%`} valueColor="text-brand" />
-                            <StatBox label={config.statLabels.extra3} value={bestHighRun} valueColor="text-brand" />
+                            <StatBox label={t(config.statLabels.best)} value={`${winRate}%`} valueColor="text-brand" />
+                            <StatBox label={t(config.statLabels.extra3)} value={bestHighRun} valueColor="text-brand" />
                         </div>
                         <div className="grid grid-cols-3 gap-2">
-                            <StatBox label={config.statLabels.bestVal} value={bestAverage} valueColor="text-brand" />
-                            <StatBox label={config.statLabels.extra1} value={recent10Avg} />
-                            <StatBox label={config.statLabels.extra2} value={`${emptyInningRate}%`} valueColor="text-red-500" />
+                            <StatBox label={t(config.statLabels.bestVal)} value={bestAverage} valueColor="text-brand" />
+                            <StatBox label={t(config.statLabels.extra1)} value={recent10Avg} />
+                            <StatBox label={t(config.statLabels.extra2)} value={`${emptyInningRate}%`} valueColor="text-red-500" />
                         </div>
                     </div>
                 )}

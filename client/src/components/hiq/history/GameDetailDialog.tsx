@@ -60,10 +60,10 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                         <div>
                             <DialogTitle className="text-xl font-semibold flex items-center gap-2">
                                 <config.mainIcon className={cn("w-5 h-5", config.themeColor)} />
-                                {config.detailTitle}
+                                {t(config.detailTitle)}
                             </DialogTitle>
                             <DialogDescription className="text-black/55 text-[12px] uppercase font-bold tracking-normal mt-1">
-                                {config.detailSubtitle}
+                                {t(config.detailSubtitle)}
                             </DialogDescription>
                         </div>
                     </div>
@@ -128,7 +128,7 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                                     )}>
                                         <LucideZap className="w-4 h-4" />
                                         <span className="text-[12px] font-semibold uppercase">
-                                            {config.statLabels.extra3 || "High Run"}
+                                            {t(config.statLabels.extra3) || "High Run"}
                                         </span>
                                     </div>
                                     <p className="text-2xl font-semibold">

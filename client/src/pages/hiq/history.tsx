@@ -70,10 +70,10 @@ export default function HiqHistory() {
                 </motion.button>
                 <div>
                     <h1 className="text-[26px] font-bold tracking-tight text-ink-1 leading-none">
-                        {config.title}
+                        {t(config.title)}
                     </h1>
                     <p className="text-[13px] font-medium text-black/55 mt-1.5">
-                        {config.subtitle}
+                        {t(config.subtitle)}
                     </p>
                 </div>
             </div>

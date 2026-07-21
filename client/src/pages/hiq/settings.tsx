@@ -33,7 +33,7 @@ export default function HiqSettings() {
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
             setHandleInput(null);
         } catch (e: any) {
-            toast({ title: e?.message || "핸들 변경 실패", variant: "destructive" });
+            toast({ title: e?.message || t("settings.handleChangeFailed"), variant: "destructive" });
         } finally {
             setHandleSaving(false);
         }
@@ -47,7 +47,7 @@ export default function HiqSettings() {
 
     const conn = member?.connections ?? {};
     const connections: { key: string; label: string; linked: boolean }[] = [
-        { key: "phone", label: "휴대폰 번호", linked: !!conn.phone },
+        { key: "phone", label: t("settings.connPhone"), linked: !!conn.phone },
         { key: "google", label: "Google", linked: !!conn.google },
         { key: "apple", label: "Apple", linked: !!conn.apple },
     ];
@@ -56,10 +56,10 @@ export default function HiqSettings() {
         <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-32 font-sans">
             {/* Header */}
             <div className="flex items-center gap-3 mb-8 pt-5">
-                <button title="뒤로" onClick={() => setLocation("/menu")} className="w-11 h-11 -ml-2 rounded-full flex items-center justify-center active:bg-black/[0.06]">
+                <button title={t("settings.back")} onClick={() => setLocation("/menu")} className="w-11 h-11 -ml-2 rounded-full flex items-center justify-center active:bg-black/[0.06]">
                     <LucideChevronLeft className="w-6 h-6 text-black/55" />
                 </button>
-                <h1 className="text-[26px] font-bold tracking-tight">설정</h1>
+                <h1 className="text-[26px] font-bold tracking-tight">{t("settings.title")}</h1>
             </div>
 
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -67,9 +67,9 @@ export default function HiqSettings() {
                 <section className="rk-card p-5">
                     <div className="flex items-center gap-2 mb-1">
                         <LucidePencil className="w-4 h-4 text-brand" />
-                        <h2 className="text-[15px] font-bold">내 핸들</h2>
+                        <h2 className="text-[15px] font-bold">{t("settings.myHandle")}</h2>
                     </div>
-                    <p className="text-[12px] text-black/45 mb-4">전 세계에서 나를 찾는 유일한 아이디예요 (영문 소문자·숫자·_ 3~20자)</p>
+                    <p className="text-[12px] text-black/45 mb-4">{t("settings.handleDesc")}</p>
                     <div className="flex items-center gap-2">
                         <div className="flex-1 flex items-center h-12 px-4 bg-black/[0.04] rounded-tile">
                             <span className="text-black/40 mr-0.5">@</span>
@@ -86,7 +86,7 @@ export default function HiqSettings() {
                             className="h-12 px-5 rounded-tile bg-brand text-brand-fg text-[14px] font-bold disabled:opacity-25 flex items-center gap-1.5"
                         >
                             {handleSaving ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <LucideCheck className="w-4 h-4" />}
-                            변경
+                            {t("settings.change")}
                         </button>
                     </div>
                 </section>
@@ -95,9 +95,9 @@ export default function HiqSettings() {
                 <section className="rk-card p-5">
                     <div className="flex items-center gap-2 mb-1">
                         <LucideGlobe className="w-4 h-4 text-brand" />
-                        <h2 className="text-[15px] font-bold">언어 · Language</h2>
+                        <h2 className="text-[15px] font-bold">{t("settings.language")}</h2>
                     </div>
-                    <p className="text-[12px] text-black/45 mb-4">{flagEmoji(member?.countryCode)} 앱 표시 언어를 선택하세요</p>
+                    <p className="text-[12px] text-black/45 mb-4">{flagEmoji(member?.countryCode)} {t("settings.languageDesc")}</p>
                     <div className="grid grid-cols-2 gap-2">
                         {LOCALES.map((l) => (
                             <button
@@ -119,17 +119,17 @@ export default function HiqSettings() {
                 <section className="rk-card p-5">
                     <div className="flex items-center gap-2 mb-1">
                         <LucideBadgeCheck className="w-4 h-4 text-brand" />
-                        <h2 className="text-[15px] font-bold">연결된 로그인</h2>
+                        <h2 className="text-[15px] font-bold">{t("settings.connections")}</h2>
                     </div>
-                    <p className="text-[12px] text-black/45 mb-4">이 계정으로 로그인할 수 있는 방법이에요</p>
+                    <p className="text-[12px] text-black/45 mb-4">{t("settings.connectionsDesc")}</p>
                     <div className="space-y-2">
                         {connections.map((c) => (
                             <div key={c.key} className="flex items-center justify-between h-12 px-4 bg-black/[0.03] rounded-tile">
                                 <span className="text-[14px] font-medium">{c.label}</span>
                                 {c.linked ? (
-                                    <span className="text-[12px] font-bold text-brand flex items-center gap-1"><LucideCheck className="w-3.5 h-3.5" /> 연결됨</span>
+                                    <span className="text-[12px] font-bold text-brand flex items-center gap-1"><LucideCheck className="w-3.5 h-3.5" /> {t("settings.linked")}</span>
                                 ) : (
-                                    <span className="text-[12px] font-medium text-black/30">미연결</span>
+                                    <span className="text-[12px] font-medium text-black/30">{t("settings.notLinked")}</span>
                                 )}
                             </div>
                         ))}
@@ -139,12 +139,12 @@ export default function HiqSettings() {
                 {/* 법적 고지 · 계정 */}
                 <section className="rk-card overflow-hidden">
                     <button onClick={() => setLocation("/privacy")} className="w-full flex items-center justify-between px-5 h-14 active:bg-black/[0.03]">
-                        <span className="flex items-center gap-2 text-[14px] font-medium"><LucideShield className="w-4 h-4 text-black/40" /> 개인정보 처리방침</span>
+                        <span className="flex items-center gap-2 text-[14px] font-medium"><LucideShield className="w-4 h-4 text-black/40" /> {t("settings.privacy")}</span>
                         <LucideChevronRight className="w-4 h-4 text-black/25" />
                     </button>
                     <div className="h-px bg-black/[0.05] mx-5" />
                     <button onClick={handleLogout} className="w-full flex items-center justify-between px-5 h-14 active:bg-black/[0.03]">
-                        <span className="flex items-center gap-2 text-[14px] font-medium text-red-500"><LucideLogOut className="w-4 h-4" /> 로그아웃</span>
+                        <span className="flex items-center gap-2 text-[14px] font-medium text-red-500"><LucideLogOut className="w-4 h-4" /> {t("settings.logout")}</span>
                     </button>
                 </section>
 
