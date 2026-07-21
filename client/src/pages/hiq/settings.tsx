@@ -81,19 +81,20 @@ export default function HiqSettings() {
                     </div>
                     <p className="text-[12px] text-black/45 mb-4">{t("settings.handleDesc")}</p>
                     <div className="flex items-center gap-2">
-                        <div className="flex-1 flex items-center h-12 px-4 bg-black/[0.04] rounded-tile">
-                            <span className="text-black/40 mr-0.5">@</span>
+                        {/* min-w-0 필수 — input의 고유 최소폭이 행을 카드 밖으로 밀어내는 것 방지(모바일) */}
+                        <div className="flex-1 min-w-0 flex items-center h-12 px-4 bg-black/[0.04] rounded-tile">
+                            <span className="text-black/40 mr-0.5 shrink-0">@</span>
                             <input
                                 value={editingHandle}
                                 onChange={(e) => setHandleInput(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20))}
-                                className="flex-1 bg-transparent outline-none text-[15px] font-semibold"
+                                className="w-full min-w-0 bg-transparent outline-none text-[15px] font-semibold"
                                 placeholder="handle"
                             />
                         </div>
                         <button
                             onClick={saveHandle}
                             disabled={handleSaving || !handleInput || handleInput === currentHandle}
-                            className="h-12 px-5 rounded-tile bg-brand text-brand-fg text-[14px] font-bold disabled:opacity-25 flex items-center gap-1.5"
+                            className="h-12 px-5 shrink-0 whitespace-nowrap rounded-tile bg-brand text-brand-fg text-[14px] font-bold disabled:opacity-25 flex items-center gap-1.5"
                         >
                             {handleSaving ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <LucideCheck className="w-4 h-4" />}
                             {t("settings.change")}
