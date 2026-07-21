@@ -13,6 +13,16 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Speech from 'expo-speech';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
+
+// 구글 OAuth 클라이언트 — GCP rankue-a0493. iOS/Android 네이티브 클라이언트 id_token.
+// (Android는 SHA-1 확보 후 채움 — 비면 iOS만 동작)
+const GOOGLE_IOS_CLIENT_ID = '103447981482-3fb4s0t0aleod83kbkc79gslr38kb6pq.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = ''; // TODO: EAS SHA-1 확보 후 GCP Android 클라이언트 생성
 
 const WEB_URL = 'https://www.rankue.co.kr';
 
@@ -172,6 +182,40 @@ export default function App() {
     // Push Listener Integration
     useNotificationListener(sendToWeb);
 
+    // ── 소셜 로그인 브릿지 (RQ-4b) ──
+    // 웹뷰에선 구글 OAuth가 정책상 막히므로 앱이 네이티브로 로그인하고 id_token만 웹에 전달.
+    // 웹의 SocialLogin이 SOCIAL_TOKEN을 받아 /api/hiq/social로 서버 검증 → 세션 발급.
+    const [, googleResponse, googlePromptAsync] = Google.useIdTokenAuthRequest({
+        iosClientId: GOOGLE_IOS_CLIENT_ID,
+        ...(GOOGLE_ANDROID_CLIENT_ID ? { androidClientId: GOOGLE_ANDROID_CLIENT_ID } : {}),
+    });
+    useEffect(() => {
+        if (googleResponse?.type === 'success') {
+            const idToken = (googleResponse.params as any)?.id_token;
+            if (idToken) sendToWeb('SOCIAL_TOKEN', { provider: 'google', idToken });
+        } else if (googleResponse?.type === 'error') {
+            sendToWeb('SOCIAL_ERROR', { provider: 'google' });
+        }
+    }, [googleResponse, sendToWeb]);
+
+    const handleAppleSignIn = useCallback(async () => {
+        try {
+            const cred = await AppleAuthentication.signInAsync({
+                requestedScopes: [
+                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
+                ],
+            });
+            if (cred.identityToken) {
+                // 애플은 최초 1회만 이름 제공 — 있으면 함께 전달
+                const name = [cred.fullName?.givenName, cred.fullName?.familyName].filter(Boolean).join(' ');
+                sendToWeb('SOCIAL_TOKEN', { provider: 'apple', idToken: cred.identityToken, name: name || undefined });
+            }
+        } catch (e: any) {
+            if (e?.code !== 'ERR_REQUEST_CANCELED') sendToWeb('SOCIAL_ERROR', { provider: 'apple' });
+        }
+    }, [sendToWeb]);
+
     const handleLocation = async () => {
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
@@ -302,6 +346,12 @@ export default function App() {
                     break;
                 case 'GET_LOCATION':
                     handleLocation();
+                    break;
+                case 'GOOGLE_SIGN_IN':
+                    googlePromptAsync();
+                    break;
+                case 'APPLE_SIGN_IN':
+                    handleAppleSignIn();
                     break;
                 case 'SHARE':
                     handleShare(message.payload || {});

@@ -21,8 +21,21 @@
         "NSCameraUsageDescription": "QR 코드 스캔 및 프로필 사진 촬영을 위해 카메라 접근 권한이 필요합니다.",
         "NSLocationWhenInUseUsageDescription": "사용자의 현재 위치를 기반으로 가까운 매장 정보를 제공하기 위해 위치 권한이 필요합니다.",
         "NSMicrophoneUsageDescription": "음성 명령 및 TTS 기능을 위해 마이크 권한이 필요합니다.",
-        "ITSAppUsesNonExemptEncryption": false
-      }
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.103447981482-3fb4s0t0aleod83kbkc79gslr38kb6pq"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "rankueapp"
+            ]
+          }
+        ]
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.rankue.app",
@@ -84,7 +97,9 @@
         {
           "locationAlwaysAndWhenInUsePermission": "사용자의 현재 위치를 기반으로 가까운 매장 정보를 제공하기 위해 위치 권한이 필요합니다."
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,
