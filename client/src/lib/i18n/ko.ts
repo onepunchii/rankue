@@ -1402,4 +1402,13 @@ export const ko: Dict = {
   "historyConfig.extra1": "최근 10",
   "historyConfig.extra2": "공타율",
   "historyConfig.extra3": "최고 HR",
+  "createClub.regionFreeformPlaceholder": "주 활동 도시 입력 (예: 서울 강남)",
+  "settings.profile": "내 프로필",
+  "settings.profileDesc": "통계·매칭에 활용돼요 (선택사항)",
+  "settings.male": "남성",
+  "settings.female": "여성",
+  "settings.birthYear": "출생연도",
+  "settings.saveFailed": "저장 실패",
+  "dashboard.completeProfile": "프로필 완성하고 매칭 정확도 높이기",
+  "dashboard.completeProfileCta": "설정에서 30초 →",
 };

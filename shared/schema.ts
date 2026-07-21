@@ -309,6 +309,9 @@ export const hiqCrews = pgTable("hiq_crews", {
   emblem: text("emblem"), // Emoji or URL
   gameType: text("game_type", { enum: ["3c", "4c", "pocket", "any", "field", "screen", "range"] }).default("any").notNull(),
   region: text("region"),
+  // 국가 코드 — 생성자 프로필에서 서버가 자동 세팅(클라 값 신뢰 안 함). 국가별 크루 발견·랭킹 축.
+  // region은 자유 텍스트 유지: ko는 행정동 검색, 비ko는 도시명 직접 입력.
+  countryCode: text("country_code"),
   tags: jsonb("tags"), // ["#tag1", "#tag2"]
   joinType: text("join_type", { enum: ["auto", "approval"] }).default("auto").notNull(),
   maxMembers: integer("max_members").default(50),

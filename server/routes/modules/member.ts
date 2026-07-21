@@ -119,6 +119,10 @@ router.patch("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any)
     const updateData: any = {};
     if (name) updateData.name = name;
     if (introduction !== undefined) updateData.introduction = introduction;
+    // 프로필 완성(설정 화면) — 가입에서 옮겨온 선택 정보. 화이트리스트 검증.
+    if (req.body.gender === "male" || req.body.gender === "female") updateData.gender = req.body.gender;
+    const by = Number(req.body.birthYear);
+    if (Number.isInteger(by) && by >= 1920 && by <= 2020) updateData.birthYear = by;
 
     if (Object.keys(updateData).length > 0) {
         await storage.updateMember(member.id, updateData);

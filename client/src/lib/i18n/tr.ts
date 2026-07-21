@@ -1400,5 +1400,14 @@ const tr: Dict = {
   "historyConfig.extra1": "Son 10",
   "historyConfig.extra2": "Boş %",
   "historyConfig.extra3": "En iyi seri",
+  "createClub.regionFreeformPlaceholder": "Şehriniz (örn. İstanbul, Kadıköy)",
+  "settings.profile": "Profilim",
+  "settings.profileDesc": "İstatistik ve eşleşme için (isteğe bağlı)",
+  "settings.male": "Erkek",
+  "settings.female": "Kadın",
+  "settings.birthYear": "Doğum yılı",
+  "settings.saveFailed": "Kaydedilemedi",
+  "dashboard.completeProfile": "Daha iyi eşleşme için profilini tamamla",
+  "dashboard.completeProfileCta": "Ayarlarda 30 sn →",
 };
 export default tr;

@@ -1400,5 +1400,14 @@ const en: Dict = {
   "historyConfig.extra1": "Last 10",
   "historyConfig.extra2": "Miss rate",
   "historyConfig.extra3": "High run",
+  "createClub.regionFreeformPlaceholder": "Your city (e.g. Istanbul, Kadıköy)",
+  "settings.profile": "My Profile",
+  "settings.profileDesc": "Used for stats & matchmaking (optional)",
+  "settings.male": "Male",
+  "settings.female": "Female",
+  "settings.birthYear": "Birth year",
+  "settings.saveFailed": "Failed to save",
+  "dashboard.completeProfile": "Complete your profile for better matches",
+  "dashboard.completeProfileCta": "30s in Settings →",
 };
 export default en;

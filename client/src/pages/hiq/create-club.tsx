@@ -49,7 +49,7 @@ const STEPS = [
 
 export default function CreateClub() {
     const [_, setLocation] = useLocation();
-    const { t } = useT();
+    const { t, locale } = useT();
     const { data: member } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
     const { toast } = useToast();
     const [uploadingField, setUploadingField] = useState<null | 'emblem' | 'coverImage'>(null);
@@ -74,8 +74,8 @@ export default function CreateClub() {
         name: "",
         shortIntro: "",
         description: "",
-        meetingDay: "매주 토요일",
-        meetingTime: "오후 2시",
+        meetingDay: "",
+        meetingTime: "",
         emblem: "",
         coverImage: "",
         gameType: "any",
@@ -341,6 +341,16 @@ export default function CreateClub() {
                             <div className="space-y-4">
                                 <div className="space-y-2">
                                     <Label className="text-xs font-semibold text-black/55">{t("createClub.regionLabel")} <span className="text-brand">*</span></Label>
+                                    {/* 지역 입력 분기 — ko: 한국 행정동 검색 / 그 외: 도시명 자유 입력
+                                        (지역 DB가 한국 전용이라 글로벌 유저는 검색 결과가 항상 비어 못 만들게 됨) */}
+                                    {locale !== "ko" ? (
+                                        <Input
+                                            value={formData.region || ""}
+                                            onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                                            placeholder={t("createClub.regionFreeformPlaceholder")}
+                                            className="h-12 bg-surface-2 border-black/10 rounded-tile text-[15px]"
+                                        />
+                                    ) : (
                                     <Popover open={isRegionOpen} onOpenChange={setIsRegionOpen}>
                                         <PopoverTrigger asChild>
                                             <Button
@@ -396,6 +406,7 @@ export default function CreateClub() {
                                             </Command>
                                         </PopoverContent>
                                     </Popover>
+                                    )}
                                 </div>
                                 <div className="relative">
                                     <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-black/55" />

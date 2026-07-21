@@ -486,7 +486,18 @@ router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =>
     }
 
     // Ownership is set from the authenticated session — never trust a client-supplied leaderId.
-    const crew = await storage.createCrew({ ...validation.data, leaderId: req.userId! });
+    // countryCode도 서버가 결정: 생성자 프로필 국가(자동 수집분) → 없으면 IP 헤더 → 그래도 없으면 null.
+    const leader = await storage.getMemberById(req.userId!);
+    let countryCode: string | undefined;
+    if (leader?.profileId) {
+        const profile = await storage.getProfile(leader.profileId);
+        countryCode = (profile as any)?.countryCode || undefined;
+    }
+    if (!countryCode && typeof req.headers["x-vercel-ip-country"] === "string") {
+        countryCode = (req.headers["x-vercel-ip-country"] as string).toUpperCase().slice(0, 2);
+    }
+
+    const crew = await storage.createCrew({ ...validation.data, leaderId: req.userId!, countryCode });
     return sendSuccess(res, crew);
 }));
 

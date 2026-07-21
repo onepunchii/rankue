@@ -19,8 +19,6 @@ const STEPS = [
     { id: "personal", title: "register.stepPersonalTitle", desc: "register.stepPersonalDesc" },
     { id: "password", title: "register.stepPasswordTitle", desc: "register.stepPasswordDesc" },
     { id: "security", title: "register.stepSecurityTitle", desc: "register.stepSecurityDesc" },
-    { id: "gender", title: "register.stepGenderTitle", desc: "register.stepGenderDesc" },
-    { id: "birth", title: "register.stepBirthTitle", desc: "register.stepBirthDesc" },
     { id: "terms", title: "register.stepTermsTitle", desc: "register.stepTermsDesc" }
 ];
 
@@ -70,8 +68,6 @@ export default function HiqRegister() {
             storeId: storeIdFromQuery,
             name: "",
             password: "", // Default
-            birthYear: 1980,
-            gender: "male",
             handi3c: 0,
             handi4c: 0,
             average: "0.000",
@@ -302,74 +298,6 @@ export default function HiqRegister() {
                         )}
 
                         {currentStep === 3 && (
-                            <motion.div
-                                key="step_gender"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                className="flex gap-4"
-                            >
-                                <Button
-                                    onClick={() => setValue("gender", "male")}
-                                    variant={formData.gender === "male" ? "default" : "outline"}
-                                    className="flex-1 h-20 rounded-2xl flex flex-row items-center justify-center gap-3 transition-all"
-                                    style={{
-                                        backgroundColor: formData.gender === "male" ? "rgb(var(--brand))" : "rgba(0,0,0,0.04)",
-                                        color: formData.gender === "male" ? "rgb(var(--brand-fg))" : "rgba(0,0,0,0.55)",
-                                        border: formData.gender === "male" ? "none" : "1px solid rgba(0,0,0,0.10)"
-                                    }}
-                                >
-                                    <span className="text-2xl">♂️</span>
-                                    <span className="font-bold text-lg">{t("register.male")}</span>
-                                </Button>
-                                <Button
-                                    onClick={() => setValue("gender", "female")}
-                                    variant={formData.gender === "female" ? "default" : "outline"}
-                                    className="flex-1 h-20 rounded-2xl flex flex-row items-center justify-center gap-3 transition-all"
-                                    style={{
-                                        backgroundColor: formData.gender === "female" ? "rgb(var(--brand))" : "rgba(0,0,0,0.04)",
-                                        color: formData.gender === "female" ? "rgb(var(--brand-fg))" : "rgba(0,0,0,0.55)",
-                                        border: formData.gender === "female" ? "none" : "1px solid rgba(0,0,0,0.10)"
-                                    }}
-                                >
-                                    <span className="text-2xl">♀️</span>
-                                    <span className="font-bold text-lg">{t("register.female")}</span>
-                                </Button>
-                            </motion.div>
-                        )}
-
-                        {currentStep === 4 && (
-                            <motion.div
-                                key="step_birth"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                className="space-y-6 text-center"
-                            >
-                                <div className="grid grid-cols-4 gap-3 max-h-[440px] overflow-y-auto p-4 bg-black/[0.04] rounded-2xl scrollbar-hide">
-                                    {Array.from({ length: new Date().getFullYear() - 1950 + 1 }, (_, i) => 1950 + i).reverse().map(year => (
-                                        <Button
-                                            key={year}
-                                            variant={formData.birthYear === year ? "default" : "outline"}
-                                            onClick={() => setValue("birthYear", year)}
-                                            title={`${year}${t("register.birthYearSuffix")}`}
-                                            className="h-14 text-lg rounded-tile transition-all tabular-nums"
-                                            style={{
-                                                backgroundColor: formData.birthYear === year ? "rgb(var(--brand))" : "transparent",
-                                                color: formData.birthYear === year ? "rgb(var(--brand-fg))" : "rgba(0,0,0,0.55)",
-                                                border: formData.birthYear === year ? "none" : "1px solid rgba(0,0,0,0.10)"
-                                            }}
-                                        >
-                                            {year}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </motion.div>
-                        )}
-
-
-
-                        {currentStep === 5 && (
                             <motion.div
                                 key="step_terms"
                                 initial={{ opacity: 0, y: 20 }}

@@ -1400,5 +1400,14 @@ const es: Dict = {
   "historyConfig.extra1": "Últimas 10",
   "historyConfig.extra2": "% fallos",
   "historyConfig.extra3": "Mejor racha",
+  "createClub.regionFreeformPlaceholder": "Tu ciudad (ej. Bogotá, Chapinero)",
+  "settings.profile": "Mi perfil",
+  "settings.profileDesc": "Para estadísticas y emparejamiento (opcional)",
+  "settings.male": "Hombre",
+  "settings.female": "Mujer",
+  "settings.birthYear": "Año de nacimiento",
+  "settings.saveFailed": "Error al guardar",
+  "dashboard.completeProfile": "Completa tu perfil para mejores partidas",
+  "dashboard.completeProfileCta": "30 s en Ajustes →",
 };
 export default es;

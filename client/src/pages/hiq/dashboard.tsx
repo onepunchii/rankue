@@ -19,8 +19,11 @@ import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { LucideRefreshCw, LucideZap, ChevronUp, ChevronDown } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 
+import { useLocation } from "wouter";
+
 export default function HiqDashboard() {
     const { t } = useT();
+    const [, setLocation] = useLocation();
     const { currentSport } = useSport();
 
     // Redirect to Golf Dashboard if sports mode is GOLF
@@ -147,6 +150,17 @@ export default function HiqDashboard() {
                 getTrend={getTrend}
                 tier={getTier(parseFloat(analysis?.summary?.overallAvg || "0"), false)}
             />
+
+            {/* 프로필 완성 넛지 — 가입에서 설정으로 옮긴 선택 정보(성별·출생연도) 채움 유도 */}
+            {member && (!(member as any).gender || !(member as any).birthYear) && (
+                <button
+                    onClick={() => setLocation("/settings")}
+                    className="w-full mb-4 px-4 py-3 rounded-tile bg-brand/10 border border-brand/25 flex items-center justify-between text-left active:scale-[0.99] transition-transform"
+                >
+                    <span className="text-[13px] font-semibold text-brand">{t("dashboard.completeProfile")}</span>
+                    <span className="text-[12px] text-brand/70">{t("dashboard.completeProfileCta")}</span>
+                </button>
+            )}
 
             {/* 전적 (승률 게이지 + 최근 폼) */}
             <PerformanceCard history={history} />

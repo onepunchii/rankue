@@ -1400,5 +1400,14 @@ const vi: Dict = {
   "historyConfig.extra1": "10 gần nhất",
   "historyConfig.extra2": "Tỷ lệ trượt",
   "historyConfig.extra3": "HR cao nhất",
+  "createClub.regionFreeformPlaceholder": "Thành phố của bạn (VD: TP.HCM, Quận 1)",
+  "settings.profile": "Hồ sơ của tôi",
+  "settings.profileDesc": "Dùng cho thống kê & ghép trận (không bắt buộc)",
+  "settings.male": "Nam",
+  "settings.female": "Nữ",
+  "settings.birthYear": "Năm sinh",
+  "settings.saveFailed": "Lưu thất bại",
+  "dashboard.completeProfile": "Hoàn thiện hồ sơ để ghép trận chuẩn hơn",
+  "dashboard.completeProfileCta": "30 giây trong Cài đặt →",
 };
 export default vi;

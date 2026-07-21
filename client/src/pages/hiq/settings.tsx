@@ -45,6 +45,16 @@ export default function HiqSettings() {
         setLocation("/");
     };
 
+    // 프로필 선택 정보(성별·출생연도) 저장 — 탭 즉시 저장, 실패는 토스트
+    const saveProfileField = async (patch: { gender?: "male" | "female"; birthYear?: number }) => {
+        try {
+            await apiRequest("/api/hiq/me", { method: "PATCH", body: JSON.stringify(patch) });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
+        } catch (e: any) {
+            toast({ title: e?.message || t("settings.saveFailed"), variant: "destructive" });
+        }
+    };
+
     const conn = member?.connections ?? {};
     const connections: { key: string; label: string; linked: boolean }[] = [
         { key: "phone", label: t("settings.connPhone"), linked: !!conn.phone },
@@ -89,6 +99,40 @@ export default function HiqSettings() {
                             {t("settings.change")}
                         </button>
                     </div>
+                </section>
+
+                {/* 내 프로필 — 가입에서 옮겨온 선택 정보(성별·출생연도). 소셜·전화 유저 공통 입력처 */}
+                <section className="rk-card p-5">
+                    <div className="flex items-center gap-2 mb-1">
+                        <LucideBadgeCheck className="w-4 h-4 text-brand" />
+                        <h2 className="text-[15px] font-bold">{t("settings.profile")}</h2>
+                    </div>
+                    <p className="text-[12px] text-black/45 mb-4">{t("settings.profileDesc")}</p>
+                    <div className="flex gap-2 mb-3">
+                        {(["male", "female"] as const).map((g) => (
+                            <button
+                                key={g}
+                                onClick={() => saveProfileField({ gender: g })}
+                                className={cn(
+                                    "flex-1 h-12 rounded-tile text-[14px] font-semibold transition-colors",
+                                    member?.gender === g ? "bg-brand text-brand-fg" : "bg-black/[0.04] text-black/60"
+                                )}
+                            >
+                                {g === "male" ? t("settings.male") : t("settings.female")}
+                            </button>
+                        ))}
+                    </div>
+                    <select
+                        value={member?.birthYear ?? ""}
+                        onChange={(e) => { const v = Number(e.target.value); if (v) saveProfileField({ birthYear: v }); }}
+                        aria-label={t("settings.birthYear")}
+                        className="w-full h-12 px-4 bg-black/[0.04] rounded-tile text-[14px] font-semibold outline-none cursor-pointer"
+                    >
+                        <option value="">{t("settings.birthYear")}</option>
+                        {Array.from({ length: 81 }, (_, i) => 2010 - i).map((y) => (
+                            <option key={y} value={y}>{y}</option>
+                        ))}
+                    </select>
                 </section>
 
                 {/* 언어 */}
