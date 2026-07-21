@@ -40,7 +40,7 @@ export default function HiqRanking() {
     const rankedMembers = (rankings ?? [])
         .filter((r: any) => {
             if (currentSport === "GOLF") return (r.totalGolfGames || 0) > 0 || (r.golfHandicap || 0) > 0;
-            const handi = rankingTab === "3c" ? r.handi3c : r.handi4c;
+            const handi = rankingTab === "3c" ? r.rating3c : r.rating4c;
             return handi > 0;
         })
         .sort((a: any, b: any) => {
@@ -54,8 +54,8 @@ export default function HiqRanking() {
 
                 return scoreA - scoreB;
             }
-            const handiA = rankingTab === "3c" ? a.handi3c : a.handi4c;
-            const handiB = rankingTab === "3c" ? b.handi3c : b.handi4c;
+            const handiA = rankingTab === "3c" ? a.rating3c : a.rating4c;
+            const handiB = rankingTab === "3c" ? b.rating3c : b.rating4c;
             if (handiB !== handiA) return handiB - handiA;
             return parseFloat(b.average || "0") - parseFloat(a.average || "0");
         });
@@ -206,7 +206,7 @@ export default function HiqRanking() {
                                                     const score = (rank.golfAvgScore || 0) > 0 ? rank.golfAvgScore : (rank.golfHandicap || 0) + 72;
                                                     return score > 0 ? score.toFixed(0) : "-";
                                                 })()
-                                                : (rankingTab === "3c" ? rank.handi3c : rank.handi4c)}
+                                                : (rankingTab === "3c" ? rank.rating3c : rank.rating4c)}
                                             <span className="text-[12px] font-medium text-black/55">
                                                 {currentSport === "GOLF" ? "" : t("ranking.pointUnit")}
                                             </span>
