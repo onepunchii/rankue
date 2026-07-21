@@ -44,12 +44,15 @@ async function initNativePush(): Promise<void> {
         await push.addListener?.("registration", (t) => {
             const token = (t as { value?: string })?.value;
             if (!token) return;
+            // iOS는 APNs 토큰(64자 hex) → apns: 접두사로 서버가 APNs 직발송.
+            // 안드로이드는 FCM 토큰 → fcm:. (무조건 fcm: 붙이면 iOS 토큰이 FCM으로 가 실패)
+            const prefix = nativePlatform() === "ios" ? "apns" : "fcm";
             // 서버 저장 — 로그인 상태(hiq_user_id 쿠키)에서만 성공, 아니면 401 무시
             fetch("/api/hiq/push-token", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ token: `fcm:${token}` }),
+                body: JSON.stringify({ token: `${prefix}:${token}` }),
             }).catch(() => {});
         });
         // 알림 탭 → 페이로드 url 딥링크
