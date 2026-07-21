@@ -17,8 +17,10 @@ import { ScoreCorrectionModal } from "@/components/hiq/dashboard/ScoreCorrection
 import { RPGuideModal } from "@/components/hiq/dashboard/RPGuideModal";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { LucideRefreshCw, LucideZap, ChevronUp, ChevronDown } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 export default function HiqDashboard() {
+    const { t } = useT();
     const { currentSport } = useSport();
 
     // Redirect to Golf Dashboard if sports mode is GOLF
@@ -63,15 +65,15 @@ export default function HiqDashboard() {
     }, [rankings, rankings3c, member, rankingTab]);
 
     const getTrend = useCallback(() => {
-        if (!analysis?.summary) return { label: "유지 중", color: "text-black/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
+        if (!analysis?.summary) return { label: t("dashboard.trendSteady"), color: "text-black/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
         const overall = parseFloat(analysis.summary.overallAvg || "0");
         const recent = parseFloat(analysis.summary.recentAvg || "0");
 
-        if (overall === 0) return { label: "신규 기록", color: "text-brand", icon: <LucideZap className="w-3 h-3" /> };
-        if (recent > overall * 1.05) return { label: "상승 중", color: "text-brand", icon: <ChevronUp className="w-3 h-3" /> };
-        if (recent < overall * 0.95) return { label: "하락 중", color: "text-black/40", icon: <ChevronDown className="w-3 h-3" /> };
-        return { label: "유지 중", color: "text-black/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
-    }, [analysis]);
+        if (overall === 0) return { label: t("dashboard.trendNew"), color: "text-brand", icon: <LucideZap className="w-3 h-3" /> };
+        if (recent > overall * 1.05) return { label: t("dashboard.trendRising"), color: "text-brand", icon: <ChevronUp className="w-3 h-3" /> };
+        if (recent < overall * 0.95) return { label: t("dashboard.trendFalling"), color: "text-black/40", icon: <ChevronDown className="w-3 h-3" /> };
+        return { label: t("dashboard.trendSteady"), color: "text-black/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
+    }, [analysis, t]);
 
     // Live Avg Helpers
     const calculateLiveAvg = (type: '3c' | '4c') => {
@@ -89,15 +91,15 @@ export default function HiqDashboard() {
 
     const getTier = (avg: number, is3c: boolean) => {
         // 1. Base Tier (Absolute Evaluation by Average)
-        let tier = { label: "브론즈", class: "tier-bronze", icon: "🥉" };
+        let tier = { label: t("dashboard.tierBronze"), class: "tier-bronze", icon: "🥉" };
         if (is3c) {
-            if (avg >= 0.90) tier = { label: "플래티넘", class: "tier-platinum", icon: "💎" };
-            else if (avg >= 0.56) tier = { label: "골드", class: "tier-gold", icon: "🥇" };
-            else if (avg >= 0.36) tier = { label: "실버", class: "tier-silver", icon: "🥈" };
+            if (avg >= 0.90) tier = { label: t("dashboard.tierPlatinum"), class: "tier-platinum", icon: "💎" };
+            else if (avg >= 0.56) tier = { label: t("dashboard.tierGold"), class: "tier-gold", icon: "🥇" };
+            else if (avg >= 0.36) tier = { label: t("dashboard.tierSilver"), class: "tier-silver", icon: "🥈" };
         } else {
-            if (avg >= 5.00) tier = { label: "플래티넘", class: "tier-platinum", icon: "💎" };
-            else if (avg >= 3.00) tier = { label: "골드", class: "tier-gold", icon: "🥇" };
-            else if (avg >= 1.51) tier = { label: "실버", class: "tier-silver", icon: "🥈" };
+            if (avg >= 5.00) tier = { label: t("dashboard.tierPlatinum"), class: "tier-platinum", icon: "💎" };
+            else if (avg >= 3.00) tier = { label: t("dashboard.tierGold"), class: "tier-gold", icon: "🥇" };
+            else if (avg >= 1.51) tier = { label: t("dashboard.tierSilver"), class: "tier-silver", icon: "🥈" };
         }
         return tier;
     };

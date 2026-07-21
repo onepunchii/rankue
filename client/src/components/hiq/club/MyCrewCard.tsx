@@ -2,6 +2,7 @@ import { memo } from "react";
 import { LucideCrown, LucideUsers, LucideChevronRight } from "@/lib/icons";
 import { HiqCrew } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface MyCrewCardProps {
     crew: HiqCrew & { memberCount?: number };
@@ -10,6 +11,7 @@ interface MyCrewCardProps {
 }
 
 export const MyCrewCard = memo(({ crew, role, onClick }: MyCrewCardProps) => {
+    const { t } = useT();
     const isLeader = role === 'leader';
 
     return (
@@ -23,7 +25,7 @@ export const MyCrewCard = memo(({ crew, role, onClick }: MyCrewCardProps) => {
                         "px-1.5 py-0.5 rounded text-[12px] font-semibold",
                         isLeader ? "bg-[#cba258]/12 text-[#cba258]" : "bg-black/[0.06] text-black/55"
                     )}>
-                        {isLeader ? '리더' : '멤버'}
+                        {isLeader ? t("myCrewCard.leader") : t("myCrewCard.member")}
                     </span>
                     {isLeader && <LucideCrown className="w-3.5 h-3.5 text-[#cba258] fill-[#cba258]" />}
                 </div>
@@ -38,7 +40,7 @@ export const MyCrewCard = memo(({ crew, role, onClick }: MyCrewCardProps) => {
                         <span className="tabular-nums">{crew.memberCount || 1} / {crew.maxMembers || 50}</span>
                     </div>
                     <span className="w-0.5 h-0.5 rounded-full bg-black/25" />
-                    <span className={cn(!crew.region && "text-ink-4")}>{crew.region || "지역 미설정"}</span>
+                    <span className={cn(!crew.region && "text-ink-4")}>{crew.region || t("myCrewCard.noRegion")}</span>
                 </div>
             </div>
 

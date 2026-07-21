@@ -3,6 +3,17 @@ import { format } from "date-fns";
 import { LucidePin, LucideLayoutList, LucideReceipt, LucidePlus } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { SocialPostCard } from "@/components/hiq/SocialPostCard";
+import { useT } from "@/lib/i18n";
+
+// 카테고리 값은 서버 데이터(p.category)와의 비교에 쓰이므로 번역하지 않고,
+// 화면 표시용 라벨만 키로 매핑해 t()로 감싼다.
+const CATEGORY_LABEL_KEYS: Record<string, string> = {
+    "전체": "crewBoard.categoryAll",
+    "공지사항": "crewBoard.categoryNotice",
+    "가입인사": "crewBoard.categoryGreeting",
+    "크루후기": "crewBoard.categoryReview",
+    "자유글": "crewBoard.categoryFree",
+};
 
 export interface Post {
     id: string;
@@ -38,6 +49,7 @@ interface CrewBoardTabProps {
 export const CrewBoardTab = memo(({
     posts, category, onCategoryChange, onPostClick, isMember, isAdmin, currentMemberId, onCreatePost, onCreateSettlement
 }: CrewBoardTabProps) => {
+    const { t } = useT();
 
     const notices = useMemo(() => {
         return posts?.filter(p => p.isNotice).slice(0, 3) || [];
@@ -64,7 +76,7 @@ export const CrewBoardTab = memo(({
                                 : "bg-black/[0.04] text-black/55 hover:bg-black/[0.06]"
                         )}
                     >
-                        {cat}
+                        {t(CATEGORY_LABEL_KEYS[cat] ?? cat)}
                     </button>
                 ))}
             </div>
@@ -72,7 +84,7 @@ export const CrewBoardTab = memo(({
             {/* Pinned Notices Section */}
             {notices.length > 0 && (
                 <div className="px-6 space-y-2">
-                    <h4 className="text-[12px] font-medium text-black/55 pl-1">필독 공지</h4>
+                    <h4 className="text-[12px] font-medium text-black/55 pl-1">{t("crewBoard.pinnedNotice")}</h4>
                     <div className="bg-brand/12 border border-brand/25 rounded-tile overflow-hidden">
                         {notices.map((notice) => (
                             <div
@@ -81,7 +93,7 @@ export const CrewBoardTab = memo(({
                                 onClick={() => onPostClick(notice)}
                             >
                                 <LucidePin className="w-3.5 h-3.5 text-brand rotate-45" />
-                                <span className="text-xs font-semibold text-[rgba(0,0,0,0.87)] flex-1 truncate">{notice.title || "제목 없음"}</span>
+                                <span className="text-xs font-semibold text-[rgba(0,0,0,0.87)] flex-1 truncate">{notice.title || t("crewBoard.untitled")}</span>
                                 <span className="text-[12px] font-medium text-black/55 tabular-nums">
                                     {notice.createdAt ? format(new Date(notice.createdAt), "MM.dd") : "--.--"}
                                 </span>
@@ -108,8 +120,8 @@ export const CrewBoardTab = memo(({
                         <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mx-auto mb-4">
                             <LucideLayoutList className="w-7 h-7 text-black/40" />
                         </div>
-                        <p className="text-[15px] font-medium text-ink-2 mb-1">아직 등록된 게시글이 없습니다</p>
-                        <p className="text-[13px] text-ink-4">첫 번째 이야기를 남겨보세요</p>
+                        <p className="text-[15px] font-medium text-ink-2 mb-1">{t("crewBoard.emptyTitle")}</p>
+                        <p className="text-[13px] text-ink-4">{t("crewBoard.emptyCta")}</p>
                     </div>
                 )}
             </div>
@@ -121,8 +133,8 @@ export const CrewBoardTab = memo(({
                         <button
                             onClick={onCreateSettlement}
                             className="w-14 h-14 bg-white text-brand rounded-full flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-black/[0.04] active:scale-95 transition-all"
-                            title="정산 요청 생성"
-                            aria-label="정산 요청 생성"
+                            title={t("crewBoard.createSettlement")}
+                            aria-label={t("crewBoard.createSettlement")}
                         >
                             <LucideReceipt className="w-7 h-7" />
                         </button>
@@ -130,8 +142,8 @@ export const CrewBoardTab = memo(({
                     <button
                         onClick={onCreatePost}
                         className="w-14 h-14 bg-brand text-brand-fg rounded-full flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-brand/90 active:scale-95 transition-all"
-                        title="새 게시글 작성"
-                        aria-label="새 게시글 작성"
+                        title={t("crewBoard.createPost")}
+                        aria-label={t("crewBoard.createPost")}
                     >
                         <LucidePlus className="w-8 h-8" />
                     </button>

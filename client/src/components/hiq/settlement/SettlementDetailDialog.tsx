@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface SettlementDetailDialogProps {
     open: boolean;
@@ -17,6 +18,7 @@ interface SettlementDetailDialogProps {
 }
 
 export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }: SettlementDetailDialogProps) {
+    const { t } = useT();
     const { toast } = useToast();
     const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
 
@@ -81,9 +83,9 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
             if (amount > 0) {
                 transfers.push({
                     fromId: debtor.id,
-                    fromName: memberNames[debtor.id] || "알 수 없음",
+                    fromName: memberNames[debtor.id] || t("settlementDetail.unknown"),
                     toId: creditor.id,
-                    toName: memberNames[creditor.id] || "알 수 없음",
+                    toName: memberNames[creditor.id] || t("settlementDetail.unknown"),
                     amount: amount
                 });
             }
@@ -99,7 +101,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
     };
 
     const allTransfers = calculateTransfers();
-    const myTransfers = allTransfers.filter(t => t.fromId === meId || t.toId === meId);
+    const myTransfers = allTransfers.filter(tr => tr.fromId === meId || tr.toId === meId);
 
     // Total spent (for 'All' tab)
     const totalAmount = settlement.items.reduce((sum: number, item: any) => sum + item.amount, 0);
@@ -108,7 +110,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
         if (!settlement.accountBank && !settlement.accountNumber) return;
         const text = `${settlement.accountBank} ${settlement.accountNumber}`;
         navigator.clipboard.writeText(text);
-        toast({ title: "계좌번호가 복사되었습니다" });
+        toast({ title: t("settlementDetail.accountCopied") });
     };
 
     return (
@@ -134,7 +136,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                             )}
                             onClick={() => setActiveTab('my')}
                         >
-                            내 정산
+                            {t("settlementDetail.myTab")}
                         </button>
                         <button
                             className={cn(
@@ -143,7 +145,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                             )}
                             onClick={() => setActiveTab('all')}
                         >
-                            전체 내역
+                            {t("settlementDetail.allTab")}
                         </button>
                     </div>
 
@@ -158,22 +160,22 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                             >
                                 {myTransfers.length > 0 ? (
                                     <div className="space-y-4">
-                                        {myTransfers.map((t, idx) => {
-                                            const isSending = t.fromId === meId;
+                                        {myTransfers.map((transfer, idx) => {
+                                            const isSending = transfer.fromId === meId;
                                             return (
                                                 <div key={idx} className="bg-black/[0.03] p-4 rounded-tile">
                                                     <p className="text-xs font-bold text-black/55 mb-1">
-                                                        {isSending ? `보낼 금액` : `받을 금액`}
+                                                        {isSending ? t("settlementDetail.amountToSend") : t("settlementDetail.amountToReceive")}
                                                     </p>
                                                     <div className="flex items-center justify-center gap-2 mb-2">
-                                                        <span className="font-bold text-lg text-[rgba(0,0,0,0.87)]">{isSending ? `${t.toName}에게` : `${t.fromName}에게서`}</span>
+                                                        <span className="font-bold text-lg text-[rgba(0,0,0,0.87)]">{isSending ? `${t("settlementDetail.toPrefix")}${transfer.toName}${t("settlementDetail.toSuffix")}` : `${t("settlementDetail.fromPrefix")}${transfer.fromName}${t("settlementDetail.fromSuffix")}`}</span>
                                                         <span className={cn("text-xs px-2 py-0.5 rounded-pill font-bold", isSending ? "bg-rose-500/10 text-rose-600" : "bg-sky-500/10 text-sky-600")}>
-                                                            {isSending ? "송금" : "입금"}
+                                                            {isSending ? t("settlementDetail.send") : t("settlementDetail.receive")}
                                                         </span>
                                                     </div>
                                                     <div className="text-3xl font-bold tabular-nums text-[rgba(0,0,0,0.87)]">
-                                                        {t.amount.toLocaleString()}
-                                                        <span className="text-lg font-bold text-black/45 ml-1">원</span>
+                                                        {transfer.amount.toLocaleString()}
+                                                        <span className="text-lg font-bold text-black/45 ml-1">{t("settlementDetail.wonUnit")}</span>
                                                     </div>
                                                 </div>
                                             );
@@ -182,8 +184,8 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                 ) : (
                                     <div className="py-8">
                                         <LucideCheckCircle2 className="w-12 h-12 text-brand mx-auto mb-3" />
-                                        <p className="font-bold text-[17px] text-[rgba(0,0,0,0.87)]">정산 완료!</p>
-                                        <p className="text-[12px] text-black/55 font-medium">주고 받을 돈이 없습니다.</p>
+                                        <p className="font-bold text-[17px] text-[rgba(0,0,0,0.87)]">{t("settlementDetail.allSettled")}</p>
+                                        <p className="text-[12px] text-black/55 font-medium">{t("settlementDetail.nothingToExchange")}</p>
                                     </div>
                                 )}
 
@@ -193,7 +195,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                         className="flex items-center justify-between bg-black/[0.03] p-4 rounded-tile cursor-pointer active:scale-95 transition-transform mt-4"
                                     >
                                         <div className="text-left">
-                                            <div className="text-[12px] font-bold text-black/55 mb-0.5">총무 계좌 (참고용)</div>
+                                            <div className="text-[12px] font-bold text-black/55 mb-0.5">{t("settlementDetail.managerAccount")}</div>
                                             <div className="font-bold text-sm flex items-center gap-1.5 text-[rgba(0,0,0,0.87)]">
                                                 <span>{settlement.accountBank}</span>
                                                 <span className="tabular-nums">{settlement.accountNumber}</span>
@@ -213,28 +215,28 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                 className="space-y-4"
                             >
                                 <div className="flex justify-between items-end border-b border-surface-line pb-4">
-                                    <span className="font-bold text-sm text-[rgba(0,0,0,0.87)]">총 지출 금액</span>
-                                    <span className="font-bold text-xl tabular-nums text-[rgba(0,0,0,0.87)]">{totalAmount.toLocaleString()}원</span>
+                                    <span className="font-bold text-sm text-[rgba(0,0,0,0.87)]">{t("settlementDetail.totalSpent")}</span>
+                                    <span className="font-bold text-xl tabular-nums text-[rgba(0,0,0,0.87)]">{totalAmount.toLocaleString()}{t("settlementDetail.won")}</span>
                                 </div>
                                 <div className="space-y-3">
                                     {settlement.items.map((item: any) => (
                                         <div key={item.id} className="text-sm border-b border-dashed border-surface-line pb-3 last:border-0">
                                             <div className="flex justify-between mb-1">
                                                 <span className="font-bold text-[rgba(0,0,0,0.87)]">{item.title}</span>
-                                                <span className="font-bold tabular-nums text-[rgba(0,0,0,0.87)]">{item.amount.toLocaleString()}원</span>
+                                                <span className="font-bold tabular-nums text-[rgba(0,0,0,0.87)]">{item.amount.toLocaleString()}{t("settlementDetail.won")}</span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs text-black/55">
                                                 <div className="flex items-center gap-1">
                                                     <span className="bg-black/[0.06] text-black/70 px-1.5 py-0.5 rounded-md text-[12px] font-bold">
-                                                        {item.payer?.name || "결제자"} 결제
+                                                        {(item.payer?.name || t("settlementDetail.payerFallback")) + t("settlementDetail.paidSuffix")}
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <LucideUsers className="w-3 h-3" />
                                                     <span className="tabular-nums">
-                                                        {item.participants.length}명
+                                                        {item.participants.length}{t("settlementDetail.personSuffix")}
                                                         {item.participants.length > 0
-                                                            ? ` (인당 ${(Math.ceil((item.amount / item.participants.length) / 10) * 10).toLocaleString()}원)`
+                                                            ? ` (${t("settlementDetail.perPerson")} ${(Math.ceil((item.amount / item.participants.length) / 10) * 10).toLocaleString()}${t("settlementDetail.won")})`
                                                             : ""}
                                                     </span>
                                                 </div>
@@ -244,16 +246,16 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                                 </div>
 
                                 <div className="mt-6 pt-4 border-t border-black/10">
-                                    <p className="text-[12px] font-semibold text-black/55 mb-3 text-center">전체 송금 리스트</p>
+                                    <p className="text-[12px] font-semibold text-black/55 mb-3 text-center">{t("settlementDetail.transferList")}</p>
                                     <div className="space-y-2">
-                                        {allTransfers.map((t, idx) => (
+                                        {allTransfers.map((transfer, idx) => (
                                             <div key={idx} className="flex items-center justify-between text-xs bg-black/[0.03] px-3 py-2 rounded-tile">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-[rgba(0,0,0,0.87)]">{t.fromName}</span>
+                                                    <span className="font-bold text-[rgba(0,0,0,0.87)]">{transfer.fromName}</span>
                                                     <LucideChevronRight className="w-3 h-3 text-black/30" />
-                                                    <span className="font-bold text-[rgba(0,0,0,0.87)]">{t.toName}</span>
+                                                    <span className="font-bold text-[rgba(0,0,0,0.87)]">{transfer.toName}</span>
                                                 </div>
-                                                <span className="font-semibold tabular-nums text-black/60">{t.amount.toLocaleString()}원</span>
+                                                <span className="font-semibold tabular-nums text-black/60">{transfer.amount.toLocaleString()}{t("settlementDetail.won")}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -268,7 +270,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
 
                 <div className="p-6">
                     <Button className="w-full rk-btn-primary h-14 text-[16px] rounded-tile" onClick={() => onOpenChange(false)}>
-                        확인
+                        {t("settlementDetail.confirm")}
                     </Button>
                 </div>
 

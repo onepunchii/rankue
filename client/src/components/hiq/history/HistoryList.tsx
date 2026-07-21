@@ -3,6 +3,7 @@ import { LucideCalendar, LucideHistory } from "@/lib/icons";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { SportConfig, ExtendedGameHistory } from "./types";
+import { useT } from "@/lib/i18n";
 
 interface HistoryListProps {
     history: ExtendedGameHistory[];
@@ -12,6 +13,7 @@ interface HistoryListProps {
 }
 
 export const HistoryList = ({ history, config, onGameClick, currentSport }: HistoryListProps) => {
+    const { t } = useT();
     return (
         <>
             <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2 text-black/55">
@@ -34,10 +36,10 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                                 <div className="flex justify-between items-center mb-3">
                                     <div className="flex gap-1.5">
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand/12 text-brand border border-brand/20 text-[12px] font-semibold">
-                                            <span className="w-1 h-1 rounded-full bg-brand" /> 공식
+                                            <span className="w-1 h-1 rounded-full bg-brand" /> {t("historyList.official")}
                                         </span>
                                         <span className="px-2 py-0.5 bg-black/[0.04] rounded-lg text-[12px] font-semibold text-black/55">
-                                            {game.gameType === "3c" ? "3구" : (currentSport === "GOLF" ? "18H" : "4구")}
+                                            {game.gameType === "3c" ? t("historyList.threeBall") : (currentSport === "GOLF" ? "18H" : t("historyList.fourBall"))}
                                         </span>
                                         {currentSport !== "GOLF" && (game.isWinner === true || game.isWinner === false) && (
                                             <span className={
@@ -46,7 +48,7 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                                                     ? "bg-brand/12 text-brand border-brand/20"
                                                     : "bg-red-500/12 text-red-600 border-red-500/20")
                                             }>
-                                                {game.isWinner ? "승" : "패"}
+                                                {game.isWinner ? t("historyList.win") : t("historyList.loss")}
                                             </span>
                                         )}
                                     </div>
@@ -76,12 +78,12 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                                         </div>
                                         <div className="w-px h-6 bg-black/10" />
                                         <div>
-                                            <p className="text-black/55 text-[12px] font-medium mb-0.5">{currentSport === "GOLF" ? "홀" : "이닝"}</p>
+                                            <p className="text-black/55 text-[12px] font-medium mb-0.5">{currentSport === "GOLF" ? t("historyList.hole") : t("historyList.inning")}</p>
                                             <p className="text-[22px] font-bold text-[rgba(0,0,0,0.87)] tabular-nums leading-none">{game.innings}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-brand text-[12px] font-semibold mb-0.5">{currentSport === "GOLF" ? "평균 타수" : "평균"}</p>
+                                        <p className="text-brand text-[12px] font-semibold mb-0.5">{currentSport === "GOLF" ? t("historyList.avgStrokes") : t("historyList.average")}</p>
                                         <p className="text-[28px] font-bold text-[rgba(0,0,0,0.87)] leading-none tracking-tight tabular-nums">
                                             {currentSport === "GOLF" ? game.score : game.average}
                                         </p>
@@ -98,8 +100,8 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                             <div className="w-16 h-16 bg-black/[0.04] rounded-full flex items-center justify-center mx-auto mb-5 ">
                                 <LucideHistory className="w-8 h-8 text-black/40" />
                             </div>
-                            <p className="text-[rgba(0,0,0,0.87)] font-semibold text-[17px] mb-1.5">인증된 경기 기록이 없습니다</p>
-                            <p className="text-black/55 text-[13px] font-medium leading-relaxed">실제 회원들과 대결하여<br />공식 기록을 남겨보세요</p>
+                            <p className="text-[rgba(0,0,0,0.87)] font-semibold text-[17px] mb-1.5">{t("historyList.emptyTitle")}</p>
+                            <p className="text-black/55 text-[13px] font-medium leading-relaxed">{t("historyList.emptyDesc1")}<br />{t("historyList.emptyDesc2")}</p>
                         </motion.div>
                     )}
                 </AnimatePresence>

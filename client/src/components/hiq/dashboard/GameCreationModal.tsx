@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BilliardBall, BallCluster, BallColor } from "../ui/BilliardBall";
+import { useT } from "@/lib/i18n";
 
 // Player slot → billiard ball color (white 수구, yellow, red, red — the 4구 set).
 const SLOT_BALL: BallColor[] = ["white", "yellow", "red", "red"];
@@ -37,6 +38,7 @@ const PlayerCard = ({
     gameType: '3c' | '4c';
     history?: HiqGameHistory[];
 }) => {
+    const { t } = useT();
     const isSelf = player.isHost;
     const isGuest = player.type === 'guest';
     const textColor = "text-brand";
@@ -59,9 +61,9 @@ const PlayerCard = ({
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            {isSelf && <span className="text-sm font-bold text-brand">나 (Me)</span>}
-                            {!isSelf && <span className="text-sm font-bold text-black/55">상대방 {idx + 1}</span>}
-                            {isSelf && <div className="text-[12px] font-bold text-white bg-brand px-2 py-0.5 rounded-full">방장</div>}
+                            {isSelf && <span className="text-sm font-bold text-brand">{t("gameCreationModal.me")}</span>}
+                            {!isSelf && <span className="text-sm font-bold text-black/55">{t("gameCreationModal.opponent")} {idx + 1}</span>}
+                            {isSelf && <div className="text-[12px] font-bold text-white bg-brand px-2 py-0.5 rounded-full">{t("gameCreationModal.host")}</div>}
                         </div>
 
                         {/* Reorder Buttons */}
@@ -69,7 +71,7 @@ const PlayerCard = ({
                             <button
                                 onClick={() => onMove(idx, -1)}
                                 disabled={idx === 0}
-                                title="위로 이동"
+                                title={t("gameCreationModal.moveUp")}
                                 className={`p-1 rounded hover:bg-black/[0.04] ${idx === 0 ? 'opacity-20 cursor-not-allowed' : 'text-black/55 hover:text-ink-1'}`}
                             >
                                 <ChevronUp className="w-4 h-4" />
@@ -77,7 +79,7 @@ const PlayerCard = ({
                             <button
                                 onClick={() => onMove(idx, 1)}
                                 disabled={idx === totalPlayers - 1}
-                                title="아래로 이동"
+                                title={t("gameCreationModal.moveDown")}
                                 className={`p-1 rounded hover:bg-black/[0.04] ${idx === totalPlayers - 1 ? 'opacity-20 cursor-not-allowed' : 'text-black/55 hover:text-ink-1'}`}
                             >
                                 <ChevronDown className="w-4 h-4" />
@@ -91,17 +93,17 @@ const PlayerCard = ({
                     <div className="flex items-center bg-black/[0.04] rounded-lg p-1 ">
                         <button
                             onClick={() => onUpdate(idx, { type: 'member', member: undefined, target: 0, name: '' })}
-                            title="회원으로 전환"
+                            title={t("gameCreationModal.switchToMember")}
                             className={`px-3 py-1.5 rounded-md text-[12px] font-bold transition-all ${!isGuest ? 'bg-white text-ink-1 shadow-sm' : 'text-black/50 hover:text-black/70'}`}
                         >
-                            회원
+                            {t("gameCreationModal.member")}
                         </button>
                         <button
                             onClick={() => onUpdate(idx, { type: 'guest', member: undefined, target: 0, name: '' })}
-                            title="게스트로 전환"
+                            title={t("gameCreationModal.switchToGuest")}
                             className={`px-3 py-1.5 rounded-md text-[12px] font-bold transition-all ${isGuest ? 'bg-white text-ink-1 shadow-sm' : 'text-black/50 hover:text-black/70'}`}
                         >
-                            게스트
+                            {t("gameCreationModal.guest")}
                         </button>
                     </div>
                 )}
@@ -114,7 +116,7 @@ const PlayerCard = ({
                         type="text"
                         value={player.name || ""}
                         onChange={(e) => onUpdate(idx, { name: e.target.value })}
-                        placeholder="이름 입력"
+                        placeholder={t("gameCreationModal.namePlaceholder")}
                         className="bg-transparent w-full font-bold text-ink-1 text-lg px-2 placeholder:text-black/40 focus:outline-none"
                     />
                 </div>
@@ -131,7 +133,7 @@ const PlayerCard = ({
                         </>
                     ) : (
                         <span className="font-medium text-black/40 text-sm animate-pulse">
-                            {isSelf ? "나" : "PIN입력 대기 중..."}
+                            {isSelf ? t("gameCreationModal.meShort") : t("gameCreationModal.waitingPin")}
                         </span>
                     )}
                 </div>
@@ -159,7 +161,7 @@ const PlayerCard = ({
             {/* Simple Stats Display (Optional, kept minimal) */}
             {player.member && winRate !== null && (
                 <div className="mt-2 border-t border-black/10 pt-2 flex justify-between items-center px-1">
-                    <span className="text-[12px] font-bold text-black/50">승률</span>
+                    <span className="text-[12px] font-bold text-black/50">{t("gameCreationModal.winRate")}</span>
                     <span className="text-xs font-semibold text-brand">
                         {winRate}%
                     </span>
@@ -170,6 +172,7 @@ const PlayerCard = ({
 };
 
 export const GameCreationModal = ({ open, onOpenChange, member, history, initialMode }: GameCreationModalProps) => {
+    const { t } = useT();
 
     // Connect logic hook
     const {
@@ -211,10 +214,10 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
             <DialogContent hideClose className="w-screen h-screen max-w-none rounded-none border-none bg-[#f2f0eb] text-ink-1 p-0 flex flex-col focus:outline-none data-[state=open]:!zoom-in-100 data-[state=closed]:!zoom-out-100 data-[state=closed]:slide-out-to-bottom-100 data-[state=open]:slide-in-from-bottom-100 duration-200">
                 {/* Custom Header */}
                 <DialogTitle className="sr-only">
-                    {gameMode === "practice" ? "혼자 연습하기" : "매칭대결하기"}
+                    {gameMode === "practice" ? t("gameCreationModal.practiceTitle") : t("gameCreationModal.matchTitle")}
                 </DialogTitle>
                 <DialogDescription className="sr-only">
-                    {gameMode === "practice" ? "연습 세션을 시작합니다." : "매칭 대결을 시작합니다."}
+                    {gameMode === "practice" ? t("gameCreationModal.practiceDesc") : t("gameCreationModal.matchDesc")}
                 </DialogDescription>
 
                 <div
@@ -223,12 +226,12 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                 >
                     <button
                         onClick={() => onOpenChange(false)}
-                        title="뒤로 가기"
+                        title={t("gameCreationModal.back")}
                         className="p-2 -ml-2 text-black/70 hover:text-ink-1"
                     >
                         <ChevronDown className="w-6 h-6 rotate-90" />
                     </button>
-                    <span className="font-semibold text-lg">{gameMode === "practice" ? "혼자 연습하기" : "매칭대결하기"}</span>
+                    <span className="font-semibold text-lg">{gameMode === "practice" ? t("gameCreationModal.practiceTitle") : t("gameCreationModal.matchTitle")}</span>
                     <div className="w-10">
                         {/* Placeholder for symmetry or save button */}
                     </div>
@@ -241,8 +244,8 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                 <>
                                     <div className="p-4 rounded-2xl bg-white mb-2">
                                         <p className="text-black/60 text-xs leading-relaxed text-center">
-                                            이 핀번호를 상대방에게 알려주세요.<br />
-                                            <span className="text-brand font-bold">회원이 참가하면 게임 전적이 자동으로 기록됩니다.</span>
+                                            {t("gameCreationModal.pinShareHint")}<br />
+                                            <span className="text-brand font-bold">{t("gameCreationModal.pinAutoRecord")}</span>
                                         </p>
                                     </div>
                                     <div className="p-8 rounded-3xl bg-brand flex flex-col items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.06)] border-4 border-black/5">
@@ -255,7 +258,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                                     onClick={retryInvite}
                                                     className="px-4 h-9 rounded-full bg-white text-brand text-[13px] font-semibold active:scale-95 transition-transform"
                                                 >
-                                                    다시 시도
+                                                    {t("gameCreationModal.retry")}
                                                 </button>
                                             </div>
                                         ) : (
@@ -265,7 +268,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                                     <div className="w-3 h-3 bg-white/30 rounded-full animate-bounce [animation-duration:1s] [animation-delay:0.2s]" />
                                                     <div className="w-3 h-3 bg-white/30 rounded-full animate-bounce [animation-duration:1s] [animation-delay:0.4s]" />
                                                 </div>
-                                                <span className="text-[12px] font-semibold text-white/70 tracking-[0.2em]">핀 생성 중...</span>
+                                                <span className="text-[12px] font-semibold text-white/70 tracking-[0.2em]">{t("gameCreationModal.generatingPin")}</span>
                                             </div>
                                         )}
                                     </div>
@@ -280,14 +283,14 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                 className={`h-14 text-xl font-semibold rounded-2xl gap-2.5 ${gameType === "4c" ? "bg-brand text-white" : "bg-white text-black/60"}`}
                             >
                                 <BallCluster colors={["white", "yellow", "red", "red"]} size={18} />
-                                4구
+                                {t("gameCreationModal.fourBall")}
                             </Button>
                             <Button
                                 onClick={() => changeGameType("3c")}
                                 className={`h-14 text-xl font-semibold rounded-2xl gap-2.5 ${gameType === "3c" ? "bg-brand text-white" : "bg-white text-black/60"}`}
                             >
                                 <BallCluster colors={["white", "yellow", "red"]} size={18} />
-                                3구
+                                {t("gameCreationModal.threeBall")}
                             </Button>
                         </div>
 
@@ -300,7 +303,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                         onClick={() => setNumberOfPlayers(count)}
                                         className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-all ${numberOfPlayers === count ? 'bg-brand text-white shadow-sm' : 'text-black/50 hover:text-black/70'}`}
                                     >
-                                        {count}인
+                                        {count}{t("gameCreationModal.playersSuffix")}
                                     </button>
                                 ))}
                             </div>
@@ -330,7 +333,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                     <div className="flex items-center gap-2">
                                         <LucideZap className={`w-4 h-4 ${useFinishRule ? 'text-brand' : 'text-black/40'}`} />
                                         <span className={`text-sm font-bold ${useFinishRule ? 'text-ink-1' : 'text-black/55'}`}>
-                                            마무리 룰 적용
+                                            {t("gameCreationModal.finishRule")}
                                         </span>
                                     </div>
                                     <div
@@ -343,7 +346,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                 {useFinishRule && (
                                     <div className="flex items-center justify-between mt-2 pl-6">
                                         <span className="text-xs text-black/60">
-                                            {gameType === "4c" ? "3쿠션 마무리 갯수" : "뱅크샷 마무리 갯수"}
+                                            {gameType === "4c" ? t("gameCreationModal.finishCount3c") : t("gameCreationModal.finishCountBank")}
                                         </span>
                                         <div className="flex items-center gap-2">
                                             <button onClick={() => setFinishTargetCount(Math.max(1, finishTargetCount - 1))} className="w-6 h-6 rounded bg-black/[0.06] hover:bg-black/[0.1] flex items-center justify-center">-</button>
@@ -359,7 +362,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                                 <div className="flex items-center justify-between p-3 bg-white rounded-xl ">
                                     <div className="flex items-center gap-2">
                                         <span className={`text-sm font-bold ${usePbaRule ? 'text-brand' : 'text-black/55'}`}>
-                                            PBA 룰 (2점제/뱅크샷)
+                                            {t("gameCreationModal.pbaRule")}
                                         </span>
                                     </div>
                                     <div
@@ -384,7 +387,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                         disabled={isStarting}
                         className="w-full h-14 bg-brand hover:bg-[#00543a] text-white rounded-full text-lg font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-all disabled:opacity-60"
                     >
-                        {isStarting ? "게임 준비 중..." : "게임 시작"}
+                        {isStarting ? t("gameCreationModal.preparing") : t("gameCreationModal.startGame")}
                     </Button>
                 </div>
             </DialogContent>

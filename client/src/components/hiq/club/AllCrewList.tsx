@@ -6,6 +6,7 @@ import { CrewDiscoveryCard } from "./CrewDiscoveryCard";
 import { useDebounce } from "@/hooks/use-debounce";
 import { LucideSearch, LucideUsers } from "@/lib/icons";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
+import { useT } from "@/lib/i18n";
 
 interface AllCrewListProps {
     searchQuery: string;
@@ -13,6 +14,7 @@ interface AllCrewListProps {
 }
 
 export const AllCrewList = memo(({ searchQuery, currentSport }: AllCrewListProps) => {
+    const { t } = useT();
     const [_, setLocation] = useLocation();
     const { location: userLocation, requestLocation, isApp } = useNativeBridge();
     const debouncedSearch = useDebounce(searchQuery, 400); // 400ms delay
@@ -59,13 +61,13 @@ export const AllCrewList = memo(({ searchQuery, currentSport }: AllCrewListProps
                 </div>
                 {hasQuery ? (
                     <>
-                        <p className="text-ink-1 font-semibold text-[16px] mb-1">검색 결과가 없습니다</p>
-                        <p className="text-ink-3 text-[13px] font-medium">다른 이름이나 지역으로 검색해보세요</p>
+                        <p className="text-ink-1 font-semibold text-[16px] mb-1">{t("allCrewList.noResults")}</p>
+                        <p className="text-ink-3 text-[13px] font-medium">{t("allCrewList.noResultsHint")}</p>
                     </>
                 ) : (
                     <>
-                        <p className="text-ink-1 font-semibold text-[16px] mb-1">아직 등록된 크루가 없어요</p>
-                        <p className="text-ink-3 text-[13px] font-medium">첫 크루를 만들어보세요</p>
+                        <p className="text-ink-1 font-semibold text-[16px] mb-1">{t("allCrewList.emptyTitle")}</p>
+                        <p className="text-ink-3 text-[13px] font-medium">{t("allCrewList.emptyHint")}</p>
                     </>
                 )}
             </div>

@@ -38,15 +38,18 @@ import {
 import { InsertHiqCrew, HiqMember } from "@shared/schema";
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
+// 라벨은 i18n 키 — 렌더 시 t()로 감싼다.
 const STEPS = [
-    { id: 1, title: "크루 정체성", subtitle: "우리 크루의 이름과 얼굴을 정해주세요" },
-    { id: 2, title: "베이스 캠프", subtitle: "주로 모이는 단골 구장이 있나요?" },
-    { id: 3, title: "활동 성향", subtitle: "어떤 분들과 함께하고 싶으신가요?" },
+    { id: 1, title: "createClub.step1Title", subtitle: "createClub.step1Subtitle" },
+    { id: 2, title: "createClub.step2Title", subtitle: "createClub.step2Subtitle" },
+    { id: 3, title: "createClub.step3Title", subtitle: "createClub.step3Subtitle" },
 ];
 
 export default function CreateClub() {
     const [_, setLocation] = useLocation();
+    const { t } = useT();
     const { data: member } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
     const { toast } = useToast();
     const [uploadingField, setUploadingField] = useState<null | 'emblem' | 'coverImage'>(null);
@@ -58,7 +61,7 @@ export default function CreateClub() {
             const url = await uploadImage(file, category);
             setFormData(prev => ({ ...prev, [field]: url }));
         } catch (err: any) {
-            toast({ title: "이미지 업로드 실패", description: err?.message || "다시 시도해주세요", variant: "destructive" });
+            toast({ title: t("createClub.imageUploadFailed"), description: err?.message || t("createClub.tryAgain"), variant: "destructive" });
         } finally {
             setUploadingField(null);
         }
@@ -95,8 +98,8 @@ export default function CreateClub() {
         },
         onSuccess: () => {
             toast({
-                title: "크루 생성 완료! 🎉",
-                description: "새로운 크루가 시작되었습니다.",
+                title: t("createClub.createdTitle"),
+                description: t("createClub.createdDesc"),
             });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/crews"] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/crews/mine"] });
@@ -104,7 +107,7 @@ export default function CreateClub() {
         },
         onError: (error: Error) => {
             toast({
-                title: "생성 실패",
+                title: t("createClub.createFailed"),
                 description: error.message,
                 variant: "destructive",
             });
@@ -120,12 +123,12 @@ export default function CreateClub() {
     // Handlers
     const handleNext = () => {
         if (step === 1 && !isStep1Valid) {
-            toast({ title: "크루 이름을 입력해주세요", variant: "destructive" });
+            toast({ title: t("createClub.nameRequired"), variant: "destructive" });
             return;
         }
         // Validate the required region on the screen that actually contains the field (step 2).
         if (step === 2 && !isStep2Valid) {
-            toast({ title: "활동 지역을 입력해주세요", variant: "destructive" });
+            toast({ title: t("createClub.regionRequired"), variant: "destructive" });
             return;
         }
         if (step < 3) {
@@ -133,7 +136,7 @@ export default function CreateClub() {
         } else {
             // Backstop: enforce required region before submitting.
             if (!isStep3Valid) {
-                toast({ title: "활동 지역을 입력해주세요", variant: "destructive" });
+                toast({ title: t("createClub.regionRequired"), variant: "destructive" });
                 return;
             }
             handleSubmit();
@@ -194,7 +197,7 @@ export default function CreateClub() {
                     <LucideChevronLeft className="w-6 h-6" />
                 </Button>
                 <div className="text-sm font-semibold text-black/70 tabular-nums">
-                    {step} / 3 단계
+                    {step}{t("createClub.stepSuffix")}
                 </div>
                 <div className="w-6" /> {/* Spacer */}
             </div>
@@ -210,8 +213,8 @@ export default function CreateClub() {
                 </div>
 
                 <div className="mb-8">
-                    <h1 className="text-2xl font-bold mb-2 tracking-tight">{STEPS[step - 1].title}</h1>
-                    <p className="text-black/55 text-sm">{STEPS[step - 1].subtitle}</p>
+                    <h1 className="text-2xl font-bold mb-2 tracking-tight">{t(STEPS[step - 1].title)}</h1>
+                    <p className="text-black/55 text-sm">{t(STEPS[step - 1].subtitle)}</p>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -225,27 +228,27 @@ export default function CreateClub() {
                         >
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">크루 이름 <span className="text-brand">*</span></Label>
+                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.nameLabel")} <span className="text-brand">*</span></Label>
                                     <Input
-                                        placeholder={currentSport === "GOLF" ? "예: 버디찬스, 72홀 골프회" : "예: 죽방전설, 서초당구클럽"}
+                                        placeholder={currentSport === "GOLF" ? t("createClub.namePlaceholderGolf") : t("createClub.namePlaceholderBilliards")}
                                         className="bg-surface-2 border-black/10 h-14 text-xl font-semibold placeholder:text-black/40 rounded-tile"
                                         value={formData.name || ""}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">간판 문구</Label>
+                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.introLabel")}</Label>
                                     <Input
-                                        placeholder={currentSport === "GOLF" ? "예: 매주 라운딩 나가는 직장인 크루 ⛳️" : "예: 광진구 2030 즐겜 크루! 🎱"}
+                                        placeholder={currentSport === "GOLF" ? t("createClub.introPlaceholderGolf") : t("createClub.introPlaceholderBilliards")}
                                         className="bg-surface-2 border-black/10 h-12 text-[15px] font-medium placeholder:text-black/40 rounded-tile"
                                         value={formData.shortIntro || ""}
                                         onChange={e => setFormData({ ...formData, shortIntro: e.target.value })}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">상세 소개</Label>
+                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.descLabel")}</Label>
                                     <Textarea
-                                        placeholder={currentSport === "GOLF" ? "회비, 라운딩 주기, 실력 제한 등 상세 정보를 입력해주세요." : "회비, 규칙, 정모 시간 등 상세한 정보를 마음껏 입력해주세요."}
+                                        placeholder={currentSport === "GOLF" ? t("createClub.descPlaceholderGolf") : t("createClub.descPlaceholderBilliards")}
                                         className="bg-surface-2 border-black/10 min-h-[160px] text-[15px] font-medium placeholder:text-black/40 resize-none rounded-tile p-4 leading-relaxed"
                                         value={formData.description || ""}
                                         onChange={e => setFormData({ ...formData, description: e.target.value })}
@@ -254,7 +257,7 @@ export default function CreateClub() {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-3">
-                                        <Label className="text-xs font-semibold text-black/55">크루 로고</Label>
+                                        <Label className="text-xs font-semibold text-black/55">{t("createClub.logoLabel")}</Label>
                                         <input
                                             type="file"
                                             id="logo-upload"
@@ -275,21 +278,21 @@ export default function CreateClub() {
                                             {uploadingField === 'emblem' ? (
                                                 <>
                                                     <LucideLoader2 className="w-6 h-6 text-brand animate-spin mb-2" />
-                                                    <span className="text-[12px] font-medium text-black/55">업로드 중...</span>
+                                                    <span className="text-[12px] font-medium text-black/55">{t("createClub.uploading")}</span>
                                                 </>
                                             ) : formData.emblem ? (
                                                 <img src={formData.emblem} className="w-full h-full object-cover" alt="Logo Preview" />
                                             ) : (
                                                 <>
                                                     <LucideCamera className="w-6 h-6 text-black/55 transition-colors mb-2 group-hover:text-brand" />
-                                                    <span className="text-[12px] font-medium text-black/55">사진 업로드</span>
+                                                    <span className="text-[12px] font-medium text-black/55">{t("createClub.uploadPhoto")}</span>
                                                 </>
                                             )}
                                         </div>
                                     </div>
 
                                     <div className="space-y-3">
-                                        <Label className="text-xs font-semibold text-black/55">메인 커버</Label>
+                                        <Label className="text-xs font-semibold text-black/55">{t("createClub.coverLabel")}</Label>
                                         <input
                                             type="file"
                                             id="cover-upload"
@@ -310,14 +313,14 @@ export default function CreateClub() {
                                             {uploadingField === 'coverImage' ? (
                                                 <>
                                                     <LucideLoader2 className="w-6 h-6 text-brand animate-spin mb-2" />
-                                                    <span className="text-[12px] font-medium text-black/55">업로드 중...</span>
+                                                    <span className="text-[12px] font-medium text-black/55">{t("createClub.uploading")}</span>
                                                 </>
                                             ) : formData.coverImage ? (
                                                 <img src={formData.coverImage} className="w-full h-full object-cover" alt="Cover Preview" />
                                             ) : (
                                                 <>
                                                     <LucideImagePlus className="w-6 h-6 text-black/55 transition-colors mb-2 group-hover:text-brand" />
-                                                    <span className="text-[12px] font-medium text-black/55">사진 업로드</span>
+                                                    <span className="text-[12px] font-medium text-black/55">{t("createClub.uploadPhoto")}</span>
                                                 </>
                                             )}
                                         </div>
@@ -337,7 +340,7 @@ export default function CreateClub() {
                         >
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">주 활동 지역 <span className="text-brand">*</span></Label>
+                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.regionLabel")} <span className="text-brand">*</span></Label>
                                     <Popover open={isRegionOpen} onOpenChange={setIsRegionOpen}>
                                         <PopoverTrigger asChild>
                                             <Button
@@ -351,21 +354,21 @@ export default function CreateClub() {
                                             >
                                                 {formData.region
                                                     ? formData.region
-                                                    : "지역 검색 (예: 강남구, 역삼동)"}
+                                                    : t("createClub.regionPlaceholder")}
                                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent align="start" sideOffset={6} className="w-[var(--radix-popover-trigger-width)] p-0 bg-white text-[rgba(0,0,0,0.87)] rounded-tile shadow-[0_8px_24px_rgba(0,0,0,0.12)] overflow-hidden z-[60]">
                                             <Command shouldFilter={false} className="bg-transparent text-[rgba(0,0,0,0.87)] rounded-tile [&_[cmdk-input-wrapper]]:border-black/10">
                                                 <CommandInput
-                                                    placeholder="지역 검색 (예: 강남구)"
+                                                    placeholder={t("createClub.regionSearchPlaceholder")}
                                                     className="h-11 border-none focus:ring-0 text-[15px] text-[rgba(0,0,0,0.87)] placeholder:text-black/40"
                                                     value={regionSearchQuery}
                                                     onValueChange={setRegionSearchQuery}
                                                 />
                                                 <CommandList className="max-h-[240px] overflow-y-auto overscroll-contain">
                                                     <CommandEmpty className="py-8 text-center text-[13px] text-black/40">
-                                                        {regionSearchQuery ? "검색 결과가 없습니다" : "지역을 검색해주세요"}
+                                                        {regionSearchQuery ? t("createClub.noResults") : t("createClub.regionSearchPrompt")}
                                                     </CommandEmpty>
                                                     <CommandGroup>
                                                         {regionResults?.map((region: any) => (
@@ -397,7 +400,7 @@ export default function CreateClub() {
                                 <div className="relative">
                                     <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-black/55" />
                                     <Input
-                                        placeholder="매장 이름 또는 주소 검색"
+                                        placeholder={t("createClub.storeSearchPlaceholder")}
                                         className="bg-surface-2 border-black/10 h-12 rounded-tile pl-10 text-[15px] font-medium placeholder:text-black/40"
                                         value={searchQuery}
                                         onChange={e => setSearchQuery(e.target.value)}
@@ -412,7 +415,7 @@ export default function CreateClub() {
                                                 <div className="text-xs text-black/60">{selectedStore.address}</div>
                                             </div>
                                             <Button variant="ghost" size="sm" onClick={() => setSelectedStore(null)}>
-                                                취소
+                                                {t("createClub.cancel")}
                                             </Button>
                                         </CardContent>
                                     </Card>
@@ -444,7 +447,7 @@ export default function CreateClub() {
                                             <div className="flex flex-col items-center justify-center h-[200px] text-black/55 gap-2">
                                                 <LucideMapPin className="w-8 h-8 opacity-40" />
                                                 <span className="text-xs">
-                                                    {searchQuery ? "검색 결과가 없습니다" : "자주 가는 매장을 등록해보세요"}
+                                                    {searchQuery ? t("createClub.noResults") : t("createClub.storeSearchPrompt")}
                                                 </span>
                                             </div>
                                         )}
@@ -454,12 +457,12 @@ export default function CreateClub() {
                                 <div className="p-4 bg-black/[0.04] rounded-tile ">
                                     <h4 className="font-bold flex items-center gap-2 mb-2 text-sm">
                                         <LucideTent className="w-4 h-4 text-brand" />
-                                        베이스 캠프란?
+                                        {t("createClub.baseCampTitle")}
                                     </h4>
                                     <p className="text-xs text-black/55 leading-relaxed">
-                                        크루의 주 활동 {currentSport === "GOLF" ? "매장" : "구장"}입니다. 베이스 캠프를 등록하면
-                                        <span className="text-black/70 font-bold"> 해당 {currentSport === "GOLF" ? "곳의 운영자" : "구장 사장님"}에게 알림</span>이 가며,
-                                        크루원을 위한 <span className="text-black/70 font-bold">전용 혜택</span>을 받을 수도 있습니다!
+                                        {currentSport === "GOLF" ? t("createClub.baseCampIntroGolf") : t("createClub.baseCampIntroBilliards")}
+                                        <span className="text-black/70 font-bold">{currentSport === "GOLF" ? t("createClub.baseCampNotifyGolf") : t("createClub.baseCampNotifyBilliards")}</span>
+                                        {t("createClub.baseCampMid")}<span className="text-black/70 font-bold">{t("createClub.baseCampPerk")}</span>{t("createClub.baseCampEnd")}
                                     </p>
                                 </div>
                             </div>
@@ -477,18 +480,18 @@ export default function CreateClub() {
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">정모 요일</Label>
+                                        <Label className="text-xs font-semibold text-black/55">{t("createClub.meetingDayLabel")}</Label>
                                         <Input
-                                            placeholder="예: 매주 토요일"
+                                            placeholder={t("createClub.meetingDayPlaceholder")}
                                             className="bg-surface-2 border-black/10 h-12 rounded-tile text-[15px] font-medium"
                                             value={formData.meetingDay || ""}
                                             onChange={e => setFormData({ ...formData, meetingDay: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">정모 시간</Label>
+                                        <Label className="text-xs font-semibold text-black/55">{t("createClub.meetingTimeLabel")}</Label>
                                         <Input
-                                            placeholder="예: 오후 2시"
+                                            placeholder={t("createClub.meetingTimePlaceholder")}
                                             className="bg-surface-2 border-black/10 h-12 rounded-tile text-[15px] font-medium"
                                             value={formData.meetingTime || ""}
                                             onChange={e => setFormData({ ...formData, meetingTime: e.target.value })}
@@ -497,18 +500,18 @@ export default function CreateClub() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">주 종목</Label>
+                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.gameTypeLabel")}</Label>
                                     <div className="flex gap-2">
                                         {(currentSport === "GOLF" ? [
-                                            { id: "any", label: "상관없음" },
-                                            { id: "field", label: "필드 라운드" },
-                                            { id: "screen", label: "스크린 골프" },
-                                            { id: "range", label: "연습장" }
+                                            { id: "any", label: "createClub.gameAny" },
+                                            { id: "field", label: "createClub.gameField" },
+                                            { id: "screen", label: "createClub.gameScreen" },
+                                            { id: "range", label: "createClub.gameRange" }
                                         ] : [
-                                            { id: "any", label: "상관없음" },
-                                            { id: "3c", label: "3쿠션" },
-                                            { id: "4c", label: "4구" },
-                                            { id: "pocket", label: "포켓볼" }
+                                            { id: "any", label: "createClub.gameAny" },
+                                            { id: "3c", label: "createClub.game3c" },
+                                            { id: "4c", label: "createClub.game4c" },
+                                            { id: "pocket", label: "createClub.gamePocket" }
                                         ]).map(type => (
                                             <button
                                                 key={type.id}
@@ -518,14 +521,14 @@ export default function CreateClub() {
                                                     : "bg-black/[0.04] text-black/55 hover:text-[rgba(0,0,0,0.87)]"
                                                     }`}
                                             >
-                                                {type.label}
+                                                {t(type.label)}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">분위기 (최대 3개)</Label>
+                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.vibeLabel")}</Label>
                                     <div className="flex flex-wrap gap-2">
                                         {(currentSport === "GOLF"
                                             ? ["#매너골프", "#싱글목표", "#명랑골프", "#라운딩", "#스크린", "#초보환영", "#고수환영", "#2030", "#4050", "#주말골퍼"]
@@ -546,7 +549,7 @@ export default function CreateClub() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">가입 방식</Label>
+                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.joinTypeLabel")}</Label>
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             onClick={() => setFormData({ ...formData, joinType: "auto" })}
@@ -555,8 +558,8 @@ export default function CreateClub() {
                                                 : "border-black/[0.08] bg-surface-2"
                                                 }`}
                                         >
-                                            <div className={`font-bold text-sm ${formData.joinType === "auto" ? "text-brand" : "text-[rgba(0,0,0,0.87)]"}`}>바로 가입</div>
-                                            <div className="text-[12px] text-black/55">누구나 즉시 가입 가능</div>
+                                            <div className={`font-bold text-sm ${formData.joinType === "auto" ? "text-brand" : "text-[rgba(0,0,0,0.87)]"}`}>{t("createClub.joinAutoTitle")}</div>
+                                            <div className="text-[12px] text-black/55">{t("createClub.joinAutoDesc")}</div>
                                         </button>
                                         <button
                                             onClick={() => setFormData({ ...formData, joinType: "approval" })}
@@ -565,15 +568,15 @@ export default function CreateClub() {
                                                 : "border-black/[0.08] bg-surface-2"
                                                 }`}
                                         >
-                                            <div className={`font-bold text-sm ${formData.joinType === "approval" ? "text-brand" : "text-[rgba(0,0,0,0.87)]"}`}>승인 후 가입</div>
-                                            <div className="text-[12px] text-black/55">크루장 승인 필요</div>
+                                            <div className={`font-bold text-sm ${formData.joinType === "approval" ? "text-brand" : "text-[rgba(0,0,0,0.87)]"}`}>{t("createClub.joinApprovalTitle")}</div>
+                                            <div className="text-[12px] text-black/55">{t("createClub.joinApprovalDesc")}</div>
                                         </button>
                                     </div>
                                 </div>
 
                                 <div className="space-y-3">
                                     <Label className="text-xs font-semibold text-black/55 flex items-center gap-2">
-                                        <LucideUsers className="w-3 h-3" /> 정원 설정
+                                        <LucideUsers className="w-3 h-3" /> {t("createClub.capacityLabel")}
                                     </Label>
                                     <div className="flex flex-wrap gap-2">
                                         {[10, 20, 30, 50, 100].map(num => (
@@ -585,11 +588,11 @@ export default function CreateClub() {
                                                     : "bg-black/[0.04] text-black/55 border-black/[0.08]"
                                                     }`}
                                             >
-                                                {num}명
+                                                {num}{t("createClub.memberUnit")}
                                             </button>
                                         ))}
                                     </div>
-                                    <p className="text-[12px] text-black/55 mt-1">* 나중에 클럽 설정에서 변경할 수 있습니다.</p>
+                                    <p className="text-[12px] text-black/55 mt-1">{t("createClub.capacityHint")}</p>
                                 </div>
                             </div>
                         </motion.div>
@@ -612,7 +615,7 @@ export default function CreateClub() {
                     onClick={handleNext}
                     disabled={createCrewMutation.isPending}
                 >
-                    {createCrewMutation.isPending ? "생성 중..." : (step === 3 ? "크루 만들기 완료" : "다음")}
+                    {createCrewMutation.isPending ? t("createClub.creating") : (step === 3 ? t("createClub.submitDone") : t("createClub.next"))}
                 </Button>
             </div>
         </div>

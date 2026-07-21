@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { HiqGame } from "@shared/schema";
 import { SportConfig } from "./types";
 import ScorecardModal from "@/golf/components/ScorecardModal";
+import { useT } from "@/lib/i18n";
 
 interface GameDetailDialogProps {
     gameId: string | null;
@@ -17,6 +18,7 @@ interface GameDetailDialogProps {
 }
 
 export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, currentSport }: GameDetailDialogProps) => {
+    const { t } = useT();
 
     const { data: game, isLoading } = useQuery<HiqGame>({
         queryKey: [`/api/hiq/history/${gameId}/detail`],
@@ -77,9 +79,9 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                             {/* Players Section (Dynamic 2-4 Players) */}
                             <div className="p-4 bg-black/[0.03] rounded-2xl ">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[12px] font-medium text-black/55 uppercase">참가자</span>
+                                    <span className="text-[12px] font-medium text-black/55 uppercase">{t("gameDetailDialog.participants")}</span>
                                     <span className={cn("text-[12px] font-bold", config.themeColor)}>
-                                        {game.gameType === '4c' ? '4구' : (currentSport === "GOLF" ? "18H" : "3구")}
+                                        {game.gameType === '4c' ? t("gameDetailDialog.fourBall") : (currentSport === "GOLF" ? "18H" : t("gameDetailDialog.threeBall"))}
                                     </span>
                                 </div>
                                 <div className={`grid gap-3 ${game.player3Name ? (game.player4Name ? 'grid-cols-4' : 'grid-cols-3') : 'grid-cols-2'}`}>
@@ -99,7 +101,7 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                                                 <p className={`text-[12px] font-bold mb-0.5 ${isMe ? 'text-brand' : 'text-black/55'}`}>
                                                     {isMe ? 'ME' : `P${idx}`}
                                                 </p>
-                                                <p className="text-sm font-semibold truncate px-1">{pName || (isMe ? "나" : `Player ${idx}`)}</p>
+                                                <p className="text-sm font-semibold truncate px-1">{pName || (isMe ? t("gameDetailDialog.me") : `Player ${idx}`)}</p>
                                                 <div className={`text-lg font-semibold flex items-center justify-center gap-1 ${isMe ? config.themeColor : 'text-black/60'}`}>
                                                     {currentSport === "GOLF" ? (
                                                         <span>{pScore || 0}</span>
@@ -140,7 +142,7 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                                     <div className="flex items-center gap-2 mb-2 text-black/55">
                                         <LucideCalendar className="w-4 h-4" />
                                         <span className="text-[12px] font-semibold uppercase">
-                                            {currentSport === "GOLF" ? "총 홀" : "총 이닝"}
+                                            {currentSport === "GOLF" ? t("gameDetailDialog.totalHoles") : t("gameDetailDialog.totalInnings")}
                                         </span>
                                     </div>
                                     <p className="text-2xl font-semibold">{game.totalInnings || 0}</p>
@@ -151,7 +153,7 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                             <div>
                                 <h4 className="text-xs font-semibold uppercase text-black/55 mb-3 flex items-center gap-2">
                                     <LucideUsers className="w-3 h-3" />
-                                    {currentSport === "GOLF" ? "홀별 스코어 상세" : "이닝별 득점 상세"}
+                                    {currentSport === "GOLF" ? t("gameDetailDialog.holeScoreDetail") : t("gameDetailDialog.inningScoreDetail")}
                                 </h4>
                                 <div className="bg-white rounded-2xl overflow-hidden">
                                     <div
@@ -162,13 +164,13 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                                                     "grid-cols-[60px_repeat(2,1fr)]"
                                         )}
                                     >
-                                        <div>{currentSport === "GOLF" ? "HOLE" : "이닝"}</div>
+                                        <div>{currentSport === "GOLF" ? "HOLE" : t("gameDetailDialog.inning")}</div>
                                         {[1, 2, 3, 4].map(idx => {
                                             if (idx > 2 && !(game as any)[`player${idx}Name`]) return null;
                                             const isMe = currentMemberId && (game as any)[`player${idx}Id`] === currentMemberId;
                                             return (
                                                 <div key={idx} className={`text-center truncate px-1 ${isMe ? 'text-brand' : ''}`}>
-                                                    {isMe ? '나' : ((game as any)[`player${idx}Name`] || `P${idx}`)}
+                                                    {isMe ? t("gameDetailDialog.me") : ((game as any)[`player${idx}Name`] || `P${idx}`)}
                                                 </div>
                                             );
                                         })}
@@ -208,7 +210,7 @@ export const GameDetailDialog = ({ gameId, onClose, currentMemberId, config, cur
                             </div>
                         </>
                     ) : (
-                        <div className="py-12 text-center text-black/55">데이터를 불러오는 중입니다...</div>
+                        <div className="py-12 text-center text-black/55">{t("gameDetailDialog.loadingData")}</div>
                     )}
                 </div>
             </DialogContent>

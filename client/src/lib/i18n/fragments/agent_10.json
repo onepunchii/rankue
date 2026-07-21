@@ -1,0 +1,310 @@
+{
+  "pinCodeModal.title": {
+    "ko": "게임 참여하기",
+    "en": "Join a Game",
+    "vi": "Tham gia trận đấu",
+    "tr": "Oyuna Katıl",
+    "es": "Unirse a la partida"
+  },
+  "pinCodeModal.subtitle": {
+    "ko": "핀 코드 입력",
+    "en": "Enter PIN code",
+    "vi": "Nhập mã PIN",
+    "tr": "PIN kodunu gir",
+    "es": "Introduce el código PIN"
+  },
+  "pinCodeModal.cancel": {
+    "ko": "취소",
+    "en": "Cancel",
+    "vi": "Hủy",
+    "tr": "İptal",
+    "es": "Cancelar"
+  },
+  "pinCodeModal.joinSuccessTitle": {
+    "ko": "참여 완료",
+    "en": "Joined!",
+    "vi": "Đã tham gia",
+    "tr": "Katıldın",
+    "es": "¡Te has unido!"
+  },
+  "pinCodeModal.joinSuccessDesc": {
+    "ko": "호스트가 상대를 확인 중입니다.",
+    "en": "The host is confirming your entry.",
+    "vi": "Chủ phòng đang xác nhận đối thủ.",
+    "tr": "Ev sahibi rakibi onaylıyor.",
+    "es": "El anfitrión está confirmando al rival."
+  },
+  "pinCodeModal.joinFailTitle": {
+    "ko": "참여 실패",
+    "en": "Couldn't join",
+    "vi": "Tham gia thất bại",
+    "tr": "Katılım başarısız",
+    "es": "No se pudo unir"
+  },
+  "pinCodeModal.joinFailDesc": {
+    "ko": "코드를 확인해주세요.",
+    "en": "Please check the code.",
+    "vi": "Vui lòng kiểm tra lại mã.",
+    "tr": "Kodu kontrol et.",
+    "es": "Revisa el código."
+  },
+  "quickActions.title": {
+    "ko": "빠른 실행",
+    "en": "Quick Actions",
+    "vi": "Thao tác nhanh",
+    "tr": "Hızlı Başlat",
+    "es": "Acciones rápidas"
+  },
+  "quickActions.subtitle": {
+    "ko": "게임을 시작하거나 참여하세요",
+    "en": "Start or join a game",
+    "vi": "Bắt đầu hoặc tham gia trận đấu",
+    "tr": "Oyun başlat veya katıl",
+    "es": "Empieza o únete a una partida"
+  },
+  "quickActions.guideTitle": {
+    "ko": "게임 모드 안내",
+    "en": "Game Mode Guide",
+    "vi": "Hướng dẫn chế độ chơi",
+    "tr": "Oyun Modu Rehberi",
+    "es": "Guía de modos de juego"
+  },
+  "quickActions.guideDesc": {
+    "ko": "각 메뉴가 어떤 기능인지 알려드려요",
+    "en": "Here's what each menu does",
+    "vi": "Giải thích chức năng của từng mục",
+    "tr": "Her menünün ne işe yaradığını anlatalım",
+    "es": "Te contamos qué hace cada menú"
+  },
+  "quickActions.practiceTitle": {
+    "ko": "혼자 연습",
+    "en": "Solo Practice",
+    "vi": "Tập một mình",
+    "tr": "Tek Başına Antrenman",
+    "es": "Práctica en solitario"
+  },
+  "quickActions.practiceDesc": {
+    "ko": "기록 없이 연습",
+    "en": "Practice off the record",
+    "vi": "Tập không lưu kết quả",
+    "tr": "Kayıtsız antrenman",
+    "es": "Practica sin registro"
+  },
+  "quickActions.matchTitle": {
+    "ko": "매칭 대결",
+    "en": "Ranked Match",
+    "vi": "Đấu xếp hạng",
+    "tr": "Sıralı Maç",
+    "es": "Partida clasificatoria"
+  },
+  "quickActions.matchDescLine1": {
+    "ko": "실력이 맞는 상대와",
+    "en": "Face an evenly matched rival",
+    "vi": "Gặp đối thủ ngang trình",
+    "tr": "Denk bir rakiple",
+    "es": "Contra un rival de tu nivel"
+  },
+  "quickActions.matchDescLine2": {
+    "ko": "1:1 랭킹 경기",
+    "en": "in a 1v1 ranked game",
+    "vi": "trong trận xếp hạng 1:1",
+    "tr": "1'e 1 sıralı maç",
+    "es": "en una partida 1 a 1"
+  },
+  "quickActions.pinTitle": {
+    "ko": "핀 참여",
+    "en": "Join by PIN",
+    "vi": "Vào bằng PIN",
+    "tr": "PIN ile Katıl",
+    "es": "Unirse con PIN"
+  },
+  "quickActions.pinDesc": {
+    "ko": "코드로 입장",
+    "en": "Enter with a code",
+    "vi": "Vào phòng bằng mã",
+    "tr": "Kodla gir",
+    "es": "Entra con un código"
+  },
+  "quickActions.simTitle": {
+    "ko": "시뮬레이터",
+    "en": "Simulator",
+    "vi": "Mô phỏng",
+    "tr": "Simülatör",
+    "es": "Simulador"
+  },
+  "quickActions.simDesc": {
+    "ko": "화면으로 즐기는 당구",
+    "en": "Billiards on your screen",
+    "vi": "Chơi bi-a trên màn hình",
+    "tr": "Ekranda bilardo keyfi",
+    "es": "Billar en tu pantalla"
+  },
+  "quickActions.modeSelectTitle": {
+    "ko": "게임 모드 선택",
+    "en": "Choose a Game Mode",
+    "vi": "Chọn chế độ chơi",
+    "tr": "Oyun Modu Seç",
+    "es": "Elige un modo de juego"
+  },
+  "quickActions.modeSelectDesc": {
+    "ko": "화면 위 당구대에서 플레이해요",
+    "en": "Play on an on-screen table",
+    "vi": "Chơi trên bàn bi-a ảo ngay trên màn hình",
+    "tr": "Ekrandaki masada oyna",
+    "es": "Juega en una mesa virtual"
+  },
+  "quickActions.close": {
+    "ko": "닫기",
+    "en": "Close",
+    "vi": "Đóng",
+    "tr": "Kapat",
+    "es": "Cerrar"
+  },
+  "quickActions.threeBall": {
+    "ko": "3구",
+    "en": "3-Ball",
+    "vi": "3 bi",
+    "tr": "3 Top",
+    "es": "3 bolas"
+  },
+  "quickActions.fourBall": {
+    "ko": "4구",
+    "en": "4-Ball",
+    "vi": "4 bi",
+    "tr": "4 Top",
+    "es": "4 bolas"
+  },
+  "quickActions.fourBallStart": {
+    "ko": "4구 게임 시작",
+    "en": "Start a 4-Ball game",
+    "vi": "Bắt đầu ván 4 bi",
+    "tr": "4 Top oyununu başlat",
+    "es": "Iniciar partida de 4 bolas"
+  },
+  "quickActions.tableSize": {
+    "ko": "테이블 규격",
+    "en": "Table Size",
+    "vi": "Kích thước bàn",
+    "tr": "Masa Boyutu",
+    "es": "Tamaño de mesa"
+  },
+  "quickActions.tableMedium": {
+    "ko": "중대",
+    "en": "Medium",
+    "vi": "Bàn trung",
+    "tr": "Orta Masa",
+    "es": "Mediana"
+  },
+  "quickActions.tableMediumDesc": {
+    "ko": "국내식",
+    "en": "Korean style",
+    "vi": "Kiểu Hàn Quốc",
+    "tr": "Kore usulü",
+    "es": "Estilo coreano"
+  },
+  "quickActions.tableLarge": {
+    "ko": "대대",
+    "en": "Large",
+    "vi": "Bàn lớn",
+    "tr": "Büyük Masa",
+    "es": "Grande"
+  },
+  "quickActions.tableLargeDesc": {
+    "ko": "국제식",
+    "en": "International",
+    "vi": "Chuẩn quốc tế",
+    "tr": "Uluslararası",
+    "es": "Internacional"
+  },
+  "quickActions.coreBadge": {
+    "ko": "핵심",
+    "en": "Main",
+    "vi": "Chính",
+    "tr": "Ana",
+    "es": "Clave"
+  },
+  "quickActions.gotIt": {
+    "ko": "알겠어요",
+    "en": "Got it",
+    "vi": "Đã hiểu",
+    "tr": "Anladım",
+    "es": "Entendido"
+  },
+  "quickActions.guideMatchDesc": {
+    "ko": "실력이 비슷한 상대와 1:1 랭킹전을 펼쳐요. 승패에 따라 랭킹 점수(RP)가 오르내립니다.",
+    "en": "Play 1v1 ranked games against evenly matched rivals. Your rating points (RP) rise or fall with each result.",
+    "vi": "Đấu xếp hạng 1:1 với đối thủ ngang trình. Điểm xếp hạng (RP) tăng hoặc giảm theo kết quả.",
+    "tr": "Denk rakiplerle 1'e 1 sıralı maç yap. Sonuca göre sıralama puanın (RP) artar veya azalır.",
+    "es": "Juega partidas clasificatorias 1 a 1 contra rivales de tu nivel. Tus puntos de ranking (RP) suben o bajan según el resultado."
+  },
+  "quickActions.guidePracticeDesc": {
+    "ko": "기록에 남지 않는 자유 연습이에요. 부담 없이 자세와 감각을 다듬어 보세요.",
+    "en": "Free practice that stays off the record. Fine-tune your form and feel with zero pressure.",
+    "vi": "Tập tự do, không lưu kết quả. Thoải mái rèn tư thế và cảm giác bi.",
+    "tr": "Kayda geçmeyen serbest antrenman. Duruşunu ve hissini rahatça geliştir.",
+    "es": "Práctica libre que no queda registrada. Pule tu postura y tu toque sin presión."
+  },
+  "quickActions.guidePinDesc": {
+    "ko": "상대가 만든 방의 PIN 코드를 입력해 바로 입장해요. 눈앞의 상대와 경기 기록을 남길 때 좋아요.",
+    "en": "Enter the PIN code of your opponent's room to jump right in. Great for recording games with someone right in front of you.",
+    "vi": "Nhập mã PIN của phòng do đối thủ tạo để vào ngay. Tiện khi ghi lại trận đấu với người ngay trước mặt.",
+    "tr": "Rakibinin oluşturduğu odanın PIN kodunu girip hemen katıl. Karşındaki rakiple maç kaydı tutmak için ideal.",
+    "es": "Introduce el código PIN de la sala de tu rival y entra al instante. Ideal para registrar partidas con alguien frente a ti."
+  },
+  "quickActions.guideSimDesc": {
+    "ko": "화면 위 가상 당구대에서 혼자 치는 연습이에요. 3구·4구, 중대·대대를 골라 시작해요.",
+    "en": "Practice on a virtual table on your screen. Pick 3-ball or 4-ball, medium or large table, and go.",
+    "vi": "Tập một mình trên bàn bi-a ảo. Chọn 3 bi hay 4 bi, bàn trung hay bàn lớn rồi bắt đầu.",
+    "tr": "Ekrandaki sanal masada tek başına antrenman. 3 top veya 4 top, orta veya büyük masayı seçip başla.",
+    "es": "Practica en solitario en una mesa virtual. Elige 3 o 4 bolas, mesa mediana o grande, y empieza."
+  },
+  "rpGuideModal.title": {
+    "ko": "What is RP?",
+    "en": "What is RP?",
+    "vi": "RP là gì?",
+    "tr": "RP nedir?",
+    "es": "¿Qué es el RP?"
+  },
+  "rpGuideModal.sectionTitle": {
+    "ko": "매치 레이팅 포인트 (Match Rating)",
+    "en": "Match Rating Points",
+    "vi": "Điểm xếp hạng trận đấu (Match Rating)",
+    "tr": "Maç Derecelendirme Puanı (Match Rating)",
+    "es": "Puntos de valoración de partidas (Match Rating)"
+  },
+  "rpGuideModal.desc": {
+    "ko": "는 플레이어의 실질적인 실력을 나타내는 점수입니다. 단순한 승률을 넘어 상대의 실력까지 고려하여 계산됩니다.",
+    "en": " is a score that reflects your true skill. It goes beyond win rate by factoring in your opponent's skill.",
+    "vi": " là điểm số thể hiện thực lực của người chơi. Không chỉ dựa vào tỷ lệ thắng mà còn tính đến trình độ của đối thủ.",
+    "tr": ", oyuncunun gerçek gücünü gösteren bir puandır. Salt kazanma oranının ötesinde rakibin seviyesini de hesaba katar.",
+    "es": " es una puntuación que refleja tu nivel real. Va más allá del porcentaje de victorias y tiene en cuenta el nivel del rival."
+  },
+  "rpGuideModal.howTitle": {
+    "ko": "점수 획득 원리",
+    "en": "How scoring works",
+    "vi": "Cách tính điểm",
+    "tr": "Puanlama nasıl işler",
+    "es": "Cómo se ganan los puntos"
+  },
+  "rpGuideModal.howDesc": {
+    "ko": "나보다 RP가 높은 상대를 이기면 더 많은 점수를 얻고, 낮은 상대에게 지면 더 많은 점수를 잃습니다.",
+    "en": "Beat a higher-RP opponent to earn more points; lose to a lower-RP opponent and you'll drop more.",
+    "vi": "Thắng đối thủ có RP cao hơn sẽ được nhiều điểm hơn; thua đối thủ RP thấp hơn sẽ mất nhiều điểm hơn.",
+    "tr": "Senden yüksek RP'li rakibi yenersen daha çok puan kazanırsın; düşük RP'li rakibe kaybedersen daha çok puan kaybedersin.",
+    "es": "Gana a un rival con más RP y obtendrás más puntos; pierde contra uno con menos RP y perderás más."
+  },
+  "rpGuideModal.note": {
+    "ko": "RP는 공식 매치(Ranked Game) 결과에 따라서만 변동되며, 연습 경기나 친선 경기는 영향을 주지 않습니다.",
+    "en": "RP only changes based on ranked game results. Practice and friendly games don't affect it.",
+    "vi": "RP chỉ thay đổi theo kết quả trận xếp hạng. Trận tập và giao hữu không ảnh hưởng.",
+    "tr": "RP yalnızca sıralı maç sonuçlarına göre değişir. Antrenman ve dostluk maçları etkilemez.",
+    "es": "El RP solo cambia con los resultados de partidas clasificatorias. Las de práctica y amistosas no influyen."
+  },
+  "rpGuideModal.gotIt": {
+    "ko": "알겠습니다",
+    "en": "Got it",
+    "vi": "Đã hiểu",
+    "tr": "Anladım",
+    "es": "Entendido"
+  }
+}

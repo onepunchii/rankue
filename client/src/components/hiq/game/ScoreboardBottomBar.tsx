@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { LucideUndo2, LucideRedo2 } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 interface Props {
     innings: number;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo, onRedo }: Props) {
+    const { t } = useT();
     // Timer State moved here to prevent re-rendering of parent
     const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -34,7 +36,7 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
             {/* Left Section: Time */}
             <div className="flex items-center gap-6 w-1/4">
                 <div className="flex flex-col">
-                    <span className="text-[12px] font-medium text-black/40">진행 시간</span>
+                    <span className="text-[12px] font-medium text-black/40">{t("scoreboardBottomBar.elapsedTime")}</span>
                     <span className="text-xl font-bold text-[rgba(0,0,0,0.87)] tabular-nums">{formatTime(elapsedTime)}</span>
                 </div>
             </div>
@@ -54,7 +56,7 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
                 {/* Billiard Ball Style Inning Display */}
                 <div className="relative group">
                     <div className="w-24 h-24 rounded-full border-4 border-brand flex flex-col items-center justify-center -mt-16 bg-white z-50 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                        <span className="text-[12px] font-medium text-black/55 leading-none mb-1">이닝</span>
+                        <span className="text-[12px] font-medium text-black/55 leading-none mb-1">{t("scoreboardBottomBar.inning")}</span>
                         <span className="text-4xl font-bold text-brand tabular-nums leading-none">{innings}</span>
                     </div>
                 </div>
@@ -76,7 +78,7 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
                     onClick={onExit}
                     className="h-12 px-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-semibold"
                 >
-                    종료하기
+                    {t("scoreboardBottomBar.exit")}
                 </Button>
             </div>
         </div>

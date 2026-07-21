@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { LucideTrendingUp, LucideTrendingDown } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { motion, AnimatePresence } from "framer-motion";
 
 export interface ChartDataPoint {
@@ -41,6 +42,7 @@ const bezierCommand = (point: number[], i: number, a: number[][]) => {
 const smoothLine = (points: number[][]) => svgPath(points, bezierCommand);
 
 export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartProps) => {
+    const { t } = useT();
     const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
 
     // 테마 설정
@@ -107,7 +109,7 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
                     </div>
                     <div className={cn("flex items-center justify-end gap-1 text-xs font-bold mt-1", isUp ? theme.text : "text-black/40")}>
                         {isUp ? <LucideTrendingUp className="w-3.5 h-3.5" /> : <LucideTrendingDown className="w-3.5 h-3.5" />}
-                        <span>직전 대비 {isUp ? '+' : '-'}{diff.toFixed(2)}</span>
+                        <span>{t("smoothTrendChart.vsPrevious")} {isUp ? '+' : '-'}{diff.toFixed(2)}</span>
                     </div>
                 </div>
             </div>
@@ -200,8 +202,8 @@ export const SmoothTrendChart = ({ title, subTitle, data, color }: TrendChartPro
 
                 {/* X-Axis */}
                 <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-[12px] text-black/55 font-medium px-1 pointer-events-none">
-                    <span>10게임 전</span>
-                    <span>오늘</span>
+                    <span>{t("smoothTrendChart.tenGamesAgo")}</span>
+                    <span>{t("smoothTrendChart.today")}</span>
                 </div>
             </div>
         </div>

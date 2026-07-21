@@ -1,0 +1,163 @@
+{
+  "hiqInstallBanner.title": {
+    "ko": "랭큐 앱 설치하기",
+    "en": "Install the RANKUE app",
+    "vi": "Cài đặt ứng dụng RANKUE",
+    "tr": "RANKUE uygulamasını yükle",
+    "es": "Instala la app RANKUE"
+  },
+  "hiqInstallBanner.subtitleIos": {
+    "ko": "홈 화면에 추가하고 편하게 쓰세요!",
+    "en": "Add it to your Home Screen for easy access!",
+    "vi": "Thêm vào màn hình chính để dùng tiện hơn!",
+    "tr": "Ana ekrana ekle, rahatça kullan!",
+    "es": "¡Añádela a tu pantalla de inicio y úsala cómodamente!"
+  },
+  "hiqInstallBanner.subtitle": {
+    "ko": "홈 화면에 추가하고 더 편하게 접속하세요!",
+    "en": "Add it to your home screen for quicker access!",
+    "vi": "Thêm vào màn hình chính để truy cập nhanh hơn!",
+    "tr": "Ana ekrana ekle, daha hızlı eriş!",
+    "es": "¡Añádela a tu pantalla de inicio para acceder más rápido!"
+  },
+  "hiqInstallBanner.howTo": {
+    "ko": "방법보기",
+    "en": "How to",
+    "vi": "Xem cách",
+    "tr": "Nasıl?",
+    "es": "Ver cómo"
+  },
+  "hiqInstallBanner.install": {
+    "ko": "설치",
+    "en": "Install",
+    "vi": "Cài đặt",
+    "tr": "Yükle",
+    "es": "Instalar"
+  },
+  "hiqInstallBanner.iosGuideTitle": {
+    "ko": "아이폰 홈 화면 추가",
+    "en": "Add to iPhone Home Screen",
+    "vi": "Thêm vào màn hình chính iPhone",
+    "tr": "iPhone Ana Ekranına Ekle",
+    "es": "Añadir a la pantalla de inicio del iPhone"
+  },
+  "hiqInstallBanner.iosGuideLine1": {
+    "ko": "사파리(Safari) 브라우저 하단의",
+    "en": "At the bottom of Safari, tap the",
+    "vi": "Ở thanh dưới cùng của Safari, hãy nhấn",
+    "tr": "Safari'nin alt kısmındaki",
+    "es": "En la parte inferior de Safari, toca el"
+  },
+  "hiqInstallBanner.iosGuideShareButton": {
+    "ko": "공유 버튼",
+    "en": "Share button",
+    "vi": "nút Chia sẻ",
+    "tr": "Paylaş düğmesine",
+    "es": "botón Compartir"
+  },
+  "hiqInstallBanner.iosGuideLine2": {
+    "ko": "을 누른 뒤",
+    "en": ", then select",
+    "vi": ", sau đó chọn",
+    "tr": " dokunun, ardından",
+    "es": " y luego selecciona"
+  },
+  "hiqInstallBanner.iosGuideAddHome": {
+    "ko": "'홈 화면에 추가'",
+    "en": "'Add to Home Screen'",
+    "vi": "'Thêm vào MH chính'",
+    "tr": "'Ana Ekrana Ekle'",
+    "es": "'Añadir a pantalla de inicio'"
+  },
+  "hiqInstallBanner.iosGuideLine3": {
+    "ko": "를 선택해주세요.",
+    "en": ".",
+    "vi": ".",
+    "tr": " seçeneğini seçin.",
+    "es": "."
+  },
+  "hiqInstallBanner.step1Prefix": {
+    "ko": "1. 하단",
+    "en": "1. Tap the",
+    "vi": "1. Nhấn",
+    "tr": "1. Alttaki",
+    "es": "1. Toca el"
+  },
+  "hiqInstallBanner.step1ShareIcon": {
+    "ko": "공유 아이콘",
+    "en": "Share icon",
+    "vi": "biểu tượng Chia sẻ",
+    "tr": "Paylaş simgesine",
+    "es": "icono Compartir"
+  },
+  "hiqInstallBanner.step1Suffix": {
+    "ko": "클릭",
+    "en": "at the bottom",
+    "vi": "ở thanh dưới",
+    "tr": "dokun",
+    "es": "abajo"
+  },
+  "hiqInstallBanner.step2Prefix": {
+    "ko": "2. 메뉴에서",
+    "en": "2. Choose",
+    "vi": "2. Chọn",
+    "tr": "2. Menüden",
+    "es": "2. Elige"
+  },
+  "hiqInstallBanner.step2AddHome": {
+    "ko": "홈 화면에 추가",
+    "en": "Add to Home Screen",
+    "vi": "Thêm vào MH chính",
+    "tr": "Ana Ekrana Ekle",
+    "es": "Añadir a pantalla de inicio"
+  },
+  "hiqInstallBanner.step2Suffix": {
+    "ko": "선택",
+    "en": "from the menu",
+    "vi": "trong menu",
+    "tr": "seçeneğini seç",
+    "es": "en el menú"
+  },
+  "hiqInstallBanner.confirm": {
+    "ko": "확인했습니다",
+    "en": "Got it",
+    "vi": "Đã hiểu",
+    "tr": "Anladım",
+    "es": "Entendido"
+  },
+  "hiqNavigation.home": {
+    "ko": "홈",
+    "en": "Home",
+    "vi": "Trang chủ",
+    "tr": "Ana Sayfa",
+    "es": "Inicio"
+  },
+  "hiqNavigation.club": {
+    "ko": "크루",
+    "en": "Crew",
+    "vi": "Nhóm",
+    "tr": "Ekip",
+    "es": "Equipo"
+  },
+  "hiqNavigation.friend": {
+    "ko": "친구",
+    "en": "Friends",
+    "vi": "Bạn bè",
+    "tr": "Arkadaşlar",
+    "es": "Amigos"
+  },
+  "hiqNavigation.log": {
+    "ko": "기록",
+    "en": "History",
+    "vi": "Lịch sử",
+    "tr": "Geçmiş",
+    "es": "Historial"
+  },
+  "hiqNavigation.menu": {
+    "ko": "전체",
+    "en": "Menu",
+    "vi": "Menu",
+    "tr": "Menü",
+    "es": "Menú"
+  }
+}

@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { getTier } from "@/lib/hiqUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { MemberActivityStats } from "@/components/hiq/member/MemberActivityStats";
+import { useT } from "@/lib/i18n";
 
 // --- Types ---
 interface EnhancedHiqMember extends HiqMember {
@@ -58,6 +59,7 @@ interface CrewMemberListProps {
 
 
 export function CrewMemberList({ members, currentMemberId, sportCategory = "BILLIARDS", crewId }: CrewMemberListProps) {
+    const { t } = useT();
     const [selectedMember, setSelectedMember] = useState<CrewMemberItemType | null>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -152,8 +154,8 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
 
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent side="bottom" className="h-[75vh] rounded-t-[2rem] bg-white border-t border-black/10 p-0 overflow-hidden">
-                    <SheetTitle className="sr-only">멤버 상세 정보</SheetTitle>
-                    <SheetDescription className="sr-only">선택한 멤버의 상세 통계와 정보를 확인합니다.</SheetDescription>
+                    <SheetTitle className="sr-only">{t("crewMemberList.sheetTitle")}</SheetTitle>
+                    <SheetDescription className="sr-only">{t("crewMemberList.sheetDescription")}</SheetDescription>
 
                     {selectedMember && sheetData && (
                         <div className="h-full flex flex-col overflow-y-auto pb-safe">
@@ -179,20 +181,20 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                     <div className="flex items-center gap-1.5">
                                         {selectedMember.role === 'leader' && (
                                             <Badge variant="outline" className="bg-[#cba258]/12 border-[#cba258]/25 text-[#cba258] gap-1 px-2">
-                                                <LucideCrown className="w-3 h-3" /> 크루장
+                                                <LucideCrown className="w-3 h-3" /> {t("crewMemberList.leader")}
                                             </Badge>
                                         )}
                                         {selectedMember.role === 'manage' && (
                                             <Badge variant="outline" className="bg-brand/10 border-brand/25 text-brand gap-1 px-2">
-                                                <LucideShield className="w-3 h-3" /> 운영진
+                                                <LucideShield className="w-3 h-3" /> {t("crewMemberList.manager")}
                                             </Badge>
                                         )}
                                     </div>
                                 </div>
                                 <p className="text-[13px] font-medium text-black/55 mb-6">
-                                    {selectedMember.member.birthYear ? `${Math.floor((new Date().getFullYear() - selectedMember.member.birthYear) / 10) * 10}대` : '연령 미입력'}
+                                    {selectedMember.member.birthYear ? `${Math.floor((new Date().getFullYear() - selectedMember.member.birthYear) / 10) * 10}${t("crewMemberList.ageSuffix")}` : t("crewMemberList.ageUnknown")}
                                     {' • '}
-                                    {selectedMember.member.gender === 'female' ? '여성' : '남성'}
+                                    {selectedMember.member.gender === 'female' ? t("crewMemberList.female") : t("crewMemberList.male")}
                                 </p>
 
                                 <MemberStatsDisplay
@@ -207,7 +209,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                 <div className="px-6 pb-4">
                                     <div className="flex items-center gap-2 mb-3">
                                         <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                                        <h2 className="text-[15px] font-semibold text-black/55">활동 성향</h2>
+                                        <h2 className="text-[15px] font-semibold text-black/55">{t("crewMemberList.activityTendency")}</h2>
                                     </div>
                                     <MemberActivityStats
                                         activities={memberActivities.activities || []}
@@ -221,7 +223,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                 {/* 소갯말 카드 */}
                                 <div className="p-5 rk-card flex flex-col gap-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[12px] font-medium text-black/55">소개글</span>
+                                        <span className="text-[12px] font-medium text-black/55">{t("crewMemberList.bioLabel")}</span>
                                         {currentMemberId === selectedMember.member.id && !isEditingBio && (
                                             <button
                                                 onClick={() => {
@@ -229,7 +231,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                                     setIsEditingBio(true);
                                                 }}
                                                 className="p-1 hover:bg-black/[0.04] rounded"
-                                                title="소개글 수정"
+                                                title={t("crewMemberList.editBio")}
                                             >
                                                 <LucideEdit2 className="w-3 h-3 text-black/40" />
                                             </button>
@@ -243,7 +245,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                                 className="w-full bg-black/[0.04] rounded-tile p-4 text-sm text-ink-1 placeholder:text-black/40 focus:outline-none focus:border-brand/50 min-h-[80px] resize-none"
                                                 value={newBio}
                                                 onChange={(e) => setNewBio(e.target.value)}
-                                                placeholder="자신을 한 줄로 소개해 보세요!"
+                                                placeholder={t("crewMemberList.bioPlaceholder")}
                                             />
                                             <div className="flex gap-2">
                                                 <Button
@@ -251,20 +253,20 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                                     variant="ghost"
                                                     className="flex-1 h-9 text-black/55 text-xs"
                                                 >
-                                                    취소
+                                                    {t("crewMemberList.cancel")}
                                                 </Button>
                                                 <Button
                                                     onClick={() => updateBioMutation.mutate()}
                                                     disabled={updateBioMutation.isPending}
                                                     className="flex-1 h-9 rk-btn-primary text-[13px] rounded-tile"
                                                 >
-                                                    {updateBioMutation.isPending ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <><LucideCheck className="w-4 h-4 mr-1" /> 저장</>}
+                                                    {updateBioMutation.isPending ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <><LucideCheck className="w-4 h-4 mr-1" /> {t("crewMemberList.save")}</>}
                                                 </Button>
                                             </div>
                                         </div>
                                     ) : (
                                         <p className="text-black/70 text-sm leading-relaxed font-medium">
-                                            {selectedMember.member.introduction || "아직 소갯말이 없습니다."}
+                                            {selectedMember.member.introduction || t("crewMemberList.noBio")}
                                         </p>
                                     )}
                                 </div>
@@ -272,7 +274,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                 <div className="p-5 rk-card space-y-4">
                                     {/* 가입일 */}
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[12px] font-medium text-black/55">크루 가입일</span>
+                                        <span className="text-[12px] font-medium text-black/55">{t("crewMemberList.joinedDate")}</span>
                                         <span className="text-[13px] font-semibold text-black/60 tabular-nums">
                                             {new Date(selectedMember.joinedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '')}
                                         </span>
@@ -283,25 +285,25 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                             <LucideCalendarCheck className="w-4 h-4 text-brand" />
                                             <span className="text-[17px] font-bold text-ink-1 tabular-nums">
                                                 {selectedMember.activityCounts?.group1 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">회</span>
+                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">{t("crewMemberList.countUnit")}</span>
                                             </span>
-                                            <span className="text-[12px] font-medium text-black/55">{sportCategory === 'GOLF' ? '라운딩' : '모임'}</span>
+                                            <span className="text-[12px] font-medium text-black/55">{sportCategory === 'GOLF' ? t("crewMemberList.rounding") : t("crewMemberList.meetup")}</span>
                                         </div>
                                         <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-black/[0.04] ">
                                             {sportCategory === 'GOLF' ? <LucideMonitor className="w-4 h-4 text-brand" /> : <LucideTrophy className="w-4 h-4 text-brand" />}
                                             <span className="text-[17px] font-bold text-ink-1 tabular-nums">
                                                 {selectedMember.activityCounts?.group2 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">회</span>
+                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">{t("crewMemberList.countUnit")}</span>
                                             </span>
-                                            <span className="text-[12px] font-medium text-black/55">{sportCategory === 'GOLF' ? '스크린' : '대회'}</span>
+                                            <span className="text-[12px] font-medium text-black/55">{sportCategory === 'GOLF' ? t("crewMemberList.screenGolf") : t("crewMemberList.tournament")}</span>
                                         </div>
                                         <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-black/[0.04] ">
                                             <LucideBeer className="w-4 h-4 text-brand" />
                                             <span className="text-[17px] font-bold text-ink-1 tabular-nums">
                                                 {selectedMember.activityCounts?.group3 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">회</span>
+                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">{t("crewMemberList.countUnit")}</span>
                                             </span>
-                                            <span className="text-[12px] font-medium text-black/55">뒷풀이</span>
+                                            <span className="text-[12px] font-medium text-black/55">{t("crewMemberList.afterParty")}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -313,21 +315,21 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                     <Button
                                         disabled
                                         className="flex-1 h-12 rk-btn-primary rounded-tile disabled:opacity-40"
-                                        title="대결 신청 (준비 중)"
+                                        title={t("crewMemberList.matchRequestTitle")}
                                     >
                                         <LucideSwords className="w-4 h-4 mr-2" />
-                                        대결 신청
+                                        {t("crewMemberList.matchRequest")}
                                     </Button>
                                     <Button
                                         disabled
                                         variant="outline"
                                         className="h-12 w-12 rounded-xl border-black/10 bg-black/[0.04] text-black/60 p-0 disabled:opacity-40"
-                                        title="메시지 보내기 (준비 중)"
+                                        title={t("crewMemberList.sendMessageTitle")}
                                     >
                                         <LucideMessageCircle className="w-5 h-5" />
                                     </Button>
                                 </div>
-                                <p className="text-[12px] font-medium text-black/40 text-center">준비 중인 기능입니다</p>
+                                <p className="text-[12px] font-medium text-black/40 text-center">{t("crewMemberList.comingSoon")}</p>
                             </div>
                         </div>
                     )}
@@ -343,6 +345,7 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
     sportCategory: string,
     onClick: () => void
 }) {
+    const { t } = useT();
     const m = item.member;
     const isLeader = item.role === "leader";
     const isAdmin = item.role === "manage";
@@ -368,7 +371,7 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
     const tierColor = TIER_COLOR[tier.label] || "text-black/55";
     const hasStat = sportCategory === 'GOLF' ? golfScore > 0 : !!(m.avg4c && m.avg4c > 0);
     const statValue = sportCategory === 'GOLF' ? golfScore.toFixed(0) : avg4c;
-    const statUnit = sportCategory === 'GOLF' ? '평균' : '4구';
+    const statUnit = sportCategory === 'GOLF' ? t("crewMemberList.avg") : t("crewMemberList.fourBall");
 
     return (
         <div
@@ -409,15 +412,15 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
                     {isLeader && <LucideCrown className="w-3.5 h-3.5 text-[#cba258] shrink-0" />}
                     {isAdmin && <LucideShield className="w-3.5 h-3.5 text-black/40 shrink-0" />}
                     {isMe && (
-                        <span className="shrink-0 px-1.5 py-px rounded-full text-[12px] font-semibold text-brand bg-brand/12">나</span>
+                        <span className="shrink-0 px-1.5 py-px rounded-full text-[12px] font-semibold text-brand bg-brand/12">{t("crewMemberList.me")}</span>
                     )}
                 </div>
                 <div className="flex items-center gap-1.5 min-w-0 text-[12px] leading-none">
                     <span className={cn("font-semibold shrink-0", tierColor)}>{tier.label}</span>
-                    {isNewbie && <><span className="text-black/20">·</span><span className="text-brand/80 font-medium shrink-0">신입</span></>}
+                    {isNewbie && <><span className="text-black/20">·</span><span className="text-brand/80 font-medium shrink-0">{t("crewMemberList.newbie")}</span></>}
                     <span className="text-black/20 shrink-0">·</span>
                     <span className="text-black/40 font-medium truncate">
-                        {m.introduction || (sportCategory === 'GOLF' ? "골프를 즐기는 랭커" : "당구를 즐기는 랭커")}
+                        {m.introduction || (sportCategory === 'GOLF' ? t("crewMemberList.defaultBioGolf") : t("crewMemberList.defaultBioBilliards"))}
                     </span>
                 </div>
             </div>
@@ -444,7 +447,9 @@ const TIER_COLOR: Record<string, string> = {
     "브론즈": "text-orange-600",
 };
 
-const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => (
+const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => {
+    const { t } = useT();
+    return (
     <div className="flex items-center justify-center gap-8 w-full max-w-sm py-4">
         {sportCategory === 'GOLF' ? (
             <>
@@ -455,15 +460,15 @@ const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => (
                     <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
                         {sheetData.golfScore > 0 ? sheetData.golfScore.toFixed(0) : "-"}
                     </span>
-                    <span className="text-[12px] text-black/55 font-medium">평균 점수</span>
+                    <span className="text-[12px] text-black/55 font-medium">{t("crewMemberList.avgScore")}</span>
                 </div>
                 <div className="w-px h-16 bg-black/10" />
                 <div className="flex flex-col items-center gap-1">
-                    <span className="text-[12px] text-brand font-semibold bg-brand/10 px-2 py-0.5 rounded-full mb-1">최고 점수</span>
+                    <span className="text-[12px] text-brand font-semibold bg-brand/10 px-2 py-0.5 rounded-full mb-1">{t("crewMemberList.bestScore")}</span>
                     <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
                         {member.golfBestScore && member.golfBestScore > 0 ? member.golfBestScore : "-"}
                     </span>
-                    <span className="text-[12px] text-black/55 font-medium">최고</span>
+                    <span className="text-[12px] text-black/55 font-medium">{t("crewMemberList.best")}</span>
                 </div>
             </>
         ) : (
@@ -473,7 +478,7 @@ const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => (
                     <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
                         {member.avg3c ? member.avg3c.toFixed(3) : "0.000"}
                     </span>
-                    <span className="text-[12px] text-black/55 font-medium">평균</span>
+                    <span className="text-[12px] text-black/55 font-medium">{t("crewMemberList.avg")}</span>
                 </div>
                 <div className="w-px h-16 bg-black/10" />
                 <div className="flex flex-col items-center gap-1">
@@ -481,12 +486,13 @@ const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => (
                     <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
                         {member.avg4c ? member.avg4c.toFixed(3) : "0.000"}
                     </span>
-                    <span className="text-[12px] text-black/55 font-medium">평균</span>
+                    <span className="text-[12px] text-black/55 font-medium">{t("crewMemberList.avg")}</span>
                 </div>
             </>
         )}
     </div>
-);
+    );
+};
 
 
 

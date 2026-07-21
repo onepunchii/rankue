@@ -30,26 +30,28 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { LucideMail, LucideSend } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 interface SuggestionModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
-const formSchema = z.object({
+const makeFormSchema = (t: (key: string) => string) => z.object({
     type: z.enum(["BUG", "PARTNERSHIP", "FEATURE", "ETC"], {
-        required_error: "카테고리를 선택해주세요",
+        required_error: t("suggestion.categoryRequired"),
     }),
-    content: z.string().min(1, "내용을 입력해주세요").max(500, "500자 이내로 입력해주세요"),
+    content: z.string().min(1, t("suggestion.contentRequired")).max(500, t("suggestion.contentMaxLength")),
     contact: z.string().optional(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
     const { toast } = useToast();
+    const { t } = useT();
     const form = useForm<FormValues>({
-        resolver: zodResolver(formSchema),
+        resolver: zodResolver(makeFormSchema(t)),
         defaultValues: {
             content: "",
             contact: "",
@@ -66,15 +68,15 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
         },
         onSuccess: () => {
             toast({
-                title: "소중한 의견 감사합니다!",
-                description: "보내주신 의견은 꼼꼼히 검토하겠습니다.",
+                title: t("suggestion.thanksTitle"),
+                description: t("suggestion.thanksDesc"),
             });
             form.reset();
             onOpenChange(false);
         },
         onError: (error: Error) => {
             toast({
-                title: "전송 실패",
+                title: t("suggestion.sendFailed"),
                 description: error.message,
                 variant: "destructive",
             });
@@ -91,10 +93,10 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
                         <LucideMail className="w-5 h-5 text-brand" />
-                        건의함 / 제휴 문의
+                        {t("suggestion.title")}
                     </DialogTitle>
                     <DialogDescription className="text-black/55">
-                        Rankue 팀에게 바라는 점이나 궁금한 점을 남겨주세요.
+                        {t("suggestion.description")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -105,18 +107,18 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             name="type"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xs font-semibold text-black/55">분류</FormLabel>
+                                    <FormLabel className="text-xs font-semibold text-black/55">{t("suggestion.categoryLabel")}</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
                                             <SelectTrigger className="bg-black/[0.04] border-black/10 text-ink-1 rounded-tile">
-                                                <SelectValue placeholder="카테고리 선택" />
+                                                <SelectValue placeholder={t("suggestion.categoryPlaceholder")} />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent className="bg-white border-black/10 text-ink-1 rounded-tile">
-                                            <SelectItem value="BUG">🚫 버그 신고</SelectItem>
-                                            <SelectItem value="PARTNERSHIP">🤝 제휴 문의</SelectItem>
-                                            <SelectItem value="FEATURE">💡 기능 제안</SelectItem>
-                                            <SelectItem value="ETC">💬 기타</SelectItem>
+                                            <SelectItem value="BUG">{t("suggestion.typeBug")}</SelectItem>
+                                            <SelectItem value="PARTNERSHIP">{t("suggestion.typePartnership")}</SelectItem>
+                                            <SelectItem value="FEATURE">{t("suggestion.typeFeature")}</SelectItem>
+                                            <SelectItem value="ETC">{t("suggestion.typeEtc")}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -129,10 +131,10 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             name="content"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xs font-semibold text-black/55">내용</FormLabel>
+                                    <FormLabel className="text-xs font-semibold text-black/55">{t("suggestion.contentLabel")}</FormLabel>
                                     <FormControl>
                                         <Textarea
-                                            placeholder="내용을 입력해주세요 (500자 이내)"
+                                            placeholder={t("suggestion.contentPlaceholder")}
                                             className="resize-none h-32 bg-black/[0.04] border-black/10 text-ink-1 placeholder:text-black/40 rounded-tile"
                                             {...field}
                                         />
@@ -147,10 +149,10 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             name="contact"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xs font-semibold text-black/55">연락처 (선택)</FormLabel>
+                                    <FormLabel className="text-xs font-semibold text-black/55">{t("suggestion.contactLabel")}</FormLabel>
                                     <FormControl>
                                         <Input
-                                            placeholder="답변 받을 이메일 또는 전화번호"
+                                            placeholder={t("suggestion.contactPlaceholder")}
                                             className="bg-black/[0.04] border-black/10 text-ink-1 placeholder:text-black/40 rounded-tile"
                                             {...field}
                                         />
@@ -165,7 +167,7 @@ export function SuggestionModal({ open, onOpenChange }: SuggestionModalProps) {
                             className="w-full bg-brand text-brand-fg hover:bg-brand-strong font-semibold rounded-tile"
                             disabled={mutation.isPending}
                         >
-                            {mutation.isPending ? "전송 중..." : "보내기"}
+                            {mutation.isPending ? t("suggestion.sending") : t("suggestion.send")}
                             <LucideSend className="w-4 h-4 ml-2" />
                         </Button>
                     </form>

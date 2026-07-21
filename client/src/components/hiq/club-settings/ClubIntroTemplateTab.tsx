@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CrewData } from '@/types/crew';
+import { useT } from '@/lib/i18n';
 
 interface ClubIntroTemplateTabProps {
     crew: CrewData;
@@ -14,6 +15,7 @@ interface ClubIntroTemplateTabProps {
 }
 
 export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: ClubIntroTemplateTabProps) {
+    const { t } = useT();
     const [questions, setQuestions] = useState(crew?.introQuestions || []);
 
     // Re-seed local state when a DIFFERENT crew is passed in (switching crews while this tab
@@ -51,8 +53,8 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
             <div className="space-y-4">
                 <div className="flex items-center justify-between px-1">
                     <div className="space-y-0.5">
-                        <h3 className="text-sm font-bold text-[rgba(0,0,0,0.87)]">가입인사 양식</h3>
-                        <p className="text-xs text-black/55 font-medium">새 멤버를 위한 질문지 설정</p>
+                        <h3 className="text-sm font-bold text-[rgba(0,0,0,0.87)]">{t("clubIntroTemplateTab.title")}</h3>
+                        <p className="text-xs text-black/55 font-medium">{t("clubIntroTemplateTab.subtitle")}</p>
                     </div>
                 </div>
 
@@ -62,14 +64,14 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-semibold text-brand flex items-center gap-1.5">
                                     <LucideLayout className="w-3.5 h-3.5" />
-                                    질문 {idx + 1}
+                                    {t("clubIntroTemplateTab.question")} {idx + 1}
                                 </span>
                                 {isLeader && (
                                     <button
                                         onClick={() => removeQuestion(q.id)}
                                         className="p-1 px-2 text-xs font-bold text-red-600/80 hover:text-red-600 transition-colors"
                                     >
-                                        삭제
+                                        {t("clubIntroTemplateTab.delete")}
                                     </button>
                                 )}
                             </div>
@@ -78,7 +80,7 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                                 value={q.text}
                                 onChange={(e) => updateQuestion(q.id, e.target.value)}
                                 disabled={!isLeader}
-                                placeholder="예: 거주 지역과 구력은 어떻게 되시나요?"
+                                placeholder={t("clubIntroTemplateTab.questionPlaceholder")}
                                 className="bg-white border-surface-line h-10 text-sm font-medium rounded-tile focus:ring-0 placeholder:text-black/40"
                             />
 
@@ -94,7 +96,7 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                                     htmlFor={`req-${q.id}`}
                                     className="text-xs font-medium text-black/55 cursor-pointer select-none"
                                 >
-                                    필수 답변 항목
+                                    {t("clubIntroTemplateTab.requiredAnswer")}
                                 </Label>
                             </div>
                         </div>
@@ -103,7 +105,7 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                     {questions.length === 0 && !isLeader && (
                         <div className="p-6 bg-surface-3 rounded-tile flex flex-col items-center justify-center gap-2 text-center">
                             <LucideLayout className="w-6 h-6 text-black/40" />
-                            <p className="text-xs font-medium text-black/40">등록된 가입 질문이 없습니다</p>
+                            <p className="text-xs font-medium text-black/40">{t("clubIntroTemplateTab.noQuestions")}</p>
                         </div>
                     )}
 
@@ -114,7 +116,7 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                         >
                             <LucidePlus className="w-4 h-4" />
                             <span className="text-xs font-semibold">
-                                {questions.length === 0 ? "첫 질문 추가하기" : "질문 추가하기"}
+                                {questions.length === 0 ? t("clubIntroTemplateTab.addFirstQuestion") : t("clubIntroTemplateTab.addQuestion")}
                             </span>
                         </button>
                     )}
@@ -127,11 +129,11 @@ export function ClubIntroTemplateTab({ crew, isLeader, onUpdate, isUpdating }: C
                             disabled={!isDirty || isUpdating}
                             className="w-full h-12 text-brand-fg rounded-tile font-bold text-sm transition-colors active:scale-[0.98] disabled:opacity-30 bg-brand hover:bg-brand-strong"
                         >
-                            {isUpdating ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : "양식 저장하기"}
+                            {isUpdating ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : t("clubIntroTemplateTab.saveTemplate")}
                         </Button>
                     ) : (
                         <div className="p-4 bg-surface-3 rounded-tile text-center text-xs font-medium text-black/55 leading-relaxed">
-                            가입인사 양식 수정 권한은 크루장에게만 있습니다
+                            {t("clubIntroTemplateTab.leaderOnlyNotice")}
                         </div>
                     )}
                 </div>

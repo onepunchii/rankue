@@ -13,6 +13,7 @@ import { addDays, format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface CreatePollDialogProps {
     open: boolean;
@@ -21,6 +22,7 @@ interface CreatePollDialogProps {
 }
 
 export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialogProps) {
+    const { t } = useT();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [title, setTitle] = useState("");
@@ -38,15 +40,15 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
             });
         },
         onSuccess: () => {
-            toast({ title: "투표가 등록되었습니다." });
+            toast({ title: t("createPoll.created") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
             onOpenChange(false);
             resetForm();
         },
         onError: (error: any) => {
             toast({
-                title: "투표 등록 실패",
-                description: error.message || "오류가 발생했습니다.",
+                title: t("createPoll.createFailed"),
+                description: error.message || t("createPoll.genericError"),
                 variant: "destructive"
             });
         }
@@ -63,7 +65,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
 
     const addOption = () => {
         if (options.length >= 10) {
-            toast({ title: "선택지는 최대 10개까지 가능합니다." });
+            toast({ title: t("createPoll.maxOptions") });
             return;
         }
         setOptions([...options, ""]);
@@ -82,13 +84,13 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
 
     const handleSubmit = () => {
         if (!title.trim()) {
-            toast({ title: "질문을 입력해주세요.", variant: "destructive" });
+            toast({ title: t("createPoll.titleRequired"), variant: "destructive" });
             return;
         }
 
         const filteredOptions = options.map(o => o.trim()).filter(o => o !== "");
         if (filteredOptions.length < 2) {
-            toast({ title: "최소 2개 이상의 선택지를 입력해주세요.", variant: "destructive" });
+            toast({ title: t("createPoll.minOptions"), variant: "destructive" });
             return;
         }
 
@@ -107,9 +109,9 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
             <DialogContent className="bg-white border-black/[0.08] text-ink-1 max-w-md p-0 overflow-hidden rounded-card">
                 <div className="py-6 space-y-6">
                     <DialogHeader className="px-6">
-                        <DialogTitle className="text-xl font-semibold text-brand">새 투표 만들기</DialogTitle>
+                        <DialogTitle className="text-xl font-semibold text-brand">{t("createPoll.title")}</DialogTitle>
                         <DialogDescription className="text-black/55">
-                            크루 멤버들의 의견을 모아보세요.
+                            {t("createPoll.description")}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -117,18 +119,18 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                         {/* Title & Description */}
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-black/55">질문</Label>
+                                <Label className="text-xs font-semibold text-black/55">{t("createPoll.questionLabel")}</Label>
                                 <Input
-                                    placeholder="무엇을 정할까요?"
+                                    placeholder={t("createPoll.questionPlaceholder")}
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     className="bg-surface-3 border-black/10 h-12 rounded-tile focus:ring-brand/30 placeholder:text-black/40"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-black/55">설명</Label>
+                                <Label className="text-xs font-semibold text-black/55">{t("createPoll.descLabel")}</Label>
                                 <Textarea
-                                    placeholder="상세 내용을 입력하세요 (선택)"
+                                    placeholder={t("createPoll.descPlaceholder")}
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     className="bg-surface-3 border-black/10 rounded-tile resize-none min-h-[80px] placeholder:text-black/40"
@@ -139,7 +141,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                         {/* Options */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <Label className="text-xs font-semibold text-black/55">선택지</Label>
+                                <Label className="text-xs font-semibold text-black/55">{t("createPoll.optionsLabel")}</Label>
                                 <span className="text-[12px] font-medium tabular-nums text-black/55">{options.length} / 10</span>
                             </div>
                             <div className="space-y-2">
@@ -147,7 +149,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                                     <div key={idx} className="flex gap-2">
                                         <div className="relative flex-1 group">
                                             <Input
-                                                placeholder={`항목 ${idx + 1}`}
+                                                placeholder={`${t("createPoll.optionPrefix")} ${idx + 1}`}
                                                 value={option}
                                                 onChange={(e) => handleOptionChange(idx, e.target.value)}
                                                 className="bg-surface-3 border-black/10 h-11 rounded-tile pl-10 placeholder:text-black/40"
@@ -174,7 +176,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                                     className="w-full h-11 border-dashed border-black/10 bg-surface-3 rounded-tile text-black/55 hover:text-ink-1 hover:bg-black/[0.06]"
                                 >
                                     <LucidePlus className="w-4 h-4 mr-2" />
-                                    항목 추가
+                                    {t("createPoll.addOption")}
                                 </Button>
                             </div>
                         </div>
@@ -189,7 +191,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                                     )}
                                     onClick={() => setIsAnonymous(!isAnonymous)}
                                 >
-                                    <Label className="text-sm font-semibold text-ink-1 cursor-pointer select-none">익명 투표</Label>
+                                    <Label className="text-sm font-semibold text-ink-1 cursor-pointer select-none">{t("createPoll.anonymous")}</Label>
                                     <Switch checked={isAnonymous} onCheckedChange={setIsAnonymous} className="data-[state=checked]:bg-brand" />
                                 </div>
 
@@ -200,13 +202,13 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                                     )}
                                     onClick={() => setAllowMultiple(!allowMultiple)}
                                 >
-                                    <Label className="text-sm font-semibold text-ink-1 cursor-pointer select-none">복수 선택</Label>
+                                    <Label className="text-sm font-semibold text-ink-1 cursor-pointer select-none">{t("createPoll.multiple")}</Label>
                                     <Switch checked={allowMultiple} onCheckedChange={setAllowMultiple} className="data-[state=checked]:bg-brand" />
                                 </div>
                             </div>
 
                             <div className="space-y-2 pb-4">
-                                <Label className="text-xs font-semibold text-black/55 pl-1">마감 기한 설정</Label>
+                                <Label className="text-xs font-semibold text-black/55 pl-1">{t("createPoll.deadlineLabel")}</Label>
                                 <Select value={duration} onValueChange={setDuration}>
                                     <SelectTrigger className="w-full h-12 bg-surface-3 border-black/10 rounded-tile text-sm px-4 focus:ring-1 focus:ring-brand/40">
                                         <div className="flex items-center gap-2">
@@ -215,13 +217,13 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                                         </div>
                                     </SelectTrigger>
                                     <SelectContent className="bg-white border-black/[0.08] text-ink-1 rounded-tile">
-                                        <SelectItem value="1" className="focus:bg-brand/10 focus:text-brand py-3">1일 후 ({format(addDays(new Date(), 1), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="2" className="focus:bg-brand/10 focus:text-brand py-3">2일 후 ({format(addDays(new Date(), 2), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="3" className="focus:bg-brand/10 focus:text-brand py-3">3일 후 ({format(addDays(new Date(), 3), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="5" className="focus:bg-brand/10 focus:text-brand py-3">5일 후 ({format(addDays(new Date(), 5), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="7" className="focus:bg-brand/10 focus:text-brand py-3">1주일 후 ({format(addDays(new Date(), 7), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="14" className="focus:bg-brand/10 focus:text-brand py-3">2주일 후 ({format(addDays(new Date(), 14), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="30" className="focus:bg-brand/10 focus:text-brand py-3">1개월 후 ({format(addDays(new Date(), 30), "M/d HH:mm", { locale: ko })})</SelectItem>
+                                        <SelectItem value="1" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after1Day")} ({format(addDays(new Date(), 1), "M/d HH:mm", { locale: ko })})</SelectItem>
+                                        <SelectItem value="2" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after2Days")} ({format(addDays(new Date(), 2), "M/d HH:mm", { locale: ko })})</SelectItem>
+                                        <SelectItem value="3" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after3Days")} ({format(addDays(new Date(), 3), "M/d HH:mm", { locale: ko })})</SelectItem>
+                                        <SelectItem value="5" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after5Days")} ({format(addDays(new Date(), 5), "M/d HH:mm", { locale: ko })})</SelectItem>
+                                        <SelectItem value="7" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after1Week")} ({format(addDays(new Date(), 7), "M/d HH:mm", { locale: ko })})</SelectItem>
+                                        <SelectItem value="14" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after2Weeks")} ({format(addDays(new Date(), 14), "M/d HH:mm", { locale: ko })})</SelectItem>
+                                        <SelectItem value="30" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after1Month")} ({format(addDays(new Date(), 30), "M/d HH:mm", { locale: ko })})</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -235,7 +237,7 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
                         disabled={createPollMutation.isPending}
                         className="w-full h-12 rk-btn-primary rounded-tile font-semibold text-[15px]"
                     >
-                        {createPollMutation.isPending ? "생성 중..." : "투표 생성하기"}
+                        {createPollMutation.isPending ? t("createPoll.creating") : t("createPoll.submit")}
                     </Button>
                 </div>
             </DialogContent>

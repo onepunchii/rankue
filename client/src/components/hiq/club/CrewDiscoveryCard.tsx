@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { HiqCrew } from "@shared/schema";
 import { LucideMapPin, LucideUsers } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 interface CrewDiscoveryCardProps {
     crew: HiqCrew & { memberCount?: number, distance?: number };
@@ -9,6 +10,7 @@ interface CrewDiscoveryCardProps {
 }
 
 export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDiscoveryCardProps) => {
+    const { t } = useT();
     // 커버 이미지가 없으면 외부 스톡 사진 대신 크루 이니셜 + 종목 아이콘 타일로 대체
     const initial = crew.name?.trim().charAt(0).toUpperCase() || "?";
 
@@ -38,18 +40,18 @@ export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDisc
                         {crew.name}
                     </h3>
                     <span className="shrink-0 text-[12px] font-semibold px-2 py-0.5 rounded-full border border-brand/25 text-brand bg-brand/12">
-                        {crew.gameType === 'any' ? '전체' : crew.gameType.toUpperCase()}
+                        {crew.gameType === 'any' ? t("crewDiscoveryCard.all") : crew.gameType.toUpperCase()}
                     </span>
                 </div>
 
                 <p className="text-[13px] text-ink-3 line-clamp-1 mb-2 font-medium">
-                    {crew.shortIntro || crew.description || "새로 만들어진 크루입니다."}
+                    {crew.shortIntro || crew.description || t("crewDiscoveryCard.defaultIntro")}
                 </p>
 
                 <div className="flex items-center gap-3 text-[12px] text-ink-3 font-medium tabular-nums">
                     <div className="flex items-center gap-1">
                         <LucideMapPin className="w-3 h-3" />
-                        <span className={crew.region ? undefined : "text-ink-4"}>{crew.region || "지역 미설정"}</span>
+                        <span className={crew.region ? undefined : "text-ink-4"}>{crew.region || t("crewDiscoveryCard.noRegion")}</span>
                     </div>
                     {crew.distance !== undefined ? (
                         <div className="flex items-center gap-1 text-brand">
@@ -58,7 +60,7 @@ export const CrewDiscoveryCard = memo(({ crew, currentSport, onClick }: CrewDisc
                     ) : (
                         <div className="flex items-center gap-1">
                             <LucideUsers className="w-3 h-3" />
-                            <span>{crew.memberCount || 1}명</span>
+                            <span>{crew.memberCount || 1}{t("crewDiscoveryCard.membersSuffix")}</span>
                         </div>
                     )}
                 </div>

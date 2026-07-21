@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 export type MatchResult = "W" | "L" | "D";
 
 const STYLES: Record<MatchResult, { bg: string; fg: string; label: string }> = {
-    W: { bg: "bg-brand", fg: "text-brand-fg", label: "승" },
-    L: { bg: "bg-red-500", fg: "text-white", label: "패" },
-    D: { bg: "bg-black/[0.06]", fg: "text-black/60", label: "무" },
+    W: { bg: "bg-brand", fg: "text-brand-fg", label: "formBadges.win" },
+    L: { bg: "bg-red-500", fg: "text-white", label: "formBadges.loss" },
+    D: { bg: "bg-black/[0.06]", fg: "text-black/60", label: "formBadges.draw" },
 };
 
 /**
@@ -21,6 +22,7 @@ export function FormBadges({
     size?: number;
     className?: string;
 }) {
+    const { t } = useT();
     if (!results.length) {
         // Designed empty state — 5 hollow placeholders instead of bare text.
         return (
@@ -45,7 +47,7 @@ export function FormBadges({
                         className={cn("inline-flex items-center justify-center rounded-full font-bold", s.bg, s.fg)}
                         style={{ width: size, height: size, fontSize: Math.round(size * 0.46) }}
                     >
-                        {s.label}
+                        {t(s.label)}
                     </span>
                 );
             })}

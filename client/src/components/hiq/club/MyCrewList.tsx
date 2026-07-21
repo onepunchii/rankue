@@ -5,12 +5,14 @@ import { apiRequest } from "@/lib/queryClient";
 import { MyCrewCard } from "./MyCrewCard";
 import { Button } from "@/components/ui/button";
 import { LucideUsers, LucidePlus } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 interface MyCrewListProps {
     currentSport: string;
 }
 
 export const MyCrewList = memo(({ currentSport }: MyCrewListProps) => {
+    const { t } = useT();
     const [_, setLocation] = useLocation();
 
     const { data: myCrews, isLoading } = useQuery<any[]>({
@@ -29,14 +31,14 @@ export const MyCrewList = memo(({ currentSport }: MyCrewListProps) => {
                 <div className="w-14 h-14 rounded-full bg-brand/10 flex items-center justify-center mb-4">
                     <LucideUsers className="w-7 h-7 text-brand" />
                 </div>
-                <p className="text-ink-1 font-semibold text-[16px] mb-1">크루가 없으신가요?</p>
-                <p className="text-ink-3 text-[13px] font-medium mb-5">새로운 크루를 만들어 시작해보세요</p>
+                <p className="text-ink-1 font-semibold text-[16px] mb-1">{t("myCrewList.emptyTitle")}</p>
+                <p className="text-ink-3 text-[13px] font-medium mb-5">{t("myCrewList.emptyDesc")}</p>
                 <Button
                     className="bg-brand text-brand-fg hover:bg-brand-strong font-semibold rounded-full px-7 h-11 text-[14px]"
                     onClick={() => setLocation("/club/create")}
                 >
                     <LucidePlus className="w-4 h-4 mr-1.5" />
-                    크루 개설하기
+                    {t("myCrewList.createCrew")}
                 </Button>
             </div>
         );

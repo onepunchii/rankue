@@ -6,6 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useT } from "@/lib/i18n";
 import { PostDetailDialog } from "./PostDetailDialog";
 import {
     AlertDialog,
@@ -52,6 +53,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
     const [isExpanded, setIsExpanded] = useState(false);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const { toast } = useToast();
+    const { t } = useT();
 
     const canDelete = isAdmin || post.authorId === currentMemberId;
     const content = post?.content || "";
@@ -95,8 +97,8 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                 queryClient.setQueryData([`/api/hiq/crews/${post.crewId}/posts`], context.previousPosts);
             }
             toast({
-                title: "오류 발생",
-                description: "좋아요 처리에 실패했습니다.",
+                title: t("socialPost.errorOccurred"),
+                description: t("socialPost.likeFailed"),
                 variant: "destructive"
             });
         },
@@ -114,13 +116,13 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
             });
         },
         onSuccess: () => {
-            toast({ title: "게시글이 삭제되었습니다." });
+            toast({ title: t("socialPost.postDeleted") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post.crewId}/posts`] });
         },
         onError: (error: any) => {
             toast({
-                title: "삭제 실패",
-                description: error.message || "권한이 없거나 오류가 발생했습니다.",
+                title: t("socialPost.deleteFailed"),
+                description: error.message || t("socialPost.noPermissionOrError"),
                 variant: "destructive"
             });
         }
@@ -129,8 +131,8 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
     const handleActionClick = (callback: () => void) => {
         if (!isMember) {
             toast({
-                title: "접근 제한",
-                description: "멤버 전용 메뉴입니다. 크루에 가입해주세요.",
+                title: t("socialPost.accessRestricted"),
+                description: t("socialPost.membersOnly"),
                 variant: "destructive"
             });
             return;
@@ -148,7 +150,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                             <img
                                 src={post.author.profileImageUrl}
                                 className="w-full h-full object-cover"
-                                alt={`${post.author.name}의 프로필`}
+                                alt={`${post.author.name} ${t("socialPost.profileAlt")}`}
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-[12px] font-bold text-black/40">
@@ -160,10 +162,10 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                         <div className="flex items-center gap-1.5">
                             <span className="text-sm font-semibold text-ink-1 leading-none">{post.author?.name}</span>
                             {post.author?.role === 'leader' && (
-                                <Badge variant="leader">방장</Badge>
+                                <Badge variant="leader">{t("socialPost.leader")}</Badge>
                             )}
                             {post.author?.role === 'manage' && (
-                                <Badge variant="manage">부방장</Badge>
+                                <Badge variant="manage">{t("socialPost.manager")}</Badge>
                             )}
                         </div>
                     </div>
@@ -178,25 +180,25 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                                 <button
                                     className="p-1.5 text-black/40 hover:text-red-500 transition-colors"
                                     disabled={deleteMutation.isPending}
-                                    title="게시글 삭제"
+                                    title={t("socialPost.deletePost")}
                                 >
                                     <LucideTrash2 className="w-3.5 h-3.5" />
                                 </button>
                             </AlertDialogTrigger>
                             <AlertDialogContent className="bg-white border-black/[0.08] rounded-card">
                                 <AlertDialogHeader>
-                                    <AlertDialogTitle className="text-ink-1">게시글 삭제</AlertDialogTitle>
+                                    <AlertDialogTitle className="text-ink-1">{t("socialPost.deletePost")}</AlertDialogTitle>
                                     <AlertDialogDescription className="text-black/60">
-                                        정말로 이 게시글을 삭제하시겠습니까? 삭제된 게시글은 복구할 수 없습니다.
+                                        {t("socialPost.deleteConfirmDesc")}
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-surface-3 text-ink-1 border-black/10 hover:bg-black/[0.06]">취소</AlertDialogCancel>
+                                    <AlertDialogCancel className="bg-surface-3 text-ink-1 border-black/10 hover:bg-black/[0.06]">{t("socialPost.cancel")}</AlertDialogCancel>
                                     <AlertDialogAction
                                         onClick={() => deleteMutation.mutate()}
                                         className="bg-red-500 hover:bg-red-600 text-white"
                                     >
-                                        삭제
+                                        {t("socialPost.delete")}
                                     </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
@@ -265,12 +267,12 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
 
                     {isLongText && !isExpanded && (
                         <span className="mt-1 block text-xs font-medium text-black/55 hover:text-brand transition-colors ">
-                            ... 더 보기
+                            {t("socialPost.seeMore")}
                         </span>
                     )}
                     {isExpanded && (
                         <span className="mt-2 block text-xs font-medium text-black/55 hover:text-ink-1 transition-colors">
-                            접기
+                            {t("socialPost.collapse")}
                         </span>
                     )}
                 </div>
@@ -286,7 +288,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                             "flex items-center gap-1.5 group/like transition-all",
                             likeMutation.isPending && "opacity-50"
                         )}
-                        aria-label={post.isLiked ? "좋아요 취소" : "좋아요"}
+                        aria-label={post.isLiked ? t("socialPost.unlike") : t("socialPost.like")}
                     >
                         <LucideHeart className={cn(
                             "w-4 h-4 transition-colors",
@@ -302,7 +304,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     <button
                         onClick={() => handleActionClick(() => setIsDetailOpen(true))}
                         className="flex items-center gap-1.5 group/comment"
-                        aria-label={`댓글 ${post.commentCount || 0}개`}
+                        aria-label={`${t("socialPost.comments")} ${post.commentCount || 0}`}
                     >
                         <LucideMessageSquare className="w-4 h-4 text-black/40 group-hover/comment:text-brand transition-colors" />
                         <span className="text-xs font-medium tabular-nums text-black/55 group-hover/comment:text-ink-1">{post.commentCount || 0}</span>

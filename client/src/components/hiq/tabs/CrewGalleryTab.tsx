@@ -8,6 +8,7 @@ import { LucideImage, LucideLoader2 } from "@/lib/icons";
 import { PhotoDetailDialog } from "@/components/hiq/PhotoDetailDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface PhotoAuthor {
     name: string;
@@ -35,6 +36,7 @@ interface CrewGalleryTabProps {
 
 export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: CrewGalleryTabProps) {
     const { toast } = useToast();
+    const { t } = useT();
     // Track only the id, then re-derive the photo from the live list cache so the detail
     // dialog reflects fresh like/comment counts after invalidation (a snapshot would go stale).
     const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                     likeCount: 0,
                     commentCount: 0,
                     isLiked: false,
-                    author: { name: "업로드 중..." }
+                    author: { name: t("crewGallery.uploading") }
                 };
                 queryClient.setQueryData<Photo[]>([`/api/hiq/crews/${crewId}/photos`], [optimisticPhoto, ...previousPhotos]);
             }
@@ -87,8 +89,8 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                 queryClient.setQueryData([`/api/hiq/crews/${crewId}/photos`], context.previousPhotos);
             }
             toast({
-                title: "업로드 실패",
-                description: "이미지 서버 전송 중 오류가 발생했습니다.",
+                title: t("crewGallery.uploadFailedTitle"),
+                description: t("crewGallery.uploadFailedDesc"),
                 variant: "destructive"
             });
         },
@@ -105,7 +107,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
 
         // Simple validation
         if (!file.type.startsWith('image/')) {
-            toast({ title: "형식 오류", description: "이미지 파일만 업로드 가능합니다.", variant: "destructive" });
+            toast({ title: t("crewGallery.invalidTypeTitle"), description: t("crewGallery.invalidTypeDesc"), variant: "destructive" });
             return;
         }
 
@@ -115,7 +117,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
             uploadPhotoMutation.mutate(url);
         } catch (error) {
             console.error("[CrewGalleryTab] Image compression failed:", error);
-            toast({ title: "이미지 처리 실패", description: "사진을 압축하는 과정에서 오류가 발생했습니다.", variant: "destructive" });
+            toast({ title: t("crewGallery.processFailedTitle"), description: t("crewGallery.processFailedDesc"), variant: "destructive" });
         } finally {
             setIsProcessing(false);
             e.target.value = "";
@@ -125,8 +127,8 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
     const handlePhotoClick = (photo: Photo) => {
         if (!isMember) {
             toast({
-                title: "접근 제한",
-                description: "사진 상세 보기는 크루 가입 후 가능합니다.",
+                title: t("crewGallery.accessDeniedTitle"),
+                description: t("crewGallery.accessDeniedDesc"),
                 variant: "destructive"
             });
             return;
@@ -154,13 +156,13 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
     return (
         <div className="pt-6">
             <header className="flex items-center justify-between mb-6 px-6">
-                <h2 className="text-[15px] font-semibold text-black/55">사진첩</h2>
+                <h2 className="text-[15px] font-semibold text-black/55">{t("crewGallery.title")}</h2>
                 {isMember && (
                     <div className="flex items-center gap-2">
                         <input
                             type="file"
                             id="gallery-upload"
-                            title="사진 업로드"
+                            title={t("crewGallery.uploadInputTitle")}
                             className="hidden"
                             accept="image/*"
                             onChange={handlePhotoUpload}
@@ -178,7 +180,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                             ) : (
                                 <LucideImage className="w-3.5 h-3.5" />
                             )}
-                            {(isProcessing || uploadPhotoMutation.isPending) ? "업로드 중..." : "업로드"}
+                            {(isProcessing || uploadPhotoMutation.isPending) ? t("crewGallery.uploading") : t("crewGallery.upload")}
                         </Button>
                     </div>
                 )}
@@ -187,7 +189,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
             {photos && photos.length > 0 ? (
                 <div
                     className="grid grid-cols-3 gap-[1px]"
-                    aria-label="크루 사진 그리드"
+                    aria-label={t("crewGallery.gridAria")}
                 >
                     {photos.map((photo) => {
                         const isOptimistic = photo.id.startsWith('temp-');
@@ -200,7 +202,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                                 )}
                                 role="button"
                                 tabIndex={0}
-                                aria-label={`사진 상세 보기 - ${photo.author?.name || "익명"}`}
+                                aria-label={t("crewGallery.photoDetailAria") + " - " + (photo.author?.name || t("crewGallery.anonymous"))}
                                 onClick={() => !isOptimistic && handlePhotoClick(photo)}
                                 onKeyDown={(e) => {
                                     if (!isOptimistic && (e.key === 'Enter' || e.key === ' ')) {
@@ -212,7 +214,7 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                                 <img
                                     src={photo.url}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                    alt={photo.author ? `${photo.author.name}님이 올린 사진` : "크루 활동 사진"}
+                                    alt={photo.author ? photo.author.name + t("crewGallery.photoBySuffix") : t("crewGallery.crewPhotoAlt")}
                                     loading="lazy"
                                 />
                                 {isOptimistic && (
@@ -229,8 +231,8 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                     <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mx-auto mb-4">
                         <LucideImage className="w-7 h-7 text-black/40" />
                     </div>
-                    <p className="text-[15px] font-medium text-ink-2 mb-1">사진이 아직 없습니다</p>
-                    <p className="text-[13px] text-ink-4">소중한 추억을 첫 번째로 남겨보세요</p>
+                    <p className="text-[15px] font-medium text-ink-2 mb-1">{t("crewGallery.emptyTitle")}</p>
+                    <p className="text-[13px] text-ink-4">{t("crewGallery.emptyDesc")}</p>
                 </div>
             )}
 

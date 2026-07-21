@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 import { motion } from 'framer-motion';
 import {
     LucideFlagTriangleRight,
@@ -46,6 +47,7 @@ const BILLIARDS_TYPES = {
 };
 
 export function MemberActivityStats({ activities = [], totalCount = 0, sportCategory = 'GOLF' }: MemberActivityStatsProps) {
+    const { t } = useT();
 
     // ------------------------------------------------------------------
     // 2. Persona / Stats Calculation
@@ -70,16 +72,16 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
         // Determine Persona
         let persona = isBilliards
             ? {
-                title: "새싹 큐잡이 🌱",
-                desc: "무한한 잠재력! 첫 큐를 잡고 모임에 참여해보세요.",
+                title: t("memberActivity.rookieCueTitle"),
+                desc: t("memberActivity.rookieCueDesc"),
                 color: "text-black/40",
                 bg: "bg-black/[0.04]",
                 border: "border-black/10",
                 icon: LucideSparkles
             }
             : {
-                title: "새싹 골퍼 🌱",
-                desc: "아직 보여줄 잠재력이 무궁무진합니다! 첫 모임을 시작해보세요.",
+                title: t("memberActivity.rookieGolferTitle"),
+                desc: t("memberActivity.rookieGolferDesc"),
                 color: "text-black/40",
                 bg: "bg-black/[0.04]",
                 border: "border-black/10",
@@ -97,8 +99,8 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                 // 당구 페르소나
                 if (isBalanced) {
                     persona = {
-                        title: "올라운더 큐잡이 💎",
-                        desc: "모임, 대회, 뒷풀이까지! 어디서든 빛나는 완벽한 당구인입니다.",
+                        title: t("memberActivity.allRounderCueTitle"),
+                        desc: t("memberActivity.allRounderCueDesc"),
                         color: "text-[#8B5CF6]",
                         bg: "bg-[#8B5CF6]/10",
                         border: "border-[#8B5CF6]/20",
@@ -106,8 +108,8 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                     };
                 } else if (maxVal === group1Count) {
                     persona = {
-                        title: "테이블의 지배자 🎱",
-                        desc: "모임이라면 빠질 수 없죠! 당구대를 제집처럼 누비는 실전파입니다.",
+                        title: t("memberActivity.tableRulerTitle"),
+                        desc: t("memberActivity.tableRulerDesc"),
                         color: "text-brand",
                         bg: "bg-brand/12",
                         border: "border-brand/20",
@@ -115,8 +117,8 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                     };
                 } else if (maxVal === group2Count) {
                     persona = {
-                        title: "대회의 강자 🏆",
-                        desc: "승부욕이 넘치는 진짜 고수! 대회마다 존재감을 드러냅니다.",
+                        title: t("memberActivity.tournamentAceTitle"),
+                        desc: t("memberActivity.tournamentAceDesc"),
                         color: "text-[#F97316]",
                         bg: "bg-[#F97316]/10",
                         border: "border-[#F97316]/20",
@@ -124,8 +126,8 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                     };
                 } else {
                     persona = {
-                        title: "분위기 메이커 🍺",
-                        desc: "당구 실력만큼 매너와 입담도 수준급! 모임의 핵인싸입니다.",
+                        title: t("memberActivity.moodMakerTitle"),
+                        desc: t("memberActivity.moodMakerDesc"),
                         color: "text-[#EC4899]",
                         bg: "bg-[#EC4899]/10",
                         border: "border-[#EC4899]/20",
@@ -136,8 +138,8 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                 // 골프 페르소나 (기존)
                 if (isBalanced) {
                     persona = {
-                        title: "육각형 올라운더 💎",
-                        desc: "필드, 스크린, 회식까지! 어디서든 빛나는 완벽한 플레이어입니다.",
+                        title: t("memberActivity.hexagonAllRounderTitle"),
+                        desc: t("memberActivity.hexagonAllRounderDesc"),
                         color: "text-[#8B5CF6]",
                         bg: "bg-[#8B5CF6]/10",
                         border: "border-[#8B5CF6]/20",
@@ -145,8 +147,8 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                     };
                 } else if (maxVal === group1Count) {
                     persona = {
-                        title: "잔디 위의 야생마 🐎",
-                        desc: "스크린보단 바람을 느껴야죠! 필드를 제집처럼 누비는 실전파입니다.",
+                        title: t("memberActivity.fieldHorseTitle"),
+                        desc: t("memberActivity.fieldHorseDesc"),
                         color: "text-brand",
                         bg: "bg-brand/12",
                         border: "border-brand/20",
@@ -154,8 +156,8 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                     };
                 } else if (maxVal === group2Count) {
                     persona = {
-                        title: "골프존의 지배자 📺",
-                        desc: "오차 없는 샷! 스크린을 평정하고 다니는 정교한 고수입니다.",
+                        title: t("memberActivity.screenRulerTitle"),
+                        desc: t("memberActivity.screenRulerDesc"),
                         color: "text-brand",
                         bg: "bg-brand/12",
                         border: "border-brand/20",
@@ -163,8 +165,8 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                     };
                 } else {
                     persona = {
-                        title: "19번 홀의 제왕 🍺",
-                        desc: "골프 실력만큼 매너와 입담도 수준급! 모임의 핵인싸입니다.",
+                        title: t("memberActivity.hole19KingTitle"),
+                        desc: t("memberActivity.hole19KingDesc"),
                         color: "text-[#F59E0B]",
                         bg: "bg-[#F59E0B]/10",
                         border: "border-[#F59E0B]/20",
@@ -176,8 +178,8 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
 
         // Labels & Colors per sportCategory
         const labels = isBilliards
-            ? { group1: '모임', group2: '대회', social: '뒷풀이' }
-            : { group1: '필드', group2: '스크린', social: '뒷풀이' };
+            ? { group1: t("memberActivity.labelMeeting"), group2: t("memberActivity.labelTournament"), social: t("memberActivity.labelSocial") }
+            : { group1: t("memberActivity.labelField"), group2: t("memberActivity.labelScreen"), social: t("memberActivity.labelSocial") };
 
         const colors = isBilliards
             ? { group1: 'bg-brand', group2: 'bg-[#F97316]', social: 'bg-[#EC4899]' }
@@ -194,7 +196,7 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
             labels,
             colors
         };
-    }, [activities, totalCount, sportCategory]);
+    }, [activities, totalCount, sportCategory, t]);
 
 
     // ------------------------------------------------------------------
@@ -278,19 +280,19 @@ export function MemberActivityStats({ activities = [], totalCount = 0, sportCate
                     {stats.group1 > 0 && (
                         <div className="flex items-center gap-1.5">
                             <div className={cn("w-1.5 h-1.5 rounded-full", stats.colors.group1)} />
-                            <span>{stats.labels.group1} {stats.group1}회 ({Math.round(stats.group1Pct)}%)</span>
+                            <span>{stats.labels.group1} {stats.group1}{t("memberActivity.countSuffix")} ({Math.round(stats.group1Pct)}%)</span>
                         </div>
                     )}
                     {stats.group2 > 0 && (
                         <div className="flex items-center gap-1.5">
                             <div className={cn("w-1.5 h-1.5 rounded-full", stats.colors.group2)} />
-                            <span>{stats.labels.group2} {stats.group2}회 ({Math.round(stats.group2Pct)}%)</span>
+                            <span>{stats.labels.group2} {stats.group2}{t("memberActivity.countSuffix")} ({Math.round(stats.group2Pct)}%)</span>
                         </div>
                     )}
                     {stats.social > 0 && (
                         <div className="flex items-center gap-1.5">
                             <div className={cn("w-1.5 h-1.5 rounded-full", stats.colors.social)} />
-                            <span>{stats.labels.social} {stats.social}회 ({Math.round(stats.socialPct)}%)</span>
+                            <span>{stats.labels.social} {stats.social}{t("memberActivity.countSuffix")} ({Math.round(stats.socialPct)}%)</span>
                         </div>
                     )}
                 </div>

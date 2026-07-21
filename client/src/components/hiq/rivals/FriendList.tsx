@@ -6,6 +6,7 @@ import { HiqMemberWithH2H, SportConfig } from "./types";
 import { getTier } from "@/lib/hiqUtils";
 import { Button } from "@/components/ui/button";
 import { RadialGauge } from "@/components/hiq/ui/RadialGauge";
+import { useT } from "@/lib/i18n";
 
 interface FriendListProps {
     friends: HiqMemberWithH2H[];
@@ -16,14 +17,15 @@ interface FriendListProps {
 }
 
 export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSearchOpen }: FriendListProps) => {
+    const { t } = useT();
     return (
         <div className="space-y-4 relative z-10">
             <div className="flex items-center justify-between px-1">
                 <h2 className="text-[15px] font-semibold text-black/60">
-                    {config.label} 리스트
+                    {currentSport === "GOLF" ? t("friendList.titleGolf") : t("friendList.titleBilliards")}
                 </h2>
                 <div className="px-3 py-1 rounded-full bg-black/[0.04] text-[12px] font-medium text-black/55 tabular-nums">
-                    {friends.length}명
+                    {friends.length}{t("friendList.countSuffix")}
                 </div>
             </div>
 
@@ -37,16 +39,16 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                         <LucideUsers className="w-9 h-9 text-black/40" />
                     </div>
                     <h3 className="text-[19px] font-bold mb-2 text-ink-1 tracking-tight">
-                        {config.emptyTitle}
+                        {t(config.emptyTitle)}
                     </h3>
                     <p className="text-[13px] text-black/55 font-medium mb-8 leading-relaxed">
-                        함께 플레이할 상대를<br />찾아보세요
+                        {t("friendList.emptyDescLine1")}<br />{t("friendList.emptyDescLine2")}
                     </p>
                     <Button
                         onClick={onSearchOpen}
                         className="px-10 h-14 rk-btn-primary rounded-tile text-[14px] active:scale-95 outline-none ring-0"
                     >
-                        {currentSport === "GOLF" ? "친구 검색하기" : "라이벌 검색하기"}
+                        {currentSport === "GOLF" ? t("friendList.searchFriends") : t("friendList.searchRivals")}
                     </Button>
                 </motion.div>
             ) : (
@@ -91,20 +93,20 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                         {currentSport !== "GOLF" && (
                                                             friend.h2h ? (
                                                                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/[0.04] ">
-                                                                    <span className="text-[12px] font-semibold text-brand">{friend.h2h.wins}승</span>
+                                                                    <span className="text-[12px] font-semibold text-brand">{friend.h2h.wins}{t("friendList.winsSuffix")}</span>
                                                                     <div className="w-0.5 h-2 bg-black/10 rounded-full" />
-                                                                    <span className="text-[12px] font-semibold text-red-500">{friend.h2h.losses}패</span>
+                                                                    <span className="text-[12px] font-semibold text-red-500">{friend.h2h.losses}{t("friendList.lossesSuffix")}</span>
                                                                 </div>
                                                             ) : (
                                                                 <div className="px-2 py-0.5 rounded-lg bg-black/[0.04] ">
-                                                                    <span className="text-[12px] font-medium text-black/55">전적 없음</span>
+                                                                    <span className="text-[12px] font-medium text-black/55">{t("friendList.noRecord")}</span>
                                                                 </div>
                                                             )
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2.5">
                                                         <div className={cn("px-2.5 py-0.5 rounded-full border bg-black/[0.04] text-[12px] font-semibold", tier.class)}>
-                                                            {tier.label}
+                                                            {t(tier.label)}
                                                         </div>
                                                         <div className="w-1 h-1 rounded-full bg-black/20" />
                                                         <span className="text-[12px] font-medium text-black/55 tabular-nums">

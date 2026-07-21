@@ -10,6 +10,7 @@ import { ClubGeneralTab } from './club-settings/ClubGeneralTab';
 import { ClubMemberTab } from './club-settings/ClubMemberTab';
 import { ClubIntroTemplateTab } from './club-settings/ClubIntroTemplateTab';
 import { LucideFileText } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 
 interface ClubSettingsDialogProps {
     open: boolean;
@@ -20,6 +21,7 @@ interface ClubSettingsDialogProps {
 }
 
 export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialMembers, me }: ClubSettingsDialogProps) {
+    const { t } = useT();
     const {
         members,
         updateCrew,
@@ -43,9 +45,9 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                                 <LucideSettings2 className="w-5 h-5 text-brand" />
                             </div>
                             <div className="flex flex-col gap-1">
-                                <DialogTitle className="text-lg font-bold text-[rgba(0,0,0,0.87)] leading-none">크루 관리</DialogTitle>
+                                <DialogTitle className="text-lg font-bold text-[rgba(0,0,0,0.87)] leading-none">{t("clubSettings.title")}</DialogTitle>
                                 <DialogDescription className="text-xs font-medium text-black/55 leading-none">
-                                    크루 정보와 멤버를 관리합니다
+                                    {t("clubSettings.description")}
                                 </DialogDescription>
                             </div>
                         </div>
@@ -58,21 +60,21 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                                 className="rounded-lg h-full text-xs font-semibold text-black/55 transition-colors z-10 data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
                             >
                                 <LucideSettings2 className="w-3.5 h-3.5 mr-1" />
-                                정보
+                                {t("clubSettings.tabGeneral")}
                             </TabsTrigger>
                             <TabsTrigger
                                 value="template"
                                 className="rounded-lg h-full text-xs font-semibold text-black/55 transition-colors z-10 data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
                             >
                                 <LucideFileText className="w-3.5 h-3.5 mr-1" />
-                                양식
+                                {t("clubSettings.tabTemplate")}
                             </TabsTrigger>
                             <TabsTrigger
                                 value="members"
                                 className="rounded-lg h-full text-xs font-semibold text-black/55 transition-colors z-10 relative data-[state=active]:text-brand-fg data-[state=active]:bg-brand"
                             >
                                 <LucideUsers2 className="w-3.5 h-3.5 mr-1" />
-                                멤버
+                                {t("clubSettings.tabMembers")}
                                 {pendingMembers.length > 0 && (
                                     <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold tabular-nums border-2 border-white">
                                         {pendingMembers.length}

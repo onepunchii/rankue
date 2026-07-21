@@ -6,6 +6,7 @@ import { RadialGauge } from "../ui/RadialGauge";
 import { FormBadges, MatchResult } from "../ui/FormBadges";
 import { BilliardBall, BallColor } from "../ui/BilliardBall";
 import { SportConfig, FilterType } from "./types";
+import { useT } from "@/lib/i18n";
 
 // Tier → billiard-ball color (replaces the emoji medal with our ball motif).
 const tierBall = (label: string): BallColor => {
@@ -33,6 +34,7 @@ const StatBox = ({ label, value, valueColor = "text-[rgba(0,0,0,0.87)]" }: { lab
 );
 
 export const StatsOverviewCard = ({ stats, config, filter, currentSport }: StatsOverviewCardProps) => {
+    const { t } = useT();
     // 안전한 데이터 접근을 위한 구조 분해 할당 (기본값 설정)
     const {
         currentTier = { icon: '🏌️', label: 'ROOKIE', color: '#ffffff', glow: '#ffffff' },
@@ -85,17 +87,17 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                         <div className="flex items-center gap-3 mb-6">
                             <BilliardBall color={tierBall(currentTier.label)} size={40} />
                             <div>
-                                <p className="text-[12px] font-medium text-black/55 uppercase tracking-[0.15em] mb-1">등급</p>
+                                <p className="text-[12px] font-medium text-black/55 uppercase tracking-[0.15em] mb-1">{t("statsOverview.tier")}</p>
                                 <p className="text-xl font-semibold uppercase text-brand tracking-wide">
                                     {currentTier.label}
                                 </p>
-                                <p className="text-[12px] font-medium text-black/55 uppercase mt-0.5">상위 15%</p>
+                                <p className="text-[12px] font-medium text-black/55 uppercase mt-0.5">{t("statsOverview.topPercent")}</p>
                             </div>
                         </div>
 
                         {/* Average Score (Main) */}
                         <div className="mb-8 text-center">
-                            <p className="text-[12px] font-medium text-black/55 uppercase tracking-[0.3em] mb-2">평균 타수</p>
+                            <p className="text-[12px] font-medium text-black/55 uppercase tracking-[0.3em] mb-2">{t("statsOverview.avgStrokes")}</p>
                             <h2 className="text-7xl font-semibold text-brand tracking-tight">
                                 {golfStats?.avgScore || "-"}
                             </h2>
@@ -104,19 +106,19 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                         {/* Sub Stats Grid */}
                         <div className="grid grid-cols-3 gap-3 pt-6 border-t border-black/10">
                             <div className="text-center">
-                                <p className="text-[12px] font-medium text-black/55 uppercase mb-1">최고 점수</p>
+                                <p className="text-[12px] font-medium text-black/55 uppercase mb-1">{t("statsOverview.bestScore")}</p>
                                 <p className="text-xl font-semibold text-[rgba(0,0,0,0.87)]">
-                                    {golfStats?.bestScore || "-"} <span className="text-xs text-brand">타</span>
+                                    {golfStats?.bestScore || "-"} <span className="text-xs text-brand">{t("statsOverview.strokesUnit")}</span>
                                 </p>
                             </div>
                             <div className="text-center border-x border-black/10">
-                                <p className="text-[12px] font-medium text-black/55 uppercase mb-1">라운드</p>
+                                <p className="text-[12px] font-medium text-black/55 uppercase mb-1">{t("statsOverview.rounds")}</p>
                                 <p className="text-xl font-semibold text-[rgba(0,0,0,0.87)]">
-                                    {golfStats?.totalRounds || 0} <span className="text-xs text-black/40">회</span>
+                                    {golfStats?.totalRounds || 0} <span className="text-xs text-black/40">{t("statsOverview.roundsUnit")}</span>
                                 </p>
                             </div>
                             <div className="text-center">
-                                <p className="text-[12px] font-medium text-black/55 uppercase mb-1">최근 경기</p>
+                                <p className="text-[12px] font-medium text-black/55 uppercase mb-1">{t("statsOverview.recentGame")}</p>
                                 <p className="text-xl font-semibold text-[rgba(0,0,0,0.87)]">{golfStats?.lastScore || "-"}</p>
                             </div>
                         </div>
@@ -144,13 +146,13 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                     <div className="flex items-center gap-3 min-w-0">
                         <BilliardBall color={tierBall(currentTier.label)} size={36} />
                         <div className="min-w-0">
-                            <p className="text-[12px] font-medium text-black/45 mb-0.5">등급</p>
+                            <p className="text-[12px] font-medium text-black/45 mb-0.5">{t("statsOverview.tier")}</p>
                             <p className="text-[17px] font-bold tracking-tight truncate text-ink-1">
                                 {currentTier.label}
                             </p>
                         </div>
                     </div>
-                    <span className="rk-chip bg-brand/10 text-brand shrink-0">상위 15%</span>
+                    <span className="rk-chip bg-brand/10 text-brand shrink-0">{t("statsOverview.topPercent")}</span>
                 </div>
 
                 {/* Hero — 승률 게이지 + 누적 평균 + 승/패 */}
@@ -161,24 +163,24 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                                 <div className="text-[26px] font-bold text-[rgba(0,0,0,0.87)] tabular-nums tracking-tight">
                                     {winRateNum}<span className="text-[14px] font-semibold text-black/55">%</span>
                                 </div>
-                                <div className="text-[12px] font-medium text-black/55 mt-1">승률</div>
+                                <div className="text-[12px] font-medium text-black/55 mt-1">{t("statsOverview.winRate")}</div>
                             </div>
                         </RadialGauge>
 
                         <div className="flex-1 min-w-0">
-                            <p className="text-[12px] font-medium text-black/55 mb-1">누적 평균</p>
+                            <p className="text-[12px] font-medium text-black/55 mb-1">{t("statsOverview.cumulativeAvg")}</p>
                             <p className="text-[36px] leading-none font-bold tabular-nums tracking-tight mb-3.5" style={{ color: currentTier.color }}>
                                 {cumulativeAverage}
                             </p>
                             <div className="flex items-center gap-4">
                                 <div className="flex items-baseline gap-1">
                                     <span className="text-[20px] font-bold text-brand tabular-nums leading-none">{wins}</span>
-                                    <span className="text-[12px] font-medium text-black/55">승</span>
+                                    <span className="text-[12px] font-medium text-black/55">{t("statsOverview.winsUnit")}</span>
                                 </div>
                                 <div className="w-px h-4 bg-black/10" />
                                 <div className="flex items-baseline gap-1">
                                     <span className="text-[20px] font-bold text-red-500 tabular-nums leading-none">{losses}</span>
-                                    <span className="text-[12px] font-medium text-black/55">패</span>
+                                    <span className="text-[12px] font-medium text-black/55">{t("statsOverview.lossesUnit")}</span>
                                 </div>
                             </div>
                         </div>
@@ -186,7 +188,7 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
 
                     {recentForm.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-black/[0.08]">
-                            <p className="text-[12px] font-medium text-black/55 mb-2">최근 5경기</p>
+                            <p className="text-[12px] font-medium text-black/55 mb-2">{t("statsOverview.recentFive")}</p>
                             <FormBadges results={recentForm} size={24} />
                         </div>
                     )}
@@ -195,10 +197,10 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                 {/* Stats grid */}
                 {filter === "all" && hasMixedHistory ? (
                     <div className="grid grid-cols-4 gap-2">
-                        <StatBox label="총 경기" value={totalAllGames} />
-                        <StatBox label="총 승리" value={totalAllWins} />
-                        <StatBox label="승률" value={`${totalAllWinRate}%`} valueColor="text-brand" />
-                        <StatBox label="주 종목" value={mainMode} />
+                        <StatBox label={t("statsOverview.totalGames")} value={totalAllGames} />
+                        <StatBox label={t("statsOverview.totalWins")} value={totalAllWins} />
+                        <StatBox label={t("statsOverview.winRate")} value={`${totalAllWinRate}%`} valueColor="text-brand" />
+                        <StatBox label={t("statsOverview.mainMode")} value={mainMode} />
                     </div>
                 ) : (
                     <div className="space-y-2">

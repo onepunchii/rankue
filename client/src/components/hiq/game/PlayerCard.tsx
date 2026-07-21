@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { HiqMember } from "@shared/schema";
 import { ArrowRight, Flame } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 interface Props {
     player?: HiqMember | { name: string };
@@ -45,6 +46,7 @@ export function PlayerCard({
     isDragging,
     onInningClick
 }: Props) {
+    const { t } = useT();
     // Light-theme-safe ball identity colors — pure white / bright yellow are invisible on a
     // white card, so player identity shifts to readable equivalents (graphite / deep gold / red / blue).
     const themeColor = theme === 'white' ? '#374151' :
@@ -79,18 +81,18 @@ export function PlayerCard({
                 {/* Content Container - Capture Drag Here */}
                 <div className="flex items-center gap-3 pointer-events-auto cursor-grab active:cursor-grabbing">
                     <h2 className={`text-3xl lg:text-4xl font-bold ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/50'}`}>
-                        {player?.name || "선수"}
+                        {player?.name || t("playerCard.defaultName")}
                     </h2>
                     {isSolo && (
                         <span className="text-[12px] px-2 py-0.5 rounded-tile text-black/55 font-medium">
-                            솔로
+                            {t("playerCard.solo")}
                         </span>
                     )}
                 </div>
 
                 <div className="flex items-center gap-3 pointer-events-auto">
                     <div className="flex flex-col items-end">
-                        <span className="text-[12px] font-medium text-black/40">목표</span>
+                        <span className="text-[12px] font-medium text-black/40">{t("playerCard.target")}</span>
                         <span className={`text-xl font-semibold tabular-nums ${isTurn ? 'text-black/60' : 'text-black/40'}`}>{target}</span>
                     </div>
                 </div>
@@ -145,7 +147,7 @@ export function PlayerCard({
                                         className="mt-[-20px] inline-flex items-center gap-1.5 px-4 py-1.5 rounded-pill bg-brand/15 border border-brand/25"
                                     >
                                         <Flame className="w-3.5 h-3.5 text-brand" />
-                                        <span className="text-[13px] font-semibold text-brand">+{displayRun} 연속</span>
+                                        <span className="text-[13px] font-semibold text-brand">+{displayRun} {t("playerCard.streak")}</span>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -163,7 +165,7 @@ export function PlayerCard({
                                 >
                                     <div className="bg-red-500/20 px-8 py-4 rounded-card border border-red-500/50 animate-pulse">
                                         <span className="text-[8vw] font-bold text-red-500">
-                                            피니시
+                                            {t("playerCard.finish")}
                                         </span>
                                     </div>
                                 </motion.div>
@@ -184,11 +186,11 @@ export function PlayerCard({
                 {/* Left Section: Average (Top) & High Run (Bottom) */}
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
-                        <span className="text-[12px] font-medium text-black/55 w-12 text-right">평균</span>
+                        <span className="text-[12px] font-medium text-black/55 w-12 text-right">{t("playerCard.average")}</span>
                         <span className={`text-2xl font-bold tabular-nums ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/45'}`}>{avg}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                        <span className="text-[12px] font-medium text-black/55 w-12 text-right">하이런</span>
+                        <span className="text-[12px] font-medium text-black/55 w-12 text-right">{t("playerCard.highRun")}</span>
                         <span className={`text-2xl font-bold tabular-nums ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/45'}`}>{displayHighRun}</span>
                     </div>
                 </div>
@@ -217,7 +219,7 @@ export function PlayerCard({
                                 className="rk-btn-primary h-16 px-8 rounded-2xl flex items-center justify-center gap-3 transition-all pointer-events-auto relative z-50"
                             >
                                 <span className="text-sm font-semibold">
-                                    이닝 종료
+                                    {t("playerCard.endInning")}
                                 </span>
                                 <ArrowRight className="w-4 h-4 text-brand-fg/50" />
                             </motion.button>

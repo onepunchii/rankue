@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { LucideCheck, LucideMapPin, LucideChevronsUpDown } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 import { COURSES } from "@/golf/data/golfCourses";
 
@@ -32,7 +33,8 @@ interface LocationSearchProps {
     className?: string;
 }
 
-export function LocationSearch({ value, onChange, placeholder = "참여 골프장을 검색하세요", className }: LocationSearchProps) {
+export function LocationSearch({ value, onChange, placeholder, className }: LocationSearchProps) {
+    const { t } = useT();
     const [open, setOpen] = useState(false);
 
     // Find selected course object if value exists
@@ -59,16 +61,16 @@ export function LocationSearch({ value, onChange, placeholder = "참여 골프�
                             {value}
                         </span>
                     ) : (
-                        <span>{placeholder}</span>
+                        <span>{placeholder ?? t("locationSearch.placeholder")}</span>
                     )}
                     <LucideChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-white border-black/10 text-ink-1 rounded-card">
                 <Command className="bg-white text-ink-1 rounded-card">
-                    <CommandInput placeholder="골프장 이름 검색..." className="h-11 border-none focus:ring-0" />
+                    <CommandInput placeholder={t("locationSearch.searchInputPlaceholder")} className="h-11 border-none focus:ring-0" />
                     <CommandList>
-                        <CommandEmpty className="py-4 text-center text-xs text-ink-3">검색 결과가 없습니다.</CommandEmpty>
+                        <CommandEmpty className="py-4 text-center text-xs text-ink-3">{t("locationSearch.noResults")}</CommandEmpty>
                         <CommandGroup>
                             {GOLF_COURSES.map((course) => (
                                 <CommandItem

@@ -12,8 +12,17 @@ import { Switch } from "@/components/ui/switch";
 import { LucideImage, LucideX, LucideCamera } from "@/lib/icons";
 import { uploadImage } from "@/lib/imageUtils";
 import { useRef } from "react";
+import { useT } from "@/lib/i18n";
 
 import { CrewData } from "@/types/crew";
+
+// 카테고리 값은 서버 저장·비교용 원문 유지, 화면 표시만 번역 키로 매핑
+const CATEGORY_LABEL_KEYS: Record<string, string> = {
+    "공지사항": "createPost.categoryNotice",
+    "가입인사": "createPost.categoryGreeting",
+    "크루후기": "createPost.categoryReview",
+    "자유글": "createPost.categoryFree",
+};
 
 interface CreatePostDialogProps {
     open: boolean;
@@ -24,6 +33,7 @@ interface CreatePostDialogProps {
 }
 
 export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: CreatePostDialogProps) {
+    const { t } = useT();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [category, setCategory] = useState("자유글");
@@ -47,7 +57,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
             });
         },
         onSuccess: () => {
-            toast({ title: "게시글이 등록되었습니다." });
+            toast({ title: t("createPost.created") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/posts`] });
             onOpenChange(false);
             setTitle("");
@@ -59,8 +69,8 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
         },
         onError: (error: any) => {
             toast({
-                title: "게시글 등록 실패",
-                description: error.message || "오류가 발생했습니다.",
+                title: t("createPost.createFailed"),
+                description: error.message || t("createPost.genericError"),
                 variant: "destructive"
             });
         }
@@ -75,7 +85,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
             const compressedImages: string[] = [];
             for (let i = 0; i < files.length; i++) {
                 if (images.length + compressedImages.length >= 5) {
-                    toast({ title: "사진은 최대 5장까지 등록 가능합니다.", variant: "destructive" });
+                    toast({ title: t("createPost.maxImages"), variant: "destructive" });
                     break;
                 }
                 const url = await uploadImage(files[i], 'post', { maxSize: 800, quality: 0.6 });
@@ -84,7 +94,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
             setImages([...images, ...compressedImages]);
         } catch (error) {
             console.error("Compression error:", error);
-            toast({ title: "이미지 압축 중 오류가 발생했습니다.", variant: "destructive" });
+            toast({ title: t("createPost.compressError"), variant: "destructive" });
         } finally {
             setIsCompressing(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
@@ -97,7 +107,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
 
     const handleSubmit = () => {
         if (!title.trim()) {
-            toast({ title: "제목을 입력해주세요.", variant: "destructive" });
+            toast({ title: t("createPost.titleRequired"), variant: "destructive" });
             return;
         }
 
@@ -107,7 +117,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
             // Validate required questions
             for (const q of crew.introQuestions) {
                 if (q.required && !answers[q.id]?.trim()) {
-                    toast({ title: `필수 항목에 답해주세요: ${q.text}`, variant: "destructive" });
+                    toast({ title: `${t("createPost.answerRequired")}: ${q.text}`, variant: "destructive" });
                     return;
                 }
             }
@@ -117,7 +127,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                 .map(q => `Q. ${q.text}\nA. ${answers[q.id] || '(미답변)'}`)
                 .join('\n\n');
         } else if (!content.trim()) {
-            toast({ title: "내용을 입력해주세요.", variant: "destructive" });
+            toast({ title: t("createPost.contentRequired"), variant: "destructive" });
             return;
         }
 
@@ -134,34 +144,34 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="bg-white border-black/[0.08] text-ink-1 max-w-md rounded-card p-0 gap-0">
                 <DialogHeader className="p-6 pb-0">
-                    <DialogTitle className="text-xl font-semibold text-brand">게시글 작성</DialogTitle>
+                    <DialogTitle className="text-xl font-semibold text-brand">{t("createPost.title")}</DialogTitle>
                     <DialogDescription className="text-black/55">
-                        크루 멤버들과 공유할 내용을 작성해주세요.
+                        {t("createPost.description")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar max-h-[60vh] md:max-h-[70vh]">
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-black/55">카테고리</Label>
+                        <Label className="text-xs font-semibold text-black/55">{t("createPost.categoryLabel")}</Label>
                         <Select value={category} onValueChange={(val) => {
                             setCategory(val);
                             if (val === "공지사항") setIsNotice(true);
                         }}>
                             <SelectTrigger className="bg-surface-3 border-black/10 h-12 rounded-tile">
-                                <SelectValue placeholder="카테고리 선택" />
+                                <SelectValue placeholder={t("createPost.categoryPlaceholder")} />
                             </SelectTrigger>
                             <SelectContent className="bg-white border-black/[0.08] text-ink-1 rounded-tile">
                                 {categories.map(c => (
-                                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                                    <SelectItem key={c} value={c}>{t(CATEGORY_LABEL_KEYS[c] ?? c)}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-black/55">제목</Label>
+                        <Label className="text-xs font-semibold text-black/55">{t("createPost.titleLabel")}</Label>
                         <Input
-                            placeholder="제목을 입력하세요"
+                            placeholder={t("createPost.titlePlaceholder")}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             className="bg-surface-3 border-black/10 h-12 rounded-tile placeholder:text-black/40"
@@ -169,19 +179,19 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-black/55">내용</Label>
+                        <Label className="text-xs font-semibold text-black/55">{t("createPost.contentLabel")}</Label>
                         {category === "가입인사" && crew?.introQuestions && crew.introQuestions.length > 0 ? (
                             <div className="space-y-4 p-4 bg-surface-3 rounded-tile">
                                 {crew.introQuestions.map((q) => (
                                     <div key={q.id} className="space-y-2">
                                         <div className="flex items-center gap-1.5">
                                             <Label className="text-[12px] font-semibold text-black/70">{q.text}</Label>
-                                            {q.required && <span className="text-brand text-[12px] font-semibold">필수</span>}
+                                            {q.required && <span className="text-brand text-[12px] font-semibold">{t("createPost.required")}</span>}
                                         </div>
                                         <Input
                                             value={answers[q.id] || ""}
                                             onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                                            placeholder="답변을 입력하세요"
+                                            placeholder={t("createPost.answerPlaceholder")}
                                             className="bg-white border-black/10 h-10 text-sm rounded-lg placeholder:text-black/40"
                                         />
                                     </div>
@@ -189,7 +199,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                             </div>
                         ) : (
                             <Textarea
-                                placeholder="내용을 입력하세요"
+                                placeholder={t("createPost.contentPlaceholder")}
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
                                 className="bg-surface-3 border-black/10 min-h-[150px] resize-none rounded-tile placeholder:text-black/40"
@@ -198,7 +208,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-black/55">사진 ({images.length}/5)</Label>
+                        <Label className="text-xs font-semibold text-black/55">{t("createPost.photosLabel")} ({images.length}/5)</Label>
                         <div className="flex flex-wrap gap-2">
                             {images.map((img, idx) => (
                                 <div key={idx} className="relative w-20 h-20 rounded-tile overflow-hidden ">
@@ -206,8 +216,8 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                                     <button
                                         onClick={() => removeImage(idx)}
                                         className="absolute top-1 right-1 p-1 bg-black/60 rounded-full hover:bg-black/80 transition-colors"
-                                        title="사진 삭제"
-                                        aria-label="사진 삭제"
+                                        title={t("createPost.removePhoto")}
+                                        aria-label={t("createPost.removePhoto")}
                                     >
                                         <LucideX className="w-3 h-3 text-white" />
                                     </button>
@@ -224,7 +234,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                                     ) : (
                                         <>
                                             <LucideCamera className="w-6 h-6 text-black/40" />
-                                            <span className="text-[12px] font-medium text-black/55">추가</span>
+                                            <span className="text-[12px] font-medium text-black/55">{t("createPost.addPhoto")}</span>
                                         </>
                                     )}
                                 </button>
@@ -237,16 +247,16 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                             accept="image/*"
                             multiple
                             className="hidden"
-                            title="사진 선택"
-                            aria-label="사진 선택"
+                            title={t("createPost.selectPhoto")}
+                            aria-label={t("createPost.selectPhoto")}
                         />
                     </div>
 
                     {isAdmin && category !== "공지사항" && (
                         <div className="flex items-center justify-between p-3 rounded-tile bg-surface-3 ">
                             <div className="space-y-0.5">
-                                <Label className="text-sm font-semibold text-ink-1">공지사항으로 등록</Label>
-                                <p className="text-[12px] text-black/55">게시판 상단에 고정됩니다.</p>
+                                <Label className="text-sm font-semibold text-ink-1">{t("createPost.registerAsNotice")}</Label>
+                                <p className="text-[12px] text-black/55">{t("createPost.noticeHint")}</p>
                             </div>
                             <Switch checked={isNotice} onCheckedChange={setIsNotice} />
                         </div>
@@ -259,7 +269,7 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
                         disabled={createPostMutation.isPending}
                         className="w-full h-12 rk-btn-primary rounded-tile font-semibold text-[15px]"
                     >
-                        {createPostMutation.isPending ? "등록 중..." : "등록하기"}
+                        {createPostMutation.isPending ? t("createPost.submitting") : t("createPost.submit")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

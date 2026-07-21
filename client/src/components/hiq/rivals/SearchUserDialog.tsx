@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { SearchResult, SportConfig } from "./types";
 import { getTier } from "@/lib/hiqUtils";
 import { flagEmoji } from "@/lib/flag";
+import { useT } from "@/lib/i18n";
 
 interface SearchUserDialogProps {
     open: boolean;
@@ -31,6 +32,7 @@ export const SearchUserDialog = ({
     isSearching,
     onAddFriend
 }: SearchUserDialogProps) => {
+    const { t } = useT();
     const [keyword, setKeyword] = useState("");
     const [hasSearched, setHasSearched] = useState(false);
 
@@ -54,10 +56,10 @@ export const SearchUserDialog = ({
                     <DialogHeader className="mb-6">
                         <div className="flex flex-col">
                             <DialogTitle className="text-[26px] font-bold tracking-tight text-ink-1">
-                                {config.label} 검색
+                                {t("searchUserDialog.titlePrefix")}{config.label}{t("searchUserDialog.titleSuffix")}
                             </DialogTitle>
                             <DialogDescription className="text-[13px] font-medium text-black/55 mt-1">
-                                닉네임이나 전화번호로 상대를 찾아보세요
+                                {t("searchUserDialog.description")}
                             </DialogDescription>
                         </div>
                     </DialogHeader>
@@ -93,16 +95,16 @@ export const SearchUserDialog = ({
                                     transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
                                     className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
                                 />
-                                <span>검색 중...</span>
+                                <span>{t("searchUserDialog.searching")}</span>
                             </div>
-                        ) : (currentSport === "GOLF" ? "친구 찾기" : "상대 찾기")}
+                        ) : (currentSport === "GOLF" ? t("searchUserDialog.findFriend") : t("searchUserDialog.findRival"))}
                     </Button>
                 </div>
 
                 <div className="px-6 pb-6 max-h-[45vh] overflow-y-auto scrollbar-hide space-y-3">
                     {!isSearching && hasSearched && searchResults.length === 0 && (
                         <div className="py-16 text-center">
-                            <p className="text-[13px] font-medium text-black/55">검색 결과가 없습니다</p>
+                            <p className="text-[13px] font-medium text-black/55">{t("searchUserDialog.noResults")}</p>
                         </div>
                     )}
 
@@ -158,7 +160,7 @@ export const SearchUserDialog = ({
                                                     : 'rk-btn-primary active:scale-95'
                                             )}
                                         >
-                                            {result.isFriend ? (currentSport === "GOLF" ? "친구" : "라이벌") : "추가하기"}
+                                            {result.isFriend ? (currentSport === "GOLF" ? t("searchUserDialog.friend") : t("searchUserDialog.rival")) : t("searchUserDialog.add")}
                                         </motion.button>
                                     </div>
                                 </motion.div>

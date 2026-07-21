@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { HiqMember } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { LucideTrophy, LucideTrendingUp, LucideInfo } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,6 +13,7 @@ interface RankingListCardProps {
 }
 
 export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMemberId }: RankingListCardProps) => {
+    const { t } = useT();
 
     // Sort logic (just in case API didn't sort, though it should)
     // 3c -> rating3c desc, 4c -> rating4c desc
@@ -27,9 +29,9 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
         <div className="space-y-4 mb-10">
             <header className="mb-2 flex items-end justify-between">
                 <div>
-                    <h2 className="text-[19px] font-bold tracking-tight text-ink-1">매장 랭킹</h2>
+                    <h2 className="text-[19px] font-bold tracking-tight text-ink-1">{t("rankingListCard.title")}</h2>
                     <p className="text-black/55 text-[13px] mt-1 flex items-center gap-1.5 font-medium">
-                        <LucideTrophy className="w-3.5 h-3.5 text-[#cba258]" /> 실시간 상위 10명
+                        <LucideTrophy className="w-3.5 h-3.5 text-[#cba258]" /> {t("rankingListCard.subtitle")}
                     </p>
                 </div>
 
@@ -42,11 +44,11 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                     <button
                         onClick={() => onTabChange('3c')}
                         className={cn("px-3.5 rounded-full text-[13px] font-bold relative z-10 transition-colors", activeTab === '3c' ? "text-white" : "text-brand/60")}
-                    >3쿠션</button>
+                    >{t("rankingListCard.tab3c")}</button>
                     <button
                         onClick={() => onTabChange('4c')}
                         className={cn("px-3.5 rounded-full text-[13px] font-bold relative z-10 transition-colors", activeTab === '4c' ? "text-white" : "text-brand/60")}
-                    >4구</button>
+                    >{t("rankingListCard.tab4c")}</button>
                 </div>
             </header>
 
@@ -86,9 +88,9 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                                         <span className={cn("font-semibold text-[15px] truncate", isMe ? "text-brand" : "text-ink-1")}>
                                             {member.name}
                                         </span>
-                                        {isMe && <span className="shrink-0 px-1.5 py-px rounded-full text-[11px] font-bold text-white bg-brand">나</span>}
+                                        {isMe && <span className="shrink-0 px-1.5 py-px rounded-full text-[11px] font-bold text-white bg-brand">{t("rankingListCard.me")}</span>}
                                     </div>
-                                    <span className="block text-[12px] font-medium text-black/40 tabular-nums mt-0.5">평균 {member.average || "0.000"}</span>
+                                    <span className="block text-[12px] font-medium text-black/40 tabular-nums mt-0.5">{t("rankingListCard.avgPrefix")} {member.average || "0.000"}</span>
                                 </div>
 
                                 {/* Score (RP) */}
@@ -105,7 +107,7 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
 
                 {displayRankings.length === 0 && (
                     <div className="py-12 text-center text-black/40 text-[14px] font-medium">
-                        아직 랭킹 데이터가 없습니다
+                        {t("rankingListCard.empty")}
                     </div>
                 )}
             </div>

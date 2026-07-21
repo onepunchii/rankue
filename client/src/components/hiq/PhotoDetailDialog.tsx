@@ -14,6 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucideHeart, LucideMessageSquare, LucideUser, LucideSend } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface Comment {
     id: string;
@@ -35,6 +36,7 @@ interface PhotoDetailDialogProps {
 }
 
 export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentMemberId }: PhotoDetailDialogProps) {
+    const { t } = useT();
     const [commentContent, setCommentContent] = useState("");
     const { toast } = useToast();
 
@@ -56,7 +58,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
         },
         onError: (error: any) => {
             toast({
-                title: "좋아요 처리 실패",
+                title: t("photoDetail.likeFailed"),
                 description: error.message,
                 variant: "destructive"
             });
@@ -78,7 +80,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
         },
         onError: (error: any) => {
             toast({
-                title: "댓글 작성 실패",
+                title: t("photoDetail.commentFailed"),
                 description: error.message,
                 variant: "destructive"
             });
@@ -93,14 +95,14 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
             });
         },
         onSuccess: () => {
-            toast({ title: "사진이 삭제되었습니다." });
+            toast({ title: t("photoDetail.photoDeleted") });
             onOpenChange(false);
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos`] });
         },
         onError: (error: any) => {
             toast({
-                title: "삭제 실패",
-                description: error.message || "권한이 없거나 오류가 발생했습니다.",
+                title: t("photoDetail.deleteFailed"),
+                description: error.message || t("photoDetail.noPermissionOrError"),
                 variant: "destructive"
             });
         }
@@ -114,14 +116,14 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
             });
         },
         onSuccess: () => {
-            toast({ title: "댓글이 삭제되었습니다." });
+            toast({ title: t("photoDetail.commentDeleted") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/comments`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos`] });
         },
         onError: (error: any) => {
             toast({
-                title: "삭제 실패",
-                description: error.message || "권한이 없거나 오류가 발생했습니다.",
+                title: t("photoDetail.deleteFailed"),
+                description: error.message || t("photoDetail.noPermissionOrError"),
                 variant: "destructive"
             });
         }
@@ -156,12 +158,12 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                     {(isAdmin || photo.uploaderId === currentMemberId) && (
                         <button
                             onClick={() => {
-                                if (confirm("이 사진을 삭제하시겠습니까?")) {
+                                if (confirm(t("photoDetail.confirmDeletePhoto"))) {
                                     deletePhotoMutation.mutate();
                                 }
                             }}
                             className="p-2 text-black/40 hover:text-red-500 transition-colors"
-                            title="사진 삭제"
+                            title={t("photoDetail.deletePhoto")}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                         </button>
@@ -205,10 +207,10 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                     <div className="px-6 pb-6 space-y-5">
                         <h4 className="text-[12px] font-semibold text-black/55 flex items-center gap-2">
                             <span className="w-1 h-1 rounded-full bg-brand" />
-                            댓글 {comments?.length || 0}
+                            {t("photoDetail.comments")} {comments?.length || 0}
                         </h4>
                         {isCommentsLoading ? (
-                            <div className="py-8 text-center text-black/55 text-[12px] font-semibold">불러오는 중...</div>
+                            <div className="py-8 text-center text-black/55 text-[12px] font-semibold">{t("photoDetail.loading")}</div>
                         ) : comments && comments.length > 0 ? (
                             <div className="space-y-5">
                                 {comments.map((comment) => (
@@ -234,12 +236,12 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                                         {(isAdmin || comment.authorId === currentMemberId) && (
                                             <button
                                                 onClick={() => {
-                                                    if (confirm("댓글을 삭제하시겠습니까?")) {
+                                                    if (confirm(t("photoDetail.confirmDeleteComment"))) {
                                                         deleteCommentMutation.mutate(comment.id);
                                                     }
                                                 }}
                                                 className="p-1 text-black/40 hover:text-red-500 transition-colors self-start mt-1 opacity-0 group-hover/comment:opacity-100"
-                                                title="댓글 삭제"
+                                                title={t("photoDetail.deleteComment")}
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                                             </button>
@@ -249,7 +251,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                             </div>
                         ) : (
                             <div className="py-12 text-center text-black/55 text-[12px] font-semibold">
-                                첫 댓글을 남겨보세요
+                                {t("photoDetail.beFirstToComment")}
                             </div>
                         )}
                     </div>
@@ -260,7 +262,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                     <div className="relative flex items-center gap-2">
                         <input
                             type="text"
-                            placeholder="댓글 달기..."
+                            placeholder={t("photoDetail.addCommentPlaceholder")}
                             value={commentContent}
                             onChange={(e) => setCommentContent(e.target.value)}
                             onKeyDown={(e) => {

@@ -6,6 +6,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LucideSearch, LucideCheck, LucideUsers } from "@/lib/icons";
 import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface MemberSelectionDialogProps {
     open: boolean;
@@ -16,6 +17,7 @@ interface MemberSelectionDialogProps {
 }
 
 export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds: initialSelectedIds, onConfirm }: MemberSelectionDialogProps) {
+    const { t } = useT();
     const [searchQuery, setSearchQuery] = useState("");
     const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(initialSelectedIds);
 
@@ -57,7 +59,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                 <DialogHeader className="p-4 border-b border-black/[0.08] shrink-0">
                     <DialogTitle className="flex items-center gap-2 text-[19px] font-bold tracking-tight">
                         <LucideUsers className="w-5 h-5 text-brand" />
-                        참석자 선택 ({tempSelectedIds.length}명)
+                        {t("memberSelection.title")} ({tempSelectedIds.length}{t("memberSelection.personSuffix")})
                     </DialogTitle>
                 </DialogHeader>
 
@@ -65,7 +67,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                     <div className="relative">
                         <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40" />
                         <Input
-                            placeholder="멤버 이름 검색..."
+                            placeholder={t("memberSelection.searchPlaceholder")}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="bg-surface-2 border-surface-line pl-10 h-10 rounded-tile"
@@ -73,12 +75,12 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                     </div>
 
                     <div className="flex items-center justify-between px-1">
-                        <span className="text-xs font-semibold text-black/55">멤버 리스트</span>
+                        <span className="text-xs font-semibold text-black/55">{t("memberSelection.memberList")}</span>
                         <button
                             onClick={toggleAll}
                             className="text-[12px] text-brand font-semibold hover:underline"
                         >
-                            {tempSelectedIds.length === members.length ? "전체 해제" : "전체 선택"}
+                            {tempSelectedIds.length === members.length ? t("memberSelection.deselectAll") : t("memberSelection.selectAll")}
                         </button>
                     </div>
 
@@ -101,7 +103,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                                         </Avatar>
                                         <div className="flex flex-col">
                                             <span className="text-[15px] font-semibold">{m.member.name}</span>
-                                            {m.role === 'leader' && <span className="text-[12px] text-brand font-semibold">크루장</span>}
+                                            {m.role === 'leader' && <span className="text-[12px] text-brand font-semibold">{t("memberSelection.leader")}</span>}
                                         </div>
                                     </div>
                                     <div className={cn(
@@ -115,7 +117,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                         })}
                         {filteredMembers.length === 0 && (
                             <div className="py-10 text-center text-black/40 text-[13px] font-medium">
-                                검색 결과가 없습니다
+                                {t("memberSelection.noResults")}
                             </div>
                         )}
                     </div>
@@ -129,7 +131,7 @@ export function MemberSelectionDialog({ open, onOpenChange, members, selectedIds
                         }}
                         className="w-full h-12 rk-btn-primary rounded-tile"
                     >
-                        {tempSelectedIds.length}명 선택 완료
+                        {t("memberSelection.confirmPrefix")}{tempSelectedIds.length}{t("memberSelection.confirmSuffix")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

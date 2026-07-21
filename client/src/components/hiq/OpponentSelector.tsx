@@ -17,6 +17,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { HiqMember } from "@shared/schema";
+import { useT } from "@/lib/i18n";
 
 interface OpponentSelectorProps {
     onSelect: (member: HiqMember) => void;
@@ -26,6 +27,7 @@ interface OpponentSelectorProps {
 }
 
 export function OpponentSelector({ onSelect, gameType, selectedOpponentIds = [], compact = false }: OpponentSelectorProps) {
+    const { t } = useT();
     const [open, setOpen] = React.useState(false);
     const [value, setValue] = React.useState("");
     const [selectedMember, setSelectedMember] = React.useState<HiqMember | null>(null);
@@ -53,20 +55,20 @@ export function OpponentSelector({ onSelect, gameType, selectedOpponentIds = [],
                         <div className="flex items-center gap-2">
                             <span className={`font-bold ${compact ? "text-xs" : ""}`}>{selectedMember.name}</span>
                             <span className={`text-[#cba258] ${compact ? "text-[12px]" : "text-xs"}`}>
-                                {gameType === "4c" ? `4구 ${selectedMember.handi4c}` : `3구 ${selectedMember.handi3c}`}
+                                {gameType === "4c" ? `${t("opponentSelector.fourBall")} ${selectedMember.handi4c}` : `${t("opponentSelector.threeCushion")} ${selectedMember.handi3c}`}
                             </span>
                         </div>
                     ) : (
-                        <span className={`text-black/40 ${compact ? "text-xs" : ""}`}>상대 선택</span>
+                        <span className={`text-black/40 ${compact ? "text-xs" : ""}`}>{t("opponentSelector.selectOpponent")}</span>
                     )}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-white border-black/10">
                 <Command className="bg-transparent text-ink-1">
-                    <CommandInput placeholder="회원 이름 검색..." className="h-10 text-sm" />
+                    <CommandInput placeholder={t("opponentSelector.searchPlaceholder")} className="h-10 text-sm" />
                     <CommandList>
-                        <CommandEmpty>결과가 없습니다.</CommandEmpty>
+                        <CommandEmpty>{t("opponentSelector.noResults")}</CommandEmpty>
                         <CommandGroup>
                             {opponents?.filter(op => !selectedOpponentIds.includes(op.id)).map((opponent) => (
                                 <CommandItem
@@ -93,15 +95,15 @@ export function OpponentSelector({ onSelect, gameType, selectedOpponentIds = [],
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="font-bold text-sm text-ink-1">{opponent.name}</span>
                                                     {isRecentlyVisited(opponent.updatedAt) && (
-                                                        <span className="text-[12px] text-brand font-bold px-1 py-0.5 bg-brand/10 rounded">접속중</span>
+                                                        <span className="text-[12px] text-brand font-bold px-1 py-0.5 bg-brand/10 rounded">{t("opponentSelector.online")}</span>
                                                     )}
                                                 </div>
-                                                <span className="text-[12px] text-black/55">에버리지 {opponent.average || "0.00"}</span>
+                                                <span className="text-[12px] text-black/55">{t("opponentSelector.average")} {opponent.average || "0.00"}</span>
                                             </div>
                                         </div>
                                         <div className="text-right">
                                             <div className="text-xs font-semibold text-[#cba258]">
-                                                {gameType === "4c" ? `4구 ${opponent.handi4c}` : `3구 ${opponent.handi3c}`}
+                                                {gameType === "4c" ? `${t("opponentSelector.fourBall")} ${opponent.handi4c}` : `${t("opponentSelector.threeCushion")} ${opponent.handi3c}`}
                                             </div>
                                         </div>
                                     </div>

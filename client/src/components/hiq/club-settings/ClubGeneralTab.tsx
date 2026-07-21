@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { uploadImage } from '@/lib/imageUtils';
 import { CrewData } from '@/types/crew';
+import { useT } from '@/lib/i18n';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -30,6 +31,7 @@ interface ClubGeneralTabProps {
 }
 
 export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating, isDeleting }: ClubGeneralTabProps) {
+    const { t } = useT();
     const { toast } = useToast();
     const [formData, setFormData] = useState({
         name: crew?.name || '',
@@ -51,7 +53,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
             const url = await uploadImage(file, type === 'coverImage' ? 'crew-cover' : 'crew-logo', { maxSize: type === 'coverImage' ? 1200 : 400 });
             setFormData(prev => ({ ...prev, [type]: url }));
         } catch (err) {
-            toast({ title: "이미지 처리 실패", variant: "destructive" });
+            toast({ title: t("clubGeneralTab.imageUploadFailed"), variant: "destructive" });
         } finally {
             setIsUploading(false);
         }
@@ -78,7 +80,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center bg-surface-3 text-black/55">
                                 <LucideImagePlus className="w-8 h-8 mb-2" />
-                                <span className="text-xs font-semibold">크루 커버 이미지</span>
+                                <span className="text-xs font-semibold">{t("clubGeneralTab.coverImage")}</span>
                             </div>
                         )}
                         {isLeader && (
@@ -87,13 +89,13 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                                 <div className="absolute inset-0 bg-black/40 hidden md:flex items-center justify-center opacity-0 group-hover/cover:opacity-100 transition-opacity pointer-events-none">
                                     <div className="flex flex-col items-center gap-2">
                                         <LucideImagePlus className="w-6 h-6 text-white" />
-                                        <span className="text-xs font-bold text-white">커버 변경</span>
+                                        <span className="text-xs font-bold text-white">{t("clubGeneralTab.changeCover")}</span>
                                     </div>
                                 </div>
                                 {/* Touch: persistent affordance */}
                                 <div className="md:hidden absolute bottom-2 right-2 flex items-center gap-1.5 h-9 px-3 rounded-pill bg-black/60 pointer-events-none">
                                     <LucideImagePlus className="w-4 h-4 text-white" />
-                                    <span className="text-xs font-bold text-white">커버 변경</span>
+                                    <span className="text-xs font-bold text-white">{t("clubGeneralTab.changeCover")}</span>
                                 </div>
                             </>
                         )}
@@ -125,8 +127,8 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                             )}
                         </div>
                         <div className="pb-1">
-                            <h3 className="text-sm font-bold text-[rgba(0,0,0,0.87)]">크루 엠블럼</h3>
-                            <p className="text-xs text-black/55 font-medium mt-0.5">로고 수정</p>
+                            <h3 className="text-sm font-bold text-[rgba(0,0,0,0.87)]">{t("clubGeneralTab.emblem")}</h3>
+                            <p className="text-xs text-black/55 font-medium mt-0.5">{t("clubGeneralTab.editLogo")}</p>
                         </div>
                     </div>
                 </div>
@@ -149,29 +151,29 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
 
             <div className="space-y-4">
                 <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-black/55 ml-1">크루 명칭</Label>
+                    <Label className="text-xs font-semibold text-black/55 ml-1">{t("clubGeneralTab.crewName")}</Label>
                     <Input
                         value={formData.name}
                         onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                         disabled={!isLeader}
-                        placeholder="동호회 이름"
+                        placeholder={t("clubGeneralTab.crewNamePlaceholder")}
                         className="bg-surface-3 border-surface-line h-10 text-sm font-bold rounded-tile focus:ring-0 focus-visible:ring-0 focus:border-brand/30 placeholder:text-black/40"
                     />
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-black/55 ml-1">슬로건</Label>
+                    <Label className="text-xs font-semibold text-black/55 ml-1">{t("clubGeneralTab.slogan")}</Label>
                     <Input
                         value={formData.shortIntro}
                         onChange={e => setFormData(prev => ({ ...prev, shortIntro: e.target.value }))}
                         disabled={!isLeader}
-                        placeholder={crew?.sportCategory === "GOLF" ? "예: 매주 라운딩 나가는 직장인 크루 ⛳️" : "예: 광진구 2030 즐겜 크루! 🎱"}
+                        placeholder={crew?.sportCategory === "GOLF" ? t("clubGeneralTab.sloganPlaceholderGolf") : t("clubGeneralTab.sloganPlaceholderBilliards")}
                         className="bg-surface-3 border-surface-line h-10 text-sm font-medium rounded-tile focus:ring-0 focus-visible:ring-0 focus:border-brand/30 placeholder:text-black/40"
                     />
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-black/55 ml-1">크루 정원</Label>
+                    <Label className="text-xs font-semibold text-black/55 ml-1">{t("clubGeneralTab.maxMembers")}</Label>
                     <div className="grid grid-cols-5 gap-2 p-1 bg-surface-3 rounded-tile">
                         {[10, 20, 30, 50, 100].map(num => (
                             <button
@@ -192,34 +194,34 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-black/55 ml-1">소개글</Label>
+                    <Label className="text-xs font-semibold text-black/55 ml-1">{t("clubGeneralTab.description")}</Label>
                     <Textarea
                         value={formData.description}
                         onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
                         disabled={!isLeader}
-                        placeholder="크루에 대해 소개해 주세요..."
+                        placeholder={t("clubGeneralTab.descriptionPlaceholder")}
                         className="bg-surface-3 border-surface-line resize-none min-h-[100px] text-sm leading-relaxed rounded-tile focus:ring-0 focus-visible:ring-0 focus:border-brand/30 placeholder:text-black/40 custom-scrollbar"
                     />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5 text-left">
-                        <Label className="text-xs font-semibold text-black/55 ml-1">정모 요일</Label>
+                        <Label className="text-xs font-semibold text-black/55 ml-1">{t("clubGeneralTab.meetingDay")}</Label>
                         <Input
                             value={formData.meetingDay}
                             onChange={e => setFormData(prev => ({ ...prev, meetingDay: e.target.value }))}
                             disabled={!isLeader}
-                            placeholder="예: 토요일"
+                            placeholder={t("clubGeneralTab.meetingDayPlaceholder")}
                             className="bg-surface-3 border-surface-line h-10 text-sm font-medium rounded-tile placeholder:text-black/40"
                         />
                     </div>
                     <div className="space-y-1.5 text-left">
-                        <Label className="text-xs font-semibold text-black/55 ml-1">시간</Label>
+                        <Label className="text-xs font-semibold text-black/55 ml-1">{t("clubGeneralTab.meetingTime")}</Label>
                         <Input
                             value={formData.meetingTime}
                             onChange={e => setFormData(prev => ({ ...prev, meetingTime: e.target.value }))}
                             disabled={!isLeader}
-                            placeholder="예: 2시"
+                            placeholder={t("clubGeneralTab.meetingTimePlaceholder")}
                             className="bg-surface-3 border-surface-line h-10 text-sm font-medium rounded-tile placeholder:text-black/40"
                         />
                     </div>
@@ -234,11 +236,11 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         >
                             {isUpdating || isUploading ? (
                                 <LucideLoader2 className="w-5 h-5 animate-spin" />
-                            ) : "변경사항 저장"}
+                            ) : t("clubGeneralTab.saveChanges")}
                         </Button>
                     ) : (
                         <div className="p-4 bg-surface-3 rounded-tile text-center text-xs font-medium text-black/55 leading-relaxed">
-                            기본 정보 수정 권한은 크루장에게만 있습니다
+                            {t("clubGeneralTab.leaderOnlyNotice")}
                         </div>
                     )}
                 </div>
@@ -252,19 +254,19 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                                     disabled={isDeleting}
                                     className="w-full h-12 text-red-600/80 hover:text-red-600 hover:bg-red-500/10 border border-red-500/20 rounded-tile text-xs font-bold transition-colors"
                                 >
-                                    {isDeleting ? "삭제 중..." : "크루 폐쇄"}
+                                    {isDeleting ? t("clubGeneralTab.deleting") : t("clubGeneralTab.closeCrew")}
                                 </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] rounded-card">
                                 <AlertDialogHeader>
-                                    <AlertDialogTitle>정말로 크루를 삭제하시겠습니까?</AlertDialogTitle>
+                                    <AlertDialogTitle>{t("clubGeneralTab.deleteConfirmTitle")}</AlertDialogTitle>
                                     <AlertDialogDescription className="text-black/60">
-                                        이 작업은 되돌릴 수 없으며, 모든 크루 데이터와 멤버 정보가 영구적으로 삭제됩니다.
+                                        {t("clubGeneralTab.deleteConfirmDesc")}
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]">취소</AlertDialogCancel>
-                                    <AlertDialogAction onClick={onDelete} className="bg-red-500 text-white hover:bg-red-600">삭제</AlertDialogAction>
+                                    <AlertDialogCancel className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]">{t("clubGeneralTab.cancel")}</AlertDialogCancel>
+                                    <AlertDialogAction onClick={onDelete} className="bg-red-500 text-white hover:bg-red-600">{t("clubGeneralTab.delete")}</AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>

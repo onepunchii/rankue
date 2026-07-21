@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
+import { useT } from "@/lib/i18n";
 
 interface DashboardHeaderProps {
     member: any;
@@ -26,6 +27,7 @@ export const DashboardHeader = ({
     getTrend,
     tier
 }: DashboardHeaderProps) => {
+    const { t } = useT();
     const pct3c = getPercentile('3c');
     const trend = getTrend();
     const [, setLocation] = useLocation();
@@ -40,18 +42,18 @@ export const DashboardHeader = ({
                 <div className="min-w-0">
                     <div className="inline-flex items-center gap-1.5 mb-2.5 px-2.5 py-1 rounded-full bg-brand/10">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-                        <span className="text-[11px] font-bold text-brand tracking-tight">당구 모드</span>
+                        <span className="text-[11px] font-bold text-brand tracking-tight">{t("dashboardHeader.billiardsMode")}</span>
                     </div>
                     <h1 className="text-[26px] leading-none font-bold text-ink-1 tracking-tight truncate">
                         {member?.nickname || member?.name}
-                        <span className="text-[15px] font-medium text-black/40 ml-1">님</span>
+                        <span className="text-[15px] font-medium text-black/40 ml-1">{t("dashboardHeader.honorific")}</span>
                     </h1>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
                     <button
                         onClick={() => setNotifOpen(true)}
-                        title="알림"
+                        title={t("dashboardHeader.notifications")}
                         className="relative w-11 h-11 rounded-full bg-brand/10 flex items-center justify-center active:scale-95 transition-transform"
                     >
                         <Bell className="w-[21px] h-[21px] text-brand" />
@@ -61,7 +63,7 @@ export const DashboardHeader = ({
                     </button>
                     <button
                         onClick={() => setLocation("/club")}
-                        title="메세지"
+                        title={t("dashboardHeader.messages")}
                         className="w-11 h-11 rounded-full bg-brand/10 flex items-center justify-center active:scale-95 transition-transform"
                     >
                         <MessageSquare className="w-[21px] h-[21px] text-brand" />
@@ -79,7 +81,7 @@ export const DashboardHeader = ({
                     className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                 >
                     <div className="flex items-start justify-between mb-3">
-                        <span className="text-[14px] font-bold text-brand tracking-tight">3쿠션</span>
+                        <span className="text-[14px] font-bold text-brand tracking-tight">{t("dashboardHeader.threeCushion")}</span>
                         <BallCluster colors={["white", "yellow", "red"]} size={22} />
                     </div>
 
@@ -92,15 +94,15 @@ export const DashboardHeader = ({
                     </div>
 
                     <div className="mt-4 flex flex-col items-start gap-2">
-                        <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">평균 {liveAvg3c}</span>
+                        <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">{t("dashboardHeader.average")} {liveAvg3c}</span>
                         {pct3c ? (
                             <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
                                 <ChevronsUp className="w-3.5 h-3.5" />
-                                상위 {pct3c}%
+                                {t("dashboardHeader.topPrefix")} {pct3c}%
                             </span>
                         ) : (
                             <span className="inline-flex items-center px-2 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
-                                분석 중
+                                {t("dashboardHeader.analyzing")}
                             </span>
                         )}
                     </div>
@@ -112,7 +114,7 @@ export const DashboardHeader = ({
                     className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                 >
                     <div className="flex items-start justify-between mb-3">
-                        <span className="text-[14px] font-bold text-ink-1 tracking-tight">4구</span>
+                        <span className="text-[14px] font-bold text-ink-1 tracking-tight">{t("dashboardHeader.fourBall")}</span>
                         <BallCluster colors={["white", "yellow", "red", "red"]} size={22} />
                     </div>
 
@@ -125,7 +127,7 @@ export const DashboardHeader = ({
                     </div>
 
                     <div className="mt-4 flex flex-col items-start gap-2">
-                        <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">평균 {liveAvg4c}</span>
+                        <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">{t("dashboardHeader.average")} {liveAvg4c}</span>
                         <span className={cn(
                             "inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-brand/[0.07] text-[12px] font-semibold",
                             trend.color

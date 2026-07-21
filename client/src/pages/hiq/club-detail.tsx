@@ -27,6 +27,7 @@ import { CreateSettlementDialog } from "@/components/hiq/settlement/CreateSettle
 import { SettlementDetailDialog } from "@/components/hiq/settlement/SettlementDetailDialog";
 import { PostDetailDialog } from "@/components/hiq/PostDetailDialog";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { useT } from "@/lib/i18n";
 
 export default function HiqClubDetail() {
     const [match, params] = useRoute("/club/:id");
@@ -34,6 +35,7 @@ export default function HiqClubDetail() {
     const [, crewParams] = useRoute("/crew/:id/:tab?");
     const [_, setLocation] = useLocation();
     const { toast } = useToast();
+    const { t } = useT();
     const id = params?.id ?? crewParams?.id;
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -98,7 +100,7 @@ export default function HiqClubDetail() {
             });
         },
         onSuccess: () => {
-            toast({ title: "채팅방에 공유되었습니다." });
+            toast({ title: t("clubDetail.sharedToChat") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}/chats`] });
         }
     });
@@ -121,8 +123,8 @@ export default function HiqClubDetail() {
         },
         onSuccess: (data: any) => {
             toast({
-                title: data.role === 'pending' ? "가입 신청 완료" : "가입 완료!",
-                description: data.role === 'pending' ? "크루장의 승인을 기다려주세요." : "크루 멤버가 되었습니다."
+                title: data.role === 'pending' ? t("clubDetail.joinPendingTitle") : t("clubDetail.joinDoneTitle"),
+                description: data.role === 'pending' ? t("clubDetail.joinPendingDesc") : t("clubDetail.joinDoneDesc")
             });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}`] });
             // 내 크루 목록 및 디스커버리(멤버 수) 리스트 갱신 — 가입 즉시 반영
@@ -130,7 +132,7 @@ export default function HiqClubDetail() {
             queryClient.invalidateQueries({ queryKey: ['/api/hiq/crews'] });
         },
         onError: (err: Error) => {
-            toast({ title: "가입 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubDetail.joinFailed"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -140,14 +142,14 @@ export default function HiqClubDetail() {
             return await apiRequest(`/api/hiq/crews/${id}/members/${me?.id}`, { method: "DELETE" });
         },
         onSuccess: () => {
-            toast({ title: "크루에서 나왔습니다." });
+            toast({ title: t("clubDetail.leftCrew") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}`] });
             queryClient.invalidateQueries({ queryKey: ['/api/hiq/crews/mine'] });
             queryClient.invalidateQueries({ queryKey: ['/api/hiq/crews'] });
             setLocation("/club");
         },
         onError: (err: Error) => {
-            toast({ title: "처리 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubDetail.actionFailed"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -159,18 +161,18 @@ export default function HiqClubDetail() {
             });
         },
         onSuccess: () => {
-            toast({ title: "정산이 등록되었습니다", description: "채팅방에 전송되었습니다." });
+            toast({ title: t("clubDetail.settlementCreated"), description: t("clubDetail.settlementSentToChat") });
             setIsCreateSettlementOpen(false);
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}/chats`] });
             setActiveTab('chat');
         },
         onError: (err: Error) => {
-            toast({ title: "등록 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubDetail.createFailed"), description: err.message, variant: "destructive" });
         }
     });
 
     if (isLoading) return <div className="h-[100dvh] bg-[#f2f0eb] flex items-center justify-center text-ink-3"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
-    if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-[#f2f0eb] flex items-center justify-center text-ink-3">데이터를 찾을 수 없습니다.</div>;
+    if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-[#f2f0eb] flex items-center justify-center text-ink-3">{t("clubDetail.notFound")}</div>;
 
     const { crew, baseStore, members = [] } = crewData;
     const myMemberData = members.find((m: any) => m.member?.id === me?.id);
@@ -183,8 +185,8 @@ export default function HiqClubDetail() {
     const handleShare = async () => {
         const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
         const shareData = {
-            title: crew?.name ?? '크루',
-            text: `${crew?.name} 크루를 확인해보세요`,
+            title: crew?.name ?? t("clubDetail.crewFallback"),
+            text: `${crew?.name} ${t("clubDetail.shareText")}`,
             url: shareUrl,
         };
         try {
@@ -194,14 +196,14 @@ export default function HiqClubDetail() {
             }
             if (typeof navigator !== 'undefined' && navigator.clipboard) {
                 await navigator.clipboard.writeText(shareUrl);
-                toast({ title: "링크가 복사되었습니다." });
+                toast({ title: t("clubDetail.linkCopied") });
                 return;
             }
-            toast({ title: "공유를 지원하지 않는 환경입니다.", variant: "destructive" });
+            toast({ title: t("clubDetail.shareNotSupported"), variant: "destructive" });
         } catch (err) {
             // 사용자가 공유 시트를 취소한 경우는 조용히 무시
             if (err instanceof DOMException && err.name === 'AbortError') return;
-            toast({ title: "공유에 실패했습니다.", variant: "destructive" });
+            toast({ title: t("clubDetail.shareFailed"), variant: "destructive" });
         }
     };
 
@@ -411,10 +413,10 @@ export default function HiqClubDetail() {
             <nav className="fixed bottom-0 w-full bg-white/95 border-t border-black/10 z-50 pb-[env(safe-area-inset-bottom)]">
                 <div className="flex items-center h-20">
                 {[
-                    { id: 'home', label: '홈', icon: LucideHome },
-                    { id: 'board', label: '게시판', icon: LucideFileText },
-                    { id: 'gallery', label: '사진첩', icon: LucideImage },
-                    { id: 'chat', label: '채팅', icon: LucideMessageCircle },
+                    { id: 'home', label: 'clubDetail.tabHome', icon: LucideHome },
+                    { id: 'board', label: 'clubDetail.tabBoard', icon: LucideFileText },
+                    { id: 'gallery', label: 'clubDetail.tabGallery', icon: LucideImage },
+                    { id: 'chat', label: 'clubDetail.tabChat', icon: LucideMessageCircle },
                 ].map((tab) => {
                     const isActive = activeTab === tab.id;
                     return (
@@ -428,7 +430,7 @@ export default function HiqClubDetail() {
                         >
                             <tab.icon size={24} strokeWidth={isActive ? 2.5 : 1.5} />
                             <span className="text-[12px] mt-1.5 font-semibold">
-                                {tab.label}
+                                {t(tab.label)}
                             </span>
                             {isActive && (
                                 <div className="absolute top-0 inset-x-0 flex justify-center">

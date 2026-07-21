@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { RecentOpponent, SportConfig } from "./types";
 import { getTier } from "@/lib/hiqUtils";
 import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
+import { useT } from "@/lib/i18n";
 
 interface RecentOpponentsSliderProps {
     opponents: RecentOpponent[];
@@ -14,13 +15,14 @@ interface RecentOpponentsSliderProps {
 }
 
 export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFriend }: RecentOpponentsSliderProps) => {
+    const { t } = useT();
     if (opponents.length === 0) return null;
 
     return (
         <div className="mb-10 relative z-10">
             <div className="flex items-center justify-between px-1 mb-4">
-                <h2 className="text-[15px] font-semibold text-black/60">최근 매칭 상대</h2>
-                <span className="text-[12px] font-medium text-black/55">최근 플레이어</span>
+                <h2 className="text-[15px] font-semibold text-black/60">{t("recentOpponents.title")}</h2>
+                <span className="text-[12px] font-medium text-black/55">{t("recentOpponents.subtitle")}</span>
             </div>
 
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-5 px-5">
@@ -45,7 +47,7 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                                                 <h3 className="text-[22px] font-bold text-ink-1 mb-1.5 tracking-tight">{opponent.name}</h3>
                                                 <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-black/[0.04]", tier.class)}>
                                                     <span className="text-xs">{tier.icon}</span>
-                                                    <span className="text-[12px] font-semibold">{tier.label}</span>
+                                                    <span className="text-[12px] font-semibold">{t(tier.label)}</span>
                                                 </div>
                                             </div>
                                             <div className="w-10 h-10 rounded-tile bg-black/[0.04] flex items-center justify-center overflow-hidden text-black/40">
@@ -63,9 +65,9 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
 
                                         <div className="mb-6 p-4 rounded-tile bg-black/[0.04] flex items-center justify-between">
                                             <div className="flex flex-col">
-                                                <span className="text-[12px] font-medium text-black/55 mb-1">최근 경기</span>
+                                                <span className="text-[12px] font-medium text-black/55 mb-1">{t("recentOpponents.lastMatch")}</span>
                                                 <span className={`text-[15px] font-bold tabular-nums ${opponent.lastGameResult === 'win' ? 'text-brand' : 'text-black/60'}`}>
-                                                    {opponent.lastGameResult === 'win' ? '승' : '패'} {opponent.lastGameScore}
+                                                    {opponent.lastGameResult === 'win' ? t("recentOpponents.win") : t("recentOpponents.loss")} {opponent.lastGameScore}
                                                 </span>
                                             </div>
                                             <FormBadges results={[lastForm]} size={32} />
@@ -77,7 +79,7 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                                             className="w-full py-3.5 rounded-tile rk-btn-secondary text-[13px] flex items-center justify-center gap-2"
                                         >
                                             <LucideUserPlus className="w-4 h-4" />
-                                            {config.actionText}
+                                            {t(config.actionText)}
                                         </motion.button>
                                     </div>
                                 </div>

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LucideShieldQuestion, LucideKeyRound, LucideCheckCircle2, LucideLoader2 } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 interface PinResetDialogProps {
     open: boolean;
@@ -15,6 +16,7 @@ interface PinResetDialogProps {
 }
 
 export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinResetDialogProps) {
+    const { t } = useT();
     const { toast } = useToast();
     const [step, setStep] = useState(1); // 1: phone, 2: answer, 3: new pin, 4: success
     const [phone, setPhone] = useState(initialPhone);
@@ -26,7 +28,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
 
     const handleFetchQuestion = async () => {
         if (phone.length < 10) {
-            toast({ variant: "destructive", title: "입력 오류", description: "올바른 전화번호를 입력해주세요." });
+            toast({ variant: "destructive", title: t("pinReset.inputError"), description: t("pinReset.invalidPhone") });
             return;
         }
 
@@ -41,8 +43,8 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
         } catch (error: any) {
             toast({
                 variant: "destructive",
-                title: "오류",
-                description: error.message || "보안 질문을 불러올 수 없습니다."
+                title: t("pinReset.error"),
+                description: error.message || t("pinReset.fetchQuestionFailed")
             });
         } finally {
             setIsLoading(false);
@@ -51,15 +53,15 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
 
     const handleVerifyAndReset = async () => {
         if (!answer) {
-            toast({ variant: "destructive", title: "입력 오류", description: "정답을 입력해주세요." });
+            toast({ variant: "destructive", title: t("pinReset.inputError"), description: t("pinReset.enterAnswer") });
             return;
         }
         if (newPin.length < 4) {
-            toast({ variant: "destructive", title: "입력 오류", description: "비밀번호는 4자리 이상이어야 합니다." });
+            toast({ variant: "destructive", title: t("pinReset.inputError"), description: t("pinReset.pinTooShort") });
             return;
         }
         if (newPin !== confirmPin) {
-            toast({ variant: "destructive", title: "입력 오류", description: "비밀번호가 일치하지 않습니다." });
+            toast({ variant: "destructive", title: t("pinReset.inputError"), description: t("pinReset.pinMismatch") });
             return;
         }
 
@@ -73,8 +75,8 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
         } catch (error: any) {
             toast({
                 variant: "destructive",
-                title: "실패",
-                description: error.message || "비밀번호 재설정에 실패했습니다."
+                title: t("pinReset.failed"),
+                description: error.message || t("pinReset.resetFailed")
             });
         } finally {
             setIsLoading(false);
@@ -100,7 +102,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                     <DialogHeader className="mb-8">
                         <DialogTitle className="text-2xl font-semibold flex items-center gap-3">
                             <LucideShieldQuestion className="w-6 h-6 text-brand" />
-                            PIN 재설정
+                            {t("pinReset.title")}
                         </DialogTitle>
                     </DialogHeader>
 
@@ -114,7 +116,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                 className="space-y-6"
                             >
                                 <div className="space-y-2">
-                                    <Label className="text-black/55 font-semibold text-xs">휴대폰 번호</Label>
+                                    <Label className="text-black/55 font-semibold text-xs">{t("pinReset.phoneLabel")}</Label>
                                     <Input
                                         placeholder="01012345678"
                                         value={phone}
@@ -127,7 +129,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                     disabled={isLoading || phone.length < 10}
                                     className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 active:scale-95 transition-all"
                                 >
-                                    {isLoading ? <LucideLoader2 className="animate-spin" /> : "질문 확인하기"}
+                                    {isLoading ? <LucideLoader2 className="animate-spin" /> : t("pinReset.checkQuestion")}
                                 </Button>
                             </motion.div>
                         )}
@@ -141,13 +143,13 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                 className="space-y-6"
                             >
                                 <div className="p-6 bg-surface-2 rounded-2xl text-center">
-                                    <p className="text-black/55 text-sm font-semibold mb-2">보안 질문</p>
+                                    <p className="text-black/55 text-sm font-semibold mb-2">{t("pinReset.securityQuestion")}</p>
                                     <h3 className="text-xl font-semibold text-[rgba(0,0,0,0.87)]">{question}</h3>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-black/55 font-semibold text-xs">정답</Label>
+                                    <Label className="text-black/55 font-semibold text-xs">{t("pinReset.answerLabel")}</Label>
                                     <Input
-                                        placeholder="정답을 입력하세요"
+                                        placeholder={t("pinReset.answerPlaceholder")}
                                         value={answer}
                                         onChange={(e) => setAnswer(e.target.value)}
                                         className="bg-surface-2 border-surface-line h-14 text-xl font-bold rounded-tile focus:border-brand transition-all"
@@ -158,9 +160,9 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                     disabled={!answer}
                                     className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 active:scale-95 transition-all"
                                 >
-                                    다음 단계
+                                    {t("pinReset.nextStep")}
                                 </Button>
-                                <button onClick={() => setStep(1)} className="w-full text-black/55 text-[12px] font-semibold hover:text-[rgba(0,0,0,0.87)] transition-all">뒤로가기</button>
+                                <button onClick={() => setStep(1)} className="w-full text-black/55 text-[12px] font-semibold hover:text-[rgba(0,0,0,0.87)] transition-all">{t("pinReset.back")}</button>
                             </motion.div>
                         )}
 
@@ -174,7 +176,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                             >
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label className="text-black/55 font-semibold text-xs">새 PIN 설정 (4자리)</Label>
+                                        <Label className="text-black/55 font-semibold text-xs">{t("pinReset.newPinLabel")}</Label>
                                         <Input
                                             type="password"
                                             maxLength={4}
@@ -185,7 +187,7 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-black/55 font-semibold text-xs">PIN 확인</Label>
+                                        <Label className="text-black/55 font-semibold text-xs">{t("pinReset.confirmPinLabel")}</Label>
                                         <Input
                                             type="password"
                                             maxLength={4}
@@ -201,9 +203,9 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                     disabled={isLoading || newPin.length < 4 || newPin !== confirmPin}
                                     className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 active:scale-95 transition-all"
                                 >
-                                    {isLoading ? <LucideLoader2 className="animate-spin" /> : "PIN 변경 완료"}
+                                    {isLoading ? <LucideLoader2 className="animate-spin" /> : t("pinReset.submitChange")}
                                 </Button>
-                                <button onClick={() => setStep(2)} className="w-full text-black/55 text-[12px] font-semibold hover:text-[rgba(0,0,0,0.87)] transition-all">뒤로가기</button>
+                                <button onClick={() => setStep(2)} className="w-full text-black/55 text-[12px] font-semibold hover:text-[rgba(0,0,0,0.87)] transition-all">{t("pinReset.back")}</button>
                             </motion.div>
                         )}
 
@@ -217,13 +219,13 @@ export function PinResetDialog({ open, onOpenChange, initialPhone = "" }: PinRes
                                 <div className="w-20 h-20 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-6">
                                     <LucideCheckCircle2 className="w-12 h-12 text-brand" />
                                 </div>
-                                <h3 className="text-2xl font-semibold mb-2">변경 완료!</h3>
-                                <p className="text-black/55 mb-8 leading-relaxed">새로운 PIN 번호로<br />로그인하실 수 있습니다.</p>
+                                <h3 className="text-2xl font-semibold mb-2">{t("pinReset.changeSuccess")}</h3>
+                                <p className="text-black/55 mb-8 leading-relaxed">{t("pinReset.successDesc1")}<br />{t("pinReset.successDesc2")}</p>
                                 <Button
                                     onClick={handleClose}
                                     className="w-full h-14 bg-brand text-brand-fg font-semibold text-lg rounded-tile hover:bg-brand/90 active:scale-95 transition-all"
                                 >
-                                    확인
+                                    {t("pinReset.confirm")}
                                 </Button>
                             </motion.div>
                         )}

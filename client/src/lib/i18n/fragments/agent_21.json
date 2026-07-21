@@ -1,0 +1,21 @@
+{
+  "dashboard.trendSteady": { "ko": "유지 중", "en": "Steady", "vi": "Ổn định", "tr": "Sabit", "es": "Estable" },
+  "dashboard.trendNew": { "ko": "신규 기록", "en": "Just started", "vi": "Mới bắt đầu", "tr": "Yeni başladı", "es": "Recién empezando" },
+  "dashboard.trendRising": { "ko": "상승 중", "en": "Rising", "vi": "Đang lên", "tr": "Yükseliyor", "es": "En alza" },
+  "dashboard.trendFalling": { "ko": "하락 중", "en": "Falling", "vi": "Đang xuống", "tr": "Düşüyor", "es": "A la baja" },
+  "dashboard.tierBronze": { "ko": "브론즈", "en": "Bronze", "vi": "Đồng", "tr": "Bronz", "es": "Bronce" },
+  "dashboard.tierSilver": { "ko": "실버", "en": "Silver", "vi": "Bạc", "tr": "Gümüş", "es": "Plata" },
+  "dashboard.tierGold": { "ko": "골드", "en": "Gold", "vi": "Vàng", "tr": "Altın", "es": "Oro" },
+  "dashboard.tierPlatinum": { "ko": "플래티넘", "en": "Platinum", "vi": "Bạch kim", "tr": "Platin", "es": "Platino" },
+
+  "friends.subtitle": { "ko": "함께 겨룰 상대를 관리하세요", "en": "Manage your matchup partners", "vi": "Quản lý đối thủ của bạn", "tr": "Rakiplerinizi yönetin", "es": "Gestiona tus rivales" },
+  "friends.golfFriendAdded": { "ko": "골프 친구 추가 완료", "en": "Golf friend added", "vi": "Đã thêm bạn golf", "tr": "Golf arkadaşı eklendi", "es": "Amigo de golf añadido" },
+  "friends.rivalAdded": { "ko": "라이벌 추가 완료", "en": "Rival added", "vi": "Đã thêm đối thủ", "tr": "Rakip eklendi", "es": "Rival añadido" },
+  "friends.golfFriendAddedDesc": { "ko": "이제 함께 라운딩을 즐길 수 있습니다.", "en": "You can now enjoy rounds together.", "vi": "Giờ bạn có thể chơi golf cùng nhau.", "tr": "Artık birlikte tur atabilirsiniz.", "es": "Ya pueden jugar rondas juntos." },
+  "friends.rivalAddedDesc": { "ko": "이제 대결 상대로 선택할 수 있습니다.", "en": "You can now pick them as an opponent.", "vi": "Giờ bạn có thể chọn họ làm đối thủ.", "tr": "Artık rakip olarak seçebilirsiniz.", "es": "Ya puedes elegirlo como rival." },
+
+  "gameScoreboard.loading": { "ko": "불러오는 중...", "en": "Loading...", "vi": "Đang tải...", "tr": "Yükleniyor...", "es": "Cargando..." },
+  "gameScoreboard.exitConfirm": { "ko": "게임을 종료하시겠습니까?", "en": "End the game?", "vi": "Kết thúc trận đấu?", "tr": "Oyunu bitirmek istiyor musunuz?", "es": "¿Terminar el juego?" },
+  "gameScoreboard.undo": { "ko": "취소", "en": "Undo", "vi": "Hoàn tác", "tr": "Geri al", "es": "Deshacer" },
+  "gameScoreboard.redo": { "ko": "복구", "en": "Redo", "vi": "Làm lại", "tr": "Yinele", "es": "Rehacer" }
+}

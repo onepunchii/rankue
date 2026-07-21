@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LucidePlus, LucideCalendarDays, LucideChevronRight } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 interface ClubActivityListProps {
     crewId: string;
@@ -19,6 +20,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateClick }: ClubActivityListProps) {
+    const { t } = useT();
     const { toast } = useToast();
 
     const { data: activities, isLoading, isError, refetch } = useQuery({
@@ -33,15 +35,15 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
             });
         },
         onSuccess: () => {
-            toast({ title: "참여 완료", description: "정모에 참여했습니다." });
+            toast({ title: t("clubActivityList.joinSuccessTitle"), description: t("clubActivityList.joinSuccessDesc") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/activities`] });
         },
         onError: (err: Error) => {
-            toast({ title: "참여 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubActivityList.joinFailTitle"), description: err.message, variant: "destructive" });
         }
     });
 
-    if (isLoading) return <div className="text-center py-8 text-black/40">활동 불러오는 중...</div>;
+    if (isLoading) return <div className="text-center py-8 text-black/40">{t("clubActivityList.loading")}</div>;
 
     const upcomingActivities: any[] = Array.isArray(activities) ? activities : [];
 
@@ -49,7 +51,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
         <div className="space-y-4 px-6 pt-0 pb-6">
             <div className="flex items-center gap-2 mb-2">
                 <LucideCalendarDays className="w-5 h-5 text-brand" />
-                <h2 className="text-lg font-semibold text-ink-1">정모 / 일정</h2>
+                <h2 className="text-lg font-semibold text-ink-1">{t("clubActivityList.sectionTitle")}</h2>
             </div>
 
             {/* Existing Activities */}
@@ -59,7 +61,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
 
                 // D-Day Calculation
                 const diff = differenceInDays(startOfDay(new Date(activity.activityDate)), startOfDay(new Date()));
-                const dDayText = diff === 0 ? "D-Day" : diff > 0 ? `D-${diff}` : "종료";
+                const dDayText = diff === 0 ? "D-Day" : diff > 0 ? `D-${diff}` : t("clubActivityList.ended");
                 const dDayColor = diff === 0 ? "bg-red-500 text-white" : diff > 0 && diff <= 3 ? "bg-orange-500 text-white" : "bg-brand text-brand-fg";
 
                 return (
@@ -73,12 +75,12 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                                         </div>
                                         <h3 className="font-bold text-lg text-ink-1">{activity.title}</h3>
                                     </div>
-                                    <p className="text-xs text-black/55 font-medium ml-0.5">공식 모임</p>
+                                    <p className="text-xs text-black/55 font-medium ml-0.5">{t("clubActivityList.officialMeeting")}</p>
                                 </div>
                                 {isJoined && (
                                     <div className="flex items-center gap-1 text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded-pill border border-brand/20">
                                         <span className="w-1 h-1 rounded-full bg-brand animate-pulse" />
-                                        참여중
+                                        {t("clubActivityList.joinedBadge")}
                                     </div>
                                 )}
                             </div>
@@ -86,26 +88,26 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                             <div className="grid grid-cols-1 gap-2.5 mb-5 text-[13px]">
                                 {/* Info Items */}
                                 <div className="flex items-center">
-                                    <div className="w-10 shrink-0 text-xs font-semibold text-black/55">일시</div>
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-black/55">{t("clubActivityList.dateLabel")}</div>
                                     <div className="font-semibold text-black/70">
-                                        {format(new Date(activity.activityDate), "M월 d일 (E) a h:mm", { locale: ko })}
+                                        {format(new Date(activity.activityDate), t("clubActivityList.dateTimeFormat"), { locale: ko })}
                                     </div>
                                 </div>
                                 <div className="flex items-start">
-                                    <div className="w-10 shrink-0 text-xs font-semibold text-black/55 mt-0.5">위치</div>
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-black/55 mt-0.5">{t("clubActivityList.locationLabel")}</div>
                                     <div className="font-semibold text-black/70">
-                                        {activity.locationName || "장소 미정"}
+                                        {activity.locationName || t("clubActivityList.locationTbd")}
                                     </div>
                                 </div>
                                 <div className="flex items-center">
-                                    <div className="w-10 shrink-0 text-xs font-semibold text-black/55">비용</div>
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-black/55">{t("clubActivityList.costLabel")}</div>
                                     <div className="font-semibold text-black/70">
-                                        {activity.cost || "협의 / n분의 1"}
+                                        {activity.cost || t("clubActivityList.costTbd")}
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between pt-1">
                                     <div className="flex items-center">
-                                        <div className="w-10 shrink-0 text-xs font-semibold text-black/55">참석</div>
+                                        <div className="w-10 shrink-0 text-xs font-semibold text-black/55">{t("clubActivityList.attendLabel")}</div>
                                         <div className="flex items-center gap-2">
                                             <div className="flex -space-x-1.5">
                                                 {(activity.participants || []).slice(0, 3).map((p: any, idx: number) => (
@@ -123,7 +125,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                                                 )}
                                             </div>
                                             <span className="text-xs font-bold tabular-nums text-black/55">
-                                                {activity.participants?.length || 0} / {activity.maxParticipants}명
+                                                {activity.participants?.length || 0} / {activity.maxParticipants}{t("clubActivityList.personSuffix")}
                                             </span>
                                         </div>
                                     </div>
@@ -144,9 +146,9 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                                     onClick={() => joinMutation.mutate(activity.id)}
                                     disabled={isFull || joinMutation.isPending}
                                 >
-                                    {isFull ? "인원 마감" : (
+                                    {isFull ? t("clubActivityList.full") : (
                                         <span className="flex items-center gap-2 font-bold">
-                                            참여하기 <LucideChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                                            {t("clubActivityList.joinButton")} <LucideChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                                         </span>
                                     )}
                                 </Button>
@@ -154,7 +156,7 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
 
                             {isMember && isJoined && (
                                 <div className="w-full bg-brand/[0.06] border border-brand/15 py-2.5 rounded-tile text-center text-xs font-semibold text-brand">
-                                    참여 중인 정모입니다
+                                    {t("clubActivityList.alreadyJoined")}
                                 </div>
                             )}
                         </CardContent>
@@ -169,13 +171,13 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                         <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
                             <LucideCalendarDays className="w-6 h-6 text-black/40" />
                         </div>
-                        <p className="text-sm font-semibold text-black/70">일정을 불러오지 못했습니다</p>
+                        <p className="text-sm font-semibold text-black/70">{t("clubActivityList.loadError")}</p>
                         <Button
                             variant="ghost"
                             onClick={() => refetch()}
                             className="h-10 px-5 rounded-pill bg-surface-3 hover:bg-black/[0.06] text-black/70 text-xs font-semibold"
                         >
-                            다시 시도
+                            {t("clubActivityList.retry")}
                         </Button>
                     </CardContent>
                 </Card>
@@ -188,9 +190,9 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                         <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center mb-1">
                             <LucideCalendarDays className="w-6 h-6 text-black/40" />
                         </div>
-                        <h3 className="text-sm font-semibold text-black/70">예정된 정모가 없습니다</h3>
+                        <h3 className="text-sm font-semibold text-black/70">{t("clubActivityList.emptyTitle")}</h3>
                         <p className="text-xs text-black/55 font-medium">
-                            {isMember ? "첫 정모를 만들어 멤버들과 모여보세요." : "곧 새로운 모임이 열릴 예정이에요."}
+                            {isMember ? t("clubActivityList.emptyMemberDesc") : t("clubActivityList.emptyGuestDesc")}
                         </p>
                     </CardContent>
                 </Card>
@@ -206,8 +208,8 @@ export function ClubActivityList({ crewId, isMember, currentMemberId, onCreateCl
                         <div className="w-12 h-12 rounded-full bg-brand/10 group-hover:bg-brand flex items-center justify-center transition-colors">
                             <LucidePlus className="w-6 h-6 text-brand group-hover:text-brand-fg transition-colors" />
                         </div>
-                        <h3 className="text-ink-1 font-semibold group-hover:text-brand transition-colors">새로운 정모 만들기</h3>
-                        <p className="text-xs text-black/55 font-medium">언제든 자유롭게 모임을 시작해보세요!</p>
+                        <h3 className="text-ink-1 font-semibold group-hover:text-brand transition-colors">{t("clubActivityList.createTitle")}</h3>
+                        <p className="text-xs text-black/55 font-medium">{t("clubActivityList.createDesc")}</p>
                     </CardContent>
                 </Card>
             )}

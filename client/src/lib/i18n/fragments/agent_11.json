@@ -1,0 +1,128 @@
+{
+  "rankingListCard.title": {
+    "ko": "매장 랭킹",
+    "en": "Venue Rankings",
+    "vi": "Xếp hạng quán",
+    "tr": "Mekân Sıralaması",
+    "es": "Ranking del local"
+  },
+  "rankingListCard.subtitle": {
+    "ko": "실시간 상위 10명",
+    "en": "Top 10 in real time",
+    "vi": "Top 10 theo thời gian thực",
+    "tr": "Anlık ilk 10",
+    "es": "Top 10 en tiempo real"
+  },
+  "rankingListCard.tab3c": {
+    "ko": "3쿠션",
+    "en": "3-Cushion",
+    "vi": "3 băng",
+    "tr": "3 Bant",
+    "es": "3 bandas"
+  },
+  "rankingListCard.tab4c": {
+    "ko": "4구",
+    "en": "4-Ball",
+    "vi": "4 bi",
+    "tr": "4 Top",
+    "es": "4 bolas"
+  },
+  "rankingListCard.me": {
+    "ko": "나",
+    "en": "Me",
+    "vi": "Tôi",
+    "tr": "Ben",
+    "es": "Yo"
+  },
+  "rankingListCard.avgPrefix": {
+    "ko": "평균",
+    "en": "Avg",
+    "vi": "TB",
+    "tr": "Ort.",
+    "es": "Prom."
+  },
+  "rankingListCard.empty": {
+    "ko": "아직 랭킹 데이터가 없습니다",
+    "en": "No ranking data yet",
+    "vi": "Chưa có dữ liệu xếp hạng",
+    "tr": "Henüz sıralama verisi yok",
+    "es": "Aún no hay datos de ranking"
+  },
+  "scoreCorrectionModal.title": {
+    "ko": "점수 보정",
+    "en": "Score Adjustment",
+    "vi": "Điều chỉnh điểm",
+    "tr": "Puan Düzeltme",
+    "es": "Ajuste de puntuación"
+  },
+  "scoreCorrectionModal.tab4c": {
+    "ko": "4구",
+    "en": "4-Ball",
+    "vi": "4 bi",
+    "tr": "4 Top",
+    "es": "4 bolas"
+  },
+  "scoreCorrectionModal.tab3c": {
+    "ko": "3구",
+    "en": "3-Cushion",
+    "vi": "3 băng",
+    "tr": "3 Bant",
+    "es": "3 bandas"
+  },
+  "scoreCorrectionModal.average": {
+    "ko": "평균",
+    "en": "Average",
+    "vi": "Trung bình",
+    "tr": "Ortalama",
+    "es": "Promedio"
+  },
+  "scoreCorrectionModal.handicap": {
+    "ko": "핸디캡",
+    "en": "Handicap",
+    "vi": "Điểm chấp",
+    "tr": "Handikap",
+    "es": "Hándicap"
+  },
+  "scoreCorrectionModal.pointSuffix": {
+    "ko": "점",
+    "en": "pts",
+    "vi": "điểm",
+    "tr": "puan",
+    "es": "pts"
+  },
+  "scoreCorrectionModal.autoCalcNote": {
+    "ko": "※ 에버리지에 따라 자동 계산됩니다.",
+    "en": "※ Calculated automatically from your average.",
+    "vi": "※ Tự động tính theo trung bình của bạn.",
+    "tr": "※ Ortalamana göre otomatik hesaplanır.",
+    "es": "※ Se calcula automáticamente según tu promedio."
+  },
+  "scoreCorrectionModal.save": {
+    "ko": "저장하기",
+    "en": "Save",
+    "vi": "Lưu",
+    "tr": "Kaydet",
+    "es": "Guardar"
+  },
+  "smoothTrendChart.vsPrevious": {
+    "ko": "직전 대비",
+    "en": "vs last",
+    "vi": "so với trước",
+    "tr": "öncekine göre",
+    "es": "vs anterior"
+  },
+  "smoothTrendChart.tenGamesAgo": {
+    "ko": "10게임 전",
+    "en": "10 games ago",
+    "vi": "10 trận trước",
+    "tr": "10 oyun önce",
+    "es": "Hace 10 juegos"
+  },
+  "smoothTrendChart.today": {
+    "ko": "오늘",
+    "en": "Today",
+    "vi": "Hôm nay",
+    "tr": "Bugün",
+    "es": "Hoy"
+  }
+}

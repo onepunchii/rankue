@@ -8,8 +8,10 @@ import { useSport } from "@/contexts/SportContext";
 
 import { cn } from "@/lib/utils";
 import { flagEmoji } from "@/lib/flag";
+import { useT } from "@/lib/i18n";
 
 export default function HiqRanking() {
+    const { t } = useT();
     const [rankingTab, setRankingTab] = useState<"3c" | "4c">("4c");
     // 매장(하이퍼로컬) → 국가 → 글로벌 3계층 랭킹
     const [rankingScope, setRankingScope] = useState<"store" | "country" | "national">("store");
@@ -63,10 +65,10 @@ export default function HiqRanking() {
             <div className="relative z-10">
                 <header className="mb-7">
                     <h1 className="text-[26px] font-bold tracking-tight mb-1.5">
-                        {currentSport === "GOLF" ? "매장 공식 랭킹" : "실시간 랭킹"}
+                        {currentSport === "GOLF" ? t("ranking.golfTitle") : t("ranking.title")}
                     </h1>
                     <p className="text-black/55 text-[13px] font-medium">
-                        {currentSport === "GOLF" ? "골프 최고 실력자들" : "당구 최고 실력자들"}
+                        {currentSport === "GOLF" ? t("ranking.golfSubtitle") : t("ranking.subtitle")}
                     </p>
                 </header>
 
@@ -80,7 +82,7 @@ export default function HiqRanking() {
                         )}
                     >
                         <LucideStore className="w-4 h-4" />
-                        매장 랭킹
+                        {t("ranking.storeTab")}
                     </button>
                     <button
                         onClick={() => setRankingScope("country")}
@@ -91,7 +93,7 @@ export default function HiqRanking() {
                     >
                         {/* 국가 랭킹 — 내 국가 기준 (3쿠션 국가 대항 정서) */}
                         <span className="text-[15px] leading-none">{flagEmoji(rankingCountry || (member as any)?.countryCode) || "🏳️"}</span>
-                        국가 랭킹
+                        {t("ranking.countryTab")}
                     </button>
                     <button
                         onClick={() => setRankingScope("national")}
@@ -101,7 +103,7 @@ export default function HiqRanking() {
                         )}
                     >
                         <LucideGlobe className="w-4 h-4" />
-                        글로벌
+                        {t("ranking.globalTab")}
                     </button>
                 </div>
 
@@ -116,7 +118,7 @@ export default function HiqRanking() {
                             )}
                         >
                             <LucideBarChart3 className="w-4 h-4" />
-                            4구
+                            {t("ranking.fourBall")}
                         </button>
                         <button
                             onClick={() => setRankingTab("3c")}
@@ -126,7 +128,7 @@ export default function HiqRanking() {
                             )}
                         >
                             <LucideTarget className="w-4 h-4" />
-                            3쿠션
+                            {t("ranking.threeCushion")}
                         </button>
                     </div>
                 )}
@@ -143,9 +145,9 @@ export default function HiqRanking() {
                     ) : rankedMembers.length === 0 ? (
                         <div className="rk-card p-8 text-center">
                             <LucideTrophy className="w-10 h-10 text-black/25 mx-auto mb-3" />
-                            <div className="text-[15px] font-semibold text-[rgba(0,0,0,0.87)]">아직 랭킹이 없습니다</div>
+                            <div className="text-[15px] font-semibold text-[rgba(0,0,0,0.87)]">{t("ranking.empty")}</div>
                             <p className="text-[13px] text-black/55 mt-1">
-                                {currentSport === "GOLF" ? "라운드 기록이 쌓이면 순위가 표시됩니다" : "경기 기록이 쌓이면 순위가 표시됩니다"}
+                                {currentSport === "GOLF" ? t("ranking.emptyGolfDesc") : t("ranking.emptyDesc")}
                             </p>
                         </div>
                     ) : (
@@ -186,7 +188,7 @@ export default function HiqRanking() {
                                                 {rankingScope !== "store" && flagEmoji(rank.countryCode) && <span className="text-[15px]">{flagEmoji(rank.countryCode)}</span>}
                                                 <span className="font-semibold text-[16px]">{rank.name}</span>
                                                 {rank.handle && <span className="text-[12px] font-medium text-black/40">@{rank.handle}</span>}
-                                                {rank.id === member?.id && <span className="px-1.5 py-0.5 bg-brand/15 rounded text-[12px] font-semibold text-brand border border-brand/25">내 순위</span>}
+                                                {rank.id === member?.id && <span className="px-1.5 py-0.5 bg-brand/15 rounded text-[12px] font-semibold text-brand border border-brand/25">{t("ranking.myRank")}</span>}
                                             </div>
                                             <div className="flex items-center gap-1.5 mt-1">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-brand" />
@@ -196,7 +198,7 @@ export default function HiqRanking() {
                                     </div>
                                     <div className="text-right">
                                         <div className="text-[12px] font-medium text-black/55 mb-1">
-                                            {currentSport === "GOLF" ? "평균 타수" : "핸디"}
+                                            {currentSport === "GOLF" ? t("ranking.golfAvgScore") : t("ranking.handicap")}
                                         </div>
                                         <div className="font-bold text-[22px] tabular-nums flex items-baseline gap-1 justify-end">
                                             {currentSport === "GOLF"
@@ -206,7 +208,7 @@ export default function HiqRanking() {
                                                 })()
                                                 : (rankingTab === "3c" ? rank.handi3c : rank.handi4c)}
                                             <span className="text-[12px] font-medium text-black/55">
-                                                {currentSport === "GOLF" ? "" : "점"}
+                                                {currentSport === "GOLF" ? "" : t("ranking.pointUnit")}
                                             </span>
                                         </div>
                                     </div>

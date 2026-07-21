@@ -8,8 +8,10 @@ import { LucideCheckCircle2, LucideXCircle, LucideLoader2 } from "@/lib/icons";
 import { HiqMember } from "@shared/schema";
 import { useStore } from "@/contexts/StoreContext";
 import { useToast } from "@/hooks/use-toast";
+import { useT } from "@/lib/i18n";
 
 export default function HiqJoin() {
+    const { t } = useT();
     const [, params] = useRoute("/join/:code");
     const code = params?.code;
     const [, setLocation] = useLocation();
@@ -38,8 +40,8 @@ export default function HiqJoin() {
         onError: () => {
             toast({
                 variant: "destructive",
-                title: "입장 실패",
-                description: "만료되었거나 유효하지 않은 초대입니다.",
+                title: t("join.failTitle"),
+                description: t("join.failDesc"),
             });
         }
     });
@@ -60,16 +62,16 @@ export default function HiqJoin() {
                 <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                     <LucideXCircle className="w-10 h-10 text-red-500" />
                 </div>
-                <h2 className="text-[22px] font-bold">로그인이 필요합니다</h2>
+                <h2 className="text-[22px] font-bold">{t("join.loginRequired")}</h2>
                 <p className="text-[14px] text-black/55 leading-relaxed">
-                    게임을 함께 하려면 먼저 로그인이 필요합니다.<br />
-                    로그인 후 다시 QR코드를 스캔해주세요.
+                    {t("join.loginRequiredDesc1")}<br />
+                    {t("join.loginRequiredDesc2")}
                 </p>
                 <Button
                     className="w-full h-14 text-lg font-bold rk-btn-primary rounded-tile"
                     onClick={() => setLocation("/?redirect=" + encodeURIComponent(`/join/${code}`))}
                 >
-                    로그인 하러 가기
+                    {t("join.goLogin")}
                 </Button>
             </div>
         );
@@ -83,8 +85,8 @@ export default function HiqJoin() {
                 <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                     <LucideXCircle className="w-10 h-10 text-red-500" />
                 </div>
-                <h2 className="text-[22px] font-bold">유효하지 않은 초대</h2>
-                <p className="text-[14px] text-black/55 leading-relaxed">이미 만료되었거나 완료된 초대입니다.</p>
+                <h2 className="text-[22px] font-bold">{t("join.invalidInvite")}</h2>
+                <p className="text-[14px] text-black/55 leading-relaxed">{t("join.invalidInviteDesc")}</p>
             </div>
         );
     }
@@ -95,10 +97,10 @@ export default function HiqJoin() {
                 <div className="w-24 h-24 mx-auto bg-brand rounded-card flex items-center justify-center mb-6">
                     <span className="text-4xl">🎱</span>
                 </div>
-                <h1 className="text-[26px] font-bold tracking-tight mb-2">게임 입장하기</h1>
+                <h1 className="text-[26px] font-bold tracking-tight mb-2">{t("join.title")}</h1>
                 <p className="text-[15px] text-black/55 leading-relaxed">
-                    <span className="text-brand font-bold">{me.name}</span>님, <br />
-                    방장의 게임에 참여하시겠습니까?
+                    <span className="text-brand font-bold">{me.name}</span>{t("join.greetingSuffix")}<br />
+                    {t("join.question")}
                 </p>
             </div>
 
@@ -106,8 +108,8 @@ export default function HiqJoin() {
                 {joinMutation.isSuccess ? (
                     <div className="p-6 bg-brand/10 border border-brand/20 rounded-tile animate-in zoom-in">
                         <LucideCheckCircle2 className="w-12 h-12 text-brand mx-auto mb-2" />
-                        <h3 className="text-xl font-bold text-brand">참여 완료!</h3>
-                        <p className="text-sm text-black/55 mt-1">방장의 화면을 확인해주세요.</p>
+                        <h3 className="text-xl font-bold text-brand">{t("join.joinedTitle")}</h3>
+                        <p className="text-sm text-black/55 mt-1">{t("join.joinedDesc")}</p>
                     </div>
                 ) : (
                     <Button
@@ -116,7 +118,7 @@ export default function HiqJoin() {
                         onClick={() => joinMutation.mutate()}
                         disabled={joinMutation.isPending}
                     >
-                        {joinMutation.isPending ? "입장 중..." : "네, 입장할게요!"}
+                        {joinMutation.isPending ? t("join.joining") : t("join.joinConfirm")}
                     </Button>
                 )}
 
@@ -126,7 +128,7 @@ export default function HiqJoin() {
                         onClick={() => setLocation("/dashboard")}
                         className="text-black/55 text-[14px] font-medium h-12"
                     >
-                        취소
+                        {t("join.cancel")}
                     </Button>
                 )}
             </div>

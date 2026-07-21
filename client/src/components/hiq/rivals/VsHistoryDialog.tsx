@@ -9,6 +9,7 @@ import { HiqMemberWithH2H } from "./types";
 import { Button } from "@/components/ui/button";
 import { RadialGauge } from "@/components/hiq/ui/RadialGauge";
 import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
+import { useT } from "@/lib/i18n";
 
 interface VsHistoryDialogProps {
     friendId: string | null;
@@ -29,6 +30,7 @@ export const VsHistoryDialog = ({
     isLoading,
     me
 }: VsHistoryDialogProps) => {
+    const { t } = useT();
     const myId = me?.id;
     const games = vsGames ?? [];
     const totalVs = games.length;
@@ -50,7 +52,7 @@ export const VsHistoryDialog = ({
                         VS {friend?.name}
                     </DialogTitle>
                     <DialogDescription className="text-black/55 text-[13px] font-medium mt-1">
-                        상대와의 맞대결 전적
+                        {t("vsHistoryDialog.description")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -62,32 +64,32 @@ export const VsHistoryDialog = ({
                                     <div className="text-[22px] font-bold text-ink-1 tabular-nums">
                                         {vsWinRate}<span className="text-[13px] font-semibold text-black/60">%</span>
                                     </div>
-                                    <div className="text-[12px] font-medium text-black/55 mt-1">승률</div>
+                                    <div className="text-[12px] font-medium text-black/55 mt-1">{t("vsHistoryDialog.winRate")}</div>
                                 </div>
                             </RadialGauge>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-4 mb-3.5">
                                     <div>
                                         <div className="text-[20px] font-bold text-brand tabular-nums leading-none">{vsWins}</div>
-                                        <div className="text-[12px] text-black/55 font-medium mt-1">승</div>
+                                        <div className="text-[12px] text-black/55 font-medium mt-1">{t("vsHistoryDialog.win")}</div>
                                     </div>
                                     <div className="w-px h-8 bg-black/10" />
                                     <div>
                                         <div className="text-[20px] font-bold text-red-500 tabular-nums leading-none">{vsLosses}</div>
-                                        <div className="text-[12px] text-black/55 font-medium mt-1">패</div>
+                                        <div className="text-[12px] text-black/55 font-medium mt-1">{t("vsHistoryDialog.loss")}</div>
                                     </div>
                                     {vsDraws > 0 && (
                                         <>
                                             <div className="w-px h-8 bg-black/10" />
                                             <div>
                                                 <div className="text-[20px] font-bold text-black/60 tabular-nums leading-none">{vsDraws}</div>
-                                                <div className="text-[12px] text-black/55 font-medium mt-1">무</div>
+                                                <div className="text-[12px] text-black/55 font-medium mt-1">{t("vsHistoryDialog.draw")}</div>
                                             </div>
                                         </>
                                     )}
                                 </div>
                                 <div>
-                                    <div className="text-[12px] font-medium text-black/55 mb-1.5">최근 {vsForm.length}경기</div>
+                                    <div className="text-[12px] font-medium text-black/55 mb-1.5">{t("vsHistoryDialog.recentPrefix")}{vsForm.length}{t("vsHistoryDialog.recentSuffix")}</div>
                                     <FormBadges results={vsForm} size={24} />
                                 </div>
                             </div>
@@ -118,7 +120,7 @@ export const VsHistoryDialog = ({
 
                             const isWin = game.winnerId === myId;
                             const isLoss = game.winnerId === friendId;
-                            const resultLabel = isWin ? '승' : (isLoss ? '패' : '무');
+                            const resultLabel = isWin ? t("vsHistoryDialog.win") : (isLoss ? t("vsHistoryDialog.loss") : t("vsHistoryDialog.draw"));
                             const resultColor = isWin ? 'text-brand' : (isLoss ? 'text-red-500' : 'text-black/40');
                             const resultBg = isWin ? 'bg-brand/12' : (isLoss ? 'bg-red-500/12' : 'bg-black/[0.06]');
 
@@ -135,12 +137,12 @@ export const VsHistoryDialog = ({
                                             </span>
                                         </div>
                                         <div className="flex items-baseline gap-1">
-                                            <span className="text-[13px] font-semibold text-black/60">{game.gameType === '3c' ? '3구' : '4구'}</span>
+                                            <span className="text-[13px] font-semibold text-black/60">{game.gameType === '3c' ? t("vsHistoryDialog.threeCushion") : t("vsHistoryDialog.fourBall")}</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <div className="text-right">
-                                            <p className="text-[12px] font-medium text-black/55">점수 (나 : 상대)</p>
+                                            <p className="text-[12px] font-medium text-black/55">{t("vsHistoryDialog.scoreLabel")}</p>
                                             <p className="text-[20px] font-bold text-ink-1 tabular-nums">
                                                 {myScore} : {friendScore}
                                             </p>
@@ -151,7 +153,7 @@ export const VsHistoryDialog = ({
                         })
                     ) : (
                         <div className="py-12 text-center text-black/55">
-                            <p className="text-[13px] font-medium">대결 기록이 없습니다</p>
+                            <p className="text-[13px] font-medium">{t("vsHistoryDialog.noRecords")}</p>
                         </div>
                     )}
                 </div>
@@ -161,7 +163,7 @@ export const VsHistoryDialog = ({
                         onClick={onClose}
                         className="w-full h-14 rk-btn-secondary rounded-tile active:scale-95"
                     >
-                        닫기
+                        {t("vsHistoryDialog.close")}
                     </Button>
                 </div>
             </DialogContent>

@@ -13,17 +13,28 @@ import { insertHiqMemberSchema, type InsertHiqMember } from "../../../../shared/
 import { LucideChevronRight, LucideCheckCircle2, LucideSparkles } from "@/lib/icons";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const STEPS = [
-    { id: "personal", title: "본인 확인", desc: "당구장에서 사용할 이름을 알려주세요." },
-    { id: "password", title: "비밀번호 설정", desc: "내 점수를 보호하기 위해 비밀번호를 설정합니다." },
-    { id: "security", title: "보안 질문", desc: "비밀번호를 잊었을 때 찾기 위한 질문입니다." },
-    { id: "gender", title: "성별 선택", desc: "성별에 맞는 랭킹 시스템이 적용됩니다." },
-    { id: "birth", title: "출생년도", desc: "연령별 랭킹 산정에 활용됩니다." },
-    { id: "terms", title: "약관 동의", desc: "마지막 단계입니다!" }
+    { id: "personal", title: "register.stepPersonalTitle", desc: "register.stepPersonalDesc" },
+    { id: "password", title: "register.stepPasswordTitle", desc: "register.stepPasswordDesc" },
+    { id: "security", title: "register.stepSecurityTitle", desc: "register.stepSecurityDesc" },
+    { id: "gender", title: "register.stepGenderTitle", desc: "register.stepGenderDesc" },
+    { id: "birth", title: "register.stepBirthTitle", desc: "register.stepBirthDesc" },
+    { id: "terms", title: "register.stepTermsTitle", desc: "register.stepTermsDesc" }
+];
+
+// 보안 질문 — value는 서버 저장값(원문 유지), key는 화면 표시용 번역 키
+const SECURITY_QUESTIONS = [
+    { value: "내가 태어난 도시는 어디인가요?", key: "register.secQ1" },
+    { value: "가장 기억에 남는 반려동물의 이름은?", key: "register.secQ2" },
+    { value: "나의 보물 1호는 무엇인가요?", key: "register.secQ3" },
+    { value: "가장 좋아하는 스포츠 팀은?", key: "register.secQ4" },
+    { value: "부모님 함자 성함은?", key: "register.secQ5" }
 ];
 
 export default function HiqRegister() {
+    const { t } = useT();
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const [currentStep, setCurrentStep] = useState(0);
@@ -112,8 +123,8 @@ export default function HiqRegister() {
         } catch (error) {
             toast({
                 variant: "destructive",
-                title: "오류",
-                description: "회원가입 중 오류가 발생했습니다.",
+                title: t("register.errorTitle"),
+                description: t("register.errorDesc"),
             });
         } finally {
             setIsSubmitting(false);
@@ -135,9 +146,9 @@ export default function HiqRegister() {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-[26px] font-bold tracking-tight mb-4"
                 >
-                    환영합니다!
+                    {t("register.welcome")}
                 </motion.h1>
-                <p className="text-[15px] font-medium text-black/55">당구장 멤버십이 활성화되었습니다.</p>
+                <p className="text-[15px] font-medium text-black/55">{t("register.membershipActivated")}</p>
                 <div className="mt-12 flex gap-2">
                     {[1, 2, 3, 4, 5].map(i => (
                         <motion.div
@@ -184,12 +195,12 @@ export default function HiqRegister() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                     >
-                        <span className="font-semibold text-[13px] mb-2 block text-brand tabular-nums">{currentStep + 1} / {STEPS.length} 단계</span>
+                        <span className="font-semibold text-[13px] mb-2 block text-brand tabular-nums">{currentStep + 1} / {STEPS.length} {t("register.stepSuffix")}</span>
                         <h1 className="text-[26px] font-bold tracking-tight mb-3 text-[rgba(0,0,0,0.87)] leading-tight">
-                            {STEPS[currentStep].title}
+                            {t(STEPS[currentStep].title)}
                         </h1>
                         <p className="text-[15px] text-black/55 font-medium">
-                            {STEPS[currentStep].desc}
+                            {t(STEPS[currentStep].desc)}
                         </p>
                     </motion.div>
                 </div>
@@ -206,17 +217,17 @@ export default function HiqRegister() {
                                 className="space-y-8"
                             >
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-black/55">성함</Label>
+                                    <Label className="text-sm font-medium text-black/55">{t("register.nameLabel")}</Label>
                                     <input
                                         {...register("name")}
-                                        placeholder="이름을 입력하세요"
+                                        placeholder={t("register.namePlaceholder")}
                                         autoFocus
                                         className="w-full bg-transparent border-b-2 border-black/10 focus:border-brand text-center text-3xl font-bold text-[rgba(0,0,0,0.87)] placeholder:text-black/40 py-4 transition-all outline-none"
                                     />
                                     {errors.name && <p className="text-red-500 text-sm font-bold text-center">{errors.name.message}</p>}
                                 </div>
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-black/55">휴대폰 번호</Label>
+                                    <Label className="text-sm font-medium text-black/55">{t("register.phoneLabel")}</Label>
                                     <div className="w-full border-b-2 border-black/10 py-4 flex items-center justify-center text-black/55 text-3xl font-bold tabular-nums">
                                         {phoneFromQuery}
                                     </div>
@@ -233,17 +244,17 @@ export default function HiqRegister() {
                                 className="space-y-4"
                             >
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-black/55">비밀번호 (4자리 이상)</Label>
+                                    <Label className="text-sm font-medium text-black/55">{t("register.passwordLabel")}</Label>
                                     <input
                                         type="password"
                                         {...register("password")}
-                                        placeholder="비밀번호 입력"
+                                        placeholder={t("register.passwordPlaceholder")}
                                         autoFocus
                                         className="w-full bg-transparent border-b-2 border-black/10 focus:border-brand text-center text-3xl font-bold text-[rgba(0,0,0,0.87)] placeholder:text-black/40 py-4 transition-all outline-none"
                                     />
                                     {/* Warn if pwd is too short, but usually we just disable 'Next' */}
                                     {formData.password && formData.password.length < 4 && (
-                                        <p className="text-red-500 text-sm font-bold text-center">4자리 이상 입력해주세요.</p>
+                                        <p className="text-red-500 text-sm font-bold text-center">{t("register.passwordTooShort")}</p>
                                     )}
                                 </div>
                             </motion.div>
@@ -258,38 +269,32 @@ export default function HiqRegister() {
                                 className="space-y-8"
                             >
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-black/55 text-center block">질문 선택</Label>
+                                    <Label className="text-sm font-medium text-black/55 text-center block">{t("register.securityQuestionLabel")}</Label>
                                     <div className="space-y-2 max-h-[240px] overflow-y-auto pr-2 custom-scrollbar">
-                                        {[
-                                            "내가 태어난 도시는 어디인가요?",
-                                            "가장 기억에 남는 반려동물의 이름은?",
-                                            "나의 보물 1호는 무엇인가요?",
-                                            "가장 좋아하는 스포츠 팀은?",
-                                            "부모님 함자 성함은?"
-                                        ].map((q) => (
+                                        {SECURITY_QUESTIONS.map((q) => (
                                             <Button
-                                                key={q}
+                                                key={q.key}
                                                 type="button"
                                                 variant="outline"
                                                 onClick={() => {
-                                                    setValue("securityQuestion", q);
+                                                    setValue("securityQuestion", q.value);
                                                 }}
                                                 className="w-full justify-start text-left py-6 rounded-tile border-black/[0.08] bg-black/[0.04] hover:bg-black/[0.06]"
                                                 style={{
-                                                    borderColor: formData.securityQuestion === q ? "rgb(var(--brand))" : "rgba(0,0,0,0.10)",
-                                                    color: formData.securityQuestion === q ? "rgb(var(--brand))" : "rgba(0,0,0,0.6)"
+                                                    borderColor: formData.securityQuestion === q.value ? "rgb(var(--brand))" : "rgba(0,0,0,0.10)",
+                                                    color: formData.securityQuestion === q.value ? "rgb(var(--brand))" : "rgba(0,0,0,0.6)"
                                                 }}
                                             >
-                                                {q}
+                                                {t(q.key)}
                                             </Button>
                                         ))}
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    <Label className="text-sm font-medium text-black/55 text-center block">정답 입력</Label>
+                                    <Label className="text-sm font-medium text-black/55 text-center block">{t("register.securityAnswerLabel")}</Label>
                                     <Input
                                         {...register("securityAnswer")}
-                                        placeholder="정답을 입력하세요"
+                                        placeholder={t("register.securityAnswerPlaceholder")}
                                         className="w-full bg-transparent border-b-2 border-black/10 focus:border-brand text-center text-2xl font-bold text-[rgba(0,0,0,0.87)] placeholder:text-black/40 py-4 transition-all outline-none h-auto rounded-none border-t-0 border-x-0"
                                     />
                                 </div>
@@ -315,7 +320,7 @@ export default function HiqRegister() {
                                     }}
                                 >
                                     <span className="text-2xl">♂️</span>
-                                    <span className="font-bold text-lg">남성</span>
+                                    <span className="font-bold text-lg">{t("register.male")}</span>
                                 </Button>
                                 <Button
                                     onClick={() => setValue("gender", "female")}
@@ -328,7 +333,7 @@ export default function HiqRegister() {
                                     }}
                                 >
                                     <span className="text-2xl">♀️</span>
-                                    <span className="font-bold text-lg">여성</span>
+                                    <span className="font-bold text-lg">{t("register.female")}</span>
                                 </Button>
                             </motion.div>
                         )}
@@ -347,7 +352,7 @@ export default function HiqRegister() {
                                             key={year}
                                             variant={formData.birthYear === year ? "default" : "outline"}
                                             onClick={() => setValue("birthYear", year)}
-                                            title={`${year}년생`}
+                                            title={`${year}${t("register.birthYearSuffix")}`}
                                             className="h-14 text-lg rounded-tile transition-all tabular-nums"
                                             style={{
                                                 backgroundColor: formData.birthYear === year ? "rgb(var(--brand))" : "transparent",
@@ -381,8 +386,8 @@ export default function HiqRegister() {
                                             disabled={true}
                                         />
                                         <Label htmlFor="essential" className="text-[15px] text-black/60 leading-tight">
-                                            <span className="text-[rgba(0,0,0,0.87)] font-bold block mb-1">[필수] 개인정보 수집 동의</span>
-                                            서비스 이용을 위해 최소한의 정보를 수집합니다.
+                                            <span className="text-[rgba(0,0,0,0.87)] font-bold block mb-1">{t("register.termsRequiredTitle")}</span>
+                                            {t("register.termsRequiredDesc")}
                                         </Label>
                                     </div>
                                     <div className="flex items-start gap-4">
@@ -392,8 +397,8 @@ export default function HiqRegister() {
                                             onCheckedChange={(checked) => setValue("marketingAgree", !!checked)}
                                         />
                                         <Label htmlFor="marketing" className="text-[15px] text-black/60 leading-tight">
-                                            <span className="text-black/70 font-bold block mb-1">[선택] 마케팅 정보 수신</span>
-                                            매장 이벤트 및 혜택 정보를 보내드려요.
+                                            <span className="text-black/70 font-bold block mb-1">{t("register.termsMarketingTitle")}</span>
+                                            {t("register.termsMarketingDesc")}
                                         </Label>
                                     </div>
                                 </div>
@@ -409,30 +414,30 @@ export default function HiqRegister() {
                         onClick={prevStep}
                         className="flex-1 h-16 text-lg font-bold bg-black/[0.04] text-black/55 hover:text-[rgba(0,0,0,0.87)] rounded-2xl active:scale-95 transition-all"
                     >
-                        이전
+                        {t("register.prev")}
                     </Button>
 
                     {currentStep === STEPS.length - 1 ? (
                         <Button
                             onClick={handleSubmit(onSubmit)}
                             disabled={isSubmitting}
-                            title="가입 완료"
+                            title={t("register.submit")}
                             className="flex-[2] h-16 text-xl font-semibold rk-btn-primary rounded-2xl active:scale-95 transition-all"
                         >
-                            {isSubmitting ? "처리 중..." : "가입 완료"}
+                            {isSubmitting ? t("register.submitting") : t("register.submit")}
                         </Button>
                     ) : (
 
                         <Button
                             onClick={nextStep}
                             disabled={!stepValid}
-                            title="다음 단계"
+                            title={t("register.nextStepTitle")}
                             className={cn(
                                 "flex-[2] h-16 text-xl font-semibold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all outline-none",
                                 stepValid ? "rk-btn-primary" : "bg-black/[0.06] text-black/40"
                             )}
                         >
-                            다음 <LucideChevronRight className="w-6 h-6" />
+                            {t("register.next")} <LucideChevronRight className="w-6 h-6" />
                         </Button>
                     )}
                 </div>

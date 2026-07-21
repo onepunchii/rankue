@@ -1,0 +1,170 @@
+{
+  "trendChartCard.title": {
+    "ko": "평균 추이",
+    "en": "Average Trend",
+    "vi": "Xu hướng điểm trung bình",
+    "tr": "Ortalama Trendi",
+    "es": "Tendencia de promedio"
+  },
+  "trendChartCard.subtitle": {
+    "ko": "최근 10경기 평균 변화",
+    "en": "Average over your last 10 games",
+    "vi": "Thay đổi trung bình 10 trận gần nhất",
+    "tr": "Son 10 maçtaki ortalama değişimi",
+    "es": "Cambio del promedio en los últimos 10 partidos"
+  },
+  "trendChartCard.tab3c": {
+    "ko": "3쿠션",
+    "en": "3-Cushion",
+    "vi": "3 băng",
+    "tr": "3 Bant",
+    "es": "3 bandas"
+  },
+  "trendChartCard.tab4b": {
+    "ko": "4구",
+    "en": "4-Ball",
+    "vi": "4 bi",
+    "tr": "4 Top",
+    "es": "4 bolas"
+  },
+  "trendChartCard.chart3cTitle": {
+    "ko": "3쿠션 평균",
+    "en": "3-Cushion Average",
+    "vi": "Trung bình 3 băng",
+    "tr": "3 Bant Ortalaması",
+    "es": "Promedio de 3 bandas"
+  },
+  "trendChartCard.chart3cSubtitle": {
+    "ko": "대대 3쿠션",
+    "en": "3-Cushion · Full table",
+    "vi": "3 băng · bàn lớn",
+    "tr": "3 Bant · Büyük masa",
+    "es": "3 bandas · mesa grande"
+  },
+  "trendChartCard.chart4cTitle": {
+    "ko": "4구 평균",
+    "en": "4-Ball Average",
+    "vi": "Trung bình 4 bi",
+    "tr": "4 Top Ortalaması",
+    "es": "Promedio de 4 bolas"
+  },
+  "trendChartCard.chart4cSubtitle": {
+    "ko": "중대 4구",
+    "en": "4-Ball · Mid table",
+    "vi": "4 bi · bàn trung",
+    "tr": "4 Top · Orta masa",
+    "es": "4 bolas · mesa mediana"
+  },
+  "inningHistoryModal.title": {
+    "ko": "이닝별 기록",
+    "en": "Inning History",
+    "vi": "Lịch sử từng lượt cơ",
+    "tr": "El Bazında Kayıt",
+    "es": "Historial por entrada"
+  },
+  "inningHistoryModal.description": {
+    "ko": "이번 경기의 이닝당 득점 분포입니다.",
+    "en": "Points scored per inning in this game.",
+    "vi": "Phân bố điểm theo từng lượt cơ trong trận này.",
+    "tr": "Bu maçta el başına puan dağılımı.",
+    "es": "Distribución de puntos por entrada en este partido."
+  },
+  "inningHistoryModal.scoreTrend": {
+    "ko": "이닝별 점수 추이",
+    "en": "Score by inning",
+    "vi": "Điểm theo từng lượt cơ",
+    "tr": "El bazında skor",
+    "es": "Puntos por entrada"
+  },
+  "inningHistoryModal.totalInningsPrefix": {
+    "ko": "총 ",
+    "en": "",
+    "vi": "Tổng ",
+    "tr": "Toplam ",
+    "es": "Total: "
+  },
+  "inningHistoryModal.totalInningsSuffix": {
+    "ko": "이닝",
+    "en": " innings total",
+    "vi": " lượt cơ",
+    "tr": " el",
+    "es": " entradas"
+  },
+  "inningHistoryModal.emptyLine1": {
+    "ko": "이닝별 상세 기록은 경기 종료 후",
+    "en": "Detailed inning stats will be available",
+    "vi": "Chi tiết từng lượt cơ sẽ hiển thị",
+    "tr": "El bazında detaylı kayıt, maç bittikten",
+    "es": "Las estadísticas por entrada estarán disponibles"
+  },
+  "inningHistoryModal.emptyLine2": {
+    "ko": "결과 화면에서 확인할 수 있습니다.",
+    "en": "on the results screen after the game.",
+    "vi": "trên màn hình kết quả sau trận đấu.",
+    "tr": "sonra sonuç ekranında görüntülenir.",
+    "es": "en la pantalla de resultados al terminar."
+  },
+  "inningHistoryModal.close": {
+    "ko": "닫기",
+    "en": "Close",
+    "vi": "Đóng",
+    "tr": "Kapat",
+    "es": "Cerrar"
+  },
+  "playerCard.defaultName": {
+    "ko": "선수",
+    "en": "Player",
+    "vi": "Cơ thủ",
+    "tr": "Oyuncu",
+    "es": "Jugador"
+  },
+  "playerCard.solo": {
+    "ko": "솔로",
+    "en": "Solo",
+    "vi": "Solo",
+    "tr": "Solo",
+    "es": "Solo"
+  },
+  "playerCard.target": {
+    "ko": "목표",
+    "en": "Target",
+    "vi": "Mục tiêu",
+    "tr": "Hedef",
+    "es": "Objetivo"
+  },
+  "playerCard.streak": {
+    "ko": "연속",
+    "en": "run",
+    "vi": "liên tiếp",
+    "tr": "seri",
+    "es": "seguidas"
+  },
+  "playerCard.finish": {
+    "ko": "피니시",
+    "en": "FINISH",
+    "vi": "KẾT THÚC",
+    "tr": "BİTİŞ",
+    "es": "FINAL"
+  },
+  "playerCard.average": {
+    "ko": "평균",
+    "en": "Avg",
+    "vi": "TB",
+    "tr": "Ort.",
+    "es": "Prom."
+  },
+  "playerCard.highRun": {
+    "ko": "하이런",
+    "en": "High Run",
+    "vi": "Sê-ri cao nhất",
+    "tr": "En Uzun Seri",
+    "es": "Serie máxima"
+  },
+  "playerCard.endInning": {
+    "ko": "이닝 종료",
+    "en": "End Inning",
+    "vi": "Kết thúc lượt",
+    "tr": "Eli Bitir",
+    "es": "Terminar entrada"
+  }
+}

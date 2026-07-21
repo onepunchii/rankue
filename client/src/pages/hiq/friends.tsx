@@ -10,6 +10,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { useStore } from "@/contexts/StoreContext";
 import { useToast } from "@/hooks/use-toast";
 import { useSport } from "@/contexts/SportContext";
+import { useT } from "@/lib/i18n";
 
 // Sub-components
 import { RecentOpponentsSlider } from "@/components/hiq/rivals/RecentOpponents";
@@ -26,6 +27,7 @@ import {
 } from "@/components/hiq/rivals/types";
 
 export default function HiqRivals() {
+    const { t } = useT();
     const [, setLocation] = useLocation();
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
@@ -63,8 +65,8 @@ export default function HiqRivals() {
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/friends"] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/friends/recent-opponents"] });
             toast({
-                title: currentSport === "GOLF" ? "골프 친구 추가 완료" : "라이벌 추가 완료",
-                description: currentSport === "GOLF" ? "이제 함께 라운딩을 즐길 수 있습니다." : "이제 대결 상대로 선택할 수 있습니다.",
+                title: currentSport === "GOLF" ? t("friends.golfFriendAdded") : t("friends.rivalAdded"),
+                description: currentSport === "GOLF" ? t("friends.golfFriendAddedDesc") : t("friends.rivalAddedDesc"),
             });
         }
     });
@@ -108,7 +110,7 @@ export default function HiqRivals() {
                             {config.title}
                         </h1>
                         <p className="text-[13px] font-medium text-black/55 mt-1">
-                            함께 겨룰 상대를 관리하세요
+                            {t("friends.subtitle")}
                         </p>
                     </div>
                 </div>

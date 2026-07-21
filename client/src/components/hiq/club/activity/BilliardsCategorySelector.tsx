@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 export type BilliardsCategory =
     | "REGULAR_BILLIARDS"
@@ -12,22 +13,23 @@ interface BilliardsCategorySelectorProps {
 }
 
 export const BilliardsCategorySelector = ({ selected, onSelect }: BilliardsCategorySelectorProps) => {
+    const { t } = useT();
 
     const categories = [
         {
-            id: "REGULAR_BILLIARDS", label: "정기 모임", desc: "월례회",
+            id: "REGULAR_BILLIARDS", label: "billiardsCategorySelector.regularLabel", desc: "billiardsCategorySelector.regularDesc",
             classes: { border: "border-brand", text: "text-brand", bg: "bg-brand" }
         },
         {
-            id: "BLITZ_BILLIARDS", label: "번개 모임", desc: "즉석 조인",
+            id: "BLITZ_BILLIARDS", label: "billiardsCategorySelector.blitzLabel", desc: "billiardsCategorySelector.blitzDesc",
             classes: { border: "border-[#EAB308]", text: "text-[#EAB308]", bg: "bg-[#EAB308]" }
         },
         {
-            id: "BILLIARDS_TOURNAMENT", label: "당구 대회", desc: "리그/토너먼트",
+            id: "BILLIARDS_TOURNAMENT", label: "billiardsCategorySelector.tournamentLabel", desc: "billiardsCategorySelector.tournamentDesc",
             classes: { border: "border-[#F97316]", text: "text-[#F97316]", bg: "bg-[#F97316]" }
         },
         {
-            id: "AFTER_PARTY", label: "뒷풀이", desc: "회식",
+            id: "AFTER_PARTY", label: "billiardsCategorySelector.afterPartyLabel", desc: "billiardsCategorySelector.afterPartyDesc",
             classes: { border: "border-[#EC4899]", text: "text-[#EC4899]", bg: "bg-[#EC4899]" }
         }
     ] as const;
@@ -52,13 +54,13 @@ export const BilliardsCategorySelector = ({ selected, onSelect }: BilliardsCateg
                             "text-xs font-semibold text-center leading-tight transition-colors",
                             isSelected ? "text-ink-1" : "text-ink-3"
                         )}>
-                            {cat.label}
+                            {t(cat.label)}
                         </span>
                         <span className={cn(
                             "text-xs font-medium mt-0.5",
                             isSelected ? cat.classes.text : "text-ink-3"
                         )}>
-                            {cat.desc}
+                            {t(cat.desc)}
                         </span>
                     </button>
                 );

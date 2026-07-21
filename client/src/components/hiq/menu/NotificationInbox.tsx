@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface NotificationInboxProps {
     open: boolean;
@@ -13,6 +14,7 @@ interface NotificationInboxProps {
 }
 
 export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
+    const { t } = useT();
     const [, setLocation] = useLocation();
     const queryClient = useQueryClient();
 
@@ -78,13 +80,13 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                     <LucideBell className="w-5 h-5 text-brand" />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold text-ink-1">알림함</h2>
-                                    <p className="text-[12px] text-black/55">받은 알림을 모아봅니다</p>
+                                    <h2 className="text-lg font-bold text-ink-1">{t("notificationInbox.title")}</h2>
+                                    <p className="text-[12px] text-black/55">{t("notificationInbox.subtitle")}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={onClose}
-                                title="닫기"
+                                title={t("notificationInbox.close")}
                                 className="w-10 h-10 rounded-full hover:bg-black/[0.04] flex items-center justify-center transition-colors"
                             >
                                 <LucideX className="w-5 h-5 text-black/40" />
@@ -96,12 +98,12 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                             {isLoading ? (
                                 <div className="flex flex-col items-center justify-center py-20 text-black/40">
                                     <div className="w-8 h-8 rounded-full border-2 border-black/15 border-t-brand animate-spin mb-4" />
-                                    <p className="text-sm">알림을 불러오는 중...</p>
+                                    <p className="text-sm">{t("notificationInbox.loading")}</p>
                                 </div>
                             ) : notifications?.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-20 text-black/30">
                                     <LucideBell className="w-12 h-12 mb-4" />
-                                    <p className="text-sm">알림 내역이 없습니다</p>
+                                    <p className="text-sm">{t("notificationInbox.empty")}</p>
                                 </div>
                             ) : (
                                 notifications?.map((notif) => (
@@ -123,7 +125,7 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="text-[12px] font-bold text-brand uppercase tracking-wider">
-                                                    {notif.type || '알림'}
+                                                    {notif.type || t("notificationInbox.defaultType")}
                                                 </span>
                                                 <span className="text-[12px] text-black/40">
                                                     {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true, locale: ko })}
@@ -139,7 +141,7 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                                     e.stopPropagation();
                                                     deleteMutation.mutate(notif.id);
                                                 }}
-                                                title="삭제"
+                                                title={t("notificationInbox.delete")}
                                                 className="p-2 rounded-lg hover:bg-red-500/10 text-black/40 hover:text-red-500 transition-all"
                                             >
                                                 <LucideTrash2 className="w-4 h-4" />
@@ -159,8 +161,8 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                             await apiRequest("/api/hiq/test-notification", {
                                                 method: "POST",
                                                 body: JSON.stringify({
-                                                    title: "🚀 기능 활성화 완료",
-                                                    body: "이제부터 받는 모든 알림이 여기에 기록됩니다.",
+                                                    title: t("notificationInbox.testTitle"),
+                                                    body: t("notificationInbox.testBody"),
                                                     type: "NOTICE"
                                                 })
                                             });
@@ -171,7 +173,7 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                     }}
                                     className="px-4 py-2 rounded-full bg-black/[0.04] text-[12px] text-black/55 hover:bg-black/[0.06] transition-colors"
                                 >
-                                    테스트 알림 받기
+                                    {t("notificationInbox.testButton")}
                                 </button>
                             </div>
                         </div>

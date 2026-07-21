@@ -38,8 +38,10 @@ import { getTier } from "@/lib/hiqUtils";
 import { InfoModal, InfoModalType } from "@/components/hiq/menu/InfoModal";
 import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 
 export default function HiqMenu() {
+    const { t } = useT();
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -79,11 +81,11 @@ export default function HiqMenu() {
             });
         },
         onSuccess: () => {
-            toast({ title: "프로필 사진이 업데이트되었습니다" });
+            toast({ title: t("menu.profilePhotoUpdated") });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
         },
         onError: (err: Error) => {
-            toast({ title: "업데이트 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("menu.updateFailed"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -103,11 +105,11 @@ export default function HiqMenu() {
             });
         },
         onSuccess: () => {
-            toast({ title: "평균 데이터가 재계산되었습니다" });
+            toast({ title: t("menu.avgRecalculated") });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
         },
         onError: (err: Error) => {
-            toast({ title: "재계산 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("menu.recalcFailed"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -121,7 +123,7 @@ export default function HiqMenu() {
             const url = await uploadImage(file, 'avatar', { maxSize: 400 });
             updateProfileMutation.mutate({ profileImageUrl: url });
         } catch (err) {
-            toast({ title: "이미지 처리 실패", variant: "destructive" });
+            toast({ title: t("menu.imageProcessFailed"), variant: "destructive" });
         } finally {
             setIsUploading(false);
         }
@@ -137,21 +139,21 @@ export default function HiqMenu() {
 
     // 계정 영구 삭제 — 서버가 개인정보 삭제 + 세션 쿠키 무효화까지 처리한다.
     const handleDeleteAccount = async () => {
-        if (deleteConfirm !== "삭제" || isDeleting) return;
+        if (deleteConfirm !== t("menu.deleteConfirmWord") || isDeleting) return;
         setIsDeleting(true);
         try {
             await apiRequest("/api/hiq/me", { method: "DELETE" });
             queryClient.clear();
-            toast({ title: "계정이 삭제되었습니다", description: "이용해 주셔서 감사합니다." });
+            toast({ title: t("menu.accountDeleted"), description: t("menu.accountDeletedDesc") });
             setLocation("/");
         } catch {
-            toast({ title: "삭제에 실패했습니다", description: "잠시 후 다시 시도해주세요.", variant: "destructive" });
+            toast({ title: t("menu.deleteFailed"), description: t("menu.deleteFailedDesc"), variant: "destructive" });
             setIsDeleting(false);
         }
     };
 
     const tier = currentSport === "GOLF"
-        ? { label: "익스플로러", class: "border-amber-500/50 text-amber-500", icon: "⛳️" }
+        ? { label: t("menu.tierExplorer"), class: "border-amber-500/50 text-amber-500", icon: "⛳️" }
         : getTier(member?.handi4c || 0, false, currentSport);
 
     const sportColor = currentSport === "GOLF" ? "#64DD17" : "#006241";
@@ -169,16 +171,16 @@ export default function HiqMenu() {
 
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between mb-8 pt-5">
-                <h1 className="text-[26px] font-bold tracking-tight text-ink-1">전체 메뉴</h1>
+                <h1 className="text-[26px] font-bold tracking-tight text-ink-1">{t("menu.title")}</h1>
                 <div className="flex gap-2.5">
                     <button
-                        title="알림"
+                        title={t("menu.notifications")}
                         onClick={() => setNotifOpen(true)}
                         className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center active:scale-95 transition-transform"
                     >
                         <LucideBell className="w-5 h-5 text-black/55" />
                     </button>
-                    <button title="설정" onClick={() => setLocation("/settings")} className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center active:scale-95 transition-transform">
+                    <button title={t("menu.settings")} onClick={() => setLocation("/settings")} className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center active:scale-95 transition-transform">
                         <LucideSettings className="w-5 h-5 text-black/55" />
                     </button>
                 </div>
@@ -225,8 +227,8 @@ export default function HiqMenu() {
                                 <div className="flex items-center gap-2 mb-1.5">
                                     <input
                                         type="text"
-                                        aria-label="이름 수정"
-                                        placeholder="이름"
+                                        aria-label={t("menu.editName")}
+                                        placeholder={t("menu.namePlaceholder")}
                                         value={newName}
                                         onChange={(e) => setNewName(e.target.value)}
                                         className="bg-transparent border-b border-black/25 text-[19px] font-bold text-ink-1 w-full max-w-[150px] outline-none"
@@ -235,10 +237,10 @@ export default function HiqMenu() {
                                             if (e.key === 'Enter') handleSaveName();
                                         }}
                                     />
-                                    <button title="저장" disabled={updateProfileMutation.isPending} onClick={handleSaveName} className="w-10 h-10 -m-2 flex items-center justify-center rounded-full active:bg-black/[0.06] shrink-0 disabled:opacity-40">
+                                    <button title={t("menu.save")} disabled={updateProfileMutation.isPending} onClick={handleSaveName} className="w-10 h-10 -m-2 flex items-center justify-center rounded-full active:bg-black/[0.06] shrink-0 disabled:opacity-40">
                                         <LucideCheck className="w-4 h-4 text-brand" />
                                     </button>
-                                    <button title="취소" onClick={() => setIsEditingName(false)} className="w-10 h-10 -m-2 flex items-center justify-center rounded-full active:bg-black/[0.06] shrink-0">
+                                    <button title={t("menu.cancel")} onClick={() => setIsEditingName(false)} className="w-10 h-10 -m-2 flex items-center justify-center rounded-full active:bg-black/[0.06] shrink-0">
                                         <LucideX className="w-4 h-4 text-red-500" />
                                     </button>
                                 </div>
@@ -246,10 +248,10 @@ export default function HiqMenu() {
                                 <div className="flex items-center gap-2 mb-1.5">
                                     <h2 className="text-[19px] font-bold text-ink-1 tracking-tight truncate">
                                         {flagEmoji(member?.countryCode) && <span className="mr-1 text-[17px]">{flagEmoji(member?.countryCode)}</span>}
-                                        {member?.nickname || member?.name || "사용자"}
-                                        <span className="text-[15px] font-medium text-black/40 ml-0.5">님</span>
+                                        {member?.nickname || member?.name || t("menu.defaultUser")}
+                                        <span className="text-[15px] font-medium text-black/40 ml-0.5">{t("menu.honorific")}</span>
                                     </h2>
-                                    <button title="이름 수정" onClick={() => setIsEditingName(true)} className="w-10 h-10 -m-2 flex items-center justify-center rounded-full text-black/55 active:bg-black/[0.06] transition-colors shrink-0">
+                                    <button title={t("menu.editName")} onClick={() => setIsEditingName(true)} className="w-10 h-10 -m-2 flex items-center justify-center rounded-full text-black/55 active:bg-black/[0.06] transition-colors shrink-0">
                                         <LucidePencil className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -263,7 +265,7 @@ export default function HiqMenu() {
                                         <span className="w-1 h-1 rounded-full bg-black/25" />
                                     </>
                                 )}
-                                <span className="text-[13px] font-medium text-black/55">일반 회원</span>
+                                <span className="text-[13px] font-medium text-black/55">{t("menu.regularMember")}</span>
                                 <span className="w-1 h-1 rounded-full bg-black/25" />
                                 <span className="text-[13px] font-medium text-black/40">Lv.{Math.floor((member?.visitCount || 0) / 5) + 1}</span>
                             </div>
@@ -273,11 +275,11 @@ export default function HiqMenu() {
                     {/* 숨김 처리 — 추후 재노출 시 false → true */}
                     {false && (
                     <Button
-                        onClick={() => toast({ title: "서비스 준비 중", description: "프리미엄 멤버십 결제 기능은 추후 업데이트될 예정입니다." })}
+                        onClick={() => toast({ title: t("menu.serviceComingSoon"), description: t("menu.premiumComingSoonDesc") })}
                         className="w-full h-12 mt-6 rounded-tile font-semibold text-[15px] bg-brand text-brand-fg hover:bg-brand active:scale-[0.98] transition-transform border-none shadow-none"
                     >
                         <LucideCrown className="w-4 h-4 mr-2" />
-                        프리미엄 멤버십 시작하기
+                        {t("menu.startPremium")}
                     </Button>
                     )}
                 </div>
@@ -288,10 +290,10 @@ export default function HiqMenu() {
                 <div className="flex items-center gap-3">
                     <div className="flex flex-col gap-2 items-center">
                         <button
-                            title="당구 모드"
+                            title={t("menu.billiardsMode")}
                             onClick={() => {
                                 setSport("BILLIARDS");
-                                toast({ title: "스포츠 모드 변경", description: "당구 모드로 전환되었습니다." });
+                                toast({ title: t("menu.sportModeChanged"), description: t("menu.switchedToBilliards") });
                             }}
                             className={cn(
                                 "w-16 h-16 rounded-2xl flex items-center justify-center transition-all active:scale-90",
@@ -308,7 +310,7 @@ export default function HiqMenu() {
                         <span className={cn(
                             "text-[12px] font-semibold tracking-tight",
                             currentSport === "BILLIARDS" ? "text-brand" : "text-black/45"
-                        )}>당구</span>
+                        )}>{t("menu.billiards")}</span>
                     </div>
 
                     {GOLF_ENABLED && (
@@ -317,10 +319,10 @@ export default function HiqMenu() {
 
                             <div className="flex flex-col gap-2 items-center">
                                 <button
-                                    title="골프 모드"
+                                    title={t("menu.golfMode")}
                                     onClick={() => {
                                         setSport("GOLF");
-                                        toast({ title: "스포츠 모드 변경", description: "골프 모드로 전환되었습니다." });
+                                        toast({ title: t("menu.sportModeChanged"), description: t("menu.switchedToGolf") });
                                     }}
                                     className={cn(
                                         "w-16 h-16 rounded-2xl flex items-center justify-center transition-all active:scale-90",
@@ -337,7 +339,7 @@ export default function HiqMenu() {
                                 <span className={cn(
                                     "text-[12px] font-semibold tracking-tight",
                                     currentSport === "GOLF" ? "text-brand" : "text-black/45"
-                                )}>골프</span>
+                                )}>{t("menu.golf")}</span>
                             </div>
                         </>
                     )}
@@ -346,24 +348,24 @@ export default function HiqMenu() {
 
             {/* Section B: Menu list */}
             <div className="relative z-10 mb-10">
-                <h3 className="text-[15px] font-semibold text-black/55 mb-3 px-1">관리 · 안내</h3>
+                <h3 className="text-[15px] font-semibold text-black/55 mb-3 px-1">{t("menu.manageInfo")}</h3>
                 <div className="flex flex-col gap-2.5">
                     {[
-                        { icon: LucideMail, label: "건의함 · 제휴 문의", desc: "무엇이든 말씀해주세요", onClick: () => setSuggestionOpen(true) },
-                        { icon: LucideInfo, label: "공지사항", desc: "새로운 소식과 공지", onClick: () => openInfoModal('announcement') },
-                        { icon: LucideBriefcase, label: "이용안내", desc: "랭큐 서비스 사용 가이드", onClick: () => openInfoModal('guide') },
-                        { icon: LucideTrophy, label: "랭킹 시스템 안내", desc: "실력 산정 및 등급 기준", onClick: () => openInfoModal('ranking') },
+                        { icon: LucideMail, label: t("menu.suggestionBox"), desc: t("menu.suggestionBoxDesc"), onClick: () => setSuggestionOpen(true) },
+                        { icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') },
+                        { icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') },
+                        { icon: LucideTrophy, label: t("menu.rankingSystem"), desc: t("menu.rankingSystemDesc"), onClick: () => openInfoModal('ranking') },
                         {
                             icon: LucideLogOut,
-                            label: "로그아웃",
-                            desc: "현재 기기에서 계정 연결 해제",
+                            label: t("menu.logout"),
+                            desc: t("menu.logoutDesc"),
                             onClick: handleLogout,
                             danger: true
                         },
                         {
                             icon: LucideUserX,
-                            label: "계정 삭제",
-                            desc: "계정과 개인정보를 영구 삭제",
+                            label: t("menu.deleteAccount"),
+                            desc: t("menu.deleteAccountDesc"),
                             onClick: () => { setDeleteConfirm(""); setDeleteOpen(true); },
                             danger: true
                         },
@@ -398,9 +400,9 @@ export default function HiqMenu() {
             >
                 <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                        <span className="rk-chip bg-brand/[0.12] text-brand mb-3">파트너 프로그램</span>
-                        <h3 className="text-[20px] font-bold text-ink-1 mt-2 leading-tight">사장님이신가요?</h3>
-                        <p className="text-[13px] font-medium text-black/55 mt-1">우리 매장도 랭큐로 스마트하게 운영하기</p>
+                        <span className="rk-chip bg-brand/[0.12] text-brand mb-3">{t("menu.partnerProgram")}</span>
+                        <h3 className="text-[20px] font-bold text-ink-1 mt-2 leading-tight">{t("menu.areYouOwner")}</h3>
+                        <p className="text-[13px] font-medium text-black/55 mt-1">{t("menu.partnerPromoDesc")}</p>
                     </div>
                     <div className="w-14 h-14 rounded-tile bg-brand/[0.12] flex items-center justify-center shrink-0">
                         <LucideBriefcase className="w-7 h-7 text-brand" />
@@ -411,18 +413,18 @@ export default function HiqMenu() {
 
             {/* Section: Family services */}
             <div className="relative z-10 mb-12">
-                <h3 className="text-[15px] font-semibold text-black/55 mb-3 px-1">패밀리 서비스</h3>
+                <h3 className="text-[15px] font-semibold text-black/55 mb-3 px-1">{t("menu.familyServices")}</h3>
                 <div className="flex flex-col gap-2.5">
                     <a href="https://www.tohk.co.kr" target="_blank" rel="noopener noreferrer" className="block rk-card p-5 hover:bg-surface-2 transition-colors group">
-                        <span className="rk-chip bg-purple-500/[0.10] text-purple-700 mb-2.5">무료 운세 · 꿈해몽</span>
-                        <h3 className="text-[16px] font-semibold text-ink-1 leading-tight mt-1.5">어젯밤 그 꿈, 혹시 태몽? 흉몽?</h3>
-                        <p className="text-[12.5px] text-black/40 font-medium mt-1 group-hover:text-purple-700/80 transition-colors">광고 없는 100% 무료 운세 바로가기</p>
+                        <span className="rk-chip bg-purple-500/[0.10] text-purple-700 mb-2.5">{t("menu.tohkChip")}</span>
+                        <h3 className="text-[16px] font-semibold text-ink-1 leading-tight mt-1.5">{t("menu.tohkTitle")}</h3>
+                        <p className="text-[12.5px] text-black/40 font-medium mt-1 group-hover:text-purple-700/80 transition-colors">{t("menu.tohkDesc")}</p>
                     </a>
 
                     <a href="https://www.polli.co.kr" target="_blank" rel="noopener noreferrer" className="block rk-card p-5 hover:bg-surface-2 transition-colors group">
-                        <span className="rk-chip bg-cyan-500/[0.10] text-cyan-700 mb-2.5">대국민 투표 · 퀴즈</span>
-                        <h3 className="text-[16px] font-semibold text-ink-1 leading-tight mt-1.5">짜장 vs 짬뽕, 당신의 선택은?</h3>
-                        <p className="text-[12.5px] text-black/40 font-medium mt-1 group-hover:text-cyan-700/80 transition-colors">폴리에서 내 취향 증명하고 결과 보기</p>
+                        <span className="rk-chip bg-cyan-500/[0.10] text-cyan-700 mb-2.5">{t("menu.polliChip")}</span>
+                        <h3 className="text-[16px] font-semibold text-ink-1 leading-tight mt-1.5">{t("menu.polliTitle")}</h3>
+                        <p className="text-[12.5px] text-black/40 font-medium mt-1 group-hover:text-cyan-700/80 transition-colors">{t("menu.polliDesc")}</p>
                     </a>
                 </div>
             </div>
@@ -448,28 +450,28 @@ export default function HiqMenu() {
             <Dialog open={deleteOpen} onOpenChange={(open) => { if (!isDeleting) setDeleteOpen(open); }}>
                 <DialogContent className="bg-white text-ink-1 max-w-md w-[92%] rounded-[28px] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
                     <DialogHeader className="text-left">
-                        <DialogTitle className="text-[20px] font-bold text-ink-1">계정을 삭제할까요?</DialogTitle>
+                        <DialogTitle className="text-[20px] font-bold text-ink-1">{t("menu.deleteDialogTitle")}</DialogTitle>
                         <DialogDescription className="text-[13px] font-medium text-black/55 mt-1">
-                            이 작업은 되돌릴 수 없습니다.
+                            {t("menu.deleteDialogDesc")}
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="mt-2 rounded-2xl bg-red-500/[0.06] p-4">
                         <ul className="text-[13px] font-medium text-black/70 space-y-1.5 list-disc pl-4">
-                            <li>이름·전화번호·프로필 사진 등 개인정보가 <b>즉시 영구 삭제</b>됩니다.</li>
-                            <li>레이팅(RP)·랭킹·친구·크루 멤버십이 삭제됩니다.</li>
-                            <li>상대방의 전적 보존을 위해 경기 기록은 <b>"탈퇴회원"</b>으로 익명 처리됩니다.</li>
+                            <li>{t("menu.deleteBullet1Pre")}<b>{t("menu.deleteBullet1Bold")}</b>{t("menu.deleteBullet1Post")}</li>
+                            <li>{t("menu.deleteBullet2")}</li>
+                            <li>{t("menu.deleteBullet3Pre")}<b>{t("menu.deleteBullet3Bold")}</b>{t("menu.deleteBullet3Post")}</li>
                         </ul>
                     </div>
 
                     <div className="mt-4">
                         <p className="text-[13px] font-medium text-black/55 mb-2">
-                            계속하려면 아래에 <b className="text-red-500">삭제</b>를 입력하세요.
+                            {t("menu.deleteConfirmPre")}<b className="text-red-500">{t("menu.deleteConfirmWord")}</b>{t("menu.deleteConfirmPost")}
                         </p>
                         <input
                             value={deleteConfirm}
                             onChange={(e) => setDeleteConfirm(e.target.value)}
-                            placeholder="삭제"
+                            placeholder={t("menu.deleteConfirmWord")}
                             className="w-full h-12 px-4 rounded-xl bg-black/[0.04] text-[15px] font-semibold text-ink-1 outline-none focus:ring-2 focus:ring-red-500/30"
                         />
                     </div>
@@ -480,14 +482,14 @@ export default function HiqMenu() {
                             disabled={isDeleting}
                             className="flex-1 h-12 rounded-full bg-black/[0.05] text-[15px] font-bold text-ink-1 active:scale-[0.98] transition-transform"
                         >
-                            취소
+                            {t("menu.cancel")}
                         </button>
                         <button
                             onClick={handleDeleteAccount}
-                            disabled={deleteConfirm !== "삭제" || isDeleting}
+                            disabled={deleteConfirm !== t("menu.deleteConfirmWord") || isDeleting}
                             className="flex-1 h-12 rounded-full bg-red-500 text-white text-[15px] font-bold disabled:opacity-35 active:scale-[0.98] transition-transform"
                         >
-                            {isDeleting ? "삭제 중..." : "영구 삭제"}
+                            {isDeleting ? t("menu.deleting") : t("menu.permanentDelete")}
                         </button>
                     </div>
                 </DialogContent>

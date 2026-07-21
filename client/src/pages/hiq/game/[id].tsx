@@ -10,9 +10,11 @@ import { SortablePlayerWrapper } from "@/components/hiq/game/SortablePlayerWrapp
 import { DndContext, closestCenter, PointerSensor, TouchSensor, MouseSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { HiqMember } from "@shared/schema";
+import { useT } from "@/lib/i18n";
 
 export default function HiqScoreboard() {
     usePreventZoom();
+    const { t } = useT();
     const [, params] = useRoute("/game/:id");
     const id = params?.id;
     const [, setLocation] = useLocation();
@@ -65,7 +67,7 @@ export default function HiqScoreboard() {
     const getAvg = (score: number) => (score / Math.max(1, gameState.innings)).toFixed(2);
 
     if (isLoading || !game) {
-        return <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-[rgba(0,0,0,0.87)]">불러오는 중...</div>;
+        return <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-[rgba(0,0,0,0.87)]">{t("gameScoreboard.loading")}</div>;
     }
 
     return (
@@ -137,11 +139,11 @@ export default function HiqScoreboard() {
 
                 <ScoreboardBottomBar
                     innings={gameState.innings}
-                    onExit={() => { if (confirm("게임을 종료하시겠습니까?")) setLocation("/dashboard"); }}
+                    onExit={() => { if (confirm(t("gameScoreboard.exitConfirm"))) setLocation("/dashboard"); }}
                     canUndo={canUndo}
                     canRedo={canRedo}
-                    onUndo={() => { undo(); speak("취소"); }}
-                    onRedo={() => { redo(); speak("복구"); }}
+                    onUndo={() => { undo(); speak(t("gameScoreboard.undo")); }}
+                    onRedo={() => { redo(); speak(t("gameScoreboard.redo")); }}
                 />
             </div>
         </LandscapeGuard>

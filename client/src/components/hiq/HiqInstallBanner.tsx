@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { LucideDownload, X, Share } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useT } from "@/lib/i18n";
 
 export function HiqInstallBanner() {
+    const { t } = useT();
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isVisible, setIsVisible] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
@@ -71,9 +73,9 @@ export function HiqInstallBanner() {
                                 <LucideDownload className="w-6 h-6 text-white" />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[rgba(0,0,0,0.87)] font-semibold text-sm">랭큐 앱 설치하기</span>
+                                <span className="text-[rgba(0,0,0,0.87)] font-semibold text-sm">{t("hiqInstallBanner.title")}</span>
                                 <span className="text-black/60 text-xs text-left">
-                                    {isIOS ? "홈 화면에 추가하고 편하게 쓰세요!" : "홈 화면에 추가하고 더 편하게 접속하세요!"}
+                                    {isIOS ? t("hiqInstallBanner.subtitleIos") : t("hiqInstallBanner.subtitle")}
                                 </span>
                             </div>
                         </div>
@@ -82,7 +84,7 @@ export function HiqInstallBanner() {
                                 onClick={handleInstallClick}
                                 className="bg-brand text-white hover:bg-brand/90 active:scale-95 font-bold text-xs h-9 rounded-full px-5 transition-all"
                             >
-                                {isIOS ? "방법보기" : "설치"}
+                                {isIOS ? t("hiqInstallBanner.howTo") : t("hiqInstallBanner.install")}
                             </Button>
                             <button
                                 onClick={() => setIsVisible(false)}
@@ -100,22 +102,22 @@ export function HiqInstallBanner() {
                 <DialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] rounded-3xl max-w-xs">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-semibold text-center mb-2">
-                            아이폰 홈 화면 추가
+                            {t("hiqInstallBanner.iosGuideTitle")}
                         </DialogTitle>
                         <DialogDescription className="text-black/60 text-center">
-                            사파리(Safari) 브라우저 하단의<br />
+                            {t("hiqInstallBanner.iosGuideLine1")}<br />
                             <Share className="w-5 h-5 inline-block mx-1 mb-1" />
-                            <span className="text-[rgba(0,0,0,0.87)] font-bold">공유 버튼</span>을 누른 뒤<br />
-                            <span className="text-[rgba(0,0,0,0.87)] font-bold">'홈 화면에 추가'</span>를 선택해주세요.
+                            <span className="text-[rgba(0,0,0,0.87)] font-bold">{t("hiqInstallBanner.iosGuideShareButton")}</span>{t("hiqInstallBanner.iosGuideLine2")}<br />
+                            <span className="text-[rgba(0,0,0,0.87)] font-bold">{t("hiqInstallBanner.iosGuideAddHome")}</span>{t("hiqInstallBanner.iosGuideLine3")}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-center py-4">
                         <div className="flex flex-col items-center gap-2 text-xs text-black/55">
                             <div className="px-3 py-2 bg-black/[0.04] rounded-lg ">
-                                1. 하단 <span className="text-[#007AFF] font-bold">공유 아이콘</span> 클릭
+                                {t("hiqInstallBanner.step1Prefix")} <span className="text-[#007AFF] font-bold">{t("hiqInstallBanner.step1ShareIcon")}</span> {t("hiqInstallBanner.step1Suffix")}
                             </div>
                             <div className="px-3 py-2 bg-black/[0.04] rounded-lg ">
-                                2. 메뉴에서 <span className="text-[rgba(0,0,0,0.87)] font-bold">홈 화면에 추가</span> 선택
+                                {t("hiqInstallBanner.step2Prefix")} <span className="text-[rgba(0,0,0,0.87)] font-bold">{t("hiqInstallBanner.step2AddHome")}</span> {t("hiqInstallBanner.step2Suffix")}
                             </div>
                         </div>
                     </div>
@@ -123,7 +125,7 @@ export function HiqInstallBanner() {
                         onClick={() => setShowIOSGuide(false)}
                         className="w-full bg-brand hover:bg-brand/90 active:scale-95 text-white font-bold rounded-full transition-all"
                     >
-                        확인했습니다
+                        {t("hiqInstallBanner.confirm")}
                     </Button>
                 </DialogContent>
             </Dialog>

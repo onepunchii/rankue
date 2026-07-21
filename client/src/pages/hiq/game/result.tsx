@@ -11,8 +11,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
+import { useT } from "@/lib/i18n";
 
 export default function HiqGameResult() {
+    const { t } = useT();
     const search = useSearch();
     const gameId = new URLSearchParams(search).get("id");
     const [result, setResult] = useState<any>(null);
@@ -70,13 +72,13 @@ export default function HiqGameResult() {
             <Card className="rk-card w-full max-w-sm">
                 <CardContent className="p-8 flex flex-col items-center text-center gap-2">
                     <LucideX className="w-8 h-8 text-black/40 mb-2" strokeWidth={2} />
-                    <p className="text-[15px] font-medium text-black/55">결과를 불러올 수 없습니다.</p>
-                    <p className="text-[12px] font-medium text-black/40 mb-4">경기 기록이 만료되었거나 존재하지 않습니다.</p>
+                    <p className="text-[15px] font-medium text-black/55">{t("gameResult.loadError")}</p>
+                    <p className="text-[12px] font-medium text-black/40 mb-4">{t("gameResult.loadErrorDesc")}</p>
                     <Button
                         onClick={() => setLocation("/dashboard")}
                         className="rk-btn-secondary w-full h-12"
                     >
-                        홈으로
+                        {t("gameResult.goHome")}
                     </Button>
                 </CardContent>
             </Card>
@@ -107,14 +109,14 @@ export default function HiqGameResult() {
                 body: { targetSlot: slotIdx }
             });
             toast({
-                title: "기록 연동 완료",
-                description: "경기가 회원님의 기록으로 저장되었습니다.",
+                title: t("gameResult.claimSuccessTitle"),
+                description: t("gameResult.claimSuccessDesc"),
             });
             window.location.reload(); // Refresh to show member data
         } catch (e: any) {
             toast({
-                title: "연동 실패",
-                description: e.message || "기록을 연동할 수 없습니다. 로그인 상태를 확인하세요.",
+                title: t("gameResult.claimFailTitle"),
+                description: e.message || t("gameResult.claimFailDesc"),
                 variant: "destructive"
             });
         } finally {
@@ -128,9 +130,9 @@ export default function HiqGameResult() {
                 <div className="flex justify-between items-start mb-4">
                     <div>
                         <p className={`text-[12px] font-semibold ${win ? 'text-brand' : 'text-black/55'}`}>
-                            {win ? '우승' : '점수'}
+                            {win ? t("gameResult.winner") : t("gameResult.score")}
                         </p>
-                        <h3 className="text-[17px] font-semibold text-[rgba(0,0,0,0.87)] truncate max-w-[120px]">{name || `선수 ${pNo}`}</h3>
+                        <h3 className="text-[17px] font-semibold text-[rgba(0,0,0,0.87)] truncate max-w-[120px]">{name || `${t("gameResult.player")} ${pNo}`}</h3>
                     </div>
                     {win && <LucideMedal className="w-8 h-8 text-brand" strokeWidth={2.5} />}
                 </div>
@@ -142,15 +144,15 @@ export default function HiqGameResult() {
 
                 <div className="grid grid-cols-3 gap-2 pt-4 border-t border-black/10">
                     <div>
-                        <p className="text-[12px] font-medium text-black/55 mb-0.5">평균</p>
+                        <p className="text-[12px] font-medium text-black/55 mb-0.5">{t("gameResult.avg")}</p>
                         <p className={`text-lg font-bold tabular-nums ${win ? 'text-brand' : 'text-[rgba(0,0,0,0.87)]'}`}>{avg}</p>
                     </div>
                     <div className="text-center border-x border-black/10">
-                        <p className="text-[12px] font-medium text-black/55 mb-0.5">하이런</p>
+                        <p className="text-[12px] font-medium text-black/55 mb-0.5">{t("gameResult.highRun")}</p>
                         <p className={`text-lg font-bold tabular-nums ${win ? 'text-brand' : 'text-[rgba(0,0,0,0.87)]'}`}>{highRun}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[12px] font-medium text-black/55 mb-1.5">상태</p>
+                        <p className="text-[12px] font-medium text-black/55 mb-1.5">{t("gameResult.status")}</p>
                         <div className="flex justify-end">
                             <FormBadges results={[win ? "W" : "L"] as MatchResult[]} size={26} />
                         </div>
@@ -161,20 +163,20 @@ export default function HiqGameResult() {
                     <Button
                         variant="ghost"
                         onClick={() => {
-                            setViewingPlayer({ name: name || `선수 ${pNo}`, score, target, avg, innings });
+                            setViewingPlayer({ name: name || `${t("gameResult.player")} ${pNo}`, score, target, avg, innings });
                             setIsInningModalOpen(true);
                         }}
                         className="rk-btn-secondary w-full h-10 text-xs gap-2"
                     >
                         <LucideLayoutGrid className="w-4 h-4 text-brand" />
-                        이닝별 기록 보기
+                        {t("gameResult.viewInnings")}
                     </Button>
                 </div>
 
                 {memberId && pNo > 1 && (
                     <div className="mt-4 pt-4 border-t border-black/10 flex items-center gap-2 text-brand justify-center">
                         <LucideCheckCircle2 className="w-4 h-4" />
-                        <span className="text-[12px] font-semibold">인증 회원</span>
+                        <span className="text-[12px] font-semibold">{t("gameResult.verifiedMember")}</span>
                     </div>
                 )}
 
@@ -186,7 +188,7 @@ export default function HiqGameResult() {
                     >
                         <div className="flex items-center gap-2 mb-1">
                             <LucideTrendingUp className="w-3 h-3" />
-                            <span className="text-[12px] font-semibold">핸디캡 상승!</span>
+                            <span className="text-[12px] font-semibold">{t("gameResult.handicapUp")}</span>
                         </div>
                         <p className="text-[12px] font-bold leading-tight">{handicapUpdate.message}</p>
                         <div className="flex items-center gap-1 mt-1 font-semibold text-sm tabular-nums">
@@ -205,9 +207,9 @@ export default function HiqGameResult() {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center mb-10"
             >
-                <h1 className="text-[26px] font-bold tracking-tight mb-1 text-brand">게임 종료</h1>
+                <h1 className="text-[26px] font-bold tracking-tight mb-1 text-brand">{t("gameResult.gameOver")}</h1>
                 <p className="text-black/55 font-medium text-[12px] bg-black/[0.04] px-3 py-1 rounded-full inline-block">
-                    {isPractice ? "연습 세션" : "경기 결과"} • {game.totalInnings}이닝
+                    {isPractice ? t("gameResult.practiceSession") : t("gameResult.matchResult")} • {game.totalInnings}{t("gameResult.inningsSuffix")}
                 </p>
             </motion.div>
 
@@ -274,7 +276,7 @@ export default function HiqGameResult() {
                     className="rk-btn-primary w-full h-16 rounded-2xl text-lg gap-2"
                 >
                     <LucideArrowRight className="w-5 h-5" />
-                    홈으로
+                    {t("gameResult.goHome")}
                 </Button>
             </div>
 
@@ -283,10 +285,10 @@ export default function HiqGameResult() {
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold flex items-center gap-2">
                             <LucideLayoutGrid className="w-5 h-5 text-brand" />
-                            이닝별 기록
+                            {t("gameResult.inningsRecord")}
                         </DialogTitle>
                         <DialogDescription className="text-black/55">
-                            {viewingPlayer?.name} 님의 이번 경기 기록입니다.
+                            {viewingPlayer?.name}{t("gameResult.inningsDescSuffix")}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -295,8 +297,8 @@ export default function HiqGameResult() {
                             <div className="space-y-3">
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[12px] font-semibold text-black/55">
-                                        <span>이닝별 점수 추이</span>
-                                        <span className="text-black/55 tabular-nums">총 {game.totalInnings}이닝</span>
+                                        <span>{t("gameResult.inningTrend")}</span>
+                                        <span className="text-black/55 tabular-nums">{t("gameResult.totalPrefix")}{game.totalInnings}{t("gameResult.inningsSuffix")}</span>
                                     </div>
                                     <div className="grid grid-cols-5 gap-2 mt-2">
                                         {(viewingPlayer?.innings || []).map((inningScore: number, i: number) => (
@@ -317,7 +319,7 @@ export default function HiqGameResult() {
                             onClick={() => setIsInningModalOpen(false)}
                             className="rk-btn-secondary w-full h-12"
                         >
-                            닫기
+                            {t("gameResult.close")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

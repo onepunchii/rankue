@@ -105,13 +105,13 @@ export default function Landing() {
 
             if (res.isNew) {
                 toast({
-                    title: "환영합니다!",
-                    description: "신규 회원님, 간단한 등록 절차를 진행합니다.",
+                    title: t("login.welcomeNewTitle"),
+                    description: t("login.welcomeNewDesc"),
                 });
             } else {
                 toast({
-                    title: `${res.member.name}님, 안녕하세요!`,
-                    description: "오늘도 즐거운 게임 되세요.",
+                    title: `${res.member.name}${t("login.welcomeBackTitle")}`,
+                    description: t("login.welcomeBackDesc"),
                 });
             }
             // Honor a ?redirect= return url (e.g. from the QR invite flow) ONLY for
@@ -124,8 +124,8 @@ export default function Landing() {
         } catch (error: any) {
             toast({
                 variant: "destructive",
-                title: "접속 실패",
-                description: error.message || "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
+                title: t("login.failedTitle"),
+                description: error.message || t("login.connectionFailed"),
             });
             if (requiresPassword) setPassword("");
         } finally {

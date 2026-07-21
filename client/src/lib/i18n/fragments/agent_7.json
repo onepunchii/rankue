@@ -1,0 +1,100 @@
+{
+  "myCrewCard.leader": {
+    "ko": "리더",
+    "en": "Leader",
+    "vi": "Trưởng nhóm",
+    "tr": "Lider",
+    "es": "Líder"
+  },
+  "myCrewCard.member": {
+    "ko": "멤버",
+    "en": "Member",
+    "vi": "Thành viên",
+    "tr": "Üye",
+    "es": "Miembro"
+  },
+  "myCrewCard.noRegion": {
+    "ko": "지역 미설정",
+    "en": "No region set",
+    "vi": "Chưa đặt khu vực",
+    "tr": "Bölge ayarlanmadı",
+    "es": "Sin región"
+  },
+  "myCrewList.emptyTitle": {
+    "ko": "크루가 없으신가요?",
+    "en": "No crew yet?",
+    "vi": "Chưa có crew nào?",
+    "tr": "Henüz ekibin yok mu?",
+    "es": "¿Todavía sin crew?"
+  },
+  "myCrewList.emptyDesc": {
+    "ko": "새로운 크루를 만들어 시작해보세요",
+    "en": "Create a new crew to get started",
+    "vi": "Tạo crew mới để bắt đầu nào",
+    "tr": "Yeni bir ekip kurup başla",
+    "es": "Crea un crew nuevo y empieza"
+  },
+  "myCrewList.createCrew": {
+    "ko": "크루 개설하기",
+    "en": "Create a Crew",
+    "vi": "Tạo crew",
+    "tr": "Ekip Kur",
+    "es": "Crear crew"
+  },
+  "billiardsCategorySelector.regularLabel": {
+    "ko": "정기 모임",
+    "en": "Regular Meetup",
+    "vi": "Gặp định kỳ",
+    "tr": "Düzenli Buluşma",
+    "es": "Encuentro regular"
+  },
+  "billiardsCategorySelector.regularDesc": {
+    "ko": "월례회",
+    "en": "Monthly",
+    "vi": "Hàng tháng",
+    "tr": "Aylık",
+    "es": "Mensual"
+  },
+  "billiardsCategorySelector.blitzLabel": {
+    "ko": "번개 모임",
+    "en": "Flash Meetup",
+    "vi": "Hẹn chớp nhoáng",
+    "tr": "Ani Buluşma",
+    "es": "Encuentro exprés"
+  },
+  "billiardsCategorySelector.blitzDesc": {
+    "ko": "즉석 조인",
+    "en": "Join on the spot",
+    "vi": "Tham gia liền",
+    "tr": "Anında katıl",
+    "es": "Únete al momento"
+  },
+  "billiardsCategorySelector.tournamentLabel": {
+    "ko": "당구 대회",
+    "en": "Billiards Tournament",
+    "vi": "Giải bi-a",
+    "tr": "Bilardo Turnuvası",
+    "es": "Torneo de billar"
+  },
+  "billiardsCategorySelector.tournamentDesc": {
+    "ko": "리그/토너먼트",
+    "en": "League/Tournament",
+    "vi": "Giải đấu/League",
+    "tr": "Lig/Turnuva",
+    "es": "Liga/Torneo"
+  },
+  "billiardsCategorySelector.afterPartyLabel": {
+    "ko": "뒷풀이",
+    "en": "After-Party",
+    "vi": "Tăng 2",
+    "tr": "After Party",
+    "es": "After"
+  },
+  "billiardsCategorySelector.afterPartyDesc": {
+    "ko": "회식",
+    "en": "Get-together",
+    "vi": "Ăn nhậu",
+    "tr": "Yeme içme",
+    "es": "Comida grupal"
+  }
+}

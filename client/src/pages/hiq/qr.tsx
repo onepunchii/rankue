@@ -1,8 +1,10 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { LucideShare2, LucideDownload, LucidePrinter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/lib/i18n';
 
 export default function HiqQrPoster() {
+    const { t } = useT();
     const qrUrl = "https://www.rankue.co.kr";
 
     const handlePrint = () => {
@@ -17,7 +19,7 @@ export default function HiqQrPoster() {
                 {/* Background Text Pattern */}
                 <div className="absolute inset-0 z-0 opacity-5 pointer-events-none select-none overflow-hidden flex flex-wrap content-start gap-4 p-4 transform -rotate-12 scale-150">
                     {Array.from({ length: 100 }).map((_, i) => (
-                        <span key={i} className="text-4xl font-bold text-brand whitespace-nowrap">랭큐</span>
+                        <span key={i} className="text-4xl font-bold text-brand whitespace-nowrap">{t("qr.brandName")}</span>
                     ))}
                 </div>
 
@@ -26,9 +28,9 @@ export default function HiqQrPoster() {
 
                     {/* Header */}
                     <div className="space-y-2 mt-8">
-                        <h1 className="text-6xl font-bold text-brand print:text-black">랭큐</h1>
+                        <h1 className="text-6xl font-bold text-brand print:text-black">{t("qr.brandName")}</h1>
                         <p className="text-2xl font-semibold text-[rgba(0,0,0,0.87)] print:text-black">
-                            프리미엄 디지털 점수판
+                            {t("qr.subtitle")}
                         </p>
                     </div>
 
@@ -50,7 +52,7 @@ export default function HiqQrPoster() {
                                 }}
                             />
                             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-8 h-8 bg-black rounded-full flex items-center justify-center">
-                                <span className="text-brand font-bold text-xs">랭큐</span>
+                                <span className="text-brand font-bold text-xs">{t("qr.brandName")}</span>
                             </div>
                         </div>
                     </div>
@@ -58,8 +60,8 @@ export default function HiqQrPoster() {
                     {/* Footer Text */}
                     <div className="space-y-4 mb-8">
                         <div className="space-y-1">
-                            <h2 className="text-3xl font-bold text-[rgba(0,0,0,0.87)] print:text-black">스캔하여 게임 시작</h2>
-                            <p className="text-ink-3 font-medium print:text-gray-600">카메라를 켜고 QR코드를 비춰주세요</p>
+                            <h2 className="text-3xl font-bold text-[rgba(0,0,0,0.87)] print:text-black">{t("qr.scanToStart")}</h2>
+                            <p className="text-ink-3 font-medium print:text-gray-600">{t("qr.scanGuide")}</p>
                         </div>
 
                         <div className="pt-6 border-t border-black/10 w-full print:border-black/10">
@@ -73,11 +75,11 @@ export default function HiqQrPoster() {
             <div className="mt-8 flex gap-4 print:hidden">
                 <Button onClick={handlePrint} className="bg-brand text-brand-fg hover:bg-brand/90 font-semibold rounded-full px-6">
                     <LucidePrinter className="w-5 h-5 mr-2" />
-                    프린트 / PDF로 저장
+                    {t("qr.printSave")}
                 </Button>
                 <Button variant="outline" className="rounded-full px-6 border-[#006241] text-[#006241] bg-transparent hover:bg-[#006241]/[0.06] hover:text-[#006241]">
                     <LucideShare2 className="w-5 h-5 mr-2" />
-                    공유하기
+                    {t("qr.share")}
                 </Button>
             </div>
         </div>

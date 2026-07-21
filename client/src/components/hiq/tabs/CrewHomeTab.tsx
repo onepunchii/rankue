@@ -15,6 +15,7 @@ import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useT } from "@/lib/i18n";
 
 const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: string, children: React.ReactNode }) => {
     return (
@@ -58,6 +59,7 @@ export const CrewHomeTab = memo(({
     crew, baseStore, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onLeave, isLeaving, isLeader, onCreateActivity, onCreatePoll, onShareToChat,
     onPollClick
 }: CrewHomeTabProps) => {
+    const { t } = useT();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
     const activeMembers = useMemo(() => members.filter((m: any) => m.role !== 'pending'), [members]);
@@ -147,7 +149,7 @@ export const CrewHomeTab = memo(({
                             {crew.name}
                         </h1>
                         <p className="text-[13px] text-black/60 font-medium mt-1">
-                            {crew.shortIntro || crew.region || "우리 크루"}
+                            {crew.shortIntro || crew.region || t("crewHome.ourCrew")}
                         </p>
                     </div>
                 </div>
@@ -160,14 +162,14 @@ export const CrewHomeTab = memo(({
                         "text-black/60 text-[15px] leading-relaxed font-normal transition-all duration-300 whitespace-pre-wrap",
                         !isDescriptionExpanded && "line-clamp-3"
                     )}>
-                        {crew.description || "크루 소개글이 없습니다."}
+                        {crew.description || t("crewHome.noDescription")}
                     </div>
                     {(crew.description?.length || 0) > 60 && (
                         <button
                             onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                             className="text-brand text-xs font-semibold mt-3 hover:text-brand/70 transition-colors inline-flex items-center gap-1"
                         >
-                            {isDescriptionExpanded ? "접기" : "더 보기"}
+                            {isDescriptionExpanded ? t("crewHome.collapse") : t("crewHome.expand")}
                             <LucideChevronDown className={cn("w-3.5 h-3.5 transition-transform", isDescriptionExpanded && "rotate-180")} />
                         </button>
                     )}
@@ -182,7 +184,7 @@ export const CrewHomeTab = memo(({
                     )}
                     <div className="flex items-center gap-1.5 px-4 py-2 bg-black/[0.04] rounded-full text-black/70 text-xs font-semibold">
                         <LucideMapPin className="w-3.5 h-3.5 text-brand" />
-                        {crew.region || "지역"}
+                        {crew.region || t("crewHome.region")}
                     </div>
                 </div>
 
@@ -191,11 +193,11 @@ export const CrewHomeTab = memo(({
                     <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-black/10 -translate-x-1/2" />
                     <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-black/10 -translate-y-1/2" />
 
-                    <StatCard title="랭킹">
-                        <span className="text-base font-medium text-black/40">순위 집계 전</span>
+                    <StatCard title={t("crewHome.ranking")}>
+                        <span className="text-base font-medium text-black/40">{t("crewHome.rankingPending")}</span>
                     </StatCard>
 
-                    <StatCard title={stats.isGolf ? "클럽 평균" : "팀 에버리지"}>
+                    <StatCard title={stats.isGolf ? t("crewHome.clubAverage") : t("crewHome.teamAverage")}>
                         <div className="flex items-center gap-3 mt-1 px-2">
                             <div className="flex flex-col items-center">
                                 <span className="text-2xl font-bold text-[rgba(0,0,0,0.87)] leading-none tabular-nums">{stats.isGolf ? stats.avgGolfScore : stats.avg3c}</span>
@@ -213,18 +215,18 @@ export const CrewHomeTab = memo(({
                         </div>
                     </StatCard>
 
-                    <StatCard title={stats.isGolf ? "누적 라운드" : "누적 점수"}>
+                    <StatCard title={stats.isGolf ? t("crewHome.totalRounds") : t("crewHome.totalPoints")}>
                         <span className="text-3xl font-bold text-[rgba(0,0,0,0.87)] tracking-tight tabular-nums">
                             {stats.isGolf ? (
-                                <>{stats.totalRounds} <span className="text-lg font-normal text-black/55">회</span></>
+                                <>{stats.totalRounds} <span className="text-lg font-normal text-black/55">{t("crewHome.roundsUnit")}</span></>
                             ) : (
                                 stats.totalPoints.toLocaleString()
                             )}
                         </span>
                     </StatCard>
 
-                    <StatCard title="활동 멤버">
-                        <span className="text-3xl font-bold text-[rgba(0,0,0,0.87)] tracking-tight tabular-nums">{stats.statsMembers.length} <span className="text-lg font-normal text-black/55">명</span></span>
+                    <StatCard title={t("crewHome.activeMembers")}>
+                        <span className="text-3xl font-bold text-[rgba(0,0,0,0.87)] tracking-tight tabular-nums">{stats.statsMembers.length} <span className="text-lg font-normal text-black/55">{t("crewHome.membersUnit")}</span></span>
                     </StatCard>
                 </div>
             </div>
@@ -233,7 +235,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6 space-y-4">
                 <div className="flex items-center gap-2 mb-4">
                     <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                    <h2 className="text-[15px] font-semibold text-black/55">정모 / 일정</h2>
+                    <h2 className="text-[15px] font-semibold text-black/55">{t("crewHome.schedule")}</h2>
                 </div>
 
                 <ClubActivityList
@@ -252,7 +254,7 @@ export const CrewHomeTab = memo(({
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                        <h2 className="text-[15px] font-semibold text-black/55">진행 중인 투표</h2>
+                        <h2 className="text-[15px] font-semibold text-black/55">{t("crewHome.activePolls")}</h2>
                     </div>
                     {isMember && (
                         <Button
@@ -261,7 +263,7 @@ export const CrewHomeTab = memo(({
                             className="h-10 px-3 text-[13px] font-medium text-black/55 hover:text-brand flex items-center gap-1.5"
                         >
                             <LucidePlus className="w-4 h-4" />
-                            만들기
+                            {t("crewHome.create")}
                         </Button>
                     )}
                 </div>
@@ -275,7 +277,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6">
                 <div className="flex items-center gap-2 mb-4">
                     <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                    <h2 className="text-[15px] font-semibold text-black/55">베이스 캠프</h2>
+                    <h2 className="text-[15px] font-semibold text-black/55">{t("crewHome.baseCamp")}</h2>
                 </div>
                 {baseStore ? (
                     <Card className="bg-surface-2 border-surface-line rounded-card overflow-hidden group hover:border-brand/50 transition-all">
@@ -285,17 +287,17 @@ export const CrewHomeTab = memo(({
                                     <h3 className="text-lg font-bold text-[rgba(0,0,0,0.87)] tracking-tight">{baseStore.name}</h3>
                                     <p className="text-xs text-black/55 mt-0.5">{baseStore.address}</p>
                                 </div>
-                                <span className="bg-brand/10 text-brand text-xs font-semibold px-2.5 py-1 rounded-full border border-brand/20">공식</span>
+                                <span className="bg-brand/10 text-brand text-xs font-semibold px-2.5 py-1 rounded-full border border-brand/20">{t("crewHome.official")}</span>
                             </div>
                             <div className="flex gap-2.5">
-                                <Button variant="outline" className="flex-1 rounded-xl text-xs h-10 border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04]">전화하기</Button>
-                                <Button className="flex-1 rounded-xl text-xs h-10 bg-brand text-brand-fg">위치보기</Button>
+                                <Button variant="outline" className="flex-1 rounded-xl text-xs h-10 border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04]">{t("crewHome.call")}</Button>
+                                <Button className="flex-1 rounded-xl text-xs h-10 bg-brand text-brand-fg">{t("crewHome.viewLocation")}</Button>
                             </div>
                         </CardContent>
                     </Card>
                 ) : (
                     <div className="py-14 text-center bg-black/[0.04] rounded-card border border-dashed border-black/10 text-black/55 text-xs font-medium">
-                        베이스 캠프 정보가 없습니다
+                        {t("crewHome.noBaseCamp")}
                     </div>
                 )}
             </div>
@@ -304,7 +306,7 @@ export const CrewHomeTab = memo(({
             <div className="px-6 pb-20">
                 <div className="flex items-center gap-2 mb-6">
                     <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                    <h2 className="text-[15px] font-semibold text-black/55">멤버 <span className="ml-1 tabular-nums">{activeMembers.length}</span></h2>
+                    <h2 className="text-[15px] font-semibold text-black/55">{t("crewHome.members")} <span className="ml-1 tabular-nums">{activeMembers.length}</span></h2>
                 </div>
                 <CrewMemberList members={activeMembers} currentMemberId={me?.id} sportCategory={crew.sportCategory} crewId={crew.id} />
             </div>
@@ -319,19 +321,19 @@ export const CrewHomeTab = memo(({
                                 className="inline-flex items-center gap-1.5 text-[13px] font-medium text-black/40 hover:text-red-500 transition-colors disabled:opacity-40"
                             >
                                 <LucideLogOut className="w-4 h-4" />
-                                크루 탈퇴
+                                {t("crewHome.leaveCrew")}
                             </button>
                         </AlertDialogTrigger>
                         <AlertDialogContent className="bg-white text-[rgba(0,0,0,0.87)] rounded-card">
                             <AlertDialogHeader>
-                                <AlertDialogTitle className="text-[rgba(0,0,0,0.87)]">크루에서 나가시겠어요?</AlertDialogTitle>
+                                <AlertDialogTitle className="text-[rgba(0,0,0,0.87)]">{t("crewHome.leaveConfirmTitle")}</AlertDialogTitle>
                                 <AlertDialogDescription className="text-black/55">
-                                    탈퇴하면 이 크루의 활동·채팅에 더 이상 참여할 수 없어요. 다시 가입할 수 있습니다.
+                                    {t("crewHome.leaveConfirmDesc")}
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                                <AlertDialogCancel className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06] hover:text-[rgba(0,0,0,0.87)]">취소</AlertDialogCancel>
-                                <AlertDialogAction onClick={onLeave} className="bg-red-500 text-white hover:bg-red-600">탈퇴하기</AlertDialogAction>
+                                <AlertDialogCancel className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06] hover:text-[rgba(0,0,0,0.87)]">{t("crewHome.cancel")}</AlertDialogCancel>
+                                <AlertDialogAction onClick={onLeave} className="bg-red-500 text-white hover:bg-red-600">{t("crewHome.leaveAction")}</AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
@@ -344,7 +346,7 @@ export const CrewHomeTab = memo(({
                     {isPending ? (
                         <div className="flex items-center gap-2 pointer-events-auto">
                             <div className="flex-1 h-14 rounded-2xl flex items-center justify-center text-base font-semibold bg-white text-black/55 ring-1 ring-black/10 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                                가입 승인 대기 중...
+                                {t("crewHome.pendingApproval")}
                             </div>
                             {onLeave && (
                                 <Button
@@ -353,7 +355,7 @@ export const CrewHomeTab = memo(({
                                     variant="outline"
                                     className="h-14 px-5 rounded-2xl text-sm font-semibold bg-white border-black/10 text-black/60 hover:bg-black/[0.04] hover:text-[rgba(0,0,0,0.87)] shadow-[0_1px_2px_rgba(0,0,0,0.06)] disabled:opacity-40"
                                 >
-                                    신청 취소
+                                    {t("crewHome.cancelRequest")}
                                 </Button>
                             )}
                         </div>
@@ -362,7 +364,7 @@ export const CrewHomeTab = memo(({
                             onClick={onJoin}
                             className="w-full h-14 rounded-2xl text-base font-semibold tracking-normal transition-all active:scale-95 pointer-events-auto shadow-[0_1px_2px_rgba(0,0,0,0.06)] bg-brand text-brand-fg hover:bg-brand/90"
                         >
-                            크루 가입하기
+                            {t("crewHome.joinCrew")}
                         </Button>
                     )}
                 </div>
@@ -372,6 +374,7 @@ export const CrewHomeTab = memo(({
 });
 
 const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }) => {
+    const { t } = useT();
     const { data: polls, isLoading } = useQuery<any[]>({
         queryKey: [`/api/hiq/crews/${crewId}/polls`],
         enabled: !!crewId,
@@ -381,7 +384,7 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
 
     if (!polls || polls.length === 0) return (
         <div className="p-8 text-center bg-black/[0.04] border border-dashed border-black/10 rounded-card">
-            <p className="text-xs font-medium text-black/55">등록된 투표가 없습니다</p>
+            <p className="text-xs font-medium text-black/55">{t("crewHome.noPolls")}</p>
         </div>
     );
 
@@ -406,9 +409,9 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
                                         <span className={cn(
                                             "text-xs font-semibold",
                                             poll.status === 'active' ? "text-brand" : "text-black/55"
-                                        )}>{poll.status === 'active' ? '진행 중' : '종료'}</span>
-                                        {poll.isAnonymous && <span className="text-xs font-semibold text-brand"> 익명</span>}
-                                        {poll.allowMultiple && <span className="text-xs font-semibold text-purple-500"> 복수</span>}
+                                        )}>{poll.status === 'active' ? t("crewHome.pollActive") : t("crewHome.pollEnded")}</span>
+                                        {poll.isAnonymous && <span className="text-xs font-semibold text-brand"> {t("crewHome.pollAnonymous")}</span>}
+                                        {poll.allowMultiple && <span className="text-xs font-semibold text-purple-500"> {t("crewHome.pollMultiple")}</span>}
                                     </div>
                                     <h3 className="text-base font-semibold text-[rgba(0,0,0,0.87)] leading-tight tracking-tight">{poll.title}</h3>
                                 </div>
@@ -420,8 +423,8 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
                             {bestOption && (
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between text-xs">
-                                        <span className="text-black/55 font-medium">현재 1위: {bestOption.text}</span>
-                                        <span className="text-black/70 font-semibold tabular-nums">{bestOption.voteCount}표</span>
+                                        <span className="text-black/55 font-medium">{t("crewHome.currentLeader")} {bestOption.text}</span>
+                                        <span className="text-black/70 font-semibold tabular-nums">{bestOption.voteCount}{t("crewHome.votesSuffix")}</span>
                                     </div>
                                     <Progress value={totalVotes > 0 ? (bestOption.voteCount / totalVotes) * 100 : 0} className="h-1.5 bg-black/[0.06]" />
                                 </div>
@@ -430,7 +433,7 @@ const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }
                             <div className="flex items-center justify-between mt-5 pt-4 border-t border-black/[0.08]">
                                 <div className="flex items-center gap-1.5 text-black/55">
                                     <LucideUsers className="w-3.5 h-3.5" />
-                                    <span className="text-xs font-medium tabular-nums">{totalVotes}명 참여</span>
+                                    <span className="text-xs font-medium tabular-nums">{totalVotes}{t("crewHome.participantsSuffix")}</span>
                                 </div>
                                 <LucideChevronRight className="w-4 h-4 text-black/40 group-hover:text-[rgba(0,0,0,0.87)] transition-colors" />
                             </div>

@@ -5,6 +5,7 @@ import { ko } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useT } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -41,6 +42,7 @@ export function ClubActivityList({
     isAdmin
 }: ClubActivityListProps) {
     const { toast } = useToast();
+    const { t } = useT();
     const [expandedActivityId, setExpandedActivityId] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [editingActivity, setEditingActivity] = useState<any | null>(null);
@@ -72,11 +74,11 @@ export function ClubActivityList({
             });
         },
         onSuccess: () => {
-            toast({ title: "참여 완료", description: "정모에 참여했습니다." });
+            toast({ title: t("clubActivityListView.joinSuccessTitle"), description: t("clubActivityListView.joinSuccessDesc") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/activities`] });
         },
         onError: (err: Error) => {
-            toast({ title: "참여 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubActivityListView.joinFailTitle"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -87,11 +89,11 @@ export function ClubActivityList({
             });
         },
         onSuccess: () => {
-            toast({ title: "삭제 완료", description: "정모가 삭제되었습니다." });
+            toast({ title: t("clubActivityListView.deleteSuccessTitle"), description: t("clubActivityListView.deleteSuccessDesc") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/activities`] });
         },
         onError: (err: Error) => {
-            toast({ title: "삭제 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubActivityListView.deleteFailTitle"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -102,11 +104,11 @@ export function ClubActivityList({
             });
         },
         onSuccess: () => {
-            toast({ title: "참여 취소", description: "정모 참여를 취소했습니다." });
+            toast({ title: t("clubActivityListView.leaveSuccessTitle"), description: t("clubActivityListView.leaveSuccessDesc") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/activities`] });
         },
         onError: (err: Error) => {
-            toast({ title: "취소 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubActivityListView.leaveFailTitle"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -173,7 +175,7 @@ export function ClubActivityList({
         }
     };
 
-    if (isLoading) return <div className="text-center py-8 text-black/55">데이터를 불러오는 중...</div>;
+    if (isLoading) return <div className="text-center py-8 text-black/55">{t("clubActivityListView.loading")}</div>;
 
     const allActivities: any[] = Array.isArray(activities) ? activities : [];
     const filteredActivities = allActivities.filter(a => a.sportCategory === sportType || (!a.sportCategory && sportType === 'BILLIARDS'));
@@ -200,7 +202,7 @@ export function ClubActivityList({
                 const totalCount = malesCount + femalesCount;
 
                 const diff = differenceInDays(startOfDay(new Date(activity.activityDate)), startOfDay(new Date()));
-                const dDayText = diff === 0 ? "D-Day" : diff > 0 ? `D-${diff}` : "종료";
+                const dDayText = diff === 0 ? "D-Day" : diff > 0 ? `D-${diff}` : t("clubActivityListView.ended");
                 const dDayColor = diff === 0 ? "bg-red-500 text-white" : diff > 0 && diff <= 3 ? "bg-orange-500 text-white" : "bg-brand text-brand-fg";
 
                 return (
@@ -216,36 +218,36 @@ export function ClubActivityList({
 
                                         {/* Admin Actions moved to bottom */}
                                     </div>
-                                    <p className="text-xs text-ink-3 font-medium ml-0.5">공식 모임</p>
+                                    <p className="text-xs text-ink-3 font-medium ml-0.5">{t("clubActivityListView.officialMeeting")}</p>
                                 </div>
                                 {isJoined && (
                                     <div className="flex items-center gap-1 text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded-full border border-brand/20">
                                         <span className="w-1 h-1 rounded-full bg-brand animate-pulse" />
-                                        참여중
+                                        {t("clubActivityListView.joinedBadge")}
                                     </div>
                                 )}
                             </div>
 
                             <div className="grid grid-cols-1 gap-2.5 mb-5 text-[13px]">
                                 <div className="flex items-center">
-                                    <div className="w-10 shrink-0 text-xs font-semibold text-ink-3">일시</div>
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-ink-3">{t("clubActivityListView.dateLabel")}</div>
                                     <div className="font-medium text-ink-2">
-                                        {format(new Date(activity.activityDate), "M월 d일 (E) a h:mm", { locale: ko })}
+                                        {format(new Date(activity.activityDate), t("clubActivityListView.dateTimeFormat"), { locale: ko })}
                                     </div>
                                 </div>
                                 <div className="flex items-start">
-                                    <div className="w-10 shrink-0 text-xs font-semibold text-ink-3 mt-0.5">위치</div>
-                                    <div className="font-medium text-ink-2">{activity.locationName || "장소 미정"}</div>
+                                    <div className="w-10 shrink-0 text-xs font-semibold text-ink-3 mt-0.5">{t("clubActivityListView.locationLabel")}</div>
+                                    <div className="font-medium text-ink-2">{activity.locationName || t("clubActivityListView.locationTbd")}</div>
                                 </div>
                                 {activity.cost && (
                                     <div className="flex items-center">
-                                        <div className="w-10 shrink-0 text-xs font-semibold text-ink-3">비용</div>
+                                        <div className="w-10 shrink-0 text-xs font-semibold text-ink-3">{t("clubActivityListView.costLabel")}</div>
                                         <div className="font-medium text-ink-2 text-sm">{activity.cost}</div>
                                     </div>
                                 )}
                                 {activity.description && (
                                     <div className="flex items-start mt-1 pt-2 border-t border-surface-line">
-                                        <div className="w-10 shrink-0 text-xs font-semibold text-ink-3 mt-0.5">메모</div>
+                                        <div className="w-10 shrink-0 text-xs font-semibold text-ink-3 mt-0.5">{t("clubActivityListView.memoLabel")}</div>
                                         <div className="font-medium text-ink-2 text-xs leading-relaxed whitespace-pre-wrap">
                                             {activity.description}
                                         </div>
@@ -253,7 +255,7 @@ export function ClubActivityList({
                                 )}
                                 <div className="flex items-center justify-between pt-1">
                                     <div className="flex items-center w-full">
-                                        <div className="w-10 shrink-0 text-xs font-semibold text-ink-3">참석</div>
+                                        <div className="w-10 shrink-0 text-xs font-semibold text-ink-3">{t("clubActivityListView.attendLabel")}</div>
                                         <div className="flex items-center gap-2">
                                             <div className="flex -space-x-2">
                                                 {(activity.participants || []).slice(0, 5).map((p: any, idx: number) => (
@@ -271,7 +273,7 @@ export function ClubActivityList({
                                                 )}
                                             </div>
                                             <span className="text-xs font-bold tabular-nums text-black/55">
-                                                {activity.participants?.length || 0} / {activity.maxParticipants}명
+                                                {activity.participants?.length || 0} / {activity.maxParticipants}{t("clubActivityListView.personSuffix")}
                                             </span>
                                         </div>
 
@@ -285,7 +287,7 @@ export function ClubActivityList({
                                                 }}
                                                 className="ml-auto text-xs bg-brand text-brand-fg px-4 py-2 rounded-pill font-semibold flex items-center gap-1.5 hover:bg-brand-strong active:scale-95 transition-all cursor-pointer z-20"
                                             >
-                                                <LucideZap className="w-3.5 h-3.5 fill-current" /> 팀 편성
+                                                <LucideZap className="w-3.5 h-3.5 fill-current" /> {t("clubActivityListView.teamAssignButton")}
                                             </button>
                                         )}
                                     </div>
@@ -302,13 +304,13 @@ export function ClubActivityList({
                                                         <LucideZap className="w-5 h-5 text-brand" />
                                                     </div>
                                                     <div>
-                                                        <h4 className="text-sm font-semibold text-ink-1 leading-tight">{terms.teamLabel} 편성 마법사</h4>
+                                                        <h4 className="text-sm font-semibold text-ink-1 leading-tight">{terms.teamLabel}{t("clubActivityListView.wizardTitleSuffix")}</h4>
                                                     </div>
                                                 </div>
                                                 <button
                                                     onClick={() => setExpandedActivityId(null)}
                                                     className="w-8 h-8 rounded-full bg-black/[0.06] flex items-center justify-center text-black/40 hover:text-ink-1 transition-colors"
-                                                    title="닫기"
+                                                    title={t("clubActivityListView.close")}
                                                     aria-label="Close"
                                                 >
                                                     <LucideX className="w-4 h-4" />
@@ -318,15 +320,15 @@ export function ClubActivityList({
                                             <div className="mb-6 space-y-4">
                                                 <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-5">
                                                     <div className="flex flex-col items-center gap-1 pb-2 border-b border-black/10">
-                                                        <span className="text-xs font-medium text-black/55">현재 참여 인원</span>
+                                                        <span className="text-xs font-medium text-black/55">{t("clubActivityListView.currentParticipants")}</span>
                                                         <div className="flex items-center gap-3">
                                                             <span className="text-2xl font-bold tabular-nums text-ink-1">{totalCount}</span>
-                                                            <span className="text-sm font-semibold text-brand">참가자</span>
+                                                            <span className="text-sm font-semibold text-brand">{t("clubActivityListView.participantsWord")}</span>
                                                         </div>
                                                         {(totalCount > 0) && (
                                                             <div className="flex items-center gap-2 mt-1">
-                                                                <span className="text-xs font-semibold tabular-nums text-brand bg-brand/10 px-2 py-0.5 rounded-full">남 {malesCount}</span>
-                                                                <span className="text-xs font-semibold tabular-nums text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-full">여 {femalesCount}</span>
+                                                                <span className="text-xs font-semibold tabular-nums text-brand bg-brand/10 px-2 py-0.5 rounded-full">{t("clubActivityListView.malePrefix")}{malesCount}</span>
+                                                                <span className="text-xs font-semibold tabular-nums text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-full">{t("clubActivityListView.femalePrefix")}{femalesCount}</span>
                                                             </div>
                                                         )}
                                                     </div>
@@ -334,12 +336,12 @@ export function ClubActivityList({
                                                     {/* Manual Name Input Feature */}
                                                     <div className="space-y-2">
                                                         <div className="flex items-center justify-between px-1">
-                                                            <label className="text-xs font-medium text-black/55">명단 직접 입력 (붙여넣기)</label>
+                                                            <label className="text-xs font-medium text-black/55">{t("clubActivityListView.manualInputLabel")}</label>
                                                             <button
                                                                 onClick={() => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], showManualInput: !prev[activity.id].showManualInput } }))}
                                                                 className="text-xs font-semibold text-brand hover:underline"
                                                             >
-                                                                {currentTeamData.showManualInput ? "숨기기" : "열기"}
+                                                                {currentTeamData.showManualInput ? t("clubActivityListView.hide") : t("clubActivityListView.open")}
                                                             </button>
                                                         </div>
                                                         {currentTeamData.showManualInput && (
@@ -347,11 +349,11 @@ export function ClubActivityList({
                                                                 <textarea
                                                                     value={currentTeamData.manualInput}
                                                                     onChange={(e) => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], manualInput: e.target.value } }))}
-                                                                    placeholder="이름을 입력하세요 (엔터나 콤마로 구분)&#13;&#10;예: 김철수, 이영희(여), 박지민여, 유니♀"
+                                                                    placeholder={t("clubActivityListView.manualInputPlaceholder")}
                                                                     className="w-full h-32 bg-surface-3 rounded-tile p-3 text-xs text-ink-1 placeholder:text-black/40 focus:border-brand/50 focus:outline-none transition-all"
                                                                 />
                                                                 <p className="text-xs text-black/45 px-1">
-                                                                    * 이름 뒤에 ♀ 또는 '여'를 붙이면 여성으로 인식됩니다. (예: 영희여, 영희(여))
+                                                                    {t("clubActivityListView.manualInputHint")}
                                                                 </p>
                                                             </div>
                                                         )}
@@ -359,7 +361,7 @@ export function ClubActivityList({
 
                                                     {/* Quick Setup Buttons */}
                                                     <div className="flex flex-col gap-2">
-                                                        <label className="text-xs font-medium text-black/45 ml-1">빠른 설정 (추천)</label>
+                                                        <label className="text-xs font-medium text-black/45 ml-1">{t("clubActivityListView.quickSetupLabel")}</label>
                                                         <div className="grid grid-cols-3 gap-2">
                                                             {[2, 3, 4].map(n => (
                                                                 <button
@@ -374,28 +376,28 @@ export function ClubActivityList({
                                                                     }}
                                                                     className="bg-black/[0.04] hover:bg-black/[0.06] py-2 rounded-tile text-xs font-semibold text-black/60 hover:text-ink-1 transition-all"
                                                                 >
-                                                                    {n}인 {terms.teamLabel}
+                                                                    {n}{t("clubActivityListView.nPersonSuffix")} {terms.teamLabel}
                                                                 </button>
                                                             ))}
                                                         </div>
                                                     </div>
 
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-xs text-black/60 font-medium">{terms.teamLabel} 개수</span>
+                                                        <span className="text-xs text-black/60 font-medium">{terms.teamLabel}{t("clubActivityListView.countSuffix")}</span>
                                                         <div className="flex items-center gap-3">
                                                             <button
                                                                 onClick={() => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], count: Math.max(1, prev[activity.id].count - 1) } }))}
                                                                 className="w-8 h-8 rounded-full bg-black/[0.06] flex items-center justify-center hover:bg-black/[0.1] text-ink-1"
-                                                                title="감소"
+                                                                title={t("clubActivityListView.decrease")}
                                                                 aria-label="Decrease"
                                                             >
                                                                 <LucideMinus className="w-3 h-3" />
                                                             </button>
-                                                            <span className="text-sm font-semibold tabular-nums text-ink-1 w-14 text-center">{currentTeamData.count}개 {terms.teamLabel}</span>
+                                                            <span className="text-sm font-semibold tabular-nums text-ink-1 w-14 text-center">{currentTeamData.count}{t("clubActivityListView.unitSuffix")} {terms.teamLabel}</span>
                                                             <button
                                                                 onClick={() => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], count: Math.min(activity.participants?.length || 50, prev[activity.id].count + 1) } }))}
                                                                 className="w-8 h-8 rounded-full bg-black/[0.06] flex items-center justify-center hover:bg-black/[0.1] text-ink-1"
-                                                                title="증가"
+                                                                title={t("clubActivityListView.increase")}
                                                                 aria-label="Increase"
                                                             >
                                                                 <LucidePlus className="w-3 h-3" />
@@ -415,9 +417,9 @@ export function ClubActivityList({
                                                                     currentTeamData.genderDist === mode ? "text-brand-fg" : "text-black/55 hover:text-black/80"
                                                                 )}
                                                             >
-                                                                {mode === 'random' && "랜덤"}
-                                                                {mode === 'spread' && "여성 균등"}
-                                                                {mode === 'group' && "여성 구분"}
+                                                                {mode === 'random' && t("clubActivityListView.random")}
+                                                                {mode === 'spread' && t("clubActivityListView.spreadFemale")}
+                                                                {mode === 'group' && t("clubActivityListView.groupFemale")}
                                                             </button>
                                                         ))}
                                                         <div
@@ -438,10 +440,10 @@ export function ClubActivityList({
                                                     >
                                                         {isGenerating ? (
                                                             <span className="flex items-center gap-1.5 text-sm font-semibold text-black/55">
-                                                                <LucideRefreshCw className="w-3.5 h-3.5 animate-spin" /> 편성 중
+                                                                <LucideRefreshCw className="w-3.5 h-3.5 animate-spin" /> {t("clubActivityListView.generating")}
                                                             </span>
                                                         ) : (
-                                                            <span className="text-sm font-semibold text-ink-1 group-hover:text-brand-fg">실력 밸런스</span>
+                                                            <span className="text-sm font-semibold text-ink-1 group-hover:text-brand-fg">{t("clubActivityListView.balanceButton")}</span>
                                                         )}
                                                     </button>
                                                     <button
@@ -451,10 +453,10 @@ export function ClubActivityList({
                                                     >
                                                         {isGenerating ? (
                                                             <span className="flex items-center gap-1.5 text-sm font-semibold text-black/55">
-                                                                <LucideRefreshCw className="w-3.5 h-3.5 animate-spin" /> 편성 중
+                                                                <LucideRefreshCw className="w-3.5 h-3.5 animate-spin" /> {t("clubActivityListView.generating")}
                                                             </span>
                                                         ) : (
-                                                            <span className="text-sm font-semibold text-ink-1 group-hover:text-brand-fg">완전 랜덤</span>
+                                                            <span className="text-sm font-semibold text-ink-1 group-hover:text-brand-fg">{t("clubActivityListView.fullRandomButton")}</span>
                                                         )}
                                                     </button>
                                                 </div>
@@ -465,9 +467,9 @@ export function ClubActivityList({
                                             <div className="bg-white px-4 py-2 flex items-center justify-between border-b border-black/10">
                                                 <div className="flex items-center gap-2">
                                                     <LucideZap className="w-4 h-4 text-brand" />
-                                                    <span className="text-xs font-bold text-ink-1">{terms.teamLabel} 편성 결과 ({currentTeamData.teams.length}개 {terms.teamLabel})</span>
+                                                    <span className="text-xs font-bold text-ink-1">{terms.teamLabel}{t("clubActivityListView.resultTitleSuffix")} ({currentTeamData.teams.length}{t("clubActivityListView.unitSuffix")} {terms.teamLabel})</span>
                                                 </div>
-                                                <span className="text-xs font-semibold text-brand bg-brand/10 px-1.5 py-0.5 rounded-pill border border-brand/20">AI 최적화</span>
+                                                <span className="text-xs font-semibold text-brand bg-brand/10 px-1.5 py-0.5 rounded-pill border border-brand/20">{t("clubActivityListView.aiOptimized")}</span>
                                             </div>
 
                                             <div className="p-4 relative">
@@ -498,19 +500,19 @@ export function ClubActivityList({
 
                                                 <div className="mt-6 space-y-3">
                                                     <div className="px-1 flex items-center justify-between">
-                                                        <label htmlFor={`result-text-${activity.id}`} className="text-xs font-medium text-black/55">편성 전체 결과 (텍스트)</label>
-                                                        <span className="text-xs text-black/45">채팅방 공유 전 수정 가능합니다</span>
+                                                        <label htmlFor={`result-text-${activity.id}`} className="text-xs font-medium text-black/55">{t("clubActivityListView.resultTextLabel")}</label>
+                                                        <span className="text-xs text-black/45">{t("clubActivityListView.resultTextHint")}</span>
                                                     </div>
                                                     <textarea
                                                         readOnly={false}
                                                         defaultValue={(() => {
-                                                            const dateStr = format(new Date(activity.activityDate), "M월 d일 (E) a h:mm", { locale: ko });
-                                                            const locStr = activity.locationName || "장소 미정";
-                                                            const tStr = currentTeamData.teams.map((t: any) => `[${t.name} (${terms.avgLabel}: ${+Number(t.avg).toFixed(2)})]\n${t.members.map((m: any) => {
+                                                            const dateStr = format(new Date(activity.activityDate), t("clubActivityListView.dateTimeFormat"), { locale: ko });
+                                                            const locStr = activity.locationName || t("clubActivityListView.locationTbd");
+                                                            const tStr = currentTeamData.teams.map((team: any) => `[${team.name} (${terms.avgLabel}: ${+Number(team.avg).toFixed(2)})]\n${team.members.map((m: any) => {
                                                                 const score = sportType === 'GOLF' ? (m.member?.golfAvgScore || 0) : (m.member?.avg4c || 0);
-                                                                return `• ${m.member?.name}${m.member?.gender === 'F' ? '(여)' : ''} (${+Number(score).toFixed(2)}${terms.unit})`;
+                                                                return `• ${m.member?.name}${m.member?.gender === 'F' ? t("clubActivityListView.femaleMark") : ''} (${+Number(score).toFixed(2)}${terms.unit})`;
                                                             }).join('\n')}`).join('\n\n');
-                                                            return `[${terms.emoji} ${terms.teamLabel} 편성 결과]\n--------------------------\n📌 모임: ${activity.title}\n📅 일시: ${dateStr}\n📍 장소: ${locStr}\n--------------------------\n\n${tStr}`;
+                                                            return `[${terms.emoji} ${terms.teamLabel}${t("clubActivityListView.resultTitleSuffix")}]\n--------------------------\n${t("clubActivityListView.shareMeetupLabel")}${activity.title}\n${t("clubActivityListView.shareDateLabel")}${dateStr}\n${t("clubActivityListView.shareLocationLabel")}${locStr}\n--------------------------\n\n${tStr}`;
                                                         })()}
                                                         id={`result-text-${activity.id}`}
                                                         className="w-full h-32 bg-white rounded-tile p-3 text-xs text-black/70 focus:outline-none focus:border-brand/30 transition-all font-mono leading-relaxed"
@@ -522,7 +524,7 @@ export function ClubActivityList({
                                                         onClick={() => setTeamData(prev => ({ ...prev, [activity.id]: { ...prev[activity.id], step: 'setup' } }))}
                                                         className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-tile text-xs text-black/55 hover:text-ink-1 bg-black/[0.04] hover:bg-black/[0.06] transition-all "
                                                     >
-                                                        <LucideRefreshCw className="w-3.5 h-3.5" /> 다시 설정
+                                                        <LucideRefreshCw className="w-3.5 h-3.5" /> {t("clubActivityListView.resetButton")}
                                                     </button>
                                                     <button
                                                         onClick={() => {
@@ -532,12 +534,12 @@ export function ClubActivityList({
                                                                 onShareToChat(fullMsg);
                                                             } else {
                                                                 navigator.clipboard.writeText(fullMsg);
-                                                                toast({ title: "복사 완료", description: "클립보드에 결과가 저장되었습니다." });
+                                                                toast({ title: t("clubActivityListView.copySuccessTitle"), description: t("clubActivityListView.copySuccessDesc") });
                                                             }
                                                         }}
                                                         className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-tile text-xs bg-brand text-brand-fg hover:bg-brand-strong transition-all font-semibold"
                                                     >
-                                                        <LucideMessageCircle className="w-4 h-4" /> 채팅방 공유
+                                                        <LucideMessageCircle className="w-4 h-4" /> {t("clubActivityListView.shareToChat")}
                                                     </button>
                                                 </div>
                                             </div>
@@ -554,18 +556,18 @@ export function ClubActivityList({
                                         onClick={() => joinMutation.mutate(activity.id)}
                                         disabled={isFull || joinMutation.isPending}
                                     >
-                                        {isFull ? "인원 마감" : <span className="flex items-center gap-2 font-bold">참여하기 <LucideChevronRight className="w-3.5 h-3.5" /></span>}
+                                        {isFull ? t("clubActivityListView.full") : <span className="flex items-center gap-2 font-bold">{t("clubActivityListView.joinButton")} <LucideChevronRight className="w-3.5 h-3.5" /></span>}
                                     </Button>
                                     <Button
                                         variant="outline"
                                         className="w-11 h-11 p-0 border-black/10 bg-black/[0.04] hover:bg-black/[0.06] text-black/60 rounded-tile"
                                         onClick={() => {
-                                            const dateStr = format(new Date(activity.activityDate), "M월 d일 (E) a h:mm", { locale: ko });
-                                            const fullMsg = `[${terms.emoji} 정모 안내]\n--------------------------\n📍 장소: ${activity.locationName || "장소 미정"}\n📅 일시: ${dateStr}\n👥 인원: ${activity.participants?.length || 0} / ${activity.maxParticipants}명\n--------------------------`;
+                                            const dateStr = format(new Date(activity.activityDate), t("clubActivityListView.dateTimeFormat"), { locale: ko });
+                                            const fullMsg = `[${terms.emoji} ${t("clubActivityListView.shareNoticeTitle")}]\n--------------------------\n${t("clubActivityListView.shareLocationLabel")}${activity.locationName || t("clubActivityListView.locationTbd")}\n${t("clubActivityListView.shareDateLabel")}${dateStr}\n${t("clubActivityListView.shareParticipantsLabel")}${activity.participants?.length || 0} / ${activity.maxParticipants}${t("clubActivityListView.personSuffix")}\n--------------------------`;
                                             if (onShareToChat) onShareToChat(fullMsg); else navigator.clipboard.writeText(fullMsg);
-                                            toast({ title: "공유 정보 복사 완료" });
+                                            toast({ title: t("clubActivityListView.shareCopied") });
                                         }}
-                                        title="공유하기"
+                                        title={t("clubActivityListView.shareTitle")}
                                     >
                                         <LucideShare2 className="w-4 h-4" />
                                     </Button>
@@ -580,7 +582,7 @@ export function ClubActivityList({
                                         onClick={() => setLeaveConfirmId(activity.id)}
                                         disabled={leaveMutation.isPending}
                                     >
-                                        참여 취소하기
+                                        {t("clubActivityListView.leaveButton")}
                                     </Button>
                                 </div>
                             )}
@@ -595,14 +597,14 @@ export function ClubActivityList({
                                             setIsEditOpen(true);
                                         }}
                                     >
-                                        <LucidePencil className="w-3 h-3 mr-1.5" /> 수정하기
+                                        <LucidePencil className="w-3 h-3 mr-1.5" /> {t("clubActivityListView.editButton")}
                                     </Button>
                                     <Button
                                         variant="outline"
                                         className="flex-1 bg-black/[0.04] border-black/10 text-black/55 hover:text-red-500 hover:bg-red-500/10 text-xs font-semibold h-9 rounded-tile"
                                         onClick={() => setDeleteConfirmId(activity.id)}
                                     >
-                                        <LucideTrash2 className="w-3 h-3 mr-1.5" /> 삭제하기
+                                        <LucideTrash2 className="w-3 h-3 mr-1.5" /> {t("clubActivityListView.deleteButton")}
                                     </Button>
                                 </div>
                             )}
@@ -617,13 +619,13 @@ export function ClubActivityList({
                         <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
                             <LucideCalendarDays className="w-6 h-6 text-black/40" />
                         </div>
-                        <p className="text-sm font-semibold text-black/70">일정을 불러오지 못했습니다</p>
+                        <p className="text-sm font-semibold text-black/70">{t("clubActivityListView.loadError")}</p>
                         <Button
                             variant="ghost"
                             onClick={() => refetch()}
                             className="h-10 px-5 rounded-pill bg-surface-3 hover:bg-black/[0.06] text-black/70 text-xs font-semibold"
                         >
-                            <LucideRefreshCw className="w-3.5 h-3.5 mr-1.5" /> 다시 시도
+                            <LucideRefreshCw className="w-3.5 h-3.5 mr-1.5" /> {t("clubActivityListView.retry")}
                         </Button>
                     </CardContent>
                 </Card>
@@ -635,9 +637,9 @@ export function ClubActivityList({
                         <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center mb-1">
                             <LucideCalendarDays className="w-6 h-6 text-black/40" />
                         </div>
-                        <h3 className="text-sm font-semibold text-black/70">예정된 정모가 없습니다</h3>
+                        <h3 className="text-sm font-semibold text-black/70">{t("clubActivityListView.emptyTitle")}</h3>
                         <p className="text-xs text-black/55 font-medium">
-                            {isMember ? "첫 정모를 만들어 멤버들과 모여보세요." : "곧 새로운 모임이 열릴 예정이에요."}
+                            {isMember ? t("clubActivityListView.emptyMemberDesc") : t("clubActivityListView.emptyGuestDesc")}
                         </p>
                     </CardContent>
                 </Card>
@@ -653,8 +655,8 @@ export function ClubActivityList({
                             <div className="w-12 h-12 rounded-full bg-brand/10 group-hover:bg-brand flex items-center justify-center transition-colors">
                                 <LucidePlus className="w-6 h-6 text-brand group-hover:text-brand-fg transition-colors" />
                             </div>
-                            <h3 className="text-ink-1 font-semibold group-hover:text-brand transition-colors">새로운 정모 만들기</h3>
-                            <p className="text-xs text-black/55 font-medium">언제든 자유롭게 모임을 시작해보세요!</p>
+                            <h3 className="text-ink-1 font-semibold group-hover:text-brand transition-colors">{t("clubActivityListView.createTitle")}</h3>
+                            <p className="text-xs text-black/55 font-medium">{t("clubActivityListView.createDesc")}</p>
                         </CardContent>
                     </Card>
                 )
@@ -686,18 +688,18 @@ export function ClubActivityList({
             <AlertDialog open={!!leaveConfirmId} onOpenChange={(open) => !open && setLeaveConfirmId(null)}>
                 <AlertDialogContent className="bg-white border-black/[0.08] text-ink-1 rounded-card">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-ink-1">참여 취소</AlertDialogTitle>
+                        <AlertDialogTitle className="text-ink-1">{t("clubActivityListView.leaveDialogTitle")}</AlertDialogTitle>
                         <AlertDialogDescription className="text-black/60">
-                            정모 참여를 취소하시겠습니까?
+                            {t("clubActivityListView.leaveDialogDesc")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-surface-3 border-black/10 text-ink-1 hover:bg-black/[0.06]">돌아가기</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-surface-3 border-black/10 text-ink-1 hover:bg-black/[0.06]">{t("clubActivityListView.goBack")}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => { if (leaveConfirmId) leaveMutation.mutate(leaveConfirmId); }}
                             className="bg-red-500 text-white hover:bg-red-600"
                         >
-                            참여 취소
+                            {t("clubActivityListView.leaveDialogTitle")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -706,18 +708,18 @@ export function ClubActivityList({
             <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
                 <AlertDialogContent className="bg-white border-black/[0.08] text-ink-1 rounded-card">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-ink-1">정모 삭제</AlertDialogTitle>
+                        <AlertDialogTitle className="text-ink-1">{t("clubActivityListView.deleteDialogTitle")}</AlertDialogTitle>
                         <AlertDialogDescription className="text-black/60">
-                            정말 이 정모를 삭제하시겠습니까?
+                            {t("clubActivityListView.deleteDialogDesc")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-surface-3 border-black/10 text-ink-1 hover:bg-black/[0.06]">취소</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-surface-3 border-black/10 text-ink-1 hover:bg-black/[0.06]">{t("clubActivityListView.cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => { if (deleteConfirmId) deleteMutation.mutate(deleteConfirmId); }}
                             className="bg-red-500 text-white hover:bg-red-600"
                         >
-                            삭제하기
+                            {t("clubActivityListView.deleteButton")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

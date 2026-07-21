@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
@@ -43,6 +43,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { LucideCalendar, LucideMapPin, LucideCoins, LucideUsers, LucideClock, LucideCar } from "@/lib/icons";
 import { CategorySelector, ActivityCategory } from "./CategorySelector";
 import { LocationSearch } from "./LocationSearch";
+import { useT } from "@/lib/i18n";
 
 interface CreateGolfActivityModalProps {
     open: boolean;
@@ -51,27 +52,30 @@ interface CreateGolfActivityModalProps {
     initialData?: any; // For Edit Mode
 }
 
-const formSchema = z.object({
-    category: z.string().min(1, "카테고리를 선택해주세요"),
-    title: z.string().min(1, "모임명을 입력해주세요"),
+const buildFormSchema = (t: (key: string) => string) => z.object({
+    category: z.string().min(1, t("createGolfActivityModal.errCategory")),
+    title: z.string().min(1, t("createGolfActivityModal.errTitle")),
     description: z.string().optional(),
-    startDate: z.date({ required_error: "일시를 선택해주세요" }),
+    startDate: z.date({ required_error: t("createGolfActivityModal.errDate") }),
     endDate: z.date().optional(), // For Tour
-    time: z.string().min(1, "시간을 선택해주세요"),
+    time: z.string().min(1, t("createGolfActivityModal.errTime")),
     locationName: z.string().optional(),
     cost: z.string().optional(),
-    maxParticipants: z.coerce.number().min(2, "최소 2명 이상이어야 합니다").optional().default(4),
+    maxParticipants: z.coerce.number().min(2, t("createGolfActivityModal.errMaxParticipants")).optional().default(4),
 
     // Golf Special Fields
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<ReturnType<typeof buildFormSchema>>;
 
 export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialData }: CreateGolfActivityModalProps) {
+    const { t } = useT();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [selectedCategory, setSelectedCategory] = useState<ActivityCategory | null>(null);
     const isEditMode = !!initialData;
+
+    const formSchema = useMemo(() => buildFormSchema(t), [t]);
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -126,23 +130,23 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
 
         switch (category) {
             case "REGULAR_ROUNDING":
-                templateTitle = `⛳️ [정기] ${format(today, "M월")} 월례회 라운딩`;
+                templateTitle = `${t("createGolfActivityModal.tplRegularRoundingPrefix")}${format(today, "M")}${t("createGolfActivityModal.tplRegularRoundingSuffix")}`;
                 break;
             case "BLITZ_ROUNDING":
-                templateTitle = `⚡️ [번개] ${dateStr} 급하게 한 분 모십니다!`;
+                templateTitle = `${t("createGolfActivityModal.tplBlitzRoundingPrefix")}${dateStr}${t("createGolfActivityModal.tplBlitzRoundingSuffix")}`;
                 break;
             case "GOLF_TOUR":
-                templateTitle = `✈️ [투어] 제주도 1박 2일 골프 여행`;
+                templateTitle = t("createGolfActivityModal.tplGolfTour");
                 defaultMax = 8;
                 break;
             case "REGULAR_SCREEN":
-                templateTitle = `📺 [스크린] ${format(today, "M월")} 정기 스크린 모임`;
+                templateTitle = `${t("createGolfActivityModal.tplRegularScreenPrefix")}${format(today, "M")}${t("createGolfActivityModal.tplRegularScreenSuffix")}`;
                 break;
             case "BLITZ_SCREEN":
-                templateTitle = `⚡️ [스크린] 오늘 저녁 가볍게 한 게임?`;
+                templateTitle = t("createGolfActivityModal.tplBlitzScreen");
                 break;
             case "AFTER_PARTY":
-                templateTitle = `🍺 [뒷풀이] 운동 없이 맛있는 저녁 모임`;
+                templateTitle = t("createGolfActivityModal.tplAfterParty");
                 defaultMax = 10;
                 break;
         }
@@ -163,7 +167,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
 
             // Append Special Fields to Description
             const extras: string[] = [];
-            if (data.endDate) extras.push(`📅 일정: ${format(data.startDate, "M/d")} ~ ${format(data.endDate, "M/d")}`);
+            if (data.endDate) extras.push(`${t("createGolfActivityModal.tourScheduleLabel")} ${format(data.startDate, "M/d")} ~ ${format(data.endDate, "M/d")}`);
 
             if (extras.length > 0) {
                 richDescription = `${richDescription}\n\n---\n${extras.join('\n')}`;
@@ -194,8 +198,8 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
         },
         onSuccess: () => {
             toast({
-                title: isEditMode ? "모임 수정 완료" : "모임 생성 완료",
-                description: isEditMode ? "골프 정모 정보가 수정되었습니다." : "새로운 골프 정모가 등록되었습니다.",
+                title: isEditMode ? t("createGolfActivityModal.toastEditSuccessTitle") : t("createGolfActivityModal.toastCreateSuccessTitle"),
+                description: isEditMode ? t("createGolfActivityModal.toastEditSuccessDesc") : t("createGolfActivityModal.toastCreateSuccessDesc"),
             });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/activities`] });
             onOpenChange(false);
@@ -205,7 +209,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
             }
         },
         onError: (err: Error) => {
-            toast({ title: isEditMode ? "수정 실패" : "생성 실패", description: err.message, variant: "destructive" });
+            toast({ title: isEditMode ? t("createGolfActivityModal.toastEditFailTitle") : t("createGolfActivityModal.toastCreateFailTitle"), description: err.message, variant: "destructive" });
         },
     });
 
@@ -221,7 +225,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
             <DialogContent className="bg-white text-ink-1 w-[95%] max-w-[420px] rounded-card p-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <DialogHeader className="mb-4">
                     <DialogTitle className="text-xl font-semibold text-center">
-                        <span className="text-brand">골프</span> 정모 {isEditMode ? "수정" : "만들기"}
+                        <span className="text-brand">{t("createGolfActivityModal.golf")}</span> {isEditMode ? t("createGolfActivityModal.titleEdit") : t("createGolfActivityModal.titleCreate")}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -230,7 +234,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
 
                         {/* 1. Category Selector */}
                         <div className="space-y-2">
-                            <FormLabel className="text-xs text-ink-3 font-medium ml-1">모임 성격 선택</FormLabel>
+                            <FormLabel className="text-xs text-ink-3 font-medium ml-1">{t("createGolfActivityModal.labelCategory")}</FormLabel>
                             <CategorySelector selected={selectedCategory} onSelect={handleCategorySelect} />
                         </div>
 
@@ -238,7 +242,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                             <div className="space-y-4 animate-in slide-in-from-bottom-2 fade-in duration-300">
 
                                 <div className="space-y-4 p-4 bg-black/[0.03] rounded-tile ">
-                                    <div className="text-xs text-ink-3 font-medium mb-2">상세 정보 입력</div>
+                                    <div className="text-xs text-ink-3 font-medium mb-2">{t("createGolfActivityModal.labelDetails")}</div>
 
                                     {/* Title */}
                                     <FormField
@@ -248,7 +252,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             <FormItem className="space-y-1">
                                                 <FormControl>
                                                     <Input
-                                                        placeholder="모임명을 입력하세요"
+                                                        placeholder={t("createGolfActivityModal.phTitle")}
                                                         {...field}
                                                         className="bg-surface-2 h-12 rounded-tile px-4 text-base font-bold text-ink-1 placeholder:text-black/40 placeholder:font-normal focus-visible:ring-1 focus-visible:ring-brand/30"
                                                     />
@@ -266,7 +270,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1 flex flex-col">
                                                     <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
-                                                        <LucideCalendar className="w-3 h-3" /> {isTour ? "시작 일시" : "모임 날짜"}
+                                                        <LucideCalendar className="w-3 h-3" /> {isTour ? t("createGolfActivityModal.labelStartDateTour") : t("createGolfActivityModal.labelDate")}
                                                     </FormLabel>
                                                     <Popover>
                                                         <PopoverTrigger asChild>
@@ -281,7 +285,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                                     {field.value ? (
                                                                         format(field.value, "MM/dd (E)", { locale: ko })
                                                                     ) : (
-                                                                        <span>날짜 선택</span>
+                                                                        <span>{t("createGolfActivityModal.pickDate")}</span>
                                                                     )}
                                                                 </Button>
                                                             </FormControl>
@@ -307,7 +311,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1">
                                                     <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
-                                                        <LucideClock className="w-3 h-3" /> 시간 (티오프)
+                                                        <LucideClock className="w-3 h-3" /> {t("createGolfActivityModal.labelTime")}
                                                     </FormLabel>
                                                     <FormControl>
                                                         <Input
@@ -330,7 +334,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1 flex flex-col">
                                                     <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
-                                                        <LucideCalendar className="w-3 h-3" /> 종료 일시 (투어)
+                                                        <LucideCalendar className="w-3 h-3" /> {t("createGolfActivityModal.labelEndDate")}
                                                     </FormLabel>
                                                     <Popover>
                                                         <PopoverTrigger asChild>
@@ -345,7 +349,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                                     {field.value ? (
                                                                         format(field.value, "MM/dd (E)", { locale: ko })
                                                                     ) : (
-                                                                        <span>종료 날짜 선택</span>
+                                                                        <span>{t("createGolfActivityModal.pickEndDate")}</span>
                                                                     )}
                                                                 </Button>
                                                             </FormControl>
@@ -374,7 +378,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1">
                                                     <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
-                                                        <LucideMapPin className="w-3 h-3" /> 장소 (골프장/매장)
+                                                        <LucideMapPin className="w-3 h-3" /> {t("createGolfActivityModal.labelLocation")}
                                                     </FormLabel>
                                                     <FormControl>
                                                         {/* Use Mock Search for Field/Tour, Simple Input for Others */}
@@ -385,7 +389,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                                             />
                                                         ) : (
                                                             <Input
-                                                                placeholder="장소 / 매장명"
+                                                                placeholder={t("createGolfActivityModal.phLocation")}
                                                                 {...field}
                                                                 value={field.value || ""}
                                                                 className="bg-surface-2 h-12 rounded-tile px-4 text-sm text-ink-1 placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
@@ -402,7 +406,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             render={({ field }) => (
                                                 <FormItem className="space-y-1">
                                                     <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
-                                                        <LucideUsers className="w-3 h-3" /> 정원 (최대 인원)
+                                                        <LucideUsers className="w-3 h-3" /> {t("createGolfActivityModal.labelMaxParticipants")}
                                                     </FormLabel>
                                                     <FormControl>
                                                         <Input
@@ -426,13 +430,13 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                         render={({ field }) => (
                                             <FormItem className="space-y-1">
                                                 <FormLabel className="text-xs text-ink-3 font-medium ml-1 flex items-center gap-1">
-                                                    <LucideCoins className="w-3 h-3" /> 비용 (참가비)
+                                                    <LucideCoins className="w-3 h-3" /> {t("createGolfActivityModal.labelCost")}
                                                 </FormLabel>
                                                 <FormControl>
                                                     <Input
                                                         type="text"
                                                         autoComplete="off"
-                                                        placeholder="예: 그린피 25, 카트/캐디 1/N"
+                                                        placeholder={t("createGolfActivityModal.phCost")}
                                                         {...field}
                                                         value={field.value || ""}
                                                         className="bg-surface-2 h-12 rounded-tile px-4 text-sm text-ink-1 placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
@@ -450,7 +454,7 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                             <FormItem className="space-y-1 pt-2">
                                                 <FormControl>
                                                     <Textarea
-                                                        placeholder="추가 전달사항 (준비물, 드레스코드 등)"
+                                                        placeholder={t("createGolfActivityModal.phDescription")}
                                                         {...field}
                                                         value={field.value || ""}
                                                         className="bg-surface-2 rounded-tile p-3 resize-none h-24 focus-visible:ring-1 focus-visible:ring-brand/30 transition-all text-ink-1 placeholder:text-black/40 text-sm leading-relaxed"
@@ -470,8 +474,8 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                                 disabled={createMutation.isPending || !selectedCategory}
                             >
                                 {createMutation.isPending
-                                    ? (isEditMode ? "수정 중..." : "생성 중...")
-                                    : (isEditMode ? "정모 수정" : "정모 만들기")}
+                                    ? (isEditMode ? t("createGolfActivityModal.submitEditing") : t("createGolfActivityModal.submitCreating"))
+                                    : (isEditMode ? t("createGolfActivityModal.submitEdit") : t("createGolfActivityModal.submitCreate"))}
                             </Button>
                         </DialogFooter>
                     </form>

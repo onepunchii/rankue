@@ -14,6 +14,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { useT } from "@/lib/i18n";
 
 interface CreateSettlementDialogProps {
     open: boolean;
@@ -26,7 +27,8 @@ interface CreateSettlementDialogProps {
 }
 
 export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me, onSubmit, isPending }: CreateSettlementDialogProps) {
-    const [title, setTitle] = useState(`${new Date().getMonth() + 1}/${new Date().getDate()} 모임 정산`);
+    const { t } = useT();
+    const [title, setTitle] = useState(`${new Date().getMonth() + 1}/${new Date().getDate()} ${t("createSettlementDialog.defaultTitleSuffix")}`);
     const [accountBank, setAccountBank] = useState("");
     const [accountNumber, setAccountNumber] = useState("");
     const [accountHolder, setAccountHolder] = useState("");
@@ -47,7 +49,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
 
     // Rounds: [{ id: 1, title: '1차', amount: 0, payerId: '...', participants: ['id1', 'id2'] }]
     const [rounds, setRounds] = useState<any[]>([
-        { id: 1, title: "1차", amount: "", payerId: "", participants: activeMembers.map(m => m.member.id) }
+        { id: 1, title: `${t("createSettlementDialog.roundPrefix")}1${t("createSettlementDialog.roundSuffix")}`, amount: "", payerId: "", participants: activeMembers.map(m => m.member.id) }
     ]);
     const [isMemberSelectOpen, setIsMemberSelectOpen] = useState(false);
     const [activeRoundId, setActiveRoundId] = useState<number | null>(null);
@@ -74,7 +76,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
         const nextId = rounds.length + 1;
         setRounds([...rounds, {
             id: nextId,
-            title: `${nextId}차`,
+            title: `${t("createSettlementDialog.roundPrefix")}${nextId}${t("createSettlementDialog.roundSuffix")}`,
             amount: "",
             payerId: "", // Default empty, user selects
             participants: activeMembers.map(m => m.member.id) // Default all active members
@@ -135,7 +137,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent hideClose className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] max-w-md max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-card">
                 <div className="shrink-0 bg-white border-b border-black/[0.08] p-4 flex items-center justify-between z-10">
-                    <DialogTitle className="font-bold text-[19px] tracking-tight text-brand">새 정산 만들기</DialogTitle>
+                    <DialogTitle className="font-bold text-[19px] tracking-tight text-brand">{t("createSettlementDialog.title")}</DialogTitle>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-black/40" onClick={() => onOpenChange(false)}>
                         <LucideX className="w-5 h-5" />
                     </Button>
@@ -145,7 +147,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                     {/* Basic Info */}
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-black/55">정산 제목</Label>
+                            <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.titleLabel")}</Label>
                             <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
@@ -154,30 +156,30 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                             <div className="space-y-2 col-span-1">
-                                <Label className="text-xs font-semibold text-black/55">은행</Label>
+                                <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.bankLabel")}</Label>
                                 <Input
                                     value={accountBank}
                                     onChange={(e) => setAccountBank(e.target.value)}
-                                    placeholder="은행명"
+                                    placeholder={t("createSettlementDialog.bankPlaceholder")}
                                     className="bg-surface-2 border-surface-line h-12 rounded-tile text-base"
                                 />
                             </div>
                             <div className="space-y-2 col-span-2">
-                                <Label className="text-xs font-semibold text-black/55">계좌번호</Label>
+                                <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.accountLabel")}</Label>
                                 <Input
                                     value={accountNumber}
                                     onChange={(e) => setAccountNumber(e.target.value)}
-                                    placeholder="- 없이 입력"
+                                    placeholder={t("createSettlementDialog.accountPlaceholder")}
                                     className="bg-surface-2 border-surface-line h-12 rounded-tile text-base"
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-black/55">예금주</Label>
+                            <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.holderLabel")}</Label>
                             <Input
                                 value={accountHolder}
                                 onChange={(e) => setAccountHolder(e.target.value)}
-                                placeholder="예금주명"
+                                placeholder={t("createSettlementDialog.holderPlaceholder")}
                                 className="bg-surface-2 border-surface-line h-12 rounded-tile text-base"
                             />
                         </div>
@@ -190,12 +192,12 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                         {rounds.map((round, index) => (
                             <div key={round.id} className="relative rk-card-2 p-4">
                                 <div className="absolute top-4 right-4 text-[12px] font-semibold text-brand bg-brand/12 px-2.5 py-1 rounded-full">
-                                    {index + 1}단계
+                                    {t("createSettlementDialog.stepPrefix")}{index + 1}{t("createSettlementDialog.stepSuffix")}
                                 </div>
 
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">차수 이름</Label>
+                                        <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.roundNameLabel")}</Label>
                                         <Input
                                             value={round.title}
                                             onChange={(e) => handleRoundChange(round.id, 'title', e.target.value)}
@@ -203,7 +205,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">결제 금액</Label>
+                                        <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.amountLabel")}</Label>
                                         <div className="relative">
                                             <Input
                                                 type="number"
@@ -212,19 +214,19 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                                 placeholder="0"
                                                 className="bg-surface-2 border-surface-line h-12 rounded-tile text-lg font-bold pl-4 pr-8"
                                             />
-                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-black/40">원</span>
+                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-black/40">{t("createSettlementDialog.currencyUnit")}</span>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4 pt-2">
                                         <div className="flex items-center justify-between px-1">
-                                            <Label className="text-xs font-semibold text-black/55">참석자 관리</Label>
+                                            <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.participantsLabel")}</Label>
                                             <div className="flex items-center gap-2">
                                                 {recentActivities.length > 0 && (
                                                     <Select onValueChange={(val) => handleImportActivity(val, round.id)}>
                                                         <SelectTrigger className="h-8 bg-black/[0.04] border-black/10 text-[12px] font-semibold text-brand px-3 rounded-full w-auto gap-1">
                                                             <LucideCalendar className="w-3 h-3" />
-                                                            모임 가져오기
+                                                            {t("createSettlementDialog.importActivity")}
                                                         </SelectTrigger>
                                                         <SelectContent className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] rounded-tile">
                                                             {recentActivities.map((act: any) => (
@@ -243,7 +245,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                                     className="flex items-center gap-1 h-8 text-[12px] font-semibold text-[rgba(0,0,0,0.87)] bg-black/[0.06] px-3 rounded-full hover:bg-black/[0.10] transition-colors"
                                                 >
                                                     <LucideSettings2 className="w-3 h-3" />
-                                                    멤버 편집
+                                                    {t("createSettlementDialog.editMembers")}
                                                 </button>
                                             </div>
                                         </div>
@@ -274,9 +276,9 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-[15px] font-semibold text-[rgba(0,0,0,0.87)] group-hover:text-brand transition-colors tabular-nums">
-                                                        {round.participants.length}명 선택됨
+                                                        {round.participants.length}{t("createSettlementDialog.selectedSuffix")}
                                                     </span>
-                                                    <p className="text-[12px] text-black/55 font-medium">참석자 목록을 편집하려면 클릭하세요</p>
+                                                    <p className="text-[12px] text-black/55 font-medium">{t("createSettlementDialog.editParticipantsHint")}</p>
                                                 </div>
                                             </div>
                                             <LucideChevronDown className="w-5 h-5 text-black/40 group-hover:text-[rgba(0,0,0,0.87)] transition-colors" />
@@ -284,7 +286,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">계산한 사람</Label>
+                                        <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.payerLabel")}</Label>
                                         <Select
                                             value={round.payerId}
                                             onValueChange={(val) => handleRoundChange(round.id, 'payerId', val)}
@@ -293,7 +295,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                                                 aria-label="Payer select"
                                                 className="w-full h-12 bg-surface-2 border-surface-line rounded-tile px-3 text-base font-bold text-[rgba(0,0,0,0.87)]"
                                             >
-                                                <SelectValue placeholder="선택하세요" />
+                                                <SelectValue placeholder={t("createSettlementDialog.payerPlaceholder")} />
                                             </SelectTrigger>
                                             <SelectContent className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] rounded-tile">
                                                 {activeMembers
@@ -316,7 +318,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                         className="w-full border-dashed border-black/20 h-12 text-black/55 hover:text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04] rounded-tile"
                         onClick={handleAddRound}
                     >
-                        + 차수 추가하기 (2차, 3차...)
+                        {t("createSettlementDialog.addRound")}
                     </Button>
                 </div>
 
@@ -339,7 +341,7 @@ export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me
                         onClick={handleSubmit}
                         disabled={isPending}
                     >
-                        {isPending ? "생성 중..." : "정산 등록 및 채팅방 전송"}
+                        {isPending ? t("createSettlementDialog.creating") : t("createSettlementDialog.submit")}
                     </Button>
                 </div>
 

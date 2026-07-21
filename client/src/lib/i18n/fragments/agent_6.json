@@ -1,0 +1,23 @@
+{
+  "clubMemberTab.pendingTitle": { "ko": "가입 대기", "en": "Pending Requests", "vi": "Chờ duyệt", "tr": "Onay Bekleyenler", "es": "Solicitudes pendientes" },
+  "clubMemberTab.activeTitle": { "ko": "활동 중인 멤버", "en": "Active Members", "vi": "Thành viên hoạt động", "tr": "Aktif Üyeler", "es": "Miembros activos" },
+  "clubMemberTab.demote": { "ko": "권한 해제", "en": "Remove Role", "vi": "Gỡ quyền", "tr": "Yetkiyi Kaldır", "es": "Quitar rol" },
+  "clubMemberTab.appointManager": { "ko": "운영진 임명", "en": "Make Manager", "vi": "Chọn làm quản lý", "tr": "Yönetici Yap", "es": "Hacer admin" },
+  "clubMemberTab.kickTitle": { "ko": "멤버 내보내기", "en": "Remove Member", "vi": "Xóa thành viên", "tr": "Üyeyi Çıkar", "es": "Expulsar miembro" },
+  "clubMemberTab.kickConfirm": { "ko": "정말로 이 멤버를 크루에서 내보내시겠습니까?", "en": "Are you sure you want to remove this member from the crew?", "vi": "Bạn có chắc muốn xóa thành viên này khỏi crew?", "tr": "Bu üyeyi ekipten çıkarmak istediğinize emin misiniz?", "es": "¿Seguro que quieres expulsar a este miembro del crew?" },
+  "clubMemberTab.cancel": { "ko": "취소", "en": "Cancel", "vi": "Hủy", "tr": "İptal", "es": "Cancelar" },
+  "clubMemberTab.confirm": { "ko": "확인", "en": "Confirm", "vi": "Xác nhận", "tr": "Onayla", "es": "Confirmar" },
+  "clubMemberTab.leaderBadge": { "ko": "크루장", "en": "Leader", "vi": "Trưởng crew", "tr": "Lider", "es": "Líder" },
+  "clubMemberTab.managerBadge": { "ko": "운영진", "en": "Manager", "vi": "Quản lý", "tr": "Yönetici", "es": "Admin" },
+  "clubMemberTab.handicapPrefix": { "ko": "핸디", "en": "HCP", "vi": "HCP", "tr": "HCP", "es": "HCP" },
+  "clubMemberTab.avgPrefix": { "ko": "평균", "en": "Avg", "vi": "TB", "tr": "Ort.", "es": "Prom." },
+  "clubMemberTab.me": { "ko": "나", "en": "Me", "vi": "Tôi", "tr": "Ben", "es": "Yo" },
+  "allCrewList.noResults": { "ko": "검색 결과가 없습니다", "en": "No results found", "vi": "Không tìm thấy kết quả", "tr": "Sonuç bulunamadı", "es": "Sin resultados" },
+  "allCrewList.noResultsHint": { "ko": "다른 이름이나 지역으로 검색해보세요", "en": "Try a different name or region", "vi": "Thử tìm với tên hoặc khu vực khác", "tr": "Farklı bir isim veya bölge deneyin", "es": "Prueba con otro nombre o región" },
+  "allCrewList.emptyTitle": { "ko": "아직 등록된 크루가 없어요", "en": "No crews here yet", "vi": "Chưa có crew nào", "tr": "Henüz kayıtlı ekip yok", "es": "Aún no hay crews" },
+  "allCrewList.emptyHint": { "ko": "첫 크루를 만들어보세요", "en": "Be the first to create one", "vi": "Hãy tạo crew đầu tiên", "tr": "İlk ekibi sen kur", "es": "Crea el primer crew" },
+  "crewDiscoveryCard.all": { "ko": "전체", "en": "ALL", "vi": "Tất cả", "tr": "Tümü", "es": "Todos" },
+  "crewDiscoveryCard.defaultIntro": { "ko": "새로 만들어진 크루입니다.", "en": "A newly created crew.", "vi": "Crew mới được tạo.", "tr": "Yeni kurulmuş bir ekip.", "es": "Un crew recién creado." },
+  "crewDiscoveryCard.noRegion": { "ko": "지역 미설정", "en": "No region set", "vi": "Chưa đặt khu vực", "tr": "Bölge belirtilmedi", "es": "Región sin definir" },
+  "crewDiscoveryCard.membersSuffix": { "ko": "명", "en": " members", "vi": " thành viên", "tr": " üye", "es": " miembros" }
+}

@@ -15,8 +15,10 @@ import { StatsOverviewCard } from "@/components/hiq/history/StatsOverviewCard";
 import { HistoryList } from "@/components/hiq/history/HistoryList";
 import { GameDetailDialog } from "@/components/hiq/history/GameDetailDialog";
 import { HiqMember } from "@shared/schema";
+import { useT } from "@/lib/i18n";
 
 export default function HiqHistory() {
+    const { t } = useT();
     const [, setLocation] = useLocation();
     const { currentSport } = useSport();
     const [filter, setFilter] = useState<FilterType>("all");
@@ -80,9 +82,9 @@ export default function HiqHistory() {
             {currentSport !== "GOLF" && (
                 <div className="flex p-1 bg-black/[0.04] rounded-2xl mb-6 ">
                     {[
-                        { id: "all", label: "전체", icon: LucideLayers },
-                        { id: "3c", label: "3쿠션", icon: LucideTarget },
-                        { id: "4c", label: "4구", icon: LucideBarChart3 }
+                        { id: "all", label: t("history.filterAll"), icon: LucideLayers },
+                        { id: "3c", label: t("history.filter3c"), icon: LucideTarget },
+                        { id: "4c", label: t("history.filter4c"), icon: LucideBarChart3 }
                     ].map((tab) => (
                         <button
                             key={tab.id}

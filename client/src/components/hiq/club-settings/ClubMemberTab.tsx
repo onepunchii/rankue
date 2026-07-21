@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CrewMember, CrewData } from '@/types/crew';
+import { useT } from "@/lib/i18n";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -25,6 +26,7 @@ interface ClubMemberTabProps {
 }
 
 export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onApprove }: ClubMemberTabProps) {
+    const { t } = useT();
     const [processingMemberId, setProcessingMemberId] = useState<string | null>(null);
     const [kickConfirmId, setKickConfirmId] = useState<string | null>(null);
 
@@ -69,7 +71,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                         <div className="flex items-center gap-2 px-1">
                             <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", themeBg)} />
                             <h3 className={cn("text-xs font-semibold", themeColor)}>
-                                가입 대기 ({pendingMembers.length})
+                                {t("clubMemberTab.pendingTitle")} ({pendingMembers.length})
                             </h3>
                         </div>
                         <div className="space-y-2">
@@ -110,7 +112,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                 <div className="flex items-center gap-2 px-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-black/25" />
                     <h3 className="text-xs font-semibold text-black/55">
-                        활동 중인 멤버 ({activeMembers.length})
+                        {t("clubMemberTab.activeTitle")} ({activeMembers.length})
                     </h3>
                 </div>
                 <div className="space-y-3">
@@ -143,7 +145,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                                     handleAction(m.member.id, () => onUpdateRole(m.member.id, newRole));
                                                 }}
                                             >
-                                                {processingMemberId === m.member.id ? <LucideLoader2 className="w-3.5 h-3.5 animate-spin" /> : (m.role === 'manage' ? "권한 해제" : "운영진 임명")}
+                                                {processingMemberId === m.member.id ? <LucideLoader2 className="w-3.5 h-3.5 animate-spin" /> : (m.role === 'manage' ? t("clubMemberTab.demote") : t("clubMemberTab.appointManager"))}
                                             </Button>
                                         )}
                                         {canKick && (
@@ -168,18 +170,18 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
             <AlertDialog open={!!kickConfirmId} onOpenChange={(open) => !open && setKickConfirmId(null)}>
                 <AlertDialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] rounded-card">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>멤버 내보내기</AlertDialogTitle>
+                        <AlertDialogTitle>{t("clubMemberTab.kickTitle")}</AlertDialogTitle>
                         <AlertDialogDescription className="text-black/60">
-                            정말로 이 멤버를 크루에서 내보내시겠습니까?
+                            {t("clubMemberTab.kickConfirm")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]">취소</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]">{t("clubMemberTab.cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => kickConfirmId && handleAction(kickConfirmId, () => onKick(kickConfirmId))}
                             className="bg-red-500 text-white hover:bg-red-600"
                         >
-                            확인
+                            {t("clubMemberTab.confirm")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -189,6 +191,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
 }
 
 function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: CrewData, isMe?: boolean, action?: React.ReactNode }) {
+    const { t } = useT();
     const themeText = 'text-brand';
 
     return (
@@ -210,14 +213,14 @@ function MemberItem({ member, crew, isMe, action }: { member: CrewMember, crew: 
                         <span className={cn(isMe ? themeText : "text-[rgba(0,0,0,0.87)]")}>
                             {member.member.nickname}
                         </span>
-                        {member.role === 'leader' && <RoleBadge icon={LucideCrown} color="text-[#cba258]" label="크루장" />}
-                        {member.role === 'manage' && <RoleBadge icon={LucideShield} color="text-brand" label="운영진" />}
+                        {member.role === 'leader' && <RoleBadge icon={LucideCrown} color="text-[#cba258]" label={t("clubMemberTab.leaderBadge")} />}
+                        {member.role === 'manage' && <RoleBadge icon={LucideShield} color="text-brand" label={t("clubMemberTab.managerBadge")} />}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                         <div className="px-2 py-0.5 rounded-lg bg-black/[0.04] text-xs font-medium text-black/55 tabular-nums">
-                            {crew.sportCategory === "GOLF" ? `핸디 ${(member.member.golfAvgScore || 0).toFixed(1)}` : `평균 ${(member.member.avg4c || 0).toFixed(1)}`}
+                            {crew.sportCategory === "GOLF" ? `${t("clubMemberTab.handicapPrefix")} ${(member.member.golfAvgScore || 0).toFixed(1)}` : `${t("clubMemberTab.avgPrefix")} ${(member.member.avg4c || 0).toFixed(1)}`}
                         </div>
-                        {isMe && <span className={cn("text-xs font-semibold", themeText)}>나</span>}
+                        {isMe && <span className={cn("text-xs font-semibold", themeText)}>{t("clubMemberTab.me")}</span>}
                     </div>
                 </div>
             </div>

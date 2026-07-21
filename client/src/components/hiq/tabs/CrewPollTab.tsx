@@ -28,6 +28,7 @@ import { CreatePollDialog } from "@/components/hiq/CreatePollDialog";
 import { format, formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useT } from "@/lib/i18n";
 
 interface CrewPollTabProps {
     crewId: string;
@@ -37,6 +38,7 @@ interface CrewPollTabProps {
 
 export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
     const { toast } = useToast();
+    const { t } = useT();
     const queryClient = useQueryClient();
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [displayLimit, setDisplayLimit] = useState(3);
@@ -57,7 +59,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
         },
         onError: (err: any) => {
-            toast({ title: "투표 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("crewPollTab.voteFailTitle"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -68,11 +70,11 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
             });
         },
         onSuccess: () => {
-            toast({ title: "투표가 삭제되었습니다." });
+            toast({ title: t("crewPollTab.deleteSuccess") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
         },
         onError: (err: any) => {
-            toast({ title: "삭제 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("crewPollTab.deleteFailTitle"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -81,10 +83,10 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
             {/* Header / CTA */}
             <div className="px-6 flex items-center justify-between">
                 <div>
-                    <h2 className="text-[15px] font-semibold text-black/55">크루 투표</h2>
+                    <h2 className="text-[15px] font-semibold text-black/55">{t("crewPollTab.title")}</h2>
                     <p className="text-xs text-black/40 mt-1 font-medium flex items-center gap-1.5 tabular-nums">
                         <LucideVote className="w-3 h-3" />
-                        총 {polls?.length || 0}개의 투표
+                        {t("crewPollTab.totalPrefix")}{polls?.length || 0}{t("crewPollTab.totalSuffix")}
                     </p>
                 </div>
                 {isMember && (
@@ -93,7 +95,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                         className="h-10 px-4 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl flex items-center gap-2"
                     >
                         <LucidePlus className="w-4 h-4" />
-                        투표 만들기
+                        {t("crewPollTab.createButton")}
                     </Button>
                 )}
             </div>
@@ -129,8 +131,8 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                         <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mx-auto mb-4">
                             <LucideVote className="w-7 h-7 text-black/40" />
                         </div>
-                        <p className="text-[15px] font-medium text-ink-2 mb-1">진행 중인 투표가 없습니다</p>
-                        <p className="text-[13px] text-ink-4">멤버들과 새로운 의견을 나눠보세요</p>
+                        <p className="text-[15px] font-medium text-ink-2 mb-1">{t("crewPollTab.emptyTitle")}</p>
+                        <p className="text-[13px] text-ink-4">{t("crewPollTab.emptyDesc")}</p>
                     </div>
                 ) : (
                     <>
@@ -148,7 +150,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                                     voteMutation.mutate({ pollId: poll.id, optionId });
                                 }}
                                 onDelete={() => {
-                                    if (confirm("정말로 이 투표를 삭제하시겠습니까?")) {
+                                    if (confirm(t("crewPollTab.deleteConfirm"))) {
                                         deletePollMutation.mutate(poll.id);
                                     }
                                 }}
@@ -163,7 +165,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                                 onClick={() => setDisplayLimit((d) => d + 10)}
                                 className="w-full h-12 bg-black/[0.04] hover:bg-black/[0.06] text-black/55 hover:text-[rgba(0,0,0,0.87)] text-[13px] font-semibold rounded-2xl flex items-center justify-center gap-2 transition-all"
                             >
-                                더보기
+                                {t("crewPollTab.loadMore")}
                                 <LucideChevronDown className="w-4 h-4" />
                             </Button>
                         )}
@@ -188,6 +190,7 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
     isAdmin: boolean;
     votingOptionId?: string;
 }) {
+    const { t } = useT();
     const isClosed = poll.status === 'closed' || (poll.endTime && new Date(poll.endTime) < new Date());
     const totalVotes = poll.totalVotes || 0;
     // Strict, unique leader only — a tie must not light up multiple "winners".
@@ -211,16 +214,16 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
                                 "h-5 px-2 text-xs font-semibold border-none",
                                 isClosed ? "bg-black/[0.06] text-black/55" : "bg-brand/10 text-brand"
                             )}>
-                                {isClosed ? "마감됨" : "진행 중"}
+                                {isClosed ? t("crewPollTab.closed") : t("crewPollTab.ongoing")}
                             </Badge>
                             {poll.isAnonymous && (
                                 <Badge className="h-5 px-2 bg-brand/10 text-brand text-xs font-semibold border-none">
-                                    <LucideShieldCheck className="w-3 h-3 mr-1" /> 익명
+                                    <LucideShieldCheck className="w-3 h-3 mr-1" /> {t("crewPollTab.anonymous")}
                                 </Badge>
                             )}
                             {poll.allowMultiple && (
                                 <Badge className="h-5 px-2 bg-purple-500/10 text-purple-500 text-xs font-semibold border-none">
-                                    복수 선택
+                                    {t("crewPollTab.multipleChoice")}
                                 </Badge>
                             )}
                         </div>
@@ -235,14 +238,14 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
                     <div className="flex flex-col items-end gap-2">
                         {poll.endTime && !isClosed && (
                             <span className="text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded-full tabular-nums">
-                                {`${formatDistanceToNow(new Date(poll.endTime), { locale: ko })} 남음`}
+                                {`${formatDistanceToNow(new Date(poll.endTime), { locale: ko })}${t("crewPollTab.remainingSuffix")}`}
                             </span>
                         )}
                         {isAdmin && (
                             <button
                                 onClick={onDelete}
                                 className="p-1.5 rounded-full hover:bg-red-500/10 text-black/40 hover:text-red-500 transition-colors"
-                                title="투표 삭제"
+                                title={t("crewPollTab.deletePollTitle")}
                             >
                                 <LucideTrash2 className="w-4 h-4" />
                             </button>
@@ -339,7 +342,7 @@ function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }:
 
                 <div className="flex items-center gap-1.5 text-black/40">
                     <LucideUsers className="w-3 h-3" />
-                    <span className="text-xs font-semibold tabular-nums">{totalVotes}명 참여</span>
+                    <span className="text-xs font-semibold tabular-nums">{totalVotes}{t("crewPollTab.participantsSuffix")}</span>
                 </div>
             </div>
         </motion.div>

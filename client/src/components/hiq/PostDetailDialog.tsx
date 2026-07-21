@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucideSend, LucideTrash2 } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 interface Comment {
     id: string;
@@ -35,6 +36,7 @@ interface PostDetailDialogProps {
 export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMemberId }: PostDetailDialogProps) {
     const [commentContent, setCommentContent] = useState("");
     const { toast } = useToast();
+    const { t } = useT();
 
     // Fetch Comments
     const { data: comments, isLoading, isError, refetch } = useQuery<Comment[]>({
@@ -59,7 +61,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
         },
         onError: (error: any) => {
             toast({
-                title: "댓글 작성 실패",
+                title: t("postDetail.commentCreateFailed"),
                 description: error.message,
                 variant: "destructive"
             });
@@ -75,14 +77,14 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
             });
         },
         onSuccess: () => {
-            toast({ title: "댓글이 삭제되었습니다." });
+            toast({ title: t("postDetail.commentDeleted") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts/${post?.id}/comments`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts`] });
         },
         onError: (error: any) => {
             toast({
-                title: "삭제 실패",
-                description: error.message || "권한이 없거나 오류가 발생했습니다.",
+                title: t("postDetail.deleteFailed"),
+                description: error.message || t("postDetail.noPermissionOrError"),
                 variant: "destructive"
             });
         }
@@ -132,19 +134,19 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                     <div className="space-y-5">
                         <h4 className="text-[12px] font-semibold text-black/55 flex items-center gap-2">
                             <span className="w-1 h-1 rounded-full bg-brand" />
-                            댓글 {comments?.length || 0}
+                            {t("postDetail.comments")} {comments?.length || 0}
                         </h4>
                         {isLoading ? (
-                            <div className="py-12 text-center text-black/55 text-[12px] font-semibold">불러오는 중...</div>
+                            <div className="py-12 text-center text-black/55 text-[12px] font-semibold">{t("postDetail.loading")}</div>
                         ) : isError ? (
                             <div className="py-16 text-center flex flex-col items-center gap-3">
-                                <p className="text-black/55 text-[12px] font-semibold">댓글을 불러오지 못했습니다</p>
+                                <p className="text-black/55 text-[12px] font-semibold">{t("postDetail.commentsLoadFailed")}</p>
                                 <Button
                                     variant="ghost"
                                     onClick={() => refetch()}
                                     className="h-9 px-4 rounded-pill bg-black/[0.04] hover:bg-black/[0.06] text-black/70 text-[12px] font-semibold"
                                 >
-                                    다시 시도
+                                    {t("postDetail.retry")}
                                 </Button>
                             </div>
                         ) : comments && comments.length > 0 ? (
@@ -172,13 +174,13 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                         {(isAdmin || comment.authorId === currentMemberId) && (
                                             <button
                                                 onClick={() => {
-                                                    if (confirm("댓글을 삭제하시겠습니까?")) {
+                                                    if (confirm(t("postDetail.confirmDeleteComment"))) {
                                                         deleteCommentMutation.mutate(comment.id);
                                                     }
                                                 }}
                                                 className="shrink-0 self-start -mr-2 flex items-center justify-center min-w-[44px] min-h-[44px] text-black/40 hover:text-red-500 transition-colors md:opacity-0 md:group-hover/comment:opacity-100"
-                                                title="댓글 삭제"
-                                                aria-label="댓글 삭제"
+                                                title={t("postDetail.deleteComment")}
+                                                aria-label={t("postDetail.deleteComment")}
                                             >
                                                 <LucideTrash2 className="w-4 h-4" />
                                             </button>
@@ -189,7 +191,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                         ) : (
                             <div className="py-16 text-center text-black/55 text-[12px] font-semibold flex flex-col items-center gap-2">
                                 <div className="w-8 h-px bg-black/10" />
-                                첫 댓글을 남겨보세요
+                                {t("postDetail.firstComment")}
                             </div>
                         )}
                     </div>
@@ -200,7 +202,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                     <div className="relative flex items-center gap-2">
                         <input
                             type="text"
-                            placeholder="댓글 달기..."
+                            placeholder={t("postDetail.commentPlaceholder")}
                             value={commentContent}
                             onChange={(e) => setCommentContent(e.target.value)}
                             onKeyDown={(e) => {

@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LucideMessageSquare, LucideSend, LucideLoader2, LucideTrash2, LucideReceipt, LucideFlag } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { useT } from "@/lib/i18n";
 
 interface ChatMessage {
     id: string;
@@ -32,6 +33,7 @@ interface CrewChatTabProps {
 
 export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSettlementClick }: CrewChatTabProps) {
     const { toast } = useToast();
+    const { t } = useT();
     const [_, setLocation] = useLocation();
     const [inputValue, setInputValue] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -62,7 +64,7 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                     senderId: currentMemberId,
                     message: newMessage,
                     createdAt: new Date().toISOString(),
-                    sender: { name: "나" },
+                    sender: { name: t("crewChat.me") },
                 };
                 queryClient.setQueryData<ChatMessage[]>([`/api/hiq/crews/${crewId}/chats`], [...previousChats, optimisticChat]);
             }
@@ -73,8 +75,8 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                 queryClient.setQueryData([`/api/hiq/crews/${crewId}/chats`], context.previousChats);
             }
             toast({
-                title: "전송 실패",
-                description: "메시지를 보내지 못했습니다.",
+                title: t("crewChat.sendFailedTitle"),
+                description: t("crewChat.sendFailedDesc"),
                 variant: "destructive"
             });
         },
@@ -91,12 +93,12 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
             });
         },
         onSuccess: () => {
-            toast({ title: "메시지가 삭제되었습니다." });
+            toast({ title: t("crewChat.deletedToast") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/chats`] });
         },
         onError: (error: any) => {
             toast({
-                title: "삭제 실패",
+                title: t("crewChat.deleteFailedTitle"),
                 description: error.message,
                 variant: "destructive"
             });
@@ -130,9 +132,9 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                 <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mb-4">
                     <LucideMessageSquare className="w-7 h-7 text-black/40" />
                 </div>
-                <p className="text-[15px] font-medium text-ink-2 mb-1">채팅은 멤버 전용입니다</p>
+                <p className="text-[15px] font-medium text-ink-2 mb-1">{t("crewChat.membersOnlyTitle")}</p>
                 <p className="text-[13px] text-ink-4 leading-relaxed">
-                    크루에 가입하여 멤버들과<br />새로운 대화를 시작해보세요
+                    {t("crewChat.membersOnlyDesc1")}<br />{t("crewChat.membersOnlyDesc2")}
                 </p>
             </div>
         );
@@ -160,7 +162,7 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                                 {showDate && (
                                     <div className="flex justify-center my-6">
                                         <span className="text-[12px] font-medium text-black/55 bg-black/[0.04] px-2.5 py-1 rounded-full tabular-nums">
-                                            {format(new Date(chat.createdAt), 'yyyy년 M월 d일 eeee', { locale: ko })}
+                                            {format(new Date(chat.createdAt), t("crewChat.dateFormat"), { locale: ko })}
                                         </span>
                                     </div>
                                 )}
@@ -180,8 +182,8 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                         <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mb-4">
                             <LucideMessageSquare className="w-7 h-7 text-black/40" />
                         </div>
-                        <p className="text-[15px] font-medium text-ink-2 mb-1">아직 대화가 없습니다</p>
-                        <p className="text-[13px] text-ink-4">첫 메시지를 남겨 대화를 시작해보세요</p>
+                        <p className="text-[15px] font-medium text-ink-2 mb-1">{t("crewChat.emptyTitle")}</p>
+                        <p className="text-[13px] text-ink-4">{t("crewChat.emptyDesc")}</p>
                     </div>
                 )}
                 <div ref={messagesEndRef} />
@@ -193,7 +195,7 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                     <div className="relative flex items-center gap-2 max-w-4xl mx-auto mb-4">
                         <input
                             type="text"
-                            placeholder="메시지 입력..."
+                            placeholder={t("crewChat.inputPlaceholder")}
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyDown={(e) => {
@@ -206,7 +208,7 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                         />
                         <Button
                             size="icon"
-                            title="메시지 전송"
+                            title={t("crewChat.sendButtonTitle")}
                             disabled={!inputValue.trim() || sendChatMutation.isPending}
                             onClick={handleSendMessage}
                             className="w-12 h-12 rounded-2xl bg-brand hover:bg-brand/90 text-brand-fg transition-all active:scale-95 flex-shrink-0"
@@ -235,6 +237,7 @@ const ChatMessageItem = memo(({
     onSettlementClick?: (id: string) => void,
     setLocation: (url: string) => void
 }) => {
+    const { t } = useT();
     const isTemp = chat.id.startsWith('temp-');
     // Server-shaped metadata is untrusted: only treat as a booking card when the
     // required fields exist, otherwise fall through to plain text (no crash).
@@ -270,21 +273,21 @@ const ChatMessageItem = memo(({
                                     <div className="bg-brand text-brand-fg px-4 py-3 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <LucideReceipt className="w-4 h-4" />
-                                            <span className="font-semibold text-xs">정산 요청</span>
+                                            <span className="font-semibold text-xs">{t("crewChat.settlementRequest")}</span>
                                         </div>
-                                        <span className="text-xs font-semibold bg-white/15 px-2 py-0.5 rounded-full">분할</span>
+                                        <span className="text-xs font-semibold bg-white/15 px-2 py-0.5 rounded-full">{t("crewChat.split")}</span>
                                     </div>
                                     <div className="p-5">
                                         <h3 className="font-medium text-xs mb-2 text-black/55 line-clamp-1">{chat.metadata?.title}</h3>
                                         <div className="text-2xl font-semibold mb-5 tracking-tight tabular-nums text-[rgba(0,0,0,0.87)]">
-                                            {chat.metadata?.totalAmount?.toLocaleString()}<span className="text-sm font-bold ml-0.5">원</span>
+                                            {chat.metadata?.totalAmount?.toLocaleString()}<span className="text-sm font-bold ml-0.5">{t("crewChat.currencyUnit")}</span>
                                         </div>
                                         <Button
                                             size="sm"
                                             className="w-full bg-black/[0.04] hover:bg-black/[0.06] text-[rgba(0,0,0,0.87)] font-semibold h-10 rounded-xl text-xs transition-all active:scale-[0.98]"
                                             onClick={() => chat.metadata?.settlementId && onSettlementClick?.(chat.metadata.settlementId)}
                                         >
-                                            상세 내역 확인하기
+                                            {t("crewChat.viewSettlementDetail")}
                                         </Button>
                                     </div>
                                 </div>
@@ -292,11 +295,11 @@ const ChatMessageItem = memo(({
                                 <div className="bg-white rounded-2xl overflow-hidden w-64 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                                     <div className="bg-brand text-brand-fg px-4 py-3 flex items-center gap-2">
                                         <LucideFlag className="w-4 h-4" />
-                                        <span className="font-semibold text-xs">부킹 공유</span>
+                                        <span className="font-semibold text-xs">{t("crewChat.bookingShare")}</span>
                                     </div>
                                     <div className="p-5 space-y-4">
                                         <div>
-                                            <h3 className="font-semibold text-[rgba(0,0,0,0.87)] text-base line-clamp-1 leading-tight">{chat.metadata?.courseName ?? '골프장'}</h3>
+                                            <h3 className="font-semibold text-[rgba(0,0,0,0.87)] text-base line-clamp-1 leading-tight">{chat.metadata?.courseName ?? t("crewChat.golfCourseFallback")}</h3>
                                             {hasValidBookingDate && (
                                                 <div className="flex items-center gap-2 mt-1.5 text-black/55 text-xs font-medium tabular-nums">
                                                     <span>{bookingDate!.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</span>
@@ -306,7 +309,7 @@ const ChatMessageItem = memo(({
                                             )}
                                         </div>
                                         <div className="text-xl font-semibold text-[rgba(0,0,0,0.87)] tracking-tight tabular-nums">
-                                            {chat.metadata?.greenFee?.toLocaleString() ?? '-'}<span className="text-xs ml-0.5 text-black/55">원</span>
+                                            {chat.metadata?.greenFee?.toLocaleString() ?? '-'}<span className="text-xs ml-0.5 text-black/55">{t("crewChat.currencyUnit")}</span>
                                         </div>
                                         {chat.metadata?.bookingId != null && (
                                             <Button
@@ -314,7 +317,7 @@ const ChatMessageItem = memo(({
                                                 className="w-full bg-black/[0.04] hover:bg-black/[0.06] text-[rgba(0,0,0,0.87)] font-semibold h-10 rounded-xl text-xs transition-all active:scale-95"
                                                 onClick={() => setLocation(`/golf/booking-list/${chat.metadata.bookingId}`)}
                                             >
-                                                자세히 보기
+                                                {t("crewChat.viewDetail")}
                                             </Button>
                                         )}
                                     </div>
@@ -328,18 +331,18 @@ const ChatMessageItem = memo(({
                             {(isMe || isAdmin) && !isTemp && (
                                 <button
                                     onClick={() => {
-                                        if (confirm("메시지를 삭제하시겠습니까?")) {
+                                        if (confirm(t("crewChat.confirmDelete"))) {
                                             onDelete(chat.id);
                                         }
                                     }}
-                                    title="메시지 삭제"
+                                    title={t("crewChat.deleteButtonTitle")}
                                     className="p-2.5 -m-1 text-black/40 hover:text-red-500 transition-colors mb-0.5"
                                 >
                                     <LucideTrash2 className="w-4 h-4" />
                                 </button>
                             )}
                             <span className="text-xs font-medium text-black/40 whitespace-nowrap px-0.5 tabular-nums">
-                                {isTemp ? "전송 중" : format(new Date(chat.createdAt), 'a h:mm', { locale: ko })}
+                                {isTemp ? t("crewChat.sending") : format(new Date(chat.createdAt), 'a h:mm', { locale: ko })}
                             </span>
                         </div>
                     </div>

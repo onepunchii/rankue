@@ -9,10 +9,12 @@ import { Card } from "@/components/ui/card";
 import { PhysicsEngine2D } from "@/lib/physics-engine-2d";
 import { ScoringEngine, ShotResult } from "@/lib/scoring-engine";
 import { Vector3 } from "three";
+import { useT } from "@/lib/i18n";
 
 type GameMode = "3c" | "4c";
 
 export default function HiqSimulation() {
+    const { t } = useT();
     const { toast } = useToast();
     const [, setLocation] = useLocation();
     const sceneRef = useRef<HTMLDivElement>(null);
@@ -128,11 +130,11 @@ export default function HiqSimulation() {
                 setRecommendedSolutions(solutions);
                 selectSolution(solutions[0], 0);
             } else {
-                toast({ title: "조회 결과 없음", description: "현재 배치와 매칭되는 실제 게임 데이터가 없습니다." });
+                toast({ title: t("simulation.noResultTitle"), description: t("simulation.noResultDesc") });
             }
         } catch (e) {
             console.error("AISolution Error:", e);
-            toast({ title: "검색 실패", description: "데이터베이스 연결 오류" });
+            toast({ title: t("simulation.searchFailTitle"), description: t("simulation.searchFailDesc") });
         } finally {
             setIsAnalyzing(false);
         }
@@ -142,13 +144,13 @@ export default function HiqSimulation() {
         // Normalize data structure (handle DB format vs Legacy format)
         const shot = {
             ...rawShot,
-            title: rawShot.title || `AI 추천 #${index + 1}`,
-            description: rawShot.description || `실전 데이터 기반 ${rawShot.cushionCount || 3}쿠션 공략입니다.`,
+            title: rawShot.title || `${t("simulation.aiRecommend")} #${index + 1}`,
+            description: rawShot.description || `${t("simulation.solutionDescPrefix")} ${rawShot.cushionCount || 3}${t("simulation.solutionDescSuffix")}`,
             solution: rawShot.solution || {
                 spin: { x: rawShot.shotParams?.spinX || 0, y: rawShot.shotParams?.spinY || 0 },
                 power: rawShot.shotParams?.power || 0,
                 thickness: 0,
-                tip: "위 가이드에 따라 샷을 구사하세요."
+                tip: t("simulation.defaultTip")
             }
         };
 
@@ -339,11 +341,11 @@ export default function HiqSimulation() {
                     <button
                         onClick={() => setLocation('/')}
                         className="p-2 hover:bg-black/[0.04] rounded-full"
-                        title="홈으로 돌아가기"
+                        title={t("simulation.backHome")}
                     >
                         <ChevronDown className="w-6 h-6 rotate-90 text-black/40" />
                     </button>
-                    <h1 className="text-[rgba(0,0,0,0.87)] font-semibold tracking-tight">랭큐 AI 솔루션</h1>
+                    <h1 className="text-[rgba(0,0,0,0.87)] font-semibold tracking-tight">{t("simulation.title")}</h1>
                 </div>
                 <div className="w-20" /> {/* Spacer for Title Centering */}
             </header>
@@ -571,7 +573,7 @@ export default function HiqSimulation() {
                                         };
                                         const colorData = baseColors[c];
                                         const isActive = activeBall === c;
-                                        const label = c === 'white' ? '수구' : c === 'yellow' ? '1적구' : '2적구';
+                                        const label = c === 'white' ? t("simulation.cueBall") : c === 'yellow' ? t("simulation.object1") : t("simulation.object2");
 
                                         return (
                                             <div key={c} className="flex flex-col items-center gap-3">
@@ -603,7 +605,7 @@ export default function HiqSimulation() {
                                 </div>
                                 <div className="text-center flex flex-col items-center">
                                     <p className="text-black/55 text-[12px] font-medium mb-3 tracking-tight">
-                                        현재 배치에서 3,000개의 족보 데이터를 기반으로<br />가장 높은 확률의 정답을 찾아냅니다.
+                                        {t("simulation.searchIntro1")}<br />{t("simulation.searchIntro2")}
                                     </p>
                                     <Button
                                         onClick={(e) => { e.stopPropagation(); runAISolution(); }}
@@ -611,14 +613,14 @@ export default function HiqSimulation() {
                                         className="rk-btn-primary h-16 px-16 rounded-pill text-lg shadow-[0_20px_40px_rgba(0,98,65,0.12)]"
                                     >
                                         {isAnalyzing ? <LucideRefreshCw className="animate-spin w-6 h-6 mr-3" /> : <Target className="w-6 h-6 mr-3" />}
-                                        최적 공략 검색
+                                        {t("simulation.searchButton")}
                                     </Button>
                                 </div>
 
                                 {/* Central Instruction Text */}
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
                                     <p className="text-[13px] font-medium text-black/40 whitespace-nowrap">
-                                        빈 공간을 드래그하여 공을 옮기세요
+                                        {t("simulation.dragHint")}
                                     </p>
                                 </div>
                             </motion.div>
@@ -628,7 +630,7 @@ export default function HiqSimulation() {
                                 className="absolute inset-0 bg-white p-8 flex flex-col"
                             >
                                 <div className="flex flex-col mb-6">
-                                    <p className="text-brand text-[12px] font-semibold mb-4">AI 추천 전략</p>
+                                    <p className="text-brand text-[12px] font-semibold mb-4">{t("simulation.aiStrategy")}</p>
                                     <div className="flex gap-3">
                                         {recommendedSolutions.map((sol, i) => (
                                             <button
@@ -639,9 +641,9 @@ export default function HiqSimulation() {
                                                     : 'bg-black/[0.04] border-black/[0.08] hover:bg-black/[0.06]'
                                                     }`}
                                             >
-                                                <span className={`text-[12px] font-semibold ${activeSolutionIndex === i ? 'text-brand-fg/60' : 'text-black/55'}`}>옵션 {i + 1}</span>
+                                                <span className={`text-[12px] font-semibold ${activeSolutionIndex === i ? 'text-brand-fg/60' : 'text-black/55'}`}>{t("simulation.option")} {i + 1}</span>
                                                 <span className={`text-[12px] font-bold truncate w-full text-center ${activeSolutionIndex === i ? 'text-brand-fg' : 'text-black/70'}`}>
-                                                    {(!sol.title || sol.title === 'Unknown') ? '추천 공략' : sol.title}
+                                                    {(!sol.title || sol.title === 'Unknown') ? t("simulation.recommendedSolution") : sol.title}
                                                 </span>
                                             </button>
                                         ))}
@@ -651,24 +653,24 @@ export default function HiqSimulation() {
                                 <div className="flex justify-between items-end mb-6">
                                     <div className="flex-1 min-w-0 pr-4">
                                         <h2 className="text-2xl font-semibold text-[rgba(0,0,0,0.87)] tracking-tight truncate leading-tight">
-                                            {simulationData?.title || 'AI 추천 공략'}
+                                            {simulationData?.title || t("simulation.aiRecommendedSolution")}
                                         </h2>
-                                        <p className="text-black/55 text-[12px] mt-1 font-medium">{simulationData?.description || '해당 배치에 대한 정석 데이터 분석 결과입니다.'}</p>
+                                        <p className="text-black/55 text-[12px] mt-1 font-medium">{simulationData?.description || t("simulation.defaultDescription")}</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => runReplay()}
-                                            title="시뮬레이션 재생"
+                                            title={t("simulation.replayTitle")}
                                             className="w-12 h-12 bg-black/[0.04] rounded-tile flex items-center justify-center text-[rgba(0,0,0,0.87)]"
                                         >
                                             <LucidePlay className="w-5 h-5 fill-current" />
                                         </button>
                                         <button
                                             onClick={() => setActiveMode("setup")}
-                                            title="배치 수정으로 돌아가기"
+                                            title={t("simulation.backToSetupTitle")}
                                             className="rk-btn-primary h-12 px-6 whitespace-nowrap shadow-[0_5px_15px_rgba(0,98,65,0.12)]"
                                         >
-                                            배치 수정
+                                            {t("simulation.editLayout")}
                                         </button>
                                     </div>
                                 </div>
@@ -696,6 +698,7 @@ export default function HiqSimulation() {
 }
 
 const SpinVisualizer = ({ spin }: { spin: any }) => {
+    const { t } = useT();
     const x = spin ? (spin.x / 12) * 100 : 0;
     const y = spin ? (spin.y / 12) * 100 : 0;
     return (
@@ -704,35 +707,41 @@ const SpinVisualizer = ({ spin }: { spin: any }) => {
                 className="absolute w-3 h-3 bg-red-600 rounded-full"
                 style={{ transform: `translate(${x}%, ${-y}%)` } as any}
             />
-            <div className="text-[12px] font-medium text-black/55 mt-10 tracking-normal">스핀</div>
+            <div className="text-[12px] font-medium text-black/55 mt-10 tracking-normal">{t("simulation.spin")}</div>
         </div>
     );
 };
 
-const ThicknessVisualizer = ({ thickness }: { thickness: number }) => (
-    <div className="flex flex-col items-center">
-        <div className="relative w-24 h-8 flex items-center">
-            <div className="absolute w-8 h-8 rounded-full bg-black/[0.04]" style={{ left: 0 } as any} />
-            <div
-                className="absolute w-8 h-8 rounded-full border border-blue-500 bg-blue-500/30"
-                style={{ '--thickness-offset': `${(thickness || 0) * 32}px`, left: 'var(--thickness-offset)' } as any}
-            />
-        </div>
-        <span className="text-[12px] font-medium text-black/55 mt-2 tracking-normal">두께 {Math.round((thickness || 0) * 8)}/8</span>
-    </div>
-);
-
-const PowerGauge = ({ power }: { power: number }) => (
-    <div className="flex flex-col items-center">
-        <div className="flex gap-1 h-6 items-end">
-            {[1, 2, 3, 4, 5].map(i => (
+const ThicknessVisualizer = ({ thickness }: { thickness: number }) => {
+    const { t } = useT();
+    return (
+        <div className="flex flex-col items-center">
+            <div className="relative w-24 h-8 flex items-center">
+                <div className="absolute w-8 h-8 rounded-full bg-black/[0.04]" style={{ left: 0 } as any} />
                 <div
-                    key={i}
-                    className={`w-2 rounded-sm ${power >= i * 20 ? 'bg-amber-400' : 'bg-black/[0.08]'}`}
-                    style={{ '--bar-height': `${i * 20}%`, height: 'var(--bar-height)' } as any}
+                    className="absolute w-8 h-8 rounded-full border border-blue-500 bg-blue-500/30"
+                    style={{ '--thickness-offset': `${(thickness || 0) * 32}px`, left: 'var(--thickness-offset)' } as any}
                 />
-            ))}
+            </div>
+            <span className="text-[12px] font-medium text-black/55 mt-2 tracking-normal">{t("simulation.thickness")} {Math.round((thickness || 0) * 8)}/8</span>
         </div>
-        <span className="text-[12px] font-medium text-black/55 mt-2 tracking-normal">파워 {power}%</span>
-    </div>
-);
+    );
+};
+
+const PowerGauge = ({ power }: { power: number }) => {
+    const { t } = useT();
+    return (
+        <div className="flex flex-col items-center">
+            <div className="flex gap-1 h-6 items-end">
+                {[1, 2, 3, 4, 5].map(i => (
+                    <div
+                        key={i}
+                        className={`w-2 rounded-sm ${power >= i * 20 ? 'bg-amber-400' : 'bg-black/[0.08]'}`}
+                        style={{ '--bar-height': `${i * 20}%`, height: 'var(--bar-height)' } as any}
+                    />
+                ))}
+            </div>
+            <span className="text-[12px] font-medium text-black/55 mt-2 tracking-normal">{t("simulation.power")} {power}%</span>
+        </div>
+    );
+};

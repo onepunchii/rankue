@@ -11,19 +11,21 @@ import {
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
+import { useT } from "@/lib/i18n";
 
 export function HiqNavigation() {
+    const { t } = useT();
     const { isApp } = useNativeBridge();
     const [location, setLocation] = useLocation();
     const { currentSport } = useSport();
     const activeColor = "rgb(var(--brand))";
 
     const tabs = [
-        { id: "home", label: "홈", icon: LucideHome, path: "/dashboard" },
-        { id: "club", label: "크루", icon: LucideFlag, path: "/club" },
-        { id: "friend", label: "친구", icon: LucideUsers, path: "/friends" },
-        { id: "log", label: "기록", icon: LucideBarChart3, path: "/history" },
-        { id: "menu", label: "전체", icon: LucideMenu, path: "/menu" },
+        { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
+        { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
+        { id: "friend", label: "hiqNavigation.friend", icon: LucideUsers, path: "/friends" },
+        { id: "log", label: "hiqNavigation.log", icon: LucideBarChart3, path: "/history" },
+        { id: "menu", label: "hiqNavigation.menu", icon: LucideMenu, path: "/menu" },
     ];
 
     const isActive = (path: string) => location === path;
@@ -55,7 +57,7 @@ export function HiqNavigation() {
                                 />
                             </div>
                             <span className="text-[12px] font-semibold transition-all duration-300" style={active ? { color: activeColor } : { color: 'rgba(0, 0, 0, 0.55)' }}>
-                                {tab.label}
+                                {t(tab.label)}
                             </span>
                         </motion.button>
                     );

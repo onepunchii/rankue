@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Flag, Zap, Plane, Monitor, MonitorPlay, Beer } from "@/lib/icons";
+import { useT } from "@/lib/i18n";
 
 
 
@@ -17,17 +18,18 @@ interface CategorySelectorProps {
 }
 
 export const CategorySelector = ({ selected, onSelect }: CategorySelectorProps) => {
+    const { t } = useT();
 
     const categories = [
         // Row 1: Field / Tour
-        { id: "REGULAR_ROUNDING", label: "정규 라운딩", desc: "월례회", icon: Flag },
-        { id: "BLITZ_ROUNDING", label: "번개 라운딩", desc: "조인/급구", icon: Zap },
-        { id: "GOLF_TOUR", label: "골프 투어", desc: "여행", icon: Plane },
+        { id: "REGULAR_ROUNDING", label: t("categorySelector.regularRounding"), desc: t("categorySelector.regularRoundingDesc"), icon: Flag },
+        { id: "BLITZ_ROUNDING", label: t("categorySelector.blitzRounding"), desc: t("categorySelector.blitzRoundingDesc"), icon: Zap },
+        { id: "GOLF_TOUR", label: t("categorySelector.golfTour"), desc: t("categorySelector.golfTourDesc"), icon: Plane },
 
         // Row 2: Screen / Social
-        { id: "REGULAR_SCREEN", label: "정규 스크린", desc: "대회", icon: Monitor },
-        { id: "BLITZ_SCREEN", label: "번개 스크린", desc: "한게임", icon: MonitorPlay },
-        { id: "AFTER_PARTY", label: "뒷풀이", desc: "회식", icon: Beer },
+        { id: "REGULAR_SCREEN", label: t("categorySelector.regularScreen"), desc: t("categorySelector.regularScreenDesc"), icon: Monitor },
+        { id: "BLITZ_SCREEN", label: t("categorySelector.blitzScreen"), desc: t("categorySelector.blitzScreenDesc"), icon: MonitorPlay },
+        { id: "AFTER_PARTY", label: t("categorySelector.afterParty"), desc: t("categorySelector.afterPartyDesc"), icon: Beer },
     ] as const;
 
     return (
