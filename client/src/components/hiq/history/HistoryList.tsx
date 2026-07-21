@@ -73,7 +73,7 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
                                 <div className="flex justify-between items-end">
                                     <div className="flex items-center gap-5">
                                         <div>
-                                            <p className="text-black/55 text-[12px] font-medium mb-0.5">{config.unit}</p>
+                                            <p className="text-black/55 text-[12px] font-medium mb-0.5">{t(config.unit)}</p>
                                             <p className="text-[22px] font-bold text-[rgba(0,0,0,0.87)] tabular-nums leading-none">{game.score}</p>
                                         </div>
                                         <div className="w-px h-6 bg-black/10" />

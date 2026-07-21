@@ -82,11 +82,10 @@ export default function SocialLogin() {
         body: JSON.stringify({ provider, idToken, name }),
       });
       const j = await res.json();
-      if (!res.ok || !j?.success) throw new Error(`${res.status} ${j?.message || "social login failed"}`);
+      if (!res.ok || !j?.success) throw new Error(j?.message || "social login failed");
       setLocation(j.data?.redirectTo || "/dashboard");
-    } catch (err) {
-      // [임시 진단] 실제 에러 노출 — 원인 파악 후 원복
-      toast({ title: t("login.failedTitle"), description: `[srv] ${String((err as Error)?.message ?? err).slice(0, 140)}`, variant: "destructive" });
+    } catch {
+      toast({ title: t("login.failedTitle"), description: t("login.socialFailed"), variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -100,10 +99,9 @@ export default function SocialLogin() {
       const idToken = await nativeSocialIdToken(provider);
       if (!idToken) { setBusy(false); return; } // 사용자 취소
       await submitToken(provider, idToken); // 성공/실패 토스트·busy 해제는 submitToken이 처리
-    } catch (e) {
-      // [임시 진단] 플러그인 단계 에러 노출 — 원인 파악 후 원복
+    } catch {
       setBusy(false);
-      toast({ title: t("login.failedTitle"), description: `[plugin] ${String((e as Error)?.message ?? e).slice(0, 140)}`, variant: "destructive" });
+      toast({ title: t("login.failedTitle"), description: t("login.socialFailed"), variant: "destructive" });
     }
   }, [busy, submitToken, toast, t]);
 

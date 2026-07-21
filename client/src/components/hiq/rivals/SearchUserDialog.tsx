@@ -56,7 +56,7 @@ export const SearchUserDialog = ({
                     <DialogHeader className="mb-6">
                         <div className="flex flex-col">
                             <DialogTitle className="text-[26px] font-bold tracking-tight text-ink-1">
-                                {t("searchUserDialog.titlePrefix")}{config.label}{t("searchUserDialog.titleSuffix")}
+                                {t("searchUserDialog.titlePrefix")}{t(config.label)}{t("searchUserDialog.titleSuffix")}
                             </DialogTitle>
                             <DialogDescription className="text-[13px] font-medium text-black/55 mt-1">
                                 {t("searchUserDialog.description")}
@@ -69,7 +69,7 @@ export const SearchUserDialog = ({
                             <LucideSearch className="w-5 h-5 text-black/40 transition-colors group-focus-within:text-brand" />
                         </div>
                         <Input
-                            placeholder={config.searchPlaceholder}
+                            placeholder={t(config.searchPlaceholder)}
                             value={keyword}
                             onChange={(e) => {
                                 setKeyword(e.target.value);

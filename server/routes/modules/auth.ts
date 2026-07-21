@@ -5,7 +5,7 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { storage } from "../../storage/index.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
-import { verifyGoogleIdToken, verifyAppleIdToken, debugDecode } from "../../lib/socialAuth.js";
+import { verifyGoogleIdToken, verifyAppleIdToken } from "../../lib/socialAuth.js";
 
 const router = Router();
 
@@ -111,9 +111,7 @@ router.post("/social", asyncHandler(async (req: any, res: any) => {
         : await verifyAppleIdToken(idToken);
     if (!identity) {
         registerFailure(key);
-        // [임시 진단] 실패한 토큰의 aud를 응답에 실어 원인 파악 — 원복 예정
-        const dc = debugDecode(idToken);
-        return sendError(res, 401, `검증실패 aud=${JSON.stringify(dc.aud)} iss=${dc.iss}`);
+        return sendError(res, 401, "토큰 검증에 실패했습니다");
     }
 
     // Vercel이 붙여주는 IP 국가 헤더 — 국가 랭킹의 축(유저 입력 없이 자동 수집)
