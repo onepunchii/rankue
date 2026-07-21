@@ -1,8 +1,17 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
+import { useT, type Locale } from '@/lib/i18n';
+
+// i18n 로케일 → TTS 엔진용 BCP-47. 텍스트가 t()로 번역되므로 엔진 언어도 반드시 맞춰야
+// 함(한국어 보이스가 베트남어 문장을 읽으면 발음이 깨짐).
+const TTS_LANG: Record<Locale, string> = {
+    ko: 'ko-KR', en: 'en-US', vi: 'vi-VN', tr: 'tr-TR', es: 'es-ES',
+};
 
 export function useGameAudio() {
+    const { locale } = useT();
+    const ttsLang = TTS_LANG[locale] ?? 'ko-KR';
     const [isMuted, setIsMuted] = useState(false);
     const synthRef = useRef<SpeechSynthesis | null>(null);
     const audioCtxRef = useRef<AudioContext | null>(null);
@@ -75,23 +84,26 @@ export function useGameAudio() {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 1.1; // Slightly faster for game pacing
         utterance.pitch = 1.0;
-        utterance.lang = 'ko-KR';
+        utterance.lang = ttsLang;
 
         let voices = synth.getVoices();
         if (voices.length === 0) voices = synth.getVoices();
-        const korVoice = voices.find(v => v.lang?.includes('ko') || v.lang?.includes('KR'));
-        if (korVoice) utterance.voice = korVoice;
+        // 현재 로케일에 맞는 보이스 선택(언어 prefix 매칭) — 없으면 엔진 기본에 맡김
+        const prefix = ttsLang.split('-')[0];
+        const voice = voices.find(v => v.lang?.toLowerCase().startsWith(prefix));
+        if (voice) utterance.voice = voice;
 
         synth.speak(utterance);
         try { synth.resume(); } catch { /* noop */ }
-    }, []);
+    }, [ttsLang]);
 
     const speak = useCallback((text: string) => {
         if (isMuted) return;
 
         // Bridge to a native TTS handler if the legacy Expo/React Native shell is present.
+        // lang 포함 — 구버전 앱은 무시하고 ko-KR로 읽음(하위호환), 신버전은 payload.lang 사용.
         if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-            (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'SPEAK', payload: { text } }));
+            (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'SPEAK', payload: { text, lang: ttsLang } }));
             return;
         }
 
@@ -100,7 +112,7 @@ export function useGameAudio() {
         // APK predates the plugin, the call rejects → fall back to Web Speech.
         if (Capacitor.isNativePlatform()) {
             try {
-                TextToSpeech.speak({ text, lang: 'ko-KR', rate: 1.1 }).catch(() => speakWeb(text));
+                TextToSpeech.speak({ text, lang: ttsLang, rate: 1.1 }).catch(() => speakWeb(text));
             } catch {
                 speakWeb(text);
             }
@@ -108,7 +120,7 @@ export function useGameAudio() {
         }
 
         speakWeb(text);
-    }, [isMuted, speakWeb]);
+    }, [isMuted, speakWeb, ttsLang]);
 
     // Simple beep effect using the shared Web Audio context.
     const playEffect = useCallback((type: 'click' | 'turn' | 'win' | 'finishing') => {

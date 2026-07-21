@@ -322,7 +322,8 @@ export default function App() {
                     console.log("🗣️ [Native] Speaking:", message.payload.text);
                     if (message.payload?.text) {
                         Speech.speak(message.payload.text, {
-                            language: 'ko-KR',
+                            // 웹이 보낸 로케일 사용(다국어 TTS) — 구형 메시지는 ko-KR 폴백
+                            language: message.payload?.lang || 'ko-KR',
                             rate: 1.0,
                             pitch: 1.0
                         });
