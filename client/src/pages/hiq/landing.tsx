@@ -7,16 +7,23 @@ import { LucideChevronRight, LucideDelete, LucideShieldQuestion } from "@/lib/ic
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@/contexts/StoreContext";
 import { PinResetDialog } from "@/components/hiq/PinResetDialog";
+import { useT, LOCALES, type Locale } from "@/lib/i18n";
+import SocialLogin, { socialLoginAvailable } from "@/components/hiq/SocialLogin";
 
 export default function Landing() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
+    const { t, locale, setLocale } = useT();
     const [phone, setPhone] = useState("");
     const [password, setPassword] = useState("");
     const [requiresPassword, setRequiresPassword] = useState(false);
     const [memberName, setMemberName] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isResetOpen, setIsResetOpen] = useState(false);
+    // 로그인 방식 분기 — 한국어는 전화번호, 그 외 언어는 구글·애플이 기본.
+    // 소셜 불가 상황(키 미배포·앱 웹뷰 브릿지 전)은 전화로 폴백. PIN 확인 단계는 항상 전화 카드.
+    const [phoneMode, setPhoneMode] = useState<boolean | null>(null);
+    const showPhone = requiresPassword || (phoneMode ?? (locale === "ko" || !socialLoginAvailable()));
 
     // Resolve the tenant slug from the URL exactly as StoreContext does, so a
     // white-label tenant logs into its OWN store rather than a hardcoded "hiq".
@@ -67,8 +74,8 @@ export default function Landing() {
         if (!requiresPassword && phone.length < 10) {
             toast({
                 variant: "destructive",
-                title: "입력 오류",
-                description: "올바른 전화번호 11자리를 입력해주세요.",
+                title: t("login.invalidPhoneTitle"),
+                description: t("login.invalidPhone"),
             });
             return;
         }
@@ -173,14 +180,25 @@ export default function Landing() {
                         <div className="flex items-center justify-center gap-2 mt-3">
                             <span className="h-[1px] w-4 bg-black/10" />
                             <p className="text-[12px] font-medium text-black/55">
-                                {requiresPassword ? `${memberName} 확인 중` : '스포츠 소셜 클럽'}
+                                {requiresPassword ? `${memberName} ${t("login.checkingMember")}` : t("common.tagline")}
                             </p>
                             <span className="h-[1px] w-4 bg-black/10" />
                         </div>
                     </motion.div>
                 </div>
 
-                {/* Input Area */}
+                {/* Input Area — 한국어(또는 앱): 전화번호 / 그 외 언어: 구글·애플 */}
+                {!showPhone ? (
+                    <div className="px-8 py-10 flex flex-col items-center gap-6">
+                        <SocialLogin />
+                        <button
+                            onClick={() => setPhoneMode(true)}
+                            className="text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4"
+                        >
+                            {t("login.phoneLoginLink")}
+                        </button>
+                    </div>
+                ) : (
                 <div className="px-8 py-10 flex flex-col items-center">
                     <div className="w-full relative group">
                         <input
@@ -188,7 +206,7 @@ export default function Landing() {
                             inputMode="numeric"
                             pattern="[0-9]*"
                             autoComplete={requiresPassword ? "current-password" : "tel-national"}
-                            placeholder={requiresPassword ? "PIN 번호" : "휴대폰 번호 입력"}
+                            placeholder={requiresPassword ? t("login.pinPlaceholder") : t("login.phonePlaceholder")}
                             value={requiresPassword ? password : formattedPhone(phone)}
                             onChange={requiresPassword
                                 ? (e) => setPassword(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))
@@ -203,7 +221,7 @@ export default function Landing() {
                         />
                         {/* Tooltip hint */}
                         <p className="text-center text-[12px] text-black/55 mt-4 font-medium">
-                            {requiresPassword ? "비밀번호를 입력하여 본인을 확인하세요" : "휴대폰 번호로 입장하세요"}
+                            {requiresPassword ? t("login.pinHint") : t("login.phoneHint")}
                         </p>
 
                         {requiresPassword && (
@@ -212,18 +230,30 @@ export default function Landing() {
                                 className="w-full mt-6 py-4 px-4 bg-black/[0.04] rounded-tile text-[12px] font-medium text-black/55 hover:text-brand hover:border-brand/50 transition-all active:scale-95 text-center flex items-center justify-center gap-2 group"
                             >
                                 <LucideShieldQuestion className="w-4 h-4 text-black/40 group-hover:text-brand transition-colors" />
-                                <span>PIN을 잊으셨나요?</span>
+                                <span>{t("login.forgotPin")}</span>
+                            </button>
+                        )}
+
+                        {/* 비한국어 유저가 전화 모드로 온 경우 — 소셜로 돌아가는 교차 링크 */}
+                        {!requiresPassword && locale !== "ko" && socialLoginAvailable() && (
+                            <button
+                                onClick={() => setPhoneMode(false)}
+                                className="w-full mt-6 text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4 text-center"
+                            >
+                                {t("login.socialLoginLink")}
                             </button>
                         )}
                     </div>
                 </div>
+                )}
 
-                {/* Enter Button */}
+                {/* Enter Button — 전화 모드에서만 */}
+                {showPhone && (
                 <div className="px-8 pb-8">
                     <motion.button
                         disabled={!canSubmit || isLoading}
                         onClick={handleStart}
-                        title={requiresPassword ? "확인 및 입장" : "입장하기"}
+                        title={requiresPassword ? t("login.confirmEnter") : t("login.enter")}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         className="w-full h-16 rounded-tile font-bold text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-20 relative overflow-hidden group"
@@ -236,16 +266,25 @@ export default function Landing() {
                             <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                         ) : (
                             <>
-                                <span>{requiresPassword ? "확인 및 입장" : "입장하기"}</span>
+                                <span>{requiresPassword ? t("login.confirmEnter") : t("login.enter")}</span>
                                 <LucideChevronRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
                             </>
                         )}
                     </motion.button>
                 </div>
+                )}
 
-                {/* Footer */}
-                <div className="text-center pb-6">
-                    <p className="text-[12px] font-medium text-black/55">RANKUE 제공</p>
+                {/* Footer — 제공 문구 + 언어 선택 */}
+                <div className="text-center pb-6 flex flex-col items-center gap-2">
+                    <p className="text-[12px] font-medium text-black/55">{t("common.poweredBy")}</p>
+                    <select
+                        value={locale}
+                        onChange={(e) => { setLocale(e.target.value as Locale); setPhoneMode(null); }}
+                        aria-label="Language"
+                        className="text-[11px] text-black/40 bg-transparent outline-none cursor-pointer text-center"
+                    >
+                        {LOCALES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+                    </select>
                 </div>
             </motion.div>
 

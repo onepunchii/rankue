@@ -44,6 +44,7 @@ import AccountDelete from "@/pages/account-delete";
 import Support from "@/pages/support";
 
 import { StoreProvider } from "./contexts/StoreContext";
+import { I18nProvider } from "@/lib/i18n";
 import { SportProvider } from "./contexts/SportContext";
 
 /**
@@ -180,12 +181,14 @@ function AppRoutes() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreProvider>
-        <SportProvider>
-          <AppRoutes />
-          <Toaster />
-        </SportProvider>
-      </StoreProvider>
+      <I18nProvider>
+        <StoreProvider>
+          <SportProvider>
+            <AppRoutes />
+            <Toaster />
+          </SportProvider>
+        </StoreProvider>
+      </I18nProvider>
     </QueryClientProvider>
   );
 }
