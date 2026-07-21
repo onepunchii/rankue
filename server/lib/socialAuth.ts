@@ -18,6 +18,15 @@ function allowedAudiences(env: string | undefined): string[] {
   return (env ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+// [임시 진단] 검증 실패 원인 파악용 — 토큰 페이로드(서명 미검증)를 디코드해 aud/iss/exp를 로그.
+function debugDecode(idToken: string): Record<string, unknown> {
+  try {
+    const part = idToken.split(".")[1] ?? "";
+    const json = Buffer.from(part.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    return JSON.parse(json);
+  } catch { return { _decodeError: true }; }
+}
+
 export async function verifyGoogleIdToken(idToken: string): Promise<SocialIdentity | null> {
   const audience = allowedAudiences(process.env.GOOGLE_CLIENT_IDS);
   if (audience.length === 0) return null; // 미설정 시 로그인 불가(안전 기본값)
@@ -32,7 +41,9 @@ export async function verifyGoogleIdToken(idToken: string): Promise<SocialIdenti
       email: typeof payload.email === "string" ? payload.email : null,
       name: typeof payload.name === "string" ? payload.name : null,
     };
-  } catch {
+  } catch (e) {
+    const c = debugDecode(idToken);
+    console.error("[social] GOOGLE verify FAIL", { err: String((e as Error)?.message ?? e), tokenAud: c.aud, tokenIss: c.iss, tokenExp: c.exp, allowedAud: audience });
     return null;
   }
 }
@@ -50,7 +61,9 @@ export async function verifyAppleIdToken(idToken: string): Promise<SocialIdentit
       email: typeof payload.email === "string" ? payload.email : null,
       name: null, // 애플은 id_token에 이름을 넣지 않음(최초 로그인 시 클라이언트가 별도 전달)
     };
-  } catch {
+  } catch (e) {
+    const c = debugDecode(idToken);
+    console.error("[social] APPLE verify FAIL", { err: String((e as Error)?.message ?? e), tokenAud: c.aud, tokenIss: c.iss, tokenExp: c.exp, allowedAud: audience });
     return null;
   }
 }
