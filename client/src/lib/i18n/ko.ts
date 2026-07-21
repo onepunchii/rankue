@@ -1411,4 +1411,6 @@ export const ko: Dict = {
   "settings.saveFailed": "저장 실패",
   "dashboard.completeProfile": "프로필 완성하고 매칭 정확도 높이기",
   "dashboard.completeProfileCta": "설정에서 30초 →",
+  "createClub.useMyLocation": "현재 위치를 크루 위치로 사용",
+  "createClub.locationSaved": "위치 저장됨",
 };

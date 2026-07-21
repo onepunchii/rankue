@@ -1409,5 +1409,7 @@ const en: Dict = {
   "settings.saveFailed": "Failed to save",
   "dashboard.completeProfile": "Complete your profile for better matches",
   "dashboard.completeProfileCta": "30s in Settings →",
+  "createClub.useMyLocation": "Use my current location for this crew",
+  "createClub.locationSaved": "Location saved",
 };
 export default en;

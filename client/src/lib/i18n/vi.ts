@@ -1409,5 +1409,7 @@ const vi: Dict = {
   "settings.saveFailed": "Lưu thất bại",
   "dashboard.completeProfile": "Hoàn thiện hồ sơ để ghép trận chuẩn hơn",
   "dashboard.completeProfileCta": "30 giây trong Cài đặt →",
+  "createClub.useMyLocation": "Dùng vị trí hiện tại cho crew",
+  "createClub.locationSaved": "Đã lưu vị trí",
 };
 export default vi;

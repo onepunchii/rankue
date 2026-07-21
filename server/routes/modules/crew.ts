@@ -497,7 +497,16 @@ router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =>
         countryCode = (req.headers["x-vercel-ip-country"] as string).toUpperCase().slice(0, 2);
     }
 
-    const crew = await storage.createCrew({ ...validation.data, leaderId: req.userId!, countryCode });
+    // 좌표 폴백 — 클라가 좌표를 안 보냈으면 지역 텍스트를 도시 수준으로 지오코딩.
+    // (거리순 크루 발견의 데이터 파이프. 실패해도 좌표 없이 저장 — 무해)
+    let { latitude, longitude } = validation.data as any;
+    if ((latitude == null || longitude == null) && validation.data.region) {
+        const { geocodeCity } = await import("../../lib/geocode.js");
+        const geo = await geocodeCity(validation.data.region, countryCode);
+        if (geo) { latitude = geo.lat; longitude = geo.lng; }
+    }
+
+    const crew = await storage.createCrew({ ...validation.data, leaderId: req.userId!, countryCode, latitude, longitude });
     return sendSuccess(res, crew);
 }));
 

@@ -39,6 +39,8 @@ import { InsertHiqCrew, HiqMember } from "@shared/schema";
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { useNativeBridge } from "@/hooks/useNativeBridge";
+import { useEffect } from "react";
 
 // 라벨은 i18n 키 — 렌더 시 t()로 감싼다.
 const STEPS = [
@@ -164,6 +166,15 @@ export default function CreateClub() {
         },
         enabled: searchQuery.length >= 2,
     });
+
+    // 크루 좌표 — "현재 위치 사용" 버튼으로 취득(앱=GPS 브릿지, 웹=브라우저 폴백).
+    // 미사용 시 서버가 지역 텍스트를 도시 수준 지오코딩으로 폴백.
+    const { location: gpsLocation, requestLocation } = useNativeBridge();
+    useEffect(() => {
+        if (gpsLocation) {
+            setFormData(prev => ({ ...prev, latitude: gpsLocation.lat, longitude: gpsLocation.lng }));
+        }
+    }, [gpsLocation]);
 
     // Region Search Query
     const [regionSearchQuery, setRegionSearchQuery] = useState("");
@@ -407,6 +418,17 @@ export default function CreateClub() {
                                         </PopoverContent>
                                     </Popover>
                                     )}
+                                    {/* 좌표 취득 — 거리순 크루 발견용(선택). 안 누르면 서버가 도시 지오코딩 폴백 */}
+                                    <button
+                                        type="button"
+                                        onClick={requestLocation}
+                                        className={cn(
+                                            "mt-1.5 text-[12px] font-medium transition-colors",
+                                            formData.latitude ? "text-brand" : "text-black/45 underline underline-offset-2"
+                                        )}
+                                    >
+                                        {formData.latitude ? `📍 ${t("createClub.locationSaved")}` : `📍 ${t("createClub.useMyLocation")}`}
+                                    </button>
                                 </div>
                                 <div className="relative">
                                     <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-black/55" />

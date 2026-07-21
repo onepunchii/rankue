@@ -1409,5 +1409,7 @@ const tr: Dict = {
   "settings.saveFailed": "Kaydedilemedi",
   "dashboard.completeProfile": "Daha iyi eşleşme için profilini tamamla",
   "dashboard.completeProfileCta": "Ayarlarda 30 sn →",
+  "createClub.useMyLocation": "Mevcut konumumu kullan",
+  "createClub.locationSaved": "Konum kaydedildi",
 };
 export default tr;

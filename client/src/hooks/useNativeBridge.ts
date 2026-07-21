@@ -88,7 +88,21 @@ export function useNativeBridge() {
 
     const openQrScanner = () => sendMessage({ type: 'OPEN_QR_SCANNER' });
 
-    const requestLocation = () => sendMessage({ type: 'GET_LOCATION' });
+    // 위치 요청 — 앱: 네이티브 GPS 브릿지 / 웹: 브라우저 geolocation 폴백.
+    // 둘 다 같은 location 상태로 수렴하므로 소비자(크루 거리순 등)는 환경을 몰라도 된다.
+    const requestLocation = useCallback(() => {
+        if (typeof window !== 'undefined' && window.ReactNativeWebView) {
+            sendMessage({ type: 'GET_LOCATION' });
+            return;
+        }
+        if (typeof navigator !== 'undefined' && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                () => { /* 거부·실패 시 조용히 무시 — 위치 없이도 목록은 동작 */ },
+                { timeout: 8000, maximumAge: 300000 }
+            );
+        }
+    }, [sendMessage]);
 
     const vibrate = (style: 'light' | 'medium' | 'heavy' = 'medium') =>
         sendMessage({ type: 'VIBRATE', payload: { style } });

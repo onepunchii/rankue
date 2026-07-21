@@ -1409,5 +1409,7 @@ const es: Dict = {
   "settings.saveFailed": "Error al guardar",
   "dashboard.completeProfile": "Completa tu perfil para mejores partidas",
   "dashboard.completeProfileCta": "30 s en Ajustes →",
+  "createClub.useMyLocation": "Usar mi ubicación actual",
+  "createClub.locationSaved": "Ubicación guardada",
 };
 export default es;
