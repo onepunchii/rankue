@@ -9,6 +9,10 @@ import { useT } from "@/lib/i18n";
 // ⚠️ Expo 앱 웹뷰에선 구글이 OAuth를 차단하므로 네이티브 브릿지(RQ-4) 완성 전까지 전체 숨김.
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+// 애플 웹 로그인(SIWA JS) — Services ID(com.rankue.app.web). 미설정이면 애플 버튼 미노출.
+const APPLE_SERVICES_ID = import.meta.env.VITE_APPLE_SERVICES_ID as string | undefined;
+
+const APPLE_LOCALE: Record<string, string> = { ko: "ko_KR", en: "en_US", vi: "vi_VN", tr: "tr_TR", es: "es_ES" };
 
 /** Expo 래퍼(웹뷰) 안인가 — App.tsx가 주입하는 ReactNativeWebView 존재로 판별 */
 export function isInAppWebView(): boolean {
@@ -30,6 +34,15 @@ declare global {
         };
       };
     };
+    AppleID?: {
+      auth: {
+        init: (cfg: { clientId: string; scope: string; redirectURI: string; usePopup: boolean }) => void;
+        signIn: () => Promise<{
+          authorization: { id_token: string };
+          user?: { name?: { firstName?: string; lastName?: string } };
+        }>;
+      };
+    };
   }
 }
 
@@ -40,6 +53,7 @@ export default function SocialLogin() {
   const [busy, setBusy] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
   const [gisReady, setGisReady] = useState(false);
+  const [appleReady, setAppleReady] = useState(false);
 
   const submitToken = useCallback(async (provider: "google" | "apple", idToken: string, name?: string) => {
     setBusy(true);
@@ -83,6 +97,43 @@ export default function SocialLogin() {
     document.head.appendChild(s);
   }, [locale, submitToken]);
 
+  // 애플 SIWA JS 로드 + init — 팝업 모드(등록된 리턴URL 오리진에서 postMessage 수신)
+  useEffect(() => {
+    if (!APPLE_SERVICES_ID || isInAppWebView()) return;
+    const id = "apple-siwa";
+    const init = () => {
+      window.AppleID?.auth.init({
+        clientId: APPLE_SERVICES_ID,
+        scope: "name email",
+        redirectURI: window.location.origin,
+        usePopup: true,
+      });
+      setAppleReady(true);
+    };
+    if (document.getElementById(id)) { init(); return; }
+    const s = document.createElement("script");
+    s.id = id;
+    s.src = `https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/${APPLE_LOCALE[locale] ?? "en_US"}/appleid.auth.js`;
+    s.async = true;
+    s.onload = init;
+    document.head.appendChild(s);
+  }, [locale]);
+
+  const handleApple = useCallback(async () => {
+    if (!window.AppleID) return;
+    try {
+      const res = await window.AppleID.auth.signIn();
+      const idToken = res?.authorization?.id_token;
+      if (!idToken) return;
+      // 애플은 최초 1회만 이름 제공 — 있으면 서버로 전달
+      const n = res.user?.name;
+      const name = [n?.firstName, n?.lastName].filter(Boolean).join(" ") || undefined;
+      await submitToken("apple", idToken, name);
+    } catch {
+      /* 유저 취소 등 — 조용히 무시 */
+    }
+  }, [submitToken]);
+
   // 키 미설정(배포 전) 또는 앱 웹뷰(브릿지 전) → 아무것도 노출하지 않음
   if (!GOOGLE_CLIENT_ID || isInAppWebView()) return null;
 
@@ -94,6 +145,22 @@ export default function SocialLogin() {
         <div ref={googleBtnRef} />
         {!gisReady && <div className="absolute inset-0 mx-auto h-[44px] w-[320px] rounded-full bg-black/[0.04] animate-pulse pointer-events-none" />}
       </div>
+
+      {/* 애플 로그인 — 브랜드 가이드(검정 배경·공식 로고·시스템 폰트) 준수 커스텀 버튼 */}
+      {APPLE_SERVICES_ID && (
+        <button
+          onClick={handleApple}
+          disabled={!appleReady || busy}
+          className="w-[320px] h-[44px] rounded-[4px] bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 transition-opacity"
+          style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+        >
+          <svg width="14" height="17" viewBox="0 0 14 17" fill="currentColor" aria-hidden>
+            <path d="M13.545 12.87c-.37.855-.547 1.237-1.023 1.993-.665 1.056-1.603 2.37-2.765 2.38-1.033.01-1.298-.672-2.7-.664-1.4.007-1.693.677-2.726.667-1.162-.01-2.05-1.198-2.716-2.253C-.245 12.028-.44 8.583.83 6.75c.902-1.302 2.326-2.064 3.664-2.064 1.362 0 2.219.747 3.345.747 1.093 0 1.759-.748 3.334-.748 1.191 0 2.453.649 3.352 1.77-2.945 1.614-2.467 5.82.02 6.415zM9.905 3.44c.573-.735.999-1.771.847-2.94-.995.068-2.158.702-2.837 1.527-.617.75-1.127 1.795-.928 2.828 1.086.034 2.21-.615 2.918-1.415z"/>
+          </svg>
+          <span>{t("login.continueApple")}</span>
+        </button>
+      )}
+
       {busy && <p className="text-[12px] text-black/40">{t("common.loading")}</p>}
     </div>
   );
