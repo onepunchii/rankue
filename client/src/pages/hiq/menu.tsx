@@ -178,7 +178,7 @@ export default function HiqMenu() {
                     >
                         <LucideBell className="w-5 h-5 text-black/55" />
                     </button>
-                    <button title="설정" className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center active:scale-95 transition-transform">
+                    <button title="설정" onClick={() => setLocation("/settings")} className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center active:scale-95 transition-transform">
                         <LucideSettings className="w-5 h-5 text-black/55" />
                     </button>
                 </div>

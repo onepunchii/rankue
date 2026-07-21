@@ -57,7 +57,13 @@ router.get("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =
         profileImageUrl: profile?.profileImageUrl,
         nickname: profile?.nickname || member.name,
         handle: profile?.handle ?? null,
-        countryCode: profile?.countryCode ?? null
+        countryCode: profile?.countryCode ?? null,
+        // 설정 화면 '연결된 로그인' 표시용 — 값 자체는 절대 노출하지 않고 연결 여부만
+        connections: {
+            phone: !member.phone?.startsWith("social:"),
+            google: !!profile?.googleSub,
+            apple: !!profile?.appleSub,
+        }
     });
 }));
 

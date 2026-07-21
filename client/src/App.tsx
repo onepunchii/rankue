@@ -16,6 +16,7 @@ import HiqGameResult from "@/pages/hiq/game/result";
 import HiqHistory from "@/pages/hiq/history";
 import HiqRanking from "@/pages/hiq/ranking";
 import HiqMenu from "@/pages/hiq/menu";
+import HiqSettings from "@/pages/hiq/settings";
 import HiqFriends from "@/pages/hiq/friends";
 import HiqClub from "@/pages/hiq/club";
 import HiqCreateClub from "@/pages/hiq/create-club";
@@ -134,6 +135,7 @@ function AppRoutes() {
       {/* HiQ 기능 페이지들 */}
       <Route path="/register" component={HiqRegister} />
       <Route path="/dashboard" component={HiqDashboard} />
+      <Route path="/settings" component={HiqSettings} />
       <Route path="/friends" component={HiqFriends} />
       <Route path="/club" component={HiqClub} />
       <Route path="/club/create" component={HiqCreateClub} />
