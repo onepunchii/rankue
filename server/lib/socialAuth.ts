@@ -19,7 +19,7 @@ function allowedAudiences(env: string | undefined): string[] {
 }
 
 // [임시 진단] 검증 실패 원인 파악용 — 토큰 페이로드(서명 미검증)를 디코드해 aud/iss/exp를 로그.
-function debugDecode(idToken: string): Record<string, unknown> {
+export function debugDecode(idToken: string): Record<string, unknown> {
   try {
     const part = idToken.split(".")[1] ?? "";
     const json = Buffer.from(part.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
