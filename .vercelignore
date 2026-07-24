@@ -1,0 +1,6 @@
+# 웹(Vercel) 배포에 불필요한 네이티브 프로젝트·빌드 산출물 제외 → 업로드 파일 수 감축
+android
+ios
+*.xcarchive
+*.apk
+*.aab
