@@ -144,6 +144,10 @@ class Storage {
     async getAdminStats(id: string) { return this.admin.getAdminStats(id); }
     async getGlobalStats() { return this.admin.getGlobalStats(); }
     async getAllMembersForAdmin() { return this.admin.getAllMembersForAdmin(); }
+    async getCrewsForSitemap() { return this.admin.getCrewsForSitemap(); }
+    async getStoresForSitemap() { return this.admin.getStoresForSitemap(); }
+    async getPublicStores() { return this.admin.getPublicStores(); }
+    async getPublicStoreBySlug(slug: string) { return this.admin.getPublicStoreBySlug(slug); }
     async createPartnerLead(data: any) { return this.admin.createPartnerLead(data); }
     async searchStores(q: string) { return this.admin.searchStores(q); }
     async getPartnerLeads() { return this.admin.getPartnerLeads(); }

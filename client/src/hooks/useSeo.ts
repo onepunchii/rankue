@@ -1,19 +1,19 @@
 import { useEffect } from "react";
-import type { Locale } from "@/lib/i18n";
 
 // SPA 라우트/언어 전환 시 <head> 메타를 갱신한다. Google 등 JS 렌더링 크롤러가
 // 페이지별·언어별 title/description/canonical/OG를 정확히 읽게 하기 위함.
 const ORIGIN = "https://www.rankue.co.kr";
-const OG_LOCALE: Record<Locale, string> = {
-  ko: "ko_KR", en: "en_US", vi: "vi_VN", tr: "tr_TR", es: "es_ES",
+const OG_LOCALE: Record<string, string> = {
+  ko: "ko_KR", en: "en_US", vi: "vi_VN", tr: "tr_TR", es: "es_ES", ja: "ja_JP", zh: "zh_CN",
 };
 
 interface SeoOptions {
   title: string;
   description: string;
   path: string; // 예: "/about"
-  locale?: Locale;
+  locale?: string;
   image?: string;
+  jsonLd?: object | null; // 페이지별 구조화데이터(LocalBusiness 등)
 }
 
 function upsertMeta(attr: "name" | "property", key: string, content: string) {
@@ -36,7 +36,9 @@ function upsertLink(rel: string, href: string) {
   el.setAttribute("href", href);
 }
 
-export function useSeo({ title, description, path, locale = "ko", image }: SeoOptions) {
+const PAGE_LD_ID = "page-jsonld";
+
+export function useSeo({ title, description, path, locale = "ko", image, jsonLd }: SeoOptions) {
   useEffect(() => {
     const url = ORIGIN + path;
     document.title = title;
@@ -54,5 +56,19 @@ export function useSeo({ title, description, path, locale = "ko", image }: SeoOp
       upsertMeta("name", "twitter:image", image);
     }
     document.documentElement.lang = locale;
-  }, [title, description, path, locale, image]);
+
+    // 페이지별 JSON-LD 주입 (라우트 이탈 시 제거)
+    const existing = document.getElementById(PAGE_LD_ID);
+    if (existing) existing.remove();
+    if (jsonLd) {
+      const s = document.createElement("script");
+      s.type = "application/ld+json";
+      s.id = PAGE_LD_ID;
+      s.textContent = JSON.stringify(jsonLd);
+      document.head.appendChild(s);
+    }
+    return () => {
+      document.getElementById(PAGE_LD_ID)?.remove();
+    };
+  }, [title, description, path, locale, image, jsonLd]);
 }

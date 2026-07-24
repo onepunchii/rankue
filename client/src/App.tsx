@@ -44,6 +44,8 @@ import Privacy from "@/pages/privacy";
 import AccountDelete from "@/pages/account-delete";
 import Support from "@/pages/support";
 import About from "@/pages/about";
+import Stores from "@/pages/stores";
+import StoreDetail from "@/pages/store-detail";
 
 import { StoreProvider } from "./contexts/StoreContext";
 import { I18nProvider } from "@/lib/i18n";
@@ -133,6 +135,8 @@ function AppRoutes() {
       <Route path="/account-delete" component={AccountDelete} />
       <Route path="/support" component={Support} />
       <Route path="/about" component={About} />
+      <Route path="/stores" component={Stores} />
+      <Route path="/store/:slug" component={StoreDetail} />
 
       {/* HiQ 기능 페이지들 */}
       <Route path="/register" component={HiqRegister} />

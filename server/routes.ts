@@ -3,9 +3,13 @@ import { createServer, type Server } from "http";
 import hiqRouter from "./routes/index.js";
 import superRouter from "./routes/modules/super.js";
 import errorsRouter from "./routes/modules/errors.js";
+import { registerSitemap } from "./sitemap.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("=== HiQ Billiards API Starting ===");
+
+  // 동적 sitemap.xml (정적 페이지 + 크루 + 매장) — SPA/정적 폴백보다 먼저 등록
+  registerSitemap(app);
 
   // HiQ Router 연결
   // (프론트 변경에 맞춰 경로를 /api/hiq -> /api 로 줄일 수도 있지만,

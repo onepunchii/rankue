@@ -43,10 +43,11 @@ export default function Support() {
             </p>
           </div>
           <div>
-            <p className="font-bold">Q. RP(레이팅 점수)는 어떻게 오르내리나요?</p>
+            <p className="font-bold">Q. 당구 점수는 어떻게 기록하나요?</p>
             <p className="mt-1">
-              매칭 대결(공식 경기)의 승패 결과에 따라 3쿠션·4구 각각의 RP가
-              갱신됩니다. 혼자 연습은 기록에 반영되지 않습니다.
+              화면의 점수판에서 터치로 득점을 입력하면 이닝·평균·하이런이
+              자동으로 계산되고 음성으로 안내됩니다. 되돌리기도 되고, 경기가
+              끝나면 전적으로 자동 저장됩니다.
             </p>
           </div>
           <div>

@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import {
     hiqStores,
+    hiqCrews,
     profiles,
     partnerLeads,
     notices,
@@ -69,6 +70,43 @@ export class AdminRepository {
             ...r,
             ownerName: r.ownerName || "Unknown"
         }));
+    }
+
+    // ── 사이트맵/공개 매장 조회 (인증 불필요, 민감필드 제외) ──
+    async getCrewsForSitemap() {
+        return db.select({ id: hiqCrews.id }).from(hiqCrews);
+    }
+
+    async getStoresForSitemap() {
+        return db.select({ slug: hiqStores.slug }).from(hiqStores);
+    }
+
+    async getPublicStores() {
+        return db.select({
+            slug: hiqStores.slug,
+            name: hiqStores.name,
+            region: hiqStores.region,
+            address: hiqStores.address,
+            phone: hiqStores.phone,
+            description: hiqStores.description,
+            latitude: hiqStores.latitude,
+            longitude: hiqStores.longitude,
+        }).from(hiqStores).orderBy(asc(hiqStores.name));
+    }
+
+    async getPublicStoreBySlug(slug: string) {
+        const [s] = await db.select({
+            slug: hiqStores.slug,
+            name: hiqStores.name,
+            region: hiqStores.region,
+            address: hiqStores.address,
+            phone: hiqStores.phone,
+            description: hiqStores.description,
+            notice: hiqStores.notice,
+            latitude: hiqStores.latitude,
+            longitude: hiqStores.longitude,
+        }).from(hiqStores).where(eq(hiqStores.slug, slug));
+        return s ?? null;
     }
 
     async searchStores(query: string): Promise<HiqStore[]> {

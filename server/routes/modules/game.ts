@@ -18,6 +18,18 @@ router.get("/stores/search", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, stores);
 }));
 
+// 공개 매장 디렉토리 (매장찾기) — 인증 불필요, 표시용 필드만 반환
+router.get("/public-stores", asyncHandler(async (_req: any, res: any) => {
+    const stores = await storage.getPublicStores();
+    return sendSuccess(res, stores);
+}));
+
+router.get("/public-stores/:slug", asyncHandler(async (req: any, res: any) => {
+    const store = await storage.getPublicStoreBySlug(req.params.slug);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다");
+    return sendSuccess(res, store);
+}));
+
 router.get("/branding/:slug", asyncHandler(async (req: any, res: any) => {
     const data = await hiqService.getBranding(req.params.slug);
     return sendSuccess(res, data);
