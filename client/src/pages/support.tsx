@@ -65,6 +65,11 @@ export default function Support() {
         <h2 className="mt-8 text-lg font-bold">관련 문서</h2>
         <ul className="mt-2 list-disc pl-5 text-sm text-gray-700 space-y-1">
           <li>
+            <a className="underline" href="/about">
+              랭큐 소개 (About)
+            </a>
+          </li>
+          <li>
             <a className="underline" href="/privacy">
               개인정보처리방침
             </a>

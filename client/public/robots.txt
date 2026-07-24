@@ -1,0 +1,47 @@
+# RANKUE 랭큐 — robots.txt
+# 일반 검색엔진: 전체 허용
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /partner/login
+
+# 네이버
+User-agent: Yeti
+Allow: /
+
+# 빙 / MS
+User-agent: Bingbot
+Allow: /
+
+# Apple (Siri / Spotlight)
+User-agent: Applebot
+Allow: /
+User-agent: Applebot-Extended
+Allow: /
+
+# ── 답변엔진 / 생성형 AI (AEO · GEO) 명시적 허용 ──
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-Web
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Perplexity-User
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: Amazonbot
+Allow: /
+User-agent: cohere-ai
+Allow: /
+
+Sitemap: https://www.rankue.co.kr/sitemap.xml

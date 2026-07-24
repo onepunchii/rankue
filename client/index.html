@@ -11,17 +11,36 @@
   <title>랭큐 RANKUE · 당구 실력 랭킹 & 매칭 앱</title>
   <meta name="description"
     content="랭큐(RANKUE)는 당구 실력을 RP 레이팅으로 측정하고 경기를 자동 기록하는 당구 랭킹·매칭 앱입니다. 3쿠션·4구 실력 관리, 실력이 맞는 라이벌·크루 찾기, 핀 코드 대결과 매장 랭킹까지 한 곳에서." />
-  <meta name="keywords" content="랭큐, RANKUE, 당구, 당구 랭킹, 당구 실력, RP 레이팅, 3쿠션, 4구, 당구 매칭, 당구 기록, 당구 크루, 당구 동호회, 당구 점수 앱" />
-  <link rel="canonical" href="https://www.rankue.co.kr" />
+  <meta name="keywords" content="랭큐, RANKUE, 당구, 당구 랭킹, 당구 실력, RP 레이팅, 3쿠션, 4구, 당구 매칭, 당구 기록, 당구 크루, 당구 동호회, 당구 점수 앱, billiards ranking, carom, 3-cushion" />
+  <meta name="author" content="RANKUE" />
+  <meta name="application-name" content="RANKUE" />
+  <meta name="robots"
+    content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <link rel="canonical" href="https://www.rankue.co.kr/" />
+
+  <!-- hreflang — 지원 언어(ko·en·vi·tr·es) 검색 노출 -->
+  <link rel="alternate" hreflang="ko" href="https://www.rankue.co.kr/" />
+  <link rel="alternate" hreflang="en" href="https://www.rankue.co.kr/?lang=en" />
+  <link rel="alternate" hreflang="vi" href="https://www.rankue.co.kr/?lang=vi" />
+  <link rel="alternate" hreflang="tr" href="https://www.rankue.co.kr/?lang=tr" />
+  <link rel="alternate" hreflang="es" href="https://www.rankue.co.kr/?lang=es" />
+  <link rel="alternate" hreflang="x-default" href="https://www.rankue.co.kr/" />
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://www.rankue.co.kr" />
   <meta property="og:title" content="랭큐 RANKUE · 당구 실력 랭킹 & 매칭 앱" />
   <meta property="og:description" content="RP 레이팅으로 내 당구 실력을 정확히. 경기 자동 기록, 실력 맞는 라이벌·크루 매칭, 매장 랭킹까지 — 당구를 제대로 즐기는 법, 랭큐." />
-  <meta property="og:image" content="/og.png" />
+  <meta property="og:image" content="https://www.rankue.co.kr/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="랭큐 RANKUE — 당구 실력 랭킹·매칭 앱" />
   <meta property="og:site_name" content="RANKUE" />
   <meta property="og:locale" content="ko_KR" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta property="og:locale:alternate" content="vi_VN" />
+  <meta property="og:locale:alternate" content="tr_TR" />
+  <meta property="og:locale:alternate" content="es_ES" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
@@ -40,6 +59,8 @@
   <!-- Icons -->
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="/app.png" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.json" id="app-manifest" />
   <script>
@@ -53,12 +74,90 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="format-detection" content="telephone=no" />
   <meta name="naver-site-verification" content="2e7af38e33b85d732c6cbdc50728f72e0ee2480e" />
+  <meta name="naver-site-verification" content="921330879833dc13b92ea6e0ff5bcb203e2120a7" />
   <meta name="google-site-verification" content="jLYgi_u7y3J0WorGpD1ODFy7tZ4FZmE8KT4BaGPnRCM" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- 구조화 데이터 (JSON-LD) — 검색(SEO)·답변엔진(AEO)·생성형엔진(GEO) 공통 -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://www.rankue.co.kr/#organization",
+        "name": "RANKUE",
+        "alternateName": "랭큐",
+        "url": "https://www.rankue.co.kr/",
+        "logo": "https://www.rankue.co.kr/icon-192.png",
+        "image": "https://www.rankue.co.kr/og.png",
+        "description": "당구 실력을 RP 레이팅으로 측정하고 경기를 자동 기록하는 당구 랭킹·매칭 플랫폼."
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://www.rankue.co.kr/#website",
+        "url": "https://www.rankue.co.kr/",
+        "name": "RANKUE 랭큐",
+        "publisher": { "@id": "https://www.rankue.co.kr/#organization" },
+        "inLanguage": ["ko", "en", "vi", "tr", "es"]
+      },
+      {
+        "@type": "MobileApplication",
+        "@id": "https://www.rankue.co.kr/#app",
+        "name": "RANKUE 랭큐",
+        "operatingSystem": "iOS, Android",
+        "applicationCategory": "SportsApplication",
+        "url": "https://www.rankue.co.kr/",
+        "inLanguage": ["ko", "en", "vi", "tr", "es"],
+        "publisher": { "@id": "https://www.rankue.co.kr/#organization" },
+        "description": "3쿠션·4구 당구 실력을 RP 레이팅으로 측정하고, 실력이 맞는 라이벌·크루를 찾아 경기하고, 경기를 자동 기록하는 당구 랭킹·매칭 앱.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://www.rankue.co.kr/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "랭큐(RANKUE)는 어떤 앱인가요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "랭큐는 당구 실력을 RP(레이팅 포인트)로 측정하고 경기를 자동 기록하는 당구 랭킹·매칭 앱입니다. 3쿠션·4구 실력 관리, 실력이 맞는 라이벌·크루 찾기, 핀 코드 대결, 매장·전국 랭킹을 제공합니다."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "RP 레이팅은 무엇인가요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "RP(Rating Point)는 경기 승패 결과로 오르내리는 당구 실력 점수입니다. 3쿠션과 4구 각각 별도로 산정되며, 실력이 비슷한 상대와 매칭하고 랭킹을 매기는 기준이 됩니다."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "랭큐는 무료인가요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "네, 랭큐는 무료로 이용할 수 있으며 iOS와 Android에서 모두 사용할 수 있습니다."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "어떤 언어를 지원하나요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "한국어, 영어, 베트남어, 터키어, 스페인어를 지원합니다."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
 </head>
 
 <body>

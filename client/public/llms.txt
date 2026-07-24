@@ -1,0 +1,42 @@
+# RANKUE (랭큐)
+
+> RANKUE is a billiards skill-rating and matchmaking app. It measures a player's
+> skill as an RP (Rating Point) score, automatically records matches, finds
+> skill-matched rivals and crews, and provides venue and nationwide rankings for
+> 3-cushion and 4-ball (carom) billiards. Available on iOS and Android, free to use,
+> in Korean, English, Vietnamese, Turkish, and Spanish.
+
+## What RANKUE is
+
+RANKUE (랭큐) is a mobile app for billiards players. Instead of vague self-reported
+handicaps, RANKUE gives every player an objective RP rating that rises and falls with
+real match results — separately for 3-cushion and 4-ball. Players use it to track their
+skill over time, get matched against opponents of similar level, keep automatic score
+records, join crews (clubs), and climb store and national leaderboards.
+
+## Key features
+
+- **RP rating**: An objective billiards skill score (separate for 3-cushion and 4-ball) that updates with win/loss results.
+- **Skill matchmaking (매칭 대결)**: 1:1 ranked matches against opponents of similar RP. PIN-code entry lets an opponent join the same game.
+- **Automatic match records (기록)**: Every official match is recorded — innings, high run, average, and RP changes.
+- **Crews (크루)**: Create or join billiards clubs, share activity and photos, chat, and manage members.
+- **Simulator (시뮬레이터)**: A solo on-screen virtual billiards table for 3-ball / 4-ball practice.
+- **Rankings (랭킹)**: Store-level and nationwide leaderboards for 3-cushion and 4-ball.
+
+## Facts
+
+- Name: RANKUE (Korean: 랭큐)
+- Category: Sports / Billiards app
+- Platforms: iOS, Android, Web (PWA)
+- Price: Free
+- Languages: Korean (ko), English (en), Vietnamese (vi), Turkish (tr), Spanish (es)
+- Disciplines: 3-cushion carom, 4-ball carom
+- Website: https://www.rankue.co.kr
+
+## Links
+
+- Homepage: https://www.rankue.co.kr
+- About: https://www.rankue.co.kr/about
+- Support / FAQ: https://www.rankue.co.kr/support
+- Privacy policy: https://www.rankue.co.kr/privacy
+- Account deletion: https://www.rankue.co.kr/account-delete

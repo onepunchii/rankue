@@ -1,0 +1,46 @@
+{
+  "slides": [
+    { "file": "01.png", "key": "scoreboard" },
+    { "file": "02.png", "key": "ranking" },
+    { "file": "03.png", "key": "rival" },
+    { "file": "04.png", "key": "crew" },
+    { "file": "05.png", "key": "stats" }
+  ],
+  "captions": {
+    "ko": {
+      "scoreboard": "실시간 점수판\n터치로 기록, 음성 콜",
+      "ranking": "매장부터 글로벌까지\n내 실력 순위",
+      "rival": "라이벌 등록\n상대 전적 한눈에",
+      "crew": "우리 크루 만들고\n근처 팀 발견",
+      "stats": "에버리지·하이런·승률\n자동 분석"
+    },
+    "en": {
+      "scoreboard": "Live scoreboard\ntap to score, voice calls",
+      "ranking": "From your venue to global\nsee where you rank",
+      "rival": "Add rivals\ntrack head-to-head",
+      "crew": "Start your crew\nfind teams nearby",
+      "stats": "Average · high run · win rate\nanalyzed automatically"
+    },
+    "vi": {
+      "scoreboard": "Bảng điểm trực tiếp\nchạm để ghi, đọc điểm",
+      "ranking": "Từ CLB đến toàn cầu\nthứ hạng của bạn",
+      "rival": "Thêm đối thủ\nlịch sử đối đầu",
+      "crew": "Lập crew của bạn\ntìm đội gần đây",
+      "stats": "Trung bình · cú dài · thắng\nphân tích tự động"
+    },
+    "tr": {
+      "scoreboard": "Canlı skor tablosu\ndokun, sesli anons",
+      "ranking": "Kulüpten dünyaya\nsıralamanı gör",
+      "rival": "Rakip ekle\nkarşılaşma geçmişi",
+      "crew": "Ekibini kur\nyakındaki takımlar",
+      "stats": "Ortalama · seri · galibiyet\notomatik analiz"
+    },
+    "es": {
+      "scoreboard": "Marcador en vivo\ntoca y anota, con voz",
+      "ranking": "De tu club al mundo\ntu posición real",
+      "rival": "Añade rivales\nhistorial cara a cara",
+      "crew": "Crea tu equipo\nclubes cercanos",
+      "stats": "Promedio · serie · victorias\nanálisis automático"
+    }
+  }
+}
