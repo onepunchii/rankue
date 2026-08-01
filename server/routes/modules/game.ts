@@ -242,6 +242,20 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
     ));
 
     // Keep the existing response shape (the client reads handicapUpdate1 / handicapUpdate2).
+    // P0: 경기 종료 → 상대 플레이어들에게 결과 알림
+    try {
+        const opponentIds = boundIds.filter((id: string) => id !== req.userId);
+        for (const oid of opponentIds) {
+            notificationService.sendAndSaveNotification({
+                memberId: oid,
+                title: "🏁 경기 종료",
+                body: "경기가 종료되었습니다. 결과를 확인해보세요.",
+                category: game?.gameType === "golf" ? "GOLF" : "BILLIARDS",
+                type: "MATCH",
+                params: { url: `/history/${req.params.id}` },
+            }).catch((err: any) => console.error("[GameFinishNotif]", err));
+        }
+    } catch(e) {}
     return sendSuccess(res, {
         game,
         handicapUpdate1: handicapUpdates[0] ?? null,
@@ -384,6 +398,21 @@ router.get("/invite/:code", requireAuth, asyncHandler(async (req: AuthRequest, r
 router.post("/invite/:code/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const success = await storage.joinInvite(req.params.code, req.userId!);
     if (!success) return sendError(res, 400, "만료되었거나 유효하지 않은 코드");
+    // P0: 게스트 참가 수락 → 호스트에게 알림
+    try {
+        const invite = await storage.games.getInviteByCode(req.params.code);
+        if (invite?.hostId) {
+            const guest = await storage.getMemberById(req.userId!);
+            notificationService.sendAndSaveNotification({
+                memberId: invite.hostId,
+                title: "🎯 초대 참가 수락",
+                body: guest?.member?.name ? `${guest.member.name}님이 초대에 응했어요!` : "상대방이 초대에 응했어요!",
+                category: "BILLIARDS",
+                type: "MATCH",
+                params: { url: `/history` },
+            }).catch(err => console.error("[InviteAcceptNotif]", err));
+        }
+    } catch(e) {}
     return sendSuccess(res, { success: true });
 }));
 

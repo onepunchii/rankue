@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes.js";
 import { serveStatic } from "./vite.js";
 import { errorHandler } from "./middleware/error.js";
+import { startNotificationScheduler } from "./services/notificationScheduler.js";
 
 const log = (message: string, context: string = "Express") => console.log(`[${context}] ${message}`);
 
@@ -23,6 +24,11 @@ app.use((req, res, next) => {
   console.log(`[Global] Incoming Request: ${req.method} ${req.url}`);
   next();
 });
+
+// Start cron reminder scheduler (only in non-Vercel environment)
+if (!process.env.VERCEL) {
+  startNotificationScheduler();
+}
 
 // Register HiQ API Routes
 const server = await registerRoutes(app);

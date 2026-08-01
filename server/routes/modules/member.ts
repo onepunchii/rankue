@@ -5,6 +5,10 @@ import { storage, getRecentOpponents, searchUsers } from "../../storage/index.js
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { db } from "../../db.js";
+import { hiqMembers } from "../../../shared/schema.js";
+import { eq } from "drizzle-orm";
+import { notificationService } from "../../services/notificationService.js";
 
 const router = Router();
 
@@ -182,6 +186,23 @@ router.post("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: 
     const finalTargetId = targetId || receiverId; // Handle both for safety
     const sportCategory = sport === "GOLF" ? "GOLF" : "BILLIARDS";
     const result = await storage.requestFriend(req.userId!, finalTargetId, sportCategory);
+
+    // P0: 라이벌 추가 → 추가당한 사람에게 알림
+    try {
+        const [sender] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, req.userId!));
+        if (sender?.profileId) {
+            const senderProfile = await storage.getProfile(sender.profileId);
+            notificationService.sendAndSaveNotification({
+                memberId: finalTargetId,
+                title: "👊 라이벌 추가",
+                body: senderProfile?.name ? `${senderProfile.name}님이 회원님을 라이벌로 추가했어요!` : "누군가가 라이벌로 추가했습니다",
+                category: sportCategory,
+                type: "FRIEND",
+                params: { url: "/friends" },
+            }).catch((err: any) => console.error("[FriendAddNotif]", err));
+        }
+    } catch(e) {}
+
     return sendSuccess(res, result);
 }));
 

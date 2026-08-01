@@ -1004,6 +1004,24 @@ export const insertHiqNotificationSchema = createInsertSchema(hiqNotifications).
 export type HiqNotification = typeof hiqNotifications.$inferSelect;
 export type InsertHiqNotification = z.infer<typeof insertHiqNotificationSchema>;
 
+// hiq_crew_notification_settings — per-crew per-member push notification preferences
+export const hiqCrewNotificationSettings = pgTable("hiq_crew_notification_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  crewId: uuid("crew_id").notNull(),
+  memberId: uuid("member_id").notNull(),
+  chatEnabled: boolean("chat_enabled").default(true).notNull(),
+  activityEnabled: boolean("activity_enabled").default(true).notNull(),
+  settlementEnabled: boolean("settlement_enabled").default(true).notNull(),
+  postCommentEnabled: boolean("post_comment_enabled").default(true).notNull(),
+  pollEnabled: boolean("poll_enabled").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniq: unique().on(table.crewId, table.memberId),
+}));
+export type HiqCrewNotificationSetting = typeof hiqCrewNotificationSettings.$inferSelect;
+export type InsertHiqCrewNotificationSetting = typeof hiqCrewNotificationSettings.$inferInsert;
+
 // --- Poll Relations ---
 
 export const hiqPollsRelations = relations(hiqPolls, ({ many, one }) => ({
