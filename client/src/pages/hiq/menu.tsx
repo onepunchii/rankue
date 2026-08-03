@@ -25,6 +25,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { flagEmoji } from "@/lib/flag";
 import { SuggestionModal } from "@/components/hiq/SuggestionModal";
+import { FamilyServices } from "@/components/hiq/FamilyServices";
 import { HiqMember } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
@@ -411,23 +412,11 @@ export default function HiqMenu() {
             </motion.button>
             )}
 
-            {/* Section: Family services */}
-            <div className="relative z-10 mb-12">
-                <h3 className="text-[15px] font-semibold text-black/55 mb-3 px-1">{t("menu.familyServices")}</h3>
-                <div className="flex flex-col gap-2.5">
-                    <a href="https://www.tohk.co.kr" target="_blank" rel="noopener noreferrer" className="block rk-card p-5 hover:bg-surface-2 transition-colors group">
-                        <span className="rk-chip bg-purple-500/[0.10] text-purple-700 mb-2.5">{t("menu.tohkChip")}</span>
-                        <h3 className="text-[16px] font-semibold text-ink-1 leading-tight mt-1.5">{t("menu.tohkTitle")}</h3>
-                        <p className="text-[12.5px] text-black/40 font-medium mt-1 group-hover:text-purple-700/80 transition-colors">{t("menu.tohkDesc")}</p>
-                    </a>
-
-                    <a href="https://www.polli.co.kr" target="_blank" rel="noopener noreferrer" className="block rk-card p-5 hover:bg-surface-2 transition-colors group">
-                        <span className="rk-chip bg-cyan-500/[0.10] text-cyan-700 mb-2.5">{t("menu.polliChip")}</span>
-                        <h3 className="text-[16px] font-semibold text-ink-1 leading-tight mt-1.5">{t("menu.polliTitle")}</h3>
-                        <p className="text-[12.5px] text-black/40 font-medium mt-1 group-hover:text-cyan-700/80 transition-colors">{t("menu.polliDesc")}</p>
-                    </a>
-                </div>
-            </div>
+            {/* Section: Family services — 카드 목록·착지점은 FamilyServices 가 갖는다.
+                여기 하드코딩돼 있던 tohk·polli 두 카드를 옮겼다. 이제 기기에 따라
+                스토어/웹으로 갈라지고, 자기 자신(랭큐)은 자동으로 빠진다.
+                폴리는 앱이 없어 이번 범위에서 제외했다(레지스트리에 없음). */}
+            <FamilyServices />
 
             <InfoModal
                 open={infoModal.open}
