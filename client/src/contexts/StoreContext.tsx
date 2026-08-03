@@ -47,13 +47,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (store) {
             document.documentElement.style.setProperty('--hiq-brand-color', store.themeColor || '#006241');
             document.documentElement.style.setProperty('--hiq-neon-color', store.neonColor || '#006241');
-            // Keep the RANKUE product title for the main app (default "hiq" tenant). Only a
-            // genuine white-label tenant (its own slug/subdomain) overrides the browser title,
-            // so SEO/tab never shows a seeded store name like "하이큐 당구장".
+            // Only a genuine white-label tenant (its own slug/subdomain) overrides the browser
+            // title, so SEO/tab never shows a seeded store name like "하이큐 당구장".
+            //
+            // 기본 테넌트에서는 title 을 **건드리지 않는다**. 예전에는 여기서 브랜드 제목을
+            // 다시 써 넣었는데, 이 effect 가 매장 데이터가 도착한 뒤(=비동기) 실행되기 때문에
+            // useSeo 로 설정한 페이지별 제목(/about, /stores, /store/:slug)을 덮어써 버렸다.
+            // 그러면 크롤러가 JS 를 실행했을 때의 제목과 서버 프리렌더 제목이 서로 어긋난다.
+            // 기본값은 client/index.html 의 <title> 이 이미 갖고 있으므로 덮어쓸 필요가 없다.
             const isDefaultTenant = !store.slug || store.slug === 'hiq' || store.slug === 'default';
-            document.title = isDefaultTenant
-                ? "랭큐 RANKUE · 당구 실력 랭킹 & 매칭"
-                : `${store.name} · 랭큐`;
+            if (!isDefaultTenant) {
+                document.title = `${store.name} · 랭큐`;
+            }
         }
     }, [store]);
 

@@ -17,6 +17,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { HiqMember, HiqCrew, HiqStore } from "@shared/schema";
+import { useSeo } from "@/hooks/useSeo";
+import { crewTitle, crewDescription } from "@shared/crewMeta";
 import { ClubSettingsDialog } from "@/components/hiq/ClubSettingsDialog";
 import { CreateActivityDialog } from "@/components/hiq/CreateActivityDialog";
 import { CreateGolfActivityModal } from "@/components/hiq/club/activity/CreateGolfActivityModal";
@@ -109,6 +111,19 @@ export default function HiqClubDetail() {
         queryKey: [`/api/hiq/crews/${id}`],
         enabled: !!id,
     });
+
+    // 크루 페이지의 title/description/canonical. 조립식은 shared/crewMeta.ts 가 정본이고
+    // server/prerender.ts 가 같은 함수를 쓴다 — 크롤러가 JS 를 실행했을 때와 안 했을 때의
+    // 제목이 어긋나지 않게 하려는 것이다. 데이터 로딩 전에는 홈 기본값을 그대로 둔다.
+    useSeo(
+        crewData?.crew
+            ? {
+                  title: crewTitle(crewData.crew),
+                  description: crewDescription(crewData.crew),
+                  path: `/club/${id ?? ""}`,
+              }
+            : null,
+    );
 
     // Set initial sportTab based on crew category - Move above conditional returns
     useEffect(() => {

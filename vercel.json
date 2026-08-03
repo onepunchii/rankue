@@ -23,6 +23,17 @@
             "dest": "/api/index.ts"
         },
         {
+            "src": "/(about|stores|support|privacy|account-delete|(?:store|club)/[^/]+)/?",
+            "has": [
+                {
+                    "type": "header",
+                    "key": "user-agent",
+                    "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
+                }
+            ],
+            "dest": "/api/index.ts"
+        },
+        {
             "handle": "filesystem"
         },
         {

@@ -1,6 +1,11 @@
+import { useSeo } from "@/hooks/useSeo";
+import { DOC_META } from "@shared/docMeta";
 // 계정 삭제 안내 — Google Play 데이터 보안(계정 삭제 URL) 요건 페이지.
 // 요건: 앱/개발자명 명시, 삭제 요청 단계 명확 표시, 삭제·보관 데이터 유형과 기간 명시.
 export default function AccountDelete() {
+  // 제목·설명은 shared/docMeta.ts 가 정본 — server/prerender.ts 가 같은 값을 쓴다.
+  useSeo({ ...DOC_META["/account-delete"], path: "/account-delete" });
+
   return (
     <div className="min-h-screen w-full bg-white text-gray-900">
       <div className="mx-auto max-w-2xl px-5 py-10 leading-relaxed">

@@ -38,8 +38,13 @@ function upsertLink(rel: string, href: string) {
 
 const PAGE_LD_ID = "page-jsonld";
 
-export function useSeo({ title, description, path, locale = "ko", image, jsonLd }: SeoOptions) {
+// null 을 허용한다: 서버 데이터가 도착해야 제목을 정할 수 있는 페이지(/club/:id 등)가
+// 훅을 조건부로 호출하지 않고도 "아직 정할 수 없음"을 표현할 수 있게 하기 위함이다.
+// 그동안에는 client/index.html 의 기본 메타가 그대로 유지된다.
+export function useSeo(opts: SeoOptions | null) {
+  const { title, description, path, locale = "ko", image, jsonLd } = opts ?? ({} as Partial<SeoOptions>);
   useEffect(() => {
+    if (!title || !description || !path) return;
     const url = ORIGIN + path;
     document.title = title;
     upsertMeta("name", "description", description);

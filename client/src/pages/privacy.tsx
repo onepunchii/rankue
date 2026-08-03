@@ -1,6 +1,11 @@
+import { useSeo } from "@/hooks/useSeo";
+import { DOC_META } from "@shared/docMeta";
 // 개인정보처리방침 — 스토어(Play/App Store) 심사용 공개 문서 페이지.
 // 로그인 게이트를 타지 않는 완전 공개 라우트여야 한다.
 export default function Privacy() {
+  // 제목·설명은 shared/docMeta.ts 가 정본 — server/prerender.ts 가 같은 값을 쓴다.
+  useSeo({ ...DOC_META["/privacy"], path: "/privacy" });
+
   return (
     <div className="min-h-screen w-full bg-white text-gray-900">
       <div className="mx-auto max-w-2xl px-5 py-10 leading-relaxed">

@@ -1,6 +1,11 @@
+import { useSeo } from "@/hooks/useSeo";
+import { DOC_META } from "@shared/docMeta";
 // 고객지원 — App Store 심사 가이드라인 1.5(Support URL) 요건 페이지.
 // 로그인 없이 접근 가능해야 하며, 사용자가 질문하고 지원을 요청할 수 있는 수단을 제공한다.
 export default function Support() {
+  // 제목·설명은 shared/docMeta.ts 가 정본 — server/prerender.ts 가 같은 값을 쓴다.
+  useSeo({ ...DOC_META["/support"], path: "/support" });
+
   return (
     <div className="min-h-screen w-full bg-white text-gray-900">
       <div className="mx-auto max-w-2xl px-5 py-10 leading-relaxed">
