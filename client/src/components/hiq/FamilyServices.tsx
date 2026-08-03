@@ -31,17 +31,14 @@ const ACCENT: Record<FamilyId, { chip: string; hover: string }> = {
     mudangk: { chip: "bg-indigo-500/[0.10] text-indigo-700", hover: "group-hover:text-indigo-700/80" },
 };
 
-// 훅과 착지점을 일치시키기 위한 사이트별 예외.
+// 훅과 착지점이 어긋나는 서비스가 있으면 여기서 웹 URL 로 고정한다. 지금은 비어 있다.
 //
-// tohk: 랭큐의 카드 문구는 "무료 운세 · 꿈해몽 / 어젯밤 그 꿈, 혹시 태몽? 흉몽?" 이다.
-//   그런데 tohk 의 앱은 스토어에 **"현경이에게 - 마음을 전하는 손편지"** 로 올라가 있고
-//   (한 사이트에 손편지 + 사주 + 특별한 날이 같이 있다), 홈도 손편지 화면이다.
-//   운세 훅을 누른 사람에게 손편지 스토어 페이지를 보여주면 "잘못 눌렀나" 하고 되돌아간다.
-//   → 이 카드만은 스토어로 보내지 않고 운세 화면(/saju)으로 보낸다.
-//   문구를 손편지 쪽으로 바꾸기로 하면 이 예외를 지우면 된다(그때는 스토어로 간다).
-const WEB_ONLY: Partial<Record<FamilyId, string>> = {
-    tohk: "https://www.tohk.co.kr/saju",
-};
+// (이력) tohk 카드는 한때 "무료 운세 · 꿈해몽" 훅이었고, 그때는 스토어(=손편지로 브랜딩된
+//   앱 페이지)로 보내면 훅과 화면이 어긋나서 /saju 로 우회시켰다. 그런데 tohk 의 운세 기능은
+//   애플 심사 대응으로 숨겨졌고(tohk 레포 커밋 2f21961) /saju 는 현재 본문 25자짜리 빈
+//   페이지다. 그래서 훅을 앱의 정체인 **손편지·기념일**로 바꿨고, 이제 훅과 스토어 페이지가
+//   맞으므로 예외 없이 다른 서비스와 똑같이 기기별 스토어로 보낸다.
+const WEB_ONLY: Partial<Record<FamilyId, string>> = {};
 
 function detectPlatform(): FamilyPlatform {
     if (typeof navigator === "undefined") return "other";

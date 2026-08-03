@@ -28,7 +28,7 @@ export interface FamilyService {
 //
 // tohk = "현경이에게 - 마음을 전하는 손편지"(번들 kr.co.tohk.naepyeonji, id6760213440).
 //   tohk.co.kr 과 현경이에게는 **같은 서비스**다(같은 레포 onepunchii/tohk).
-//   손편지 + 사주(/saju) + 특별한 날 + 작명이 한 사이트에 있다.
+//   손편지 + 편지함 + 기념일·특별한 날 + 작명이 한 사이트에 있다.
 const RAW: FamilyService[] = [
   {
     id: "mapix",
@@ -61,8 +61,9 @@ const RAW: FamilyService[] = [
   },
   {
     id: "tohk",
-    // 손편지가 앱의 정체지만, 사주·꿈해몽이 훅으로 더 세다. 문구를 운세로 쓸 경우
-    // 웹 착지점은 반드시 /saju 여야 한다 — 홈(=손편지)으로 보내면 훅과 화면이 어긋난다.
+    // "현경이에게 - 마음을 전하는 손편지". 손편지 + 편지함 + 기념일·특별한 날 + 작명.
+    // 사주·꿈해몽도 있었으나 애플 심사 대응으로 숨겨졌다(tohk 레포 커밋 2f21961) —
+    // /saju 는 지금 본문 25자짜리 빈 페이지이므로 그쪽으로 링크하지 말 것.
     web: "https://www.tohk.co.kr",
     ios: "https://apps.apple.com/app/id6760213440",
     android: "https://play.google.com/store/apps/details?id=kr.co.tohk.pwa",
