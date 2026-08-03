@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { db } from "../db.js";
 import { hiqCrewActivities, hiqCrewActivityParticipants, hiqPolls, hiqCrewMembers, hiqCrews, hiqNotifications } from "../../shared/schema.js";
-import { eq, and, gte, lte, ne, desc, or } from "drizzle-orm";
+import { eq, and, gte, lte, ne, sql } from "drizzle-orm";
 import { notificationService } from "./notificationService.js";
 
 // Runs every 30 minutes
@@ -32,16 +32,20 @@ async function getActivityParticipants(activityId: string): Promise<string[]> {
   return rows.map(r => r.memberId);
 }
 
-async function wasRecentlyNotified(paramsKey: string, memberId: string, activityId: string, hoursAgo: number): Promise<boolean> {
+// 같은 리마인더가 중복 발송되는 것만 막는다. 알림 저장 시 params.reminderKey에
+// "<종류>:<대상id>"를 남기고 그 키로만 조회한다.
+// (이전 구현은 memberId+시간만 봐서 "최근에 아무 알림이나 받은 사람"을 전부 건너뛰었고,
+//  채팅 알림 하나만 받아도 정모 리마인더가 영영 오지 않았다.)
+async function wasRecentlyNotified(reminderKey: string, memberId: string, hoursAgo: number): Promise<boolean> {
   const cutoff = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
   const [notif] = await db.select({ id: hiqNotifications.id })
     .from(hiqNotifications)
     .where(and(
       eq(hiqNotifications.memberId, memberId),
       gte(hiqNotifications.createdAt, cutoff),
+      sql`${hiqNotifications.params}->>'reminderKey' = ${reminderKey}`,
     ))
-    .orderBy(desc(hiqNotifications.createdAt))
-    .limit(10);
+    .limit(1);
   return !!notif;
 }
 
@@ -53,8 +57,9 @@ async function sendActivityReminder(
   activityDate: Date,
   hoursLeft: number,
 ) {
-  const recentKey = `activity_reminder_${hoursLeft}h`;
-  if (await wasRecentlyNotified(recentKey, participantId, activityId, 20)) return;
+  // 같은 정모·같은 시점(24h/1h)의 리마인더는 1회만.
+  const reminderKey = `activity:${activityId}:${hoursLeft}h`;
+  if (await wasRecentlyNotified(reminderKey, participantId, 20)) return;
 
   const sportCategory = await getCrewSportCategory(crewId);
   const timeStr = activityDate.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -69,12 +74,13 @@ async function sendActivityReminder(
     body,
     category: sportCategory,
     type: "ACTIVITY_REMINDER",
-    params: { url: `/crew/${crewId}/activity` },
+    params: { url: `/crew/${crewId}/activity`, reminderKey },
   }).catch(err => console.error(`[Scheduler] Activity reminder failed for ${participantId}:`, err));
 }
 
 async function sendPollReminder(pollId: string, participantId: string, crewId: string, title: string, endTime: Date) {
-  if (await wasRecentlyNotified("poll_reminder", participantId, pollId, 20)) return;
+  const reminderKey = `poll:${pollId}`;
+  if (await wasRecentlyNotified(reminderKey, participantId, 20)) return;
 
   const sportCategory = await getCrewSportCategory(crewId);
   const timeStr = endTime.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -85,7 +91,7 @@ async function sendPollReminder(pollId: string, participantId: string, crewId: s
     body: `"${title}" 투표가 ${timeStr}에 마감됩니다. 지금 투표해주세요!`,
     category: sportCategory,
     type: "POLL_REMINDER",
-    params: { url: `/crew/${crewId}` },
+    params: { url: `/crew/${crewId}`, reminderKey },
   }).catch(err => console.error(`[Scheduler] Poll reminder failed for ${participantId}:`, err));
 }
 
@@ -155,11 +161,17 @@ async function runPollReminders() {
   }
 }
 
+// 리마인더 1회 실행. 로컬은 node-cron이, 프로덕션(Vercel)은 /api/cron/reminders가 호출한다.
+export async function runReminders(): Promise<{ ok: true }> {
+  console.log("[Scheduler] Running activity & poll reminders...");
+  await Promise.all([runActivityReminders(), runPollReminders()]);
+  console.log("[Scheduler] Reminder run complete.");
+  return { ok: true };
+}
+
+// 상주 프로세스가 있는 환경(로컬 개발)에서만 사용. Vercel 서버리스에는 상주 프로세스가
+// 없어 node-cron이 돌지 않으므로 vercel.json의 crons가 HTTP로 runReminders를 호출한다.
 export function startNotificationScheduler() {
   console.log("[Scheduler] Starting notification scheduler — runs every 30 minutes");
-  cron.schedule(SCHEDULE, async () => {
-    console.log("[Scheduler] Running activity & poll reminders...");
-    await Promise.all([runActivityReminders(), runPollReminders()]);
-    console.log("[Scheduler] Reminder run complete.");
-  });
+  cron.schedule(SCHEDULE, () => { void runReminders(); });
 }
