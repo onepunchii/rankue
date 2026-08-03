@@ -4,12 +4,16 @@ import App from "./App";
 import "./index.css";
 import { initErrorReporter } from "./lib/errorReporter";
 import { initNativeBridge } from "./lib/nativeBridge";
+import { initKeyboardAvoid } from "./lib/keyboardAvoid";
 
 // 클라이언트 에러 수집기 마운트 (프로덕션에서 /api/errors 로 익명 전송)
 initErrorReporter();
 
 // 네이티브 앱(Capacitor) 브릿지 — 안드 뒤로가기·푸시 등록. 웹에선 no-op.
 initNativeBridge();
+
+// 소프트 키보드가 하단 입력창을 가리지 않도록 --keyboard-height 추적
+initKeyboardAvoid();
 
 // Suppress AbortError from showing Vite error overlay
 // This error occurs during React component cleanup and is harmless

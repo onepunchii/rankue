@@ -189,9 +189,13 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area - 하단 탭(h-20) 위에 위치하도록 bottom-20 설정 */}
+            {/* Input Area — 평소엔 하단 탭(h-20=5rem) 위, 키보드가 뜨면 키보드 바로 위로.
+                (웹뷰가 리사이즈되지 않으므로 --keyboard-height로 직접 띄운다) */}
             {isMember && (
-                <div className="absolute bottom-20 left-0 right-0 p-6 bg-[#f2f0eb] pt-10 z-50">
+                <div
+                    className="absolute left-0 right-0 p-6 bg-[#f2f0eb] pt-10 z-50 transition-[bottom] duration-200"
+                    style={{ bottom: "max(5rem, var(--keyboard-height, 0px))" }}
+                >
                     <div className="relative flex items-center gap-2 max-w-4xl mx-auto mb-4">
                         <input
                             type="text"

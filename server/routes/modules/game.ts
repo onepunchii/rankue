@@ -4,6 +4,7 @@ import { storage } from "../../storage/index.js";
 import { insertHiqSuccessfulShotSchema } from "../../../shared/schema.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { hiqService } from "../../services/hiqService.js";
+import { notificationService } from "../../services/notificationService.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 
@@ -400,13 +401,13 @@ router.post("/invite/:code/join", requireAuth, asyncHandler(async (req: AuthRequ
     if (!success) return sendError(res, 400, "만료되었거나 유효하지 않은 코드");
     // P0: 게스트 참가 수락 → 호스트에게 알림
     try {
-        const invite = await storage.games.getInviteByCode(req.params.code);
+        const invite = await storage.getInviteStatus(req.params.code);
         if (invite?.hostId) {
             const guest = await storage.getMemberById(req.userId!);
             notificationService.sendAndSaveNotification({
                 memberId: invite.hostId,
                 title: "🎯 초대 참가 수락",
-                body: guest?.member?.name ? `${guest.member.name}님이 초대에 응했어요!` : "상대방이 초대에 응했어요!",
+                body: guest?.name ? `${guest.name}님이 초대에 응했어요!` : "상대방이 초대에 응했어요!",
                 category: "BILLIARDS",
                 type: "MATCH",
                 params: { url: `/history` },

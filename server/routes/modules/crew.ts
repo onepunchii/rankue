@@ -59,7 +59,7 @@ router.post("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest
                 notificationService.sendAndSaveNotification({
                     memberId: m.member.id,
                     title: `📅 [${crewData.crew.name}] 새 정모`,
-                    body: `${creator?.member?.name || "누군가"}님이 "${activity.title || "정모"}"를 만들었어요. ${activityTime}`,
+                    body: `${creator?.name || "누군가"}님이 "${activity.title || "정모"}"를 만들었어요. ${activityTime}`,
                     category: crewData.crew.sportCategory || "BILLIARDS",
                     type: "ACTIVITY",
                     params: { url: `/crew/${req.params.id}/activity` },
@@ -84,7 +84,7 @@ router.post("/:id/activities/:activityId/join", requireAuth, asyncHandler(async 
             notificationService.sendAndSaveNotification({
                 memberId: act.creatorId,
                 title: "✅ 정모 참가",
-                body: `${joiner?.member?.name || "누군가"}님이 "${act.title || "정모"}"에 참가했어요!`,
+                body: `${joiner?.name || "누군가"}님이 "${act.title || "정모"}"에 참가했어요!`,
                 category: "BILLIARDS",
                 type: "ACTIVITY",
                 params: { url: `/crew/${req.params.id}/activity` },
@@ -279,7 +279,7 @@ router.post("/:id/posts/:postId/comments", requireAuth, asyncHandler(async (req:
                 notificationService.sendAndSaveNotification({
                     memberId: post.authorId,
                     title: `💬 새 댓글`,
-                    body: `${commenter?.member?.name || "누군가"}님이 "${post.title || "게시글"}"에 댓글을 달았습니다.`,
+                    body: `${commenter?.name || "누군가"}님이 "${post.title || "게시글"}"에 댓글을 달았습니다.`,
                     category: "BILLIARDS",
                     type: "POST_COMMENT",
                     params: { url: `/crew/${req.params.id}` },
@@ -518,7 +518,7 @@ router.post("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res
                 notificationService.sendAndSaveNotification({
                     memberId: m.member.id,
                     title: `📊 [${crewData.crew.name}] 새 투표`,
-                    body: `${author?.member?.name || "누군가"}님이 "${rest.title || "투표"}"를 만들었어요. 지금 참여해보세요!`,
+                    body: `${author?.name || "누군가"}님이 "${rest.title || "투표"}"를 만들었어요. 지금 참여해보세요!`,
                     category: crewData.crew.sportCategory || "BILLIARDS",
                     type: "POLL",
                     params: { url: `/crew/${req.params.id}` },
@@ -665,7 +665,7 @@ router.post("/:id/join", requireAuth, asyncHandler(async (req: AuthRequest, res:
         const crewData = await storage.getCrew(req.params.id);
         if (crewData) {
             const applicant = await storage.getMemberById(req.userId!);
-            const applicantName = applicant?.member?.name || "누군가";
+            const applicantName = applicant?.name || "누군가";
             const admins = crewData.members.filter((m: any) => m.role === "leader" || m.role === "manage");
             for (const admin of admins) {
                 notificationService.sendAndSaveNotification({
@@ -899,7 +899,7 @@ router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthReques
         const crewData = await storage.getCrew(req.params.id);
         if (crewData && participants && Array.isArray(participants)) {
             const creator = await storage.getMemberById(req.userId!);
-            const creatorName = creator?.member?.name || "크루원";
+            const creatorName = creator?.name || "크루원";
             for (const p of participants) {
                 const pid = typeof p === "string" ? p : p?.memberId;
                 if (pid && pid !== req.userId) {

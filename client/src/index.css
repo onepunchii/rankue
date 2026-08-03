@@ -1121,6 +1121,21 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* 소프트 키보드 회피 — keyboardAvoid.ts가 --keyboard-height / body.keyboard-open을 갱신한다.
+   웹뷰가 리사이즈되지 않으므로(iOS contentInset:never, Android adjustPan) 다이얼로그를
+   보이는 영역 안으로 직접 끌어올린다. 다이얼로그는 translate(-50%,-50%)로 중앙 정렬돼 있어
+   translate 값을 유지한 채 키보드 높이의 절반만큼 위로 민다. */
+body.keyboard-open [role="dialog"] {
+  transform: translate(-50%, calc(-50% - var(--keyboard-height, 0px) / 2)) !important;
+  max-height: calc(100dvh - var(--keyboard-height, 0px) - 2rem);
+  overflow-y: auto;
+}
+
+/* 하단 고정 바(네비게이션 등)는 키보드가 뜨면 숨겨 입력 영역을 확보 */
+body.keyboard-open .hide-on-keyboard {
+  display: none;
+}
+
 /* Safe Area Insets for iOS PWA */
 @supports (padding: env(safe-area-inset-bottom)) {
   .pb-safe {

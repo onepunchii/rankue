@@ -190,12 +190,13 @@ router.post("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: 
     // P0: 라이벌 추가 → 추가당한 사람에게 알림
     try {
         const [sender] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, req.userId!));
-        if (sender?.profileId) {
-            const senderProfile = await storage.getProfile(sender.profileId);
+        if (sender) {
+            // 이름은 회원 레코드 우선(프로필 미연결 계정도 알림이 가야 한다).
+            const senderName = sender.name || (sender.profileId ? (await storage.getProfile(sender.profileId))?.nickname : null);
             notificationService.sendAndSaveNotification({
                 memberId: finalTargetId,
                 title: "👊 라이벌 추가",
-                body: senderProfile?.name ? `${senderProfile.name}님이 회원님을 라이벌로 추가했어요!` : "누군가가 라이벌로 추가했습니다",
+                body: senderName ? `${senderName}님이 회원님을 라이벌로 추가했어요!` : "누군가가 라이벌로 추가했습니다",
                 category: sportCategory,
                 type: "FRIEND",
                 params: { url: "/friends" },

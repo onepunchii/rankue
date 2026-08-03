@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { db } from "../db.js";
 import { hiqCrewActivities, hiqCrewActivityParticipants, hiqPolls, hiqCrewMembers, hiqCrews, hiqNotifications } from "../../shared/schema.js";
-import { eq, and, gte, lte, ne, desc, or, notInSelect } from "drizzle-orm";
+import { eq, and, gte, lte, ne, desc, or } from "drizzle-orm";
 import { notificationService } from "./notificationService.js";
 
 // Runs every 30 minutes
