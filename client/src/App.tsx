@@ -2,6 +2,7 @@ import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
+import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -194,6 +195,10 @@ function App() {
           <SportProvider>
             <AppRoutes />
             <Toaster />
+            {/* 앱 설치 유도 — iOS/안드로이드 스토어 우선, 미출시 플랫폼은 PWA 폴백.
+                컴포넌트는 예전부터 있었지만 **어디에도 마운트돼 있지 않아 죽어 있었다**(번들에서도 빠졌다).
+                여기 붙여야 실제로 뜬다. 네이티브 앱 안에서는 컴포넌트가 스스로 숨는다. */}
+            <HiqInstallBanner />
           </SportProvider>
         </StoreProvider>
       </I18nProvider>
