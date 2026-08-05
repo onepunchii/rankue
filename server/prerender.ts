@@ -417,6 +417,46 @@ export function registerPrerender(app: Express) {
   // ── /club/:id ──────────────────────────────────────────────────────
   // 크루 상세는 비로그인·쿠키 없이 200 으로 열린다(GET /api/hiq/crews/:id 로 확인).
   // 즉 공개 데이터라서 프리렌더가 사용자 화면의 충실한 재현이 된다.
+  // 공유 링크(/r/:id) — 카톡·문자에 붙였을 때 뜨는 미리보기 카드를 만든다.
+  // 이미지 파일을 주고받는 대신 링크를 던지는 방식이라, 미리보기가 결과 요약을 대신한다.
+  app.get("/r/:id", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    const id = req.params.id;
+    let game: Record<string, any> | null = null;
+    try {
+      game = (await storage.getHiqGameById(id)) as Record<string, any> | null;
+    } catch (e) {
+      console.warn("[prerender] shared result failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    if (!game) return sendGone(res, "경기를 찾을 수 없습니다.", "요청한 경기 결과가 없습니다.");
+
+    const typeLabel = game.gameType === "3c" ? "3쿠션" : "4구";
+    // 이름이 있는 슬롯만. 회원 id 같은 식별자는 넣지 않는다(공개 페이지).
+    const rows = [1, 2, 3, 4]
+      .map((n) => ({ name: game![`player${n}Name`] as string | null, score: Number(game![`player${n}Score`]) || 0 }))
+      .filter((p) => p.name);
+    const scoreLine = rows.map((p) => `${p.name} ${p.score}`).join(" : ");
+    const innings = Number(game.totalInnings) || 0;
+
+    const title = `${typeLabel} ${scoreLine} · 랭큐`;
+    res.setHeader("X-Prerender", "shared-result");
+    noStore(res);
+    res.send(
+      page({
+        title,
+        desc: `${typeLabel} 경기 결과 — ${scoreLine}${innings ? ` (${innings}이닝)` : ""}. 손안의 당구 점수판, 랭큐.`,
+        canonical: `${ORIGIN}/r/${encodeURIComponent(id)}`,
+        body: `<main>
+  <h1>${esc(typeLabel)} 경기 결과</h1>
+  <p>${esc(scoreLine)}</p>
+  ${innings ? `<p>총 ${esc(innings)}이닝</p>` : ""}
+  <nav><a href="/">랭큐 시작하기</a> <a href="/about">랭큐 소개</a></nav>
+</main>`,
+      }),
+    );
+  });
+
   app.get("/club/:id", async (req, res, next) => {
     if (!isBot(req)) return next();
     const id = req.params.id;

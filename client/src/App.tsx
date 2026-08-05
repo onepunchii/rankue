@@ -47,6 +47,7 @@ import Support from "@/pages/support";
 import About from "@/pages/about";
 import Stores from "@/pages/stores";
 import StoreDetail from "@/pages/store-detail";
+import SharedResult from "@/pages/hiq/shared-result";
 
 import { StoreProvider } from "./contexts/StoreContext";
 import { I18nProvider } from "@/lib/i18n";
@@ -138,6 +139,8 @@ function AppRoutes() {
       <Route path="/about" component={About} />
       <Route path="/stores" component={Stores} />
       <Route path="/store/:slug" component={StoreDetail} />
+      {/* 공유 링크로 열리는 공개 경기 결과 — 로그인 불필요 */}
+      <Route path="/r/:id" component={SharedResult} />
 
       {/* HiQ 기능 페이지들 */}
       <Route path="/register" component={HiqRegister} />

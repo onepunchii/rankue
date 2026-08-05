@@ -317,6 +317,7 @@ export default function HiqGameResult() {
             <div className="w-full max-w-md flex flex-col gap-3">
                 {/* 결과 이미지 공유가 가장 값싼 유입 경로라 여기서는 이게 주 동선이다. */}
                 <ShareResultButton
+                    gameId={gameId}
                     data={{
                         players: sharePlayers,
                         innings: game.totalInnings,

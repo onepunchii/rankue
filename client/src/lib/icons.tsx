@@ -121,6 +121,7 @@ export const LucideSend = ((Ph as any).PaperPlaneTilt ?? F) as Ph.Icon;
 export const LucideSettings = ((Ph as any).GearSix ?? F) as Ph.Icon;
 export const LucideSettings2 = ((Ph as any).GearSix ?? F) as Ph.Icon;
 export const LucideShare2 = ((Ph as any).ShareNetwork ?? F) as Ph.Icon;
+export const LucideLink = ((Ph as any).LinkSimple ?? F) as Ph.Icon;
 export const LucideShield = ((Ph as any).Shield ?? F) as Ph.Icon;
 export const LucideShieldAlert = ((Ph as any).ShieldWarning ?? F) as Ph.Icon;
 export const LucideShieldCheck = ((Ph as any).ShieldCheck ?? F) as Ph.Icon;

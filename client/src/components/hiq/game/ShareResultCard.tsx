@@ -14,7 +14,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
-import { LucideShare2, LucideDownload, LucideUsers, LucideChevronRight } from "@/lib/icons";
+import { LucideShare2, LucideDownload, LucideUsers, LucideChevronRight, LucideLink } from "@/lib/icons";
 
 /* ============================================================================
  * 경기 결과 공유 카드
@@ -54,6 +54,7 @@ const INK_1 = "rgba(0,0,0,0.87)";
 const INK_3 = "rgba(0,0,0,0.55)";
 const INK_4 = "rgba(0,0,0,0.40)";
 const SITE = "rankue.co.kr";
+const SITE_URL = "https://www.rankue.co.kr";
 
 // BilliardBall.tsx 의 3D 글로시 팔레트 + 4번 슬롯(파랑, PlayerCard 테마와 동일 계열).
 // 화면 카드와 캔버스가 같은 값을 쓰도록 한 곳에 둔다.
@@ -562,11 +563,38 @@ async function shareNative(blob: Blob, filename: string, text: string): Promise<
     }
 }
 
+// 클립보드 복사 — 앱 WebView에서도 동작한다(https 컨텍스트).
+// navigator.clipboard 가 막힌 환경을 위해 execCommand 폴백을 남겨 둔다.
+async function copyText(text: string): Promise<boolean> {
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch { /* 폴백으로 */ }
+    try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return ok;
+    } catch {
+        return false;
+    }
+}
+
 export function ShareResultButton({
     data,
+    gameId,
     className,
 }: {
     data: ShareResultData;
+    gameId?: string | null;
     className?: string;
 }) {
     const { toast } = useToast();
@@ -694,6 +722,32 @@ export function ShareResultButton({
         }
     };
 
+    // 링크 공유 — 이미지와 달리 네이티브 플러그인이 필요 없어서, 앱을 새로 빌드하지 않아도 동작한다.
+    // 받는 사람은 링크를 눌러 결과를 보고 그 자리에서 앱으로 들어올 수 있다(이미지엔 없던 유입 경로).
+    const shareUrl = gameId ? `${SITE_URL}/r/${gameId}` : null;
+
+    const handleCopyLink = async () => {
+        if (!shareUrl) return;
+        const body = `${buildShareText(data)}\n${shareUrl}`;
+
+        // 공유 시트를 쓸 수 있으면 그게 낫다(카톡을 바로 고를 수 있다). 텍스트 공유는 WebView에서도 통한다.
+        try {
+            const nav = navigator as any;
+            if (typeof nav.share === "function") {
+                await nav.share({ title: "랭큐 경기 결과", text: buildShareText(data), url: shareUrl });
+                return;
+            }
+        } catch (e: any) {
+            if (e?.name === "AbortError") return; // 사용자가 닫음
+        }
+
+        toast(
+            await copyText(body)
+                ? { title: "링크를 복사했어요", description: "단톡방에 붙여넣기 하세요." }
+                : { title: "복사하지 못했어요", description: shareUrl, variant: "destructive" },
+        );
+    };
+
     const handleCrewClick = () => {
         if (myCrews.length === 1) {
             const c = myCrews[0]?.crew ?? myCrews[0];
@@ -725,13 +779,25 @@ export function ShareResultButton({
                     <ShareResultCard data={data} />
 
                     <div className="flex flex-col gap-2 pt-1">
+                        {shareUrl && (
+                            <Button
+                                onClick={handleCopyLink}
+                                disabled={busy}
+                                className="rk-btn-primary h-12 w-full gap-2 rounded-2xl"
+                            >
+                                <LucideLink className="h-4 w-4" />
+                                링크로 공유 (카톡 등)
+                            </Button>
+                        )}
+
                         <Button
+                            variant="ghost"
                             onClick={handleShare}
                             disabled={busy}
-                            className="rk-btn-primary h-12 w-full gap-2 rounded-2xl"
+                            className="rk-btn-secondary h-12 w-full gap-2 rounded-2xl"
                         >
                             <LucideShare2 className="h-4 w-4" />
-                            {busy ? "만드는 중…" : "밖으로 공유 (카톡 등)"}
+                            {busy ? "만드는 중…" : "이미지로 공유"}
                         </Button>
 
                         {myCrews.length > 0 && (
