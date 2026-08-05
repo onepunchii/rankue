@@ -58,6 +58,22 @@ router.get("/movers", asyncHandler(async (req: any, res: Response) => {
     return sendSuccess(res, movers);
 }));
 
+// GET /umb/nations?category= — 국가별 집계 (당구 강국 랭킹)
+router.get("/nations", asyncHandler(async (req: any, res: Response) => {
+    const category = parseCategory(req.query.category ?? "players");
+    if (!category) return sendError(res, 400, "잘못된 부문입니다");
+    const data = await storage.umb.getNations(category);
+    return sendSuccess(res, data);
+}));
+
+// GET /umb/calendar?category= — 대회 일정 (레전드 파싱, D-day는 클라이언트 계산)
+router.get("/calendar", asyncHandler(async (req: any, res: Response) => {
+    const category = parseCategory(req.query.category ?? "players");
+    if (!category) return sendError(res, 400, "잘못된 부문입니다");
+    const events = await storage.umb.getCalendar(category);
+    return sendSuccess(res, events);
+}));
+
 // GET /umb/summary?category= — 홈 섹션 요약 (총 인원·한국 선수·1위·한국 최고)
 router.get("/summary", asyncHandler(async (req: any, res: Response) => {
     const category = parseCategory(req.query.category ?? "players");

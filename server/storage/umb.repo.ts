@@ -216,6 +216,65 @@ export class UmbRepository {
         return rows;
     }
 
+    // 국가별 집계 — "당구 강국 랭킹". 상위 5명 합산 포인트로 정렬(데이비스컵 방식):
+    // 총합은 선수 수가 많은 나라가, 1위 순위만은 스타 한 명이 왜곡하므로 톱5 합산이 균형점.
+    async getNations(category: UmbCategory) {
+        const editions = await this.getLatestEditions(category, 1);
+        if (!editions.length) return { edition: null, editionDate: null, nations: [] };
+        const latest = editions[0];
+        const result: any = await db.execute(sql`
+            SELECT fed,
+                   count(*)::int AS "players",
+                   min(rank)::int AS "bestRank",
+                   (array_agg(player_name ORDER BY rank))[1] AS "bestPlayer",
+                   sum(points) FILTER (WHERE rn <= 5)::int AS "top5Points"
+            FROM (
+                SELECT fed, rank, points, player_name,
+                       row_number() OVER (PARTITION BY fed ORDER BY rank) AS rn
+                FROM ${umbRankings}
+                WHERE category = ${category} AND edition = ${latest.edition}
+            ) s
+            GROUP BY fed
+            ORDER BY "top5Points" DESC NULLS LAST, "bestRank" ASC
+        `);
+        const nations = (result.rows ?? result) as any[];
+        return { edition: latest.edition, editionDate: latest.editionDate, nations };
+    }
+
+    // 대회 캘린더 — 최신 회차 레전드에서 도시·국가·날짜를 파싱.
+    // 월드컵은 "PORTO (PT) 2025-07-05", 세계선수권은 "14/18 Oct. 2025 - ANTWERP (BE)" 형식.
+    async getCalendar(category: UmbCategory) {
+        const editions = await this.getLatestEditions(category, 1);
+        if (!editions.length) return [];
+        const events = await db.select({ colKey: umbEvents.colKey, label: umbEvents.label })
+            .from(umbEvents)
+            .where(and(eq(umbEvents.category, category), eq(umbEvents.edition, editions[0].edition)));
+
+        const MONTHS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+        const parsed = events.map(e => {
+            const label = e.label;
+            let date: Date | null = null;
+            const iso = label.match(/(\d{4})-(\d{2})-(\d{2})/);
+            if (iso) date = new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3]));
+            else {
+                const en = label.match(/(\d{1,2})(?:\/\d{1,2})?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{4})/i);
+                if (en) date = new Date(Date.UTC(+en[3], MONTHS[en[2].toLowerCase().slice(0, 3)], +en[1]));
+            }
+            const loc = [...label.matchAll(/([A-ZÀ-Ü][A-ZÀ-Ü' .]+?)\s*\(([A-Z]{2})\)/g)].pop();
+            const kind = /World Championship/i.test(label) ? "championship"
+                : /World Cup/i.test(label) ? "worldcup" : "other";
+            return {
+                colKey: e.colKey,
+                label,
+                kind,
+                city: loc ? loc[1].trim() : null,
+                country: loc ? loc[2] : null,
+                date: date ? date.toISOString() : null,
+            };
+        }).filter(e => e.date && e.kind !== "other");
+        return parsed.sort((a, b) => a.date!.localeCompare(b.date!));
+    }
+
     async getSummary(category: UmbCategory) {
         const editions = await this.getLatestEditions(category, 1);
         if (!editions.length) return null;
