@@ -9,6 +9,8 @@ import { useStore } from "@/contexts/StoreContext";
 import { PinResetDialog } from "@/components/hiq/PinResetDialog";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import SocialLogin, { socialLoginAvailable } from "@/components/hiq/SocialLogin";
+import { Capacitor } from "@capacitor/core";
+import MarketingLanding from "./marketing-landing";
 
 export default function Landing() {
     const [, setLocation] = useLocation();
@@ -24,6 +26,23 @@ export default function Landing() {
     // 소셜 불가 상황(키 미배포·앱 웹뷰 브릿지 전)은 전화로 폴백. PIN 확인 단계는 항상 전화 카드.
     const [phoneMode, setPhoneMode] = useState<boolean | null>(null);
     const showPhone = requiresPassword || (phoneMode ?? (locale === "ko" || !socialLoginAvailable()));
+
+    // 마케팅 랜딩을 먼저 보여줄지. 앱 안이거나, 화이트라벨 매장 진입(?store=)이거나,
+    // 한 번 시작을 누른 뒤에는 곧장 로그인 폼으로 간다(랜딩이 매번 끼면 방해만 된다).
+    const [showIntro, setShowIntro] = useState(() => {
+        try {
+            if (Capacitor.isNativePlatform()) return false;
+            const p = new URLSearchParams(window.location.search);
+            if (p.get("store") || p.get("login")) return false;
+            if (window.location.pathname !== "/") return false;
+            return localStorage.getItem("rankue-intro-seen") !== "1";
+        } catch {
+            return false;
+        }
+    });
+    const markIntroSeen = () => {
+        try { localStorage.setItem("rankue-intro-seen", "1"); } catch { /* ignore */ }
+    };
 
     // Resolve the tenant slug from the URL exactly as StoreContext does, so a
     // white-label tenant logs into its OWN store rather than a hardcoded "hiq".
@@ -136,6 +155,14 @@ export default function Landing() {
     // One predicate drives both the disabled state and the active styling so a
     // valid number can never render as an inert-looking button.
     const canSubmit = requiresPassword ? password.length >= 4 : phone.length >= 10;
+
+    // 검색으로 들어온 방문자에게는 로그인 폼 대신 마케팅 랜딩을 먼저 보여준다.
+    // 홈(/)이 곧바로 "휴대폰 번호를 입력하세요"라 랭큐를 모르는 사람이 그대로 이탈했고,
+    // 검색엔진 입장에서도 제품 설명이 없는 로그인 폼이라 색인 가치가 낮았다.
+    // 앱(Capacitor)·화이트라벨 매장(?store=)·이미 시작을 누른 사람은 기존 흐름 그대로 간다.
+    if (showIntro) {
+        return <MarketingLanding onStart={() => { setShowIntro(false); markIntroSeen(); }} />;
+    }
 
     if (isBrandLoading || !brand) {
         return (
