@@ -275,19 +275,20 @@ export class UmbRepository {
         return parsed.sort((a, b) => a.date!.localeCompare(b.date!));
     }
 
-    async getSummary(category: UmbCategory) {
+    // fed = 뷰어의 "우리나라" (기본 KR) — 요약 줄의 국가별 통계 기준
+    async getSummary(category: UmbCategory, fed = "KR") {
         const editions = await this.getLatestEditions(category, 1);
         if (!editions.length) return null;
         const latest = editions[0];
         const base = and(eq(umbRankings.category, category), eq(umbRankings.edition, latest.edition));
-        const [[{ total }], [{ krCount }], [top], [krTop]] = await Promise.all([
-            db.select({ total: sql<number>`count(*)::int` }).from(umbRankings).where(base),
-            db.select({ krCount: sql<number>`count(*)::int` }).from(umbRankings).where(and(base, eq(umbRankings.fed, "KR"))),
+        const [[{ fedCount }], [top], [fedTop]] = await Promise.all([
+            db.select({ fedCount: sql<number>`count(*)::int` }).from(umbRankings).where(and(base, eq(umbRankings.fed, fed))),
             db.select({ rank: umbRankings.rank, playerName: umbRankings.playerName, fed: umbRankings.fed })
                 .from(umbRankings).where(base).orderBy(asc(umbRankings.rank)).limit(1),
             db.select({ rank: umbRankings.rank, playerName: umbRankings.playerName })
-                .from(umbRankings).where(and(base, eq(umbRankings.fed, "KR"))).orderBy(asc(umbRankings.rank)).limit(1),
+                .from(umbRankings).where(and(base, eq(umbRankings.fed, fed))).orderBy(asc(umbRankings.rank)).limit(1),
         ]);
-        return { edition: latest.edition, editionDate: latest.editionDate, total, krCount, top: top ?? null, krTop: krTop ?? null };
+        const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(umbRankings).where(base);
+        return { edition: latest.edition, editionDate: latest.editionDate, total, fed, fedCount, top: top ?? null, fedTop: fedTop ?? null };
     }
 }

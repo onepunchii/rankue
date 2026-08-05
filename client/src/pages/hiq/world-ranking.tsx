@@ -11,7 +11,7 @@ import { LucideChevronLeft, LucideSearch, LucideTrendingUp } from "@/lib/icons";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { UmbPlayerSheet } from "@/components/hiq/umb/UmbPlayerSheet";
 import { MoveBadge } from "@/components/hiq/umb/WorldRankingCard";
-import { UMB_CATEGORIES, UMB_SOURCE_URL, type UmbCategory, type UmbRankingRow, type UmbRankingsResponse } from "@/components/hiq/umb/types";
+import { UMB_CATEGORIES, UMB_SOURCE_URL, regionName as intlRegionName, resolveHomeFed, type UmbCategory, type UmbRankingRow, type UmbRankingsResponse } from "@/components/hiq/umb/types";
 
 const PAGE_SIZE = 50;
 
@@ -27,6 +27,10 @@ export default function HiqWorldRanking() {
     const [openPlayerId, setOpenPlayerId] = useState<string | null>(null);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [view, setView] = useState<"players" | "nations">("players");
+
+    // 뷰어의 "우리나라" — 프로필 국가 우선, 없으면 언어로 추정 (tr→튀르키예, vi→베트남 등)
+    const { data: me } = useQuery<any>({ queryKey: ["/api/hiq/me"], retry: false });
+    const homeFed = resolveHomeFed(me?.countryCode, locale);
 
     useSeo({
         title: "당구 세계랭킹 — UMB 공식 3쿠션 랭킹 | 랭큐",
@@ -44,7 +48,7 @@ export default function HiqWorldRanking() {
     const filterKey = `${category}|${krOnly}|${debouncedQ}`;
     const filterKeyRef = useRef(filterKey);
     filterKeyRef.current = filterKey;
-    const params = `category=${category}&limit=${PAGE_SIZE}${krOnly ? "&fed=KR" : ""}${debouncedQ ? `&q=${encodeURIComponent(debouncedQ)}` : ""}`;
+    const params = `category=${category}&limit=${PAGE_SIZE}${krOnly ? `&fed=${homeFed}` : ""}${debouncedQ ? `&q=${encodeURIComponent(debouncedQ)}` : ""}`;
 
     const { data, isLoading } = useQuery<UmbRankingsResponse>({
         queryKey: ["/api/hiq/umb/rankings", filterKey],
@@ -82,10 +86,7 @@ export default function HiqWorldRanking() {
     const futureEvents = calendar.filter(e => dday(e.date) >= 0);
     const seasonEvents = [...pastEvents, ...futureEvents];
 
-    // 국가 코드 → 현재 언어 국가명 ("KR" → "대한민국")
-    let regionNames: Intl.DisplayNames | null = null;
-    try { regionNames = new Intl.DisplayNames([locale || "ko"], { type: "region" }); } catch { /* 미지원 브라우저 */ }
-    const countryName = (code: string) => { try { return regionNames?.of(code) || code; } catch { return code; } };
+    const countryName = (code: string) => intlRegionName(code, locale);
 
     const changeFilter = (fn: () => void) => { fn(); setOlder([]); };
 
@@ -208,7 +209,7 @@ export default function HiqWorldRanking() {
                 <div className="flex flex-col gap-1.5 relative z-10">
                     <p className="text-[11.5px] font-medium text-black/40 px-1 mb-0.5">{t("umb.nationsDesc")}</p>
                     {(nationsData?.nations || []).map((n, idx) => {
-                        const isKr = n.fed === "KR";
+                        const isKr = n.fed === homeFed;
                         const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
                         return (
                             <div
@@ -262,7 +263,7 @@ export default function HiqWorldRanking() {
                         krOnly ? "bg-brand text-white" : "bg-white text-ink-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                     )}
                 >
-                    🇰🇷 {t("umb.krOnly")}
+                    {flagEmoji(homeFed)} {intlRegionName(homeFed, locale)}
                 </button>
             </div>
 
@@ -303,7 +304,7 @@ export default function HiqWorldRanking() {
                     <div className="rk-card p-10 text-center text-[14px] font-semibold text-ink-3">{t("umb.empty")}</div>
                 )}
                 {rows.map(r => {
-                    const isKr = r.fed === "KR";
+                    const isKr = r.fed === homeFed;
                     return (
                         <button
                             key={r.playerUmbId}

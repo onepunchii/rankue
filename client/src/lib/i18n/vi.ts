@@ -1466,7 +1466,7 @@ const vi: Dict = {
   "umb.sourceStore": "CLB",
   "umb.sourceWorld": "Thế giới",
   "umb.subtitle": "BXH 3 băng chính thức của UMB",
-  "umb.summaryLine": "{count} cơ thủ Hàn Quốc · cao nhất #{rank} {name}",
+  "umb.summaryLine": "{count} cơ thủ {country} · cao nhất #{rank} {name}",
   "umb.title": "BXH thế giới",
   "umb.totalPlayers": "{n} cơ thủ",
   "umb.updated": "cập nhật",

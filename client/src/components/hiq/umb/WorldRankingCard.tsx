@@ -7,7 +7,7 @@ import { flagEmoji } from "@/lib/flag";
 import { useT } from "@/lib/i18n";
 import { LucideGlobe, LucideChevronRight } from "@/lib/icons";
 import { UmbPlayerSheet } from "./UmbPlayerSheet";
-import { UMB_CATEGORIES, UMB_SOURCE_URL, type UmbCategory, type UmbRankingsResponse, type UmbSummary } from "./types";
+import { UMB_CATEGORIES, UMB_SOURCE_URL, regionName, resolveHomeFed, type UmbCategory, type UmbRankingsResponse, type UmbSummary } from "./types";
 
 // 순위 변동 뱃지 — ▲상승(브랜드) ▼하락(레드) NEW(노랑) –유지
 export const MoveBadge = ({ move }: { move: number | null }) => {
@@ -20,10 +20,14 @@ export const MoveBadge = ({ move }: { move: number | null }) => {
 
 // 홈 세계 랭킹 카드 — UMB 공식 랭킹 톱10 + 요약 한 줄. 선수 탭 → 상세 시트.
 export const WorldRankingCard = () => {
-    const { t } = useT();
+    const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const [category, setCategory] = useState<UmbCategory>("players");
     const [openPlayerId, setOpenPlayerId] = useState<string | null>(null);
+
+    // 뷰어의 "우리나라" — 프로필 국가 우선, 없으면 언어로 추정 (홈은 로그인 상태라 /me 캐시 재사용)
+    const { data: me } = useQuery<any>({ queryKey: ["/api/hiq/me"], retry: false });
+    const homeFed = resolveHomeFed(me?.countryCode, locale);
 
     const { data, isLoading } = useQuery<UmbRankingsResponse>({
         queryKey: ["/api/hiq/umb/rankings", category, "top10"],
@@ -31,8 +35,8 @@ export const WorldRankingCard = () => {
         staleTime: 10 * 60 * 1000,
     });
     const { data: summary } = useQuery<UmbSummary>({
-        queryKey: ["/api/hiq/umb/summary", category],
-        queryFn: async () => apiRequest(`/api/hiq/umb/summary?category=${category}`),
+        queryKey: ["/api/hiq/umb/summary", category, homeFed],
+        queryFn: async () => apiRequest(`/api/hiq/umb/summary?category=${category}&fed=${homeFed}`),
         staleTime: 10 * 60 * 1000,
     });
 
@@ -63,12 +67,16 @@ export const WorldRankingCard = () => {
                 )}
             </div>
 
-            {/* 요약 한 줄 — 한국 선수 규모·최고 순위 */}
-            {summary && summary.krTop && (
+            {/* 요약 한 줄 — 뷰어 국가의 선수 규모·최고 순위 (프로필/언어 기반) */}
+            {summary && summary.fedTop && (
                 <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-brand/[0.07] text-[12.5px] font-semibold text-brand">
-                    <span>🇰🇷</span>
+                    <span>{flagEmoji(summary.fed)}</span>
                     <span className="truncate">
-                        {t("umb.summaryLine").replace("{count}", String(summary.krCount)).replace("{name}", summary.krTop.playerName).replace("{rank}", String(summary.krTop.rank))}
+                        {t("umb.summaryLine")
+                            .replace("{country}", regionName(summary.fed, locale))
+                            .replace("{count}", String(summary.fedCount))
+                            .replace("{name}", summary.fedTop.playerName)
+                            .replace("{rank}", String(summary.fedTop.rank))}
                     </span>
                 </div>
             )}
@@ -82,7 +90,7 @@ export const WorldRankingCard = () => {
                     <div className="py-10 text-center text-black/40 text-[13.5px] font-medium">{t("umb.empty")}</div>
                 )}
                 {rows.map((r) => {
-                    const isKr = r.fed === "KR";
+                    const isKr = r.fed === homeFed;
                     return (
                         <button
                             key={r.playerUmbId}

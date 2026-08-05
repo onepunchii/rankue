@@ -1466,7 +1466,7 @@ const tr: Dict = {
   "umb.sourceStore": "Salon",
   "umb.sourceWorld": "Dünya",
   "umb.subtitle": "Resmî UMB 3 bant dünya sıralaması",
-  "umb.summaryLine": "{count} Koreli oyuncu · en iyi #{rank} {name}",
+  "umb.summaryLine": "{count} {country} oyuncusu · en iyi #{rank} {name}",
   "umb.title": "Dünya sıralaması",
   "umb.totalPlayers": "{n} oyuncu",
   "umb.updated": "güncellendi",

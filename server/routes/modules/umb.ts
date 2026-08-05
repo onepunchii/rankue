@@ -74,11 +74,13 @@ router.get("/calendar", asyncHandler(async (req: any, res: Response) => {
     return sendSuccess(res, events);
 }));
 
-// GET /umb/summary?category= — 홈 섹션 요약 (총 인원·한국 선수·1위·한국 최고)
+// GET /umb/summary?category=&fed= — 홈 섹션 요약 (총 인원·1위 + 뷰어 국가의 선수 수·최고)
 router.get("/summary", asyncHandler(async (req: any, res: Response) => {
     const category = parseCategory(req.query.category ?? "players");
     if (!category) return sendError(res, 400, "잘못된 부문입니다");
-    const summary = await storage.umb.getSummary(category);
+    const fed = typeof req.query.fed === "string" && /^[A-Za-z]{2}$/.test(req.query.fed)
+        ? req.query.fed.toUpperCase() : "KR";
+    const summary = await storage.umb.getSummary(category, fed);
     return sendSuccess(res, summary);
 }));
 

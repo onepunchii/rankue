@@ -1466,7 +1466,7 @@ const en: Dict = {
   "umb.sourceStore": "Store",
   "umb.sourceWorld": "World",
   "umb.subtitle": "Official UMB 3-cushion world ranking",
-  "umb.summaryLine": "{count} Korean players · best #{rank} {name}",
+  "umb.summaryLine": "{count} {country} players · best #{rank} {name}",
   "umb.title": "World Ranking",
   "umb.totalPlayers": "{n} players",
   "umb.updated": "updated",
