@@ -13,10 +13,31 @@ let fcmToken: { token: string; exp: number } | null = null;
 
 function serviceAccount(): SA | null {
   if (sa !== undefined) return sa;
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw) { sa = null; return sa; }
+
   try {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-    sa = raw ? (JSON.parse(raw) as SA) : null;
-  } catch { sa = null; }
+    sa = JSON.parse(raw) as SA;
+    return sa;
+  } catch { /* 아래에서 한 번 보정해 본다 */ }
+
+  // 서비스 계정 JSON을 환경변수에 넣을 때, private_key 안의 "\n"이 실제 줄바꿈으로
+  // 저장되는 일이 흔하다(붙여넣기/CLI 경유). 그러면 JSON 문자열 리터럴 안에 제어문자가
+  // 들어가 JSON.parse가 통째로 실패하고 → serviceAccount()가 null → FCM이 조용히 'skip'된다.
+  // 실제로 이 상태로 안드로이드 푸시가 전혀 나가지 않고 있었어서, 값을 고치지 않아도
+  // 동작하도록 파서 쪽에서 방어한다.
+  try {
+    const repaired = raw.replace(
+      /"private_key"\s*:\s*"([\s\S]*?)"(\s*[,}])/,
+      (_m, key: string, tail: string) =>
+        `"private_key": "${key.replace(/\r/g, "").replace(/\n/g, "\\n")}"${tail}`,
+    );
+    sa = JSON.parse(repaired) as SA;
+    console.warn("[Push] FIREBASE_SERVICE_ACCOUNT의 private_key 개행을 보정해 파싱했습니다. 환경변수 값을 정상 JSON으로 교체하는 것을 권장합니다.");
+  } catch (e) {
+    console.error("[Push] FIREBASE_SERVICE_ACCOUNT 파싱 실패 — 안드로이드 푸시가 비활성화됩니다:", (e as Error)?.message);
+    sa = null;
+  }
   return sa;
 }
 
