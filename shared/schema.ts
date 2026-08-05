@@ -151,6 +151,7 @@ export const hiqMembers = pgTable("hiq_members", {
   defaultAccountNumber: text("default_account_number"),
   defaultAccountHolder: text("default_account_holder"),
   introduction: text("introduction"),
+  hideSkillBadge: boolean("hide_skill_badge").default(false).notNull(), // 커뮤니티 실력 뱃지 숨김
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1055,5 +1056,99 @@ export const hiqPollVotesRelations = relations(hiqPollVotes, ({ one }) => ({
     references: [hiqMembers.id],
   }),
 }));
+
+// 13. 커뮤니티 — 전체 공개 게시판. 크루와의 경계선: 가입 승인이 없으면 커뮤니티.
+// 채팅·DM은 만들지 않는다(공개 댓글만) — 거래 알선 뒷문 + 크루 잠식 방지.
+export const hiqCommunityPosts = pgTable("hiq_community_posts", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  // brag=한 큐 자랑, ask=물어보기(잡담 흡수), store=우리 매장, lesson=레슨
+  board: text("board", { enum: ["brag", "ask", "store", "lesson"] }).notNull(),
+  authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
+  // 자랑은 제목 없이 캡션이 곧 제목 — title은 store/lesson에서만 선택 사용
+  title: text("title"),
+  content: text("content").notNull(),
+  images: jsonb("images").$type<string[]>(),
+  // 경기결과 카드 — 클라이언트는 historyId만 보내고, 카드 내용(gameCard)은 서버가
+  // 전적 DB에서 직접 스냅샷을 떠서 채운다. 수정 불가(위조 불가능이 랭큐의 차별점).
+  historyId: uuid("history_id").references(() => hiqGameHistory.id),
+  gameCard: jsonb("game_card").$type<{
+    gameType: string; score: number; innings: number; average: string;
+    isWinner: boolean; highRun: number; opponentName: string | null; playedAt: string;
+  }>(),
+  tags: jsonb("tags").$type<string[]>(), // #장비 등 — 중고거래 수요 관찰용
+  regionName: text("region_name"), // 사용자가 직접 선택한 시·군·구 (GPS 미사용)
+  // 우리 매장/레슨 글의 소속 근거 — 최근 30일 내 경기를 기록한 매장
+  storeId: uuid("store_id").references(() => hiqStores.id),
+  storeName: text("store_name"),
+  isBlinded: boolean("is_blinded").default(false).notNull(), // 3인 신고 자동 블라인드
+  blindReason: text("blind_reason"),
+  appealText: text("appeal_text"), // 블라인드 이의제기 (원탭 + 사유)
+  appealAt: timestamp("appeal_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const hiqCommunityComments = pgTable("hiq_community_comments", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  postId: uuid("post_id").references(() => hiqCommunityPosts.id).notNull(),
+  authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
+  content: text("content").notNull(),
+  isBlinded: boolean("is_blinded").default(false).notNull(),
+  blindReason: text("blind_reason"),
+  appealText: text("appeal_text"),
+  appealAt: timestamp("appeal_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const hiqCommunityLikes = pgTable("hiq_community_likes", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  postId: uuid("post_id").references(() => hiqCommunityPosts.id).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.postId, table.memberId),
+]);
+
+// 14. 신고 — 커뮤니티뿐 아니라 크루 콘텐츠에도 소급 적용 (Apple 1.2 / Play UGC)
+export const hiqReports = pgTable("hiq_reports", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  targetType: text("target_type", {
+    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_chat", "member"],
+  }).notNull(),
+  targetId: uuid("target_id").notNull(),
+  reporterId: uuid("reporter_id").references(() => hiqMembers.id).notNull(),
+  reason: text("reason").notNull(), // abuse, gambling, trade, privacy, spam, etc
+  detail: text("detail"),
+  status: text("status", { enum: ["pending", "actioned", "dismissed"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.targetType, table.targetId, table.reporterId), // 동일인 중복 신고 방지
+]);
+
+// 15. 사용자 차단 — 피드·상세·댓글 모든 쿼리에 횡단 적용 (Play 1:1 상호작용 필수 요건)
+export const hiqBlocks = pgTable("hiq_blocks", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  blockerId: uuid("blocker_id").references(() => hiqMembers.id).notNull(),
+  blockedId: uuid("blocked_id").references(() => hiqMembers.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.blockerId, table.blockedId),
+]);
+
+export const insertHiqCommunityPostSchema = createInsertSchema(hiqCommunityPosts).omit({
+  id: true, createdAt: true, updatedAt: true, isBlinded: true, blindReason: true, appealText: true, appealAt: true,
+});
+export type HiqCommunityPost = typeof hiqCommunityPosts.$inferSelect;
+export type InsertHiqCommunityPost = z.infer<typeof insertHiqCommunityPostSchema>;
+
+export const insertHiqCommunityCommentSchema = createInsertSchema(hiqCommunityComments).omit({
+  id: true, createdAt: true, isBlinded: true, blindReason: true, appealText: true, appealAt: true,
+});
+export type HiqCommunityComment = typeof hiqCommunityComments.$inferSelect;
+export type InsertHiqCommunityComment = z.infer<typeof insertHiqCommunityCommentSchema>;
+
+export type HiqReport = typeof hiqReports.$inferSelect;
+export type InsertHiqReport = typeof hiqReports.$inferInsert;
+export type HiqBlock = typeof hiqBlocks.$inferSelect;
 
 

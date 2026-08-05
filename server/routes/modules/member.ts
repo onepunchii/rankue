@@ -145,6 +145,8 @@ router.patch("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any)
     if (req.body.gender === "male" || req.body.gender === "female") updateData.gender = req.body.gender;
     const by = Number(req.body.birthYear);
     if (Number.isInteger(by) && by >= 1920 && by <= 2020) updateData.birthYear = by;
+    // 커뮤니티 실력 뱃지 숨김 토글
+    if (typeof req.body.hideSkillBadge === "boolean") updateData.hideSkillBadge = req.body.hideSkillBadge;
 
     if (Object.keys(updateData).length > 0) {
         await storage.updateMember(member.id, updateData);

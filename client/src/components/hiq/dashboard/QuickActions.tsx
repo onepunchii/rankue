@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ChevronDown, Target, Swords, LogIn, Cpu, HelpCircle } from "@/lib/icons";
+import { ChevronDown, Target, Swords, LogIn, Cpu, HelpCircle, LucideMessageCircle } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useState } from "react";
@@ -47,6 +47,12 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
             descKey: "quickActions.guideSimDesc",
             highlight: false,
         },
+        {
+            icon: LucideMessageCircle,
+            titleKey: "quickActions.communityTitle",
+            descKey: "quickActions.guideCommunityDesc",
+            highlight: false,
+        },
     ];
 
     return (
@@ -81,33 +87,33 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
 
-                {/* 매칭 대결 (hero, spans full column) */}
+                {/* 매칭 대결 (hero, 세로 2칸) */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
                     onClick={() => onStartGame("match")}
-                    className="row-span-3 h-[420px] rounded-3xl bg-brand flex flex-col justify-between p-6 text-left shadow-[0_8px_24px_rgba(0,98,65,0.20)]"
+                    className="row-span-2 h-[276px] rounded-3xl bg-brand flex flex-col justify-between p-6 text-left shadow-[0_8px_24px_rgba(0,98,65,0.20)]"
                 >
-                    <div className="w-16 h-16 rounded-3xl bg-white/15 flex items-center justify-center">
-                        <Swords className="w-8 h-8 text-white" strokeWidth={2} />
+                    <div className="w-14 h-14 rounded-3xl bg-white/15 flex items-center justify-center">
+                        <Swords className="w-7 h-7 text-white" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[22px] font-bold text-white leading-tight">{t("quickActions.matchTitle")}</span>
+                        <span className="block text-[21px] font-bold text-white leading-tight">{t("quickActions.matchTitle")}</span>
                         <span className="block text-[13px] font-medium text-white/80 mt-2 leading-snug">{t("quickActions.matchDescLine1")}<br />{t("quickActions.matchDescLine2")}</span>
                     </div>
                 </motion.button>
 
-                {/* 핀 코드 참여 (1x1) */}
+                {/* 핀 코드 참여 (1x1) — 당구공 빨간색 */}
                 <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={onJoinGame}
-                    className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
+                    className="h-[132px] rounded-3xl bg-[#E02D2D] flex flex-col justify-between p-5 text-left shadow-[0_4px_14px_rgba(224,45,45,0.35)] transition-colors hover:bg-[#D42828]"
                 >
-                    <div className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center">
-                        <LogIn className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
+                    <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center">
+                        <LogIn className="w-[22px] h-[22px] text-white" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.pinTitle")}</span>
-                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.pinDesc")}</span>
+                        <span className="block text-[15px] font-semibold text-white leading-tight">{t("quickActions.pinTitle")}</span>
+                        <span className="block text-[12.5px] font-medium text-white/80 mt-0.5">{t("quickActions.pinDesc")}</span>
                     </div>
                 </motion.button>
 
@@ -123,6 +129,21 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     <div>
                         <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.simTitle")}</span>
                         <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.simDesc")}</span>
+                    </div>
+                </motion.button>
+
+                {/* 커뮤니티 (1x1) — 당구공 노란색, 매칭 대결 바로 아래 우측 칸 */}
+                <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setLocation("/community")}
+                    className="h-[132px] rounded-3xl bg-[#F5B721] flex flex-col justify-between p-5 text-left shadow-[0_4px_14px_rgba(245,183,33,0.35)] transition-colors hover:bg-[#F0B01A]"
+                >
+                    <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center">
+                        <LucideMessageCircle className="w-[22px] h-[22px] text-white" strokeWidth={2} />
+                    </div>
+                    <div>
+                        <span className="block text-[15px] font-semibold text-white leading-tight">{t("quickActions.communityTitle")}</span>
+                        <span className="block text-[12.5px] font-medium text-white/85 mt-0.5">{t("quickActions.communityDesc")}</span>
                     </div>
                 </motion.button>
             </div>

@@ -25,6 +25,8 @@ import HiqClubDetail from "@/pages/hiq/club-detail";
 import HiqJoin from "@/pages/hiq/join";
 import HiqSimulation from "@/pages/hiq/simulation";
 import HiqOnlineGame from "@/pages/hiq/online-game";
+import HiqCommunity from "@/pages/hiq/community";
+import HiqCommunityPost from "@/pages/hiq/community-post";
 import GolfNewGame from "@/golf/pages/NewGame";
 import GolfScorecard from "@/golf/pages/GamePage";
 import GameResult from "@/golf/pages/GameResult";
@@ -95,6 +97,8 @@ const FramedJoin = framed(HiqJoin);
 const FramedHistory = framed(HiqHistory);
 const FramedRanking = framed(HiqRanking);
 const FramedMenu = framed(HiqMenu);
+const FramedCommunity = framed(HiqCommunity);
+const FramedCommunityPost = framed(HiqCommunityPost);
 
 /**
  * localStorage에 저장된 FCM 토큰을 서버에 등록한다.
@@ -215,6 +219,8 @@ function AppRoutes() {
       <Route path="/history" component={FramedHistory} />
       <Route path="/ranking" component={FramedRanking} />
       <Route path="/menu" component={FramedMenu} />
+      <Route path="/community" component={FramedCommunity} />
+      <Route path="/community/:id" component={FramedCommunityPost} />
       <Route path="/admin" component={HiqAdmin} />
       <Route path="/simulation" component={HiqSimulation} />
 

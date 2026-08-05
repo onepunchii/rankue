@@ -8,6 +8,7 @@ import memberRouter from "./modules/member.js";
 import gameRouter from "./modules/game.js";
 import notificationRouter from "./modules/notification.js";
 import regionRouter from "./modules/region.js";
+import communityRouter from "./modules/community.js";
 
 const router = Router();
 
@@ -48,5 +49,9 @@ router.use("/", gameRouter);
 
 // 9. Regions (/regions)
 router.use("/regions", regionRouter);
+
+// 10. Community (/community)
+// - 전체 공개 게시판 4개 + 신고/차단/이의제기
+router.use("/community", communityRouter);
 
 export default router;

@@ -55,6 +55,16 @@ export default function HiqSettings() {
         }
     };
 
+    // 커뮤니티 실력 뱃지 토글 — 기본 표시, 끄면 글·댓글에서 다마수·에버리지 숨김
+    const toggleSkillBadge = async () => {
+        try {
+            await apiRequest("/api/hiq/me", { method: "PATCH", body: JSON.stringify({ hideSkillBadge: !member?.hideSkillBadge }) });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
+        } catch (e: any) {
+            toast({ title: e?.message || t("settings.saveFailed"), variant: "destructive" });
+        }
+    };
+
     const conn = member?.connections ?? {};
     const connections: { key: string; label: string; linked: boolean }[] = [
         { key: "phone", label: t("settings.connPhone"), linked: !!conn.phone },
@@ -161,6 +171,30 @@ export default function HiqSettings() {
                             </button>
                         ))}
                     </div>
+                </section>
+
+                {/* 커뮤니티 */}
+                <section className="rk-card p-5">
+                    <div className="flex items-center gap-2 mb-1">
+                        <LucideBadgeCheck className="w-4 h-4 text-brand" />
+                        <h2 className="text-[15px] font-bold">{t("settings.community")}</h2>
+                    </div>
+                    <p className="text-[12px] text-black/45 mb-4">{t("settings.skillBadgeDesc")}</p>
+                    <button
+                        onClick={toggleSkillBadge}
+                        className="w-full flex items-center justify-between h-12 px-4 bg-black/[0.03] rounded-tile"
+                    >
+                        <span className="text-[14px] font-medium">{t("settings.skillBadge")}</span>
+                        <span className={cn(
+                            "relative w-11 h-6 rounded-full transition-colors",
+                            member?.hideSkillBadge ? "bg-black/[0.12]" : "bg-brand"
+                        )}>
+                            <span className={cn(
+                                "absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all",
+                                member?.hideSkillBadge ? "left-0.5" : "left-[22px]"
+                            )} />
+                        </span>
+                    </button>
                 </section>
 
                 {/* 연결된 로그인 */}
