@@ -243,6 +243,14 @@ export class CrewRepository {
             .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
     }
 
+    // 크루명 중복 검사 — 대소문자·양끝 공백 무시. excludeId는 자기 자신 이름 유지용(PATCH).
+    async findCrewByName(name: string, excludeId?: string) {
+        const conds: any[] = [sql`lower(trim(${hiqCrews.name})) = lower(trim(${name}))`];
+        if (excludeId) conds.push(ne(hiqCrews.id, excludeId));
+        const [row] = await db.select({ id: hiqCrews.id }).from(hiqCrews).where(and(...conds)).limit(1);
+        return row;
+    }
+
     // 승인제 → 자동 전환 시 기존 대기자 일괄 승격 — 신청(joinedAt) 순서대로 정원
     // 잔여만큼만 pending → member. 초과분은 pending 유지. 승격된 memberId 목록을 반환.
     async promotePendingMembers(crewId: string): Promise<string[]> {

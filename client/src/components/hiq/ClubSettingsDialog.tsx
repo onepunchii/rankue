@@ -33,6 +33,8 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
 
     const myMemberInfo = members.find((m) => m.member.id === me?.id);
     const isLeader = myMemberInfo?.role === 'leader';
+    // 정보 수정은 리더+매니저 (서버 PATCH 정책과 일치, 오너 확정 2026-08-05). 크루 폐쇄만 리더 전용.
+    const canEdit = isLeader || myMemberInfo?.role === 'manage';
     const pendingMembers = members.filter((m) => m.role === 'pending');
 
     return (
@@ -87,6 +89,7 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                             <ClubGeneralTab
                                 crew={crew}
                                 isLeader={isLeader}
+                                canEdit={canEdit}
                                 onUpdate={(data) => updateCrew.mutate(data)}
                                 onDelete={() => deleteCrew.mutate()}
                                 isUpdating={updateCrew.isPending}
@@ -95,9 +98,10 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, members: initialM
                         </TabsContent>
 
                         <TabsContent value="template" className="focus-visible:outline-none outline-none border-none">
+                            {/* 가입 질문 편집도 리더+매니저 (prop 이름만 isLeader로 남음) */}
                             <ClubIntroTemplateTab
                                 crew={crew}
-                                isLeader={isLeader}
+                                isLeader={canEdit}
                                 onUpdate={(data) => updateCrew.mutate(data)}
                                 isUpdating={updateCrew.isPending}
                             />

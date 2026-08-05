@@ -328,7 +328,9 @@ export const hiqCrews = pgTable("hiq_crews", {
 
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  unique().on(table.name), // 크루명 중복 금지 (오너 확정 2026-08-05). 대소문자 변형은 앱 검사가 잡는다.
+]);
 
 export const hiqCrewMembers = pgTable("hiq_crew_members", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),

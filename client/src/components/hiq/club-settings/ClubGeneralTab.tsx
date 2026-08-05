@@ -23,14 +23,15 @@ import {
 
 interface ClubGeneralTabProps {
     crew: CrewData;
-    isLeader: boolean;
+    isLeader: boolean; // 크루 폐쇄 등 리더 전용 동작
+    canEdit: boolean; // 리더+매니저 — 정보 수정 (서버 PATCH 정책과 일치)
     onUpdate: (data: any) => void;
     onDelete: () => void;
     isUpdating: boolean;
     isDeleting: boolean;
 }
 
-export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating, isDeleting }: ClubGeneralTabProps) {
+export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, isUpdating, isDeleting }: ClubGeneralTabProps) {
     const { t } = useT();
     const { toast } = useToast();
     const [formData, setFormData] = useState({
@@ -43,6 +44,8 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
         meetingDay: crew?.meetingDay || '',
         meetingTime: crew?.meetingTime || '',
         joinType: crew?.joinType || 'auto', // 가입 방식 — 생성 후에도 변경 가능 (서버 PATCH 화이트리스트에 포함)
+        gameType: crew?.gameType || 'any',
+        tags: crew?.tags || [],
     });
     const [isUploading, setIsUploading] = useState(false);
 
@@ -61,10 +64,17 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
             meetingDay: crew?.meetingDay || '',
             meetingTime: crew?.meetingTime || '',
             joinType: crew?.joinType || 'auto',
+            gameType: crew?.gameType || 'any',
+            tags: crew?.tags || [],
         });
     }
 
-    const isDirty = Object.keys(formData).some(key => (formData as any)[key] !== (crew as any)[key]);
+    // tags는 배열이라 !== 참조 비교가 항상 참이 된다(저장 후 리페치·null 크루 즉시 dirty) — 내용 비교로
+    const isDirty = Object.keys(formData).some(key => {
+        const a = (formData as any)[key], b = (crew as any)[key];
+        if (Array.isArray(a) || Array.isArray(b)) return JSON.stringify(a ?? []) !== JSON.stringify(b ?? []);
+        return a !== b;
+    });
 
     const handleFileChange = async (type: 'emblem' | 'coverImage', file: File) => {
         try {
@@ -88,10 +98,10 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                 {/* Emblem & Cover Upload */}
                 <div className="space-y-4">
                     <div
-                        onClick={() => isLeader && document.getElementById('settings-cover-upload')?.click()}
+                        onClick={() => canEdit && document.getElementById('settings-cover-upload')?.click()}
                         className={cn(
                             "relative group/cover h-[140px] rounded-tile bg-surface-3 overflow-hidden",
-                            isLeader && "cursor-pointer"
+                            canEdit && "cursor-pointer"
                         )}
                     >
                         {formData.coverImage ? (
@@ -102,7 +112,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                                 <span className="text-xs font-semibold">{t("clubGeneralTab.coverImage")}</span>
                             </div>
                         )}
-                        {isLeader && (
+                        {canEdit && (
                             <>
                                 {/* Desktop: hover-reveal overlay */}
                                 <div className="absolute inset-0 bg-black/40 hidden md:flex items-center justify-center opacity-0 group-hover/cover:opacity-100 transition-opacity pointer-events-none">
@@ -122,8 +132,8 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
 
                     <div className="flex items-center gap-4 -mt-10 px-4 relative z-10">
                         <div
-                            onClick={(e) => { e.stopPropagation(); if (isLeader) document.getElementById('settings-logo-upload')?.click(); }}
-                            className={cn("relative group/logo flex-shrink-0", isLeader && "cursor-pointer")}
+                            onClick={(e) => { e.stopPropagation(); if (canEdit) document.getElementById('settings-logo-upload')?.click(); }}
+                            className={cn("relative group/logo flex-shrink-0", canEdit && "cursor-pointer")}
                         >
                             <div className="w-20 h-20 rounded-tile bg-surface-3 border-2 overflow-hidden relative border-brand/30 group-hover/logo:border-brand transition-colors">
                                 {formData.emblem ? (
@@ -133,13 +143,13 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                                         <LucideCamera className="w-6 h-6 text-black/40" />
                                     </div>
                                 )}
-                                {isLeader && (
+                                {canEdit && (
                                     <div className="absolute inset-0 bg-black/40 hidden md:flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity pointer-events-none">
                                         <LucideCamera className="w-5 h-5 text-white" />
                                     </div>
                                 )}
                             </div>
-                            {isLeader && (
+                            {canEdit && (
                                 <div className="md:hidden absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand border-2 border-white flex items-center justify-center pointer-events-none">
                                     <LucideCamera className="w-3.5 h-3.5 text-brand-fg" />
                                 </div>
@@ -174,7 +184,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                     <Input
                         value={formData.name}
                         onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                        disabled={!isLeader}
+                        disabled={!canEdit}
                         placeholder={t("clubGeneralTab.crewNamePlaceholder")}
                         className="bg-surface-3 border-surface-line h-10 text-sm font-bold rounded-tile focus:ring-0 focus-visible:ring-0 focus:border-brand/30 placeholder:text-black/40"
                     />
@@ -185,7 +195,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                     <Input
                         value={formData.shortIntro}
                         onChange={e => setFormData(prev => ({ ...prev, shortIntro: e.target.value }))}
-                        disabled={!isLeader}
+                        disabled={!canEdit}
                         placeholder={crew?.sportCategory === "GOLF" ? t("clubGeneralTab.sloganPlaceholderGolf") : t("clubGeneralTab.sloganPlaceholderBilliards")}
                         className="bg-surface-3 border-surface-line h-10 text-sm font-medium rounded-tile focus:ring-0 focus-visible:ring-0 focus:border-brand/30 placeholder:text-black/40"
                     />
@@ -197,7 +207,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         {[10, 20, 30, 50, 100].map(num => (
                             <button
                                 key={num}
-                                disabled={!isLeader}
+                                disabled={!canEdit}
                                 onClick={() => setFormData(prev => ({ ...prev, maxMembers: num }))}
                                 className={cn(
                                     "h-10 rounded-tile text-xs font-semibold tabular-nums transition-colors",
@@ -212,13 +222,75 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                     </div>
                 </div>
 
+                {/* 활동 종목 — 생성 위저드(활동 성향)와 같은 선택지. 지역·베이스캠프는
+                    오너 결정으로 수정 제외(2026-08-05), 활동 성향 필드만 수정 허용. */}
+                <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-black/55 ml-1">{t("createClub.gameTypeLabel")}</Label>
+                    <div className="flex gap-2">
+                        {(crew?.sportCategory === "GOLF" ? [
+                            { id: "any", label: "createClub.gameAny" },
+                            { id: "field", label: "createClub.gameField" },
+                            { id: "screen", label: "createClub.gameScreen" },
+                            { id: "range", label: "createClub.gameRange" },
+                        ] : [
+                            { id: "any", label: "createClub.gameAny" },
+                            { id: "3c", label: "createClub.game3c" },
+                            { id: "4c", label: "createClub.game4c" },
+                            { id: "pocket", label: "createClub.gamePocket" },
+                        ]).map(type => (
+                            <button
+                                key={type.id}
+                                disabled={!canEdit}
+                                onClick={() => setFormData(prev => ({ ...prev, gameType: type.id }))}
+                                className={cn(
+                                    "flex-1 py-2 rounded-tile text-xs font-semibold transition-colors",
+                                    formData.gameType === type.id ? "bg-brand text-brand-fg" : "bg-surface-3 text-black/55 hover:text-[rgba(0,0,0,0.87)]"
+                                )}
+                            >
+                                {t(type.label)}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 분위기 태그 — 최대 3개 */}
+                <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-black/55 ml-1">{t("createClub.vibeLabel")}</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                        {(crew?.sportCategory === "GOLF"
+                            ? ["#매너골프", "#싱글목표", "#명랑골프", "#라운딩", "#스크린", "#초보환영", "#고수환영", "#2030", "#4050", "#주말골퍼"]
+                            : ["#빡겜", "#즐겜", "#내기환영", "#매너필수", "#음주가무", "#금연", "#초보환영", "#고수환영", "#2030", "#4050"]
+                        ).map(tag => {
+                            const selected = (formData.tags as string[]).includes(tag);
+                            return (
+                                <button
+                                    key={tag}
+                                    disabled={!canEdit}
+                                    onClick={() => setFormData(prev => {
+                                        const tags = prev.tags as string[];
+                                        if (tags.includes(tag)) return { ...prev, tags: tags.filter(t2 => t2 !== tag) };
+                                        if (tags.length >= 3) return prev;
+                                        return { ...prev, tags: [...tags, tag] };
+                                    })}
+                                    className={cn(
+                                        "px-2.5 py-1.5 rounded-pill text-xs font-medium transition-all",
+                                        selected ? "bg-brand text-brand-fg" : "bg-surface-3 text-black/55"
+                                    )}
+                                >
+                                    {tag}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
                 {/* 가입 방식 — 생성 위저드(활동 성향)와 같은 2택. 승인제→자동 전환 시
                     서버가 대기자를 신청 순서대로 정원 내에서 자동 승격한다 (PATCH 응답 promotedCount). */}
                 <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-black/55 ml-1">{t("createClub.joinTypeLabel")}</Label>
                     <div className="grid grid-cols-2 gap-2">
                         <button
-                            disabled={!isLeader}
+                            disabled={!canEdit}
                             onClick={() => setFormData(prev => ({ ...prev, joinType: 'auto' }))}
                             className={cn(
                                 "p-3 rounded-tile border text-left space-y-1 transition-colors",
@@ -229,7 +301,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                             <div className="text-[12px] text-black/55">{t("createClub.joinAutoDesc")}</div>
                         </button>
                         <button
-                            disabled={!isLeader}
+                            disabled={!canEdit}
                             onClick={() => setFormData(prev => ({ ...prev, joinType: 'approval' }))}
                             className={cn(
                                 "p-3 rounded-tile border text-left space-y-1 transition-colors",
@@ -247,7 +319,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                     <Textarea
                         value={formData.description}
                         onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                        disabled={!isLeader}
+                        disabled={!canEdit}
                         placeholder={t("clubGeneralTab.descriptionPlaceholder")}
                         className="bg-surface-3 border-surface-line resize-none min-h-[100px] text-sm leading-relaxed rounded-tile focus:ring-0 focus-visible:ring-0 focus:border-brand/30 placeholder:text-black/40 custom-scrollbar"
                     />
@@ -259,7 +331,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         <Input
                             value={formData.meetingDay}
                             onChange={e => setFormData(prev => ({ ...prev, meetingDay: e.target.value }))}
-                            disabled={!isLeader}
+                            disabled={!canEdit}
                             placeholder={t("clubGeneralTab.meetingDayPlaceholder")}
                             className="bg-surface-3 border-surface-line h-10 text-sm font-medium rounded-tile placeholder:text-black/40"
                         />
@@ -269,7 +341,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                         <Input
                             value={formData.meetingTime}
                             onChange={e => setFormData(prev => ({ ...prev, meetingTime: e.target.value }))}
-                            disabled={!isLeader}
+                            disabled={!canEdit}
                             placeholder={t("clubGeneralTab.meetingTimePlaceholder")}
                             className="bg-surface-3 border-surface-line h-10 text-sm font-medium rounded-tile placeholder:text-black/40"
                         />
@@ -277,7 +349,7 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                 </div>
 
                 <div className="pt-4 pb-4">
-                    {isLeader ? (
+                    {canEdit ? (
                         <Button
                             onClick={handleSave}
                             disabled={!isDirty || isUpdating || isUploading}

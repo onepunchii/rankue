@@ -655,6 +655,9 @@ router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =>
     if (!validation.data.name || validation.data.name.length > 30) {
         return sendError(res, 400, "크루 이름은 1~30자여야 합니다");
     }
+    if (await storage.crews.findCrewByName(validation.data.name)) {
+        return sendError(res, 409, "이미 사용 중인 크루 이름입니다");
+    }
 
     // Ownership is set from the authenticated session — never trust a client-supplied leaderId.
     // countryCode도 서버가 결정: 생성자 프로필 국가(자동 수집분) → 없으면 IP 헤더 → 그래도 없으면 null.
@@ -792,6 +795,11 @@ router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any
     if (updateData.name !== undefined) {
         updateData.name = String(updateData.name).trim();
         if (!updateData.name || updateData.name.length > 30) return sendError(res, 400, "크루 이름은 1~30자여야 합니다");
+        // 클라이언트는 이름을 안 바꿔도 전체 폼을 보낸다 — 자기 현재 이름 그대로면 중복
+        // 검사를 건너뛴다 (레거시 변형 중복이 있어도 이름 외 설정 저장이 막히지 않게).
+        if (updateData.name !== data?.crew?.name && await storage.crews.findCrewByName(updateData.name, crewId)) {
+            return sendError(res, 409, "이미 사용 중인 크루 이름입니다");
+        }
     }
     if (updateData.maxMembers !== undefined && updateData.maxMembers !== null) {
         const n = Number(updateData.maxMembers);
@@ -809,7 +817,14 @@ router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any
     }
 
     const oldCrew = data?.crew;
-    const crew = await storage.updateCrew(crewId, updateData);
+    let crew;
+    try {
+        crew = await storage.updateCrew(crewId, updateData);
+    } catch (e: any) {
+        // check-then-write 사이의 경합으로 DB unique(name)에 걸리면 500이 아니라 409로
+        if (e?.code === "23505") return sendError(res, 409, "이미 사용 중인 크루 이름입니다");
+        throw e;
+    }
 
     // 승인제 → 자동 전환: 기존 대기자를 신청 순서대로 정원 내에서 자동 승격.
     // 방치하면 먼저 신청한 사람이 무기한 pending으로 남고 새 신청자만 즉시 가입되는 역전이 생긴다.
