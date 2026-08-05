@@ -619,6 +619,10 @@ export function ShareResultButton({
             variant: "destructive",
         });
 
+    // 아래 두 핸들러(이미지 공유 / 이미지 저장)는 현재 버튼이 없다 — 링크 공유와 사실상 중복이라 뺐다.
+    // 카톡은 링크를 붙이면 OG 미리보기 카드를 띄워주므로 "이미지처럼 보이는 효과"를 링크가 이미 낸다.
+    // 게다가 이미지 공유는 네이티브 플러그인이 필요해 앱 재빌드(=스토어 재심사)를 유발한다.
+    // 되살릴 일이 생기면 버튼만 다시 붙이면 되므로 구현은 남겨 둔다.
     const handleShare = async () => {
         if (busy) return;
         setBusy(true);
@@ -790,16 +794,6 @@ export function ShareResultButton({
                             </Button>
                         )}
 
-                        <Button
-                            variant="ghost"
-                            onClick={handleShare}
-                            disabled={busy}
-                            className="rk-btn-secondary h-12 w-full gap-2 rounded-2xl"
-                        >
-                            <LucideShare2 className="h-4 w-4" />
-                            {busy ? "만드는 중…" : "이미지로 공유"}
-                        </Button>
-
                         {myCrews.length > 0 && (
                             <Button
                                 variant="ghost"
@@ -812,13 +806,6 @@ export function ShareResultButton({
                             </Button>
                         )}
 
-                        <button
-                            onClick={handleDownload}
-                            disabled={busy}
-                            className="h-10 w-full text-[13px] font-semibold text-black/45 hover:text-black/70 transition-colors disabled:opacity-40"
-                        >
-                            이미지만 저장
-                        </button>
                     </div>
                 </DialogContent>
             </Dialog>
