@@ -51,7 +51,7 @@ export function DesktopFrame({ children }: { children: ReactNode }) {
 function SideLeft() {
     return (
         <aside
-            className="hidden xl:flex xl:flex-col self-start sticky top-0 h-[100dvh] w-[352px] 2xl:w-[400px] shrink-0 overflow-y-auto scrollbar-hide py-12 pl-2"
+            className="rk-no-safe hidden xl:flex xl:flex-col self-start sticky top-0 h-[100dvh] w-[352px] 2xl:w-[400px] shrink-0 overflow-y-auto scrollbar-hide py-12 pl-2"
             aria-label="랭큐 소개"
         >
             <Link href="/dashboard" className="flex items-center gap-2.5 group" aria-label="랭큐 홈">
@@ -118,7 +118,7 @@ function SideLeft() {
 function SideRight() {
     return (
         <aside
-            className="hidden xl:flex xl:flex-col gap-4 self-start sticky top-0 h-[100dvh] w-[352px] 2xl:w-[400px] shrink-0 overflow-y-auto scrollbar-hide py-12 pr-2"
+            className="rk-no-safe hidden xl:flex xl:flex-col gap-4 self-start sticky top-0 h-[100dvh] w-[352px] 2xl:w-[400px] shrink-0 overflow-y-auto scrollbar-hide py-12 pr-2"
             aria-label="랭큐 크루와 바로가기"
         >
             {/* 크루 — 랭큐의 당구 커뮤니티 */}

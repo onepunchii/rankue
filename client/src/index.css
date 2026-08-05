@@ -1155,8 +1155,10 @@ body.keyboard-open .hide-on-keyboard {
   }
 
   /* 네이티브 쉘(iOS 노치) — 상단 고정 헤더·하단 고정 바가 시스템 영역을 침범하지 않게.
-     웹 브라우저에선 inset이 0이라 무영향. (shell-kit safe-area 표준) */
-  .fixed.top-0, .sticky.top-0 {
+     웹 브라우저에선 inset이 0이라 무영향. (shell-kit safe-area 표준)
+     주의: 이 규칙은 특이도가 0,2,0 이라 py-12 같은 유틸리티(0,1,0)를 이긴다.
+     자체 상단 여백이 필요한 sticky/fixed 요소는 .rk-no-safe 로 제외한다. */
+  .fixed.top-0:not(.rk-no-safe), .sticky.top-0:not(.rk-no-safe) {
     padding-top: env(safe-area-inset-top);
   }
   .fixed.bottom-0 {

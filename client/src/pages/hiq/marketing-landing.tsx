@@ -357,7 +357,9 @@ export default function MarketingLanding({ onStart }: { onStart: () => void }) {
                                         href={STORE_ANDROID}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-[#1c1c1f] text-[14.5px] font-bold text-white transition-transform active:scale-[0.98]"
+                                        // 세로로 쌓이는 모바일에서 flex-1 은 "남는 세로 공간을 나눠 가져라"가 되어
+                                        // h-12 가 눌린다. 가로로 놓이는 sm 이상에서만 폭을 반씩 나눠 갖게 한다.
+                                        className="flex h-12 shrink-0 items-center justify-center rounded-2xl bg-[#1c1c1f] text-[14.5px] font-bold text-white transition-transform active:scale-[0.98] sm:flex-1"
                                     >
                                         Google Play
                                     </a>
@@ -365,7 +367,7 @@ export default function MarketingLanding({ onStart }: { onStart: () => void }) {
                                         href={STORE_IOS}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-black/[0.05] text-[14.5px] font-bold text-ink-1 transition-transform active:scale-[0.98]"
+                                        className="flex h-12 shrink-0 items-center justify-center rounded-2xl bg-black/[0.05] text-[14.5px] font-bold text-ink-1 transition-transform active:scale-[0.98] sm:flex-1"
                                     >
                                         App Store
                                     </a>
