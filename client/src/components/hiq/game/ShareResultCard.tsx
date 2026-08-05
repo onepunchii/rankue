@@ -1,4 +1,8 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Capacitor } from "@capacitor/core";
+import { Share } from "@capacitor/share";
+import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -9,7 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { LucideShare2, LucideDownload } from "@/lib/icons";
+import { apiRequest } from "@/lib/queryClient";
+import { LucideShare2, LucideDownload, LucideUsers, LucideChevronRight } from "@/lib/icons";
 
 /* ============================================================================
  * 경기 결과 공유 카드
@@ -524,6 +529,39 @@ function downloadBlob(blob: Blob, filename: string) {
     }
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result));
+        r.onerror = () => reject(new Error("read failed"));
+        r.readAsDataURL(blob);
+    });
+}
+
+// 네이티브 앱 공유. WebView 안에서는 navigator.share 의 파일 공유도, <a download> 도
+// 동작하지 않아서(둘 다 조용히 아무 일도 안 일어난다) 파일을 캐시에 쓴 뒤
+// 네이티브 공유 시트를 띄우는 경로가 유일하게 확실하다.
+async function shareNative(blob: Blob, filename: string, text: string): Promise<boolean> {
+    if (!Capacitor.isNativePlatform()) return false;
+    try {
+        const dataUrl = await blobToDataUrl(blob);
+        const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+        const written = await Filesystem.writeFile({
+            path: filename,
+            data: base64,
+            directory: Directory.Cache,
+        });
+        await Share.share({ title: "랭큐 경기 결과", text, files: [written.uri] });
+        return true;
+    } catch (e: any) {
+        // 사용자가 공유 시트를 닫은 것도 여기로 온다 — 실패로 보고 폴백하면 안 된다.
+        const msg = String(e?.message ?? e);
+        if (/cancel|abort|dismiss/i.test(msg)) return true;
+        console.warn("[ShareResultCard] native share failed", e);
+        return false;
+    }
+}
+
 export function ShareResultButton({
     data,
     className,
@@ -534,8 +572,17 @@ export function ShareResultButton({
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
+    // 크루가 2개 이상이면 어디에 올릴지 골라야 한다. 1개면 바로 올리고, 0개면 버튼을 숨긴다.
+    const [pickCrew, setPickCrew] = useState(false);
 
     const filename = `rankue-${fileSlugOf(data.playedAt)}.png`;
+
+    const { data: myCrews = [] } = useQuery<any[]>({
+        queryKey: ["/api/hiq/crews/mine"],
+        queryFn: async () => await apiRequest("/api/hiq/crews/mine?sport=BILLIARDS"),
+        enabled: open,
+        staleTime: 60_000,
+    });
 
     const failToast = () =>
         toast({
@@ -553,6 +600,9 @@ export function ShareResultButton({
                 failToast();
                 return;
             }
+
+            // 네이티브 앱이면 여기서 끝난다(웹 경로는 WebView에서 통하지 않는다).
+            if (await shareNative(blob, filename, buildShareText(data))) return;
 
             const nav = navigator as any;
             try {
@@ -600,6 +650,8 @@ export function ShareResultButton({
                 failToast();
                 return;
             }
+            // 앱에서는 <a download> 가 통하지 않는다 → 네이티브 공유 시트("이미지 저장"도 여기서 고를 수 있다)
+            if (await shareNative(blob, filename, buildShareText(data))) return;
             downloadBlob(blob, filename);
             toast({ title: "이미지를 저장했어요" });
         } catch (e) {
@@ -607,6 +659,47 @@ export function ShareResultButton({
             failToast();
         } finally {
             setBusy(false);
+        }
+    };
+
+    // 크루 사진첩에 올린다. 이미지를 Blob 스토리지에 먼저 올리고 그 URL을 사진으로 등록.
+    const shareToCrew = async (crewId: string, crewName: string) => {
+        if (busy) return;
+        setBusy(true);
+        try {
+            const blob = await renderShareBlob(data);
+            if (!blob) { failToast(); return; }
+
+            const dataUrl = await blobToDataUrl(blob);
+            const up = await apiRequest("/api/hiq/upload", {
+                method: "POST",
+                body: { dataUrl, category: "crew-photo" },
+            });
+            const url = up?.url ?? up?.data?.url;
+            if (!url) throw new Error("업로드 URL 없음");
+
+            await apiRequest(`/api/hiq/crews/${crewId}/photos`, {
+                method: "POST",
+                body: { url, caption: buildShareText(data).split("\n")[0] },
+            });
+
+            toast({ title: `${crewName} 사진첩에 올렸어요` });
+            setPickCrew(false);
+            setOpen(false);
+        } catch (e) {
+            console.warn("[ShareResultCard] crew share failed", e);
+            toast({ title: "크루에 올리지 못했어요", description: "잠시 후 다시 시도해주세요.", variant: "destructive" });
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleCrewClick = () => {
+        if (myCrews.length === 1) {
+            const c = myCrews[0]?.crew ?? myCrews[0];
+            shareToCrew(c.id, c.name);
+        } else {
+            setPickCrew(true);
         }
     };
 
@@ -638,17 +731,65 @@ export function ShareResultButton({
                             className="rk-btn-primary h-12 w-full gap-2 rounded-2xl"
                         >
                             <LucideShare2 className="h-4 w-4" />
-                            {busy ? "만드는 중…" : "이미지 공유"}
+                            {busy ? "만드는 중…" : "밖으로 공유 (카톡 등)"}
                         </Button>
-                        <Button
-                            variant="ghost"
+
+                        {myCrews.length > 0 && (
+                            <Button
+                                variant="ghost"
+                                onClick={handleCrewClick}
+                                disabled={busy}
+                                className="rk-btn-secondary h-12 w-full gap-2 rounded-2xl"
+                            >
+                                <LucideUsers className="h-4 w-4" />
+                                크루에 올리기
+                            </Button>
+                        )}
+
+                        <button
                             onClick={handleDownload}
                             disabled={busy}
-                            className="rk-btn-secondary h-12 w-full gap-2 rounded-2xl"
+                            className="h-10 w-full text-[13px] font-semibold text-black/45 hover:text-black/70 transition-colors disabled:opacity-40"
                         >
-                            <LucideDownload className="h-4 w-4" />
-                            이미지 저장
-                        </Button>
+                            이미지만 저장
+                        </button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* 크루가 2개 이상일 때만 — 어디에 올릴지 고른다 */}
+            <Dialog open={pickCrew} onOpenChange={(o) => { if (!busy) setPickCrew(o); }}>
+                <DialogContent className="max-w-sm rounded-card bg-white text-[rgba(0,0,0,0.87)]">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold">어느 크루에 올릴까요?</DialogTitle>
+                        <DialogDescription className="text-black/55">
+                            선택한 크루의 사진첩에 결과 카드가 올라갑니다.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex flex-col gap-2">
+                        {myCrews.map((row: any) => {
+                            const c = row?.crew ?? row;
+                            return (
+                                <button
+                                    key={c.id}
+                                    onClick={() => shareToCrew(c.id, c.name)}
+                                    disabled={busy}
+                                    className="flex items-center justify-between gap-3 rounded-2xl bg-white p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:scale-[0.99] transition-transform disabled:opacity-50"
+                                >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-[15px] font-bold text-brand">
+                                            {(c.name ?? "?").trim().charAt(0)}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="truncate text-[15px] font-bold text-ink-1">{c.name}</p>
+                                            {c.region && <p className="truncate text-[12px] font-medium text-black/45">{c.region}</p>}
+                                        </div>
+                                    </div>
+                                    <LucideChevronRight className="h-4 w-4 shrink-0 text-black/30" />
+                                </button>
+                            );
+                        })}
                     </div>
                 </DialogContent>
             </Dialog>
