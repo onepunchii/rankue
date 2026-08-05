@@ -19,11 +19,6 @@ import {
     CommandList,
 } from "@/components/ui/command";
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
-import {
     LucideChevronLeft,
     LucideCheck,
     LucideSearch,
@@ -60,7 +55,8 @@ export default function CreateClub() {
     const handleImageSelect = async (field: 'emblem' | 'coverImage', file: File, category: string) => {
         try {
             setUploadingField(field);
-            const url = await uploadImage(file, category);
+            // 수정 화면(ClubGeneralTab)과 동일 크기로 통일 — 로고 400px, 커버 1200px
+            const url = await uploadImage(file, category, { maxSize: field === 'coverImage' ? 1200 : 400 });
             setFormData(prev => ({ ...prev, [field]: url }));
         } catch (err: any) {
             toast({ title: t("createClub.imageUploadFailed"), description: err?.message || t("createClub.tryAgain"), variant: "destructive" });
@@ -202,8 +198,10 @@ export default function CreateClub() {
 
     return (
         <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans pb-36">
-            {/* Header */}
-            <div className="sticky top-0 z-10 bg-[#f2f0eb] border-b border-surface-line px-5 py-4 flex items-center justify-between">
+            {/* Header — 전역 .sticky.top-0 세이프에어리어 규칙(index.css)이 py-4의 상단
+                패딩을 env()로 덮어써 헤더가 위에 딱 붙었다. rk-no-safe로 제외하고
+                env+16px을 직접 준다 (웹=16px, 앱=상태바+16px). */}
+            <div className="rk-no-safe sticky top-0 z-10 bg-[#f2f0eb] border-b border-surface-line px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] mt-[calc(-1*env(safe-area-inset-top))] flex items-center justify-between">
                 <Button variant="ghost" className="p-0 h-auto text-black/60 hover:text-[rgba(0,0,0,0.87)]" onClick={() => step > 1 ? setStep(step - 1) : setLocation("/club")}>
                     <LucideChevronLeft className="w-6 h-6" />
                 </Button>
@@ -362,61 +360,66 @@ export default function CreateClub() {
                                             className="h-12 bg-surface-2 border-black/10 rounded-tile text-[15px]"
                                         />
                                     ) : (
-                                    <Popover open={isRegionOpen} onOpenChange={setIsRegionOpen}>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                role="combobox"
-                                                aria-expanded={isRegionOpen}
-                                                className={cn(
-                                                    "w-full justify-between bg-surface-2 border-black/10 h-12 rounded-tile text-[15px] font-medium hover:bg-surface-2 hover:text-[rgba(0,0,0,0.87)]",
-                                                    formData.region ? "text-[rgba(0,0,0,0.87)]" : "text-black/40"
-                                                )}
-                                            >
-                                                {formData.region
-                                                    ? formData.region
-                                                    : t("createClub.regionPlaceholder")}
-                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent align="start" sideOffset={6} className="w-[var(--radix-popover-trigger-width)] p-0 bg-white text-[rgba(0,0,0,0.87)] rounded-tile shadow-[0_8px_24px_rgba(0,0,0,0.12)] overflow-hidden z-[60]">
-                                            <Command shouldFilter={false} className="bg-transparent text-[rgba(0,0,0,0.87)] rounded-tile [&_[cmdk-input-wrapper]]:border-black/10">
-                                                <CommandInput
-                                                    placeholder={t("createClub.regionSearchPlaceholder")}
-                                                    className="h-11 border-none focus:ring-0 text-[15px] text-[rgba(0,0,0,0.87)] placeholder:text-black/40"
-                                                    value={regionSearchQuery}
-                                                    onValueChange={setRegionSearchQuery}
-                                                />
-                                                <CommandList className="max-h-[240px] overflow-y-auto overscroll-contain">
-                                                    <CommandEmpty className="py-8 text-center text-[13px] text-black/40">
-                                                        {regionSearchQuery ? t("createClub.noResults") : t("createClub.regionSearchPrompt")}
-                                                    </CommandEmpty>
-                                                    <CommandGroup>
-                                                        {regionResults?.map((region: any) => (
-                                                            <CommandItem
-                                                                key={region.code}
-                                                                value={region.fullName}
-                                                                onSelect={(currentValue) => {
-                                                                    setFormData({ ...formData, region: region.fullName });
-                                                                    setRegionSearchQuery(region.fullName); // Update input to show selection if needed, but display handles it
-                                                                    setIsRegionOpen(false);
-                                                                }}
-                                                                className="text-[15px] text-black/70 rounded-xl aria-selected:bg-brand/15 aria-selected:text-[rgba(0,0,0,0.87)] data-[selected=true]:bg-brand/15 cursor-pointer py-2.5"
-                                                            >
-                                                                <LucideCheck
-                                                                    className={cn(
-                                                                        "mr-2 h-4 w-4",
-                                                                        formData.region === region.fullName ? "opacity-100" : "opacity-0"
-                                                                    )}
-                                                                />
-                                                                {region.fullName}
-                                                            </CommandItem>
-                                                        ))}
-                                                    </CommandGroup>
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                    </Popover>
+                                    // 인라인 검색 패널 — Popover(포털+fixed 좌표)는 모바일에서
+                                    // 키보드가 뷰포트를 줄이는 순간 앵커 계산이 깨져 (0,0)으로 튄다.
+                                    // 문서 흐름 안에 그리면 구조적으로 어긋날 수 없다.
+                                    <div>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={isRegionOpen}
+                                            onClick={() => setIsRegionOpen(v => !v)}
+                                            className={cn(
+                                                "w-full justify-between bg-surface-2 border-black/10 h-12 rounded-tile text-[15px] font-medium hover:bg-surface-2 hover:text-[rgba(0,0,0,0.87)]",
+                                                formData.region ? "text-[rgba(0,0,0,0.87)]" : "text-black/40"
+                                            )}
+                                        >
+                                            {formData.region
+                                                ? formData.region
+                                                : t("createClub.regionPlaceholder")}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                        {isRegionOpen && (
+                                            <div className="mt-2 bg-white text-[rgba(0,0,0,0.87)] rounded-tile shadow-[0_8px_24px_rgba(0,0,0,0.12)] overflow-hidden border border-black/[0.06]">
+                                                <Command shouldFilter={false} className="bg-transparent text-[rgba(0,0,0,0.87)] rounded-tile [&_[cmdk-input-wrapper]]:border-black/10">
+                                                    <CommandInput
+                                                        autoFocus
+                                                        placeholder={t("createClub.regionSearchPlaceholder")}
+                                                        className="h-11 border-none focus:ring-0 text-[15px] text-[rgba(0,0,0,0.87)] placeholder:text-black/40"
+                                                        value={regionSearchQuery}
+                                                        onValueChange={setRegionSearchQuery}
+                                                    />
+                                                    <CommandList className="max-h-[240px] overflow-y-auto overscroll-contain">
+                                                        <CommandEmpty className="py-8 text-center text-[13px] text-black/40">
+                                                            {regionSearchQuery ? t("createClub.noResults") : t("createClub.regionSearchPrompt")}
+                                                        </CommandEmpty>
+                                                        <CommandGroup>
+                                                            {regionResults?.map((region: any) => (
+                                                                <CommandItem
+                                                                    key={region.code}
+                                                                    value={region.fullName}
+                                                                    onSelect={() => {
+                                                                        setFormData({ ...formData, region: region.fullName });
+                                                                        setRegionSearchQuery(region.fullName);
+                                                                        setIsRegionOpen(false);
+                                                                    }}
+                                                                    className="text-[15px] text-black/70 rounded-xl aria-selected:bg-brand/15 aria-selected:text-[rgba(0,0,0,0.87)] data-[selected=true]:bg-brand/15 cursor-pointer py-2.5"
+                                                                >
+                                                                    <LucideCheck
+                                                                        className={cn(
+                                                                            "mr-2 h-4 w-4",
+                                                                            formData.region === region.fullName ? "opacity-100" : "opacity-0"
+                                                                        )}
+                                                                    />
+                                                                    {region.fullName}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </div>
+                                        )}
+                                    </div>
                                     )}
                                     {/* 좌표 취득 — 거리순 크루 발견용(선택). 안 누르면 서버가 도시 지오코딩 폴백 */}
                                     <button
@@ -646,9 +649,11 @@ export default function CreateClub() {
                         "w-full h-14 text-lg font-bold rounded-tile bg-brand text-brand-fg hover:bg-brand/90 transition-all"
                     )}
                     onClick={handleNext}
-                    disabled={createCrewMutation.isPending}
+                    disabled={createCrewMutation.isPending || uploadingField !== null}
                 >
-                    {createCrewMutation.isPending ? t("createClub.creating") : (step === 3 ? t("createClub.submitDone") : t("createClub.next"))}
+                    {uploadingField !== null
+                        ? t("createClub.uploading")
+                        : createCrewMutation.isPending ? t("createClub.creating") : (step === 3 ? t("createClub.submitDone") : t("createClub.next"))}
                 </Button>
             </div>
         </div>

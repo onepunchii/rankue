@@ -243,6 +243,38 @@ export class CrewRepository {
             .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
     }
 
+    // 승인제 → 자동 전환 시 기존 대기자 일괄 승격 — 신청(joinedAt) 순서대로 정원
+    // 잔여만큼만 pending → member. 초과분은 pending 유지. 승격된 memberId 목록을 반환.
+    async promotePendingMembers(crewId: string): Promise<string[]> {
+        return await db.transaction(async (tx) => {
+            const [crew] = await tx.select().from(hiqCrews)
+                .where(eq(hiqCrews.id, crewId))
+                .for('update');
+            if (!crew) return [];
+
+            const pending = await tx.select().from(hiqCrewMembers)
+                .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.role, 'pending')))
+                .orderBy(asc(hiqCrewMembers.joinedAt));
+            if (!pending.length) return [];
+
+            const limit = crew.maxMembers ?? 0;
+            let room = pending.length;
+            if (limit > 0) {
+                const [row] = await tx.select({ count: sql<number>`count(*)` })
+                    .from(hiqCrewMembers)
+                    .where(and(eq(hiqCrewMembers.crewId, crewId), ne(hiqCrewMembers.role, 'pending')));
+                room = Math.max(0, limit - Number(row?.count || 0));
+            }
+
+            const toPromote = pending.slice(0, room);
+            if (!toPromote.length) return [];
+            await tx.update(hiqCrewMembers)
+                .set({ role: 'member' })
+                .where(inArray(hiqCrewMembers.id, toPromote.map(p => p.id)));
+            return toPromote.map(p => p.memberId);
+        });
+    }
+
     // 가입 승인 — joinCrew와 동일하게 크루 행을 FOR UPDATE로 잠그고 정원을 센다.
     // 라우트에서 조회-후-갱신하면 동시 승인 두 건이 같은 잔여 정원을 보고 초과 승인된다.
     async approveCrewMember(crewId: string, memberId: string) {

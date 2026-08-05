@@ -650,6 +650,11 @@ router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =>
     if (!validation.success) {
         return sendError(res, 400, validation.error.errors[0].message);
     }
+    // 크루명 — zod 스키마에 min/max가 없어 빈 문자열·초장문이 통과한다 (클라 trim 검사는 우회 가능)
+    validation.data.name = String(validation.data.name || "").trim();
+    if (!validation.data.name || validation.data.name.length > 30) {
+        return sendError(res, 400, "크루 이름은 1~30자여야 합니다");
+    }
 
     // Ownership is set from the authenticated session — never trust a client-supplied leaderId.
     // countryCode도 서버가 결정: 생성자 프로필 국가(자동 수집분) → 없으면 IP 헤더 → 그래도 없으면 null.
@@ -774,8 +779,55 @@ router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any
         if (req.body[key] !== undefined) updateData[key] = req.body[key];
     }
 
+    // 값 검증 — 화이트리스트만으로는 부족하다. 드리즐 text enum은 DB CHECK가 아니라서
+    // joinType에 깨진 값이 들어가면 joinCrew의 'approval' 비교가 실패해 승인제 크루가
+    // 사실상 자동가입으로 변질된다.
+    if (updateData.joinType !== undefined && !['auto', 'approval'].includes(updateData.joinType)) {
+        return sendError(res, 400, "잘못된 가입 방식입니다");
+    }
+    if (updateData.gameType !== undefined && updateData.gameType !== null
+        && !['3c', '4c', 'pocket', 'any', 'field', 'screen', 'range'].includes(updateData.gameType)) {
+        return sendError(res, 400, "잘못된 활동 종목입니다");
+    }
+    if (updateData.name !== undefined) {
+        updateData.name = String(updateData.name).trim();
+        if (!updateData.name || updateData.name.length > 30) return sendError(res, 400, "크루 이름은 1~30자여야 합니다");
+    }
+    if (updateData.maxMembers !== undefined && updateData.maxMembers !== null) {
+        const n = Number(updateData.maxMembers);
+        if (!Number.isInteger(n) || n < 0 || n > 1000) return sendError(res, 400, "정원이 올바르지 않습니다");
+        updateData.maxMembers = n;
+        // 현재 인원보다 작게 줄이면 신규 가입만 막히고 아무 안내가 없다 — 명시적으로 거부
+        const activeCount = (data?.members || []).filter((m: any) => m.role !== 'pending').length;
+        if (n > 0 && n < activeCount) return sendError(res, 400, `현재 크루원(${activeCount}명)보다 정원을 작게 설정할 수 없습니다`);
+    }
+    if (updateData.tags !== undefined && (!Array.isArray(updateData.tags) || updateData.tags.length > 3 || updateData.tags.some((t: any) => typeof t !== "string" || t.length > 20))) {
+        return sendError(res, 400, "태그가 올바르지 않습니다");
+    }
+    if (Object.keys(updateData).length === 0) {
+        return sendError(res, 400, "수정할 내용이 없습니다"); // 빈 UPDATE는 드리즐이 500을 던진다
+    }
+
     const oldCrew = data?.crew;
     const crew = await storage.updateCrew(crewId, updateData);
+
+    // 승인제 → 자동 전환: 기존 대기자를 신청 순서대로 정원 내에서 자동 승격.
+    // 방치하면 먼저 신청한 사람이 무기한 pending으로 남고 새 신청자만 즉시 가입되는 역전이 생긴다.
+    let promotedIds: string[] = [];
+    if (oldCrew?.joinType === 'approval' && updateData.joinType === 'auto') {
+        try {
+            promotedIds = await storage.crews.promotePendingMembers(crewId);
+            await settleNotifications("[JoinTypePromote]", promotedIds.map(memberId =>
+                notificationService.sendAndSaveNotification({
+                    memberId,
+                    title: `🎉 [${crew?.name || oldCrew?.name}] 가입 승인`,
+                    body: "크루가 바로 가입 방식으로 바뀌면서 가입이 승인되었어요!",
+                    category: oldCrew?.sportCategory || "BILLIARDS",
+                    type: "CREW",
+                    params: { url: `/crew/${crewId}/home`, crewId },
+                })));
+        } catch (e) { console.error("[JoinTypePromote]", e); }
+    }
 
     // A replaced cover/emblem leaves the old Blob orphaned — delete it. emblem may be an
     // emoji (ignored by deleteBlobs). Only when the field was actually changed to a new value.
@@ -785,7 +837,7 @@ router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any
     if ('emblem' in updateData && updateData.emblem !== oldCrew?.emblem) {
         await deleteBlobs(oldCrew?.emblem);
     }
-    return sendSuccess(res, crew);
+    return sendSuccess(res, { ...crew, promotedCount: promotedIds.length });
 }));
 
 

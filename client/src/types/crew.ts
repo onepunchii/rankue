@@ -24,6 +24,7 @@ export interface CrewData {
     coverImage: string | null;
     sportCategory: 'GOLF' | 'BILLIARDS' | 'MIXED';
     maxMembers: number | null;
+    joinType?: 'auto' | 'approval' | null;
     meetingDay: string | null;
     meetingTime: string | null;
     memberCount?: number;

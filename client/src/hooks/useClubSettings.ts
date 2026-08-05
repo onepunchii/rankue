@@ -24,9 +24,16 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
                 body: data
             });
         },
-        onSuccess: () => {
+        onSuccess: (res: any) => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
-            toast({ title: "크루 정보가 수정되었습니다" });
+            // 승인제→자동 전환으로 대기자가 자동 승격됐으면 멤버 목록도 갱신
+            const promoted = res?.promotedCount ?? res?.data?.promotedCount ?? 0;
+            if (promoted > 0) {
+                queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
+                toast({ title: "크루 정보가 수정되었습니다", description: `대기 중이던 ${promoted}명이 자동 승인되었습니다` });
+            } else {
+                toast({ title: "크루 정보가 수정되었습니다" });
+            }
         },
         onError: (err: Error) => {
             toast({ title: "수정 실패", description: err.message, variant: "destructive" });

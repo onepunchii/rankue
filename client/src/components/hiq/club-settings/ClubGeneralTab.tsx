@@ -42,8 +42,27 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
         coverImage: crew?.coverImage,
         meetingDay: crew?.meetingDay || '',
         meetingTime: crew?.meetingTime || '',
+        joinType: crew?.joinType || 'auto', // 가입 방식 — 생성 후에도 변경 가능 (서버 PATCH 화이트리스트에 포함)
     });
     const [isUploading, setIsUploading] = useState(false);
+
+    // 크루 전환·외부 갱신 시 폼 재시드 — useState 1회 초기화만으로는 stale 데이터가 남는다
+    // (ClubIntroTemplateTab과 동일 패턴)
+    const [seededCrewId, setSeededCrewId] = useState(crew?.id);
+    if (seededCrewId !== crew?.id) {
+        setSeededCrewId(crew?.id);
+        setFormData({
+            name: crew?.name || '',
+            shortIntro: crew?.shortIntro || '',
+            description: crew?.description || '',
+            maxMembers: crew?.maxMembers || 50,
+            emblem: crew?.emblem,
+            coverImage: crew?.coverImage,
+            meetingDay: crew?.meetingDay || '',
+            meetingTime: crew?.meetingTime || '',
+            joinType: crew?.joinType || 'auto',
+        });
+    }
 
     const isDirty = Object.keys(formData).some(key => (formData as any)[key] !== (crew as any)[key]);
 
@@ -190,6 +209,36 @@ export function ClubGeneralTab({ crew, isLeader, onUpdate, onDelete, isUpdating,
                                 {num}
                             </button>
                         ))}
+                    </div>
+                </div>
+
+                {/* 가입 방식 — 생성 위저드(활동 성향)와 같은 2택. 승인제→자동 전환 시
+                    서버가 대기자를 신청 순서대로 정원 내에서 자동 승격한다 (PATCH 응답 promotedCount). */}
+                <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-black/55 ml-1">{t("createClub.joinTypeLabel")}</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            disabled={!isLeader}
+                            onClick={() => setFormData(prev => ({ ...prev, joinType: 'auto' }))}
+                            className={cn(
+                                "p-3 rounded-tile border text-left space-y-1 transition-colors",
+                                formData.joinType === 'auto' ? "border-brand bg-brand/5" : "border-black/[0.08] bg-surface-3"
+                            )}
+                        >
+                            <div className={cn("font-bold text-sm", formData.joinType === 'auto' ? "text-brand" : "text-[rgba(0,0,0,0.87)]")}>{t("createClub.joinAutoTitle")}</div>
+                            <div className="text-[12px] text-black/55">{t("createClub.joinAutoDesc")}</div>
+                        </button>
+                        <button
+                            disabled={!isLeader}
+                            onClick={() => setFormData(prev => ({ ...prev, joinType: 'approval' }))}
+                            className={cn(
+                                "p-3 rounded-tile border text-left space-y-1 transition-colors",
+                                formData.joinType === 'approval' ? "border-brand bg-brand/5" : "border-black/[0.08] bg-surface-3"
+                            )}
+                        >
+                            <div className={cn("font-bold text-sm", formData.joinType === 'approval' ? "text-brand" : "text-[rgba(0,0,0,0.87)]")}>{t("createClub.joinApprovalTitle")}</div>
+                            <div className="text-[12px] text-black/55">{t("createClub.joinApprovalDesc")}</div>
+                        </button>
                     </div>
                 </div>
 
