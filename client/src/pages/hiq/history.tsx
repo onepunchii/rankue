@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useGameStats } from "@/hooks/useGameStats";
 import { SPORT_CONFIG, FilterType } from "@/components/hiq/history/types";
 import { StatsOverviewCard } from "@/components/hiq/history/StatsOverviewCard";
+import { GrowthChart } from "@/components/hiq/history/GrowthChart";
 import { HistoryList } from "@/components/hiq/history/HistoryList";
 import { GameDetailDialog } from "@/components/hiq/history/GameDetailDialog";
 import { HiqMember } from "@shared/schema";
@@ -110,6 +111,15 @@ export default function HiqHistory() {
                 filter={filter}
                 currentSport={currentSport}
             />
+
+            {/* 성장 그래프 — 골프는 스코어가 낮을수록 좋아 '평균 추이' 해석이 반대라 제외한다 */}
+            {currentSport !== "GOLF" && (
+                <GrowthChart
+                    history={stats.officialHistory}
+                    filter={filter}
+                    mainMode={stats.mainMode}
+                />
+            )}
 
             {/* History List */}
             <HistoryList

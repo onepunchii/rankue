@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
+import { ShareResultButton, type SharePlayer } from "@/components/hiq/game/ShareResultCard";
 import { useT } from "@/lib/i18n";
 
 export default function HiqGameResult() {
@@ -99,6 +100,49 @@ export default function HiqGameResult() {
     if (game.player2Id || game.player2Name) totalPlayers = 2;
     if (game.player3Id || game.player3Name) totalPlayers = 3;
     if (game.player4Id || game.player4Name) totalPlayers = 4;
+
+    // 공유 카드용 데이터 — 화면 카드와 같은 계산식(에버 = 점수 / 총이닝)을 쓴다.
+    const avgOf = (score: number) => (Number(score || 0) / (game.totalInnings || 1)).toFixed(2);
+    const sharePlayers: SharePlayer[] = [
+        {
+            name: p1?.name || game.player1Name || `${t("gameResult.player")} 1`,
+            score: game.player1Score,
+            target: game.player1Target,
+            avg: avgOf(game.player1Score),
+            highRun: result.p1HighRun ?? 0,
+            win: p1Win,
+        },
+    ];
+    if (!isPractice) {
+        sharePlayers.push({
+            name: p2?.name || game.player2Name || `${t("gameResult.player")} 2`,
+            score: game.player2Score,
+            target: game.player2Target,
+            avg: avgOf(game.player2Score),
+            highRun: result.p2HighRun ?? 0,
+            win: p2Win,
+        });
+        if (totalPlayers >= 3) {
+            sharePlayers.push({
+                name: p3?.name || game.player3Name || `${t("gameResult.player")} 3`,
+                score: game.player3Score,
+                target: game.player3Target,
+                avg: avgOf(game.player3Score),
+                highRun: result.p3HighRun ?? 0,
+                win: p3Win,
+            });
+        }
+        if (totalPlayers >= 4) {
+            sharePlayers.push({
+                name: p4?.name || game.player4Name || `${t("gameResult.player")} 4`,
+                score: game.player4Score,
+                target: game.player4Target,
+                avg: avgOf(game.player4Score),
+                highRun: result.p4HighRun ?? 0,
+                win: p4Win,
+            });
+        }
+    }
 
     const handleClaim = async (slotIdx: number) => {
         if (!gameId) return;
@@ -270,10 +314,22 @@ export default function HiqGameResult() {
                 )}
             </div>
 
-            <div className="w-full max-w-md">
+            <div className="w-full max-w-md flex flex-col gap-3">
+                {/* 결과 이미지 공유가 가장 값싼 유입 경로라 여기서는 이게 주 동선이다. */}
+                <ShareResultButton
+                    data={{
+                        players: sharePlayers,
+                        innings: game.totalInnings,
+                        gameType: game.gameType,
+                        isPractice,
+                        playedAt: game.playedAt,
+                    }}
+                    className="w-full h-16 rounded-2xl text-lg"
+                />
                 <Button
+                    variant="ghost"
                     onClick={() => setLocation("/dashboard")}
-                    className="rk-btn-primary w-full h-16 rounded-2xl text-lg gap-2"
+                    className="rk-btn-secondary w-full h-16 rounded-2xl text-lg gap-2"
                 >
                     <LucideArrowRight className="w-5 h-5" />
                     {t("gameResult.goHome")}
