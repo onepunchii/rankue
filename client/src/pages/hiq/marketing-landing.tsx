@@ -3,6 +3,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Capacitor } from "@capacitor/core";
 import { useSeo } from "@/hooks/useSeo";
 import { BilliardBall } from "@/components/hiq/ui/BilliardBall";
+import { LANDING_FAQS, LANDING_META } from "@shared/landingContent";
 
 // 설치 배너(HiqInstallBanner)와 같은 링크. utm 만 랜딩용으로 구분해 유입 경로를 나눈다.
 const STORE_IOS = "https://apps.apple.com/app/id6760333313?ct=web_landing";
@@ -103,42 +104,17 @@ const FEATURES: { name: string; desc: string; icon: ReactNode }[] = [
     },
 ];
 
-// 랜딩에 실제로 보이는 문답. client/index.html 의 FAQPage JSON-LD 와 **같은 내용**이어야 한다
-// (구조화데이터에만 있고 화면에 없는 문답은 구글 기준 위반이다).
-const FAQS: { q: string; a: string }[] = [
-    {
-        q: "당구 점수판 앱, 랭큐는 뭐가 좋아요?",
-        a: "랭큐는 점수만 세는 계수기가 아니라 손안의 당구 점수판입니다. 터치로 점수를 올리면 이닝·평균(에버리지)·하이런이 자동으로 계산되고 음성으로 안내되며, 경기가 끝나면 전적으로 자동 저장돼 매장·전국 랭킹까지 이어집니다. 3쿠션과 4구를 모두 지원하고 무료입니다.",
-    },
-    {
-        q: "3쿠션 에버리지(평균)는 어떻게 계산하나요?",
-        a: "에버리지는 득점을 이닝 수로 나눈 값입니다. 30점을 20이닝에 쳤다면 1.500이 되죠. 랭큐는 경기 중 이닝을 자동으로 세기 때문에 따로 계산할 필요 없이 에버리지와 하이런이 실시간으로 표시됩니다.",
-    },
-    {
-        q: "당구 동호회는 어디서 찾나요?",
-        a: "랭큐의 크루에서 찾을 수 있습니다. 당구 커뮤니티를 둘러보고 가입을 신청하거나, 직접 크루를 만들어 멤버를 모을 수 있어요. 크루 안에서는 활동 사진과 채팅, 크루 랭킹이 함께 제공됩니다.",
-    },
-    {
-        q: "설치하지 않고 먼저 써볼 수 있나요?",
-        a: "네. 웹 브라우저에서 바로 시작할 수 있습니다. 휴대폰 번호로 로그인하면 그때까지의 기록이 그대로 이어지고, 푸시 알림과 음성 안내까지 편하게 쓰려면 iOS·Android 앱을 설치하세요.",
-    },
-    {
-        q: "랭큐는 무료인가요?",
-        a: "네, 랭큐는 무료로 이용할 수 있으며 iOS와 Android에서 모두 사용할 수 있습니다.",
-    },
-    {
-        q: "어떤 언어를 지원하나요?",
-        a: "한국어, 영어, 베트남어, 터키어, 스페인어를 지원합니다.",
-    },
-];
+// 문답·메타 문안은 shared/landingContent.ts 가 정본이다 — 서버 프리렌더(server/prerender.ts)가
+// 같은 객체를 렌더하므로, 여기에 다시 적으면 봇이 본 내용과 사용자가 본 내용이 갈려 클로킹이 된다.
+// (구조화데이터에만 있고 화면에 없는 문답도 구글 기준 위반이라 화면에 그대로 노출한다.)
+const FAQS = LANDING_FAQS;
 
 const HERO_CHIPS = ["3쿠션 · 4구 지원", "전적 자동 저장", "매장 · 전국 랭킹", "무료"];
 
 export default function MarketingLanding({ onStart }: { onStart: () => void }) {
     useSeo({
-        title: "랭큐 RANKUE · 손안의 당구 점수판",
-        description:
-            "스마트폰으로 당구 점수를 기록하세요. 터치 한 번에 이닝·평균(에버리지)·하이런 자동 계산, 상대와 매칭, 전적 자동 저장, 당구 동호회 크루와 매장·전국 랭킹까지. 3쿠션·4구 지원, 무료.",
+        title: LANDING_META.title,
+        description: LANDING_META.desc,
         path: "/",
         locale: "ko",
         image: "https://www.rankue.co.kr/og.png",

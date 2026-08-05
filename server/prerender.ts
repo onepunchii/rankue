@@ -3,6 +3,7 @@ import { storage } from "./storage/index.js";
 import { ABOUT_CONTENT, ABOUT_LANGS, type AboutContent } from "../shared/aboutContent.js";
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
+import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW } from "../shared/landingContent.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
 //
@@ -259,6 +260,54 @@ export function registerPrerender(app: Express) {
   // → 홈은 정적 셸에 맡긴다. vercel.json 의 봇 라우트에서도 "/" 를 제외해야 한다.
 
   // ── /about ─────────────────────────────────────────────────────────
+  // 홈(/) — 검색 방문자에게 보이는 랜딩과 **같은 문안**을 봇에게 텍스트로 준다.
+  // 구글은 JS를 렌더링해 랜딩 본문을 읽지만 네이버(Yeti)는 그러지 않아, 프리렌더가 없으면
+  // 정적 셸의 메타 태그만 보고 본문(기능·크루·FAQ)을 통째로 못 본다.
+  // 문안은 shared/landingContent.ts 정본을 그대로 써서 클로킹이 되지 않게 한다.
+  app.get("/", (req, res, next) => {
+    if (!isBot(req)) return next();
+    res.setHeader("X-Prerender", "home");
+    noStore(res);
+    res.send(
+      page({
+        title: LANDING_META.title,
+        desc: LANDING_META.desc,
+        canonical: `${ORIGIN}/`,
+        jsonLd: [
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: LANDING_FAQS.map((f) => ({
+              "@type": "Question",
+              name: f.q,
+              acceptedAnswer: { "@type": "Answer", text: f.a },
+            })),
+          },
+          APP_LD,
+        ],
+        body: `<main>
+  <h1>${esc(LANDING_META.h1)}</h1>
+  <p>${esc(LANDING_META.lead)}</p>
+
+  <h2>이런 걸 할 수 있어요</h2>
+  <p>점수판부터 매칭, 기록, 당구 커뮤니티까지 — 당구장에서 필요한 게 한 앱에 모여 있습니다.</p>
+  ${LANDING_FEATURES.map((f) => `<section><h3>${esc(f.name)}</h3><p>${esc(f.desc)}</p></section>`).join("\n  ")}
+
+  <h2>${esc(LANDING_CREW.title)}</h2>
+  <p>${esc(LANDING_CREW.desc)}</p>
+  <ul>
+  ${LANDING_CREW.items.map((i) => `<li>${esc(i.t)} — ${esc(i.d)}</li>`).join("\n  ")}
+  </ul>
+
+  <h2>자주 묻는 질문</h2>
+  ${LANDING_FAQS.map((f) => `<section><h3>${esc(f.q)}</h3><p>${esc(f.a)}</p></section>`).join("\n  ")}
+
+  <nav><a href="/about">랭큐 소개</a> <a href="/stores">매장 찾기</a> <a href="/support">고객지원</a></nav>
+</main>`,
+      }),
+    );
+  });
+
   app.get("/about", (req, res, next) => {
     if (!isBot(req)) return next();
     const q = typeof req.query.lang === "string" ? req.query.lang : "";
