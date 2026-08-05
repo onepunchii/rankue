@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { useT } from "@/lib/i18n";
@@ -16,16 +18,21 @@ interface UmbPlayerSheetProps {
     category: UmbCategory;
     playerUmbId: string | null; // null이면 닫힘
     onClose: () => void;
+    // 국내 라이벌 탭 → 그 선수의 시트로 전환 (부모의 openPlayerId setter)
+    onNavigate?: (playerUmbId: string) => void;
 }
 
-// 선수 상세 — 순위 히스토리(주간 스냅샷 ~50회차) + 대회별 포인트 분해.
-// 데이터 전체를 쓰는 화면의 핵심: 어느 대회에서 몇 점을 땄는지까지 보여준다.
-export const UmbPlayerSheet = ({ category, playerUmbId, onClose }: UmbPlayerSheetProps) => {
+// 선수 상세 — 순위 히스토리(주간 스냅샷 ~50회차) + 대회별 포인트 분해 + 성취 뱃지 +
+// 1년 전 대비 + 국내 라이벌. 데이터 전체를 쓰는 화면의 핵심.
+export const UmbPlayerSheet = ({ category, playerUmbId, onClose, onNavigate }: UmbPlayerSheetProps) => {
     const { t } = useT();
+    const [metric, setMetric] = useState<"rank" | "points">("rank");
 
+    // ?v=2 — 응답 형태가 바뀔 때 올린다. 초기 배포가 브라우저에도 하루짜리
+    // stale-while-revalidate를 심어놔서(이후 CDN 전용으로 분리) URL로 캐시를 우회해야 한다.
     const { data, isLoading } = useQuery<UmbPlayerDetail>({
-        queryKey: [`/api/hiq/umb/players/${category}/${playerUmbId}`],
-        queryFn: async () => apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}`),
+        queryKey: [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v2"],
+        queryFn: async () => apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}?v=2`),
         enabled: !!playerUmbId,
         staleTime: 10 * 60 * 1000,
     });
@@ -45,6 +52,36 @@ export const UmbPlayerSheet = ({ category, playerUmbId, onClose }: UmbPlayerShee
             .sort((a, b) => b[1] - a[1])
         : [];
 
+    // --- 히스토리 파생 지표 (전부 이미 받은 데이터로 계산) ---
+    const last = history[history.length - 1];
+    const prev = history[history.length - 2];
+    const weeklyMove = last && prev ? prev.rank - last.rank : null;
+    // 연속 상승 스트릭 — 직전 회차보다 순위가 오른 주가 몇 번 이어졌나
+    let streak = 0;
+    for (let i = history.length - 1; i >= 1; i--) {
+        if (history[i - 1].rank > history[i].rank) streak++;
+        else break;
+    }
+    // 역대 최고 순위를 처음 찍은 시점
+    const bestEntry = data ? history.find(h => h.rank === data.bestRank) : undefined;
+    const bestAt = bestEntry ? new Date(bestEntry.editionDate).toLocaleDateString("ko-KR", { year: "numeric", month: "short" }) : null;
+    // 1년 전과 비교 — 365일에 가장 가까운 과거 회차
+    const yearAgoTarget = last ? new Date(last.editionDate).getTime() - 365 * 24 * 3600 * 1000 : 0;
+    const yearAgo = history.length > 5
+        ? [...history].sort((a, b) =>
+            Math.abs(new Date(a.editionDate).getTime() - yearAgoTarget) - Math.abs(new Date(b.editionDate).getTime() - yearAgoTarget))[0]
+        : undefined;
+    const showYearAgo = yearAgo && last && yearAgo.edition !== last.edition
+        && Math.abs(new Date(yearAgo.editionDate).getTime() - yearAgoTarget) < 90 * 24 * 3600 * 1000;
+    const top10Weeks = history.filter(h => h.rank <= 10).length;
+
+    // 성취 뱃지 — 큰 것 하나만 고르지 않고 해당되는 걸 전부 (최대 3개면 충분히 정갈)
+    const badges: string[] = [];
+    if (player?.rank === 1) badges.push(`🏆 ${t("umb.badgeWorldNo1")}`);
+    else if (player && player.rank <= 10) badges.push(`⭐ TOP 10`);
+    if (player?.nationalRank === 1 && player.rank !== 1) badges.push(`${flagEmoji(player.fed)} ${t("umb.badgeNationalNo1")}`);
+    if (streak >= 3) badges.push(`🔥 ${t("umb.streakUp").replace("{n}", String(streak))}`);
+
     return (
         <Dialog open={!!playerUmbId} onOpenChange={(o) => { if (!o) onClose(); }}>
             <DialogContent hideClose className="bg-white text-ink-1 max-w-md w-[92%] max-h-[86vh] overflow-y-auto rounded-[28px] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
@@ -61,16 +98,30 @@ export const UmbPlayerSheet = ({ category, playerUmbId, onClose }: UmbPlayerShee
                 )}
 
                 {player && (
-                    <div className="flex flex-col gap-5">
-                        {/* 헤더 */}
+                    // min-w-0·overflow-hidden 필수 — DialogContent(grid) 안에서 recharts가
+                    // 고유 폭으로 컬럼을 밀어내 시트 전체가 가로 스크롤되는 것을 막는다
+                    <div className="flex flex-col gap-5 min-w-0 max-w-full overflow-hidden">
+                        {/* 헤더 + 주간 변동 + 성취 뱃지 */}
                         <div>
                             <DialogTitle className="text-[22px] font-bold text-ink-1 leading-tight flex items-center gap-2">
                                 <span className="text-[24px] leading-none">{flagEmoji(player.fed)}</span>
-                                {player.playerName}
+                                <span className="min-w-0 truncate">{player.playerName}</span>
+                                {weeklyMove !== null && weeklyMove !== 0 && (
+                                    <span className={cn("shrink-0 text-[13px] font-bold tabular-nums", weeklyMove > 0 ? "text-brand" : "text-red-500")}>
+                                        {weeklyMove > 0 ? `▲${weeklyMove}` : `▼${-weeklyMove}`}
+                                    </span>
+                                )}
                             </DialogTitle>
                             <DialogDescription className="text-[12.5px] font-medium text-black/50 mt-1">
                                 {t(`umb.cat${category === "players" ? "Players" : category === "ladies" ? "Ladies" : "Juniors"}`)} · {t("umb.subtitle")}
                             </DialogDescription>
+                            {badges.length > 0 && (
+                                <div className="flex gap-1.5 flex-wrap mt-2.5">
+                                    {badges.map(b => (
+                                        <span key={b} className="px-2 py-1 rounded-full bg-[#F5B721]/15 text-[11.5px] font-bold text-[#8a6a0a] leading-none">{b}</span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* 핵심 지표 4칸 */}
@@ -88,24 +139,76 @@ export const UmbPlayerSheet = ({ category, playerUmbId, onClose }: UmbPlayerShee
                             ))}
                         </div>
 
-                        {/* 순위 추이 — y축 반전(1위가 위) */}
+                        {/* 커리어 하이라이트 한 줄 — 최고 순위 시점 · 톱10 유지 · 1년 전 대비 */}
+                        {(bestAt || top10Weeks > 0 || showYearAgo) && (
+                            <p className="text-[12px] font-medium text-black/50 leading-relaxed -mt-2 px-0.5">
+                                {[
+                                    bestAt ? t("umb.bestAt").replace("{rank}", String(data!.bestRank)).replace("{date}", bestAt) : null,
+                                    top10Weeks > 0 ? t("umb.top10Weeks").replace("{n}", String(top10Weeks)) : null,
+                                    showYearAgo ? t("umb.yearAgo").replace("{from}", String(yearAgo!.rank)).replace("{to}", String(player.rank)) : null,
+                                ].filter(Boolean).join(" · ")}
+                            </p>
+                        )}
+
+                        {/* 추이 차트 — 순위(기본)/포인트 토글. 순위는 y축 반전(1위가 위) + 톱10 존 표시 */}
                         {chartData.length >= 2 && (
-                            <div>
-                                <h3 className="text-[13.5px] font-bold text-ink-1 mb-2">{t("umb.rankHistory")}</h3>
-                                <div className="h-44 -mx-2">
+                            <div className="min-w-0">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-[13.5px] font-bold text-ink-1">{t("umb.rankHistory")}</h3>
+                                    <div className="flex gap-1">
+                                        {(["rank", "points"] as const).map(m => (
+                                            <button
+                                                key={m}
+                                                onClick={() => setMetric(m)}
+                                                className={cn(
+                                                    "h-7 px-2.5 rounded-full text-[11.5px] font-semibold transition-colors",
+                                                    metric === m ? "bg-ink-1 text-white" : "bg-black/[0.04] text-black/50"
+                                                )}
+                                            >
+                                                {t(m === "rank" ? "umb.metricRank" : "umb.metricPoints")}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="h-44 w-full min-w-0">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 0, left: -14 }}>
                                             <XAxis dataKey="label" tick={{ fontSize: 10, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} interval="preserveStartEnd" minTickGap={40} />
                                             {/* domain을 [1, max]로 고정하면 1000위권 선수의 등락이 바닥 평평한 선이 된다 — 본인 범위로 */}
-                                            <YAxis reversed domain={["dataMin", "dataMax"]} tick={{ fontSize: 10, fill: AXIS }} tickLine={false} axisLine={false} width={40} allowDecimals={false} />
+                                            <YAxis reversed={metric === "rank"} domain={["dataMin", "dataMax"]} tick={{ fontSize: 10, fill: AXIS }} tickLine={false} axisLine={false} width={40} allowDecimals={false} />
+                                            {/* 톱10 존 — 순위 차트에서 톱10 경험이 있는 선수에게만 */}
+                                            {metric === "rank" && data!.bestRank <= 10 && (
+                                                <ReferenceArea y1={1} y2={10} fill={BRAND} fillOpacity={0.06} />
+                                            )}
                                             <Tooltip
-                                                formatter={(v: any) => [`${v}${t("umb.rankSuffix")}`, ""]}
+                                                formatter={(v: any) => [metric === "rank" ? `${v}${t("umb.rankSuffix")}` : `${v}${t("umb.pointsUnit")}`, ""]}
                                                 labelFormatter={(l: any, payload: any) => payload?.[0]?.payload?.edition ? `Edition ${payload[0].payload.edition}` : l}
                                                 contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.08)", fontSize: 12, padding: "6px 10px" }}
                                             />
-                                            <Line type="monotone" dataKey="rank" stroke={BRAND} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: BRAND }} />
+                                            <Line type="monotone" dataKey={metric} stroke={BRAND} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: BRAND }} />
                                         </LineChart>
                                     </ResponsiveContainer>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 국내 라이벌 — 같은 국가에서 순위가 가장 가까운 선수. 탭하면 이동 */}
+                        {(data?.rivals?.length ?? 0) > 0 && (
+                            <div>
+                                <h3 className="text-[13.5px] font-bold text-ink-1 mb-2">{flagEmoji(player.fed)} {t("umb.rivals")}</h3>
+                                <div className="flex flex-col gap-1.5">
+                                    {data!.rivals.map(r => (
+                                        <button
+                                            key={r.playerUmbId}
+                                            onClick={() => onNavigate?.(r.playerUmbId)}
+                                            disabled={!onNavigate}
+                                            className="flex items-center gap-3 rounded-xl bg-black/[0.03] px-3 py-2.5 text-left hover:bg-black/[0.06] transition-colors"
+                                        >
+                                            <span className="w-9 shrink-0 text-center font-bold text-[13.5px] tabular-nums text-black/45">{r.rank}</span>
+                                            <span className="flex-1 min-w-0 truncate text-[13.5px] font-semibold text-ink-1">{r.playerName}</span>
+                                            <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-black/45">{r.points}{t("umb.pointsUnit")}</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         )}
@@ -115,12 +218,17 @@ export const UmbPlayerSheet = ({ category, playerUmbId, onClose }: UmbPlayerShee
                             <div>
                                 <h3 className="text-[13.5px] font-bold text-ink-1 mb-2">{t("umb.pointsBreakdown")}</h3>
                                 <div className="flex flex-col gap-1.5">
-                                    {breakdown.map(([colKey, pts]) => {
+                                    {breakdown.map(([colKey, pts], idx) => {
                                         const max = breakdown[0][1] || 1;
                                         return (
                                             <div key={colKey} className="rounded-xl bg-black/[0.03] px-3 py-2">
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-[12px] font-medium text-ink-2 truncate">{eventLabels.get(colKey) || `${t("umb.event")} ${colKey}`}</span>
+                                                    <span className="min-w-0 flex items-center gap-1.5">
+                                                        <span className="text-[12px] font-medium text-ink-2 truncate">{eventLabels.get(colKey) || `${t("umb.event")} ${colKey}`}</span>
+                                                        {idx === 0 && pts > 0 && breakdown.length > 1 && (
+                                                            <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[10px] font-bold text-brand leading-none">{t("umb.mainEvent")}</span>
+                                                        )}
+                                                    </span>
                                                     <span className={`text-[13px] font-bold tabular-nums shrink-0 ${pts < 0 ? "text-red-500" : "text-brand"}`}>{pts > 0 ? `+${pts}` : pts}</span>
                                                 </div>
                                                 {pts > 0 && (

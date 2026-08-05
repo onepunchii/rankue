@@ -40,6 +40,7 @@ export interface UmbPlayerDetail {
     bestRank: number;
     history: Array<{ edition: string; editionDate: string; rank: number; points: number }>;
     events: Array<{ colKey: string; label: string }>;
+    rivals: Array<{ rank: number; playerName: string; playerUmbId: string; points: number }>;
 }
 
 export const UMB_CATEGORIES: Array<{ id: UmbCategory; labelKey: string }> = [

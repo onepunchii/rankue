@@ -9,10 +9,13 @@ import type { UmbCategory } from "../../services/umbService.js";
 // 전부 비로그인 읽기 허용: 세계 랭킹 페이지는 검색 유입용 공개 화면이다.
 const router = Router();
 
-// 주 1회 갱신 데이터 — CDN(s-maxage)이 반복 요청을 흡수해 Neon을 보호한다.
-// 크론 적재 후 최대 10분 내 자연 갱신 + stale-while-revalidate로 무정지.
+// 주 1회 갱신 데이터 — CDN이 반복 요청을 흡수해 Neon을 보호한다.
+// 주의: Cache-Control에 stale-while-revalidate를 넣으면 **브라우저도** 하루짜리
+// 낡은 응답을 그대로 보여준다(실측: 새 필드가 배포돼도 옛 JSON이 렌더됨).
+// 브라우저는 매번 재검증(ETag 304라 저렴), CDN 캐시는 Vercel 전용 헤더로 분리한다.
 router.use((_req, res, next) => {
-    res.set("Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400");
+    res.set("Cache-Control", "public, max-age=0, must-revalidate");
+    res.set("CDN-Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400");
     next();
 });
 

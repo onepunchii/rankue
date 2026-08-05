@@ -161,7 +161,25 @@ export class UmbRepository {
                 sql`${umbRankings.rank} <= ${latestRow.rank}`,
             )) : [{ n: 0 }];
 
+        // 국내 라이벌 — 같은 국가에서 순위가 가장 가까운 2명 (탭하면 그 선수로 이동)
+        const rivals = latestRow ? await db.select({
+            rank: umbRankings.rank,
+            playerName: umbRankings.playerName,
+            playerUmbId: umbRankings.playerUmbId,
+            points: umbRankings.points,
+        })
+            .from(umbRankings)
+            .where(and(
+                eq(umbRankings.category, category),
+                eq(umbRankings.edition, latestEdition),
+                eq(umbRankings.fed, latestRow.fed),
+                sql`${umbRankings.playerUmbId} != ${playerUmbId}`,
+            ))
+            .orderBy(sql`abs(${umbRankings.rank} - ${latestRow.rank})`)
+            .limit(2) : [];
+
         return {
+            rivals: rivals.sort((a, b) => a.rank - b.rank),
             player: latestRow ? {
                 playerName: latestRow.playerName,
                 fed: latestRow.fed,

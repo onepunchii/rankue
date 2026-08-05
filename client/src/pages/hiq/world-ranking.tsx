@@ -210,7 +210,7 @@ export default function HiqWorldRanking() {
                 </a>
             </div>
 
-            <UmbPlayerSheet category={category} playerUmbId={openPlayerId} onClose={() => setOpenPlayerId(null)} />
+            <UmbPlayerSheet category={category} playerUmbId={openPlayerId} onClose={() => setOpenPlayerId(null)} onNavigate={setOpenPlayerId} />
             <HiqNavigation />
         </div>
     );
