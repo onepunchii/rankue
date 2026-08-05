@@ -58,19 +58,26 @@ export default function Landing() {
         return "hiq";
     };
 
-    // Check if already logged in
+    // 이미 로그인했는지 확인. 결과가 나오기 전까지는 로그인 폼을 그리지 않는다 —
+    // 예전에는 확인을 기다리지 않고 폼부터 렌더해서, 앱을 열 때마다 "휴대폰 번호 입력"
+    // 화면이 깜빡 보였다가 대시보드로 넘어갔다(자동 로그인은 되는데 화면만 스쳤다).
+    // "확인 안 됨"이 아니라 "확인 중"을 별도 상태로 둬야 그 깜빡임이 사라진다.
+    const [authState, setAuthState] = useState<"checking" | "in" | "out">("checking");
     useEffect(() => {
-        const checkAuth = async () => {
+        let alive = true;
+        (async () => {
             try {
                 const res = await fetch("/api/hiq/me");
+                if (!alive) return;
                 if (res.ok) {
+                    setAuthState("in");
                     setLocation("/dashboard", { replace: true });
+                    return;
                 }
-            } catch (e) {
-                // Not logged in, ignore
-            }
-        };
-        checkAuth();
+            } catch { /* 네트워크 실패는 미로그인으로 취급 */ }
+            if (alive) setAuthState("out");
+        })();
+        return () => { alive = false; };
     }, [setLocation]);
 
     const { store: brand, isLoading: isBrandLoading, error: brandError } = useStore();
@@ -160,11 +167,14 @@ export default function Landing() {
     // 홈(/)이 곧바로 "휴대폰 번호를 입력하세요"라 랭큐를 모르는 사람이 그대로 이탈했고,
     // 검색엔진 입장에서도 제품 설명이 없는 로그인 폼이라 색인 가치가 낮았다.
     // 앱(Capacitor)·화이트라벨 매장(?store=)·이미 시작을 누른 사람은 기존 흐름 그대로 간다.
-    if (showIntro) {
+    // 로그인 상태면 마케팅 랜딩도 건너뛴다 — 이미 쓰는 사람에게 소개 화면은 방해다.
+    if (showIntro && authState === "out") {
         return <MarketingLanding onStart={() => { setShowIntro(false); markIntroSeen(); }} />;
     }
 
-    if (isBrandLoading || !brand) {
+    // 인증 확인 중이거나(=대시보드로 갈 수도 있다) 이미 로그인해 이동하는 중이면
+    // 로그인 폼 대신 스플래시를 유지한다. 이게 앱 실행 시 화면이 스쳐 지나가던 원인이었다.
+    if (authState !== "out" || isBrandLoading || !brand) {
         return (
             <div className="min-h-screen bg-[#f2f0eb] flex flex-col items-center justify-center gap-4">
                 <div className="text-brand font-bold text-4xl animate-pulse">RANKUE</div>

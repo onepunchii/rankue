@@ -4,7 +4,7 @@ import { queryClient, apiRequest } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
 import NotFound from "@/pages/not-found";
-import { useEffect } from "react";
+import { useEffect, type ComponentType, type FunctionComponent } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 // HiQ Pages
@@ -52,6 +52,49 @@ import SharedResult from "@/pages/hiq/shared-result";
 import { StoreProvider } from "./contexts/StoreContext";
 import { I18nProvider } from "@/lib/i18n";
 import { SportProvider } from "./contexts/SportContext";
+import { DesktopFrame } from "@/components/hiq/DesktopFrame";
+
+/**
+ * 폰 기준(375~430px)으로 그려진 앱 화면을 데스크탑에서 중앙 448px로 고정하고,
+ * 남는 좌우에 랭큐 콘텐츠를 채우는 껍데기를 씌운다. lg 미만에서는 아무 효과가 없다.
+ *
+ * 감싸는 화면: 대시보드·크루·기록·랭킹·친구·메뉴 같은 "모바일 앱 화면"만.
+ * 감싸지 않는 화면과 그 이유 —
+ *   /game/:id        가로모드 전용(LandscapeGuard)이 화면 전체를 쓴다
+ *   /online-game     캔버스 전체화면
+ *   /simulation      가상 당구대가 max-w-[900px] 로 넓을수록 유리하다
+ *   /game/result     유일하게 md: 반응형을 쓰는 화면 — 뷰포트 기준이라 좁은 프레임 안에서 깨진다
+ *   / /about /stores /store/:slug /support /privacy /account-delete /r/:id
+ *                    이미 자체 반응형 레이아웃을 가진 공개 페이지
+ *   /admin /admin/dashboard /partner/*   데스크탑 전용 레이아웃
+ *   /golf/*          다크 테마의 별도 모듈 — 크림 껍데기와 톤이 맞지 않는다
+ *   /club/:id /crew/:id/:tab?
+ *                    루트가 `fixed inset-0` 전체화면 셸 + framer-motion drag(transform) 탭이라
+ *                    DOM 을 감싸도 프레임을 뚫고 나온다. 페이지 구조부터 손대야 한다.
+ *
+ * ⚠️ 모듈 최상위에서 한 번만 만든다. 렌더마다 새로 만들면 컴포넌트 정체성이 바뀌어
+ *    라우트를 오갈 때마다 페이지 전체가 언마운트/재마운트된다(상태·스크롤 유실).
+ */
+function framed<P extends object>(Page: ComponentType<P>): FunctionComponent<P> {
+  const Framed: FunctionComponent<P> = (props) => (
+    <DesktopFrame>
+      <Page {...(props as P)} />
+    </DesktopFrame>
+  );
+  Framed.displayName = `Framed(${Page.displayName || Page.name || "Page"})`;
+  return Framed;
+}
+
+const FramedRegister = framed(HiqRegister);
+const FramedDashboard = framed(HiqDashboard);
+const FramedSettings = framed(HiqSettings);
+const FramedFriends = framed(HiqFriends);
+const FramedClub = framed(HiqClub);
+const FramedCreateClub = framed(HiqCreateClub);
+const FramedJoin = framed(HiqJoin);
+const FramedHistory = framed(HiqHistory);
+const FramedRanking = framed(HiqRanking);
+const FramedMenu = framed(HiqMenu);
 
 /**
  * localStorage에 저장된 FCM 토큰을 서버에 등록한다.
@@ -142,17 +185,21 @@ function AppRoutes() {
       {/* 공유 링크로 열리는 공개 경기 결과 — 로그인 불필요 */}
       <Route path="/r/:id" component={SharedResult} />
 
-      {/* HiQ 기능 페이지들 */}
-      <Route path="/register" component={HiqRegister} />
-      <Route path="/dashboard" component={HiqDashboard} />
-      <Route path="/settings" component={HiqSettings} />
-      <Route path="/friends" component={HiqFriends} />
-      <Route path="/club" component={HiqClub} />
-      <Route path="/club/create" component={HiqCreateClub} />
+      {/* HiQ 기능 페이지들 — 데스크탑에서는 DesktopFrame 이 중앙 448px로 고정한다 */}
+      <Route path="/register" component={FramedRegister} />
+      <Route path="/dashboard" component={FramedDashboard} />
+      <Route path="/settings" component={FramedSettings} />
+      <Route path="/friends" component={FramedFriends} />
+      <Route path="/club" component={FramedClub} />
+      <Route path="/club/create" component={FramedCreateClub} />
+      {/* 크루 상세는 프레임에서 뺐다 — 루트가 `fixed inset-0` 전체화면 셸이라 DOM 을 감싸도
+          효과가 없고(뷰포트 기준으로 튀어나온다), 탭이 framer-motion drag(transform)로
+          움직여 그 안의 fixed 요소 기준까지 어긋난다. 프레임에 넣으려면 club-detail.tsx
+          자체를 일반 흐름 레이아웃으로 바꿔야 한다. */}
       <Route path="/club/:id" component={HiqClubDetail} />
       {/* 이미 발송된 푸시 페이로드(/crew/:id/:tab) 호환 별칭 */}
       <Route path="/crew/:id/:tab?" component={HiqClubDetail} />
-      <Route path="/join/:code" component={HiqJoin} />
+      <Route path="/join/:code" component={FramedJoin} />
       <Route path="/game/result" component={HiqGameResult} />
       <Route path="/game/:id" component={HiqScoreboard} />
       <Route path="/golf/game/new" component={GolfNewGame} />
@@ -165,9 +212,9 @@ function AppRoutes() {
       <Route path="/golf/elite60" component={GolfElite60} />
       <Route path="/golf/course/:id" component={GolfCourseDetail} />
       <Route path="/golf/booking-list/:id?" component={GolfBookingList} />
-      <Route path="/history" component={HiqHistory} />
-      <Route path="/ranking" component={HiqRanking} />
-      <Route path="/menu" component={HiqMenu} />
+      <Route path="/history" component={FramedHistory} />
+      <Route path="/ranking" component={FramedRanking} />
+      <Route path="/menu" component={FramedMenu} />
       <Route path="/admin" component={HiqAdmin} />
       <Route path="/simulation" component={HiqSimulation} />
 
@@ -181,7 +228,7 @@ function AppRoutes() {
 
       {/* 호환성 라우트 */}
       <Route path="/hiq" component={HiqLanding} />
-      <Route path="/hiq/dashboard" component={HiqDashboard} />
+      <Route path="/hiq/dashboard" component={FramedDashboard} />
       <Route path="/online-game" component={HiqOnlineGame} />
 
       {/* 404 페이지 */}
