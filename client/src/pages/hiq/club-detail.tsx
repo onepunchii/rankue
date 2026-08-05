@@ -44,7 +44,18 @@ export default function HiqClubDetail() {
     const [isCreateActivityOpen, setIsCreateActivityOpen] = useState(false);
     const [isCreatePollOpen, setIsCreatePollOpen] = useState(false);
     const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'home' | 'board' | 'gallery' | 'chat' | 'poll'>('home');
+    // 딥링크 탭은 반드시 useState "초기값"으로 반영한다. 마운트 직후 useEffect에서
+    // setActiveTab을 하면 AnimatePresence(mode="wait")가 home 탭의 exit 완료 신호를
+    // 못 받아 다음 탭이 영영 마운트되지 않는다 → /crew/:id/board 진입 시 빈 화면.
+    const [activeTab, setActiveTab] = useState<'home' | 'board' | 'gallery' | 'chat' | 'poll'>(() => {
+        const validTabs = ['home', 'board', 'gallery', 'chat', 'poll'];
+        let tab: string | null | undefined = crewParams?.tab;
+        if (!tab && typeof window !== 'undefined') {
+            tab = new URLSearchParams(window.location.search).get('tab');
+        }
+        const normalized = tab?.toLowerCase();
+        return (normalized && validTabs.includes(normalized) ? normalized : 'home') as any;
+    });
     const [boardCategory, setBoardCategory] = useState("전체");
     const [isCreateSettlementOpen, setIsCreateSettlementOpen] = useState(false);
     const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
@@ -89,7 +100,7 @@ export default function HiqClubDetail() {
 
     const { data: me } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
 
-    const { data: posts } = useQuery<any[]>({
+    const { data: posts, isLoading: postsLoading } = useQuery<any[]>({
         queryKey: [`/api/hiq/crews/${id}/posts`],
         enabled: !!id && activeTab === 'board',
     });
@@ -194,6 +205,17 @@ export default function HiqClubDetail() {
     const isMember = !!myMemberData && myMemberData.role !== 'pending';
     const isPending = !!myMemberData && myMemberData.role === 'pending';
     const isNotMember = !myMemberData;
+
+    // 게시판·사진첩은 서버도 크루원 전용으로 막혀 있다 — 비멤버·승인 대기자에게는
+    // 빈 목록 대신 가입 안내를 보여준다.
+    const membersOnlyNotice = (
+        <div className="h-full flex flex-col items-center justify-center gap-1.5 px-8 text-center">
+            <p className="text-[15px] font-bold text-ink-2">{t("clubDetail.membersOnlyTitle")}</p>
+            <p className="text-[13px] font-medium text-black/45">
+                {isPending ? t("clubDetail.membersOnlyPending") : t("clubDetail.membersOnlyDesc")}
+            </p>
+        </div>
+    );
     const isAdmin = !!myMemberData && (myMemberData.role === 'leader' || myMemberData.role === 'manage');
     const hasPending = members.some((m: any) => m.role === 'pending');
 
@@ -328,17 +350,23 @@ export default function HiqClubDetail() {
                             }}
                             className="h-full overflow-y-auto custom-scrollbar pb-32"
                         >
-                            <CrewBoardTab
-                                posts={posts || []}
-                                category={boardCategory}
-                                onCategoryChange={setBoardCategory}
-                                onPostClick={setSelectedPost}
-                                isMember={isMember}
-                                isAdmin={isAdmin}
-                                currentMemberId={me?.id}
-                                onCreatePost={() => setIsCreatePostOpen(true)}
-                                onCreateSettlement={() => setIsCreateSettlementOpen(true)}
-                            />
+                            {!isMember ? (
+                                membersOnlyNotice
+                            ) : postsLoading ? (
+                                <div className="h-full flex items-center justify-center text-[13.5px] font-medium text-black/40">{t("common.loading")}</div>
+                            ) : (
+                                <CrewBoardTab
+                                    posts={posts || []}
+                                    category={boardCategory}
+                                    onCategoryChange={setBoardCategory}
+                                    onPostClick={setSelectedPost}
+                                    isMember={isMember}
+                                    isAdmin={isAdmin}
+                                    currentMemberId={me?.id}
+                                    onCreatePost={() => setIsCreatePostOpen(true)}
+                                    onCreateSettlement={() => setIsCreateSettlementOpen(true)}
+                                />
+                            )}
                         </motion.div>
                     )}
 
@@ -360,12 +388,16 @@ export default function HiqClubDetail() {
                             }}
                             className="h-full overflow-y-auto custom-scrollbar pb-32"
                         >
-                            <CrewGalleryTab
-                                crewId={id as string}
-                                isMember={isMember}
-                                isAdmin={isAdmin}
-                                currentMemberId={me?.id}
-                            />
+                            {!isMember ? (
+                                membersOnlyNotice
+                            ) : (
+                                <CrewGalleryTab
+                                    crewId={id as string}
+                                    isMember={isMember}
+                                    isAdmin={isAdmin}
+                                    currentMemberId={me?.id}
+                                />
+                            )}
                         </motion.div>
                     )}
 
@@ -376,13 +408,14 @@ export default function HiqClubDetail() {
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 20 }}
                             drag="x"
+                            dragDirectionLock
                             dragConstraints={{ left: 0, right: 0 }}
                             dragElastic={0.2}
                             onDragEnd={(_, info) => {
                                 const swipe = info.offset.x;
                                 const velocity = info.velocity.x;
-                                if (swipe < -70 || velocity < -400) handleSwipe(1);
-                                else if (swipe > 70 || velocity > 400) handleSwipe(-1);
+                                if (swipe < -100 || velocity < -500) handleSwipe(1);
+                                else if (swipe > 100 || velocity > 500) handleSwipe(-1);
                             }}
                             className="h-full flex flex-col overflow-hidden"
                         >

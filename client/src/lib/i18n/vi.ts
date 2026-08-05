@@ -1,6 +1,9 @@
 import type { Dict } from "./index";
 
 const vi: Dict = {
+  "clubDetail.membersOnlyDesc": "Tham gia crew để xem bảng tin và album ảnh",
+  "clubDetail.membersOnlyPending": "Yêu cầu tham gia đang chờ duyệt",
+  "clubDetail.membersOnlyTitle": "Chỉ dành cho thành viên crew",
   "common.appName": "RANKUE",
   "common.tagline": "Câu lạc bộ thể thao",
   "common.poweredBy": "Cung cấp bởi RANKUE",

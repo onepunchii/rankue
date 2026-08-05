@@ -1,6 +1,9 @@
 import type { Dict } from "./index";
 
 const en: Dict = {
+  "clubDetail.membersOnlyDesc": "Join the crew to see the board and photo album",
+  "clubDetail.membersOnlyPending": "Your join request is pending approval",
+  "clubDetail.membersOnlyTitle": "Crew members only",
   "common.appName": "RANKUE",
   "common.tagline": "Sports Social Club",
   "common.poweredBy": "Powered by RANKUE",

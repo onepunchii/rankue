@@ -37,7 +37,8 @@ export const MyCrewCard = memo(({ crew, role, onClick }: MyCrewCardProps) => {
                 <div className="flex items-center gap-2 text-ink-3 text-[12px] font-medium">
                     <div className="flex items-center gap-1">
                         <LucideUsers className="w-3 h-3" />
-                        <span className="tabular-nums">{crew.memberCount || 1} / {crew.maxMembers || 50}</span>
+                        {/* maxMembers null/0 = 무제한(서버 기준) — "N / 50"으로 찍으면 거짓 정보 */}
+                        <span className="tabular-nums">{crew.maxMembers ? `${crew.memberCount || 1} / ${crew.maxMembers}` : `${crew.memberCount || 1}`}</span>
                     </div>
                     <span className="w-0.5 h-0.5 rounded-full bg-black/25" />
                     <span className={cn(!crew.region && "text-ink-4")}>{crew.region || t("myCrewCard.noRegion")}</span>

@@ -42,7 +42,8 @@ function activeMembers(members: any[] | undefined): any[] {
 // --- Activities ---
 
 // GET /activities - Get upcoming activities
-router.get("/:id/activities", asyncHandler(async (req: any, res: any) => {
+// 가입 검토 중인 로그인 사용자에게는 보여주되(가입 유도), 비로그인 크롤러성 접근은 차단
+router.get("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const activities = await storage.getUpcomingCrewActivities(req.params.id);
     return sendSuccess(res, activities);
 }));
@@ -212,7 +213,8 @@ router.delete("/:id/activities/:activityId", requireAuth, asyncHandler(async (re
 }));
 
 // GET /activities/member/:memberId - 멤버별 활동 내역 (페르소나 분석용)
-router.get("/activities/member/:memberId", asyncHandler(async (req: any, res: any) => {
+// 임의 회원 이력 열람 방지 — 최소한 로그인 사용자로 제한
+router.get("/activities/member/:memberId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const crewId = req.query.crewId as string;
     const result = await storage.getMemberActivities(req.params.memberId, crewId);
     return sendSuccess(res, result);
@@ -221,11 +223,10 @@ router.get("/activities/member/:memberId", asyncHandler(async (req: any, res: an
 
 // --- Posts ---
 
-// GET /posts
-router.get("/:id/posts", asyncHandler(async (req: any, res: any) => {
-    const userId = req.signedCookies?.hiq_user_id;
-    const posts = await storage.getCrewPosts(req.params.id, userId);
-    console.log(`[GET] Found ${posts.length} posts for crew ${req.params.id}`);
+// GET /posts — 승인제 크루의 게시판은 크루원 전용 (비로그인·승인 대기자 차단)
+router.get("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const posts = await storage.getCrewPosts(req.params.id, req.userId);
     return sendSuccess(res, posts);
 }));
 
@@ -347,10 +348,10 @@ router.delete("/:id/comments/:commentId", requireAuth, asyncHandler(async (req: 
 
 // --- Photos ---
 
-// GET /crews/:id/photos
-router.get("/:id/photos", asyncHandler(async (req: any, res: any) => {
-    const userId = req.signedCookies?.hiq_user_id;
-    const photos = await storage.getCrewPhotos(req.params.id, userId);
+// GET /crews/:id/photos — 사진첩도 크루원 전용 (원본 URL 무단 열람 방지)
+router.get("/:id/photos", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const photos = await storage.getCrewPhotos(req.params.id, req.userId);
     return sendSuccess(res, photos);
 }));
 
@@ -464,12 +465,14 @@ router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res
 
     // 화이트리스트 — req.body를 그대로 펼치면 id/createdAt까지 통과해 PK 충돌이나
     // 목록 최상단 강제 점유가 가능하다.
+    // type/metadata도 받지 않는다 — 클라이언트가 지정할 수 있으면 가짜 정산·예약 카드를
+    // 주입할 수 있다. 카드형 메시지(settlement 등)는 서버 내부 생성 경로에서만 만든다.
     const chat = await storage.createCrewChat({
         crewId: req.params.id,
         senderId: req.userId,
         message: req.body.message,
-        type: req.body.type,
-        metadata: req.body.metadata,
+        type: "text",
+        metadata: null,
     } as any);
 
     // Send notification to all crew members except sender
@@ -524,10 +527,10 @@ router.delete("/:id/chats/:chatId", requireAuth, asyncHandler(async (req: AuthRe
 
 // --- Polls ---
 
-// GET /polls - List crew polls
-router.get("/:id/polls", asyncHandler(async (req: any, res: any) => {
-    const userId = req.signedCookies?.hiq_user_id;
-    const polls = await storage.getCrewPolls(req.params.id, userId);
+// GET /polls - List crew polls — 크루원 전용
+router.get("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const polls = await storage.getCrewPolls(req.params.id, req.userId);
     return sendSuccess(res, polls);
 }));
 
@@ -691,17 +694,34 @@ router.get("/", asyncHandler(async (req: any, res: any) => {
 }));
 
 // GET /crews/:id - Get crew details
+// 나이·성별은 크루 안에서 쓰는 멤버 카드 기능 — 크루원이 아닌 조회자(비로그인 포함)에게는
+// 내려주지 않는다. 크루 홈은 SEO 공개 페이지라 엔드포인트 자체는 열어둔다.
+async function stripMemberPrivacy(req: any, crew: any): Promise<any> {
+    const userId = (req as any).signedCookies?.hiq_user_id;
+    if (userId) {
+        const membership = await storage.getCrewMembership(crew.crew.id, userId);
+        if (membership && membership.role !== "pending") return crew;
+    }
+    return {
+        ...crew,
+        members: (crew.members || []).map((m: any) => ({
+            ...m,
+            member: { ...m.member, birthYear: null, gender: null },
+        })),
+    };
+}
+
 router.get("/:id", asyncHandler(async (req: any, res: any) => {
     const crew = await storage.getCrew(req.params.id);
     if (!crew) return sendError(res, 404, "크루를 찾을 수 없습니다");
-    return sendSuccess(res, crew);
+    return sendSuccess(res, await stripMemberPrivacy(req, crew));
 }));
 
 // GET /crews/:id/members - Get all members of a crew
 router.get("/:id/members", asyncHandler(async (req: any, res: any) => {
     const crew = await storage.getCrew(req.params.id);
     if (!crew) return sendError(res, 404, "크루를 찾을 수 없습니다");
-    return sendSuccess(res, crew.members);
+    return sendSuccess(res, (await stripMemberPrivacy(req, crew)).members);
 }));
 
 // POST /crews/:id/join - Join a crew
@@ -808,20 +828,9 @@ router.post("/:id/members/:memberId/approve", requireAuth, asyncHandler(async (r
         return sendError(res, 403, "권한이 없습니다");
     }
 
-    // Target Check
-    const target = data.members.find((m: any) => m.member.id === memberId);
-    if (!target) return sendError(res, 404, "대상을 찾을 수 없습니다");
-    if (target.role !== 'pending') return sendError(res, 400, "이미 승인된 멤버입니다");
-
-    // 정원 확인 — 승인은 pending을 실제 크루원으로 올리는 거라 여기서도 막지 않으면
-    // 가입 신청만 쌓아두고 무제한으로 정원을 넘길 수 있다. (maxMembers 미설정 = 무제한)
-    const limit = data.crew.maxMembers ?? 0;
-    if (limit > 0) {
-        const activeCount = data.members.filter((m: any) => m.role !== 'pending').length;
-        if (activeCount >= limit) return sendError(res, 409, "크루 정원이 가득 찼습니다");
-    }
-
-    await storage.updateCrewMemberRole(crewId, memberId, 'member');
+    // 대상 확인·정원 확인·승격을 리포지토리 트랜잭션(FOR UPDATE)에서 원자적으로 처리 —
+    // 여기서 조회-후-갱신하면 동시 승인 두 건이 같은 잔여 정원을 보고 초과 승인된다.
+    await storage.crews.approveCrewMember(crewId, memberId);
 
     // Send Notification to Approved Member
     try {

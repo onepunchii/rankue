@@ -1,6 +1,9 @@
 import type { Dict } from "./index";
 
 const es: Dict = {
+  "clubDetail.membersOnlyDesc": "Únete al crew para ver el tablón y el álbum",
+  "clubDetail.membersOnlyPending": "Tu solicitud está pendiente de aprobación",
+  "clubDetail.membersOnlyTitle": "Solo para miembros del crew",
   "common.appName": "RANKUE",
   "common.tagline": "Club Social Deportivo",
   "common.poweredBy": "Con tecnología de RANKUE",

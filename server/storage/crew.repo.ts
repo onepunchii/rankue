@@ -243,6 +243,34 @@ export class CrewRepository {
             .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
     }
 
+    // 가입 승인 — joinCrew와 동일하게 크루 행을 FOR UPDATE로 잠그고 정원을 센다.
+    // 라우트에서 조회-후-갱신하면 동시 승인 두 건이 같은 잔여 정원을 보고 초과 승인된다.
+    async approveCrewMember(crewId: string, memberId: string) {
+        return await db.transaction(async (tx) => {
+            const [crew] = await tx.select().from(hiqCrews)
+                .where(eq(hiqCrews.id, crewId))
+                .for('update');
+            if (!crew) throw notFound("Crew not found");
+
+            const [target] = await tx.select().from(hiqCrewMembers)
+                .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
+            if (!target) throw notFound("대상을 찾을 수 없습니다");
+            if (target.role !== 'pending') throw conflict("이미 승인된 멤버입니다");
+
+            const limit = crew.maxMembers ?? 0;
+            if (limit > 0) {
+                const [row] = await tx.select({ count: sql<number>`count(*)` })
+                    .from(hiqCrewMembers)
+                    .where(and(eq(hiqCrewMembers.crewId, crewId), ne(hiqCrewMembers.role, 'pending')));
+                if (Number(row?.count || 0) >= limit) throw conflict("크루 정원이 가득 찼습니다");
+            }
+
+            await tx.update(hiqCrewMembers)
+                .set({ role: 'member' })
+                .where(eq(hiqCrewMembers.id, target.id));
+        });
+    }
+
     async updateCrew(id: string, data: Partial<InsertHiqCrew>) {
         const [crew] = await db.update(hiqCrews)
             .set(data)

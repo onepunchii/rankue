@@ -1,6 +1,9 @@
 import type { Dict } from "./index";
 
 const tr: Dict = {
+  "clubDetail.membersOnlyDesc": "Panoyu ve albümü görmek için ekibe katıl",
+  "clubDetail.membersOnlyPending": "Katılım isteğin onay bekliyor",
+  "clubDetail.membersOnlyTitle": "Yalnızca ekip üyeleri",
   "common.appName": "RANKUE",
   "common.tagline": "Spor Sosyal Kulübü",
   "common.poweredBy": "RANKUE tarafından",

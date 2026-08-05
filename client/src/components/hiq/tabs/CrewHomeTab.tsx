@@ -199,19 +199,16 @@ export const CrewHomeTab = memo(({
 
                     <StatCard title={stats.isGolf ? t("crewHome.clubAverage") : t("crewHome.teamAverage")}>
                         <div className="flex items-center gap-3 mt-1 px-2">
+                            {/* 골프: 평균 타수와 HDCP는 다른 값 — 평균 타수에 "HDCP" 라벨을 달면 안 된다 */}
                             <div className="flex flex-col items-center">
                                 <span className="text-2xl font-bold text-[rgba(0,0,0,0.87)] leading-none tabular-nums">{stats.isGolf ? stats.avgGolfScore : stats.avg3c}</span>
-                                <span className="text-xs text-black/55 font-medium mt-1 tracking-tight">{stats.isGolf ? "HDCP" : "3C"}</span>
+                                <span className="text-xs text-black/55 font-medium mt-1 tracking-tight">{stats.isGolf ? t("ranking.golfAvgScore") : t("ranking.threeCushion")}</span>
                             </div>
-                            {!stats.isGolf && (
-                                <>
-                                    <div className="h-8 w-px bg-black/10" />
-                                    <div className="flex flex-col items-center">
-                                        <span className="text-2xl font-bold text-[rgba(0,0,0,0.87)] leading-none tabular-nums">{stats.avg4c}</span>
-                                        <span className="text-xs text-black/55 font-medium mt-1 tracking-tight">4B</span>
-                                    </div>
-                                </>
-                            )}
+                            <div className="h-8 w-px bg-black/10" />
+                            <div className="flex flex-col items-center">
+                                <span className="text-2xl font-bold text-[rgba(0,0,0,0.87)] leading-none tabular-nums">{stats.isGolf ? stats.avgHdcp : stats.avg4c}</span>
+                                <span className="text-xs text-black/55 font-medium mt-1 tracking-tight">{stats.isGolf ? "HDCP" : t("ranking.fourBall")}</span>
+                            </div>
                         </div>
                     </StatCard>
 
