@@ -109,8 +109,9 @@ export async function parseRankingPdf(buffer: ArrayBuffer): Promise<ParsedRankin
 
     for (const page of pages) {
         // 이 페이지의 헤더 행에서 컬럼 x좌표를 잡는다 (페이지마다 반복됨)
+        // 주니어 PDF는 "Rank."처럼 마침표가 붙는다 — startsWith로 잡는다
         const header = page.find(r =>
-            r.items.some(i => i.str === "Rank") && r.items.some(i => i.str === "Pnts"));
+            r.items.some(i => i.str.startsWith("Rank")) && r.items.some(i => i.str === "Pnts"));
         let cols: Array<{ key: string; x: number }> = [];
         if (header) {
             cols = header.items
@@ -141,13 +142,16 @@ export async function parseRankingPdf(buffer: ArrayBuffer): Promise<ParsedRankin
             if (!name) continue;
             const fed = items[fedIdx].str.trim();
             const umbId = items[fedIdx + 1].str.trim();
-            const pntsItem = items[fedIdx + 2];
+            // 주니어 PDF는 Player ID와 Pnts 사이에 생년월일(DOB, "24.08.2005") 컬럼이 있다
+            let pntsIdx = fedIdx + 2;
+            if (items[pntsIdx] && /^\d{2}\.\d{2}\.\d{4}$/.test(items[pntsIdx].str.trim())) pntsIdx++;
+            const pntsItem = items[pntsIdx];
             if (!pntsItem || !/^-?\d+$/.test(pntsItem.str.trim())) continue;
             if (seenIds.has(umbId)) continue; // 드물게 PDF에 중복 표기되는 행 방지
 
             const eventPoints: Record<string, number> = {};
             let penaltyPoints = 0;
-            for (const it of items.slice(fedIdx + 3)) {
+            for (const it of items.slice(pntsIdx + 1)) {
                 const v = Number(it.str.trim());
                 if (!Number.isFinite(v)) continue;
                 // 가장 가까운 컬럼 헤더에 비닝 (허용 오차 10px)
