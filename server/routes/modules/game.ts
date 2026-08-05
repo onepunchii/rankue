@@ -218,7 +218,13 @@ const FINISH_EDITABLE = [
 
 // POST /game/:id/finish
 router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    if (!(await assertParticipant(req.params.id, req.userId!, res))) return;
+    const before = await assertParticipant(req.params.id, req.userId!, res);
+    if (!before) return;
+
+    // finishHiqGame은 이미 종료된 경기에 대해 fast-path로 기존 행을 그대로 돌려준다(멱등).
+    // 반환값만으로는 이번 호출이 실제로 종료시킨 건지 알 수 없어서, 재시도·중복 탭 때마다
+    // 상대에게 "경기 종료" 알림이 한 번 더 나갔다. 종료 전 상태를 여기서 기억해 둔다.
+    const wasAlreadyFinished = before.status === "finished";
 
     const finalData: any = {};
     for (const key of FINISH_EDITABLE) {
@@ -269,20 +275,24 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
     ));
 
     // Keep the existing response shape (the client reads handicapUpdate1 / handicapUpdate2).
-    // P0: 경기 종료 → 상대 플레이어들에게 결과 알림
+    // P0: 경기 종료 → 상대 플레이어들에게 결과 알림 (이번 호출이 실제로 종료시켰을 때만)
     try {
-        const opponentIds = boundIds.filter((id: string) => id !== req.userId);
-        for (const oid of opponentIds) {
-            notificationService.sendAndSaveNotification({
-                memberId: oid,
-                title: "🏁 경기 종료",
-                body: "경기가 종료되었습니다. 결과를 확인해보세요.",
-                category: game?.gameType === "golf" ? "GOLF" : "BILLIARDS",
-                type: "MATCH",
-                params: { url: `/history/${req.params.id}` },
-            }).catch((err: any) => console.error("[GameFinishNotif]", err));
+        if (!wasAlreadyFinished) {
+            const opponentIds = boundIds.filter((id: string) => id !== req.userId);
+            for (const oid of opponentIds) {
+                notificationService.sendAndSaveNotification({
+                    memberId: oid,
+                    title: "🏁 경기 종료",
+                    body: "경기가 종료되었습니다. 결과를 확인해보세요.",
+                    category: game?.gameType === "golf" ? "GOLF" : "BILLIARDS",
+                    type: "MATCH",
+                    // /history/:id 라우트는 존재하지 않는다(상세는 /history 안의 다이얼로그) —
+                    // 그대로 두면 알림을 탭한 사람이 404 페이지로 떨어진다.
+                    params: { url: `/history` },
+                }).catch((err: any) => console.error("[GameFinishNotif]", err));
+            }
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 경기 종료:", e); }
     return sendSuccess(res, {
         game,
         handicapUpdate1: handicapUpdates[0] ?? null,
@@ -423,15 +433,21 @@ router.get("/invite/:code", requireAuth, asyncHandler(async (req: AuthRequest, r
 }));
 
 router.post("/invite/:code/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    // 참가 '전'의 상태를 먼저 읽는다. joinInvite는 이미 수락한 게스트가 다시 눌러도 true를
+    // 돌려주므로(멱등), 반환값만 보면 로비 화면 재진입·재시도마다 호스트에게 "초대 참가 수락"
+    // 푸시가 반복해서 나갔다. hostId도 여기서 같이 얻어 쓰므로 쿼리 수는 그대로다.
+    const inviteBefore = await storage.getInviteStatus(req.params.code).catch(() => null);
+    const alreadyAccepted = Array.isArray(inviteBefore?.guests)
+        && inviteBefore.guests.some((g: any) => g?.id === req.userId);
+
     const success = await storage.joinInvite(req.params.code, req.userId!);
     if (!success) return sendError(res, 400, "만료되었거나 유효하지 않은 코드");
-    // P0: 게스트 참가 수락 → 호스트에게 알림
+    // P0: 게스트 참가 수락 → 호스트에게 알림 (최초 수락 1회만)
     try {
-        const invite = await storage.getInviteStatus(req.params.code);
-        if (invite?.hostId) {
+        if (!alreadyAccepted && inviteBefore?.hostId) {
             const guest = await storage.getMemberById(req.userId!);
             notificationService.sendAndSaveNotification({
-                memberId: invite.hostId,
+                memberId: inviteBefore.hostId,
                 title: "🎯 초대 참가 수락",
                 body: guest?.name ? `${guest.name}님이 초대에 응했어요!` : "상대방이 초대에 응했어요!",
                 category: "BILLIARDS",
@@ -439,7 +455,7 @@ router.post("/invite/:code/join", requireAuth, asyncHandler(async (req: AuthRequ
                 params: { url: `/history` },
             }).catch(err => console.error("[InviteAcceptNotif]", err));
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 초대 참가 수락:", e); }
     return sendSuccess(res, { success: true });
 }));
 

@@ -3,9 +3,20 @@ import { InsertHiqNotification } from '../../shared/schema.js';
 import { sendPushNative } from './pushNative.js';
 
 // 딥링크 URL 구성 — 알림 탭 시 이동. 카테고리/타입 기반 최소 매핑(없으면 홈).
+// params는 {url} 또는 {crewId, tab} 두 형태가 섞여 있다(발송처마다 다름). 인앱 알림함
+// (NotificationInbox)과 이 푸시 경로가 **둘 다** 이해해야 어느 쪽으로 열어도 같은 곳에 도착한다.
 function deepLinkUrl(category?: string, type?: string, params?: any): string {
-    if (params?.url && typeof params.url === 'string' && params.url.startsWith('/')) return params.url;
-    if (category === 'crew' && params?.crewId) return `/crew/${params.crewId}`;
+    if (params?.url && typeof params.url === 'string' && params.url.startsWith('/') && !params.url.startsWith('//')) {
+        return params.url;
+    }
+    // category === 'crew' 조건이 붙어 있던 탓에 사실상 죽은 분기였다 — 크루 알림의 category는
+    // 종목(BILLIARDS/GOLF)이라 절대 'crew'가 아니어서, crewId만 실린 알림(채팅·가입승인)을
+    // 탭하면 크루가 아니라 홈으로 떨어졌다.
+    if (params?.crewId) {
+        const crewPath = `/crew/${encodeURIComponent(String(params.crewId))}`;
+        const tab = typeof params.tab === 'string' ? params.tab.toLowerCase() : '';
+        return tab ? `${crewPath}/${encodeURIComponent(tab)}` : crewPath;
+    }
     if (category === 'match' || type === 'match') return '/history';
     return '/';
 }

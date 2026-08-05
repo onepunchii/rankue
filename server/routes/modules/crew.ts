@@ -30,6 +30,14 @@ async function settleNotifications(tag: string, tasks: Promise<any>[]): Promise<
     }
 }
 
+// 크루 브로드캐스트 대상 — 승인 대기(pending)는 아직 크루원이 아니므로 제외한다.
+// storage.getCrew()는 pending까지 그대로 담아 돌려주기 때문에(읽기 전용 리포지토리),
+// 그대로 쓰면 앱에서 채팅 조회가 403으로 막힌 신청자에게 채팅 원문("보낸사람: 메시지")이
+// 푸시 본문으로 새어 나갔다.
+function activeMembers(members: any[] | undefined): any[] {
+    return (members || []).filter((m: any) => m?.role !== 'pending');
+}
+
 
 // --- Activities ---
 
@@ -62,7 +70,7 @@ router.post("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest
         if (crewData) {
             const creator = await storage.getMemberById(req.userId!);
             const activityTime = activity.activityDate ? new Date(activity.activityDate).toLocaleString("ko-KR", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "곧";
-            await settleNotifications("[ActivityCreateNotif]", crewData.members
+            await settleNotifications("[ActivityCreateNotif]", activeMembers(crewData.members)
                 .filter((m: any) => m.member.id !== req.userId)
                 .map(async (m: any) => {
                     const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
@@ -73,11 +81,11 @@ router.post("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest
                         body: `${creator?.name || "누군가"}님이 "${activity.title || "정모"}"를 만들었어요. ${activityTime}`,
                         category: crewData.crew.sportCategory || "BILLIARDS",
                         type: "ACTIVITY",
-                        params: { url: `/crew/${req.params.id}/activity` },
+                        params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
                     });
                 }));
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 정모 생성:", e); }
     return sendSuccess(res, activity);
 }));
 
@@ -98,10 +106,10 @@ router.post("/:id/activities/:activityId/join", requireAuth, asyncHandler(async 
                 body: `${joiner?.name || "누군가"}님이 "${act.title || "정모"}"에 참가했어요!`,
                 category: "BILLIARDS",
                 type: "ACTIVITY",
-                params: { url: `/crew/${req.params.id}/activity` },
+                params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
             }).catch((err: any) => console.error("[ActivityJoinNotif]", err));
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 정모 참가:", e); }
     return sendSuccess(res, { success: true });
 }));
 
@@ -154,11 +162,11 @@ router.patch("/:id/activities/:activityId", requireAuth, asyncHandler(async (req
                         body: `"${updated?.title || activity.title || "정모"}"이(가) 수정되었어요.`,
                         category: crewData?.crew?.sportCategory || "BILLIARDS",
                         type: "ACTIVITY",
-                        params: { url: `/crew/${req.params.id}/activity` },
+                        params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
                     });
                 }));
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 정모 수정:", e); }
     return sendSuccess(res, updated);
 }));
 
@@ -195,11 +203,11 @@ router.delete("/:id/activities/:activityId", requireAuth, asyncHandler(async (re
                         body: `"${activity.title || "정모"}"이(가) 취소되었어요.`,
                         category: crewData?.crew?.sportCategory || "BILLIARDS",
                         type: "ACTIVITY",
-                        params: { url: `/crew/${req.params.id}/activity` },
+                        params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
                     });
                 }));
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 정모 취소:", e); }
     return sendSuccess(res, { success: true });
 }));
 
@@ -306,11 +314,11 @@ router.post("/:id/posts/:postId/comments", requireAuth, asyncHandler(async (req:
                     body: `${commenter?.name || "누군가"}님이 "${post.title || "게시글"}"에 댓글을 달았습니다.`,
                     category: "BILLIARDS",
                     type: "POST_COMMENT",
-                    params: { url: `/crew/${req.params.id}` },
+                    params: { url: `/crew/${req.params.id}/board`, crewId: req.params.id, tab: "board" },
                 }).catch((err: any) => console.error("[CommentNotif]", err));
             }
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 게시글 댓글:", e); }
     return sendSuccess(res, comment);
 }));
 
@@ -469,7 +477,8 @@ router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res
         const crewData = await storage.getCrew(req.params.id);
         if (crewData) {
             const userId = req.userId!;
-            const membersToNotify = crewData.members.filter((m: any) => m.member.id !== userId);
+            // pending 제외 — 알림 본문에 대화 원문이 그대로 실린다(아래 body 참고).
+            const membersToNotify = activeMembers(crewData.members).filter((m: any) => m.member.id !== userId);
             const sender = crewData.members.find((m: any) => m.member.id === userId);
             const senderName = sender?.member.name || "누군가";
 
@@ -483,7 +492,7 @@ router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res
                     body: `${senderName}: ${chat.message}`,
                     category: crewData.crew.sportCategory || "BILLIARDS",
                     type: "CHAT",
-                    params: { crewId: req.params.id, tab: "Chat" }
+                    params: { url: `/crew/${req.params.id}/chat`, crewId: req.params.id, tab: "chat" }
                 });
             }));
         }
@@ -548,7 +557,7 @@ router.post("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res
         const crewData = await storage.getCrew(req.params.id);
         if (crewData) {
             const author = await storage.getMemberById(req.userId!);
-            await settleNotifications("[PollCreateNotif]", crewData.members
+            await settleNotifications("[PollCreateNotif]", activeMembers(crewData.members)
                 .filter((m: any) => m.member.id !== req.userId)
                 .map(async (m: any) => {
                     const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
@@ -559,11 +568,11 @@ router.post("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res
                         body: `${author?.name || "누군가"}님이 "${rest.title || "투표"}"를 만들었어요. 지금 참여해보세요!`,
                         category: crewData.crew.sportCategory || "BILLIARDS",
                         type: "POLL",
-                        params: { url: `/crew/${req.params.id}` },
+                        params: { url: `/crew/${req.params.id}/poll`, crewId: req.params.id, tab: "poll" },
                     });
                 }));
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 투표 생성:", e); }
     return sendSuccess(res, poll);
 }));
 
@@ -698,24 +707,31 @@ router.get("/:id/members", asyncHandler(async (req: any, res: any) => {
 // POST /crews/:id/join - Join a crew
 router.post("/:id/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const role = await storage.joinCrew(req.params.id, req.userId!);
-    // P0: 가입 신청 → 리더/매니저에게 알림
+    // P0: 가입 → 리더/매니저에게 알림
+    // joinType이 'auto'(기본값)면 joinCrew가 곧바로 'member'로 확정한다 — 그때도 "승인해주세요"를
+    // 보내면 운영진이 들어가 봐야 승인할 대기자가 없다. 실제 role로 문구를 나눈다.
     try {
         const crewData = await storage.getCrew(req.params.id);
         if (crewData) {
             const applicant = await storage.getMemberById(req.userId!);
             const applicantName = applicant?.name || "누군가";
+            const isPending = role === 'pending';
             const admins = crewData.members.filter((m: any) => m.role === "leader" || m.role === "manage");
             await settleNotifications("[JoinReqNotif]", admins.map((admin: any) =>
                 notificationService.sendAndSaveNotification({
                     memberId: admin.member.id,
-                    title: `📩 [${crewData.crew.name}] 가입 신청`,
-                    body: `${applicantName}님이 크루 가입을 신청했어요. 확인 후 승인해주세요.`,
+                    title: isPending
+                        ? `📩 [${crewData.crew.name}] 가입 신청`
+                        : `🙌 [${crewData.crew.name}] 새 멤버 합류`,
+                    body: isPending
+                        ? `${applicantName}님이 크루 가입을 신청했어요. 확인 후 승인해주세요.`
+                        : `${applicantName}님이 크루에 합류했어요. 반갑게 맞아주세요!`,
                     category: crewData.crew.sportCategory || "BILLIARDS",
                     type: "SYSTEM",
-                    params: { url: `/crew/${req.params.id}` },
+                    params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
                 })));
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 크루 가입:", e); }
     return sendSuccess(res, { success: true, role });
 }));
 
@@ -815,7 +831,7 @@ router.post("/:id/members/:memberId/approve", requireAuth, asyncHandler(async (r
             body: "크루 가입이 승인되었습니다! 지금 활동을 시작해보세요.",
             category: data.crew.sportCategory || "BILLIARDS",
             type: "SYSTEM",
-            params: { crewId: crewId }
+            params: { url: `/crew/${crewId}/home`, crewId: crewId, tab: "home" }
         });
     } catch (err) {
         console.error(`[ApproveNotif] Failed for ${memberId}:`, err);
@@ -852,18 +868,25 @@ router.delete("/:id/members/:memberId", requireAuth, asyncHandler(async (req: Au
             return sendError(res, 403, "권한이 없습니다");
         }
 
-        // P1: 강퇴 → 당사자에게 알림
+        // P1: 강퇴/가입 반려 → 당사자에게 알림
+        // 클라의 승인 대기 목록 X 버튼도 이 라우트를 쓴다 — 대상이 pending이면 가입한 적이 없으므로
+        // "탈퇴 처리" 문구는 사실과 다르다. 현재 role로 문구를 나눈다.
         try {
-            const crewData = await storage.getCrew(req.params.id);
+            const crewName = data?.crew?.name || "크루";
+            const isPendingTarget = target.role === 'pending';
             await notificationService.sendAndSaveNotification({
                 memberId: memberId,
-                title: `⚠️ [${crewData?.crew.name || "크루"}] 강퇴 안내`,
-                body: "크루에서 탈퇴 처리되었습니다.",
-                category: crewData?.crew?.sportCategory || "BILLIARDS",
+                title: isPendingTarget
+                    ? `📪 [${crewName}] 가입 신청 결과`
+                    : `⚠️ [${crewName}] 강퇴 안내`,
+                body: isPendingTarget
+                    ? "가입 신청이 반려되었습니다."
+                    : "크루에서 탈퇴 처리되었습니다.",
+                category: data?.crew?.sportCategory || "BILLIARDS",
                 type: "SYSTEM",
                 params: { url: "/club" },
             }).catch((err: any) => console.error("[KickNotif]", err));
-        } catch(e) {}
+        } catch(e) { console.error("[Notify] 강퇴/가입 반려:", e); }
     }
 
     await storage.leaveCrew(crewId, memberId);
@@ -899,17 +922,16 @@ router.patch("/:id/members/:memberId/role", requireAuth, asyncHandler(async (req
 
     // P1: 역할 변경 → 대상자에게 알림
     try {
-        const crewData = await storage.getCrew(req.params.id);
         const roleLabel = role === "manage" ? "부관리자" : "일반 멤버";
         await notificationService.sendAndSaveNotification({
             memberId: memberId,
-            title: `👤 [${crewData?.crew.name || "크루"}] 권한 변경`,
+            title: `👤 [${data?.crew?.name || "크루"}] 권한 변경`,
             body: `크루장님이 회원을 "${roleLabel}"(으)로 변경했어요.`,
-            category: crewData?.crew?.sportCategory || "BILLIARDS",
+            category: data?.crew?.sportCategory || "BILLIARDS",
             type: "SYSTEM",
-            params: { url: `/crew/${req.params.id}` },
+            params: { url: `/crew/${crewId}/home`, crewId, tab: "home" },
         }).catch((err: any) => console.error("[RoleChangeNotif]", err));
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 권한 변경:", e); }
 
     return sendSuccess(res, { success: true });
 }));
@@ -954,6 +976,8 @@ router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthReques
         }
     }
 
+    const settlementTab = req.body.sendToChat ? "chat" : "home";
+
     // P0: 정산 요청 → 참여 대상자들 모두에게 알림
     try {
         const crewData = await storage.getCrew(req.params.id);
@@ -964,7 +988,8 @@ router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthReques
             // participants는 클라 body에서 그대로 온다 — 크루원 집합과 교집합만 남긴다.
             // (검증이 없으면 임의의 memberId를 실어 아무에게나 푸시를 보낼 수 있었다.)
             // 같은 사람이 여러 차수에 들어 있어도 알림은 1번이면 되므로 Set으로 중복 제거.
-            const crewMemberIds = new Set(crewData.members.map((m: any) => m.member.id));
+            // 승인 대기자는 정산 대상이 될 수 없다 — 교집합을 정식 멤버로 한정한다.
+            const crewMemberIds = new Set(activeMembers(crewData.members).map((m: any) => m.member.id));
             const targetIds = new Set<string>();
             for (const p of participants) {
                 const pid = typeof p === "string" ? p : p?.memberId;
@@ -980,11 +1005,12 @@ router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthReques
                     body: `${creatorName}님이 정산 "${settlement.title}"을(를) 요청했어요. 총 ${totalAmount.toLocaleString()}원`,
                     category: crewData.crew.sportCategory || "BILLIARDS",
                     type: "SETTLEMENT",
-                    params: { url: `/crew/${req.params.id}` },
+                    // 정산은 채팅 카드로만 열 수 있다 — 카드를 안 보냈으면 홈으로.
+                    params: { url: `/crew/${req.params.id}/${settlementTab}`, crewId: req.params.id, tab: settlementTab },
                 });
             }));
         }
-    } catch(e) {}
+    } catch(e) { console.error("[Notify] 정산 요청:", e); }
 
     return sendSuccess(res, settlement);
 }));

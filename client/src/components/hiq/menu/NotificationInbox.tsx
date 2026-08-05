@@ -46,11 +46,23 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
             readMutation.mutate(notif.id);
         }
 
-        // Deep linking logic — 크루 상세는 /club/:id 에 마운트되어 있고, 탭은 ?tab= 쿼리로 전달한다.
-        if (notif.params && notif.params.crewId) {
-            const tab = notif.params.tab?.toLowerCase();
-            setLocation(`/club/${notif.params.crewId}${tab ? `?tab=${tab}` : ''}`);
+        // Deep linking logic — 알림 params는 {url} 과 {crewId, tab} 두 형태가 섞여 있다.
+        // 예전엔 crewId만 봤기 때문에 url만 실린 알림(정모·투표·정산·경기 등)은 탭해도 아무 반응이
+        // 없었다. 네이티브 푸시 쪽(deepLinkUrl)과 동일하게 url을 먼저 보고, 없으면 crewId로 만든다.
+        const p = notif.params;
+        const url = typeof p?.url === "string" ? p.url : "";
+        // 앱 내부 경로만 허용 — '//host' 는 외부로 튕겨나가므로 제외한다.
+        if (url.startsWith("/") && !url.startsWith("//")) {
+            setLocation(url);
             onClose();
+            return;
+        }
+        // 크루 상세는 /club/:id 에 마운트되어 있고, 탭은 ?tab= 쿼리로 전달한다.
+        if (p?.crewId) {
+            const tab = typeof p.tab === "string" ? p.tab.toLowerCase() : "";
+            setLocation(`/club/${p.crewId}${tab ? `?tab=${tab}` : ''}`);
+            onClose();
+            return;
         }
         // NOTICE 등 목적지 페이지가 없는 알림은 읽음 처리만 하고 이동하지 않는다 (전용 페이지 부재).
     };
