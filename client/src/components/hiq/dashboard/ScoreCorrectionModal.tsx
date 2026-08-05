@@ -1,8 +1,7 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { HiqMember } from "@shared/schema";
-import { useState, useEffect } from "react";
-import { apiRequest } from "@/lib/queryClient";
-import { X, Check, Calculator } from "@/lib/icons";
+import { useState } from "react";
+import { X, Calculator } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 
@@ -12,61 +11,20 @@ interface ScoreCorrectionModalProps {
     member: HiqMember;
 }
 
+// 예전엔 여기서 average/handi3c/handi4c를 PATCH /api/hiq/me로 보냈다. 그런데 서버는 이 필드들을
+// 받지 않는다 — 자기 신고 다마수를 그대로 저장하면 랭킹이 오염되므로 안 받는 게 맞다. 결과적으로
+// "저장하기"는 아무것도 바꾸지 않으면서 저장된 것처럼 보이고, 새로고침 뒤 값이 그대로라 사용자는
+// 버그로 받아들였다. 그래서 쓰기를 없애고, 현재 값과 산정 방식을 보여주는 읽기 전용 안내로 바꿨다.
 export const ScoreCorrectionModal = ({ open, onOpenChange, member }: ScoreCorrectionModalProps) => {
     const { t } = useT();
-    const [editAverage, setEditAverage] = useState<string>("");
-    const [editHandi3c, setEditHandi3c] = useState<number>(0);
-    const [editHandi4c, setEditHandi4c] = useState<number>(0);
-    const [activeEditType, setActiveEditType] = useState<"3c" | "4c">("4c");
+    const [activeType, setActiveType] = useState<"3c" | "4c">("4c");
 
-    useEffect(() => {
-        if (open && member) {
-            setEditAverage(member.average || "0");
-            setEditHandi3c(member.handi3c || 15);
-            setEditHandi4c(member.handi4c || 150);
-        }
-    }, [open, member]);
+    const average = activeType === "4c" ? member?.avg4c : member?.avg3c;
+    const handicap = activeType === "4c" ? member?.handi4c : member?.handi3c;
 
-    const handleAverageChange = (newAvg: string) => {
-        setEditAverage(newAvg);
-        const avg = parseFloat(newAvg);
-        if (!isNaN(avg)) {
-            if (activeEditType === "4c") {
-                setEditHandi4c(Math.floor(avg) * 10);
-            } else {
-                setEditHandi3c(Math.floor(avg * 20 + 5));
-            }
-        }
-    };
-
-    const handleTypeChange = (type: "3c" | "4c") => {
-        setActiveEditType(type);
-        const avg = parseFloat(editAverage);
-        if (!isNaN(avg)) {
-            if (type === "4c") {
-                setEditHandi4c(Math.floor(avg) * 10);
-            } else {
-                setEditHandi3c(Math.floor(avg * 20 + 5));
-            }
-        }
-    };
-
-    const confirmScoreUpdate = async () => {
-        try {
-            await apiRequest("/api/hiq/me", {
-                method: "PATCH",
-                body: {
-                    average: editAverage,
-                    handi3c: editHandi3c,
-                    handi4c: editHandi4c
-                }
-            });
-            onOpenChange(false);
-            window.location.reload(); // Simple reload to reflect changes
-        } catch (error) {
-            console.error("Failed to update scores:", error);
-        }
-    };
+    // 아직 해당 종목 랭킹전 기록이 없으면 0이 온다 — 0.000/0점보다 "-"가 덜 오해를 부른다.
+    const averageText = typeof average === "number" && average > 0 ? average.toFixed(3) : "-";
+    const handicapText = handicap && handicap > 0 ? `${handicap} ${t("scoreCorrectionModal.pointSuffix")}` : "-";
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -85,43 +43,42 @@ export const ScoreCorrectionModal = ({ open, onOpenChange, member }: ScoreCorrec
                     {/* Tab Switch */}
                     <div className="flex bg-black/[0.04] p-1 rounded-tile">
                         <button
-                            onClick={() => handleTypeChange("4c")}
-                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeEditType === "4c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-ink-1"}`}
+                            onClick={() => setActiveType("4c")}
+                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeType === "4c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-ink-1"}`}
                         >
                             {t("scoreCorrectionModal.tab4c")}
                         </button>
                         <button
-                            onClick={() => handleTypeChange("3c")}
-                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeEditType === "3c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-ink-1"}`}
+                            onClick={() => setActiveType("3c")}
+                            className={`flex-1 py-2 rounded-tile text-sm font-semibold transition-all ${activeType === "3c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-ink-1"}`}
                         >
                             {t("scoreCorrectionModal.tab3c")}
                         </button>
                     </div>
 
-                    {/* Inputs */}
+                    {/* Read-only current values */}
                     <div className="space-y-4">
                         <div>
                             <label className="text-xs font-medium text-black/55 mb-1 block">{t("scoreCorrectionModal.average")}</label>
-                            <input
-                                type="number"
-                                step="0.001"
-                                value={editAverage}
-                                onChange={(e) => handleAverageChange(e.target.value)}
-                                className="w-full bg-black/[0.04] rounded-tile px-4 py-3 text-lg font-bold tabular-nums text-ink-1 focus:outline-none focus:border-brand/50"
-                            />
+                            <div className="w-full bg-black/[0.04] rounded-tile px-4 py-3 text-lg font-bold tabular-nums text-ink-1">
+                                {averageText}
+                            </div>
                         </div>
                         <div>
                             <label className="text-xs font-medium text-black/55 mb-1 block">{t("scoreCorrectionModal.handicap")}</label>
                             <div className="w-full bg-black/[0.04] rounded-tile px-4 py-3 text-lg font-bold tabular-nums text-brand">
-                                {activeEditType === "4c" ? editHandi4c : editHandi3c} {t("scoreCorrectionModal.pointSuffix")}
+                                {handicapText}
                             </div>
                             <p className="text-[12px] text-black/55 mt-1">{t("scoreCorrectionModal.autoCalcNote")}</p>
                         </div>
                     </div>
 
-                    <Button onClick={confirmScoreUpdate} className="rk-btn-primary w-full h-12 text-lg">
-                        <Check className="w-5 h-5 mr-2" />
-                        {t("scoreCorrectionModal.save")}
+                    <p className="text-[12px] leading-relaxed text-black/55 bg-black/[0.03] rounded-tile px-4 py-3">
+                        {t("gameCreationModal.pinAutoRecord")}
+                    </p>
+
+                    <Button onClick={() => onOpenChange(false)} className="rk-btn-primary w-full h-12 text-lg">
+                        {t("quickActions.close")}
                     </Button>
                 </div>
             </DialogContent>

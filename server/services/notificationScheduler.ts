@@ -1,8 +1,9 @@
 import cron from "node-cron";
 import { db } from "../db.js";
-import { hiqCrewActivities, hiqCrewActivityParticipants, hiqPolls, hiqCrewMembers, hiqCrews, hiqNotifications } from "../../shared/schema.js";
+import { hiqCrewActivities, hiqCrewActivityParticipants, hiqPolls, hiqPollVotes, hiqCrewMembers, hiqCrews, hiqNotifications } from "../../shared/schema.js";
 import { eq, and, gte, lte, ne, sql } from "drizzle-orm";
 import { notificationService } from "./notificationService.js";
+import { storage } from "../storage/index.js";
 
 // Runs every 30 minutes
 const SCHEDULE = "*/30 * * * *";
@@ -57,6 +58,10 @@ async function sendActivityReminder(
   activityDate: Date,
   hoursLeft: number,
 ) {
+  // 크루별 알림 설정 존중 — 사용자가 정모 알림을 꺼도 크론이 계속 보내던 문제.
+  const setting = await storage.notifs.getCrewNotificationSetting(crewId, participantId);
+  if (!setting.activityEnabled) return;
+
   // 같은 정모·같은 시점(24h/1h)의 리마인더는 1회만.
   const reminderKey = `activity:${activityId}:${hoursLeft}h`;
   if (await wasRecentlyNotified(reminderKey, participantId, 20)) return;
@@ -79,6 +84,17 @@ async function sendActivityReminder(
 }
 
 async function sendPollReminder(pollId: string, participantId: string, crewId: string, title: string, endTime: Date) {
+  // 크루별 알림 설정 존중 — 투표 알림을 꺼도 크론이 계속 보내던 문제.
+  const setting = await storage.notifs.getCrewNotificationSetting(crewId, participantId);
+  if (!setting.pollEnabled) return;
+
+  // 이미 투표한 사람에게 "지금 투표해주세요"는 스팸이다.
+  const [voted] = await db.select({ id: hiqPollVotes.id })
+    .from(hiqPollVotes)
+    .where(and(eq(hiqPollVotes.pollId, pollId), eq(hiqPollVotes.memberId, participantId)))
+    .limit(1);
+  if (voted) return;
+
   const reminderKey = `poll:${pollId}`;
   if (await wasRecentlyNotified(reminderKey, participantId, 20)) return;
 

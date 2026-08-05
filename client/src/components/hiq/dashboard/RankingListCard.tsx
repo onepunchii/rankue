@@ -12,6 +12,12 @@ interface RankingListCardProps {
     currentMemberId: number | string;
 }
 
+// 평균은 소스에 따라 2자리("0.43")로 오기도 해서 표시만 3자리로 통일한다.
+const formatAvg = (value: unknown) => {
+    const n = parseFloat(String(value ?? ""));
+    return isNaN(n) ? "0.000" : n.toFixed(3);
+};
+
 export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMemberId }: RankingListCardProps) => {
     const { t } = useT();
 
@@ -22,8 +28,12 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
         return ((b[field] || 0) - (a[field] || 0));
     }) : [];
 
-    // Filter out users with 0 RP if needed, or keep them. Let's keep top 10.
-    const displayRankings = sortedRankings.filter(r => (activeTab === '3c' ? r.rating3c : r.rating4c) !== undefined).slice(0, 10);
+    // rating 컬럼은 notNull default 0이라 `!== undefined`로는 아무도 걸러지지 않았고,
+    // 0 RP 회원과 익명화된 탈퇴회원까지 대시보드 랭킹에 노출됐다.
+    // 랭킹 페이지(/ranking)와 같은 기준(> 0)으로 맞추고 탈퇴회원도 뺀다.
+    const displayRankings = sortedRankings
+        .filter(r => ((activeTab === '3c' ? r.rating3c : r.rating4c) || 0) > 0 && r.name !== "탈퇴회원")
+        .slice(0, 10);
 
     return (
         <div className="space-y-4 mb-10">
@@ -90,7 +100,7 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                                         </span>
                                         {isMe && <span className="shrink-0 px-1.5 py-px rounded-full text-[11px] font-bold text-white bg-brand">{t("rankingListCard.me")}</span>}
                                     </div>
-                                    <span className="block text-[12px] font-medium text-black/40 tabular-nums mt-0.5">{t("rankingListCard.avgPrefix")} {member.average || "0.000"}</span>
+                                    <span className="block text-[12px] font-medium text-black/40 tabular-nums mt-0.5">{t("rankingListCard.avgPrefix")} {formatAvg(member.average)}</span>
                                 </div>
 
                                 {/* Score (RP) */}

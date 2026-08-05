@@ -24,15 +24,11 @@ export class NotificationService {
     }) {
         const { memberId, title, body, category, type, params: deepLinkParams } = params;
 
-        // 1. 사용자 토큰 조회
-        // memberId로 profile을 가져와야 함 (pushToken은 profile에 있음)
         const member = await storage.getMemberById(memberId);
-        if (!member || !member.profileId) return;
+        if (!member) return;
 
-        const profile = await storage.getProfile(member.profileId);
-        const pushToken = profile?.pushToken;
-
-        // 2. DB에 알림 내역 저장
+        // 1. DB에 알림 내역 먼저 저장. 푸시 가능 여부(프로필·토큰)와 무관하게 인앱 알림함에는 남아야 한다.
+        // (매장에서 전화번호만으로 등록된 회원은 profileId가 없어서, 예전엔 여기서 나가버려 알림함이 영영 비어 있었다.)
         const notificationData: InsertHiqNotification = {
             memberId,
             title,
@@ -43,6 +39,14 @@ export class NotificationService {
             isRead: false
         };
         await storage.createNotification(notificationData);
+
+        // 2. 푸시 토큰 조회 — pushToken은 profile에 있으므로 프로필이 없으면 푸시 단계만 건너뛴다.
+        if (!member.profileId) {
+            console.log(`[Push] No profile for member ${memberId}, saved to DB only.`);
+            return;
+        }
+        const profile = await storage.getProfile(member.profileId);
+        const pushToken = profile?.pushToken;
 
         // 3. 실제 푸시 발송 — FCM(안드로이드·웹)/APNs(iOS) 자동 판별. 토큰 없으면 DB만.
         if (pushToken) {

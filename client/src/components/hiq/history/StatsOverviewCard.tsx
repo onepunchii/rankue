@@ -43,15 +43,16 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
         totalNormalizedScore = 0,
         winRate = 0,
         bestHighRun = 0,
-        bestAverage = "0.00",
-        recent10Avg = "0.00",
+        // 평균 표기는 앱 전체가 3자리(useGameStats도 toFixed(3))라 기본값도 3자리로 맞춘다.
+        bestAverage = "0.000",
+        recent10Avg = "0.000",
         emptyInningRate = 0,
         mainMode = "-",
         totalAllGames = 0,
         totalAllWins = 0,
         totalAllWinRate = 0,
         hasMixedHistory = false,
-        cumulativeAverage = "0.00",
+        cumulativeAverage = "0.000",
         // member // for golf handicap (not used directly in this refactor, relying on computed golfStats)
     } = stats || {}; // stats가 null일 경우 대비
 
@@ -88,10 +89,11 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                             <BilliardBall color={tierBall(currentTier.label)} size={40} />
                             <div>
                                 <p className="text-[12px] font-medium text-black/55 uppercase tracking-[0.15em] mb-1">{t("statsOverview.tier")}</p>
+                                {/* statsOverview.topPercent("상위 15%")는 데이터와 무관한 고정 문자열이라 제거.
+                                    이 화면엔 모집단 정보가 없어 실제 백분위를 계산할 수 없다. */}
                                 <p className="text-xl font-semibold uppercase text-brand tracking-wide">
                                     {currentTier.label}
                                 </p>
-                                <p className="text-[12px] font-medium text-black/55 uppercase mt-0.5">{t("statsOverview.topPercent")}</p>
                             </div>
                         </div>
 
@@ -141,8 +143,8 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
     return (
         <motion.div key={filter} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
             <div className="rk-card p-5">
-                {/* Tier row */}
-                <div className="flex items-center justify-between mb-5">
+                {/* Tier row — 우측 "상위 15%" 칩은 고정 문자열이라 제거했다(모집단을 몰라 계산 불가). */}
+                <div className="flex items-center mb-5">
                     <div className="flex items-center gap-3 min-w-0">
                         <BilliardBall color={tierBall(currentTier.label)} size={36} />
                         <div className="min-w-0">
@@ -152,7 +154,6 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                             </p>
                         </div>
                     </div>
-                    <span className="rk-chip bg-brand/10 text-brand shrink-0">{t("statsOverview.topPercent")}</span>
                 </div>
 
                 {/* Hero — 승률 게이지 + 누적 평균 + 승/패 */}

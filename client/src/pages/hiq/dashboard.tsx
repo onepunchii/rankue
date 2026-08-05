@@ -21,6 +21,10 @@ import { useT } from "@/lib/i18n";
 
 import { useLocation } from "wouter";
 
+// 서버 GET /api/hiq/rankings 는 항상 상위 20명만 잘라서 준다(getTopRankings(storeId, 20, type)).
+// 응답 길이가 이 값에 닿았다면 뒤에 몇 명이 더 있는지 알 수 없다.
+const RANKINGS_API_LIMIT = 20;
+
 export default function HiqDashboard() {
     const { t } = useT();
     const [, setLocation] = useLocation();
@@ -54,6 +58,11 @@ export default function HiqDashboard() {
         // (3c always uses the dedicated 3c list; 4c only meaningful when the tab is on 4c.)
         const source = type === '3c' ? rankings3c : (rankingTab === '4c' ? rankings : null);
         if (!source) return null;
+
+        // 목록이 상한에 걸렸으면 이건 매장 전체가 아니라 '상위 20명'일 뿐이다.
+        // 이걸 모집단으로 쓰면 회원 400명 매장에서도 "상위 50%" 같은 거짓 숫자가 나오므로,
+        // 모집단을 확신할 수 없을 땐 백분위를 포기한다(DashboardHeader는 null이면 '분석 중'을 띄운다).
+        if (source.length >= RANKINGS_API_LIMIT) return null;
 
         const field = type === '3c' ? 'rating3c' : 'rating4c';
         const ranked = source

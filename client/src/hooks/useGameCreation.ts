@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, ApiError } from "@/lib/queryClient";
 import { HiqMember, HiqGameHistory } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useT } from "@/lib/i18n";
 
 export type PlayerType = 'member' | 'guest';
 
@@ -23,6 +24,10 @@ interface GameCreationProps {
      *  PIN poll would keep hitting the server every 3s forever after the user closes it. */
     open?: boolean;
 }
+
+// hiq_games 스키마의 슬롯은 player1~4가 전부다. 그 이상으로 늘려봐야 저장될 자리가 없어
+// 5번째 참가자는 조용히 사라진다.
+const MAX_PLAYERS = 4;
 
 // Helper to calculate target score based on average and game type
 const calculateTargetScore = (avg: string | number | null | undefined, type: '3c' | '4c'): number => {
@@ -67,11 +72,22 @@ const calculateRecordAverage = (history: HiqGameHistory[] | undefined, type: '3c
 export const useGameCreation = ({ member, history, initialMode = "practice", initialType = "4c", open = true }: GameCreationProps) => {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
+    const { t } = useT();
 
     // Game Config State
     const [gameMode, setGameMode] = useState<"practice" | "match">(initialMode);
     const [gameType, setGameType] = useState<"3c" | "4c">(initialType);
-    const [numberOfPlayers, setNumberOfPlayers] = useState(2);
+    const [numberOfPlayers, setNumberOfPlayersInternal] = useState(2);
+    const numberOfPlayersRef = useRef(numberOfPlayers);
+    numberOfPlayersRef.current = numberOfPlayers;
+
+    // 호스트가 인원 수를 직접 고르면 그 선택이 폴링보다 우선한다. 이 플래그가 없으면 "2인"을
+    // 눌러도 3초 뒤 폴링이 참가자 수만큼 슬롯을 도로 늘려 선택이 취소된 것처럼 보인다.
+    const playerCountTouchedRef = useRef(false);
+    const setNumberOfPlayers = useCallback((count: number) => {
+        playerCountTouchedRef.current = true;
+        setNumberOfPlayersInternal(Math.min(MAX_PLAYERS, Math.max(1, count)));
+    }, []);
 
     // Players State
     const [players, setPlayers] = useState<PlayerInfo[]>([]);
@@ -108,6 +124,8 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             // games. The effect below owns creation and reacts to the settled gameMode instead.
             setInviteCode(null);
             setDismissedIds([]);
+            // 새 세션이므로 인원 수 수동 선택 기록도 초기화한다.
+            playerCountTouchedRef.current = false;
         }
     }, [member, history, gameType, numberOfPlayers]);
 
@@ -199,6 +217,11 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             const targetIndex = index + direction;
             if (targetIndex < 0 || targetIndex >= newPlayers.length) return prev;
 
+            // 호스트는 1번 슬롯 고정. 서버는 슬롯2~4에 "내 초대에 동의한 게스트"만 허용하고
+            // 호스트 본인은 자기 초대에 참여할 수 없어 그 목록에 절대 없다 — 호스트가 내려가면
+            // player2Id로 본인 id가 실려 400이 떨어지고 경기가 영영 시작되지 않는다.
+            if (newPlayers[index].isHost || newPlayers[targetIndex].isHost) return prev;
+
             [newPlayers[index], newPlayers[targetIndex]] = [newPlayers[targetIndex], newPlayers[index]];
             return newPlayers;
         });
@@ -210,50 +233,51 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             const interval = setInterval(async () => {
                 try {
                     const res = await apiRequest(`/api/hiq/invite/${inviteCode}`);
-                    if (res.guests && res.guests.length > 0) {
-                        setPlayers(prev => {
-                            let currentPlayers = [...prev];
-                            const requiredSlots = 1 + res.guests.length;
+                    const guests: any[] = res.guests || [];
+                    if (guests.length === 0) return;
 
-                            // Auto-expand
-                            if (requiredSlots > currentPlayers.length) {
-                                const additional = requiredSlots - currentPlayers.length;
-                                for (let i = 0; i < additional; i++) {
-                                    currentPlayers.push({ type: 'guest', target: 0, name: '' });
-                                }
-                                setNumberOfPlayers(requiredSlots);
+                    // 참가자가 몰려도 슬롯 상한(4)을 넘기지 않는다.
+                    const requiredSlots = Math.min(MAX_PLAYERS, 1 + guests.length);
+                    // 호스트가 인원을 직접 고른 뒤에는 폴링이 그 선택을 되돌리지 않는다.
+                    const mayExpand = !playerCountTouchedRef.current;
+
+                    setPlayers(prev => {
+                        const currentPlayers = [...prev];
+
+                        // Auto-expand
+                        if (mayExpand) {
+                            while (currentPlayers.length < requiredSlots) {
+                                currentPlayers.push({ type: 'guest', target: 0, name: '' });
                             }
+                        }
 
-                            const existingIds = new Set(currentPlayers.filter(p => p.member).map(p => p.member!.id));
+                        const existingIds = new Set(currentPlayers.filter(p => p.member).map(p => p.member!.id));
 
-                            res.guests.forEach((guest: any) => {
-                                if (existingIds.has(guest.id) || dismissedIds.includes(guest.id)) return;
+                        guests.forEach((guest: any) => {
+                            if (existingIds.has(guest.id) || dismissedIds.includes(guest.id)) return;
 
-                                const emptySlotIdx = currentPlayers.findIndex(p => !p.isHost && !p.member && (!p.name || p.name === ''));
-                                if (emptySlotIdx !== -1) {
-                                    currentPlayers[emptySlotIdx] = {
-                                        ...currentPlayers[emptySlotIdx],
-                                        type: 'member',
-                                        member: guest,
-                                        target: calculateTargetScore(memberAvgForType(guest, gameType), gameType),
-                                        name: guest.name
-                                    };
-                                } else {
-                                    // Fallback
-                                    const guestSlotIdx = currentPlayers.findIndex(p => !p.isHost && !p.member);
-                                    if (guestSlotIdx !== -1) {
-                                        currentPlayers[guestSlotIdx] = {
-                                            ...currentPlayers[guestSlotIdx],
-                                            type: 'member',
-                                            member: guest,
-                                            target: calculateTargetScore(memberAvgForType(guest, gameType), gameType),
-                                            name: guest.name
-                                        };
-                                    }
-                                }
-                            });
-                            return currentPlayers;
+                            // 앉힐 수 있는 자리는 '비어 있는' 슬롯뿐이다. 예전 폴백은 빈 슬롯이 없으면
+                            // 이름이 이미 적힌 게스트 슬롯까지 덮어써서, 호스트가 적어둔 상대 이름이
+                            // 핀에 아무나 들어오는 순간 조용히 바뀌었다. 자리가 없으면 그냥 둔다.
+                            const emptySlotIdx = currentPlayers.findIndex(p => !p.isHost && !p.member && !p.name?.trim());
+                            if (emptySlotIdx === -1) return;
+
+                            currentPlayers[emptySlotIdx] = {
+                                ...currentPlayers[emptySlotIdx],
+                                type: 'member',
+                                member: guest,
+                                target: calculateTargetScore(memberAvgForType(guest, gameType), gameType),
+                                name: guest.name
+                            };
+                            existingIds.add(guest.id);
                         });
+                        return currentPlayers;
+                    });
+
+                    // 인원 셀렉터와 슬롯 수가 어긋나지 않게 맞춘다. setPlayers 업데이터 안에서
+                    // 호출하면 렌더 도중 다른 state를 건드리는 부수효과가 되므로 밖에서 처리.
+                    if (mayExpand && requiredSlots > numberOfPlayersRef.current) {
+                        setNumberOfPlayersInternal(requiredSlots);
                     }
                 } catch (e: any) {
                     // The server 404s a code that no longer exists / has expired. Keep showing a
@@ -291,6 +315,16 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
 
         const ruleFinishType = !useFinishRule ? "none" : (gameType === "4c" ? "3c" : "bank");
 
+        // 게스트 이름이 비면 서버에 ""가 저장되는데, 스코어보드는 (playerNId || playerNName)으로
+        // 참가 인원을 세기 때문에 빈 문자열이 falsy가 되어 상대 카드가 아예 렌더링되지 않는다
+        // (턴을 넘겨도 이닝만 올라간다). 막는 대신 자동으로 채운다 — 마찰이 적다.
+        // 단, 연습 모드는 1번 슬롯만 쓰므로 채우면 혼자 연습이 2인 경기로 둔갑한다.
+        const guestSlotName = (p: PlayerInfo | undefined, idx: number): string | undefined => {
+            const typed = p?.name?.trim();
+            if (typed) return typed;
+            return gameMode === "match" ? `${t("gameCreationModal.guest")} ${idx + 1}` : p?.name;
+        };
+
         try {
             const body = {
                 gameMode,
@@ -300,13 +334,13 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                 player1Name: players[0].name,
                 player1Target: players[0].target,
                 player2Id: players[1]?.type === 'member' ? players[1].member?.id : null,
-                player2Name: players[1]?.type === 'guest' ? players[1].name : undefined,
+                player2Name: players[1]?.type === 'guest' ? guestSlotName(players[1], 1) : undefined,
                 player2Target: players[1]?.target || 0,
                 player3Id: players[2]?.type === 'member' ? players[2].member?.id : null,
-                player3Name: players[2]?.type === 'guest' ? players[2].name : undefined,
+                player3Name: players[2]?.type === 'guest' ? guestSlotName(players[2], 2) : undefined,
                 player3Target: players[2]?.target || 0,
                 player4Id: players[3]?.type === 'member' ? players[3].member?.id : null,
-                player4Name: players[3]?.type === 'guest' ? players[3].name : undefined,
+                player4Name: players[3]?.type === 'guest' ? guestSlotName(players[3], 3) : undefined,
                 player4Target: players[3]?.target || 0,
                 ruleFinishType,
                 finishTargetCount: useFinishRule ? finishTargetCount : 0,
@@ -321,9 +355,13 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             setLocation(`/game/${game.id}`);
         } catch (error) {
             console.error("Failed to start game:", error);
+            // 서버가 준 사유("상대의 참가 확인이 만료되었습니다. 새 핀으로..." 등)를 그대로 보여준다.
+            // 고정 문구만 띄우면 호스트는 몇 번을 다시 눌러도 원인을 알 수 없었다.
+            // 네트워크 오류(TypeError: Failed to fetch)는 사용자에게 의미가 없어 기본 문구로 간다.
+            const serverMessage = error instanceof ApiError ? error.message : "";
             toast({
                 title: "게임 시작 실패",
-                description: "잠시 후 다시 시도해주세요.",
+                description: serverMessage || "잠시 후 다시 시도해주세요.",
                 variant: "destructive"
             });
             // Only release the guard on failure — on success we navigate away.

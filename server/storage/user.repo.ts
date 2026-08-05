@@ -8,6 +8,7 @@ import {
     hiqGames,
     hiqInvites,
     hiqNotifications,
+    hiqCrews,
     hiqCrewMembers,
     hiqStores,
     suggestions
@@ -17,7 +18,34 @@ import type {
     InsertHiqMember,
     HiqMember
 } from "../../shared/schema.js";
-import { eq, desc, asc, and, or, sql, gte, inArray } from "drizzle-orm";
+import { eq, desc, asc, and, or, ne, sql, gt, gte, inArray } from "drizzle-orm";
+
+// SECURITY: 남에게 보이는 응답(랭킹·상대목록·검색·타인 프로필)은 반드시 이 화이트리스트로만 셀렉트한다.
+// hiqMembers를 통째로 select하면 phone과 정산 계좌(defaultAccount*)까지 API로 새어 나간다.
+// crew.repo.ts와 같은 규칙: phone, profileId, storeId, marketingAgree, visitCount/lastVisitedAt,
+// defaultAccountBank/Number/Holder는 절대 포함하지 않는다.
+export const PUBLIC_MEMBER_COLUMNS = {
+    id: hiqMembers.id,
+    name: hiqMembers.name,
+    birthYear: hiqMembers.birthYear,
+    gender: hiqMembers.gender,
+    handi3c: hiqMembers.handi3c,
+    handi4c: hiqMembers.handi4c,
+    average: hiqMembers.average,
+    rating3c: hiqMembers.rating3c,
+    rating4c: hiqMembers.rating4c,
+    avg3c: hiqMembers.avg3c,
+    avg4c: hiqMembers.avg4c,
+    golfHandicap: hiqMembers.golfHandicap,
+    golfBestScore: hiqMembers.golfBestScore,
+    golfAvgScore: hiqMembers.golfAvgScore,
+    golfGrade: hiqMembers.golfGrade,
+    golfGradeVerified: hiqMembers.golfGradeVerified,
+    totalGolfGames: hiqMembers.totalGolfGames,
+    totalSimPoints: hiqMembers.totalSimPoints,
+    introduction: hiqMembers.introduction,
+    createdAt: hiqMembers.createdAt,
+};
 
 export class UserRepository {
     async createProfile(data: Partial<Profile>): Promise<Profile> {
@@ -73,8 +101,16 @@ export class UserRepository {
         return member;
     }
 
+    // 내부 전용 — 전 컬럼(phone·계좌·profileId 포함). 알림 발송·본인 조회 등 서버 내부에서만 쓴다.
+    // 남의 정보를 응답으로 내보낼 때는 절대 쓰지 말고 getMemberPublicById를 쓸 것.
     async getMemberById(id: string): Promise<HiqMember | undefined> {
         const [member] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, id));
+        return member;
+    }
+
+    // 타인 프로필 조회용 — 민감 컬럼 제외
+    async getMemberPublicById(id: string): Promise<any | undefined> {
+        const [member] = await db.select(PUBLIC_MEMBER_COLUMNS).from(hiqMembers).where(eq(hiqMembers.id, id));
         return member;
     }
 
@@ -124,21 +160,34 @@ export class UserRepository {
     }
 
     // 랭킹 — 매장(하이퍼로컬)·국가·글로벌을 같은 쿼리 축으로. countryCode 지정 시 국가 랭킹.
-    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c', countryCode?: string): Promise<HiqMember[]> {
+    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c', countryCode?: string): Promise<any[]> {
         const field = type === '3c' ? hiqMembers.rating3c : hiqMembers.rating4c;
-        let query = db.select({
-            member: hiqMembers,
-            handle: profiles.handle,
-            countryCode: profiles.countryCode,
-        }).from(hiqMembers).leftJoin(profiles, eq(hiqMembers.profileId, profiles.id));
 
+        const conditions: any[] = [
+            // 탈퇴 회원은 익명화만 하고 행을 남기므로(전적 보존) 명시적으로 걸러야 한다.
+            ne(hiqMembers.name, "탈퇴회원"),
+            // 0 RP(=한 판도 안 친 신규 가입자)는 랭킹에서 뺀다. 단 이 엔드포인트는 골프 랭킹 화면도
+            // 같이 쓰는데 골퍼는 당구 RP가 0일 수 있어, 골프 활동이 있으면 남긴다.
+            or(gt(field, 0), gt(hiqMembers.totalGolfGames, 0), gt(hiqMembers.golfHandicap, 0)),
+        ];
         if (storeId) {
-            query.where(eq(hiqMembers.storeId, storeId));
+            conditions.push(eq(hiqMembers.storeId, storeId));
         } else if (countryCode) {
-            query.where(eq(profiles.countryCode, countryCode));
+            conditions.push(eq(profiles.countryCode, countryCode));
         }
 
-        const rows = await query.orderBy(desc(field)).limit(limit);
+        const rows = await db.select({
+            // 랭킹 카드는 Lv. 표기에 visitCount를 쓰므로 공개 컬럼에 그것만 더한다.
+            member: { ...PUBLIC_MEMBER_COLUMNS, visitCount: hiqMembers.visitCount },
+            handle: profiles.handle,
+            countryCode: profiles.countryCode,
+        })
+            .from(hiqMembers)
+            .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
+            .where(and(...conditions))
+            .orderBy(desc(field))
+            .limit(limit);
+
         const members = rows.map((r) => ({ ...r.member, handle: r.handle, countryCode: r.countryCode } as any));
 
         // Calculate Official AVG for each member based on Game History
@@ -170,11 +219,12 @@ export class UserRepository {
         return enhancedMembers;
     }
 
-    async getAvailableOpponents(storeId: string, currentUserId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<HiqMember[]> {
+    async getAvailableOpponents(storeId: string, currentUserId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<any[]> {
         const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
 
         const members = await db
-            .select()
+            // 상대 선택 화면은 '최근 방문' 뱃지에 updatedAt을 쓴다(정렬 축이기도 하다).
+            .select({ ...PUBLIC_MEMBER_COLUMNS, updatedAt: hiqMembers.updatedAt })
             .from(hiqMembers)
             .where(
                 and(
@@ -243,7 +293,7 @@ export class UserRepository {
 
     async getFriends(memberId: string, sport: string = "BILLIARDS"): Promise<any[]> {
         const friends = await db.select({
-            friend: hiqMembers,
+            friend: PUBLIC_MEMBER_COLUMNS,
             profile: profiles,
             status: hiqFriendships.status
         })
@@ -264,8 +314,18 @@ export class UserRepository {
                 )
             );
 
-        const result: any[] = [];
+        // A→B, B→A 양방향 행이 다 있으면 같은 상대가 두 번 나온다 — 상대 id로 접는다.
+        // 상태가 갈리면 accepted 우선(한쪽만 수락된 레거시 행 대비).
+        const uniqueFriends = new Map<string, any>();
         for (const f of friends) {
+            const prev = uniqueFriends.get(f.friend.id);
+            if (!prev || (prev.status !== "accepted" && f.status === "accepted")) {
+                uniqueFriends.set(f.friend.id, f);
+            }
+        }
+
+        const result: any[] = [];
+        for (const f of uniqueFriends.values()) {
             const h2h = await this.getHeadToHeadStats(memberId, f.friend.id, sport);
             result.push({
                 ...f.friend,
@@ -275,7 +335,7 @@ export class UserRepository {
                 h2h: {
                     wins: h2h.myWins,
                     losses: h2h.friendWins,
-                    draws: 0
+                    draws: h2h.draws
                 }
             });
         }
@@ -323,13 +383,24 @@ export class UserRepository {
                 )
             );
 
-        const myWins = games.filter(g => g.hiq_game_history.isWinner).length;
+        // 승패는 hiqGames.winnerId로 판정한다. isWinner만 보고 friendWins = total - myWins로 빼면
+        // 3~4인 경기에서 제3자가 이긴 판까지 상대 승으로 잡히고, 무승부(winnerId 없음)가 사라진다.
+        let myWins = 0;
+        let friendWins = 0;
+        let draws = 0;
+        for (const g of games) {
+            const winnerId = g.hiq_games.winnerId;
+            if (winnerId === myId) myWins++;
+            else if (winnerId === friendId) friendWins++;
+            else draws++; // 무승부이거나 제3자 승 — 둘 사이의 승패로는 치지 않는다
+        }
         const total = games.length;
 
         return {
             total,
             myWins,
-            friendWins: total - myWins, // Simple loss calculation
+            friendWins,
+            draws,
             winRate: total > 0 ? Math.round((myWins / total) * 100) : 0
         };
     }
@@ -349,6 +420,39 @@ export class UserRepository {
         }
 
         await db.transaction(async (tx) => {
+            // 0. 내가 리더인 크루는 리더를 넘기고 나간다. 안 그러면 leaderId가 탈퇴회원을 가리켜
+            //    아무도 관리할 수 없는 좀비 크루가 된다.
+            const ledCrews = await tx.select({ id: hiqCrews.id })
+                .from(hiqCrews)
+                .where(eq(hiqCrews.leaderId, memberId));
+
+            for (const crew of ledCrews) {
+                const candidates = await tx.select({
+                    memberId: hiqCrewMembers.memberId,
+                    role: hiqCrewMembers.role,
+                })
+                    .from(hiqCrewMembers)
+                    .where(and(
+                        eq(hiqCrewMembers.crewId, crew.id),
+                        ne(hiqCrewMembers.memberId, memberId)
+                    ))
+                    .orderBy(asc(hiqCrewMembers.joinedAt));
+
+                // 운영진 우선, 없으면 가장 오래된 멤버. pending은 아직 승인 전이라 제외.
+                const successor = candidates.find(c => c.role === "manage")
+                    ?? candidates.find(c => c.role === "member");
+
+                // 남은 멤버가 아무도 없으면 크루는 그대로 둔다 — 자식 테이블(게시글·정산·투표…)이 많아
+                // 여기서 삭제하는 건 위험하다.
+                if (!successor) continue;
+
+                await tx.update(hiqCrews).set({ leaderId: successor.memberId }).where(eq(hiqCrews.id, crew.id));
+                await tx.update(hiqCrewMembers).set({ role: "leader" }).where(and(
+                    eq(hiqCrewMembers.crewId, crew.id),
+                    eq(hiqCrewMembers.memberId, successor.memberId)
+                ));
+            }
+
             // 1. 소셜/알림/초대/크루 멤버십 삭제
             await tx.delete(hiqFriendships).where(or(eq(hiqFriendships.requesterId, memberId), eq(hiqFriendships.receiverId, memberId)));
             await tx.delete(hiqInvites).where(or(eq(hiqInvites.hostId, memberId), eq(hiqInvites.guestId, memberId)));

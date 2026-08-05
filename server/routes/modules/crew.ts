@@ -20,6 +20,16 @@ async function requireCrewMember(req: AuthRequest, res: any): Promise<string | n
     return membership.role;
 }
 
+// 알림 발송을 await 한다 — 서버리스(Vercel)는 응답을 보내면 실행이 얼어붙어서
+// fire-and-forget으로 띄운 푸시가 그대로 유실된다. 개별 실패는 로그만 남기고
+// 요청 자체는 성공시켜야 하므로 allSettled.
+async function settleNotifications(tag: string, tasks: Promise<any>[]): Promise<void> {
+    const results = await Promise.allSettled(tasks);
+    for (const r of results) {
+        if (r.status === 'rejected') console.error(tag, r.reason);
+    }
+}
+
 
 // --- Activities ---
 
@@ -52,19 +62,20 @@ router.post("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest
         if (crewData) {
             const creator = await storage.getMemberById(req.userId!);
             const activityTime = activity.activityDate ? new Date(activity.activityDate).toLocaleString("ko-KR", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "곧";
-            for (const m of crewData.members) {
-                if (m.member.id === req.userId) continue;
-                const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
-                if (!setting.activityEnabled) continue;
-                notificationService.sendAndSaveNotification({
-                    memberId: m.member.id,
-                    title: `📅 [${crewData.crew.name}] 새 정모`,
-                    body: `${creator?.name || "누군가"}님이 "${activity.title || "정모"}"를 만들었어요. ${activityTime}`,
-                    category: crewData.crew.sportCategory || "BILLIARDS",
-                    type: "ACTIVITY",
-                    params: { url: `/crew/${req.params.id}/activity` },
-                }).catch((err: any) => console.error("[ActivityCreateNotif]", err));
-            }
+            await settleNotifications("[ActivityCreateNotif]", crewData.members
+                .filter((m: any) => m.member.id !== req.userId)
+                .map(async (m: any) => {
+                    const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
+                    if (!setting.activityEnabled) return;
+                    await notificationService.sendAndSaveNotification({
+                        memberId: m.member.id,
+                        title: `📅 [${crewData.crew.name}] 새 정모`,
+                        body: `${creator?.name || "누군가"}님이 "${activity.title || "정모"}"를 만들었어요. ${activityTime}`,
+                        category: crewData.crew.sportCategory || "BILLIARDS",
+                        type: "ACTIVITY",
+                        params: { url: `/crew/${req.params.id}/activity` },
+                    });
+                }));
         }
     } catch(e) {}
     return sendSuccess(res, activity);
@@ -81,7 +92,7 @@ router.post("/:id/activities/:activityId/join", requireAuth, asyncHandler(async 
         const act = await storage.getCrewActivity(req.params.activityId);
         if (act?.creatorId && act.creatorId !== req.userId) {
             const joiner = await storage.getMemberById(req.userId!);
-            notificationService.sendAndSaveNotification({
+            await notificationService.sendAndSaveNotification({
                 memberId: act.creatorId,
                 title: "✅ 정모 참가",
                 body: `${joiner?.name || "누군가"}님이 "${act.title || "정모"}"에 참가했어요!`,
@@ -127,23 +138,25 @@ router.patch("/:id/activities/:activityId", requireAuth, asyncHandler(async (req
 
     const updated = await storage.updateCrewActivity(req.params.activityId, updateData);
     // P1: 정모 수정 → 참여자 전원에게 알림
+    // 참가자는 별도 테이블에 있다 — 정모 행에는 participants 컬럼이 없어서 예전엔 항상 스킵됐다.
     try {
-        const act = await storage.getCrewActivity(req.params.activityId);
-        if (act?.participants && Array.isArray(act.participants)) {
+        const participantIds = await storage.crews.getActivityParticipantIds(req.params.activityId);
+        if (participantIds.length > 0) {
             const crewData = await storage.getCrew(req.params.id);
-            for (const pid of act.participants) {
-                if (pid === req.userId) continue;
-                const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, pid);
-                if (!setting.activityEnabled) continue;
-                notificationService.sendAndSaveNotification({
-                    memberId: pid,
-                    title: `⚠️ [${crewData?.crew.name || "크루"}] 정모 수정`,
-                    body: `"${act.title || "정모"}"이(가) 수정되었어요.`,
-                    category: crewData?.crew?.sportCategory || "BILLIARDS",
-                    type: "ACTIVITY",
-                    params: { url: `/crew/${req.params.id}/activity` },
-                }).catch((err: any) => console.error("[ActivityEditNotif]", err));
-            }
+            await settleNotifications("[ActivityEditNotif]", participantIds
+                .filter((pid) => pid !== req.userId)
+                .map(async (pid) => {
+                    const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, pid);
+                    if (!setting.activityEnabled) return;
+                    await notificationService.sendAndSaveNotification({
+                        memberId: pid,
+                        title: `⚠️ [${crewData?.crew.name || "크루"}] 정모 수정`,
+                        body: `"${updated?.title || activity.title || "정모"}"이(가) 수정되었어요.`,
+                        category: crewData?.crew?.sportCategory || "BILLIARDS",
+                        type: "ACTIVITY",
+                        params: { url: `/crew/${req.params.id}/activity` },
+                    });
+                }));
         }
     } catch(e) {}
     return sendSuccess(res, updated);
@@ -162,25 +175,29 @@ router.delete("/:id/activities/:activityId", requireAuth, asyncHandler(async (re
     const activity = await storage.getCrewActivity(req.params.activityId);
     if (!activity || activity.crewId !== req.params.id) return sendError(res, 404, "정모를 찾을 수 없습니다");
 
+    // 삭제하면 참가자 행도 같이 사라지므로 알림 대상은 반드시 삭제 '전에' 확보한다.
+    const participantIds = await storage.crews.getActivityParticipantIds(req.params.activityId)
+        .catch(() => [] as string[]);
+
     await storage.deleteCrewActivity(req.params.activityId);
     // P1: 정모 취소 → 참여자 전원에게 알림
     try {
-        const act = await storage.getCrewActivity(req.params.activityId);
-        if (act?.participants && Array.isArray(act.participants)) {
+        if (participantIds.length > 0) {
             const crewData = await storage.getCrew(req.params.id);
-            for (const pid of act.participants) {
-                if (pid === req.userId) continue;
-                const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, pid);
-                if (!setting.activityEnabled) continue;
-                notificationService.sendAndSaveNotification({
-                    memberId: pid,
-                    title: `⚠️ [${crewData?.crew.name || "크루"}] 정모 취소`,
-                    body: `"${act.title || "정모"}"이(가) 취소되었어요.`,
-                    category: crewData?.crew?.sportCategory || "BILLIARDS",
-                    type: "ACTIVITY",
-                    params: { url: `/crew/${req.params.id}/activity` },
-                }).catch((err: any) => console.error("[ActivityDeleteNotif]", err));
-            }
+            await settleNotifications("[ActivityDeleteNotif]", participantIds
+                .filter((pid) => pid !== req.userId)
+                .map(async (pid) => {
+                    const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, pid);
+                    if (!setting.activityEnabled) return;
+                    await notificationService.sendAndSaveNotification({
+                        memberId: pid,
+                        title: `⚠️ [${crewData?.crew.name || "크루"}] 정모 취소`,
+                        body: `"${activity.title || "정모"}"이(가) 취소되었어요.`,
+                        category: crewData?.crew?.sportCategory || "BILLIARDS",
+                        type: "ACTIVITY",
+                        params: { url: `/crew/${req.params.id}/activity` },
+                    });
+                }));
         }
     } catch(e) {}
     return sendSuccess(res, { success: true });
@@ -206,11 +223,15 @@ router.get("/:id/posts", asyncHandler(async (req: any, res: any) => {
 
 // POST /posts
 router.post("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    if (await requireCrewMember(req, res) === null) return;
+    const role = await requireCrewMember(req, res);
+    if (role === null) return;
     const data = {
         ...req.body,
         crewId: req.params.id,
-        authorId: req.userId
+        authorId: req.userId,
+        // 공지 등록은 운영진 전용 — 일반 멤버가 isNotice:true를 실어 보내 상단 고정 공지로
+        // 올리는 걸 막는다.
+        isNotice: (role === 'leader' || role === 'manage') ? req.body.isNotice === true : false,
     };
 
     const validation = insertHiqCrewPostSchema.safeParse(data);
@@ -241,8 +262,11 @@ router.delete("/:id/posts/:postId", requireAuth, asyncHandler(async (req: AuthRe
     return sendSuccess(res, { success: true });
 }));
 
-// POST /posts/:postId/like - Toggle Like
+// POST /posts/:postId/like - Toggle Like (members only)
 router.post("/:id/posts/:postId/like", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const post = await storage.getCrewPost(req.params.postId);
+    if (!post || post.crewId !== req.params.id) return sendError(res, 404, "게시글을 찾을 수 없습니다");
     const result = await storage.toggleCrewPostLike(req.params.postId, req.userId!);
     return sendSuccess(res, result);
 }));
@@ -276,7 +300,7 @@ router.post("/:id/posts/:postId/comments", requireAuth, asyncHandler(async (req:
             const commenter = await storage.getMemberById(req.userId!);
             const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, post.authorId);
             if (setting.postCommentEnabled) {
-                notificationService.sendAndSaveNotification({
+                await notificationService.sendAndSaveNotification({
                     memberId: post.authorId,
                     title: `💬 새 댓글`,
                     body: `${commenter?.name || "누군가"}님이 "${post.title || "게시글"}"에 댓글을 달았습니다.`,
@@ -322,8 +346,11 @@ router.get("/:id/photos", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, photos);
 }));
 
-// POST /crews/:id/photos/:photoId/like
+// POST /crews/:id/photos/:photoId/like (members only)
 router.post("/:id/photos/:photoId/like", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const photo = await storage.getCrewPhoto(req.params.photoId);
+    if (!photo || photo.crewId !== req.params.id) return sendError(res, 404, "사진을 찾을 수 없습니다");
     const result = await storage.toggleCrewPhotoLike(req.params.photoId, req.userId!);
     return sendSuccess(res, result);
 }));
@@ -376,11 +403,16 @@ router.delete("/:id/photo-comments/:commentId", requireAuth, asyncHandler(async 
 // POST /crews/:id/photos
 router.post("/:id/photos", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
+    const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+    if (!url) return sendError(res, 400, "사진 URL이 필요합니다");
+    // 화이트리스트 — req.body를 그대로 펼치면 id/createdAt까지 통과해 PK 충돌이나
+    // 목록 최상단 강제 점유가 가능하다.
     const photo = await storage.createCrewPhoto({
-        ...req.body,
         crewId: req.params.id,
-        uploaderId: req.userId
-    });
+        uploaderId: req.userId,
+        url,
+        caption: typeof req.body?.caption === 'string' ? req.body.caption : null,
+    } as any);
     return sendSuccess(res, photo);
 }));
 
@@ -422,13 +454,17 @@ router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res
         return sendError(res, 400, "메시지를 입력해주세요");
     }
 
+    // 화이트리스트 — req.body를 그대로 펼치면 id/createdAt까지 통과해 PK 충돌이나
+    // 목록 최상단 강제 점유가 가능하다.
     const chat = await storage.createCrewChat({
-        ...req.body,
         crewId: req.params.id,
-        senderId: req.userId
-    });
+        senderId: req.userId,
+        message: req.body.message,
+        type: req.body.type,
+        metadata: req.body.metadata,
+    } as any);
 
-    // Background: Send notification to all crew members except sender
+    // Send notification to all crew members except sender
     try {
         const crewData = await storage.getCrew(req.params.id);
         if (crewData) {
@@ -437,18 +473,19 @@ router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res
             const sender = crewData.members.find((m: any) => m.member.id === userId);
             const senderName = sender?.member.name || "누군가";
 
-            for (const m of membersToNotify) {
+            // 설정 조회도 멤버별로 병렬 — 예전엔 멤버 수만큼 순차 await이라 큰 크루에서 응답이 느렸다.
+            await settleNotifications("[ChatNotif]", membersToNotify.map(async (m: any) => {
                 const chatSetting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
-                if (!chatSetting.chatEnabled) continue;
-                notificationService.sendAndSaveNotification({
+                if (!chatSetting.chatEnabled) return;
+                await notificationService.sendAndSaveNotification({
                     memberId: m.member.id,
                     title: `💬 [${crewData.crew.name}] 새 메시지`,
                     body: `${senderName}: ${chat.message}`,
                     category: crewData.crew.sportCategory || "BILLIARDS",
                     type: "CHAT",
                     params: { crewId: req.params.id, tab: "Chat" }
-                }).catch(err => console.error(`[ChatNotif] Failed for ${m.member.id}:`, err));
-            }
+                });
+            }));
         }
     } catch (notifErr) {
         console.error("[ChatNotif] Error getting crew members:", notifErr);
@@ -511,19 +548,20 @@ router.post("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res
         const crewData = await storage.getCrew(req.params.id);
         if (crewData) {
             const author = await storage.getMemberById(req.userId!);
-            for (const m of crewData.members) {
-                if (m.member.id === req.userId) continue;
-                const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
-                if (!setting.pollEnabled) continue;
-                notificationService.sendAndSaveNotification({
-                    memberId: m.member.id,
-                    title: `📊 [${crewData.crew.name}] 새 투표`,
-                    body: `${author?.name || "누군가"}님이 "${rest.title || "투표"}"를 만들었어요. 지금 참여해보세요!`,
-                    category: crewData.crew.sportCategory || "BILLIARDS",
-                    type: "POLL",
-                    params: { url: `/crew/${req.params.id}` },
-                }).catch((err: any) => console.error("[PollCreateNotif]", err));
-            }
+            await settleNotifications("[PollCreateNotif]", crewData.members
+                .filter((m: any) => m.member.id !== req.userId)
+                .map(async (m: any) => {
+                    const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
+                    if (!setting.pollEnabled) return;
+                    await notificationService.sendAndSaveNotification({
+                        memberId: m.member.id,
+                        title: `📊 [${crewData.crew.name}] 새 투표`,
+                        body: `${author?.name || "누군가"}님이 "${rest.title || "투표"}"를 만들었어요. 지금 참여해보세요!`,
+                        category: crewData.crew.sportCategory || "BILLIARDS",
+                        type: "POLL",
+                        params: { url: `/crew/${req.params.id}` },
+                    });
+                }));
         }
     } catch(e) {}
     return sendSuccess(res, poll);
@@ -667,7 +705,7 @@ router.post("/:id/join", requireAuth, asyncHandler(async (req: AuthRequest, res:
             const applicant = await storage.getMemberById(req.userId!);
             const applicantName = applicant?.name || "누군가";
             const admins = crewData.members.filter((m: any) => m.role === "leader" || m.role === "manage");
-            for (const admin of admins) {
+            await settleNotifications("[JoinReqNotif]", admins.map((admin: any) =>
                 notificationService.sendAndSaveNotification({
                     memberId: admin.member.id,
                     title: `📩 [${crewData.crew.name}] 가입 신청`,
@@ -675,8 +713,7 @@ router.post("/:id/join", requireAuth, asyncHandler(async (req: AuthRequest, res:
                     category: crewData.crew.sportCategory || "BILLIARDS",
                     type: "SYSTEM",
                     params: { url: `/crew/${req.params.id}` },
-                }).catch((err: any) => console.error("[JoinReqNotif]", err));
-            }
+                })));
         }
     } catch(e) {}
     return sendSuccess(res, { success: true, role });
@@ -760,6 +797,14 @@ router.post("/:id/members/:memberId/approve", requireAuth, asyncHandler(async (r
     if (!target) return sendError(res, 404, "대상을 찾을 수 없습니다");
     if (target.role !== 'pending') return sendError(res, 400, "이미 승인된 멤버입니다");
 
+    // 정원 확인 — 승인은 pending을 실제 크루원으로 올리는 거라 여기서도 막지 않으면
+    // 가입 신청만 쌓아두고 무제한으로 정원을 넘길 수 있다. (maxMembers 미설정 = 무제한)
+    const limit = data.crew.maxMembers ?? 0;
+    if (limit > 0) {
+        const activeCount = data.members.filter((m: any) => m.role !== 'pending').length;
+        if (activeCount >= limit) return sendError(res, 409, "크루 정원이 가득 찼습니다");
+    }
+
     await storage.updateCrewMemberRole(crewId, memberId, 'member');
 
     // Send Notification to Approved Member
@@ -810,7 +855,7 @@ router.delete("/:id/members/:memberId", requireAuth, asyncHandler(async (req: Au
         // P1: 강퇴 → 당사자에게 알림
         try {
             const crewData = await storage.getCrew(req.params.id);
-            notificationService.sendAndSaveNotification({
+            await notificationService.sendAndSaveNotification({
                 memberId: memberId,
                 title: `⚠️ [${crewData?.crew.name || "크루"}] 강퇴 안내`,
                 body: "크루에서 탈퇴 처리되었습니다.",
@@ -837,13 +882,26 @@ router.patch("/:id/members/:memberId/role", requireAuth, asyncHandler(async (req
         return sendError(res, 403, "크루장만 권한을 변경할 수 있습니다");
     }
 
+    // 검증 없이 저장하면 'leader'나 'pending' 같은 값이 그대로 들어가 권한 체계가 뒤틀린다.
+    if (role !== 'manage' && role !== 'member') {
+        return sendError(res, 400, "변경할 수 있는 권한은 부관리자/일반 멤버뿐입니다");
+    }
+    // 리더가 스스로를 강등하면 크루에 리더가 없어져 삭제·위임 모두 막힌다(위임은 별도 기능).
+    if (memberId === req.userId) {
+        return sendError(res, 400, "크루장은 자신의 권한을 변경할 수 없습니다");
+    }
+
+    const target = data?.members.find((m: any) => m.member.id === memberId);
+    if (!target) return sendError(res, 404, "대상을 찾을 수 없습니다");
+    if (target.role === 'pending') return sendError(res, 400, "가입 승인 후에 권한을 변경할 수 있습니다");
+
     await storage.updateCrewMemberRole(crewId, memberId, role);
 
     // P1: 역할 변경 → 대상자에게 알림
     try {
         const crewData = await storage.getCrew(req.params.id);
-        const roleLabel = role === "manage" ? "부관리자" : role === "member" ? "일반 멤버" : role;
-        notificationService.sendAndSaveNotification({
+        const roleLabel = role === "manage" ? "부관리자" : "일반 멤버";
+        await notificationService.sendAndSaveNotification({
             memberId: memberId,
             title: `👤 [${crewData?.crew.name || "크루"}] 권한 변경`,
             body: `크루장님이 회원을 "${roleLabel}"(으)로 변경했어요.`,
@@ -874,12 +932,14 @@ router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthReques
 
     const settlement = await storage.createSettlement(validation.data, items, participants);
 
+    // hiqSettlements에는 totalAmount 컬럼이 없다 — 항목 금액을 합산해서 쓴다(채팅 카드·알림 공용).
+    const totalAmount = Array.isArray(items)
+        ? items.reduce((sum: number, it: any) => sum + (Number(it?.amount) || 0), 0)
+        : 0;
+
     // Broadcast a settlement card into the crew chat so members can see and open it.
     // (The client sends sendToChat: true; without this the settlement dead-ends after creation.)
     if (req.body.sendToChat) {
-        const totalAmount = Array.isArray(items)
-            ? items.reduce((sum: number, it: any) => sum + (Number(it?.amount) || 0), 0)
-            : 0;
         try {
             await storage.createCrewChat({
                 crewId: req.params.id,
@@ -897,22 +957,32 @@ router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthReques
     // P0: 정산 요청 → 참여 대상자들 모두에게 알림
     try {
         const crewData = await storage.getCrew(req.params.id);
-        if (crewData && participants && Array.isArray(participants)) {
+        if (crewData && Array.isArray(participants)) {
             const creator = await storage.getMemberById(req.userId!);
             const creatorName = creator?.name || "크루원";
+
+            // participants는 클라 body에서 그대로 온다 — 크루원 집합과 교집합만 남긴다.
+            // (검증이 없으면 임의의 memberId를 실어 아무에게나 푸시를 보낼 수 있었다.)
+            // 같은 사람이 여러 차수에 들어 있어도 알림은 1번이면 되므로 Set으로 중복 제거.
+            const crewMemberIds = new Set(crewData.members.map((m: any) => m.member.id));
+            const targetIds = new Set<string>();
             for (const p of participants) {
                 const pid = typeof p === "string" ? p : p?.memberId;
-                if (pid && pid !== req.userId) {
-                    notificationService.sendAndSaveNotification({
-                        memberId: pid,
-                        title: `💰 [${crewData.crew.name}] 정산 요청`,
-                        body: `${creatorName}님이 정산 "${settlement.title}"을(를) 요청했어요. 총 ${settlement.totalAmount?.toLocaleString()}원`,
-                        category: crewData.crew.sportCategory || "BILLIARDS",
-                        type: "SETTLEMENT",
-                        params: { url: `/crew/${req.params.id}` },
-                    }).catch((err: any) => console.error("[SettlementNotif]", err));
-                }
+                if (pid && pid !== req.userId && crewMemberIds.has(pid)) targetIds.add(pid);
             }
+
+            await settleNotifications("[SettlementNotif]", [...targetIds].map(async (pid) => {
+                const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, pid);
+                if (!setting.settlementEnabled) return;
+                await notificationService.sendAndSaveNotification({
+                    memberId: pid,
+                    title: `💰 [${crewData.crew.name}] 정산 요청`,
+                    body: `${creatorName}님이 정산 "${settlement.title}"을(를) 요청했어요. 총 ${totalAmount.toLocaleString()}원`,
+                    category: crewData.crew.sportCategory || "BILLIARDS",
+                    type: "SETTLEMENT",
+                    params: { url: `/crew/${req.params.id}` },
+                });
+            }));
         }
     } catch(e) {}
 

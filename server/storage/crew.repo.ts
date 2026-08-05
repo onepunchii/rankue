@@ -22,7 +22,7 @@ import {
     hiqPollOptions,
     hiqPollVotes
 } from "../../shared/schema.js";
-import { eq, and, desc, asc, sql, or, gte, like, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, or, gte, like, inArray, ne } from "drizzle-orm";
 import { notFound, conflict } from "../utils/errors.js";
 import type {
     InsertHiqCrew,
@@ -195,29 +195,46 @@ export class CrewRepository {
     }
 
     async joinCrew(crewId: string, memberId: string, role?: string) {
-        // Check if already joined
-        const [existing] = await db.select().from(hiqCrewMembers)
-            .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
-
-        if (existing) {
-            if (existing.role === 'pending') throw conflict("가입 승인 대기 중입니다");
-            throw conflict("이미 활동 중인 멤버입니다");
-        }
-
-        // Determine Role if not provided
-        if (!role) {
-            const [crew] = await db.select().from(hiqCrews).where(eq(hiqCrews.id, crewId));
+        // 정원 경합을 막기 위해 크루 행을 FOR UPDATE로 잠근 뒤 세고 넣는다
+        // (joinCrewActivity의 maxParticipants 처리와 동일한 패턴).
+        return await db.transaction(async (tx) => {
+            const [crew] = await tx.select().from(hiqCrews)
+                .where(eq(hiqCrews.id, crewId))
+                .for('update');
             if (!crew) throw notFound("Crew not found");
-            role = crew.joinType === 'approval' ? 'pending' : 'member';
-        }
 
-        await db.insert(hiqCrewMembers).values({
-            crewId,
-            memberId,
-            role,
+            // Check if already joined
+            const [existing] = await tx.select().from(hiqCrewMembers)
+                .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
+
+            if (existing) {
+                if (existing.role === 'pending') throw conflict("가입 승인 대기 중입니다");
+                throw conflict("이미 활동 중인 멤버입니다");
+            }
+
+            // Determine Role if not provided
+            if (!role) {
+                role = crew.joinType === 'approval' ? 'pending' : 'member';
+            }
+
+            // 정원 확인. 승인 대기(pending)는 아직 크루원이 아니므로 인원에서 제외한다.
+            // maxMembers가 null/0인 옛 크루는 제한 없음으로 취급(기존 데이터를 갑자기 막지 않기 위해).
+            const limit = crew.maxMembers ?? 0;
+            if (limit > 0) {
+                const [row] = await tx.select({ count: sql<number>`count(*)` })
+                    .from(hiqCrewMembers)
+                    .where(and(eq(hiqCrewMembers.crewId, crewId), ne(hiqCrewMembers.role, 'pending')));
+                if (Number(row?.count || 0) >= limit) throw conflict("크루 정원이 가득 찼습니다");
+            }
+
+            await tx.insert(hiqCrewMembers).values({
+                crewId,
+                memberId,
+                role,
+            });
+
+            return role;
         });
-
-        return role;
     }
 
     async updateCrewMemberRole(crewId: string, memberId: string, role: string) {
@@ -286,10 +303,11 @@ export class CrewRepository {
 
                 await tx.delete(hiqSettlements).where(eq(hiqSettlements.crewId, crewId));
             }
-        });
 
-        // Use a second replace to finish the delete logic properly including database table deletion
-        await db.delete(hiqCrews).where(eq(hiqCrews.id, crewId));
+            // 7. 크루 본체 — 같은 트랜잭션 안에서 지운다. 밖에서 지우면 이 delete가 실패했을 때
+            // 자식 행만 전부 사라지고 멤버 0명짜리 유령 크루가 남는다.
+            await tx.delete(hiqCrews).where(eq(hiqCrews.id, crewId));
+        });
     }
 
     async getUserCrews(memberId: string, sportCategory?: string) {
@@ -519,6 +537,15 @@ export class CrewRepository {
         const [activity] = await db.select().from(hiqCrewActivities)
             .where(eq(hiqCrewActivities.id, activityId));
         return activity || null;
+    }
+
+    // 참가자 memberId만 뽑는다. hiqCrewActivities 행에는 participants 컬럼이 없어서
+    // getCrewActivity 결과로는 참가자를 알 수 없다(수정·취소 알림이 조용히 스킵되던 원인).
+    async getActivityParticipantIds(activityId: string): Promise<string[]> {
+        const rows = await db.select({ memberId: hiqCrewActivityParticipants.memberId })
+            .from(hiqCrewActivityParticipants)
+            .where(eq(hiqCrewActivityParticipants.activityId, activityId));
+        return rows.map(r => r.memberId);
     }
 
     // 멤버별 활동 내역 조회 (페르소나 분석용)

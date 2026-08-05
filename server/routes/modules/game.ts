@@ -176,7 +176,12 @@ const assertParticipant = async (gameId: string, userId: string, res: any) => {
 
 // PATCH /game/:id/score
 router.patch("/game/:id/score", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    if (!(await assertParticipant(req.params.id, req.userId!, res))) return;
+    const game = await assertParticipant(req.params.id, req.userId!, res);
+    if (!game) return;
+
+    // 종료된 경기는 되돌릴 수 없다. 이 라우트가 finished 경기에 status:'playing_base'를 써넣을 수
+    // 있었기 때문에, 되돌린 뒤 /finish를 다시 호출하면 history 4건과 RP가 그대로 한 번 더 쌓였다.
+    if (game.status === "finished") return sendError(res, 409, "이미 종료된 경기는 수정할 수 없습니다");
 
     // Whitelist only score/inning/high-run columns. Never let a participant set winnerId,
     // isRanked, playerNId (slot reassignment), playerNTarget, storeId, or status:'finished'
@@ -218,6 +223,27 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
     const finalData: any = {};
     for (const key of FINISH_EDITABLE) {
         if (req.body?.[key] !== undefined) finalData[key] = req.body[key];
+    }
+
+    // 종료 페이로드 범위 검증. 여기서 들어온 점수/이닝이 그대로 hiq_game_history의 average가
+    // 되고, 그 average가 다시 핸디(다마수)와 랭킹의 입력값이 된다 — 999점 한 방이면 한 회원의
+    // 다마수와 랭킹이 통째로 오염된다. /game/start의 target 상한(999)과 같은 스케일로 막는다.
+    // 하한을 0이 아니라 -999로 둔 건 당구 파울 감점으로 점수가 음수가 되는 게 정상이기 때문이다.
+    for (const k of ["player1Score", "player2Score", "player3Score", "player4Score"]) {
+        if (finalData[k] === undefined) continue;
+        const n = Number(finalData[k]);
+        if (!Number.isFinite(n) || n < -999 || n > 999) {
+            return sendError(res, 400, "점수 값이 올바르지 않습니다");
+        }
+        finalData[k] = Math.round(n);
+    }
+    if (finalData.totalInnings !== undefined) {
+        const n = Number(finalData.totalInnings);
+        // 이닝 0은 평균 계산의 분모라 성립하지 않는다(경기가 끝났다면 최소 1이닝은 쳤다).
+        if (!Number.isFinite(n) || n < 1 || n > 999) {
+            return sendError(res, 400, "이닝 수가 올바르지 않습니다");
+        }
+        finalData.totalInnings = Math.round(n);
     }
 
     const game = await storage.finishHiqGame(req.params.id, finalData);

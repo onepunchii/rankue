@@ -16,15 +16,32 @@ export const useGameStats = (
             (filter === "all" || g.gameType === filter)
         ) || []) as ExtendedGameHistory[];
 
+        // Main Mode — ALL 탭에서 어느 종목을 대표로 볼지
+        const games3cCount = officialHistory.filter(g => g.gameType === "3c").length;
+        const games4cCount = officialHistory.filter(g => g.gameType === "4c").length;
+        const mainMode = games3cCount >= games4cCount ? "3-Cushion" : "4-Ball";
+
+        // 티어·평균 판정의 종목 컨텍스트. ALL 탭에선 주 종목을 따른다.
+        // (예전엔 `filter === "3c"`라 ALL 탭이 무조건 4구 기준이 돼 3구 전용 유저가 플래티넘 → 브론즈로 뒤집혔다.)
+        const is3cContext = filter === "all" ? mainMode === "3-Cushion" : filter === "3c";
+
+        // ALL 탭은 3구·4구가 섞여 들어온다. 스케일이 다른 두 종목의 점수·이닝을 그대로 합치면
+        // 어느 쪽도 대변하지 못하는 평균이 나오므로, 평균 계열 지표는 주 종목 경기만으로 집계한다.
+        // (골프 기록은 gameType이 3c/4c가 아니라 분리 대상이 아니다.)
+        const avgBase = (currentSport !== "GOLF" && filter === "all")
+            ? officialHistory.filter(g => g.gameType === (is3cContext ? "3c" : "4c"))
+            : officialHistory;
+
         // Calculate aggregated stats
         const totalNormalizedScore = officialHistory.reduce((acc, g) => acc + g.score, 0);
-        const totalInnings = officialHistory.reduce((acc, g) => acc + g.innings, 0);
 
-        // Calculate Cumulative Average
-        const cumulativeAverage = totalInnings > 0
+        // Calculate Cumulative Average (주 종목 기준)
+        const avgBaseScore = avgBase.reduce((acc, g) => acc + g.score, 0);
+        const avgBaseInnings = avgBase.reduce((acc, g) => acc + g.innings, 0);
+        const cumulativeAverage = avgBaseInnings > 0
             ? (currentSport === "GOLF"
-                ? ((totalNormalizedScore / totalInnings) * 18).toFixed(1)
-                : (totalNormalizedScore / totalInnings).toFixed(3))
+                ? ((avgBaseScore / avgBaseInnings) * 18).toFixed(1)
+                : (avgBaseScore / avgBaseInnings).toFixed(3))
             : (currentSport === "GOLF" ? "0.0" : "0.000");
 
         // Stats
@@ -38,7 +55,7 @@ export const useGameStats = (
 
         // Best Average — filter out NaN (a null/blank `average` would otherwise poison
         // Math.min/Math.max and render "NaN" in the UI).
-        const validAverages = officialHistory
+        const validAverages = avgBase
             .map(g => parseFloat(g.average))
             .filter(v => !isNaN(v));
         const bestAverage = validAverages.length > 0
@@ -48,7 +65,7 @@ export const useGameStats = (
             : "0.000";
 
         // Recent 10 Games Average
-        const recent10 = officialHistory.slice(0, 10);
+        const recent10 = avgBase.slice(0, 10);
         const r10Score = recent10.reduce((acc, g) => acc + g.score, 0);
         const r10Innings = recent10.reduce((acc, g) => acc + g.innings, 0);
         const recent10Avg = r10Innings > 0
@@ -101,18 +118,13 @@ export const useGameStats = (
 
         const currentTier = currentSport === "GOLF"
             ? getTier(0, false)
-            : getTier(parseFloat(cumulativeAverage), filter === "3c");
+            : getTier(parseFloat(cumulativeAverage), is3cContext);
 
-        // Last 10 games for sparkline
-        const last10Games = [...officialHistory].slice(0, 10).reverse().map((g, idx) => ({
+        // Last 10 games for sparkline — 종목이 섞이면 눈금이 달라 선이 의미를 잃으므로 avgBase 기준
+        const last10Games = [...avgBase].slice(0, 10).reverse().map((g, idx) => ({
             index: idx,
             avg: parseFloat(g.average) || 0
         }));
-
-        // Main Mode calculation for "ALL" tab
-        const games3cCount = officialHistory.filter(g => g.gameType === "3c").length;
-        const games4cCount = officialHistory.filter(g => g.gameType === "4c").length;
-        const mainMode = games3cCount >= games4cCount ? "3-Cushion" : "4-Ball";
 
         // Total stats for combined view
         const totalAllGames = officialHistory.length;

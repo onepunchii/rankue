@@ -6,11 +6,22 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { db } from "../../db.js";
-import { hiqMembers } from "../../../shared/schema.js";
-import { eq } from "drizzle-orm";
+import { hiqMembers, hiqFriendships } from "../../../shared/schema.js";
+import { eq, and, or } from "drizzle-orm";
 import { notificationService } from "../../services/notificationService.js";
 
 const router = Router();
+
+// 다른 회원이 보는 응답에서 반드시 제거할 컬럼.
+// hiqMembers 행을 통째로 내보내면 전화번호와 정산 계좌(은행/계좌번호/예금주)까지 따라 나간다.
+// 본인 정보인 GET /me 는 예외 — 정산 다이얼로그가 기본 계좌를 불러온다.
+function toPublicMember<T extends Record<string, any>>(member: T): Omit<T, 'phone' | 'defaultAccountBank' | 'defaultAccountNumber' | 'defaultAccountHolder'> {
+    const { phone, defaultAccountBank, defaultAccountNumber, defaultAccountHolder, ...pub } = member;
+    return pub;
+}
+
+// UUID 컬럼에 형식이 안 맞는 문자열을 넣으면 Postgres가 22P02로 던져 500이 된다.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 
 // --- Image Upload (Vercel Blob) ---
@@ -97,6 +108,13 @@ router.get("/handle-check", asyncHandler(async (req: any, res: any) => {
 }));
 
 // PATCH /me - Update profile/member info
+//
+// 여기서 average / handi3c / handi4c 는 의도적으로 받지 않는다. 빠뜨린 게 아니다.
+// 자기 신고 다마수를 그대로 저장하면 '짠다마'(실력보다 낮게 신고해 핸디를 챙기는 것)로
+// 랭킹·매칭이 통째로 오염된다. 이 값들은 경기 기록에서 서버가 계산한다
+// (POST /me/recalculate-avg, storage._updateUserAverage). 등록 경로도 같은 이유로 막아 뒀다
+// — hiqService.register() 의 skill/rating 필드 삭제 참고.
+// 클라이언트가 이 필드를 보내더라도 조용히 버려지는 게 정상이다.
 router.patch("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
     if (!member) return sendError(res, 404, "회원 정보 없음");
@@ -158,9 +176,11 @@ router.post("/me/recalculate-avg", requireAuth, asyncHandler(async (req: AuthReq
 
 // GET /members/:memberId - Get public member info
 router.get("/members/:memberId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID_RE.test(req.params.memberId)) return sendError(res, 400, "회원 ID가 올바르지 않습니다");
+
     const member = await storage.getMemberById(req.params.memberId);
     if (!member) return sendError(res, 404, "회원 없음");
-    return sendSuccess(res, member);
+    return sendSuccess(res, toPublicMember(member));
 }));
 
 // GET /opponents
@@ -170,7 +190,7 @@ router.get("/opponents", requireAuth, asyncHandler(async (req: AuthRequest, res:
 
     const sport = (req.query.sport as string) === "GOLF" ? "GOLF" : "BILLIARDS";
     const opponents = await storage.getAvailableOpponents(member.storeId, member.id, sport);
-    return sendSuccess(res, opponents);
+    return sendSuccess(res, opponents.map(toPublicMember));
 }));
 
 // GET /friends
@@ -182,9 +202,33 @@ router.get("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: a
 
 // POST /friends - Request/Accept friend
 router.post("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const { receiverId, targetId, sport } = req.body;
+    const { receiverId, targetId, sport } = req.body || {};
     const finalTargetId = targetId || receiverId; // Handle both for safety
     const sportCategory = sport === "GOLF" ? "GOLF" : "BILLIARDS";
+
+    // 검증 없이 넘기면 (a) 형식이 틀린 값은 Postgres 22P02로 500이 나고,
+    // (b) 존재하는 UUID만 알면 아무 회원에게나 라이벌 추가 푸시를 쏠 수 있다.
+    if (typeof finalTargetId !== "string" || !UUID_RE.test(finalTargetId)) {
+        return sendError(res, 400, "상대 회원 ID가 올바르지 않습니다");
+    }
+    if (finalTargetId === req.userId) {
+        return sendError(res, 400, "자기 자신은 라이벌로 추가할 수 없습니다");
+    }
+    if (!(await storage.getMemberById(finalTargetId))) {
+        return sendError(res, 404, "회원 없음");
+    }
+
+    // 중복 방어. hiqFriendships 유니크 제약은 (requester, receiver, sport) 한 방향뿐이라
+    // 상대가 먼저 추가한 경우는 걸리지 않고 행이 하나 더 쌓이며 알림도 다시 발송된다.
+    const [existing] = await db.select().from(hiqFriendships).where(and(
+        eq(hiqFriendships.sportCategory, sportCategory),
+        or(
+            and(eq(hiqFriendships.requesterId, req.userId!), eq(hiqFriendships.receiverId, finalTargetId)),
+            and(eq(hiqFriendships.requesterId, finalTargetId), eq(hiqFriendships.receiverId, req.userId!))
+        )
+    )).limit(1);
+    if (existing) return sendError(res, 409, "이미 라이벌로 등록된 회원입니다");
+
     const result = await storage.requestFriend(req.userId!, finalTargetId, sportCategory);
 
     // P0: 라이벌 추가 → 추가당한 사람에게 알림
@@ -213,7 +257,8 @@ router.get("/friends/search", requireAuth, asyncHandler(async (req: AuthRequest,
     if (!query) return sendSuccess(res, []);
     const sport = (req.query.sport as string) === "GOLF" ? "GOLF" : "BILLIARDS";
     const users = await searchUsers(query, req.userId!, sport);
-    return sendSuccess(res, users);
+    // 전화번호로도 검색되는 엔드포인트라, 결과에 번호가 섞여 나가면 번호 대조 확인까지 가능해진다.
+    return sendSuccess(res, users.map(toPublicMember));
 }));
 
 // Recent Opponents: Get recent players who aren't friends yet
@@ -232,7 +277,7 @@ router.get("/rankings", requireAuth, asyncHandler(async (req: AuthRequest, res: 
 
     if (!scope || scope === 'store') {
         const rankings = await storage.getTopRankings(member?.storeId, 20, type);
-        return sendSuccess(res, rankings);
+        return sendSuccess(res, rankings.map(toPublicMember));
     }
 
     if (scope === 'country') {
@@ -243,12 +288,12 @@ router.get("/rankings", requireAuth, asyncHandler(async (req: AuthRequest, res: 
             country = (profile as any)?.countryCode || "";
         }
         const rankings = await storage.getTopRankings(undefined, 20, type, country || "KR");
-        return sendSuccess(res, { country: country || "KR", rankings });
+        return sendSuccess(res, { country: country || "KR", rankings: rankings.map(toPublicMember) });
     }
 
     // national(레거시 명칭) = 글로벌 전체
     const rankings = await storage.getTopRankings(undefined, 20, type);
-    return sendSuccess(res, rankings);
+    return sendSuccess(res, rankings.map(toPublicMember));
 }));
 
 // POST /suggestions - Submit a suggestion

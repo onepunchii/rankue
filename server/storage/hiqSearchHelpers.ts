@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { profiles, hiqStores, hiqMembers, hiqGames, hiqVisitLogs, hiqGameHistory, hiqFriendships, hiqInvites, golfMatchSessions } from "../../shared/schema.js";
 import type { HiqStore, InsertHiqStore, HiqMember, InsertHiqMember, HiqGame, InsertHiqGame, HiqGameHistory, InsertHiqGameHistory, HiqFriendship } from "../../shared/schema.js";
 import { eq, desc, and, or, sql, gt, isNull, inArray } from "drizzle-orm";
+import { PUBLIC_MEMBER_COLUMNS } from "./user.repo.js";
 
 // Search users by nickname, ID, or phone
 export async function searchUsers(keyword: string, currentUserId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<any[]> {
@@ -46,8 +47,10 @@ export async function searchUsers(keyword: string, currentUserId: string, sport:
     }
 
     // Search users
+    // SECURITY: 전화번호 부분일치로 남을 찾는 검색이라, 전 컬럼을 내보내면 검색만으로
+    // 다른 회원의 번호·정산 계좌를 그대로 긁어갈 수 있다. 공개 컬럼만 셀렉트한다.
     const users = await db.select({
-        member: hiqMembers,
+        member: PUBLIC_MEMBER_COLUMNS,
         profileImageUrl: profiles.profileImageUrl,
         nickname: profiles.nickname,
         handle: profiles.handle,
@@ -174,7 +177,7 @@ export async function getRecentOpponents(currentUserId: string, sport: "BILLIARD
                 if (opponentMap.has(opp.memberId)) continue;
 
                 const [opponentData] = await db.select({
-                    member: hiqMembers,
+                    member: PUBLIC_MEMBER_COLUMNS, // 남의 정보다 — 전 컬럼 노출 금지(phone·계좌)
                     profileImageUrl: profiles.profileImageUrl,
                     nickname: profiles.nickname
                 })
@@ -232,7 +235,7 @@ export async function getRecentOpponents(currentUserId: string, sport: "BILLIARD
                 if (opponentMap.has(opponentId)) continue; // Already added
 
                 const [opponentData] = await db.select({
-                    member: hiqMembers,
+                    member: PUBLIC_MEMBER_COLUMNS, // 남의 정보다 — 전 컬럼 노출 금지(phone·계좌)
                     profileImageUrl: profiles.profileImageUrl,
                     nickname: profiles.nickname
                 })

@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import { storage } from "../storage/index.js";
 import { HiqStore, HiqMember, InsertHiqMember } from "../../shared/schema.js";
 import { unauthorized, notFound, badRequest } from "../utils/errors.js";
@@ -6,6 +7,40 @@ import { generateHandle } from "../lib/handle.js";
 
 // 글로벌(비매장) 유저의 소속 스토어 — 마이그레이션에서 시드됨. 소셜 가입 유저는 여기 속한다.
 const GLOBAL_STORE_SLUG = "global";
+
+// --- PIN 해싱 ---
+// PIN은 예전에 평문으로 저장·비교됐다. DB가 새면 전 회원 PIN이 그대로 털리므로 bcrypt로 전환한다.
+const BCRYPT_ROUNDS = 10;
+// 저장값이 bcrypt 해시($2a/$2b/$2y$rounds$…)인지 — 평문 시절 데이터와 구분하는 유일한 단서.
+const BCRYPT_HASH_RE = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+
+export function hashPassword(plain: string): Promise<string> {
+    return bcrypt.hash(plain, BCRYPT_ROUNDS);
+}
+
+// PIN 검증 + 점진 마이그레이션.
+// 기존 회원 행에는 평문 PIN이 그대로 남아 있어서, 해시 검증만 하면 그 전원이 로그인 불가가 된다.
+// 그래서 저장값이 해시면 bcrypt.compare, 평문이면 직접 비교하고 성공한 그 순간 해시로 재저장한다.
+// 올바른 PIN을 서버가 알 수 있는 시점은 로그인 성공 순간뿐이라, 여기서 못 바꾸면 영영 평문으로 남는다.
+async function verifyPassword(
+    input: string | undefined | null,
+    profile: { id: string; password?: string | null }
+): Promise<boolean> {
+    const stored = profile.password;
+    if (!stored || !input) return false;
+
+    if (BCRYPT_HASH_RE.test(stored)) return bcrypt.compare(input, stored);
+
+    // 레거시 평문 경로
+    if (input !== stored) return false;
+    try {
+        await storage.updateProfile(profile.id, { password: await hashPassword(input) });
+    } catch (err) {
+        // 재저장 실패가 로그인을 막아선 안 된다 — 다음 로그인에 다시 시도된다.
+        console.error("[pin-migrate] 해시 전환 실패", err);
+    }
+    return true;
+}
 
 export class HiqService {
     async getBranding(slug: string) {
@@ -47,7 +82,7 @@ export class HiqService {
             if (!profile.password) {
                 return { success: false, message: "비밀번호가 설정되지 않은 계정입니다. 관리자에게 문의하세요." };
             }
-            if (!password || password !== profile.password) {
+            if (!(await verifyPassword(password, profile))) {
                 return { success: false, message: "비밀번호가 일치하지 않습니다." };
             }
         } else {
@@ -98,7 +133,7 @@ export class HiqService {
                         return { isNew: false, requiresPassword: true, phone, memberName: member.name };
                     }
                     // Password provided but incorrect
-                    if (password !== profile.password) {
+                    if (!(await verifyPassword(password, profile))) {
                         throw unauthorized("INVALID_PASSWORD");
                     }
                 }
@@ -165,7 +200,7 @@ export class HiqService {
             if (!profile) {
                 profile = await storage.createProfile({
                     phone: data.phone,
-                    password: data.password,
+                    password: await hashPassword(data.password),
                     role: 'user',
                     nickname: data.name,
                     // 전화 가입도 @핸들 자동 부여(한글 이름은 정규화에서 걸러져 player_#### 폴백)
@@ -179,7 +214,7 @@ export class HiqService {
                 // Q&A here — otherwise anyone who knows a phone number could reset the PIN and
                 // take over the account. An already-protected profile is reused as-is.
                 profile = await storage.updateProfile(profile.id, {
-                    password: data.password,
+                    password: await hashPassword(data.password),
                     securityQuestion: data.securityQuestion,
                     securityAnswer: normalizedAnswer
                 });
@@ -191,7 +226,7 @@ export class HiqService {
                 // (store id is attacker-controlled) and hijack the victim's global profile —
                 // reading and overwriting their nickname / image / role across every store.
                 // A legitimate cross-store user supplying the correct PIN still links correctly.
-                if (!data.password || data.password !== profile.password) {
+                if (!(await verifyPassword(data.password, profile))) {
                     throw unauthorized("INVALID_PASSWORD");
                 }
             }
@@ -237,7 +272,7 @@ export class HiqService {
             throw unauthorized("INVALID_ANSWER");
         }
 
-        await storage.updateProfile(profile.id, { password: newPin });
+        await storage.updateProfile(profile.id, { password: await hashPassword(newPin) });
         return { success: true };
     }
 }

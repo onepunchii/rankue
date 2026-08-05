@@ -22,11 +22,12 @@ const LOCKOUT_MS = 15 * 60 * 1000;  // lock duration once threshold is crossed
 type AttemptEntry = { count: number; first: number; lockedUntil: number };
 const attemptStore = new Map<string, AttemptEntry>();
 
-function attemptKey(action: string, phone: unknown, ip: unknown): string {
+// 파트너 로그인(partner.ts)도 같은 4자리 PIN을 쓰므로 이 방어를 공유한다 — export.
+export function attemptKey(action: string, phone: unknown, ip: unknown): string {
     return `${action}:${phone || 'nophone'}:${ip || 'noip'}`;
 }
 
-function checkRateLimit(key: string): { limited: boolean; retryAfterSec: number } {
+export function checkRateLimit(key: string): { limited: boolean; retryAfterSec: number } {
     const now = Date.now();
     const entry = attemptStore.get(key);
     if (!entry) return { limited: false, retryAfterSec: 0 };
@@ -40,7 +41,7 @@ function checkRateLimit(key: string): { limited: boolean; retryAfterSec: number 
     return { limited: false, retryAfterSec: 0 };
 }
 
-function registerFailure(key: string): void {
+export function registerFailure(key: string): void {
     const now = Date.now();
     let entry = attemptStore.get(key);
     if (!entry || now - entry.first > WINDOW_MS) {
@@ -53,7 +54,7 @@ function registerFailure(key: string): void {
     attemptStore.set(key, entry);
 }
 
-function clearAttempts(key: string): void {
+export function clearAttempts(key: string): void {
     attemptStore.delete(key);
 }
 
@@ -161,10 +162,26 @@ router.post("/logout", (req, res) => {
     return sendSuccess(res, { success: true });
 });
 
-// POST /push-token - Save/Update Expo Push Token
+// 푸시 토큰 형식 검증.
+// APNs 발송(pushNative.ts)은 토큰을 HTTP/2 :path(`/3/device/${token}`)에 그대로 보간하므로,
+// 슬래시·공백·개행이 섞인 값이 들어오면 요청 경로 자체가 변조된다. 저장 시점에 막는다.
+// 클라 규약과 판별 규칙은 pushNative.ts와 동일: 'apns:'/'fcm:' 접두사, 없으면 64 hex=APNs / 그 외 FCM.
+const APNS_TOKEN_RE = /^[0-9a-fA-F]{64}$/;
+// FCM 등록 토큰 — base64url 문자에 ':' 구분자(예: cXX…:APA91b…)가 섞인 형태.
+const FCM_TOKEN_RE = /^[A-Za-z0-9_:.-]{32,512}$/;
+
+function isValidPushToken(raw: unknown): raw is string {
+    if (typeof raw !== "string" || raw.length > 600) return false;
+    if (raw.startsWith("apns:")) return APNS_TOKEN_RE.test(raw.slice(5));
+    const body = raw.startsWith("fcm:") ? raw.slice(4) : raw;
+    return APNS_TOKEN_RE.test(body) || FCM_TOKEN_RE.test(body);
+}
+
+// POST /push-token - Save/Update Push Token (FCM / APNs)
 router.post("/push-token", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const { token } = req.body;
+    const { token } = req.body || {};
     if (!token) return sendError(res, 400, "토큰이 필요합니다");
+    if (!isValidPushToken(token)) return sendError(res, 400, "푸시 토큰 형식이 올바르지 않습니다");
 
     await storage.updatePushToken(req.userId!, token);
     return sendSuccess(res, { success: true });

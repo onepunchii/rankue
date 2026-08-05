@@ -43,6 +43,13 @@ const PlayerCard = ({
     const isGuest = player.type === 'guest';
     const textColor = "text-brand";
 
+    // 호스트는 1번 슬롯에 고정한다. 서버(POST /game/start)는 슬롯1을 로그인 세션으로 강제하고
+    // 슬롯2~4는 "내 초대에 동의한 게스트"만 허용하는데, 호스트 본인은 자기 초대에 참여할 수
+    // 없어 그 동의 목록에 절대 들어가지 않는다. 호스트를 아래로 내리면 player2Id에 본인 id가
+    // 실려 서버가 400("참가 확인이 만료되었습니다")을 던지고, 새 핀을 받아도 영구 실패한다.
+    const canMoveUp = !isSelf && idx > 1; // idx 1이 위로 가면 호스트와 자리가 바뀐다
+    const canMoveDown = !isSelf && idx < totalPlayers - 1;
+
     // Calculate Win Rate if history is available (only for self/host usually)
     const winRate = history ? (() => {
         const myGames = history.filter(g => g.gameMode === 'match' && g.sportCategory === 'BILLIARDS'); // Only count billiards match games
@@ -70,17 +77,17 @@ const PlayerCard = ({
                         <div className="flex items-center gap-1 mt-1">
                             <button
                                 onClick={() => onMove(idx, -1)}
-                                disabled={idx === 0}
+                                disabled={!canMoveUp}
                                 title={t("gameCreationModal.moveUp")}
-                                className={`p-1 rounded hover:bg-black/[0.04] ${idx === 0 ? 'opacity-20 cursor-not-allowed' : 'text-black/55 hover:text-ink-1'}`}
+                                className={`p-1 rounded hover:bg-black/[0.04] ${!canMoveUp ? 'opacity-20 cursor-not-allowed' : 'text-black/55 hover:text-ink-1'}`}
                             >
                                 <ChevronUp className="w-4 h-4" />
                             </button>
                             <button
                                 onClick={() => onMove(idx, 1)}
-                                disabled={idx === totalPlayers - 1}
+                                disabled={!canMoveDown}
                                 title={t("gameCreationModal.moveDown")}
-                                className={`p-1 rounded hover:bg-black/[0.04] ${idx === totalPlayers - 1 ? 'opacity-20 cursor-not-allowed' : 'text-black/55 hover:text-ink-1'}`}
+                                className={`p-1 rounded hover:bg-black/[0.04] ${!canMoveDown ? 'opacity-20 cursor-not-allowed' : 'text-black/55 hover:text-ink-1'}`}
                             >
                                 <ChevronDown className="w-4 h-4" />
                             </button>

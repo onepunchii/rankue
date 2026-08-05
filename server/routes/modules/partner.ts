@@ -3,6 +3,7 @@ import { hiqService } from "../../services/hiqService.js";
 import { storage } from "../../storage/index.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 
 const router = Router();
 
@@ -11,9 +12,18 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
     const { phone, password } = req.body;
     if (!phone) return sendError(res, 400, "전화번호가 필요합니다.");
 
+    // 일반 로그인과 동일한 무차별 대입 방어. 파트너도 4자리 PIN이라, 무방비면
+    // 매장 관리자(그리고 role=admin 계정)까지 전수 탐색으로 뚫린다.
+    const key = attemptKey('partner-login', phone, req.ip);
+    const rl = checkRateLimit(key);
+    if (rl.limited) {
+        return sendError(res, 429, `로그인 시도가 너무 많습니다. ${rl.retryAfterSec}초 후 다시 시도해주세요.`);
+    }
+
     const result = await hiqService.partnerLogin(phone, password);
 
     if (result.success) {
+        clearAttempts(key);
         res.cookie('hiq_partner_auth', result.profileId, {
             maxAge: 30 * 24 * 60 * 60 * 1000,
             httpOnly: true,
@@ -24,6 +34,7 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
         });
         return sendSuccess(res, result);
     }
+    registerFailure(key);
     return sendError(res, 401, "로그인에 실패했습니다.");
 }));
 

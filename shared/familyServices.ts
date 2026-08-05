@@ -4,8 +4,9 @@
 //   · 문구는 사이트마다 언어 수가 다르다(랭큐 5개, xong 10개, tohk 7개).
 //     레지스트리가 문구를 들면 6서비스 × 3문장 × 10언어 = 180개를 한 파일에 지게 된다.
 //   · 문구는 그 사이트 방문자에게 맞춰 다르게 쓰는 게 광고로서 더 낫다(취향의 영역).
-// → 문구는 각 사이트의 i18n 사전에 `menu.<id>Chip/Title/Desc` 규칙으로 둔다.
-//   랭큐가 이미 그 규칙을 쓰고 있어(ko.ts 의 menu.tohkChip 등) 그대로 이어간다.
+// → 문구는 각 사이트의 i18n 사전에 둔다. **키 이름은 그 사이트의 관용구를 따른다** —
+//   랭큐는 화면 단위 접두사를 써서 `menu.<id>Chip/Title/Desc` 이고, mapix·xong·onp·무당k 는
+//   `family.*` 네임스페이스를 쓴다. 사이트마다 사전 구조가 달라 억지로 통일하지 않는다.
 //
 // ⚠️ 이 파일은 6개 레포에 **같은 내용으로 복제**된다. 원본은 mapix 다
 //    (mapix 가 superHub·IndexNow 중앙 역할을 이미 맡고 있다).
@@ -56,16 +57,26 @@ const RAW: FamilyService[] = [
   {
     id: "onp",
     web: "https://onp.co.kr",
-    ios: "https://apps.apple.com/app/id6790407283",
+    // ★ /kr/ 를 반드시 넣는다 — onp 는 **한국 스토어프론트 전용**이다.
+    //   실측(2026-08-03): iTunes lookup 이 kr 만 O, us/jp/vn/tr/es 는 X.
+    //   국가 세그먼트가 없으면 데스크톱에서 열 때 하드 404 가 된다(/kr/ 는 301 → 정상 페이지).
+    //   아이폰에서는 두 형식 모두 itms-appss:// 로 301 돼 App Store 앱이 열리므로,
+    //   해외 계정 사용자는 앱 안에서 "이 국가에서 이용 불가" 안내를 받는다(웹 404 가 아니다).
+    ios: "https://apps.apple.com/kr/app/id6790407283",
     android: "https://play.google.com/store/apps/details?id=kr.co.onp.app",
   },
   {
     id: "tohk",
     // "현경이에게 - 마음을 전하는 손편지". 손편지 + 편지함 + 기념일·특별한 날 + 작명.
-    // 사주·꿈해몽도 있었으나 애플 심사 대응으로 숨겨졌다(tohk 레포 커밋 2f21961) —
-    // /saju 는 지금 본문 25자짜리 빈 페이지이므로 그쪽으로 링크하지 말 것.
+    //
+    // ⚠️ 운세·사주·꿈해몽으로 홍보하지 말 것. tohk 가 그 기능을 **의도적으로 닫아 뒀다**:
+    //    레포에 SHOW_FORTUNE = false 가 세 곳(src/app/page.tsx, src/app/menu/page.tsx,
+    //    src/components/layout/Navbar/Navbar.tsx)에 박혀 있어 자기 UI 의 진입점이 전부 없다.
+    //    커밋 2f21961 "App Store Review 대응 - UI 구조 변경 및 운세 기능 임시 숨김".
+    //    (/saju 페이지 자체는 살아 있다 — CSR 이라 SSR 본문이 25자로 보이는 것뿐이다.
+    //     한때 "빈 페이지"라고 적었는데 그 표현은 부정확했다.)
     web: "https://www.tohk.co.kr",
-    ios: "https://apps.apple.com/app/id6760213440",
+    ios: "https://apps.apple.com/kr/app/id6760213440", // onp 와 같은 이유로 /kr/ 필수(KR 전용)
     android: "https://play.google.com/store/apps/details?id=kr.co.tohk.pwa",
   },
   {
