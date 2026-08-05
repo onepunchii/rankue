@@ -23,7 +23,7 @@
             "dest": "/api/index.ts"
         },
         {
-            "src": "/(about|stores|support|privacy|account-delete|(?:store|club)/[^/]+)/?",
+            "src": "/(about|stores|support|privacy|account-delete|(?:store|club|r)/[^/]+)/?",
             "has": [
                 {
                     "type": "header",
