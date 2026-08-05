@@ -36,6 +36,8 @@ export async function generateSitemap(): Promise<string> {
     entry(`${ORIGIN}/`, { langs: APP_LANGS, changefreq: "weekly", priority: "1.0" }),
     entry(`${ORIGIN}/about`, { langs: ABOUT_LANGS, changefreq: "monthly", priority: "0.9" }),
     entry(`${ORIGIN}/stores`, { changefreq: "weekly", priority: "0.7" }),
+    // UMB 세계랭킹 — 주간 갱신 공개 페이지 ("당구 세계랭킹" 검색 유입 타깃)
+    entry(`${ORIGIN}/world-ranking`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }),
     entry(`${ORIGIN}/support`, { changefreq: "monthly", priority: "0.5" }),
     entry(`${ORIGIN}/privacy`, { changefreq: "yearly", priority: "0.3" }),
     entry(`${ORIGIN}/account-delete`, { changefreq: "yearly", priority: "0.3" }),

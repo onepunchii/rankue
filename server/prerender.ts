@@ -308,6 +308,41 @@ export function registerPrerender(app: Express) {
     );
   });
 
+  // ── /world-ranking ─────────────────────────────────────────────────
+  // UMB 세계랭킹 — 사이트맵에 등록된 검색 유입 타깃이라 봇에게 빈 SPA 셸이 아니라
+  // 실제 톱10이 담긴 HTML을 내보낸다. DB 조회 실패 시에도 메타는 나가야 한다.
+  app.get("/world-ranking", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    let listHtml = "";
+    let editionLabel = "";
+    try {
+      const data = await storage.umb.getRankings("players", { limit: 10 });
+      if (data.rows.length) {
+        editionLabel = data.edition ? ` (Edition ${data.edition})` : "";
+        listHtml = `<ol>\n${data.rows.map((r: any) =>
+          `  <li>${esc(r.playerName)} (${esc(r.fed)}) — ${r.points}점</li>`).join("\n")}\n</ol>`;
+      }
+    } catch (e) {
+      console.warn("[prerender] world-ranking rows failed:", (e as Error)?.message);
+    }
+    res.setHeader("X-Prerender", "world-ranking");
+    res.send(
+      page({
+        title: "당구 세계랭킹 — UMB 공식 3쿠션 랭킹 | 랭큐 RANKUE",
+        desc: "UMB 공식 3쿠션 세계랭킹을 매주 업데이트. 남자·여자·주니어 전체 순위와 한국 선수, 선수별 순위 히스토리를 랭큐에서 확인하세요.",
+        canonical: `${ORIGIN}/world-ranking`,
+        body: `<main>
+  <h1>당구 세계랭킹${esc(editionLabel)}</h1>
+  <p>UMB(세계당구연맹) 공식 3쿠션 세계랭킹입니다. 매주 갱신되며 남자·여자·주니어 부문 전체 순위와 선수별 순위 변동을 볼 수 있습니다.</p>
+  <h2>남자 세계랭킹 톱 10</h2>
+  ${listHtml || "<p>랭킹 데이터를 불러오는 중입니다.</p>"}
+  <p>출처: <a href="https://www.umb-carom.org" rel="noopener">UMB 공식 랭킹</a></p>
+  <nav><a href="/">홈으로</a> <a href="/about">랭큐 소개</a> <a href="/stores">매장 찾기</a></nav>
+</main>`,
+      }),
+    );
+  });
+
   app.get("/about", (req, res, next) => {
     if (!isBot(req)) return next();
     const q = typeof req.query.lang === "string" ? req.query.lang : "";

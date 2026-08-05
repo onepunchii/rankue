@@ -10,6 +10,9 @@ interface RankingListCardProps {
     activeTab: '3c' | '4c';
     onTabChange: (type: '3c' | '4c') => void;
     currentMemberId: number | string;
+    // 대시보드 랭킹 섹션(세계|매장 토글)이 제목을 대신 그릴 때 자체 헤더 생략 —
+    // 3c/4c 스위치만 우측 정렬로 남긴다
+    hideHeader?: boolean;
 }
 
 // 평균은 소스에 따라 2자리("0.43")로 오기도 해서 표시만 3자리로 통일한다.
@@ -18,7 +21,7 @@ const formatAvg = (value: unknown) => {
     return isNaN(n) ? "0.000" : n.toFixed(3);
 };
 
-export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMemberId }: RankingListCardProps) => {
+export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMemberId, hideHeader }: RankingListCardProps) => {
     const { t } = useT();
 
     // Sort logic (just in case API didn't sort, though it should)
@@ -36,7 +39,25 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
         .slice(0, 10);
 
     return (
-        <div className="space-y-4 mb-10">
+        <div className={cn("space-y-4", !hideHeader && "mb-10")}>
+            {/* hideHeader(대시보드 랭킹 섹션): 헤더의 [세계|매장] 토글과 겹쳐 보이지 않게
+                3쿠션/4구를 세계 카드의 부문 칩과 같은 모양·위치(좌측 칩 줄)로 그린다 */}
+            {hideHeader ? (
+                <div className="flex gap-1.5">
+                    {(["3c", "4c"] as const).map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => onTabChange(tab)}
+                            className={cn(
+                                "h-8 px-3 rounded-full text-[12.5px] font-semibold transition-colors",
+                                activeTab === tab ? "bg-ink-1 text-white" : "bg-white text-ink-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                            )}
+                        >
+                            {t(tab === "3c" ? "rankingListCard.tab3c" : "rankingListCard.tab4c")}
+                        </button>
+                    ))}
+                </div>
+            ) : (
             <header className="mb-2 flex items-end justify-between">
                 <div>
                     <h2 className="text-[19px] font-bold tracking-tight text-ink-1">{t("rankingListCard.title")}</h2>
@@ -61,6 +82,7 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                     >{t("rankingListCard.tab4c")}</button>
                 </div>
             </header>
+            )}
 
             <div className="flex flex-col gap-2">
                 <AnimatePresence mode="popLayout">

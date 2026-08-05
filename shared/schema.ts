@@ -9,7 +9,8 @@ import {
   jsonb,
   doublePrecision,
   date,
-  varchar
+  varchar,
+  index
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -1136,6 +1137,44 @@ export const hiqBlocks = pgTable("hiq_blocks", {
 }, (table) => [
   unique().on(table.blockerId, table.blockedId),
 ]);
+
+// 16. UMB 세계랭킹 — 주간 스냅샷 (umb-carom.org 공식 랭킹 PDF에서 수집, 출처 표기)
+export const umbRankings = pgTable("umb_rankings", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  category: text("category", { enum: ["players", "ladies", "juniors"] }).notNull(),
+  edition: text("edition").notNull(), // "21/2026"
+  editionDate: timestamp("edition_date").notNull(),
+  rank: integer("rank").notNull(),
+  playerName: text("player_name").notNull(),
+  fed: text("fed").notNull(), // 국가 코드 2자
+  playerUmbId: text("player_umb_id").notNull(), // UMB 고유 선수 ID — 선행 0 보존 위해 text
+  points: integer("points").notNull(),
+  penaltyPoints: integer("penalty_points").default(0).notNull(),
+  // 대회별 획득 점수 {A: 57, B: 16, ...} — 컬럼 의미는 umbEvents 레전드 참조
+  eventPoints: jsonb("event_points").$type<Record<string, number>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.category, table.edition, table.playerUmbId),
+  index("umb_rankings_player_idx").on(table.category, table.playerUmbId),
+  index("umb_rankings_edition_idx").on(table.category, table.editionDate),
+]);
+
+// 회차별 대회 레전드 — PDF 1페이지의 컬럼(A~M) → 대회명·장소·날짜 매핑
+export const umbEvents = pgTable("umb_events", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  category: text("category", { enum: ["players", "ladies", "juniors"] }).notNull(),
+  edition: text("edition").notNull(),
+  editionDate: timestamp("edition_date").notNull(),
+  colKey: text("col_key").notNull(), // "A" ~ "M"
+  label: text("label").notNull(), // "UMB / CEB World Cup - PORTO (PT) 2025-07-05"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.category, table.edition, table.colKey),
+]);
+
+export type UmbRanking = typeof umbRankings.$inferSelect;
+export type InsertUmbRanking = typeof umbRankings.$inferInsert;
+export type UmbEvent = typeof umbEvents.$inferSelect;
 
 export const insertHiqCommunityPostSchema = createInsertSchema(hiqCommunityPosts).omit({
   id: true, createdAt: true, updatedAt: true, isBlinded: true, blindReason: true, appealText: true, appealAt: true,

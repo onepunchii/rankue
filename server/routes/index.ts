@@ -9,6 +9,7 @@ import gameRouter from "./modules/game.js";
 import notificationRouter from "./modules/notification.js";
 import regionRouter from "./modules/region.js";
 import communityRouter from "./modules/community.js";
+import umbRouter from "./modules/umb.js";
 
 const router = Router();
 
@@ -53,5 +54,8 @@ router.use("/regions", regionRouter);
 // 10. Community (/community)
 // - 전체 공개 게시판 4개 + 신고/차단/이의제기
 router.use("/community", communityRouter);
+
+// 11. UMB 세계랭킹 (/umb) — 공개 읽기 전용
+router.use("/umb", umbRouter);
 
 export default router;

@@ -5,6 +5,7 @@ import { GameRepository } from "./game.repo.js";
 import { AdminRepository } from "./admin.repo.js";
 import { NotificationRepository } from "./notification.repo.js";
 import { CommunityRepository } from "./community.repo.js";
+import { UmbRepository } from "./umb.repo.js";
 
 class Storage {
     public users = new UserRepository();
@@ -14,6 +15,7 @@ class Storage {
     public admin = new AdminRepository();
     public notifs = new NotificationRepository();
     public community = new CommunityRepository();
+    public umb = new UmbRepository();
 
     // --- Backward Compatibility Wrappers ---
     // User / Member

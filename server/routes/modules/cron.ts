@@ -32,4 +32,16 @@ router.get("/reminders", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, result);
 }));
 
+// UMB 세계랭킹 일일 동기화 — 새 회차가 있으면 부문당 최대 2개 적재
+async function handleUmbSync(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { syncUmbRankings } = await import("../../services/umbSync.js");
+    const result = await syncUmbRankings();
+    return sendSuccess(res, result);
+}
+router.get("/umb-sync", asyncHandler(handleUmbSync));
+router.post("/umb-sync", asyncHandler(handleUmbSync));
+
 export default router;
