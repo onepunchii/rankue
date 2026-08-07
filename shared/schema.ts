@@ -10,7 +10,8 @@ import {
   doublePrecision,
   date,
   varchar,
-  index
+  index,
+  bigint
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -1236,6 +1237,51 @@ export type UmbPlayerName = typeof umbPlayerNames.$inferSelect;
 export type UmbRanking = typeof umbRankings.$inferSelect;
 export type InsertUmbRanking = typeof umbRankings.$inferInsert;
 export type UmbEvent = typeof umbEvents.$inferSelect;
+
+// --- PBA 투어 (pbatour.org 공개 AJAX API 수집) ---
+// 선수 프로필 — detail API의 스탯은 통산(누적) 기준 (김가영 Prize 9.7억 = 통산 실측 확인).
+// 선수 사진(ImgURL)은 초상권 문제로 수집·저장하지 않는다.
+export const pbaPlayers = pgTable("pba_players", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memCode: text("mem_code").notNull(), // "M0022424" — PBA 고유 선수 코드
+  league: text("league", { enum: ["PBA", "LPBA"] }).notNull(),
+  nameKo: text("name_ko").notNull(),
+  nameEn: text("name_en"),
+  nationCode: text("nation_code"), // "KR", "ES" 등 2자
+  birthday: text("birthday"), // "1974-03-03" — detail API 원문 보존
+  average: doublePrecision("average"), // 통산 에버리지
+  bankShotRate: doublePrecision("bank_shot_rate"), // 뱅크샷 성공률 %
+  highRun: integer("high_run"),
+  win: integer("win"),
+  lose: integer("lose"),
+  draw: integer("draw"),
+  careerPrize: bigint("career_prize", { mode: "number" }), // 통산 상금(원)
+  // UMB 세계랭킹 교차 매칭 (이름 정규화 매칭 — "Daniel SANCHEZ" ↔ "SANCHEZ Daniel")
+  umbPlayerId: text("umb_player_id"),
+  umbCategory: text("umb_category"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.memCode),
+]);
+
+// 시즌별 랭킹 스냅샷 — 시즌 진행 중엔 주간 크론이 같은 행을 덮어쓴다
+export const pbaSeasonRanks = pgTable("pba_season_ranks", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memCode: text("mem_code").notNull(),
+  season: integer("season").notNull(), // 2025 = 2025-26 시즌
+  league: text("league", { enum: ["PBA", "LPBA"] }).notNull(),
+  prizeRank: integer("prize_rank"),
+  pointRank: integer("point_rank"),
+  prize: bigint("prize", { mode: "number" }).default(0).notNull(), // 시즌 상금(원)
+  rankingPoint: integer("ranking_point").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.memCode, table.season),
+  index("pba_season_ranks_season_idx").on(table.league, table.season),
+]);
+
+export type PbaPlayer = typeof pbaPlayers.$inferSelect;
+export type PbaSeasonRank = typeof pbaSeasonRanks.$inferSelect;
 
 export const insertHiqCommunityPostSchema = createInsertSchema(hiqCommunityPosts).omit({
   id: true, createdAt: true, updatedAt: true, isBlinded: true, blindReason: true, appealText: true, appealAt: true,

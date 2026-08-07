@@ -7,6 +7,7 @@ import { ABOUT_CONTENT, ABOUT_LANGS, type AboutContent } from "../shared/aboutCo
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW } from "../shared/landingContent.js";
+import { formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared } from "../shared/pbaMeta.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
 //
@@ -700,6 +701,121 @@ export function registerPrerender(app: Express) {
       console.warn("[prerender] player failed:", (e as Error)?.message);
       return next();
     }
+  });
+
+  // ── /pba, /pba-player/:memCode ────────────────────────────────────
+  // PBA 투어 — pbatour.org 공개 데이터 재가공(사실 정보). "스롱 피아비 상금" 같은
+  // 국내 롱테일 검색 타깃이라 ko 단일 언어로 서빙한다.
+  // 표기 유틸은 클라이언트와 shared/pbaMeta 를 공유해 문자 단위 일치를 구조로 보장한다.
+  const formatPrizeKo = pbaFormatPrizeKo;
+  const pbaSeasonLabel = pbaSeasonLabelShared;
+
+  app.get("/pba", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    try {
+      const { currentPbaSeason } = await import("./services/pbaSync.js");
+      // 시즌 롤오버 공백에도 비지 않게 — DB 에 행이 실존하는 최신 시즌 기준 (라우트와 동일 규칙)
+      const season = await storage.pba.getDisplaySeason("PBA", currentPbaSeason());
+      const rows = (await storage.pba.getRankings("PBA", season, "prize", 50)) as any[];
+      if (!rows.length) return sendUnavailable(res);
+      res.setHeader("X-Prerender", "pba");
+      noStore(res);
+      res.send(
+        page({
+          title: "PBA 투어 랭킹 · 프로당구 시즌 상금·포인트 순위 | 랭큐",
+          desc: "프로당구 PBA·LPBA 시즌별 랭킹. 상금 순위, 랭킹 포인트, 선수별 통산 기록과 시즌 히스토리를 랭큐에서.",
+          canonical: `${ORIGIN}/pba`,
+          jsonLd: [
+            {
+              "@context": "https://schema.org",
+              "@type": "ItemList",
+              name: "PBA 투어 랭킹 · 프로당구 시즌 상금·포인트 순위 | 랭큐",
+              itemListElement: rows.slice(0, 20).map((r, i) => ({
+                "@type": "ListItem", position: i + 1, name: r.nameKo,
+                url: `${ORIGIN}/pba-player/${r.memCode}`,
+              })),
+            },
+          ],
+          body: `<main>
+  <h1>PBA 투어 랭킹</h1>
+  <p>프로당구 PBA·LPBA 시즌 랭킹 — ${pbaSeasonLabel(season)} 시즌 상금순</p>
+  <ol>
+  ${rows.map((r) => `<li><a href="/pba-player/${esc(r.memCode)}">${esc(r.nameKo)}</a>${r.nameEn ? ` (${esc(r.nameEn)})` : ""} — 상금 ${esc(formatPrizeKo(r.prize))}원, 랭킹포인트 ${r.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
+  </ol>
+  <p>출처: PBA 투어 공식 기록 — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
+  <nav><a href="/world-ranking">UMB 세계랭킹</a> <a href="/">홈</a></nav>
+</main>`,
+        }),
+      );
+    } catch (e) {
+      console.warn("[prerender] pba failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+  });
+
+  app.get("/pba-player/:memCode", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    if (!/^[A-Za-z0-9_-]{1,20}$/.test(req.params.memCode)) {
+      return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
+    }
+    let p: any = null;
+    try {
+      p = await storage.pba.getPlayer(req.params.memCode);
+    } catch (e) {
+      console.warn("[prerender] pba-player failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    if (!p) return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
+    const games = (p.win ?? 0) + (p.lose ?? 0) + (p.draw ?? 0);
+    const winRate = games > 0 ? Math.round(((p.win ?? 0) / games) * 100) : null;
+    res.setHeader("X-Prerender", "pba-player");
+    noStore(res);
+    res.send(
+      page({
+        // client/src/pages/hiq/pba-player.tsx 의 useSeo(ko) 와 문자 단위로 같아야 한다
+        title: `${p.nameKo} — ${p.league} 프로당구 선수 | 랭큐`,
+        desc: `${p.nameKo}${p.nameEn ? ` (${p.nameEn})` : ""} — ${p.league} 통산 상금 ${p.careerPrize != null ? formatPrizeKo(p.careerPrize) : "-"}, 에버리지 ${p.average ?? "-"}, 하이런 ${p.highRun ?? "-"}.`,
+        canonical: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
+        jsonLd: [
+          {
+            "@context": "https://schema.org",
+            "@type": "Person",
+            name: p.nameKo,
+            ...(p.nameEn ? { alternateName: p.nameEn } : {}),
+            ...(p.nationCode ? { nationality: p.nationCode } : {}),
+            jobTitle: "Professional billiards player",
+            memberOf: { "@type": "SportsOrganization", name: `${p.league} Tour` },
+            url: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "PBA 투어 랭킹", item: `${ORIGIN}/pba` },
+              { "@type": "ListItem", position: 2, name: p.nameKo, item: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}` },
+            ],
+          },
+        ],
+        body: `<main>
+  <nav><a href="/pba">← PBA 투어 랭킹</a></nav>
+  <h1>${esc(p.nameKo)}</h1>
+  <p>${esc(p.nameEn ?? "")} · ${esc(p.league)}${p.nationCode ? ` · ${esc(p.nationCode)}` : ""}</p>
+  <dl>
+    <dt>통산 상금</dt><dd>${p.careerPrize != null ? `${esc(formatPrizeKo(p.careerPrize))}원` : "-"}</dd>
+    ${p.win != null ? `<dt>승-패</dt><dd>${p.win}-${p.lose ?? 0}${winRate != null ? ` (승률 ${winRate}%)` : ""}</dd>` : ""}
+    ${p.average != null ? `<dt>에버리지</dt><dd>${p.average}</dd>` : ""}
+    ${p.bankShotRate != null ? `<dt>뱅크샷 성공률</dt><dd>${p.bankShotRate}%</dd>` : ""}
+    ${p.highRun != null ? `<dt>하이런</dt><dd>${p.highRun}</dd>` : ""}
+  </dl>
+  <h2>시즌별 기록</h2>
+  <ul>
+  ${(p.seasons ?? []).map((s: any) => `<li>${esc(pbaSeasonLabel(s.season))} 시즌 — ${s.prizeRank != null ? `상금랭킹 ${s.prizeRank}위, ` : ""}상금 ${esc(formatPrizeKo(s.prize))}원, 포인트 ${s.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
+  </ul>
+  ${p.umbPlayerId && p.umbCategory ? `<p><a href="/player/${esc(p.umbCategory)}/${esc(p.umbPlayerId)}">이 선수의 UMB 세계랭킹 기록 보기</a></p>` : ""}
+  <p>출처: PBA 투어 공식 기록 — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
+</main>`,
+      }),
+    );
   });
 
   // ── /community, /community/:id ────────────────────────────────────

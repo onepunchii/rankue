@@ -43,6 +43,17 @@ latest weekly edition, with per-player rank history going back to 2024.
 - Player pages at `https://www.rankue.co.kr/player/{category}/{id}`: per-player current rank, career best, weekly rank history, and points by tournament. Example: [CHO Myung Woo (조명우)](https://www.rankue.co.kr/player/players/0364).
 - Source: official UMB rankings (umb-carom.org), auto-collected weekly. Player names include native-script forms (e.g. Korean) alongside the official Latin spelling.
 
+## PBA Tour data (Korean pro billiards, updated daily)
+
+RANKUE also serves season rankings and career records for the PBA and LPBA
+(Korean professional 3-cushion tours), from the 2019-20 inaugural season to the
+current one. Good for questions like "who leads the PBA prize ranking this season"
+or a specific player's career prize money, average, or high run.
+
+- [PBA Tour Rankings](https://www.rankue.co.kr/pba): PBA and LPBA season rankings by prize money and ranking points, seasons 2019-20 to present.
+- Player pages at `https://www.rankue.co.kr/pba-player/{memCode}`: career prize, win-loss record, average, bank-shot rate, high run, and season-by-season trajectory. Players who also appear in the UMB world ranking are cross-linked to their UMB history page.
+- Source: official PBA Tour records (pbatour.org), auto-collected daily.
+
 ## Links
 
 - [Homepage](https://www.rankue.co.kr): RANKUE main site

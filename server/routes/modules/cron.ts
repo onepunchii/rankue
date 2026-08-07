@@ -44,4 +44,16 @@ async function handleUmbSync(req: any, res: any) {
 router.get("/umb-sync", asyncHandler(handleUmbSync));
 router.post("/umb-sync", asyncHandler(handleUmbSync));
 
+// PBA 투어 일일 동기화 — 현재 시즌 랭킹 + 선수 상세 회전 갱신(60명/회)
+async function handlePbaSync(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { syncPba } = await import("../../services/pbaSync.js");
+    const result = await syncPba();
+    return sendSuccess(res, result);
+}
+router.get("/pba-sync", asyncHandler(handlePbaSync));
+router.post("/pba-sync", asyncHandler(handlePbaSync));
+
 export default router;

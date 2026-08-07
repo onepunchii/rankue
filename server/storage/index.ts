@@ -6,6 +6,7 @@ import { AdminRepository } from "./admin.repo.js";
 import { NotificationRepository } from "./notification.repo.js";
 import { CommunityRepository } from "./community.repo.js";
 import { UmbRepository } from "./umb.repo.js";
+import { PbaRepository } from "./pba.repo.js";
 
 class Storage {
     public users = new UserRepository();
@@ -16,6 +17,7 @@ class Storage {
     public notifs = new NotificationRepository();
     public community = new CommunityRepository();
     public umb = new UmbRepository();
+    public pba = new PbaRepository();
 
     // --- Backward Compatibility Wrappers ---
     // User / Member

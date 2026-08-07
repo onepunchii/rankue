@@ -91,6 +91,17 @@ export async function generateSitemap(): Promise<string> {
     console.warn("[sitemap] umb players failed:", (e as Error)?.message);
   }
 
+  // PBA 투어 — 랭킹 + 선수 전원. "스롱 피아비 상금"류 국내 검색 타깃, ko 단일 언어.
+  try {
+    const players = await storage.pba.getPlayersForSitemap();
+    if (players.length) {
+      parts.push(entry(`${ORIGIN}/pba`, { changefreq: "weekly", priority: "0.8" }));
+      for (const p of players) parts.push(entry(`${ORIGIN}/pba-player/${p.memCode}`, { changefreq: "weekly", priority: "0.5" }));
+    }
+  } catch (e) {
+    console.warn("[sitemap] pba players failed:", (e as Error)?.message);
+  }
+
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${parts.join("\n")}\n</urlset>\n`;
 }
 

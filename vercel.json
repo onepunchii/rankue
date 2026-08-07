@@ -34,7 +34,7 @@
             "dest": "/api/index.ts"
         },
         {
-            "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking|community(?:/[^/]+)?|player/[^/]+/[^/]+|(?:store|club|r)/[^/]+)/?",
+            "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking|pba|pba-player/[^/]+|community(?:/[^/]+)?|player/[^/]+/[^/]+|(?:store|club|r)/[^/]+)/?",
             "has": [
                 {
                     "type": "header",
@@ -60,6 +60,10 @@
         {
             "path": "/api/cron/umb-sync",
             "schedule": "0 21 * * *"
+        },
+        {
+            "path": "/api/cron/pba-sync",
+            "schedule": "30 21 * * *"
         }
     ],
     "env": {

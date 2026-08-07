@@ -377,6 +377,13 @@ export default function HiqWorldRanking() {
                         {isLoadingMore ? t("umb.loading") : t("umb.loadMore")}
                     </button>
                 )}
+                {/* PBA 투어 교차 링크 — 국내 프로 랭킹은 별도 페이지 */}
+                <button
+                    onClick={() => setLocation("/pba")}
+                    className="h-12 mt-1 rounded-2xl bg-ink-1 text-white text-[14px] font-bold active:scale-[0.99] transition-transform"
+                >
+                    {({ ko: "PBA 투어 랭킹", en: "PBA Tour Rankings", vi: "BXH PBA Tour", tr: "PBA Tur Sıralaması", es: "Ranking PBA Tour" } as Record<string, string>)[locale] ?? "PBA Tour Rankings"} →
+                </button>
                 <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-center text-[11px] font-medium text-black/35 py-3">
                     {t("umb.source")}
                 </a>
