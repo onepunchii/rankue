@@ -315,12 +315,42 @@ export function registerPrerender(app: Express) {
     if (!isBot(req)) return next();
     let listHtml = "";
     let editionLabel = "";
+    let faqHtml = "";
+    const jsonLd: unknown[] = [];
     try {
       const data = await storage.umb.getRankings("players", { limit: 10 });
       if (data.rows.length) {
         editionLabel = data.edition ? ` (Edition ${data.edition})` : "";
+        const disp = (r: any) => r.nativeName ? `${r.nativeName} (${r.playerName})` : r.playerName;
         listHtml = `<ol>\n${data.rows.map((r: any) =>
-          `  <li>${esc(r.playerName)} (${esc(r.fed)}) — ${r.points}점</li>`).join("\n")}\n</ol>`;
+          `  <li><a href="/player/players/${esc(r.playerUmbId)}">${esc(disp(r))}</a> (${esc(r.fed)}) — ${r.points}점</li>`).join("\n")}\n</ol>`;
+
+        // AEO — 검색의 "관련 질문"("당구 세계 1위는 누구입니까?")에 그대로 대응하는 문답.
+        // 데이터에서 매주 자동 갱신되므로 답이 낡지 않는다.
+        const top = data.rows[0] as any;
+        const summary = await storage.umb.getSummary("players", "KR");
+        const updated = data.editionDate ? new Date(data.editionDate).toLocaleDateString("ko-KR", { year: "numeric", month: "long" }) : "";
+        const krTop = summary?.fedTop as any;
+        faqHtml = `
+  <h2>자주 묻는 질문</h2>
+  <section><h3>당구 세계랭킹 1위는 누구인가요?</h3>
+  <p>${updated ? `${esc(updated)} 기준 ` : ""}UMB 공식 3쿠션 세계랭킹 1위는 ${esc(disp(top))} 선수입니다 (${top.points}점).</p></section>
+  ${krTop ? `<section><h3>한국 당구 선수 최고 순위는?</h3>
+  <p>한국 선수 최고 순위는 ${krTop.nativeName ? esc(krTop.nativeName) : esc(krTop.playerName)} 선수의 세계 ${krTop.rank}위이며, 한국 선수 ${summary!.fedCount}명이 랭킹에 올라 있습니다.</p></section>` : ""}
+  <section><h3>당구 세계랭킹은 얼마나 자주 갱신되나요?</h3>
+  <p>UMB(세계당구연맹)가 대회 결과를 반영해 주 단위로 발표하며, 랭큐는 이를 자동 수집해 함께 갱신합니다.</p></section>`;
+
+        jsonLd.push({
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          name: "UMB 3쿠션 세계랭킹 톱 10",
+          itemListElement: data.rows.map((r: any, i: number) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            name: r.nativeName || r.playerName,
+            url: `${ORIGIN}/player/players/${r.playerUmbId}`,
+          })),
+        });
       }
     } catch (e) {
       console.warn("[prerender] world-ranking rows failed:", (e as Error)?.message);
@@ -331,11 +361,13 @@ export function registerPrerender(app: Express) {
         title: "당구 세계랭킹 — UMB 공식 3쿠션 랭킹 | 랭큐 RANKUE",
         desc: "UMB 공식 3쿠션 세계랭킹을 매주 업데이트. 남자·여자·주니어 전체 순위와 한국 선수, 선수별 순위 히스토리를 랭큐에서 확인하세요.",
         canonical: `${ORIGIN}/world-ranking`,
+        jsonLd,
         body: `<main>
   <h1>당구 세계랭킹${esc(editionLabel)}</h1>
   <p>UMB(세계당구연맹) 공식 3쿠션 세계랭킹입니다. 매주 갱신되며 남자·여자·주니어 부문 전체 순위와 선수별 순위 변동을 볼 수 있습니다.</p>
   <h2>남자 세계랭킹 톱 10</h2>
   ${listHtml || "<p>랭킹 데이터를 불러오는 중입니다.</p>"}
+  ${faqHtml}
   <p>출처: <a href="https://www.umb-carom.org" rel="noopener">UMB 공식 랭킹</a></p>
   <nav><a href="/">홈으로</a> <a href="/about">랭큐 소개</a> <a href="/stores">매장 찾기</a></nav>
 </main>`,
@@ -356,22 +388,56 @@ export function registerPrerender(app: Express) {
       const catKo = category === "players" ? "남자" : category === "ladies" ? "여자" : "주니어";
       // 한글 이름이 있으면 병기 — "조명우 (CHO Myung Woo)". 한글 검색 매칭의 핵심.
       const nameFull = p.nativeName ? `${p.nativeName} (${p.playerName})` : p.playerName;
+      const nameMain = p.nativeName || p.playerName;
+      const canonical = `${ORIGIN}/player/${category}/${req.params.umbId}`;
       const historySummary = data.history.slice(-10).map((h: any) =>
         `<li>Edition ${esc(h.edition)}: ${h.rank}위 (${h.points}점)</li>`).join("\n  ");
+      const updatedAt = data.history.length
+        ? new Date(data.history[data.history.length - 1].editionDate).toLocaleDateString("ko-KR", { year: "numeric", month: "long" })
+        : "";
       res.setHeader("X-Prerender", "umb-player");
       res.send(
         page({
           title: `${nameFull} — 당구 세계랭킹 ${p.rank}위 | 랭큐 RANKUE`,
           desc: `${nameFull} (${p.fed}) UMB 공식 3쿠션 ${catKo} 세계랭킹 ${p.rank}위, ${p.points}점. 역대 최고 ${data.bestRank}위. 주간 순위 히스토리와 대회별 포인트를 랭큐에서 확인하세요.`,
-          canonical: `${ORIGIN}/player/${category}/${req.params.umbId}`,
+          canonical,
+          // Person JSON-LD — "조명우 = CHO Myung Woo = 당구 선수" 개체 연결의 핵심.
+          // alternateName에 로마자를 실어 한글·로마자 검색 양쪽이 같은 개체로 묶이게 한다.
+          jsonLd: [
+            {
+              "@context": "https://schema.org",
+              "@type": "Person",
+              name: nameMain,
+              alternateName: p.nativeName ? p.playerName : undefined,
+              nationality: { "@type": "Country", name: p.fed },
+              description: `UMB 공식 3쿠션 ${catKo} 세계랭킹 ${p.rank}위 당구 선수 (${p.points}점, 역대 최고 ${data.bestRank}위)`,
+              url: canonical,
+              knowsAbout: "Three-cushion billiards",
+            },
+            {
+              "@context": "https://schema.org",
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "당구 세계랭킹", item: `${ORIGIN}/world-ranking` },
+                { "@type": "ListItem", position: 2, name: nameMain, item: canonical },
+              ],
+            },
+          ],
           body: `<main>
   <h1>${esc(nameFull)} — 당구 세계랭킹 ${p.rank}위</h1>
-  <p>UMB 공식 3쿠션 ${catKo} 세계랭킹. 국가 ${esc(p.fed)} · 현재 ${p.rank}위 · ${p.points}점 · 역대 최고 ${data.bestRank}위 · 국내 ${p.nationalRank ?? "-"}위</p>
+  <p>UMB 공식 3쿠션 ${catKo} 세계랭킹. 국가 ${esc(p.fed)} · 현재 ${p.rank}위 · ${p.points}점 · 역대 최고 ${data.bestRank}위 · 국내 ${p.nationalRank ?? "-"}위${updatedAt ? ` · ${esc(updatedAt)} 기준` : ""}</p>
+
+  <h2>자주 묻는 질문</h2>
+  <section><h3>${esc(nameMain)}의 현재 세계랭킹은 몇 위인가요?</h3>
+  <p>${esc(nameMain)} 선수는 UMB 공식 3쿠션 ${catKo} 세계랭킹 ${p.rank}위입니다 (${p.points}점${updatedAt ? `, ${esc(updatedAt)} 기준` : ""}).</p></section>
+  <section><h3>${esc(nameMain)}의 역대 최고 순위는?</h3>
+  <p>역대 최고 세계랭킹은 ${data.bestRank}위입니다.${p.nationalRank ? ` 현재 국내 순위는 ${p.nationalRank}위입니다.` : ""}</p></section>
+
   <h2>최근 순위 히스토리</h2>
   <ul>
   ${historySummary}
   </ul>
-  <p>출처: <a href="https://www.umb-carom.org" rel="noopener">UMB 공식 랭킹</a></p>
+  <p>출처: <a href="https://www.umb-carom.org" rel="noopener">UMB 공식 랭킹</a> — 매주 갱신</p>
   <nav><a href="/world-ranking">당구 세계랭킹 전체</a> <a href="/">랭큐 홈</a></nav>
 </main>`,
         }),

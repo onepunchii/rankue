@@ -21,14 +21,26 @@ export default function HiqWorldPlayer() {
     // SEO 타이틀은 데이터 로드 후 갱신 (같은 쿼리 키라 Body와 캐시 공유)
     const { data } = usePlayerDetail(category, umbId);
     const p = data?.player;
+    const nameMain = p ? (p.nativeName || p.playerName) : null;
     useSeo({
         title: p
-            ? `${p.playerName} — ${t("umb.pageTitle")} ${p.rank}${t("umb.rankSuffix")} | RANKUE`
+            ? `${p.nativeName ? `${p.nativeName} (${p.playerName})` : p.playerName} — ${t("umb.pageTitle")} ${p.rank}${t("umb.rankSuffix")} | RANKUE`
             : `${t("umb.pageTitle")} | RANKUE`,
         description: p
-            ? `${p.playerName} (${p.fed}) — ${t("umb.subtitle")} ${p.rank}${t("umb.rankSuffix")}, ${p.points}${t("umb.pointsUnit")}. ${t("umb.rankHistory")}·${t("umb.pointsBreakdown")}`
+            ? `${nameMain} (${p.fed}) — ${t("umb.subtitle")} ${p.rank}${t("umb.rankSuffix")}, ${p.points}${t("umb.pointsUnit")}. ${t("umb.rankHistory")}·${t("umb.pointsBreakdown")}`
             : t("umb.subtitle"),
         path: `/player/${category}/${umbId}`,
+        // 개체 연결(조명우 = CHO Myung Woo)용 Person 스키마 — 프리렌더와 동일 구조
+        jsonLd: p ? {
+            "@context": "https://schema.org",
+            "@type": "Person",
+            name: nameMain,
+            alternateName: p.nativeName ? p.playerName : undefined,
+            nationality: { "@type": "Country", name: p.fed },
+            description: `${t("umb.subtitle")} ${p.rank}${t("umb.rankSuffix")} (${p.points}${t("umb.pointsUnit")})`,
+            url: `https://www.rankue.co.kr/player/${category}/${umbId}`,
+            knowsAbout: "Three-cushion billiards",
+        } : null,
     });
 
     return (
