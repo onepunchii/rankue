@@ -3,6 +3,7 @@ export type UmbCategory = "players" | "ladies" | "juniors";
 export interface UmbRankingRow {
     rank: number;
     playerName: string;
+    nativeName?: string | null;
     fed: string;
     playerUmbId: string;
     points: number;
@@ -23,13 +24,14 @@ export interface UmbSummary {
     total: number;
     fed: string; // 요약 기준 국가 (뷰어의 "우리나라")
     fedCount: number;
-    top: { rank: number; playerName: string; fed: string } | null;
-    fedTop: { rank: number; playerName: string } | null;
+    top: { rank: number; playerName: string; nativeName?: string | null; fed: string } | null;
+    fedTop: { rank: number; playerName: string; nativeName?: string | null } | null;
 }
 
 export interface UmbPlayerDetail {
     player: {
         playerName: string;
+        nativeName?: string | null;
         fed: string;
         playerUmbId: string;
         rank: number;
@@ -41,7 +43,7 @@ export interface UmbPlayerDetail {
     bestRank: number;
     history: Array<{ edition: string; editionDate: string; rank: number; points: number }>;
     events: Array<{ colKey: string; label: string }>;
-    rivals: Array<{ rank: number; playerName: string; playerUmbId: string; points: number }>;
+    rivals: Array<{ rank: number; playerName: string; nativeName?: string | null; playerUmbId: string; points: number }>;
 }
 
 export const UMB_CATEGORIES: Array<{ id: UmbCategory; labelKey: string }> = [
@@ -51,6 +53,11 @@ export const UMB_CATEGORIES: Array<{ id: UmbCategory; labelKey: string }> = [
 ];
 
 export const UMB_SOURCE_URL = "https://www.umb-carom.org/ranking/archive";
+
+// 목록 표시용 이름 — 한국어 화면이면 한글 이름 우선 ("조명우"), 그 외엔 로마자
+export function displayName(row: { playerName: string; nativeName?: string | null }, locale: string): string {
+    return locale === "ko" && row.nativeName ? row.nativeName : row.playerName;
+}
 
 // 사용자의 "우리나라" — 강조·필터·요약의 기준. 프로필 국가가 있으면 그것,
 // 없으면(비로그인 등) 언어로 추정한다. 튀르키예·베트남은 3쿠션 강국이라

@@ -11,7 +11,7 @@ import { LucideChevronLeft, LucideSearch, LucideTrendingUp } from "@/lib/icons";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { UmbPlayerSheet } from "@/components/hiq/umb/UmbPlayerSheet";
 import { MoveBadge } from "@/components/hiq/umb/WorldRankingCard";
-import { UMB_CATEGORIES, UMB_SOURCE_URL, regionName as intlRegionName, resolveHomeFed, type UmbCategory, type UmbRankingRow, type UmbRankingsResponse } from "@/components/hiq/umb/types";
+import { UMB_CATEGORIES, UMB_SOURCE_URL, displayName, regionName as intlRegionName, resolveHomeFed, type UmbCategory, type UmbRankingRow, type UmbRankingsResponse } from "@/components/hiq/umb/types";
 
 const PAGE_SIZE = 50;
 
@@ -281,7 +281,7 @@ export default function HiqWorldRanking() {
                                 className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                             >
                                 <span className="text-[16px] leading-none">{flagEmoji(m.fed)}</span>
-                                <span className="text-[13px] font-semibold text-ink-1 max-w-[110px] truncate">{m.playerName}</span>
+                                <span className="text-[13px] font-semibold text-ink-1 max-w-[110px] truncate">{displayName(m, locale)}</span>
                                 <span className="text-[12px] font-bold text-brand tabular-nums">▲{m.move}</span>
                                 <span className="text-[11.5px] font-medium text-black/40 tabular-nums">{m.rank}{t("umb.rankSuffix")}</span>
                             </button>
@@ -316,7 +316,7 @@ export default function HiqWorldRanking() {
                         >
                             <span className={cn("w-10 shrink-0 text-center font-bold text-[15px] tabular-nums", isKr ? "text-brand" : "text-black/45")}>{r.rank}</span>
                             <span className="text-[17px] leading-none shrink-0">{flagEmoji(r.fed)}</span>
-                            <span className={cn("flex-1 min-w-0 truncate font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{r.playerName}</span>
+                            <span className={cn("flex-1 min-w-0 truncate font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{displayName(r, locale)}</span>
                             <MoveBadge move={r.move} />
                             <span className="w-12 shrink-0 text-right font-bold text-[15px] tabular-nums text-ink-1">{r.points}</span>
                         </button>

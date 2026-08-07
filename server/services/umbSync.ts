@@ -10,6 +10,7 @@ export interface SyncResult {
     checked: number;
     ingested: Array<{ category: string; edition: string; rows: number }>;
     errors: Array<{ category: string; edition: string; error: string }>;
+    namesAdded?: number; // 이번 실행에서 새로 채워진 한글 이름 수
 }
 
 export async function syncUmbRankings(opts: { maxPerCategory?: number; delayMs?: number } = {}): Promise<SyncResult> {
@@ -33,6 +34,7 @@ export async function syncUmbRankings(opts: { maxPerCategory?: number; delayMs?:
         byCategory.get(e.category)!.push(e);
     }
 
+    let namesAdded = 0;
     for (const [, list] of byCategory) {
         list.sort((a, b) => b.editionDate.getTime() - a.editionDate.getTime());
         let done = 0;
@@ -56,5 +58,9 @@ export async function syncUmbRankings(opts: { maxPerCategory?: number; delayMs?:
             }
         }
     }
-    return result;
+    // 새 한국 선수의 한글 이름 채우기 (결정적 변환, 멱등)
+    try {
+        namesAdded = await storage.umb.fillMissingKoreanNames();
+    } catch (e) { console.error("[umbSync] 한글 이름 채우기 실패:", e); }
+    return { ...result, namesAdded };
 }

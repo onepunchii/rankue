@@ -7,7 +7,7 @@ import { flagEmoji } from "@/lib/flag";
 import { useT } from "@/lib/i18n";
 import { LucideGlobe, LucideChevronRight } from "@/lib/icons";
 import { UmbPlayerSheet } from "./UmbPlayerSheet";
-import { UMB_CATEGORIES, UMB_SOURCE_URL, regionName, resolveHomeFed, type UmbCategory, type UmbRankingsResponse, type UmbSummary } from "./types";
+import { UMB_CATEGORIES, UMB_SOURCE_URL, displayName, regionName, resolveHomeFed, type UmbCategory, type UmbRankingsResponse, type UmbSummary } from "./types";
 
 // 순위 변동 뱃지 — ▲상승(브랜드) ▼하락(레드) NEW(노랑) –유지
 export const MoveBadge = ({ move }: { move: number | null }) => {
@@ -75,7 +75,7 @@ export const WorldRankingCard = () => {
                         {t("umb.summaryLine")
                             .replace("{country}", regionName(summary.fed, locale))
                             .replace("{count}", String(summary.fedCount))
-                            .replace("{name}", summary.fedTop.playerName)
+                            .replace("{name}", displayName(summary.fedTop as any, locale))
                             .replace("{rank}", String(summary.fedTop.rank))}
                     </span>
                 </div>
@@ -109,7 +109,7 @@ export const WorldRankingCard = () => {
                             </div>
                             <span className="text-[18px] leading-none shrink-0">{flagEmoji(r.fed)}</span>
                             <div className="flex-1 min-w-0">
-                                <span className={cn("block font-semibold text-[14.5px] truncate", isKr ? "text-brand" : "text-ink-1")}>{r.playerName}</span>
+                                <span className={cn("block font-semibold text-[14.5px] truncate", isKr ? "text-brand" : "text-ink-1")}>{displayName(r, locale)}</span>
                             </div>
                             <MoveBadge move={r.move} />
                             <div className="flex items-baseline gap-1 shrink-0 w-14 justify-end">

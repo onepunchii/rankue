@@ -1172,6 +1172,20 @@ export const umbEvents = pgTable("umb_events", {
   unique().on(table.category, table.edition, table.colKey),
 ]);
 
+// 선수 네이티브 이름 — 로마자 표기(UMB 원본)의 현지 문자 표기.
+// 한국 선수는 로마자→한글 결정적 변환기(umbKoreanName.ts)가 채운다.
+// 자국 문자로 검색·표시하는 사용자를 위함 ("조명우" ↔ "CHO Myung Woo").
+export const umbPlayerNames = pgTable("umb_player_names", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  playerUmbId: text("player_umb_id").notNull(),
+  nativeName: text("native_name").notNull(),
+  lang: text("lang").notNull(), // "ko" 등
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.playerUmbId),
+]);
+export type UmbPlayerName = typeof umbPlayerNames.$inferSelect;
+
 export type UmbRanking = typeof umbRankings.$inferSelect;
 export type InsertUmbRanking = typeof umbRankings.$inferInsert;
 export type UmbEvent = typeof umbEvents.$inferSelect;

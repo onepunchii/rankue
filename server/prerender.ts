@@ -352,18 +352,20 @@ export function registerPrerender(app: Express) {
     try {
       const data = await storage.umb.getPlayerHistory(category as any, req.params.umbId);
       if (!data?.player) return next();
-      const p = data.player;
+      const p = data.player as any;
       const catKo = category === "players" ? "남자" : category === "ladies" ? "여자" : "주니어";
+      // 한글 이름이 있으면 병기 — "조명우 (CHO Myung Woo)". 한글 검색 매칭의 핵심.
+      const nameFull = p.nativeName ? `${p.nativeName} (${p.playerName})` : p.playerName;
       const historySummary = data.history.slice(-10).map((h: any) =>
         `<li>Edition ${esc(h.edition)}: ${h.rank}위 (${h.points}점)</li>`).join("\n  ");
       res.setHeader("X-Prerender", "umb-player");
       res.send(
         page({
-          title: `${p.playerName} — 당구 세계랭킹 ${p.rank}위 | 랭큐 RANKUE`,
-          desc: `${p.playerName} (${p.fed}) UMB 공식 3쿠션 ${catKo} 세계랭킹 ${p.rank}위, ${p.points}점. 역대 최고 ${data.bestRank}위. 주간 순위 히스토리와 대회별 포인트를 랭큐에서 확인하세요.`,
+          title: `${nameFull} — 당구 세계랭킹 ${p.rank}위 | 랭큐 RANKUE`,
+          desc: `${nameFull} (${p.fed}) UMB 공식 3쿠션 ${catKo} 세계랭킹 ${p.rank}위, ${p.points}점. 역대 최고 ${data.bestRank}위. 주간 순위 히스토리와 대회별 포인트를 랭큐에서 확인하세요.`,
           canonical: `${ORIGIN}/player/${category}/${req.params.umbId}`,
           body: `<main>
-  <h1>${esc(p.playerName)} — 당구 세계랭킹 ${p.rank}위</h1>
+  <h1>${esc(nameFull)} — 당구 세계랭킹 ${p.rank}위</h1>
   <p>UMB 공식 3쿠션 ${catKo} 세계랭킹. 국가 ${esc(p.fed)} · 현재 ${p.rank}위 · ${p.points}점 · 역대 최고 ${data.bestRank}위 · 국내 ${p.nationalRank ?? "-"}위</p>
   <h2>최근 순위 히스토리</h2>
   <ul>

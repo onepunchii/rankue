@@ -36,7 +36,7 @@ interface UmbPlayerBodyProps {
 // 선수 상세 본문 — 시트(다이얼로그)와 전체 페이지(/player, SEO·공유용)가 공유한다.
 // 순위 히스토리 + 대회별 포인트 분해 + 성취 뱃지 + 1년 전 대비 + 국내 라이벌.
 export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }: UmbPlayerBodyProps) => {
-    const { t } = useT();
+    const { t, locale } = useT();
     const [metric, setMetric] = useState<"rank" | "points">("rank");
     const { data, isLoading } = usePlayerDetail(category, playerUmbId);
 
@@ -103,7 +103,8 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
             <div>
                 <TitleTag className="text-[22px] font-bold text-ink-1 leading-tight flex items-center gap-2">
                     <span className="text-[24px] leading-none">{flagEmoji(player.fed)}</span>
-                    <span className="min-w-0 truncate">{player.playerName}</span>
+                    {/* 한국어 화면 + 한글 이름 보유 시 한글 우선, 로마자는 부제로 병기 */}
+                    <span className="min-w-0 truncate">{locale === "ko" && player.nativeName ? player.nativeName : player.playerName}</span>
                     {weeklyMove !== null && weeklyMove !== 0 && (
                         <span className={cn("shrink-0 text-[13px] font-bold tabular-nums", weeklyMove > 0 ? "text-brand" : "text-red-500")}>
                             {weeklyMove > 0 ? `▲${weeklyMove}` : `▼${-weeklyMove}`}
@@ -111,6 +112,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                     )}
                 </TitleTag>
                 <DescTag className="text-[12.5px] font-medium text-black/50 mt-1">
+                    {locale === "ko" && player.nativeName ? `${player.playerName} · ` : player.nativeName ? `${player.nativeName} · ` : ""}
                     {t(`umb.cat${category === "players" ? "Players" : category === "ladies" ? "Ladies" : "Juniors"}`)} · {t("umb.subtitle")}
                 </DescTag>
                 {badges.length > 0 && (
@@ -202,7 +204,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                 className="flex items-center gap-3 rounded-xl bg-black/[0.03] px-3 py-2.5 text-left hover:bg-black/[0.06] transition-colors"
                             >
                                 <span className="w-9 shrink-0 text-center font-bold text-[13.5px] tabular-nums text-black/45">{r.rank}</span>
-                                <span className="flex-1 min-w-0 truncate text-[13.5px] font-semibold text-ink-1">{r.playerName}</span>
+                                <span className="flex-1 min-w-0 truncate text-[13.5px] font-semibold text-ink-1">{locale === "ko" && r.nativeName ? r.nativeName : r.playerName}</span>
                                 <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-black/45">{r.points}{t("umb.pointsUnit")}</span>
                             </button>
                         ))}

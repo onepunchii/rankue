@@ -1,7 +1,8 @@
 import { db } from "../db.js";
-import { umbRankings, umbEvents, type InsertUmbRanking } from "../../shared/schema.js";
-import { and, eq, desc, asc, sql, inArray, ilike } from "drizzle-orm";
+import { umbRankings, umbEvents, umbPlayerNames, type InsertUmbRanking } from "../../shared/schema.js";
+import { and, eq, desc, asc, sql, inArray, ilike, or } from "drizzle-orm";
 import type { UmbCategory, ParsedRanking, ArchiveEntry } from "../services/umbService.js";
+import { toKoreanName } from "../services/umbKoreanName.js";
 
 // UMB 세계랭킹 저장소. 공개 데이터라 뷰어 개인화·차단 로직이 없고,
 // 회차(edition) 단위 스냅샷의 멱등 적재가 핵심이다.
@@ -80,24 +81,35 @@ export class UmbRepository {
         if (!editions.length) return { edition: null, editionDate: null, total: 0, rows: [] };
         const [latest, prev] = editions;
 
-        const conds = [eq(umbRankings.category, category), eq(umbRankings.edition, latest.edition)];
+        const conds: any[] = [eq(umbRankings.category, category), eq(umbRankings.edition, latest.edition)];
         if (opts.fed) conds.push(eq(umbRankings.fed, opts.fed.toUpperCase()));
-        if (opts.q) conds.push(ilike(umbRankings.playerName, `%${opts.q}%`));
+        // 검색은 로마자·네이티브(한글) 양쪽 매칭 — "조명우"로도 "CHO"로도 찾게
+        if (opts.q) conds.push(or(
+            ilike(umbRankings.playerName, `%${opts.q}%`),
+            ilike(umbPlayerNames.nativeName, `%${opts.q}%`),
+        ));
+
+        const base = () => db.select({
+            rank: umbRankings.rank,
+            playerName: umbRankings.playerName,
+            nativeName: umbPlayerNames.nativeName,
+            fed: umbRankings.fed,
+            playerUmbId: umbRankings.playerUmbId,
+            points: umbRankings.points,
+        })
+            .from(umbRankings)
+            .leftJoin(umbPlayerNames, eq(umbPlayerNames.playerUmbId, umbRankings.playerUmbId));
 
         const [rows, [{ total }]] = await Promise.all([
-            db.select({
-                rank: umbRankings.rank,
-                playerName: umbRankings.playerName,
-                fed: umbRankings.fed,
-                playerUmbId: umbRankings.playerUmbId,
-                points: umbRankings.points,
-            })
-                .from(umbRankings)
+            base()
                 .where(and(...conds))
                 .orderBy(asc(umbRankings.rank))
                 .limit(limit)
                 .offset(offset),
-            db.select({ total: sql<number>`count(*)::int` }).from(umbRankings).where(and(...conds)),
+            db.select({ total: sql<number>`count(*)::int` })
+                .from(umbRankings)
+                .leftJoin(umbPlayerNames, eq(umbPlayerNames.playerUmbId, umbRankings.playerUmbId))
+                .where(and(...conds)),
         ]);
 
         // 직전 회차 순위 → 변동 계산 (조회된 페이지의 선수만)
@@ -162,7 +174,7 @@ export class UmbRepository {
             )) : [{ n: 0 }];
 
         // 국내 라이벌 — 같은 국가에서 순위가 가장 가까운 2명 (탭하면 그 선수로 이동)
-        const rivals = latestRow ? await db.select({
+        const rivalsRaw = latestRow ? await db.select({
             rank: umbRankings.rank,
             playerName: umbRankings.playerName,
             playerUmbId: umbRankings.playerUmbId,
@@ -177,11 +189,19 @@ export class UmbRepository {
             ))
             .orderBy(sql`abs(${umbRankings.rank} - ${latestRow.rank})`)
             .limit(2) : [];
+        const rivals = rivalsRaw.sort((a, b) => a.rank - b.rank);
+
+        // 네이티브 이름(한글 등) 일괄 조회 — 본인 + 라이벌
+        const nameRows = await db.select({ playerUmbId: umbPlayerNames.playerUmbId, nativeName: umbPlayerNames.nativeName })
+            .from(umbPlayerNames)
+            .where(inArray(umbPlayerNames.playerUmbId, [playerUmbId, ...rivals.map(r => r.playerUmbId)]));
+        const nativeNames = new Map(nameRows.map(n => [n.playerUmbId, n.nativeName]));
 
         return {
-            rivals: rivals.sort((a, b) => a.rank - b.rank),
+            rivals: rivals.map(r => ({ ...r, nativeName: nativeNames.get(r.playerUmbId) ?? null })),
             player: latestRow ? {
                 playerName: latestRow.playerName,
+                nativeName: nativeNames.get(playerUmbId) ?? null,
                 fed: latestRow.fed,
                 playerUmbId,
                 rank: latestRow.rank,
@@ -206,9 +226,12 @@ export class UmbRepository {
         const before = sql`(SELECT rank, player_umb_id FROM ${umbRankings}
             WHERE category = ${category} AND edition = ${prev.edition})`;
         const rows: any[] = await db.execute(sql`
-            SELECT c.rank, c.player_name AS "playerName", c.fed, c.player_umb_id AS "playerUmbId",
+            SELECT c.rank, c.player_name AS "playerName", n.native_name AS "nativeName",
+                   c.fed, c.player_umb_id AS "playerUmbId",
                    c.points, b.rank AS "prevRank", (b.rank - c.rank) AS move
-            FROM ${cur} c JOIN ${before} b ON b.player_umb_id = c.player_umb_id
+            FROM ${cur} c
+            JOIN ${before} b ON b.player_umb_id = c.player_umb_id
+            LEFT JOIN ${umbPlayerNames} n ON n.player_umb_id = c.player_umb_id
             WHERE b.rank - c.rank > 0
             ORDER BY move DESC, c.rank ASC
             LIMIT ${limit}
@@ -216,8 +239,8 @@ export class UmbRepository {
         return rows;
     }
 
-    // 사이트맵용 선수 목록 — 부문별 톱 200 + 한국 선수 전원.
-    // 전 선수(4,300+)를 넣으면 하위권 페이지가 얇은 콘텐츠로 저품질 판정 위험이 있어 제한한다.
+    // 사이트맵용 선수 목록 — 부문별 톱 1000 + 한국 선수 전원 (오너 결정: 세계 톱1000).
+    // 전 선수(4,300+)까지는 하위권 페이지가 얇은 콘텐츠로 저품질 판정 위험이 있어 제한한다.
     async getPlayersForSitemap(): Promise<Array<{ category: string; playerUmbId: string }>> {
         const out: Array<{ category: string; playerUmbId: string }> = [];
         for (const category of ["players", "ladies", "juniors"] as UmbCategory[]) {
@@ -228,12 +251,32 @@ export class UmbRepository {
                 .where(and(
                     eq(umbRankings.category, category),
                     eq(umbRankings.edition, editions[0].edition),
-                    sql`(${umbRankings.rank} <= 200 OR ${umbRankings.fed} = 'KR')`,
+                    sql`(${umbRankings.rank} <= 1000 OR ${umbRankings.fed} = 'KR')`,
                 ))
                 .orderBy(asc(umbRankings.rank));
             for (const r of rows) out.push({ category, playerUmbId: r.playerUmbId });
         }
         return out;
+    }
+
+    // 로마자→한글 변환으로 아직 이름이 없는 한국 선수를 채운다.
+    // 변환기는 모든 음절이 확실할 때만 결과를 내므로(불확실=null) 틀린 이름이 저장되지 않는다.
+    // 동기화(주간)·백필이 함께 쓴다 — 멱등.
+    async fillMissingKoreanNames(): Promise<number> {
+        const result: any = await db.execute(sql`
+            SELECT DISTINCT r.player_umb_id AS id, r.player_name AS name
+            FROM ${umbRankings} r
+            LEFT JOIN ${umbPlayerNames} n ON n.player_umb_id = r.player_umb_id
+            WHERE r.fed = 'KR' AND n.id IS NULL
+        `);
+        const missing = (result.rows ?? result) as Array<{ id: string; name: string }>;
+        const values = missing
+            .map(m => ({ playerUmbId: m.id, nativeName: toKoreanName(m.name), lang: "ko" }))
+            .filter((v): v is { playerUmbId: string; nativeName: string; lang: string } => !!v.nativeName);
+        for (let i = 0; i < values.length; i += 500) {
+            await db.insert(umbPlayerNames).values(values.slice(i, i + 500)).onConflictDoNothing();
+        }
+        return values.length;
     }
 
     // 국가별 집계 — "당구 강국 랭킹". 상위 5명 합산 포인트로 정렬(데이비스컵 방식):
@@ -303,10 +346,14 @@ export class UmbRepository {
         const base = and(eq(umbRankings.category, category), eq(umbRankings.edition, latest.edition));
         const [[{ fedCount }], [top], [fedTop]] = await Promise.all([
             db.select({ fedCount: sql<number>`count(*)::int` }).from(umbRankings).where(and(base, eq(umbRankings.fed, fed))),
-            db.select({ rank: umbRankings.rank, playerName: umbRankings.playerName, fed: umbRankings.fed })
-                .from(umbRankings).where(base).orderBy(asc(umbRankings.rank)).limit(1),
-            db.select({ rank: umbRankings.rank, playerName: umbRankings.playerName })
-                .from(umbRankings).where(and(base, eq(umbRankings.fed, fed))).orderBy(asc(umbRankings.rank)).limit(1),
+            db.select({ rank: umbRankings.rank, playerName: umbRankings.playerName, nativeName: umbPlayerNames.nativeName, fed: umbRankings.fed })
+                .from(umbRankings)
+                .leftJoin(umbPlayerNames, eq(umbPlayerNames.playerUmbId, umbRankings.playerUmbId))
+                .where(base).orderBy(asc(umbRankings.rank)).limit(1),
+            db.select({ rank: umbRankings.rank, playerName: umbRankings.playerName, nativeName: umbPlayerNames.nativeName })
+                .from(umbRankings)
+                .leftJoin(umbPlayerNames, eq(umbPlayerNames.playerUmbId, umbRankings.playerUmbId))
+                .where(and(base, eq(umbRankings.fed, fed))).orderBy(asc(umbRankings.rank)).limit(1),
         ]);
         const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(umbRankings).where(base);
         return { edition: latest.edition, editionDate: latest.editionDate, total, fed, fedCount, top: top ?? null, fedTop: fedTop ?? null };
