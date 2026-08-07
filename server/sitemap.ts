@@ -59,6 +59,26 @@ export async function generateSitemap(): Promise<string> {
     console.warn("[sitemap] stores failed:", (e as Error)?.message);
   }
 
+  // 커뮤니티 — 목록 + 글(블라인드 제외). 크루 내부 콘텐츠는 색인 제외가 원칙이지만
+  // 커뮤니티는 공개 게시판이라 색인 대상 (오너 결정 2026-08-05).
+  try {
+    const posts = await storage.community.getPostsForSitemap();
+    if (posts.length) {
+      parts.push(entry(`${ORIGIN}/community`, { changefreq: "daily", priority: "0.7" }));
+      for (const p of posts) parts.push(entry(`${ORIGIN}/community/${p.id}`, { changefreq: "weekly", priority: "0.5" }));
+    }
+  } catch (e) {
+    console.warn("[sitemap] community failed:", (e as Error)?.message);
+  }
+
+  // UMB 선수 페이지 — 부문별 톱 200 + 한국 선수 전원 (~1,100). 주간 갱신 콘텐츠.
+  try {
+    const players = await storage.umb.getPlayersForSitemap();
+    for (const p of players) parts.push(entry(`${ORIGIN}/player/${p.category}/${p.playerUmbId}`, { changefreq: "weekly", priority: "0.5" }));
+  } catch (e) {
+    console.warn("[sitemap] umb players failed:", (e as Error)?.message);
+  }
+
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${parts.join("\n")}\n</urlset>\n`;
 }
 

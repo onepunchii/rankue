@@ -343,6 +343,100 @@ export function registerPrerender(app: Express) {
     );
   });
 
+  // ── /player/:category/:umbId ──────────────────────────────────────
+  // UMB 선수 페이지 — 사이트맵(톱200+한국 전원) 대상. 봇에게 순위·히스토리 요약 HTML.
+  app.get("/player/:category/:umbId", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    const category = ["players", "ladies", "juniors"].includes(req.params.category) ? req.params.category : null;
+    if (!category || !/^\d{1,6}$/.test(req.params.umbId)) return next();
+    try {
+      const data = await storage.umb.getPlayerHistory(category as any, req.params.umbId);
+      if (!data?.player) return next();
+      const p = data.player;
+      const catKo = category === "players" ? "남자" : category === "ladies" ? "여자" : "주니어";
+      const historySummary = data.history.slice(-10).map((h: any) =>
+        `<li>Edition ${esc(h.edition)}: ${h.rank}위 (${h.points}점)</li>`).join("\n  ");
+      res.setHeader("X-Prerender", "umb-player");
+      res.send(
+        page({
+          title: `${p.playerName} — 당구 세계랭킹 ${p.rank}위 | 랭큐 RANKUE`,
+          desc: `${p.playerName} (${p.fed}) UMB 공식 3쿠션 ${catKo} 세계랭킹 ${p.rank}위, ${p.points}점. 역대 최고 ${data.bestRank}위. 주간 순위 히스토리와 대회별 포인트를 랭큐에서 확인하세요.`,
+          canonical: `${ORIGIN}/player/${category}/${req.params.umbId}`,
+          body: `<main>
+  <h1>${esc(p.playerName)} — 당구 세계랭킹 ${p.rank}위</h1>
+  <p>UMB 공식 3쿠션 ${catKo} 세계랭킹. 국가 ${esc(p.fed)} · 현재 ${p.rank}위 · ${p.points}점 · 역대 최고 ${data.bestRank}위 · 국내 ${p.nationalRank ?? "-"}위</p>
+  <h2>최근 순위 히스토리</h2>
+  <ul>
+  ${historySummary}
+  </ul>
+  <p>출처: <a href="https://www.umb-carom.org" rel="noopener">UMB 공식 랭킹</a></p>
+  <nav><a href="/world-ranking">당구 세계랭킹 전체</a> <a href="/">랭큐 홈</a></nav>
+</main>`,
+        }),
+      );
+    } catch (e) {
+      console.warn("[prerender] player failed:", (e as Error)?.message);
+      return next();
+    }
+  });
+
+  // ── /community, /community/:id ────────────────────────────────────
+  // 커뮤니티는 공개 게시판이라 색인 대상 (크루 내부 콘텐츠는 색인 제외 원칙과 구분).
+  app.get("/community", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    let listHtml = "";
+    try {
+      const posts = await storage.community.getPosts({ limit: 20 });
+      listHtml = posts.filter((p: any) => !p.isBlinded).map((p: any) =>
+        `<li><a href="/community/${esc(p.id)}">${esc((p.title || p.content || "").slice(0, 60))}</a></li>`).join("\n  ");
+    } catch (e) {
+      console.warn("[prerender] community list failed:", (e as Error)?.message);
+    }
+    res.setHeader("X-Prerender", "community");
+    res.send(
+      page({
+        title: "당구 커뮤니티 — 한 큐 자랑·질문·매장·레슨 | 랭큐 RANKUE",
+        desc: "전국 당구인들의 커뮤니티. 한 큐 자랑, 당구 질문, 매장 소식, 레슨 정보를 나눠보세요.",
+        canonical: `${ORIGIN}/community`,
+        body: `<main>
+  <h1>당구 커뮤니티</h1>
+  <p>전국 당구인들과 이야기하는 공간입니다. 한 큐 자랑, 물어보기, 우리 매장, 레슨 게시판이 있습니다.</p>
+  <ul>
+  ${listHtml || "<li>첫 글을 남겨보세요.</li>"}
+  </ul>
+  <nav><a href="/">랭큐 홈</a> <a href="/world-ranking">당구 세계랭킹</a></nav>
+</main>`,
+      }),
+    );
+  });
+
+  app.get("/community/:id", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return next();
+    try {
+      const post = await storage.community.getPost(req.params.id);
+      if (!post || post.isBlinded) return next(); // 블라인드 글은 색인시키지 않는다
+      const title = (post.title || post.content.split("\n")[0] || "당구 커뮤니티 글").slice(0, 60);
+      res.setHeader("X-Prerender", "community-post");
+      res.send(
+        page({
+          title: `${title} | 랭큐 당구 커뮤니티`,
+          desc: post.content.slice(0, 150).replace(/\n/g, " "),
+          canonical: `${ORIGIN}/community/${req.params.id}`,
+          body: `<main>
+  <h1>${esc(title)}</h1>
+  <p>${esc(post.content.slice(0, 1000))}</p>
+  <p>작성: ${esc(post.author?.name || "")} · ${esc(new Date(post.createdAt).toLocaleDateString("ko-KR"))}</p>
+  <nav><a href="/community">당구 커뮤니티</a> <a href="/">랭큐 홈</a></nav>
+</main>`,
+        }),
+      );
+    } catch (e) {
+      console.warn("[prerender] community post failed:", (e as Error)?.message);
+      return next();
+    }
+  });
+
   app.get("/about", (req, res, next) => {
     if (!isBot(req)) return next();
     const q = typeof req.query.lang === "string" ? req.query.lang : "";

@@ -216,6 +216,26 @@ export class UmbRepository {
         return rows;
     }
 
+    // 사이트맵용 선수 목록 — 부문별 톱 200 + 한국 선수 전원.
+    // 전 선수(4,300+)를 넣으면 하위권 페이지가 얇은 콘텐츠로 저품질 판정 위험이 있어 제한한다.
+    async getPlayersForSitemap(): Promise<Array<{ category: string; playerUmbId: string }>> {
+        const out: Array<{ category: string; playerUmbId: string }> = [];
+        for (const category of ["players", "ladies", "juniors"] as UmbCategory[]) {
+            const editions = await this.getLatestEditions(category, 1);
+            if (!editions.length) continue;
+            const rows = await db.select({ playerUmbId: umbRankings.playerUmbId, rank: umbRankings.rank, fed: umbRankings.fed })
+                .from(umbRankings)
+                .where(and(
+                    eq(umbRankings.category, category),
+                    eq(umbRankings.edition, editions[0].edition),
+                    sql`(${umbRankings.rank} <= 200 OR ${umbRankings.fed} = 'KR')`,
+                ))
+                .orderBy(asc(umbRankings.rank));
+            for (const r of rows) out.push({ category, playerUmbId: r.playerUmbId });
+        }
+        return out;
+    }
+
     // 국가별 집계 — "당구 강국 랭킹". 상위 5명 합산 포인트로 정렬(데이비스컵 방식):
     // 총합은 선수 수가 많은 나라가, 1위 순위만은 스타 한 명이 왜곡하므로 톱5 합산이 균형점.
     async getNations(category: UmbCategory) {

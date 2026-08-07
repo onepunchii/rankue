@@ -28,6 +28,7 @@ import HiqOnlineGame from "@/pages/hiq/online-game";
 import HiqCommunity from "@/pages/hiq/community";
 import HiqCommunityPost from "@/pages/hiq/community-post";
 import HiqWorldRanking from "@/pages/hiq/world-ranking";
+import HiqWorldPlayer from "@/pages/hiq/world-player";
 import GolfNewGame from "@/golf/pages/NewGame";
 import GolfScorecard from "@/golf/pages/GamePage";
 import GameResult from "@/golf/pages/GameResult";
@@ -101,6 +102,7 @@ const FramedMenu = framed(HiqMenu);
 const FramedCommunity = framed(HiqCommunity);
 const FramedCommunityPost = framed(HiqCommunityPost);
 const FramedWorldRanking = framed(HiqWorldRanking);
+const FramedWorldPlayer = framed(HiqWorldPlayer);
 
 /**
  * localStorage에 저장된 FCM 토큰을 서버에 등록한다.
@@ -224,6 +226,7 @@ function AppRoutes() {
       <Route path="/community" component={FramedCommunity} />
       <Route path="/community/:id" component={FramedCommunityPost} />
       <Route path="/world-ranking" component={FramedWorldRanking} />
+      <Route path="/player/:category/:umbId" component={FramedWorldPlayer} />
       <Route path="/admin" component={HiqAdmin} />
       <Route path="/simulation" component={HiqSimulation} />
 

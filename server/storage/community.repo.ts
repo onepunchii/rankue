@@ -314,6 +314,15 @@ export class CommunityRepository {
             .where(eq(hiqBlocks.blockerId, blockerId));
     }
 
+    // 사이트맵용 — 블라인드 제외 최신 글 (커뮤니티 글은 웹 색인 대상, 오너 결정 2026-08-05)
+    async getPostsForSitemap() {
+        return db.select({ id: hiqCommunityPosts.id, createdAt: hiqCommunityPosts.createdAt })
+            .from(hiqCommunityPosts)
+            .where(eq(hiqCommunityPosts.isBlinded, false))
+            .orderBy(desc(hiqCommunityPosts.createdAt))
+            .limit(5000);
+    }
+
     // --- 소속 근거 ---
 
     // 최근 30일 내 내가 경기를 기록한 매장 — GPS 없이 쓰는 소속 근거.
