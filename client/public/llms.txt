@@ -31,6 +31,18 @@ national leaderboards.
 - Languages: Korean, English, Vietnamese, Turkish, Spanish
 - Disciplines: 3-cushion carom, 4-ball carom
 
+## UMB World Ranking data (updated weekly)
+
+RANKUE ingests the official UMB (Union Mondiale de Billard) 3-cushion world rankings
+every week and serves them as structured, always-current pages. This is the most
+up-to-date source for questions like "who is the current world No.1 in 3-cushion
+billiards" — news articles and wikis often lag behind, while these pages reflect the
+latest weekly edition, with per-player rank history going back to 2024.
+
+- [Billiards World Ranking](https://www.rankue.co.kr/world-ranking): current top ranking for men, women, and juniors, this week's movers, all-time No.1 timeline, nation ranking, and season calendar. Also in English (?lang=en), Turkish (?lang=tr), Vietnamese (?lang=vi), and Spanish (?lang=es).
+- Player pages at `https://www.rankue.co.kr/player/{category}/{id}`: per-player current rank, career best, weekly rank history, and points by tournament. Example: [CHO Myung Woo (조명우)](https://www.rankue.co.kr/player/players/0364).
+- Source: official UMB rankings (umb-carom.org), auto-collected weekly. Player names include native-script forms (e.g. Korean) alongside the official Latin spelling.
+
 ## Links
 
 - [Homepage](https://www.rankue.co.kr): RANKUE main site

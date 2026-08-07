@@ -290,7 +290,8 @@ export class UmbRepository {
                    count(*)::int AS "players",
                    min(rank)::int AS "bestRank",
                    (array_agg(player_name ORDER BY rank))[1] AS "bestPlayer",
-                   sum(points) FILTER (WHERE rn <= 5)::int AS "top5Points"
+                   sum(points) FILTER (WHERE rn <= 5)::int AS "top5Points",
+                   count(*) FILTER (WHERE rank <= 20)::int AS "top20Count"
             FROM (
                 SELECT fed, rank, points, player_name,
                        row_number() OVER (PARTITION BY fed ORDER BY rank) AS rn
@@ -339,6 +340,36 @@ export class UmbRepository {
     }
 
     // fed = 뷰어의 "우리나라" (기본 KR) — 요약 줄의 국가별 통계 기준
+    // 역대 세계 1위 계보 — 연속 재임 구간으로 접는다. "지금 1위는 누구" 정답 허브의 핵심:
+    // AI 검색·위키가 낡은 답(전임 1위)을 주는 공백을 주간 스냅샷 2년치로 메운다.
+    async getNo1History(category: UmbCategory) {
+        const rows = await db.select({
+            edition: umbRankings.edition,
+            editionDate: umbRankings.editionDate,
+            playerUmbId: umbRankings.playerUmbId,
+            playerName: umbRankings.playerName,
+            nativeName: umbPlayerNames.nativeName,
+            fed: umbRankings.fed,
+        })
+            .from(umbRankings)
+            .leftJoin(umbPlayerNames, eq(umbPlayerNames.playerUmbId, umbRankings.playerUmbId))
+            .where(and(eq(umbRankings.category, category), eq(umbRankings.rank, 1)))
+            .orderBy(asc(umbRankings.editionDate));
+
+        const reigns: Array<{ playerUmbId: string; playerName: string; nativeName: string | null; fed: string; from: Date; to: Date; weeks: number; current: boolean }> = [];
+        for (const r of rows) {
+            const last = reigns[reigns.length - 1];
+            if (last && last.playerUmbId === r.playerUmbId) {
+                last.to = r.editionDate;
+                last.weeks++;
+            } else {
+                reigns.push({ playerUmbId: r.playerUmbId, playerName: r.playerName, nativeName: r.nativeName, fed: r.fed, from: r.editionDate, to: r.editionDate, weeks: 1, current: false });
+            }
+        }
+        if (reigns.length) reigns[reigns.length - 1].current = true;
+        return reigns.reverse(); // 현재 1위부터
+    }
+
     async getSummary(category: UmbCategory, fed = "KR") {
         const editions = await this.getLatestEditions(category, 1);
         if (!editions.length) return null;

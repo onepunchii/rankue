@@ -74,6 +74,14 @@ router.get("/calendar", asyncHandler(async (req: any, res: Response) => {
     return sendSuccess(res, events);
 }));
 
+// GET /umb/no1-history?category= — 역대 세계 1위 계보 (재임 구간·주수)
+router.get("/no1-history", asyncHandler(async (req: any, res: Response) => {
+    const category = parseCategory(req.query.category ?? "players");
+    if (!category) return sendError(res, 400, "잘못된 부문입니다");
+    const reigns = await storage.umb.getNo1History(category);
+    return sendSuccess(res, reigns);
+}));
+
 // GET /umb/summary?category=&fed= — 홈 섹션 요약 (총 인원·1위 + 뷰어 국가의 선수 수·최고)
 router.get("/summary", asyncHandler(async (req: any, res: Response) => {
     const category = parseCategory(req.query.category ?? "players");

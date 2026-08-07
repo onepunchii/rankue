@@ -64,7 +64,7 @@ export default function HiqWorldRanking() {
     });
 
     // 국가 랭킹 — 상위 5명 합산 포인트 기준 (스타 1명 왜곡·머릿수 왜곡의 균형점)
-    interface Nation { fed: string; players: number; bestRank: number; bestPlayer: string; top5Points: number | null }
+    interface Nation { fed: string; players: number; bestRank: number; bestPlayer: string; top5Points: number | null; top20Count: number }
     const { data: nationsData } = useQuery<{ edition: string | null; nations: Nation[] }>({
         queryKey: ["/api/hiq/umb/nations", category],
         queryFn: async () => apiRequest(`/api/hiq/umb/nations?category=${category}`),
@@ -87,6 +87,14 @@ export default function HiqWorldRanking() {
     const seasonEvents = [...pastEvents, ...futureEvents];
 
     const countryName = (code: string) => intlRegionName(code, locale);
+
+    // 역대 세계 1위 계보 — "지금 1위는 누구" 정답 허브의 시각 요소
+    interface Reign { playerUmbId: string; playerName: string; nativeName: string | null; fed: string; from: string; to: string; weeks: number; current: boolean }
+    const { data: reigns = [] } = useQuery<Reign[]>({
+        queryKey: ["/api/hiq/umb/no1-history", category],
+        queryFn: async () => apiRequest(`/api/hiq/umb/no1-history?category=${category}`),
+        staleTime: 30 * 60 * 1000,
+    });
 
     const changeFilter = (fn: () => void) => { fn(); setOlder([]); };
 
@@ -165,10 +173,13 @@ export default function HiqWorldRanking() {
                 </div>
             </div>
 
-            {/* 시즌 대회 일정 — 지난 대회 ✓ 최근 2개 + 다가오는 대회 D-day */}
+            {/* 시즌 대회 일정 — 지난 대회 ✓ 최근 2개 + 다가오는 대회 D-day + 공식 중계 안내 */}
             {seasonEvents.length > 0 && !q && !krOnly && (
                 <div className="mb-4">
-                    <h2 className="text-[13px] font-bold text-ink-2 mb-2">🗓️ {t("umb.calendarTitle")}</h2>
+                    <div className="flex items-baseline justify-between mb-2">
+                        <h2 className="text-[13px] font-bold text-ink-2">🗓️ {t("umb.calendarTitle")}</h2>
+                        <span className="text-[10.5px] font-medium text-black/35">{t("umb.watchNote")}</span>
+                    </div>
                     <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-5 px-5">
                         {seasonEvents.map(e => {
                             const d = dday(e.date);
@@ -227,7 +238,9 @@ export default function HiqWorldRanking() {
                                 <div className="flex-1 min-w-0">
                                     <span className={cn("block text-[14.5px] font-semibold truncate", isKr ? "text-brand" : "text-ink-1")}>{countryName(n.fed)}</span>
                                     <span className="block text-[11.5px] font-medium text-black/45 truncate mt-0.5">
-                                        {t("umb.playersCount").replace("{n}", String(n.players))} · {n.bestRank}{t("umb.rankSuffix")} {n.bestPlayer}
+                                        {t("umb.playersCount").replace("{n}", String(n.players))}
+                                        {n.top20Count > 0 ? ` · ${t("umb.top20Count").replace("{n}", String(n.top20Count))}` : ""}
+                                        {" · "}{n.bestRank}{t("umb.rankSuffix")} {n.bestPlayer}
                                     </span>
                                 </div>
                                 <div className="text-right shrink-0">
@@ -284,6 +297,39 @@ export default function HiqWorldRanking() {
                                 <span className="text-[13px] font-semibold text-ink-1 max-w-[110px] truncate">{displayName(m, locale)}</span>
                                 <span className="text-[12px] font-bold text-brand tabular-nums">▲{m.move}</span>
                                 <span className="text-[11.5px] font-medium text-black/40 tabular-nums">{m.rank}{t("umb.rankSuffix")}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 역대 세계 1위 계보 — 재임 기간·주수. 현 1위가 맨 앞 */}
+            {reigns.length > 0 && !q && !krOnly && (
+                <div className="mb-4">
+                    <h2 className="text-[13px] font-bold text-ink-2 mb-2">👑 {t("umb.no1History")}</h2>
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-5 px-5">
+                        {reigns.slice(0, 8).map((rg, i) => (
+                            <button
+                                key={`${rg.playerUmbId}-${rg.from}`}
+                                onClick={() => setOpenPlayerId(rg.playerUmbId)}
+                                className={cn(
+                                    "shrink-0 px-3.5 py-2.5 rounded-2xl text-left",
+                                    rg.current ? "bg-[#F5B721]/15 border border-[#F5B721]/40" : "bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                                )}
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[15px] leading-none">{flagEmoji(rg.fed)}</span>
+                                    <span className="text-[12.5px] font-bold text-ink-1 max-w-[130px] truncate">
+                                        {locale === "ko" && rg.nativeName ? rg.nativeName : rg.playerName}
+                                    </span>
+                                    {rg.current && <span className="px-1.5 py-0.5 rounded-full bg-[#F5B721]/25 text-[9.5px] font-bold text-[#8a6a0a] leading-none">{t("umb.reignNow")}</span>}
+                                </div>
+                                <div className="text-[10.5px] font-medium text-black/45 mt-1 tabular-nums">
+                                    {new Date(rg.from).toLocaleDateString(locale === "ko" ? "ko-KR" : undefined, { year: "2-digit", month: "short" })}
+                                    {" ~ "}
+                                    {rg.current ? "" : new Date(rg.to).toLocaleDateString(locale === "ko" ? "ko-KR" : undefined, { year: "2-digit", month: "short" })}
+                                    {" · "}{t("umb.reignWeeks").replace("{n}", String(rg.weeks))}
+                                </div>
                             </button>
                         ))}
                     </div>

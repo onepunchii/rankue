@@ -317,6 +317,9 @@ export function registerPrerender(app: Express) {
     faqH: string; faq1q: string; faq1a: (name: string, pts: number, updated: string) => string;
     fedFaq: { fed: string; q: string; a: (name: string, rank: number, count: number) => string } | null;
     freqQ: string; freqA: string; loading: string; source: string;
+    gapQ: string; gapA: (n1: string, n2: string, diff: number) => string;
+    no1H: string; weeksWord: (n: number) => string; nowWord: string;
+    watchNote: string;
   }> = {
     ko: {
       title: "당구 세계랭킹 — UMB 공식 3쿠션 랭킹 | 랭큐 RANKUE",
@@ -329,6 +332,10 @@ export function registerPrerender(app: Express) {
       freqQ: "당구 세계랭킹은 얼마나 자주 갱신되나요?",
       freqA: "UMB(세계당구연맹)가 대회 결과를 반영해 주 단위로 발표하며, 랭큐는 이를 자동 수집해 함께 갱신합니다.",
       loading: "랭킹 데이터를 불러오는 중입니다.", source: "출처: UMB 공식 랭킹",
+      gapQ: "1위와 2위의 포인트 격차는 얼마나 되나요?",
+      gapA: (n1, n2, d) => `현재 1위 ${n1}와(과) 2위 ${n2}의 격차는 ${d}점입니다.`,
+      no1H: "역대 세계 1위", weeksWord: (n) => `${n}주`, nowWord: "현재",
+      watchNote: "공식 중계: SOOP Live · 대회 공식 채널 (TRT Spor·HTV 등 지역별 상이)",
     },
     en: {
       title: "Billiards World Ranking — Official UMB 3-Cushion Rankings | RANKUE",
@@ -341,6 +348,10 @@ export function registerPrerender(app: Express) {
       freqQ: "How often is the billiards world ranking updated?",
       freqA: "The UMB publishes updated rankings weekly after each event, and RANKUE ingests them automatically.",
       loading: "Loading ranking data.", source: "Source: official UMB rankings",
+      gapQ: "How close is the race for No.1?",
+      gapA: (n1, n2, d) => `No.1 ${n1} currently leads No.2 ${n2} by ${d} points.`,
+      no1H: "All-time world No.1s", weeksWord: (n) => `${n} wks`, nowWord: "current",
+      watchNote: "Official broadcasts: SOOP Live and official event channels (TRT Spor, HTV by region)",
     },
     tr: {
       title: "Bilardo Dünya Sıralaması — Resmî UMB 3 Bant Sıralaması | RANKUE",
@@ -353,6 +364,10 @@ export function registerPrerender(app: Express) {
       freqQ: "Bilardo dünya sıralaması ne sıklıkla güncellenir?",
       freqA: "UMB, turnuva sonuçlarını yansıtarak sıralamayı haftalık yayımlar; RANKUE bunları otomatik toplar.",
       loading: "Sıralama verileri yükleniyor.", source: "Kaynak: resmî UMB sıralaması",
+      gapQ: "1 numara ile 2 numara arasındaki puan farkı ne kadar?",
+      gapA: (n1, n2, d) => `Şu anda 1 numara ${n1}, 2 numara ${n2}'nin ${d} puan önünde.`,
+      no1H: "Tüm zamanların dünya 1 numaraları", weeksWord: (n) => `${n} hafta`, nowWord: "güncel",
+      watchNote: "Resmî yayınlar: TRT Spor, SOOP Live ve turnuva resmî kanalları",
     },
     vi: {
       title: "BXH Bida Thế giới — BXH 3 băng chính thức của UMB | RANKUE",
@@ -365,6 +380,10 @@ export function registerPrerender(app: Express) {
       freqQ: "BXH bida thế giới cập nhật bao lâu một lần?",
       freqA: "UMB công bố BXH hằng tuần theo kết quả các giải; RANKUE tự động thu thập và cập nhật cùng lúc.",
       loading: "Đang tải dữ liệu BXH.", source: "Nguồn: BXH chính thức UMB",
+      gapQ: "Khoảng cách điểm giữa hạng 1 và hạng 2 là bao nhiêu?",
+      gapA: (n1, n2, d) => `Hiện tại hạng 1 ${n1} hơn hạng 2 ${n2} ${d} điểm.`,
+      no1H: "Các số 1 thế giới qua các thời kỳ", weeksWord: (n) => `${n} tuần`, nowWord: "hiện tại",
+      watchNote: "Phát sóng chính thức: SOOP Live, HTV và kênh chính thức của giải",
     },
     es: {
       title: "Ranking Mundial de Billar — Ranking oficial UMB de tres bandas | RANKUE",
@@ -377,6 +396,10 @@ export function registerPrerender(app: Express) {
       freqQ: "¿Con qué frecuencia se actualiza el ranking mundial de billar?",
       freqA: "La UMB publica el ranking semanalmente tras cada torneo; RANKUE lo recoge automáticamente.",
       loading: "Cargando datos del ranking.", source: "Fuente: ranking oficial UMB",
+      gapQ: "¿Qué diferencia de puntos hay entre el N.º 1 y el N.º 2?",
+      gapA: (n1, n2, d) => `Actualmente el N.º 1 ${n1} supera al N.º 2 ${n2} por ${d} puntos.`,
+      no1H: "N.º 1 mundiales de todos los tiempos", weeksWord: (n) => `${n} sem`, nowWord: "actual",
+      watchNote: "Emisiones oficiales: SOOP Live y canales oficiales del torneo",
     },
   };
 
@@ -411,13 +434,41 @@ export function registerPrerender(app: Express) {
             fedFaqHtml = `<section><h3>${esc(W.fedFaq.q)}</h3>\n  <p>${esc(W.fedFaq.a(fedName, fedTop.rank, summary!.fedCount))}</p></section>`;
           }
         }
+        // 1·2위 격차 — "2점차" 같은 수치가 그 자체로 뉴스 헤드라인 소재가 되는 종목이다
+        const second = data.rows[1] as any;
+        const gapHtml = second
+            ? `<section><h3>${esc(W.gapQ)}</h3>\n  <p>${esc(W.gapA(disp(top), disp(second), top.points - second.points))}</p></section>`
+            : "";
+
+        // 역대 1위 계보 — AI·위키가 전임 1위를 현 1위로 잘못 답하는 공백을 정면으로 메운다
+        let no1Html = "";
+        try {
+            const reigns = await storage.umb.getNo1History("players");
+            if (reigns.length) {
+                const fmt = (d: Date) => new Date(d).toLocaleDateString(DATE_LOCALE[lang as UmbLang], { year: "numeric", month: "short" });
+                no1Html = `
+  <h2>${esc(W.no1H)}</h2>
+  <ul>
+  ${reigns.slice(0, 8).map(rg => {
+                    const nm = lang === "ko" && rg.nativeName ? rg.nativeName : rg.playerName;
+                    return `  <li>${esc(nm)} (${esc(rg.fed)}) — ${esc(fmt(rg.from))} ~ ${rg.current ? esc(W.nowWord) : esc(fmt(rg.to))}, ${esc(W.weeksWord(rg.weeks))}</li>`;
+                }).join("\n")}
+  </ul>`;
+            }
+        } catch (e) {
+            console.warn("[prerender] no1 history failed:", (e as Error)?.message);
+        }
+
         faqHtml = `
   <h2>${esc(W.faqH)}</h2>
   <section><h3>${esc(W.faq1q)}</h3>
   <p>${esc(W.faq1a(disp(top), top.points, updated))}</p></section>
+  ${gapHtml}
   ${fedFaqHtml}
   <section><h3>${esc(W.freqQ)}</h3>
-  <p>${esc(W.freqA)}</p></section>`;
+  <p>${esc(W.freqA)}</p></section>
+  ${no1Html}
+  <p>${esc(W.watchNote)}</p>`;
 
         jsonLd.push({
           "@context": "https://schema.org",
@@ -479,6 +530,7 @@ export function registerPrerender(app: Express) {
     source: string;
     navAll: string;
     navHome: string;
+    reignNote: (n: number) => string; // "세계 1위 통산 N주"
   }> = {
     ko: {
       cat: { players: "남자", ladies: "여자", juniors: "주니어" },
@@ -495,6 +547,7 @@ export function registerPrerender(app: Express) {
       rankWord: (r) => `${r}위`,
       source: "출처: UMB 공식 랭킹 — 매주 갱신",
       navAll: "당구 세계랭킹 전체", navHome: "랭큐 홈",
+      reignNote: (n) => `세계 1위 통산 ${n}주.`,
     },
     en: {
       cat: { players: "Men's", ladies: "Women's", juniors: "Junior" },
@@ -511,6 +564,7 @@ export function registerPrerender(app: Express) {
       rankWord: (r) => `No.${r}`,
       source: "Source: official UMB rankings — updated weekly",
       navAll: "Full billiards world ranking", navHome: "RANKUE home",
+      reignNote: (n) => `${n} total weeks at world No.1.`,
     },
     tr: {
       cat: { players: "Erkekler", ladies: "Kadınlar", juniors: "Gençler" },
@@ -527,6 +581,7 @@ export function registerPrerender(app: Express) {
       rankWord: (r) => `${r}.`,
       source: "Kaynak: resmî UMB sıralaması — haftalık güncellenir",
       navAll: "Tüm bilardo dünya sıralaması", navHome: "RANKUE ana sayfa",
+      reignNote: (n) => `Toplam ${n} hafta dünya 1 numarası.`,
     },
     vi: {
       cat: { players: "Nam", ladies: "Nữ", juniors: "Trẻ" },
@@ -543,6 +598,7 @@ export function registerPrerender(app: Express) {
       rankWord: (r) => `hạng ${r}`,
       source: "Nguồn: BXH chính thức UMB — cập nhật hằng tuần",
       navAll: "BXH bida thế giới đầy đủ", navHome: "Trang chủ RANKUE",
+      reignNote: (n) => `Tổng cộng ${n} tuần giữ vị trí số 1 thế giới.`,
     },
     es: {
       cat: { players: "Masculino", ladies: "Femenino", juniors: "Juvenil" },
@@ -559,6 +615,7 @@ export function registerPrerender(app: Express) {
       rankWord: (r) => `N.º ${r}`,
       source: "Fuente: ranking oficial UMB — actualización semanal",
       navAll: "Ranking mundial completo", navHome: "Inicio RANKUE",
+      reignNote: (n) => `${n} semanas en total como N.º 1 mundial.`,
     },
   };
   const DATE_LOCALE: Record<UmbLang, string> = { ko: "ko-KR", en: "en-US", tr: "tr-TR", vi: "vi-VN", es: "es-ES" };
@@ -616,7 +673,10 @@ export function registerPrerender(app: Express) {
           ],
           body: `<main>
   <h1>${esc(nameFull)} — ${esc(L.rankingName)} ${esc(L.rankWord(p.rank))}</h1>
-  <p>${esc(L.statsLine(p.fed, p.rank, p.points, data.bestRank, String(p.nationalRank ?? "-"), updatedAt))}</p>
+  <p>${esc(L.statsLine(p.fed, p.rank, p.points, data.bestRank, String(p.nationalRank ?? "-"), updatedAt))}${(() => {
+      const w = data.history.filter((h: any) => h.rank === 1).length;
+      return w > 0 ? " " + esc(L.reignNote(w)) : "";
+    })()}</p>
 
   <h2>${esc(L.faqH)}</h2>
   <section><h3>${esc(L.faq1q(nameMain))}</h3>

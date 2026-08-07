@@ -77,6 +77,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
     const showYearAgo = yearAgo && last && yearAgo.edition !== last.edition
         && Math.abs(new Date(yearAgo.editionDate).getTime() - yearAgoTarget) < 90 * 24 * 3600 * 1000;
     const top10Weeks = history.filter(h => h.rank <= 10).length;
+    const no1Weeks = history.filter(h => h.rank === 1).length;
 
     // 성취 뱃지
     const badges: string[] = [];
@@ -144,6 +145,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                 <p className="text-[12px] font-medium text-black/50 leading-relaxed -mt-2 px-0.5">
                     {[
                         bestAt ? t("umb.bestAt").replace("{rank}", String(data!.bestRank)).replace("{date}", bestAt) : null,
+                        no1Weeks > 0 ? t("umb.no1Weeks").replace("{n}", String(no1Weeks)) : null,
                         top10Weeks > 0 ? t("umb.top10Weeks").replace("{n}", String(top10Weeks)) : null,
                         showYearAgo ? t("umb.yearAgo").replace("{from}", String(yearAgo!.rank)).replace("{to}", String(player.rank)) : null,
                     ].filter(Boolean).join(" · ")}
