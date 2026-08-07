@@ -225,7 +225,7 @@ const STORE_ANDROID =
 const SHORTCUTS: { href: string; label: string; sub: string }[] = [
     { href: "/ranking", label: "랭킹", sub: "매장 · 전국 순위" },
     { href: "/stores", label: "매장 찾기", sub: "가까운 당구장" },
-    { href: "/simulation", label: "시뮬레이터", sub: "배치 그려보기" },
+    { href: "/world-ranking", label: "세계 랭킹", sub: "UMB 공식 순위" },
     { href: "/about", label: "랭큐 소개", sub: "무엇을 하는 앱인지" },
 ];
 

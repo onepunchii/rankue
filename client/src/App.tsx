@@ -23,7 +23,6 @@ import HiqClub from "@/pages/hiq/club";
 import HiqCreateClub from "@/pages/hiq/create-club";
 import HiqClubDetail from "@/pages/hiq/club-detail";
 import HiqJoin from "@/pages/hiq/join";
-import HiqSimulation from "@/pages/hiq/simulation";
 import HiqOnlineGame from "@/pages/hiq/online-game";
 import HiqCommunity from "@/pages/hiq/community";
 import HiqCommunityPost from "@/pages/hiq/community-post";
@@ -67,7 +66,6 @@ import { DesktopFrame } from "@/components/hiq/DesktopFrame";
  * 감싸지 않는 화면과 그 이유 —
  *   /game/:id        가로모드 전용(LandscapeGuard)이 화면 전체를 쓴다
  *   /online-game     캔버스 전체화면
- *   /simulation      가상 당구대가 max-w-[900px] 로 넓을수록 유리하다
  *   /game/result     유일하게 md: 반응형을 쓰는 화면 — 뷰포트 기준이라 좁은 프레임 안에서 깨진다
  *   / /about /stores /store/:slug /support /privacy /account-delete /r/:id
  *                    이미 자체 반응형 레이아웃을 가진 공개 페이지
@@ -230,7 +228,6 @@ function AppRoutes() {
       <Route path="/world-ranking" component={FramedWorldRanking} />
       <Route path="/player/:category/:umbId" component={FramedWorldPlayer} />
       <Route path="/admin" component={HiqAdmin} />
-      <Route path="/simulation" component={HiqSimulation} />
 
       {/* Partner (SaaS) Pages */}
       <Route path="/partner/login" component={PartnerLogin} />
