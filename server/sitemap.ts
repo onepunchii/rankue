@@ -71,10 +71,11 @@ export async function generateSitemap(): Promise<string> {
     console.warn("[sitemap] community failed:", (e as Error)?.message);
   }
 
-  // UMB 선수 페이지 — 부문별 톱 200 + 한국 선수 전원 (~1,100). 주간 갱신 콘텐츠.
+  // UMB 선수 페이지 — 부문별 톱 1000 + 한국 선수 전원. 주간 갱신 콘텐츠.
+  // hreflang: 프리렌더가 ?lang=en·tr·vi·es 4개 언어 버전을 실제로 서빙한다.
   try {
     const players = await storage.umb.getPlayersForSitemap();
-    for (const p of players) parts.push(entry(`${ORIGIN}/player/${p.category}/${p.playerUmbId}`, { changefreq: "weekly", priority: "0.5" }));
+    for (const p of players) parts.push(entry(`${ORIGIN}/player/${p.category}/${p.playerUmbId}`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.5" }));
   } catch (e) {
     console.warn("[sitemap] umb players failed:", (e as Error)?.message);
   }

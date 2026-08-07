@@ -311,106 +311,297 @@ export function registerPrerender(app: Express) {
   // ── /world-ranking ─────────────────────────────────────────────────
   // UMB 세계랭킹 — 사이트맵에 등록된 검색 유입 타깃이라 봇에게 빈 SPA 셸이 아니라
   // 실제 톱10이 담긴 HTML을 내보낸다. DB 조회 실패 시에도 메타는 나가야 한다.
+  // 목록 페이지 언어별 문구 — 각 언어의 핵심 키워드("bilardo dünya sıralaması" 등)를 정면 타깃
+  const WR_L10N: Record<string, {
+    title: string; desc: string; intro: string; topH: string;
+    faqH: string; faq1q: string; faq1a: (name: string, pts: number, updated: string) => string;
+    fedFaq: { fed: string; q: string; a: (name: string, rank: number, count: number) => string } | null;
+    freqQ: string; freqA: string; loading: string; source: string;
+  }> = {
+    ko: {
+      title: "당구 세계랭킹 — UMB 공식 3쿠션 랭킹 | 랭큐 RANKUE",
+      desc: "UMB 공식 3쿠션 세계랭킹을 매주 업데이트. 남자·여자·주니어 전체 순위와 한국 선수, 선수별 순위 히스토리를 랭큐에서 확인하세요.",
+      intro: "UMB(세계당구연맹) 공식 3쿠션 세계랭킹입니다. 매주 갱신되며 남자·여자·주니어 부문 전체 순위와 선수별 순위 변동을 볼 수 있습니다.",
+      topH: "남자 세계랭킹 톱 10", faqH: "자주 묻는 질문",
+      faq1q: "당구 세계랭킹 1위는 누구인가요?",
+      faq1a: (n, p, u) => `${u ? `${u} 기준 ` : ""}UMB 공식 3쿠션 세계랭킹 1위는 ${n} 선수입니다 (${p}점).`,
+      fedFaq: { fed: "KR", q: "한국 당구 선수 최고 순위는?", a: (n, r, c) => `한국 선수 최고 순위는 ${n} 선수의 세계 ${r}위이며, 한국 선수 ${c}명이 랭킹에 올라 있습니다.` },
+      freqQ: "당구 세계랭킹은 얼마나 자주 갱신되나요?",
+      freqA: "UMB(세계당구연맹)가 대회 결과를 반영해 주 단위로 발표하며, 랭큐는 이를 자동 수집해 함께 갱신합니다.",
+      loading: "랭킹 데이터를 불러오는 중입니다.", source: "출처: UMB 공식 랭킹",
+    },
+    en: {
+      title: "Billiards World Ranking — Official UMB 3-Cushion Rankings | RANKUE",
+      desc: "Official UMB 3-cushion world rankings, updated weekly. Full men's, women's and junior standings with per-player rank history on RANKUE.",
+      intro: "The official UMB (Union Mondiale de Billard) 3-cushion world ranking, updated weekly with full men's, women's and junior standings.",
+      topH: "Men's world ranking top 10", faqH: "Frequently asked questions",
+      faq1q: "Who is No.1 in the billiards world ranking?",
+      faq1a: (n, p, u) => `${u ? `As of ${u}, ` : ""}the No.1 in the official UMB 3-cushion world ranking is ${n} (${p} points).`,
+      fedFaq: null,
+      freqQ: "How often is the billiards world ranking updated?",
+      freqA: "The UMB publishes updated rankings weekly after each event, and RANKUE ingests them automatically.",
+      loading: "Loading ranking data.", source: "Source: official UMB rankings",
+    },
+    tr: {
+      title: "Bilardo Dünya Sıralaması — Resmî UMB 3 Bant Sıralaması | RANKUE",
+      desc: "Resmî UMB 3 bant dünya sıralaması, her hafta güncellenir. Erkekler, kadınlar ve gençler tam sıralama ve oyuncu bazlı sıralama geçmişi RANKUE'de.",
+      intro: "UMB (Dünya Bilardo Birliği) resmî 3 bant dünya sıralaması. Her hafta güncellenir; erkekler, kadınlar ve gençler kategorilerinin tam sıralamasını içerir.",
+      topH: "Erkekler dünya sıralaması ilk 10", faqH: "Sık sorulan sorular",
+      faq1q: "Bilardo dünya sıralamasında 1 numara kim?",
+      faq1a: (n, p, u) => `${u ? `${u} itibarıyla ` : ""}resmî UMB 3 bant dünya sıralamasının 1 numarası ${n} (${p} puan).`,
+      fedFaq: { fed: "TR", q: "Türk oyuncuların en yüksek sıralaması kaç?", a: (n, r, c) => `En yüksek sıradaki Türk oyuncu, dünya ${r}. sırasındaki ${n}. Sıralamada toplam ${c} Türk oyuncu var.` },
+      freqQ: "Bilardo dünya sıralaması ne sıklıkla güncellenir?",
+      freqA: "UMB, turnuva sonuçlarını yansıtarak sıralamayı haftalık yayımlar; RANKUE bunları otomatik toplar.",
+      loading: "Sıralama verileri yükleniyor.", source: "Kaynak: resmî UMB sıralaması",
+    },
+    vi: {
+      title: "BXH Bida Thế giới — BXH 3 băng chính thức của UMB | RANKUE",
+      desc: "BXH bida 3 băng thế giới chính thức của UMB, cập nhật hằng tuần. Đầy đủ nam, nữ, trẻ và diễn biến thứ hạng từng cơ thủ trên RANKUE.",
+      intro: "BXH bida 3 băng thế giới chính thức của UMB (Liên đoàn Bida Thế giới), cập nhật hằng tuần với đầy đủ các hạng mục nam, nữ và trẻ.",
+      topH: "Top 10 BXH nam thế giới", faqH: "Câu hỏi thường gặp",
+      faq1q: "Ai đang đứng số 1 BXH bida thế giới?",
+      faq1a: (n, p, u) => `${u ? `Tính đến ${u}, ` : ""}số 1 BXH bida 3 băng thế giới chính thức của UMB là ${n} (${p} điểm).`,
+      fedFaq: { fed: "VN", q: "Cơ thủ Việt Nam xếp hạng cao nhất là ai?", a: (n, r, c) => `Cơ thủ Việt Nam xếp cao nhất là ${n}, hạng ${r} thế giới. Có tổng cộng ${c} cơ thủ Việt Nam trong BXH.` },
+      freqQ: "BXH bida thế giới cập nhật bao lâu một lần?",
+      freqA: "UMB công bố BXH hằng tuần theo kết quả các giải; RANKUE tự động thu thập và cập nhật cùng lúc.",
+      loading: "Đang tải dữ liệu BXH.", source: "Nguồn: BXH chính thức UMB",
+    },
+    es: {
+      title: "Ranking Mundial de Billar — Ranking oficial UMB de tres bandas | RANKUE",
+      desc: "Ranking mundial oficial UMB de billar a tres bandas, actualizado cada semana. Clasificación completa masculina, femenina y juvenil en RANKUE.",
+      intro: "Ranking mundial oficial de billar a tres bandas de la UMB (Unión Mundial de Billar), actualizado semanalmente con las categorías masculina, femenina y juvenil.",
+      topH: "Top 10 del ranking mundial masculino", faqH: "Preguntas frecuentes",
+      faq1q: "¿Quién es el N.º 1 del ranking mundial de billar?",
+      faq1a: (n, p, u) => `${u ? `A ${u}, ` : ""}el N.º 1 del ranking mundial oficial UMB de tres bandas es ${n} (${p} puntos).`,
+      fedFaq: { fed: "ES", q: "¿Cuál es el mejor jugador español del ranking?", a: (n, r, c) => `El español mejor clasificado es ${n}, N.º ${r} del mundo. Hay ${c} jugadores españoles en el ranking.` },
+      freqQ: "¿Con qué frecuencia se actualiza el ranking mundial de billar?",
+      freqA: "La UMB publica el ranking semanalmente tras cada torneo; RANKUE lo recoge automáticamente.",
+      loading: "Cargando datos del ranking.", source: "Fuente: ranking oficial UMB",
+    },
+  };
+
   app.get("/world-ranking", async (req, res, next) => {
     if (!isBot(req)) return next();
+    const qLang = typeof req.query.lang === "string" ? req.query.lang : "";
+    const lang = ["en", "tr", "vi", "es"].includes(qLang) ? qLang : "ko";
+    const W = WR_L10N[lang];
     let listHtml = "";
     let editionLabel = "";
     let faqHtml = "";
     const jsonLd: unknown[] = [];
+    const langSuffix = lang === "ko" ? "" : `?lang=${lang}`;
     try {
       const data = await storage.umb.getRankings("players", { limit: 10 });
       if (data.rows.length) {
         editionLabel = data.edition ? ` (Edition ${data.edition})` : "";
-        const disp = (r: any) => r.nativeName ? `${r.nativeName} (${r.playerName})` : r.playerName;
+        // ko만 한글 이름 병기, 그 외 언어는 로마자
+        const disp = (r: any) => lang === "ko" && r.nativeName ? `${r.nativeName} (${r.playerName})` : r.playerName;
         listHtml = `<ol>\n${data.rows.map((r: any) =>
-          `  <li><a href="/player/players/${esc(r.playerUmbId)}">${esc(disp(r))}</a> (${esc(r.fed)}) — ${r.points}점</li>`).join("\n")}\n</ol>`;
+          `  <li><a href="/player/players/${esc(r.playerUmbId)}${langSuffix}">${esc(disp(r))}</a> (${esc(r.fed)}) — ${r.points}pts</li>`).join("\n")}\n</ol>`;
 
-        // AEO — 검색의 "관련 질문"("당구 세계 1위는 누구입니까?")에 그대로 대응하는 문답.
-        // 데이터에서 매주 자동 갱신되므로 답이 낡지 않는다.
+        // AEO 문답 — 언어별 "관련 질문" 직격. 데이터 기반이라 매주 자동 갱신.
         const top = data.rows[0] as any;
-        const summary = await storage.umb.getSummary("players", "KR");
-        const updated = data.editionDate ? new Date(data.editionDate).toLocaleDateString("ko-KR", { year: "numeric", month: "long" }) : "";
-        const krTop = summary?.fedTop as any;
+        const updated = data.editionDate ? new Date(data.editionDate).toLocaleDateString(DATE_LOCALE[lang as UmbLang], { year: "numeric", month: "long" }) : "";
+        let fedFaqHtml = "";
+        if (W.fedFaq) {
+          const summary = await storage.umb.getSummary("players", W.fedFaq.fed);
+          const fedTop = summary?.fedTop as any;
+          if (fedTop) {
+            const fedName = lang === "ko" && fedTop.nativeName ? fedTop.nativeName : fedTop.playerName;
+            fedFaqHtml = `<section><h3>${esc(W.fedFaq.q)}</h3>\n  <p>${esc(W.fedFaq.a(fedName, fedTop.rank, summary!.fedCount))}</p></section>`;
+          }
+        }
         faqHtml = `
-  <h2>자주 묻는 질문</h2>
-  <section><h3>당구 세계랭킹 1위는 누구인가요?</h3>
-  <p>${updated ? `${esc(updated)} 기준 ` : ""}UMB 공식 3쿠션 세계랭킹 1위는 ${esc(disp(top))} 선수입니다 (${top.points}점).</p></section>
-  ${krTop ? `<section><h3>한국 당구 선수 최고 순위는?</h3>
-  <p>한국 선수 최고 순위는 ${krTop.nativeName ? esc(krTop.nativeName) : esc(krTop.playerName)} 선수의 세계 ${krTop.rank}위이며, 한국 선수 ${summary!.fedCount}명이 랭킹에 올라 있습니다.</p></section>` : ""}
-  <section><h3>당구 세계랭킹은 얼마나 자주 갱신되나요?</h3>
-  <p>UMB(세계당구연맹)가 대회 결과를 반영해 주 단위로 발표하며, 랭큐는 이를 자동 수집해 함께 갱신합니다.</p></section>`;
+  <h2>${esc(W.faqH)}</h2>
+  <section><h3>${esc(W.faq1q)}</h3>
+  <p>${esc(W.faq1a(disp(top), top.points, updated))}</p></section>
+  ${fedFaqHtml}
+  <section><h3>${esc(W.freqQ)}</h3>
+  <p>${esc(W.freqA)}</p></section>`;
 
         jsonLd.push({
           "@context": "https://schema.org",
           "@type": "ItemList",
-          name: "UMB 3쿠션 세계랭킹 톱 10",
+          name: "UMB 3-Cushion World Ranking Top 10",
           itemListElement: data.rows.map((r: any, i: number) => ({
             "@type": "ListItem",
             position: i + 1,
-            name: r.nativeName || r.playerName,
-            url: `${ORIGIN}/player/players/${r.playerUmbId}`,
+            name: lang === "ko" ? (r.nativeName || r.playerName) : r.playerName,
+            url: `${ORIGIN}/player/players/${r.playerUmbId}${langSuffix}`,
           })),
         });
       }
     } catch (e) {
       console.warn("[prerender] world-ranking rows failed:", (e as Error)?.message);
     }
-    res.setHeader("X-Prerender", "world-ranking");
+    res.setHeader("X-Prerender", `world-ranking:${lang}`);
     res.send(
       page({
-        title: "당구 세계랭킹 — UMB 공식 3쿠션 랭킹 | 랭큐 RANKUE",
-        desc: "UMB 공식 3쿠션 세계랭킹을 매주 업데이트. 남자·여자·주니어 전체 순위와 한국 선수, 선수별 순위 히스토리를 랭큐에서 확인하세요.",
-        canonical: `${ORIGIN}/world-ranking`,
+        title: W.title,
+        desc: W.desc,
+        canonical: `${ORIGIN}/world-ranking${langSuffix}`,
+        lang,
+        altLangs: ["en", "tr", "vi", "es"],
+        altBase: `${ORIGIN}/world-ranking`,
         jsonLd,
         body: `<main>
-  <h1>당구 세계랭킹${esc(editionLabel)}</h1>
-  <p>UMB(세계당구연맹) 공식 3쿠션 세계랭킹입니다. 매주 갱신되며 남자·여자·주니어 부문 전체 순위와 선수별 순위 변동을 볼 수 있습니다.</p>
-  <h2>남자 세계랭킹 톱 10</h2>
-  ${listHtml || "<p>랭킹 데이터를 불러오는 중입니다.</p>"}
+  <h1>${esc(W.title.split(" | ")[0])}${esc(editionLabel)}</h1>
+  <p>${esc(W.intro)}</p>
+  <h2>${esc(W.topH)}</h2>
+  ${listHtml || `<p>${esc(W.loading)}</p>`}
   ${faqHtml}
-  <p>출처: <a href="https://www.umb-carom.org" rel="noopener">UMB 공식 랭킹</a></p>
-  <nav><a href="/">홈으로</a> <a href="/about">랭큐 소개</a> <a href="/stores">매장 찾기</a></nav>
+  <p>${esc(W.source)} — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
+  <nav><a href="/">RANKUE</a> <a href="/about">About</a> <a href="/stores">Stores</a></nav>
 </main>`,
       }),
     );
   });
 
   // ── /player/:category/:umbId ──────────────────────────────────────
-  // UMB 선수 페이지 — 사이트맵(톱200+한국 전원) 대상. 봇에게 순위·히스토리 요약 HTML.
+  // UMB 선수 페이지 — 사이트맵(톱1000+한국 전원) 대상. ?lang=en·tr·vi·es 4개 언어 버전.
+  // 터키·베트남은 3쿠션 인구가 커서 현지어 제목·문답이 유입의 핵심이다.
+  // 데이터(순위·포인트)는 언어 중립 — 템플릿 문장만 언어별로 바꾼다.
+  const UMB_LANGS = ["en", "tr", "vi", "es"] as const;
+  type UmbLang = "ko" | (typeof UMB_LANGS)[number];
+  const UMB_L10N: Record<UmbLang, {
+    cat: Record<string, string>;
+    rankingName: string;              // "당구 세계랭킹" — h1·브레드크럼 공용
+    playerTitle: (name: string, rank: number) => string;
+    playerDesc: (name: string, fed: string, cat: string, rank: number, pts: number, best: number) => string;
+    statsLine: (fed: string, rank: number, pts: number, best: number, natl: string, updated: string) => string;
+    faqH: string;
+    faq1q: (name: string) => string;
+    faq1a: (name: string, cat: string, rank: number, pts: number, updated: string) => string;
+    faq2q: (name: string) => string;
+    faq2a: (best: number, natl: number | null) => string;
+    histH: string;
+    rankWord: (rank: number) => string; // 히스토리 목록의 "12위" / "No.12"
+    source: string;
+    navAll: string;
+    navHome: string;
+  }> = {
+    ko: {
+      cat: { players: "남자", ladies: "여자", juniors: "주니어" },
+      rankingName: "당구 세계랭킹",
+      playerTitle: (n, r) => `${n} — 당구 세계랭킹 ${r}위 | 랭큐 RANKUE`,
+      playerDesc: (n, f, c, r, p, b) => `${n} (${f}) UMB 공식 3쿠션 ${c} 세계랭킹 ${r}위, ${p}점. 역대 최고 ${b}위. 주간 순위 히스토리와 대회별 포인트를 랭큐에서 확인하세요.`,
+      statsLine: (f, r, p, b, natl, u) => `UMB 공식 3쿠션 세계랭킹. 국가 ${f} · 현재 ${r}위 · ${p}점 · 역대 최고 ${b}위 · 국내 ${natl}위${u ? ` · ${u} 기준` : ""}`,
+      faqH: "자주 묻는 질문",
+      faq1q: (n) => `${n}의 현재 세계랭킹은 몇 위인가요?`,
+      faq1a: (n, c, r, p, u) => `${n} 선수는 UMB 공식 3쿠션 ${c} 세계랭킹 ${r}위입니다 (${p}점${u ? `, ${u} 기준` : ""}).`,
+      faq2q: (n) => `${n}의 역대 최고 순위는?`,
+      faq2a: (b, natl) => `역대 최고 세계랭킹은 ${b}위입니다.${natl ? ` 현재 국내 순위는 ${natl}위입니다.` : ""}`,
+      histH: "최근 순위 히스토리",
+      rankWord: (r) => `${r}위`,
+      source: "출처: UMB 공식 랭킹 — 매주 갱신",
+      navAll: "당구 세계랭킹 전체", navHome: "랭큐 홈",
+    },
+    en: {
+      cat: { players: "Men's", ladies: "Women's", juniors: "Junior" },
+      rankingName: "Billiards World Ranking",
+      playerTitle: (n, r) => `${n} — 3-Cushion Billiards World Ranking No.${r} | RANKUE`,
+      playerDesc: (n, f, c, r, p, b) => `${n} (${f}) is No.${r} in the official UMB 3-cushion ${c.toLowerCase()} world ranking with ${p} points. Career best No.${b}. Weekly rank history and points by tournament on RANKUE.`,
+      statsLine: (f, r, p, b, natl, u) => `Official UMB 3-cushion world ranking. Country ${f} · current No.${r} · ${p} pts · career best No.${b} · national No.${natl}${u ? ` · as of ${u}` : ""}`,
+      faqH: "Frequently asked questions",
+      faq1q: (n) => `What is ${n}'s current world ranking?`,
+      faq1a: (n, c, r, p, u) => `${n} is ranked No.${r} in the official UMB 3-cushion ${c.toLowerCase()} world ranking (${p} points${u ? `, as of ${u}` : ""}).`,
+      faq2q: (n) => `What is ${n}'s career-best ranking?`,
+      faq2a: (b, natl) => `The career-best world ranking is No.${b}.${natl ? ` Current national ranking is No.${natl}.` : ""}`,
+      histH: "Recent ranking history",
+      rankWord: (r) => `No.${r}`,
+      source: "Source: official UMB rankings — updated weekly",
+      navAll: "Full billiards world ranking", navHome: "RANKUE home",
+    },
+    tr: {
+      cat: { players: "Erkekler", ladies: "Kadınlar", juniors: "Gençler" },
+      rankingName: "Bilardo Dünya Sıralaması",
+      playerTitle: (n, r) => `${n} — 3 Bant Bilardo Dünya Sıralaması ${r}. | RANKUE`,
+      playerDesc: (n, f, c, r, p, b) => `${n} (${f}), resmî UMB 3 bant ${c.toLowerCase()} dünya sıralamasında ${p} puanla ${r}. sırada. Kariyer rekoru ${b}. sıra. Haftalık sıralama geçmişi RANKUE'de.`,
+      statsLine: (f, r, p, b, natl, u) => `Resmî UMB 3 bant dünya sıralaması. Ülke ${f} · güncel ${r}. · ${p} puan · kariyer rekoru ${b}. · ulusal ${natl}.${u ? ` · ${u} itibarıyla` : ""}`,
+      faqH: "Sık sorulan sorular",
+      faq1q: (n) => `${n}'in güncel dünya sıralaması kaç?`,
+      faq1a: (n, c, r, p, u) => `${n}, resmî UMB 3 bant ${c.toLowerCase()} dünya sıralamasında ${r}. sırada (${p} puan${u ? `, ${u} itibarıyla` : ""}).`,
+      faq2q: (n) => `${n}'in kariyer rekoru kaçıncı sıra?`,
+      faq2a: (b, natl) => `Kariyer rekoru dünya ${b}. sıralık.${natl ? ` Güncel ulusal sıralaması ${natl}.` : ""}`,
+      histH: "Son sıralama geçmişi",
+      rankWord: (r) => `${r}.`,
+      source: "Kaynak: resmî UMB sıralaması — haftalık güncellenir",
+      navAll: "Tüm bilardo dünya sıralaması", navHome: "RANKUE ana sayfa",
+    },
+    vi: {
+      cat: { players: "Nam", ladies: "Nữ", juniors: "Trẻ" },
+      rankingName: "BXH Bida Thế giới",
+      playerTitle: (n, r) => `${n} — BXH Bida 3 băng Thế giới hạng ${r} | RANKUE`,
+      playerDesc: (n, f, c, r, p, b) => `${n} (${f}) đứng hạng ${r} BXH bida 3 băng ${c.toLowerCase()} thế giới chính thức của UMB với ${p} điểm. Cao nhất sự nghiệp hạng ${b}. Xem diễn biến thứ hạng hằng tuần trên RANKUE.`,
+      statsLine: (f, r, p, b, natl, u) => `BXH bida 3 băng thế giới chính thức của UMB. Quốc gia ${f} · hiện tại hạng ${r} · ${p} điểm · cao nhất hạng ${b} · trong nước hạng ${natl}${u ? ` · tính đến ${u}` : ""}`,
+      faqH: "Câu hỏi thường gặp",
+      faq1q: (n) => `Thứ hạng thế giới hiện tại của ${n} là bao nhiêu?`,
+      faq1a: (n, c, r, p, u) => `${n} đang đứng hạng ${r} BXH bida 3 băng ${c.toLowerCase()} thế giới chính thức của UMB (${p} điểm${u ? `, tính đến ${u}` : ""}).`,
+      faq2q: (n) => `Thứ hạng cao nhất sự nghiệp của ${n}?`,
+      faq2a: (b, natl) => `Thứ hạng thế giới cao nhất là hạng ${b}.${natl ? ` Hiện xếp hạng ${natl} trong nước.` : ""}`,
+      histH: "Diễn biến thứ hạng gần đây",
+      rankWord: (r) => `hạng ${r}`,
+      source: "Nguồn: BXH chính thức UMB — cập nhật hằng tuần",
+      navAll: "BXH bida thế giới đầy đủ", navHome: "Trang chủ RANKUE",
+    },
+    es: {
+      cat: { players: "Masculino", ladies: "Femenino", juniors: "Juvenil" },
+      rankingName: "Ranking Mundial de Billar",
+      playerTitle: (n, r) => `${n} — Ranking Mundial de Billar a Tres Bandas N.º ${r} | RANKUE`,
+      playerDesc: (n, f, c, r, p, b) => `${n} (${f}) es N.º ${r} del ranking mundial oficial UMB de billar a tres bandas (${c.toLowerCase()}) con ${p} puntos. Mejor puesto histórico: N.º ${b}. Historial semanal en RANKUE.`,
+      statsLine: (f, r, p, b, natl, u) => `Ranking mundial oficial UMB de tres bandas. País ${f} · actual N.º ${r} · ${p} pts · mejor histórico N.º ${b} · nacional N.º ${natl}${u ? ` · a ${u}` : ""}`,
+      faqH: "Preguntas frecuentes",
+      faq1q: (n) => `¿Cuál es el ranking mundial actual de ${n}?`,
+      faq1a: (n, c, r, p, u) => `${n} es N.º ${r} del ranking mundial oficial UMB de tres bandas (${c.toLowerCase()}) con ${p} puntos${u ? `, a ${u}` : ""}.`,
+      faq2q: (n) => `¿Cuál es el mejor puesto histórico de ${n}?`,
+      faq2a: (b, natl) => `Su mejor puesto histórico es el N.º ${b}.${natl ? ` Actualmente es N.º ${natl} en su país.` : ""}`,
+      histH: "Historial reciente",
+      rankWord: (r) => `N.º ${r}`,
+      source: "Fuente: ranking oficial UMB — actualización semanal",
+      navAll: "Ranking mundial completo", navHome: "Inicio RANKUE",
+    },
+  };
+  const DATE_LOCALE: Record<UmbLang, string> = { ko: "ko-KR", en: "en-US", tr: "tr-TR", vi: "vi-VN", es: "es-ES" };
+
   app.get("/player/:category/:umbId", async (req, res, next) => {
     if (!isBot(req)) return next();
     const category = ["players", "ladies", "juniors"].includes(req.params.category) ? req.params.category : null;
     if (!category || !/^\d{1,6}$/.test(req.params.umbId)) return next();
+    const qLang = typeof req.query.lang === "string" ? req.query.lang : "";
+    const lang: UmbLang = (UMB_LANGS as readonly string[]).includes(qLang) ? (qLang as UmbLang) : "ko";
+    const L = UMB_L10N[lang];
     try {
       const data = await storage.umb.getPlayerHistory(category as any, req.params.umbId);
       if (!data?.player) return next();
       const p = data.player as any;
-      const catKo = category === "players" ? "남자" : category === "ladies" ? "여자" : "주니어";
-      // 한글 이름이 있으면 병기 — "조명우 (CHO Myung Woo)". 한글 검색 매칭의 핵심.
-      const nameFull = p.nativeName ? `${p.nativeName} (${p.playerName})` : p.playerName;
-      const nameMain = p.nativeName || p.playerName;
-      const canonical = `${ORIGIN}/player/${category}/${req.params.umbId}`;
+      const catName = L.cat[category];
+      // ko는 한글 이름 우선("조명우 (CHO Myung Woo)"), 그 외 언어는 로마자 원표기
+      const nameMain = lang === "ko" ? (p.nativeName || p.playerName) : p.playerName;
+      const nameFull = lang === "ko" && p.nativeName ? `${p.nativeName} (${p.playerName})` : p.playerName;
+      const base = `${ORIGIN}/player/${category}/${req.params.umbId}`;
+      const canonical = lang === "ko" ? base : `${base}?lang=${lang}`;
       const historySummary = data.history.slice(-10).map((h: any) =>
-        `<li>Edition ${esc(h.edition)}: ${h.rank}위 (${h.points}점)</li>`).join("\n  ");
+        `<li>Edition ${esc(h.edition)}: ${esc(L.rankWord(h.rank))} (${h.points}pts)</li>`).join("\n  ");
       const updatedAt = data.history.length
-        ? new Date(data.history[data.history.length - 1].editionDate).toLocaleDateString("ko-KR", { year: "numeric", month: "long" })
+        ? new Date(data.history[data.history.length - 1].editionDate).toLocaleDateString(DATE_LOCALE[lang], { year: "numeric", month: "long" })
         : "";
-      res.setHeader("X-Prerender", "umb-player");
+      res.setHeader("X-Prerender", `umb-player:${lang}`);
       res.send(
         page({
-          title: `${nameFull} — 당구 세계랭킹 ${p.rank}위 | 랭큐 RANKUE`,
-          desc: `${nameFull} (${p.fed}) UMB 공식 3쿠션 ${catKo} 세계랭킹 ${p.rank}위, ${p.points}점. 역대 최고 ${data.bestRank}위. 주간 순위 히스토리와 대회별 포인트를 랭큐에서 확인하세요.`,
+          title: L.playerTitle(nameFull, p.rank),
+          desc: L.playerDesc(nameFull, p.fed, catName, p.rank, p.points, data.bestRank),
           canonical,
-          // Person JSON-LD — "조명우 = CHO Myung Woo = 당구 선수" 개체 연결의 핵심.
-          // alternateName에 로마자를 실어 한글·로마자 검색 양쪽이 같은 개체로 묶이게 한다.
+          lang,
+          altLangs: [...UMB_LANGS],
+          altBase: base, // 상호 hreflang 클러스터 — ko가 기준, ?lang=xx가 변형
           jsonLd: [
             {
               "@context": "https://schema.org",
               "@type": "Person",
               name: nameMain,
-              alternateName: p.nativeName ? p.playerName : undefined,
+              alternateName: p.nativeName && lang === "ko" ? p.playerName : (p.nativeName || undefined),
               nationality: { "@type": "Country", name: p.fed },
-              description: `UMB 공식 3쿠션 ${catKo} 세계랭킹 ${p.rank}위 당구 선수 (${p.points}점, 역대 최고 ${data.bestRank}위)`,
+              description: L.playerDesc(nameMain, p.fed, catName, p.rank, p.points, data.bestRank),
               url: canonical,
               knowsAbout: "Three-cushion billiards",
             },
@@ -418,27 +609,27 @@ export function registerPrerender(app: Express) {
               "@context": "https://schema.org",
               "@type": "BreadcrumbList",
               itemListElement: [
-                { "@type": "ListItem", position: 1, name: "당구 세계랭킹", item: `${ORIGIN}/world-ranking` },
+                { "@type": "ListItem", position: 1, name: L.rankingName, item: `${ORIGIN}/world-ranking${lang === "ko" ? "" : `?lang=${lang}`}` },
                 { "@type": "ListItem", position: 2, name: nameMain, item: canonical },
               ],
             },
           ],
           body: `<main>
-  <h1>${esc(nameFull)} — 당구 세계랭킹 ${p.rank}위</h1>
-  <p>UMB 공식 3쿠션 ${catKo} 세계랭킹. 국가 ${esc(p.fed)} · 현재 ${p.rank}위 · ${p.points}점 · 역대 최고 ${data.bestRank}위 · 국내 ${p.nationalRank ?? "-"}위${updatedAt ? ` · ${esc(updatedAt)} 기준` : ""}</p>
+  <h1>${esc(nameFull)} — ${esc(L.rankingName)} ${esc(L.rankWord(p.rank))}</h1>
+  <p>${esc(L.statsLine(p.fed, p.rank, p.points, data.bestRank, String(p.nationalRank ?? "-"), updatedAt))}</p>
 
-  <h2>자주 묻는 질문</h2>
-  <section><h3>${esc(nameMain)}의 현재 세계랭킹은 몇 위인가요?</h3>
-  <p>${esc(nameMain)} 선수는 UMB 공식 3쿠션 ${catKo} 세계랭킹 ${p.rank}위입니다 (${p.points}점${updatedAt ? `, ${esc(updatedAt)} 기준` : ""}).</p></section>
-  <section><h3>${esc(nameMain)}의 역대 최고 순위는?</h3>
-  <p>역대 최고 세계랭킹은 ${data.bestRank}위입니다.${p.nationalRank ? ` 현재 국내 순위는 ${p.nationalRank}위입니다.` : ""}</p></section>
+  <h2>${esc(L.faqH)}</h2>
+  <section><h3>${esc(L.faq1q(nameMain))}</h3>
+  <p>${esc(L.faq1a(nameMain, catName, p.rank, p.points, updatedAt))}</p></section>
+  <section><h3>${esc(L.faq2q(nameMain))}</h3>
+  <p>${esc(L.faq2a(data.bestRank, p.nationalRank))}</p></section>
 
-  <h2>최근 순위 히스토리</h2>
+  <h2>${esc(L.histH)}</h2>
   <ul>
   ${historySummary}
   </ul>
-  <p>출처: <a href="https://www.umb-carom.org" rel="noopener">UMB 공식 랭킹</a> — 매주 갱신</p>
-  <nav><a href="/world-ranking">당구 세계랭킹 전체</a> <a href="/">랭큐 홈</a></nav>
+  <p>${esc(L.source)} — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
+  <nav><a href="/world-ranking${lang === "ko" ? "" : `?lang=${lang}`}">${esc(L.navAll)}</a> <a href="/">${esc(L.navHome)}</a></nav>
 </main>`,
         }),
       );
