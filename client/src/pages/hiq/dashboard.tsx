@@ -11,6 +11,7 @@ import { DashboardHeader } from "@/components/hiq/dashboard/DashboardHeader";
 import { PerformanceCard } from "@/components/hiq/dashboard/PerformanceCard";
 import { RankingListCard } from "@/components/hiq/dashboard/RankingListCard";
 import { WorldRankingCard } from "@/components/hiq/umb/WorldRankingCard";
+import { PbaRankingCard, PBA_CARD_L } from "@/components/hiq/pba/PbaRankingCard";
 import { QuickActions } from "@/components/hiq/dashboard/QuickActions";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
 import { PinCodeModal } from "@/components/hiq/dashboard/PinCodeModal";
@@ -27,7 +28,7 @@ import { useLocation } from "wouter";
 const RANKINGS_API_LIMIT = 20;
 
 export default function HiqDashboard() {
-    const { t } = useT();
+    const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const { currentSport } = useSport();
 
@@ -38,8 +39,8 @@ export default function HiqDashboard() {
 
     // Local State for Ranking Tab
     const [rankingTab, setRankingTab] = useState<'3c' | '4c'>('4c');
-    // 랭킹 섹션 소스 — 기본 세계(UMB), 토글로 매장
-    const [rankingSource, setRankingSource] = useState<'world' | 'store'>('world');
+    // 랭킹 섹션 소스 — 기본 세계(UMB), 토글로 PBA·매장
+    const [rankingSource, setRankingSource] = useState<'world' | 'pba' | 'store'>('world');
 
     // Use Custom Hook for Data
     const { member, history, rankings, analysis, isLoading } = useDashboardStats(rankingTab);
@@ -183,33 +184,48 @@ export default function HiqDashboard() {
                 onJoinGame={() => toggleModal('join', true)}
             />
 
-            {/* 랭킹 섹션 — 기본은 UMB 세계랭킹(볼거리·매주 갱신), 매장 랭킹은 토글로.
+            {/* 랭킹 섹션 — 기본은 UMB 세계랭킹(볼거리·매주 갱신), PBA·매장 랭킹은 토글로.
                 매장 데이터가 쌓이면 기본값 재검토 (오너 결정 2026-08-05) */}
             <div className="mb-10">
-                <header className="mb-4 flex items-end justify-between">
-                    <div>
-                        <h2 className="text-[19px] font-bold tracking-tight text-ink-1">
-                            {rankingSource === "world" ? t("umb.title") : t("rankingListCard.title")}
+                <header className="mb-4 flex items-end justify-between gap-3">
+                    <div className="min-w-0">
+                        <h2 className="text-[19px] font-bold tracking-tight text-ink-1 truncate">
+                            {rankingSource === "world" ? t("umb.title")
+                                : rankingSource === "pba" ? (PBA_CARD_L[locale] ?? PBA_CARD_L.ko).title
+                                    : t("rankingListCard.title")}
                         </h2>
-                        <p className="text-black/55 text-[13px] mt-1 font-medium">
-                            {rankingSource === "world" ? t("umb.subtitle") : t("rankingListCard.subtitle")}
+                        <p className="text-black/55 text-[13px] mt-1 font-medium truncate">
+                            {rankingSource === "world" ? t("umb.subtitle")
+                                : rankingSource === "pba" ? (PBA_CARD_L[locale] ?? PBA_CARD_L.ko).subtitle
+                                    : t("rankingListCard.subtitle")}
                         </p>
                     </div>
-                    <div className="flex bg-brand/[0.08] p-1 rounded-full relative h-9">
-                        <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-brand transition-all duration-300 ease-out z-0 shadow-[0_1px_3px_rgba(0,98,65,0.25)] ${rankingSource === "world" ? "left-1" : "left-[calc(50%+2px)]"}`} />
-                        <button
-                            onClick={() => setRankingSource("world")}
-                            className={`px-3.5 rounded-full text-[13px] font-bold relative z-10 transition-colors ${rankingSource === "world" ? "text-white" : "text-brand/60"}`}
-                        >{t("umb.sourceWorld")}</button>
-                        <button
-                            onClick={() => setRankingSource("store")}
-                            className={`px-3.5 rounded-full text-[13px] font-bold relative z-10 transition-colors ${rankingSource === "store" ? "text-white" : "text-brand/60"}`}
-                        >{t("umb.sourceStore")}</button>
+                    <div className="flex bg-brand/[0.08] p-1 rounded-full relative h-9 shrink-0">
+                        <div
+                            className="absolute top-1 bottom-1 rounded-full bg-brand transition-all duration-300 ease-out z-0 shadow-[0_1px_3px_rgba(0,98,65,0.25)]"
+                            style={{
+                                width: "calc((100% - 8px) / 3)",
+                                left: `calc(4px + ${["world", "pba", "store"].indexOf(rankingSource)} * (100% - 8px) / 3)`,
+                            }}
+                        />
+                        {([
+                            ["world", t("umb.sourceWorld")],
+                            ["pba", "PBA"],
+                            ["store", t("umb.sourceStore")],
+                        ] as const).map(([src, label]) => (
+                            <button
+                                key={src}
+                                onClick={() => setRankingSource(src)}
+                                className={`px-3 rounded-full text-[13px] font-bold relative z-10 transition-colors ${rankingSource === src ? "text-white" : "text-brand/60"}`}
+                            >{label}</button>
+                        ))}
                     </div>
                 </header>
 
                 {rankingSource === "world" ? (
                     <WorldRankingCard />
+                ) : rankingSource === "pba" ? (
+                    <PbaRankingCard />
                 ) : (
                     <RankingListCard
                         rankings={rankings}
