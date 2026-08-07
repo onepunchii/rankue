@@ -1172,6 +1172,53 @@ export const umbEvents = pgTable("umb_events", {
   unique().on(table.category, table.edition, table.colKey),
 ]);
 
+// 17. 매장 디렉터리 — 수집한 전국 당구장 목록 (제휴 hiqStores와 별개의 미인증 리스팅).
+// 객관 정보만 싣는다(오너 결정 2026-08-05): 이름·주소·전화(비마스킹만)·영업시간·테이블 수.
+// 설명·요금 자유텍스트는 저작권·퍼오기 인상 때문에 미전재 — 사장님 인증 후 직접 작성.
+export const storeListings = pgTable("store_listings", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  code: text("code").notNull(), // 수집 소스의 클럽코드 (안정 식별자, URL 슬러그)
+  name: text("name").notNull(),
+  region: text("region").notNull(), // 시도 (서울·경기·...)
+  address: text("address").notNull(),
+  phone: text("phone"), // 마스킹(별표) 전화는 null
+  openHours: text("open_hours"),
+  tableLarge: integer("table_large"),   // 대대
+  tableMedium: integer("table_medium"), // 중대
+  tablePocket: integer("table_pocket"), // 포켓
+  claimed: boolean("claimed").default(false).notNull(), // 사장님 인증 완료 여부
+  claimedStoreId: uuid("claimed_store_id"), // 인증 시 연결되는 제휴 매장(hiqStores)
+  description: text("description"), // 사장님 인증 후 직접 작성
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.code),
+  index("store_listings_region_idx").on(table.region),
+]);
+
+// 사장님 클레임 신청 — 초기엔 수동 승인(오너 검토), 추후 전화 인증 자동화
+export const storeListingClaims = pgTable("store_listing_claims", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  listingCode: text("listing_code").notNull(),
+  applicantName: text("applicant_name").notNull(),
+  applicantPhone: text("applicant_phone").notNull(),
+  message: text("message"),
+  status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 정보 수정 제안 — 폐업·이전·오기 신고 (방문자 누구나)
+export const storeListingSuggestions = pgTable("store_listing_suggestions", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  listingCode: text("listing_code").notNull(),
+  message: text("message").notNull(),
+  contact: text("contact"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type StoreListing = typeof storeListings.$inferSelect;
+export type InsertStoreListing = typeof storeListings.$inferInsert;
+
 // 선수 네이티브 이름 — 로마자 표기(UMB 원본)의 현지 문자 표기.
 // 한국 선수는 로마자→한글 결정적 변환기(umbKoreanName.ts)가 채운다.
 // 자국 문자로 검색·표시하는 사용자를 위함 ("조명우" ↔ "CHO Myung Woo").

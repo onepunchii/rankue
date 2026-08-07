@@ -50,6 +50,7 @@ import AccountDelete from "@/pages/account-delete";
 import Support from "@/pages/support";
 import About from "@/pages/about";
 import Stores from "@/pages/stores";
+import StoreListing from "@/pages/store-listing";
 import StoreDetail from "@/pages/store-detail";
 import SharedResult from "@/pages/hiq/shared-result";
 
@@ -189,6 +190,7 @@ function AppRoutes() {
       <Route path="/support" component={Support} />
       <Route path="/about" component={About} />
       <Route path="/stores" component={Stores} />
+      <Route path="/stores/:code" component={StoreListing} />
       <Route path="/store/:slug" component={StoreDetail} />
       {/* 공유 링크로 열리는 공개 경기 결과 — 로그인 불필요 */}
       <Route path="/r/:id" component={SharedResult} />

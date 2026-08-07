@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import { storage } from "./storage/index.js";
+import { db } from "./db.js";
+import { storeListings } from "../shared/schema.js";
+import { asc } from "drizzle-orm";
 
 // 동적 사이트맵 — 정적 페이지 + 모든 크루(/club/:id) + 모든 매장(/store/:slug)을
 // DB에서 조립. 새 크루/매장이 생기면 자동 반영된다. 루트(/sitemap.xml)에서 서빙.
@@ -57,6 +60,14 @@ export async function generateSitemap(): Promise<string> {
     for (const s of stores) if (s.slug) parts.push(entry(`${ORIGIN}/store/${encodeURIComponent(s.slug)}`, { changefreq: "weekly", priority: "0.6" }));
   } catch (e) {
     console.warn("[sitemap] stores failed:", (e as Error)?.message);
+  }
+
+  // 매장 디렉토리 — 수집 1,195곳. "지역명 + 당구장" 로컬 검색 타깃, 한국어 전용 페이지.
+  try {
+    const listings = await db.select({ code: storeListings.code }).from(storeListings).orderBy(asc(storeListings.code));
+    for (const l of listings) parts.push(entry(`${ORIGIN}/stores/${l.code}`, { changefreq: "monthly", priority: "0.4" }));
+  } catch (e) {
+    console.warn("[sitemap] listings failed:", (e as Error)?.message);
   }
 
   // 커뮤니티 — 목록 + 글(블라인드 제외). 크루 내부 콘텐츠는 색인 제외가 원칙이지만

@@ -1,5 +1,8 @@
 import type { Express, Request } from "express";
 import { storage } from "./storage/index.js";
+import { db } from "./db.js";
+import { storeListings } from "../shared/schema.js";
+import { asc, eq, sql } from "drizzle-orm";
 import { ABOUT_CONTENT, ABOUT_LANGS, type AboutContent } from "../shared/aboutContent.js";
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
@@ -799,8 +802,18 @@ export function registerPrerender(app: Express) {
   app.get("/stores", async (req, res, next) => {
     if (!isBot(req)) return next();
     let items: { slug: string | null; name: string; region: string | null; address: string | null }[] = [];
+    let dirRows: { code: string; name: string; region: string; address: string }[] = [];
+    let dirTotal = 0;
     try {
-      items = (await storage.getPublicStores()) as typeof items;
+      // 디렉터리는 SPA 초기 화면과 같은 30곳(이름순)만 싣는다 — 전체 1,195곳의 발견 경로는 사이트맵.
+      [items, dirRows, [{ total: dirTotal }]] = await Promise.all([
+        storage.getPublicStores() as Promise<typeof items>,
+        db.select({
+          code: storeListings.code, name: storeListings.name,
+          region: storeListings.region, address: storeListings.address,
+        }).from(storeListings).orderBy(asc(storeListings.name)).limit(30),
+        db.select({ total: sql<number>`count(*)::int` }).from(storeListings),
+      ]);
     } catch (e) {
       // 빈 목록("총 0개 매장")을 200 으로 내보내면 크롤러가 "매장이 없는 사이트"로 학습한다.
       console.warn("[prerender] stores failed:", (e as Error)?.message);
@@ -810,25 +823,28 @@ export function registerPrerender(app: Express) {
     noStore(res);
     res.send(
       page({
-        title: "매장 찾기 · 랭큐 당구장 디렉토리",
-        desc: "랭큐와 함께하는 당구장을 지역·이름으로 찾아보세요. 매장 랭킹, 매칭, 크루 활동이 가능한 파트너 당구장 목록.",
+        // client/src/pages/stores.tsx 의 ko metaTitle/metaDesc·title/subtitle 과 문자 단위로 같아야 한다.
+        title: "당구장 찾기 · 전국 당구장 디렉토리 | 랭큐",
+        desc: "전국 1,200여 개 당구장을 지역·이름으로 검색하세요. 주소·영업시간·테이블 구성, 랭큐 파트너 매장의 랭킹·매칭까지.",
         canonical: `${ORIGIN}/stores`,
         jsonLd: [
           {
             "@context": "https://schema.org",
             "@type": "ItemList",
-            itemListElement: items.slice(0, 100).map((s, i) => ({
-              "@type": "ListItem",
-              position: i + 1,
-              name: s.name,
-              url: s.slug ? `${ORIGIN}/store/${encodeURIComponent(s.slug)}` : undefined,
-            })),
+            numberOfItems: dirTotal + items.length,
+            itemListElement: [
+              ...items.map((s) => ({
+                name: s.name,
+                url: s.slug ? `${ORIGIN}/store/${encodeURIComponent(s.slug)}` : undefined,
+              })),
+              ...dirRows.map((s) => ({ name: s.name, url: `${ORIGIN}/stores/${s.code}` })),
+            ].map((e, i) => ({ "@type": "ListItem", position: i + 1, ...e })),
           },
         ],
         body: `<main>
   <h1>매장 찾기</h1>
-  <p>랭큐 파트너 당구장을 찾아보세요</p>
-  <p>총 ${items.length}개 매장</p>
+  <p>전국 당구장을 지역·이름으로 찾아보세요</p>
+  <p>총 ${(dirTotal + items.length).toLocaleString("ko-KR")}개 매장</p>
   ${
     items.length
       ? items
@@ -841,6 +857,77 @@ export function registerPrerender(app: Express) {
           .join("\n  ")
       : "<p>표시할 매장이 없습니다.</p>"
   }
+  <h2>전국 당구장 디렉토리</h2>
+  ${dirRows
+    .map(
+      (s) =>
+        `<section><h3><a href="/stores/${esc(s.code)}">${esc(s.name)}</a></h3><p>${esc(s.region)}</p><p>${esc(s.address)}</p></section>`,
+    )
+    .join("\n  ")}
+</main>`,
+      }),
+    );
+  });
+
+  // ── /stores/:code — 수집 디렉토리 매장 상세 ─────────────────────────
+  // "김해 당구장"류 로컬 검색이 타깃. 객관 정보(주소·전화·영업시간·테이블)만 싣는다
+  // (수집 원문 소개·요금 미전재 원칙 — 소개는 사장님 인증 후 직접 작성).
+  app.get("/stores/:code", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    if (!/^[A-Za-z0-9_-]{1,20}$/.test(req.params.code)) {
+      return sendGone(res, "매장을 찾을 수 없습니다.", "요청한 당구장 정보가 없습니다.");
+    }
+    let s: Record<string, any> | null = null;
+    try {
+      [s = null] = await db.select().from(storeListings).where(eq(storeListings.code, req.params.code));
+    } catch (e) {
+      // /store/:slug 와 같은 이유 — DB 장애를 404 로 내면 유효 URL 이 색인에서 빠진다.
+      console.warn("[prerender] listing failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    if (!s) return sendGone(res, "매장을 찾을 수 없습니다.", "요청한 당구장 정보가 없습니다.");
+    const tables = [
+      s.tableLarge ? `대대 ${s.tableLarge}` : "",
+      s.tableMedium ? `중대 ${s.tableMedium}` : "",
+      s.tablePocket ? `포켓 ${s.tablePocket}` : "",
+    ].filter(Boolean);
+    res.setHeader("X-Prerender", "store-listing");
+    noStore(res);
+    res.send(
+      page({
+        // client/src/pages/store-listing.tsx 의 useSeo title/desc 와 문자 단위로 같아야 한다.
+        title: `${s.name} — ${s.region} 당구장 | 랭큐`,
+        desc: `${s.name} — ${s.address}. 영업시간·테이블 정보와 전국 당구장 디렉토리를 랭큐에서.`,
+        canonical: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
+        jsonLd: [
+          {
+            "@context": "https://schema.org",
+            "@type": "LocalBusiness",
+            name: s.name,
+            url: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
+            address: { "@type": "PostalAddress", streetAddress: s.address, addressLocality: s.region, addressCountry: "KR" },
+            ...(s.phone ? { telephone: s.phone } : {}),
+            ...(s.openHours ? { openingHours: s.openHours } : {}),
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "매장 찾기", item: `${ORIGIN}/stores` },
+              { "@type": "ListItem", position: 2, name: s.name, item: `${ORIGIN}/stores/${encodeURIComponent(s.code)}` },
+            ],
+          },
+        ],
+        body: `<main>
+  <nav><a href="/stores">← 매장 찾기</a></nav>
+  <h1>${esc(s.name)}</h1>
+  <p>${esc(s.region)}</p>
+  <dl>
+    <dt>주소</dt><dd>${esc(s.address)}</dd>
+    ${s.phone ? `<dt>전화</dt><dd>${esc(s.phone)}</dd>` : ""}
+    ${s.openHours ? `<dt>영업시간</dt><dd>${esc(s.openHours)}</dd>` : ""}
+    ${tables.length ? `<dt>테이블</dt><dd>${esc(tables.join(" · "))}</dd>` : ""}
+  </dl>
 </main>`,
       }),
     );

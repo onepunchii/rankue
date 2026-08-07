@@ -10,6 +10,7 @@ import notificationRouter from "./modules/notification.js";
 import regionRouter from "./modules/region.js";
 import communityRouter from "./modules/community.js";
 import umbRouter from "./modules/umb.js";
+import listingsRouter from "./modules/listings.js";
 
 const router = Router();
 
@@ -57,5 +58,8 @@ router.use("/community", communityRouter);
 
 // 11. UMB 세계랭킹 (/umb) — 공개 읽기 전용
 router.use("/umb", umbRouter);
+
+// 12. 매장 디렉터리 (/listings) — 공개 + 클레임·수정 제안 접수
+router.use("/listings", listingsRouter);
 
 export default router;
