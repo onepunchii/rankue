@@ -1002,6 +1002,13 @@ export function registerPrerender(app: Express) {
       return sendUnavailable(res);
     }
     if (!s) return sendGone(res, "매장을 찾을 수 없습니다.", "요청한 당구장 정보가 없습니다.");
+    // 활동 크루 — 클라이언트 상세와 같은 공개 필드
+    let crews: { id: string; name: string }[] = [];
+    try {
+      const { hiqCrews } = await import("../shared/schema.js");
+      crews = await db.select({ id: hiqCrews.id, name: hiqCrews.name })
+        .from(hiqCrews).where(eq(hiqCrews.baseListingCode, s.code)).limit(10);
+    } catch { /* 크루 조회 실패는 본문 축소로만 — 페이지는 나간다 */ }
     const tables = [
       s.tableLarge ? `대대 ${s.tableLarge}` : "",
       s.tableMedium ? `중대 ${s.tableMedium}` : "",
@@ -1050,6 +1057,7 @@ export function registerPrerender(app: Express) {
     ${tables.length ? `<dt>테이블</dt><dd>${esc(tables.join(" · "))}</dd>` : ""}
     ${rates.length ? `<dt>요금</dt><dd>${esc(rates.join(", "))}</dd>` : ""}
   </dl>
+  ${crews.length ? `<h2>이 매장에서 활동하는 크루</h2><ul>${crews.map((c) => `<li><a href="/club/${esc(c.id)}">${esc(c.name)}</a></li>`).join("")}</ul>` : ""}
 </main>`,
       }),
     );

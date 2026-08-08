@@ -399,6 +399,7 @@ const tr: Dict = {
   "createClub.nameRequired": "Lütfen ekip adı gir",
   "createClub.next": "İleri",
   "createClub.noResults": "Sonuç bulunamadı",
+  "createClub.partnerBadge": "RANKUE ortağı",
   "createClub.regionLabel": "Ana bölge",
   "createClub.regionPlaceholder": "Bölge ara (örn. Gangnam-gu)",
   "createClub.regionRequired": "Lütfen etkinlik bölgesi gir",

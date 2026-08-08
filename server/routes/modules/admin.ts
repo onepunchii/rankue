@@ -115,4 +115,108 @@ router.patch("/membership/orders/:id/status", checkSuperAdmin, asyncHandler(asyn
     return sendSuccess(res, order);
 }));
 
+// --- 매장 클레임 승인 대기열 ---
+// 승인 = 사장님 계정(profile) + 파트너 매장(hiqStores) 자동 발급 + 디렉토리 연결.
+// 임시 PIN은 응답에 1회만 노출 — 오너가 사장님께 전화로 전달하는 운영 전제.
+
+// GET /admin/listing-claims — 대기 중 클레임 + 매장 정보
+router.get("/listing-claims", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    const { db } = await import("../../db.js");
+    const { storeListingClaims, storeListings } = await import("../../../shared/schema.js");
+    const { eq, desc } = await import("drizzle-orm");
+    const claims = await db.select({
+        id: storeListingClaims.id,
+        listingCode: storeListingClaims.listingCode,
+        applicantName: storeListingClaims.applicantName,
+        applicantPhone: storeListingClaims.applicantPhone,
+        message: storeListingClaims.message,
+        status: storeListingClaims.status,
+        createdAt: storeListingClaims.createdAt,
+        listingName: storeListings.name,
+        listingRegion: storeListings.region,
+        listingAddress: storeListings.address,
+    }).from(storeListingClaims)
+        .leftJoin(storeListings, eq(storeListings.code, storeListingClaims.listingCode))
+        .orderBy(desc(storeListingClaims.createdAt)).limit(100);
+    return sendSuccess(res, claims);
+}));
+
+// POST /admin/listing-claims/:id/approve
+router.post("/listing-claims/:id/approve", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { db } = await import("../../db.js");
+    const { storeListingClaims, storeListings, hiqStores, profiles } = await import("../../../shared/schema.js");
+    const { eq } = await import("drizzle-orm");
+    const { hashPassword } = await import("../../services/hiqService.js");
+    const crypto = await import("node:crypto");
+
+    const [claim] = await db.select().from(storeListingClaims).where(eq(storeListingClaims.id, req.params.id));
+    if (!claim) return sendError(res, 404, "클레임을 찾을 수 없습니다");
+    if (claim.status !== "pending") return sendError(res, 409, "이미 처리된 클레임입니다");
+    const [listing] = await db.select().from(storeListings).where(eq(storeListings.code, claim.listingCode));
+    if (!listing) return sendError(res, 404, "매장을 찾을 수 없습니다");
+    if (listing.claimed) return sendError(res, 409, "이미 인증된 매장입니다");
+
+    // 사장님 계정 — 같은 전화번호 프로필이 있으면 재사용(기존 비밀번호 유지), 없으면 새 PIN 발급
+    const phone = claim.applicantPhone.replace(/[^\d]/g, "");
+    let [profile] = await db.select().from(profiles).where(eq(profiles.phone, phone));
+    let issuedPin: string | null = null;
+    const result = await db.transaction(async (tx) => {
+        if (!profile) {
+            issuedPin = String(crypto.randomInt(1000, 10000)); // 파트너 로그인은 4자리 PIN
+            [profile] = await tx.insert(profiles).values({
+                id: crypto.randomUUID(),
+                nickname: claim.applicantName,
+                phone,
+                password: await hashPassword(issuedPin),
+                role: "store_owner",
+            }).returning();
+        } else if (profile.role === "user") {
+            await tx.update(profiles).set({ role: "store_owner" }).where(eq(profiles.id, profile.id));
+        }
+
+        // 파트너 매장 — slug 는 디렉토리 코드 기반 (충돌 시 임의 접미)
+        let slug = claim.listingCode.toLowerCase();
+        const [dup] = await tx.select({ id: hiqStores.id }).from(hiqStores).where(eq(hiqStores.slug, slug));
+        if (dup) slug = `${slug}-${crypto.randomBytes(2).toString("hex")}`;
+        const [store] = await tx.insert(hiqStores).values({
+            slug,
+            name: listing.name,
+            ownerId: profile.id,
+            region: listing.region,
+            address: listing.address,
+            phone: listing.phone,
+            priceLarge: listing.rate10Large ?? undefined,
+            priceMedium: listing.rate10Medium ?? undefined,
+        }).returning();
+
+        await tx.update(storeListings)
+            .set({ claimed: true, claimedStoreId: store.id, updatedAt: new Date() })
+            .where(eq(storeListings.code, listing.code));
+        await tx.update(storeListingClaims)
+            .set({ status: "approved" })
+            .where(eq(storeListingClaims.id, claim.id));
+        return { storeId: store.id, slug: store.slug };
+    });
+
+    return sendSuccess(res, {
+        approved: true,
+        storeSlug: result.slug,
+        partnerPhone: phone,
+        // 신규 계정일 때만 발급 — 기존 계정은 쓰던 비밀번호 그대로
+        issuedPin,
+    });
+}));
+
+// POST /admin/listing-claims/:id/reject
+router.post("/listing-claims/:id/reject", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { db } = await import("../../db.js");
+    const { storeListingClaims } = await import("../../../shared/schema.js");
+    const { eq } = await import("drizzle-orm");
+    const [claim] = await db.select().from(storeListingClaims).where(eq(storeListingClaims.id, req.params.id));
+    if (!claim) return sendError(res, 404, "클레임을 찾을 수 없습니다");
+    if (claim.status !== "pending") return sendError(res, 409, "이미 처리된 클레임입니다");
+    await db.update(storeListingClaims).set({ status: "rejected" }).where(eq(storeListingClaims.id, req.params.id));
+    return sendSuccess(res, { rejected: true });
+}));
+
 export default router;

@@ -399,6 +399,7 @@ const en: Dict = {
   "createClub.nameRequired": "Please enter a crew name",
   "createClub.next": "Next",
   "createClub.noResults": "No results found",
+  "createClub.partnerBadge": "RANKUE partner",
   "createClub.regionLabel": "Main region",
   "createClub.regionPlaceholder": "Search region (e.g. Gangnam-gu)",
   "createClub.regionRequired": "Please enter your region",

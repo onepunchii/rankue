@@ -643,6 +643,42 @@ router.get("/:id/polls/options/:optionId/votes", requireAuth, asyncHandler(async
 
 // --- General Crew Management ---
 
+// 베이스 매장(디렉토리 코드) 검증 — 형식·실존 확인. 통과 시 null, 실패 시 에러 메시지.
+async function validateBaseListing(data: { baseListingCode?: string | null }): Promise<string | null> {
+    const code = String(data.baseListingCode || "").trim();
+    if (!code) { data.baseListingCode = null; return null; }
+    if (!/^[A-Za-z0-9_-]{1,20}$/.test(code)) return "잘못된 매장 코드입니다";
+    const { db } = await import("../../db.js");
+    const { storeListings } = await import("../../../shared/schema.js");
+    const { eq } = await import("drizzle-orm");
+    const [row] = await db.select({ code: storeListings.code }).from(storeListings).where(eq(storeListings.code, code));
+    if (!row) return "존재하지 않는 매장입니다";
+    data.baseListingCode = code;
+    return null;
+}
+
+// GET /crews/store-search — 크루 베이스 매장 선택용 통합 검색 (파트너 + 디렉토리 1,195곳)
+router.get("/store-search", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const q = String(req.query.q || "").trim().slice(0, 40);
+    if (q.length < 2) return sendSuccess(res, []);
+    const { db } = await import("../../db.js");
+    const { storeListings } = await import("../../../shared/schema.js");
+    const { ilike, or, asc } = await import("drizzle-orm");
+    const [partners, listings] = await Promise.all([
+        storage.searchStores(q),
+        db.select({
+            code: storeListings.code, name: storeListings.name,
+            region: storeListings.region, address: storeListings.address,
+        }).from(storeListings)
+            .where(or(ilike(storeListings.name, `%${q}%`), ilike(storeListings.address, `%${q}%`)))
+            .orderBy(asc(storeListings.name)).limit(15),
+    ]);
+    // 파트너 매장 우선 노출, 같은 이름의 디렉토리 항목과 중복돼도 그대로 둔다(주소로 구분 가능)
+    return sendSuccess(res, [
+        ...(partners as any[]).slice(0, 5).map((s) => ({ type: "partner", id: s.id, name: s.name, address: s.address ?? s.region ?? "" })),
+        ...listings.map((s) => ({ type: "listing", code: s.code, name: s.name, address: s.address, region: s.region })),
+    ]);
+}));
 
 // POST /crews - Create a new crew
 router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -657,6 +693,12 @@ router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =>
     }
     if (await storage.crews.findCrewByName(validation.data.name)) {
         return sendError(res, 409, "이미 사용 중인 크루 이름입니다");
+    }
+    // 베이스 매장(디렉토리) — 존재하는 코드만 허용. 깨진 코드가 저장되면
+    // 매장 상세의 "활동 크루" 집계가 유령 매장을 가리킨다.
+    if (validation.data.baseListingCode != null) {
+        const err = await validateBaseListing(validation.data as any);
+        if (err) return sendError(res, 400, err);
     }
 
     // Ownership is set from the authenticated session — never trust a client-supplied leaderId.
@@ -776,7 +818,7 @@ router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any
     // sportCategory) are deliberately excluded to prevent mass-assignment / ownership hijack.
     const EDITABLE = ['name', 'description', 'emblem', 'gameType', 'region', 'tags', 'joinType',
         'maxMembers', 'coverImage', 'shortIntro', 'meetingDay', 'meetingTime', 'introQuestions',
-        'latitude', 'longitude', 'baseStoreId'] as const;
+        'latitude', 'longitude', 'baseStoreId', 'baseListingCode'] as const;
     const updateData: any = {};
     for (const key of EDITABLE) {
         if (req.body[key] !== undefined) updateData[key] = req.body[key];
@@ -787,6 +829,10 @@ router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any
     // 사실상 자동가입으로 변질된다.
     if (updateData.joinType !== undefined && !['auto', 'approval'].includes(updateData.joinType)) {
         return sendError(res, 400, "잘못된 가입 방식입니다");
+    }
+    if (updateData.baseListingCode !== undefined && updateData.baseListingCode !== null) {
+        const err = await validateBaseListing(updateData);
+        if (err) return sendError(res, 400, err);
     }
     if (updateData.gameType !== undefined && updateData.gameType !== null
         && !['3c', '4c', 'pocket', 'any', 'field', 'screen', 'range'].includes(updateData.gameType)) {

@@ -399,6 +399,7 @@ const vi: Dict = {
   "createClub.nameRequired": "Vui lòng nhập tên crew",
   "createClub.next": "Tiếp",
   "createClub.noResults": "Không có kết quả",
+  "createClub.partnerBadge": "Đối tác RANKUE",
   "createClub.regionLabel": "Khu vực hoạt động chính",
   "createClub.regionPlaceholder": "Tìm khu vực (VD: Gangnam-gu)",
   "createClub.regionRequired": "Vui lòng nhập khu vực hoạt động",

@@ -13,6 +13,7 @@ interface Listing {
   rate10Large: number | null; rate10Medium: number | null; rate10Pocket: number | null;
   flatLarge: number | null; flatMedium: number | null; flatPocket: number | null;
   claimed: boolean; description: string | null;
+  crews?: Array<{ id: string; name: string; emblem: string | null; gameType: string; memberCount: number }>;
 }
 
 // 페이지 문구 — 디렉터리는 한국 콘텐츠지만 라벨은 5개 언어 (stores.tsx와 같은 패턴)
@@ -22,6 +23,7 @@ const L: Record<Locale, Record<string, string>> = {
     address: "주소", phone: "전화", hours: "영업시간", tables: "테이블",
     large: "대대", medium: "중대", pocket: "포켓",
     rates: "요금", per10: "10분당", flat: "정액", won: "원",
+    crewsTitle: "이 매장에서 활동하는 크루", crewMembers: "명",
     descEmpty: "사장님 인증 후 매장 소개가 표시됩니다.",
     claimCta: "사장님이신가요? 내 매장 정보 관리 신청",
     claimTitle: "내 매장 관리 신청",
@@ -41,6 +43,7 @@ const L: Record<Locale, Record<string, string>> = {
     address: "Address", phone: "Phone", hours: "Hours", tables: "Tables",
     large: "Large", medium: "Medium", pocket: "Pocket",
     rates: "Rates", per10: "per 10 min", flat: "Flat rate", won: "₩",
+    crewsTitle: "Crews based at this venue", crewMembers: "members",
     descEmpty: "The owner's introduction will appear after verification.",
     claimCta: "Own this hall? Claim your listing",
     claimTitle: "Claim this listing",
@@ -60,6 +63,7 @@ const L: Record<Locale, Record<string, string>> = {
     address: "Địa chỉ", phone: "Điện thoại", hours: "Giờ mở cửa", tables: "Bàn",
     large: "Lớn", medium: "Vừa", pocket: "Pocket",
     rates: "Giá", per10: "mỗi 10 phút", flat: "Trọn gói", won: "₩",
+    crewsTitle: "Crew hoạt động tại đây", crewMembers: "thành viên",
     descEmpty: "Phần giới thiệu sẽ hiển thị sau khi chủ quán xác nhận.",
     claimCta: "Bạn là chủ quán? Nhận quản lý trang này",
     claimTitle: "Nhận quản lý trang",
@@ -79,6 +83,7 @@ const L: Record<Locale, Record<string, string>> = {
     address: "Adres", phone: "Telefon", hours: "Çalışma saatleri", tables: "Masalar",
     large: "Büyük", medium: "Orta", pocket: "Pocket",
     rates: "Ücretler", per10: "10 dk başına", flat: "Sabit ücret", won: "₩",
+    crewsTitle: "Bu salonda aktif ekipler", crewMembers: "üye",
     descEmpty: "Sahibi doğrulandıktan sonra tanıtım burada görünecek.",
     claimCta: "Salon sizin mi? Kaydınızı sahiplenin",
     claimTitle: "Kaydı sahiplen",
@@ -98,6 +103,7 @@ const L: Record<Locale, Record<string, string>> = {
     address: "Dirección", phone: "Teléfono", hours: "Horario", tables: "Mesas",
     large: "Grande", medium: "Mediana", pocket: "Pocket",
     rates: "Tarifas", per10: "por 10 min", flat: "Tarifa plana", won: "₩",
+    crewsTitle: "Crews activos en este local", crewMembers: "miembros",
     descEmpty: "La presentación aparecerá tras la verificación del propietario.",
     claimCta: "¿Es tu local? Reclama tu ficha",
     claimTitle: "Reclamar ficha",
@@ -253,6 +259,26 @@ export default function StoreListingPage() {
                 </div>
               )}
             </div>
+
+            {/* 활동 크루 — 매장 페이지를 살아있는 프로필로 만드는 섹션 */}
+            {(s.crews?.length ?? 0) > 0 && (
+              <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-4">
+                <p className="text-[11.5px] font-bold text-black/40 mb-2.5">{t.crewsTitle}</p>
+                <div className="space-y-2">
+                  {s.crews!.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setLocation(`/club/${c.id}`)}
+                      className="w-full flex items-center gap-3 py-2 px-2.5 rounded-xl bg-black/[0.03] text-left active:scale-[0.99] transition-transform"
+                    >
+                      <span className="text-[20px] leading-none shrink-0">{c.emblem || "🎱"}</span>
+                      <span className="flex-1 min-w-0 text-[14px] font-semibold truncate">{c.name}</span>
+                      <span className="shrink-0 text-[12px] font-medium text-black/45 tabular-nums">{c.memberCount}{t.crewMembers}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 소개 — 인증 전엔 비워둔다 (수집 원문 미전재 원칙) */}
             <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-4">

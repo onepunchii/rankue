@@ -147,18 +147,24 @@ export default function CreateClub() {
         createCrewMutation.mutate({
             ...formData as InsertHiqCrew,
             leaderId: member.id,
-            baseStoreId: selectedStore?.id || null, // Optional
+            // 파트너 매장이면 baseStoreId, 디렉토리(1,195곳)면 baseListingCode — 서버가 실존 검증
+            baseStoreId: selectedStore?.type === "partner" ? selectedStore.id : null,
+            baseListingCode: selectedStore?.type === "listing" ? selectedStore.code : null,
             tags: formData.tags || [],
             sportCategory: currentSport,
-        });
+        } as any);
     };
 
-    // Store Search Query
+    // Store Search Query — 당구는 파트너+디렉토리 통합 검색, 골프는 기존 파트너 검색 유지
     const { data: storeResults } = useQuery({
-        queryKey: ["/api/hiq/stores/search", searchQuery],
+        queryKey: ["/api/hiq/crews/store-search", currentSport, searchQuery],
         queryFn: async () => {
             if (searchQuery.length < 2) return [];
-            return await apiRequest(`/api/hiq/stores/search?q=${searchQuery}`);
+            if (currentSport === "GOLF") {
+                const rows = await apiRequest(`/api/hiq/stores/search?q=${encodeURIComponent(searchQuery)}`);
+                return (rows as any[]).map((s) => ({ type: "partner", id: s.id, name: s.name, address: s.address }));
+            }
+            return await apiRequest(`/api/hiq/crews/store-search?q=${encodeURIComponent(searchQuery)}`);
         },
         enabled: searchQuery.length >= 2,
     });
@@ -460,7 +466,7 @@ export default function CreateClub() {
                                         {storeResults?.length > 0 ? (
                                             storeResults.map((store: any) => (
                                                 <div
-                                                    key={store.id}
+                                                    key={store.id || store.code}
                                                     onClick={() => {
                                                         setSelectedStore(store);
                                                         // Auto-fill region hint if likely match from address
@@ -472,11 +478,16 @@ export default function CreateClub() {
                                                     }}
                                                     className="p-4 border-b border-black/[0.08] last:border-0 hover:bg-black/[0.04] active:bg-black/[0.06] cursor-pointer flex items-center justify-between group"
                                                 >
-                                                    <div>
-                                                        <div className="font-bold text-sm transition-colors group-hover:text-brand">{store.name}</div>
-                                                        <div className="text-xs text-black/55">{store.address}</div>
+                                                    <div className="min-w-0">
+                                                        <div className="font-bold text-sm transition-colors group-hover:text-brand flex items-center gap-1.5">
+                                                            <span className="truncate">{store.name}</span>
+                                                            {store.type === "partner" && (
+                                                                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[10px] font-bold text-brand leading-none">{t("createClub.partnerBadge")}</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-black/55 truncate">{store.address}</div>
                                                     </div>
-                                                    <LucideCheck className="w-4 h-4 text-black/55 opacity-0 group-hover:opacity-100 transition-all group-hover:text-brand" />
+                                                    <LucideCheck className="w-4 h-4 shrink-0 ml-2 text-black/55 opacity-0 group-hover:opacity-100 transition-all group-hover:text-brand" />
                                                 </div>
                                             ))
                                         ) : (

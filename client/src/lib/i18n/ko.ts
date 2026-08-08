@@ -401,6 +401,7 @@ export const ko: Dict = {
   "createClub.nameRequired": "크루 이름을 입력해주세요",
   "createClub.next": "다음",
   "createClub.noResults": "검색 결과가 없습니다",
+  "createClub.partnerBadge": "랭큐 파트너",
   "createClub.regionLabel": "주 활동 지역",
   "createClub.regionPlaceholder": "지역 검색 (예: 강남구, 역삼동)",
   "createClub.regionRequired": "활동 지역을 입력해주세요",

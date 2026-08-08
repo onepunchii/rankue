@@ -399,6 +399,7 @@ const es: Dict = {
   "createClub.nameRequired": "Ingresa el nombre del crew",
   "createClub.next": "Siguiente",
   "createClub.noResults": "Sin resultados",
+  "createClub.partnerBadge": "Socio RANKUE",
   "createClub.regionLabel": "Región principal",
   "createClub.regionPlaceholder": "Buscar región (ej.: Gangnam-gu)",
   "createClub.regionRequired": "Ingresa la región de actividad",

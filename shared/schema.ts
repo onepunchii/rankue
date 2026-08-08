@@ -306,7 +306,10 @@ export const hiqCrews = pgTable("hiq_crews", {
   name: text("name").notNull(),
   description: text("description"),
   leaderId: uuid("leader_id").references(() => hiqMembers.id).notNull(),
-  baseStoreId: uuid("base_store_id").references(() => hiqStores.id), // Basecamp
+  baseStoreId: uuid("base_store_id").references(() => hiqStores.id), // Basecamp (파트너 매장)
+  // 디렉토리(storeListings) 베이스 — 파트너가 아닌 전국 1,195곳 어디든 지정 가능.
+  // 매장 상세 페이지의 "활동 크루" 섹션이 이 컬럼으로 조회한다 (사장님 유입 플라이휠의 연료).
+  baseListingCode: text("base_listing_code"),
 
   // New Fields for Wizard
   emblem: text("emblem"), // Emoji or URL

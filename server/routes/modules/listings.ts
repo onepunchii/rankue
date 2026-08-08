@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Response } from "express";
 import { db } from "../../db.js";
-import { storeListings, storeListingClaims, storeListingSuggestions } from "../../../shared/schema.js";
+import { storeListings, storeListingClaims, storeListingSuggestions, hiqCrews } from "../../../shared/schema.js";
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
@@ -29,10 +29,10 @@ function isSubmitLimited(ip: string): boolean {
 }
 
 router.use((_req, res, next) => {
-    // 목록·상세는 하루 단위로나 변하는 데이터 — CDN이 흡수
+    // 목록은 하루 단위로나 변하지만 상세에 활동 크루가 실리면서 10분으로 낮춤 — CDN이 흡수
     if (_req.method === "GET") {
         res.set("Cache-Control", "public, max-age=0, must-revalidate");
-        res.set("CDN-Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
+        res.set("CDN-Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400");
     }
     next();
 });
@@ -79,7 +79,20 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
         claimed: storeListings.claimed, description: storeListings.description,
     }).from(storeListings).where(eq(storeListings.code, req.params.code));
     if (!row) return sendError(res, 404, "매장을 찾을 수 없습니다");
-    return sendSuccess(res, row);
+
+    // 이 매장을 베이스로 활동하는 크루 — 공개 필드만 (이름·엠블럼·종목·인원).
+    // 매장 페이지를 "살아있는 프로필"로 만들어 사장님 클레임 유인이 되는 핵심 섹션.
+    const crews = await db.select({
+        id: hiqCrews.id,
+        name: hiqCrews.name,
+        emblem: hiqCrews.emblem,
+        gameType: hiqCrews.gameType,
+        // drizzle 은 sql`` 안 컬럼 참조를 비정규화 렌더링한다 — 서브쿼리에서 외부 컬럼이
+        // 내부 테이블로 오해석되므로(실측: "crew_id" = "id" 가 멤버 테이블 id 와 비교됨) 풀 경로 raw 로 쓴다
+        memberCount: sql<number>`(SELECT count(*)::int FROM hiq_crew_members m WHERE m.crew_id = hiq_crews.id AND m.role != 'pending')`,
+    }).from(hiqCrews).where(eq(hiqCrews.baseListingCode, req.params.code)).limit(10);
+
+    return sendSuccess(res, { ...row, crews });
 }));
 
 // POST /listings/:code/claim — 사장님 클레임 신청 (수동 승인 대기열)
