@@ -52,6 +52,7 @@ import Support from "@/pages/support";
 import About from "@/pages/about";
 import Stores from "@/pages/stores";
 import StoreListing from "@/pages/store-listing";
+import BriefingPage from "@/pages/briefing";
 import StoreDetail from "@/pages/store-detail";
 import SharedResult from "@/pages/hiq/shared-result";
 
@@ -80,9 +81,9 @@ import { DesktopFrame } from "@/components/hiq/DesktopFrame";
  * ⚠️ 모듈 최상위에서 한 번만 만든다. 렌더마다 새로 만들면 컴포넌트 정체성이 바뀌어
  *    라우트를 오갈 때마다 페이지 전체가 언마운트/재마운트된다(상태·스크롤 유실).
  */
-function framed<P extends object>(Page: ComponentType<P>): FunctionComponent<P> {
+function framed<P extends object>(Page: ComponentType<P>, opts?: { wide?: boolean }): FunctionComponent<P> {
   const Framed: FunctionComponent<P> = (props) => (
-    <DesktopFrame>
+    <DesktopFrame wide={opts?.wide}>
       <Page {...(props as P)} />
     </DesktopFrame>
   );
@@ -102,10 +103,11 @@ const FramedRanking = framed(HiqRanking);
 const FramedMenu = framed(HiqMenu);
 const FramedCommunity = framed(HiqCommunity);
 const FramedCommunityPost = framed(HiqCommunityPost);
-const FramedWorldRanking = framed(HiqWorldRanking);
-const FramedWorldPlayer = framed(HiqWorldPlayer);
-const FramedPba = framed(HiqPba);
-const FramedPbaPlayer = framed(HiqPbaPlayer);
+// 데이터 표 페이지들은 데스크탑에서 넓게 (사이드 패널 없이 중앙 720px)
+const FramedWorldRanking = framed(HiqWorldRanking, { wide: true });
+const FramedWorldPlayer = framed(HiqWorldPlayer, { wide: true });
+const FramedPba = framed(HiqPba, { wide: true });
+const FramedPbaPlayer = framed(HiqPbaPlayer, { wide: true });
 
 /**
  * localStorage에 저장된 FCM 토큰을 서버에 등록한다.
@@ -193,6 +195,8 @@ function AppRoutes() {
       <Route path="/about" component={About} />
       <Route path="/stores" component={Stores} />
       <Route path="/stores/:code" component={StoreListing} />
+      <Route path="/briefing" component={BriefingPage} />
+      <Route path="/briefing/:date" component={BriefingPage} />
       <Route path="/store/:slug" component={StoreDetail} />
       {/* 공유 링크로 열리는 공개 경기 결과 — 로그인 불필요 */}
       <Route path="/r/:id" component={SharedResult} />

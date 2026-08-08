@@ -91,6 +91,17 @@ export async function generateSitemap(): Promise<string> {
     console.warn("[sitemap] umb players failed:", (e as Error)?.message);
   }
 
+  // 브리핑 아카이브 — 오늘(KST) + 최근 30일 고정 URL (AEO). 과거분은 결정적 재계산이라 저장 불필요.
+  {
+    const { todayKst } = await import("../shared/briefingMeta.js");
+    const base = new Date(todayKst() + "T00:00:00Z").getTime();
+    parts.push(entry(`${ORIGIN}/briefing`, { changefreq: "daily", priority: "0.6" }));
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(base - i * 86400000).toISOString().slice(0, 10);
+      parts.push(entry(`${ORIGIN}/briefing/${d}`, { changefreq: "monthly", priority: "0.3" }));
+    }
+  }
+
   // PBA 투어 — 랭킹 + 선수 전원. "스롱 피아비 상금"류 국내 검색 타깃, ko 단일 언어.
   try {
     const players = await storage.pba.getPlayersForSitemap();

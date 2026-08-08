@@ -36,6 +36,7 @@ const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: str
 interface CrewHomeTabProps {
     crew: HiqCrew;
     baseStore: HiqStore | null;
+    baseListing?: { code: string; name: string; address: string } | null;
     members: any[]; // Extended member data with profile info
     isMember: boolean;
     isPending: boolean;
@@ -56,7 +57,7 @@ interface CrewHomeTabProps {
 }
 
 export const CrewHomeTab = memo(({
-    crew, baseStore, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onLeave, isLeaving, isLeader, onCreateActivity, onCreatePoll, onShareToChat,
+    crew, baseStore, baseListing = null, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onLeave, isLeaving, isLeader, onCreateActivity, onCreatePoll, onShareToChat,
     onPollClick
 }: CrewHomeTabProps) => {
     const { t } = useT();
@@ -290,6 +291,24 @@ export const CrewHomeTab = memo(({
                                 <Button variant="outline" className="flex-1 rounded-xl text-xs h-10 border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04]">{t("crewHome.call")}</Button>
                                 <Button className="flex-1 rounded-xl text-xs h-10 bg-brand text-brand-fg">{t("crewHome.viewLocation")}</Button>
                             </div>
+                        </CardContent>
+                    </Card>
+                ) : baseListing ? (
+                    /* 디렉토리 베이스 매장 — 매장 페이지(/stores/:code)로 연결 */
+                    <Card className="bg-surface-2 border-surface-line rounded-card overflow-hidden group hover:border-brand/50 transition-all">
+                        <CardContent className="p-5">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="min-w-0">
+                                    <h3 className="text-lg font-bold text-[rgba(0,0,0,0.87)] tracking-tight truncate">{baseListing.name}</h3>
+                                    <p className="text-xs text-black/55 mt-0.5 truncate">{baseListing.address}</p>
+                                </div>
+                            </div>
+                            <a
+                                href={`/stores/${baseListing.code}`}
+                                className="flex items-center justify-center w-full rounded-xl text-xs font-semibold h-10 bg-brand text-brand-fg"
+                            >
+                                {t("crewHome.viewLocation")}
+                            </a>
                         </CardContent>
                     </Card>
                 ) : (

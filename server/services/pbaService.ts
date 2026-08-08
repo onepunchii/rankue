@@ -197,3 +197,35 @@ export async function fetchPlayerDetail(memCode: string): Promise<PbaDetail | nu
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// 시즌 대회 일정 — /ko/tournament/schedule/ajax/list (2026-08-09 실측).
+// MATCH_START_DATE 가 {year, monthValue, dayOfMonth} 객체 형태라 ISO 로 정규화한다.
+export interface PbaEvent {
+    title: string;
+    league: string; // PBA1·LPBA1·PBA2(드림투어)·TLG(팀리그)
+    startDate: string; // YYYY-MM-DD
+    endDate: string;
+    place: string | null;
+}
+export async function fetchSchedule(season: number): Promise<PbaEvent[]> {
+    const json = await fetchJson(`/ko/tournament/schedule/ajax/list?leagueCode=&season=${season}`);
+    const list = Array.isArray(json?.list) ? json.list : [];
+    const iso = (d: any): string | null =>
+        d?.year && d?.monthValue && d?.dayOfMonth
+            ? `${d.year}-${String(d.monthValue).padStart(2, "0")}-${String(d.dayOfMonth).padStart(2, "0")}`
+            : null;
+    return list
+        .map((r: any): PbaEvent | null => {
+            const startDate = iso(r.MATCH_START_DATE);
+            const endDate = iso(r.MATCH_END_DATE) ?? startDate;
+            const title = capStr(r.TITLE, 80);
+            if (!startDate || !endDate || !title) return null;
+            return {
+                title,
+                league: capStr(r.LEAGUE_GUBUN, 10) ?? "PBA1",
+                startDate, endDate,
+                place: r.PLACE && r.PLACE !== "미정" ? capStr(r.PLACE, 60) : null,
+            };
+        })
+        .filter(Boolean) as PbaEvent[];
+}

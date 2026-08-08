@@ -28,7 +28,7 @@ const L: Record<Locale, Record<string, string>> = {
         title: "PBA 투어 랭킹", subtitle: "프로당구 PBA·LPBA 시즌 랭킹",
         byPrize: "상금순", byPoint: "포인트순", prize: "상금", point: "포인트",
         season: "시즌", empty: "데이터가 없습니다", source: "출처: PBA 투어 공식 기록",
-        umbLink: "UMB 세계랭킹 보기",
+        umbLink: "UMB 세계랭킹 보기", upcoming: "다가오는 대회", dday: "D-", today: "진행 중",
         metaTitle: "PBA 투어 랭킹 · 프로당구 시즌 상금·포인트 순위 | 랭큐",
         metaDesc: "프로당구 PBA·LPBA 시즌별 랭킹. 상금 순위, 랭킹 포인트, 선수별 통산 기록과 시즌 히스토리를 랭큐에서.",
     },
@@ -36,7 +36,7 @@ const L: Record<Locale, Record<string, string>> = {
         title: "PBA Tour Rankings", subtitle: "Korean pro billiards PBA · LPBA season rankings",
         byPrize: "By prize", byPoint: "By points", prize: "Prize", point: "Points",
         season: "Season", empty: "No data", source: "Source: PBA Tour official records",
-        umbLink: "UMB World Ranking",
+        umbLink: "UMB World Ranking", upcoming: "Upcoming events", dday: "D-", today: "Live now",
         metaTitle: "PBA Tour Rankings · Korean Pro Billiards | RANKUE",
         metaDesc: "PBA & LPBA season rankings — prize money, ranking points, and career records of Korean pro billiards players.",
     },
@@ -44,7 +44,7 @@ const L: Record<Locale, Record<string, string>> = {
         title: "BXH PBA Tour", subtitle: "Bi-a chuyên nghiệp Hàn Quốc PBA · LPBA",
         byPrize: "Theo tiền thưởng", byPoint: "Theo điểm", prize: "Tiền thưởng", point: "Điểm",
         season: "Mùa giải", empty: "Chưa có dữ liệu", source: "Nguồn: PBA Tour",
-        umbLink: "BXH thế giới UMB",
+        umbLink: "BXH thế giới UMB", upcoming: "Giải sắp tới", dday: "D-", today: "Đang diễn ra",
         metaTitle: "BXH PBA Tour · Bi-a chuyên nghiệp Hàn Quốc | RANKUE",
         metaDesc: "BXH mùa giải PBA & LPBA — tiền thưởng, điểm xếp hạng và thành tích của các cơ thủ chuyên nghiệp.",
     },
@@ -52,7 +52,7 @@ const L: Record<Locale, Record<string, string>> = {
         title: "PBA Tur Sıralaması", subtitle: "Kore profesyonel bilardo PBA · LPBA",
         byPrize: "Para ödülü", byPoint: "Puan", prize: "Ödül", point: "Puan",
         season: "Sezon", empty: "Veri yok", source: "Kaynak: PBA Tour",
-        umbLink: "UMB Dünya Sıralaması",
+        umbLink: "UMB Dünya Sıralaması", upcoming: "Yaklaşan turnuvalar", dday: "D-", today: "Devam ediyor",
         metaTitle: "PBA Tur Sıralaması · Kore Profesyonel Bilardo | RANKUE",
         metaDesc: "PBA & LPBA sezon sıralamaları — para ödülleri, sıralama puanları ve oyuncu kariyer kayıtları.",
     },
@@ -60,7 +60,7 @@ const L: Record<Locale, Record<string, string>> = {
         title: "Ranking PBA Tour", subtitle: "Billar profesional coreano PBA · LPBA",
         byPrize: "Por premios", byPoint: "Por puntos", prize: "Premios", point: "Puntos",
         season: "Temporada", empty: "Sin datos", source: "Fuente: PBA Tour",
-        umbLink: "Ranking mundial UMB",
+        umbLink: "Ranking mundial UMB", upcoming: "Próximos torneos", dday: "D-", today: "En curso",
         metaTitle: "Ranking PBA Tour · Billar Profesional Coreano | RANKUE",
         metaDesc: "Rankings de temporada PBA y LPBA — premios, puntos y récords de los jugadores profesionales.",
     },
@@ -93,6 +93,15 @@ export default function HiqPba() {
         placeholderData: (prev) => prev,
     });
     const rows = data?.rows ?? [];
+
+    // 다가오는 대회 — 라이브 프록시 (시즌 일정)
+    const { data: sched } = useQuery<{ upcoming: Array<{ title: string; league: string; startDate: string; endDate: string; place: string | null }> }>({
+        queryKey: ["/api/hiq/pba/schedule"],
+        queryFn: async () => apiRequest("/api/hiq/pba/schedule"),
+        staleTime: 60 * 60 * 1000,
+    });
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const dday = (d: string) => Math.ceil((new Date(d + "T00:00:00").getTime() - new Date(todayStr + "T00:00:00").getTime()) / 86400000);
 
     useSeo({
         title: t.metaTitle,
@@ -174,6 +183,36 @@ export default function HiqPba() {
                             {seasonLabel(s)}
                         </button>
                     ))}
+                </div>
+            )}
+
+            {/* 다가오는 대회 스트립 */}
+            {(sched?.upcoming?.length ?? 0) > 0 && (
+                <div className="mb-4">
+                    <p className="text-[11.5px] font-bold text-black/40 mb-2">{t.upcoming}</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5 scrollbar-hide">
+                        {sched!.upcoming.map((e) => {
+                            const d = dday(e.startDate);
+                            const live = e.startDate <= todayStr && e.endDate >= todayStr;
+                            return (
+                                <div key={`${e.title}-${e.startDate}`} className="shrink-0 w-[190px] rounded-2xl bg-white p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={cn(
+                                            "px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none",
+                                            live ? "bg-[#E02D2D] text-white" : "bg-brand/10 text-brand",
+                                        )}>
+                                            {live ? t.today : `${t.dday}${d}`}
+                                        </span>
+                                        <span className="text-[10.5px] font-bold text-black/40">{e.league.replace(/1$/, "")}</span>
+                                    </div>
+                                    <p className="mt-1.5 text-[12.5px] font-bold leading-snug line-clamp-2">{e.title}</p>
+                                    <p className="mt-1 text-[10.5px] text-black/40 tabular-nums">
+                                        {e.startDate.slice(5).replace("-", ".")}~{e.endDate.slice(5).replace("-", ".")}{e.place ? ` · ${e.place}` : ""}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 

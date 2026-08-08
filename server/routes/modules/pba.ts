@@ -50,6 +50,30 @@ router.get("/player/:memCode", asyncHandler(async (req: any, res: Response) => {
     return sendSuccess(res, player);
 }));
 
+// GET /pba/schedule — 다가오는 대회 (라이브 프록시 + CDN 캐시, DB 저장 없음).
+// 프로세스 캐시 1시간 — pbatour 장애 시 캐시분으로 버티고, 완전 실패면 빈 배열.
+let scheduleCache: { at: number; data: any[] } | null = null;
+router.get("/schedule", asyncHandler(async (_req: any, res: Response) => {
+    if (!scheduleCache || Date.now() - scheduleCache.at > 60 * 60 * 1000) {
+        try {
+            const { fetchSchedule } = await import("../../services/pbaService.js");
+            const season = currentPbaSeason();
+            // 시즌 경계에서 다음 시즌 일정이 먼저 올라오는 경우까지 커버
+            const events = [...await fetchSchedule(season), ...await fetchSchedule(season + 1).catch(() => [])];
+            scheduleCache = { at: Date.now(), data: events };
+        } catch (e) {
+            console.warn("[pba] schedule 수집 실패:", (e as Error)?.message);
+            if (!scheduleCache) scheduleCache = { at: Date.now(), data: [] };
+        }
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const upcoming = scheduleCache.data
+        .filter((e: any) => e.endDate >= today)
+        .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate))
+        .slice(0, 8);
+    return sendSuccess(res, { upcoming });
+}));
+
 // GET /pba/benchmark — 리그별 통산 에버리지 분포 (유저 "프로와 나" 비교 카드용)
 router.get("/benchmark", asyncHandler(async (_req: any, res: Response) => {
     const { db } = await import("../../db.js");

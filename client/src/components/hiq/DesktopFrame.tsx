@@ -27,19 +27,25 @@ import { LANDING_CREW, LANDING_FEATURES, LANDING_META } from "@shared/landingCon
  * 다만 DOM 조상은 여전히 이 프레임이므로 index.css 의 `.rk-frame .bottom-navigation-container`
  * 규칙이 프레임 안에서 렌더될 때만 폭을 접어 가로 정렬을 맞춘다(설계 원칙 3번이 전제다).
  */
-export function DesktopFrame({ children }: { children: ReactNode }) {
+export function DesktopFrame({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
     // 네이티브 앱(Capacitor)은 그 자체가 이미 '기기 화면'이다. 태블릿 앱이 1024px을 넘겨
     // 사이드가 튀어나오면 어색하므로 껍데기를 아예 씌우지 않고 그대로 통과시킨다.
     if (Capacitor.isNativePlatform()) return <>{children}</>;
 
+    // wide: 데이터 표 성격 페이지(세계랭킹·선수·PBA)는 448px가 답답하다 — 중앙 720px,
+    // 사이드 패널 없이. --rk-frame-w 변수를 이 서브트리에서 덮어써 index.css 의
+    // 고정 요소 폭 보정(FAB·하단 네비)도 함께 따라온다.
     return (
-        <div className="lg:flex lg:justify-center lg:gap-7 xl:gap-9 lg:min-h-[100dvh] lg:bg-[var(--rk-frame-outer)]">
-            <SideLeft />
+        <div
+            className="lg:flex lg:justify-center lg:gap-7 xl:gap-9 lg:min-h-[100dvh] lg:bg-[var(--rk-frame-outer)]"
+            style={wide ? ({ "--rk-frame-w": "720px" } as React.CSSProperties) : undefined}
+        >
+            {!wide && <SideLeft />}
             {/* 앱 본체. rk-frame 클래스는 index.css 의 하단 네비 보정이 잡는 훅이기도 하다. */}
             <div className="rk-frame w-full lg:w-[var(--rk-frame-w)] lg:shrink-0 lg:bg-[#f2f0eb] lg:shadow-[var(--rk-frame-shadow)]">
                 {children}
             </div>
-            <SideRight />
+            {!wide && <SideRight />}
         </div>
     );
 }

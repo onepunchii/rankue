@@ -75,9 +75,19 @@ router.get("/calendar", asyncHandler(async (req: any, res: Response) => {
 }));
 
 // GET /umb/no1-history?category= — 역대 세계 1위 계보 (재임 구간·주수)
-// GET /umb/briefing — 오늘의 당구 한 줄 (역사 속 오늘 / 1·2위 격차)
-router.get("/briefing", asyncHandler(async (_req: any, res: Response) => {
-    return sendSuccess(res, await storage.umb.getBriefing());
+// GET /umb/briefing?date=YYYY-MM-DD — 당구 한 줄 (역사 속 오늘 / 1·2위 격차). 무날짜 = 오늘
+router.get("/briefing", asyncHandler(async (req: any, res: Response) => {
+    let date: string | undefined;
+    if (typeof req.query.date === "string" && req.query.date) {
+        const { todayKst } = await import("../../../shared/briefingMeta.js");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) return sendError(res, 400, "잘못된 날짜입니다");
+        // 미래 판정은 KST 기준 — UTC 로 비교하면 한국 새벽에 '오늘'이 404 가 된다
+        if (req.query.date > todayKst() || Number(req.query.date.slice(0, 4)) < 2024) {
+            return sendError(res, 404, "브리핑이 없는 날짜입니다");
+        }
+        date = req.query.date;
+    }
+    return sendSuccess(res, await storage.umb.getBriefing(date));
 }));
 
 router.get("/no1-history", asyncHandler(async (req: any, res: Response) => {

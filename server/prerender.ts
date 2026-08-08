@@ -8,6 +8,7 @@ import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW } from "../shared/landingContent.js";
 import { formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared } from "../shared/pbaMeta.js";
+import { briefingLineKo, briefingDateKo, briefingTitle, briefingDesc, todayKst } from "../shared/briefingMeta.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
 //
@@ -817,6 +818,43 @@ export function registerPrerender(app: Express) {
       }),
     );
   });
+
+  // ── /briefing, /briefing/:date ────────────────────────────────────
+  // 날짜별 고정 URL 아카이브 — "당구 브리핑"류 질문형 검색(AEO)의 착지점. ko 단일 언어.
+  // 문구는 shared/briefingMeta 로 클라이언트와 문자 단위 일치.
+  const briefingHandler = async (req: Parameters<Parameters<Express["get"]>[1]>[0], res: Parameters<Parameters<Express["get"]>[1]>[1], next: () => void) => {
+    if (!isBot(req)) return next();
+    const raw = (req.params as any).date as string | undefined;
+    const today = todayKst();
+    const date = raw ?? today;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today || Number(date.slice(0, 4)) < 2024) {
+      return sendGone(res, "브리핑이 없는 날짜입니다.", "요청한 날짜의 브리핑이 없습니다.");
+    }
+    let b: any = null;
+    try {
+      b = await storage.umb.getBriefing(date);
+    } catch (e) {
+      console.warn("[prerender] briefing failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    res.setHeader("X-Prerender", "briefing");
+    noStore(res);
+    res.send(
+      page({
+        title: briefingTitle(date),
+        desc: briefingDesc(b, date),
+        canonical: `${ORIGIN}/briefing/${date}`,
+        body: `<main>
+  <nav><a href="/world-ranking">← 세계 랭킹</a></nav>
+  <h1>오늘의 당구 브리핑 — ${esc(briefingDateKo(date))}</h1>
+  ${b ? `<p><a href="/player/players/${esc(b.playerUmbId)}">${esc(briefingLineKo(b))}</a></p>` : "<p>이 날짜의 브리핑이 없습니다.</p>"}
+  <p>출처: UMB 공식 랭킹 — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a> · 매일 자동 갱신</p>
+</main>`,
+      }),
+    );
+  };
+  app.get("/briefing", briefingHandler);
+  app.get("/briefing/:date", briefingHandler);
 
   // ── /community, /community/:id ────────────────────────────────────
   // 커뮤니티는 공개 게시판이라 색인 대상 (크루 내부 콘텐츠는 색인 제외 원칙과 구분).

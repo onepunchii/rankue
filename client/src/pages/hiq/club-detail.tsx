@@ -118,7 +118,7 @@ export default function HiqClubDetail() {
         }
     });
 
-    const { data: crewData, isLoading } = useQuery<{ crew: HiqCrew, baseStore: HiqStore, members: any[] }>({
+    const { data: crewData, isLoading } = useQuery<{ crew: HiqCrew, baseStore: HiqStore, baseListing?: { code: string; name: string; address: string } | null, members: any[] }>({
         queryKey: [`/api/hiq/crews/${id}`],
         enabled: !!id,
     });
@@ -200,7 +200,7 @@ export default function HiqClubDetail() {
     if (isLoading) return <div className="h-[100dvh] bg-[#f2f0eb] flex items-center justify-center text-ink-3"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
     if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-[#f2f0eb] flex items-center justify-center text-ink-3">{t("clubDetail.notFound")}</div>;
 
-    const { crew, baseStore, members = [] } = crewData;
+    const { crew, baseStore, baseListing = null, members = [] } = crewData;
     const myMemberData = members.find((m: any) => m.member?.id === me?.id);
     const isMember = !!myMemberData && myMemberData.role !== 'pending';
     const isPending = !!myMemberData && myMemberData.role === 'pending';
@@ -312,6 +312,7 @@ export default function HiqClubDetail() {
                             <CrewHomeTab
                                 crew={crew}
                                 baseStore={baseStore}
+                                baseListing={baseListing}
                                 members={members}
                                 isMember={isMember}
                                 isPending={isPending}

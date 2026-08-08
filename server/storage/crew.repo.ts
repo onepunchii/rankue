@@ -59,10 +59,17 @@ export class CrewRepository {
         const [crew] = await db.select().from(hiqCrews).where(eq(hiqCrews.id, id));
         if (!crew) return null;
 
-        // 2. Get Base Store
+        // 2. Get Base Store — 파트너 매장 우선, 없으면 디렉토리(storeListings) 베이스
         let baseStore = null;
         if (crew.baseStoreId) {
             [baseStore] = await db.select().from(hiqStores).where(eq(hiqStores.id, crew.baseStoreId));
+        }
+        let baseListing: { code: string; name: string; address: string } | null = null;
+        if (!baseStore && (crew as any).baseListingCode) {
+            const { storeListings } = await import("../../shared/schema.js");
+            [baseListing = null] = await db.select({
+                code: storeListings.code, name: storeListings.name, address: storeListings.address,
+            }).from(storeListings).where(eq(storeListings.code, (crew as any).baseListingCode));
         }
 
         // 3. Get Members with Role and Profile.
@@ -170,7 +177,7 @@ export class CrewRepository {
             };
         }));
 
-        return { crew, baseStore, members: enrichedMembers };
+        return { crew, baseStore, baseListing, members: enrichedMembers };
     }
 
     // Lightweight membership check — single indexed lookup, avoids loading the full enriched crew.
