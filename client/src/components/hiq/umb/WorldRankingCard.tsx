@@ -40,6 +40,33 @@ export const WorldRankingCard = () => {
         staleTime: 10 * 60 * 1000,
     });
 
+    // 오늘의 당구 한 줄 — 역사 속 오늘(과거 같은 시기 1위) 또는 1·2위 격차. 남자부 데이터라 남자부 탭에서만
+    const { data: briefing } = useQuery<any>({
+        queryKey: ["/api/hiq/umb/briefing"],
+        queryFn: async () => apiRequest("/api/hiq/umb/briefing"),
+        staleTime: 60 * 60 * 1000,
+        enabled: category === "players",
+    });
+    const briefName = (b: any, native: string | null, latin: string) =>
+        locale === "ko" ? (native ?? latin) : latin;
+    const briefingLine = category === "players" && briefing ? (
+        briefing.type === "onThisDay"
+            ? ({
+                ko: `${briefing.yearsAgo}년 전 오늘의 세계 1위 — ${briefName(briefing, briefing.nativeName, briefing.name)} (${briefing.points}점)`,
+                en: `World No.1 on this day ${briefing.yearsAgo}y ago — ${briefing.name} (${briefing.points}pt)`,
+                vi: `Số 1 thế giới ngày này ${briefing.yearsAgo} năm trước — ${briefing.name} (${briefing.points}đ)`,
+                tr: `${briefing.yearsAgo} yıl önce bugün dünya 1 numarası — ${briefing.name} (${briefing.points}p)`,
+                es: `N.º 1 mundial tal día hace ${briefing.yearsAgo} años — ${briefing.name} (${briefing.points}pt)`,
+            } as Record<string, string>)[locale] ?? ""
+            : ({
+                ko: `1위 ${briefName(briefing, briefing.nativeName, briefing.name)} — 2위 ${briefName(briefing, briefing.rivalNativeName, briefing.rivalName)}와 ${briefing.gap}점 차`,
+                en: `No.1 ${briefing.name} — ${briefing.gap}pt clear of ${briefing.rivalName}`,
+                vi: `Số 1 ${briefing.name} — hơn ${briefing.rivalName} ${briefing.gap} điểm`,
+                tr: `1. ${briefing.name} — ${briefing.rivalName}'a ${briefing.gap} puan fark`,
+                es: `N.º 1 ${briefing.name} — ${briefing.gap}pt sobre ${briefing.rivalName}`,
+            } as Record<string, string>)[locale] ?? ""
+    ) : null;
+
     const rows = data?.rows || [];
 
     return (
@@ -66,6 +93,17 @@ export const WorldRankingCard = () => {
                     </span>
                 )}
             </div>
+
+            {/* 오늘의 당구 — 데이터에서 매일 갱신되는 한 줄 (선수 탭 → 상세 시트) */}
+            {briefingLine && (
+                <button
+                    onClick={() => setOpenPlayerId(briefing.playerUmbId)}
+                    className="w-full flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-[#F5B721]/[0.12] text-[12.5px] font-semibold text-[#8a6a0a] text-left"
+                >
+                    <span className="shrink-0">📅</span>
+                    <span className="truncate">{briefingLine}</span>
+                </button>
+            )}
 
             {/* 요약 한 줄 — 뷰어 국가의 선수 규모·최고 순위 (프로필/언어 기반) */}
             {summary && summary.fedTop && (

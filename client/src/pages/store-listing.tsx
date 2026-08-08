@@ -14,6 +14,7 @@ interface Listing {
   flatLarge: number | null; flatMedium: number | null; flatPocket: number | null;
   claimed: boolean; description: string | null;
   crews?: Array<{ id: string; name: string; emblem: string | null; gameType: string; memberCount: number }>;
+  honor?: { founder: string | null; regular: { name: string; games: number } | null } | null;
 }
 
 // 페이지 문구 — 디렉터리는 한국 콘텐츠지만 라벨은 5개 언어 (stores.tsx와 같은 패턴)
@@ -24,6 +25,8 @@ const L: Record<Locale, Record<string, string>> = {
     large: "대대", medium: "중대", pocket: "포켓",
     rates: "요금", per10: "10분당", flat: "정액", won: "원",
     crewsTitle: "이 매장에서 활동하는 크루", crewMembers: "명",
+    honorTitle: "명예의 전당", founder: "초대 대장", regular: "단골 왕관 (최근 90일)", regularGames: "경기",
+    emptyThrone: "이 매장의 왕좌가 비어 있습니다", emptyThroneDesc: "랭큐 점수판으로 이 매장의 첫 경기를 기록한 사람이 초대 대장이 됩니다.",
     descEmpty: "사장님 인증 후 매장 소개가 표시됩니다.",
     claimCta: "사장님이신가요? 내 매장 정보 관리 신청",
     claimTitle: "내 매장 관리 신청",
@@ -44,6 +47,8 @@ const L: Record<Locale, Record<string, string>> = {
     large: "Large", medium: "Medium", pocket: "Pocket",
     rates: "Rates", per10: "per 10 min", flat: "Flat rate", won: "₩",
     crewsTitle: "Crews based at this venue", crewMembers: "members",
+    honorTitle: "Hall of fame", founder: "Founding champion", regular: "Regular crown (90 days)", regularGames: "games",
+    emptyThrone: "This venue's throne is empty", emptyThroneDesc: "The first player to record a game here on RANKUE becomes the founding champion.",
     descEmpty: "The owner's introduction will appear after verification.",
     claimCta: "Own this hall? Claim your listing",
     claimTitle: "Claim this listing",
@@ -64,6 +69,8 @@ const L: Record<Locale, Record<string, string>> = {
     large: "Lớn", medium: "Vừa", pocket: "Pocket",
     rates: "Giá", per10: "mỗi 10 phút", flat: "Trọn gói", won: "₩",
     crewsTitle: "Crew hoạt động tại đây", crewMembers: "thành viên",
+    honorTitle: "Đại sảnh danh vọng", founder: "Nhà vô địch khai quán", regular: "Vương miện khách quen (90 ngày)", regularGames: "trận",
+    emptyThrone: "Ngai vàng của quán còn trống", emptyThroneDesc: "Người đầu tiên ghi trận đấu tại đây trên RANKUE sẽ trở thành nhà vô địch khai quán.",
     descEmpty: "Phần giới thiệu sẽ hiển thị sau khi chủ quán xác nhận.",
     claimCta: "Bạn là chủ quán? Nhận quản lý trang này",
     claimTitle: "Nhận quản lý trang",
@@ -84,6 +91,8 @@ const L: Record<Locale, Record<string, string>> = {
     large: "Büyük", medium: "Orta", pocket: "Pocket",
     rates: "Ücretler", per10: "10 dk başına", flat: "Sabit ücret", won: "₩",
     crewsTitle: "Bu salonda aktif ekipler", crewMembers: "üye",
+    honorTitle: "Şeref salonu", founder: "Kurucu şampiyon", regular: "Müdavim tacı (90 gün)", regularGames: "maç",
+    emptyThrone: "Bu salonun tahtı boş", emptyThroneDesc: "RANKUE ile burada ilk maçı kaydeden kişi kurucu şampiyon olur.",
     descEmpty: "Sahibi doğrulandıktan sonra tanıtım burada görünecek.",
     claimCta: "Salon sizin mi? Kaydınızı sahiplenin",
     claimTitle: "Kaydı sahiplen",
@@ -104,6 +113,8 @@ const L: Record<Locale, Record<string, string>> = {
     large: "Grande", medium: "Mediana", pocket: "Pocket",
     rates: "Tarifas", per10: "por 10 min", flat: "Tarifa plana", won: "₩",
     crewsTitle: "Crews activos en este local", crewMembers: "miembros",
+    honorTitle: "Salón de la fama", founder: "Campeón fundador", regular: "Corona del habitual (90 días)", regularGames: "partidas",
+    emptyThrone: "El trono de este local está vacío", emptyThroneDesc: "El primero en registrar una partida aquí con RANKUE será el campeón fundador.",
     descEmpty: "La presentación aparecerá tras la verificación del propietario.",
     claimCta: "¿Es tu local? Reclama tu ficha",
     claimTitle: "Reclamar ficha",
@@ -256,6 +267,40 @@ export default function StoreListingPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* 명예의 전당 — 데이터가 있으면 왕관, 없으면 빈 왕좌 초대장 */}
+            <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-4">
+              <p className="text-[11.5px] font-bold text-black/40 mb-2.5">{t.honorTitle}</p>
+              {s.honor && (s.honor.founder || s.honor.regular) ? (
+                <div className="space-y-2">
+                  {s.honor.founder && (
+                    <div className="flex items-center gap-3 py-2 px-2.5 rounded-xl bg-[#cba258]/10">
+                      <span className="text-[20px] leading-none">👑</span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold text-[#8a6a2a]">{t.founder}</p>
+                        <p className="text-[14.5px] font-bold text-ink-1 truncate">{s.honor.founder}</p>
+                      </div>
+                    </div>
+                  )}
+                  {s.honor.regular && (
+                    <div className="flex items-center gap-3 py-2 px-2.5 rounded-xl bg-brand/[0.06]">
+                      <span className="text-[20px] leading-none">🏆</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold text-brand/70">{t.regular}</p>
+                        <p className="text-[14.5px] font-bold text-ink-1 truncate">{s.honor.regular.name}</p>
+                      </div>
+                      <span className="text-[12px] font-semibold text-black/45 tabular-nums shrink-0">{s.honor.regular.games}{t.regularGames}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-3">
+                  <p className="text-[22px] mb-1.5">🪑</p>
+                  <p className="text-[14px] font-bold text-ink-1">{t.emptyThrone}</p>
+                  <p className="text-[12.5px] text-black/50 mt-1 leading-relaxed">{t.emptyThroneDesc}</p>
                 </div>
               )}
             </div>

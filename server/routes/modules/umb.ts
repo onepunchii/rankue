@@ -75,6 +75,11 @@ router.get("/calendar", asyncHandler(async (req: any, res: Response) => {
 }));
 
 // GET /umb/no1-history?category= — 역대 세계 1위 계보 (재임 구간·주수)
+// GET /umb/briefing — 오늘의 당구 한 줄 (역사 속 오늘 / 1·2위 격차)
+router.get("/briefing", asyncHandler(async (_req: any, res: Response) => {
+    return sendSuccess(res, await storage.umb.getBriefing());
+}));
+
 router.get("/no1-history", asyncHandler(async (req: any, res: Response) => {
     const category = parseCategory(req.query.category ?? "players");
     if (!category) return sendError(res, 400, "잘못된 부문입니다");

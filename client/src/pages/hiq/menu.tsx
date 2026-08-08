@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { useSport } from "@/contexts/SportContext";
 import { getTier } from "@/lib/hiqUtils";
 import { InfoModal, InfoModalType } from "@/components/hiq/menu/InfoModal";
+import { BadgeShelf } from "@/components/hiq/BadgeShelf";
 import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
@@ -285,6 +286,11 @@ export default function HiqMenu() {
                     </Button>
                     )}
                 </div>
+            </div>
+
+            {/* Section: 큐 컬렉션 — 기록 기반 뱃지 진열장 */}
+            <div className="relative z-10 mb-10">
+                <BadgeShelf />
             </div>
 
             {/* Section: Sports Mode Switcher (Icon Only Style) */}

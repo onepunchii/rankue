@@ -10,6 +10,26 @@ import { geocodeCity } from "../lib/geocode.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Neon WebSocket 은 20분+ 배치 중 유휴 연결이 끊길 수 있다(실측: ECONNRESET 로 프로세스 사망).
+// 소켓의 비동기 error 이벤트가 unhandled 로 터지는 것을 삼키고, 쿼리는 새 연결로 재시도한다.
+process.on("uncaughtException", (e) => console.warn("[geocode] 연결 오류 무시:", (e as Error)?.message));
+process.on("unhandledRejection", (e) => console.warn("[geocode] 비동기 오류 무시:", (e as any)?.message ?? e));
+
+async function saveWithRetry(code: string, lat: number, lng: number): Promise<boolean> {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            await db.update(storeListings)
+                .set({ latitude: lat, longitude: lng })
+                .where(eq(storeListings.code, code));
+            return true;
+        } catch (e) {
+            console.warn(`[geocode] DB 저장 실패(${attempt}/3) ${code}:`, (e as Error)?.message);
+            await sleep(3000);
+        }
+    }
+    return false;
+}
+
 const rows = await db.select({ code: storeListings.code, address: storeListings.address })
     .from(storeListings).where(isNull(storeListings.latitude));
 console.log(`좌표 미보유 ${rows.length}건 — 예상 소요 ~${Math.ceil(rows.length * 1.15 / 60)}분`);
@@ -19,10 +39,7 @@ for (const [i, r] of rows.entries()) {
     // 번지 뒤 층·호 표기는 지오코딩에 노이즈 — "서울 동대문구 답십리동 492-1 5층" → 층 제거
     const cleaned = r.address.replace(/\s+(지하\s*)?\d+층.*$/, "").replace(/\s+[\dB]+호.*$/, "");
     const geo = await geocodeCity(cleaned, "KR");
-    if (geo) {
-        await db.update(storeListings)
-            .set({ latitude: geo.lat, longitude: geo.lng })
-            .where(eq(storeListings.code, r.code));
+    if (geo && await saveWithRetry(r.code, geo.lat, geo.lng)) {
         ok++;
     } else {
         fail++;

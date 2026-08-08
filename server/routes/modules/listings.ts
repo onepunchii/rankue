@@ -94,8 +94,32 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
         rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium, rate10Pocket: storeListings.rate10Pocket,
         flatLarge: storeListings.flatLarge, flatMedium: storeListings.flatMedium, flatPocket: storeListings.flatPocket,
         claimed: storeListings.claimed, description: storeListings.description,
+        claimedStoreId: storeListings.claimedStoreId, // 내부용 — 응답에서 제거
     }).from(storeListings).where(eq(storeListings.code, req.params.code));
     if (!row) return sendError(res, 404, "매장을 찾을 수 없습니다");
+
+    // 명예의 전당 — 클레임된 매장은 연결된 파트너 매장의 실경기로 계산.
+    // 미클레임(대부분)은 null → 클라이언트가 "빈 왕좌" 초대장을 그린다.
+    let honor: { founder: string | null; regular: { name: string; games: number } | null } | null = null;
+    if (row.claimedStoreId) {
+        try {
+            const [founder] = (await db.execute(sql`
+                SELECT m.name FROM hiq_games g JOIN hiq_members m ON m.id = g.player1_id
+                WHERE g.store_id = ${row.claimedStoreId} ORDER BY g.played_at ASC LIMIT 1`)).rows as any[];
+            const [regular] = (await db.execute(sql`
+                SELECT m.name, count(*)::int AS games FROM hiq_games g
+                JOIN hiq_members m ON m.id IN (g.player1_id, g.player2_id, g.player3_id, g.player4_id)
+                WHERE g.store_id = ${row.claimedStoreId} AND g.played_at > now() - interval '90 days'
+                GROUP BY m.id, m.name ORDER BY games DESC LIMIT 1`)).rows as any[];
+            honor = {
+                founder: founder?.name ?? null,
+                regular: regular ? { name: regular.name, games: regular.games } : null,
+            };
+        } catch (e) {
+            console.warn("[listings] honor 계산 실패:", (e as Error)?.message);
+        }
+    }
+    const { claimedStoreId: _hidden, ...pub } = row;
 
     // 이 매장을 베이스로 활동하는 크루 — 공개 필드만 (이름·엠블럼·종목·인원).
     // 매장 페이지를 "살아있는 프로필"로 만들어 사장님 클레임 유인이 되는 핵심 섹션.
@@ -109,7 +133,7 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
         memberCount: sql<number>`(SELECT count(*)::int FROM hiq_crew_members m WHERE m.crew_id = hiq_crews.id AND m.role != 'pending')`,
     }).from(hiqCrews).where(eq(hiqCrews.baseListingCode, req.params.code)).limit(10);
 
-    return sendSuccess(res, { ...row, crews });
+    return sendSuccess(res, { ...pub, crews, honor });
 }));
 
 // POST /listings/:code/claim — 사장님 클레임 신청 (수동 승인 대기열)

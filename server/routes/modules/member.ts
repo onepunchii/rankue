@@ -324,4 +324,77 @@ router.delete("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any
     return sendSuccess(res, { success: true });
 }));
 
+// GET /me/achievement — 주간 달성률(득점÷다마수) 추이, 최근 8주.
+// 다마수는 매장마다 스케일이 달라 절대 비교가 안 되지만, "자기 다마 대비 몇 %"는 공정하다.
+// match 경기 + target>0 만 집계 (연습·목표 미설정 경기는 수치 오염).
+router.get("/me/achievement", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { db } = await import("../../db.js");
+    const { sql } = await import("drizzle-orm");
+    const me = req.userId!;
+    const rows = await db.execute(sql`
+        WITH mine AS (
+            SELECT date_trunc('week', played_at)::date AS wk, game_type,
+                CASE WHEN player1_id = ${me} THEN player1_score WHEN player2_id = ${me} THEN player2_score
+                     WHEN player3_id = ${me} THEN player3_score ELSE player4_score END AS score,
+                CASE WHEN player1_id = ${me} THEN player1_target WHEN player2_id = ${me} THEN player2_target
+                     WHEN player3_id = ${me} THEN player3_target ELSE player4_target END AS target
+            FROM hiq_games
+            WHERE game_mode = 'match' AND sport_category = 'BILLIARDS'
+              AND played_at > now() - interval '8 weeks'
+              AND ${me} IN (player1_id, player2_id, player3_id, player4_id)
+        )
+        SELECT wk, game_type AS type, sum(score)::int AS score, sum(target)::int AS target, count(*)::int AS games
+        FROM mine WHERE target > 0 AND score >= 0
+        GROUP BY wk, game_type ORDER BY wk`);
+    const weeks = (rows.rows as any[]).map((r) => ({
+        week: r.wk, type: r.type, games: r.games,
+        rate: Math.round((r.score / r.target) * 100),
+    }));
+    return sendSuccess(res, { weeks });
+}));
+
+// GET /me/badges — 큐 컬렉션 (기록 기반 뱃지, 요청 시 계산 — 소급 자동).
+// 등급: 1 나무큐 → 2 카본큐 → 3 금장큐 → 4 명인큐. 점수판 자동 기록 경기만 집계.
+const BADGE_DEFS: { id: string; tiers: number[] }[] = [
+    { id: "hr3c", tiers: [3, 5, 8, 12] },     // 3쿠션 하이런
+    { id: "hr4c", tiers: [5, 10, 15, 20] },   // 4구 하이런
+    { id: "innings", tiers: [100, 500, 1000, 5000] }, // 이닝 클럽
+    { id: "games", tiers: [10, 50, 100, 500] },
+    { id: "wins", tiers: [5, 20, 50, 200] },
+    { id: "visits", tiers: [5, 20, 50, 200] },
+];
+router.get("/me/badges", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { db } = await import("../../db.js");
+    const { sql } = await import("drizzle-orm");
+    const me = req.userId!;
+    const [agg] = (await db.execute(sql`
+        SELECT
+            coalesce(max(CASE WHEN game_type = '3c' THEN
+                CASE WHEN player1_id = ${me} THEN player1_high_run WHEN player2_id = ${me} THEN player2_high_run
+                     WHEN player3_id = ${me} THEN player3_high_run ELSE player4_high_run END END), 0)::int AS hr3c,
+            coalesce(max(CASE WHEN game_type = '4c' THEN
+                CASE WHEN player1_id = ${me} THEN player1_high_run WHEN player2_id = ${me} THEN player2_high_run
+                     WHEN player3_id = ${me} THEN player3_high_run ELSE player4_high_run END END), 0)::int AS hr4c,
+            coalesce(sum(
+                CASE WHEN player1_id = ${me} THEN player1_finish_innings WHEN player2_id = ${me} THEN player2_finish_innings
+                     WHEN player3_id = ${me} THEN player3_finish_innings ELSE player4_finish_innings END), 0)::int AS innings,
+            count(*)::int AS games,
+            count(*) FILTER (WHERE winner_id = ${me})::int AS wins
+        FROM hiq_games
+        WHERE sport_category = 'BILLIARDS' AND ${me} IN (player1_id, player2_id, player3_id, player4_id)`)).rows as any[];
+    const [vis] = (await db.execute(sql`SELECT count(*)::int AS visits FROM hiq_visit_logs WHERE member_id = ${me}`)).rows as any[];
+
+    const values: Record<string, number> = {
+        hr3c: agg?.hr3c ?? 0, hr4c: agg?.hr4c ?? 0, innings: agg?.innings ?? 0,
+        games: agg?.games ?? 0, wins: agg?.wins ?? 0, visits: vis?.visits ?? 0,
+    };
+    const badges = BADGE_DEFS.map((d) => {
+        const v = values[d.id];
+        const tier = d.tiers.filter((t) => v >= t).length; // 0~4
+        const next = tier < 4 ? d.tiers[tier] : null;
+        return { id: d.id, value: v, tier, next };
+    });
+    return sendSuccess(res, { badges });
+}));
+
 export default router;

@@ -389,4 +389,43 @@ export class UmbRepository {
         const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(umbRankings).where(base);
         return { edition: latest.edition, editionDate: latest.editionDate, total, fed, fedCount, top: top ?? null, fedTop: fedTop ?? null };
     }
+
+    // 데일리 브리핑 — "역사 속 오늘"(±3일 과거 연도 1위) 또는 현재 1·2위 격차 폴백.
+    // 나열이 아니라 매일 바뀌는 헤드라인 한 줄. 요청 시 계산 + CDN 캐시로 충분(크론 불필요).
+    async getBriefing() {
+        // 1) 과거 같은 시기(±3일)의 1위 — 히스토리가 쌓일수록 적중률이 올라간다
+        const [past] = (await db.execute(sql`
+            SELECT r.edition_date, r.player_name, r.player_umb_id, r.points, n.native_name
+            FROM umb_rankings r
+            LEFT JOIN umb_player_names n ON n.player_umb_id = r.player_umb_id
+            WHERE r.category = 'players' AND r.rank = 1
+              AND r.edition_date < now() - interval '300 days'
+              AND abs(extract(doy FROM r.edition_date) - extract(doy FROM now())) <= 3
+            ORDER BY r.edition_date DESC LIMIT 1`)).rows as any[];
+        if (past) {
+            const yearsAgo = new Date().getFullYear() - new Date(past.edition_date).getFullYear();
+            return {
+                type: "onThisDay" as const, yearsAgo,
+                name: past.player_name, nativeName: past.native_name ?? null,
+                playerUmbId: past.player_umb_id, points: past.points,
+            };
+        }
+        // 2) 폴백: 현재 1·2위 격차 밀리스톤
+        const [latest] = await this.getLatestEditions("players", 1);
+        if (!latest) return null;
+        const top2 = (await db.execute(sql`
+            SELECT r.rank, r.player_name, r.player_umb_id, r.points, n.native_name
+            FROM umb_rankings r
+            LEFT JOIN umb_player_names n ON n.player_umb_id = r.player_umb_id
+            WHERE r.category = 'players' AND r.edition = ${latest.edition} AND r.rank <= 2
+            ORDER BY r.rank`)).rows as any[];
+        if (top2.length < 2) return null;
+        return {
+            type: "gap" as const,
+            name: top2[0].player_name, nativeName: top2[0].native_name ?? null,
+            playerUmbId: top2[0].player_umb_id,
+            rivalName: top2[1].player_name, rivalNativeName: top2[1].native_name ?? null,
+            gap: top2[0].points - top2[1].points,
+        };
+    }
 }
