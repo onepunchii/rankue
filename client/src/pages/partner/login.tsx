@@ -145,6 +145,13 @@ export default function PartnerLogin() {
                     <p className="text-xs text-black/40">
                         아직 파트너가 아니신가요?
                     </p>
+                    {/* 주 동선: 디렉토리에서 내 매장을 찾아 클레임 → 승인되면 이 화면으로 로그인 */}
+                    <a
+                        href="/stores"
+                        className="block w-full py-3 rounded-2xl bg-[#006241]/[0.08] text-[#006241] text-sm font-bold"
+                    >
+                        내 매장 찾아 관리 신청하기 →
+                    </a>
                     <PartnerInquiryDialog />
                 </div>
             </div>

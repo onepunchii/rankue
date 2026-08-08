@@ -50,6 +50,25 @@ router.get("/player/:memCode", asyncHandler(async (req: any, res: Response) => {
     return sendSuccess(res, player);
 }));
 
+// GET /pba/benchmark — 리그별 통산 에버리지 분포 (유저 "프로와 나" 비교 카드용)
+router.get("/benchmark", asyncHandler(async (_req: any, res: Response) => {
+    const { db } = await import("../../db.js");
+    const { pbaPlayers } = await import("../../../shared/schema.js");
+    const { and, eq, isNotNull, sql, desc } = await import("drizzle-orm");
+    const bench: Record<string, any> = {};
+    for (const league of LEAGUES) {
+        const [agg] = await db.select({
+            avg: sql<number>`round(avg(average)::numeric, 3)::float8`,
+            top: sql<number>`max(average)::float8`,
+        }).from(pbaPlayers).where(and(eq(pbaPlayers.league, league), isNotNull(pbaPlayers.average)));
+        const [topPlayer] = await db.select({ nameKo: pbaPlayers.nameKo, memCode: pbaPlayers.memCode, average: pbaPlayers.average })
+            .from(pbaPlayers).where(and(eq(pbaPlayers.league, league), isNotNull(pbaPlayers.average)))
+            .orderBy(desc(pbaPlayers.average)).limit(1);
+        bench[league] = { avg: agg?.avg ?? null, top: topPlayer ?? null };
+    }
+    return sendSuccess(res, bench);
+}));
+
 // GET /pba/summary?league= — 표시 시즌 1위 요약 (홈 카드용)
 router.get("/summary", asyncHandler(async (req: any, res: Response) => {
     const league = parseLeague(req.query.league ?? "PBA");

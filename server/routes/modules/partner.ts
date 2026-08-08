@@ -50,7 +50,27 @@ const requirePartner = asyncHandler(async (req: any, res: any, next: any) => {
 router.get("/store", requirePartner, asyncHandler(async (req: any, res: any) => {
     const store = await hiqService.getPartnerStore(req.partnerProfileId);
     if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
-    return sendSuccess(res, store);
+
+    // 클레임으로 연결된 디렉토리 페이지 정보 — 사장님 대시보드의 "내 매장 페이지" 카드용
+    // (활동 크루·멤버 합계 = 이 매장 페이지가 유저에게 어떻게 보이는지의 핵심 지표)
+    let listing: any = null;
+    try {
+        const { db } = await import("../../db.js");
+        const { storeListings, hiqCrews } = await import("../../../shared/schema.js");
+        const { eq, sql } = await import("drizzle-orm");
+        const [l] = await db.select({ code: storeListings.code, description: storeListings.description })
+            .from(storeListings).where(eq(storeListings.claimedStoreId, store.id));
+        if (l) {
+            const [stats] = await db.select({
+                crewCount: sql<number>`count(*)::int`,
+                memberTotal: sql<number>`coalesce(sum((SELECT count(*)::int FROM hiq_crew_members m WHERE m.crew_id = hiq_crews.id AND m.role != 'pending')), 0)::int`,
+            }).from(hiqCrews).where(eq(hiqCrews.baseListingCode, l.code));
+            listing = { code: l.code, description: l.description, crewCount: stats?.crewCount ?? 0, crewMemberTotal: stats?.memberTotal ?? 0 };
+        }
+    } catch (e) {
+        console.warn("[partner] listing 조회 실패:", (e as Error)?.message);
+    }
+    return sendSuccess(res, { ...store, listing });
 }));
 
 // PATCH /partner/store — allowlisted fields only. Billing/subscription/ownership are
@@ -71,6 +91,30 @@ router.patch("/store", requirePartner, asyncHandler(async (req: any, res: any) =
         if (STORE_EDITABLE.has(k)) patch[k] = v;
     }
     const updated = await hiqService.updateStore(store.id, patch);
+
+    // 클레임된 디렉토리 페이지 동기화 — 사장님이 여기서 고치면 공개 매장 페이지(/stores/:code)에
+    // 그대로 반영된다 (소개·전화·요금·영업시간). 플라이휠 3단계의 핵심 흐름.
+    try {
+        const { db } = await import("../../db.js");
+        const { storeListings } = await import("../../../shared/schema.js");
+        const { eq } = await import("drizzle-orm");
+        const sync: any = {};
+        if (patch.description !== undefined) sync.description = String(patch.description ?? "").slice(0, 2000) || null;
+        if (patch.phone !== undefined) sync.phone = patch.phone || null;
+        if (patch.priceLarge !== undefined) sync.rate10Large = Number(patch.priceLarge) || null;
+        if (patch.priceMedium !== undefined) sync.rate10Medium = Number(patch.priceMedium) || null;
+        if (patch.openTime !== undefined || patch.closeTime !== undefined) {
+            const open = patch.openTime ?? (updated as any)?.openTime;
+            const close = patch.closeTime ?? (updated as any)?.closeTime;
+            if (open && close) sync.openHours = `${open} ~ ${close}`;
+        }
+        if (Object.keys(sync).length) {
+            sync.updatedAt = new Date();
+            await db.update(storeListings).set(sync).where(eq(storeListings.claimedStoreId, store.id));
+        }
+    } catch (e) {
+        console.warn("[partner] listing 동기화 실패:", (e as Error)?.message);
+    }
     return sendSuccess(res, updated);
 }));
 

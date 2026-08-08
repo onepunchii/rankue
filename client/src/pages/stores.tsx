@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
 import { apiRequest } from "@/lib/queryClient";
+import { useNativeBridge } from "@/hooks/useNativeBridge";
 
 interface PublicStore {
   slug: string;
@@ -18,11 +19,12 @@ interface Listing {
   code: string; name: string; region: string; address: string; phone: string | null;
   openHours: string | null; tableLarge: number | null; tableMedium: number | null; tablePocket: number | null;
   rate10Large: number | null; rate10Medium: number | null;
+  distanceKm: number | null;
   claimed: boolean;
 }
 interface ListingsResponse { total: number; rows: Listing[]; regions: Array<{ region: string; count: number }> }
 
-const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string }> = {
+const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; nearby: string; nearbyOn: string }> = {
   ko: {
     title: "매장 찾기",
     subtitle: "전국 당구장을 지역·이름으로 찾아보세요",
@@ -37,6 +39,10 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     tables: (l, m, p) => [l ? `대대 ${l}` : null, m ? `중대 ${m}` : null, p ? `포켓 ${p}` : null].filter(Boolean).join(" · "),
     more: "더 보기",
     verified: "사장님 인증",
+    ownerBannerTitle: "사장님이신가요?",
+    ownerBannerDesc: "목록에서 내 매장을 찾아 상세 페이지의 '내 매장 정보 관리 신청'을 눌러주세요. 승인되면 소개·요금을 직접 관리할 수 있습니다.",
+    nearby: "내 주변",
+    nearbyOn: "거리순",
   },
   en: {
     title: "Find a venue",
@@ -52,6 +58,10 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     tables: (l, m, p) => [l ? `L ${l}` : null, m ? `M ${m}` : null, p ? `Pocket ${p}` : null].filter(Boolean).join(" · "),
     more: "Load more",
     verified: "Owner verified",
+    ownerBannerTitle: "Own a billiards hall?",
+    ownerBannerDesc: "Find your venue in the list and tap 'Claim your listing' on its page to manage your info.",
+    nearby: "Near me",
+    nearbyOn: "By distance",
   },
   vi: {
     title: "Tìm quán",
@@ -67,6 +77,10 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     tables: (l, m, p) => [l ? `Lớn ${l}` : null, m ? `Vừa ${m}` : null, p ? `Pocket ${p}` : null].filter(Boolean).join(" · "),
     more: "Xem thêm",
     verified: "Chủ quán xác nhận",
+    ownerBannerTitle: "Bạn là chủ quán?",
+    ownerBannerDesc: "Tìm quán của bạn trong danh sách và nhấn 'Nhận quản lý trang' để tự quản lý thông tin.",
+    nearby: "Gần tôi",
+    nearbyOn: "Theo khoảng cách",
   },
   tr: {
     title: "Salon bul",
@@ -82,6 +96,10 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     tables: (l, m, p) => [l ? `Büyük ${l}` : null, m ? `Orta ${m}` : null, p ? `Pocket ${p}` : null].filter(Boolean).join(" · "),
     more: "Daha fazla",
     verified: "Sahibi onaylı",
+    ownerBannerTitle: "Salon sahibi misiniz?",
+    ownerBannerDesc: "Listede salonunuzu bulun ve sayfasında 'Kaydınızı sahiplenin'e dokunun.",
+    nearby: "Yakınımda",
+    nearbyOn: "Mesafeye göre",
   },
   es: {
     title: "Buscar local",
@@ -97,6 +115,10 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     tables: (l, m, p) => [l ? `G ${l}` : null, m ? `M ${m}` : null, p ? `Pocket ${p}` : null].filter(Boolean).join(" · "),
     more: "Ver más",
     verified: "Verificado",
+    ownerBannerTitle: "¿Tienes un salón?",
+    ownerBannerDesc: "Encuentra tu local en la lista y pulsa 'Reclama tu ficha' para gestionar tu información.",
+    nearby: "Cerca de mí",
+    nearbyOn: "Por distancia",
   },
 };
 
@@ -108,6 +130,8 @@ export default function Stores() {
   const [q, setQ] = useState("");
   const [region, setRegion] = useState("");
   const [older, setOlder] = useState<Listing[]>([]);
+  const [nearbyOn, setNearbyOn] = useState(false);
+  const { location: gps, requestLocation } = useNativeBridge();
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const t = L[locale] ?? L.ko;
 
@@ -117,13 +141,14 @@ export default function Stores() {
     const id = setTimeout(() => setDq(q), 300);
     return () => clearTimeout(id);
   }, [q]);
-  useEffect(() => { setOlder([]); }, [dq, region]);
+  useEffect(() => { setOlder([]); }, [dq, region, nearbyOn, gps?.lat]);
 
   const { data: partners = [] } = useQuery<PublicStore[]>({ queryKey: ["/api/hiq/public-stores"] });
 
-  const params = `${region ? `region=${encodeURIComponent(region)}&` : ""}${dq ? `q=${encodeURIComponent(dq)}&` : ""}limit=${PAGE_SIZE}`;
+  const coords = nearbyOn && gps ? `lat=${gps.lat}&lng=${gps.lng}&` : "";
+  const params = `${region ? `region=${encodeURIComponent(region)}&` : ""}${dq ? `q=${encodeURIComponent(dq)}&` : ""}${coords}limit=${PAGE_SIZE}`;
   const { data, isLoading } = useQuery<ListingsResponse>({
-    queryKey: ["/api/hiq/listings", region, dq],
+    queryKey: ["/api/hiq/listings", region, dq, nearbyOn && gps ? `${gps.lat},${gps.lng}` : ""],
     queryFn: async () => apiRequest(`/api/hiq/listings?${params}`),
     staleTime: 10 * 60 * 1000,
     placeholderData: (prev) => prev,
@@ -190,6 +215,15 @@ export default function Stores() {
         {regions.length > 0 && (
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-5 px-5 mb-3">
             <button
+              onClick={() => {
+                if (!nearbyOn) requestLocation();
+                setNearbyOn(v => !v);
+              }}
+              className={`shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold transition-colors ${nearbyOn ? "bg-brand text-white" : "bg-white text-brand shadow-[0_1px_2px_rgba(0,0,0,0.05)]"}`}
+            >
+              📍 {nearbyOn ? t.nearbyOn : t.nearby}
+            </button>
+            <button
               onClick={() => setRegion("")}
               className={`shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold transition-colors ${!region ? "bg-ink-1 text-white" : "bg-white text-ink-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"}`}
             >
@@ -245,7 +279,7 @@ export default function Stores() {
                   <h2 className="text-[15px] font-bold text-ink-1 truncate">{s.name}</h2>
                   {s.claimed && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[10px] font-bold text-brand leading-none">✓ {t.verified}</span>}
                 </div>
-                <p className="text-[12.5px] text-black/55 mt-1 truncate">{s.address}</p>
+                <p className="text-[12.5px] text-black/55 mt-1 truncate">{s.distanceKm != null && <span className="text-brand font-bold">{s.distanceKm}km · </span>}{s.address}</p>
                 {(s.tableLarge || s.tableMedium || s.tablePocket || s.rate10Large || s.rate10Medium) && (
                   <p className="text-[12px] text-black/40 mt-0.5 tabular-nums truncate">
                     {t.tables(s.tableLarge ?? 0, s.tableMedium ?? 0, s.tablePocket ?? 0)}
@@ -269,6 +303,11 @@ export default function Stores() {
                 {t.more}
               </button>
             )}
+            {/* 사장님 안내 배너 — 매장주 신청의 발견 지점 (신청 자체는 각 매장 상세에서) */}
+            <div className="mt-4 rounded-2xl bg-brand/[0.06] p-5 text-center">
+              <p className="text-[14px] font-bold text-brand">{t.ownerBannerTitle}</p>
+              <p className="text-[12.5px] text-black/55 mt-1 leading-relaxed">{t.ownerBannerDesc}</p>
+            </div>
           </div>
         )}
       </div>

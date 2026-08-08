@@ -10,8 +10,17 @@ import { cn } from "@/lib/utils";
 import { flagEmoji } from "@/lib/flag";
 import { useT } from "@/lib/i18n";
 
+// "프로와 나" 카드 문구 — 3쿠션 탭 전용, 실측 PBA 통산 에버리지와 비교
+const PRO_L: Record<string, { title: string; mine: string; proAvg: string; percent: (p: number) => string; cta: string }> = {
+    ko: { title: "프로와 나", mine: "내 에버리지", proAvg: "PBA 투어 평균", percent: (p) => `프로 평균의 ${p}%까지 왔어요`, cta: "PBA 랭킹 보기" },
+    en: { title: "You vs the pros", mine: "My average", proAvg: "PBA Tour average", percent: (p) => `You're at ${p}% of the pro average`, cta: "PBA rankings" },
+    vi: { title: "Bạn và dân chuyên", mine: "Average của tôi", proAvg: "Trung bình PBA", percent: (p) => `Bạn đạt ${p}% mức chuyên nghiệp`, cta: "BXH PBA" },
+    tr: { title: "Sen ve profesyoneller", mine: "Ortalamam", proAvg: "PBA ortalaması", percent: (p) => `Profesyonel ortalamanın %${p}'indesin`, cta: "PBA sıralaması" },
+    es: { title: "Tú y los profesionales", mine: "Mi promedio", proAvg: "Promedio PBA", percent: (p) => `Estás al ${p}% del promedio pro`, cta: "Ranking PBA" },
+};
+
 export default function HiqRanking() {
-    const { t } = useT();
+    const { t, locale } = useT();
     const [rankingTab, setRankingTab] = useState<"3c" | "4c">("4c");
     // 매장(하이퍼로컬) → 국가 → 글로벌 3계층 랭킹
     const [rankingScope, setRankingScope] = useState<"store" | "country" | "national">("store");
@@ -19,6 +28,14 @@ export default function HiqRanking() {
 
     const { data: member } = useQuery<HiqMember>({
         queryKey: ["/api/hiq/me"],
+    });
+
+    // PBA 벤치마크 — 3쿠션 탭 + 내 에버리지가 있을 때만 조회
+    const myAvg3c = (member as any)?.avg3c || 0;
+    const { data: bench } = useQuery<any>({
+        queryKey: ["/api/hiq/pba/benchmark"],
+        enabled: currentSport !== "GOLF" && rankingTab === "3c" && myAvg3c > 0,
+        staleTime: 60 * 60 * 1000,
     });
 
     const [rankingCountry, setRankingCountry] = useState<string | null>(null);
@@ -132,6 +149,32 @@ export default function HiqRanking() {
                         </button>
                     </div>
                 )}
+
+                {/* 프로와 나 — 3쿠션 탭 + 기록 보유 시. 나열이 아니라 '나와의 거리' 프레임 */}
+                {currentSport !== "GOLF" && rankingTab === "3c" && myAvg3c > 0 && bench?.PBA?.avg && (() => {
+                    const pl = PRO_L[locale] ?? PRO_L.ko;
+                    const pct = Math.min(999, Math.round((myAvg3c / bench.PBA.avg) * 100));
+                    return (
+                        <button
+                            onClick={() => (window.location.href = "/pba")}
+                            className="w-full mb-4 rounded-2xl bg-ink-1 p-4 text-left active:scale-[0.99] transition-transform"
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11.5px] font-bold text-white/55">{pl.title}</span>
+                                <span className="text-[11.5px] font-bold text-brand-fg/70 text-white/70">{pl.cta} →</span>
+                            </div>
+                            <div className="mt-2 flex items-baseline gap-3 tabular-nums">
+                                <span className="text-white"><b className="text-[22px]">{myAvg3c.toFixed(3)}</b> <span className="text-[11px] text-white/50">{pl.mine}</span></span>
+                                <span className="text-white/35 text-[13px]">vs</span>
+                                <span className="text-white"><b className="text-[22px]">{Number(bench.PBA.avg).toFixed(3)}</b> <span className="text-[11px] text-white/50">{pl.proAvg}</span></span>
+                            </div>
+                            <div className="mt-2.5 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                <div className="h-full rounded-full bg-[#F5B721]" style={{ width: `${Math.min(100, pct)}%` }} />
+                            </div>
+                            <p className="mt-1.5 text-[12px] font-semibold text-[#F5B721]">{pl.percent(pct)}</p>
+                        </button>
+                    );
+                })()}
 
                 <div className="space-y-2.5">
                     {isLoading ? (

@@ -233,6 +233,30 @@ export default function PartnerDashboard() {
                 </div>
             </div>
 
+            {/* 1.4. 내 매장 페이지 — 디렉토리에 클레임된 매장만. 공개 페이지 상태와 크루 지표 */}
+            {(store as any)?.listing && (
+                <div className="px-6 mt-4">
+                    <button
+                        onClick={() => window.open(`/stores/${(store as any).listing.code}`, "_blank")}
+                        className="w-full bg-white rounded-[1.5rem] p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] text-left active:scale-[0.99] transition-transform"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <span className="text-[10px] text-black/55 font-bold uppercase tracking-widest">내 매장 페이지</span>
+                                <div className="mt-1.5 flex items-center gap-4 tabular-nums">
+                                    <span className="text-[14px]"><b className="text-[#006241] text-[20px] font-black">{(store as any).listing.crewCount}</b> <span className="text-black/50">활동 크루</span></span>
+                                    <span className="text-[14px]"><b className="text-[#006241] text-[20px] font-black">{(store as any).listing.crewMemberTotal}</b> <span className="text-black/50">크루 멤버</span></span>
+                                </div>
+                                {!(store as any).listing.description && (
+                                    <p className="mt-1.5 text-[12px] text-[#E02D2D] font-semibold">매장 소개가 비어 있어요 — 설정에서 작성하면 공개 페이지에 바로 실립니다</p>
+                                )}
+                            </div>
+                            <span className="text-[12.5px] font-bold text-[#006241] shrink-0">페이지 보기 →</span>
+                        </div>
+                    </button>
+                </div>
+            )}
+
             {/* 1.5. Tournament Banner (The Flower of the Platform) */}
             <div className="px-6 mt-4 mb-6">
                 <button

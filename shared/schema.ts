@@ -1198,6 +1198,9 @@ export const storeListings = pgTable("store_listings", {
   flatLarge: integer("flat_large"),       // 정액제 대대
   flatMedium: integer("flat_medium"),     // 정액제 중대
   flatPocket: integer("flat_pocket"),     // 정액제 포켓
+  // 좌표 — Nominatim 지오코딩(동·구 수준 폴백 포함). "내 주변 당구장" 거리순용
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
   claimed: boolean("claimed").default(false).notNull(), // 사장님 인증 완료 여부
   claimedStoreId: uuid("claimed_store_id"), // 인증 시 연결되는 제휴 매장(hiqStores)
   description: text("description"), // 사장님 인증 후 직접 작성

@@ -39,18 +39,30 @@ router.use((_req, res, next) => {
 
 const CODE_RE = /^[A-Za-z0-9_-]{1,20}$/;
 
-// GET /listings?region=&q=&limit=&offset= — 디렉터리 목록 + 지역별 집계
+// GET /listings?region=&q=&lat=&lng=&limit=&offset= — 디렉터리 목록 + 지역별 집계.
+// lat/lng 가 오면 거리순(하버사인) 정렬 + distanceKm 포함 ("내 주변 당구장").
 router.get("/", asyncHandler(async (req: any, res: Response) => {
     const region = typeof req.query.region === "string" ? req.query.region.slice(0, 10) : "";
     const q = typeof req.query.q === "string" ? req.query.q.slice(0, 40) : "";
     const limit = Math.max(1, Math.min(Number(req.query.limit) || 30, 100));
     const offset = Math.max(Number(req.query.offset) || 0, 0);
     if (!Number.isInteger(limit) || !Number.isInteger(offset)) return sendError(res, 400, "잘못된 페이지 값입니다");
+    const lat = Number(req.query.lat), lng = Number(req.query.lng);
+    const nearby = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 
     const conds: any[] = [];
     if (region) conds.push(eq(storeListings.region, region));
     if (q) conds.push(or(ilike(storeListings.name, `%${q}%`), ilike(storeListings.address, `%${q}%`)));
     const where = conds.length ? and(...conds) : undefined;
+
+    // 좌표 없는 행은 거리 계산 불가 — 거리순일 때 목록 끝으로 보낸다
+    const distanceKm = nearby
+        ? sql<number | null>`CASE WHEN store_listings.latitude IS NULL THEN NULL ELSE
+            round((6371 * acos(least(1.0,
+                cos(radians(${lat})) * cos(radians(store_listings.latitude)) *
+                cos(radians(store_listings.longitude) - radians(${lng})) +
+                sin(radians(${lat})) * sin(radians(store_listings.latitude)))))::numeric, 1)::float8 END`
+        : sql<number | null>`NULL`;
 
     const [rows, [{ total }], regions] = await Promise.all([
         db.select({
@@ -59,7 +71,12 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
             tableLarge: storeListings.tableLarge, tableMedium: storeListings.tableMedium, tablePocket: storeListings.tablePocket,
             rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium,
             claimed: storeListings.claimed,
-        }).from(storeListings).where(where).orderBy(asc(storeListings.name)).limit(limit).offset(offset),
+            distanceKm,
+        }).from(storeListings).where(where)
+            .orderBy(...(nearby
+                ? [sql`${distanceKm} ASC NULLS LAST`]
+                : [asc(storeListings.name)]))
+            .limit(limit).offset(offset),
         db.select({ total: sql<number>`count(*)::int` }).from(storeListings).where(where),
         db.select({ region: storeListings.region, count: sql<number>`count(*)::int` })
             .from(storeListings).groupBy(storeListings.region).orderBy(sql`count(*) DESC`),
