@@ -990,6 +990,8 @@ const vi: Dict = {
   "menu.settings": "Cài đặt",
   "menu.sportModeChanged": "Đã đổi chế độ thể thao",
   "menu.startPremium": "Bắt đầu gói Premium",
+  "menu.storeFinder": "Tìm quán bi-a",
+  "menu.storeFinderDesc": "Danh bạ 1.197 quán bi-a Hàn Quốc",
   "menu.suggestionBox": "Góp ý · Hợp tác",
   "menu.suggestionBoxDesc": "Cứ nói với chúng tôi",
   "menu.switchedToBilliards": "Đã chuyển sang chế độ bi-a.",

@@ -1007,6 +1007,11 @@ export function registerPrerender(app: Express) {
       s.tableMedium ? `중대 ${s.tableMedium}` : "",
       s.tablePocket ? `포켓 ${s.tablePocket}` : "",
     ].filter(Boolean);
+    // 요금 — 구조화 숫자만 (자유텍스트 요금안내는 미전재 정책)
+    const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+    const rates = ([["대대", s.rate10Large, s.flatLarge], ["중대", s.rate10Medium, s.flatMedium], ["포켓", s.rate10Pocket, s.flatPocket]] as const)
+      .filter(([, r, f]) => r != null || f != null)
+      .map(([label, r, f]) => `${label} ${[r != null ? `10분당 ${won(r)}` : "", f != null ? `정액 ${won(f)}` : ""].filter(Boolean).join(" · ")}`);
     res.setHeader("X-Prerender", "store-listing");
     noStore(res);
     res.send(
@@ -1043,6 +1048,7 @@ export function registerPrerender(app: Express) {
     ${s.phone ? `<dt>전화</dt><dd>${esc(s.phone)}</dd>` : ""}
     ${s.openHours ? `<dt>영업시간</dt><dd>${esc(s.openHours)}</dd>` : ""}
     ${tables.length ? `<dt>테이블</dt><dd>${esc(tables.join(" · "))}</dd>` : ""}
+    ${rates.length ? `<dt>요금</dt><dd>${esc(rates.join(", "))}</dd>` : ""}
   </dl>
 </main>`,
       }),

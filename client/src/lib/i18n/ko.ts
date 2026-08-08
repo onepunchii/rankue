@@ -992,6 +992,8 @@ export const ko: Dict = {
   "menu.settings": "설정",
   "menu.sportModeChanged": "스포츠 모드 변경",
   "menu.startPremium": "프리미엄 멤버십 시작하기",
+  "menu.storeFinder": "매장 찾기",
+  "menu.storeFinderDesc": "전국 당구장 1,197곳 디렉토리",
   "menu.suggestionBox": "건의함 · 제휴 문의",
   "menu.suggestionBoxDesc": "무엇이든 말씀해주세요",
   "menu.switchedToBilliards": "당구 모드로 전환되었습니다.",

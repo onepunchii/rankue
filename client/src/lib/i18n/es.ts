@@ -990,6 +990,8 @@ const es: Dict = {
   "menu.settings": "Ajustes",
   "menu.sportModeChanged": "Modo de deporte cambiado",
   "menu.startPremium": "Empezar membresía premium",
+  "menu.storeFinder": "Buscar local",
+  "menu.storeFinderDesc": "Directorio de 1.197 salones de billar",
   "menu.suggestionBox": "Sugerencias · Alianzas",
   "menu.suggestionBoxDesc": "Cuéntanos lo que sea",
   "menu.switchedToBilliards": "Cambiado a modo billar.",

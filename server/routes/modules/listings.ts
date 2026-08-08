@@ -57,6 +57,7 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
             code: storeListings.code, name: storeListings.name, region: storeListings.region,
             address: storeListings.address, phone: storeListings.phone, openHours: storeListings.openHours,
             tableLarge: storeListings.tableLarge, tableMedium: storeListings.tableMedium, tablePocket: storeListings.tablePocket,
+            rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium,
             claimed: storeListings.claimed,
         }).from(storeListings).where(where).orderBy(asc(storeListings.name)).limit(limit).offset(offset),
         db.select({ total: sql<number>`count(*)::int` }).from(storeListings).where(where),
@@ -73,6 +74,8 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
         code: storeListings.code, name: storeListings.name, region: storeListings.region,
         address: storeListings.address, phone: storeListings.phone, openHours: storeListings.openHours,
         tableLarge: storeListings.tableLarge, tableMedium: storeListings.tableMedium, tablePocket: storeListings.tablePocket,
+        rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium, rate10Pocket: storeListings.rate10Pocket,
+        flatLarge: storeListings.flatLarge, flatMedium: storeListings.flatMedium, flatPocket: storeListings.flatPocket,
         claimed: storeListings.claimed, description: storeListings.description,
     }).from(storeListings).where(eq(storeListings.code, req.params.code));
     if (!row) return sendError(res, 404, "매장을 찾을 수 없습니다");

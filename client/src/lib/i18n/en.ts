@@ -990,6 +990,8 @@ const en: Dict = {
   "menu.settings": "Settings",
   "menu.sportModeChanged": "Sport mode changed",
   "menu.startPremium": "Start Premium membership",
+  "menu.storeFinder": "Find a venue",
+  "menu.storeFinderDesc": "Directory of 1,197 billiards halls in Korea",
   "menu.suggestionBox": "Suggestions · Partnerships",
   "menu.suggestionBoxDesc": "Tell us anything",
   "menu.switchedToBilliards": "Switched to billiards mode.",

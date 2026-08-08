@@ -69,7 +69,10 @@ async function main() {
     const [header, ...rows] = parseCsv(raw);
     const col = (name: string) => header.indexOf(name);
     const iCode = col("클럽코드"), iRegion = col("지역"), iName = col("클럽명"), iHours = col("영업시간"),
-        iPhone = col("전화"), iAddr = col("주소"), iL = col("당구대_대대"), iM = col("당구대_중대"), iP = col("당구대_포켓");
+        iPhone = col("전화"), iAddr = col("주소"), iL = col("당구대_대대"), iM = col("당구대_중대"), iP = col("당구대_포켓"),
+        iFlatL = col("정액_대대"), iFlatM = col("정액_중대"), iFlatP = col("정액_포켓"),
+        iRateL = col("시간_대대"), iRateM = col("시간_중대"), iRateP = col("시간_포켓");
+    // "요금안내" 자유텍스트 컬럼은 의도적으로 읽지 않는다 — 원문 전재 금지 정책
 
     let ok = 0, skippedForeign = 0, phoneDropped = 0;
     const values: any[] = [];
@@ -91,10 +94,19 @@ async function main() {
             const n = parseInt((v || "").trim(), 10);
             return Number.isFinite(n) && n > 0 && n < 100 ? n : null;
         };
+        // "2,000원" → 2000. 100원 미만·10만원 초과는 오기로 보고 버린다
+        const won = (v: string | undefined) => {
+            const digits = (v || "").replace(/[^\d]/g, "");
+            if (!digits) return null;
+            const n = parseInt(digits, 10);
+            return Number.isFinite(n) && n >= 100 && n <= 100_000 ? n : null;
+        };
         values.push({
             code, name, region, address, phone,
             openHours: (r[iHours] || "").trim() || null,
             tableLarge: num(r[iL]), tableMedium: num(r[iM]), tablePocket: num(r[iP]),
+            rate10Large: won(r[iRateL]), rate10Medium: won(r[iRateM]), rate10Pocket: won(r[iRateP]),
+            flatLarge: won(r[iFlatL]), flatMedium: won(r[iFlatM]), flatPocket: won(r[iFlatP]),
         });
         ok++;
     }
@@ -112,7 +124,11 @@ async function main() {
                     name: sql`excluded.name`, region: sql`excluded.region`, address: sql`excluded.address`,
                     phone: sql`excluded.phone`, openHours: sql`excluded.open_hours`,
                     tableLarge: sql`excluded.table_large`, tableMedium: sql`excluded.table_medium`,
-                    tablePocket: sql`excluded.table_pocket`, updatedAt: sql`now()`,
+                    tablePocket: sql`excluded.table_pocket`,
+                    rate10Large: sql`excluded.rate10_large`, rate10Medium: sql`excluded.rate10_medium`,
+                    rate10Pocket: sql`excluded.rate10_pocket`,
+                    flatLarge: sql`excluded.flat_large`, flatMedium: sql`excluded.flat_medium`,
+                    flatPocket: sql`excluded.flat_pocket`, updatedAt: sql`now()`,
                 },
             });
     }

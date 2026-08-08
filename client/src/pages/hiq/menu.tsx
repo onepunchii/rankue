@@ -17,6 +17,7 @@ import {
     LucideCheck,
     LucideX,
     LucideMail,
+    LucideStore,
     LucideCrown,
     LucideCircle,
     LucideFlag,
@@ -352,6 +353,8 @@ export default function HiqMenu() {
                 <h3 className="text-[15px] font-semibold text-black/55 mb-3 px-1">{t("menu.manageInfo")}</h3>
                 <div className="flex flex-col gap-2.5">
                     {[
+                        // 매장 찾기 — 모바일의 유일한 상시 진입점 (하단 네비·홈에는 자리가 없다)
+                        { icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") },
                         { icon: LucideMail, label: t("menu.suggestionBox"), desc: t("menu.suggestionBoxDesc"), onClick: () => setSuggestionOpen(true) },
                         { icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') },
                         { icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') },

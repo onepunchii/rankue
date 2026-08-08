@@ -227,13 +227,22 @@ export default function HiqDashboard() {
                 ) : rankingSource === "pba" ? (
                     <PbaRankingCard />
                 ) : (
-                    <RankingListCard
-                        rankings={rankings}
-                        activeTab={rankingTab}
-                        onTabChange={setRankingTab}
-                        currentMemberId={member.id}
-                        hideHeader
-                    />
+                    <>
+                        <RankingListCard
+                            rankings={rankings}
+                            activeTab={rankingTab}
+                            onTabChange={setRankingTab}
+                            currentMemberId={member.id}
+                            hideHeader
+                        />
+                        {/* 매장 랭킹이 비어 있는 초기엔 이 링크가 매장 탭의 실질 콘텐츠다 */}
+                        <button
+                            onClick={() => setLocation("/stores")}
+                            className="mt-3 w-full h-12 rounded-2xl bg-white text-[14px] font-semibold text-brand shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:scale-[0.99] transition-transform"
+                        >
+                            {({ ko: "전국 당구장 1,197곳 찾아보기", en: "Browse 1,197 billiards halls", vi: "Xem 1.197 quán bi-a", tr: "1.197 bilardo salonuna göz at", es: "Explorar 1.197 salones" } as Record<string, string>)[locale] ?? "Browse billiards halls"} →
+                        </button>
+                    </>
                 )}
             </div>
 

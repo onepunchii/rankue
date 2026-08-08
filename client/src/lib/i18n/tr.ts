@@ -990,6 +990,8 @@ const tr: Dict = {
   "menu.settings": "Ayarlar",
   "menu.sportModeChanged": "Spor modu değişti",
   "menu.startPremium": "Premium üyeliği başlat",
+  "menu.storeFinder": "Salon bul",
+  "menu.storeFinderDesc": "Kore'de 1.197 bilardo salonu rehberi",
   "menu.suggestionBox": "Öneri · İş birliği",
   "menu.suggestionBoxDesc": "Bize her şeyi söyleyin",
   "menu.switchedToBilliards": "Bilardo moduna geçildi.",

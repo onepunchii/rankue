@@ -1187,6 +1187,14 @@ export const storeListings = pgTable("store_listings", {
   tableLarge: integer("table_large"),   // 대대
   tableMedium: integer("table_medium"), // 중대
   tablePocket: integer("table_pocket"), // 포켓
+  // 요금 — 구조화된 숫자만 전재 (원 단위). "요금안내" 자유텍스트는 저작권·퍼오기 인상
+  // 때문에 미전재(사장님 인증 후 직접 작성) — 오너 확정 정책과 일관.
+  rate10Large: integer("rate10_large"),   // 10분당 대대
+  rate10Medium: integer("rate10_medium"), // 10분당 중대
+  rate10Pocket: integer("rate10_pocket"), // 10분당 포켓
+  flatLarge: integer("flat_large"),       // 정액제 대대
+  flatMedium: integer("flat_medium"),     // 정액제 중대
+  flatPocket: integer("flat_pocket"),     // 정액제 포켓
   claimed: boolean("claimed").default(false).notNull(), // 사장님 인증 완료 여부
   claimedStoreId: uuid("claimed_store_id"), // 인증 시 연결되는 제휴 매장(hiqStores)
   description: text("description"), // 사장님 인증 후 직접 작성

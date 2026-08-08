@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 interface Listing {
   code: string; name: string; region: string; address: string; phone: string | null;
   openHours: string | null; tableLarge: number | null; tableMedium: number | null; tablePocket: number | null;
+  rate10Large: number | null; rate10Medium: number | null; rate10Pocket: number | null;
+  flatLarge: number | null; flatMedium: number | null; flatPocket: number | null;
   claimed: boolean; description: string | null;
 }
 
@@ -19,6 +21,7 @@ const L: Record<Locale, Record<string, string>> = {
     back: "매장 찾기", unverified: "수집 정보", verified: "✓ 사장님 인증",
     address: "주소", phone: "전화", hours: "영업시간", tables: "테이블",
     large: "대대", medium: "중대", pocket: "포켓",
+    rates: "요금", per10: "10분당", flat: "정액", won: "원",
     descEmpty: "사장님 인증 후 매장 소개가 표시됩니다.",
     claimCta: "사장님이신가요? 내 매장 정보 관리 신청",
     claimTitle: "내 매장 관리 신청",
@@ -37,6 +40,7 @@ const L: Record<Locale, Record<string, string>> = {
     back: "Find a venue", unverified: "Collected info", verified: "✓ Owner verified",
     address: "Address", phone: "Phone", hours: "Hours", tables: "Tables",
     large: "Large", medium: "Medium", pocket: "Pocket",
+    rates: "Rates", per10: "per 10 min", flat: "Flat rate", won: "₩",
     descEmpty: "The owner's introduction will appear after verification.",
     claimCta: "Own this hall? Claim your listing",
     claimTitle: "Claim this listing",
@@ -55,6 +59,7 @@ const L: Record<Locale, Record<string, string>> = {
     back: "Tìm quán", unverified: "Thông tin thu thập", verified: "✓ Chủ quán xác nhận",
     address: "Địa chỉ", phone: "Điện thoại", hours: "Giờ mở cửa", tables: "Bàn",
     large: "Lớn", medium: "Vừa", pocket: "Pocket",
+    rates: "Giá", per10: "mỗi 10 phút", flat: "Trọn gói", won: "₩",
     descEmpty: "Phần giới thiệu sẽ hiển thị sau khi chủ quán xác nhận.",
     claimCta: "Bạn là chủ quán? Nhận quản lý trang này",
     claimTitle: "Nhận quản lý trang",
@@ -73,6 +78,7 @@ const L: Record<Locale, Record<string, string>> = {
     back: "Salon bul", unverified: "Derlenen bilgi", verified: "✓ Sahibi onaylı",
     address: "Adres", phone: "Telefon", hours: "Çalışma saatleri", tables: "Masalar",
     large: "Büyük", medium: "Orta", pocket: "Pocket",
+    rates: "Ücretler", per10: "10 dk başına", flat: "Sabit ücret", won: "₩",
     descEmpty: "Sahibi doğrulandıktan sonra tanıtım burada görünecek.",
     claimCta: "Salon sizin mi? Kaydınızı sahiplenin",
     claimTitle: "Kaydı sahiplen",
@@ -91,6 +97,7 @@ const L: Record<Locale, Record<string, string>> = {
     back: "Buscar local", unverified: "Información recopilada", verified: "✓ Verificado",
     address: "Dirección", phone: "Teléfono", hours: "Horario", tables: "Mesas",
     large: "Grande", medium: "Mediana", pocket: "Pocket",
+    rates: "Tarifas", per10: "por 10 min", flat: "Tarifa plana", won: "₩",
     descEmpty: "La presentación aparecerá tras la verificación del propietario.",
     claimCta: "¿Es tu local? Reclama tu ficha",
     claimTitle: "Reclamar ficha",
@@ -171,6 +178,14 @@ export default function StoreListingPage() {
     s.tablePocket ? [t.pocket, s.tablePocket] : null,
   ].filter(Boolean) as Array<[string, number]> : [];
 
+  // 요금 행 — [종류, 10분당, 정액] (있는 값만)
+  const won = (n: number) => `${n.toLocaleString("ko-KR")}${locale === "ko" ? t.won : ""}`;
+  const rateRows = s ? [
+    [t.large, s.rate10Large, s.flatLarge],
+    [t.medium, s.rate10Medium, s.flatMedium],
+    [t.pocket, s.rate10Pocket, s.flatPocket],
+  ].filter(([, r, f]) => r != null || f != null) as Array<[string, number | null, number | null]> : [];
+
   return (
     <div className="min-h-screen w-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans">
       <div className="mx-auto max-w-2xl px-5 py-12">
@@ -216,6 +231,23 @@ export default function StoreListingPage() {
                   <div className="flex gap-2 mt-1.5">
                     {tableRows.map(([label, n]) => (
                       <span key={label} className="px-2.5 py-1.5 rounded-xl bg-black/[0.04] text-[13px] font-semibold tabular-nums">{label} {n}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {rateRows.length > 0 && (
+                <div>
+                  <p className="text-[11.5px] font-bold text-black/40">{t.rates}</p>
+                  <div className="mt-1.5 space-y-1">
+                    {rateRows.map(([label, rate, flat]) => (
+                      <div key={label} className="flex items-center justify-between py-1.5 px-2.5 rounded-xl bg-black/[0.03] text-[13px]">
+                        <span className="font-semibold">{label}</span>
+                        <span className="tabular-nums text-black/70">
+                          {rate != null && <>{t.per10} <b className="text-ink-1">{won(rate)}</b></>}
+                          {rate != null && flat != null && <span className="mx-1.5 text-black/25">·</span>}
+                          {flat != null && <>{t.flat} <b className="text-ink-1">{won(flat)}</b></>}
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </div>

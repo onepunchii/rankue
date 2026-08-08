@@ -17,6 +17,7 @@ interface PublicStore {
 interface Listing {
   code: string; name: string; region: string; address: string; phone: string | null;
   openHours: string | null; tableLarge: number | null; tableMedium: number | null; tablePocket: number | null;
+  rate10Large: number | null; rate10Medium: number | null;
   claimed: boolean;
 }
 interface ListingsResponse { total: number; rows: Listing[]; regions: Array<{ region: string; count: number }> }
@@ -245,8 +246,17 @@ export default function Stores() {
                   {s.claimed && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[10px] font-bold text-brand leading-none">✓ {t.verified}</span>}
                 </div>
                 <p className="text-[12.5px] text-black/55 mt-1 truncate">{s.address}</p>
-                {(s.tableLarge || s.tableMedium || s.tablePocket) && (
-                  <p className="text-[12px] text-black/40 mt-0.5 tabular-nums">{t.tables(s.tableLarge ?? 0, s.tableMedium ?? 0, s.tablePocket ?? 0)}</p>
+                {(s.tableLarge || s.tableMedium || s.tablePocket || s.rate10Large || s.rate10Medium) && (
+                  <p className="text-[12px] text-black/40 mt-0.5 tabular-nums truncate">
+                    {t.tables(s.tableLarge ?? 0, s.tableMedium ?? 0, s.tablePocket ?? 0)}
+                    {/* 10분당 요금 — 대대 우선, 없으면 중대 */}
+                    {(s.rate10Large || s.rate10Medium) && (
+                      <span className="text-brand font-semibold">
+                        {(s.tableLarge || s.tableMedium || s.tablePocket) ? " · " : ""}
+                        10{locale === "ko" ? "분" : "min"} {((s.rate10Large ?? s.rate10Medium) as number).toLocaleString("ko-KR")}{locale === "ko" ? "원" : "₩"}
+                      </span>
+                    )}
+                  </p>
                 )}
               </button>
             ))}
