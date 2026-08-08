@@ -1,9 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ChevronDown, Target, Swords, LogIn, Cpu, HelpCircle, LucideMessageCircle } from "@/lib/icons";
-import { motion, AnimatePresence } from "framer-motion";
+import { Target, Swords, LogIn, HelpCircle, LucideMessageCircle, LucideStore } from "@/lib/icons";
+import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { useState } from "react";
-import { BallCluster } from "../ui/BilliardBall";
 import { useT } from "@/lib/i18n";
 
 interface QuickActionsProps {
@@ -15,11 +14,7 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
     const [, setLocation] = useLocation();
     const { t } = useT();
 
-    const [isOnlineGameModalOpen, setIsOnlineGameModalOpen] = useState(false);
-    const [threeBallSelectionMode, setThreeBallSelectionMode] = useState(false);
     const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-
-    const handleOnlineGameClick = () => setIsOnlineGameModalOpen(true);
 
     // 처음 오는 사람을 위한 각 메뉴 안내 — 매칭 대결이 핵심이라 강조 표기
     const guideItems = [
@@ -42,9 +37,9 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
             highlight: false,
         },
         {
-            icon: Cpu,
-            titleKey: "quickActions.simTitle",
-            descKey: "quickActions.guideSimDesc",
+            icon: LucideStore,
+            titleKey: "quickActions.storeTitle",
+            descKey: "quickActions.guideStoreDesc",
             highlight: false,
         },
         {
@@ -117,18 +112,18 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
 
-                {/* 시뮬레이터 (1x1) */}
+                {/* 매장 찾기 (1x1) — 시뮬레이터(미사용) 자리를 대체. /online-game 은 직접 URL 로만 남는다 */}
                 <motion.button
                     whileTap={{ scale: 0.97 }}
-                    onClick={handleOnlineGameClick}
+                    onClick={() => setLocation("/stores")}
                     className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
                 >
                     <div className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center">
-                        <Cpu className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
+                        <LucideStore className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.simTitle")}</span>
-                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.simDesc")}</span>
+                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.storeTitle")}</span>
+                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.storeDesc")}</span>
                     </div>
                 </motion.button>
 
@@ -147,108 +142,6 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
             </div>
-
-            {/* Online Game Mode Selection Modal */}
-            <Dialog
-                open={isOnlineGameModalOpen}
-                onOpenChange={(open) => {
-                    setIsOnlineGameModalOpen(open);
-                    if (!open) setThreeBallSelectionMode(false);
-                }}
-            >
-                <DialogContent hideClose className="bg-white text-ink-1 max-w-md w-[92%] rounded-[32px] p-0 overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.18)] focus:outline-none">
-                    <div className="p-7">
-                        <DialogHeader className="mb-7">
-                            <div className="flex flex-col items-center text-center">
-                                <DialogTitle className="text-[24px] font-bold tracking-tight text-ink-1 mb-1.5">{t("quickActions.modeSelectTitle")}</DialogTitle>
-                                <DialogDescription className="text-[13px] font-medium text-black/55">
-                                    {t("quickActions.modeSelectDesc")}
-                                </DialogDescription>
-                            </div>
-                        </DialogHeader>
-
-                        <button
-                            onClick={() => setIsOnlineGameModalOpen(false)}
-                            title={t("quickActions.close")}
-                            className="absolute top-6 right-6 w-9 h-9 rounded-full bg-black/[0.04] flex items-center justify-center hover:bg-black/[0.08] transition-all"
-                        >
-                            <span className="text-xl text-black/40 leading-none">&times;</span>
-                        </button>
-
-                        <div className={`grid ${threeBallSelectionMode ? 'grid-cols-1' : 'grid-cols-2'} gap-3.5 min-h-[200px]`}>
-                            {/* 3-BALL */}
-                            <motion.div
-                                layout
-                                className={`relative flex flex-col items-center justify-center p-6 rounded-3xl transition-all duration-400 overflow-hidden cursor-pointer ${threeBallSelectionMode
-                                    ? "bg-brand/[0.06] col-span-1 h-[260px]"
-                                    : "bg-black/[0.04] hover:bg-black/[0.06] active:scale-[0.98]"
-                                    }`}
-                                onClick={() => !threeBallSelectionMode && setThreeBallSelectionMode(true)}
-                            >
-                                {!threeBallSelectionMode ? (
-                                    <div className="flex flex-col items-center gap-4">
-                                        <BallCluster colors={["white", "yellow", "red"]} size={30} />
-                                        <span className="text-[18px] font-bold text-ink-1">{t("quickActions.threeBall")}</span>
-                                    </div>
-                                ) : (
-                                    <motion.div
-                                        initial={{ opacity: 0, scale: 0.96 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="w-full h-full flex flex-col justify-between"
-                                    >
-                                        <div className="flex items-center justify-between mb-6">
-                                            <span className="text-[16px] font-bold text-ink-1">{t("quickActions.tableSize")}</span>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setThreeBallSelectionMode(false); }}
-                                                className="w-8 h-8 rounded-full bg-black/[0.04] flex items-center justify-center hover:bg-black/[0.08] transition-all"
-                                            >
-                                                <ChevronDown className="w-4 h-4 text-black/40 rotate-90" />
-                                            </button>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <motion.button
-                                                whileTap={{ scale: 0.96 }}
-                                                onClick={(e) => { e.stopPropagation(); setLocation("/online-game?mode=3ball&table=medium"); }}
-                                                className="flex flex-col items-center p-5 rounded-2xl bg-white hover:bg-black/[0.02] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-all"
-                                            >
-                                                <span className="text-[17px] font-bold text-ink-1 mb-0.5">{t("quickActions.tableMedium")}</span>
-                                                <span className="text-[12px] font-medium text-black/55">{t("quickActions.tableMediumDesc")}</span>
-                                            </motion.button>
-                                            <motion.button
-                                                whileTap={{ scale: 0.96 }}
-                                                onClick={(e) => { e.stopPropagation(); setLocation("/online-game?mode=3ball&table=large"); }}
-                                                className="flex flex-col items-center p-5 rounded-2xl bg-brand hover:bg-brand/90 border border-brand transition-all"
-                                            >
-                                                <span className="text-[17px] font-bold text-white mb-0.5">{t("quickActions.tableLarge")}</span>
-                                                <span className="text-[12px] font-medium text-white/80">{t("quickActions.tableLargeDesc")}</span>
-                                            </motion.button>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </motion.div>
-
-                            {/* 4-BALL */}
-                            <AnimatePresence>
-                                {!threeBallSelectionMode && (
-                                    <motion.button
-                                        initial={{ opacity: 0, scale: 0.9, x: 20 }}
-                                        animate={{ opacity: 1, scale: 1, x: 0 }}
-                                        exit={{ opacity: 0, scale: 0.9, x: 20 }}
-                                        onClick={() => setLocation("/online-game?mode=4ball&table=medium")}
-                                        title={t("quickActions.fourBallStart")}
-                                        className="relative flex flex-col items-center justify-center p-6 rounded-3xl bg-black/[0.04] hover:bg-black/[0.06] transition-all active:scale-[0.98] h-full"
-                                    >
-                                        <div className="flex flex-col items-center gap-4">
-                                            <BallCluster colors={["white", "yellow", "red", "red"]} size={30} />
-                                            <span className="text-[18px] font-bold text-ink-1">{t("quickActions.fourBall")}</span>
-                                        </div>
-                                    </motion.button>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
 
             {/* 처음 오는 사람을 위한 메뉴 안내 모달 */}
             <Dialog open={isHelpModalOpen} onOpenChange={setIsHelpModalOpen}>
