@@ -975,7 +975,7 @@ const en: Dict = {
   "menu.namePlaceholder": "Name",
   "menu.notifications": "Notifications",
   "menu.partnerProgram": "Partner program",
-  "menu.partnerPromoDesc": "Run your venue smarter with Rankue",
+  "menu.partnerPromoDesc": "Claim your venue page, manage info, host events",
   "menu.permanentDelete": "Delete forever",
   "menu.polliChip": "Public polls · Quizzes",
   "menu.polliDesc": "Prove your taste on Polli and see the results",

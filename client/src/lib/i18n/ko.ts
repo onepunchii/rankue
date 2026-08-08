@@ -977,7 +977,7 @@ export const ko: Dict = {
   "menu.namePlaceholder": "이름",
   "menu.notifications": "알림",
   "menu.partnerProgram": "파트너 프로그램",
-  "menu.partnerPromoDesc": "우리 매장도 랭큐로 스마트하게 운영하기",
+  "menu.partnerPromoDesc": "내 매장 페이지 관리 신청부터 대회 개최까지",
   "menu.permanentDelete": "영구 삭제",
   "menu.polliChip": "대국민 투표 · 퀴즈",
   "menu.polliDesc": "폴리에서 내 취향 증명하고 결과 보기",

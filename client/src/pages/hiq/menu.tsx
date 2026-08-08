@@ -401,8 +401,9 @@ export default function HiqMenu() {
                 </div>
             </div>
 
-            {/* Section C: Partner promo — 숨김 처리 (추후 재노출 시 false → true) */}
-            {false && (
+            {/* Section C: Partner promo — 클레임 흐름 완성으로 재노출 (2026-08-09).
+                /partner/login 이 신청('내 매장 찾아 관리 신청')과 로그인을 모두 안내한다 */}
+            {true && (
             <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setLocation("/partner/login")}

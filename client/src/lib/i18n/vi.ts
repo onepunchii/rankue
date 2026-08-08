@@ -975,7 +975,7 @@ const vi: Dict = {
   "menu.namePlaceholder": "Tên",
   "menu.notifications": "Thông báo",
   "menu.partnerProgram": "Chương trình đối tác",
-  "menu.partnerPromoDesc": "Vận hành quán thông minh hơn với Rankue",
+  "menu.partnerPromoDesc": "Nhận quản lý trang quán, tổ chức giải đấu",
   "menu.permanentDelete": "Xóa vĩnh viễn",
   "menu.polliChip": "Bình chọn · Đố vui",
   "menu.polliDesc": "Chứng minh gu của bạn trên Polli và xem kết quả",

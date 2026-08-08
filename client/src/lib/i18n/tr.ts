@@ -975,7 +975,7 @@ const tr: Dict = {
   "menu.namePlaceholder": "Ad",
   "menu.notifications": "Bildirimler",
   "menu.partnerProgram": "Ortaklık programı",
-  "menu.partnerPromoDesc": "Mekanınızı Rankue ile akıllıca yönetin",
+  "menu.partnerPromoDesc": "Salon sayfanı sahiplen, bilgileri yönet, turnuva düzenle",
   "menu.permanentDelete": "Kalıcı olarak sil",
   "menu.polliChip": "Halk oylaması · Quiz",
   "menu.polliDesc": "Polli'de zevkini kanıtla, sonuçları gör",
