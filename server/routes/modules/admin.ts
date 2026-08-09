@@ -159,6 +159,16 @@ router.post("/listing-claims/:id/approve", checkSuperAdmin, asyncHandler(async (
     // 사장님 계정 — 같은 전화번호 프로필이 있으면 재사용(기존 비밀번호 유지), 없으면 새 PIN 발급
     const phone = claim.applicantPhone.replace(/[^\d]/g, "");
     let [profile] = await db.select().from(profiles).where(eq(profiles.phone, phone));
+
+    // 이중 매장 가드 — 이 프로필이 이미 파트너 매장을 소유하면 새 매장을 또 만들지 않는다.
+    // getPartnerStore 가 소유 매장 중 임의의 첫 행을 집기 때문에(비결정) 이중 소유는 사고다.
+    if (profile) {
+        const [owned] = await db.select({ id: hiqStores.id, name: hiqStores.name })
+            .from(hiqStores).where(eq(hiqStores.ownerId, profile.id));
+        if (owned) {
+            return sendError(res, 409, `이 전화번호는 이미 파트너 매장(${owned.name})을 보유 중입니다. 한 계정 1매장 원칙 — 별도 처리 필요`);
+        }
+    }
     let issuedPin: string | null = null;
     const result = await db.transaction(async (tx) => {
         if (!profile) {

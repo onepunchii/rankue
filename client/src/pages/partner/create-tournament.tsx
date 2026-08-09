@@ -127,8 +127,8 @@ export default function CreateTournament() {
                         className="space-y-6"
                     >
                         <div className="text-center mb-8">
-                            <div className="w-16 h-16 bg-[#006241]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <LucideCalendar className="w-8 h-8 text-[#006241]" />
+                            <div className="w-16 h-16 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <LucideCalendar className="w-8 h-8 text-brand" />
                             </div>
                             <h2 className="text-xl font-bold text-[rgba(0,0,0,0.87)]">언제 하시나요?</h2>
                             <p className="text-black/55 text-sm">대회 일정과 이름을 정해주세요.</p>
@@ -139,15 +139,15 @@ export default function CreateTournament() {
                             name="title"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[10px] text-black/55 font-bold ml-1 uppercase">Tournament Title</FormLabel>
+                                    <FormLabel className="text-[12px] text-black/55 font-bold ml-1 ">대회명</FormLabel>
                                     <FormControl>
                                         <Input
                                             placeholder="대회명을 입력하세요"
                                             {...field}
-                                            className="bg-transparent border-t-0 border-x-0 border-b border-black/[0.12] rounded-none px-1 h-12 text-lg font-black focus-visible:ring-0 focus-visible:border-[#006241] transition-colors placeholder:text-black/30"
+                                            className="bg-transparent border-t-0 border-x-0 border-b border-black/[0.12] rounded-none px-1 h-12 text-lg font-bold focus-visible:ring-0 focus-visible:border-brand transition-colors placeholder:text-black/30"
                                         />
                                     </FormControl>
-                                    <FormMessage className="text-[#006241] text-[10px]" />
+                                    <FormMessage className="text-brand text-[12px]" />
                                 </FormItem>
                             )}
                         />
@@ -158,8 +158,8 @@ export default function CreateTournament() {
                                 name="startDate"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1 flex flex-col">
-                                        <FormLabel className="text-[10px] text-black/55 font-bold ml-1 uppercase flex items-center gap-1">
-                                            <LucideCalendar className="w-3 h-3" /> Date
+                                        <FormLabel className="text-[12px] text-black/55 font-bold ml-1 flex items-center gap-1">
+                                            <LucideCalendar className="w-3 h-3" /> 날짜
                                         </FormLabel>
                                         <Popover>
                                             <PopoverTrigger asChild>
@@ -167,7 +167,7 @@ export default function CreateTournament() {
                                                     <Button
                                                         variant={"ghost"}
                                                         className={cn(
-                                                            "w-full pl-1 text-left font-black border-b border-black/[0.12] rounded-none h-12 hover:bg-transparent hover:text-[rgba(0,0,0,0.87)] px-1 justify-start text-base",
+                                                            "w-full pl-1 text-left font-bold border-b border-black/[0.12] rounded-none h-12 hover:bg-transparent hover:text-[rgba(0,0,0,0.87)] px-1 justify-start text-base",
                                                             !field.value && "text-black/40"
                                                         )}
                                                     >
@@ -190,7 +190,7 @@ export default function CreateTournament() {
                                                 />
                                             </PopoverContent>
                                         </Popover>
-                                        <FormMessage className="text-[#006241] text-[10px]" />
+                                        <FormMessage className="text-brand text-[12px]" />
                                     </FormItem>
                                 )}
                             />
@@ -200,24 +200,24 @@ export default function CreateTournament() {
                                 name="startTime"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[10px] text-black/55 font-bold ml-1 uppercase flex items-center gap-1">
-                                            <LucideClock className="w-3 h-3" /> Time
+                                        <FormLabel className="text-[12px] text-black/55 font-bold ml-1 flex items-center gap-1">
+                                            <LucideClock className="w-3 h-3" /> 시간
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="time"
                                                 {...field}
                                                 style={{ colorScheme: "light" }}
-                                                className="bg-transparent border-t-0 border-x-0 border-b border-black/[0.12] rounded-none px-1 h-14 text-2xl font-black focus-visible:ring-0 focus-visible:border-[#006241] transition-colors"
+                                                className="bg-transparent border-t-0 border-x-0 border-b border-black/[0.12] rounded-none px-1 h-14 text-2xl font-bold focus-visible:ring-0 focus-visible:border-brand transition-colors"
                                             />
                                         </FormControl>
-                                        <FormMessage className="text-[#006241] text-[10px]" />
+                                        <FormMessage className="text-brand text-[12px]" />
                                     </FormItem>
                                 )}
                             />
                         </div>
 
-                        <Button type="button" onClick={() => setStep(2)} className="w-full h-16 bg-[#006241] hover:bg-[#00553a] text-white text-lg font-black rounded-full mt-8 shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-all transform active:scale-95">
+                        <Button type="button" onClick={() => setStep(2)} className="w-full h-16 bg-brand hover:bg-brand-strong text-white text-lg font-bold rounded-full mt-8 shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-all transform active:scale-95">
                             다음으로
                         </Button>
                     </motion.div>
@@ -231,8 +231,8 @@ export default function CreateTournament() {
                         className="space-y-6"
                     >
                         <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-[#006241]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <LucideTrophy className="w-8 h-8 text-[#006241]" />
+                            <div className="w-16 h-16 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <LucideTrophy className="w-8 h-8 text-brand" />
                             </div>
                             <h2 className="text-xl font-bold text-[rgba(0,0,0,0.87)]">규칙을 설정해주세요</h2>
                             <p className="text-black/55 text-sm">종목과 진행 방식을 상세하게 정해주세요.</p>
@@ -246,10 +246,10 @@ export default function CreateTournament() {
                                 <FormItem>
                                     <FormLabel>종목</FormLabel>
                                     <div className="grid grid-cols-2 gap-3">
-                                        <button type="button" onClick={() => field.onChange("3c")} className={`p-3 rounded-xl border-2 text-center transition-all ${field.value === "3c" ? "border-[#006241] bg-[#006241]/10 text-[#006241]" : "border-black/[0.08] bg-black/[0.04] text-black/55"}`}>
+                                        <button type="button" onClick={() => field.onChange("3c")} className={`p-3 rounded-xl border-2 text-center transition-all ${field.value === "3c" ? "border-brand bg-brand/10 text-brand" : "border-black/[0.08] bg-black/[0.04] text-black/55"}`}>
                                             <span className="font-bold">3쿠션</span>
                                         </button>
-                                        <button type="button" onClick={() => field.onChange("4c")} className={`p-3 rounded-xl border-2 text-center transition-all ${field.value === "4c" ? "border-[#006241] bg-[#006241]/10 text-[#006241]" : "border-black/[0.08] bg-black/[0.04] text-black/55"}`}>
+                                        <button type="button" onClick={() => field.onChange("4c")} className={`p-3 rounded-xl border-2 text-center transition-all ${field.value === "4c" ? "border-brand bg-brand/10 text-brand" : "border-black/[0.08] bg-black/[0.04] text-black/55"}`}>
                                             <span className="font-bold">4구</span>
                                         </button>
                                     </div>
@@ -265,12 +265,12 @@ export default function CreateTournament() {
                                 <FormItem>
                                     <FormLabel>진행 방식</FormLabel>
                                     <div className="grid grid-cols-2 gap-3">
-                                        <button type="button" onClick={() => field.onChange("handicap")} className={`p-4 rounded-xl border-2 text-center cursor-pointer transition-all ${field.value === "handicap" ? "border-[#006241] bg-[#006241]/10 text-[#006241]" : "border-black/[0.08] bg-black/[0.04] text-black/55"}`}>
-                                            <span className="font-black text-lg block">핸디캡 적용</span>
+                                        <button type="button" onClick={() => field.onChange("handicap")} className={`p-4 rounded-xl border-2 text-center cursor-pointer transition-all ${field.value === "handicap" ? "border-brand bg-brand/10 text-brand" : "border-black/[0.08] bg-black/[0.04] text-black/55"}`}>
+                                            <span className="font-bold text-lg block">핸디캡 적용</span>
                                             <span className="text-xs">점수차등</span>
                                         </button>
-                                        <button type="button" onClick={() => field.onChange("fixed")} className={`p-4 rounded-xl border-2 text-center cursor-pointer transition-all ${field.value === "fixed" ? "border-[#006241] bg-[#006241]/10 text-[#006241]" : "border-black/[0.08] bg-black/[0.04] text-black/55"}`}>
-                                            <span className="font-black text-lg block">점수제</span>
+                                        <button type="button" onClick={() => field.onChange("fixed")} className={`p-4 rounded-xl border-2 text-center cursor-pointer transition-all ${field.value === "fixed" ? "border-brand bg-brand/10 text-brand" : "border-black/[0.08] bg-black/[0.04] text-black/55"}`}>
+                                            <span className="font-bold text-lg block">점수제</span>
                                             <span className="text-xs">고정점수</span>
                                         </button>
                                     </div>
@@ -285,9 +285,9 @@ export default function CreateTournament() {
                                 name="handicapRate"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-[#006241]">핸디캡 적용 비율 (%)</FormLabel>
+                                        <FormLabel className="text-brand">핸디캡 적용 비율 (%)</FormLabel>
                                         <FormControl>
-                                            <Input type="number" {...field} className="bg-black/[0.04] border-[#006241]/30 ring-[#006241]/20 h-12 text-lg font-bold text-center" />
+                                            <Input type="number" {...field} className="bg-black/[0.04] border-brand/30 ring-brand/20 h-12 text-lg font-bold text-center" />
                                         </FormControl>
                                         <p className="text-xs text-black/55 text-center">예: 70% 설정 시 20점 → 14점 경기</p>
                                     </FormItem>
@@ -299,9 +299,9 @@ export default function CreateTournament() {
                                 name="targetScore"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-[#006241]">목표 점수 (점)</FormLabel>
+                                        <FormLabel className="text-brand">목표 점수 (점)</FormLabel>
                                         <FormControl>
-                                            <Input type="number" {...field} placeholder="20" className="bg-black/[0.04] border-[#006241]/30 ring-[#006241]/20 h-12 text-lg font-bold text-center" />
+                                            <Input type="number" {...field} placeholder="20" className="bg-black/[0.04] border-brand/30 ring-brand/20 h-12 text-lg font-bold text-center" />
                                         </FormControl>
                                         <p className="text-xs text-black/55 text-center">모든 참가자가 동일한 점수로 경기합니다.</p>
                                     </FormItem>
@@ -354,7 +354,7 @@ export default function CreateTournament() {
                                                 key={num}
                                                 type="button"
                                                 onClick={() => field.onChange(num)}
-                                                className={`p-3 rounded-xl border text-center cursor-pointer ${field.value === num ? "border-[#006241] bg-[#006241]/10 text-[#006241] font-bold" : "border-black/[0.08] bg-black/[0.04] text-black/55 border-dashed"}`}
+                                                className={`p-3 rounded-xl border text-center cursor-pointer ${field.value === num ? "border-brand bg-brand/10 text-brand font-bold" : "border-black/[0.08] bg-black/[0.04] text-black/55 border-dashed"}`}
                                             >
                                                 {num}강
                                             </button>
@@ -365,7 +365,7 @@ export default function CreateTournament() {
                         />
                         <div className="flex gap-3 mt-4">
                             <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1 h-14 border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04]">이전</Button>
-                            <Button type="button" onClick={() => setStep(3)} className="flex-[2] h-14 bg-[#006241] hover:bg-[#00553a] text-white font-bold">다음으로</Button>
+                            <Button type="button" onClick={() => setStep(3)} className="flex-[2] h-14 bg-brand hover:bg-brand-strong text-white font-bold">다음으로</Button>
                         </div>
                     </motion.div>
                 );
@@ -425,7 +425,7 @@ export default function CreateTournament() {
 
                         <div className="flex gap-3 mt-4">
                             <Button type="button" variant="outline" onClick={() => setStep(2)} className="flex-1 h-14 border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04]">이전</Button>
-                            <Button type="button" onClick={() => setStep(4)} className="flex-[2] h-14 bg-[#006241] hover:bg-[#00553a] text-white font-bold">다음으로</Button>
+                            <Button type="button" onClick={() => setStep(4)} className="flex-[2] h-14 bg-brand hover:bg-brand-strong text-white font-bold">다음으로</Button>
                         </div>
                     </motion.div>
                 );
@@ -436,18 +436,17 @@ export default function CreateTournament() {
                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                         className="text-center space-y-6"
                     >
-                        <div className="w-20 h-20 bg-[#006241] rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                        <div className="w-20 h-20 bg-brand rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                             <LucideSparkles className="w-10 h-10 text-white" />
                         </div>
-                        <h2 className="text-2xl font-black text-[rgba(0,0,0,0.87)]">대회 포스터 완성!</h2>
+                        <h2 className="text-2xl font-bold text-[rgba(0,0,0,0.87)]">대회 포스터 완성!</h2>
                         <p className="text-black/60 text-sm mb-6">아래 내용으로 대회를 생성할까요?</p>
 
                         {/* Mock Poster Card */}
-                        <div className="bg-gradient-to-b from-[#1a1a1a] to-black rounded-2xl p-6 relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 opacity-50 group-hover:opacity-100 transition-opacity" />
+                        <div className="bg-[#141416] rounded-2xl p-6 relative overflow-hidden group">
                             <div className="relative z-10 space-y-4">
                                 <div className="flex flex-wrap gap-2">
-                                    <span className="inline-block px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-500 text-xs font-bold">
+                                    <span className="inline-block px-3 py-1 rounded-full bg-brand/20 text-[#7bd4a8] text-xs font-bold">
                                         {form.getValues("gameType") === "3c" ? "3쿠션" : "4구"}
                                     </span>
                                     <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-white/70 text-xs font-bold ">
@@ -457,20 +456,20 @@ export default function CreateTournament() {
                                         {form.getValues("timeLimit")}분 / 뱅크{form.getValues("bankShotPoint")}
                                     </span>
                                 </div>
-                                <h3 className="text-2xl font-black text-white leading-tight break-keep">{form.getValues("title")}</h3>
+                                <h3 className="text-2xl font-bold text-white leading-tight break-keep">{form.getValues("title")}</h3>
                                 <div className="text-sm text-white/60 space-y-1">
                                     <p>{format(new Date(form.getValues("startDate")), "PPP", { locale: ko })} {form.getValues("startTime")}</p>
                                     <p>총 {form.getValues("maxPlayers")}강 / 참가비 {parseInt(form.getValues("entryFee")).toLocaleString()}원</p>
                                 </div>
                                 <div className="pt-4 border-t border-white/10">
-                                    <p className="text-yellow-500 font-bold">🥇 우승: {form.getValues("prize1")}</p>
+                                    <p className="text-[#F5B721] font-bold">🥇 우승: {form.getValues("prize1")}</p>
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex gap-3 mt-8">
                             <Button type="button" variant="outline" onClick={() => setStep(3)} className="flex-1 h-14 border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04]">수정하기</Button>
-                            <Button type="submit" className="flex-[2] h-14 bg-[#006241] hover:bg-[#00553a] text-white font-bold rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                            <Button type="submit" className="flex-[2] h-14 bg-brand hover:bg-brand-strong text-white font-bold rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                                 <LucideCheckCircle className="w-5 h-5 mr-2" />
                                 대회 생성하기
                             </Button>
@@ -489,7 +488,7 @@ export default function CreateTournament() {
                 </Button>
                 <div className="flex gap-1.5 align-center">
                     {[1, 2, 3, 4].map(s => (
-                        <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${s <= step ? "w-8 bg-[#006241]" : "w-2 bg-black/10"}`} />
+                        <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${s <= step ? "w-8 bg-brand" : "w-2 bg-black/10"}`} />
                     ))}
                 </div>
                 <div className="w-6" />

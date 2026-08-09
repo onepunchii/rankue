@@ -16,7 +16,7 @@ const router = Router();
 const submitLog = new Map<string, { count: number; first: number }>();
 const SUBMIT_WINDOW_MS = 60 * 60 * 1000;
 const SUBMIT_MAX = 5;
-function isSubmitLimited(ip: string): boolean {
+export function isSubmitLimited(ip: string): boolean {
     const now = Date.now();
     if (submitLog.size > 10_000) submitLog.clear(); // 메모리 상한
     const entry = submitLog.get(ip);
@@ -139,8 +139,10 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
 // POST /listings/:code/claim — 사장님 클레임 신청 (수동 승인 대기열)
 router.post("/:code/claim", asyncHandler(async (req: any, res: Response) => {
     if (!CODE_RE.test(req.params.code)) return sendError(res, 404, "매장을 찾을 수 없습니다");
-    const [listing] = await db.select({ code: storeListings.code }).from(storeListings).where(eq(storeListings.code, req.params.code));
+    const [listing] = await db.select({ code: storeListings.code, claimed: storeListings.claimed })
+        .from(storeListings).where(eq(storeListings.code, req.params.code));
     if (!listing) return sendError(res, 404, "매장을 찾을 수 없습니다");
+    if (listing.claimed) return sendError(res, 409, "이미 사장님 인증이 완료된 매장입니다");
 
     const name = String(req.body?.applicantName || "").trim().slice(0, 30);
     const phone = String(req.body?.applicantPhone || "").trim().slice(0, 20);

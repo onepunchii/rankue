@@ -123,7 +123,23 @@ router.patch("/store", requirePartner, asyncHandler(async (req: any, res: any) =
 // cookie — doing so previously let anyone take over a store/admin account by phone number.
 // Actual partner onboarding happens through /partner/login (password-verified).
 router.post("/inquiry", asyncHandler(async (req: any, res: any) => {
-    await storage.createPartnerLead(req.body);
+    // 무검증 직삽입이었다 — 필수값·화이트리스트·레이트리밋. status 등 내부 필드 주입 차단.
+    const { isSubmitLimited } = await import("./listings.js");
+    if (isSubmitLimited(req.ip || "?")) return sendError(res, 429, "잠시 후 다시 시도해주세요");
+    const ownerName = String(req.body?.ownerName || "").trim().slice(0, 30);
+    const phoneNumber = String(req.body?.phoneNumber || "").trim().slice(0, 20);
+    if (!ownerName || !/^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(phoneNumber.replace(/\s/g, ""))) {
+        return sendError(res, 400, "성함과 올바른 연락처를 입력해주세요");
+    }
+    await storage.createPartnerLead({
+        ownerName,
+        phoneNumber,
+        storeName: String(req.body?.storeName || "").slice(0, 60) || null,
+        region: String(req.body?.region || "").slice(0, 60) || null,
+        regionDetail: String(req.body?.regionDetail || "").slice(0, 60) || null,
+        businessNumber: String(req.body?.businessNumber || "").slice(0, 20) || null,
+        businessLicenseFile: String(req.body?.businessLicenseFile || "").slice(0, 120) || null,
+    });
     return sendSuccess(res, { success: true, message: "입점 신청이 접수되었습니다. 담당자가 확인 후 연락드립니다." });
 }));
 

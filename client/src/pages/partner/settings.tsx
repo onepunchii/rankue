@@ -141,7 +141,7 @@ export default function PartnerSettings() {
 
                         {/* 1. 기본 정보 */}
                         <div className="space-y-4">
-                            <h2 className="text-[#006241] font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+                            <h2 className="text-brand font-bold text-sm  flex items-center gap-2">
                                 <LucideStore size={14} /> 기본 정보
                             </h2>
                             <div className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-4">
@@ -189,7 +189,7 @@ export default function PartnerSettings() {
 
                         {/* 2. 요금 및 시설 */}
                         <div className="space-y-4">
-                            <h2 className="text-[#006241] font-bold text-sm uppercase tracking-wider">요금 및 테이블</h2>
+                            <h2 className="text-brand font-bold text-sm ">요금 및 테이블</h2>
                             <div className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <FormField
@@ -248,7 +248,7 @@ export default function PartnerSettings() {
 
                         {/* 3. 운영 정보 */}
                         <div className="space-y-4">
-                            <h2 className="text-[#006241] font-bold text-sm uppercase tracking-wider">운영 정보</h2>
+                            <h2 className="text-brand font-bold text-sm ">운영 정보</h2>
                             <div className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <FormField
@@ -317,7 +317,7 @@ export default function PartnerSettings() {
 
                         <Button
                             type="submit"
-                            className="w-full h-14 bg-[#006241] hover:bg-[#00553a] text-white font-bold text-lg rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                            className="w-full h-14 bg-brand hover:bg-brand-strong text-white font-bold text-lg rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
                             disabled={mutation.isPending}
                         >
                             {mutation.isPending ? "저장 중..." : "저장하기"}

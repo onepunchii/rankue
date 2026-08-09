@@ -62,7 +62,8 @@ export default function PartnerLogin() {
                 });
 
                 if (result.role === 'super_admin' || result.role === 'admin') {
-                    setLocation("/admin/dashboard");
+                    // 클레임 승인 탭이 있는 통합 관리자 화면으로 (구 /admin/dashboard 는 별도 레거시)
+                    setLocation("/admin");
                 } else {
                     setLocation("/partner/dashboard");
                 }
@@ -90,7 +91,7 @@ export default function PartnerLogin() {
     return (
         <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col p-6 font-sans">
             <div className="flex items-center mb-10">
-                <button onClick={() => setLocation("/menu")} className="p-2 -ml-2 text-black/40 hover:text-[rgba(0,0,0,0.87)]" aria-label="Go back">
+                <button onClick={() => setLocation("/menu")} className="p-2 -ml-2 text-black/40 hover:text-[rgba(0,0,0,0.87)]" aria-label="뒤로 가기">
                     <LucideArrowLeft className="w-6 h-6" />
                 </button>
             </div>
@@ -101,32 +102,32 @@ export default function PartnerLogin() {
                     animate={{ opacity: 1, y: 0 }}
                     className="mb-12 text-center"
                 >
-                    <div className="w-20 h-20 bg-[#006241]/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-[#006241]/20 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                        <LucideBriefcase className="w-10 h-10 text-[#006241]" />
+                    <div className="w-20 h-20 bg-brand/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-brand/20 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                        <LucideBriefcase className="w-10 h-10 text-brand" />
                     </div>
-                    <h1 className="text-3xl font-black mb-2 tracking-tighter text-[#006241]">파트너 로그인</h1>
+                    <h1 className="text-3xl font-bold mb-2 tracking-tight text-brand">파트너 로그인</h1>
                     <p className="text-black/55">매장 관리자 계정으로 접속하세요.</p>
                 </motion.div>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-black/55 uppercase tracking-widest pl-1">Phone Number</label>
+                        <label className="text-[12px] font-bold text-black/55 pl-1">휴대폰 번호</label>
                         <Input
                             {...register("phone")}
                             type="tel"
                             placeholder="01012345678"
-                            className="h-16 bg-white border-black/[0.08] rounded-2xl text-xl font-bold px-6 placeholder:text-black/40 focus:border-[#006241] transition-all"
+                            className="h-16 bg-white border-black/[0.08] rounded-2xl text-xl font-bold px-6 placeholder:text-black/40 focus:border-brand transition-all"
                         />
                         {errors.phone && <p className="text-red-500 text-xs pl-1">{errors.phone.message}</p>}
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-black/55 uppercase tracking-widest pl-1">Password</label>
+                        <label className="text-[12px] font-bold text-black/55 pl-1">비밀번호</label>
                         <Input
                             {...register("password")}
                             type="password"
                             placeholder="비밀번호"
-                            className="h-16 bg-white border-black/[0.08] rounded-2xl text-xl font-bold px-6 placeholder:text-black/40 focus:border-[#006241] transition-all"
+                            className="h-16 bg-white border-black/[0.08] rounded-2xl text-xl font-bold px-6 placeholder:text-black/40 focus:border-brand transition-all"
                         />
                         {errors.password && <p className="text-red-500 text-xs pl-1">{errors.password.message}</p>}
                     </div>
@@ -134,7 +135,7 @@ export default function PartnerLogin() {
                     <Button
                         type="submit"
                         disabled={isSubmitting}
-                        className="w-full h-16 bg-[#006241] hover:bg-[#00553a] text-white text-lg font-black rounded-full transition-all shadow-[0_1px_2px_rgba(0,0,0,0.06)] active:scale-[0.98]"
+                        className="w-full h-16 bg-brand hover:bg-brand-strong text-white text-lg font-bold rounded-full transition-all shadow-[0_1px_2px_rgba(0,0,0,0.06)] active:scale-[0.98]"
                     >
                         {isSubmitting ? "확인 중..." : "매장 관리 접속"}
                     </Button>
@@ -148,7 +149,7 @@ export default function PartnerLogin() {
                     {/* 주 동선: 디렉토리에서 내 매장을 찾아 클레임 → 승인되면 이 화면으로 로그인 */}
                     <a
                         href="/stores"
-                        className="block w-full py-3 rounded-2xl bg-[#006241]/[0.08] text-[#006241] text-sm font-bold"
+                        className="block w-full py-3 rounded-2xl bg-brand/[0.08] text-brand text-sm font-bold"
                     >
                         내 매장 찾아 관리 신청하기 →
                     </a>
@@ -234,13 +235,13 @@ function PartnerInquiryDialog() {
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" className="w-full h-14 bg-transparent border border-[#006241] text-[#006241] hover:bg-[#006241]/[0.06] rounded-full">
-                    <span className="font-bold text-[#006241]">입점하기</span>
+                <Button variant="outline" className="w-full h-14 bg-transparent border border-brand text-brand hover:bg-brand/[0.06] rounded-full">
+                    <span className="font-bold text-brand">입점하기</span>
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] max-w-md w-full rounded-[2.5rem] p-8">
+            <DialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] max-w-md w-full rounded-card p-8">
                 <DialogHeader>
-                    <DialogTitle className="text-3xl font-black text-center tracking-tighter mb-2">
+                    <DialogTitle className="text-3xl font-bold text-center tracking-tight mb-2">
                         {step === "form" ? "내 매장 무료 등록" : "신청 완료!"}
                     </DialogTitle>
                     <DialogDescription className="text-center text-black/55 text-base font-medium">
@@ -252,7 +253,7 @@ function PartnerInquiryDialog() {
                     <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                         <div className="space-y-3">
                             <div>
-                                <label className="text-[10px] font-bold text-black/55 uppercase tracking-widest pl-1 mb-1 block">
+                                <label className="text-[12px] font-bold text-black/55 pl-1 mb-1 block">
                                     사장님 성함 <span className="text-red-500">*</span>
                                 </label>
                                 <Input
@@ -260,11 +261,11 @@ function PartnerInquiryDialog() {
                                     placeholder="홍길동"
                                     value={formData.ownerName}
                                     onChange={e => setFormData({ ...formData, ownerName: e.target.value })}
-                                    className="bg-black/[0.04] border-black/[0.08] h-14 rounded-2xl px-5 text-lg font-bold placeholder:text-black/40 focus:border-[#006241] transition-all"
+                                    className="bg-black/[0.04] border-black/[0.08] h-12 rounded-xl px-4 text-[15px] font-semibold placeholder:text-black/40 focus:border-brand transition-all"
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] font-bold text-black/55 uppercase tracking-widest pl-1 mb-1 block">
+                                <label className="text-[12px] font-bold text-black/55 pl-1 mb-1 block">
                                     연락처 <span className="text-red-500">*</span>
                                 </label>
                                 <Input
@@ -273,25 +274,25 @@ function PartnerInquiryDialog() {
                                     placeholder="010-1234-5678"
                                     value={formData.phoneNumber}
                                     onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })}
-                                    className="bg-black/[0.04] border-black/[0.08] h-10 rounded-xl placeholder:text-black/40 focus:border-[#006241]"
+                                    className="bg-black/[0.04] border-black/[0.08] h-12 rounded-xl placeholder:text-black/40 focus:border-brand"
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] font-bold text-black/55 uppercase tracking-widest pl-1 mb-1 block">
+                                <label className="text-[12px] font-bold text-black/55 pl-1 mb-1 block">
                                     매장명 (선택)
                                 </label>
                                 <Input
                                     placeholder="운영 중인 매장명"
                                     value={formData.storeName}
                                     onChange={e => setFormData({ ...formData, storeName: e.target.value })}
-                                    className="bg-black/[0.04] border-black/[0.08] h-10 rounded-xl placeholder:text-black/40 focus:border-[#006241]"
+                                    className="bg-black/[0.04] border-black/[0.08] h-12 rounded-xl placeholder:text-black/40 focus:border-brand"
                                 />
                             </div>
                         </div>
 
                         {/* Address Cascade */}
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-black/55 uppercase tracking-widest pl-1 mb-1 block">
+                            <label className="text-[12px] font-bold text-black/55 pl-1 mb-1 block">
                                 매장 지역 (선택)
                             </label>
                             <div className="flex gap-2">
@@ -299,7 +300,7 @@ function PartnerInquiryDialog() {
                                     value={formData.region}
                                     onValueChange={(value) => setFormData({ ...formData, region: value, regionGu: "", regionDong: "" })}
                                 >
-                                    <SelectTrigger className="bg-black/[0.04] border-black/[0.08] h-14 rounded-2xl px-5 text-lg font-bold focus:ring-[#006241] text-[rgba(0,0,0,0.87)] flex-1 transition-all">
+                                    <SelectTrigger className="bg-black/[0.04] border-black/[0.08] h-12 rounded-xl px-4 text-[15px] font-semibold focus:ring-brand text-[rgba(0,0,0,0.87)] flex-1 transition-all">
                                         <SelectValue placeholder="시/도" />
                                     </SelectTrigger>
                                     <SelectContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] h-[200px]">
@@ -328,7 +329,7 @@ function PartnerInquiryDialog() {
                                         value={formData.regionGu}
                                         onValueChange={(value) => setFormData({ ...formData, regionGu: value })}
                                     >
-                                        <SelectTrigger className="bg-black/[0.04] border-black/[0.08] h-10 rounded-xl focus:ring-[#006241] text-[rgba(0,0,0,0.87)] flex-1">
+                                        <SelectTrigger className="bg-black/[0.04] border-black/[0.08] h-12 rounded-xl focus:ring-brand text-[rgba(0,0,0,0.87)] flex-1">
                                             <SelectValue placeholder="구" />
                                         </SelectTrigger>
                                         <SelectContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] h-[200px]">
@@ -344,14 +345,14 @@ function PartnerInquiryDialog() {
                                     placeholder="동 입력 (예: 역삼동)"
                                     value={formData.regionDong}
                                     onChange={e => setFormData({ ...formData, regionDong: e.target.value })}
-                                    className="bg-black/[0.04] border-black/[0.08] h-10 rounded-xl placeholder:text-black/40 focus:border-[#006241]"
+                                    className="bg-black/[0.04] border-black/[0.08] h-12 rounded-xl placeholder:text-black/40 focus:border-brand"
                                 />
                             )}
                         </div>
 
                         {/* Business Info */}
                         <div>
-                            <label className="text-[10px] font-bold text-black/55 uppercase tracking-widest pl-1 mb-1 block">
+                            <label className="text-[12px] font-bold text-black/55 pl-1 mb-1 block">
                                 사업자 정보 (선택)
                             </label>
                             <div className="space-y-2">
@@ -359,7 +360,7 @@ function PartnerInquiryDialog() {
                                     placeholder="사업자 등록번호 (숫자만 입력)"
                                     value={formData.businessNumber}
                                     onChange={e => setFormData({ ...formData, businessNumber: e.target.value })}
-                                    className="bg-black/[0.04] border-black/[0.08] h-10 rounded-xl placeholder:text-black/40 focus:border-[#006241]"
+                                    className="bg-black/[0.04] border-black/[0.08] h-12 rounded-xl placeholder:text-black/40 focus:border-brand"
                                 />
                                 <div className="relative">
                                     <Input
@@ -386,15 +387,15 @@ function PartnerInquiryDialog() {
                         <Button
                             type="submit"
                             disabled={isSubmitting}
-                            className="w-full h-14 bg-[#006241] hover:bg-[#00553a] text-white text-xl font-black rounded-full mt-4 shadow-[0_1px_2px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-all"
+                            className="w-full h-14 bg-brand hover:bg-brand-strong text-white text-xl font-bold rounded-full mt-4 shadow-[0_1px_2px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-all"
                         >
                             {isSubmitting ? "처리 중..." : "지금 바로 시작하기"}
                         </Button>
                     </form>
                 ) : (
                     <div className="flex flex-col items-center py-6">
-                        <div className="w-16 h-16 bg-[#006241]/10 rounded-full flex items-center justify-center mb-4">
-                            <LucideCheckCircle2 className="w-8 h-8 text-[#006241]" />
+                        <div className="w-16 h-16 bg-brand/10 rounded-full flex items-center justify-center mb-4">
+                            <LucideCheckCircle2 className="w-8 h-8 text-brand" />
                         </div>
                         <p className="text-center text-sm text-black/60 font-medium mb-6 leading-relaxed">
                             입점 문의가 접수되었습니다.<br />
@@ -402,7 +403,7 @@ function PartnerInquiryDialog() {
                         </p>
                         <Button
                             onClick={handleClose}
-                            className="w-full h-12 bg-[#006241] hover:bg-[#00553a] text-white font-bold rounded-full"
+                            className="w-full h-12 bg-brand hover:bg-brand-strong text-white font-bold rounded-full"
                         >
                             확인
                         </Button>

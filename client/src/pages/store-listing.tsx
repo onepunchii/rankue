@@ -332,12 +332,15 @@ export default function StoreListingPage() {
                 : <p className="text-[13px] text-black/40">{t.descEmpty}</p>}
             </div>
 
-            <button
-              onClick={() => setClaimOpen(true)}
-              className="w-full h-13 py-3.5 rounded-2xl bg-brand text-white text-[15px] font-bold active:scale-[0.99] transition-transform mb-2"
-            >
-              {t.claimCta}
-            </button>
+            {/* 이미 인증된 매장에는 신청 버튼을 숨긴다 — 서버도 409 로 이중 방어 */}
+            {!s.claimed && (
+              <button
+                onClick={() => setClaimOpen(true)}
+                className="w-full h-13 py-3.5 rounded-2xl bg-brand text-white text-[15px] font-bold active:scale-[0.99] transition-transform mb-2"
+              >
+                {t.claimCta}
+              </button>
+            )}
             <button
               onClick={() => setSuggestOpen(true)}
               className="w-full py-3 rounded-2xl text-[13.5px] font-semibold text-black/50 hover:bg-black/[0.03]"

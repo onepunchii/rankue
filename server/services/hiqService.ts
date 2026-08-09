@@ -61,6 +61,9 @@ export class HiqService {
     }
 
     async partnerLogin(phone: string, password?: string) {
+        // 하이픈·공백 입력 허용 — profiles.phone 은 digits-only 로 저장된다(클레임 승인 흐름 포함).
+        // 정규화 없이는 '010-1234-5678' 입력이 계정을 못 찾아 로그인 불가였다.
+        phone = String(phone || "").replace(/[^\d]/g, "");
         // 1. Try to find Profile directly first
         let profile = await storage.getProfileByPhone(phone);
         let profileId = profile?.id;
