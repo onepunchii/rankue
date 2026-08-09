@@ -86,6 +86,7 @@ type Suggestion = {
 function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
     const menuItems = [
         { id: "dashboard", label: "Dashboard", icon: LucideLayoutDashboard },
+        { id: "claims", label: "매장 클레임", icon: LucideStore },
         { id: "leads", label: "입점 문의", icon: LucidePhone },
         { id: "stores", label: "매장 리스트", icon: LucideStore },
         { id: "crews", label: "크루 현황", icon: LucideUsersRound },
@@ -146,7 +147,7 @@ export default function AdminDashboard() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [tab, setTab] = useState<"dashboard" | "leads" | "stores" | "crews" | "members" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders">("dashboard");
+    const [tab, setTab] = useState<"dashboard" | "claims" | "leads" | "stores" | "crews" | "members" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders">("dashboard");
     const [memberSearch, setMemberSearch] = useState("");
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
@@ -164,6 +165,27 @@ export default function AdminDashboard() {
     const filteredCrews = crews.filter(crew => {
         if (crewSportFilter === "ALL") return true;
         return crew.sportCategory === crewSportFilter || crew.sportCategory === "MIXED";
+    });
+
+    // 매장 클레임 대기열 — 승인 = 사장님 계정(전화+PIN)+파트너 매장 자동 발급 (실제 온보딩)
+    const { data: claims = [] } = useQuery<Array<{
+        id: string; listingCode: string; applicantName: string; applicantPhone: string;
+        message: string | null; status: string; createdAt: string;
+        listingName: string | null; listingRegion: string | null; listingAddress: string | null;
+    }>>({ queryKey: ["/api/hiq/admin/listing-claims"] });
+    const [approveResult, setApproveResult] = useState<{ storeSlug: string; partnerPhone: string; issuedPin: string | null } | null>(null);
+    const approveClaim = useMutation({
+        mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/listing-claims/${id}/approve`, { method: "POST" }),
+        onSuccess: (r: any) => {
+            setApproveResult(r);
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/listing-claims"] });
+        },
+        onError: (e: any) => toast({ title: e?.message || "승인 실패", variant: "destructive" }),
+    });
+    const rejectClaim = useMutation({
+        mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/listing-claims/${id}/reject`, { method: "POST" }),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/listing-claims"] }),
+        onError: (e: any) => toast({ title: e?.message || "거절 실패", variant: "destructive" }),
     });
 
     // Mutations
@@ -343,8 +365,60 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
+                    {tab === "claims" && (
+                        <div className="grid gap-4">
+                            {approveResult && (
+                                <div className="bg-brand/[0.06] border border-brand/30 p-5 rounded-2xl">
+                                    <p className="font-bold text-brand mb-2">✓ 승인 완료 — 사장님께 전화로 전달하세요</p>
+                                    <div className="text-[14px] space-y-1 tabular-nums">
+                                        <p>파트너 로그인 전화번호: <b>{approveResult.partnerPhone}</b></p>
+                                        {approveResult.issuedPin
+                                            ? <p>임시 PIN: <b className="text-[19px] text-brand">{approveResult.issuedPin}</b> <span className="text-black/45 text-[12px]">— 이 화면을 닫으면 다시 볼 수 없습니다</span></p>
+                                            : <p className="text-black/55">기존 계정 재사용 — 쓰던 비밀번호로 로그인</p>}
+                                        <p className="text-black/55 text-[13px]">파트너 포털: /partner/login</p>
+                                    </div>
+                                    <Button variant="ghost" size="sm" className="mt-2" onClick={() => setApproveResult(null)}>닫기</Button>
+                                </div>
+                            )}
+                            {claims.length === 0 && (
+                                <div className="bg-white p-8 rounded-2xl text-center text-black/45 text-sm">
+                                    접수된 클레임이 없습니다. 사장님이 매장 페이지(/stores)에서 '내 매장 정보 관리 신청'을 하면 여기에 쌓입니다.
+                                </div>
+                            )}
+                            {claims.map((c) => (
+                                <div key={c.id} className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Badge variant={c.status === "pending" ? "destructive" : c.status === "approved" ? "default" : "secondary"}>
+                                                {c.status === "pending" ? "대기" : c.status === "approved" ? "승인됨" : "거절됨"}
+                                            </Badge>
+                                            <span className="text-xs text-black/40">{new Date(c.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                        <h3 className="text-lg font-bold truncate">{c.listingName ?? c.listingCode}</h3>
+                                        <div className="text-black/60 text-sm mt-1">
+                                            {c.applicantName} 사장님 · {c.applicantPhone}
+                                        </div>
+                                        <div className="text-black/45 text-xs mt-0.5 truncate">{c.listingRegion} · {c.listingAddress}</div>
+                                        {c.message && <div className="text-black/55 text-xs mt-1 truncate">"{c.message}"</div>}
+                                    </div>
+                                    {c.status === "pending" && (
+                                        <div className="flex gap-2 shrink-0">
+                                            <Button size="sm" variant="outline" onClick={() => window.open(`tel:${c.applicantPhone}`)}>전화</Button>
+                                            <Button size="sm" variant="ghost" className="text-red-500" disabled={rejectClaim.isPending} onClick={() => rejectClaim.mutate(c.id)}>거절</Button>
+                                            <Button size="sm" className="bg-brand hover:bg-brand-strong text-white" disabled={approveClaim.isPending} onClick={() => approveClaim.mutate(c.id)}>승인·계정 발급</Button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {tab === "leads" && (
                         <div className="grid gap-4">
+                            <div className="bg-[#F5B721]/[0.12] p-4 rounded-2xl text-[13px] text-[#8a6a0a] leading-relaxed">
+                                입점 문의는 <b>연락처 접수함</b>입니다 — 여기서 상태를 바꿔도 계정은 발급되지 않습니다.
+                                사장님께 전화드려 <b>매장 찾기에서 본인 매장을 '관리 신청'(클레임)</b>하도록 안내하면, '매장 클레임' 탭에서 승인 한 번으로 계정·매장이 자동 발급됩니다.
+                            </div>
                             {leads.map((lead) => (
                                 <div key={lead.id} className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:border-black/10 transition">
                                     <div>
@@ -361,8 +435,11 @@ export default function AdminDashboard() {
                                     </div>
                                     <div className="flex gap-2">
                                         <Button size="sm" variant="outline" onClick={() => window.open(`tel:${lead.phoneNumber}`)}>전화</Button>
+                                        {lead.status === 'NEW' && (
+                                            <Button size="sm" variant="outline" onClick={() => updateLeadStatusMutation.mutate({ id: lead.id, status: "CONTACTED" })}>연락함</Button>
+                                        )}
                                         {lead.status !== 'REGISTERED' && (
-                                            <Button size="sm" className="bg-brand hover:bg-brand/90 text-white" onClick={() => updateLeadStatusMutation.mutate({ id: lead.id, status: "REGISTERED" })}>승인</Button>
+                                            <Button size="sm" className="bg-brand hover:bg-brand-strong text-white" onClick={() => updateLeadStatusMutation.mutate({ id: lead.id, status: "REGISTERED" })}>등록 완료 표시</Button>
                                         )}
                                     </div>
                                 </div>

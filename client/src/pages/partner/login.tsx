@@ -62,8 +62,8 @@ export default function PartnerLogin() {
                 });
 
                 if (result.role === 'super_admin' || result.role === 'admin') {
-                    // 클레임 승인 탭이 있는 통합 관리자 화면으로 (구 /admin/dashboard 는 별도 레거시)
-                    setLocation("/admin");
+                    // 통합 관리자 콘솔 (매장 클레임·입점 문의·회원·신고 전부 여기)
+                    setLocation("/admin/dashboard");
                 } else {
                     setLocation("/partner/dashboard");
                 }
@@ -115,8 +115,11 @@ export default function PartnerLogin() {
                         <Input
                             {...register("phone")}
                             type="tel"
+                            inputMode="tel"
+                            autoComplete="tel"
+                            enterKeyHint="next"
                             placeholder="01012345678"
-                            className="h-16 bg-white border-black/[0.08] rounded-2xl text-xl font-bold px-6 placeholder:text-black/40 focus:border-brand transition-all"
+                            className="h-14 bg-white border-black/[0.08] rounded-2xl text-[17px] font-semibold px-5 tabular-nums placeholder:text-black/40 focus:border-brand transition-all"
                         />
                         {errors.phone && <p className="text-red-500 text-xs pl-1">{errors.phone.message}</p>}
                     </div>
@@ -126,8 +129,11 @@ export default function PartnerLogin() {
                         <Input
                             {...register("password")}
                             type="password"
-                            placeholder="비밀번호"
-                            className="h-16 bg-white border-black/[0.08] rounded-2xl text-xl font-bold px-6 placeholder:text-black/40 focus:border-brand transition-all"
+                            inputMode="numeric"
+                            autoComplete="current-password"
+                            enterKeyHint="done"
+                            placeholder="비밀번호 (승인 시 받은 4자리)"
+                            className="h-14 bg-white border-black/[0.08] rounded-2xl text-[17px] font-semibold px-5 placeholder:text-black/40 focus:border-brand transition-all"
                         />
                         {errors.password && <p className="text-red-500 text-xs pl-1">{errors.password.message}</p>}
                     </div>

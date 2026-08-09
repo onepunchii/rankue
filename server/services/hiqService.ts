@@ -96,15 +96,18 @@ export class HiqService {
         // 4. Find Store owned by this Profile
         const store = await storage.getStoreByOwnerProfileId(profile.id);
 
-        if (!store) {
+        // 관리자는 매장 없이도 로그인 허용 — 로그인 후 /admin/dashboard 로 착지한다.
+        // (기존엔 매장 미보유 admin 이 파트너 로그인 자체가 막혀 관리자 진입점이 없었다)
+        const isAdmin = profile.role === "admin" || profile.role === "super_admin";
+        if (!store && !isAdmin) {
             return { success: false, message: "매장 정보가 연결되지 않은 계정입니다. 입점 신청을 해주세요." };
         }
 
         return {
             success: true,
-            storeName: store.name,
+            storeName: store?.name ?? "관리자",
             profileId,
-            storeId: store.id,
+            storeId: store?.id ?? null,
             role: profile?.role // Return role
         };
     }

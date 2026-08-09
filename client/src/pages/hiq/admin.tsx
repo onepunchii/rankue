@@ -40,27 +40,6 @@ export default function HiqAdmin() {
         queryKey: ["/api/hiq/partner/stats"],
     });
 
-    // 매장 클레임 대기열 — 승인 시 사장님 계정+파트너 매장 자동 발급
-    const { data: claims } = useQuery<Array<{
-        id: string; listingCode: string; applicantName: string; applicantPhone: string;
-        message: string | null; status: string; createdAt: string;
-        listingName: string | null; listingRegion: string | null; listingAddress: string | null;
-    }>>({ queryKey: ["/api/hiq/admin/listing-claims"] });
-    const [approveResult, setApproveResult] = useState<{ storeSlug: string; partnerPhone: string; issuedPin: string | null } | null>(null);
-    const approveClaim = useMutation({
-        mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/listing-claims/${id}/approve`, { method: "POST" }),
-        onSuccess: (r: any) => {
-            setApproveResult(r);
-            queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/listing-claims"] });
-        },
-        onError: (e: any) => toast({ title: e?.message || "승인 실패", variant: "destructive" }),
-    });
-    const rejectClaim = useMutation({
-        mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/listing-claims/${id}/reject`, { method: "POST" }),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/listing-claims"] }),
-        onError: (e: any) => toast({ title: e?.message || "거절 실패", variant: "destructive" }),
-    });
-
     // No bulk-SMS backend exists yet; the marketing center runs in demo mode
     // rather than POSTing to a nonexistent /send-sms route (which always 404'd).
     const [isSendingSms, setIsSendingSms] = useState(false);
@@ -212,73 +191,7 @@ export default function HiqAdmin() {
                         <TabsTrigger value="members" className="data-[state=active]:bg-brand data-[state=active]:text-brand-fg rounded-lg px-8 py-3 font-semibold">회원 관리</TabsTrigger>
                         <TabsTrigger value="messaging" className="data-[state=active]:bg-brand data-[state=active]:text-brand-fg rounded-lg px-8 py-3 font-semibold">마케팅 센터</TabsTrigger>
                         <TabsTrigger value="golf-orders" className="data-[state=active]:bg-brand data-[state=active]:text-brand-fg rounded-lg px-8 py-3 font-semibold">골프 회원권 접수</TabsTrigger>
-                        <TabsTrigger value="claims" className="data-[state=active]:bg-brand data-[state=active]:text-brand-fg rounded-lg px-8 py-3 font-semibold">
-                            매장 클레임{(claims?.filter(c => c.status === "pending").length ?? 0) > 0 && ` (${claims!.filter(c => c.status === "pending").length})`}
-                        </TabsTrigger>
                     </TabsList>
-
-                    <TabsContent value="claims" className="space-y-4">
-                        {approveResult && (
-                            <Card className="rk-card border-brand/40 bg-brand/[0.05]">
-                                <CardContent className="p-5">
-                                    <p className="font-bold text-brand mb-2">✓ 승인 완료 — 사장님께 전화로 전달하세요</p>
-                                    <div className="text-[14px] space-y-1 tabular-nums">
-                                        <p>파트너 로그인 전화번호: <b>{approveResult.partnerPhone}</b></p>
-                                        {approveResult.issuedPin
-                                            ? <p>임시 PIN: <b className="text-[18px] text-brand">{approveResult.issuedPin}</b> <span className="text-black/45 text-[12px]">— 이 화면을 닫으면 다시 볼 수 없습니다</span></p>
-                                            : <p className="text-black/55">기존 계정 재사용 — 쓰던 비밀번호로 로그인</p>}
-                                        <p className="text-black/55 text-[13px]">파트너 포털: /partner/login · 매장 슬러그: {approveResult.storeSlug}</p>
-                                    </div>
-                                    <Button variant="ghost" size="sm" className="mt-2" onClick={() => setApproveResult(null)}>닫기</Button>
-                                </CardContent>
-                            </Card>
-                        )}
-                        <Card className="rk-card overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-[14px]">
-                                    <thead>
-                                        <tr className="bg-surface-2 border-b border-surface-line">
-                                            <th className="p-4 font-semibold text-black/60">매장</th>
-                                            <th className="p-4 font-semibold text-black/60">신청자</th>
-                                            <th className="p-4 font-semibold text-black/60">연락처</th>
-                                            <th className="p-4 font-semibold text-black/60">메시지</th>
-                                            <th className="p-4 font-semibold text-black/60">신청일</th>
-                                            <th className="p-4 font-semibold text-black/60 text-right">처리</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(claims ?? []).map((c) => (
-                                            <tr key={c.id} className="border-b border-surface-line last:border-0">
-                                                <td className="p-4">
-                                                    <div className="font-semibold">{c.listingName ?? c.listingCode}</div>
-                                                    <div className="text-[12px] text-black/45">{c.listingRegion} · {c.listingAddress}</div>
-                                                </td>
-                                                <td className="p-4">{c.applicantName}</td>
-                                                <td className="p-4 tabular-nums">{c.applicantPhone}</td>
-                                                <td className="p-4 max-w-[220px] text-[13px] text-black/60 truncate">{c.message}</td>
-                                                <td className="p-4 tabular-nums text-black/55">{new Date(c.createdAt).toLocaleDateString("ko-KR")}</td>
-                                                <td className="p-4 text-right">
-                                                    {c.status === "pending" ? (
-                                                        <div className="flex gap-2 justify-end">
-                                                            <Button size="sm" disabled={approveClaim.isPending} onClick={() => approveClaim.mutate(c.id)} className="bg-brand text-brand-fg hover:bg-brand rounded-lg">승인</Button>
-                                                            <Button size="sm" variant="ghost" disabled={rejectClaim.isPending} onClick={() => rejectClaim.mutate(c.id)} className="text-red-500">거절</Button>
-                                                        </div>
-                                                    ) : (
-                                                        <span className={`text-[12px] font-bold ${c.status === "approved" ? "text-brand" : "text-black/40"}`}>
-                                                            {c.status === "approved" ? "승인됨" : "거절됨"}
-                                                        </span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {(claims ?? []).length === 0 && (
-                                            <tr><td colSpan={6} className="p-10 text-center text-black/40">접수된 클레임이 없습니다</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </Card>
-                    </TabsContent>
 
                     <TabsContent value="members" className="space-y-6">
                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between rk-card p-4">
