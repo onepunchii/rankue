@@ -41,7 +41,6 @@ const L: Record<Locale, { title: string; subtitle: string; tiers: string[]; name
     },
 };
 
-const EMOJI: Record<string, string> = { hr3c: "🎯", hr4c: "🎱", innings: "⏱️", games: "📋", wins: "🏆", visits: "📍" };
 const TIER_STYLE = [
     "bg-black/[0.03] text-black/35",                 // 0 미획득
     "bg-[#a9825e]/12 text-[#7a5c3e]",                // 1 나무
@@ -49,6 +48,77 @@ const TIER_STYLE = [
     "bg-[#cba258]/15 text-[#8a6a2a]",                // 3 금장
     "bg-brand/12 text-brand",                        // 4 명인
 ];
+
+// 등급 게이지 세그먼트 색 — 획득한 칸은 해당 등급의 큐 색으로 칠한다 (나무→카본→금장→명인)
+const TIER_FILL = ["#a9825e", "#3a3a3c", "#cba258", "#006241"];
+
+// 랜딩·데스크탑 프레임과 같은 획으로 그린 당구 뱃지 아이콘 (currentColor 상속 — 등급 색이 곧 아이콘 색)
+const Ico = ({ children }: { children: React.ReactNode }) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-[22px] h-[22px]" aria-hidden>
+        {children}
+    </svg>
+);
+const BADGE_ICON: Record<string, React.ReactNode> = {
+    // 3쿠션 하이런 — 당구대 위 쿠션을 세 번 도는 궤적 + 수구
+    hr3c: (
+        <Ico>
+            <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+            <path d="M5.5 16.5 9 7.5l4.5 9 4.5-9" strokeDasharray="0" />
+            <circle cx="5.5" cy="16.5" r="1.4" fill="currentColor" stroke="none" />
+        </Ico>
+    ),
+    // 4구 하이런 — 공 네 개
+    hr4c: (
+        <Ico>
+            <circle cx="8" cy="8" r="3.4" />
+            <circle cx="16" cy="8" r="3.4" />
+            <circle cx="8" cy="16" r="3.4" />
+            <circle cx="16" cy="16" r="3.4" fill="currentColor" stroke="none" />
+        </Ico>
+    ),
+    // 이닝 클럽 — 이닝을 세는 초크 큐브 (당구의 시간 단위)
+    innings: (
+        <Ico>
+            <path d="M5 9.5 12 6l7 3.5v6L12 19l-7-3.5z" />
+            <path d="M5 9.5 12 13l7-3.5M12 13v6" />
+        </Ico>
+    ),
+    // 경기 수 — 점수판 (상하 점수 + 구분선)
+    games: (
+        <Ico>
+            <rect x="3" y="5" width="18" height="14" rx="2.5" />
+            <path d="M3 12h18M8.5 8.5h.01M8.5 15.5h.01" />
+            <path d="M12.5 8.5H16M12.5 15.5H16" />
+        </Ico>
+    ),
+    // 승리 — 세워진 큐 두 자루 교차 + 공 (트로피 대신 당구답게)
+    wins: (
+        <Ico>
+            <path d="M6 20 16.5 4.5M18 20 7.5 4.5" />
+            <circle cx="12" cy="19" r="2.2" fill="currentColor" stroke="none" />
+        </Ico>
+    ),
+    // 출석 — 당구대 다이아(포인트) 마크
+    visits: (
+        <Ico>
+            <path d="M12 3.5 19 12l-7 8.5L5 12z" />
+            <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+        </Ico>
+    ),
+};
+
+// 등급 게이지 — 큐 스틱 4마디: 채워진 마디 수 = 달성한 등급
+const TierGauge = ({ tier }: { tier: number }) => (
+    <div className="flex items-center gap-[3px] mt-1.5" aria-label={`등급 ${tier}/4`}>
+        {[0, 1, 2, 3].map((i) => (
+            <span
+                key={i}
+                className="h-[4px] flex-1 rounded-full"
+                style={{ background: i < tier ? TIER_FILL[i] : "rgba(0,0,0,0.08)" }}
+            />
+        ))}
+    </div>
+);
 
 export const BadgeShelf = () => {
     const { locale } = useT();
@@ -72,14 +142,17 @@ export const BadgeShelf = () => {
             ) : (
                 <div className="grid grid-cols-2 gap-2">
                     {badges.map((b) => (
-                        <div key={b.id} className={cn("rounded-2xl p-3 flex items-start gap-2.5", TIER_STYLE[b.tier])}>
-                            <span className={cn("text-[20px] leading-none", b.tier === 0 && "grayscale opacity-40")}>{EMOJI[b.id]}</span>
-                            <div className="min-w-0">
-                                <p className="text-[12.5px] font-bold leading-tight">{t.names[b.id]}</p>
-                                <p className="text-[11px] font-semibold mt-0.5 tabular-nums">
-                                    {b.tier > 0 ? `${t.tiers[b.tier]} · ${b.value.toLocaleString()}` : (b.next != null ? t.next(b.next - b.value) : "")}
-                                </p>
+                        <div key={b.id} className={cn("rounded-2xl p-3", TIER_STYLE[b.tier])}>
+                            <div className="flex items-start gap-2.5">
+                                <span className={cn("shrink-0 mt-0.5", b.tier === 0 && "opacity-45")}>{BADGE_ICON[b.id]}</span>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[12.5px] font-bold leading-tight">{t.names[b.id]}</p>
+                                    <p className="text-[12px] font-semibold mt-0.5 tabular-nums">
+                                        {b.tier > 0 ? `${t.tiers[b.tier]} · ${b.value.toLocaleString()}` : (b.next != null ? t.next(b.next - b.value) : "")}
+                                    </p>
+                                </div>
                             </div>
+                            <TierGauge tier={b.tier} />
                         </div>
                     ))}
                 </div>
