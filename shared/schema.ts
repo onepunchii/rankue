@@ -610,6 +610,7 @@ export const notices = pgTable("notices", {
   title: text("title").notNull(),
   content: text("content").notNull(),
   target: text("target", { enum: ["all", "owners"] }).default("all").notNull(),
+  hidden: boolean("hidden").default(false).notNull(), // 가리기 — 삭제 없이 비노출
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

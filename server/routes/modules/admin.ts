@@ -56,6 +56,54 @@ router.post("/notices", checkSuperAdmin, asyncHandler(async (req: any, res: any)
     return sendSuccess(res, notice);
 }));
 
+// 공지 숨김 토글 · 삭제
+router.patch("/notices/:id", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { db } = await import("../../db.js");
+    const { notices } = await import("../../../shared/schema.js");
+    const { eq } = await import("drizzle-orm");
+    await db.update(notices).set({ hidden: !!req.body?.hidden }).where(eq(notices.id, req.params.id));
+    return sendSuccess(res, { success: true });
+}));
+router.delete("/notices/:id", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { db } = await import("../../db.js");
+    const { notices } = await import("../../../shared/schema.js");
+    const { eq } = await import("drizzle-orm");
+    await db.delete(notices).where(eq(notices.id, req.params.id));
+    return sendSuccess(res, { success: true });
+}));
+
+// 푸시함 — 선택한 회원(들)에게 인앱 알림 + 네이티브 푸시 발송.
+// memberIds: uuid[] 또는 "all". 인앱 알림함에도 남으므로 토큰 없는 회원도 수신한다.
+router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const title = String(req.body?.title || "").trim().slice(0, 60);
+    const body = String(req.body?.body || "").trim().slice(0, 200);
+    if (!title || !body) return sendError(res, 400, "제목과 내용을 입력해주세요");
+
+    let memberIds: string[];
+    if (req.body?.memberIds === "all") {
+        const all = await storage.getAllMembersForAdmin();
+        memberIds = (all as any[]).map((m) => m.id);
+    } else if (Array.isArray(req.body?.memberIds)) {
+        const UUID_RE = /^[0-9a-f-]{36}$/i;
+        memberIds = req.body.memberIds.filter((id: any) => typeof id === "string" && UUID_RE.test(id)).slice(0, 500);
+    } else {
+        return sendError(res, 400, "받는 사람을 선택해주세요");
+    }
+    if (!memberIds.length) return sendError(res, 400, "받는 사람이 없습니다");
+
+    const { notificationService } = await import("../../services/notificationService.js");
+    let sent = 0;
+    for (const memberId of memberIds) {
+        try {
+            await notificationService.sendAndSaveNotification({ memberId, title, body, category: "admin", type: "broadcast" });
+            sent++;
+        } catch (e) {
+            console.warn(`[admin push] ${memberId} 실패:`, (e as Error)?.message);
+        }
+    }
+    return sendSuccess(res, { sent, total: memberIds.length });
+}));
+
 router.get("/reports", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const reports = await storage.getReportedUsers();
     return sendSuccess(res, reports);

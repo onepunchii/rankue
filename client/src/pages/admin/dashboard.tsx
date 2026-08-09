@@ -91,6 +91,7 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
         { id: "stores", label: "매장 리스트", icon: LucideStore },
         { id: "crews", label: "크루 현황", icon: LucideUsersRound },
         { id: "members", label: "회원 관리", icon: LucideUsers },
+        { id: "push", label: "푸시 발송", icon: LucideBell },
         { id: "golf-orders", label: "골프 회원권", icon: LucideFlag }, // New
         { id: "billing", label: "결제 관리", icon: LucideCreditCard },
         { id: "suggestions", label: "건의함", icon: LucideMail },
@@ -147,7 +148,7 @@ export default function AdminDashboard() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [tab, setTab] = useState<"dashboard" | "claims" | "leads" | "stores" | "crews" | "members" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders">("dashboard");
+    const [tab, setTab] = useState<"dashboard" | "claims" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders">("dashboard");
     const [memberSearch, setMemberSearch] = useState("");
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
@@ -186,6 +187,34 @@ export default function AdminDashboard() {
         mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/listing-claims/${id}/reject`, { method: "POST" }),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/listing-claims"] }),
         onError: (e: any) => toast({ title: e?.message || "거절 실패", variant: "destructive" }),
+    });
+
+    // 공지 숨김·삭제
+    const toggleNoticeMutation = useMutation({
+        mutationFn: async ({ id, hidden }: { id: string; hidden: boolean }) =>
+            apiRequest(`/api/hiq/admin/notices/${id}`, { method: "PATCH", body: { hidden } }),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/notices"] }),
+    });
+    const deleteNoticeMutation = useMutation({
+        mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/notices/${id}`, { method: "DELETE" }),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/notices"] }),
+    });
+
+    // 푸시함 — 전체/개별 회원 대상 발송
+    const [pushForm, setPushForm] = useState({ title: "", body: "" });
+    const [pushTargets, setPushTargets] = useState<string[]>([]);
+    const [pushAll, setPushAll] = useState(true);
+    const sendPushMutation = useMutation({
+        mutationFn: async () => apiRequest("/api/hiq/admin/push", {
+            method: "POST",
+            body: { memberIds: pushAll ? "all" : pushTargets, title: pushForm.title, body: pushForm.body },
+        }),
+        onSuccess: (r: any) => {
+            toast({ title: `발송 완료 — ${r.sent}/${r.total}명` });
+            setPushForm({ title: "", body: "" });
+            setPushTargets([]);
+        },
+        onError: (e: any) => toast({ title: e?.message || "발송 실패", variant: "destructive" }),
     });
 
     // Mutations
@@ -630,6 +659,68 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
+                    {tab === "push" && (
+                        <div className="grid gap-4 max-w-3xl">
+                            <div className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] space-y-3">
+                                <h3 className="font-bold text-lg">푸시 알림 보내기</h3>
+                                <p className="text-[13px] text-black/50 leading-relaxed">
+                                    인앱 알림함에 저장되고, 푸시 토큰이 있는 회원에게는 기기 알림도 함께 갑니다.
+                                </p>
+                                <Input
+                                    value={pushForm.title}
+                                    onChange={(e) => setPushForm({ ...pushForm, title: e.target.value })}
+                                    maxLength={60}
+                                    placeholder="제목 (예: 이번 주 랭킹전 안내)"
+                                    className="bg-black/[0.04] border-black/10 h-12"
+                                />
+                                <Textarea
+                                    value={pushForm.body}
+                                    onChange={(e) => setPushForm({ ...pushForm, body: e.target.value })}
+                                    maxLength={200}
+                                    placeholder="내용 (200자 이내)"
+                                    className="bg-black/[0.04] border-black/10 h-24"
+                                />
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setPushAll(true)}
+                                        className={`px-3.5 h-10 rounded-full text-[13px] font-bold transition-colors ${pushAll ? "bg-brand text-white" : "bg-black/[0.05] text-black/55"}`}
+                                    >
+                                        전체 회원 ({members.length}명)
+                                    </button>
+                                    <button
+                                        onClick={() => setPushAll(false)}
+                                        className={`px-3.5 h-10 rounded-full text-[13px] font-bold transition-colors ${!pushAll ? "bg-brand text-white" : "bg-black/[0.05] text-black/55"}`}
+                                    >
+                                        개별 선택{!pushAll && pushTargets.length > 0 ? ` (${pushTargets.length}명)` : ""}
+                                    </button>
+                                </div>
+                                {!pushAll && (
+                                    <div className="max-h-64 overflow-y-auto rounded-xl border border-black/[0.06] divide-y divide-black/[0.05]">
+                                        {members.map((m: any) => (
+                                            <label key={m.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-black/[0.02]">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={pushTargets.includes(m.id)}
+                                                    onChange={(e) => setPushTargets((prev) =>
+                                                        e.target.checked ? [...prev, m.id] : prev.filter((id) => id !== m.id))}
+                                                />
+                                                <span className="text-[14px] font-semibold">{m.name}</span>
+                                                <span className="text-[12px] text-black/40 tabular-nums">{m.phone}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                                <Button
+                                    disabled={!pushForm.title.trim() || !pushForm.body.trim() || (!pushAll && pushTargets.length === 0) || sendPushMutation.isPending}
+                                    onClick={() => sendPushMutation.mutate()}
+                                    className="w-full h-12 bg-brand hover:bg-brand-strong text-white font-bold"
+                                >
+                                    {sendPushMutation.isPending ? "발송 중..." : `발송하기 (${pushAll ? members.length : pushTargets.length}명)`}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
                     {tab === "notices" && (
                         <div className="space-y-6">
                             <div className="flex justify-end">
@@ -668,14 +759,25 @@ export default function AdminDashboard() {
 
                             <div className="grid gap-4">
                                 {notices.map(notice => (
-                                    <div key={notice.id} className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                                    <div key={notice.id} className={`bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] ${(notice as any).hidden ? "opacity-55" : ""}`}>
                                         <div className="flex justify-between items-start mb-2">
                                             <h3 className="font-bold text-lg">{notice.title}</h3>
-                                            <Badge variant="outline" className="border-black/10">{notice.target === 'all' ? 'Users' : 'Owners'}</Badge>
+                                            <div className="flex items-center gap-1.5">
+                                                {(notice as any).hidden && <Badge variant="secondary">숨김</Badge>}
+                                                <Badge variant="outline" className="border-black/10">{notice.target === 'all' ? '전체' : '사장님'}</Badge>
+                                            </div>
                                         </div>
                                         <p className="text-black/60 text-sm whitespace-pre-wrap">{notice.content}</p>
-                                        <div className="mt-4 text-xs text-black/40 text-right">
-                                            {new Date(notice.createdAt).toLocaleString()}
+                                        <div className="mt-4 flex items-center justify-between">
+                                            <span className="text-xs text-black/40">{new Date(notice.createdAt).toLocaleString()}</span>
+                                            <div className="flex gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => toggleNoticeMutation.mutate({ id: notice.id, hidden: !(notice as any).hidden })}>
+                                                    {(notice as any).hidden ? "보이기" : "가리기"}
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="text-red-500" onClick={() => { if (confirm("이 공지를 삭제할까요?")) deleteNoticeMutation.mutate(notice.id); }}>
+                                                    삭제
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
