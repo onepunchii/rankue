@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
@@ -38,11 +38,30 @@ export default function PartnerLogin() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // 앱에 이미 로그인된 계정이 파트너(매장 소유·관리자)면 폼 없이 자동 진입
+    const [ssoChecking, setSsoChecking] = useState(true);
 
     const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
         resolver: zodResolver(loginSchema)
     });
     const { sendMessage } = useNativeBridge();
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const r = await apiRequest("/api/hiq/partner/sso", { method: "POST" });
+                if (!alive) return;
+                if (r?.success) {
+                    toast({ title: "자동 로그인", description: `${r.storeName} 계정으로 접속합니다.` });
+                    setLocation(r.role === "super_admin" || r.role === "admin" ? "/admin/dashboard" : "/partner/dashboard");
+                    return;
+                }
+            } catch { /* 파트너 아님·비로그인 — 폼으로 */ }
+            if (alive) setSsoChecking(false);
+        })();
+        return () => { alive = false; };
+    }, [setLocation, toast]);
 
     const onSubmit = async (data: LoginForm) => {
         setIsSubmitting(true);
@@ -87,6 +106,15 @@ export default function PartnerLogin() {
             setIsSubmitting(false);
         }
     };
+
+    // SSO 확인 중엔 폼을 깜빡이지 않는다 — 파트너면 이 화면을 스치듯 지나간다
+    if (ssoChecking) {
+        return (
+            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-black/45 text-[14px] font-medium">
+                계정 확인 중...
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col p-6 font-sans">

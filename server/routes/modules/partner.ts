@@ -38,6 +38,33 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
     return sendError(res, 401, "로그인에 실패했습니다.");
 }));
 
+// POST /partner/sso — 이미 유저로 로그인된 세션에서 파트너 자동 진입.
+// 전화번호 문자열 비교가 아니라 **계정 연결(member.profileId)** 기준: 유저 세션은 이미
+// 비밀번호 인증을 통과했으므로, 같은 profile 이 매장을 소유(또는 관리자)하면 재인증은 중복이다.
+router.post("/sso", asyncHandler(async (req: any, res: any) => {
+    const userId = req.signedCookies?.hiq_user_id;
+    if (!userId) return sendError(res, 401, "로그인이 필요합니다");
+
+    const member = await storage.getMemberById(userId);
+    if (!member?.profileId) return sendError(res, 403, "파트너 계정이 아닙니다");
+    const profile = await storage.getProfile(member.profileId);
+    if (!profile) return sendError(res, 403, "파트너 계정이 아닙니다");
+
+    const store = await storage.getStoreByOwnerProfileId(profile.id);
+    const isAdmin = profile.role === "admin" || profile.role === "super_admin";
+    if (!store && !isAdmin) return sendError(res, 403, "파트너 계정이 아닙니다");
+
+    res.cookie('hiq_partner_auth', profile.id, {
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        signed: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
+        path: '/'
+    });
+    return sendSuccess(res, { success: true, storeName: store?.name ?? "관리자", role: profile.role });
+}));
+
 // Helper for protected partner routes — trust only the SIGNED partner cookie.
 const requirePartner = asyncHandler(async (req: any, res: any, next: any) => {
     const profileId = req.signedCookies?.hiq_partner_auth;
