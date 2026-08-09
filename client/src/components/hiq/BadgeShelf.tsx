@@ -43,14 +43,14 @@ const L: Record<Locale, { title: string; subtitle: string; tiers: string[]; name
 
 const TIER_STYLE = [
     "bg-black/[0.03] text-black/35",                 // 0 미획득
-    "bg-[#a9825e]/12 text-[#7a5c3e]",                // 1 나무
+    "bg-brand/[0.07] text-brand",                    // 1 나무 — 시그니처 그린 연톤
     "bg-black/[0.08] text-black/70",                 // 2 카본
     "bg-[#cba258]/15 text-[#8a6a2a]",                // 3 금장
-    "bg-brand/12 text-brand",                        // 4 명인
+    "bg-brand text-white",                           // 4 명인 — 꽉 찬 브랜드 그린
 ];
 
-// 등급 게이지 세그먼트 색 — 획득한 칸은 해당 등급의 큐 색으로 칠한다 (나무→카본→금장→명인)
-const TIER_FILL = ["#a9825e", "#3a3a3c", "#cba258", "#006241"];
+// 등급 게이지 세그먼트 색 — 획득한 칸은 해당 등급의 큐 색 (연그린→카본→금장→딥그린)
+const TIER_FILL = ["#7fb89a", "#3a3a3c", "#cba258", "#006241"];
 
 // 랜딩·데스크탑 프레임과 같은 획으로 그린 당구 뱃지 아이콘 (currentColor 상속 — 등급 색이 곧 아이콘 색)
 const Ico = ({ children }: { children: React.ReactNode }) => (
@@ -114,7 +114,12 @@ const TierGauge = ({ tier }: { tier: number }) => (
             <span
                 key={i}
                 className="h-[4px] flex-1 rounded-full"
-                style={{ background: i < tier ? TIER_FILL[i] : "rgba(0,0,0,0.08)" }}
+                // 명인(꽉 찬 그린 카드)에서는 등급색이 배경에 묻혀 흰색 게이지로 전환
+                style={{
+                    background: i < tier
+                        ? (tier === 4 ? "rgba(255,255,255,0.92)" : TIER_FILL[i])
+                        : (tier === 4 ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.08)"),
+                }}
             />
         ))}
     </div>
