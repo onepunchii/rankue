@@ -53,12 +53,21 @@ export const AchievementCard = ({ filter }: { filter: string }) => {
         cur.games += w.games;
         byWeek.set(w.week, cur);
     }
-    const weeks = [...byWeek.entries()]
-        .map(([week, v]) => ({ week, games: v.games, rate: Math.round(v.rateSum / v.games) }))
-        .sort((a, b) => a.week.localeCompare(b.week))
-        .slice(-8);
 
-    if (weeks.length === 0) {
+    // 8주 축 고정 — 경기 없는 주도 빈 칸으로 그려야 "이번 주가 몇 번째 칸인지"가 안 흔들린다.
+    // 서버의 date_trunc('week')는 월요일(UTC) 시작 — 같은 기준으로 주 키를 생성한다.
+    const monday = new Date();
+    monday.setUTCHours(0, 0, 0, 0);
+    monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+    const weeks = Array.from({ length: 8 }, (_, i) => {
+        const d = new Date(monday.getTime() - (7 - i) * 7 * 86400000); // i=7 이 이번 주(월요일)
+        const key = d.toISOString().slice(0, 10);
+        const v = byWeek.get(key);
+        return { week: key, games: v?.games ?? 0, rate: v ? Math.round(v.rateSum / v.games) : null };
+    });
+
+    const withData = weeks.filter((w) => w.rate != null);
+    if (withData.length === 0) {
         return (
             <div className="rk-card p-5 mb-6">
                 <h3 className="text-[15px] font-bold text-ink-1">{t.title}</h3>
@@ -67,33 +76,43 @@ export const AchievementCard = ({ filter }: { filter: string }) => {
         );
     }
 
-    const maxRate = Math.max(...weeks.map((w) => w.rate), 100);
-    const last = weeks[weeks.length - 1];
-    const prev = weeks.length > 1 ? weeks[weeks.length - 2] : null;
-    const delta = prev ? last.rate - prev.rate : null;
+    const maxRate = Math.max(...withData.map((w) => w.rate!), 100);
+    const last = withData[withData.length - 1];
+    const prev = withData.length > 1 ? withData[withData.length - 2] : null;
+    const delta = prev ? last.rate! - prev.rate! : null;
 
     return (
         <div className="rk-card p-5 mb-6">
-            <div className="flex items-baseline justify-between mb-1">
+            <div className="flex items-baseline justify-between mb-3">
                 <h3 className="text-[15px] font-bold text-ink-1">{t.title}</h3>
                 <span className="text-[11.5px] font-medium text-black/40">{t.subtitle}</span>
             </div>
-            <div className="flex items-baseline gap-2 mb-3">
-                <span className="text-[28px] font-bold text-brand tabular-nums">{last.rate}%</span>
+            {/* 헤드라인 칩 — 이번 달성률 + 지난주 대비 */}
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <span className="inline-flex items-baseline gap-1 px-3.5 py-1.5 rounded-full bg-brand text-white">
+                    <b className="text-[18px] tabular-nums leading-none">{last.rate}%</b>
+                </span>
                 {delta != null && (
-                    <span className={cn("text-[12.5px] font-bold", delta > 0 ? "text-brand" : delta < 0 ? "text-red-500" : "text-black/40")}>
+                    <span className={cn(
+                        "inline-flex items-center px-3 py-1.5 rounded-full text-[12.5px] font-bold leading-none",
+                        delta > 0 ? "bg-brand/10 text-brand" : delta < 0 ? "bg-red-500/10 text-red-500" : "bg-black/[0.05] text-black/45",
+                    )}>
                         {delta === 0 ? t.same : t.vs(delta)}
                     </span>
                 )}
             </div>
             <div className="flex items-end gap-1.5 h-[72px]">
-                {weeks.map((w, i) => (
+                {weeks.map((w) => (
                     <div key={w.week} className="flex-1 flex flex-col items-center gap-1">
-                        <div
-                            className={cn("w-full rounded-t-md", i === weeks.length - 1 ? "bg-brand" : "bg-brand/25")}
-                            style={{ height: `${Math.max(8, (w.rate / maxRate) * 64)}px` }}
-                            title={`${w.rate}% · ${w.games}${t.games}`}
-                        />
+                        {w.rate != null ? (
+                            <div
+                                className={cn("w-full rounded-t-md", w.week === last.week ? "bg-brand" : "bg-brand/25")}
+                                style={{ height: `${Math.max(8, (w.rate / maxRate) * 64)}px` }}
+                                title={`${w.rate}% · ${w.games}${t.games}`}
+                            />
+                        ) : (
+                            <div className="w-full h-[6px] rounded-full bg-black/[0.05]" />
+                        )}
                         <span className="text-[9.5px] text-black/35 tabular-nums">
                             {new Date(w.week).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}
                         </span>
