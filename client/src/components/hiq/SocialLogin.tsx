@@ -84,8 +84,11 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
       const j = await res.json();
       if (!res.ok || !j?.success) throw new Error(j?.message || "social login failed");
       setLocation(j.data?.redirectTo || "/dashboard");
-    } catch {
-      toast({ title: t("login.failedTitle"), description: t("login.socialFailed"), variant: "destructive" });
+    } catch (err) {
+      // 서버가 알려준 실패 사유(레이트리밋·검증 실패 등)를 그대로 보여준다 — 일반 문구만으로는 원인 추적 불가
+      const detail = err instanceof Error && err.message !== "social login failed" ? err.message : t("login.socialFailed");
+      console.error("[social] login failed:", err);
+      toast({ title: t("login.failedTitle"), description: detail, variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -99,9 +102,12 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
       const idToken = await nativeSocialIdToken(provider);
       if (!idToken) { setBusy(false); return; } // 사용자 취소
       await submitToken(provider, idToken); // 성공/실패 토스트·busy 해제는 submitToken이 처리
-    } catch {
+    } catch (err) {
+      // 플러그인 미탑재(구 앱 빌드)·설정 오류가 전부 여기로 떨어진다 — 원인 문구를 남겨야 추적 가능
+      console.error("[social] native sign-in failed:", err);
       setBusy(false);
-      toast({ title: t("login.failedTitle"), description: t("login.socialFailed"), variant: "destructive" });
+      const msg = err instanceof Error && err.message ? err.message : t("login.socialFailed");
+      toast({ title: t("login.failedTitle"), description: msg, variant: "destructive" });
     }
   }, [busy, submitToken, toast, t]);
 

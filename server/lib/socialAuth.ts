@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify, decodeJwt } from "jose";
 
 // 소셜 로그인 id_token 서버 검증 — xong/mapix 검증 패턴 이식.
 // 클라이언트가 받아온 토큰을 절대 신뢰하지 않고 발급사 JWKS로 서명·발급자·수신자를 검증한다.
@@ -18,9 +18,23 @@ function allowedAudiences(env: string | undefined): string[] {
   return (env ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+// 검증 실패 진단 로그 — 서명 검증 없이 클레임만 읽어 iss/aud/만료를 남긴다.
+// PII(email·name)는 로그에 넣지 않는다. aud 불일치·만료·발급자 오류가 한눈에 보이게.
+function logVerifyFailure(provider: string, idToken: string, err: unknown, allowed: string[]) {
+  let claims: Record<string, unknown> = {};
+  try {
+    const p = decodeJwt(idToken);
+    claims = { iss: p.iss, aud: p.aud, azp: (p as any).azp, expInSec: p.exp ? p.exp - Math.floor(Date.now() / 1000) : null };
+  } catch { claims = { decode: "failed" }; }
+  console.warn(`[social] ${provider} 토큰 검증 실패:`, (err as Error)?.message ?? err, "| claims:", JSON.stringify(claims), "| allowed aud:", allowed.length);
+}
+
 export async function verifyGoogleIdToken(idToken: string): Promise<SocialIdentity | null> {
   const audience = allowedAudiences(process.env.GOOGLE_CLIENT_IDS);
-  if (audience.length === 0) return null; // 미설정 시 로그인 불가(안전 기본값)
+  if (audience.length === 0) {
+    console.warn("[social] GOOGLE_CLIENT_IDS 미설정 — 구글 로그인 불가");
+    return null; // 미설정 시 로그인 불가(안전 기본값)
+  }
   try {
     const { payload } = await jwtVerify(idToken, GOOGLE_JWKS, {
       issuer: ["https://accounts.google.com", "accounts.google.com"],
@@ -32,7 +46,8 @@ export async function verifyGoogleIdToken(idToken: string): Promise<SocialIdenti
       email: typeof payload.email === "string" ? payload.email : null,
       name: typeof payload.name === "string" ? payload.name : null,
     };
-  } catch {
+  } catch (err) {
+    logVerifyFailure("google", idToken, err, audience);
     return null;
   }
 }
@@ -50,7 +65,8 @@ export async function verifyAppleIdToken(idToken: string): Promise<SocialIdentit
       email: typeof payload.email === "string" ? payload.email : null,
       name: null, // 애플은 id_token에 이름을 넣지 않음(최초 로그인 시 클라이언트가 별도 전달)
     };
-  } catch {
+  } catch (err) {
+    logVerifyFailure("apple", idToken, err, audience);
     return null;
   }
 }
