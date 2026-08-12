@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
-import { isNativeApp } from "@/lib/nativeBridge";
+import { isNativeApp, nativePlatform } from "@/lib/nativeBridge";
 import { nativeSocialIdToken } from "@/lib/nativeSignIn";
 
 // 소셜 로그인(구글·애플) — 글로벌(비한국어) 유저의 기본 진입.
@@ -180,15 +180,20 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
           <GoogleG />
           <span>{t("login.continueGoogle")}</span>
         </button>
-        <button
-          onClick={() => nativeSignIn("apple")}
-          disabled={busy}
-          className="w-[320px] h-[44px] rounded-[8px] bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 active:scale-[0.98] transition-transform"
-          style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
-        >
-          <AppleLogo />
-          <span>{t("login.continueApple")}</span>
-        </button>
+        {/* 안드로이드 앱은 애플 버튼 미노출 — 네이티브 initialize에서 apple 설정을 뺐고(웹뷰 제약,
+            nativeSignIn.ts 참고) 누르면 "Provider was not initialized"만 난다. 애플 정책상
+            안드로이드 앱에 애플 로그인 의무도 없다. iOS 앱·웹(안드로이드 브라우저 포함)은 유지. */}
+        {nativePlatform() !== "android" && (
+          <button
+            onClick={() => nativeSignIn("apple")}
+            disabled={busy}
+            className="w-[320px] h-[44px] rounded-[8px] bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 active:scale-[0.98] transition-transform"
+            style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+          >
+            <AppleLogo />
+            <span>{t("login.continueApple")}</span>
+          </button>
+        )}
         {busy && <p className="text-[12px] text-black/40">{t("common.loading")}</p>}
       </div>
     );
