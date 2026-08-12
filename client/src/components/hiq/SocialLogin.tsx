@@ -62,7 +62,7 @@ function AppleLogo() {
   );
 }
 
-export default function SocialLogin() {
+export default function SocialLogin({ hint = true }: { hint?: boolean }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useT();
@@ -165,7 +165,7 @@ export default function SocialLogin() {
   if (inApp) {
     return (
       <div className="w-full flex flex-col items-center gap-3">
-        <p className="text-[12px] font-medium text-black/55 text-center">{t("login.socialHint")}</p>
+        {hint && <p className="text-[12px] font-medium text-black/55 text-center">{t("login.socialHint")}</p>}
         <button
           onClick={() => nativeSignIn("google")}
           disabled={busy}
@@ -192,7 +192,7 @@ export default function SocialLogin() {
   if (!GOOGLE_CLIENT_ID) return null;
   return (
     <div className="w-full flex flex-col items-center gap-3">
-      <p className="text-[12px] font-medium text-black/55 text-center">{t("login.socialHint")}</p>
+      {hint && <p className="text-[12px] font-medium text-black/55 text-center">{t("login.socialHint")}</p>}
       {/* GIS가 이 컨테이너 내부 DOM을 직접 소유 — React 자식을 절대 넣지 말 것(removeChild 충돌) */}
       <div className="flex justify-center min-h-[44px] relative">
         <div ref={googleBtnRef} />

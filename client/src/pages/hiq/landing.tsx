@@ -271,15 +271,6 @@ export default function Landing() {
                             </button>
                         )}
 
-                        {/* 비한국어 유저가 전화 모드로 온 경우 — 소셜로 돌아가는 교차 링크 */}
-                        {!requiresPassword && locale !== "ko" && socialLoginAvailable() && (
-                            <button
-                                onClick={() => setPhoneMode(false)}
-                                className="w-full mt-6 text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4 text-center"
-                            >
-                                {t("login.socialLoginLink")}
-                            </button>
-                        )}
                     </div>
                 </div>
                 )}
@@ -309,6 +300,19 @@ export default function Landing() {
                         )}
                     </motion.button>
                 </div>
+                )}
+
+                {/* 전화 모드에서도 구글·애플 동시 노출 — 한국어 포함 전 로케일 3종 로그인 (오너 결정 2026-08-12).
+                    PIN 확인 단계(requiresPassword)는 기존 회원 본인 확인 중이므로 제외. */}
+                {showPhone && !requiresPassword && socialLoginAvailable() && (
+                    <div className="px-8 pb-8 flex flex-col items-center gap-4 -mt-1">
+                        <div className="w-full flex items-center gap-3">
+                            <span className="flex-1 h-[1px] bg-black/10" />
+                            <span className="text-[11px] font-medium text-black/40">{t("login.or")}</span>
+                            <span className="flex-1 h-[1px] bg-black/10" />
+                        </div>
+                        <SocialLogin hint={false} />
+                    </div>
                 )}
 
                 {/* Footer — 제공 문구 + 언어 선택 */}

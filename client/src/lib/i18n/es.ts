@@ -101,6 +101,7 @@ const es: Dict = {
 
   "login.continueGoogle": "Continuar con Google",
   "login.continueApple": "Continuar con Apple",
+  "login.or": "o",
   "login.socialHint": "Empieza en segundos y compite en el ranking mundial de billar",
   "login.phoneLoginLink": "¿Miembro de un club coreano? Entra con teléfono",
   "login.socialLoginLink": "Continuar con Google / Apple",

@@ -101,6 +101,7 @@ const vi: Dict = {
 
   "login.continueGoogle": "Tiếp tục với Google",
   "login.continueApple": "Tiếp tục với Apple",
+  "login.or": "hoặc",
   "login.socialHint": "Bắt đầu trong vài giây và chinh phục bảng xếp hạng bi-a thế giới",
   "login.phoneLoginLink": "Thành viên CLB Hàn Quốc? Đăng nhập bằng số điện thoại",
   "login.socialLoginLink": "Tiếp tục với Google / Apple",

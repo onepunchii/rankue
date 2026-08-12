@@ -103,6 +103,7 @@ export const ko: Dict = {
 
   "login.continueGoogle": "Google로 계속하기",
   "login.continueApple": "Apple로 계속하기",
+  "login.or": "또는",
   "login.socialHint": "간편하게 시작하고 전 세계 랭킹에 도전하세요",
   "login.phoneLoginLink": "한국 매장 회원이신가요? 전화번호로 로그인",
   "login.socialLoginLink": "Google / Apple로 계속하기",

@@ -101,6 +101,7 @@ const tr: Dict = {
 
   "login.continueGoogle": "Google ile devam et",
   "login.continueApple": "Apple ile devam et",
+  "login.or": "veya",
   "login.socialHint": "Saniyeler içinde başlayın, dünya bilardo sıralamasına meydan okuyun",
   "login.phoneLoginLink": "Kore kulüp üyesi misiniz? Telefonla giriş yapın",
   "login.socialLoginLink": "Google / Apple ile devam et",
