@@ -651,32 +651,38 @@ export const errorLogs = pgTable("error_logs", {
 export type ErrorLog = typeof errorLogs.$inferSelect;
 
 
-// 일별 유니크 웹 접속자 — 슈퍼관리자 대시보드의 "접속자" 지표.
-//
-// ⚠️ 아래 hiq_visit_logs 와 혼동하지 말 것. 그쪽은 **회원의 매장 방문 기록**이라
-//    member_id 가 필수이고, 로그인하지 않은 사람은 애초에 잡히지 않는다.
-//    이 테이블은 가입 여부와 무관한 **웹/앱 접속자**를 센다.
-//
-// 설계:
-//  · (day, visitor) 를 PK 로 두어 하루 한 사람이 한 행 → count(*) 가 곧 유니크 접속자수.
-//  · 클라이언트가 localStorage 로 게이트하므로 DB 쓰기는 방문자당 하루 1회다
-//    (페이지 이동마다 쓰면 트래픽이 늘수록 DB 비용·지연이 같이 늘어난다).
-//  · visitor 는 클라이언트가 만든 난수 ID다. IP·계정을 저장하지 않는다.
-//  · day 는 KST 기준으로 넣는다(서버 UTC 자정에 날짜가 바뀌면 한국 기준과 어긋난다).
-export const dailyVisits = pgTable("daily_visits", {
-  day: date("day").notNull(),
-  visitor: text("visitor").notNull(),
-  firstSeen: timestamp("first_seen").defaultNow().notNull(),
-}, (t) => ({
-  pk: primaryKey({ columns: [t.day, t.visitor] }),
-}));
-
 export const hiqVisitLogs = pgTable("hiq_visit_logs", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
   storeId: uuid("store_id").references(() => hiqStores.id), // Which store?
   visitedAt: timestamp("visited_at").defaultNow().notNull(),
 });
+
+// 일별 유니크 웹 접속자 — 슈퍼관리자 대시보드의 "접속자" 지표.
+//
+// ⚠️ 바로 위 hiq_visit_logs 와 혼동하지 말 것. 그쪽은 **회원의 매장 방문 기록**이라
+//    member_id 가 필수이고 로그인하지 않은 사람은 애초에 잡히지 않는다.
+//    이 테이블은 가입 여부와 무관한 웹/앱 접속자를 센다.
+//    대시보드 라벨도 "접속자" vs "매장방문(24시간)" 으로 나눠 놨다.
+//
+// 설계:
+//  · (day, visitor) 복합 PK → 하루 한 사람이 한 행. count(*) 가 곧 유니크 접속자수라
+//    distinct 집계가 필요 없다.
+//  · 클라이언트가 localStorage 로 게이트하므로 DB 쓰기는 방문자당 하루 1회다
+//    (페이지 이동마다 쓰면 트래픽이 늘수록 DB 비용·지연이 같이 늘어난다).
+//  · visitor 는 클라이언트가 만든 난수 ID다. IP·계정을 저장하지 않는다.
+//  · day 는 KST 기준으로 넣는다(서버 UTC 자정에 날짜가 바뀌면 한국 기준과 어긋난다).
+//
+// DB 에는 2026-08-13 raw SQL 로 먼저 생성했고, 이 정의는 drizzle push 가
+// "DB 에만 있는 테이블을 지울까요?" 로 제안하지 않게 막는 앵커 역할도 한다.
+export const dailyVisits = pgTable("daily_visits", {
+  day: date("day").notNull(),
+  visitor: text("visitor").notNull(),
+  firstSeen: timestamp("first_seen").defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.day, table.visitor] }),
+  index("daily_visits_day_idx").on(table.day),
+]);
 
 export const hiqGameHistory = pgTable("hiq_game_history", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
