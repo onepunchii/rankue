@@ -7,7 +7,7 @@ import {
     hiqVisitLogs,
     partnerLeads,
     suggestions,
-    errorLogs
+    errorLogs, dailyVisits
 } from "../../../shared/schema.js";
 import { desc, eq, sql } from "drizzle-orm";
 
@@ -34,6 +34,8 @@ function redactPII(text: string): string {
 }
 
 // --- 슈퍼관리자 요약 ---
+// 접속자 지표는 daily_visits 테이블을 읽는다. 테이블이 없으면 "미설정"으로 뜬다
+// (0명이 아니다 — 둘은 다른 사실이다). 생성 SQL: migrations/daily_visits.sql
 // GET /api/super-summary            → 카운트 요약
 // GET /api/super-summary?detail=1   → 요약 + 건의함·에러함 최근 10건 목록
 // 인증: Authorization: Bearer <SUPER_ADMIN_SECRET> (외부 모니터링용이라 쿠키 세션 대신 시크릿 헤더 사용)
@@ -76,12 +78,38 @@ router.get("/super-summary", async (req, res) => {
             .where(sql`${errorLogs.createdAt} >= now() - interval '1 day'`))
     ]);
 
+    // 웹/앱 접속자(가입 여부 무관) — daily_visits 는 (day, visitor) PK 라 count(*) 가 곧 유니크 수다.
+    //
+    // ★ 실패 시 0 이 아니라 null 을 유지한다. "접속자 0명"과 "집계가 아직 준비되지 않음"은
+    //   전혀 다른 사실인데 0 으로 뭉개면 대시보드에서 구분할 수 없고, 스키마를 아직 밀지 않은
+    //   환경에서 서비스가 죽은 줄로 오해한다. 그래서 아래에서 "미설정"으로 표시한다.
+    let visitorsToday: number | null = null;
+    let visitorsYesterday: number | null = null;
+    try {
+        const r = await db.execute(sql`
+            select
+              count(*) filter (where day = (now() at time zone 'Asia/Seoul')::date)::int      as today,
+              count(*) filter (where day = (now() at time zone 'Asia/Seoul')::date - 1)::int  as yesterday
+            from daily_visits
+            where day >= (now() at time zone 'Asia/Seoul')::date - 1
+        `);
+        const row = ((r as unknown as { rows?: { today: number; yesterday: number }[] }).rows ?? [])[0];
+        visitorsToday = row?.today ?? 0;
+        visitorsYesterday = row?.yesterday ?? 0;
+    } catch {
+        // null 유지 → "미설정"
+    }
+
     // 서비스 특성 지표 (쿼리 실패분은 제외)
-    const metrics = [
+    const metrics: { label: string; value: number | string }[] = [
+        { label: "접속자(오늘)", value: visitorsToday ?? "미설정" },
+        { label: "접속자(어제)", value: visitorsYesterday ?? "미설정" },
         { label: "매장", value: storesTotal },
         { label: "매장회원", value: storeMembersTotal },
-        { label: "방문(24시간)", value: visits24h }
-    ].filter((m): m is { label: string; value: number } => m.value !== null);
+        // ⚠️ 이건 웹 접속자가 아니라 **회원의 매장 방문 기록**(hiq_visit_logs)이다.
+        //    위 "접속자"와 이름이 비슷해 혼동하기 쉬워 라벨을 명확히 했다.
+        { label: "매장방문(24시간)", value: visits24h }
+    ].filter((m) => m.value !== null) as { label: string; value: number | string }[];
 
     // 사람 눈길이 필요한 미처리 항목 (0건이거나 쿼리 실패면 제외)
     const pending = [

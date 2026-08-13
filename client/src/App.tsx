@@ -3,6 +3,7 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
+import { VisitBeacon } from "@/components/hiq/VisitBeacon";
 import NotFound from "@/pages/not-found";
 import { useEffect, type ComponentType, type FunctionComponent } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -270,6 +271,8 @@ function App() {
                 컴포넌트는 예전부터 있었지만 **어디에도 마운트돼 있지 않아 죽어 있었다**(번들에서도 빠졌다).
                 여기 붙여야 실제로 뜬다. 네이티브 앱 안에서는 컴포넌트가 스스로 숨는다. */}
             <HiqInstallBanner />
+            {/* 일별 유니크 접속자 비콘 — 하루 1회만 전송 */}
+            <VisitBeacon />
           </SportProvider>
         </StoreProvider>
       </I18nProvider>
