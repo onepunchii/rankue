@@ -47,12 +47,12 @@ const RAW: FamilyService[] = [
     id: "xong",
     web: "https://xong.co.kr",
     ios: "https://apps.apple.com/app/id6790474855",
-    // ⚠️ TODO(플레이 승인되면 아래 줄로 되돌린다):
-    //   "https://play.google.com/store/apps/details?id=kr.co.xong.app"
-    // 2026-08-03 실측: 그 Play 페이지가 아직 404 다(심사 대기). 같은 방식으로 확인한
-    // 나머지 5개는 200 이므로 조회 방법 문제가 아니다. 404 인 링크를 걸어 두면
-    // 안드로이드 사용자가 카드를 누를 때마다 Play 오류 화면을 만난다 → 그동안은 웹으로.
-    android: null,
+    // 2026-08-16 되돌림(승인됨). 2026-08-03 에는 이 Play 페이지가 404(심사 대기)라
+    // null 로 막아 뒀었다 — 404 링크는 안드로이드 사용자에게 Play 오류 화면을 준다.
+    // 판별법: 미게시 앱은 Play 가 404 + <title>찾을 수 없음</title> 을 준다.
+    //   실측(2026-08-16) kr.co.xong.app=200 / kr.co.polli.app=404 / com.tgmpark.app=404.
+    //   두 개가 404 로 나오므로 "전부 200" 같은 조회 방법 착오가 아니다.
+    android: "https://play.google.com/store/apps/details?id=kr.co.xong.app",
   },
   {
     id: "onp",
