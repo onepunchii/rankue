@@ -122,6 +122,9 @@ export default function HiqPbaPlayer() {
             : "PBA 선수 프로필",
         path: `/pba-player/${memCode}`,
         locale,
+        // 선수 상세 패밀리 기본 og:image — server/prerender.ts 의 /pba-player 와 같은 값.
+        // 사이트 기본값 og.png 는 "당구 점수판 앱" 홍보컷이라 선수 프로필 공유컷으로 엉뚱했다.
+        image: "https://www.rankue.co.kr/og-pba.png",
         jsonLd: p ? {
             "@context": "https://schema.org",
             "@type": "Person",

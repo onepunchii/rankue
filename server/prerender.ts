@@ -851,6 +851,11 @@ export function registerPrerender(app: Express) {
         title: `${p.nameKo} — ${p.league} 프로당구 선수 | 랭큐`,
         desc: `${p.nameKo}${p.nameEn ? ` (${p.nameEn})` : ""} — ${p.league} 통산 상금 ${p.careerPrize != null ? formatPrizeKo(p.careerPrize) : "-"}, 에버리지 ${p.average ?? "-"}, 하이런 ${p.highRun ?? "-"}.`,
         canonical: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
+        // 선수 상세 패밀리 기본 og:image — 사이트 기본값(og.png, "당구 점수판 앱" 홍보컷)은
+        // 선수 프로필과 무관해 카톡·네이버 공유 썸네일이 엉뚱했다. /pba 허브와 같은
+        // PBA 대표컷(1200×630)을 패밀리 기본값으로 쓴다. 선수 본인 사진은 없다(초상권).
+        image: `${ORIGIN}/og-pba.png`,
+        imageAlt: `${p.nameKo} — ${p.league} 프로당구 선수 | 랭큐`,
         jsonLd: [
           {
             "@context": "https://schema.org",
@@ -892,7 +897,10 @@ export function registerPrerender(app: Express) {
   ${(p.seasons ?? []).map((s: any) => `<li>${esc(pbaSeasonLabel(s.season))} 시즌 — ${s.prizeRank != null ? `상금랭킹 ${s.prizeRank}위, ` : ""}상금 ${esc(formatPrizeKo(s.prize))}원, 포인트 ${s.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
   </ul>
   </section>
-  ${p.umbPlayerId && p.umbCategory ? `<p id="umb"><a href="/player/${esc(p.umbCategory)}/${esc(p.umbPlayerId)}">${esc(A.umb)} 보기</a></p>` : ""}
+  ${p.umbPlayerId && p.umbCategory ? `<section id="umb">
+  <h2>${esc(A.umb)}</h2>
+  <p><a href="/player/${esc(p.umbCategory)}/${esc(p.umbPlayerId)}">${esc(A.umb)} 보기</a></p>
+  </section>` : ""}
   ${related.length ? `<section id="related">
   <h2>${esc(A.related)}</h2>
   <ul>
