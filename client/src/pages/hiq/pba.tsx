@@ -108,6 +108,8 @@ export default function HiqPba() {
         description: t.metaDesc,
         path: "/pba",
         locale,
+        // 허브 전용 대표 이미지 — 프리렌더(/pba)와 같은 값
+        image: "https://www.rankue.co.kr/og-pba.png",
         jsonLd: rows.length ? {
             "@context": "https://schema.org",
             "@type": "ItemList",

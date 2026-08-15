@@ -7,7 +7,7 @@ import { ABOUT_CONTENT, ABOUT_LANGS, type AboutContent } from "../shared/aboutCo
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW } from "../shared/landingContent.js";
-import { formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared } from "../shared/pbaMeta.js";
+import { formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared, PBA_PLAYER_ANCHORS_KO, pbaRelated } from "../shared/pbaMeta.js";
 import { briefingLineKo, briefingDateKo, briefingTitle, briefingDesc, todayKst } from "../shared/briefingMeta.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
@@ -98,6 +98,11 @@ interface PageParts {
   altBase?: string;
   body: string;
   jsonLd?: unknown[];
+  /** 페이지 전용 og:image(1200×630 절대 URL). 없으면 패밀리 기본값 OG_IMAGE. */
+  image?: string;
+  imageAlt?: string;
+  /** head 에 그대로 삽입할 추가 태그(소유확인 메타 등). 호출부가 이스케이프를 책임진다. */
+  extraHead?: string;
 }
 
 function page(p: PageParts): string {
@@ -127,6 +132,8 @@ function page(p: PageParts): string {
     .join("");
 
   const lang = p.lang ?? "ko";
+  const ogImage = p.image ?? OG_IMAGE;
+  const ogImageAlt = p.imageAlt ?? "랭큐 RANKUE — 당구 실력 랭킹·매칭 앱";
   return `<!DOCTYPE html>
 <html lang="${esc(lang)}">
 <head>
@@ -142,14 +149,14 @@ function page(p: PageParts): string {
   <meta property="og:description" content="${esc(p.desc)}" />
   <meta property="og:url" content="${esc(p.canonical)}" />
   <meta property="og:locale" content="${esc(OG_LOCALE[lang] ?? "ko_KR")}" />
-  <meta property="og:image" content="${esc(OG_IMAGE)}" />
+  <meta property="og:image" content="${esc(ogImage)}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="랭큐 RANKUE — 당구 실력 랭킹·매칭 앱" />
+  <meta property="og:image:alt" content="${esc(ogImageAlt)}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${esc(p.title)}" />
   <meta name="twitter:description" content="${esc(p.desc)}" />
-  <meta name="twitter:image" content="${esc(OG_IMAGE)}" />${ld}
+  <meta name="twitter:image" content="${esc(ogImage)}" />${p.extraHead ?? ""}${ld}
 </head>
 <body>
 ${p.body}
@@ -278,6 +285,13 @@ export function registerPrerender(app: Express) {
         title: LANDING_META.title,
         desc: LANDING_META.desc,
         canonical: `${ORIGIN}/`,
+        // 소유확인 메타 — client/index.html 의 하드코딩 값과 같은 값이어야 한다.
+        // 네이버·구글 소유확인 검사기가 봇 UA 로 홈을 요청하면 이 프리렌더를 받으므로,
+        // 여기 없으면 소유확인이 풀릴 수 있다 (정적 셸에만 있던 기존 공백을 메움).
+        extraHead:
+          `\n  <meta name="naver-site-verification" content="2e7af38e33b85d732c6cbdc50728f72e0ee2480e" />` +
+          `\n  <meta name="naver-site-verification" content="921330879833dc13b92ea6e0ff5bcb203e2120a7" />` +
+          `\n  <meta name="google-site-verification" content="jLYgi_u7y3J0WorGpD1ODFy7tZ4FZmE8KT4BaGPnRCM" />`,
         jsonLd: [
           {
             "@context": "https://schema.org",
@@ -531,6 +545,8 @@ export function registerPrerender(app: Express) {
     faq2q: (name: string) => string;
     faq2a: (best: number, natl: number | null) => string;
     histH: string;
+    /** 국내 라이벌 블록 제목 — 클라 i18n "umb.rivals" 와 문자 단위 동일 */
+    rivalsH: string;
     rankWord: (rank: number) => string; // 히스토리 목록의 "12위" / "No.12"
     source: string;
     navAll: string;
@@ -549,6 +565,7 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `${n}의 역대 최고 순위는?`,
       faq2a: (b, natl) => `역대 최고 세계랭킹은 ${b}위입니다.${natl ? ` 현재 국내 순위는 ${natl}위입니다.` : ""}`,
       histH: "최근 순위 히스토리",
+      rivalsH: "국내 라이벌",
       rankWord: (r) => `${r}위`,
       source: "출처: UMB 공식 랭킹 — 매주 갱신",
       navAll: "당구 세계랭킹 전체", navHome: "랭큐 홈",
@@ -566,6 +583,7 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `What is ${n}'s career-best ranking?`,
       faq2a: (b, natl) => `The career-best world ranking is No.${b}.${natl ? ` Current national ranking is No.${natl}.` : ""}`,
       histH: "Recent ranking history",
+      rivalsH: "National rivals",
       rankWord: (r) => `No.${r}`,
       source: "Source: official UMB rankings — updated weekly",
       navAll: "Full billiards world ranking", navHome: "RANKUE home",
@@ -583,6 +601,7 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `${n}'in kariyer rekoru kaçıncı sıra?`,
       faq2a: (b, natl) => `Kariyer rekoru dünya ${b}. sıralık.${natl ? ` Güncel ulusal sıralaması ${natl}.` : ""}`,
       histH: "Son sıralama geçmişi",
+      rivalsH: "Ulusal rakipler",
       rankWord: (r) => `${r}.`,
       source: "Kaynak: resmî UMB sıralaması — haftalık güncellenir",
       navAll: "Tüm bilardo dünya sıralaması", navHome: "RANKUE ana sayfa",
@@ -600,6 +619,7 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `Thứ hạng cao nhất sự nghiệp của ${n}?`,
       faq2a: (b, natl) => `Thứ hạng thế giới cao nhất là hạng ${b}.${natl ? ` Hiện xếp hạng ${natl} trong nước.` : ""}`,
       histH: "Diễn biến thứ hạng gần đây",
+      rivalsH: "Đối thủ trong nước",
       rankWord: (r) => `hạng ${r}`,
       source: "Nguồn: BXH chính thức UMB — cập nhật hằng tuần",
       navAll: "BXH bida thế giới đầy đủ", navHome: "Trang chủ RANKUE",
@@ -617,6 +637,7 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `¿Cuál es el mejor puesto histórico de ${n}?`,
       faq2a: (b, natl) => `Su mejor puesto histórico es el N.º ${b}.${natl ? ` Actualmente es N.º ${natl} en su país.` : ""}`,
       histH: "Historial reciente",
+      rivalsH: "Rivales nacionales",
       rankWord: (r) => `N.º ${r}`,
       source: "Fuente: ranking oficial UMB — actualización semanal",
       navAll: "Ranking mundial completo", navHome: "Inicio RANKUE",
@@ -644,6 +665,22 @@ export function registerPrerender(app: Express) {
       const canonical = lang === "ko" ? base : `${base}?lang=${lang}`;
       const historySummary = data.history.slice(-10).map((h: any) =>
         `<li>Edition ${esc(h.edition)}: ${esc(L.rankWord(h.rank))} (${h.points}pts)</li>`).join("\n  ");
+      // 국내 라이벌 — 클라 상세(UmbPlayerBody #rivals)와 같은 데이터·표기 규칙.
+      // 관련문서용 내부링크이자 앵커 섹션. 이름 표기는 히어로와 동일(ko는 한글 우선).
+      const rivals = (data as any).rivals as { rank: number; playerName: string; playerUmbId: string; points: number; nativeName: string | null }[] ?? [];
+      const rivalDisp = (r: { playerName: string; nativeName: string | null }) =>
+        lang === "ko" && r.nativeName ? r.nativeName : r.playerName;
+      // 앵커 목차 — 네이버가 앵커 텍스트를 "본문 바로가기" 칩 문구로 그대로 쓴다.
+      // 첫 앵커에 선수명(핵심 키워드) 포함: "{선수명} 최근 순위 히스토리".
+      // id 는 클라(UmbPlayerBody)의 #history·#rivals 와 짝이라 칩 클릭이 SPA 에서도 착지한다.
+      const tocHtml = ([
+        ["history", `${nameMain} ${L.histH}`, true],
+        ["rivals", L.rivalsH, rivals.length > 0],
+        ["faq", L.faqH, true],
+      ] as const)
+        .filter(([, , show]) => show)
+        .map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`)
+        .join(" ");
       const updatedAt = data.history.length
         ? new Date(data.history[data.history.length - 1].editionDate).toLocaleDateString(DATE_LOCALE[lang], { year: "numeric", month: "long" })
         : "";
@@ -682,17 +719,28 @@ export function registerPrerender(app: Express) {
       const w = data.history.filter((h: any) => h.rank === 1).length;
       return w > 0 ? " " + esc(L.reignNote(w)) : "";
     })()}</p>
+  <nav aria-label="목차">${tocHtml}</nav>
 
+  <section id="faq">
   <h2>${esc(L.faqH)}</h2>
   <section><h3>${esc(L.faq1q(nameMain))}</h3>
   <p>${esc(L.faq1a(nameMain, catName, p.rank, p.points, updatedAt))}</p></section>
   <section><h3>${esc(L.faq2q(nameMain))}</h3>
   <p>${esc(L.faq2a(data.bestRank, p.nationalRank))}</p></section>
+  </section>
 
+  <section id="history">
   <h2>${esc(L.histH)}</h2>
   <ul>
   ${historySummary}
   </ul>
+  </section>
+  ${rivals.length ? `<section id="rivals">
+  <h2>${esc(L.rivalsH)}</h2>
+  <ul>
+  ${rivals.map((r) => `<li><a href="/player/${esc(category)}/${esc(r.playerUmbId)}${lang === "ko" ? "" : `?lang=${lang}`}">${esc(rivalDisp(r))}</a> — ${esc(L.rankWord(r.rank))} (${r.points}pts)</li>`).join("\n  ")}
+  </ul>
+  </section>` : ""}
   <p>${esc(L.source)} — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
   <nav><a href="/world-ranking${lang === "ko" ? "" : `?lang=${lang}`}">${esc(L.navAll)}</a> <a href="/">${esc(L.navHome)}</a></nav>
 </main>`,
@@ -726,6 +774,9 @@ export function registerPrerender(app: Express) {
           title: "PBA 투어 랭킹 · 프로당구 시즌 상금·포인트 순위 | 랭큐",
           desc: "프로당구 PBA·LPBA 시즌별 랭킹. 상금 순위, 랭킹 포인트, 선수별 통산 기록과 시즌 히스토리를 랭큐에서.",
           canonical: `${ORIGIN}/pba`,
+          // 허브 전용 대표 이미지(1200×630) — client/src/pages/hiq/pba.tsx useSeo 의 image 와 같은 값
+          image: `${ORIGIN}/og-pba.png`,
+          imageAlt: "PBA 투어 랭킹 · 프로당구 시즌 상금·포인트 순위 | 랭큐",
           jsonLd: [
             {
               "@context": "https://schema.org",
@@ -769,6 +820,29 @@ export function registerPrerender(app: Express) {
     if (!p) return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
     const games = (p.win ?? 0) + (p.lose ?? 0) + (p.draw ?? 0);
     const winRate = games > 0 ? Math.round(((p.win ?? 0) / games) * 100) : null;
+    // 관련 선수 — 같은 리그 상금랭킹 인접 5명. 클라(pba-player.tsx)와 같은 로직(pbaRelated)이라
+    // 봇 문서와 React 렌더가 같은 링크 집합을 낸다. 조회 실패는 본문 축소로만 — 페이지는 나간다.
+    let related: { memCode: string; prizeRank: number | null; prize: number; nameKo: string; nameEn: string | null }[] = [];
+    try {
+      const { currentPbaSeason } = await import("./services/pbaSync.js");
+      const season = await storage.pba.getDisplaySeason(p.league, currentPbaSeason());
+      const rows = (await storage.pba.getRankings(p.league, season, "prize", 50)) as typeof related;
+      related = pbaRelated(rows, p.memCode, 5);
+    } catch (e) {
+      console.warn("[prerender] pba-player related failed:", (e as Error)?.message);
+    }
+    const A = PBA_PLAYER_ANCHORS_KO;
+    // 앵커 목차 — 네이버가 이 앵커 텍스트로 "본문 바로가기" 칩을 만든다.
+    // 첫 칩에 선수명(핵심 키워드) 포함: "{선수명} 통산 기록". 라벨·id 는 클라 목차와 동일.
+    const tocHtml = ([
+      ["career", `${p.nameKo} ${A.career}`, true],
+      ["seasons", A.seasons, (p.seasons ?? []).length > 1],
+      ["umb", A.umb, !!(p.umbPlayerId && p.umbCategory)],
+      ["related", A.related, related.length > 0],
+    ] as const)
+      .filter(([, , show]) => show)
+      .map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`)
+      .join(" ");
     res.setHeader("X-Prerender", "pba-player");
     noStore(res);
     res.send(
@@ -801,6 +875,9 @@ export function registerPrerender(app: Express) {
   <nav><a href="/pba">← PBA 투어 랭킹</a></nav>
   <h1>${esc(p.nameKo)}</h1>
   <p>${esc(p.nameEn ?? "")} · ${esc(p.league)}${p.nationCode ? ` · ${esc(p.nationCode)}` : ""}</p>
+  <nav aria-label="목차">${tocHtml}</nav>
+  <section id="career">
+  <h2>${esc(A.career)}</h2>
   <dl>
     <dt>통산 상금</dt><dd>${p.careerPrize != null ? `${esc(formatPrizeKo(p.careerPrize))}원` : "-"}</dd>
     ${p.win != null ? `<dt>승-패</dt><dd>${p.win}-${p.lose ?? 0}${winRate != null ? ` (승률 ${winRate}%)` : ""}</dd>` : ""}
@@ -808,11 +885,21 @@ export function registerPrerender(app: Express) {
     ${p.bankShotRate != null ? `<dt>뱅크샷 성공률</dt><dd>${p.bankShotRate}%</dd>` : ""}
     ${p.highRun != null ? `<dt>하이런</dt><dd>${p.highRun}</dd>` : ""}
   </dl>
-  <h2>시즌별 기록</h2>
+  </section>
+  <section id="seasons">
+  <h2>${esc(A.seasons)}</h2>
   <ul>
   ${(p.seasons ?? []).map((s: any) => `<li>${esc(pbaSeasonLabel(s.season))} 시즌 — ${s.prizeRank != null ? `상금랭킹 ${s.prizeRank}위, ` : ""}상금 ${esc(formatPrizeKo(s.prize))}원, 포인트 ${s.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
   </ul>
-  ${p.umbPlayerId && p.umbCategory ? `<p><a href="/player/${esc(p.umbCategory)}/${esc(p.umbPlayerId)}">이 선수의 UMB 세계랭킹 기록 보기</a></p>` : ""}
+  </section>
+  ${p.umbPlayerId && p.umbCategory ? `<p id="umb"><a href="/player/${esc(p.umbCategory)}/${esc(p.umbPlayerId)}">${esc(A.umb)} 보기</a></p>` : ""}
+  ${related.length ? `<section id="related">
+  <h2>${esc(A.related)}</h2>
+  <ul>
+  ${related.map((r) => `<li><a href="/pba-player/${esc(r.memCode)}">${esc(r.nameKo)}</a>${r.nameEn ? ` (${esc(r.nameEn)})` : ""} — ${r.prizeRank != null ? `상금랭킹 ${r.prizeRank}위, ` : ""}상금 ${esc(formatPrizeKo(r.prize))}원</li>`).join("\n  ")}
+  </ul>
+  <p><a href="/pba">${esc(A.related)} →</a></p>
+  </section>` : ""}
   <p>출처: PBA 투어 공식 기록 — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
 </main>`,
       }),

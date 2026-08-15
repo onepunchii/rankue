@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { motion } from "framer-motion";
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip } from "recharts";
 import { LucideChevronLeft, LucideGlobe, LucideTrophy } from "@/lib/icons";
@@ -7,6 +8,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { PBA_PLAYER_ANCHORS_KO, pbaRelated } from "@shared/pbaMeta";
 import { seasonLabel, formatPrize } from "./pba";
 
 // PBA 선수 상세 — 통산 스탯 + 시즌별 궤적. 사진 없이 국기·이름·숫자만(초상권).
@@ -32,10 +34,13 @@ interface PbaPlayerData {
 
 const L: Record<Locale, Record<string, string>> = {
     ko: {
-        back: "PBA 랭킹", career: "통산 기록", prize: "통산 상금", record: "승-패", winRate: "승률",
-        average: "에버리지", bank: "뱅크샷", hr: "하이런", seasons: "시즌별 궤적",
+        // 앵커 목차 칩에 쓰이는 4개 라벨(back·career·seasons·umbCard)은 프리렌더 봇 문서와
+        // 문자 단위 일치가 필요해 shared/pbaMeta.ts 의 정본을 쓴다.
+        back: PBA_PLAYER_ANCHORS_KO.related, career: PBA_PLAYER_ANCHORS_KO.career,
+        prize: "통산 상금", record: "승-패", winRate: "승률",
+        average: "에버리지", bank: "뱅크샷", hr: "하이런", seasons: PBA_PLAYER_ANCHORS_KO.seasons,
         rank: "순위", point: "포인트", seasonPrize: "시즌 상금",
-        umbCard: "이 선수의 UMB 세계랭킹 기록", umbCta: "세계랭킹 히스토리 보기",
+        umbCard: PBA_PLAYER_ANCHORS_KO.umb, umbCta: "세계랭킹 히스토리 보기",
         notFound: "선수를 찾을 수 없습니다", source: "출처: PBA 투어 공식 기록",
     },
     en: {
@@ -82,6 +87,23 @@ export default function HiqPbaPlayer() {
         staleTime: 10 * 60 * 1000,
         retry: false,
     });
+
+    // 관련 선수(같은 리그 상금랭킹 인접 5명) — 내부링크 클러스터. 프리렌더와 같은 로직(pbaRelated).
+    const { data: rankData } = useQuery<{ rows: { memCode: string; prizeRank: number | null; prize: number; nameKo: string; nameEn: string | null; nationCode: string | null }[] }>({
+        queryKey: ["/api/hiq/pba/rankings/related", p?.league],
+        queryFn: async () => apiRequest(`/api/hiq/pba/rankings?league=${p!.league}&by=prize&limit=50`),
+        enabled: !!p,
+        staleTime: 5 * 60 * 1000,
+    });
+    const related = pbaRelated(rankData?.rows ?? [], memCode, 5);
+
+    // 네이버 "본문 바로가기" 칩으로 유입되면 URL 에 #career 류 해시가 붙는다.
+    // SPA 는 데이터 로드 후에야 섹션이 생기므로 브라우저 기본 앵커 점프가 안 먹는다 — 직접 스크롤.
+    useEffect(() => {
+        if (!p) return;
+        const hash = window.location.hash.slice(1);
+        if (hash) document.getElementById(hash)?.scrollIntoView();
+    }, [p]);
 
     const games = (p?.win ?? 0) + (p?.lose ?? 0) + (p?.draw ?? 0);
     const winRate = games > 0 ? Math.round(((p?.win ?? 0) / games) * 100) : null;
@@ -142,8 +164,29 @@ export default function HiqPbaPlayer() {
                         </p>
                     </header>
 
+                    {/* 앵커 목차 — 네이버가 이 <nav> 의 앵커 텍스트로 "본문 바로가기" 칩을 만든다.
+                        첫 칩에 선수명(핵심 키워드)을 포함시켜 "{선수명} 통산 기록"이 검색결과에 노출되게 한다.
+                        칩 스타일은 pba.tsx 시즌 칩과 동일한 디자인 시스템. */}
+                    <nav aria-label={t.back} className="flex gap-1.5 overflow-x-auto pb-1 mb-5 -mx-5 px-5 scrollbar-hide">
+                        {([
+                            ["career", `${p.nameKo} ${t.career}`, true],
+                            ["seasons", t.seasons, chartData.length > 1],
+                            ["umb", t.umbCard, !!(p.umbPlayerId && p.umbCategory)],
+                            ["related", t.back, related.length > 0],
+                        ] as const).filter(([, , show]) => show).map(([id, label]) => (
+                            <a
+                                key={id}
+                                href={`#${id}`}
+                                className="shrink-0 h-8 px-3.5 rounded-full text-[12.5px] font-semibold bg-white text-ink-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center"
+                            >
+                                {label}
+                            </a>
+                        ))}
+                    </nav>
+
                     {/* 통산 스탯 */}
-                    <section className="mb-5">
+                    <section id="career" className="mb-5 scroll-mt-6">
+                        <h2 className="text-[15px] font-bold mb-3">{t.career}</h2>
                         <div className="rounded-3xl bg-brand p-5 text-white mb-2.5 shadow-[0_8px_24px_rgba(0,98,65,0.20)]">
                             <div className="flex items-center gap-2 text-white/75 text-[12px] font-bold">
                                 <LucideTrophy className="w-4 h-4" />{t.prize}
@@ -170,7 +213,7 @@ export default function HiqPbaPlayer() {
 
                     {/* 시즌별 궤적 */}
                     {chartData.length > 1 && (
-                        <section className="rounded-3xl bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-5 min-w-0 max-w-full overflow-hidden">
+                        <section id="seasons" className="rounded-3xl bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-5 min-w-0 max-w-full overflow-hidden scroll-mt-6">
                             <h2 className="text-[15px] font-bold mb-3">{t.seasons}</h2>
                             <div className="h-[180px] min-w-0">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -205,14 +248,48 @@ export default function HiqPbaPlayer() {
                     {/* UMB 교차 링크 — 세계랭킹 기록이 있는 선수만 */}
                     {p.umbPlayerId && p.umbCategory && (
                         <button
+                            id="umb"
                             onClick={() => setLocation(`/player/${p.umbCategory}/${p.umbPlayerId}`)}
-                            className="w-full rounded-3xl bg-ink-1 p-5 text-left text-white active:scale-[0.99] transition-transform mb-5"
+                            className="w-full rounded-3xl bg-ink-1 p-5 text-left text-white active:scale-[0.99] transition-transform mb-5 scroll-mt-6"
                         >
                             <div className="flex items-center gap-2 text-white/60 text-[12px] font-bold">
                                 <LucideGlobe className="w-4 h-4" />{t.umbCard}
                             </div>
                             <p className="mt-1.5 text-[16px] font-bold">{t.umbCta} →</p>
                         </button>
+                    )}
+
+                    {/* 관련 선수 — 같은 리그 상금랭킹 인접 5명 + 랭킹 허브. 도메인 내 클러스터(내부링크)이자
+                        네이버 관련문서의 재료. 실제 <a>(wouter Link)로 렌더해 크롤러가 따라갈 수 있게 한다. */}
+                    {related.length > 0 && (
+                        <section id="related" className="mb-5 scroll-mt-6">
+                            <h2 className="text-[15px] font-bold mb-3">{t.back}</h2>
+                            <div className="space-y-2">
+                                {related.map((r) => (
+                                    <Link
+                                        key={r.memCode}
+                                        href={`/pba-player/${r.memCode}`}
+                                        className="w-full flex items-center justify-between p-4 rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] text-left active:scale-[0.99] transition-transform"
+                                    >
+                                        <div className="flex items-center gap-3.5 min-w-0">
+                                            <span className="w-9 shrink-0 text-center font-semibold text-black/40 text-[15px] tabular-nums">{r.prizeRank ?? "-"}</span>
+                                            <span className="text-[16px] leading-none shrink-0">{flagEmoji(r.nationCode ?? "") || "🏳️"}</span>
+                                            <div className="min-w-0">
+                                                <span className="block text-[15.5px] font-semibold truncate">{r.nameKo}</span>
+                                                {r.nameEn && <span className="block text-[11.5px] font-medium text-black/40 truncate">{r.nameEn}</span>}
+                                            </div>
+                                        </div>
+                                        <span className="text-right shrink-0 ml-3 text-[15px] font-bold tabular-nums">{formatPrize(r.prize, locale)}</span>
+                                    </Link>
+                                ))}
+                                <Link
+                                    href="/pba"
+                                    className="w-full flex items-center justify-center p-3.5 rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] text-[13.5px] font-semibold text-ink-3 active:scale-[0.99] transition-transform"
+                                >
+                                    {t.back} →
+                                </Link>
+                            </div>
+                        </section>
                     )}
 
                     <p className="text-center text-[11px] text-black/35">{t.source}</p>

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
 import { motion } from "framer-motion";
 import { useT } from "@/lib/i18n";
@@ -22,6 +23,14 @@ export default function HiqWorldPlayer() {
     const { data } = usePlayerDetail(category, umbId);
     const p = data?.player;
     const nameMain = p ? (p.nativeName || p.playerName) : null;
+
+    // 네이버 "본문 바로가기" 칩(#history·#rivals)으로 유입되면 데이터 로드 후에야
+    // 섹션이 생겨 브라우저 기본 앵커 점프가 안 먹는다 — 로드 시점에 직접 스크롤.
+    useEffect(() => {
+        if (!p) return;
+        const hash = window.location.hash.slice(1);
+        if (hash) document.getElementById(hash)?.scrollIntoView();
+    }, [p]);
     useSeo({
         title: p
             ? `${p.nativeName ? `${p.nativeName} (${p.playerName})` : p.playerName} — ${t("umb.pageTitle")} ${p.rank}${t("umb.rankSuffix")} | RANKUE`

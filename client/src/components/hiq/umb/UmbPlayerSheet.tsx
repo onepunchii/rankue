@@ -152,9 +152,10 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                 </p>
             )}
 
-            {/* 추이 차트 — 순위(기본)/포인트 토글 */}
+            {/* 추이 차트 — 순위(기본)/포인트 토글.
+                id 는 프리렌더 봇 문서의 앵커(#history)와 짝 — 네이버 "본문 바로가기" 칩 착지점 */}
             {chartData.length >= 2 && (
-                <div className="min-w-0">
+                <div id="history" className="min-w-0 scroll-mt-6">
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-[13.5px] font-bold text-ink-1">{t("umb.rankHistory")}</h3>
                         <div className="flex gap-1">
@@ -193,9 +194,10 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                 </div>
             )}
 
-            {/* 국내 라이벌 — 같은 국가에서 순위가 가장 가까운 선수. 탭하면 이동 */}
+            {/* 국내 라이벌 — 같은 국가에서 순위가 가장 가까운 선수. 탭하면 이동.
+                id 는 프리렌더 봇 문서의 앵커(#rivals)와 짝 */}
             {(data?.rivals?.length ?? 0) > 0 && (
-                <div>
+                <div id="rivals" className="scroll-mt-6">
                     <h3 className="text-[13.5px] font-bold text-ink-1 mb-2">{flagEmoji(player.fed)} {t("umb.rivals")}</h3>
                     <div className="flex flex-col gap-1.5">
                         {data!.rivals.map(r => (
