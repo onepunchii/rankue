@@ -167,7 +167,7 @@ export default function HiqPbaPlayer() {
                     {/* 앵커 목차 — 네이버가 이 <nav> 의 앵커 텍스트로 "본문 바로가기" 칩을 만든다.
                         첫 칩에 선수명(핵심 키워드)을 포함시켜 "{선수명} 통산 기록"이 검색결과에 노출되게 한다.
                         칩 스타일은 pba.tsx 시즌 칩과 동일한 디자인 시스템. */}
-                    <nav aria-label={t.back} className="flex gap-1.5 overflow-x-auto pb-1 mb-5 -mx-5 px-5 scrollbar-hide">
+                    <nav aria-label="목차" className="flex gap-1.5 overflow-x-auto pb-1 mb-5 -mx-5 px-5 scrollbar-hide">
                         {([
                             ["career", `${p.nameKo} ${t.career}`, true],
                             ["seasons", t.seasons, chartData.length > 1],
