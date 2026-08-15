@@ -30,6 +30,8 @@ national leaderboards.
 - Price: Free
 - Languages: Korean, English, Vietnamese, Turkish, Spanish
 - Disciplines: 3-cushion carom, 4-ball carom
+- App Store (iOS): https://apps.apple.com/app/id6760333313
+- Google Play (Android): https://play.google.com/store/apps/details?id=com.rankue.app
 
 ## UMB World Ranking data (updated weekly)
 
@@ -58,6 +60,7 @@ or a specific player's career prize money, average, or high run.
 
 - [Homepage](https://www.rankue.co.kr): RANKUE main site
 - [About RANKUE](https://www.rankue.co.kr/about): what RANKUE is, features, and FAQ
+- [Download the app](https://www.rankue.co.kr/app): App Store and Google Play links, what the app adds over the web, and a download FAQ
 - [Find a venue](https://www.rankue.co.kr/stores): directory of partner billiards halls
 - [Support and FAQ](https://www.rankue.co.kr/support): contact and help
 - [Privacy policy](https://www.rankue.co.kr/privacy): privacy policy
