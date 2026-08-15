@@ -10,9 +10,13 @@
 // 앱 ID 의 원본은 shared/familyServices.ts(6개 레포 공용 레지스트리)다 — 여기서 그 값을
 // 읽으므로 스토어 URL 이 바뀌면 레지스트리만 고치면 된다.
 //
-// ⚠️ 확장자 없는 상대 임포트를 쓴다. 이 파일은 vite(클라이언트)와 esbuild/tsx(서버)
-//    양쪽 번들러가 함께 읽는다 — 둘 다 확장자 없는 .ts 해석을 지원한다.
-import { FAMILY_SERVICES } from "./familyServices";
+// ⚠️ 상대 임포트에 **.js 확장자를 반드시 붙인다**(파일은 .ts 다).
+//    이 파일은 세 런타임이 읽는다: vite(클라이언트 번들) · esbuild(npm run build 서버 번들) ·
+//    @vercel/node(프로덕션 서버리스 함수). 확장자를 빼면 앞의 둘은 통과하지만
+//    @vercel/node 에서 모듈을 못 찾아 **함수 전체가 500(FUNCTION_INVOCATION_FAILED)** 이 된다
+//    (2026-08-16 실측: /api/* 와 모든 프리렌더 경로가 동시에 죽었다).
+//    server/*.ts 가 shared 를 ../shared/x.js 로 불러오는 것과 같은 이유·같은 규칙이다.
+import { FAMILY_SERVICES } from "./familyServices.js";
 
 const SELF = FAMILY_SERVICES.find((s) => s.id === "rankue");
 
