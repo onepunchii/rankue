@@ -1,4 +1,5 @@
 import { useSeo } from "@/hooks/useSeo";
+import { SiteFooter } from "@/components/hiq/SiteFooter";
 import { DOC_META } from "@shared/docMeta";
 // 개인정보처리방침 — 스토어(Play/App Store) 심사용 공개 문서 페이지.
 // 로그인 게이트를 타지 않는 완전 공개 라우트여야 한다.
@@ -70,6 +71,8 @@ export default function Privacy() {
         </p>
 
         <p className="mt-10 text-xs text-gray-400">시행일: 2026년 7월 14일</p>
+
+        <SiteFooter />
       </div>
     </div>
   );

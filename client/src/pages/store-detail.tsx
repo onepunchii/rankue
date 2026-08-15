@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { SiteFooter } from "@/components/hiq/SiteFooter";
 
 interface PublicStore {
   slug: string;
@@ -109,6 +110,8 @@ export default function StoreDetail() {
             </dl>
           </article>
         )}
+
+        <SiteFooter />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { SiteFooter } from "@/components/hiq/SiteFooter";
 
 // RANKUE 소개(About) — 공개·다국어 페이지. SEO/AEO/GEO 대상 마케팅 콘텐츠.
 // 핵심 메시지 = "손안의 당구 점수판"(스마트폰으로 간편 점수 기록). RP 레이팅 같은 용어는 헤드라인에서 배제.
@@ -144,12 +145,9 @@ export default function About() {
           </button>
         </section>
 
-        {/* Footer links */}
-        <nav className="flex items-center justify-center gap-5 text-[13px] font-medium text-black/45">
-          <a href="/support" className="hover:text-black/70">{c.support}</a>
-          <span aria-hidden>·</span>
-          <a href="/privacy" className="hover:text-black/70">{c.privacy}</a>
-        </nav>
+        {/* Footer links — 기존 지원·개인정보 링크는 SiteFooter 안에 그대로 있고,
+            거기에 스토어 링크(사용자·크롤러 모두가 보는)가 더해진다. */}
+        <SiteFooter />
       </div>
     </div>
   );

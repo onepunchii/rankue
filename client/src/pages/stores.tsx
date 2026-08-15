@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { SiteFooter } from "@/components/hiq/SiteFooter";
 import { apiRequest } from "@/lib/queryClient";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 
@@ -310,6 +311,8 @@ export default function Stores() {
             </div>
           </div>
         )}
+
+        <SiteFooter />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useSeo } from "@/hooks/useSeo";
+import { SiteFooter } from "@/components/hiq/SiteFooter";
 import { DOC_META } from "@shared/docMeta";
 // 고객지원 — App Store 심사 가이드라인 1.5(Support URL) 요건 페이지.
 // 로그인 없이 접근 가능해야 하며, 사용자가 질문하고 지원을 요청할 수 있는 수단을 제공한다.
@@ -90,6 +91,8 @@ export default function Support() {
         <p className="mt-10 text-xs text-gray-400">
           문의: petudy@kakao.com · 랭큐(RANKUE)
         </p>
+
+        <SiteFooter />
       </div>
     </div>
   );

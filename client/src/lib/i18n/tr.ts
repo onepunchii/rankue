@@ -1549,5 +1549,12 @@ const tr: Dict = {
   "menu.mudangkDesc": "Doğum tarihine göre Kore saju yorumu",
   "menu.familyGetApp": "Uygulamayı al",
   "menu.familyOpenWeb": "Web'de aç",
+  "footer.getApp": "RANKUE uygulamasını al",
+  "footer.about": "RANKUE hakkında",
+  "footer.appPage": "Uygulamayı indir",
+  "footer.stores": "Bilardo salonu bul",
+  "footer.support": "Destek",
+  "footer.privacy": "Gizlilik politikası",
+  "footer.company": "JH Square",
 };
 export default tr;

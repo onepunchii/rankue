@@ -9,6 +9,14 @@ import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW } from "../shared/landingContent.js";
 import { formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared, PBA_PLAYER_ANCHORS_KO, pbaRelated } from "../shared/pbaMeta.js";
 import { briefingLineKo, briefingDateKo, briefingTitle, briefingDesc, todayKst } from "../shared/briefingMeta.js";
+import { APP_STORE_URL, PLAY_STORE_URL, playLink, appStoreLink } from "../shared/appLinks.js";
+import {
+  APP_PAGE_META,
+  APP_PAGE_EXTRAS,
+  APP_PAGE_FAQS,
+  APP_PAGE_STEPS,
+  appPageJsonLd,
+} from "../shared/appPageContent.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
 //
@@ -103,7 +111,42 @@ interface PageParts {
   imageAlt?: string;
   /** head 에 그대로 삽입할 추가 태그(소유확인 메타 등). 호출부가 이스케이프를 책임진다. */
   extraHead?: string;
+  /**
+   * 공개 페이지 공통 푸터(SITE_FOOTER)를 붙일지.
+   * ★ 클라이언트가 <SiteFooter/> 를 실제로 렌더하는 경로에서만 true 로 둔다.
+   *   봇에게만 있는 링크를 만들면 클로킹이다(이 파일의 금선). 지금 켜 둔 경로:
+   *   / · /about · /app · /stores · /stores/:code · /store/:slug · /support ·
+   *   /privacy · /account-delete
+   */
+  footer?: boolean;
 }
+
+// ── 공개 페이지 공통 푸터 ────────────────────────────────────────────
+// client/src/components/hiq/SiteFooter.tsx 가 사용자에게 그리는 것과 **같은 내용**이다.
+//
+// 왜 서버 HTML 에 있어야 하나: Play·App Store 페이지는 구글 웹 검색에 색인되는
+// 웹페이지다. 이미 색인된 우리 페이지에서 그쪽으로 링크를 걸면 스토어 페이지의 검색
+// 노출에 도움이 된다. 그런데 랭큐 웹은 SPA 라 크롤러가 받는 HTML 은 이 파일이 만드는
+// 것뿐이고, 기존 스토어 링크는 전부 React 안에 있어 **서버 HTML 에 한 줄도 없었다**
+// (2026-08-15 실측: 패밀리 8개 사이트 중 tohk 하나만 서버 HTML 에 Play 링크가 있었다).
+//
+// ⛔ 숨김 링크(display:none·sr-only·0px·화면 밖)로 하지 않는다 — 클로킹으로 취급된다.
+//    여기 링크는 사용자 화면에도 같은 자리에 같은 문구로 보인다.
+// 스토어 URL 이 null 이면(=미게시) 그 버튼은 아예 없다 — 죽은 스토어 링크를 만들지 않는다.
+const SITE_FOOTER = (() => {
+  const play = playLink("footer");
+  const ios = appStoreLink("footer");
+  const stores = [
+    play ? `<a href="${esc(play)}">Google Play</a>` : "",
+    ios ? `<a href="${esc(ios)}">App Store</a>` : "",
+  ].filter(Boolean);
+  return `
+<footer>
+  ${stores.length ? `<p>랭큐 앱 다운로드</p>\n  <nav>${stores.join(" ")}</nav>` : ""}
+  <nav><a href="/about">랭큐 소개</a> <a href="/app">앱 다운로드</a> <a href="/stores">당구장 찾기</a> <a href="/support">고객지원</a> <a href="/privacy">개인정보처리방침</a></nav>
+  <p>RANKUE · 제이에이치스퀘어</p>
+</footer>`;
+})();
 
 function page(p: PageParts): string {
   // 상호(reciprocal) hreflang: 어느 언어판을 내보내든 **같은 전체 클러스터**를 선언해야
@@ -159,7 +202,7 @@ function page(p: PageParts): string {
   <meta name="twitter:image" content="${esc(ogImage)}" />${p.extraHead ?? ""}${ld}
 </head>
 <body>
-${p.body}
+${p.body}${p.footer ? SITE_FOOTER : ""}
 </body>
 </html>
 `;
@@ -253,8 +296,10 @@ function aboutBody(c: AboutContent): string {
 
   <h2>${esc(c.ctaTitle)}</h2>
   <p>${esc(c.ctaBody)}</p>
+  <p><a href="/">${esc(c.home)}</a></p>
 
-  <nav><a href="/">${esc(c.home)}</a> <a href="/support">${esc(c.support)}</a> <a href="/privacy">${esc(c.privacy)}</a></nav>
+  <!-- 지원·개인정보 링크는 공통 푸터(footer: true)로 옮겼다 — 클라이언트 about 페이지도
+       같은 자리에서 <SiteFooter/> 를 렌더한다(client/src/pages/about.tsx). -->
 </main>`;
 }
 
@@ -285,6 +330,7 @@ export function registerPrerender(app: Express) {
         title: LANDING_META.title,
         desc: LANDING_META.desc,
         canonical: `${ORIGIN}/`,
+        footer: true,
         // 소유확인 메타 — client/index.html 의 하드코딩 값과 같은 값이어야 한다.
         // 네이버·구글 소유확인 검사기가 봇 UA 로 홈을 요청하면 이 프리렌더를 받으므로,
         // 여기 없으면 소유확인이 풀릴 수 있다 (정적 셸에만 있던 기존 공백을 메움).
@@ -321,7 +367,9 @@ export function registerPrerender(app: Express) {
   <h2>자주 묻는 질문</h2>
   ${LANDING_FAQS.map((f) => `<section><h3>${esc(f.q)}</h3><p>${esc(f.a)}</p></section>`).join("\n  ")}
 
-  <nav><a href="/about">랭큐 소개</a> <a href="/stores">매장 찾기</a> <a href="/support">고객지원</a></nav>
+  <!-- 사이트 내 링크는 아래 공통 푸터(footer: true)가 낸다. 클라이언트 랜딩도 같은
+       자리에서 <SiteFooter/> 를 렌더하므로 본문에 nav 를 따로 두면 사용자 화면에 없는
+       링크 묶음이 봇에게만 생긴다. -->
 </main>`,
       }),
     );
@@ -1030,6 +1078,7 @@ export function registerPrerender(app: Express) {
         // 어느 언어판이든 같은 전체 클러스터를 내야 상호 선언이 성립한다.
         altBase: `${ORIGIN}/about`,
         altLangs: ["en", "vi", "tr", "es", "ja", "zh"],
+        footer: true,
         jsonLd: [
           {
             "@context": "https://schema.org",
@@ -1043,6 +1092,57 @@ export function registerPrerender(app: Express) {
           APP_LD,
         ],
         body: aboutBody(c),
+      }),
+    );
+  });
+
+  // ── /app — 앱 다운로드 랜딩 ────────────────────────────────────────
+  // 문안·구조화데이터는 shared/appPageContent.ts, 기능 목록은 shared/landingContent.ts,
+  // 스토어 URL 은 shared/appLinks.ts 가 정본이다. client/src/pages/app-landing.tsx 가
+  // **같은 모듈**을 읽어 같은 문구·같은 링크를 그린다(그래야 클로킹이 아니다).
+  //
+  // 이 페이지가 존재하는 이유: Play·App Store 페이지는 구글 웹 검색에 색인되는 웹페이지고,
+  // 이미 색인된 우리 사이트에서 크롤러가 따라갈 수 있는 링크를 걸어주는 착지점이 필요하다.
+  app.get("/app", (req, res, next) => {
+    if (!isBot(req)) return next();
+    const play = playLink("app_page");
+    const ios = appStoreLink("app_page");
+    const buttons = [
+      play ? `<a href="${esc(play)}">Google Play</a>` : "",
+      ios ? `<a href="${esc(ios)}">App Store</a>` : "",
+    ].filter(Boolean);
+    res.setHeader("X-Prerender", "app");
+    noStore(res);
+    res.send(
+      page({
+        title: APP_PAGE_META.title,
+        desc: APP_PAGE_META.desc,
+        canonical: `${ORIGIN}/app`,
+        footer: true,
+        // 구조화데이터에는 어트리뷰션 없는 원본 스토어 URL 을 쓴다.
+        jsonLd: [appPageJsonLd(ORIGIN, [PLAY_STORE_URL, APP_STORE_URL])],
+        body: `<main>
+  <p>${esc(APP_PAGE_META.kicker)}</p>
+  <h1>${esc(APP_PAGE_META.h1)}</h1>
+  <p>${esc(APP_PAGE_META.lead)}</p>
+  ${buttons.length ? `<nav>${buttons.join(" ")}</nav>` : ""}
+  <p>설치 없이 웹에서 먼저 써보려면 <a href="/">랭큐 홈</a>에서 바로 시작하세요.</p>
+
+  <h2>앱에서 할 수 있는 것</h2>
+  ${LANDING_FEATURES.map((f) => `<section><h3>${esc(f.name)}</h3><p>${esc(f.desc)}</p></section>`).join("\n  ")}
+
+  <h2>웹에서도 되지만, 앱이면 더 편한 것</h2>
+  <ul>
+  ${APP_PAGE_EXTRAS.map((e) => `<li>${esc(e.name)} — ${esc(e.desc)}</li>`).join("\n  ")}
+  </ul>
+
+  <h2>설치하고 첫 경기까지</h2>
+  <ol>${APP_PAGE_STEPS.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
+
+  <h2>자주 묻는 질문</h2>
+  ${APP_PAGE_FAQS.map((f) => `<section><h3>${esc(f.q)}</h3><p>${esc(f.a)}</p></section>`).join("\n  ")}
+  <p>계정 삭제 절차는 <a href="/account-delete">계정 삭제 안내</a>에 정리돼 있습니다.</p>
+</main>`,
       }),
     );
   });
@@ -1076,6 +1176,7 @@ export function registerPrerender(app: Express) {
         title: "당구장 찾기 · 전국 당구장 디렉토리 | 랭큐",
         desc: "전국 1,200여 개 당구장을 지역·이름으로 검색하세요. 주소·영업시간·테이블 구성, 랭큐 파트너 매장의 랭킹·매칭까지.",
         canonical: `${ORIGIN}/stores`,
+        footer: true,
         jsonLd: [
           {
             "@context": "https://schema.org",
@@ -1160,6 +1261,7 @@ export function registerPrerender(app: Express) {
         title: `${s.name} — ${s.region} 당구장 | 랭큐`,
         desc: `${s.name} — ${s.address}. 영업시간·테이블 정보와 전국 당구장 디렉토리를 랭큐에서.`,
         canonical: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
+        footer: true,
         jsonLd: [
           {
             "@context": "https://schema.org",
@@ -1223,6 +1325,7 @@ export function registerPrerender(app: Express) {
           s.description ||
           `${s.name}${s.region ? ` (${s.region})` : ""} — 랭큐 파트너 당구장. 매장 랭킹·매칭·크루.`,
         canonical: `${ORIGIN}/store/${encodeURIComponent(s.slug)}`,
+        footer: true,
         jsonLd: [
           {
             "@context": "https://schema.org",
@@ -1449,7 +1552,9 @@ export function registerPrerender(app: Express) {
       if (!isBot(req)) return next();
       res.setHeader("X-Prerender", path.slice(1));
       noStore(res);
-      res.send(page({ title: meta.title, desc: meta.description, canonical: `${ORIGIN}${path}`, body }));
+      // footer: 세 페이지 모두 클라이언트가 <SiteFooter/> 를 렌더한다
+      // (support.tsx · privacy.tsx · account-delete.tsx).
+      res.send(page({ title: meta.title, desc: meta.description, canonical: `${ORIGIN}${path}`, body, footer: true }));
     });
   }
 }

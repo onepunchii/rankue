@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Capacitor } from "@capacitor/core";
 import { useSeo } from "@/hooks/useSeo";
+import { SiteFooter } from "@/components/hiq/SiteFooter";
 import { BilliardBall } from "@/components/hiq/ui/BilliardBall";
 import { LANDING_FAQS, LANDING_META } from "@shared/landingContent";
 
@@ -405,15 +406,10 @@ export default function MarketingLanding({ onStart }: { onStart: () => void }) {
                     </button>
                 </section>
 
-                <nav className="mt-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] font-medium text-ink-4">
-                    <a href="/about" className="hover:text-ink-2">랭큐 소개</a>
-                    <span aria-hidden>·</span>
-                    <a href="/stores" className="hover:text-ink-2">당구장 찾기</a>
-                    <span aria-hidden>·</span>
-                    <a href="/support" className="hover:text-ink-2">고객지원</a>
-                    <span aria-hidden>·</span>
-                    <a href="/privacy" className="hover:text-ink-2">개인정보처리방침</a>
-                </nav>
+                {/* 푸터 — 기존 링크 4개는 SiteFooter 안에 그대로 있고, 거기에 스토어 링크가
+                    더해진다. 홈은 색인이 가장 잘 잡힌 페이지라 이 링크가 Play·App Store
+                    페이지로 보내는 신호도 가장 크다(server/prerender.ts 가 같은 푸터를 낸다). */}
+                <SiteFooter />
             </div>
         </div>
     );

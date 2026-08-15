@@ -51,6 +51,7 @@ import Privacy from "@/pages/privacy";
 import AccountDelete from "@/pages/account-delete";
 import Support from "@/pages/support";
 import About from "@/pages/about";
+import AppLanding from "@/pages/app-landing";
 import Stores from "@/pages/stores";
 import StoreListing from "@/pages/store-listing";
 import BriefingPage from "@/pages/briefing";
@@ -194,6 +195,10 @@ function AppRoutes() {
       <Route path="/account-delete" component={AccountDelete} />
       <Route path="/support" component={Support} />
       <Route path="/about" component={About} />
+      {/* 앱 다운로드 랜딩 — 스토어 버튼이 서버 HTML(프리렌더)에도 실린다.
+          별칭(/download 등)은 두지 않는다: vercel.json 의 봇 라우트·프리렌더·사이트맵에
+          없는 경로는 크롤러가 홈 canonical 을 가진 정적 셸을 받아 "홈의 중복"이 된다. */}
+      <Route path="/app" component={AppLanding} />
       <Route path="/stores" component={Stores} />
       <Route path="/stores/:code" component={StoreListing} />
       <Route path="/briefing" component={BriefingPage} />

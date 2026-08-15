@@ -1549,5 +1549,12 @@ const en: Dict = {
   "menu.mudangkDesc": "Korean saju reading from your birth date",
   "menu.familyGetApp": "Get the app",
   "menu.familyOpenWeb": "Open on web",
+  "footer.getApp": "Get the RANKUE app",
+  "footer.about": "About RANKUE",
+  "footer.appPage": "Download the app",
+  "footer.stores": "Find a billiard hall",
+  "footer.support": "Support",
+  "footer.privacy": "Privacy policy",
+  "footer.company": "JH Square",
 };
 export default en;

@@ -1549,5 +1549,12 @@ const vi: Dict = {
   "menu.mudangkDesc": "Luận saju theo ngày sinh",
   "menu.familyGetApp": "Tải ứng dụng",
   "menu.familyOpenWeb": "Mở trên web",
+  "footer.getApp": "Tải ứng dụng RANKUE",
+  "footer.about": "Giới thiệu RANKUE",
+  "footer.appPage": "Tải ứng dụng",
+  "footer.stores": "Tìm câu lạc bộ billiard",
+  "footer.support": "Hỗ trợ",
+  "footer.privacy": "Chính sách bảo mật",
+  "footer.company": "JH Square",
 };
 export default vi;

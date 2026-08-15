@@ -38,6 +38,10 @@ export async function generateSitemap(): Promise<string> {
   const parts: string[] = [
     entry(`${ORIGIN}/`, { langs: APP_LANGS, changefreq: "weekly", priority: "1.0" }),
     entry(`${ORIGIN}/about`, { langs: ABOUT_LANGS, changefreq: "monthly", priority: "0.9" }),
+    // 앱 다운로드 랜딩 — 한국어 단일 언어(문안 정본 shared/appPageContent.ts).
+    // hreflang 을 선언하지 않는다: ?lang= 언어판을 서버가 실제로 서빙하지 않으므로
+    // 선언만 하면 없는 URL 을 가리키게 된다.
+    entry(`${ORIGIN}/app`, { changefreq: "monthly", priority: "0.8" }),
     entry(`${ORIGIN}/stores`, { changefreq: "weekly", priority: "0.7" }),
     // UMB 세계랭킹 — 주간 갱신 공개 페이지 ("당구 세계랭킹" 검색 유입 타깃)
     entry(`${ORIGIN}/world-ranking`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }),

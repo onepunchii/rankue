@@ -1551,4 +1551,12 @@ export const ko: Dict = {
   "menu.mudangkDesc": "생년월일로 보는 사주 풀이",
   "menu.familyGetApp": "앱 설치",
   "menu.familyOpenWeb": "웹에서 보기",
+  // 공개 페이지 공통 푸터 (SiteFooter) — 스토어 링크·사이트 내 이동
+  "footer.getApp": "랭큐 앱 다운로드",
+  "footer.about": "랭큐 소개",
+  "footer.appPage": "앱 다운로드",
+  "footer.stores": "당구장 찾기",
+  "footer.support": "고객지원",
+  "footer.privacy": "개인정보처리방침",
+  "footer.company": "제이에이치스퀘어",
 };

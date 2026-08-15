@@ -1549,5 +1549,12 @@ const es: Dict = {
   "menu.mudangkDesc": "Lectura de saju según tu fecha de nacimiento",
   "menu.familyGetApp": "Obtener la app",
   "menu.familyOpenWeb": "Abrir en web",
+  "footer.getApp": "Descarga la app RANKUE",
+  "footer.about": "Sobre RANKUE",
+  "footer.appPage": "Descargar la app",
+  "footer.stores": "Buscar sala de billar",
+  "footer.support": "Soporte",
+  "footer.privacy": "Política de privacidad",
+  "footer.company": "JH Square",
 };
 export default es;

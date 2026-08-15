@@ -1,4 +1,5 @@
 import { useSeo } from "@/hooks/useSeo";
+import { SiteFooter } from "@/components/hiq/SiteFooter";
 import { DOC_META } from "@shared/docMeta";
 // 계정 삭제 안내 — Google Play 데이터 보안(계정 삭제 URL) 요건 페이지.
 // 요건: 앱/개발자명 명시, 삭제 요청 단계 명확 표시, 삭제·보관 데이터 유형과 기간 명시.
@@ -60,6 +61,8 @@ export default function AccountDelete() {
         <p className="mt-10 text-xs text-gray-400">
           문의: petudy@kakao.com · 시행일: 2026년 7월 14일
         </p>
+
+        <SiteFooter />
       </div>
     </div>
   );
