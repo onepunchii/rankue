@@ -18,7 +18,8 @@ import { PinCodeModal } from "@/components/hiq/dashboard/PinCodeModal";
 import { ScoreCorrectionModal } from "@/components/hiq/dashboard/ScoreCorrectionModal";
 import { RPGuideModal } from "@/components/hiq/dashboard/RPGuideModal";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
-import { LucideRefreshCw, LucideZap, ChevronUp, ChevronDown } from "@/lib/icons";
+import { LoginGate } from "@/components/hiq/LoginGate";
+import { LucideRefreshCw, LucideZap, ChevronUp, ChevronDown, LucideHome } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 
 import { useLocation } from "wouter";
@@ -148,7 +149,23 @@ export default function HiqDashboard() {
         );
     }
 
-    if (!member) return null; // Or redirect
+    // 비로그인 방문자(검색 유입이 하단 '홈' 탭을 누른 경우). 예전에는 여기서 null 을 반환해
+    // 흰 화면만 남았다 — 방문자에겐 앱이 고장 난 것으로 보인다.
+    if (!member) {
+        return (
+            <LoginGate
+                icon={LucideHome}
+                title="내 당구 홈"
+                desc="로그인하면 내 전적·평균(에버리지)과 매칭 게임, 라이벌 순위가 여기에 표시됩니다."
+                links={[
+                    { label: "매장 찾기 — 전국 당구장", to: "/stores" },
+                    { label: "세계 랭킹 — UMB 공식", to: "/world-ranking" },
+                    { label: "PBA 투어 랭킹", to: "/pba" },
+                    { label: "커뮤니티 둘러보기", to: "/community" },
+                ]}
+            />
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#f2f0eb] px-5 pb-32">

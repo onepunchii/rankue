@@ -3,10 +3,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useState, useMemo, useCallback } from "react";
-import { LucideChevronLeft, LucideSearch } from "@/lib/icons";
+import { LucideChevronLeft, LucideSearch, LucideUsers } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
-import { HiqMember, HiqGame } from "@shared/schema";
+import { HiqGame } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { useAuth } from "@/hooks/useAuth";
+import { LoginGate } from "@/components/hiq/LoginGate";
 import { useStore } from "@/contexts/StoreContext";
 import { useToast } from "@/hooks/use-toast";
 import { useSport } from "@/contexts/SportContext";
@@ -38,19 +40,19 @@ export default function HiqRivals() {
     const sportKey = currentSport as keyof typeof SPORT_CONFIGS;
     const config = useMemo(() => SPORT_CONFIGS[sportKey] || SPORT_CONFIGS.BILLIARDS, [sportKey]);
 
-    // Data Fetching
+    // Data Fetching — 비로그인이면 401 이 확정이라 요청 자체를 걸지 않는다.
+    const { member: me, isGuest, isLoading: isAuthLoading } = useAuth();
+
     const { data: friends = [] } = useQuery<HiqMemberWithH2H[]>({
         queryKey: ["/api/hiq/friends", currentSport],
+        enabled: !!me,
         queryFn: async () => await apiRequest(`/api/hiq/friends?sport=${currentSport}`)
     });
 
     const { data: recentOpponents = [] } = useQuery<RecentOpponent[]>({
         queryKey: ["/api/hiq/friends/recent-opponents", currentSport],
+        enabled: !!me,
         queryFn: async () => await apiRequest(`/api/hiq/friends/recent-opponents?sport=${currentSport}`)
-    });
-
-    const { data: me } = useQuery<HiqMember>({
-        queryKey: ["/api/hiq/me"],
     });
 
     // Mutations
@@ -92,6 +94,31 @@ export default function HiqRivals() {
     const selectedFriend = useMemo(() =>
         friends.find(f => f.id === selectedFriendId),
         [friends, selectedFriendId]);
+
+    // 로그인 확인 중 — 빈 목록을 먼저 그리면 "라이벌 0명"이 깜빡였다가 안내로 바뀐다.
+    if (isAuthLoading) {
+        return (
+            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-black/10 border-t-brand rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    // 비로그인 — 예전에는 "라이벌 0명 · 아직 라이벌이 없네요" 를 그려서, 라이벌이 없는
+    // 로그인 유저와 구분이 안 됐다. 로그인하면 열린다는 사실을 화면에 둔다.
+    if (isGuest) {
+        return (
+            <LoginGate
+                icon={LucideUsers}
+                title="라이벌"
+                desc="로그인하면 함께 친 상대가 라이벌로 쌓이고, 상대별 상대전적을 볼 수 있습니다."
+                links={[
+                    { label: "크루 둘러보기 — 당구 동호회", to: "/club" },
+                    { label: "커뮤니티 둘러보기", to: "/community" },
+                ]}
+            />
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-28 relative overflow-x-hidden font-sans">

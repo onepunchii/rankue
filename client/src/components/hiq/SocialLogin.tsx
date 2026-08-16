@@ -83,7 +83,10 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
       });
       const j = await res.json();
       if (!res.ok || !j?.success) throw new Error(j?.message || "social login failed");
-      setLocation(j.data?.redirectTo || "/dashboard");
+      // LoginGate 가 붙여 보낸 ?redirect= 로 돌아간다 — 라이벌을 보려다 로그인한 사람은
+      // 라이벌로 되돌아와야 한다. startsWith("/") 로 오픈 리다이렉트를 막는다(전화 로그인과 동일).
+      const back = new URLSearchParams(window.location.search).get("redirect");
+      setLocation(back?.startsWith("/") ? back : (j.data?.redirectTo || "/dashboard"));
     } catch (err) {
       // 서버가 알려준 실패 사유(레이트리밋·검증 실패 등)를 그대로 보여준다 — 일반 문구만으로는 원인 추적 불가
       const detail = err instanceof Error && err.message !== "social login failed" ? err.message : t("login.socialFailed");

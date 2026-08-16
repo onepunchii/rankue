@@ -16,8 +16,9 @@ import { GrowthChart } from "@/components/hiq/history/GrowthChart";
 import { HistoryList } from "@/components/hiq/history/HistoryList";
 import { GameDetailDialog } from "@/components/hiq/history/GameDetailDialog";
 import { AchievementCard } from "@/components/hiq/history/AchievementCard";
-import { HiqMember } from "@shared/schema";
 import { useT } from "@/lib/i18n";
+import { useAuth } from "@/hooks/useAuth";
+import { LoginGate } from "@/components/hiq/LoginGate";
 
 export default function HiqHistory() {
     const { t } = useT();
@@ -27,13 +28,15 @@ export default function HiqHistory() {
     const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
 
     // 1. Data Fetching
-    const { data: member } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
+    const { member, isLoading: isAuthLoading, isGuest } = useAuth();
 
     // Using the same query key/fn as before
-    const { data: history = [], isLoading } = useQuery({
+    const { data: history = [], isLoading: isHistoryLoading } = useQuery({
         queryKey: ["/api/hiq/history", currentSport],
+        enabled: !!member,
         queryFn: async () => await apiRequest(`/api/hiq/history?sport=${currentSport}`)
     });
+    const isLoading = isAuthLoading || (!!member && isHistoryLoading);
 
     // 2. Custom Hook for logic
     const stats = useGameStats(history, filter, currentSport, member);
@@ -53,6 +56,21 @@ export default function HiqHistory() {
                     )}
                 />
             </div>
+        );
+    }
+
+    // 비로그인 — 예전에는 "0승 0패 · 누적 평균 0.000" 을 그려서 기록이 없는 것처럼 보였다.
+    if (isGuest) {
+        return (
+            <LoginGate
+                icon={LucideBarChart3}
+                title="내 경기 기록"
+                desc="로그인하면 전적·평균(에버리지)·하이런과 성장 그래프가 쌓입니다."
+                links={[
+                    { label: "세계 랭킹 — UMB 공식", to: "/world-ranking" },
+                    { label: "PBA 투어 랭킹", to: "/pba" },
+                ]}
+            />
         );
     }
 

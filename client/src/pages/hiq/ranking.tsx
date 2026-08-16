@@ -5,6 +5,8 @@ import { LucideMedal, LucideStore, LucideGlobe, LucideTarget, LucideBarChart3, L
 import { HiqMember } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { useSport } from "@/contexts/SportContext";
+import { useAuth } from "@/hooks/useAuth";
+import { LoginGate } from "@/components/hiq/LoginGate";
 
 import { cn } from "@/lib/utils";
 import { flagEmoji } from "@/lib/flag";
@@ -26,9 +28,7 @@ export default function HiqRanking() {
     const [rankingScope, setRankingScope] = useState<"store" | "country" | "national">("store");
     const { currentSport } = useSport();
 
-    const { data: member } = useQuery<HiqMember>({
-        queryKey: ["/api/hiq/me"],
-    });
+    const { member, isGuest, isLoading: isAuthLoading } = useAuth();
 
     // PBA 벤치마크 — 3쿠션 탭 + 내 에버리지가 있을 때만 조회
     const myAvg3c = (member as any)?.avg3c || 0;
@@ -41,6 +41,7 @@ export default function HiqRanking() {
     const [rankingCountry, setRankingCountry] = useState<string | null>(null);
     const { data: rankings, isLoading } = useQuery<HiqMember[]>({
         queryKey: [`/api/hiq/rankings`, rankingScope, currentSport, rankingTab],
+        enabled: !!member, // 인증 필요(401) — 게스트는 아래 LoginGate 로 간다
         queryFn: async () => {
             const res = await fetch(`/api/hiq/rankings?scope=${rankingScope}&type=${rankingTab}&sport=${currentSport}`);
             const data = await res.json();
@@ -76,6 +77,32 @@ export default function HiqRanking() {
             if (handiB !== handiA) return handiB - handiA;
             return parseFloat(b.average || "0") - parseFloat(a.average || "0");
         });
+
+    // 로그인 확인 중 — "아직 랭킹이 없습니다"가 먼저 깜빡이는 것을 막는다.
+    if (isAuthLoading) {
+        return (
+            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-black/10 border-t-brand rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    // 비로그인 — 랭킹 API 는 인증이 필요해 예전에는 "아직 랭킹이 없습니다"로 보였다.
+    // 공개 랭킹(세계·PBA)은 바로 갈 수 있게 길을 열어 둔다.
+    if (isGuest) {
+        return (
+            <LoginGate
+                icon={LucideMedal}
+                title="랭킹"
+                desc="로그인하면 자주 가는 매장과 전국에서 내가 몇 등인지 볼 수 있습니다."
+                links={[
+                    { label: "세계 랭킹 — UMB 공식", to: "/world-ranking" },
+                    { label: "PBA 투어 랭킹", to: "/pba" },
+                    { label: "매장 찾기 — 전국 당구장", to: "/stores" },
+                ]}
+            />
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">

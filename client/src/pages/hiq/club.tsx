@@ -9,12 +9,16 @@ import { useT } from "@/lib/i18n";
 // Sub-components
 import { MyCrewList } from "@/components/hiq/club/MyCrewList";
 import { AllCrewList } from "@/components/hiq/club/AllCrewList";
+import { useAuth } from "@/hooks/useAuth";
+import { goLogin } from "@/components/hiq/LoginGate";
 
 export default function HiqClub() {
     const { t } = useT();
     const [_, setLocation] = useLocation();
     const [searchQuery, setSearchQuery] = useState("");
     const { currentSport } = useSport();
+    // 크루 목록·검색은 공개다. 만들기(=계정 필요)만 로그인으로 보낸다.
+    const { isGuest } = useAuth();
 
     return (
         <div className="min-h-screen bg-[#f2f0eb] text-ink-1 font-sans pb-28 relative overflow-hidden">
@@ -28,7 +32,7 @@ export default function HiqClub() {
                             <Button
                                 variant="ghost"
                                 className="h-9 px-3.5 text-[13px] font-semibold rounded-full transition-all bg-brand/10 text-brand hover:bg-brand/20"
-                                onClick={() => setLocation("/club/create")}
+                                onClick={() => (isGuest ? goLogin(setLocation, "/club") : setLocation("/club/create"))}
                             >
                                 <LucidePlus className="w-3.5 h-3.5 mr-1" />
                                 {t("club.create")}

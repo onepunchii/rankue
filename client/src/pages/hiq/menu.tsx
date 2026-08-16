@@ -21,7 +21,9 @@ import {
     LucideCrown,
     LucideCircle,
     LucideFlag,
-    LucideUserX
+    LucideUserX,
+    LucideUser,
+    LucideGlobe
 } from "@/lib/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { flagEmoji } from "@/lib/flag";
@@ -42,6 +44,8 @@ import { BadgeShelf } from "@/components/hiq/BadgeShelf";
 import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
+import { useAuth } from "@/hooks/useAuth";
+import { goLogin } from "@/components/hiq/LoginGate";
 
 export default function HiqMenu() {
     const { t } = useT();
@@ -66,9 +70,7 @@ export default function HiqMenu() {
     const [isEditingName, setIsEditingName] = useState(false);
     const [newName, setNewName] = useState("");
 
-    const { data: member } = useQuery<any>({
-        queryKey: ["/api/hiq/me"],
-    });
+    const { member, isGuest, isLoading: isAuthLoading } = useAuth();
 
     useEffect(() => {
         if (member) {
@@ -164,6 +166,15 @@ export default function HiqMenu() {
     const sportBgClass = currentSport === "GOLF" ? "bg-brand" : "bg-brand";
     const sportGlowClass = currentSport === "GOLF" ? "" : "";
 
+    // 로그인 확인 중 — 게스트인데 "사용자님 · Lv.1" 프로필이 먼저 깜빡이는 것을 막는다.
+    if (isAuthLoading) {
+        return (
+            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-black/10 border-t-brand rounded-full animate-spin" />
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">
             {/* Background Light Effect */}
@@ -175,6 +186,8 @@ export default function HiqMenu() {
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between mb-8 pt-5">
                 <h1 className="text-[26px] font-bold tracking-tight text-ink-1">{t("menu.title")}</h1>
+                {/* 알림함·설정은 계정이 있어야 의미가 있다 — 게스트에겐 숨긴다 */}
+                {!isGuest && (
                 <div className="flex gap-2.5">
                     <button
                         title={t("menu.notifications")}
@@ -187,9 +200,30 @@ export default function HiqMenu() {
                         <LucideSettings className="w-5 h-5 text-black/55" />
                     </button>
                 </div>
+                )}
             </div>
 
-            {/* Section A: Profile card */}
+            {/* Section A: Profile card — 게스트에겐 가짜 프로필("사용자님 · Lv.1") 대신 로그인 카드.
+                메뉴의 공개 항목(매장 찾기·안내)은 그대로 보이므로 화면이 비지 않는다. */}
+            {isGuest ? (
+            <div className="relative z-10 mb-10">
+                <div className="rk-card p-6 flex flex-col items-center text-center">
+                    <div className="w-14 h-14 rounded-full bg-brand/[0.08] flex items-center justify-center mb-4">
+                        <LucideUser className="w-7 h-7 text-brand" />
+                    </div>
+                    <h2 className="text-[17px] font-bold text-ink-1">로그인하고 시작하세요</h2>
+                    <p className="text-[13px] text-black/50 mt-1.5 leading-relaxed">
+                        내 전적·평균(에버리지)과 크루, 라이벌이 이 계정에 쌓입니다.
+                    </p>
+                    <button
+                        onClick={() => goLogin(setLocation, "/menu")}
+                        className="w-full mt-5 h-[50px] rounded-tile bg-brand text-white text-[15px] font-bold active:scale-[0.98] transition-transform"
+                    >
+                        로그인하고 시작하기
+                    </button>
+                </div>
+            </div>
+            ) : (
             <div className="relative z-10 mb-10">
                 <div className="rk-card p-6">
                     <div className="flex items-center gap-4">
@@ -287,11 +321,14 @@ export default function HiqMenu() {
                     )}
                 </div>
             </div>
+            )}
 
-            {/* Section: 큐 컬렉션 — 기록 기반 뱃지 진열장 */}
+            {/* Section: 큐 컬렉션 — 기록 기반 뱃지 진열장 (내 기록이 있어야 의미가 있다) */}
+            {!isGuest && (
             <div className="relative z-10 mb-10">
                 <BadgeShelf />
             </div>
+            )}
 
             {/* Section: Sports Mode Switcher (Icon Only Style) */}
             <div className="relative z-10 mb-10">
@@ -365,25 +402,39 @@ export default function HiqMenu() {
                             : []),
                         // 매장 찾기 — 모바일의 유일한 상시 진입점 (하단 네비·홈에는 자리가 없다)
                         { icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") },
-                        { icon: LucideMail, label: t("menu.suggestionBox"), desc: t("menu.suggestionBoxDesc"), onClick: () => setSuggestionOpen(true) },
+                        // 세계·PBA 랭킹은 로그인 없이도 보는 공개 콘텐츠 — 게스트에게 갈 곳을 준다
+                        ...(isGuest
+                            ? [
+                                { icon: LucideGlobe, label: "세계 랭킹", desc: "UMB 공식 세계 순위", onClick: () => setLocation("/world-ranking") },
+                                { icon: LucideTrophy, label: "PBA 투어", desc: "프로당구 시즌 랭킹·선수", onClick: () => setLocation("/pba") },
+                            ]
+                            : []),
+                        ...(!isGuest
+                            ? [{ icon: LucideMail, label: t("menu.suggestionBox"), desc: t("menu.suggestionBoxDesc"), onClick: () => setSuggestionOpen(true) }]
+                            : []),
                         { icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') },
                         { icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') },
                         { icon: LucideTrophy, label: t("menu.rankingSystem"), desc: t("menu.rankingSystemDesc"), onClick: () => openInfoModal('ranking') },
-                        {
-                            icon: LucideLogOut,
-                            label: t("menu.logout"),
-                            desc: t("menu.logoutDesc"),
-                            onClick: handleLogout,
-                            danger: true
-                        },
-                        {
-                            icon: LucideUserX,
-                            label: t("menu.deleteAccount"),
-                            desc: t("menu.deleteAccountDesc"),
-                            onClick: () => { setDeleteConfirm(""); setDeleteOpen(true); },
-                            danger: true
-                        },
-                    ].map((item, idx) => (
+                        // 로그아웃·계정 삭제는 계정이 있어야 성립한다
+                        ...(!isGuest
+                            ? [
+                                {
+                                    icon: LucideLogOut,
+                                    label: t("menu.logout"),
+                                    desc: t("menu.logoutDesc"),
+                                    onClick: handleLogout,
+                                    danger: true
+                                },
+                                {
+                                    icon: LucideUserX,
+                                    label: t("menu.deleteAccount"),
+                                    desc: t("menu.deleteAccountDesc"),
+                                    onClick: () => { setDeleteConfirm(""); setDeleteOpen(true); },
+                                    danger: true
+                                },
+                            ]
+                            : []),
+                    ].map((item: any, idx) => (
                         <motion.button
                             key={idx}
                             whileTap={{ scale: 0.98 }}

@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { HiqMember, HiqCrew, HiqStore } from "@shared/schema";
 import { useSeo } from "@/hooks/useSeo";
 import { crewTitle, crewDescription } from "@shared/crewMeta";
+import { useAuth } from "@/hooks/useAuth";
+import { goLogin } from "@/components/hiq/LoginGate";
 import { ClubSettingsDialog } from "@/components/hiq/ClubSettingsDialog";
 import { CreateActivityDialog } from "@/components/hiq/CreateActivityDialog";
 import { CreateGolfActivityModal } from "@/components/hiq/club/activity/CreateGolfActivityModal";
@@ -98,7 +100,7 @@ export default function HiqClubDetail() {
         enabled: !!selectedSettlementId
     });
 
-    const { data: me } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
+    const { member: me, isGuest } = useAuth();
 
     const { data: posts, isLoading: postsLoading } = useQuery<any[]>({
         queryKey: [`/api/hiq/crews/${id}/posts`],
@@ -319,7 +321,9 @@ export default function HiqClubDetail() {
                                 isNotMember={isNotMember}
                                 isAdmin={isAdmin}
                                 me={me}
-                                onJoin={() => joinMutation.mutate()}
+                                // 게스트가 가입을 누르면 401 토스트 대신 로그인으로 보낸다.
+                                // 로그인 뒤 이 크루 페이지로 되돌아온다(goLogin 의 redirect).
+                                onJoin={() => (isGuest ? goLogin(setLocation) : joinMutation.mutate())}
                                 onLeave={() => leaveMutation.mutate()}
                                 isLeaving={leaveMutation.isPending}
                                 isLeader={myMemberData?.role === 'leader'}
