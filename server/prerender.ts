@@ -7,7 +7,10 @@ import { ABOUT_CONTENT, ABOUT_LANGS, type AboutContent } from "../shared/aboutCo
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW } from "../shared/landingContent.js";
-import { formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared } from "../shared/pbaMeta.js";
+import {
+  formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared,
+  PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo, pbaIncomeAnswerKo, PBA_LIST_TITLE_KO, PBA_LIST_DESC_KO,
+} from "../shared/pbaMeta.js";
 import { briefingLineKo, briefingDateKo, briefingTitle, briefingDesc, todayKst } from "../shared/briefingMeta.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
@@ -723,14 +726,14 @@ export function registerPrerender(app: Express) {
       noStore(res);
       res.send(
         page({
-          title: "PBA 투어 랭킹 · 프로당구 시즌 상금·포인트 순위 | 랭큐",
-          desc: "프로당구 PBA·LPBA 시즌별 랭킹. 상금 순위, 랭킹 포인트, 선수별 통산 기록과 시즌 히스토리를 랭큐에서.",
+          title: PBA_LIST_TITLE_KO,
+          desc: PBA_LIST_DESC_KO,
           canonical: `${ORIGIN}/pba`,
           jsonLd: [
             {
               "@context": "https://schema.org",
               "@type": "ItemList",
-              name: "PBA 투어 랭킹 · 프로당구 시즌 상금·포인트 순위 | 랭큐",
+              name: PBA_LIST_TITLE_KO,
               itemListElement: rows.slice(0, 20).map((r, i) => ({
                 "@type": "ListItem", position: i + 1, name: r.nameKo,
                 url: `${ORIGIN}/pba-player/${r.memCode}`,
@@ -743,6 +746,7 @@ export function registerPrerender(app: Express) {
   <ol>
   ${rows.map((r) => `<li><a href="/pba-player/${esc(r.memCode)}">${esc(r.nameKo)}</a>${r.nameEn ? ` (${esc(r.nameEn)})` : ""} — 상금 ${esc(formatPrizeKo(r.prize))}원, 랭킹포인트 ${r.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
   </ol>
+  <p>${esc(PBA_INCOME_NOTE_KO)}</p>
   <p>출처: PBA 투어 공식 기록 — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
   <nav><a href="/world-ranking">UMB 세계랭킹</a> <a href="/">홈</a></nav>
 </main>`,
@@ -774,8 +778,8 @@ export function registerPrerender(app: Express) {
     res.send(
       page({
         // client/src/pages/hiq/pba-player.tsx 의 useSeo(ko) 와 문자 단위로 같아야 한다
-        title: `${p.nameKo} — ${p.league} 프로당구 선수 | 랭큐`,
-        desc: `${p.nameKo}${p.nameEn ? ` (${p.nameEn})` : ""} — ${p.league} 통산 상금 ${p.careerPrize != null ? formatPrizeKo(p.careerPrize) : "-"}, 에버리지 ${p.average ?? "-"}, 하이런 ${p.highRun ?? "-"}.`,
+        title: pbaPlayerTitleKo(p.nameKo, p.league),
+        desc: pbaPlayerDescKo(p.nameKo, p.nameEn, p.league, p.careerPrize, p.average, p.highRun),
         canonical: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
         jsonLd: [
           {
@@ -796,6 +800,19 @@ export function registerPrerender(app: Express) {
               { "@type": "ListItem", position: 2, name: p.nameKo, item: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}` },
             ],
           },
+          // "OOO 연봉" 은 조회가 많은 질의인데 프로당구엔 연봉 자체가 없다. 없는 수치를 지어내지 않고
+          // 질문에 정확히 답하는 FAQ 를 준다 — AI 검색·구글 FAQ 리치결과 대응.
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: [
+              {
+                "@type": "Question",
+                name: `${p.nameKo} 선수 연봉은 얼마인가요?`,
+                acceptedAnswer: { "@type": "Answer", text: pbaIncomeAnswerKo(p.nameKo, p.careerPrize) },
+              },
+            ],
+          },
         ],
         body: `<main>
   <nav><a href="/pba">← PBA 투어 랭킹</a></nav>
@@ -808,6 +825,9 @@ export function registerPrerender(app: Express) {
     ${p.bankShotRate != null ? `<dt>뱅크샷 성공률</dt><dd>${p.bankShotRate}%</dd>` : ""}
     ${p.highRun != null ? `<dt>하이런</dt><dd>${p.highRun}</dd>` : ""}
   </dl>
+  <p>${esc(PBA_INCOME_NOTE_KO)}</p>
+  <h2>${esc(p.nameKo)} 선수 연봉은 얼마인가요?</h2>
+  <p>${esc(pbaIncomeAnswerKo(p.nameKo, p.careerPrize))}</p>
   <h2>시즌별 기록</h2>
   <ul>
   ${(p.seasons ?? []).map((s: any) => `<li>${esc(pbaSeasonLabel(s.season))} 시즌 — ${s.prizeRank != null ? `상금랭킹 ${s.prizeRank}위, ` : ""}상금 ${esc(formatPrizeKo(s.prize))}원, 포인트 ${s.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}

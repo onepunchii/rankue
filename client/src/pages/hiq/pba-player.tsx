@@ -8,6 +8,7 @@ import { flagEmoji } from "@/lib/flag";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
 import { seasonLabel, formatPrize } from "./pba";
+import { PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo } from "@shared/pbaMeta";
 
 // PBA 선수 상세 — 통산 스탯 + 시즌별 궤적. 사진 없이 국기·이름·숫자만(초상권).
 
@@ -94,9 +95,16 @@ export default function HiqPbaPlayer() {
     }));
 
     useSeo({
-        title: p ? `${p.nameKo} — ${p.league} ${locale === "ko" ? "프로당구 선수" : "pro billiards player"} | 랭큐` : "PBA | 랭큐",
+        // ko 는 "OOO 연봉" 검색 대응 문안(shared/pbaMeta)을 쓴다 — 프리렌더와 문자 단위로 같아야 한다.
+        title: p
+            ? (locale === "ko"
+                ? pbaPlayerTitleKo(p.nameKo, p.league)
+                : `${p.nameKo} — ${p.league} pro billiards player | 랭큐`)
+            : "PBA | 랭큐",
         description: p
-            ? `${p.nameKo}${p.nameEn ? ` (${p.nameEn})` : ""} — ${p.league} ${t.prize} ${p.careerPrize != null ? formatPrize(p.careerPrize, locale) : "-"}, ${t.average} ${p.average ?? "-"}, ${t.hr} ${p.highRun ?? "-"}.`
+            ? (locale === "ko"
+                ? pbaPlayerDescKo(p.nameKo, p.nameEn, p.league, p.careerPrize, p.average, p.highRun)
+                : `${p.nameKo}${p.nameEn ? ` (${p.nameEn})` : ""} — ${p.league} ${t.prize} ${p.careerPrize != null ? formatPrize(p.careerPrize, locale) : "-"}, ${t.average} ${p.average ?? "-"}, ${t.hr} ${p.highRun ?? "-"}.`)
             : "PBA 선수 프로필",
         path: `/pba-player/${memCode}`,
         locale,
@@ -166,6 +174,10 @@ export default function HiqPbaPlayer() {
                                 </div>
                             ))}
                         </div>
+                        {/* "선수 연봉" 으로 들어온 방문자에게 주는 정확한 답 — 상금을 연봉이라 부르지 않는다 */}
+                        {locale === "ko" && (
+                            <p className="text-[12px] text-black/45 leading-relaxed mt-3 px-1">{PBA_INCOME_NOTE_KO}</p>
+                        )}
                     </section>
 
                     {/* 시즌별 궤적 */}

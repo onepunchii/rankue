@@ -68,6 +68,8 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
   const { t, locale } = useT();
   const [busy, setBusy] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [gisWidth, setGisWidth] = useState(0);
   const [gisReady, setGisReady] = useState(false);
   const [appleReady, setAppleReady] = useState(false);
   const inApp = isNativeApp();
@@ -114,9 +116,22 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
     }
   }, [busy, submitToken, toast, t]);
 
+  // GIS 버튼은 폭을 **픽셀 숫자로만** 받는다(% 불가). 고정 320 으로 두면 좁은 화면에서
+  // 전화 입력·애플 버튼(부모 폭)보다 넓어져 혼자 튀어나온다 — 실제로 그랬다(2026-08-16).
+  // 그래서 부모 폭을 재서 넘긴다. GIS 허용 범위는 200~400.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || inApp) return;
+    const measure = () => setGisWidth(Math.max(200, Math.min(400, Math.round(el.getBoundingClientRect().width))));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [inApp]);
+
   // 웹 전용: GIS 스크립트 로드 + 공식 구글 버튼(브랜드 가이드 준수)
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || inApp) return;
+    if (!GOOGLE_CLIENT_ID || inApp || !gisWidth) return;
     const id = "google-gsi";
     const init = () => {
       if (!window.google || !googleBtnRef.current) return;
@@ -124,8 +139,10 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
         client_id: GOOGLE_CLIENT_ID,
         callback: (r) => { if (r.credential) void submitToken("google", r.credential); },
       });
+      // shape:"pill" — 애플 버튼과 한 쌍으로 읽히게 맞춘 것. GIS 는 높이를 지정할 수 없어
+      // large(40px) 가 고정이라, 감싸는 행을 44px 로 잡아 애플 버튼과 리듬을 맞춘다.
       window.google.accounts.id.renderButton(googleBtnRef.current, {
-        theme: "outline", size: "large", width: 320, text: "continue_with", locale,
+        theme: "outline", size: "large", shape: "pill", width: gisWidth, text: "continue_with", locale,
       });
       setGisReady(true);
     };
@@ -134,7 +151,7 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
     s.id = id; s.src = "https://accounts.google.com/gsi/client"; s.async = true;
     s.onload = init;
     document.head.appendChild(s);
-  }, [locale, submitToken, inApp]);
+  }, [locale, submitToken, inApp, gisWidth]);
 
   // 웹 전용: 애플 SIWA JS(팝업)
   useEffect(() => {
@@ -178,7 +195,7 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
         <button
           onClick={() => nativeSignIn("google")}
           disabled={busy}
-          className="w-[320px] h-[44px] rounded-full bg-white border border-black/15 flex items-center justify-center gap-2.5 text-[15px] font-medium text-black/80 disabled:opacity-40 active:scale-[0.98] transition-transform"
+          className="w-full max-w-[320px] h-[44px] rounded-full bg-white border border-black/15 flex items-center justify-center gap-2.5 text-[15px] font-medium text-black/80 disabled:opacity-40 active:scale-[0.98] transition-transform"
         >
           <GoogleG />
           <span>{t("login.continueGoogle")}</span>
@@ -190,7 +207,7 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
           <button
             onClick={() => nativeSignIn("apple")}
             disabled={busy}
-            className="w-[320px] h-[44px] rounded-[8px] bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 active:scale-[0.98] transition-transform"
+            className="w-full max-w-[320px] h-[44px] rounded-full bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 active:scale-[0.98] transition-transform"
             style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
           >
             <AppleLogo />
@@ -205,19 +222,19 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
   // ── 웹: GIS + SIWA JS ──
   if (!GOOGLE_CLIENT_ID) return null;
   return (
-    <div className="w-full flex flex-col items-center gap-3">
+    <div ref={wrapRef} className="w-full flex flex-col items-center gap-3">
       {hint && <p className="text-[12px] font-medium text-black/55 text-center">{t("login.socialHint")}</p>}
       {/* GIS가 이 컨테이너 내부 DOM을 직접 소유 — React 자식을 절대 넣지 말 것(removeChild 충돌) */}
-      <div className="flex justify-center min-h-[44px] relative">
+      <div className="w-full flex justify-center items-center h-[44px] relative">
         <div ref={googleBtnRef} />
-        {!gisReady && <div className="absolute inset-0 mx-auto h-[44px] w-[320px] rounded-full bg-black/[0.04] animate-pulse pointer-events-none" />}
+        {!gisReady && <div className="absolute inset-0 rounded-full bg-black/[0.04] animate-pulse pointer-events-none" />}
       </div>
 
       {APPLE_SERVICES_ID && (
         <button
           onClick={handleAppleWeb}
           disabled={!appleReady || busy}
-          className="w-[320px] h-[44px] rounded-[8px] bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 transition-opacity"
+          className="w-full h-[44px] rounded-full bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 transition-opacity"
           style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
         >
           <AppleLogo />

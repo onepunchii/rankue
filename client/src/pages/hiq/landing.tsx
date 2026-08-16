@@ -226,8 +226,10 @@ export default function Landing() {
 
                 {/* Input Area — 한국어(또는 앱): 전화번호 / 그 외 언어: 구글·애플 */}
                 {!showPhone ? (
-                    <div className="px-8 py-10 flex flex-col items-center gap-6">
-                        <SocialLogin />
+                    <div className="px-7 py-10 flex flex-col items-center gap-6">
+                        <div className="w-full max-w-[320px] flex flex-col">
+                            <SocialLogin />
+                        </div>
                         <button
                             onClick={() => setPhoneMode(true)}
                             className="text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4"
@@ -236,8 +238,11 @@ export default function Landing() {
                         </button>
                     </div>
                 ) : (
-                <div className="px-8 py-10 flex flex-col items-center">
-                    <div className="w-full relative group">
+                /* 로그인 수단 3종(전화·구글·애플)을 **하나의 320px 열**에 담는다.
+                   예전에는 전화 영역(폭 271, x=52)과 소셜 영역(폭 320, x=28)이 서로 다른 열이었고
+                   높이도 70/64/44/40 으로 제각각이라 "정리 안 된" 화면이 됐다(2026-08-16 실측). */
+                <div className="px-7 pt-9 pb-8 flex flex-col items-center">
+                    <div className="w-full max-w-[320px] flex flex-col">
                         <input
                             type={requiresPassword ? "password" : "tel"}
                             inputMode="numeric"
@@ -253,66 +258,61 @@ export default function Landing() {
                                     handleStart();
                                 }
                             }}
-                            className={`w-full bg-transparent border-b-2 border-black/10 focus:border-brand text-center text-3xl font-bold tabular-nums text-[rgba(0,0,0,0.87)] placeholder:text-black/40 py-4 transition-all outline-none`}
+                            /* 입력칸처럼 보여야 한다 — 예전 스타일(밑줄 + 3xl 볼드 플레이스홀더)은
+                               제목으로 읽혀서 어디에 입력하는지 알 수 없었다. */
+                            className="w-full h-[54px] rounded-tile bg-black/[0.03] border border-black/[0.09] focus:border-brand focus:bg-white text-center text-[19px] font-semibold tabular-nums text-[rgba(0,0,0,0.87)] placeholder:text-black/35 placeholder:font-medium transition-colors outline-none"
                             autoFocus={requiresPassword}
                         />
-                        {/* Tooltip hint */}
-                        <p className="text-center text-[12px] text-black/55 mt-4 font-medium">
+                        <p className="text-center text-[12px] text-black/45 mt-2.5 font-medium">
                             {requiresPassword ? t("login.pinHint") : t("login.phoneHint")}
                         </p>
+
+                        <motion.button
+                            disabled={!canSubmit || isLoading}
+                            onClick={handleStart}
+                            title={requiresPassword ? t("login.confirmEnter") : t("login.enter")}
+                            whileTap={canSubmit ? { scale: 0.98 } : undefined}
+                            /* 비활성일 때 opacity-20 은 '고장난 버튼'으로 읽혔다 — 형태는 유지하고 색만 낮춘다 */
+                            className="w-full h-[54px] mt-4 rounded-tile font-bold text-[16px] flex items-center justify-center gap-2 transition-colors"
+                            style={{
+                                background: canSubmit ? "rgb(var(--brand))" : "rgba(0,0,0,0.05)",
+                                color: canSubmit ? "rgb(var(--brand-fg))" : "rgba(0,0,0,0.32)",
+                            }}
+                        >
+                            {isLoading ? (
+                                <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    <span>{requiresPassword ? t("login.confirmEnter") : t("login.enter")}</span>
+                                    <LucideChevronRight className="w-5 h-5" />
+                                </>
+                            )}
+                        </motion.button>
 
                         {requiresPassword && (
                             <button
                                 onClick={() => setIsResetOpen(true)}
-                                className="w-full mt-6 py-4 px-4 bg-black/[0.04] rounded-tile text-[12px] font-medium text-black/55 hover:text-brand hover:border-brand/50 transition-all active:scale-95 text-center flex items-center justify-center gap-2 group"
+                                className="w-full mt-3 h-[44px] bg-black/[0.03] rounded-tile text-[12.5px] font-medium text-black/55 hover:text-brand transition-colors active:scale-[0.98] flex items-center justify-center gap-2 group"
                             >
                                 <LucideShieldQuestion className="w-4 h-4 text-black/40 group-hover:text-brand transition-colors" />
                                 <span>{t("login.forgotPin")}</span>
                             </button>
                         )}
 
-                    </div>
-                </div>
-                )}
-
-                {/* Enter Button — 전화 모드에서만 */}
-                {showPhone && (
-                <div className="px-8 pb-8">
-                    <motion.button
-                        disabled={!canSubmit || isLoading}
-                        onClick={handleStart}
-                        title={requiresPassword ? t("login.confirmEnter") : t("login.enter")}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full h-16 rounded-tile font-bold text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-20 relative overflow-hidden group"
-                        style={{
-                            background: canSubmit ? "rgb(var(--brand))" : "rgba(0,0,0,0.04)",
-                            color: canSubmit ? "rgb(var(--brand-fg))" : "rgba(0,0,0,0.40)"
-                        }}
-                    >
-                        {isLoading ? (
-                            <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                        ) : (
+                        {/* 구글·애플 — 같은 열, 같은 폭. PIN 확인 단계는 본인 확인 중이라 제외
+                            (오너 결정 2026-08-12: 한국어 포함 전 로케일 3종 노출). */}
+                        {!requiresPassword && socialLoginAvailable() && (
                             <>
-                                <span>{requiresPassword ? t("login.confirmEnter") : t("login.enter")}</span>
-                                <LucideChevronRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
+                                <div className="flex items-center gap-3 my-5">
+                                    <span className="flex-1 h-[1px] bg-black/[0.08]" />
+                                    <span className="text-[11.5px] font-medium text-black/35">{t("login.or")}</span>
+                                    <span className="flex-1 h-[1px] bg-black/[0.08]" />
+                                </div>
+                                <SocialLogin hint={false} />
                             </>
                         )}
-                    </motion.button>
-                </div>
-                )}
-
-                {/* 전화 모드에서도 구글·애플 동시 노출 — 한국어 포함 전 로케일 3종 로그인 (오너 결정 2026-08-12).
-                    PIN 확인 단계(requiresPassword)는 기존 회원 본인 확인 중이므로 제외. */}
-                {showPhone && !requiresPassword && socialLoginAvailable() && (
-                    <div className="px-8 pb-8 flex flex-col items-center gap-4 -mt-1">
-                        <div className="w-full flex items-center gap-3">
-                            <span className="flex-1 h-[1px] bg-black/10" />
-                            <span className="text-[11px] font-medium text-black/40">{t("login.or")}</span>
-                            <span className="flex-1 h-[1px] bg-black/10" />
-                        </div>
-                        <SocialLogin hint={false} />
                     </div>
+                </div>
                 )}
 
                 {/* Footer — 제공 문구 + 언어 선택 */}

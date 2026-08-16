@@ -7,6 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { PBA_INCOME_NOTE_KO, PBA_LIST_TITLE_KO, PBA_LIST_DESC_KO } from "@shared/pbaMeta";
 import { cn } from "@/lib/utils";
 
 // PBA 투어 랭킹 — pbatour.org 공개 데이터 재가공(출처 표기). 시즌 2019~현재.
@@ -29,8 +30,9 @@ const L: Record<Locale, Record<string, string>> = {
         byPrize: "상금순", byPoint: "포인트순", prize: "상금", point: "포인트",
         season: "시즌", empty: "데이터가 없습니다", source: "출처: PBA 투어 공식 기록",
         umbLink: "UMB 세계랭킹 보기", upcoming: "다가오는 대회", dday: "D-", today: "진행 중",
-        metaTitle: "PBA 투어 랭킹 · 프로당구 시즌 상금·포인트 순위 | 랭큐",
-        metaDesc: "프로당구 PBA·LPBA 시즌별 랭킹. 상금 순위, 랭킹 포인트, 선수별 통산 기록과 시즌 히스토리를 랭큐에서.",
+        // ko 메타는 프리렌더와 문자 단위 일치가 필요해 shared/pbaMeta 상수를 쓴다("연봉" 질의 대응 포함)
+        metaTitle: PBA_LIST_TITLE_KO,
+        metaDesc: PBA_LIST_DESC_KO,
     },
     en: {
         title: "PBA Tour Rankings", subtitle: "Korean pro billiards PBA · LPBA season rankings",
@@ -276,7 +278,11 @@ export default function HiqPba() {
                 <LucideGlobe className="w-4 h-4" />
                 {t.umbLink}
             </button>
-            <p className="mt-4 text-center text-[11px] text-black/35">{t.source}</p>
+            {/* "프로당구 선수 연봉" 검색 대응 — 상금을 연봉으로 부르지 않고 사실을 밝힌다 */}
+            {locale === "ko" && (
+                <p className="mt-4 text-[11.5px] text-black/40 leading-relaxed px-1">{PBA_INCOME_NOTE_KO}</p>
+            )}
+            <p className="mt-3 text-center text-[11px] text-black/35">{t.source}</p>
         </div>
     );
 }
