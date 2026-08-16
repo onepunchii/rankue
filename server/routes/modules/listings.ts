@@ -94,6 +94,9 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
         rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium, rate10Pocket: storeListings.rate10Pocket,
         flatLarge: storeListings.flatLarge, flatMedium: storeListings.flatMedium, flatPocket: storeListings.flatPocket,
         claimed: storeListings.claimed, description: storeListings.description,
+        // 좌표 — 길찾기 버튼과 LocalBusiness geo(로컬 검색 노출)에 쓴다. 이미 공개된 주소의 좌표라
+        // 새로 노출되는 개인정보는 없다.
+        latitude: storeListings.latitude, longitude: storeListings.longitude,
         claimedStoreId: storeListings.claimedStoreId, // 내부용 — 응답에서 제거
     }).from(storeListings).where(eq(storeListings.code, req.params.code));
     if (!row) return sendError(res, 404, "매장을 찾을 수 없습니다");

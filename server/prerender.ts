@@ -6,6 +6,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { ABOUT_CONTENT, ABOUT_LANGS, type AboutContent } from "../shared/aboutContent.js";
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
+import { storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "../shared/storeMeta.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW } from "../shared/landingContent.js";
 import {
   formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared,
@@ -1082,19 +1083,11 @@ export function registerPrerender(app: Express) {
     res.send(
       page({
         // client/src/pages/store-listing.tsx 의 useSeo title/desc 와 문자 단위로 같아야 한다.
-        title: `${s.name} — ${s.region} 당구장 | 랭큐`,
-        desc: `${s.name} — ${s.address}. 영업시간·테이블 정보와 전국 당구장 디렉토리를 랭큐에서.`,
+        title: storeTitleKo(s.name, s.region),
+        desc: storeDescKo(s.name, s.address, s as any, s.openHours),
         canonical: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
         jsonLd: [
-          {
-            "@context": "https://schema.org",
-            "@type": "LocalBusiness",
-            name: s.name,
-            url: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
-            address: { "@type": "PostalAddress", streetAddress: s.address, addressLocality: s.region, addressCountry: "KR" },
-            ...(s.phone ? { telephone: s.phone } : {}),
-            ...(s.openHours ? { openingHours: s.openHours } : {}),
-          },
+          storeJsonLd(s as any, ORIGIN),
           {
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
@@ -1108,6 +1101,7 @@ export function registerPrerender(app: Express) {
   <nav><a href="/stores">← 매장 찾기</a></nav>
   <h1>${esc(s.name)}</h1>
   <p>${esc(s.region)}</p>
+  <p><a href="${esc(mapLink(s as any))}" rel="noopener">길찾기 · 지도에서 보기</a>${s.phone ? ` · <a href="tel:${esc(s.phone)}">전화 걸기</a>` : ""}</p>
   <dl>
     <dt>주소</dt><dd>${esc(s.address)}</dd>
     ${s.phone ? `<dt>전화</dt><dd>${esc(s.phone)}</dd>` : ""}

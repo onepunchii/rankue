@@ -6,9 +6,12 @@ import { useSeo } from "@/hooks/useSeo";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
+import { LucidePhone, LucideMapPin, LucideShare2 } from "@/lib/icons";
 
 interface Listing {
   code: string; name: string; region: string; address: string; phone: string | null;
+  latitude: number | string | null; longitude: number | string | null;
   openHours: string | null; tableLarge: number | null; tableMedium: number | null; tablePocket: number | null;
   rate10Large: number | null; rate10Medium: number | null; rate10Pocket: number | null;
   flatLarge: number | null; flatMedium: number | null; flatPocket: number | null;
@@ -39,6 +42,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestMsg: "수정할 내용", suggestContact: "회신 연락처 (선택)",
     suggestSubmit: "보내기", suggestDone: "제보 감사합니다! 확인 후 반영하겠습니다.",
     notFound: "매장을 찾을 수 없습니다", loading: "불러오는 중...", error: "문제가 발생했습니다",
+    callCta: "전화", directionsCta: "길찾기", shareCta: "공유", shareCopied: "링크를 복사했어요",
     close: "닫기",
   },
   en: {
@@ -61,6 +65,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestMsg: "What should change", suggestContact: "Reply contact (optional)",
     suggestSubmit: "Send", suggestDone: "Thanks! We'll review and update.",
     notFound: "Venue not found", loading: "Loading...", error: "Something went wrong",
+    callCta: "Call", directionsCta: "Directions", shareCta: "Share", shareCopied: "Link copied",
     close: "Close",
   },
   vi: {
@@ -83,6 +88,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestMsg: "Nội dung cần sửa", suggestContact: "Liên hệ phản hồi (tùy chọn)",
     suggestSubmit: "Gửi", suggestDone: "Cảm ơn! Chúng tôi sẽ kiểm tra và cập nhật.",
     notFound: "Không tìm thấy quán", loading: "Đang tải...", error: "Đã xảy ra lỗi",
+    callCta: "Gọi", directionsCta: "Chỉ đường", shareCta: "Chia sẻ", shareCopied: "Đã sao chép liên kết",
     close: "Đóng",
   },
   tr: {
@@ -105,6 +111,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestMsg: "Değişmesi gereken", suggestContact: "Yanıt için iletişim (isteğe bağlı)",
     suggestSubmit: "Gönder", suggestDone: "Teşekkürler! İnceleyip güncelleyeceğiz.",
     notFound: "Salon bulunamadı", loading: "Yükleniyor...", error: "Bir sorun oluştu",
+    callCta: "Ara", directionsCta: "Yol tarifi", shareCta: "Paylaş", shareCopied: "Bağlantı kopyalandı",
     close: "Kapat",
   },
   es: {
@@ -127,6 +134,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestMsg: "Qué debería cambiar", suggestContact: "Contacto de respuesta (opcional)",
     suggestSubmit: "Enviar", suggestDone: "¡Gracias! Lo revisaremos.",
     notFound: "Local no encontrado", loading: "Cargando...", error: "Algo salió mal",
+    callCta: "Llamar", directionsCta: "Cómo llegar", shareCta: "Compartir", shareCopied: "Enlace copiado",
     close: "Cerrar",
   },
 };
@@ -146,6 +154,19 @@ export default function StoreListingPage() {
   const [cMsg, setCMsg] = useState("");
   const [sMsg, setSMsg] = useState("");
   const [sContact, setSContact] = useState("");
+
+  // 공유 — 모바일은 OS 공유 시트, 데스크톱은 링크 복사로 폴백.
+  const handleShare = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: document.title, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast({ title: t.shareCopied });
+    } catch { /* 사용자가 공유 시트를 닫은 경우 등 — 조용히 무시 */ }
+  };
 
   const { data: s, isLoading } = useQuery<Listing>({
     queryKey: [`/api/hiq/listings/${code}`],
@@ -173,20 +194,13 @@ export default function StoreListingPage() {
     onError: (e: any) => toast({ title: e?.message || t.error, variant: "destructive" }),
   });
 
+  // 메타·구조화데이터는 shared/storeMeta 로 프리렌더와 공유한다(문자 단위 일치).
   useSeo({
-    title: s ? `${s.name} — ${s.region} 당구장 | 랭큐` : `당구장 | 랭큐`,
-    description: s ? `${s.name} — ${s.address}. 영업시간·테이블 정보와 전국 당구장 디렉토리를 랭큐에서.` : "전국 당구장 디렉토리",
+    title: s ? storeTitleKo(s.name, s.region) : `당구장 | 랭큐`,
+    description: s ? storeDescKo(s.name, s.address, s, s.openHours) : "전국 당구장 디렉토리",
     path: `/stores/${code}`,
     locale,
-    jsonLd: s ? {
-      "@context": "https://schema.org",
-      "@type": "LocalBusiness",
-      name: s.name,
-      address: { "@type": "PostalAddress", streetAddress: s.address, addressCountry: "KR" },
-      telephone: s.phone || undefined,
-      openingHours: s.openHours || undefined,
-      url: `https://www.rankue.co.kr/stores/${code}`,
-    } : null,
+    jsonLd: s ? storeJsonLd(s) : null,
   });
 
   const tableRows = s ? [
@@ -225,10 +239,42 @@ export default function StoreListingPage() {
               <p className="text-[14px] text-brand font-semibold mt-1">{s.region}</p>
             </header>
 
+            {/* 액션 바 — 매장 페이지에 온 사람이 실제로 하려는 것은 '전화'와 '길찾기'다.
+                예전에는 전화번호가 링크로만 있고 길찾기는 아예 없어서, 주소를 복사해
+                지도 앱에 붙여넣어야 했다. */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <a
+                href={s.phone ? `tel:${s.phone}` : undefined}
+                aria-disabled={!s.phone}
+                className={`h-[52px] rounded-2xl flex flex-col items-center justify-center gap-1 transition-colors ${s.phone ? "bg-brand text-white active:bg-brand/90" : "bg-black/[0.04] text-black/25 pointer-events-none"}`}
+              >
+                <LucidePhone className="w-[18px] h-[18px]" />
+                <span className="text-[11.5px] font-bold leading-none">{t.callCta}</span>
+              </a>
+              <a
+                href={mapLink(s)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-[52px] rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center gap-1 active:bg-black/[0.02] transition-colors"
+              >
+                <LucideMapPin className="w-[18px] h-[18px] text-brand" />
+                <span className="text-[11.5px] font-bold leading-none">{t.directionsCta}</span>
+              </a>
+              <button
+                onClick={handleShare}
+                className="h-[52px] rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center gap-1 active:bg-black/[0.02] transition-colors"
+              >
+                <LucideShare2 className="w-[18px] h-[18px] text-brand" />
+                <span className="text-[11.5px] font-bold leading-none">{t.shareCta}</span>
+              </button>
+            </div>
+
             <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-3 mb-4">
               <div>
                 <p className="text-[11.5px] font-bold text-black/40">{t.address}</p>
-                <p className="text-[14.5px] font-medium mt-0.5">{s.address}</p>
+                <a href={mapLink(s)} target="_blank" rel="noopener noreferrer" className="text-[14.5px] font-medium mt-0.5 block hover:text-brand transition-colors">
+                  {s.address}
+                </a>
               </div>
               {s.phone && (
                 <div>
@@ -255,15 +301,19 @@ export default function StoreListingPage() {
               {rateRows.length > 0 && (
                 <div>
                   <p className="text-[11.5px] font-bold text-black/40">{t.rates}</p>
-                  <div className="mt-1.5 space-y-1">
+                  {/* 요금표 — 예전에는 "10분당 1,700원 · 정액 10,000원"이 한 줄에 붙어 있어
+                      대대/중대 간 금액 비교가 안 됐다. 열을 나누면 세로로 바로 비교된다. */}
+                  <div className="mt-2 rounded-xl border border-black/[0.06] overflow-hidden">
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-2 bg-black/[0.02] text-[11px] font-bold text-black/40">
+                      <span />
+                      <span className="text-right w-[74px]">{t.per10}</span>
+                      <span className="text-right w-[74px]">{t.flat}</span>
+                    </div>
                     {rateRows.map(([label, rate, flat]) => (
-                      <div key={label} className="flex items-center justify-between py-1.5 px-2.5 rounded-xl bg-black/[0.03] text-[13px]">
+                      <div key={label} className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-2.5 text-[13.5px] border-t border-black/[0.05]">
                         <span className="font-semibold">{label}</span>
-                        <span className="tabular-nums text-black/70">
-                          {rate != null && <>{t.per10} <b className="text-ink-1">{won(rate)}</b></>}
-                          {rate != null && flat != null && <span className="mx-1.5 text-black/25">·</span>}
-                          {flat != null && <>{t.flat} <b className="text-ink-1">{won(flat)}</b></>}
-                        </span>
+                        <span className="text-right w-[74px] tabular-nums font-semibold">{rate != null ? won(rate) : <span className="text-black/20">-</span>}</span>
+                        <span className="text-right w-[74px] tabular-nums font-semibold">{flat != null ? won(flat) : <span className="text-black/20">-</span>}</span>
                       </div>
                     ))}
                   </div>
