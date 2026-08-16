@@ -114,7 +114,7 @@ export function HiqInstallBanner() {
                     initial={{ y: 100, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 100, opacity: 0 }}
-                    className="fixed bottom-4 left-4 right-4 z-50"
+                    className="rk-install-banner fixed bottom-4 left-4 right-4 z-50"
                 >
                     <div className="bg-white p-4 rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.10)] flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 
@@ -198,7 +199,7 @@ export default function Stores() {
 
   return (
     <div className="min-h-screen w-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans">
-      <div className="mx-auto max-w-2xl px-5 py-12">
+      <div className="mx-auto max-w-2xl px-5 py-12 pb-28 md:pb-12">
         <header className="mb-6">
           <h1 className="text-[28px] font-bold tracking-tight">{t.title}</h1>
           <p className="text-[14px] text-black/55 mt-1">{t.subtitle}</p>
@@ -311,6 +312,9 @@ export default function Stores() {
           </div>
         )}
       </div>
+      {/* 모바일 하단 네비 — 앱에서 넘어온 사용자가 돌아갈 길, 검색 유입에는 제품 진입로.
+          데스크톱은 넓은 공개 레이아웃이라 앱 탭바가 어울리지 않아 감춘다. */}
+      <div className="md:hidden"><HiqNavigation /></div>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { PBA_INCOME_NOTE_KO, PBA_LIST_TITLE_KO, PBA_LIST_DESC_KO } from "@shared/pbaMeta";
 import { cn } from "@/lib/utils";
 
@@ -283,6 +284,7 @@ export default function HiqPba() {
                 <p className="mt-4 text-[11.5px] text-black/40 leading-relaxed px-1">{PBA_INCOME_NOTE_KO}</p>
             )}
             <p className="mt-3 text-center text-[11px] text-black/35">{t.source}</p>
+            <HiqNavigation />
         </div>
     );
 }

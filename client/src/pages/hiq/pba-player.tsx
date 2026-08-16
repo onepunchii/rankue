@@ -7,6 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { seasonLabel, formatPrize } from "./pba";
 import { PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo } from "@shared/pbaMeta";
 
@@ -230,6 +231,7 @@ export default function HiqPbaPlayer() {
                     <p className="text-center text-[11px] text-black/35">{t.source}</p>
                 </>
             )}
+            <HiqNavigation />
         </div>
     );
 }

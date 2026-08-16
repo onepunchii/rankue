@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -219,7 +220,7 @@ export default function StoreListingPage() {
 
   return (
     <div className="min-h-screen w-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans">
-      <div className="mx-auto max-w-2xl px-5 py-12">
+      <div className="mx-auto max-w-2xl px-5 py-12 pb-28 md:pb-12">
         <button onClick={() => setLocation("/stores")} className="text-[13.5px] font-semibold text-black/50 mb-5 hover:text-black/70">
           ← {t.back}
         </button>
@@ -444,6 +445,9 @@ export default function StoreListingPage() {
           </DialogContent>
         </Dialog>
       </div>
+      {/* 모바일 하단 네비 — 앱에서 넘어온 사용자가 돌아갈 길, 검색 유입에는 제품 진입로.
+          데스크톱은 넓은 공개 레이아웃이라 앱 탭바가 어울리지 않아 감춘다. */}
+      <div className="md:hidden"><HiqNavigation /></div>
     </div>
   );
 }

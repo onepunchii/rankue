@@ -1305,6 +1305,15 @@ body.keyboard-open .hide-on-keyboard {
   }
 }
 
+/* 앱 설치 배너 ↔ 하단 네비 겹침 방지.
+   둘 다 fixed bottom z-50 이라, App.tsx 에서 나중에 렌더되는 배너가 네비를 덮어
+   탭이 통째로 가려져 있었다. 네비가 떠 있는 화면(html[data-bottom-nav])에서만
+   배너를 네비 높이(약 88px)만큼 올린다. 네비가 없는 공개 페이지는 기존 그대로. */
+html[data-bottom-nav] .rk-install-banner {
+  /* 네비 실측 높이 99px(안전영역 제외) + 여백. 안전영역은 네비도 같이 밀리므로 함께 더한다. */
+  bottom: calc(108px + env(safe-area-inset-bottom));
+}
+
 /* PWA Bottom Navigation Fix */
 @media (display-mode: standalone) {
   .bottom-navigation-container {

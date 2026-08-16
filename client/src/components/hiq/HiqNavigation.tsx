@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -15,6 +16,13 @@ import { useT } from "@/lib/i18n";
 
 export function HiqNavigation() {
     const { t } = useT();
+    // 하단 네비가 떠 있다는 사실을 문서에 알린다 — 앱 설치 배너도 fixed bottom z-50 이라
+    // 나중에 렌더되는 배너가 네비를 그대로 덮고 있었다(2026-08-16 실측). 배너는 이 표식을 보고
+    // 네비 높이만큼 올라간다(index.css). 컴포넌트끼리 서로를 몰라도 되게 문서 상태로 푼다.
+    useEffect(() => {
+        document.documentElement.dataset.bottomNav = "1";
+        return () => { delete document.documentElement.dataset.bottomNav; };
+    }, []);
     const { isApp } = useNativeBridge();
     const [location, setLocation] = useLocation();
     const { currentSport } = useSport();
