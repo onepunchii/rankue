@@ -323,6 +323,22 @@ export class CommunityRepository {
             .limit(5000);
     }
 
+    // RSS 피드용 — 제목·본문 일부까지 (네이버 서치어드바이저 RSS 제출).
+    // 사이트맵과 달리 "무엇에 대한 글인지"가 필요해 title/content 를 함께 읽는다.
+    async getPostsForRss(limit = 30) {
+        return db.select({
+            id: hiqCommunityPosts.id,
+            board: hiqCommunityPosts.board,
+            title: hiqCommunityPosts.title,
+            content: hiqCommunityPosts.content,
+            createdAt: hiqCommunityPosts.createdAt,
+        })
+            .from(hiqCommunityPosts)
+            .where(eq(hiqCommunityPosts.isBlinded, false))
+            .orderBy(desc(hiqCommunityPosts.createdAt))
+            .limit(limit);
+    }
+
     // --- 소속 근거 ---
 
     // 최근 30일 내 내가 경기를 기록한 매장 — GPS 없이 쓰는 소속 근거.

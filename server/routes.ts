@@ -6,6 +6,7 @@ import errorsRouter from "./routes/modules/errors.js";
 import visitsRouter from "./routes/modules/visits.js";
 import cronRouter from "./routes/modules/cron.js";
 import { registerSitemap } from "./sitemap.js";
+import { registerRss } from "./rss.js";
 import { registerPrerender } from "./prerender.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -13,6 +14,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 동적 sitemap.xml (정적 페이지 + 크루 + 매장) — SPA/정적 폴백보다 먼저 등록
   registerSitemap(app);
+  registerRss(app);
 
   // 크롤러 전용 프리렌더 — 봇이 아니면 next() 로 흘려보내므로 사용자 경로에 영향 없다.
   // ⚠️ vercel.json 의 routes 에 has(User-Agent) 조건으로 해당 경로가 등록돼 있어야

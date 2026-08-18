@@ -45,3 +45,5 @@ User-agent: cohere-ai
 Allow: /
 
 Sitemap: https://www.rankue.co.kr/sitemap.xml
+# RSS — 네이버 서치어드바이저 RSS 제출용(최근 브리핑·커뮤니티)
+Sitemap: https://www.rankue.co.kr/rss.xml
