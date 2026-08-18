@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { storage } from "./storage/index.js";
 import { db } from "./db.js";
 import { storeListings } from "../shared/schema.js";
+import { hreflangOf } from "../shared/aboutContent.js";
 import { asc } from "drizzle-orm";
 
 // 동적 사이트맵 — 정적 페이지 + 모든 크루(/club/:id) + 모든 매장(/store/:slug)을
@@ -23,7 +24,7 @@ function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; prio
     const sep = loc.includes("?") ? "&" : "?";
     alts =
       `\n    <xhtml:link rel="alternate" hreflang="ko" href="${esc(loc)}" />` +
-      opts.langs.map((l) => `\n    <xhtml:link rel="alternate" hreflang="${l}" href="${esc(loc + sep + "lang=" + l)}" />`).join("") +
+      opts.langs.map((l) => `\n    <xhtml:link rel="alternate" hreflang="${hreflangOf(l)}" href="${esc(loc + sep + "lang=" + l)}" />`).join("") +
       `\n    <xhtml:link rel="alternate" hreflang="x-default" href="${esc(loc)}" />`;
   }
   return (
@@ -106,8 +107,10 @@ export async function generateSitemap(): Promise<string> {
   try {
     const players = await storage.pba.getPlayersForSitemap();
     if (players.length) {
-      parts.push(entry(`${ORIGIN}/pba`, { changefreq: "weekly", priority: "0.8" }));
-      for (const p of players) parts.push(entry(`${ORIGIN}/pba-player/${p.memCode}`, { changefreq: "weekly", priority: "0.5" }));
+      // hreflang: 프리렌더가 ?lang=en·vi·tr·es 언어판을 실제로 서빙한다(2026-08-18).
+      // 선언만 하고 같은 문서를 주면 클러스터 전체가 무시되므로, 서빙과 선언을 함께 바꾼다.
+      parts.push(entry(`${ORIGIN}/pba`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }));
+      for (const p of players) parts.push(entry(`${ORIGIN}/pba-player/${p.memCode}`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.5" }));
     }
   } catch (e) {
     console.warn("[sitemap] pba players failed:", (e as Error)?.message);

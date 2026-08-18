@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Capacitor } from "@capacitor/core";
 import { useSeo } from "@/hooks/useSeo";
+import { useT } from "@/lib/i18n";
 import { BilliardBall } from "@/components/hiq/ui/BilliardBall";
-import { LANDING_FAQS, LANDING_META } from "@shared/landingContent";
+import { landingContent } from "@shared/landingContent";
 
 // 설치 배너(HiqInstallBanner)와 같은 링크. utm 만 랜딩용으로 구분해 유입 경로를 나눈다.
 const STORE_IOS = "https://apps.apple.com/app/id6760333313?ct=web_landing";
@@ -107,16 +108,21 @@ const FEATURES: { name: string; desc: string; icon: ReactNode }[] = [
 // 문답·메타 문안은 shared/landingContent.ts 가 정본이다 — 서버 프리렌더(server/prerender.ts)가
 // 같은 객체를 렌더하므로, 여기에 다시 적으면 봇이 본 내용과 사용자가 본 내용이 갈려 클로킹이 된다.
 // (구조화데이터에만 있고 화면에 없는 문답도 구글 기준 위반이라 화면에 그대로 노출한다.)
-const FAQS = LANDING_FAQS;
 
-const HERO_CHIPS = ["3쿠션 · 4구 지원", "전적 자동 저장", "매장 · 전국 랭킹", "무료"];
+
 
 export default function MarketingLanding({ onStart }: { onStart: () => void }) {
+    const { locale } = useT();
+    // 홈은 사이트맵이 en·vi·tr·es 언어판을 선언한다 — 실제 문안도 로케일을 따라야
+    // 봇이 받는 문서와 사람이 보는 화면이 갈리지 않는다(shared/landingContent).
+    const LC = landingContent(locale);
+    const FAQS = LC.faqs;
+    const HERO_CHIPS = LC.chips;
     useSeo({
-        title: LANDING_META.title,
-        description: LANDING_META.desc,
+        title: LC.title,
+        description: LC.desc,
         path: "/",
-        locale: "ko",
+        locale,
         image: "https://www.rankue.co.kr/og.png",
     });
 

@@ -3,14 +3,15 @@ import { storage } from "./storage/index.js";
 import { db } from "./db.js";
 import { storeListings } from "../shared/schema.js";
 import { asc, eq, sql } from "drizzle-orm";
-import { ABOUT_CONTENT, ABOUT_LANGS, type AboutContent } from "../shared/aboutContent.js";
+import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../shared/aboutContent.js";
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "../shared/storeMeta.js";
-import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW } from "../shared/landingContent.js";
+import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW, LANDING_LANGS, landingContent } from "../shared/landingContent.js";
 import {
   formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared,
   PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo, pbaIncomeAnswerKo, PBA_LIST_TITLE_KO, PBA_LIST_DESC_KO,
+  PBA_LANGS, pbaL10n,
 } from "../shared/pbaMeta.js";
 import { briefingLineKo, briefingDateKo, briefingTitle, briefingDesc, todayKst } from "../shared/briefingMeta.js";
 
@@ -111,7 +112,7 @@ function page(p: PageParts): string {
   const alts = (p.altLangs ?? []).length
     ? `\n  <link rel="alternate" hreflang="ko" href="${esc(base)}" />` +
       (p.altLangs ?? [])
-        .map((l) => `\n  <link rel="alternate" hreflang="${l}" href="${esc(base + "?lang=" + l)}" />`)
+        .map((l) => `\n  <link rel="alternate" hreflang="${hreflangOf(l)}" href="${esc(base + "?lang=" + l)}" />`)
         .join("") +
       `\n  <link rel="alternate" hreflang="x-default" href="${esc(base)}" />`
     : "";
@@ -273,20 +274,40 @@ export function registerPrerender(app: Express) {
   // 구글은 JS를 렌더링해 랜딩 본문을 읽지만 네이버(Yeti)는 그러지 않아, 프리렌더가 없으면
   // 정적 셸의 메타 태그만 보고 본문(기능·크루·FAQ)을 통째로 못 본다.
   // 문안은 shared/landingContent.ts 정본을 그대로 써서 클로킹이 되지 않게 한다.
+  // 홈 섹션 소제목 — 본문(features/faq)과 같은 언어로 나가야 한다. 한국어로 고정해 두면
+  // 언어판이 반쪽짜리가 되어 "번역된 척"이 된다.
+  const HOME_H: Record<string, { canH: string; canP: string; faqH: string; about: string; stores: string; support: string }> = {
+    ko: { canH: "이런 걸 할 수 있어요", canP: "점수판부터 매칭, 기록, 당구 커뮤니티까지 — 당구장에서 필요한 게 한 앱에 모여 있습니다.", faqH: "자주 묻는 질문", about: "랭큐 소개", stores: "매장 찾기", support: "고객지원" },
+    en: { canH: "What you can do", canP: "Scoreboard, matched games, history and a billiards community — everything you need at the hall, in one app.", faqH: "Frequently asked questions", about: "About RANKUE", stores: "Find a venue", support: "Support" },
+    vi: { canH: "Bạn có thể làm gì", canP: "Bảng điểm, đấu ghép cặp, lịch sử và cộng đồng bida — mọi thứ bạn cần ở quán, gói trong một app.", faqH: "Câu hỏi thường gặp", about: "Giới thiệu RANKUE", stores: "Tìm quán", support: "Hỗ trợ" },
+    tr: { canH: "Neler yapabilirsiniz", canP: "Skor tablosu, eşleşmeli maç, geçmiş ve bilardo topluluğu — salonda gereken her şey tek uygulamada.", faqH: "Sıkça sorulan sorular", about: "RANKUE Hakkında", stores: "Salon bul", support: "Destek" },
+    es: { canH: "Qué puedes hacer", canP: "Marcador, partidas emparejadas, historial y comunidad del billar: todo lo que necesitas en la sala, en una app.", faqH: "Preguntas frecuentes", about: "Acerca de RANKUE", stores: "Buscar sala", support: "Soporte" },
+  };
+
   app.get("/", (req, res, next) => {
     if (!isBot(req)) return next();
+    // 언어판 — 사이트맵이 홈에 en·vi·tr·es 를 선언하므로 실제로 그 언어를 서빙해야 한다.
+    // 화이트리스트 밖 값(?lang=zz)은 ko 로 접고 canonical 도 ko 판을 가리켜 soft-404 를 막는다.
+    const q = String(req.query.lang ?? "");
+    const lang = (LANDING_LANGS as readonly string[]).includes(q) ? q : "ko";
+    const c = landingContent(lang);
+    const h = HOME_H[lang] ?? HOME_H.ko;
     res.setHeader("X-Prerender", "home");
     noStore(res);
     res.send(
       page({
-        title: LANDING_META.title,
-        desc: LANDING_META.desc,
-        canonical: `${ORIGIN}/`,
+        lang,
+        title: c.title,
+        desc: c.desc,
+        // 언어판은 자기 URL 을 self-canonical 해야 한다(안 그러면 전부 ko 의 중복으로 색인 제외).
+        canonical: lang === "ko" ? `${ORIGIN}/` : `${ORIGIN}/?lang=${lang}`,
+        altLangs: LANDING_LANGS.filter((l) => l !== "ko") as unknown as string[],
+        altBase: `${ORIGIN}/`,
         jsonLd: [
           {
             "@context": "https://schema.org",
             "@type": "FAQPage",
-            mainEntity: LANDING_FAQS.map((f) => ({
+            mainEntity: c.faqs.map((f) => ({
               "@type": "Question",
               name: f.q,
               acceptedAnswer: { "@type": "Answer", text: f.a },
@@ -295,23 +316,23 @@ export function registerPrerender(app: Express) {
           APP_LD,
         ],
         body: `<main>
-  <h1>${esc(LANDING_META.h1)}</h1>
-  <p>${esc(LANDING_META.lead)}</p>
+  <h1>${esc(c.h1)}</h1>
+  <p>${esc(c.lead)}</p>
 
-  <h2>이런 걸 할 수 있어요</h2>
-  <p>점수판부터 매칭, 기록, 당구 커뮤니티까지 — 당구장에서 필요한 게 한 앱에 모여 있습니다.</p>
-  ${LANDING_FEATURES.map((f) => `<section><h3>${esc(f.name)}</h3><p>${esc(f.desc)}</p></section>`).join("\n  ")}
+  <h2>${esc(h.canH)}</h2>
+  <p>${esc(h.canP)}</p>
+  ${c.features.map((f) => `<section><h3>${esc(f.name)}</h3><p>${esc(f.desc)}</p></section>`).join("\n  ")}
 
-  <h2>${esc(LANDING_CREW.title)}</h2>
-  <p>${esc(LANDING_CREW.desc)}</p>
+  <h2>${esc(c.crew.title)}</h2>
+  <p>${esc(c.crew.desc)}</p>
   <ul>
-  ${LANDING_CREW.items.map((i) => `<li>${esc(i.t)} — ${esc(i.d)}</li>`).join("\n  ")}
+  ${c.crew.items.map((i) => `<li>${esc(i.t)} — ${esc(i.d)}</li>`).join("\n  ")}
   </ul>
 
-  <h2>자주 묻는 질문</h2>
-  ${LANDING_FAQS.map((f) => `<section><h3>${esc(f.q)}</h3><p>${esc(f.a)}</p></section>`).join("\n  ")}
+  <h2>${esc(h.faqH)}</h2>
+  ${c.faqs.map((f) => `<section><h3>${esc(f.q)}</h3><p>${esc(f.a)}</p></section>`).join("\n  ")}
 
-  <nav><a href="/about">랭큐 소개</a> <a href="/stores">매장 찾기</a> <a href="/support">고객지원</a></nav>
+  <nav><a href="${lang === "ko" ? "/about" : `/about?lang=${lang}`}">${esc(h.about)}</a> <a href="/stores">${esc(h.stores)}</a> <a href="/support">${esc(h.support)}</a></nav>
 </main>`,
       }),
     );
@@ -631,14 +652,19 @@ export function registerPrerender(app: Express) {
 
   app.get("/player/:category/:umbId", async (req, res, next) => {
     if (!isBot(req)) return next();
+    // soft-404 방지: 예전에는 next() 로 흘려보내 정적 셸(=한국어 홈 문서)이 200 으로 나갔다.
+    // 봇에게는 "없는 선수 URL 이 홈 내용으로 색인 가능"한 상태였다(2026-08-18 실측).
+    // /stores/:code·/pba-player/:code 와 같은 규칙으로 404 를 준다.
     const category = ["players", "ladies", "juniors"].includes(req.params.category) ? req.params.category : null;
-    if (!category || !/^\d{1,6}$/.test(req.params.umbId)) return next();
+    if (!category || !/^\d{1,6}$/.test(req.params.umbId)) {
+      return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
+    }
     const qLang = typeof req.query.lang === "string" ? req.query.lang : "";
     const lang: UmbLang = (UMB_LANGS as readonly string[]).includes(qLang) ? (qLang as UmbLang) : "ko";
     const L = UMB_L10N[lang];
     try {
       const data = await storage.umb.getPlayerHistory(category as any, req.params.umbId);
-      if (!data?.player) return next();
+      if (!data?.player) return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
       const p = data.player as any;
       const catName = L.cat[category];
       // ko는 한글 이름 우선("조명우 (CHO Myung Woo)"), 그 외 언어는 로마자 원표기
@@ -717,6 +743,10 @@ export function registerPrerender(app: Express) {
 
   app.get("/pba", async (req, res, next) => {
     if (!isBot(req)) return next();
+    // 언어판 — PBA 에는 베트남·터키·스페인 선수가 뛴다. ko 고정이면 그 나라 검색은 못 잡는다.
+    const pq = String(req.query.lang ?? "");
+    const plang = (PBA_LANGS as readonly string[]).includes(pq) ? pq : "ko";
+    const PL = pbaL10n(plang);
     try {
       const { currentPbaSeason } = await import("./services/pbaSync.js");
       // 시즌 롤오버 공백에도 비지 않게 — DB 에 행이 실존하는 최신 시즌 기준 (라우트와 동일 규칙)
@@ -727,14 +757,17 @@ export function registerPrerender(app: Express) {
       noStore(res);
       res.send(
         page({
-          title: PBA_LIST_TITLE_KO,
-          desc: PBA_LIST_DESC_KO,
-          canonical: `${ORIGIN}/pba`,
+          lang: plang,
+          title: PL.listTitle,
+          desc: PL.listDesc,
+          canonical: plang === "ko" ? `${ORIGIN}/pba` : `${ORIGIN}/pba?lang=${plang}`,
+          altLangs: PBA_LANGS.filter((l) => l !== "ko") as unknown as string[],
+          altBase: `${ORIGIN}/pba`,
           jsonLd: [
             {
               "@context": "https://schema.org",
               "@type": "ItemList",
-              name: PBA_LIST_TITLE_KO,
+              name: PL.listTitle,
               itemListElement: rows.slice(0, 20).map((r, i) => ({
                 "@type": "ListItem", position: i + 1, name: r.nameKo,
                 url: `${ORIGIN}/pba-player/${r.memCode}`,
@@ -742,14 +775,15 @@ export function registerPrerender(app: Express) {
             },
           ],
           body: `<main>
-  <h1>PBA 투어 랭킹</h1>
-  <p>프로당구 PBA·LPBA 시즌 랭킹 — ${pbaSeasonLabel(season)} 시즌 상금순</p>
+  <h1>${esc(PL.navList)}</h1>
+  <p>${esc(PL.listDesc)}</p>
+  <p>${esc(pbaSeasonLabel(season))}</p>
   <ol>
   ${rows.map((r) => `<li><a href="/pba-player/${esc(r.memCode)}">${esc(r.nameKo)}</a>${r.nameEn ? ` (${esc(r.nameEn)})` : ""} — 상금 ${esc(formatPrizeKo(r.prize))}원, 랭킹포인트 ${r.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
   </ol>
-  <p>${esc(PBA_INCOME_NOTE_KO)}</p>
-  <p>출처: PBA 투어 공식 기록 — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
-  <nav><a href="/world-ranking">UMB 세계랭킹</a> <a href="/">홈</a></nav>
+  <p>${esc(PL.incomeNote)}</p>
+  <p>${esc(PL.source)} — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
+  <nav><a href="/world-ranking${plang === "ko" ? "" : `?lang=${plang}`}">UMB</a> <a href="/${plang === "ko" ? "" : `?lang=${plang}`}">RANKUE</a></nav>
 </main>`,
         }),
       );
@@ -774,14 +808,24 @@ export function registerPrerender(app: Express) {
     if (!p) return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
     const games = (p.win ?? 0) + (p.lose ?? 0) + (p.draw ?? 0);
     const winRate = games > 0 ? Math.round(((p.win ?? 0) / games) * 100) : null;
+    const ppq = String(req.query.lang ?? "");
+    const pplang = (PBA_LANGS as readonly string[]).includes(ppq) ? ppq : "ko";
+    const PP = pbaL10n(pplang);
+    const prizeStr = p.careerPrize != null ? `${formatPrizeKo(p.careerPrize)}${pplang === "ko" ? "원" : " KRW"}` : "-";
     res.setHeader("X-Prerender", "pba-player");
     noStore(res);
     res.send(
       page({
         // client/src/pages/hiq/pba-player.tsx 의 useSeo(ko) 와 문자 단위로 같아야 한다
-        title: pbaPlayerTitleKo(p.nameKo, p.league),
-        desc: pbaPlayerDescKo(p.nameKo, p.nameEn, p.league, p.careerPrize, p.average, p.highRun),
-        canonical: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
+        lang: pplang,
+        // ko 는 한글 이름, 그 외 언어는 로마자 원표기(현지 팬이 검색하는 형태)
+        title: PP.playerTitle(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), p.league),
+        desc: PP.playerDesc(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), pplang === "ko" ? p.nameEn : null, p.league, prizeStr, p.average, p.highRun),
+        canonical: pplang === "ko"
+          ? `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`
+          : `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}?lang=${pplang}`,
+        altLangs: PBA_LANGS.filter((l) => l !== "ko") as unknown as string[],
+        altBase: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
         jsonLd: [
           {
             "@context": "https://schema.org",
@@ -809,8 +853,8 @@ export function registerPrerender(app: Express) {
             mainEntity: [
               {
                 "@type": "Question",
-                name: `${p.nameKo} 선수 연봉은 얼마인가요?`,
-                acceptedAnswer: { "@type": "Answer", text: pbaIncomeAnswerKo(p.nameKo, p.careerPrize) },
+                name: PP.incomeQ(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo)),
+                acceptedAnswer: { "@type": "Answer", text: PP.incomeA(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), prizeStr) },
               },
             ],
           },
@@ -820,16 +864,16 @@ export function registerPrerender(app: Express) {
   <h1>${esc(p.nameKo)}</h1>
   <p>${esc(p.nameEn ?? "")} · ${esc(p.league)}${p.nationCode ? ` · ${esc(p.nationCode)}` : ""}</p>
   <dl>
-    <dt>통산 상금</dt><dd>${p.careerPrize != null ? `${esc(formatPrizeKo(p.careerPrize))}원` : "-"}</dd>
+    <dt>${esc(PP.careerPrize)}</dt><dd>${esc(prizeStr)}</dd>
     ${p.win != null ? `<dt>승-패</dt><dd>${p.win}-${p.lose ?? 0}${winRate != null ? ` (승률 ${winRate}%)` : ""}</dd>` : ""}
     ${p.average != null ? `<dt>에버리지</dt><dd>${p.average}</dd>` : ""}
     ${p.bankShotRate != null ? `<dt>뱅크샷 성공률</dt><dd>${p.bankShotRate}%</dd>` : ""}
     ${p.highRun != null ? `<dt>하이런</dt><dd>${p.highRun}</dd>` : ""}
   </dl>
-  <p>${esc(PBA_INCOME_NOTE_KO)}</p>
-  <h2>${esc(p.nameKo)} 선수 연봉은 얼마인가요?</h2>
-  <p>${esc(pbaIncomeAnswerKo(p.nameKo, p.careerPrize))}</p>
-  <h2>시즌별 기록</h2>
+  <p>${esc(PP.incomeNote)}</p>
+  <h2>${esc(PP.incomeQ(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo)))}</h2>
+  <p>${esc(PP.incomeA(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), prizeStr))}</p>
+  <h2>${esc(PP.seasonH)}</h2>
   <ul>
   ${(p.seasons ?? []).map((s: any) => `<li>${esc(pbaSeasonLabel(s.season))} 시즌 — ${s.prizeRank != null ? `상금랭킹 ${s.prizeRank}위, ` : ""}상금 ${esc(formatPrizeKo(s.prize))}원, 포인트 ${s.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
   </ul>
