@@ -23,6 +23,10 @@
             "dest": "/api/index.ts"
         },
         {
+            "src": "/(rss|feed)\\.xml",
+            "dest": "/api/index.ts"
+        },
+        {
             "src": "^/$",
             "has": [
                 {
