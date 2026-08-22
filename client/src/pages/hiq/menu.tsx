@@ -323,8 +323,10 @@ export default function HiqMenu() {
             </div>
             )}
 
-            {/* Section: 큐 컬렉션 — 기록 기반 뱃지 진열장 (내 기록이 있어야 의미가 있다) */}
-            {!isGuest && (
+            {/* Section: 큐 컬렉션 — 기록 기반 뱃지 진열장.
+                숨김 처리(오너 결정 2026-08-19) — 재노출 시 false → !isGuest 로 되돌린다.
+                컴포넌트(BadgeShelf)는 그대로 살려 둔다. */}
+            {false && (
             <div className="relative z-10 mb-10">
                 <BadgeShelf />
             </div>
