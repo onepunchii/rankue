@@ -144,6 +144,46 @@ router.get("/suggestions", checkSuperAdmin, asyncHandler(async (req: any, res: a
     return sendSuccess(res, suggestions);
 }));
 
+// POST /admin/suggestions/:id/reply — 건의한 회원에게 답장(인앱 알림함 + 네이티브 푸시).
+//
+// 왜 필요한가: 건의함에는 '읽음' 표시만 있어서, 답을 주려면 남긴 연락처로 전화하는 수밖에
+// 없었다(오너 제보 2026-08-19). 건의는 이미 회원 계정(profileId)에 연결돼 저장되므로
+// 전화번호를 쓰지 않고 앱 안에서 바로 회신할 수 있다.
+//
+// 연결 고리: suggestions.userId(=profiles.id) → hiq_members → memberId → 알림.
+// 비로그인 건의(userId 없음)나 탈퇴 회원은 회신 대상이 없으므로 명확히 거절한다.
+router.post("/suggestions/:id/reply", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const message = String(req.body?.message || "").trim().slice(0, 500);
+    if (!message) return sendError(res, 400, "답장 내용을 입력해주세요");
+
+    const { db } = await import("../../db.js");
+    const { suggestions } = await import("../../../shared/schema.js");
+    const { eq } = await import("drizzle-orm");
+    const [s] = await db.select().from(suggestions).where(eq(suggestions.id, req.params.id));
+    if (!s) return sendError(res, 404, "건의사항을 찾을 수 없습니다.");
+    if (!s.userId) {
+        return sendError(res, 409, "회원 계정에 연결되지 않은 건의라 앱 답장을 보낼 수 없습니다. 남긴 연락처로 연락해주세요.");
+    }
+
+    const member = await storage.getMemberByProfileId(s.userId);
+    if (!member) {
+        return sendError(res, 409, "건의한 회원을 찾을 수 없습니다(탈퇴했을 수 있습니다).");
+    }
+
+    const { notificationService } = await import("../../services/notificationService.js");
+    await notificationService.sendAndSaveNotification({
+        memberId: member.id,
+        title: "건의하신 내용에 답변이 도착했어요",
+        body: message,
+        category: "admin",
+        type: "suggestion_reply",
+    });
+
+    // 답장했으면 처리한 건이다 — 읽음 표시를 따로 누르게 하지 않는다.
+    await db.update(suggestions).set({ isRead: true }).where(eq(suggestions.id, s.id));
+    return sendSuccess(res, { sent: true, memberName: member.name });
+}));
+
 router.patch("/suggestions/:id", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const { isRead } = req.body;
     const suggestion = await storage.markSuggestionRead(req.params.id, isRead === true);

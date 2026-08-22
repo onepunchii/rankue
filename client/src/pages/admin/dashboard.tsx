@@ -260,6 +260,21 @@ export default function AdminDashboard() {
         }
     });
 
+        // 건의 답장 — 전화 말고 앱 알림으로 회신한다(오너 요청 2026-08-19).
+    const [replyingId, setReplyingId] = useState<string | null>(null);
+    const [replyText, setReplyText] = useState("");
+    const replyMutation = useMutation({
+        mutationFn: async ({ id, message }: { id: string; message: string }) =>
+            apiRequest(`/api/hiq/admin/suggestions/${id}/reply`, { method: "POST", body: { message } }),
+        onSuccess: (r: any) => {
+            toast({ title: `${r?.memberName ?? "회원"}님에게 답장을 보냈습니다` });
+            setReplyingId(null);
+            setReplyText("");
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/suggestions"] });
+        },
+        onError: (e: any) => toast({ title: e?.message || "답장 전송 실패", variant: "destructive" }),
+    });
+
     const toggleSuggestionReadMutation = useMutation({
         mutationFn: async ({ id, isRead }: { id: string, isRead: boolean }) => {
             return apiRequest(`/api/hiq/admin/suggestions/${id}`, { method: "PATCH", body: { isRead } });
@@ -640,17 +655,56 @@ export default function AdminDashboard() {
                                                 : <><LucideCheckCircle className="w-3 h-3 mr-1" /> 읽음 처리</>}
                                         </Button>
                                         {suggestion.contact && (
-                                            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                                            <Button size="sm" variant="ghost" className="h-8 text-xs text-black/50" onClick={() => {
                                                 if (suggestion.contact?.includes('@')) {
                                                     window.location.href = `mailto:${suggestion.contact}`;
                                                 } else {
                                                     window.location.href = `tel:${suggestion.contact}`;
                                                 }
                                             }}>
-                                                <LucideMail className="w-3 h-3 mr-1" /> 답변하기
+                                                {suggestion.contact.includes('@') ? "메일" : "전화"}
                                             </Button>
                                         )}
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 text-xs"
+                                            onClick={() => {
+                                                setReplyingId(replyingId === suggestion.id ? null : suggestion.id);
+                                                setReplyText("");
+                                            }}
+                                        >
+                                            <LucideMail className="w-3 h-3 mr-1" /> 앱으로 답장
+                                        </Button>
                                     </div>
+
+                                    {replyingId === suggestion.id && (
+                                        <div className="rounded-xl bg-black/[0.03] p-3 space-y-2">
+                                            <p className="text-[12px] text-black/50">
+                                                건의한 회원의 알림함으로 전송됩니다. 푸시 토큰이 있으면 기기 알림도 함께 갑니다.
+                                            </p>
+                                            <Textarea
+                                                value={replyText}
+                                                onChange={(e) => setReplyText(e.target.value)}
+                                                maxLength={500}
+                                                placeholder="답장 내용 (500자 이내)"
+                                                className="bg-white border-black/10 h-24 text-sm"
+                                            />
+                                            <div className="flex justify-end gap-2">
+                                                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setReplyingId(null)}>
+                                                    취소
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    className="h-8 text-xs"
+                                                    disabled={!replyText.trim() || replyMutation.isPending}
+                                                    onClick={() => replyMutation.mutate({ id: suggestion.id, message: replyText.trim() })}
+                                                >
+                                                    {replyMutation.isPending ? "보내는 중..." : "답장 보내기"}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                             {suggestions.length === 0 && (
