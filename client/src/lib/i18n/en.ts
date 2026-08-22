@@ -1117,6 +1117,7 @@ const en: Dict = {
   "playerCard.average": "Avg",
   "playerCard.defaultName": "Player",
   "playerCard.endInning": "End Inning",
+  "playerCard.finishRemaining": "Finish left",
   "playerCard.finish": "FINISH",
   "playerCard.highRun": "High Run",
   "playerCard.solo": "Solo",

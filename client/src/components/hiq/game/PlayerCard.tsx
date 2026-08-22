@@ -12,6 +12,8 @@ interface Props {
     avg: string;
     isTurn: boolean;
     isFinishMode: boolean;
+    /** 마무리 룰: 남은 마무리 개수. 0이면 마무리 완료(진짜 FINISH), undefined면 마무리 룰 없음 */
+    finishRemaining?: number;
     theme: string;
     onTap: (zone: "top" | "bottom") => void;
     onTurnClick?: () => void;
@@ -34,6 +36,7 @@ export function PlayerCard({
     avg,
     isTurn,
     isFinishMode,
+    finishRemaining,
     theme,
     onTap,
     onTurnClick,
@@ -157,17 +160,29 @@ export function PlayerCard({
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.5 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    className="absolute inset-0 flex items-center justify-center z-50 pointer-events-auto cursor-pointer"
+                                    /* 마무리가 남았을 때는 오버레이가 탭을 가로채면 안 된다 —
+                                       마무리 성공/실패 입력은 카드 본래의 상·하단 탭으로 받는다.
+                                       다 채웠을 때만 눌러서 종료하는 FINISH 가 된다. */
+                                    className={`absolute inset-0 flex items-center justify-center z-50 ${(finishRemaining ?? 0) > 0 ? "pointer-events-none" : "pointer-events-auto cursor-pointer"}`}
                                     onClick={(e) => {
+                                        if ((finishRemaining ?? 0) > 0) return;
                                         e.stopPropagation();
                                         onTurnClick && onTurnClick();
                                     }}
                                 >
-                                    <div className="bg-red-500/20 px-8 py-4 rounded-card border border-red-500/50 animate-pulse">
-                                        <span className="text-[8vw] font-bold text-red-500">
-                                            {t("playerCard.finish")}
-                                        </span>
-                                    </div>
+                                    {(finishRemaining ?? 0) > 0 ? (
+                                        <div className="bg-amber-500/15 px-7 py-3.5 rounded-card border border-amber-500/50">
+                                            <span className="text-[5.5vw] font-bold text-amber-600 tabular-nums">
+                                                {t("playerCard.finishRemaining")} {finishRemaining}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-red-500/20 px-8 py-4 rounded-card border border-red-500/50 animate-pulse">
+                                            <span className="text-[8vw] font-bold text-red-500">
+                                                {t("playerCard.finish")}
+                                            </span>
+                                        </div>
+                                    )}
                                 </motion.div>
                             )}
                         </motion.div>
@@ -206,7 +221,7 @@ export function PlayerCard({
                     </div>
 
                     <AnimatePresence>
-                        {isTurn && !isFinishMode && !hideEndInning && (
+                        {isTurn && (!isFinishMode || (finishRemaining ?? 0) > 0) && !hideEndInning && (
                             <motion.button
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}

@@ -190,7 +190,7 @@ router.patch("/game/:id/score", requireAuth, asyncHandler(async (req: AuthReques
         "player1Score", "player2Score", "player3Score", "player4Score",
         "player1Innings", "player2Innings", "player3Innings", "player4Innings",
         "player1HighRun", "player2HighRun", "player3HighRun", "player4HighRun",
-        "totalInnings",
+        "totalInnings", "finishProgress",
     ];
     const updateData: any = {};
     for (const key of ALLOWED_KEYS) {

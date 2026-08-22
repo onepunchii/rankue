@@ -1117,6 +1117,7 @@ const es: Dict = {
   "playerCard.average": "Prom.",
   "playerCard.defaultName": "Jugador",
   "playerCard.endInning": "Terminar entrada",
+  "playerCard.finishRemaining": "Restantes",
   "playerCard.finish": "FINAL",
   "playerCard.highRun": "Serie máxima",
   "playerCard.solo": "Solo",

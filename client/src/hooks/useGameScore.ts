@@ -173,6 +173,11 @@ export function useGameScore(id: string) {
                     player2Innings: gameState.p2Innings,
                     player3Innings: gameState.p3Innings,
                     player4Innings: gameState.p4Innings,
+                    // 마무리 진행 — 새로고침해도 "마무리 2/3" 이 남아야 한다
+                    finishProgress: {
+                        1: gameState.p1FinishScore, 2: gameState.p2FinishScore,
+                        3: gameState.p3FinishScore, 4: gameState.p4FinishScore,
+                    },
                     status: "playing_base"
                 },
             });
@@ -225,11 +230,11 @@ export function useGameScore(id: string) {
             p2Score: game.player2Score ?? 0,
             p3Score: game.player3Score ?? 0,
             p4Score: game.player4Score ?? 0,
-            p1FinishScore: 0,
-            p2FinishScore: 0,
-            p3FinishScore: 0,
-            p4FinishScore: 0,
             innings: Math.max(1, game.totalInnings ?? 0),
+            p1FinishScore: Number((game as any).finishProgress?.["1"] ?? 0),
+            p2FinishScore: Number((game as any).finishProgress?.["2"] ?? 0),
+            p3FinishScore: Number((game as any).finishProgress?.["3"] ?? 0),
+            p4FinishScore: Number((game as any).finishProgress?.["4"] ?? 0),
             p1FinishInnings: 0,
             p2FinishInnings: 0,
             p3FinishInnings: 0,
@@ -384,7 +389,32 @@ export function useGameScore(id: string) {
         // zone 가드: 목표에 도달한 뒤에도 하단(감점) 탭은 종료가 아니라 정정이다.
         // 실수로 목표 점수를 만들고 되돌리려 아래를 눌렀다가 경기가 끝나버리면(비가역)
         // 복구할 방법이 없으므로, 종료는 상단 탭일 때만 허용하고 하단은 감점 경로로 흘린다.
-        if (zone === "top" && target > 0 && currentScore >= target) {
+        // 마무리 룰 — 목표(알다마)를 채운 뒤 쿠션 N개를 더 성공해야 진짜 끝이다.
+        // 설정값(finishTargetCount)은 저장만 되고 점수판이 읽지 않아, 3개로 맞춰 놔도
+        // 목표 도달 즉시 FINISH 가 떴다(오너 확인 2026-08-19). 여기서 실제로 세어 준다.
+        const finishNeed = game.ruleFinishType !== "none" ? (game.finishTargetCount || 0) : 0;
+        const finishKey = `p${playerIndex}FinishScore` as keyof GameState;
+        const finishDone = gameState[finishKey] as number;
+        const inFinishPhase = target > 0 && currentScore >= target;
+
+        if (inFinishPhase && finishNeed > 0) {
+            // 상단 = 마무리 1개 성공. 알다마는 이미 끝났으므로 점수는 올리지 않는다
+            // (올리면 분자만 커져 에버리지가 부풀고, 마무리는 종료 조건이지 득점이 아니다).
+            if (zone === "top" && finishDone < finishNeed) {
+                playEffect('finishing');
+                setGameState(prev => ({ ...prev, [finishKey]: (prev[finishKey] as number) + 1 }));
+                return;
+            }
+            // 하단 = 마무리 되돌리기. 되돌릴 마무리가 없을 때만 아래의 감점 경로로 흘려
+            // "목표를 잘못 만들었을 때 점수를 내려 복구한다"는 기존 안전장치를 지킨다.
+            if (zone === "bottom" && finishDone > 0) {
+                setGameState(prev => ({ ...prev, [finishKey]: Math.max(0, (prev[finishKey] as number) - 1) }));
+                return;
+            }
+        }
+
+        // 종료 — 마무리 룰이 있으면 개수를 다 채웠을 때만 허용한다.
+        if (zone === "top" && inFinishPhase && (finishNeed === 0 || finishDone >= finishNeed)) {
             playEffect('win');
             let winnerId: string | undefined | null = undefined;
             if (playerIndex === 1) winnerId = game.player1Id;

@@ -1119,6 +1119,7 @@ export const ko: Dict = {
   "playerCard.average": "평균",
   "playerCard.defaultName": "선수",
   "playerCard.endInning": "이닝 종료",
+  "playerCard.finishRemaining": "마무리",
   "playerCard.finish": "피니시",
   "playerCard.highRun": "하이런",
   "playerCard.solo": "솔로",

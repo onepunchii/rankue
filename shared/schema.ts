@@ -233,6 +233,9 @@ export const hiqGames = pgTable("hiq_games", {
   player4Innings: jsonb("player4_innings"),
 
   totalInnings: integer("total_innings").default(0).notNull(),
+  // 마무리(알다마 종료 후 쿠션) 진행 상황 — 슬롯별 성공 횟수 {"1":2,"2":0}.
+  // 새로고침해도 마무리 진행이 남아야 해서 저장한다(점수·이닝과 같은 동기화 경로).
+  finishProgress: jsonb("finish_progress").$type<Record<string, number>>(),
 
   // Game State
   status: text("status", { enum: ["playing_base", "playing_finish", "finished"] }).default("playing_base").notNull(),

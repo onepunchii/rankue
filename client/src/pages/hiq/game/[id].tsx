@@ -114,6 +114,11 @@ export default function HiqScoreboard() {
                                             avg={getAvg(score, playerId, target)}
                                             isTurn={gameState.currentTurn === playerId}
                                             isFinishMode={target > 0 && score >= target}
+                                            finishRemaining={
+                                                game.ruleFinishType !== "none" && (game.finishTargetCount || 0) > 0
+                                                    ? Math.max(0, (game.finishTargetCount || 0) - (gameState[`p${playerId}FinishScore` as keyof typeof gameState] as number))
+                                                    : undefined
+                                            }
                                             theme={theme}
                                             onTap={(zone) => handleCardTap(playerId as 1 | 2 | 3 | 4, zone)}
                                             onTurnClick={() => {

@@ -1117,6 +1117,7 @@ const vi: Dict = {
   "playerCard.average": "TB",
   "playerCard.defaultName": "Cơ thủ",
   "playerCard.endInning": "Kết thúc lượt",
+  "playerCard.finishRemaining": "Còn lại",
   "playerCard.finish": "KẾT THÚC",
   "playerCard.highRun": "Sê-ri cao nhất",
   "playerCard.solo": "Solo",

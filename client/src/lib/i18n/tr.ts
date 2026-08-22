@@ -1117,6 +1117,7 @@ const tr: Dict = {
   "playerCard.average": "Ort.",
   "playerCard.defaultName": "Oyuncu",
   "playerCard.endInning": "Eli Bitir",
+  "playerCard.finishRemaining": "Kalan",
   "playerCard.finish": "BİTİŞ",
   "playerCard.highRun": "En Uzun Seri",
   "playerCard.solo": "Solo",
