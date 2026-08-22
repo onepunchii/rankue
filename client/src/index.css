@@ -458,6 +458,14 @@ body {
   --green-accent: #00754A;        /* luminous CTA green */
   --gold: #cba258;                /* Rewards / tier ceremony only */
 
+  /* 당구공 색 — 랭큐의 시각 언어. 초록 라사 위의 흰·노랑·빨강 공(3쿠션·4구 공통 세트).
+     장식이 아니라 의미 코드로만 쓴다: 4구=노란공, 3쿠션=빨간공.
+     브랜드 그린은 라사(테이블 천)이고, 공 색이 그 위에서 종목을 구분한다. */
+  --ball-yellow: #E8B325;         /* 4구 — 수구(노란공) */
+  --ball-red: #C8442E;            /* 3쿠션 — 적구 */
+  --ball-white: #F7F4ED;          /* 백구 — 크림빛 아이보리(순백 아님) */
+  --cloth: #0B5D3B;               /* 라사 — brand 보다 살짝 짙은 테이블 천 */
+
   /* Layered surfaces (light). 0 = cream page, 1/2 = white cards, 3 = inset tint. */
   --surface-0: #f2f0eb;                    /* Neutral Warm — page canvas */
   --surface-1: #ffffff;                    /* white card */

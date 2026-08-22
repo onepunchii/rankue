@@ -1158,4 +1158,126 @@ router.patch("/:id/notifications/settings", requireAuth, asyncHandler(async (req
     return sendSuccess(res, { success: true });
 }));
 
+
+// ── 대결 신청 ─────────────────────────────────────────────────────────
+// 크루 멤버끼리 "한 판 치자"를 보내는 신호. 실제 경기를 만들지는 않는다 —
+// 대부분 같은 매장에서 만나 치므로 경기 개설은 기존 PIN 흐름 그대로 두고,
+// 여기서는 의사만 오간다(오너 결정 2026-08-22).
+
+// POST /crews/:id/challenge — 같은 크루 멤버에게 대결 신청
+router.post("/:id/challenge", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const role = await requireCrewMember(req, res);
+    if (!role) return;
+
+    const toMemberId = String(req.body?.toMemberId || "");
+    if (!/^[0-9a-f-]{36}$/i.test(toMemberId)) return sendError(res, 400, "상대를 찾을 수 없습니다");
+    if (toMemberId === req.userId) return sendError(res, 400, "자신에게는 신청할 수 없습니다");
+
+    // 상대도 이 크루의 정식 멤버여야 한다 — 크루 밖으로 알림이 새지 않게 하는 경계.
+    const targetMembership = await storage.getCrewMembership(req.params.id, toMemberId);
+    if (!targetMembership || targetMembership.role === "pending") {
+        return sendError(res, 404, "크루 멤버가 아닙니다");
+    }
+
+    const { db } = await import("../../db.js");
+    const { hiqChallenges } = await import("../../../shared/schema.js");
+    const { and, eq, gt, desc } = await import("drizzle-orm");
+
+    // 24시간 안에 같은 상대에게 보낸 대기 중 신청이 있으면 막는다 — 알림 도배 방지.
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [dup] = await db.select({ id: hiqChallenges.id }).from(hiqChallenges)
+        .where(and(
+            eq(hiqChallenges.fromMemberId, req.userId!),
+            eq(hiqChallenges.toMemberId, toMemberId),
+            eq(hiqChallenges.status, "pending"),
+            gt(hiqChallenges.createdAt, since),
+        )).limit(1);
+    if (dup) return sendError(res, 409, "이미 신청했습니다. 상대의 응답을 기다려주세요");
+
+    const [created] = await db.insert(hiqChallenges).values({
+        crewId: req.params.id, fromMemberId: req.userId!, toMemberId,
+    }).returning();
+
+    const [meMember, crew] = await Promise.all([
+        storage.getMemberById(req.userId!),
+        storage.getCrew(req.params.id),
+    ]);
+    const myName = (meMember as any)?.name || "크루 멤버";
+    const crewName = (crew as any)?.crew?.name || "크루";
+
+    await settleNotifications("[Challenge]", [
+        notificationService.sendAndSaveNotification({
+            memberId: toMemberId,
+            title: `⚔️ ${myName}님의 대결 신청`,
+            body: `[${crewName}] ${myName}님이 한 판 치자고 합니다. 알림함에서 수락할 수 있어요.`,
+            category: (crew as any)?.crew?.sportCategory || "BILLIARDS",
+            type: "CHALLENGE",
+            params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, challengeId: created.id },
+        }),
+    ]);
+
+    return sendSuccess(res, { id: created.id, status: created.status });
+}));
+
+// POST /crews/:id/challenge/:challengeId/respond — 수락/거절
+// 수락은 신청자에게 알림이 돌아가고, 거절은 조용히 닫는다(거절 통보는 관계를 상하게 한다).
+router.post("/:id/challenge/:challengeId/respond", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const accept = req.body?.accept === true;
+
+    const { db } = await import("../../db.js");
+    const { hiqChallenges } = await import("../../../shared/schema.js");
+    const { eq } = await import("drizzle-orm");
+
+    const [ch] = await db.select().from(hiqChallenges).where(eq(hiqChallenges.id, req.params.challengeId));
+    if (!ch) return sendError(res, 404, "신청을 찾을 수 없습니다");
+    if (ch.toMemberId !== req.userId) return sendError(res, 403, "받은 사람만 응답할 수 있습니다");
+    if (ch.status !== "pending") return sendError(res, 409, "이미 응답한 신청입니다");
+
+    await db.update(hiqChallenges)
+        .set({ status: accept ? "accepted" : "declined", respondedAt: new Date() })
+        .where(eq(hiqChallenges.id, ch.id));
+
+    if (accept) {
+        const me = await storage.getMemberById(req.userId!);
+        const crew = await storage.getCrew(ch.crewId);
+        await settleNotifications("[ChallengeAccept]", [
+            notificationService.sendAndSaveNotification({
+                memberId: ch.fromMemberId,
+                title: `✅ 대결 신청 수락`,
+                body: `${(me as any)?.name || "상대"}님이 대결을 수락했습니다. 만나서 한 판 치세요!`,
+                category: (crew as any)?.crew?.sportCategory || "BILLIARDS",
+                type: "CHALLENGE",
+                params: { url: `/crew/${ch.crewId}/home`, crewId: ch.crewId },
+            }),
+        ]);
+    }
+    return sendSuccess(res, { status: accept ? "accepted" : "declined" });
+}));
+
+// GET /crews/:id/challenges — 이 크루에서 내가 보낸/받은 대기 중 신청
+// 프로필 시트가 "신청함"을 표시하고, 받은 신청에 수락 버튼을 띄우는 데 쓴다.
+router.get("/:id/challenges", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const role = await requireCrewMember(req, res);
+    if (!role) return;
+
+    const { db } = await import("../../db.js");
+    const { hiqChallenges } = await import("../../../shared/schema.js");
+    const { and, eq, or, gt } = await import("drizzle-orm");
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const rows = await db.select({
+        id: hiqChallenges.id,
+        fromMemberId: hiqChallenges.fromMemberId,
+        toMemberId: hiqChallenges.toMemberId,
+        status: hiqChallenges.status,
+        createdAt: hiqChallenges.createdAt,
+    }).from(hiqChallenges).where(and(
+        eq(hiqChallenges.crewId, req.params.id),
+        eq(hiqChallenges.status, "pending"),
+        gt(hiqChallenges.createdAt, since),
+        or(eq(hiqChallenges.fromMemberId, req.userId!), eq(hiqChallenges.toMemberId, req.userId!)),
+    ));
+    return sendSuccess(res, { challenges: rows, myId: req.userId });
+}));
+
 export default router;

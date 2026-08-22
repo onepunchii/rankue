@@ -1039,6 +1039,25 @@ export const hiqNotifications = pgTable("hiq_notifications", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// 대결 신청 — 크루 멤버끼리 "한 판 치자"를 보내는 가장 가벼운 신호.
+// 실제 경기 생성이 아니라 약속 제안이다(오너 결정 2026-08-22): 대부분 같은 매장에서
+// 만나 치므로, 경기는 기존 PIN 흐름 그대로 두고 여기서는 의사만 오간다.
+// 수락하면 신청자에게 알림이 돌아가고, 거절은 조용히 닫는다(거절 통보는 관계를 상하게 한다).
+export const hiqChallenges = pgTable("hiq_challenges", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id).notNull(),
+  fromMemberId: uuid("from_member_id").references(() => hiqMembers.id).notNull(),
+  toMemberId: uuid("to_member_id").references(() => hiqMembers.id).notNull(),
+  status: text("status", { enum: ["pending", "accepted", "declined"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  respondedAt: timestamp("responded_at"),
+}, (table) => [
+  index("hiq_challenges_to_idx").on(table.toMemberId, table.status),
+  index("hiq_challenges_pair_idx").on(table.fromMemberId, table.toMemberId),
+]);
+
+export type HiqChallenge = typeof hiqChallenges.$inferSelect;
+
 export const insertHiqNotificationSchema = createInsertSchema(hiqNotifications).omit({ id: true, createdAt: true });
 export type HiqNotification = typeof hiqNotifications.$inferSelect;
 export type InsertHiqNotification = z.infer<typeof insertHiqNotificationSchema>;

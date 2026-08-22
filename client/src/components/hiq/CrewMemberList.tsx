@@ -29,6 +29,7 @@ import { getTier } from "@/lib/hiqUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { MemberActivityStats } from "@/components/hiq/member/MemberActivityStats";
 import { useT } from "@/lib/i18n";
+import { useToast } from "@/hooks/use-toast";
 
 // --- Types ---
 interface EnhancedHiqMember extends HiqMember {
@@ -60,6 +61,7 @@ interface CrewMemberListProps {
 
 export function CrewMemberList({ members, currentMemberId, sportCategory = "BILLIARDS", crewId }: CrewMemberListProps) {
     const { t } = useT();
+    const { toast } = useToast();
     const [selectedMember, setSelectedMember] = useState<CrewMemberItemType | null>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -120,6 +122,50 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
         enabled: isSheetOpen && !!selectedMember
     });
 
+    const isMe = currentMemberId === selectedMember?.member?.id;
+
+    // 나와의 상대전적 — 라이벌 화면에만 있던 정보를 크루 프로필에도 붙인다.
+    // 크루에서 멤버를 열었을 때 가장 궁금한 숫자다("나랑 붙으면 누가 이겼더라").
+    const { data: h2h } = useQuery<{ total: number; myWins: number; friendWins: number; winRate: number }>({
+        queryKey: [`/api/hiq/stats/h2h/${selectedMember?.member?.id}`],
+        enabled: isSheetOpen && !!selectedMember && !isMe,
+        staleTime: 60 * 1000,
+    });
+
+    // 대결 신청 상태 — 내가 보낸 것/받은 것(24시간 내 대기 중)
+    const { data: challengeData } = useQuery<{ challenges: any[]; myId: string }>({
+        queryKey: [`/api/hiq/crews/${crewId}/challenges`],
+        enabled: isSheetOpen,
+        staleTime: 30 * 1000,
+    });
+    const sentChallenge = challengeData?.challenges?.find(
+        (c) => c.fromMemberId === currentMemberId && c.toMemberId === selectedMember?.member?.id);
+    const receivedChallenge = challengeData?.challenges?.find(
+        (c) => c.toMemberId === currentMemberId && c.fromMemberId === selectedMember?.member?.id);
+
+    const invalidateChallenges = () =>
+        queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/challenges`] });
+
+    const challengeMutation = useMutation({
+        mutationFn: async () => apiRequest(`/api/hiq/crews/${crewId}/challenge`, {
+            method: "POST", body: { toMemberId: selectedMember?.member?.id },
+        }),
+        onSuccess: () => { toast({ title: t("crewMemberList.challengeSent") }); invalidateChallenges(); },
+        onError: (e: any) => toast({ title: e?.message || t("crewMemberList.challengeFailed"), variant: "destructive" }),
+    });
+
+    const respondMutation = useMutation({
+        mutationFn: async (accept: boolean) =>
+            apiRequest(`/api/hiq/crews/${crewId}/challenge/${receivedChallenge?.id}/respond`, {
+                method: "POST", body: { accept },
+            }),
+        onSuccess: (_r, accept) => {
+            toast({ title: accept ? t("crewMemberList.challengeAccepted") : t("crewMemberList.challengeDeclined") });
+            invalidateChallenges();
+        },
+        onError: (e: any) => toast({ title: e?.message || t("crewMemberList.challengeFailed"), variant: "destructive" }),
+    });
+
     const sheetData = useMemo(() => {
         if (!selectedMember) return null;
         const m = selectedMember.member;
@@ -158,7 +204,10 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                     <SheetDescription className="sr-only">{t("crewMemberList.sheetDescription")}</SheetDescription>
 
                     {selectedMember && sheetData && (
-                        <div className="h-full flex flex-col overflow-y-auto pb-safe">
+                        /* 액션바를 하단에 고정하기 위해 스크롤을 본문에만 준다.
+                           예전에는 시트 전체가 스크롤돼 대결 버튼이 내용에 밀려 사라졌다. */
+                        <div className="h-full flex flex-col">
+                        <div className="flex-1 min-h-0 overflow-y-auto">
                             <div className="relative pt-12 pb-8 px-6 flex flex-col items-center bg-white">
                                 <div className="absolute top-3 w-12 h-1 bg-black/10 rounded-full left-1/2 -translate-x-1/2" />
                                 <Avatar className={cn(
@@ -202,6 +251,25 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                     sheetData={sheetData}
                                     member={selectedMember.member}
                                 />
+
+                                {/* 나와의 상대전적 — 크루 멤버를 열었을 때 가장 궁금한 숫자 */}
+                                {!isMe && h2h && h2h.total > 0 && (
+                                    <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-brand/[0.07] mb-1">
+                                        <LucideSwords className="w-3.5 h-3.5 text-brand" />
+                                        <span className="text-[12.5px] font-bold text-brand tabular-nums">
+                                            {t("crewMemberList.h2hLabel")} {h2h.myWins}{t("crewMemberList.winUnit")} {h2h.friendWins}{t("crewMemberList.loseUnit")}
+                                        </span>
+                                    </div>
+                                )}
+                                {/* 전적·하이런 — 데이터가 있는데 안 쓰고 있었다 */}
+                                {sportCategory !== "GOLF" && (selectedMember.member.totalBilliardsGames || 0) > 0 && (
+                                    <p className="text-[12px] font-medium text-black/45 tabular-nums">
+                                        {t("crewMemberList.totalGames")} {selectedMember.member.totalBilliardsGames}
+                                        {(selectedMember.member as any).highRun3c || (selectedMember.member as any).highRun4c
+                                            ? ` · ${t("crewMemberList.highRun")} ${Math.max((selectedMember.member as any).highRun3c || 0, (selectedMember.member as any).highRun4c || 0)}`
+                                            : ""}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Activity Persona & Stats */}
@@ -279,7 +347,11 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                             {new Date(selectedMember.joinedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '')}
                                         </span>
                                     </div>
-                                    {/* 활동 카운트 3칸 */}
+                                    {/* 활동 카운트 3칸 — 전부 0이면 숨긴다. 0/0/0 이 큰 칸 3개를
+                                        차지하면서 정작 당구 기록을 아래로 밀어내고 있었다. */}
+                                    {((selectedMember.activityCounts?.group1 || 0)
+                                        + (selectedMember.activityCounts?.group2 || 0)
+                                        + (selectedMember.activityCounts?.group3 || 0)) > 0 && (
                                     <div className="grid grid-cols-3 gap-2">
                                         <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-black/[0.04] ">
                                             <LucideCalendarCheck className="w-4 h-4 text-brand" />
@@ -306,31 +378,64 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                             <span className="text-[12px] font-medium text-black/55">{t("crewMemberList.afterParty")}</span>
                                         </div>
                                     </div>
+                                    )}
                                 </div>
 
                             </div>
 
-                            <div className="mt-4 p-6 bg-white border-t border-black/10 flex flex-col gap-2 pb-safe">
-                                <div className="flex gap-3">
+                            </div>
+
+                            {/* 하단 액션 — 예전에는 대결·메시지 둘 다 disabled 라서 프로필을 열어도
+                                할 수 있는 게 없었다. 대결 신청을 실제로 살리고(상대에게 알림),
+                                메시지는 신고·차단이 필수인 UGC 라 별도 작업으로 미룬다. */}
+                            {!isMe && (
+                            <div className="shrink-0 px-6 pt-4 pb-6 bg-cloth flex flex-col gap-2 pb-safe">
+                                {receivedChallenge ? (
+                                    <>
+                                        <p className="text-[13px] font-semibold text-white/90 text-center mb-1">
+                                            {t("crewMemberList.challengeReceived")}
+                                        </p>
+                                        <div className="flex gap-3">
+                                            <Button
+                                                onClick={() => respondMutation.mutate(true)}
+                                                disabled={respondMutation.isPending}
+                                                className="flex-1 h-12 rounded-tile font-bold text-[15px] bg-ball-yellow text-[rgba(0,0,0,0.82)] hover:bg-ball-yellow active:scale-[0.98] transition-transform border-none"
+                                            >
+                                                <LucideSwords className="w-4 h-4 mr-2" />
+                                                {t("crewMemberList.accept")}
+                                            </Button>
+                                            <Button
+                                                onClick={() => respondMutation.mutate(false)}
+                                                disabled={respondMutation.isPending}
+                                                variant="outline"
+                                                className="h-12 px-5 rounded-tile border-white/20 bg-white/10 text-white/80 hover:bg-white/15 hover:text-white"
+                                            >
+                                                {t("crewMemberList.decline")}
+                                            </Button>
+                                        </div>
+                                    </>
+                                ) : (
                                     <Button
-                                        disabled
-                                        className="flex-1 h-12 rk-btn-primary rounded-tile disabled:opacity-40"
+                                        onClick={() => challengeMutation.mutate()}
+                                        disabled={!!sentChallenge || challengeMutation.isPending}
+                                        className="w-full h-12 rounded-tile font-bold text-[15px] bg-ball-yellow text-[rgba(0,0,0,0.82)] hover:bg-ball-yellow active:scale-[0.98] transition-transform disabled:opacity-40 border-none"
                                         title={t("crewMemberList.matchRequestTitle")}
                                     >
-                                        <LucideSwords className="w-4 h-4 mr-2" />
-                                        {t("crewMemberList.matchRequest")}
+                                        {challengeMutation.isPending ? (
+                                            <LucideLoader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <LucideSwords className="w-4 h-4 mr-2" />
+                                                {sentChallenge ? t("crewMemberList.challengeWaiting") : t("crewMemberList.matchRequest")}
+                                            </>
+                                        )}
                                     </Button>
-                                    <Button
-                                        disabled
-                                        variant="outline"
-                                        className="h-12 w-12 rounded-xl border-black/10 bg-black/[0.04] text-black/60 p-0 disabled:opacity-40"
-                                        title={t("crewMemberList.sendMessageTitle")}
-                                    >
-                                        <LucideMessageCircle className="w-5 h-5" />
-                                    </Button>
-                                </div>
-                                <p className="text-[12px] font-medium text-black/40 text-center">{t("crewMemberList.comingSoon")}</p>
+                                )}
+                                <p className="text-[12px] font-medium text-white/55 text-center">
+                                    {sentChallenge ? t("crewMemberList.challengeWaitingHint") : t("crewMemberList.challengeHint")}
+                                </p>
                             </div>
+                            )}
                         </div>
                     )}
                 </SheetContent>
@@ -447,6 +552,24 @@ const TIER_COLOR: Record<string, string> = {
     "브론즈": "text-orange-600",
 };
 
+// 당구공 한 알 위에 숫자를 얹은 스탯. 공 색이 종목을 말한다(노랑=4구, 빨강=3쿠션).
+// 하이라이트는 실제 공의 반사광을 흉내 낸 작은 점 하나 — 그라데이션 워시가 아니다.
+const BallStat = ({ label, ballColor, value, sub }: { label: string; ballColor: string; value: string | null; sub: string }) => (
+    <div className="flex flex-col items-center gap-2">
+        <div
+            className="relative w-[68px] h-[68px] rounded-full flex items-center justify-center shadow-[0_3px_10px_rgba(0,0,0,0.18)]"
+            style={{ background: value ? ballColor : "var(--surface-3)" }}
+        >
+            <span className="absolute top-[11px] left-[15px] w-[13px] h-[9px] rounded-full bg-white/35" />
+            <span className={cn("text-[13px] font-bold tracking-tight", value ? "text-white/90" : "text-black/30")}>{label}</span>
+        </div>
+        <span className="text-[26px] font-bold text-ink-1 tracking-tight tabular-nums leading-none">
+            {value ?? <span className="text-[20px] text-black/25">–</span>}
+        </span>
+        <span className="text-[11.5px] text-black/45 font-medium">{sub}</span>
+    </div>
+);
+
 const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => {
     const { t } = useT();
     return (
@@ -473,21 +596,22 @@ const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => {
             </>
         ) : (
             <>
-                <div className="flex flex-col items-center gap-1">
-                    <span className="text-[12px] text-brand font-semibold bg-brand/12 px-2 py-0.5 rounded-full mb-1">3C</span>
-                    <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
-                        {member.avg3c ? member.avg3c.toFixed(3) : "0.000"}
-                    </span>
-                    <span className="text-[12px] text-black/55 font-medium">{t("crewMemberList.avg")}</span>
-                </div>
-                <div className="w-px h-16 bg-black/10" />
-                <div className="flex flex-col items-center gap-1">
-                    <span className="text-[12px] text-brand font-semibold bg-brand/10 px-2 py-0.5 rounded-full mb-1">4C</span>
-                    <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
-                        {member.avg4c ? member.avg4c.toFixed(3) : "0.000"}
-                    </span>
-                    <span className="text-[12px] text-black/55 font-medium">{t("crewMemberList.avg")}</span>
-                </div>
+                {/* 당구공 언어 — 4구는 노란 공, 3쿠션은 빨간 공. 초록 라사 위에 공이 놓인 모양이라
+                    한눈에 종목이 구분된다(장식이 아니라 의미 코드).
+                    기록이 없으면 0.000 을 띄우지 않는다 — 신규 멤버 프로필이 더 빈약해 보였다.
+                    다마수를 함께 적는 이유: 같이 칠 때 실제로 필요한 숫자다. */}
+                <BallStat
+                    label="4C"
+                    ballColor="var(--ball-yellow)"
+                    value={member.avg4c ? member.avg4c.toFixed(3) : null}
+                    sub={member.handi4c ? `${member.handi4c}${t("crewMemberList.handiUnit")}` : t("crewMemberList.avg")}
+                />
+                <BallStat
+                    label="3C"
+                    ballColor="var(--ball-red)"
+                    value={member.avg3c ? member.avg3c.toFixed(3) : null}
+                    sub={member.handi3c ? `${member.handi3c}${t("crewMemberList.handiUnit")}` : t("crewMemberList.avg")}
+                />
             </>
         )}
     </div>

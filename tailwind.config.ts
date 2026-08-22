@@ -31,6 +31,13 @@ export default {
       },
       colors: {
         // Rankue design tokens — single brand accent + layered surfaces + text ramp.
+        // 당구공 색 — 종목 구분 코드(4구=노랑, 3쿠션=빨강). index.css 정의 참고.
+        ball: {
+          yellow: "var(--ball-yellow)",
+          red: "var(--ball-red)",
+          white: "var(--ball-white)",
+        },
+        cloth: "var(--cloth)",
         brand: {
           DEFAULT: "rgb(var(--brand) / <alpha-value>)",
           strong: "rgb(var(--brand-strong) / <alpha-value>)",
