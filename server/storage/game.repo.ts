@@ -17,6 +17,7 @@ import type {
 } from "../../shared/schema.js";
 import { eq, ne, desc, asc, and, or, sql, gt, inArray } from "drizzle-orm";
 import { notFound } from "../utils/errors.js";
+import { scoringInnings } from "../../shared/averageRule.js";
 
 const HANDICAP_MAP_4C = [
     { avg: 1.5, handi: 50 },
@@ -102,11 +103,9 @@ export class GameRepository {
             // 공용 totalInnings를 그대로 쓰면 후공의 에버리지가 실제보다 낮게 저장된다.
             // 배열이 없거나 비어 있으면(구버전 페이로드) totalInnings로 폴백한다.
             const totalInnings = game.totalInnings || 0;
-            const inningsOf = (inningData: unknown): number => {
-                if (!Array.isArray(inningData) || inningData.length === 0) return totalInnings;
-                // 한 선수의 이닝이 경기 전체 이닝을 넘을 수는 없다(깨진 페이로드 방어).
-                return totalInnings > 0 ? Math.min(inningData.length, totalInnings) : inningData.length;
-            };
+            // 목표(알다마) 도달 이후의 마무리 이닝은 에버리지에서 제외한다 — shared/averageRule 참고.
+            const inningsOf = (inningData: unknown, target: unknown): number =>
+                scoringInnings(inningData, Number(target ?? 0), totalInnings);
 
             // 슬롯별 history 저장. 점수는 파울 감점으로 음수가 될 수 있으므로 클램프하지 않는다.
             const saveHistory = async (slot: 1 | 2 | 3 | 4, opponentName: string) => {
@@ -116,7 +115,7 @@ export class GameRepository {
 
                 const score: number = g[`player${slot}Score`] ?? 0;
                 const inningData = g[`player${slot}Innings`] ?? null;
-                const innings = inningsOf(inningData);
+                const innings = inningsOf(inningData, g[`player${slot}Target`]);
 
                 await tx.insert(hiqGameHistory).values({
                     memberId,
@@ -389,11 +388,10 @@ export class GameRepository {
             // 위에서 종료된 경기만 통과시켰으므로 여기선 score/inning이 항상 확정값이다.
             const score = g[`player${slotIndex}Score`] ?? 0;
             const inningData = g[`player${slotIndex}Innings`] ?? null;
-            // 후공은 덜 칠 수 있으니 본인 이닝 배열 길이를 우선한다(finishHiqGame과 동일 규칙).
+            // 후공은 덜 칠 수 있으니 본인 이닝 배열 길이를 우선하고, 목표 도달 이후의
+            // 마무리 이닝은 제외한다 — finishHiqGame 과 같은 규칙(shared/averageRule).
             const totalInnings = game.totalInnings ?? 0;
-            const innings = Array.isArray(inningData) && inningData.length > 0
-                ? (totalInnings > 0 ? Math.min(inningData.length, totalInnings) : inningData.length)
-                : totalInnings;
+            const innings = scoringInnings(inningData, Number(g[`player${slotIndex}Target`] ?? 0), totalInnings);
             const highRun = g[`player${slotIndex}HighRun`] ?? 0;
             const average = (score / (innings || 1)).toFixed(2);
 

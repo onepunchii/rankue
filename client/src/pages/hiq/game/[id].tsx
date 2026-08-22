@@ -11,6 +11,7 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, MouseSensor, use
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { HiqMember } from "@shared/schema";
 import { useT } from "@/lib/i18n";
+import { scoringInnings } from "@shared/averageRule";
 
 export default function HiqScoreboard() {
     usePreventZoom();
@@ -64,7 +65,17 @@ export default function HiqScoreboard() {
 
     if (!id) return null;
 
-    const getAvg = (score: number) => (score / Math.max(1, gameState.innings)).toFixed(2);
+    // 에버리지 분모는 저장 규칙(shared/averageRule)과 같아야 한다 — 화면에선 떨어지는데
+    // 전적엔 안 떨어지면(또는 반대면) 유저가 둘 중 뭘 믿어야 할지 알 수 없다.
+    // 목표(알다마) 도달 이후의 마무리 이닝은 세지 않는다.
+    const getAvg = (score: number, playerId: number, target: number) => {
+        const inningData = gameState[`p${playerId}Innings` as keyof typeof gameState] as number[] | undefined;
+        // 진행 중인 이닝의 현재 런은 아직 배열에 없다 — 표시용으로만 덧붙여 실시간성을 맞춘다.
+        const run = gameState[`p${playerId}Run` as keyof typeof gameState] as number;
+        const live = Array.isArray(inningData) ? [...inningData, run] : undefined;
+        const innings = scoringInnings(live, target, gameState.innings);
+        return (score / Math.max(1, innings)).toFixed(2);
+    };
 
     if (isLoading || !game) {
         return <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-[rgba(0,0,0,0.87)]">{t("gameScoreboard.loading")}</div>;
@@ -100,7 +111,7 @@ export default function HiqScoreboard() {
                                             target={target}
                                             run={run}
                                             highRun={highRun}
-                                            avg={getAvg(score)}
+                                            avg={getAvg(score, playerId, target)}
                                             isTurn={gameState.currentTurn === playerId}
                                             isFinishMode={target > 0 && score >= target}
                                             theme={theme}
