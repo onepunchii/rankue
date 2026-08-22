@@ -6,6 +6,7 @@ import { HiqMember } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { useSport } from "@/contexts/SportContext";
 import { useAuth } from "@/hooks/useAuth";
+import { BallDot } from "@/components/hiq/BallDot";
 import { LoginGate } from "@/components/hiq/LoginGate";
 
 import { cn } from "@/lib/utils";
@@ -161,7 +162,7 @@ export default function HiqRanking() {
                                 rankingTab === "4c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-black/70"
                             )}
                         >
-                            <LucideBarChart3 className="w-4 h-4" />
+                            <BallDot type="4c" />
                             {t("ranking.fourBall")}
                         </button>
                         <button
@@ -171,7 +172,7 @@ export default function HiqRanking() {
                                 rankingTab === "3c" ? "bg-brand text-brand-fg" : "text-black/55 hover:text-black/70"
                             )}
                         >
-                            <LucideTarget className="w-4 h-4" />
+                            <BallDot type="3c" />
                             {t("ranking.threeCushion")}
                         </button>
                     </div>

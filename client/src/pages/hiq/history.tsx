@@ -19,6 +19,7 @@ import { AchievementCard } from "@/components/hiq/history/AchievementCard";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginGate } from "@/components/hiq/LoginGate";
+import { BallDot } from "@/components/hiq/BallDot";
 
 export default function HiqHistory() {
     const { t } = useT();
@@ -102,9 +103,9 @@ export default function HiqHistory() {
             {currentSport !== "GOLF" && (
                 <div className="flex p-1 bg-black/[0.04] rounded-2xl mb-6 ">
                     {[
-                        { id: "all", label: t("history.filterAll"), icon: LucideLayers },
-                        { id: "3c", label: t("history.filter3c"), icon: LucideTarget },
-                        { id: "4c", label: t("history.filter4c"), icon: LucideBarChart3 }
+                        { id: "all", label: t("history.filterAll") },
+                        { id: "4c", label: t("history.filter4c") },
+                        { id: "3c", label: t("history.filter3c") },
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -116,7 +117,7 @@ export default function HiqHistory() {
                                     : "text-black/55 hover:text-black/70"
                             )}
                         >
-                            <tab.icon className="w-4 h-4" />
+                            <BallDot type={tab.id as "all" | "3c" | "4c"} />
                             {tab.label}
                         </button>
                     ))}
