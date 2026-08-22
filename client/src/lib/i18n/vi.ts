@@ -29,6 +29,7 @@ const vi: Dict = {
   "community.close": "Đóng",
   "community.commentBlinded": "Bình luận đã bị ẩn",
   "community.commentEmpty": "Hãy là người bình luận đầu tiên",
+  "community.commentLoginCta": "Đăng nhập để bình luận",
   "community.commentPlaceholder": "Viết bình luận",
   "community.commentSubmit": "Gửi bình luận",
   "community.comments": "Bình luận",

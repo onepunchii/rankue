@@ -7,6 +7,8 @@ import { ko } from "date-fns/locale";
 import { LucideChevronLeft, LucideSend, LucideMoreVertical } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { useAuth } from "@/hooks/useAuth";
+import { goLogin } from "@/components/hiq/LoginGate";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { CommunityPostCard } from "@/components/hiq/community/CommunityPostCard";
@@ -29,6 +31,9 @@ export default function HiqCommunityPost() {
     const queryClient = useQueryClient();
 
     const [comment, setComment] = useState("");
+    // 게스트는 댓글을 쓸 수 없다(서버 401). 예전에는 입력창이 그대로 보여서, 다 쓰고 보내면
+    // "로그인이 필요합니다" 토스트만 뜨고 로그인할 길이 없었다 — 유저에겐 '안 써지는' 상태다.
+    const { isGuest } = useAuth();
     const [reportTarget, setReportTarget] = useState<CommunityComment | null>(null);
     const [menuCommentId, setMenuCommentId] = useState<string | null>(null);
 
@@ -168,9 +173,24 @@ export default function HiqCommunityPost() {
                 </div>
             )}
 
-            {/* 댓글 입력 — 하단 고정 */}
+            {/* 댓글 입력 — 하단 고정.
+                bottom-20(5rem=80px)은 하단 네비 높이(99px)보다 낮아 입력창 아래가 네비에
+                19px 가려져 있었다. 그리고 키보드가 뜰 때 --keyboard-height 를 쓰지 않아
+                (크루 채팅은 쓰는데 여기만 빠져 있었다) 소프트 키보드가 입력창을 덮었다.
+                → 평소엔 네비 위, 키보드가 뜨면 키보드 바로 위로 올린다. */}
             {post && !post.isBlinded && (
-                <div className="fixed bottom-20 left-0 right-0 z-30 px-5">
+                <div
+                    className="fixed left-0 right-0 z-30 px-5"
+                    style={{ bottom: "max(calc(6.5rem + env(safe-area-inset-bottom)), var(--keyboard-height, 0px))" }}
+                >
+                    {isGuest ? (
+                        <button
+                            onClick={() => goLogin(setLocation)}
+                            className="max-w-md mx-auto w-full flex items-center justify-center gap-2 bg-white rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-black/[0.05] h-[52px] text-[14px] font-bold text-brand active:scale-[0.98] transition-transform"
+                        >
+                            {t("community.commentLoginCta")}
+                        </button>
+                    ) : (
                     <div className="max-w-md mx-auto flex items-center gap-2 bg-white rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-black/[0.05] pl-4 pr-1.5 py-1.5">
                         <input
                             value={comment}
@@ -192,6 +212,7 @@ export default function HiqCommunityPost() {
                             <LucideSend className="w-[18px] h-[18px]" />
                         </button>
                     </div>
+                    )}
                 </div>
             )}
 

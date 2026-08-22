@@ -29,6 +29,7 @@ const en: Dict = {
   "community.close": "Close",
   "community.commentBlinded": "This comment has been hidden",
   "community.commentEmpty": "Be the first to comment",
+  "community.commentLoginCta": "Sign in to comment",
   "community.commentPlaceholder": "Write a comment",
   "community.commentSubmit": "Post comment",
   "community.comments": "Comments",

@@ -31,6 +31,7 @@ export const ko: Dict = {
   "community.close": "닫기",
   "community.commentBlinded": "블라인드된 댓글입니다",
   "community.commentEmpty": "첫 댓글을 남겨보세요",
+  "community.commentLoginCta": "로그인하고 댓글 쓰기",
   "community.commentPlaceholder": "댓글을 남겨보세요",
   "community.commentSubmit": "댓글 등록",
   "community.comments": "댓글",

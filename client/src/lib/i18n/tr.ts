@@ -29,6 +29,7 @@ const tr: Dict = {
   "community.close": "Kapat",
   "community.commentBlinded": "Bu yorum gizlendi",
   "community.commentEmpty": "İlk yorumu sen yap",
+  "community.commentLoginCta": "Yorum için giriş yapın",
   "community.commentPlaceholder": "Yorum yaz",
   "community.commentSubmit": "Yorumu gönder",
   "community.comments": "Yorumlar",

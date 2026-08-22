@@ -190,10 +190,13 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
             </div>
 
             {/* Input Area — 평소엔 하단 탭(h-20=5rem) 위, 키보드가 뜨면 키보드 바로 위로.
-                (웹뷰가 리사이즈되지 않으므로 --keyboard-height로 직접 띄운다) */}
+                (웹뷰가 리사이즈되지 않으므로 --keyboard-height로 직접 띄운다)
+                ⚠ bottom 에 transition 을 걸지 말 것 — 트랜지션이 걸리면 크로미움이
+                  var(--keyboard-height) 변경을 bottom 에 반영하지 않아 키보드가 입력창을
+                  그대로 덮는다(2026-08-22 실측: 트랜지션만 뺀 동일 요소는 정상 이동). */}
             {isMember && (
                 <div
-                    className="absolute left-0 right-0 p-6 bg-[#f2f0eb] pt-10 z-50 transition-[bottom] duration-200"
+                    className="absolute left-0 right-0 p-6 bg-[#f2f0eb] pt-10 z-50"
                     style={{ bottom: "max(5rem, var(--keyboard-height, 0px))" }}
                 >
                     <div className="relative flex items-center gap-2 max-w-4xl mx-auto mb-4">
