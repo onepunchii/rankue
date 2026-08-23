@@ -269,17 +269,22 @@ function PartnerInquiryDialog() {
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" className="w-full h-14 bg-transparent border border-brand text-brand hover:bg-brand/[0.06] rounded-full">
-                    <span className="font-bold text-brand">입점하기</span>
-                </Button>
+                {/* 폴백 — 디렉토리 1,195곳에 없는 매장만. 주 동선(위의 '내 매장 찾아 관리 신청')과
+                    같은 비중으로 두면 사장님이 굳이 폼을 채우고, 그건 접수만 되고 발급으로
+                    이어지지 않는다(실제로 문의 3건이 그렇게 묵혀 있었다). */}
+                <button className="w-full py-2 text-[12.5px] font-medium text-black/45 underline underline-offset-4 hover:text-brand transition-colors">
+                    목록에 내 매장이 없나요?
+                </button>
             </DialogTrigger>
             <DialogContent className="bg-white border-black/[0.08] text-[rgba(0,0,0,0.87)] max-w-md w-full rounded-card p-8">
                 <DialogHeader>
                     <DialogTitle className="text-3xl font-bold text-center tracking-tight mb-2">
-                        {step === "form" ? "내 매장 무료 등록" : "신청 완료!"}
+                        {step === "form" ? "매장 등록 요청" : "요청 접수됨"}
                     </DialogTitle>
                     <DialogDescription className="text-center text-black/55 text-base font-medium">
-                        {step === "form" ? "담당자 확인 후 연락드립니다." : "입점 문의가 정상 접수되었습니다."}
+                        {step === "form"
+                            ? "전국 당구장 목록에 없는 매장만 남겨주세요. 목록에 있다면 매장을 찾아 신청하시는 편이 훨씬 빠릅니다."
+                            : "확인 후 목록에 추가되면 연락드립니다."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -432,7 +437,7 @@ function PartnerInquiryDialog() {
                             <LucideCheckCircle2 className="w-8 h-8 text-brand" />
                         </div>
                         <p className="text-center text-sm text-black/60 font-medium mb-6 leading-relaxed">
-                            입점 문의가 접수되었습니다.<br />
+                            매장 등록 요청이 접수되었습니다.<br />
                             담당자가 확인 후 연락드리겠습니다. 🙌
                         </p>
                         <Button

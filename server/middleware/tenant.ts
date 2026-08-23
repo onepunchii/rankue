@@ -1,9 +1,10 @@
+import { DEFAULT_STORE_SLUG } from "../../shared/systemStores.js";
 import { Request, Response, NextFunction } from "express";
 import { storage } from "../storage/index.js";
 import { sendError } from "../utils/response.js";
 
 export async function tenantMiddleware(req: Request, res: Response, next: NextFunction) {
-    const slug = req.headers["x-store-slug"] as string || "hiq";
+    const slug = req.headers["x-store-slug"] as string || DEFAULT_STORE_SLUG;
 
     try {
         const store = await storage.getStoreBySlug(slug);

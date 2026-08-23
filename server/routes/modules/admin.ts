@@ -41,9 +41,13 @@ router.post("/leads/:id/status", checkSuperAdmin, asyncHandler(async (req: any, 
     return sendSuccess(res, { success: true });
 }));
 
+// 가맹점 목록 — 시스템 매장(hiq·global)은 제외한다.
+// 이 둘은 사업체가 아니라 유저가 소속되는 그릇인데, 목록에 섞여 있으면
+// 실제로 계약된 매장이 몇 곳인지 가려진다(오너 확인 2026-08-23).
 router.get("/stores", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { isSystemStore } = await import("../../../shared/systemStores.js");
     const stores = await storage.getAllStores();
-    return sendSuccess(res, stores);
+    return sendSuccess(res, (stores as any[]).filter((s) => !isSystemStore(s.slug)));
 }));
 
 router.get("/notices", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
@@ -296,12 +300,37 @@ router.post("/listing-claims/:id/approve", checkSuperAdmin, asyncHandler(async (
         return { storeId: store.id, slug: store.slug };
     });
 
+    // 승인 통보 — 예전에는 화면에 뜬 PIN 을 관리자가 전화로 불러주는 수밖에 없었다.
+    // 신청자가 이미 랭큐 회원이면 PIN 자체가 필요 없다: SSO 가 로그인된 유저를
+    // 파트너로 자동 진입시키므로(POST /partner/sso), 알림만 보내면 통화가 사라진다.
+    let notified = false;
+    try {
+        const member = await storage.getMemberByProfileId(profile!.id);
+        if (member) {
+            const { notificationService } = await import("../../services/notificationService.js");
+            await notificationService.sendAndSaveNotification({
+                memberId: member.id,
+                title: "🎉 매장 관리 권한이 열렸습니다",
+                body: `${listing.name} 사장님 인증이 완료됐어요. 전체 메뉴 → 내 매장 관리에서 바로 들어가실 수 있습니다.`,
+                category: "admin",
+                type: "partner_approved",
+                params: { url: "/partner/dashboard" },
+            });
+            notified = true;
+        }
+    } catch (e) {
+        // 알림 실패가 승인을 되돌리면 안 된다 — 발급은 이미 끝났다. 관리자는 PIN/전화로 폴백한다.
+        console.warn("[claim approve] 알림 실패:", (e as Error)?.message);
+    }
+
     return sendSuccess(res, {
         approved: true,
         storeSlug: result.slug,
         partnerPhone: phone,
         // 신규 계정일 때만 발급 — 기존 계정은 쓰던 비밀번호 그대로
         issuedPin,
+        // true 면 앱 알림으로 통보 완료 — 관리자가 전화할 필요 없다
+        notified,
     });
 }));
 

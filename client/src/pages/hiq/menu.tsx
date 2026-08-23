@@ -398,6 +398,12 @@ export default function HiqMenu() {
                 <h3 className="text-[15px] font-semibold text-black/55 mb-3 px-1">{t("menu.manageInfo")}</h3>
                 <div className="flex flex-col gap-2.5">
                     {[
+                        // 내 매장 관리 — 이미 가맹점인 사장님(store_owner)에게만.
+                        // 예전에는 사장님도 '파트너 프로그램' 홍보 카드를 찾아 눌러야 했다.
+                        // SSO 가 로그인 상태를 그대로 파트너 세션으로 바꿔주므로 재로그인이 없다.
+                        ...((member as any)?.role === "store_owner"
+                            ? [{ icon: LucideStore, label: "내 매장 관리", desc: "매장 정보 · 회원 · 통계", onClick: () => setLocation("/partner/dashboard") }]
+                            : []),
                         // 관리자 콘솔 — role 이 admin/super_admin 인 계정에게만 노출 (진입점 부재 문제 해결)
                         ...((member as any)?.role === "admin" || (member as any)?.role === "super_admin"
                             ? [{ icon: LucideBriefcase, label: "관리자 콘솔", desc: "매장 클레임 · 입점 문의 · 회원 · 신고 관리", onClick: () => setLocation("/admin/dashboard") }]
@@ -459,8 +465,10 @@ export default function HiqMenu() {
             </div>
 
             {/* Section C: Partner promo — 클레임 흐름 완성으로 재노출 (2026-08-09).
-                /partner/login 이 신청('내 매장 찾아 관리 신청')과 로그인을 모두 안내한다 */}
-            {true && (
+                /partner/login 이 신청('내 매장 찾아 관리 신청')과 로그인을 모두 안내한다.
+                이미 가맹점인 사장님에겐 숨긴다 — 위에 '내 매장 관리'가 이미 있어 중복이고,
+                가입 권유를 계속 보는 건 이상하다. */}
+            {(member as any)?.role !== "store_owner" && (
             <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setLocation("/partner/login")}

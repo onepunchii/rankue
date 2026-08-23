@@ -174,7 +174,7 @@ export default function AdminDashboard() {
         message: string | null; status: string; createdAt: string;
         listingName: string | null; listingRegion: string | null; listingAddress: string | null;
     }>>({ queryKey: ["/api/hiq/admin/listing-claims"] });
-    const [approveResult, setApproveResult] = useState<{ storeSlug: string; partnerPhone: string; issuedPin: string | null } | null>(null);
+    const [approveResult, setApproveResult] = useState<{ storeSlug: string; partnerPhone: string; issuedPin: string | null; notified?: boolean } | null>(null);
     const approveClaim = useMutation({
         mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/listing-claims/${id}/approve`, { method: "POST" }),
         onSuccess: (r: any) => {
@@ -413,13 +413,27 @@ export default function AdminDashboard() {
                         <div className="grid gap-4">
                             {approveResult && (
                                 <div className="bg-brand/[0.06] border border-brand/30 p-5 rounded-2xl">
-                                    <p className="font-bold text-brand mb-2">✓ 승인 완료 — 사장님께 전화로 전달하세요</p>
+                                    {/* 신청자가 회원이면 앱 알림으로 통보가 끝난다 — 전화할 필요가 없다.
+                                        비회원일 때만 PIN 을 전화로 불러줘야 한다. */}
+                                    <p className="font-bold text-brand mb-2">
+                                        {approveResult.notified
+                                            ? "✓ 승인 완료 — 사장님께 앱 알림을 보냈습니다"
+                                            : "✓ 승인 완료 — 사장님께 전화로 전달하세요"}
+                                    </p>
                                     <div className="text-[14px] space-y-1 tabular-nums">
-                                        <p>파트너 로그인 전화번호: <b>{approveResult.partnerPhone}</b></p>
-                                        {approveResult.issuedPin
-                                            ? <p>임시 PIN: <b className="text-[19px] text-brand">{approveResult.issuedPin}</b> <span className="text-black/45 text-[12px]">— 이 화면을 닫으면 다시 볼 수 없습니다</span></p>
-                                            : <p className="text-black/55">기존 계정 재사용 — 쓰던 비밀번호로 로그인</p>}
-                                        <p className="text-black/55 text-[13px]">파트너 포털: /partner/login</p>
+                                        {approveResult.notified ? (
+                                            <p className="text-black/60">
+                                                따로 연락하지 않으셔도 됩니다. 사장님이 앱 전체 메뉴 → 내 매장 관리에서 바로 들어갑니다.
+                                            </p>
+                                        ) : (
+                                            <>
+                                                <p>파트너 로그인 전화번호: <b>{approveResult.partnerPhone}</b></p>
+                                                {approveResult.issuedPin
+                                                    ? <p>임시 PIN: <b className="text-[19px] text-brand">{approveResult.issuedPin}</b> <span className="text-black/45 text-[12px]">— 이 화면을 닫으면 다시 볼 수 없습니다</span></p>
+                                                    : <p className="text-black/55">기존 계정 재사용 — 쓰던 비밀번호로 로그인</p>}
+                                                <p className="text-black/55 text-[13px]">파트너 포털: /partner/login</p>
+                                            </>
+                                        )}
                                     </div>
                                     <Button variant="ghost" size="sm" className="mt-2" onClick={() => setApproveResult(null)}>닫기</Button>
                                 </div>

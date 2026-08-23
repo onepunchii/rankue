@@ -6,7 +6,8 @@ import type { SocialIdentity } from "../lib/socialAuth.js";
 import { generateHandle } from "../lib/handle.js";
 
 // 글로벌(비매장) 유저의 소속 스토어 — 마이그레이션에서 시드됨. 소셜 가입 유저는 여기 속한다.
-const GLOBAL_STORE_SLUG = "global";
+// 공유 상수 사용 — 슬러그가 여러 파일에 흩어지면 하나만 바뀌었을 때 소셜 가입이 조용히 깨진다.
+import { GLOBAL_STORE_SLUG } from "../../shared/systemStores.js";
 
 // --- PIN 해싱 ---
 // PIN은 예전에 평문으로 저장·비교됐다. DB가 새면 전 회원 PIN이 그대로 털리므로 bcrypt로 전환한다.
