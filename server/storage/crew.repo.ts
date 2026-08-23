@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import {
+    storeListings,
     hiqCrews,
     hiqCrewMembers,
     hiqMembers,
@@ -420,11 +421,16 @@ export class CrewRepository {
             crew: hiqCrews,
             memberCount: sql<number>`count(${hiqCrewMembers.id})`,
             storeLat: hiqStores.latitude,
-            storeLng: hiqStores.longitude
+            storeLng: hiqStores.longitude,
+            // 디렉토리(수집 1,195곳) 베이스 매장 좌표. 파트너 매장(hiqStores)만 조인하고
+            // 있어서 거리 계산이 늘 비어 있었다 — 실제 크루는 전부 디렉토리를 베이스로 잡는다.
+            listingLat: storeListings.latitude,
+            listingLng: storeListings.longitude,
         })
             .from(hiqCrews)
             .leftJoin(hiqCrewMembers, eq(hiqCrews.id, hiqCrewMembers.crewId))
             .leftJoin(hiqStores, eq(hiqCrews.baseStoreId, hiqStores.id))
+            .leftJoin(storeListings, eq(hiqCrews.baseListingCode, storeListings.code))
             .where(
                 and(
                     query ? or(
@@ -434,13 +440,14 @@ export class CrewRepository {
                     sportCategory ? eq(hiqCrews.sportCategory, sportCategory as any) : undefined
                 )
             )
-            .groupBy(hiqCrews.id, hiqStores.latitude, hiqStores.longitude)
+            .groupBy(hiqCrews.id, hiqStores.latitude, hiqStores.longitude, storeListings.latitude, storeListings.longitude)
             .limit(50) // Increased limit for location sorting
             .orderBy(desc(hiqCrews.createdAt));
 
         let results = crewsWithCount.map(r => {
-            let lat = r.crew.latitude || r.storeLat;
-            let lng = r.crew.longitude || r.storeLng;
+            // 우선순위: 크루 자체 좌표 → 파트너 매장 → 디렉토리 매장
+            let lat = r.crew.latitude || r.storeLat || r.listingLat;
+            let lng = r.crew.longitude || r.storeLng || r.listingLng;
             let distance: number | undefined;
 
             if (userLat && userLng && lat && lng) {

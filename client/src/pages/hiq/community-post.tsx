@@ -181,7 +181,7 @@ export default function HiqCommunityPost() {
             {post && !post.isBlinded && (
                 <div
                     className="fixed left-0 right-0 z-30 px-5"
-                    style={{ bottom: "max(calc(6.5rem + env(safe-area-inset-bottom)), var(--keyboard-height, 0px))" }}
+                    style={{ bottom: "max(calc(6.75rem + env(safe-area-inset-bottom)), var(--keyboard-height, 0px))" }}
                 >
                     {isGuest ? (
                         <button

@@ -128,7 +128,7 @@ export const CrewBoardTab = memo(({
 
             {/* Floating Action Buttons */}
             {isMember && (
-                <div className="fixed bottom-24 right-6 flex flex-col items-end gap-4 z-30">
+                <div className="fixed above-nav right-6 flex flex-col items-end gap-4 z-30">
                     {isAdmin && (
                         <button
                             onClick={onCreateSettlement}

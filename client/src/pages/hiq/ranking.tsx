@@ -106,7 +106,7 @@ export default function HiqRanking() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] px-5 pt-6 pb-nav font-sans relative overflow-x-hidden">
             <div className="relative z-10">
                 <header className="mb-7">
                     <h1 className="text-[26px] font-bold tracking-tight mb-1.5">

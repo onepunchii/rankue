@@ -1313,6 +1313,22 @@ body.keyboard-open .hide-on-keyboard {
   }
 }
 
+/* 하단 네비를 가리지 않는 콘텐츠 여백.
+   네비 실측 높이는 99px + env(safe-area-inset-bottom) 이다(아이폰 홈인디케이터에서 +34px).
+   그런데 화면들이 pb-28(112px)·pb-32(128px) 같은 고정값을 쓰고 있어서, 안전영역이 있는
+   아이폰에서는 콘텐츠 하단이 네비에 잘려 보였다(오너 제보 2026-08-24: 크루 내역·가입 버튼).
+   고정 px 로는 기기별 안전영역을 알 수 없으므로 env() 를 포함한 이 클래스를 쓴다. */
+.pb-nav {
+  padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+}
+
+/* 하단 네비 바로 위에 떠 있는 고정 요소(크루 가입 버튼·커뮤니티 글쓰기 등).
+   5.5rem(88px)·6rem 같은 고정값을 쓰면 네비(99px + 안전영역) 뒤로 들어가 버린다 —
+   아이폰에서 '크루 가입하기'가 네비와 겹쳐 보이던 원인이다. */
+.above-nav {
+  bottom: calc(6.75rem + env(safe-area-inset-bottom));
+}
+
 /* 앱 설치 배너 ↔ 하단 네비 겹침 방지.
    둘 다 fixed bottom z-50 이라, App.tsx 에서 나중에 렌더되는 배너가 네비를 덮어
    탭이 통째로 가려져 있었다. 네비가 떠 있는 화면(html[data-bottom-nav])에서만

@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { uploadImage } from '@/lib/imageUtils';
 import { CrewData } from '@/types/crew';
 import { useT } from '@/lib/i18n';
+import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -46,8 +48,19 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
         joinType: crew?.joinType || 'auto', // 가입 방식 — 생성 후에도 변경 가능 (서버 PATCH 화이트리스트에 포함)
         gameType: crew?.gameType || 'any',
         tags: crew?.tags || [],
+        baseListingCode: (crew as any)?.baseListingCode ?? null,
     });
     const [isUploading, setIsUploading] = useState(false);
+
+    // 베이스캠프 검색 — 크루 생성 화면과 같은 API(/crews/store-search)를 쓴다.
+    const [baseQuery, setBaseQuery] = useState("");
+    const [baseName, setBaseName] = useState<string | null>((crew as any)?.baseListing?.name ?? null);
+    const { data: baseResults } = useQuery<any[]>({
+        queryKey: ["/api/hiq/crews/store-search", baseQuery],
+        enabled: baseQuery.trim().length >= 2,
+        queryFn: async () => apiRequest(`/api/hiq/crews/store-search?q=${encodeURIComponent(baseQuery.trim())}`),
+    });
+    const onChange = (key: string, value: any) => setFormData((prev) => ({ ...prev, [key]: value }));
 
     // 크루 전환·외부 갱신 시 폼 재시드 — useState 1회 초기화만으로는 stale 데이터가 남는다
     // (ClubIntroTemplateTab과 동일 패턴)
@@ -66,6 +79,7 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
             joinType: crew?.joinType || 'auto',
             gameType: crew?.gameType || 'any',
             tags: crew?.tags || [],
+            baseListingCode: (crew as any)?.baseListingCode ?? null,
         });
     }
 
@@ -222,8 +236,58 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
                     </div>
                 </div>
 
-                {/* 활동 종목 — 생성 위저드(활동 성향)와 같은 선택지. 지역·베이스캠프는
-                    오너 결정으로 수정 제외(2026-08-05), 활동 성향 필드만 수정 허용. */}
+
+                {/* 베이스캠프(주 활동 매장) — 2026-08-05 에는 수정 제외였는데, 그 결과
+                    생성 때 안 고른 크루는 영영 베이스가 비고 '내 주변 크루'가 죽는다.
+                    실제로 크루 3개 전부 베이스가 없었다(오너 확인 2026-08-24). 크루장·운영진만 변경 가능. */}
+                <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-black/55 ml-1">{t("clubSettings.baseCampLabel")}</Label>
+                    {baseName ? (
+                        <div className="flex items-center justify-between gap-2 p-3 rounded-tile bg-brand/[0.07]">
+                            <div className="min-w-0">
+                                <div className="text-[14px] font-bold text-brand truncate">{baseName}</div>
+                                <p className="text-[11.5px] text-black/45 mt-0.5">{t("clubSettings.baseCampHint")}</p>
+                            </div>
+                            <Button type="button" variant="ghost" size="sm" className="shrink-0 text-black/50"
+                                onClick={() => { onChange("baseListingCode", null); setBaseName(null); setBaseQuery(""); }}>
+                                {t("clubSettings.baseCampClear")}
+                            </Button>
+                        </div>
+                    ) : (
+                        <>
+                            <Input
+                                value={baseQuery}
+                                onChange={(e) => setBaseQuery(e.target.value)}
+                                placeholder={t("clubSettings.baseCampPlaceholder")}
+                                className="bg-surface-2 border-black/10 h-11 rounded-tile text-[14px]"
+                            />
+                            {baseQuery.trim().length >= 2 && (
+                                <div className="rounded-tile bg-surface-2 overflow-hidden max-h-[180px] overflow-y-auto">
+                                    {(baseResults ?? []).length === 0 && (
+                                        <p className="p-3 text-[12.5px] text-black/40">{t("clubSettings.baseCampEmpty")}</p>
+                                    )}
+                                    {(baseResults ?? []).map((s: any) => (
+                                        <button
+                                            key={s.code || s.id}
+                                            type="button"
+                                            onClick={() => {
+                                                onChange("baseListingCode", s.code ?? null);
+                                                setBaseName(s.name);
+                                                setBaseQuery("");
+                                            }}
+                                            className="w-full text-left p-3 border-b border-black/[0.06] last:border-0 active:bg-black/[0.04]"
+                                        >
+                                            <div className="text-[13.5px] font-bold truncate">{s.name}</div>
+                                            <div className="text-[11.5px] text-black/45 truncate">{s.address}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* 활동 종목 — 생성 위저드(활동 성향)와 같은 선택지. */}
                 <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-black/55 ml-1">{t("createClub.gameTypeLabel")}</Label>
                     <div className="flex gap-2">

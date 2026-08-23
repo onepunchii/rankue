@@ -38,6 +38,14 @@ export default function HiqClubDetail() {
     // 호환 별칭: 이미 발송된 푸시 페이로드가 /crew/:id/:tab 로 진입할 수 있다.
     const [, crewParams] = useRoute("/crew/:id/:tab?");
     const [_, setLocation] = useLocation();
+
+    // 크루 상세는 HiqNavigation 대신 자체 탭바(홈·게시판·사진첩·채팅)를 쓴다.
+    // 그래서 HiqNavigation 이 켜 주는 표식이 없어 앱 설치 배너가 이 탭바를 덮고 있었다.
+    // 같은 표식을 여기서도 남긴다(index.css 의 html[data-bottom-nav] 규칙).
+    useEffect(() => {
+        document.documentElement.dataset.bottomNav = "1";
+        return () => { delete document.documentElement.dataset.bottomNav; };
+    }, []);
     const { toast } = useToast();
     const { t } = useT();
     const id = params?.id ?? crewParams?.id;

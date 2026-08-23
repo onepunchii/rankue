@@ -168,7 +168,7 @@ export default function HiqDashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] px-5 pb-32">
+        <div className="min-h-screen bg-[#f2f0eb] px-5 pb-nav">
 
             {/* Header / Profile */}
             <DashboardHeader

@@ -121,7 +121,7 @@ export default function HiqRivals() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-28 relative overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
             {/* Header */}
             <div className="flex items-center justify-between mb-8 relative z-10">
                 <div className="flex items-center gap-3">

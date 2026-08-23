@@ -112,7 +112,7 @@ export const CrewHomeTab = memo(({
     }, [activeMembers, crew.sportCategory]);
 
     return (
-        <div className="space-y-8 pb-32">
+        <div className="space-y-8 pb-nav">
             {/* Hero Section */}
             <div className="relative">
                 <div className="relative w-full overflow-hidden">
@@ -358,7 +358,7 @@ export const CrewHomeTab = memo(({
 
             {/* Join CTA for non-members / pending */}
             {(isNotMember || isPending) && (
-                <div className="fixed bottom-[5.5rem] left-0 right-0 px-6 py-2 z-50 pointer-events-none">
+                <div className="fixed above-nav left-0 right-0 px-6 py-2 z-50 pointer-events-none">
                     {isPending ? (
                         <div className="flex items-center gap-2 pointer-events-auto">
                             <div className="flex-1 h-14 rounded-2xl flex items-center justify-center text-base font-semibold bg-white text-black/55 ring-1 ring-black/10 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">

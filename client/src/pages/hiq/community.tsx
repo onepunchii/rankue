@@ -59,7 +59,7 @@ export default function HiqCommunity() {
     const writeBoard: CommunityBoard = board === "all" ? "ask" : board;
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-28 relative overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
             {/* Header */}
             <div className="flex items-center justify-between mb-6 relative z-10">
                 <div className="flex items-center gap-3">
@@ -126,7 +126,7 @@ export default function HiqCommunity() {
             {/* 글쓰기 FAB — 당구공 노란색. fixed를 그대로 쓰면 데스크탑 프레임에서
                 448px 컬럼 밖(창 오른쪽 끝)으로 나가므로, 하단 네비와 같은 방식으로
                 전체폭 컨테이너 + max-w-md 정렬로 컬럼 안에 붙인다. */}
-            <div className="fixed bottom-28 left-0 right-0 z-30 pointer-events-none">
+            <div className="fixed above-nav left-0 right-0 z-30 pointer-events-none">
                 <div className="max-w-md mx-auto px-5 flex justify-end">
                     <motion.button
                         whileTap={{ scale: 0.92 }}

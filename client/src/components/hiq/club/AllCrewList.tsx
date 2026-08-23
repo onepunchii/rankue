@@ -1,10 +1,12 @@
 import { memo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { CrewDiscoveryCard } from "./CrewDiscoveryCard";
 import { useDebounce } from "@/hooks/use-debounce";
-import { LucideSearch, LucideUsers } from "@/lib/icons";
+import { LucideSearch, LucideUsers, LucideMapPin } from "@/lib/icons";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { useT } from "@/lib/i18n";
 
@@ -19,18 +21,18 @@ export const AllCrewList = memo(({ searchQuery, currentSport }: AllCrewListProps
     const { location: userLocation, requestLocation, isApp } = useNativeBridge();
     const debouncedSearch = useDebounce(searchQuery, 400); // 400ms delay
 
-    useEffect(() => {
-        if (isApp) {
-            requestLocation();
-        }
-    }, [isApp, requestLocation]);
+    // 위치는 사용자가 '내 주변'을 눌렀을 때만 요청한다. 화면 진입만으로 권한 팝업을 띄우면
+    // 브라우저가 자동 차단하기도 하고, 왜 묻는지 모른 채 거절당하면 다시 물어볼 수 없다.
+    // (예전에는 앱에서만 자동 요청해서 웹은 거리순이 아예 동작하지 않았다.)
+    const [nearbyOn, setNearbyOn] = useState(false);
+    const gps = nearbyOn ? userLocation : null;
 
     const { data: allCrews, isLoading } = useQuery<any[]>({
-        queryKey: ["/api/hiq/crews", debouncedSearch, currentSport, userLocation?.lat, userLocation?.lng],
+        queryKey: ["/api/hiq/crews", debouncedSearch, currentSport, gps?.lat, gps?.lng],
         queryFn: async () => {
             let url = `/api/hiq/crews?q=${encodeURIComponent(debouncedSearch)}&sport=${encodeURIComponent(currentSport)}`;
-            if (userLocation) {
-                url += `&lat=${encodeURIComponent(userLocation.lat)}&lng=${encodeURIComponent(userLocation.lng)}`;
+            if (gps) {
+                url += `&lat=${encodeURIComponent(gps.lat)}&lng=${encodeURIComponent(gps.lng)}`;
             }
             return await apiRequest(url);
         },
@@ -76,6 +78,22 @@ export const AllCrewList = memo(({ searchQuery, currentSport }: AllCrewListProps
 
     return (
         <div className="space-y-3">
+            {/* 내 주변 — 크루의 베이스캠프 매장 좌표로 거리를 잰다.
+                베이스캠프가 없는 크루는 거리 없이 뒤로 밀린다(서버 정렬 규칙). */}
+            <button
+                onClick={() => {
+                    if (!nearbyOn) requestLocation();
+                    setNearbyOn(!nearbyOn);
+                }}
+                className={cn(
+                    "h-9 px-3.5 rounded-full text-[13px] font-bold inline-flex items-center gap-1.5 transition-colors",
+                    nearbyOn && gps ? "bg-brand text-white" : "bg-black/[0.05] text-black/55",
+                )}
+            >
+                <LucideMapPin className="w-3.5 h-3.5" />
+                {nearbyOn && gps ? t("club.nearbyOn") : t("club.nearby")}
+            </button>
+
             {allCrews.map(crew => (
                 <CrewDiscoveryCard
                     key={crew.id}

@@ -176,7 +176,7 @@ export default function HiqMenu() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-32 font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-nav font-sans relative overflow-x-hidden">
             {/* Background Light Effect */}
             <div
                 className="absolute top-0 right-0 w-[80dvw] h-[50dvh] blur-[120px] rounded-full -mr-[30dvw] -mt-[10dvh] pointer-events-none transition-colors duration-700"
