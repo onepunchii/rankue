@@ -19,10 +19,13 @@ router.get("/stores/search", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, stores);
 }));
 
-// 공개 매장 디렉토리 (매장찾기) — 인증 불필요, 표시용 필드만 반환
+// 공개 매장 디렉토리 (매장찾기) — 인증 불필요, 표시용 필드만 반환.
+// 시스템 매장(hiq·global)은 제외한다. 유저가 소속되는 그릇일 뿐 찾아갈 수 있는
+// 당구장이 아닌데 '파트너 매장'으로 상단에 뜨고 있었다(오너 확인 2026-08-23).
 router.get("/public-stores", asyncHandler(async (_req: any, res: any) => {
+    const { isSystemStore } = await import("../../../shared/systemStores.js");
     const stores = await storage.getPublicStores();
-    return sendSuccess(res, stores);
+    return sendSuccess(res, (stores as any[]).filter((s) => !isSystemStore(s.slug)));
 }));
 
 router.get("/public-stores/:slug", asyncHandler(async (req: any, res: any) => {

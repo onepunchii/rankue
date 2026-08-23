@@ -55,10 +55,12 @@ export async function generateSitemap(): Promise<string> {
     console.warn("[sitemap] crews failed:", (e as Error)?.message);
   }
 
-  // 매장
+  // 매장 — 시스템 매장(hiq·global)은 제외한다. 유저가 소속되는 그릇일 뿐이라
+  // 검색에 노출할 콘텐츠가 없고, 색인되면 '랭큐'로 검색한 사람이 빈 매장 페이지를 만난다.
   try {
+    const { isSystemStore } = await import("../shared/systemStores.js");
     const stores = await storage.getStoresForSitemap();
-    for (const s of stores) if (s.slug) parts.push(entry(`${ORIGIN}/store/${encodeURIComponent(s.slug)}`, { changefreq: "weekly", priority: "0.6" }));
+    for (const s of stores) if (s.slug && !isSystemStore(s.slug)) parts.push(entry(`${ORIGIN}/store/${encodeURIComponent(s.slug)}`, { changefreq: "weekly", priority: "0.6" }));
   } catch (e) {
     console.warn("[sitemap] stores failed:", (e as Error)?.message);
   }
