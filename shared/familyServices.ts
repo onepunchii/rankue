@@ -47,12 +47,9 @@ const RAW: FamilyService[] = [
     id: "xong",
     web: "https://xong.co.kr",
     ios: "https://apps.apple.com/app/id6790474855",
-    // ⚠️ TODO(플레이 승인되면 아래 줄로 되돌린다):
-    //   "https://play.google.com/store/apps/details?id=kr.co.xong.app"
-    // 2026-08-03 실측: 그 Play 페이지가 아직 404 다(심사 대기). 같은 방식으로 확인한
-    // 나머지 5개는 200 이므로 조회 방법 문제가 아니다. 404 인 링크를 걸어 두면
-    // 안드로이드 사용자가 카드를 누를 때마다 Play 오류 화면을 만난다 → 그동안은 웹으로.
-    android: null,
+    // Play 심사 통과 확인 후 복구(2026-08-23 실측 200, "XONG – Book Korean Celebrities").
+    // 2026-08-03 에는 404(심사 대기)라 웹으로 우회시켜 뒀던 자리다.
+    android: "https://play.google.com/store/apps/details?id=kr.co.xong.app",
   },
   {
     id: "onp",
