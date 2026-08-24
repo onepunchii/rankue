@@ -1,3 +1,4 @@
+import { iosStoreUrl, androidStoreUrl } from "@shared/appLinks";
 import type { ReactNode } from "react";
 import { Link } from "wouter";
 import { Capacitor } from "@capacitor/core";
@@ -223,9 +224,8 @@ function SideRight() {
 const SITE_URL = "https://www.rankue.co.kr/";
 
 // 설치 배너(HiqInstallBanner)·랜딩과 같은 스토어 링크. utm 만 이 패널용으로 구분한다.
-const STORE_IOS = "https://apps.apple.com/app/id6760333313?ct=desktop_side_panel";
-const STORE_ANDROID =
-    "https://play.google.com/store/apps/details?id=com.rankue.app&referrer=utm_source%3Dweb%26utm_medium%3Ddesktop_side_panel";
+const STORE_IOS = iosStoreUrl("desktop_side_panel");
+const STORE_ANDROID = androidStoreUrl("desktop_side_panel");
 
 // 하단 네비(홈·크루·친구·기록·메뉴)에 **없는** 화면만 골랐다. 있는 걸 또 놓으면 중복이다.
 const SHORTCUTS: { href: string; label: string; sub: string }[] = [

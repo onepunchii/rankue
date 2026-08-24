@@ -3,6 +3,7 @@ import { useLocation, useRoute } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useSeo } from "@/hooks/useSeo";
 import { briefingLineKo, briefingDateKo, briefingTitle, briefingDesc, todayKst, type BriefingData } from "@shared/briefingMeta";
+import { ShareButton } from "@/components/hiq/ShareButton";
 
 // 당구 브리핑 아카이브 — 날짜별 고정 URL(AEO 자산). ko 단일 언어 공개 페이지.
 // 문구는 shared/briefingMeta 로 프리렌더와 문자 단위 일치.
@@ -50,6 +51,7 @@ export default function BriefingPage() {
             <button onClick={() => shift(-1)} className="w-9 h-9 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] text-black/50">←</button>
             <h1 className="text-[22px] font-bold tracking-tight tabular-nums">{briefingDateKo(date)}</h1>
             <button onClick={() => shift(1)} disabled={isToday} className="w-9 h-9 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] text-black/50 disabled:opacity-30">→</button>
+            <ShareButton className="ml-auto w-9 h-9" url={`https://www.rankue.co.kr/briefing/${date}`} title={`${briefingDateKo(date)} 당구 브리핑`} />
           </div>
         </header>
 

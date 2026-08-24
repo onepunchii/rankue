@@ -23,7 +23,8 @@ import {
     LucideFlag,
     LucideUserX,
     LucideUser,
-    LucideGlobe
+    LucideGlobe,
+    LucideShare2
 } from "@/lib/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { flagEmoji } from "@/lib/flag";
@@ -45,6 +46,8 @@ import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
+import { useShare } from "@/hooks/useShare";
+import { appDownloadUrl } from "@shared/appLinks";
 import { goLogin } from "@/components/hiq/LoginGate";
 
 export default function HiqMenu() {
@@ -141,6 +144,14 @@ export default function HiqMenu() {
         queryClient.clear();
         setLocation("/");
     };
+
+    // 친구에게 앱 추천 — 기기에 맞는 스토어(PC 는 웹) 링크를 OS 공유 시트로 보낸다.
+    const share = useShare();
+    const shareApp = () => share({
+        title: t("share.appTitle"),
+        text: t("share.appText"),
+        url: appDownloadUrl("share"),
+    });
 
     // 계정 영구 삭제 — 서버가 개인정보 삭제 + 세션 쿠키 무효화까지 처리한다.
     const handleDeleteAccount = async () => {
@@ -410,6 +421,8 @@ export default function HiqMenu() {
                             : []),
                         // 매장 찾기 — 모바일의 유일한 상시 진입점 (하단 네비·홈에는 자리가 없다)
                         { icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") },
+                        // 앱 공유 — 오픈 초기 유일한 유입 경로가 입소문이라 최우선. 기기에 맞는 스토어로.
+                        { icon: LucideShare2, label: t("share.appTitle"), desc: t("share.appDesc"), onClick: () => shareApp() },
                         // 세계·PBA 랭킹은 로그인 없이도 보는 공개 콘텐츠 — 게스트에게 갈 곳을 준다
                         ...(isGuest
                             ? [

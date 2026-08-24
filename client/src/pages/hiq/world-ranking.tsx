@@ -12,6 +12,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { UmbPlayerSheet } from "@/components/hiq/umb/UmbPlayerSheet";
 import { MoveBadge } from "@/components/hiq/umb/WorldRankingCard";
 import { UMB_CATEGORIES, UMB_SOURCE_URL, displayName, regionName as intlRegionName, resolveHomeFed, type UmbCategory, type UmbRankingRow, type UmbRankingsResponse } from "@/components/hiq/umb/types";
+import { ShareButton } from "@/components/hiq/ShareButton";
 
 const PAGE_SIZE = 50;
 
@@ -139,6 +140,7 @@ export default function HiqWorldRanking() {
                         {t("umb.subtitle")}{data?.edition ? ` · Edition ${data.edition}` : ""}
                     </p>
                 </div>
+                <ShareButton className="ml-auto" url="https://www.rankue.co.kr/world-ranking" title={t("umb.pageTitle")} />
             </div>
 
             {/* 부문 탭 + [선수|국가] 보기 전환 */}

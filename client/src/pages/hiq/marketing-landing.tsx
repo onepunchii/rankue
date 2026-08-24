@@ -1,3 +1,4 @@
+import { iosStoreUrl, androidStoreUrl } from "@shared/appLinks";
 import type { ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Capacitor } from "@capacitor/core";
@@ -7,9 +8,8 @@ import { BilliardBall } from "@/components/hiq/ui/BilliardBall";
 import { landingContent } from "@shared/landingContent";
 
 // 설치 배너(HiqInstallBanner)와 같은 링크. utm 만 랜딩용으로 구분해 유입 경로를 나눈다.
-const STORE_IOS = "https://apps.apple.com/app/id6760333313?ct=web_landing";
-const STORE_ANDROID =
-    "https://play.google.com/store/apps/details?id=com.rankue.app&referrer=utm_source%3Dweb%26utm_medium%3Dlanding";
+const STORE_IOS = iosStoreUrl("web_landing");
+const STORE_ANDROID = androidStoreUrl("web_landing");
 
 // 검색으로 들어온 비로그인 방문자에게 보여주는 마케팅 랜딩.
 // 기존 홈(/)은 곧바로 전화번호 입력 폼이라, 랭큐를 모르는 사람이 검색으로 들어오면

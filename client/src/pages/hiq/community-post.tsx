@@ -16,6 +16,7 @@ import { SkillBadge } from "@/components/hiq/community/SkillBadge";
 import { ReportDialog } from "@/components/hiq/community/ReportDialog";
 import type { CommunityComment, CommunityPost } from "@/components/hiq/community/types";
 import type { HiqMember } from "@shared/schema";
+import { ShareButton } from "@/components/hiq/ShareButton";
 
 interface PostDetail extends CommunityPost {
     comments: CommunityComment[];
@@ -78,6 +79,7 @@ export default function HiqCommunityPost() {
                     <LucideChevronLeft className="w-5 h-5" />
                 </motion.button>
                 <h1 className="text-[20px] font-bold tracking-tight text-ink-1">{t("community.title")}</h1>
+                {post && !post.isBlinded && <ShareButton className="ml-auto" url={`https://www.rankue.co.kr/community/${postId}`} />}
             </div>
 
             {isLoading && (

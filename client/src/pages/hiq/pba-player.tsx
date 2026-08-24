@@ -10,6 +10,7 @@ import { useSeo } from "@/hooks/useSeo";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { seasonLabel, formatPrize } from "./pba";
 import { PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo } from "@shared/pbaMeta";
+import { ShareButton } from "@/components/hiq/ShareButton";
 
 // PBA 선수 상세 — 통산 스탯 + 시즌별 궤적. 사진 없이 국기·이름·숫자만(초상권).
 
@@ -133,6 +134,7 @@ export default function HiqPbaPlayer() {
                     <LucideChevronLeft className="w-5 h-5" />
                 </motion.button>
                 <span className="text-[13.5px] font-semibold text-black/50">{t.back}</span>
+                {p && <ShareButton className="ml-auto" url={`https://www.rankue.co.kr/pba-player/${memCode}`} title={p.nameKo} />}
             </div>
 
             {isLoading && <div className="h-48 bg-black/[0.04] rounded-3xl animate-pulse" />}

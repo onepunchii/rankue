@@ -1,3 +1,4 @@
+import { iosStoreUrl, androidStoreUrl } from "@shared/appLinks";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LucideDownload, X, Share } from "@/lib/icons";
@@ -14,10 +15,8 @@ import { isNativeApp } from "@/lib/nativeBridge";
 // ★ 미출시 플랫폼은 null 로 둔다 → 그 플랫폼은 기존 PWA 경로를 그대로 쓴다.
 //   (출시되면 URL 만 채우면 된다. 죽은 스토어 링크로 보내지 않기 위한 장치다.)
 // referrer/ct 는 유입 측정용 — 없으면 이 배너가 효과가 있는지 영영 알 수 없다.
-const IOS_APP_STORE_URL: string | null =
-    "https://apps.apple.com/app/id6760333313?ct=web_install_banner";
-const ANDROID_PLAY_URL: string | null =
-    "https://play.google.com/store/apps/details?id=com.rankue.app&referrer=utm_source%3Dweb%26utm_medium%3Dinstall_banner";
+const IOS_APP_STORE_URL: string | null = iosStoreUrl("install_banner");
+const ANDROID_PLAY_URL: string | null = androidStoreUrl("install_banner");
 
 export function HiqInstallBanner() {
     const { t } = useT();
