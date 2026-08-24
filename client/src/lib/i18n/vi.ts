@@ -1,6 +1,8 @@
 import type { Dict } from "./index";
 
 const vi: Dict = {
+  "clubDetail.share": "Chia sẻ",
+  "clubDetail.settings": "Cài đặt",
   "clubDetail.membersOnlyDesc": "Tham gia crew để xem bảng tin và album ảnh",
   "clubDetail.membersOnlyPending": "Yêu cầu tham gia đang chờ duyệt",
   "clubDetail.membersOnlyTitle": "Chỉ dành cho thành viên crew",

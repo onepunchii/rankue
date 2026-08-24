@@ -3,6 +3,8 @@ import type { Dict } from "./index";
 // 한국어 원문 사전 — 다른 언어 사전의 키 기준이자 폴백.
 // 키 규칙: 화면.요소 (login.*, common.*)
 export const ko: Dict = {
+  "clubDetail.share": "공유",
+  "clubDetail.settings": "설정",
   "clubDetail.membersOnlyDesc": "크루에 가입하면 게시판과 사진첩을 볼 수 있어요",
   "clubDetail.membersOnlyPending": "가입 승인을 기다리고 있어요. 승인되면 볼 수 있습니다",
   "clubDetail.membersOnlyTitle": "크루 멤버 전용입니다",

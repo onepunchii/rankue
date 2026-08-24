@@ -230,7 +230,9 @@ export default function HiqClubDetail() {
     const hasPending = members.some((m: any) => m.role === 'pending');
 
     const handleShare = async () => {
-        const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+        // 공개 정본 URL 은 /club/:id 다. window.location.href 는 앱 내부 경로(/crew/:id/home,
+        // localhost, 데스크톱 프레임)라 남에게 보내면 안 열린다 — 사이트맵과 같은 형태로 고정 조립.
+        const shareUrl = `https://www.rankue.co.kr/club/${id ?? ""}`;
         const shareData = {
             title: crew?.name ?? t("clubDetail.crewFallback"),
             text: `${crew?.name} ${t("clubDetail.shareText")}`,
@@ -276,25 +278,30 @@ export default function HiqClubDetail() {
                         {crew?.name}
                     </div>
 
-                    {/* 우측: 관리자/설정 */}
-                    {isAdmin ? (
+                    {/* 우측: 공유 + (관리자면) 설정.
+                        예전에는 자리 하나를 관리자/비관리자로 나눠 써서, 정작 자기 크루를
+                        공유하고 싶은 크루장에게만 공유 버튼이 없었다(오너 지적 2026-08-24). */}
+                    <div className="flex items-center -mr-3">
                         <Button
                             variant="ghost"
-                            className="p-3 -mr-3 h-auto text-ink-2 hover:text-ink-1 transition-colors relative"
-                            onClick={() => setIsSettingsOpen(true)}
-                        >
-                            <LucideMoreVertical className="w-6 h-6" />
-                            {hasPending && <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-brand ring-2 ring-white" />}
-                        </Button>
-                    ) : (
-                        <Button
-                            variant="ghost"
-                            className="p-3 -mr-3 h-auto text-ink-2 hover:text-ink-1 transition-colors"
+                            className="p-3 h-auto text-ink-2 hover:text-ink-1 transition-colors"
                             onClick={handleShare}
+                            aria-label={t("clubDetail.share")}
                         >
                             <LucideShare2 className="w-6 h-6" />
                         </Button>
-                    )}
+                        {isAdmin && (
+                            <Button
+                                variant="ghost"
+                                className="p-3 h-auto text-ink-2 hover:text-ink-1 transition-colors relative"
+                                onClick={() => setIsSettingsOpen(true)}
+                                aria-label={t("clubDetail.settings")}
+                            >
+                                <LucideMoreVertical className="w-6 h-6" />
+                                {hasPending && <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-brand ring-2 ring-white" />}
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </div>
 

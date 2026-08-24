@@ -1,6 +1,8 @@
 import type { Dict } from "./index";
 
 const tr: Dict = {
+  "clubDetail.share": "Paylaş",
+  "clubDetail.settings": "Ayarlar",
   "clubDetail.membersOnlyDesc": "Panoyu ve albümü görmek için ekibe katıl",
   "clubDetail.membersOnlyPending": "Katılım isteğin onay bekliyor",
   "clubDetail.membersOnlyTitle": "Yalnızca ekip üyeleri",

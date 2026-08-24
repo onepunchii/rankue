@@ -1,6 +1,8 @@
 import type { Dict } from "./index";
 
 const en: Dict = {
+  "clubDetail.share": "Share",
+  "clubDetail.settings": "Settings",
   "clubDetail.membersOnlyDesc": "Join the crew to see the board and photo album",
   "clubDetail.membersOnlyPending": "Your join request is pending approval",
   "clubDetail.membersOnlyTitle": "Crew members only",
