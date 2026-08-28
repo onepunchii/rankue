@@ -11,7 +11,8 @@ import {
     hiqSettlements,
     hiqSettlementItems,
     hiqSettlementParticipants,
-    suggestions
+    suggestions,
+    storeListings
 } from "../../shared/schema.js";
 import type {
     HiqStore,
@@ -25,7 +26,7 @@ import type {
     Suggestion,
     InsertSuggestion
 } from "../../shared/schema.js";
-import { eq, desc, asc, and, or, sql, gt, gte, like } from "drizzle-orm";
+import { eq, desc, asc, and, or, sql, gt, gte, like, isNull } from "drizzle-orm";
 
 export class AdminRepository {
     // --- Store Management ---
@@ -78,7 +79,11 @@ export class AdminRepository {
     }
 
     async getStoresForSitemap() {
-        return db.select({ slug: hiqStores.slug }).from(hiqStores);
+        // 디렉토리에 연결된 매장은 제외 — /stores/:code 가 정본이고 /store/:slug 는 그리로
+        // 301 리다이렉트되므로 둘 다 실으면 중복 URL 이다.
+        return db.select({ slug: hiqStores.slug }).from(hiqStores)
+            .leftJoin(storeListings, eq(storeListings.claimedStoreId, hiqStores.id))
+            .where(isNull(storeListings.id));
     }
 
     async getPublicStores() {
@@ -105,7 +110,13 @@ export class AdminRepository {
             notice: hiqStores.notice,
             latitude: hiqStores.latitude,
             longitude: hiqStores.longitude,
-        }).from(hiqStores).where(eq(hiqStores.slug, slug));
+            // 디렉토리에 연결된 매장이면 그 코드 — /store/:slug(주소만 있는 구형 페이지)에서
+            // /stores/:code(요금표·명예의전당이 있는 정본)로 보내기 위한 것.
+            // 같은 매장에 페이지가 둘 뜨는 혼란의 근원 차단(2026-08-28 실사고).
+            listingCode: storeListings.code,
+        }).from(hiqStores)
+            .leftJoin(storeListings, eq(storeListings.claimedStoreId, hiqStores.id))
+            .where(eq(hiqStores.slug, slug));
         return s ?? null;
     }
 

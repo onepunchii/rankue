@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
@@ -13,6 +14,7 @@ interface PublicStore {
   notice: string | null;
   latitude: number | null;
   longitude: number | null;
+  listingCode?: string | null;
 }
 
 const L: Record<Locale, { back: string; address: string; phone: string; notice: string; notFound: string; suffix: string }> = {
@@ -34,6 +36,12 @@ export default function StoreDetail() {
     queryKey: ["/api/hiq/public-stores", slug],
     enabled: !!slug,
   });
+
+  // 디렉토리에 연결된 매장은 /stores/:code 가 정본(요금표·명예의전당·클레임까지 있는 페이지).
+  // 이 구형 페이지는 주소만 있어서 같은 매장이 두 얼굴로 보였다(2026-08-28 오너 제보).
+  useEffect(() => {
+    if (store?.listingCode) setLocation(`/stores/${store.listingCode}`, { replace: true });
+  }, [store?.listingCode, setLocation]);
 
   useSeo({
     title: store ? `${store.name} · ${store.region ?? ""} ${t.suffix}`.replace(/\s+/g, " ").trim() : `${t.suffix}`,

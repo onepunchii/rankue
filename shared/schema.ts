@@ -665,6 +665,10 @@ export const storeRegistrations = pgTable("store_registrations", {
   status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
   /** 승인 시 발급된 리스팅 코드 (n00001~) — 추적·중복 방지용 역참조 */
   listingCode: text("listing_code"),
+  /** 승인 시 발급된 초기 PIN(신규 계정일 때만). 관리자가 나중에 사장님께 전화로 알려줄 수
+   *  있도록 평문 보관(오너 결정 2026-08-28) — 어드민 전용 표면에서만 노출한다.
+   *  사장님이 이후 비밀번호를 바꾸면 이 값은 낡은 값이 된다(라벨에 '초기'를 명시). */
+  issuedPin: text("issued_pin"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   processedAt: timestamp("processed_at"),
 }, (table) => [
@@ -1306,6 +1310,8 @@ export const storeListingClaims = pgTable("store_listing_claims", {
   applicantPhone: text("applicant_phone").notNull(),
   message: text("message"),
   status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
+  /** 승인 시 발급된 초기 PIN(신규 계정일 때만) — 위 storeRegistrations 와 동일 정책 */
+  issuedPin: text("issued_pin"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

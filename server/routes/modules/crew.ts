@@ -673,9 +673,23 @@ router.get("/store-search", requireAuth, asyncHandler(async (req: AuthRequest, r
             .where(or(ilike(storeListings.name, `%${q}%`), ilike(storeListings.address, `%${q}%`)))
             .orderBy(asc(storeListings.name)).limit(15),
     ]);
-    // 파트너 매장 우선 노출, 같은 이름의 디렉토리 항목과 중복돼도 그대로 둔다(주소로 구분 가능)
+    // 파트너 매장 중 (a) 시스템 매장(hiq·global — 소속 그릇이지 갈 수 있는 매장이 아님)과
+    // (b) 디렉토리에 연결된 매장은 제외한다. (b)를 남기면 같은 매장이 두 줄로 뜨고,
+    // 파트너 줄에는 code 가 없어 베이스캠프로 고르면 null 이 저장됐다(2026-08-28 실사고:
+    // 하이큐 당구장 — 설정 화면엔 선택된 듯 보이는데 크루 홈엔 "정보 없음").
+    const { isSystemStore } = await import("../../../shared/systemStores.js");
+    const { inArray } = await import("drizzle-orm");
+    const partnerIds = (partners as any[]).map((s) => s.id);
+    const linked = partnerIds.length
+        ? await db.select({ id: storeListings.claimedStoreId }).from(storeListings)
+            .where(inArray(storeListings.claimedStoreId, partnerIds))
+        : [];
+    const linkedSet = new Set(linked.map((l) => l.id));
     return sendSuccess(res, [
-        ...(partners as any[]).slice(0, 5).map((s) => ({ type: "partner", id: s.id, name: s.name, address: s.address ?? s.region ?? "" })),
+        ...(partners as any[])
+            .filter((s) => !isSystemStore(s.slug) && !linkedSet.has(s.id))
+            .slice(0, 5)
+            .map((s) => ({ type: "partner", id: s.id, name: s.name, address: s.address ?? s.region ?? "" })),
         ...listings.map((s) => ({ type: "listing", code: s.code, name: s.name, address: s.address, region: s.region })),
     ]);
 }));

@@ -49,6 +49,7 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
         gameType: crew?.gameType || 'any',
         tags: crew?.tags || [],
         baseListingCode: (crew as any)?.baseListingCode ?? null,
+        baseStoreId: (crew as any)?.baseStoreId ?? null,
     });
     const [isUploading, setIsUploading] = useState(false);
 
@@ -80,6 +81,7 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
             gameType: crew?.gameType || 'any',
             tags: crew?.tags || [],
             baseListingCode: (crew as any)?.baseListingCode ?? null,
+            baseStoreId: (crew as any)?.baseStoreId ?? null,
         });
     }
 
@@ -249,7 +251,7 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
                                 <p className="text-[11.5px] text-black/45 mt-0.5">{t("clubSettings.baseCampHint")}</p>
                             </div>
                             <Button type="button" variant="ghost" size="sm" className="shrink-0 text-black/50"
-                                onClick={() => { onChange("baseListingCode", null); setBaseName(null); setBaseQuery(""); }}>
+                                onClick={() => { onChange("baseListingCode", null); onChange("baseStoreId", null); setBaseName(null); setBaseQuery(""); }}>
                                 {t("clubSettings.baseCampClear")}
                             </Button>
                         </div>
@@ -271,7 +273,15 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
                                             key={s.code || s.id}
                                             type="button"
                                             onClick={() => {
-                                                onChange("baseListingCode", s.code ?? null);
+                                                // 파트너 매장(코드 없음)은 baseStoreId, 디렉토리는 baseListingCode.
+                                                // 예전엔 s.code ?? null 만 저장해 파트너를 고르면 null 이 저장됐다.
+                                                if (s.type === "partner") {
+                                                    onChange("baseStoreId", s.id ?? null);
+                                                    onChange("baseListingCode", null);
+                                                } else {
+                                                    onChange("baseListingCode", s.code ?? null);
+                                                    onChange("baseStoreId", null);
+                                                }
                                                 setBaseName(s.name);
                                                 setBaseQuery("");
                                             }}

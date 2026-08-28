@@ -173,7 +173,7 @@ export default function AdminDashboard() {
     // 매장 클레임 대기열 — 승인 = 사장님 계정(전화+PIN)+파트너 매장 자동 발급 (실제 온보딩)
     const { data: claims = [] } = useQuery<Array<{
         id: string; listingCode: string; applicantName: string; applicantPhone: string;
-        message: string | null; status: string; createdAt: string;
+        message: string | null; status: string; issuedPin: string | null; createdAt: string;
         listingName: string | null; listingRegion: string | null; listingAddress: string | null;
     }>>({ queryKey: ["/api/hiq/admin/listing-claims"] });
     const [approveResult, setApproveResult] = useState<{ storeSlug: string; partnerPhone: string; issuedPin: string | null; notified?: boolean } | null>(null);
@@ -199,7 +199,7 @@ export default function AdminDashboard() {
         rate10Large: number | null; rate10Medium: number | null; rate10Pocket: number | null;
         flatLarge: number | null; flatMedium: number | null; flatPocket: number | null;
         applicantName: string; applicantPhone: string;
-        status: "pending" | "approved" | "rejected"; listingCode: string | null; createdAt: string;
+        status: "pending" | "approved" | "rejected"; listingCode: string | null; issuedPin: string | null; createdAt: string;
     }>>({ queryKey: ["/api/hiq/admin/store-registrations"] });
     const [regResult, setRegResult] = useState<{ listingCode: string; storeSlug: string; partnerPhone: string; issuedPin: string | null; notified?: boolean } | null>(null);
     const approveReg = useMutation({
@@ -477,6 +477,11 @@ export default function AdminDashboard() {
                                             <Badge variant={c.status === "pending" ? "destructive" : c.status === "approved" ? "default" : "secondary"}>
                                                 {c.status === "pending" ? "대기" : c.status === "approved" ? "승인됨" : "거절됨"}
                                             </Badge>
+                                            {c.issuedPin && (
+                                                <Badge variant="outline" className="border-brand/40 text-brand tabular-nums" title="발급 당시 초기 PIN — 사장님이 변경했다면 낡은 값일 수 있습니다">
+                                                    초기 PIN {c.issuedPin}
+                                                </Badge>
+                                            )}
                                             <span className="text-xs text-black/40">{new Date(c.createdAt).toLocaleDateString()}</span>
                                         </div>
                                         <h3 className="text-lg font-bold truncate">{c.listingName ?? c.listingCode}</h3>
@@ -532,6 +537,11 @@ export default function AdminDashboard() {
                                         <span className="font-bold text-[15px]">{r.name}</span>
                                         <Badge variant="secondary">{r.region}</Badge>
                                         {r.status === "approved" && <Badge className="bg-brand text-white">등록됨 {r.listingCode && `· ${r.listingCode}`}</Badge>}
+                                        {r.issuedPin && (
+                                            <Badge variant="outline" className="border-brand/40 text-brand tabular-nums" title="발급 당시 초기 PIN — 사장님이 변경했다면 낡은 값일 수 있습니다">
+                                                초기 PIN {r.issuedPin}
+                                            </Badge>
+                                        )}
                                         {r.status === "rejected" && <Badge variant="destructive">거절됨</Badge>}
                                         <span className="text-xs text-black/40 ml-auto">{new Date(r.createdAt).toLocaleString()}</span>
                                     </div>

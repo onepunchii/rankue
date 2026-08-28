@@ -223,6 +223,8 @@ router.get("/listing-claims", checkSuperAdmin, asyncHandler(async (_req: any, re
         applicantPhone: storeListingClaims.applicantPhone,
         message: storeListingClaims.message,
         status: storeListingClaims.status,
+        // 초기 PIN — 승인 후에도 관리자가 전화로 알려줄 수 있게(어드민 전용 표면)
+        issuedPin: storeListingClaims.issuedPin,
         createdAt: storeListingClaims.createdAt,
         listingName: storeListings.name,
         listingRegion: storeListings.region,
@@ -361,6 +363,15 @@ router.post("/listing-claims/:id/approve", checkSuperAdmin, asyncHandler(async (
     });
     if (!out.ok) return sendError(res, out.status, out.message);
 
+    // 초기 PIN 을 행에 보존 — 관리자가 나중에 전화로 알려줄 수 있게(오너 요청 2026-08-28).
+    // 트랜잭션 밖이지만 표시용 메타데이터라 실패해도 승인은 유효하다.
+    if (out.issuedPin) {
+        try {
+            await db.update(storeListingClaims).set({ issuedPin: out.issuedPin } as any)
+                .where(eq(storeListingClaims.id, claim.id));
+        } catch (e) { console.warn("[claim approve] PIN 보존 실패:", (e as Error)?.message); }
+    }
+
     return sendSuccess(res, {
         approved: true,
         storeSlug: out.storeSlug,
@@ -448,6 +459,13 @@ router.post("/store-registrations/:id/approve", checkSuperAdmin, asyncHandler(as
         }
     } catch (e) {
         console.warn("[store-registration approve] 지오코딩 실패:", (e as Error)?.message);
+    }
+
+    if (out.issuedPin) {
+        try {
+            await db.update(storeRegistrations).set({ issuedPin: out.issuedPin } as any)
+                .where(eq(storeRegistrations.id, reg.id));
+        } catch (e) { console.warn("[registration approve] PIN 보존 실패:", (e as Error)?.message); }
     }
 
     return sendSuccess(res, {

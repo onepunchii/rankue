@@ -1174,6 +1174,10 @@ export function registerPrerender(app: Express) {
       console.warn("[prerender] store failed:", (e as Error)?.message);
       return sendUnavailable(res);
     }
+    // 디렉토리에 연결된 매장은 /stores/:code 가 정본 — 301 로 크롤러 색인을 그쪽에 모은다.
+    if (s && (s as any).listingCode) {
+      return res.redirect(301, `${ORIGIN}/stores/${encodeURIComponent((s as any).listingCode)}`);
+    }
     // 없는 매장 = 404. 크롤러에게 "이 URL 은 없다"를 정확히 알리는 것이 맞는 응답이다.
     if (!s) return sendGone(res, "매장을 찾을 수 없습니다.", "요청한 당구장 정보가 없습니다.");
     // client/src/pages/store-detail.tsx:39 의 useSeo title 과 **문자 단위로 같아야** 한다.
