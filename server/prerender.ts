@@ -1093,6 +1093,9 @@ export function registerPrerender(app: Express) {
   // (수집 원문 소개·요금 미전재 원칙 — 소개는 사장님 인증 후 직접 작성).
   app.get("/stores/:code", async (req, res, next) => {
     if (!isBot(req)) return next();
+    // /stores/register 는 등록 폼 페이지 — 코드 정규식(영문 소문자 매치)에 걸려 410 이 나가면
+    // 카톡·페북 스크래퍼가 미리보기를 못 만든다. 봇에게도 SPA 셸을 주도록 통과시킨다.
+    if (req.params.code === "register") return next();
     if (!/^[A-Za-z0-9_-]{1,20}$/.test(req.params.code)) {
       return sendGone(res, "매장을 찾을 수 없습니다.", "요청한 당구장 정보가 없습니다.");
     }

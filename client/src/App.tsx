@@ -53,6 +53,7 @@ import Support from "@/pages/support";
 import About from "@/pages/about";
 import Stores from "@/pages/stores";
 import StoreListing from "@/pages/store-listing";
+import StoreRegister from "@/pages/store-register";
 import BriefingPage from "@/pages/briefing";
 import StoreDetail from "@/pages/store-detail";
 import SharedResult from "@/pages/hiq/shared-result";
@@ -195,6 +196,8 @@ function AppRoutes() {
       <Route path="/support" component={Support} />
       <Route path="/about" component={About} />
       <Route path="/stores" component={Stores} />
+      {/* register 는 :code 와일드카드보다 먼저 — 아니면 "register"가 매장 코드로 해석돼 404 */}
+      <Route path="/stores/register" component={StoreRegister} />
       <Route path="/stores/:code" component={StoreListing} />
       <Route path="/briefing" component={BriefingPage} />
       <Route path="/briefing/:date" component={BriefingPage} />

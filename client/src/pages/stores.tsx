@@ -25,7 +25,7 @@ interface Listing {
 }
 interface ListingsResponse { total: number; rows: Listing[]; regions: Array<{ region: string; count: number }> }
 
-const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; nearby: string; nearbyOn: string }> = {
+const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string }> = {
   ko: {
     title: "매장 찾기",
     subtitle: "전국 당구장을 지역·이름으로 찾아보세요",
@@ -42,6 +42,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     verified: "사장님 인증",
     ownerBannerTitle: "사장님이신가요?",
     ownerBannerDesc: "목록에서 내 매장을 찾아 상세 페이지의 '내 매장 정보 관리 신청'을 눌러주세요. 승인되면 소개·요금을 직접 관리할 수 있습니다.",
+    registerCta: "내 매장 등록하기",
     nearby: "내 주변",
     nearbyOn: "거리순",
   },
@@ -61,6 +62,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     verified: "Owner verified",
     ownerBannerTitle: "Own a billiards hall?",
     ownerBannerDesc: "Find your venue in the list and tap 'Claim your listing' on its page to manage your info.",
+    registerCta: "Register my venue",
     nearby: "Near me",
     nearbyOn: "By distance",
   },
@@ -80,6 +82,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     verified: "Chủ quán xác nhận",
     ownerBannerTitle: "Bạn là chủ quán?",
     ownerBannerDesc: "Tìm quán của bạn trong danh sách và nhấn 'Nhận quản lý trang' để tự quản lý thông tin.",
+    registerCta: "Đăng ký quán của tôi",
     nearby: "Gần tôi",
     nearbyOn: "Theo khoảng cách",
   },
@@ -99,6 +102,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     verified: "Sahibi onaylı",
     ownerBannerTitle: "Salon sahibi misiniz?",
     ownerBannerDesc: "Listede salonunuzu bulun ve sayfasında 'Kaydınızı sahiplenin'e dokunun.",
+    registerCta: "Salonumu kaydet",
     nearby: "Yakınımda",
     nearbyOn: "Mesafeye göre",
   },
@@ -118,6 +122,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     verified: "Verificado",
     ownerBannerTitle: "¿Tienes un salón?",
     ownerBannerDesc: "Encuentra tu local en la lista y pulsa 'Reclama tu ficha' para gestionar tu información.",
+    registerCta: "Registrar mi local",
     nearby: "Cerca de mí",
     nearbyOn: "Por distancia",
   },
@@ -267,7 +272,16 @@ export default function Stores() {
         {isLoading && listings.length === 0 ? (
           <div className="h-40 bg-black/[0.04] rounded-2xl animate-pulse" />
         ) : listings.length === 0 && filteredPartners.length === 0 ? (
-          <p className="text-center text-black/45 py-16 text-[14px]">{t.empty}</p>
+          <div className="text-center py-14">
+            <p className="text-black/45 text-[14px]">{t.empty}</p>
+            {/* 검색해도 없다 = 신규 등록의 가장 자연스러운 순간 */}
+            <button
+              onClick={() => setLocation("/stores/register")}
+              className="mt-4 h-11 px-5 rounded-full bg-brand text-white text-[13.5px] font-bold active:scale-[0.98] transition-transform"
+            >
+              {t.registerCta} →
+            </button>
+          </div>
         ) : (
           <div className="grid gap-2">
             {listings.map((s) => (
@@ -308,6 +322,13 @@ export default function Stores() {
             <div className="mt-4 rounded-2xl bg-brand/[0.06] p-5 text-center">
               <p className="text-[14px] font-bold text-brand">{t.ownerBannerTitle}</p>
               <p className="text-[12.5px] text-black/55 mt-1 leading-relaxed">{t.ownerBannerDesc}</p>
+              {/* 목록에 없는 매장 — 신규 등록 신청 (승인 시 매장 페이지+사장님 권한 발급) */}
+              <button
+                onClick={() => setLocation("/stores/register")}
+                className="mt-3 h-10 px-4 rounded-full bg-brand text-white text-[13px] font-bold active:scale-[0.98] transition-transform"
+              >
+                {t.registerCta} →
+              </button>
             </div>
           </div>
         )}

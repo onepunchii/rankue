@@ -636,6 +636,43 @@ export const suggestions = pgTable("suggestions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// 신규 매장 등록 신청 — 디렉토리(1,195곳)에 없는 매장의 사장님이 직접 등록을 요청한다.
+//
+// 왜 별도 테이블인가: store_listings 를 읽는 공개 표면이 11곳(목록·상세·사이트맵·프리렌더·
+// 크루 베이스 지정)이라, status 컬럼로 pending 을 섞으면 필터 하나만 빠져도 미승인 매장이
+// 검색 색인에 샌다(2026-08-25 전수 실측). 신청은 여기 격리하고 승인 시에만 listings 로 옮긴다.
+//
+// 승인 = 리스팅 생성(코드 n00001~ 서버 발급) + 지오코딩 + 기존 클레임 승인 파이프라인
+// (사장님 계정·파트너 매장·앱 알림) 재사용. 필드는 storeListings 와 1:1 로 맞춘다.
+export const storeRegistrations = pgTable("store_registrations", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  name: text("name").notNull(),
+  region: text("region").notNull(),       // 시도 (서울·경기·... — listings 와 같은 17개 축)
+  address: text("address").notNull(),
+  phone: text("phone"),
+  openHours: text("open_hours"),
+  tableLarge: integer("table_large"),
+  tableMedium: integer("table_medium"),
+  tablePocket: integer("table_pocket"),
+  rate10Large: integer("rate10_large"),
+  rate10Medium: integer("rate10_medium"),
+  rate10Pocket: integer("rate10_pocket"),
+  flatLarge: integer("flat_large"),
+  flatMedium: integer("flat_medium"),
+  flatPocket: integer("flat_pocket"),
+  applicantName: text("applicant_name").notNull(),
+  applicantPhone: text("applicant_phone").notNull(),
+  status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
+  /** 승인 시 발급된 리스팅 코드 (n00001~) — 추적·중복 방지용 역참조 */
+  listingCode: text("listing_code"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  processedAt: timestamp("processed_at"),
+}, (table) => [
+  index("store_registrations_status_idx").on(table.status, table.createdAt),
+]);
+
+export type StoreRegistration = typeof storeRegistrations.$inferSelect;
+
 export const insertSuggestionSchema = createInsertSchema(suggestions).omit({ id: true, createdAt: true, isRead: true });
 export type Suggestion = typeof suggestions.$inferSelect;
 export type InsertSuggestion = z.infer<typeof insertSuggestionSchema>;

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Response } from "express";
 import { db } from "../../db.js";
-import { storeListings, storeListingClaims, storeListingSuggestions, hiqCrews } from "../../../shared/schema.js";
+import { storeListings, storeListingClaims, storeListingSuggestions, storeRegistrations, hiqCrews } from "../../../shared/schema.js";
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
@@ -163,6 +163,63 @@ router.post("/:code/claim", asyncHandler(async (req: any, res: Response) => {
         applicantName: name,
         applicantPhone: phone,
         message: String(req.body?.message || "").slice(0, 500) || null,
+    });
+    return sendSuccess(res, { submitted: true });
+}));
+
+// POST /listings/register — 신규 매장 등록 신청 (디렉토리에 없는 매장, 수동 승인 대기열)
+//
+// 즉시 게시하지 않는 이유: 매장 페이지는 구글 색인되는 공개 디렉토리라, 무검증 게시는
+// 스팸·장난 매장을 검색에 노출시킨다. 승인은 어드민 원클릭이고, 승인 순간
+// 사장님 계정·파트너 매장까지 자동 발급되므로(issueOwnership) 온보딩이 오히려 빠르다.
+const REGIONS = new Set(["서울", "경기", "인천", "부산", "대구", "광주", "대전", "울산", "세종", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"]);
+router.post("/register", asyncHandler(async (req: any, res: Response) => {
+    if (isSubmitLimited(req.ip || "?")) return sendError(res, 429, "잠시 후 다시 시도해주세요");
+
+    const name = String(req.body?.name || "").trim().slice(0, 60);
+    const region = String(req.body?.region || "").trim();
+    const address = String(req.body?.address || "").trim().slice(0, 120);
+    const applicantName = String(req.body?.applicantName || "").trim().slice(0, 30);
+    const applicantPhone = String(req.body?.applicantPhone || "").trim().slice(0, 20);
+    if (name.length < 2) return sendError(res, 400, "매장 이름을 입력해주세요");
+    if (!REGIONS.has(region)) return sendError(res, 400, "지역(시/도)을 선택해주세요");
+    if (address.length < 5) return sendError(res, 400, "주소를 입력해주세요");
+    if (!applicantName || !/^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(applicantPhone.replace(/\s/g, ""))) {
+        return sendError(res, 400, "성함과 올바른 연락처를 입력해주세요");
+    }
+    const phone = String(req.body?.phone || "").trim().slice(0, 20) || null;
+    const openHours = String(req.body?.openHours || "").trim().slice(0, 40) || null;
+    // 숫자 필드 — 범위를 벗어나면 저장하지 않는다(테이블 0~99대, 요금 0~100만원).
+    const intOr = (v: unknown, max: number) => {
+        const n = Number(v);
+        return Number.isInteger(n) && n > 0 && n <= max ? n : null;
+    };
+
+    // 같은 이름+주소가 이미 디렉토리에 있으면 등록이 아니라 클레임 대상이다.
+    const [dupListing] = await db.select({ code: storeListings.code }).from(storeListings)
+        .where(and(eq(storeListings.name, name), eq(storeListings.address, address))).limit(1);
+    if (dupListing) return sendError(res, 409, "이미 등록된 매장입니다. 매장 찾기에서 검색해 '사장님이신가요?'로 신청해주세요");
+    // 같은 이름+주소의 대기 중 신청 중복 방지
+    const [dupReg] = await db.select({ id: storeRegistrations.id }).from(storeRegistrations)
+        .where(and(
+            eq(storeRegistrations.name, name),
+            eq(storeRegistrations.address, address),
+            eq(storeRegistrations.status, "pending"),
+        )).limit(1);
+    if (dupReg) return sendError(res, 409, "이미 접수된 신청이 있습니다. 확인 후 연락드릴게요");
+
+    await db.insert(storeRegistrations).values({
+        name, region, address, phone, openHours,
+        tableLarge: intOr(req.body?.tableLarge, 99),
+        tableMedium: intOr(req.body?.tableMedium, 99),
+        tablePocket: intOr(req.body?.tablePocket, 99),
+        rate10Large: intOr(req.body?.rate10Large, 1_000_000),
+        rate10Medium: intOr(req.body?.rate10Medium, 1_000_000),
+        rate10Pocket: intOr(req.body?.rate10Pocket, 1_000_000),
+        flatLarge: intOr(req.body?.flatLarge, 1_000_000),
+        flatMedium: intOr(req.body?.flatMedium, 1_000_000),
+        flatPocket: intOr(req.body?.flatPocket, 1_000_000),
+        applicantName, applicantPhone,
     });
     return sendSuccess(res, { submitted: true });
 }));
