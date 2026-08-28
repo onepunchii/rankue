@@ -83,7 +83,7 @@ export function storeJsonLd(s: StoreLdInput, origin = "https://www.rankue.co.kr"
         ...(lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)
             ? {
                 geo: { "@type": "GeoCoordinates", latitude: lat, longitude: lng },
-                hasMap: `https://map.kakao.com/link/map/${encodeURIComponent(s.name)},${lat},${lng}`,
+                hasMap: mapLink(s as any),
             }
             : {}),
         ...(tables > 0
@@ -92,12 +92,26 @@ export function storeJsonLd(s: StoreLdInput, origin = "https://www.rankue.co.kr"
     };
 }
 
-/** 길찾기 링크 — 좌표가 있으면 지도에 정확히 찍고, 없으면 주소 검색으로 연다. */
+/** 길찾기 링크 — 항상 주소 검색으로 연다.
+ *
+ *  좌표를 쓰지 않는 이유: 우리 좌표는 Nominatim 지오코딩이 번지를 못 찾으면 동·구
+ *  중심점으로 폴백한 값이라 수백 m 어긋날 수 있다(2026-08-28 실사고: 구의동 242-22 가
+ *  약 900m 북쪽 지점으로 안내됨). 거리순 정렬에는 충분하지만 길찾기 목적지로는 틀린다.
+ *  카카오맵은 한국 지번·도로명 주소를 정확한 필지로 해석하므로 주소 검색이 항상 옳다.
+ *  층·호·괄호 주기는 검색 노이즈라 떼고 넘긴다. */
 export function mapLink(s: { name: string; address: string; latitude?: number | string | null; longitude?: number | string | null }): string {
+    const cleaned = s.address
+        .replace(/\(.*$/, "")
+        .replace(/\s*(지하\s*)?\d+층.*$/, "")
+        .replace(/\s+[\dB]+호.*$/, "")
+        .trim();
+    const q = cleaned.length >= 5 ? cleaned : s.address;
+    if (q) return `https://map.kakao.com/link/search/${encodeURIComponent(q)}`;
+    // 주소가 아예 없을 때만 좌표 폴백
     const lat = s.latitude != null ? Number(s.latitude) : null;
     const lng = s.longitude != null ? Number(s.longitude) : null;
     if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) {
-        return `https://map.kakao.com/link/to/${encodeURIComponent(s.name)},${lat},${lng}`;
+        return `https://map.kakao.com/link/map/${encodeURIComponent(s.name)},${lat},${lng}`;
     }
-    return `https://map.kakao.com/link/search/${encodeURIComponent(s.address)}`;
+    return `https://map.kakao.com/link/search/${encodeURIComponent(s.name)}`;
 }
