@@ -361,17 +361,34 @@ export default function StoreListingPage() {
               <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-4">
                 <p className="text-[11.5px] font-bold text-black/40 mb-2.5">{t.crewsTitle}</p>
                 <div className="space-y-2">
-                  {s.crews!.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => setLocation(`/club/${c.id}`)}
-                      className="w-full flex items-center gap-3 py-2 px-2.5 rounded-xl bg-black/[0.03] text-left active:scale-[0.99] transition-transform"
-                    >
-                      <span className="text-[20px] leading-none shrink-0">{c.emblem || "🎱"}</span>
-                      <span className="flex-1 min-w-0 text-[14px] font-semibold truncate">{c.name}</span>
-                      <span className="shrink-0 text-[12px] font-medium text-black/45 tabular-nums">{c.memberCount}{t.crewMembers}</span>
-                    </button>
-                  ))}
+                  {s.crews!.map((c) => {
+                    // 엠블럼은 업로드 이미지 URL — 텍스트로 뿌리면 URL 이 그대로 찍혀 레이아웃을
+                    // 뚫는다(2026-08-28 실사고). 크루 홈과 같은 규칙: 이미지, 없으면 이니셜 타일.
+                    const isImg = !!c.emblem && /^https?:\/\//.test(c.emblem);
+                    const initial = c.name?.trim().charAt(0).toUpperCase() || "?";
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => setLocation(`/club/${c.id}`)}
+                        className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl bg-black/[0.03] text-left active:scale-[0.99] transition-transform"
+                      >
+                        <span className="w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-brand/10 flex items-center justify-center">
+                          {isImg ? (
+                            <img src={c.emblem!} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-[16px] font-bold text-brand leading-none">{initial}</span>
+                          )}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[14.5px] font-bold text-ink-1 truncate">{c.name}</span>
+                          <span className="block text-[12px] font-medium text-black/45 tabular-nums mt-0.5">
+                            {c.memberCount}{t.crewMembers}{c.gameType && c.gameType !== "any" ? ` · ${c.gameType.toUpperCase()}` : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-black/25 text-[16px]">›</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
