@@ -173,7 +173,19 @@ export class AdminRepository {
             lastVisitedAt: hiqMembers.lastVisitedAt,
             createdAt: hiqMembers.createdAt,
             profileId: hiqMembers.profileId,
-        }).from(hiqMembers).orderBy(sql`${hiqMembers.createdAt} DESC`);
+            // 국가 = 프로필의 IP 기반 자동 수집값(국가 랭킹 축과 동일).
+            countryCode: profiles.countryCode,
+            // 기기 = 푸시토큰 접두사로 판별. 'apns:'=애플, 'fcm:'=안드로이드.
+            //   토큰 원문은 민감정보라 내려주지 않고, 접두사만으로 platform 을 만든다.
+            platform: sql<string | null>`
+                CASE
+                    WHEN ${profiles.pushToken} LIKE 'apns:%' THEN 'ios'
+                    WHEN ${profiles.pushToken} LIKE 'fcm:%' THEN 'android'
+                    ELSE NULL
+                END`,
+        }).from(hiqMembers)
+            .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
+            .orderBy(sql`${hiqMembers.createdAt} DESC`);
     }
 
     async getAdminStats(storeId: string): Promise<{

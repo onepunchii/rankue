@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // Assuming Sheet is available or using conditional rendering
+import { flagEmoji } from "@/lib/flag";
 
 // --- Types ---
 type GlobalStats = {
@@ -896,6 +897,8 @@ export default function AdminDashboard() {
                                             <th className="p-4 font-black text-black/55">이름</th>
                                             <th className="p-4 font-black text-black/55">연락처</th>
                                             <th className="p-4 font-black text-black/55 text-center">성별</th>
+                                            <th className="p-4 font-black text-black/55 text-center">국가</th>
+                                            <th className="p-4 font-black text-black/55 text-center">기기</th>
                                             <th className="p-4 font-black text-black/55 text-right">3쿠션 RP</th>
                                             <th className="p-4 font-black text-black/55 text-right">4구 RP</th>
                                             <th className="p-4 font-black text-black/55 text-right">방문</th>
@@ -910,6 +913,16 @@ export default function AdminDashboard() {
                                                     <td className="p-4 font-bold text-[rgba(0,0,0,0.87)]">{m.name}</td>
                                                     <td className="p-4 text-black/60 font-mono">{m.phone}</td>
                                                     <td className="p-4 text-center text-black/60">{m.gender === "male" ? "남" : m.gender === "female" ? "여" : "-"}</td>
+                                                    <td className="p-4 text-center">
+                                                        {m.countryCode
+                                                            ? <span title={m.countryCode}>{flagEmoji(m.countryCode) || m.countryCode}</span>
+                                                            : <span className="text-black/25">-</span>}
+                                                    </td>
+                                                    <td className="p-4 text-center">
+                                                        {m.platform === "ios" ? <span title="iOS(애플)">🍎</span>
+                                                            : m.platform === "android" ? <span title="Android(안드로이드)">🤖</span>
+                                                            : <span className="text-black/25" title="앱 미설치(웹) 또는 알림 미허용">-</span>}
+                                                    </td>
                                                     <td className="p-4 text-right font-mono font-bold text-brand">{m.rating3c ?? 0}</td>
                                                     <td className="p-4 text-right font-mono font-bold text-brand">{m.rating4c ?? 0}</td>
                                                     <td className="p-4 text-right text-black/60 font-mono">{m.visitCount ?? 0}</td>
@@ -917,7 +930,7 @@ export default function AdminDashboard() {
                                                 </tr>
                                             ))}
                                         {members.length === 0 && (
-                                            <tr><td colSpan={7} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
+                                            <tr><td colSpan={9} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
