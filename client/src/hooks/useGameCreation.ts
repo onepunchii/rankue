@@ -23,6 +23,10 @@ interface GameCreationProps {
     /** Whether the lobby is on screen. The modal is never unmounted, so without this the
      *  PIN poll would keep hitting the server every 3s forever after the user closes it. */
     open?: boolean;
+    /** 크루 토너먼트 대진에서 시작한 경기. 상대가 이미 정해져 있어 PIN 단계를 건너뛰고
+     *  2번 슬롯에 바로 앉힌다(오너 결정 2026-08-30: 8명 대회면 PIN 을 7번 주고받아야 한다).
+     *  목표 점수는 여기서 강제하지 않는다 — 매칭 화면에서 그때그때 맞춘다. */
+    tournamentMatch?: { matchId: string; opponent: HiqMember } | null;
 }
 
 // hiq_games 스키마의 슬롯은 player1~4가 전부다. 그 이상으로 늘려봐야 저장될 자리가 없어
@@ -69,7 +73,7 @@ const calculateRecordAverage = (history: HiqGameHistory[] | undefined, type: '3c
     return totalInnings > 0 ? (totalScore / totalInnings).toFixed(3) : (defaultAvg || "0.000");
 };
 
-export const useGameCreation = ({ member, history, initialMode = "practice", initialType = "4c", open = true }: GameCreationProps) => {
+export const useGameCreation = ({ member, history, initialMode = "practice", initialType = "4c", open = true, tournamentMatch = null }: GameCreationProps) => {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const { t } = useT();
@@ -112,10 +116,21 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             const recordAvg = calculateRecordAverage(history, gameType, memberAvgForType(member, gameType));
             const initialTarget = calculateTargetScore(recordAvg, gameType);
 
-            setPlayers([
-                { type: 'member', member, name: member.name, target: initialTarget, isHost: true },
-                ...Array(numberOfPlayers - 1).fill({ type: 'guest', target: 0, name: '' })
-            ]);
+            // 대진 경기는 상대가 정해져 있다 — 2인 고정으로 앉히고 상대 목표는 그 사람 기록으로.
+            setPlayers(tournamentMatch
+                ? [
+                    { type: 'member', member, name: member.name, target: initialTarget, isHost: true },
+                    {
+                        type: 'member',
+                        member: tournamentMatch.opponent,
+                        name: tournamentMatch.opponent.name,
+                        target: calculateTargetScore(memberAvgForType(tournamentMatch.opponent, gameType), gameType),
+                    },
+                ]
+                : [
+                    { type: 'member', member, name: member.name, target: initialTarget, isHost: true },
+                    ...Array(numberOfPlayers - 1).fill({ type: 'guest', target: 0, name: '' })
+                ]);
 
             // Drop any previous PIN so each new session mints a fresh one.
             // NOTE: the invite code is NOT created here — the caller (GameCreationModal) invokes
@@ -127,7 +142,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             // 새 세션이므로 인원 수 수동 선택 기록도 초기화한다.
             playerCountTouchedRef.current = false;
         }
-    }, [member, history, gameType, numberOfPlayers]);
+    }, [member, history, gameType, numberOfPlayers, tournamentMatch]);
 
     // Mint the match PIN whenever we're in match mode without one.
     // Keyed on the settled gameMode, so it works even when the mode is set in the same tick
@@ -135,6 +150,14 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
     const invitePendingRef = useRef(false);
     useEffect(() => {
         if (!open || !member) return;
+
+        // 대진 경기는 상대가 이미 확정돼 PIN 이 필요 없다(서버가 대진으로 동의를 검증한다).
+        if (tournamentMatch) {
+            setInviteCode(null);
+            setInviteError(null);
+            invitePendingRef.current = false;
+            return;
+        }
 
         if (gameMode !== "match") {
             setInviteCode(null);
@@ -156,7 +179,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                 setInviteError("핀 코드를 만들지 못했습니다. 다시 시도해주세요.");
             })
             .finally(() => { invitePendingRef.current = false; });
-    }, [open, gameMode, member, inviteCode, inviteError]);
+    }, [open, gameMode, member, inviteCode, inviteError, tournamentMatch]);
 
     // Clearing the code + error re-triggers the mint effect above.
     const retryInvite = useCallback(() => {
@@ -346,6 +369,8 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                 finishTargetCount: useFinishRule ? finishTargetCount : 0,
                 usePbaRule: gameType === "3c" ? usePbaRule : false,
                 targetScore: players[0].target,
+                // 서버가 이 id 로 대진을 확인하고 상대를 직접 앉힌다(클라 값은 믿지 않는다).
+                ...(tournamentMatch ? { tournamentMatchId: tournamentMatch.matchId } : {}),
             };
 
             const game = await apiRequest("/api/hiq/game/start", {

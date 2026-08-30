@@ -89,7 +89,21 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
     // host (the real join flow, see joinInvite / getConsentedGuestIds). Any player{N}Id
     // that is not a consented guest is demoted to a name-only guest slot, so finishHiqGame
     // never applies RP / handicap / history rows to a non-consenting member.
-    const consented = await storage.games.getConsentedGuestIds(player1Id);
+    // 크루 토너먼트 대진에서 시작한 경기는 PIN 단계를 건너뛴다. 대진의 두 사람은 각자
+    // 스스로 참가 신청해 그 자리에 앉은 것이므로 동의가 이미 증명돼 있고, 8명 대회면
+    // 7경기마다 PIN 을 주고받아야 해서 현장에서 못 쓴다.
+    // 상대는 body 가 아니라 **대진에서 서버가 직접** 꺼낸다 — 클라가 남의 id 를 끼워 넣지
+    // 못하게. resolveSeat 이 대진 존재·호출자가 그 자리의 선수·크루 정식 멤버 셋을 본다.
+    const seat = req.body?.tournamentMatchId
+        ? await storage.tournaments.resolveSeat(String(req.body.tournamentMatchId), player1Id)
+        : null;
+    if (req.body?.tournamentMatchId && !seat) {
+        return sendError(res, 403, "이 대진의 참가자가 아니거나 이미 끝난 경기입니다");
+    }
+
+    const consented = seat
+        ? new Set([seat.opponentId])
+        : await storage.games.getConsentedGuestIds(player1Id);
 
     // A member id the client supplied that has NOT consented is a hard error, not something to
     // silently drop: nulling it out produced a game with no opponent at all (empty slot, solo
@@ -101,9 +115,10 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
     }
 
     const gateId = (id: any): string | null => (id && consented.has(id)) ? id : null;
-    const player2Id = gateId(req.body.player2Id);
-    const player3Id = gateId(req.body.player3Id);
-    const player4Id = gateId(req.body.player4Id);
+    // 대진 경기는 상대가 딱 한 명으로 정해져 있다. 슬롯 3·4 는 쓰지 않는다.
+    const player2Id = seat ? seat.opponentId : gateId(req.body.player2Id);
+    const player3Id = seat ? null : gateId(req.body.player3Id);
+    const player4Id = seat ? null : gateId(req.body.player4Id);
 
     // Ranked only if at least one CONSENTED verified member is playing.
     const isRanked = !!(player2Id || player3Id || player4Id);
@@ -158,8 +173,20 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
         player2Name: p2Name,
         player3Name: p3Name,
         player4Name: p4Name,
+        // 대진 경기도 gameMode 는 반드시 "match" 다. game.repo.ts 가 "match" 일 때만 RP 를
+        // 반영하고 상대 슬롯의 전적 행을 남기므로, "tournament" 로 두면 대회에서 이겨도
+        // RP·상대전적이 하나도 안 남는다(대회는 경기 종류가 아니라 경기에 붙는 꼬리표다).
+        ...(seat ? { gameMode: "match" as const } : {}),
         isRanked
     });
+
+    // 대진에 경기를 물린다. 실패해도 경기 자체는 살아 있어야 하므로 요청을 깨지 않는다 —
+    // 대진이 안 붙으면 종료 훅이 이 경기를 대회 경기로 못 알아보고 그냥 일반 경기가 된다.
+    if (seat) {
+        try {
+            await storage.tournaments.attachGame(seat.matchId, game.id);
+        } catch (e) { console.error("[Tournament] 대진에 경기 연결 실패:", e); }
+    }
 
     // NOTE: the invite is deliberately NOT consumed here. Consuming it at start meant a retry
     // after a dropped response (or an app backgrounding) hit an already-expired invite, and the
@@ -257,13 +284,30 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
 
     const game = await storage.finishHiqGame(req.params.id, finalData);
 
+    // 이 경기가 크루 토너먼트 대진 경기인지 한 번만 조회한다(gameId 인덱스). 아래 두 곳이 쓴다.
+    const bracketMatch = await storage.tournaments.findMatchByGameId(game.id)
+        .catch((e: any) => { console.error("[Tournament] 대진 조회 실패:", e); return null; });
+
     // Anti-farm: a COMPLETED ranked game consumes the invites it was built from, so one PIN
     // yields at most one ranked result. (Doing this at start instead made retries lose the
     // opponent.) finishHiqGame is idempotent, so a repeat finish won't double-consume anything.
-    if (game.isRanked) {
+    //
+    // 대진 경기는 예외다 — PIN 없이 시작했으므로 소비할 초대가 없는데, 그대로 두면 같은 두
+    // 사람이 다른 용도로 발급해 살려둔 PIN 을 엉뚱하게 만료시킨다(consumeInvites 는
+    // host+guest 로만 조건을 건다).
+    if (game.isRanked && !bracketMatch) {
         const boundGuests = [game.player2Id, game.player3Id, game.player4Id]
             .filter((x): x is string => !!x);
         await storage.games.consumeInvites(game.player1Id, boundGuests);
+    }
+
+    // 대진에 결과를 반영하고 승자를 윗칸으로 올린다. wasAlreadyFinished 로 정확히 1회만 —
+    // 재시도·중복 탭에 두 번 올라가면 대진이 어긋난다. 클라이언트가 아니라 서버에서 하는
+    // 이유는, 앱이 죽거나 오프라인이면 대진이 영영 멈추기 때문이다.
+    if (!wasAlreadyFinished && bracketMatch) {
+        try {
+            await storage.tournaments.reportResult(game.id, game.winnerId ?? null);
+        } catch (e) { console.error("[Tournament] 승자 진출 처리 실패:", e); }
     }
 
     // Recheck handicaps for EVERY bound member slot — slots 3 and 4 were previously skipped,

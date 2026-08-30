@@ -457,6 +457,7 @@ body {
   --house-green: #1E3932;         /* near-black brand green — deep surfaces */
   --green-accent: #00754A;        /* luminous CTA green */
   --gold: #cba258;                /* Rewards / tier ceremony only */
+  --gold-soft: rgba(203, 162, 88, 0.14);  /* 우승 카드 바탕 — gold 는 알파를 못 받는 리터럴이라 따로 둔다 */
 
   /* 당구공 색 — 랭큐의 시각 언어. 초록 라사 위의 흰·노랑·빨강 공(3쿠션·4구 공통 세트).
      장식이 아니라 의미 코드로만 쓴다: 4구=노란공, 3쿠션=빨간공.

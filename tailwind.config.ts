@@ -38,6 +38,8 @@ export default {
           white: "var(--ball-white)",
         },
         cloth: "var(--cloth)",
+        // 등급·시상 의례 전용. 승패는 brand(초록)로 말하고, 우승만 이 색을 쓴다.
+        gold: "var(--gold)",
         brand: {
           DEFAULT: "rgb(var(--brand) / <alpha-value>)",
           strong: "rgb(var(--brand-strong) / <alpha-value>)",

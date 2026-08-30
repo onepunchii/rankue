@@ -5,3 +5,4 @@ export * from "./CrewChatTab";
 export * from "./CrewGalleryTab";
 export * from "./CrewHomeTab";
 export * from "./CrewPollTab";
+export * from "./CrewTournamentTab";

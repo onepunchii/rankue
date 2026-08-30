@@ -641,6 +641,178 @@ router.get("/:id/polls/options/:optionId/votes", requireAuth, asyncHandler(async
     return sendSuccess(res, votes);
 }));
 
+// --- Tournaments ---
+// 크루 토너먼트. 오너 결정(2026-08-30): 참가는 승인 없이 즉시 확정, 대진은 크루장이 조정 가능,
+// 목표점수·핸디캡은 대회에서 정하지 않고 대진에서 경기를 시작할 때 매칭 화면에서 맞춘다.
+
+// 대회 운영 권한 — 크루장·부크루장. null 이면 이미 403 을 보낸 상태다.
+async function requireCrewAdmin(req: AuthRequest, res: any): Promise<boolean> {
+    const crewData = await storage.getCrew(req.params.id);
+    if (!crewData) { sendError(res, 404, "크루를 찾을 수 없습니다"); return false; }
+    const me = crewData.members.find((m: any) => m.member.id === req.userId);
+    if (!me || (me.role !== 'leader' && me.role !== 'manage')) {
+        sendError(res, 403, "대회 운영 권한이 없습니다 (모임장/부모임장만 가능)");
+        return false;
+    }
+    return true;
+}
+
+// 하위 리소스는 항상 부모 crewId 와 대조한다 — :id 경로 파라미터를 그대로 믿지 않는다.
+async function loadTournament(req: AuthRequest, res: any) {
+    const detail = await storage.tournaments.getDetail(req.params.tournamentId);
+    if (!detail || detail.tournament.crewId !== req.params.id) {
+        sendError(res, 404, "대회를 찾을 수 없습니다");
+        return null;
+    }
+    return detail;
+}
+
+// GET /tournaments — 크루의 대회 목록
+router.get("/:id/tournaments", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    return sendSuccess(res, await storage.tournaments.listByCrew(req.params.id));
+}));
+
+// GET /tournaments/:tournamentId — 대회 + 참가자 + 대진 전부
+router.get("/:id/tournaments/:tournamentId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const detail = await loadTournament(req, res);
+    if (!detail) return;
+    return sendSuccess(res, detail);
+}));
+
+// POST /tournaments — 대회 개설 (크루장/부크루장)
+router.post("/:id/tournaments", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await requireCrewAdmin(req, res)) return;
+
+    const title = String(req.body?.title || "").trim().slice(0, 60);
+    if (!title) return sendError(res, 400, "대회 이름을 입력해주세요");
+    const gameType = req.body?.gameType;
+    if (gameType !== "3c" && gameType !== "4c") return sendError(res, 400, "종목을 선택해주세요");
+    const maxPlayers = Number(req.body?.maxPlayers ?? 8);
+    if (![4, 8, 16].includes(maxPlayers)) return sendError(res, 400, "정원은 4·8·16명 중에서 고를 수 있습니다");
+
+    const tournament = await storage.tournaments.create({
+        crewId: req.params.id,
+        creatorId: req.userId,
+        title,
+        description: req.body?.description ? String(req.body.description).slice(0, 500) : null,
+        gameType,
+        maxPlayers,
+        recruitEnd: req.body?.recruitEnd ? new Date(req.body.recruitEnd) : null,
+        startAt: req.body?.startAt ? new Date(req.body.startAt) : null,
+        prize: req.body?.prize ? String(req.body.prize).slice(0, 100) : null,
+    });
+
+    try {
+        const crewData = await storage.getCrew(req.params.id);
+        if (crewData) {
+            const creator = await storage.getMemberById(req.userId!);
+            await settleNotifications("[TournamentCreateNotif]", activeMembers(crewData.members)
+                .filter((m: any) => m.member.id !== req.userId)
+                .map(async (m: any) => {
+                    const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
+                    if (!setting.activityEnabled) return;
+                    await notificationService.sendAndSaveNotification({
+                        memberId: m.member.id,
+                        title: `🏆 [${crewData.crew.name}] 새 대회`,
+                        body: `${creator?.name || "누군가"}님이 "${title}"를 열었어요. 지금 참가 신청하세요!`,
+                        category: crewData.crew.sportCategory || "BILLIARDS",
+                        type: "TOURNAMENT",
+                        params: { url: `/crew/${req.params.id}/tournament`, crewId: req.params.id, tab: "tournament" },
+                    });
+                }));
+        }
+    } catch (e) { console.error("[Notify] 대회 개설:", e); }
+    return sendSuccess(res, tournament);
+}));
+
+// POST /tournaments/:tournamentId/join — 참가 신청 (승인 없이 즉시 확정)
+router.post("/:id/tournaments/:tournamentId/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const detail = await loadTournament(req, res);
+    if (!detail) return;
+
+    const row = await storage.tournaments.join(req.params.tournamentId, req.userId!);
+
+    try {
+        const joiner = await storage.getMemberById(req.userId!);
+        if (detail.tournament.creatorId !== req.userId) {
+            await notificationService.sendAndSaveNotification({
+                memberId: detail.tournament.creatorId,
+                title: "🏆 대회 참가 신청",
+                body: `${joiner?.name || "누군가"}님이 "${detail.tournament.title}"에 참가했어요!`,
+                category: "BILLIARDS",
+                type: "TOURNAMENT",
+                params: { url: `/crew/${req.params.id}/tournament`, crewId: req.params.id, tab: "tournament" },
+            }).catch((err: any) => console.error("[TournamentJoinNotif]", err));
+        }
+    } catch (e) { console.error("[Notify] 대회 참가:", e); }
+    return sendSuccess(res, row);
+}));
+
+// DELETE /tournaments/:tournamentId/join — 참가 취소 (대진 나오기 전까지)
+router.delete("/:id/tournaments/:tournamentId/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    if (!await loadTournament(req, res)) return;
+    await storage.tournaments.leave(req.params.tournamentId, req.userId!);
+    return sendSuccess(res, { success: true });
+}));
+
+// POST /tournaments/:tournamentId/draw — 대진 짜기 / 다시 뽑기 (크루장/부크루장)
+router.post("/:id/tournaments/:tournamentId/draw", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await requireCrewAdmin(req, res)) return;
+    const detail = await loadTournament(req, res);
+    if (!detail) return;
+
+    const result = await storage.tournaments.draw(req.params.tournamentId, { shuffle: !!req.body?.shuffle });
+
+    try {
+        const crewData = await storage.getCrew(req.params.id);
+        const ids = await storage.tournaments.getParticipantIds(req.params.tournamentId);
+        await settleNotifications("[TournamentDrawNotif]", ids
+            .filter((pid) => pid !== req.userId)
+            .map(async (pid) => {
+                const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, pid);
+                if (!setting.activityEnabled) return;
+                await notificationService.sendAndSaveNotification({
+                    memberId: pid,
+                    title: `🏆 대진표가 나왔어요`,
+                    body: `"${detail.tournament.title}" 대진이 확정됐어요. 내 상대를 확인해보세요!`,
+                    category: crewData?.crew?.sportCategory || "BILLIARDS",
+                    type: "TOURNAMENT",
+                    params: { url: `/crew/${req.params.id}/tournament`, crewId: req.params.id, tab: "tournament" },
+                });
+            }));
+    } catch (e) { console.error("[Notify] 대진 생성:", e); }
+    return sendSuccess(res, result);
+}));
+
+// POST /tournaments/:tournamentId/swap — 첫 라운드 두 자리 맞바꾸기 (크루장/부크루장)
+router.post("/:id/tournaments/:tournamentId/swap", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await requireCrewAdmin(req, res)) return;
+    const detail = await loadTournament(req, res);
+    if (!detail) return;
+
+    const { a, b } = req.body ?? {};
+    const valid = (x: any) => x && typeof x.matchId === "string" && (x.side === "p1" || x.side === "p2");
+    if (!valid(a) || !valid(b)) return sendError(res, 400, "바꿀 두 자리를 골라주세요");
+    // 남의 대회 대진 id 를 끼워 넣지 못하도록, 이 대회의 대진인지 확인한다.
+    const ids = new Set(detail.matches.map((m) => m.id));
+    if (!ids.has(a.matchId) || !ids.has(b.matchId)) return sendError(res, 404, "대진을 찾을 수 없습니다");
+
+    await storage.tournaments.swapSlots(req.params.tournamentId, a, b);
+    return sendSuccess(res, { success: true });
+}));
+
+// DELETE /tournaments/:tournamentId — 대회 삭제 (크루장/부크루장)
+router.delete("/:id/tournaments/:tournamentId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await requireCrewAdmin(req, res)) return;
+    if (!await loadTournament(req, res)) return;
+    await storage.tournaments.remove(req.params.tournamentId);
+    return sendSuccess(res, { success: true });
+}));
+
 // --- General Crew Management ---
 
 // 베이스 매장(디렉토리 코드) 검증 — 형식·실존 확인. 통과 시 null, 실패 시 에러 메시지.

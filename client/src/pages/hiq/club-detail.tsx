@@ -25,7 +25,7 @@ import { ClubSettingsDialog } from "@/components/hiq/ClubSettingsDialog";
 import { CreateActivityDialog } from "@/components/hiq/CreateActivityDialog";
 import { CreateGolfActivityModal } from "@/components/hiq/club/activity/CreateGolfActivityModal";
 import { CreatePostDialog } from "@/components/hiq/CreatePostDialog";
-import { CrewBoardTab, CrewChatTab, CrewGalleryTab, CrewHomeTab, CrewPollTab } from "@/components/hiq/tabs";
+import { CrewBoardTab, CrewChatTab, CrewGalleryTab, CrewHomeTab, CrewPollTab, CrewTournamentTab } from "@/components/hiq/tabs";
 import { CreatePollDialog } from "@/components/hiq/CreatePollDialog";
 import { CreateSettlementDialog } from "@/components/hiq/settlement/CreateSettlementDialog";
 import { SettlementDetailDialog } from "@/components/hiq/settlement/SettlementDetailDialog";
@@ -57,8 +57,8 @@ export default function HiqClubDetail() {
     // 딥링크 탭은 반드시 useState "초기값"으로 반영한다. 마운트 직후 useEffect에서
     // setActiveTab을 하면 AnimatePresence(mode="wait")가 home 탭의 exit 완료 신호를
     // 못 받아 다음 탭이 영영 마운트되지 않는다 → /crew/:id/board 진입 시 빈 화면.
-    const [activeTab, setActiveTab] = useState<'home' | 'board' | 'gallery' | 'chat' | 'poll'>(() => {
-        const validTabs = ['home', 'board', 'gallery', 'chat', 'poll'];
+    const [activeTab, setActiveTab] = useState<'home' | 'board' | 'gallery' | 'chat' | 'poll' | 'tournament'>(() => {
+        const validTabs = ['home', 'board', 'gallery', 'chat', 'poll', 'tournament'];
         let tab: string | null | undefined = crewParams?.tab;
         if (!tab && typeof window !== 'undefined') {
             tab = new URLSearchParams(window.location.search).get('tab');
@@ -83,7 +83,7 @@ export default function HiqClubDetail() {
 
     // 딥링크로 전달된 탭(?tab= 또는 /crew/:id/:tab 별칭)을 초기 활성 탭으로 반영한다.
     useEffect(() => {
-        const validTabs = ['home', 'board', 'gallery', 'chat', 'poll'];
+        const validTabs = ['home', 'board', 'gallery', 'chat', 'poll', 'tournament'];
         let tab: string | null | undefined = crewParams?.tab;
         if (!tab && typeof window !== 'undefined') {
             tab = new URLSearchParams(window.location.search).get('tab');
@@ -346,6 +346,7 @@ export default function HiqClubDetail() {
                                 onCreatePoll={() => setIsCreatePollOpen(true)}
                                 onShareToChat={(msg) => shareToChatMutation.mutate(msg)}
                                 onPollClick={() => setActiveTab('poll')}
+                                onTournamentClick={() => setActiveTab('tournament')}
                                 sportTab={sportTab}
                                 setSportTab={setSportTab}
                             />
@@ -472,6 +473,25 @@ export default function HiqClubDetail() {
                                 isAdmin={isAdmin}
                                 isMember={isMember}
                             />
+                        </motion.div>
+                    )}
+
+                    {activeTab === 'tournament' && (
+                        <motion.div
+                            key="tournament"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            className="h-full overflow-y-auto custom-scrollbar"
+                        >
+                            {isMember ? (
+                                <CrewTournamentTab
+                                    crewId={id as string}
+                                    isAdmin={isAdmin}
+                                    isMember={isMember}
+                                    me={me}
+                                />
+                            ) : membersOnlyNotice}
                         </motion.div>
                     )}
                 </AnimatePresence>

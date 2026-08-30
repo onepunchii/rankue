@@ -1,7 +1,7 @@
 import { useState, memo, useMemo } from "react";
 import {
     LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus,
-    LucideChevronDown, LucideUsers, LucideFlag, LucideTarget, LucideLogOut
+    LucideChevronDown, LucideUsers, LucideFlag, LucideTarget, LucideLogOut, LucideTrophy
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useT } from "@/lib/i18n";
+import { BallDot } from "@/components/hiq/BallDot";
 
 const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: string, children: React.ReactNode }) => {
     return (
@@ -51,6 +52,7 @@ interface CrewHomeTabProps {
     onCreatePoll: () => void;
     onShareToChat: (msg: string) => void;
     onPollClick: () => void;
+    onTournamentClick: () => void;
     // Received from parent for API symmetry but not used in this view.
     sportTab?: 'BILLIARDS' | 'GOLF';
     setSportTab?: (tab: 'BILLIARDS' | 'GOLF') => void;
@@ -58,7 +60,7 @@ interface CrewHomeTabProps {
 
 export const CrewHomeTab = memo(({
     crew, baseStore, baseListing = null, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onLeave, isLeaving, isLeader, onCreateActivity, onCreatePoll, onShareToChat,
-    onPollClick
+    onPollClick, onTournamentClick
 }: CrewHomeTabProps) => {
     const { t } = useT();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -271,6 +273,17 @@ export const CrewHomeTab = memo(({
                 </div>
             </div>
 
+            {/* 대회 — 홈에는 요약만, 전체는 전용 탭에서 (투표와 같은 방식) */}
+            <div className="px-6">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand" />
+                    <h2 className="text-[15px] font-semibold text-black/55">{t("crewHome.tournament")}</h2>
+                </div>
+                <div onClick={onTournamentClick} className="cursor-pointer active:scale-[0.98] transition-all">
+                    <TournamentPreview crewId={crew.id} isMember={isMember} />
+                </div>
+            </div>
+
             {/* Base Camp Section */}
             <div className="px-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -388,6 +401,59 @@ export const CrewHomeTab = memo(({
         </div>
     );
 });
+
+// 대회 요약 — 진행 중/모집 중인 것 위주로 최대 2개. 전체는 대회 탭에서 본다.
+const TournamentPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }) => {
+    const { t } = useT();
+    const { data: list, isLoading } = useQuery<any[]>({
+        queryKey: [`/api/hiq/crews/${crewId}/tournaments`],
+        enabled: !!crewId && isMember,
+    });
+
+    if (isLoading) return <div className="h-24 bg-black/[0.04] rounded-card animate-pulse" />;
+
+    if (!list || list.length === 0) return (
+        <div className="p-8 text-center bg-black/[0.04] border border-dashed border-black/10 rounded-card">
+            <p className="text-xs font-medium text-black/55">{t("crewHome.noTournaments")}</p>
+        </div>
+    );
+
+    return (
+        <div className="space-y-3">
+            {list.slice(0, 2).map((tr: any) => (
+                <Card key={tr.id} className="bg-surface-2 border-surface-line rounded-card overflow-hidden group hover:border-brand/30 transition-all">
+                    <CardContent className="p-6">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0 space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                    <BallDot type={tr.gameType} size={11} />
+                                    <span className={cn(
+                                        "text-xs font-semibold",
+                                        tr.status === "ended" ? "text-black/55" : "text-brand",
+                                    )}>
+                                        {t(`crewTournament.status.${tr.status}`)}
+                                    </span>
+                                </div>
+                                <h3 className="text-base font-semibold text-[rgba(0,0,0,0.87)] leading-tight tracking-tight truncate">{tr.title}</h3>
+                            </div>
+                            <div className="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center shrink-0">
+                                <LucideTrophy className="w-5 h-5 text-brand" />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between mt-5 pt-4 border-t border-black/[0.08]">
+                            <div className="flex items-center gap-1.5 text-black/55">
+                                <LucideUsers className="w-3.5 h-3.5" />
+                                <span className="text-xs font-medium tabular-nums">{tr.participantCount}/{tr.maxPlayers}</span>
+                            </div>
+                            <LucideChevronRight className="w-4 h-4 text-black/40 group-hover:text-[rgba(0,0,0,0.87)] transition-colors" />
+                        </div>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    );
+};
 
 const PollPreview = ({ crewId, isMember }: { crewId: string; isMember: boolean }) => {
     const { t } = useT();

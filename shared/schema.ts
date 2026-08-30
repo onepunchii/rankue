@@ -511,6 +511,91 @@ export const hiqPollVotes = pgTable("hiq_poll_votes", {
   unique().on(table.optionId, table.memberId)
 ]);
 
+// 8.9 크루 토너먼트 (Crew Tournament)
+// 기존 hiqTournaments(6번)는 storeId 가 notNull 인 **매장 소유** 대회라 크루가 여는 대회를
+// 담을 수 없다. 정모(hiqCrewActivities) 패턴을 그대로 복제해 크루용으로 따로 둔다.
+// 목표점수·핸디캡 컬럼이 없는 건 의도다 — 오너 결정(2026-08-30): 대회에서 정하지 않고
+// 대진에서 경기를 시작할 때 기존 매칭 화면에서 그때그때 맞춘다.
+export const hiqCrewTournaments = pgTable("hiq_crew_tournaments", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id, { onDelete: 'cascade' }).notNull(),
+  creatorId: uuid("creator_id").references(() => hiqMembers.id).notNull(),
+
+  title: text("title").notNull(),
+  description: text("description"),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(), // 종목 — 화면의 공 색과 1:1
+  format: text("format", { enum: ["knockout", "league"] }).default("knockout").notNull(),
+
+  maxPlayers: integer("max_players").default(8).notNull(),
+  recruitEnd: timestamp("recruit_end"),
+  startAt: timestamp("start_at"),
+  prize: text("prize"), // "우승 5만원" 같은 자유 문구
+
+  // recruiting: 접수중(대진 없음) → drawn: 대진 확정(아직 아무 경기도 시작 안 함, 조정 자유)
+  // → ongoing: 경기가 하나라도 시작됨 → ended: 우승자 확정
+  status: text("status", { enum: ["recruiting", "drawn", "ongoing", "ended", "canceled"] }).default("recruiting").notNull(),
+  championId: uuid("champion_id").references(() => hiqMembers.id),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 참가 신청 — 오너 결정(2026-08-30): 크루원은 승인 절차 없이 신청 즉시 확정.
+export const hiqCrewTournamentParticipants = pgTable("hiq_crew_tournament_participants", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  tournamentId: uuid("tournament_id").references(() => hiqCrewTournaments.id, { onDelete: 'cascade' }).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+
+  seed: integer("seed"), // 대진 생성 시 RP 내림차순으로 부여. 크루장이 자리를 바꾸면 같이 바뀐다.
+  finalRank: integer("final_rank"), // 1 = 우승
+  status: text("status", { enum: ["active", "eliminated", "winner"] }).default("active").notNull(),
+  wins: integer("wins").default(0).notNull(),   // 풀리그 순위 집계용
+  losses: integer("losses").default(0).notNull(),
+
+  registeredAt: timestamp("registered_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.tournamentId, table.memberId), // 중복 신청 방지
+]);
+
+// 대진 한 칸. 좌표 규칙은 shared/tournamentBracket.ts 참고 —
+// round 1 이 가장 아래(첫 경기)이고 위로 갈수록 커진다. (round,slot) 승자는 (round+1, slot>>1).
+// gameId 로 실제 경기 기록과 이어지고, 경기가 끝나면 이 행을 통해 승자를 윗칸에 올린다.
+// hiqGames 쪽에는 컬럼을 추가하지 않는다 — gameMode 를 "match" 그대로 두어야 RP·상대전적이
+// 지금과 똑같이 남기 때문이다(대회는 경기의 종류가 아니라 경기에 붙는 꼬리표).
+export const hiqCrewTournamentMatches = pgTable("hiq_crew_tournament_matches", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  tournamentId: uuid("tournament_id").references(() => hiqCrewTournaments.id, { onDelete: 'cascade' }).notNull(),
+
+  round: integer("round").notNull(),
+  slot: integer("slot").notNull(),
+
+  p1Id: uuid("p1_id").references(() => hiqMembers.id),
+  p2Id: uuid("p2_id").references(() => hiqMembers.id), // null + p1 있음 = 부전승
+  p1Score: integer("p1_score"),
+  p2Score: integer("p2_score"),
+  winnerId: uuid("winner_id").references(() => hiqMembers.id),
+  loserId: uuid("loser_id").references(() => hiqMembers.id),
+
+  gameId: uuid("game_id").references(() => hiqGames.id),
+  // pending: 두 자리가 아직 안 참 / ready: 둘 다 찼고 시작 대기(이때만 자리 조정 가능)
+  // playing: 경기중 / done: 종료 / bye: 부전승 자동 진출
+  status: text("status", { enum: ["pending", "ready", "playing", "done", "bye"] }).default("pending").notNull(),
+
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.tournamentId, table.round, table.slot),
+  index("idx_crew_tmatch_game").on(table.gameId), // 경기 종료 훅이 gameId 로 대진을 되찾는다
+]);
+
+export const insertHiqCrewTournamentSchema = createInsertSchema(hiqCrewTournaments)
+  .omit({ id: true, createdAt: true, updatedAt: true, status: true, championId: true, creatorId: true, crewId: true });
+export type HiqCrewTournament = typeof hiqCrewTournaments.$inferSelect;
+export type InsertHiqCrewTournament = z.infer<typeof insertHiqCrewTournamentSchema>;
+export type HiqCrewTournamentParticipant = typeof hiqCrewTournamentParticipants.$inferSelect;
+export type HiqCrewTournamentMatch = typeof hiqCrewTournamentMatches.$inferSelect;
+
 
 export const insertHiqCrewSchema = createInsertSchema(hiqCrews).omit({ id: true, createdAt: true });
 export const insertHiqCrewMemberSchema = createInsertSchema(hiqCrewMembers).omit({ id: true, joinedAt: true });

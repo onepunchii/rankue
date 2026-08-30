@@ -18,6 +18,9 @@ interface GameCreationModalProps {
     member: HiqMember | undefined;
     history: HiqGameHistory[] | undefined;
     initialMode?: "practice" | "match";
+    initialType?: "3c" | "4c";
+    /** 크루 토너먼트 대진에서 열었을 때. 상대가 이미 정해져 있어 PIN 단계를 건너뛴다. */
+    tournamentMatch?: { matchId: string; opponent: HiqMember } | null;
 }
 
 // Sub-component for individual Player Card (Internal to this file for now to keep context easy)
@@ -178,7 +181,7 @@ const PlayerCard = ({
     );
 };
 
-export const GameCreationModal = ({ open, onOpenChange, member, history, initialMode }: GameCreationModalProps) => {
+export const GameCreationModal = ({ open, onOpenChange, member, history, initialMode, initialType, tournamentMatch = null }: GameCreationModalProps) => {
     const { t } = useT();
 
     // Connect logic hook
@@ -193,7 +196,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
         usePbaRule, setUsePbaRule,
         initializeGame,
         confirmStart, isStarting
-    } = useGameCreation({ member, history, initialMode, open });
+    } = useGameCreation({ member, history, initialMode, initialType, open, tournamentMatch });
 
     // Keep a live ref to initializeGame so the open-effect can invoke the latest version
     // WITHOUT depending on it (initializeGame is recreated whenever gameType / numberOfPlayers
@@ -247,7 +250,23 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                 <div className="flex-1 overflow-y-auto min-h-0 scrollbar-hide p-6 pb-32">
                     <div className="max-w-md md:max-w-4xl mx-auto transition-all duration-300">
                         <div className="flex flex-col gap-1 mb-6">
-                            {gameMode === "match" && (
+                            {/* 대진 경기는 상대가 이미 확정돼 PIN 이 없다. 그대로 두면 핀 카드가
+                                영원히 "핀 생성 중..."으로 남는다. */}
+                            {gameMode === "match" && tournamentMatch && (
+                                <div className="p-5 rounded-3xl bg-brand flex flex-col items-center gap-1.5 mb-2 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                                    <span className="text-[12px] font-semibold text-white/70 tracking-[0.15em]">
+                                        {t("gameCreationModal.bracketLabel")}
+                                    </span>
+                                    <span className="text-xl font-semibold text-white">
+                                        {tournamentMatch.opponent?.name}
+                                    </span>
+                                    <span className="text-[12px] text-white/70 text-center leading-relaxed mt-1">
+                                        {t("gameCreationModal.bracketHint")}
+                                    </span>
+                                </div>
+                            )}
+
+                            {gameMode === "match" && !tournamentMatch && (
                                 <>
                                     <div className="p-4 rounded-2xl bg-white mb-2">
                                         <p className="text-black/60 text-xs leading-relaxed text-center">
@@ -283,8 +302,9 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                             )}
                         </div>
 
-                        {/* Game Type Selection */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
+                        {/* Game Type Selection — 대진 경기는 대회가 정한 종목으로 고정한다.
+                            여기서 바꾸면 3쿠션 대회 경기가 4구로 기록돼 RP 도 엉뚱한 쪽에 붙는다. */}
+                        <div className={`grid grid-cols-2 gap-3 mb-4 ${tournamentMatch ? "hidden" : ""}`}>
                             <Button
                                 onClick={() => changeGameType("4c")}
                                 className={`h-14 text-xl font-semibold rounded-2xl gap-2.5 ${gameType === "4c" ? "bg-brand text-white" : "bg-white text-black/60"}`}
@@ -301,8 +321,8 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                             </Button>
                         </div>
 
-                        {/* Player Count Selector (Match Only) */}
-                        {gameMode === "match" && (
+                        {/* Player Count Selector (Match Only) — 대진 경기는 1대1 고정 */}
+                        {gameMode === "match" && !tournamentMatch && (
                             <div className="bg-black/[0.04] p-1 rounded-xl flex gap-1 mb-4">
                                 {[2, 3, 4].map((count) => (
                                     <button

@@ -7,6 +7,7 @@ import { NotificationRepository } from "./notification.repo.js";
 import { CommunityRepository } from "./community.repo.js";
 import { UmbRepository } from "./umb.repo.js";
 import { PbaRepository } from "./pba.repo.js";
+import { TournamentRepository } from "./tournament.repo.js";
 
 class Storage {
     public users = new UserRepository();
@@ -18,6 +19,7 @@ class Storage {
     public community = new CommunityRepository();
     public umb = new UmbRepository();
     public pba = new PbaRepository();
+    public tournaments = new TournamentRepository();
 
     // --- Backward Compatibility Wrappers ---
     // User / Member
