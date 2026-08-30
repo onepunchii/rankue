@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useT } from "@/lib/i18n";
 import { BallDot } from "@/components/hiq/BallDot";
-import { HallOfFame } from "@/components/hiq/tournament/HallOfFame";
 
 const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: string, children: React.ReactNode }) => {
     return (
@@ -55,7 +54,7 @@ interface CrewHomeTabProps {
     onPollClick: () => void;
     onTournamentClick: () => void;
     onCreateTournament: () => void;
-    onOpenTournament: (tournamentId: string) => void;
+    onOpenHallOfFame: () => void;
     // Received from parent for API symmetry but not used in this view.
     sportTab?: 'BILLIARDS' | 'GOLF';
     setSportTab?: (tab: 'BILLIARDS' | 'GOLF') => void;
@@ -63,7 +62,7 @@ interface CrewHomeTabProps {
 
 export const CrewHomeTab = memo(({
     crew, baseStore, baseListing = null, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onLeave, isLeaving, isLeader, onCreateActivity, onCreatePoll, onShareToChat,
-    onPollClick, onTournamentClick, onCreateTournament, onOpenTournament
+    onPollClick, onTournamentClick, onCreateTournament, onOpenHallOfFame
 }: CrewHomeTabProps) => {
     const { t } = useT();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -298,17 +297,21 @@ export const CrewHomeTab = memo(({
                 <div onClick={onTournamentClick} className="cursor-pointer active:scale-[0.98] transition-all">
                     <TournamentPreview crewId={crew.id} isMember={isMember} />
                 </div>
+
+                {/* 명예의 전당은 전용 페이지로 — 홈에 펼쳐 두면 목록이 길어져 대회가 묻힌다. */}
+                {isMember && (
+                    <button
+                        type="button"
+                        onClick={onOpenHallOfFame}
+                        className="w-full flex items-center gap-2.5 rounded-tile bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:scale-[0.99] transition-transform"
+                    >
+                        <LucideTrophy className="w-4 h-4 text-gold shrink-0" />
+                        <span className="flex-1 text-left text-[14px] font-semibold text-ink-1">{t("hallOfFame.title")}</span>
+                        <LucideChevronRight className="w-4 h-4 text-ink-4" />
+                    </button>
+                )}
             </div>
 
-            {/* 명예의 전당 — 대회 바로 아래. 별도 탭을 또 만들면 탭이 6개가 되는데,
-                자주 들어가는 곳이 아니라 자랑하려고 스쳐 보는 곳이라 홈이 맞다. */}
-            <div className="px-6 space-y-4">
-                <div className="flex items-center gap-2 mb-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                    <h2 className="text-[15px] font-semibold text-black/55">{t("hallOfFame.title")}</h2>
-                </div>
-                <HallOfFame crewId={crew.id} isMember={isMember} onOpenTournament={onOpenTournament} />
-            </div>
 
             {/* Base Camp Section */}
             <div className="px-6">

@@ -1661,8 +1661,14 @@ const vi: Dict = {
   "hallOfFame.title": "Bảng vàng",
   "hallOfFame.empty": "Chưa có giải nào kết thúc. Đang chờ nhà vô địch đầu tiên.",
   "hallOfFame.currentChampion": "ĐƯƠNG KIM VÔ ĐỊCH",
-  "hallOfFame.record": "Nhì {r} · BK {s}",
   "hallOfFame.past": "{n} giải đã qua",
   "crewMember.wins": "{n} lần vô địch",
+  "hallOfFame.kings": "Vua từng bộ môn",
+  "hallOfFame.winners": "Nhà vô địch",
+  "hallOfFame.podium": "Á quân & bán kết",
+  "hallOfFame.runnerUp": "{n}× nhì",
+  "hallOfFame.semi": "{n}× BK",
+  "hallOfFame.winCount": "{n} lần vô địch",
+  "hallOfFame.noKing": "Chưa có vua",
 };
 export default vi;

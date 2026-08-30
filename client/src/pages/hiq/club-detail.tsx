@@ -70,7 +70,10 @@ export default function HiqClubDetail() {
     // 홈의 대회 "만들기" → 대회 탭으로 옮기면서 개설 다이얼로그까지 열어준다.
     const [tournamentAutoCreate, setTournamentAutoCreate] = useState(false);
     // 명예의 전당에서 역대 대회를 누르면 대회 탭으로 옮기면서 그 대진표를 연다.
-    const [tournamentOpenId, setTournamentOpenId] = useState<string | null>(null);
+    const [tournamentOpenId, setTournamentOpenId] = useState<string | null>(() => {
+        if (typeof window === 'undefined') return null;
+        return new URLSearchParams(window.location.search).get('open');
+    });
     const [isCreateSettlementOpen, setIsCreateSettlementOpen] = useState(false);
     const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
     const [selectedPost, setSelectedPost] = useState<any>(null);
@@ -352,7 +355,7 @@ export default function HiqClubDetail() {
                                 onPollClick={() => setActiveTab('poll')}
                                 onTournamentClick={() => setActiveTab('tournament')}
                                 onCreateTournament={() => { setTournamentAutoCreate(true); setActiveTab('tournament'); }}
-                                onOpenTournament={(tid) => { setTournamentOpenId(tid); setActiveTab('tournament'); }}
+                                onOpenHallOfFame={() => setLocation(`/crew/${id}/hall-of-fame`)}
                                 sportTab={sportTab}
                                 setSportTab={setSportTab}
                             />

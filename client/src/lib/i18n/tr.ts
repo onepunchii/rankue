@@ -1661,8 +1661,14 @@ const tr: Dict = {
   "hallOfFame.title": "Onur listesi",
   "hallOfFame.empty": "Henüz biten turnuva yok. İlk şampiyon bekleniyor.",
   "hallOfFame.currentChampion": "MEVCUT ŞAMPİYON",
-  "hallOfFame.record": "2. {r} · YF {s}",
   "hallOfFame.past": "Geçmiş {n} turnuva",
   "crewMember.wins": "{n} kupa",
+  "hallOfFame.kings": "Branş kralları",
+  "hallOfFame.winners": "Şampiyonlar",
+  "hallOfFame.podium": "İkinciler ve yarı finaller",
+  "hallOfFame.runnerUp": "{n}× 2.",
+  "hallOfFame.semi": "{n}× YF",
+  "hallOfFame.winCount": "{n} kupa",
+  "hallOfFame.noKing": "Henüz kral yok",
 };
 export default tr;

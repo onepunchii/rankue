@@ -23,6 +23,7 @@ import HiqFriends from "@/pages/hiq/friends";
 import HiqClub from "@/pages/hiq/club";
 import HiqCreateClub from "@/pages/hiq/create-club";
 import HiqClubDetail from "@/pages/hiq/club-detail";
+import CrewHallOfFame from "@/pages/hiq/crew-hall-of-fame";
 import HiqJoin from "@/pages/hiq/join";
 import HiqOnlineGame from "@/pages/hiq/online-game";
 import HiqCommunity from "@/pages/hiq/community";
@@ -217,6 +218,9 @@ function AppRoutes() {
           움직여 그 안의 fixed 요소 기준까지 어긋난다. 프레임에 넣으려면 club-detail.tsx
           자체를 일반 흐름 레이아웃으로 바꿔야 한다. */}
       <Route path="/club/:id" component={HiqClubDetail} />
+      {/* 명예의 전당은 탭이 아니라 별도 페이지다. 아래 /crew/:id/:tab? 보다 반드시 위에
+          둬야 한다 — 아래면 "hall-of-fame" 이 탭 이름으로 먹혀 홈으로 떨어진다. */}
+      <Route path="/crew/:id/hall-of-fame" component={CrewHallOfFame} />
       {/* 이미 발송된 푸시 페이로드(/crew/:id/:tab) 호환 별칭 */}
       <Route path="/crew/:id/:tab?" component={HiqClubDetail} />
       <Route path="/join/:code" component={FramedJoin} />

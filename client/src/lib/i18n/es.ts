@@ -1661,8 +1661,14 @@ const es: Dict = {
   "hallOfFame.title": "Salón de la fama",
   "hallOfFame.empty": "Aún no hay torneos terminados. El primer campeón está por llegar.",
   "hallOfFame.currentChampion": "CAMPEÓN ACTUAL",
-  "hallOfFame.record": "2º {r} · SF {s}",
   "hallOfFame.past": "{n} torneos anteriores",
   "crewMember.wins": "{n} títulos",
+  "hallOfFame.kings": "Reyes por modalidad",
+  "hallOfFame.winners": "Campeones",
+  "hallOfFame.podium": "Subcampeones y semifinales",
+  "hallOfFame.runnerUp": "{n}× 2º",
+  "hallOfFame.semi": "{n}× SF",
+  "hallOfFame.winCount": "{n} títulos",
+  "hallOfFame.noKing": "Aún sin rey",
 };
 export default es;

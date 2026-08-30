@@ -44,6 +44,7 @@ interface TournamentRow {
 
 export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreate, onAutoOpenHandled, autoOpenTournamentId }: Props) {
     const { t } = useT();
+    const [, setLocation] = useLocation();
     // 매칭 화면이 목표 점수를 뽑을 때 쓴다. 대시보드와 같은 쿼리키라 캐시를 그대로 나눠 쓴다.
     const { data: history } = useQuery<HiqGameHistory[]>({ queryKey: ["/api/hiq/history"], enabled: !!me });
     const [openId, setOpenId] = useState<string | null>(null);
@@ -90,15 +91,26 @@ export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreat
                         {t("crewTournament.count").replace("{n}", String(list?.length ?? 0))}
                     </p>
                 </div>
-                {isAdmin && (
-                    <Button
-                        onClick={() => setIsCreateOpen(true)}
-                        className="h-10 px-4 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl flex items-center gap-2"
+                <div className="flex items-center gap-1.5">
+                    {/* 명예의 전당 — 대회를 보러 온 자리에서 바로 갈 수 있게 */}
+                    <button
+                        type="button"
+                        onClick={() => setLocation(`/crew/${crewId}/hall-of-fame`)}
+                        className="h-10 w-10 rounded-xl border border-surface-line flex items-center justify-center active:opacity-60"
+                        aria-label={t("hallOfFame.title")}
                     >
-                        <LucidePlus className="w-4 h-4" />
-                        {t("crewTournament.open")}
-                    </Button>
-                )}
+                        <LucideTrophy className="w-4 h-4 text-gold" />
+                    </button>
+                    {isAdmin && (
+                        <Button
+                            onClick={() => setIsCreateOpen(true)}
+                            className="h-10 px-4 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl flex items-center gap-2"
+                        >
+                            <LucidePlus className="w-4 h-4" />
+                            {t("crewTournament.open")}
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <div className="px-6 space-y-3">

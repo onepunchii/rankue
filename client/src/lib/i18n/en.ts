@@ -1661,8 +1661,14 @@ const en: Dict = {
   "hallOfFame.title": "Hall of Fame",
   "hallOfFame.empty": "No tournaments finished yet — the first champion is still open.",
   "hallOfFame.currentChampion": "REIGNING CHAMPION",
-  "hallOfFame.record": "2nd {r} · SF {s}",
   "hallOfFame.past": "{n} past tournaments",
   "crewMember.wins": "{n} wins",
+  "hallOfFame.kings": "Kings by discipline",
+  "hallOfFame.winners": "Champions",
+  "hallOfFame.podium": "Runners-up & semifinals",
+  "hallOfFame.runnerUp": "{n}× 2nd",
+  "hallOfFame.semi": "{n}× SF",
+  "hallOfFame.winCount": "{n} titles",
+  "hallOfFame.noKing": "No king yet",
 };
 export default en;
