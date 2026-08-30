@@ -53,6 +53,7 @@ interface CrewHomeTabProps {
     onShareToChat: (msg: string) => void;
     onPollClick: () => void;
     onTournamentClick: () => void;
+    onCreateTournament: () => void;
     // Received from parent for API symmetry but not used in this view.
     sportTab?: 'BILLIARDS' | 'GOLF';
     setSportTab?: (tab: 'BILLIARDS' | 'GOLF') => void;
@@ -60,7 +61,7 @@ interface CrewHomeTabProps {
 
 export const CrewHomeTab = memo(({
     crew, baseStore, baseListing = null, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onLeave, isLeaving, isLeader, onCreateActivity, onCreatePoll, onShareToChat,
-    onPollClick, onTournamentClick
+    onPollClick, onTournamentClick, onCreateTournament
 }: CrewHomeTabProps) => {
     const { t } = useT();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -274,10 +275,23 @@ export const CrewHomeTab = memo(({
             </div>
 
             {/* 대회 — 홈에는 요약만, 전체는 전용 탭에서 (투표와 같은 방식) */}
-            <div className="px-6">
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                    <h2 className="text-[15px] font-semibold text-black/55">{t("crewHome.tournament")}</h2>
+            <div className="px-6 space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-brand" />
+                        <h2 className="text-[15px] font-semibold text-black/55">{t("crewHome.tournament")}</h2>
+                    </div>
+                    {/* 대회 개설은 운영진만 — 크루원에게 눌러도 403 나는 버튼을 보여주지 않는다. */}
+                    {isAdmin && (
+                        <Button
+                            variant="ghost"
+                            onClick={onCreateTournament}
+                            className="h-10 px-3 text-[13px] font-medium text-black/55 hover:text-brand flex items-center gap-1.5"
+                        >
+                            <LucidePlus className="w-4 h-4" />
+                            {t("crewHome.create")}
+                        </Button>
+                    )}
                 </div>
                 <div onClick={onTournamentClick} className="cursor-pointer active:scale-[0.98] transition-all">
                     <TournamentPreview crewId={crew.id} isMember={isMember} />

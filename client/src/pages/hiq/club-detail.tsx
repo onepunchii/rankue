@@ -67,6 +67,8 @@ export default function HiqClubDetail() {
         return (normalized && validTabs.includes(normalized) ? normalized : 'home') as any;
     });
     const [boardCategory, setBoardCategory] = useState("전체");
+    // 홈의 대회 "만들기" → 대회 탭으로 옮기면서 개설 다이얼로그까지 열어준다.
+    const [tournamentAutoCreate, setTournamentAutoCreate] = useState(false);
     const [isCreateSettlementOpen, setIsCreateSettlementOpen] = useState(false);
     const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
     const [selectedPost, setSelectedPost] = useState<any>(null);
@@ -347,6 +349,7 @@ export default function HiqClubDetail() {
                                 onShareToChat={(msg) => shareToChatMutation.mutate(msg)}
                                 onPollClick={() => setActiveTab('poll')}
                                 onTournamentClick={() => setActiveTab('tournament')}
+                                onCreateTournament={() => { setTournamentAutoCreate(true); setActiveTab('tournament'); }}
                                 sportTab={sportTab}
                                 setSportTab={setSportTab}
                             />
@@ -490,6 +493,8 @@ export default function HiqClubDetail() {
                                     isAdmin={isAdmin}
                                     isMember={isMember}
                                     me={me}
+                                    autoOpenCreate={tournamentAutoCreate}
+                                    onAutoOpenHandled={() => setTournamentAutoCreate(false)}
                                 />
                             ) : membersOnlyNotice}
                         </motion.div>

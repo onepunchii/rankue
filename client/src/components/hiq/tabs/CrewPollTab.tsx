@@ -79,7 +79,7 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
     });
 
     return (
-        <div className="space-y-8 pb-20">
+        <div className="space-y-8 pt-5 pb-20">
             {/* Header / CTA */}
             <div className="px-6 flex items-center justify-between">
                 <div>

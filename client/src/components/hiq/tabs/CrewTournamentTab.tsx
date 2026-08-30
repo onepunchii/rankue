@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,9 @@ interface Props {
     isAdmin: boolean;
     isMember: boolean;
     me: HiqMember | undefined;
+    /** 홈의 "만들기"로 들어온 경우 — 탭이 열리자마자 개설 다이얼로그를 띄운다. */
+    autoOpenCreate?: boolean;
+    onAutoOpenHandled?: () => void;
 }
 
 interface TournamentRow {
@@ -37,12 +40,21 @@ interface TournamentRow {
     creatorId: string; participantCount: number;
 }
 
-export function CrewTournamentTab({ crewId, isAdmin, isMember, me }: Props) {
+export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreate, onAutoOpenHandled }: Props) {
     const { t } = useT();
     // 매칭 화면이 목표 점수를 뽑을 때 쓴다. 대시보드와 같은 쿼리키라 캐시를 그대로 나눠 쓴다.
     const { data: history } = useQuery<HiqGameHistory[]>({ queryKey: ["/api/hiq/history"], enabled: !!me });
     const [openId, setOpenId] = useState<string | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+    // 홈에서 "만들기"를 눌러 넘어온 경우 다이얼로그를 한 번만 자동으로 연다.
+    useEffect(() => {
+        if (autoOpenCreate && isAdmin) {
+            setOpenId(null);
+            setIsCreateOpen(true);
+            onAutoOpenHandled?.();
+        }
+    }, [autoOpenCreate, isAdmin, onAutoOpenHandled]);
 
     const { data: list, isLoading } = useQuery<TournamentRow[]>({
         queryKey: [`/api/hiq/crews/${crewId}/tournaments`],
@@ -59,7 +71,7 @@ export function CrewTournamentTab({ crewId, isAdmin, isMember, me }: Props) {
     }
 
     return (
-        <div className="space-y-6 pb-nav">
+        <div className="space-y-6 pt-5 pb-nav">
             <div className="px-6 flex items-center justify-between">
                 <div>
                     <h2 className="text-[15px] font-semibold text-ink-3">{t("crewTournament.title")}</h2>
@@ -266,7 +278,7 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
     };
 
     return (
-        <div className="space-y-5 pb-nav">
+        <div className="space-y-5 pt-3 pb-nav">
             <div className="px-6 pt-1 flex items-center gap-2">
                 <button onClick={onBack} className="-ml-2 p-2 text-ink-3 active:opacity-60" aria-label={t("common.back")}>
                     <LucideChevronLeft className="w-5 h-5" />
