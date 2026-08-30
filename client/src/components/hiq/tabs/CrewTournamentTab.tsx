@@ -39,7 +39,7 @@ interface TournamentRow {
     gameType: "3c" | "4c"; format: "knockout" | "league";
     maxPlayers: number; status: string; championId: string | null;
     prize: string | null; startAt: string | null; recruitEnd: string | null;
-    creatorId: string; participantCount: number;
+    creatorId: string; participantCount: number; championName?: string | null;
 }
 
 export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreate, onAutoOpenHandled, autoOpenTournamentId }: Props) {
@@ -134,21 +134,38 @@ export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreat
                     <button
                         key={row.id}
                         onClick={() => setOpenId(row.id)}
-                        className="w-full rk-card p-4 text-left active:scale-[0.99] transition-transform"
+                        className="w-full flex items-stretch rounded-tile bg-white overflow-hidden text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:scale-[0.99] transition-transform"
                     >
-                        <div className="flex items-center gap-2 mb-1.5">
-                            <BallDot type={row.gameType} size={12} />
-                            <span className="flex-1 min-w-0 truncate text-[15px] font-semibold text-ink-1">{row.title}</span>
-                            <StatusChip status={row.status} />
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-ink-3 rk-num">
-                            <span className="flex items-center gap-1">
-                                <LucideUsers className="w-3 h-3" />
-                                {row.participantCount}/{row.maxPlayers}
+                        {/* 왼쪽 띠가 종목 색 — 목록을 훑을 때 빨강·노랑만 보고 갈린다. */}
+                        <span
+                            className="w-1 shrink-0"
+                            style={{ background: row.gameType === "3c" ? "var(--ball-red)" : "var(--ball-yellow)" }}
+                        />
+                        <span className="flex-1 min-w-0 px-4 py-3.5">
+                            <span className="flex items-center gap-2">
+                                <span className="flex-1 min-w-0 truncate text-[15px] font-semibold text-ink-1">{row.title}</span>
+                                <StatusChip status={row.status} />
                             </span>
-                            {row.format === "league" && <span>{t("crewTournament.league")}</span>}
-                            {row.prize && <span className="truncate">{row.prize}</span>}
-                        </div>
+                            <span className="mt-1.5 flex items-center gap-2 text-[12.5px] text-ink-3">
+                                {/* 끝난 대회는 우승자가 제일 중요한 정보다 */}
+                                {row.status === "ended" && row.championName ? (
+                                    <span className="flex items-center gap-1 font-semibold text-ink-2">
+                                        <LucideTrophy className="w-3.5 h-3.5" style={{ color: "var(--gold-fill)" }} />
+                                        {row.championName}
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1 rk-num">
+                                        <LucideUsers className="w-3 h-3" />
+                                        {row.participantCount}/{row.maxPlayers}
+                                    </span>
+                                )}
+                                <span className="text-ink-4">·</span>
+                                <span>{row.gameType === "3c" ? t("crewTournament.type3c") : t("crewTournament.type4c")}</span>
+                                {row.prize && (
+                                    <><span className="text-ink-4">·</span><span className="truncate">{row.prize}</span></>
+                                )}
+                            </span>
+                        </span>
                     </button>
                 ))}
             </div>

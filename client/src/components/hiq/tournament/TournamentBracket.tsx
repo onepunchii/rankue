@@ -8,9 +8,10 @@ import { roundName, totalRounds, bracketSize } from "@shared/tournamentBracket";
 // 왜 이 방향인가(오너 결정 2026-08-30): "어떻게 올라가고 결승 가고 우승하는지"를 보여주는 게
 // 목적이다. 첫 경기가 맨 아래, 우승이 맨 위에 있으면 올라간다는 감각이 그대로 읽힌다.
 //
-// 왜 라사 위인가(오너 지적 2026-08-30, 2차): 크림 배경에 회색 상자만 있으니 게시판·정모와
-// 구분이 안 되고 당구 대회로 안 보였다. 짙은 라사 초록을 깔고 그 위에 흰 카드를 띄우면
-// "당구대 위에서 벌어지는 일"이 된다. 대회는 크루 안에서 특별한 사건이라 자기 세계를 가진다.
+// 배경은 앱 기본 크림 그대로 둔다(오너 지적 2026-08-30, 3차: 라사 초록 밴드는 너무 무겁다).
+// 색은 배경이 아니라 **카드가** 가진다:
+//   금색 = 우승(유일) · 초록 = 이긴 쪽 · 빨강 = 지금 경기중 · 흰색 = 나머지 전부
+// 이러면 훑을 때 금색 하나, 초록 몇 개, 빨강 하나만 눈에 걸린다.
 //
 // 정보 위계(1차 시안의 가장 큰 결함): 우승 카드가 일반 경기 칸과 같은 크기였고, 아직 안 치른
 // 빈 자리가 "8강 1경기 승자"라는 긴 글자를 여덟 번 반복하며 화면 절반을 먹었다. 지금은
@@ -96,7 +97,7 @@ export function TournamentBracket({
 
     const bracket = (
         <div
-            className="flex flex-col px-4 pt-5 pb-6"
+            className="flex flex-col px-1 pt-1 pb-2"
             style={needsScroll ? { minWidth: firstRoundSlots * 86 } : undefined}
         >
             {/* ── 우승: 대진표의 클라이맥스. 제일 크고 유일한 금색. ── */}
@@ -145,9 +146,8 @@ export function TournamentBracket({
         </div>
     );
 
-    // 라사 밴드 — 좌우로 꽉 채워 "당구대 위"가 되게 한다.
     return (
-        <div className={cn("-mx-5 bg-cloth rounded-card overflow-hidden", className)}>
+        <div className={cn("-mx-1", className)}>
             {needsScroll ? <ScrollableBracket>{bracket}</ScrollableBracket> : bracket}
         </div>
     );
@@ -169,11 +169,11 @@ function ScrollableBracket({ children }: { children: React.ReactNode }) {
 function RoundLabel({ children }: { children: React.ReactNode }) {
     return (
         <div className="flex items-center gap-2 my-2">
-            <span className="h-px flex-1 bg-white/12" />
-            <span className="rounded-pill bg-white/10 px-2.5 py-0.5 text-[10.5px] font-semibold tracking-wider text-white/65 rk-num">
+            <span className="h-px flex-1 bg-surface-line" />
+            <span className="rounded-pill bg-surface-3 px-2.5 py-0.5 text-[10.5px] font-semibold tracking-wider text-ink-3 rk-num">
                 {children}
             </span>
-            <span className="h-px flex-1 bg-white/12" />
+            <span className="h-px flex-1 bg-surface-line" />
         </div>
     );
 }
@@ -185,9 +185,9 @@ function Connector({ rounds, lit, stemLit, single = false }: {
     stemLit: boolean[];
     single?: boolean;
 }) {
-    // 라사 위라 회색 선은 안 보인다. 지나간 길은 밝은 민트, 아직은 흰색 저채도.
-    const ON = "bg-[#7fd3ad]";
-    const OFF = "bg-white/18";
+    // 지나간 길은 브랜드 초록, 아직 안 지난 길은 옅은 회색.
+    const ON = "bg-brand";
+    const OFF = "bg-[var(--surface-line-strong)]";
     if (single) {
         return (
             <div className="flex h-5" aria-hidden="true">
@@ -238,8 +238,8 @@ function MatchCard({ match, players, meId, onClick, swapMode, selectedSlot, onSl
     //    예전엔 "8강 1경기 승자"를 여덟 번 반복해서 화면 절반이 글자로 찼다.
     if (pending && !swappable) {
         return (
-            <div className="w-full max-w-[168px] rounded-[9px] bg-white/[0.07] h-[38px] flex items-center justify-center">
-                <span className="h-px w-5 bg-white/20" />
+            <div className="w-full max-w-[168px] rounded-[9px] bg-surface-3 h-[38px] flex items-center justify-center">
+                <span className="h-px w-5 bg-[var(--surface-line-strong)]" />
             </div>
         );
     }
@@ -255,8 +255,8 @@ function MatchCard({ match, players, meId, onClick, swapMode, selectedSlot, onSl
             {(live || bye) && (
                 <div className={cn(
                     "text-center text-[9.5px] py-0.5 rk-num font-semibold",
-                    live ? "text-white bg-brand" : "text-ink-4 border-t border-surface-line",
-                )}>
+                    live ? "text-white" : "text-ink-4 border-t border-surface-line",
+                )} style={live ? { background: "var(--ball-red)" } : undefined}>
                     {live && <span className="inline-block w-1 h-1 rounded-full bg-white mr-1 align-middle motion-safe:animate-pulse" />}
                     {live ? t("tournament.match.playing") : t("tournament.match.bye")}
                 </div>
@@ -265,20 +265,23 @@ function MatchCard({ match, players, meId, onClick, swapMode, selectedSlot, onSl
     );
 
     const cls = cn(
-        "w-full max-w-[168px] min-w-0 overflow-hidden rounded-[9px] bg-white",
-        // 내 경기는 라사 위에서 한 겹 떠 보이게 — 16강이면 카드가 8개라 내 것을 찾기 어렵다.
-        mine ? "ring-2 ring-[#7fd3ad]" : "ring-1 ring-white/15",
-        live && "shadow-[0_0_0_3px_rgba(0,98,65,0.35)]",
+        "w-full max-w-[168px] min-w-0 overflow-hidden rounded-[9px] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]",
+        // 내 경기 표시 — 16강이면 카드가 8개라 내 것을 찾기 어렵다. 다만 굵은 초록 테두리는
+        // 카드를 통째로 초록으로 만들어 승자 표시(초록 띠)와 뒤섞인다. 얇고 옅게.
+        mine ? "ring-[1.5px] ring-brand/45" : "ring-1 ring-surface-line",
     );
 
+    // 경기중은 빨강이 가장 강한 신호라 내 경기 초록 테두리보다 우선한다.
+    const liveStyle = live ? { boxShadow: `0 0 0 2px var(--ball-red)` } : undefined;
     if (!swapMode && onClick && (match.status === "ready" || live || match.status === "done")) {
         return (
-            <button type="button" onClick={() => onClick(match)} className={cn(cls, "text-left active:scale-[0.98] transition-transform")}>
+            <button type="button" onClick={() => onClick(match)} style={liveStyle}
+                className={cn(cls, live && "ring-0", "text-left active:scale-[0.98] transition-transform")}>
                 {body}
             </button>
         );
     }
-    return <div className={cls}>{body}</div>;
+    return <div className={cn(cls, live && "ring-0")} style={liveStyle}>{body}</div>;
 }
 
 function Slot({ side, match, players, meId, swappable, selectedSlot, onSlotClick }: {
@@ -318,8 +321,9 @@ function Slot({ side, match, players, meId, swappable, selectedSlot, onSlotClick
     const base = cn(
         "flex items-center gap-1.5 px-[7px] py-1.5 min-h-[29px] w-full",
         side === "p2" && "border-t border-surface-line",
-        // 이긴 쪽은 초록 띠 + 옅은 초록 바탕 — 흰 카드 안에서 한눈에 갈린다.
-        isWinner && "bg-brand/[0.09] shadow-[inset_3px_0_0_rgb(var(--brand))]",
+        // 이긴 쪽은 왼쪽 초록 띠로만 말한다. 바탕까지 초록으로 깔면 카드가 흰색이 아니게 되고
+        // 8강·16강처럼 카드가 여러 개일 때 화면이 통째로 초록이 된다.
+        isWinner && "bg-brand/[0.05] shadow-[inset_3px_0_0_rgb(var(--brand))]",
         selected && "ring-2 ring-inset ring-brand bg-brand/5",
     );
 
@@ -333,20 +337,24 @@ function Slot({ side, match, players, meId, swappable, selectedSlot, onSlotClick
     return <div className={base}>{content}</div>;
 }
 
-/** 우승 — 대진표에서 유일하게 금색이고 제일 크다. 여기가 클라이맥스다. */
+/** 우승 — 대진표에서 유일하게 금색을 꽉 채운 카드이고 제일 크다. 여기가 클라이맥스다.
+ *  오너 결정(2026-08-30): 노란 금색 바탕에 흰 글씨. */
 function ChampionCard({ nickname, isMe }: { nickname: string; isMe: boolean }) {
     const { t } = useT();
     return (
-        <div className="mx-auto w-full max-w-[230px] rounded-card bg-gold px-5 py-4 text-center shadow-[0_6px_20px_rgba(0,0,0,0.28)]">
+        <div
+            className="mx-auto w-full max-w-[236px] rounded-card px-5 py-4 text-center shadow-[0_4px_16px_rgba(190,138,12,0.35)]"
+            style={{ background: "var(--gold-fill)" }}
+        >
             <Trophy />
-            <span className="mt-1 block text-[10px] font-bold tracking-[0.2em] text-[#5a4415] rk-num">
+            <span className="mt-1.5 block text-[10px] font-bold tracking-[0.22em] text-white/85 rk-num">
                 {t("tournament.round.champion")}
             </span>
-            <span className="mt-0.5 block text-[22px] leading-tight font-bold text-[#3b2c0c] truncate">
+            <span className="mt-1 block text-[23px] leading-tight font-bold text-white truncate">
                 {nickname}
             </span>
             {isMe && (
-                <span className="mt-1.5 inline-block rounded-pill bg-[#3b2c0c]/12 px-2 py-0.5 text-[10.5px] font-bold text-[#3b2c0c]">
+                <span className="mt-2 inline-block rounded-pill bg-white/25 px-2.5 py-0.5 text-[10.5px] font-bold text-white">
                     {t("tournament.champion.me")}
                 </span>
             )}
@@ -358,9 +366,9 @@ function ChampionCard({ nickname, isMe }: { nickname: string; isMe: boolean }) {
 function ChampionPending() {
     const { t } = useT();
     return (
-        <div className="mx-auto w-full max-w-[230px] rounded-card border border-dashed border-white/25 px-5 py-5 text-center">
-            <span className="mx-auto block w-6 h-6 opacity-30"><Trophy dim /></span>
-            <span className="mt-1.5 block text-[10.5px] font-semibold tracking-[0.18em] text-white/40 rk-num">
+        <div className="mx-auto w-full max-w-[230px] rounded-card border border-dashed border-[var(--surface-line-strong)] px-5 py-5 text-center">
+            <span className="mx-auto block w-6 h-6 opacity-40"><Trophy dim /></span>
+            <span className="mt-1.5 block text-[10.5px] font-semibold tracking-[0.18em] text-ink-4 rk-num">
                 {t("tournament.round.champion")}
             </span>
         </div>
@@ -371,7 +379,7 @@ function Trophy({ dim = false }: { dim?: boolean }) {
     return (
         <svg width={dim ? 24 : 30} height={dim ? 24 : 30} viewBox="0 0 24 24" fill="none" stroke="currentColor"
             strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-            className={cn("mx-auto", dim ? "text-white" : "text-[#3b2c0c]")} aria-hidden="true">
+            className={cn("mx-auto", dim ? "text-ink-4" : "text-white")} aria-hidden="true">
             <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
             <path d="M17 5h2.5a2.5 2.5 0 0 1 0 5H17" />
             <path d="M7 5H4.5a2.5 2.5 0 0 0 0 5H7" />

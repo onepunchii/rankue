@@ -28,11 +28,14 @@ export class TournamentRepository {
 
     /** 크루의 대회 목록 — 진행 중인 것이 위, 끝난 것이 아래. 참가자 수를 함께 센다. */
     async listByCrew(crewId: string) {
-        const rows = await db
-            .select()
+        // 끝난 대회는 목록에서도 우승자가 제일 중요한 정보라 이름을 같이 붙인다.
+        const raw = await db
+            .select({ t: hiqCrewTournaments, championName: hiqMembers.name })
             .from(hiqCrewTournaments)
+            .leftJoin(hiqMembers, eq(hiqMembers.id, hiqCrewTournaments.championId))
             .where(eq(hiqCrewTournaments.crewId, crewId))
             .orderBy(desc(hiqCrewTournaments.createdAt));
+        const rows = raw.map((r) => ({ ...r.t, championName: r.championName }));
         if (rows.length === 0) return [];
 
         // N+1 회피 — 참가자 수를 한 방에 집계한다(getUpcomingCrewActivities 패턴).
