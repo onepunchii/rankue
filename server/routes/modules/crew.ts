@@ -805,6 +805,20 @@ router.post("/:id/tournaments/:tournamentId/swap", requireAuth, asyncHandler(asy
     return sendSuccess(res, { success: true });
 }));
 
+// POST /tournaments/:tournamentId/matches/:matchId/reset — 진행 중인 경기를 되돌린다 (크루장/부크루장)
+// 당구대가 안 나서 점수판을 그냥 닫는 이탈이 흔한데, 그러면 그 칸이 영구히 "경기중"으로
+// 굳고 재추첨도 막혀서 대회를 통째로 지우는 것 말고는 복구 수단이 없었다.
+router.post("/:id/tournaments/:tournamentId/matches/:matchId/reset", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await requireCrewAdmin(req, res)) return;
+    const detail = await loadTournament(req, res);
+    if (!detail) return;
+    if (!detail.matches.some((m) => m.id === req.params.matchId)) {
+        return sendError(res, 404, "대진을 찾을 수 없습니다");
+    }
+    await storage.tournaments.resetMatch(req.params.tournamentId, req.params.matchId);
+    return sendSuccess(res, { success: true });
+}));
+
 // DELETE /tournaments/:tournamentId — 대회 삭제 (크루장/부크루장)
 router.delete("/:id/tournaments/:tournamentId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!await requireCrewAdmin(req, res)) return;

@@ -1653,5 +1653,10 @@ const es: Dict = {
   "common.back": "Atrás",
   "gameCreationModal.bracketLabel": "Partido del torneo",
   "gameCreationModal.bracketHint": "Tu rival ya está fijado, sin PIN. Ajusta los objetivos abajo.",
+  "crewTournament.alreadyPlaying": "Este partido ya empezó",
+  "crewTournament.resetHint": "Un partido se inició y no terminó. Reinícialo para volver a jugar.",
+  "crewTournament.resetMatch": "Reiniciar {a} vs {b}",
+  "crewTournament.resetDone": "Partido reiniciado",
+  "crewTournament.winLoss": "{w}V {l}D",
 };
 export default es;

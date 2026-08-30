@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
+import { useLocation } from "wouter";
 import { BallDot } from "@/components/hiq/BallDot";
 import { TournamentBracket, type BracketMatch, type BracketPlayer, type SlotRef } from "@/components/hiq/tournament/TournamentBracket";
 import { CreateCrewTournamentDialog } from "@/components/hiq/tournament/CreateCrewTournamentDialog";
@@ -157,6 +158,7 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
     const { t } = useT();
     const { toast } = useToast();
     const qc = useQueryClient();
+    const [, setLocation] = useLocation();
     const [swapMode, setSwapMode] = useState(false);
     const [picked, setPicked] = useState<SlotRef | null>(null);
     const [playMatch, setPlayMatch] = useState<{ matchId: string; opponent: HiqMember } | null>(null);
@@ -189,6 +191,11 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
         mutationFn: (body: { a: SlotRef; b: SlotRef }) => apiRequest(`${key}/swap`, { method: "POST", body: JSON.stringify(body) }),
         onSuccess: () => { setPicked(null); refresh(); },
         onError: (e) => { setPicked(null); fail(e); },
+    });
+    const resetM = useMutation({
+        mutationFn: (matchId: string) => apiRequest(`${key}/matches/${matchId}/reset`, { method: "POST" }),
+        onSuccess: () => { toast({ title: t("crewTournament.resetDone") }); refresh(); },
+        onError: fail,
     });
     const deleteM = useMutation({
         mutationFn: () => apiRequest(key, { method: "DELETE" }),
@@ -231,6 +238,16 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
 
     const onMatchClick = (m: BracketMatch) => {
         if (!myTurn(m) || !me) return;
+
+        // 이미 시작된 경기는 **새로 만들지 않고 그 경기로 들어간다**. 예전엔 '경기중' 카드를
+        // 다시 눌러도 매칭 화면이 열려 같은 자리에서 랭킹 경기가 계속 만들어졌다
+        // (대진에는 첫 경기만 물려 있어서 승자도 안 올라가고 RP 만 쌓였다).
+        if (m.status === "playing") {
+            if (m.gameId) setLocation(`/game/${m.gameId}`);
+            else toast({ title: t("crewTournament.alreadyPlaying") });
+            return;
+        }
+
         const opponentId = m.p1Id === me.id ? m.p2Id : m.p1Id;
         const opp = participants.find((p) => p.memberId === opponentId);
         if (!opp) return;
@@ -354,6 +371,27 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
                     </div>
                 )}
 
+                {/* 시작만 하고 끝내지 않은 경기 되돌리기 — 안 그러면 그 칸이 영구히 "경기중"으로
+                    굳고 재추첨도 막혀 대회를 통째로 지워야 한다. */}
+                {isAdmin && matches.some((m) => m.status === "playing") && (
+                    <div className="rk-card p-3.5 space-y-2">
+                        <p className="text-[12.5px] text-ink-3">{t("crewTournament.resetHint")}</p>
+                        {matches.filter((m) => m.status === "playing").map((m) => (
+                            <button
+                                key={m.id}
+                                onClick={() => resetM.mutate(m.id)}
+                                disabled={resetM.isPending}
+                                className="w-full h-10 rounded-xl border border-surface-line text-[13px] text-ink-2 flex items-center justify-center gap-1.5 active:opacity-70"
+                            >
+                                <LucideRefreshCw className="w-3.5 h-3.5" />
+                                {t("crewTournament.resetMatch")
+                                    .replace("{a}", (m.p1Id && players[m.p1Id]?.nickname) || "-")
+                                    .replace("{b}", (m.p2Id && players[m.p2Id]?.nickname) || "-")}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {isAdmin && drawn && !isLeague && tr.status !== "ended" && (
                     <Button variant="outline" onClick={() => { setSwapMode(!swapMode); setPicked(null); }}
                         className={cn("w-full h-11 rounded-xl border-surface-line", swapMode && "border-brand text-brand")}>
@@ -408,7 +446,7 @@ function LeagueTable({ participants, matches, players, onMatchClick, canPlay }: 
                         <span className="w-4 text-[12px] text-ink-3 rk-num">{p.finalRank ?? i + 1}</span>
                         <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-ink-1">{p.nickname}</span>
                         {p.finalRank === 1 && <LucideTrophy className="w-3.5 h-3.5 text-gold" />}
-                        <span className="w-12 text-right text-[12px] text-ink-2 rk-num">{p.wins}승 {p.losses}패</span>
+                        <span className="w-12 text-right text-[12px] text-ink-2 rk-num">{t("crewTournament.winLoss").replace("{w}", String(p.wins)).replace("{l}", String(p.losses))}</span>
                     </div>
                 ))}
             </div>

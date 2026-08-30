@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { and, eq, desc, inArray, sql } from "drizzle-orm";
+import { and, eq, desc, inArray, isNull, sql } from "drizzle-orm";
 import {
     hiqCrewTournaments,
     hiqCrewTournamentParticipants,
@@ -7,6 +7,7 @@ import {
     hiqCrewMembers,
     hiqMembers,
     hiqGames,
+    hiqGameHistory,
 } from "../../shared/schema.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { planKnockout, planLeague, advanceTarget, bracketSize, totalRounds, shouldUseLeague } from "../../shared/tournamentBracket.js";
@@ -294,8 +295,16 @@ export class TournamentRepository {
     /**
      * 대진에서 경기를 시작할 때, 호출자가 그 자리의 선수가 맞는지 확인하고 상대를 알려준다.
      * PIN 을 건너뛰는 근거가 여기다 — 두 사람 다 이 대회에 스스로 참가 신청했으므로
-     * 이미 동의한 상대다. 대신 이 검증이 뚫리면 아무나 남의 이름으로 경기를 만들 수 있으니
-     * (1) 대진 존재·미완료 (2) 호출자가 그 자리의 선수 (3) 크루 정식 멤버 셋 다 본다.
+     * 이미 동의한 상대다.
+     *
+     * ⚠️ 이 검증이 곧 랭킹 경기 생성 권한이다. PIN 경로에는 "초대 1개 = 랭크 경기 1회"
+     * 상한(consumeInvites)이 있는데 대진 경로는 그걸 건너뛰므로, 상한을 여기서 세워야 한다.
+     * 예전엔 status "playing" 을 통과시켜서, 경기를 시작해 놓고 끝내지 않은 채 같은 칸으로
+     * /game/start 를 무한 반복하면 랭킹 경기를 찍어내 RP 를 올릴 수 있었다.
+     * 그래서 **아직 아무 경기도 안 붙은 ready 상태**에서만 자리를 내준다.
+     *
+     * 상대의 크루 멤버십도 같이 본다 — 대진 확정 뒤 탈퇴·강퇴된 사람은 대회 화면조차 못 보는데
+     * 그 사람 이름으로 랭킹 패배가 기록될 수 있었다(본인은 존재도 모르는 경기).
      */
     async resolveSeat(matchId: string, callerId: string) {
         const [row] = await db
@@ -309,37 +318,81 @@ export class TournamentRepository {
         if (!row) return null;
 
         const { match, tournament } = row;
-        if (match.status === "done" || match.status === "bye") return null;
+        // ready = 두 자리가 찼고 아직 경기가 안 붙은 상태. playing/done/bye/pending 은 전부 거절.
+        if (match.status !== "ready" || match.gameId) return null;
         if (!match.p1Id || !match.p2Id) return null;
         if (match.p1Id !== callerId && match.p2Id !== callerId) return null;
         if (tournament.status === "ended" || tournament.status === "canceled") return null;
 
-        // 크루 정식 멤버인지 — 탈퇴했는데 대진에 이름이 남아 있을 수 있다.
-        const [membership] = await db.select().from(hiqCrewMembers).where(and(
+        // 두 선수 다 크루 정식 멤버여야 한다 — 호출자만 보면 상대가 탈퇴했어도 통과했다.
+        const rows = await db.select().from(hiqCrewMembers).where(and(
             eq(hiqCrewMembers.crewId, tournament.crewId),
-            eq(hiqCrewMembers.memberId, callerId),
+            inArray(hiqCrewMembers.memberId, [match.p1Id, match.p2Id]),
         ));
-        if (!membership || membership.role === "pending") return null;
+        const active = rows.filter((r) => r.role !== "pending").map((r) => r.memberId);
+        if (!active.includes(match.p1Id) || !active.includes(match.p2Id)) return null;
 
         const opponentId = match.p1Id === callerId ? match.p2Id : match.p1Id;
         return { tournamentId: tournament.id, matchId: match.id, opponentId, crewId: tournament.crewId };
     }
 
-    /** 경기 시작 직후 대진에 경기를 물린다. */
+    /**
+     * 경기 시작 직후 대진에 경기를 물린다.
+     * 0행이 갱신되면 그 사이 다른 사람이 먼저 시작한 것이다 — 조용히 넘기면 두 번째 경기가
+     * 대진에서 떨어져 나가 승자가 영영 안 올라가므로, 실패를 알려 호출부가 되돌리게 한다.
+     */
     async attachGame(matchId: string, gameId: string) {
-        await db.update(hiqCrewTournamentMatches)
+        const updated = await db.update(hiqCrewTournamentMatches)
             .set({ gameId, status: "playing", startedAt: new Date() })
             .where(and(
                 eq(hiqCrewTournamentMatches.id, matchId),
-                inArray(hiqCrewTournamentMatches.status, ["ready", "pending"]),
+                eq(hiqCrewTournamentMatches.status, "ready"),
+                isNull(hiqCrewTournamentMatches.gameId),
+            ))
+            .returning({ tournamentId: hiqCrewTournamentMatches.tournamentId });
+        if (updated.length === 0) throw conflict("이미 시작된 대진입니다");
+
+        await db.update(hiqCrewTournaments)
+            .set({ status: "ongoing", updatedAt: new Date() })
+            .where(and(
+                eq(hiqCrewTournaments.id, updated[0].tournamentId),
+                inArray(hiqCrewTournaments.status, ["recruiting", "drawn"]),
             ));
-        const [t] = await db.select({ tournamentId: hiqCrewTournamentMatches.tournamentId })
-            .from(hiqCrewTournamentMatches).where(eq(hiqCrewTournamentMatches.id, matchId));
-        if (t) {
-            await db.update(hiqCrewTournaments)
-                .set({ status: "ongoing", updatedAt: new Date() })
-                .where(and(eq(hiqCrewTournaments.id, t.tournamentId), inArray(hiqCrewTournaments.status, ["recruiting", "drawn"])));
-        }
+    }
+
+    /**
+     * 시작만 하고 끝내지 않은 대진 자리를 되돌린다(크루장).
+     * 당구대가 안 나서 점수판을 그냥 닫는 이탈이 흔한데, 그러면 그 칸이 영구히 "경기중"으로
+     * 굳고 재추첨도 막혀(draw 가 409) 대회를 통째로 지우는 것 말고는 복구 수단이 없었다.
+     * 이미 끝난(done) 칸은 되돌리지 않는다 — 결과가 RP·전적에 이미 반영됐다.
+     */
+    async resetMatch(tournamentId: string, matchId: string) {
+        const [m] = await db.select().from(hiqCrewTournamentMatches).where(and(
+            eq(hiqCrewTournamentMatches.id, matchId),
+            eq(hiqCrewTournamentMatches.tournamentId, tournamentId),
+        ));
+        if (!m) throw notFound("대진을 찾을 수 없습니다");
+        if (m.status !== "playing") throw conflict("진행 중인 경기만 되돌릴 수 있습니다");
+        await db.update(hiqCrewTournamentMatches)
+            .set({ status: "ready", gameId: null, startedAt: null, p1Score: null, p2Score: null })
+            .where(eq(hiqCrewTournamentMatches.id, matchId));
+        return { ok: true };
+    }
+
+    /**
+     * 대진에 못 붙은 방금 만든 경기를 되돌린다.
+     * 아직 시작 상태(playing_base)이고 전적 행이 하나도 없을 때만 지운다 — 실제로 친 경기를
+     * 지우는 일이 절대 없도록 조건을 좁게 둔다.
+     */
+    async discardOrphanGame(gameId: string) {
+        const hist = await db.select({ id: hiqGameHistory.id }).from(hiqGameHistory)
+            .where(eq(hiqGameHistory.gameId, gameId));
+        if (hist.length > 0) return false;
+        const gone = await db.delete(hiqGames).where(and(
+            eq(hiqGames.id, gameId),
+            eq(hiqGames.status, "playing_base"),
+        )).returning({ id: hiqGames.id });
+        return gone.length > 0;
     }
 
     /** 이 경기가 대진 경기인지. 경기 종료 훅에서 한 번만 조회해 쓴다. */
@@ -356,66 +409,79 @@ export class TournamentRepository {
      * 높은 쪽을 승자로 본다. 동점이거나 점수가 없으면 손대지 않고 그대로 둔다.
      */
     async reportResult(gameId: string, winnerIdFromGame: string | null) {
-        const match = await this.findMatchByGameId(gameId);
-        if (!match || match.status === "done") return null;
+        // 전부 한 트랜잭션 안에서 한다. 예전엔 대진 UPDATE 와 승자 진출이 따로 커밋돼서,
+        // 중간에 끊기면 그 칸만 done 이 되고 윗칸은 비어 아무도 다음 경기를 못 시작했다.
+        return await db.transaction(async (tx) => {
+            const [match] = await tx.select().from(hiqCrewTournamentMatches)
+                .where(eq(hiqCrewTournamentMatches.gameId, gameId)).for("update");
+            if (!match || match.status === "done") return null;
 
-        const [game] = await db.select().from(hiqGames).where(eq(hiqGames.id, gameId));
-        if (!game) return null;
+            const [game] = await tx.select().from(hiqGames).where(eq(hiqGames.id, gameId));
+            if (!game) return null;
 
-        // 대진의 두 선수가 경기의 어느 슬롯에 앉았는지 찾아 점수를 가져온다.
-        const slotOf = (memberId: string | null) => {
-            if (!memberId) return null;
-            if (game.player1Id === memberId) return { score: game.player1Score };
-            if (game.player2Id === memberId) return { score: game.player2Score };
-            if (game.player3Id === memberId) return { score: game.player3Score };
-            if (game.player4Id === memberId) return { score: game.player4Score };
-            return null;
-        };
-        const s1 = slotOf(match.p1Id)?.score ?? null;
-        const s2 = slotOf(match.p2Id)?.score ?? null;
+            // 대진의 두 선수가 경기의 어느 슬롯에 앉았는지 찾아 점수를 가져온다.
+            const slotOf = (memberId: string | null) => {
+                if (!memberId) return null;
+                if (game.player1Id === memberId) return { score: game.player1Score };
+                if (game.player2Id === memberId) return { score: game.player2Score };
+                if (game.player3Id === memberId) return { score: game.player3Score };
+                if (game.player4Id === memberId) return { score: game.player4Score };
+                return null;
+            };
+            const s1 = slotOf(match.p1Id)?.score ?? null;
+            const s2 = slotOf(match.p2Id)?.score ?? null;
 
-        let winnerId = winnerIdFromGame;
-        if (winnerId !== match.p1Id && winnerId !== match.p2Id) winnerId = null;
-        if (!winnerId && s1 != null && s2 != null && s1 !== s2) {
-            winnerId = s1 > s2 ? match.p1Id : match.p2Id;
-        }
-        if (!winnerId) {
-            // 승자를 못 정했다 — 경기는 끝났지만 대진은 열어둔다. 크루장이 다시 붙이면 된다.
-            await db.update(hiqCrewTournamentMatches)
-                .set({ p1Score: s1, p2Score: s2, status: "ready", gameId: null, endedAt: null })
-                .where(eq(hiqCrewTournamentMatches.id, match.id));
-            return null;
-        }
-        const loserId = winnerId === match.p1Id ? match.p2Id : match.p1Id;
+            let winnerId = winnerIdFromGame;
+            if (winnerId !== match.p1Id && winnerId !== match.p2Id) winnerId = null;
+            if (!winnerId && s1 != null && s2 != null && s1 !== s2) {
+                winnerId = s1 > s2 ? match.p1Id : match.p2Id;
+            }
+            if (!winnerId) {
+                // 승자를 못 정했다 — 경기는 끝났지만 대진은 열어둔다. 크루장이 다시 붙이면 된다.
+                await tx.update(hiqCrewTournamentMatches)
+                    .set({ p1Score: s1, p2Score: s2, status: "ready", gameId: null, endedAt: null, startedAt: null })
+                    .where(eq(hiqCrewTournamentMatches.id, match.id));
+                return null;
+            }
+            const loserId = winnerId === match.p1Id ? match.p2Id : match.p1Id;
 
-        const [t] = await db.select().from(hiqCrewTournaments).where(eq(hiqCrewTournaments.id, match.tournamentId));
-        if (!t) return null;
+            const [t] = await tx.select().from(hiqCrewTournaments).where(eq(hiqCrewTournaments.id, match.tournamentId));
+            if (!t) return null;
 
-        await db.update(hiqCrewTournamentMatches)
-            .set({ p1Score: s1, p2Score: s2, winnerId, loserId, status: "done", endedAt: new Date() })
-            .where(eq(hiqCrewTournamentMatches.id, match.id));
+            // status 를 조건에 넣어 승자 처리가 정확히 1회만 돌게 한다. 두 사람이 동시에
+            // '경기 종료'를 누르면 둘 다 여기까지 와서 wins/losses 가 2씩 올랐다.
+            const claimed = await tx.update(hiqCrewTournamentMatches)
+                .set({ p1Score: s1, p2Score: s2, winnerId, loserId, status: "done", endedAt: new Date() })
+                .where(and(
+                    eq(hiqCrewTournamentMatches.id, match.id),
+                    eq(hiqCrewTournamentMatches.status, match.status),
+                ))
+                .returning({ id: hiqCrewTournamentMatches.id });
+            if (claimed.length === 0) return null;
 
-        await db.update(hiqCrewTournamentParticipants)
-            .set({ wins: sql`${hiqCrewTournamentParticipants.wins} + 1` })
-            .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, winnerId)));
-        if (loserId) {
-            await db.update(hiqCrewTournamentParticipants)
-                .set({ losses: sql`${hiqCrewTournamentParticipants.losses} + 1` })
-                .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, loserId)));
-        }
+            await tx.update(hiqCrewTournamentParticipants)
+                .set({ wins: sql`${hiqCrewTournamentParticipants.wins} + 1` })
+                .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, winnerId)));
+            if (loserId) {
+                await tx.update(hiqCrewTournamentParticipants)
+                    .set({ losses: sql`${hiqCrewTournamentParticipants.losses} + 1` })
+                    .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, loserId)));
+            }
 
-        if (t.format === "league") return await this.settleLeagueIfDone(t.id);
+            if (t.format === "league") return await this.settleLeagueIfDone(tx, t.id);
 
-        const participantCount = await this.countParticipants(t.id);
-        const rounds = totalRounds(bracketSize(participantCount));
-        // 진 사람은 여기서 탈락 확정.
-        if (loserId) {
-            await db.update(hiqCrewTournamentParticipants)
-                .set({ status: "eliminated" })
-                .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, loserId)));
-        }
-        return await db.transaction(async (tx) =>
-            await this.pushWinnerUp(tx, t.id, match.round, match.slot, winnerId!, rounds));
+            const [cnt] = await tx.select({ n: sql<number>`count(*)::int` })
+                .from(hiqCrewTournamentParticipants)
+                .where(eq(hiqCrewTournamentParticipants.tournamentId, t.id));
+            const rounds = totalRounds(bracketSize(Number(cnt?.n ?? 0)));
+            // 진 사람은 여기서 탈락 확정.
+            if (loserId) {
+                await tx.update(hiqCrewTournamentParticipants)
+                    .set({ status: "eliminated" })
+                    .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, loserId)));
+            }
+            return await this.pushWinnerUp(tx, t.id, match.round, match.slot, winnerId, rounds);
+        });
     }
 
     /** 승자를 윗칸에 앉힌다. 결승이면 우승 확정. */
@@ -450,33 +516,26 @@ export class TournamentRepository {
         return { champion: null, advancedTo: { round: target.round, slot: target.slot } };
     }
 
-    private async countParticipants(tournamentId: string) {
-        const [row] = await db.select({ n: sql<number>`count(*)::int` })
-            .from(hiqCrewTournamentParticipants)
-            .where(eq(hiqCrewTournamentParticipants.tournamentId, tournamentId));
-        return Number(row?.n ?? 0);
-    }
-
     /** 풀리그는 모든 경기가 끝나면 승수로 순위를 매긴다. 동률이면 공동 순위. */
-    private async settleLeagueIfDone(tournamentId: string) {
-        const matches = await db.select().from(hiqCrewTournamentMatches)
+    private async settleLeagueIfDone(tx: any, tournamentId: string) {
+        const matches = await tx.select().from(hiqCrewTournamentMatches)
             .where(eq(hiqCrewTournamentMatches.tournamentId, tournamentId));
-        if (matches.some((m) => m.status !== "done" && m.status !== "bye")) return { champion: null };
+        if (matches.some((m: any) => m.status !== "done" && m.status !== "bye")) return { champion: null };
 
-        const parts = await db.select().from(hiqCrewTournamentParticipants)
+        const parts = await tx.select().from(hiqCrewTournamentParticipants)
             .where(eq(hiqCrewTournamentParticipants.tournamentId, tournamentId));
-        const ranked = [...parts].sort((a, b) => (b.wins - a.wins) || (a.losses - b.losses));
+        const ranked = [...parts].sort((a: any, b: any) => (b.wins - a.wins) || (a.losses - b.losses));
 
         let rank = 0, prevKey = "";
         for (let i = 0; i < ranked.length; i++) {
             const key = `${ranked[i].wins}-${ranked[i].losses}`;
             if (key !== prevKey) { rank = i + 1; prevKey = key; }
-            await db.update(hiqCrewTournamentParticipants)
+            await tx.update(hiqCrewTournamentParticipants)
                 .set({ finalRank: rank, status: rank === 1 ? "winner" : "eliminated" })
                 .where(eq(hiqCrewTournamentParticipants.id, ranked[i].id));
         }
         const champion = ranked[0]?.memberId ?? null;
-        await db.update(hiqCrewTournaments)
+        await tx.update(hiqCrewTournaments)
             .set({ status: "ended", championId: champion, updatedAt: new Date() })
             .where(eq(hiqCrewTournaments.id, tournamentId));
         return { champion };

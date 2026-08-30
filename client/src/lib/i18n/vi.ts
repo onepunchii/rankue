@@ -1653,5 +1653,10 @@ const vi: Dict = {
   "common.back": "Quay lại",
   "gameCreationModal.bracketLabel": "Trận đấu giải",
   "gameCreationModal.bracketHint": "Đối thủ đã xác định, không cần mã PIN. Chỉnh điểm mục tiêu bên dưới.",
+  "crewTournament.alreadyPlaying": "Trận này đã bắt đầu",
+  "crewTournament.resetHint": "Có trận đã bắt đầu nhưng chưa kết thúc. Đặt lại để chơi lại.",
+  "crewTournament.resetMatch": "Đặt lại {a} vs {b}",
+  "crewTournament.resetDone": "Đã đặt lại trận",
+  "crewTournament.winLoss": "{w}T {l}B",
 };
 export default vi;

@@ -180,12 +180,17 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
         isRanked
     });
 
-    // 대진에 경기를 물린다. 실패해도 경기 자체는 살아 있어야 하므로 요청을 깨지 않는다 —
-    // 대진이 안 붙으면 종료 훅이 이 경기를 대회 경기로 못 알아보고 그냥 일반 경기가 된다.
+    // 대진에 경기를 물린다. 실패하면 그 사이 상대가 먼저 시작한 것이므로, 방금 만든 경기를
+    // 지우고 요청을 실패시킨다. 예전엔 실패를 삼켰는데 그러면 대진에 안 붙은 랭킹 경기가
+    // 남아(승자가 영영 안 올라감) 같은 자리에서 경기가 계속 찍혀 나왔다.
     if (seat) {
         try {
             await storage.tournaments.attachGame(seat.matchId, game.id);
-        } catch (e) { console.error("[Tournament] 대진에 경기 연결 실패:", e); }
+        } catch (e) {
+            console.error("[Tournament] 대진에 경기 연결 실패 — 방금 만든 경기를 되돌린다:", e);
+            try { await storage.tournaments.discardOrphanGame(game.id); } catch (e2) { console.error("[Tournament] 되돌리기 실패:", e2); }
+            return sendError(res, 409, "상대가 이미 이 경기를 시작했습니다. 대진표를 새로고침해주세요.");
+        }
     }
 
     // NOTE: the invite is deliberately NOT consumed here. Consuming it at start meant a retry

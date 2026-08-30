@@ -1653,5 +1653,10 @@ const tr: Dict = {
   "common.back": "Geri",
   "gameCreationModal.bracketLabel": "Turnuva maçı",
   "gameCreationModal.bracketHint": "Rakibiniz belli, PIN gerekmez. Hedef skorları aşağıda ayarlayın.",
+  "crewTournament.alreadyPlaying": "Bu maç zaten başladı",
+  "crewTournament.resetHint": "Başlayıp bitmeyen bir maç var. Sıfırlayıp tekrar başlayabilirsiniz.",
+  "crewTournament.resetMatch": "{a} - {b} sıfırla",
+  "crewTournament.resetDone": "Maç sıfırlandı",
+  "crewTournament.winLoss": "{w}G {l}M",
 };
 export default tr;

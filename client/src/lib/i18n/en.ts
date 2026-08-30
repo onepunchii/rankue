@@ -1653,5 +1653,10 @@ const en: Dict = {
   "common.back": "Back",
   "gameCreationModal.bracketLabel": "Tournament match",
   "gameCreationModal.bracketHint": "Your opponent is set — no PIN needed. Adjust target scores below.",
+  "crewTournament.alreadyPlaying": "This match already started",
+  "crewTournament.resetHint": "A match was started but never finished. Reset it to play again.",
+  "crewTournament.resetMatch": "Reset {a} vs {b}",
+  "crewTournament.resetDone": "Match reset",
+  "crewTournament.winLoss": "{w}W {l}L",
 };
 export default en;

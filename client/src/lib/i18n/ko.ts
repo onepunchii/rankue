@@ -1655,4 +1655,9 @@ export const ko: Dict = {
   "common.back": "뒤로",
   "gameCreationModal.bracketLabel": "대회 대진 경기",
   "gameCreationModal.bracketHint": "상대가 정해져 있어 핀 없이 바로 시작해요. 목표 점수는 아래에서 맞추세요.",
+  "crewTournament.alreadyPlaying": "이미 시작된 경기예요",
+  "crewTournament.resetHint": "시작만 하고 끝나지 않은 경기가 있어요. 되돌리면 다시 시작할 수 있어요.",
+  "crewTournament.resetMatch": "{a} vs {b} 되돌리기",
+  "crewTournament.resetDone": "경기를 되돌렸어요",
+  "crewTournament.winLoss": "{w}승 {l}패",
 };

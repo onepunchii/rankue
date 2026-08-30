@@ -30,6 +30,8 @@ export interface BracketMatch {
     p2Score: number | null;
     winnerId: string | null;
     status: "pending" | "ready" | "playing" | "done" | "bye";
+    /** 시작된 경기. "경기중" 칸을 누르면 새로 만들지 않고 이 경기로 들어간다. */
+    gameId: string | null;
 }
 
 /** 자리 조정 모드에서 고른 한 칸. */
@@ -88,8 +90,16 @@ export function TournamentBracket({
             .replace("{n}", String(slot * 2 + (side === "p1" ? 1 : 2)));
     };
 
-    return (
-        <div className={cn("flex flex-col", className)}>
+    // 1라운드 칸이 4개를 넘으면(16명) 폰 폭에서 칸당 40px 밑으로 떨어져 닉네임이 잘린다.
+    // 저장소 관례대로 가로 스크롤을 열고 최소 폭을 준다.
+    const firstRoundSlots = byRound.get(1)?.length ?? 0;
+    const needsScroll = firstRoundSlots > 4;
+
+    const bracket = (
+        <div
+            className={cn("flex flex-col", !needsScroll && className)}
+            style={needsScroll ? { minWidth: firstRoundSlots * 84 } : undefined}
+        >
             {/* 우승 */}
             <RoundLabel>{t("tournament.round.champion")}</RoundLabel>
             {champion ? <ChampionCard nickname={champion.nickname} /> : <ChampionPlaceholder />}
@@ -127,6 +137,13 @@ export function TournamentBracket({
                     </div>
                 );
             })}
+        </div>
+    );
+
+    if (!needsScroll) return bracket;
+    return (
+        <div className={cn("-mx-5 px-5 overflow-x-auto scrollbar-hide", className)}>
+            {bracket}
         </div>
     );
 }
@@ -191,8 +208,10 @@ function MatchCard({ match, players, onClick, swapMode, selectedSlot, onSlotClic
     const live = match.status === "playing";
     const done = match.status === "done";
     const bye = match.status === "bye";
-    // 자리 조정은 아직 시작 안 한 경기에서만. 시작된 경기의 선수를 바꾸면 기록이 어긋난다.
-    const swappable = swapMode && (match.status === "ready" || match.status === "pending");
+    // 자리 조정은 **첫 라운드의 아직 시작 안 한 경기**에서만. 윗 라운드는 승자가 자동으로
+    // 올라오는 자리라 손으로 바꾸면 기록과 어긋나고, 서버도 400 으로 거절한다 —
+    // 여기서 안 막으면 눌리기만 하고 실패 토스트만 뜬다.
+    const swappable = swapMode && match.round === 1 && (match.status === "ready" || match.status === "pending");
 
     const body = (
         <>
