@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { roundName, totalRounds, bracketSize } from "@shared/tournamentBracket";
@@ -141,9 +141,21 @@ export function TournamentBracket({
     );
 
     if (!needsScroll) return bracket;
+    return <ScrollableBracket className={className}>{bracket}</ScrollableBracket>;
+}
+
+/** 16강처럼 넓은 대진표는 열자마자 가운데(결승·우승)가 보이게 맞춘다.
+ *  왼쪽 끝에서 시작하면 제일 중요한 우승 카드가 화면 밖에 있다. */
+function ScrollableBracket({ children, className }: { children: React.ReactNode; className?: string }) {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
+    }, []);
     return (
-        <div className={cn("-mx-5 px-5 overflow-x-auto scrollbar-hide", className)}>
-            {bracket}
+        <div ref={ref} className={cn("-mx-5 px-5 overflow-x-auto scrollbar-hide", className)}>
+            {children}
         </div>
     );
 }
