@@ -1660,4 +1660,10 @@ export const ko: Dict = {
   "crewTournament.resetMatch": "{a} vs {b} 되돌리기",
   "crewTournament.resetDone": "경기를 되돌렸어요",
   "crewTournament.winLoss": "{w}승 {l}패",
+  "hallOfFame.title": "명예의 전당",
+  "hallOfFame.empty": "아직 끝난 대회가 없어요. 첫 우승자를 기다리는 중.",
+  "hallOfFame.currentChampion": "현 챔피언",
+  "hallOfFame.record": "준 {r} · 4강 {s}",
+  "hallOfFame.past": "역대 대회 {n}개",
+  "crewMember.wins": "우승 {n}",
 };

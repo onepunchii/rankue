@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useT } from "@/lib/i18n";
 import { BallDot } from "@/components/hiq/BallDot";
+import { HallOfFame } from "@/components/hiq/tournament/HallOfFame";
 
 const StatCard = ({ title, subTitle, children }: { title: string, subTitle?: string, children: React.ReactNode }) => {
     return (
@@ -54,6 +55,7 @@ interface CrewHomeTabProps {
     onPollClick: () => void;
     onTournamentClick: () => void;
     onCreateTournament: () => void;
+    onOpenTournament: (tournamentId: string) => void;
     // Received from parent for API symmetry but not used in this view.
     sportTab?: 'BILLIARDS' | 'GOLF';
     setSportTab?: (tab: 'BILLIARDS' | 'GOLF') => void;
@@ -61,7 +63,7 @@ interface CrewHomeTabProps {
 
 export const CrewHomeTab = memo(({
     crew, baseStore, baseListing = null, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onLeave, isLeaving, isLeader, onCreateActivity, onCreatePoll, onShareToChat,
-    onPollClick, onTournamentClick, onCreateTournament
+    onPollClick, onTournamentClick, onCreateTournament, onOpenTournament
 }: CrewHomeTabProps) => {
     const { t } = useT();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -296,6 +298,16 @@ export const CrewHomeTab = memo(({
                 <div onClick={onTournamentClick} className="cursor-pointer active:scale-[0.98] transition-all">
                     <TournamentPreview crewId={crew.id} isMember={isMember} />
                 </div>
+            </div>
+
+            {/* 명예의 전당 — 대회 바로 아래. 별도 탭을 또 만들면 탭이 6개가 되는데,
+                자주 들어가는 곳이 아니라 자랑하려고 스쳐 보는 곳이라 홈이 맞다. */}
+            <div className="px-6 space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand" />
+                    <h2 className="text-[15px] font-semibold text-black/55">{t("hallOfFame.title")}</h2>
+                </div>
+                <HallOfFame crewId={crew.id} isMember={isMember} onOpenTournament={onOpenTournament} />
             </div>
 
             {/* Base Camp Section */}

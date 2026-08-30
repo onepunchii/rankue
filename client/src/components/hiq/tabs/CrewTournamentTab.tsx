@@ -30,6 +30,8 @@ interface Props {
     /** 홈의 "만들기"로 들어온 경우 — 탭이 열리자마자 개설 다이얼로그를 띄운다. */
     autoOpenCreate?: boolean;
     onAutoOpenHandled?: () => void;
+    /** 명예의 전당에서 역대 대회를 눌러 들어온 경우 — 그 대회 대진표를 바로 연다. */
+    autoOpenTournamentId?: string | null;
 }
 
 interface TournamentRow {
@@ -40,7 +42,7 @@ interface TournamentRow {
     creatorId: string; participantCount: number;
 }
 
-export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreate, onAutoOpenHandled }: Props) {
+export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreate, onAutoOpenHandled, autoOpenTournamentId }: Props) {
     const { t } = useT();
     // 매칭 화면이 목표 점수를 뽑을 때 쓴다. 대시보드와 같은 쿼리키라 캐시를 그대로 나눠 쓴다.
     const { data: history } = useQuery<HiqGameHistory[]>({ queryKey: ["/api/hiq/history"], enabled: !!me });
@@ -55,6 +57,14 @@ export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreat
             onAutoOpenHandled?.();
         }
     }, [autoOpenCreate, isAdmin, onAutoOpenHandled]);
+
+    // 명예의 전당에서 역대 대회를 눌러 넘어온 경우 그 대진표를 연다.
+    useEffect(() => {
+        if (autoOpenTournamentId) {
+            setOpenId(autoOpenTournamentId);
+            onAutoOpenHandled?.();
+        }
+    }, [autoOpenTournamentId, onAutoOpenHandled]);
 
     const { data: list, isLoading } = useQuery<TournamentRow[]>({
         queryKey: [`/api/hiq/crews/${crewId}/tournaments`],

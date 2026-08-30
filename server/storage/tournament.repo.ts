@@ -92,6 +92,94 @@ export class TournamentRepository {
         return { tournament, participants, matches };
     }
 
+    /**
+     * 명예의 전당 — 끝난 대회만 모아 보여준다.
+     * 새로 저장하는 건 없다. 대회의 championId 와 참가자의 finalRank 가 이미 쌓이고 있어서
+     * 집계만 하면 된다.
+     *
+     * 종목을 나누는 이유: 3쿠션과 4구는 실력 스케일이 완전히 달라서 한 줄로 세우면
+     * 한 사람이 모든 왕관을 쓴다. 종목별로 왕을 따로 두면 크루 안에서 자랑거리가 늘어난다.
+     */
+    async getHallOfFame(crewId: string) {
+        const ended = await db
+            .select({
+                id: hiqCrewTournaments.id,
+                title: hiqCrewTournaments.title,
+                gameType: hiqCrewTournaments.gameType,
+                format: hiqCrewTournaments.format,
+                championId: hiqCrewTournaments.championId,
+                endedAt: hiqCrewTournaments.updatedAt,
+                championName: hiqMembers.name,
+            })
+            .from(hiqCrewTournaments)
+            .leftJoin(hiqMembers, eq(hiqMembers.id, hiqCrewTournaments.championId))
+            .where(and(eq(hiqCrewTournaments.crewId, crewId), eq(hiqCrewTournaments.status, "ended")))
+            .orderBy(desc(hiqCrewTournaments.updatedAt));
+
+        if (ended.length === 0) return { current: null, honors: [], history: [] };
+
+        // 참가자별 성적 — 끝난 대회 것만. N+1 없이 한 방에.
+        const ids = ended.map((t) => t.id);
+        const rows = await db
+            .select({
+                memberId: hiqCrewTournamentParticipants.memberId,
+                nickname: hiqMembers.name,
+                finalRank: hiqCrewTournamentParticipants.finalRank,
+                gameType: hiqCrewTournaments.gameType,
+            })
+            .from(hiqCrewTournamentParticipants)
+            .innerJoin(hiqCrewTournaments, eq(hiqCrewTournaments.id, hiqCrewTournamentParticipants.tournamentId))
+            .innerJoin(hiqMembers, eq(hiqMembers.id, hiqCrewTournamentParticipants.memberId))
+            .where(inArray(hiqCrewTournamentParticipants.tournamentId, ids));
+
+        // (회원 × 종목) 별로 우승·준우승·4강 횟수를 센다.
+        const byKey = new Map<string, {
+            memberId: string; nickname: string; gameType: "3c" | "4c";
+            wins: number; runnerUp: number; semi: number; played: number;
+        }>();
+        for (const r of rows) {
+            const key = `${r.memberId}:${r.gameType}`;
+            const cur = byKey.get(key) ?? {
+                memberId: r.memberId, nickname: r.nickname, gameType: r.gameType as "3c" | "4c",
+                wins: 0, runnerUp: 0, semi: 0, played: 0,
+            };
+            cur.played += 1;
+            if (r.finalRank === 1) cur.wins += 1;
+            else if (r.finalRank === 2) cur.runnerUp += 1;
+            else if (r.finalRank === 3) cur.semi += 1;
+            byKey.set(key, cur);
+        }
+
+        const honors = [...byKey.values()]
+            .filter((h) => h.wins > 0 || h.runnerUp > 0 || h.semi > 0)
+            .sort((a, b) => b.wins - a.wins || b.runnerUp - a.runnerUp || b.semi - a.semi);
+
+        return {
+            // 현 챔피언 = 가장 최근에 끝난 대회의 우승자
+            current: ended.find((t) => t.championId) ?? null,
+            honors,
+            history: ended,
+        };
+    }
+
+    /** 크루 멤버 목록에 붙일 우승 횟수 — 회원 id → 우승 수. */
+    async getWinCounts(crewId: string): Promise<Record<string, number>> {
+        const rows = await db
+            .select({
+                memberId: hiqCrewTournamentParticipants.memberId,
+                n: sql<number>`count(*)::int`,
+            })
+            .from(hiqCrewTournamentParticipants)
+            .innerJoin(hiqCrewTournaments, eq(hiqCrewTournaments.id, hiqCrewTournamentParticipants.tournamentId))
+            .where(and(
+                eq(hiqCrewTournaments.crewId, crewId),
+                eq(hiqCrewTournaments.status, "ended"),
+                eq(hiqCrewTournamentParticipants.finalRank, 1),
+            ))
+            .groupBy(hiqCrewTournamentParticipants.memberId);
+        return Object.fromEntries(rows.map((r) => [r.memberId, Number(r.n)]));
+    }
+
     // ---------- 개설 · 참가 ----------
 
     async create(data: any) {
@@ -474,10 +562,13 @@ export class TournamentRepository {
                 .from(hiqCrewTournamentParticipants)
                 .where(eq(hiqCrewTournamentParticipants.tournamentId, t.id));
             const rounds = totalRounds(bracketSize(Number(cnt?.n ?? 0)));
-            // 진 사람은 여기서 탈락 확정.
+            // 진 사람은 여기서 탈락 확정 + 최종 순위 기록.
+            // 명예의 전당이 우승자만 남기면 참가자 대부분에게 아무것도 안 남으므로,
+            // 탈락한 라운드로 순위를 매긴다(관례): 결승에서 지면 2위, 4강에서 지면 공동 3위,
+            // 8강에서 지면 공동 5위 — finalRank = 2^(남은 라운드 수) + 1.
             if (loserId) {
                 await tx.update(hiqCrewTournamentParticipants)
-                    .set({ status: "eliminated" })
+                    .set({ status: "eliminated", finalRank: Math.pow(2, rounds - match.round) + 1 })
                     .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, loserId)));
             }
             return await this.pushWinnerUp(tx, t.id, match.round, match.slot, winnerId, rounds);

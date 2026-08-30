@@ -673,6 +673,14 @@ router.get("/:id/tournaments", requireAuth, asyncHandler(async (req: AuthRequest
     return sendSuccess(res, await storage.tournaments.listByCrew(req.params.id));
 }));
 
+// GET /tournaments/hall-of-fame — 명예의 전당 (현 챔피언 · 우승 횟수 · 역대 대회)
+// ⚠️ 반드시 /:tournamentId 라우트보다 **위**에 있어야 한다. 아래에 두면 Express 가
+// "hall-of-fame" 을 대회 id 로 받아 404 를 낸다.
+router.get("/:id/tournaments/hall-of-fame", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    return sendSuccess(res, await storage.tournaments.getHallOfFame(req.params.id));
+}));
+
 // GET /tournaments/:tournamentId — 대회 + 참가자 + 대진 전부
 router.get("/:id/tournaments/:tournamentId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;

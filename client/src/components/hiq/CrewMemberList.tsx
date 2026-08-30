@@ -60,6 +60,16 @@ interface CrewMemberListProps {
 
 
 export function CrewMemberList({ members, currentMemberId, sportCategory = "BILLIARDS", crewId }: CrewMemberListProps) {
+    // 크루 대회 우승 횟수 — 명예의 전당과 같은 소스. 회원마다 조회하면 N+1 이라 한 번에 받는다.
+    const { data: hallOfFame } = useQuery<{ honors?: Array<{ memberId: string; wins: number }> }>({
+        queryKey: [`/api/hiq/crews/${crewId}/tournaments/hall-of-fame`],
+        enabled: !!crewId,
+    });
+    const winsByMember = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const h of hallOfFame?.honors ?? []) map[h.memberId] = (map[h.memberId] ?? 0) + h.wins;
+        return map;
+    }, [hallOfFame]);
     const { t } = useT();
     const { toast } = useToast();
     const [selectedMember, setSelectedMember] = useState<CrewMemberItemType | null>(null);
@@ -193,6 +203,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                         item={item}
                         currentMemberId={currentMemberId}
                         sportCategory={sportCategory}
+                        tournamentWins={winsByMember[item.member.id]}
                         onClick={() => handleMemberClick(item)}
                     />
                 ))}
@@ -444,11 +455,12 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     );
 }
 
-function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
+function MemberListItem({ item, currentMemberId, sportCategory, onClick, tournamentWins }: {
     item: CrewMemberItemType,
     currentMemberId?: string,
     sportCategory: string,
-    onClick: () => void
+    onClick: () => void,
+    tournamentWins?: number,
 }) {
     const { t } = useT();
     const m = item.member;
@@ -515,6 +527,16 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick }: {
                         {m.nickname || m.name}
                     </span>
                     {isLeader && <LucideCrown className="w-3.5 h-3.5 text-[#cba258] shrink-0" />}
+                    {/* 크루 대회 우승 횟수 — 크루 안에서만 보이는 명예라 부담이 없다. */}
+                    {!!tournamentWins && tournamentWins > 0 && (
+                        <span
+                            className="shrink-0 inline-flex items-center gap-0.5 text-[12px] font-semibold text-gold rk-num"
+                            title={t("crewMember.wins").replace("{n}", String(tournamentWins))}
+                        >
+                            <LucideTrophy className="w-3.5 h-3.5" />
+                            {tournamentWins}
+                        </span>
+                    )}
                     {isAdmin && <LucideShield className="w-3.5 h-3.5 text-black/40 shrink-0" />}
                     {isMe && (
                         <span className="shrink-0 px-1.5 py-px rounded-full text-[12px] font-semibold text-brand bg-brand/12">{t("crewMemberList.me")}</span>

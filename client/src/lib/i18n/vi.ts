@@ -1658,5 +1658,11 @@ const vi: Dict = {
   "crewTournament.resetMatch": "Đặt lại {a} vs {b}",
   "crewTournament.resetDone": "Đã đặt lại trận",
   "crewTournament.winLoss": "{w}T {l}B",
+  "hallOfFame.title": "Bảng vàng",
+  "hallOfFame.empty": "Chưa có giải nào kết thúc. Đang chờ nhà vô địch đầu tiên.",
+  "hallOfFame.currentChampion": "ĐƯƠNG KIM VÔ ĐỊCH",
+  "hallOfFame.record": "Nhì {r} · BK {s}",
+  "hallOfFame.past": "{n} giải đã qua",
+  "crewMember.wins": "{n} lần vô địch",
 };
 export default vi;

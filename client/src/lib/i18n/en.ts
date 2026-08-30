@@ -1658,5 +1658,11 @@ const en: Dict = {
   "crewTournament.resetMatch": "Reset {a} vs {b}",
   "crewTournament.resetDone": "Match reset",
   "crewTournament.winLoss": "{w}W {l}L",
+  "hallOfFame.title": "Hall of Fame",
+  "hallOfFame.empty": "No tournaments finished yet — the first champion is still open.",
+  "hallOfFame.currentChampion": "REIGNING CHAMPION",
+  "hallOfFame.record": "2nd {r} · SF {s}",
+  "hallOfFame.past": "{n} past tournaments",
+  "crewMember.wins": "{n} wins",
 };
 export default en;

@@ -1658,5 +1658,11 @@ const tr: Dict = {
   "crewTournament.resetMatch": "{a} - {b} sıfırla",
   "crewTournament.resetDone": "Maç sıfırlandı",
   "crewTournament.winLoss": "{w}G {l}M",
+  "hallOfFame.title": "Onur listesi",
+  "hallOfFame.empty": "Henüz biten turnuva yok. İlk şampiyon bekleniyor.",
+  "hallOfFame.currentChampion": "MEVCUT ŞAMPİYON",
+  "hallOfFame.record": "2. {r} · YF {s}",
+  "hallOfFame.past": "Geçmiş {n} turnuva",
+  "crewMember.wins": "{n} kupa",
 };
 export default tr;
