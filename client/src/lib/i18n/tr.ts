@@ -1670,5 +1670,7 @@ const tr: Dict = {
   "hallOfFame.semi": "{n}× YF",
   "hallOfFame.winCount": "{n} kupa",
   "hallOfFame.noKing": "Henüz kral yok",
+  "crewTournament.knockout": "Eleme",
+  "tournament.champion.me": "Bu benim",
 };
 export default tr;

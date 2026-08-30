@@ -1670,5 +1670,7 @@ const en: Dict = {
   "hallOfFame.semi": "{n}× SF",
   "hallOfFame.winCount": "{n} titles",
   "hallOfFame.noKing": "No king yet",
+  "crewTournament.knockout": "Knockout",
+  "tournament.champion.me": "That's me",
 };
 export default en;

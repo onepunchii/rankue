@@ -310,14 +310,22 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
                 <StatusChip status={tr.status} />
             </div>
 
+            {/* 메타 한 줄 — 종목·인원·형식·상품을 흩어 놓지 않고 모아 둔다.
+                예전엔 상품만 금색 알약으로 혼자 떠 있어 태그처럼 보였다. */}
+            <div className="px-6 -mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-ink-3">
+                <span>{tr.gameType === "3c" ? t("crewTournament.type3c") : t("crewTournament.type4c")}</span>
+                <span className="text-ink-4">·</span>
+                <span className="rk-num">{participants.length}/{tr.maxPlayers}</span>
+                <span className="text-ink-4">·</span>
+                <span>{isLeague ? t("crewTournament.league") : t("crewTournament.knockout")}</span>
+                {tr.prize && (
+                    <>
+                        <span className="text-ink-4">·</span>
+                        <span className="font-medium" style={{ color: "var(--gold)" }}>{tr.prize}</span>
+                    </>
+                )}
+            </div>
             {tr.description && <p className="px-6 text-[13px] text-ink-3 leading-relaxed">{tr.description}</p>}
-            {tr.prize && (
-                <div className="px-6">
-                    <span className="rk-chip bg-[var(--gold-soft)] text-[13px]" style={{ color: "var(--gold)" }}>
-                        {t("crewTournament.prize").replace("{v}", tr.prize)}
-                    </span>
-                </div>
-            )}
 
             {/* 대진표 (또는 리그 순위표) */}
             {drawn && (
@@ -329,6 +337,7 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
                             matches={matches}
                             players={players}
                             playerCount={participants.length}
+                            meId={me?.id}
                             onMatchClick={onMatchClick}
                             swapMode={swapMode}
                             selectedSlot={picked}

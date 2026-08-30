@@ -1672,4 +1672,6 @@ export const ko: Dict = {
   "hallOfFame.semi": "4강 {n}",
   "hallOfFame.winCount": "{n}회 우승",
   "hallOfFame.noKing": "아직 왕이 없어요",
+  "crewTournament.knockout": "토너먼트",
+  "tournament.champion.me": "내가 우승",
 };

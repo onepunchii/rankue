@@ -1670,5 +1670,7 @@ const vi: Dict = {
   "hallOfFame.semi": "{n}× BK",
   "hallOfFame.winCount": "{n} lần vô địch",
   "hallOfFame.noKing": "Chưa có vua",
+  "crewTournament.knockout": "Loại trực tiếp",
+  "tournament.champion.me": "Chính là tôi",
 };
 export default vi;
