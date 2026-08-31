@@ -50,18 +50,21 @@ export class CommunityRepository {
         cursor?: string; // ISO createdAt
         limit?: number;
         viewerId?: string;
+        lang?: string;
     }) {
-        const { board, tag, cursor, viewerId } = opts;
+        const { board, tag, cursor, viewerId, lang } = opts;
         const limit = Math.min(opts.limit ?? 20, 50);
 
         const conds: any[] = [notBlockedBy(viewerId, hiqCommunityPosts.authorId)];
         if (board) conds.push(eq(hiqCommunityPosts.board, board as any));
+        if (lang) conds.push(eq(hiqCommunityPosts.language, lang));
         if (tag) conds.push(sql`${hiqCommunityPosts.tags} @> ${JSON.stringify([tag])}::jsonb`);
         if (cursor) conds.push(lt(hiqCommunityPosts.createdAt, new Date(cursor)));
 
         const rows = await db.select({
             id: hiqCommunityPosts.id,
             board: hiqCommunityPosts.board,
+            language: hiqCommunityPosts.language,
             authorId: hiqCommunityPosts.authorId,
             title: hiqCommunityPosts.title,
             content: hiqCommunityPosts.content,
@@ -117,6 +120,7 @@ export class CommunityRepository {
         const rows = await db.select({
             id: hiqCommunityPosts.id,
             board: hiqCommunityPosts.board,
+            language: hiqCommunityPosts.language,
             authorId: hiqCommunityPosts.authorId,
             title: hiqCommunityPosts.title,
             content: hiqCommunityPosts.content,
@@ -329,6 +333,7 @@ export class CommunityRepository {
         return db.select({
             id: hiqCommunityPosts.id,
             board: hiqCommunityPosts.board,
+            language: hiqCommunityPosts.language,
             title: hiqCommunityPosts.title,
             content: hiqCommunityPosts.content,
             createdAt: hiqCommunityPosts.createdAt,

@@ -1688,5 +1688,6 @@ const en: Dict = {
   "loginGate.linkWorld": "World ranking — official UMB",
   "loginGate.linkPba": "PBA Tour ranking",
   "loginGate.linkCommunity": "Browse the community",
+  "community.myLanguage": "My language",
 };
 export default en;

@@ -947,7 +947,13 @@ router.get("/", asyncHandler(async (req: any, res: any) => {
     const sport = req.query.sport as string;
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
-    const crews = await storage.searchCrews(query, sport, lat, lng);
+    // 같은 나라 크루 우선 — 크루는 장소 공동체라 언어가 아니라 나라·위치로 갈린다
+    // (오너 결정 2026-08-31). 국가는 가입 로직과 같은 소스(Vercel IP 헤더)로 읽어
+    // 비로그인 방문자에게도 동작한다.
+    const viewerCountry = typeof req.headers["x-vercel-ip-country"] === "string"
+        ? (req.headers["x-vercel-ip-country"] as string).toUpperCase().slice(0, 2)
+        : undefined;
+    const crews = await storage.searchCrews(query, sport, lat, lng, viewerCountry);
     return sendSuccess(res, crews);
 }));
 

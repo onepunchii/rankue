@@ -1690,4 +1690,5 @@ export const ko: Dict = {
   "loginGate.linkWorld": "세계 랭킹 — UMB 공식",
   "loginGate.linkPba": "PBA 투어 랭킹",
   "loginGate.linkCommunity": "커뮤니티 둘러보기",
+  "community.myLanguage": "내 언어만",
 };

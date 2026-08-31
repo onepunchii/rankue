@@ -21,7 +21,7 @@ interface CommunityPostCardProps {
 }
 
 export const CommunityPostCard = ({ post, myId, showBoardChip, onClick, detail, onDeleted }: CommunityPostCardProps) => {
-    const { t } = useT();
+    const { t, locale } = useT();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [isReportOpen, setIsReportOpen] = useState(false);
@@ -100,6 +100,12 @@ export const CommunityPostCard = ({ post, myId, showBoardChip, onClick, detail, 
                             <time className="text-[11.5px] font-medium text-black/45 leading-none">
                                 {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ko })}
                             </time>
+                            {/* 내 언어가 아닌 글에만 언어 뱃지 — 전 글에 붙이면 정보가 0이 된다 */}
+                            {post.language && post.language !== locale && (
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-brand bg-brand/10 rounded px-1 py-px leading-none">
+                                    {post.language}
+                                </span>
+                            )}
                             {post.storeName && <span className="text-[11.5px] font-medium text-black/45 leading-none">· {post.storeName}</span>}
                             {post.regionName && <span className="text-[11.5px] font-medium text-black/45 leading-none">· {post.regionName}</span>}
                         </div>

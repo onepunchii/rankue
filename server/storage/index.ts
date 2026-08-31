@@ -136,7 +136,7 @@ class Storage {
     async createCrewChat(data: any) { return this.crews.createCrewChat(data); }
     async getCrewChat(id: string) { return this.crews.getCrewChat(id); }
     async deleteCrewChat(id: string) { return this.crews.deleteCrewChat(id); }
-    async searchCrews(q?: string, s?: string, lat?: number, lng?: number) { return this.crews.searchCrews(q, s, lat, lng); }
+    async searchCrews(q?: string, s?: string, lat?: number, lng?: number, viewerCountry?: string) { return this.crews.searchCrews(q, s, lat, lng, viewerCountry); }
     async joinCrew(cid: string, mid: string) { return this.crews.joinCrew(cid, mid); }
     async updateCrew(id: string, data: any) { return this.crews.updateCrew(id, data); }
     async deleteCrew(id: string) { return this.crews.deleteCrew(id); }

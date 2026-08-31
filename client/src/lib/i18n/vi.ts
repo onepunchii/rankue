@@ -1688,5 +1688,6 @@ const vi: Dict = {
   "loginGate.linkWorld": "Xếp hạng thế giới — UMB",
   "loginGate.linkPba": "Xếp hạng PBA Tour",
   "loginGate.linkCommunity": "Khám phá cộng đồng",
+  "community.myLanguage": "Ngôn ngữ của tôi",
 };
 export default vi;

@@ -33,10 +33,14 @@ const optionalAuth = (req: AuthRequest, _res: Response, next: NextFunction) => {
 // GET /posts?board=&tag=&cursor=
 // 비로그인 허용 엔드포인트라 크롤러가 임의 값을 넣는다 — 잘못된 입력은 500이 아니라 400.
 router.get("/posts", optionalAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { board, tag, cursor } = req.query as Record<string, string | undefined>;
+    const { board, tag, cursor, lang } = req.query as Record<string, string | undefined>;
     if (board && !BOARDS.includes(board as any)) return sendError(res, 400, "잘못된 게시판입니다");
     if (cursor && isNaN(Date.parse(cursor))) return sendError(res, 400, "잘못된 커서입니다");
-    const posts = await storage.community.getPosts({ board, tag, cursor, viewerId: req.userId });
+    // 언어 필터 — 정렬이 아니라 필터인 이유: 커서가 createdAt 기반이라 "내 언어 우선 정렬"은
+    // 페이지를 넘길 때 언어 그룹 경계에서 커서가 깨진다. 필터는 커서와 그대로 호환된다.
+    const LANGS = ["ko", "en", "es", "tr", "vi"];
+    const safeLang = lang && LANGS.includes(lang) ? lang : undefined;
+    const posts = await storage.community.getPosts({ board, tag, cursor, lang: safeLang, viewerId: req.userId });
     return sendSuccess(res, posts);
 }));
 
@@ -51,7 +55,7 @@ router.get("/posts/:id", optionalAuth, asyncHandler(async (req: AuthRequest, res
 
 // POST /posts — 글 작성. 서버측 금칙어 필터 + 연락처 마스킹 + 결과카드 서버 스냅샷.
 router.post("/posts", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { board, title, content, images, historyId, tags, regionName, storeId } = req.body || {};
+    const { board, title, content, images, historyId, tags, regionName, storeId, language } = req.body || {};
 
     if (!BOARDS.includes(board)) return sendError(res, 400, "잘못된 게시판입니다");
     if (typeof content !== "string" || !content.trim()) return sendError(res, 400, "내용을 입력해주세요");
@@ -96,8 +100,12 @@ router.post("/posts", requireAuth, asyncHandler(async (req: AuthRequest, res: Re
     }
 
     const isStoreBoard = board === "store" || board === "lesson";
+    // 작성자의 앱 언어 — 목록의 언어 필터·뱃지 축. 화이트리스트 밖 값은 ko 로 떨군다.
+    const LANGS = ["ko", "en", "es", "tr", "vi"];
+    const safeLang = LANGS.includes(language) ? language : "ko";
     const data = {
         board,
+        language: safeLang,
         authorId: req.userId!,
         title: title ? maskContacts(String(title).slice(0, 100)) : null,
         content: maskContacts(content.trim()),

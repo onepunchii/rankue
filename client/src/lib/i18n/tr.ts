@@ -1688,5 +1688,6 @@ const tr: Dict = {
   "loginGate.linkWorld": "Dünya sıralaması — UMB",
   "loginGate.linkPba": "PBA Tour sıralaması",
   "loginGate.linkCommunity": "Topluluğa göz at",
+  "community.myLanguage": "Dilim",
 };
 export default tr;

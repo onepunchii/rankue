@@ -27,7 +27,7 @@ interface MyHistoryItem extends CommunityGameCard {
 // - 물어보기(ask): 진입 마찰 0 — 한 줄만 써도 됨. #장비 태그 제공(중고거래 수요 관찰)
 // - 우리 매장(store)·레슨(lesson): 최근 30일 경기 기록 매장을 소속 근거로 선택
 export const WritePostDialog = ({ open, onOpenChange, board: initialBoard }: WritePostDialogProps) => {
-    const { t } = useT();
+    const { t, locale } = useT();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,6 +83,8 @@ export const WritePostDialog = ({ open, onOpenChange, board: initialBoard }: Wri
                 tags: tagEquip ? ["장비"] : [],
                 regionName: regionName.trim() || undefined,
                 storeId: storeId || undefined,
+                // 작성자의 앱 언어 — 목록의 언어 필터·뱃지 축 (서버가 화이트리스트 검증)
+                language: locale,
             },
         }),
         onSuccess: () => {

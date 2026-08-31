@@ -1247,6 +1247,10 @@ export const hiqCommunityPosts = pgTable("hiq_community_posts", {
   // brag=한 큐 자랑, ask=물어보기(잡담 흡수), store=우리 매장, lesson=레슨
   board: text("board", { enum: ["brag", "ask", "store", "lesson"] }).notNull(),
   authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
+  // 작성자의 앱 언어. 글이 곧 콘텐츠라 언어가 다르면 소음이 된다 — 목록에서 언어 필터와
+  // 뱃지의 축. 게시판을 물리적으로 나누지 않는 이유: 지금 글이 2건이라 나누면 무인도가 된다
+  // (오너 결정 2026-08-31: 분리가 아니라 태그+필터).
+  language: text("language").default("ko").notNull(),
   // 자랑은 제목 없이 캡션이 곧 제목 — title은 store/lesson에서만 선택 사용
   title: text("title"),
   content: text("content").notNull(),

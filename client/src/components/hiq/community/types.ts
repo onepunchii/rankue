@@ -26,6 +26,8 @@ export interface CommunityGameCard {
 }
 
 export interface CommunityPost {
+    /** 작성자의 앱 언어(ko/en/es/tr/vi). 내 언어가 아닌 글에 뱃지를 붙인다. */
+    language?: string;
     id: string;
     board: CommunityBoard;
     authorId: string;

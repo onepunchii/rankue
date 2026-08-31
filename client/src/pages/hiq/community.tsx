@@ -15,24 +15,35 @@ const BOARDS: (CommunityBoard | "all")[] = ["all", "brag", "ask", "store", "less
 
 // 커뮤니티 — 전체 공개 게시판 4개. 크루와 달리 가입이 없고, 채팅·DM도 없다(공개 댓글만).
 export default function HiqCommunity() {
-    const { t } = useT();
+    const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const [board, setBoard] = useState<CommunityBoard | "all">("all");
+    // 언어 필터 — 기본은 전체. 글이 몇 건 없는 지금 내 언어만 기본으로 걸면 빈 목록이 된다
+    // (오너 결정 2026-08-31: 게시판 분리가 아니라 태그+필터). 내 언어가 아닌 글에는 뱃지가 붙는다.
+    const [langOnly, setLangOnly] = useState(false);
     const [isWriteOpen, setIsWriteOpen] = useState(false);
     const [older, setOlder] = useState<CommunityPost[]>([]);
     const [hasMore, setHasMore] = useState(true);
 
     const { data: me } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
 
-    const boardParam = board === "all" ? "" : `board=${board}`;
+    const params = new URLSearchParams();
+    if (board !== "all") params.set("board", board);
+    if (langOnly) params.set("lang", locale);
+    const listQs = params.toString();
     const { data: latest = [], isLoading } = useQuery<CommunityPost[]>({
-        queryKey: ["/api/hiq/community/posts", board],
-        queryFn: async () => apiRequest(`/api/hiq/community/posts?${boardParam}`),
+        queryKey: ["/api/hiq/community/posts", board, langOnly ? locale : "all"],
+        queryFn: async () => apiRequest(`/api/hiq/community/posts?${listQs}`),
     });
 
     // 커서 페이지네이션 — 탭 전환 시 older를 비운다
     const changeBoard = (b: CommunityBoard | "all") => {
         setBoard(b);
+        setOlder([]);
+        setHasMore(true);
+    };
+    const toggleLangOnly = () => {
+        setLangOnly(v => !v);
         setOlder([]);
         setHasMore(true);
     };
@@ -46,7 +57,7 @@ export default function HiqCommunity() {
     const loadMore = async () => {
         if (!lastCreatedAt) return;
         const more: CommunityPost[] = await apiRequest(
-            `/api/hiq/community/posts?${boardParam}${boardParam ? "&" : ""}cursor=${encodeURIComponent(lastCreatedAt)}`
+            `/api/hiq/community/posts?${listQs}${listQs ? "&" : ""}cursor=${encodeURIComponent(lastCreatedAt)}`
         );
         if (more.length < 20) setHasMore(false);
         setOlder(prev => {
@@ -89,6 +100,14 @@ export default function HiqCommunity() {
                         {b === "all" ? t("community.boardAll") : t(BOARD_KEYS[b])}
                     </button>
                 ))}
+                {/* 내 언어만 보기 — 글이 여러 언어로 쌓이기 시작하면 이 칩이 공간을 가른다.
+                    기본은 전체: 지금 글이 몇 건 없어 내 언어 기본이면 빈 목록이 된다. */}
+                <button
+                    onClick={toggleLangOnly}
+                    className={`shrink-0 h-9 px-4 rounded-full text-[13.5px] font-semibold transition-colors ${langOnly ? "bg-brand text-white" : "bg-white text-ink-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:bg-black/[0.02]"}`}
+                >
+                    {t("community.myLanguage")}
+                </button>
             </div>
 
             {/* 글 목록 */}

@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { alias } from "drizzle-orm/pg-core";
 import {
     storeListings,
     hiqCrews,
@@ -414,9 +415,10 @@ export class CrewRepository {
             .orderBy(desc(hiqCrews.createdAt));
     }
 
-    async searchCrews(query?: string, sportCategory?: string, userLat?: number, userLng?: number) {
+    async searchCrews(query?: string, sportCategory?: string, userLat?: number, userLng?: number, viewerCountry?: string) {
         // TODO: For high-performance search on large datasets, consider using
         // PostgreSQL Full Text Search (GIN Index) instead of LIKE '%query%'.
+        const leaderMember = alias(hiqMembers, "leader_member");
         const crewsWithCount = await db.select({
             crew: hiqCrews,
             memberCount: sql<number>`count(${hiqCrewMembers.id})`,
@@ -426,11 +428,16 @@ export class CrewRepository {
             // 있어서 거리 계산이 늘 비어 있었다 — 실제 크루는 전부 디렉토리를 베이스로 잡는다.
             listingLat: storeListings.latitude,
             listingLng: storeListings.longitude,
+            // 크루의 국가 = 리더의 국가. 미기록(국가 저장 도입 전 가입자)은 KR 로 본다 —
+            // 기존 크루는 전부 한국 크루다.
+            leaderCountry: profiles.countryCode,
         })
             .from(hiqCrews)
             .leftJoin(hiqCrewMembers, eq(hiqCrews.id, hiqCrewMembers.crewId))
             .leftJoin(hiqStores, eq(hiqCrews.baseStoreId, hiqStores.id))
             .leftJoin(storeListings, eq(hiqCrews.baseListingCode, storeListings.code))
+            .leftJoin(leaderMember, eq(leaderMember.id, hiqCrews.leaderId))
+            .leftJoin(profiles, eq(profiles.id, leaderMember.profileId))
             .where(
                 and(
                     query ? or(
@@ -440,7 +447,7 @@ export class CrewRepository {
                     sportCategory ? eq(hiqCrews.sportCategory, sportCategory as any) : undefined
                 )
             )
-            .groupBy(hiqCrews.id, hiqStores.latitude, hiqStores.longitude, storeListings.latitude, storeListings.longitude)
+            .groupBy(hiqCrews.id, hiqStores.latitude, hiqStores.longitude, storeListings.latitude, storeListings.longitude, profiles.countryCode)
             .limit(50) // Increased limit for location sorting
             .orderBy(desc(hiqCrews.createdAt));
 
@@ -457,22 +464,27 @@ export class CrewRepository {
             return {
                 ...r.crew,
                 memberCount: Number(r.memberCount),
+                countryCode: r.leaderCountry || "KR",
                 distance
             };
         });
 
-        if (userLat && userLng) {
-            results.sort((a, b) => {
-                // If distance is available, sort by it
-                if (a.distance !== undefined && b.distance !== undefined) {
-                    return a.distance - b.distance;
-                }
-                // If only one has distance, prefer it
+        // 같은 나라 크루 우선 — 멕시코 유저에게 한국 크루 50개보다 멕시코 크루 1개가 먼저다.
+        // 그 안에서는 기존 규칙(거리 → 최신) 유지.
+        const sameCountry = (c: { countryCode: string }) =>
+            viewerCountry && c.countryCode === viewerCountry ? 0 : 1;
+        results.sort((a, b) => {
+            if (viewerCountry) {
+                const d = sameCountry(a) - sameCountry(b);
+                if (d !== 0) return d;
+            }
+            if (userLat && userLng) {
+                if (a.distance !== undefined && b.distance !== undefined) return a.distance - b.distance;
                 if (a.distance !== undefined) return -1;
                 if (b.distance !== undefined) return 1;
-                return 0;
-            });
-        }
+            }
+            return 0;
+        });
 
         return results;
     }
