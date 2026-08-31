@@ -1,3 +1,4 @@
+import { useT } from "@/lib/i18n";
 import { useLocation } from "wouter";
 import { HiqNavigation } from "./HiqNavigation";
 import { LucideLock, LucideChevronRight, type LucideIcon } from "@/lib/icons";
@@ -32,6 +33,7 @@ interface LoginGateProps {
 }
 
 export function LoginGate({ title, desc, icon: Icon = LucideLock, links, nav = true }: LoginGateProps) {
+    const { t } = useT();
     const [, setLocation] = useLocation();
 
     return (
@@ -47,13 +49,13 @@ export function LoginGate({ title, desc, icon: Icon = LucideLock, links, nav = t
                     onClick={() => goLogin(setLocation)}
                     className="w-full mt-6 h-[52px] rounded-tile bg-brand text-white text-[15px] font-bold active:scale-[0.98] transition-transform"
                 >
-                    로그인하고 시작하기
+                    {t("loginGate.cta")}
                 </button>
             </div>
 
             {links && links.length > 0 && (
                 <div className="w-full max-w-[380px] mt-4">
-                    <p className="text-[12px] font-medium text-black/40 px-1 mb-2">로그인 없이 볼 수 있어요</p>
+                    <p className="text-[12px] font-medium text-black/40 px-1 mb-2">{t("loginGate.publicSection")}</p>
                     <div className="rk-card divide-y divide-black/[0.06]">
                         {links.map((l) => (
                             <button

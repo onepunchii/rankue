@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, ApiError } from "@/lib/queryClient";
 import { HiqGame, HiqMember } from "@shared/schema";
 import { useGameHistory } from "@/hooks/useGameHistory";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useT } from "@/lib/i18n";
+import { useToast } from "@/hooks/use-toast";
 import { arrayMove } from '@dnd-kit/sortable';
 import { GameState } from "@/types/game";
 
@@ -30,7 +31,8 @@ function finalizeInnings(state: GameState) {
 export function useGameScore(id: string) {
     const [, setLocation] = useLocation();
     const { speak, playEffect } = useGameAudio();
-    const { t } = useT(); // TTS 경기 콜 다국어 (엔진 언어는 useGameAudio가 로케일 연동)
+    const { t } = useT();
+    const { toast } = useToast(); // TTS 경기 콜 다국어 (엔진 언어는 useGameAudio가 로케일 연동)
 
     // Game State with History
     const { state: gameState, set: setGameState, undo, redo, canUndo, canRedo, reset: resetGameState } = useGameHistory<GameState>({
@@ -149,6 +151,17 @@ export function useGameScore(id: string) {
                 p4HighRun: gameState.p4HighRun
             }));
             setLocation(`/game/result?id=${id}`);
+        },
+        onError: (err: any) => {
+            // 실패를 알리고 점수 저장 차단을 되돌린다 — 예전엔 아무 표시 없이 조용히 실패했고,
+            // finishedRef 가 그대로 true 라 이후의 진행 점수 저장까지 전부 막혔다
+            // (외국 유저 19경기 전원이 playing_base 에 고착된 원인 중 하나).
+            finishedRef.current = false;
+            toast({
+                title: t("gameScoreboard.finishFailTitle"),
+                description: err instanceof ApiError ? err.message : t("gameScoreboard.finishFailDesc"),
+                variant: "destructive",
+            });
         },
     });
 

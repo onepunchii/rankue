@@ -226,5 +226,14 @@ if (typeof window !== "undefined") {
     persister,
     maxAge: 1000 * 60 * 60 * 24 * 7, // 1주일
     buster: "RANKUE_CACHE_v2.3_FINAL",
+    // 진행 중 경기 행은 절대 영속화하지 않는다. 7일짜리 localStorage 스냅샷이
+    // 앱 재실행 때 점수판에 먼저 하이드레이션되고, 점수판은 그 낡은 점수를 서버에
+    // 다시 PATCH 해서 실제 진행 상황을 되돌렸다(예: 8이닝 친 경기가 0:0 으로).
+    dehydrateOptions: {
+      shouldDehydrateQuery: (query) => {
+        const key = String(query.queryKey[0] ?? "");
+        return !key.startsWith("/api/hiq/game/");
+      },
+    },
   });
 }

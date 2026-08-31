@@ -119,6 +119,34 @@ export function PlayerCard({
                 <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-black/10 pointer-events-none" />
             </div>
 
+            {/* FINISH / 마무리 오버레이 — 탭 존(z-[45])보다 위(z-[46])에 있어야 눌린다.
+                target=0 슬롯(게스트 기본값)은 승리 조건이 없으므로 절대 띄우지 않는다. */}
+            {target > 0 && displayRemaining === 0 && (
+                <div className="absolute inset-0 z-[46] flex items-center justify-center pointer-events-none">
+                    {(finishRemaining ?? 0) > 0 ? (
+                        /* 마무리가 남았을 때는 표시만 — 마무리 성공/실패 입력은 상·하단 탭으로 받는다. */
+                        <div className="bg-amber-500/15 px-7 py-3.5 rounded-card border border-amber-500/50">
+                            <span className="text-[5.5vw] font-bold text-amber-600 tabular-nums">
+                                {t("playerCard.finishRemaining")} {finishRemaining}
+                            </span>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            className="pointer-events-auto cursor-pointer bg-red-500/90 px-8 py-4 rounded-card border border-red-500 shadow-[0_4px_16px_rgba(239,68,68,0.4)] animate-pulse active:scale-95 transition-transform"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onTurnClick && onTurnClick();
+                            }}
+                        >
+                            <span className="text-[8vw] font-bold text-white">
+                                {t("playerCard.finish")}
+                            </span>
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Score Body (Flex-1) */}
             <div className="flex-1 relative flex flex-col z-10 pointer-events-none">
 
@@ -155,36 +183,11 @@ export function PlayerCard({
                                 )}
                             </AnimatePresence>
 
-                            {/* Centered FINISH Text - Interactive */}
-                            {displayRemaining === 0 && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.5 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    /* 마무리가 남았을 때는 오버레이가 탭을 가로채면 안 된다 —
-                                       마무리 성공/실패 입력은 카드 본래의 상·하단 탭으로 받는다.
-                                       다 채웠을 때만 눌러서 종료하는 FINISH 가 된다. */
-                                    className={`absolute inset-0 flex items-center justify-center z-50 ${(finishRemaining ?? 0) > 0 ? "pointer-events-none" : "pointer-events-auto cursor-pointer"}`}
-                                    onClick={(e) => {
-                                        if ((finishRemaining ?? 0) > 0) return;
-                                        e.stopPropagation();
-                                        onTurnClick && onTurnClick();
-                                    }}
-                                >
-                                    {(finishRemaining ?? 0) > 0 ? (
-                                        <div className="bg-amber-500/15 px-7 py-3.5 rounded-card border border-amber-500/50">
-                                            <span className="text-[5.5vw] font-bold text-amber-600 tabular-nums">
-                                                {t("playerCard.finishRemaining")} {finishRemaining}
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-red-500/20 px-8 py-4 rounded-card border border-red-500/50 animate-pulse">
-                                            <span className="text-[8vw] font-bold text-red-500">
-                                                {t("playerCard.finish")}
-                                            </span>
-                                        </div>
-                                    )}
-                                </motion.div>
-                            )}
+                            {/* FINISH 배지는 여기서 렌더하지 않는다 — 이 서브트리는 z-10
+                                스태킹 컨텍스트 안이라 탭 존(z-[45])이 항상 위에 깔려,
+                                배지의 onClick 이 절대 실행되지 않았다(죽은 코드). 배지를 누르면
+                                실제로는 상·하단 탭이 발동해 하단 절반은 감점이었다.
+                                배지는 카드 루트 직속(z-[46], 탭 존 위)으로 옮겼다 — 아래 참조. */}
                         </motion.div>
                     </AnimatePresence>
                 </div>

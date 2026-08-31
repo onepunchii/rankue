@@ -33,6 +33,13 @@ interface GameCreationProps {
 // 5번째 참가자는 조용히 사라진다.
 const MAX_PLAYERS = 4;
 
+// 게스트 슬롯의 기본 목표 점수. 예전엔 0이었는데, target=0 슬롯은 승리 조건이 없어서
+// (클라 가드 target>0) 게스트는 몇 점을 내도 이길 수 없고 화면엔 시작부터 가짜 FINISH 가
+// 떠 있었다. 실측(2026-08-31): 게스트 상대 경기 종료율 14% vs 회원 상대 80%,
+// 외국 유저 19경기 전원 미종료. 한국 유저는 게스트에게도 다마수를 손으로 넣는 문화라
+// 살아남았을 뿐이다.
+const DEFAULT_GUEST_TARGET = 15;
+
 // Helper to calculate target score based on average and game type
 const calculateTargetScore = (avg: string | number | null | undefined, type: '3c' | '4c'): number => {
     const average = typeof avg === 'string' ? parseFloat(avg) : (avg || 0);
@@ -129,7 +136,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                 ]
                 : [
                     { type: 'member', member, name: member.name, target: initialTarget, isHost: true },
-                    ...Array(numberOfPlayers - 1).fill({ type: 'guest', target: 0, name: '' })
+                    ...Array(numberOfPlayers - 1).fill({ type: 'guest', target: DEFAULT_GUEST_TARGET, name: '' })
                 ]);
 
             // Drop any previous PIN so each new session mints a fresh one.
@@ -176,7 +183,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             .catch(e => {
                 console.error("Failed to create invite code", e);
                 // Surface it — the host used to sit on "핀 생성 중..." forever with no way out.
-                setInviteError("핀 코드를 만들지 못했습니다. 다시 시도해주세요.");
+                setInviteError(t("gameCreation.pinCreateFail"));
             })
             .finally(() => { invitePendingRef.current = false; });
     }, [open, gameMode, member, inviteCode, inviteError, tournamentMatch]);
@@ -195,7 +202,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
 
             const newPlayers = [...prev];
             while (newPlayers.length < numberOfPlayers) {
-                newPlayers.push({ type: 'guest', target: 0, name: '' });
+                newPlayers.push({ type: 'guest', target: DEFAULT_GUEST_TARGET, name: '' });
             }
             return newPlayers;
         });
@@ -270,7 +277,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                         // Auto-expand
                         if (mayExpand) {
                             while (currentPlayers.length < requiredSlots) {
-                                currentPlayers.push({ type: 'guest', target: 0, name: '' });
+                                currentPlayers.push({ type: 'guest', target: DEFAULT_GUEST_TARGET, name: '' });
                             }
                         }
 
@@ -308,7 +315,7 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                     // never join — surface it and let them mint a fresh one.
                     const msg = String(e?.message || "");
                     if (msg.includes("존재하지") || msg.includes("404")) {
-                        setInviteError("핀이 만료되었습니다. 새 핀을 발급해주세요.");
+                        setInviteError(t("gameCreation.pinExpired"));
                         setInviteCode(null);
                         return;
                     }
@@ -385,8 +392,8 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             // 네트워크 오류(TypeError: Failed to fetch)는 사용자에게 의미가 없어 기본 문구로 간다.
             const serverMessage = error instanceof ApiError ? error.message : "";
             toast({
-                title: "게임 시작 실패",
-                description: serverMessage || "잠시 후 다시 시도해주세요.",
+                title: t("gameCreation.startFailTitle"),
+                description: serverMessage || t("gameCreation.startFailDesc"),
                 variant: "destructive"
             });
             // Only release the guard on failure — on success we navigate away.

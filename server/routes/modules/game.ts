@@ -75,6 +75,12 @@ router.get("/game/:id", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, game);
 }));
 
+// GET /game/ongoing/mine — 내 진행 중 경기 (대시보드 "이어서 하기" 배너)
+router.get("/game/ongoing/mine", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const game = await storage.games.getMyOngoingGame(req.userId!);
+    return sendSuccess(res, game);
+}));
+
 // POST /game/start
 router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
@@ -159,6 +165,12 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
             const n = Number(startData[k]);
             startData[k] = Number.isFinite(n) ? Math.min(999, Math.max(0, Math.round(n))) : 0;
         }
+    }
+    // 호스트(P1) 목표는 최소 1. target=0 슬롯은 승리 조건이 없는데(클라 가드 target>0),
+    // 게스트 슬롯은 그게 의도지만 호스트까지 0이면 경기를 끝낼 방법이 아예 없다 —
+    // 실제로 외국 유저의 0/0 경기가 영구 미종료로 남았다.
+    if (!startData.player1Target || startData.player1Target < 1) {
+        startData.player1Target = Math.max(1, Number(startData.targetScore) || 15);
     }
 
     const game = await storage.startHiqGame({

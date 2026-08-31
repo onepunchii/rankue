@@ -12,6 +12,7 @@ import { PerformanceCard } from "@/components/hiq/dashboard/PerformanceCard";
 import { RankingListCard } from "@/components/hiq/dashboard/RankingListCard";
 import { WorldRankingCard } from "@/components/hiq/umb/WorldRankingCard";
 import { PbaRankingCard, PBA_CARD_L } from "@/components/hiq/pba/PbaRankingCard";
+import { OngoingGameBanner } from "@/components/hiq/dashboard/OngoingGameBanner";
 import { QuickActions } from "@/components/hiq/dashboard/QuickActions";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
 import { PinCodeModal } from "@/components/hiq/dashboard/PinCodeModal";
@@ -155,13 +156,13 @@ export default function HiqDashboard() {
         return (
             <LoginGate
                 icon={LucideHome}
-                title="내 당구 홈"
-                desc="로그인하면 내 전적·평균(에버리지)과 매칭 게임, 라이벌 순위가 여기에 표시됩니다."
+                title={t("loginGate.homeTitle")}
+                desc={t("loginGate.homeDesc")}
                 links={[
-                    { label: "매장 찾기 — 전국 당구장", to: "/stores" },
-                    { label: "세계 랭킹 — UMB 공식", to: "/world-ranking" },
-                    { label: "PBA 투어 랭킹", to: "/pba" },
-                    { label: "커뮤니티 둘러보기", to: "/community" },
+                    { label: t("loginGate.linkStores"), to: "/stores" },
+                    { label: t("loginGate.linkWorld"), to: "/world-ranking" },
+                    { label: t("loginGate.linkPba"), to: "/pba" },
+                    { label: t("loginGate.linkCommunity"), to: "/community" },
                 ]}
             />
         );
@@ -180,6 +181,10 @@ export default function HiqDashboard() {
                 getTrend={getTrend}
                 tier={getTier(parseFloat(analysis?.summary?.overallAvg || "0"), false)}
             />
+
+            {/* 진행 중 경기 이어하기 — 이탈한 경기로 돌아갈 유일한 입구.
+                이게 없어서 앱을 껐다 켜면 경기가 영구히 미완료로 남았다(완주율 33% 실측). */}
+            <OngoingGameBanner />
 
             {/* 프로필 완성 넛지 — 가입에서 설정으로 옮긴 선택 정보(성별·출생연도) 채움 유도 */}
             {member && (!(member as any).gender || !(member as any).birthYear) && (

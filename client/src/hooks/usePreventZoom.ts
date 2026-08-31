@@ -18,26 +18,22 @@ export function usePreventZoom() {
             }
         };
 
-        // 더블 탭 방지
-        let lastTouchEnd = 0;
-        const handleTouchEnd = (e: TouchEvent) => {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                e.preventDefault();
-            }
-            lastTouchEnd = now;
-        };
+        // 더블 탭 줌 방지 — CSS 로 한다. 예전엔 300ms 안의 모든 touchend 를
+        // preventDefault 해서, 당구 연속 득점처럼 빠르게 연타하면 첫 탭만 살고
+        // 나머지 클릭이 통째로 죽었다(점수판 연타 씹힘의 원인). touch-action:
+        // manipulation 은 더블탭 줌만 막고 클릭은 지연 없이 그대로 살린다.
+        const prevTouchAction = document.documentElement.style.touchAction;
+        document.documentElement.style.touchAction = 'manipulation';
 
         window.addEventListener('resize', handleResize);
         window.addEventListener('visibilitychange', handleResize); // 화면 켜짐/꺼짐 감지
         document.addEventListener('touchmove', handleTouchMove, { passive: false });
-        document.addEventListener('touchend', handleTouchEnd, { passive: false });
 
         return () => {
+            document.documentElement.style.touchAction = prevTouchAction;
             window.removeEventListener('resize', handleResize);
             window.removeEventListener('visibilitychange', handleResize);
             document.removeEventListener('touchmove', handleTouchMove);
-            document.removeEventListener('touchend', handleTouchEnd);
         };
     }, []);
 }

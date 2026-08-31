@@ -109,7 +109,7 @@ const PlayerCard = ({
                             {t("gameCreationModal.member")}
                         </button>
                         <button
-                            onClick={() => onUpdate(idx, { type: 'guest', member: undefined, target: 0, name: '' })}
+                            onClick={() => onUpdate(idx, { type: 'guest', member: undefined, target: 15, name: '' })}
                             title={t("gameCreationModal.switchToGuest")}
                             className={`px-3 py-1.5 rounded-md text-[12px] font-bold transition-all ${isGuest ? 'bg-white text-ink-1 shadow-sm' : 'text-black/50 hover:text-black/70'}`}
                         >
@@ -152,7 +152,7 @@ const PlayerCard = ({
             {/* Score Control */}
             <div className="flex items-center gap-2">
                 <button
-                    onClick={() => onUpdate(idx, { target: Math.max(0, player.target - 1) })}
+                    onClick={() => onUpdate(idx, { target: Math.max(1, player.target - 1) })}
                     className="flex-1 h-14 rounded-xl bg-black/[0.04] hover:bg-black/[0.08] active:scale-95 transition-all flex items-center justify-center "
                 >
                     <ChevronDown className="w-6 h-6 text-ink-1" />

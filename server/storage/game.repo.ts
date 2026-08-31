@@ -44,6 +44,30 @@ const HANDICAP_MAP_3C = [
 ];
 
 export class GameRepository {
+
+    /**
+     * 내 진행 중 경기 — 대시보드의 "이어서 하기" 배너용.
+     * 앱을 껐다 켜면 진행 중 경기로 돌아갈 입구가 아예 없어서, 한 번 이탈한 경기는
+     * 영구히 playing_base 로 남았다(전체 완주율 33%, 외국 유저는 0% — 2026-08-31 실측).
+     * 최근 24시간 것만 — 며칠 지난 미완 경기를 들이밀면 오히려 혼란스럽다.
+     */
+    async getMyOngoingGame(memberId: string) {
+        const rows = await db.select().from(hiqGames)
+            .where(and(
+                inArray(hiqGames.status, ["playing_base", "playing_finish"]),
+                or(
+                    eq(hiqGames.player1Id, memberId), eq(hiqGames.player2Id, memberId),
+                    eq(hiqGames.player3Id, memberId), eq(hiqGames.player4Id, memberId),
+                ),
+            ))
+            .orderBy(desc(hiqGames.playedAt))
+            .limit(1);
+        const g = rows[0];
+        if (!g) return null;
+        const age = Date.now() - new Date(g.playedAt as any).getTime();
+        if (age > 24 * 3600 * 1000) return null;
+        return g;
+    }
     async startHiqGame(gameData: InsertHiqGame): Promise<HiqGame> {
         const [game] = await db.insert(hiqGames).values(gameData).returning();
         return game;
