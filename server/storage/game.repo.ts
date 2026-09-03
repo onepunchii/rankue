@@ -642,6 +642,24 @@ export class GameRepository {
         return true;
     }
 
+    /**
+     * 진행 중인 경기를 버린다 — 기록·RP 없이 행을 지운다.
+     * 유저 건의(2026-09-03): 잘못 시작한 경기가 "진행 중"으로 영원히 남아, 없애려면 억지로
+     * 점수를 채워 FINISH 를 누르는 수밖에 없었고 그게 랭킹 기록으로 남았다.
+     * 끝난 경기는 지우지 않는다(이미 RP·전적에 반영됨). 전적 행은 미종료 경기엔 없지만
+     * 방어적으로 같이 지운다.
+     */
+    async discardGame(gameId: string): Promise<boolean> {
+        return await db.transaction(async (tx) => {
+            const [g] = await tx.select({ id: hiqGames.id, status: hiqGames.status })
+                .from(hiqGames).where(eq(hiqGames.id, gameId));
+            if (!g || g.status === "finished") return false;
+            await tx.delete(hiqGameHistory).where(eq(hiqGameHistory.gameId, gameId));
+            await tx.delete(hiqGames).where(eq(hiqGames.id, gameId));
+            return true;
+        });
+    }
+
     // --- Private Helper ---
     async _updateUserAverage(memberId: string, type: "3c" | "4c") {
         const history = await this.getMemberGameHistory(memberId);

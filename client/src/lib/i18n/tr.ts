@@ -822,7 +822,7 @@ const tr: Dict = {
   "gameResult.verifiedMember": "Onaylı üye",
   "gameResult.viewInnings": "Devre kayıtlarını gör",
   "gameResult.winner": "Kazanan",
-  "gameScoreboard.exitConfirm": "Kaydetmeden çıkılsın mı? Bu oyun kaydedilmeyecek. Bitirmek için hedefe ulaşıp FINISH'e dokunun.",
+  "gameScoreboard.exitConfirm": "Bu oyun silinsin mi? Kaydedilmez ve devam eden oyunlardan kaldırılır.",
   "gameScoreboard.loading": "Yükleniyor...",
   "gameScoreboard.redo": "Yinele",
   "gameScoreboard.undo": "Geri al",
@@ -1689,5 +1689,10 @@ const tr: Dict = {
   "loginGate.linkPba": "PBA Tour sıralaması",
   "loginGate.linkCommunity": "Topluluğa göz at",
   "community.myLanguage": "Dilim",
+  "crewTournament.fieldFormat": "Format",
+  "crewTournament.minPlayersHint": "Her iki format için en az 4 oyuncu gerekir",
+  "crewTournament.fieldBestOf": "Maç başına oyun",
+  "crewTournament.bestOfN": "{n} maçlık",
+  "crewTournament.bestOfHint": "3 maçlık = 2 galibiyet alan kazanır. Her oyun yeni skor tablosu açar.",
 };
 export default tr;

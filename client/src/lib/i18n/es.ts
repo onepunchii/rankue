@@ -822,7 +822,7 @@ const es: Dict = {
   "gameResult.verifiedMember": "Miembro verificado",
   "gameResult.viewInnings": "Ver registro por entradas",
   "gameResult.winner": "Ganador",
-  "gameScoreboard.exitConfirm": "¿Salir sin guardar? La partida no quedará registrada. Para terminarla, alcanza tu objetivo y toca FINISH.",
+  "gameScoreboard.exitConfirm": "¿Descartar esta partida? No quedará registrada y desaparecerá de tus partidas en curso.",
   "gameScoreboard.loading": "Cargando...",
   "gameScoreboard.redo": "Rehacer",
   "gameScoreboard.undo": "Deshacer",
@@ -1689,5 +1689,10 @@ const es: Dict = {
   "loginGate.linkPba": "Ranking PBA Tour",
   "loginGate.linkCommunity": "Explorar la comunidad",
   "community.myLanguage": "Mi idioma",
+  "crewTournament.fieldFormat": "Formato",
+  "crewTournament.minPlayersHint": "Ambos formatos necesitan al menos 4 jugadores",
+  "crewTournament.fieldBestOf": "Partidas por cruce",
+  "crewTournament.bestOfN": "Al mejor de {n}",
+  "crewTournament.bestOfHint": "Al mejor de 3 = primero en ganar 2. Cada partida abre un marcador nuevo.",
 };
 export default es;

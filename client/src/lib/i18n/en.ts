@@ -822,7 +822,7 @@ const en: Dict = {
   "gameResult.verifiedMember": "Verified member",
   "gameResult.viewInnings": "View inning records",
   "gameResult.winner": "Winner",
-  "gameScoreboard.exitConfirm": "Leave without saving? This game won't be recorded. To finish, reach your target and tap FINISH.",
+  "gameScoreboard.exitConfirm": "Discard this game? It won't be recorded and will disappear from your ongoing games.",
   "gameScoreboard.loading": "Loading...",
   "gameScoreboard.redo": "Redo",
   "gameScoreboard.undo": "Undo",
@@ -1689,5 +1689,10 @@ const en: Dict = {
   "loginGate.linkPba": "PBA Tour ranking",
   "loginGate.linkCommunity": "Browse the community",
   "community.myLanguage": "My language",
+  "crewTournament.fieldFormat": "Format",
+  "crewTournament.minPlayersHint": "Both formats need at least 4 players to draw",
+  "crewTournament.fieldBestOf": "Games per match",
+  "crewTournament.bestOfN": "Best of {n}",
+  "crewTournament.bestOfHint": "Best of 3 = first to 2 wins. Each game opens a fresh scoreboard.",
 };
 export default en;

@@ -824,7 +824,7 @@ export const ko: Dict = {
   "gameResult.verifiedMember": "인증 회원",
   "gameResult.viewInnings": "이닝별 기록 보기",
   "gameResult.winner": "우승",
-  "gameScoreboard.exitConfirm": "저장하지 않고 나갈까요? 경기는 기록에 남지 않아요. 끝내려면 목표 도달 후 FINISH를 누르세요.",
+  "gameScoreboard.exitConfirm": "이 경기를 버릴까요? 기록에 남지 않고 진행 중 목록에서도 사라져요.",
   "gameScoreboard.loading": "불러오는 중...",
   "gameScoreboard.redo": "복구",
   "gameScoreboard.undo": "취소",
@@ -1691,4 +1691,9 @@ export const ko: Dict = {
   "loginGate.linkPba": "PBA 투어 랭킹",
   "loginGate.linkCommunity": "커뮤니티 둘러보기",
   "community.myLanguage": "내 언어만",
+  "crewTournament.fieldFormat": "형식",
+  "crewTournament.minPlayersHint": "토너먼트·풀리그 모두 4명부터 대진을 짤 수 있어요",
+  "crewTournament.fieldBestOf": "판 수",
+  "crewTournament.bestOfN": "{n}판",
+  "crewTournament.bestOfHint": "3판이면 2선승, 5판이면 3선승이에요. 판마다 점수판이 새로 열려요.",
 };

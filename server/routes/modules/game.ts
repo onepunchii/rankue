@@ -221,6 +221,20 @@ const assertParticipant = async (gameId: string, userId: string, res: any) => {
     return g;
 };
 
+// DELETE /game/:id — 진행 중인 경기를 버린다(기록·RP 없음).
+// 유저 건의(2026-09-03): 잘못 시작한 경기가 "진행 중"으로 영원히 남아 배너가 계속 떴고,
+// 없애려면 억지로 점수를 채워 FINISH 를 누르는 수밖에 없어 그게 랭킹 기록으로 남았다.
+// 점수판의 나가기가 이 라우트를 부른다(오너 결정: 나가기 = 그 경기 없애기).
+router.delete("/game/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const game = await assertParticipant(req.params.id, req.userId!, res);
+    if (!game) return;
+    if (game.status === "finished") return sendError(res, 409, "끝난 경기는 지울 수 없습니다");
+    // 대진 경기였다면 그 칸을 다시 연다 — 승수는 유지, 이번 판만 없던 일로.
+    try { await storage.tournaments.detachGame(game.id); } catch (e) { console.error("[Discard] 대진 분리 실패:", e); }
+    const removed = await storage.games.discardGame(game.id);
+    return sendSuccess(res, { discarded: removed });
+}));
+
 // PATCH /game/:id/score
 router.patch("/game/:id/score", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const game = await assertParticipant(req.params.id, req.userId!, res);

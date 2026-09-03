@@ -699,6 +699,9 @@ router.post("/:id/tournaments", requireAuth, asyncHandler(async (req: AuthReques
     if (gameType !== "3c" && gameType !== "4c") return sendError(res, 400, "종목을 선택해주세요");
     const maxPlayers = Number(req.body?.maxPlayers ?? 8);
     if (![4, 8, 16].includes(maxPlayers)) return sendError(res, 400, "정원은 4·8·16명 중에서 고를 수 있습니다");
+    const format = req.body?.format === "league" ? "league" : "knockout";
+    const bestOf = Number(req.body?.bestOf ?? 1);
+    if (![1, 3, 5].includes(bestOf)) return sendError(res, 400, "판 수는 1·3·5판 중에서 고를 수 있습니다");
 
     const tournament = await storage.tournaments.create({
         crewId: req.params.id,
@@ -706,6 +709,8 @@ router.post("/:id/tournaments", requireAuth, asyncHandler(async (req: AuthReques
         title,
         description: req.body?.description ? String(req.body.description).slice(0, 500) : null,
         gameType,
+        format,
+        bestOf,
         maxPlayers,
         recruitEnd: req.body?.recruitEnd ? new Date(req.body.recruitEnd) : null,
         startAt: req.body?.startAt ? new Date(req.body.startAt) : null,

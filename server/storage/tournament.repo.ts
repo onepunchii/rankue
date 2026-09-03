@@ -10,7 +10,7 @@ import {
     hiqGameHistory,
 } from "../../shared/schema.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
-import { planKnockout, planLeague, advanceTarget, bracketSize, totalRounds, shouldUseLeague } from "../../shared/tournamentBracket.js";
+import { planKnockout, planLeague, advanceTarget, bracketSize, totalRounds } from "../../shared/tournamentBracket.js";
 
 // 크루 토너먼트 저장소.
 //
@@ -259,7 +259,8 @@ export class TournamentRepository {
                 .from(hiqCrewTournamentParticipants)
                 .innerJoin(hiqMembers, eq(hiqMembers.id, hiqCrewTournamentParticipants.memberId))
                 .where(eq(hiqCrewTournamentParticipants.tournamentId, tournamentId));
-            if (parts.length < 2) throw badRequest("참가자가 2명 이상이어야 대진을 짤 수 있습니다");
+            // 오너 결정(2026-09-03): 대회는 4명부터. 2명은 대회가 아니라 매칭이고 3명 풀리그는 어색하다.
+            if (parts.length < 4) throw badRequest("대회는 4명부터 대진을 짤 수 있습니다");
 
             const ratingOf = (p: typeof parts[number]) => (t.gameType === "3c" ? p.rating3c : p.rating4c) ?? 0;
             const ordered = [...parts].sort((a, b) => ratingOf(b) - ratingOf(a));
@@ -272,7 +273,8 @@ export class TournamentRepository {
             }
             const ids = ordered.map((p) => p.memberId);
 
-            const league = shouldUseLeague(ids.length);
+            // 풀리그는 인원으로 자동 전환하지 않는다 — 크루장이 개설할 때 고른 형식을 따른다.
+            const league = t.format === "league";
             const planned = league ? planLeague(ids) : planKnockout(ids);
 
             await tx.delete(hiqCrewTournamentMatches).where(eq(hiqCrewTournamentMatches.tournamentId, tournamentId));
@@ -486,6 +488,16 @@ export class TournamentRepository {
         return gone.length > 0;
     }
 
+    /**
+     * 선수가 경기를 버리면 대진 칸을 다시 연다(ready, gameId 없음). 승수는 그대로 —
+     * 버린 건 이번 판뿐이다. 크루장 resetMatch 와 같은 결과지만 선수 본인이 트리거한다.
+     */
+    async detachGame(gameId: string) {
+        await db.update(hiqCrewTournamentMatches)
+            .set({ gameId: null, status: "ready", startedAt: null })
+            .where(and(eq(hiqCrewTournamentMatches.gameId, gameId), eq(hiqCrewTournamentMatches.status, "playing")));
+    }
+
     /** 이 경기가 대진 경기인지. 경기 종료 훅에서 한 번만 조회해 쓴다. */
     async findMatchByGameId(gameId: string) {
         const [m] = await db.select().from(hiqCrewTournamentMatches).where(eq(hiqCrewTournamentMatches.gameId, gameId));
@@ -534,15 +546,32 @@ export class TournamentRepository {
                     .where(eq(hiqCrewTournamentMatches.id, match.id));
                 return null;
             }
-            const loserId = winnerId === match.p1Id ? match.p2Id : match.p1Id;
-
             const [t] = await tx.select().from(hiqCrewTournaments).where(eq(hiqCrewTournaments.id, match.tournamentId));
             if (!t) return null;
+
+            // N판 승부 — 이번 판 승자의 승수를 올리고, 필요 승수(3판이면 2)에 닿았을 때만 대진을 끝낸다.
+            // 못 닿았으면 자리를 다시 열어(ready, gameId 없음) 다음 판을 시작할 수 있게 한다.
+            const need = Math.ceil((t.bestOf ?? 1) / 2);
+            const p1Wins = match.p1Wins + (winnerId === match.p1Id ? 1 : 0);
+            const p2Wins = match.p2Wins + (winnerId === match.p2Id ? 1 : 0);
+            if (p1Wins < need && p2Wins < need) {
+                const reopened = await tx.update(hiqCrewTournamentMatches)
+                    .set({ p1Score: s1, p2Score: s2, p1Wins, p2Wins, gameId: null, status: "ready", startedAt: null })
+                    .where(and(
+                        eq(hiqCrewTournamentMatches.id, match.id),
+                        eq(hiqCrewTournamentMatches.status, match.status),
+                    ))
+                    .returning({ id: hiqCrewTournamentMatches.id });
+                return reopened.length ? { champion: null, nextGame: true } : null;
+            }
+            // 시리즈 승자 — 이번 판 승자와 같을 수밖에 없지만 승수로 판정해 일관되게 둔다.
+            const seriesWinnerId: string = p1Wins >= need ? match.p1Id! : match.p2Id!;
+            const loserId = seriesWinnerId === match.p1Id ? match.p2Id : match.p1Id;
 
             // status 를 조건에 넣어 승자 처리가 정확히 1회만 돌게 한다. 두 사람이 동시에
             // '경기 종료'를 누르면 둘 다 여기까지 와서 wins/losses 가 2씩 올랐다.
             const claimed = await tx.update(hiqCrewTournamentMatches)
-                .set({ p1Score: s1, p2Score: s2, winnerId, loserId, status: "done", endedAt: new Date() })
+                .set({ p1Score: s1, p2Score: s2, p1Wins, p2Wins, winnerId: seriesWinnerId, loserId, status: "done", endedAt: new Date() })
                 .where(and(
                     eq(hiqCrewTournamentMatches.id, match.id),
                     eq(hiqCrewTournamentMatches.status, match.status),
@@ -552,7 +581,7 @@ export class TournamentRepository {
 
             await tx.update(hiqCrewTournamentParticipants)
                 .set({ wins: sql`${hiqCrewTournamentParticipants.wins} + 1` })
-                .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, winnerId)));
+                .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, seriesWinnerId)));
             if (loserId) {
                 await tx.update(hiqCrewTournamentParticipants)
                     .set({ losses: sql`${hiqCrewTournamentParticipants.losses} + 1` })
@@ -574,7 +603,7 @@ export class TournamentRepository {
                     .set({ status: "eliminated", finalRank: Math.pow(2, rounds - match.round) + 1 })
                     .where(and(eq(hiqCrewTournamentParticipants.tournamentId, t.id), eq(hiqCrewTournamentParticipants.memberId, loserId)));
             }
-            return await this.pushWinnerUp(tx, t.id, match.round, match.slot, winnerId, rounds);
+            return await this.pushWinnerUp(tx, t.id, match.round, match.slot, seriesWinnerId, rounds);
         });
     }
 

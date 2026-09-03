@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { HiqGame, HiqMember } from "@shared/schema";
 import { useGameHistory } from "@/hooks/useGameHistory";
@@ -97,6 +97,7 @@ export function useGameScore(id: string) {
     const finalizedInningsRef = useRef<ReturnType<typeof finalizeInnings> | null>(null);
     // 종료 요청을 보낸 뒤로는 진행 중 점수 저장을 내보내면 안 된다.
     const finishedRef = useRef(false);
+    const queryClient = useQueryClient();
 
     // Mutations
     const finishMutation = useMutation({
@@ -296,6 +297,27 @@ export function useGameScore(id: string) {
             updateScoreMutation.mutate();
         };
     }, []);
+
+    // 나가기 = 이 경기 버리기(오너 결정 2026-09-03). 기록·RP 없이 서버에서 행을 지운다.
+    // 예전엔 나가도 경기가 "진행 중"으로 남아 배너가 계속 떴고, 없애려면 억지로 점수를 채워
+    // FINISH 를 누르는 수밖에 없어 그게 랭킹 기록으로 남았다(유저 제보).
+    const discardMutation = useMutation({
+        scope: { id: `hiq-game-${id}` },
+        mutationFn: async () => {
+            // 이후의 디바운스 저장·언마운트 플러시가 지운 경기를 되살리지 않게 막는다.
+            finishedRef.current = true;
+            return await apiRequest(`/api/hiq/game/${id}`, { method: "DELETE" });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/game/ongoing/mine"] });
+            setLocation("/dashboard");
+        },
+        onError: () => {
+            // 못 지웠으면 저장 차단을 풀고 그대로 둔다 — 화면은 나가되 배너에서 다시 들어올 수 있다.
+            finishedRef.current = false;
+            setLocation("/dashboard");
+        },
+    });
 
     // Player Order Logic
     let totalPlayers = 1;
@@ -512,6 +534,7 @@ export function useGameScore(id: string) {
         handleTurnChange, // Need to export for manual calls
         handleCardTap,
         finishMutation,
+        discardMutation,
         speak
     };
 }

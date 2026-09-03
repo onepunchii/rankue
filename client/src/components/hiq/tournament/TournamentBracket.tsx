@@ -39,6 +39,9 @@ export interface BracketMatch {
     status: "pending" | "ready" | "playing" | "done" | "bye";
     /** 시작된 경기. "경기중" 칸을 누르면 새로 만들지 않고 이 경기로 들어간다. */
     gameId: string | null;
+    /** N판 승부의 누적 승수. 1판 대회면 화면에 안 보인다. */
+    p1Wins?: number;
+    p2Wins?: number;
 }
 
 /** 자리 조정 모드에서 고른 한 칸. */
@@ -53,6 +56,8 @@ interface Props {
     playerCount: number;
     /** 지금 보고 있는 사람 — 내 경기를 눈에 띄게 표시한다. */
     meId?: string;
+    /** 한 대진의 판 수. 1 이면 승수 표시를 숨긴다. */
+    bestOf?: number;
     /** 경기 카드를 눌렀을 때 — 경기 시작·상세로 보낸다. 조정 모드에서는 무시된다. */
     onMatchClick?: (match: BracketMatch) => void;
     /** 크루장 자리 조정 모드. 첫 라운드의 확정 안 된 자리끼리만 맞바꿀 수 있다. */
@@ -63,7 +68,7 @@ interface Props {
 }
 
 export function TournamentBracket({
-    matches, players, playerCount, meId,
+    matches, players, playerCount, meId, bestOf = 1,
     onMatchClick, swapMode = false, selectedSlot = null, onSlotClick, className,
 }: Props) {
     const { t } = useT();
@@ -123,6 +128,7 @@ export function TournamentBracket({
                                         match={m}
                                         players={players}
                                         meId={meId}
+                                        bestOf={bestOf}
                                         onClick={onMatchClick}
                                         swapMode={swapMode}
                                         selectedSlot={selectedSlot}
@@ -216,10 +222,11 @@ function Connector({ rounds, lit, stemLit, single = false }: {
     );
 }
 
-function MatchCard({ match, players, meId, onClick, swapMode, selectedSlot, onSlotClick }: {
+function MatchCard({ match, players, meId, bestOf = 1, onClick, swapMode, selectedSlot, onSlotClick }: {
     match: BracketMatch;
     players: Record<string, BracketPlayer>;
     meId?: string;
+    bestOf?: number;
     onClick?: (m: BracketMatch) => void;
     swapMode: boolean;
     selectedSlot: SlotRef | null;
@@ -251,6 +258,12 @@ function MatchCard({ match, players, meId, onClick, swapMode, selectedSlot, onSl
             {!bye && (
                 <Slot side="p2" match={match} players={players} meId={meId}
                     swappable={swappable} selectedSlot={selectedSlot} onSlotClick={onSlotClick} />
+            )}
+            {/* N판 승부 — 누적 승수. 1판 대회면 숨긴다. */}
+            {bestOf > 1 && ((match.p1Wins ?? 0) + (match.p2Wins ?? 0) > 0 || match.status === "done") && (
+                <div className="text-center text-[9.5px] py-0.5 border-t border-surface-line text-ink-3 rk-num font-semibold">
+                    {match.p1Wins ?? 0} - {match.p2Wins ?? 0}
+                </div>
             )}
             {(live || bye) && (
                 <div className={cn(

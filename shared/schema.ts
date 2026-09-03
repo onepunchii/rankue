@@ -527,6 +527,9 @@ export const hiqCrewTournaments = pgTable("hiq_crew_tournaments", {
   format: text("format", { enum: ["knockout", "league"] }).default("knockout").notNull(),
 
   maxPlayers: integer("max_players").default(8).notNull(),
+  // 한 대진을 몇 판으로 가리는가(1·3·5). 오너 결정(2026-09-03): 유저 건의 "몇전 몇승이
+  // 승리인가요?" — 판 수는 대회 전체 공통. 3판이면 2선승.
+  bestOf: integer("best_of").default(1).notNull(),
   recruitEnd: timestamp("recruit_end"),
   startAt: timestamp("start_at"),
   prize: text("prize"), // "우승 5만원" 같은 자유 문구
@@ -571,8 +574,11 @@ export const hiqCrewTournamentMatches = pgTable("hiq_crew_tournament_matches", {
 
   p1Id: uuid("p1_id").references(() => hiqMembers.id),
   p2Id: uuid("p2_id").references(() => hiqMembers.id), // null + p1 있음 = 부전승
-  p1Score: integer("p1_score"),
+  p1Score: integer("p1_score"), // 마지막 판 점수
   p2Score: integer("p2_score"),
+  // N판 승부의 누적 승수. bestOf=1 이면 항상 0/1 로 끝난다.
+  p1Wins: integer("p1_wins").default(0).notNull(),
+  p2Wins: integer("p2_wins").default(0).notNull(),
   winnerId: uuid("winner_id").references(() => hiqMembers.id),
   loserId: uuid("loser_id").references(() => hiqMembers.id),
 
@@ -747,6 +753,9 @@ export const storeRegistrations = pgTable("store_registrations", {
   flatPocket: integer("flat_pocket"),
   applicantName: text("applicant_name").notNull(),
   applicantPhone: text("applicant_phone").notNull(),
+  /** owner = 사장님 신청(승인 시 사장님 권한·PIN 발급) / report = 이용자 제보(디렉토리에
+   *  미인증 매장으로만 추가, 권한 없음). 유저 건의(2026-09-03) "사장님이 아닌데 등록 가능한가요?" */
+  kind: text("kind", { enum: ["owner", "report"] }).default("owner").notNull(),
   status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
   /** 승인 시 발급된 리스팅 코드 (n00001~) — 추적·중복 방지용 역참조 */
   listingCode: text("listing_code"),

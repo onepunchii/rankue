@@ -822,7 +822,7 @@ const vi: Dict = {
   "gameResult.verifiedMember": "Thành viên xác thực",
   "gameResult.viewInnings": "Xem điểm từng lượt",
   "gameResult.winner": "Chiến thắng",
-  "gameScoreboard.exitConfirm": "Thoát mà không lưu? Trận này sẽ không được ghi lại. Để kết thúc, đạt mục tiêu rồi chạm FINISH.",
+  "gameScoreboard.exitConfirm": "Bỏ trận này? Trận sẽ không được ghi lại và biến mất khỏi danh sách đang chơi.",
   "gameScoreboard.loading": "Đang tải...",
   "gameScoreboard.redo": "Làm lại",
   "gameScoreboard.undo": "Hoàn tác",
@@ -1689,5 +1689,10 @@ const vi: Dict = {
   "loginGate.linkPba": "Xếp hạng PBA Tour",
   "loginGate.linkCommunity": "Khám phá cộng đồng",
   "community.myLanguage": "Ngôn ngữ của tôi",
+  "crewTournament.fieldFormat": "Thể thức",
+  "crewTournament.minPlayersHint": "Cả hai thể thức cần ít nhất 4 người",
+  "crewTournament.fieldBestOf": "Số ván mỗi trận",
+  "crewTournament.bestOfN": "{n} ván",
+  "crewTournament.bestOfHint": "3 ván = thắng 2 trước. Mỗi ván mở bảng điểm mới.",
 };
 export default vi;

@@ -41,6 +41,9 @@ const L: Record<Locale, Record<string, string>> = {
     secApplicant: "신청자 정보", applicantName: "성함", applicantPhone: "연락처",
     applicantPhonePh: "예: 010-1234-5678",
     notice: "확인 후 등록해 드려요. 승인되면 매장 페이지가 열리고, 영업시간·요금·소개를 직접 관리할 수 있는 사장님 권한이 함께 발급됩니다.",
+    kindOwner: "사장님입니다", kindReport: "이용자 제보입니다",
+    noticeReport: "확인 후 매장 찾기 목록에 올려 드려요. 제보는 사장님 권한이 발급되지 않고, 나중에 사장님이 직접 \"사장님이신가요?\"로 가져갈 수 있어요.",
+    doneDescReport: "확인 후 매장 찾기에 올려 드릴게요. 제보 감사합니다!",
     submit: "등록 신청하기", submitting: "접수 중...",
     doneTitle: "신청이 접수되었습니다",
     doneDesc: "확인 후 등록해 드릴게요. 랭큐 회원이시면 승인 즉시 앱 알림으로 알려드리고, 전체 메뉴 → 내 매장 관리에서 바로 시작할 수 있습니다.",
@@ -58,6 +61,9 @@ const L: Record<Locale, Record<string, string>> = {
     secApplicant: "Applicant", applicantName: "Name", applicantPhone: "Contact number",
     applicantPhonePh: "e.g. 010-1234-5678",
     notice: "We'll review and publish your venue. Once approved, you get an owner account to manage hours, rates and the intro yourself.",
+    kindOwner: "I'm the owner", kindReport: "I'm a customer (report)",
+    noticeReport: "We'll review and add the venue to the directory. Reports don't create an owner account; the owner can claim it later.",
+    doneDescReport: "We'll review and list it. Thanks for the report!",
     submit: "Submit", submitting: "Submitting...",
     doneTitle: "Request received",
     doneDesc: "We'll review and publish it. RANKUE members get an in-app notification the moment it's approved.",
@@ -75,6 +81,9 @@ const L: Record<Locale, Record<string, string>> = {
     secApplicant: "Người đăng ký", applicantName: "Họ tên", applicantPhone: "Số liên lạc",
     applicantPhonePh: "VD: 010-1234-5678",
     notice: "Chúng tôi sẽ duyệt và đăng quán của bạn. Sau khi duyệt, bạn nhận tài khoản chủ quán để tự quản lý thông tin.",
+    kindOwner: "Tôi là chủ quán", kindReport: "Tôi là khách (báo tin)",
+    noticeReport: "Chúng tôi sẽ xem xét và thêm quán vào danh mục. Báo tin không tạo tài khoản chủ quán; chủ quán có thể nhận sau.",
+    doneDescReport: "Chúng tôi sẽ xem xét và đăng. Cảm ơn bạn đã báo!",
     submit: "Gửi đăng ký", submitting: "Đang gửi...",
     doneTitle: "Đã nhận yêu cầu",
     doneDesc: "Chúng tôi sẽ duyệt và đăng quán. Thành viên RANKUE sẽ nhận thông báo ngay khi được duyệt.",
@@ -92,6 +101,9 @@ const L: Record<Locale, Record<string, string>> = {
     secApplicant: "Başvuran", applicantName: "Ad", applicantPhone: "İletişim numarası",
     applicantPhonePh: "örn. 010-1234-5678",
     notice: "İnceleyip yayınlayacağız. Onaylanınca bilgileri kendiniz yönetebileceğiniz sahip hesabı verilir.",
+    kindOwner: "Sahibiyim", kindReport: "Müşteriyim (bildirim)",
+    noticeReport: "İnceleyip mekânı rehbere ekleyeceğiz. Bildirimler sahip hesabı oluşturmaz; sahibi daha sonra talep edebilir.",
+    doneDescReport: "İnceleyip listeleyeceğiz. Bildirim için teşekkürler!",
     submit: "Başvur", submitting: "Gönderiliyor...",
     doneTitle: "Başvuru alındı",
     doneDesc: "İnceleyip yayınlayacağız. RANKUE üyeleri onaylanır onaylanmaz bildirim alır.",
@@ -109,6 +121,9 @@ const L: Record<Locale, Record<string, string>> = {
     secApplicant: "Solicitante", applicantName: "Nombre", applicantPhone: "Contacto",
     applicantPhonePh: "ej. 010-1234-5678",
     notice: "Revisaremos y publicaremos tu local. Al aprobarse recibirás una cuenta de propietario para gestionarlo.",
+    kindOwner: "Soy el dueño", kindReport: "Soy cliente (aviso)",
+    noticeReport: "Revisaremos y añadiremos el local al directorio. Los avisos no crean cuenta de dueño; el dueño podrá reclamarlo después.",
+    doneDescReport: "Lo revisaremos y lo publicaremos. ¡Gracias por el aviso!",
     submit: "Enviar", submitting: "Enviando...",
     doneTitle: "Solicitud recibida",
     doneDesc: "La revisaremos y publicaremos. Los miembros de RANKUE reciben una notificación al aprobarse.",
@@ -134,6 +149,9 @@ export default function StoreRegister() {
     applicantName: "", applicantPhone: "",
   });
   const [done, setDone] = useState(false);
+  // 사장님 신청 / 이용자 제보. 유저 건의(2026-09-03): 사장님이 아닌데 검색에 없는 당구장을
+  // 올리고 싶다. 제보는 승인 시 디렉토리에만 추가되고 권한·PIN 은 발급되지 않는다.
+  const [kind, setKind] = useState<"owner" | "report">("owner");
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   // 로그인 회원이면 신청자 정보 자동 채움 — 소셜 가입자의 placeholder 전화는 제외
@@ -162,6 +180,7 @@ export default function StoreRegister() {
       method: "POST",
       body: {
         ...form,
+        kind,
         applicantName: prefillName,
         applicantPhone: prefillPhone,
       },
@@ -181,7 +200,7 @@ export default function StoreRegister() {
             <LucideCheckCircle className="w-7 h-7 text-brand" />
           </div>
           <h1 className="text-[20px] font-bold">{t.doneTitle}</h1>
-          <p className="text-[13.5px] text-black/50 mt-2 leading-relaxed">{t.doneDesc}</p>
+          <p className="text-[13.5px] text-black/50 mt-2 leading-relaxed">{kind === "report" ? t.doneDescReport : t.doneDesc}</p>
           <button
             onClick={() => setLocation("/stores")}
             className="w-full mt-6 h-[50px] rounded-tile bg-brand text-white text-[15px] font-bold active:scale-[0.98] transition-transform"
@@ -275,9 +294,17 @@ export default function StoreRegister() {
           </div>
         </section>
 
-        {/* 신청자 */}
+        {/* 신청자 — 사장님인지 이용자 제보인지 먼저 고른다 */}
         <section className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-4">
           <h2 className="text-[13px] font-bold text-brand mb-4">{t.secApplicant}</h2>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {(["owner", "report"] as const).map((k) => (
+              <button key={k} type="button" onClick={() => setKind(k)}
+                className={`h-11 rounded-xl border text-[13px] font-semibold transition-colors ${kind === k ? "border-brand bg-brand/[0.06] text-[rgba(0,0,0,0.87)]" : "border-black/10 text-black/50"}`}>
+                {k === "owner" ? t.kindOwner : t.kindReport}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>{t.applicantName} <span className="text-red-500">*</span></label>
@@ -292,7 +319,7 @@ export default function StoreRegister() {
           </div>
         </section>
 
-        <p className="text-[12px] text-black/45 leading-relaxed px-1 mb-5">{t.notice}</p>
+        <p className="text-[12px] text-black/45 leading-relaxed px-1 mb-5">{kind === "report" ? t.noticeReport : t.notice}</p>
 
         <button
           disabled={!canSubmit}

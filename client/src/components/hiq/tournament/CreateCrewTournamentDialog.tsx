@@ -34,9 +34,13 @@ export function CreateCrewTournamentDialog({ open, onOpenChange, crewId }: Props
     const [gameType, setGameType] = useState<"3c" | "4c">("3c");
     const [maxPlayers, setMaxPlayers] = useState<number>(8);
     const [prize, setPrize] = useState("");
+    // 형식은 인원으로 자동 전환하지 않고 크루장이 고른다(오너 결정 2026-09-03). 둘 다 4명부터.
+    const [format, setFormat] = useState<"knockout" | "league">("knockout");
+    // 한 대진을 몇 판으로 가리는가 — 3판이면 2선승. 유저 건의 "몇전 몇승이 승리인가요?"
+    const [bestOf, setBestOf] = useState<1 | 3 | 5>(1);
 
     const reset = () => {
-        setTitle(""); setDescription(""); setGameType("3c"); setMaxPlayers(8); setPrize("");
+        setTitle(""); setDescription(""); setGameType("3c"); setMaxPlayers(8); setPrize(""); setFormat("knockout"); setBestOf(1);
     };
 
     const createM = useMutation({
@@ -67,6 +71,8 @@ export function CreateCrewTournamentDialog({ open, onOpenChange, crewId }: Props
             description: description.trim() || null,
             gameType,
             maxPlayers,
+            format,
+            bestOf,
             prize: prize.trim() || null,
         });
     };
@@ -123,6 +129,42 @@ export function CreateCrewTournamentDialog({ open, onOpenChange, crewId }: Props
                             ))}
                         </div>
                         <p className="text-[11.5px] text-ink-4 leading-relaxed">{t("crewTournament.sizeHint")}</p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label>{t("crewTournament.fieldFormat")}</Label>
+                        <div className="flex gap-2">
+                            {(["knockout", "league"] as const).map((f) => (
+                                <button
+                                    key={f} type="button" onClick={() => setFormat(f)}
+                                    className={cn(
+                                        "flex-1 h-11 rounded-xl border text-[13px] font-semibold transition-colors",
+                                        format === f ? "border-brand bg-brand/[0.06] text-ink-1" : "border-surface-line text-ink-3",
+                                    )}
+                                >
+                                    {f === "knockout" ? t("crewTournament.knockout") : t("crewTournament.league")}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[11.5px] text-ink-4 leading-relaxed">{t("crewTournament.minPlayersHint")}</p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label>{t("crewTournament.fieldBestOf")}</Label>
+                        <div className="flex gap-2">
+                            {([1, 3, 5] as const).map((n) => (
+                                <button
+                                    key={n} type="button" onClick={() => setBestOf(n)}
+                                    className={cn(
+                                        "flex-1 h-11 rounded-xl border text-[13px] font-semibold rk-num transition-colors",
+                                        bestOf === n ? "border-brand bg-brand/[0.06] text-ink-1" : "border-surface-line text-ink-3",
+                                    )}
+                                >
+                                    {t("crewTournament.bestOfN").replace("{n}", String(n))}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[11.5px] text-ink-4 leading-relaxed">{t("crewTournament.bestOfHint")}</p>
                     </div>
 
                     <div className="space-y-1.5">

@@ -27,7 +27,7 @@ export default function HiqScoreboard() {
         game, isLoading, players, totalPlayers,
         gameState, canUndo, canRedo, undo, redo,
         playerOrder, handleDragEnd, handleCardTap, handleTurnChange,
-        finishMutation, speak
+        finishMutation, discardMutation, speak
     } = useGameScore(id || "");
 
     const [inningModalPlayer, setInningModalPlayer] = useState<number | null>(null);
@@ -155,7 +155,7 @@ export default function HiqScoreboard() {
 
                 <ScoreboardBottomBar
                     innings={gameState.innings}
-                    onExit={() => { if (confirm(t("gameScoreboard.exitConfirm"))) setLocation("/dashboard"); }}
+                    onExit={() => { if (discardMutation.isPending) return; if (confirm(t("gameScoreboard.exitConfirm"))) discardMutation.mutate(); }}
                     canUndo={canUndo}
                     canRedo={canRedo}
                     onUndo={() => { undo(); speak(t("gameScoreboard.undo")); }}

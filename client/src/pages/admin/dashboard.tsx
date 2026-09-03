@@ -200,8 +200,9 @@ export default function AdminDashboard() {
         flatLarge: number | null; flatMedium: number | null; flatPocket: number | null;
         applicantName: string; applicantPhone: string;
         status: "pending" | "approved" | "rejected"; listingCode: string | null; issuedPin: string | null; createdAt: string;
+        kind?: "owner" | "report";
     }>>({ queryKey: ["/api/hiq/admin/store-registrations"] });
-    const [regResult, setRegResult] = useState<{ listingCode: string; storeSlug: string; partnerPhone: string; issuedPin: string | null; notified?: boolean } | null>(null);
+    const [regResult, setRegResult] = useState<{ listingCode: string; storeSlug?: string; partnerPhone?: string; issuedPin?: string | null; notified?: boolean; kind?: "owner" | "report" } | null>(null);
     const approveReg = useMutation({
         mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/store-registrations/${id}/approve`, { method: "POST" }),
         onSuccess: (r: any) => {
@@ -505,7 +506,15 @@ export default function AdminDashboard() {
 
                     {tab === "registrations" && (
                         <div className="grid gap-4">
-                            {regResult && (
+                            {regResult && regResult.kind === "report" && (
+                                <div className="bg-brand/[0.06] border border-brand/30 p-5 rounded-2xl">
+                                    <p className="font-bold text-brand mb-2">✓ 디렉토리에 추가했습니다 — 권한·PIN 은 발급하지 않았습니다(이용자 제보)</p>
+                                    <p className="text-[14px]">매장 페이지: <a className="text-brand font-bold underline" href={`/stores/${regResult.listingCode}`} target="_blank" rel="noreferrer">/stores/{regResult.listingCode}</a></p>
+                                    <p className="text-[13px] text-black/55 mt-1">사장님이 나중에 "사장님이신가요?"로 클레임하면 그때 권한이 나갑니다.</p>
+                                    <Button variant="ghost" size="sm" className="mt-2" onClick={() => setRegResult(null)}>닫기</Button>
+                                </div>
+                            )}
+                            {regResult && regResult.kind !== "report" && (
                                 <div className="bg-brand/[0.06] border border-brand/30 p-5 rounded-2xl">
                                     <p className="font-bold text-brand mb-2">
                                         {regResult.notified
@@ -536,6 +545,7 @@ export default function AdminDashboard() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-bold text-[15px]">{r.name}</span>
                                         <Badge variant="secondary">{r.region}</Badge>
+                                        {r.kind === "report" && <Badge variant="outline" className="border-[#F5B721] text-[#8a6a0a]">이용자 제보 · 권한 미발급</Badge>}
                                         {r.status === "approved" && <Badge className="bg-brand text-white">등록됨 {r.listingCode && `· ${r.listingCode}`}</Badge>}
                                         {r.issuedPin && (
                                             <Badge variant="outline" className="border-brand/40 text-brand tabular-nums" title="발급 당시 초기 PIN — 사장님이 변경했다면 낡은 값일 수 있습니다">
@@ -559,7 +569,7 @@ export default function AdminDashboard() {
                                             <Button size="sm" variant="outline" onClick={() => window.open(`tel:${r.applicantPhone}`)}>전화</Button>
                                             <Button size="sm" variant="ghost" className="text-red-500" disabled={rejectReg.isPending} onClick={() => rejectReg.mutate(r.id)}>거절</Button>
                                             <Button size="sm" className="bg-brand hover:bg-brand-strong text-white" disabled={approveReg.isPending} onClick={() => approveReg.mutate(r.id)}>
-                                                {approveReg.isPending ? "발급 중..." : "승인·페이지 생성"}
+                                                {approveReg.isPending ? "처리 중..." : r.kind === "report" ? "승인·디렉토리 추가" : "승인·페이지 생성"}
                                             </Button>
                                         </div>
                                     )}

@@ -408,10 +408,8 @@ router.post("/store-registrations/:id/approve", checkSuperAdmin, asyncHandler(as
     if (!reg) return sendError(res, 404, "신청을 찾을 수 없습니다");
     if (reg.status !== "pending") return sendError(res, 409, "이미 처리된 신청입니다");
 
-    const out = await issueOwnership({
-        applicantName: reg.applicantName,
-        applicantPhone: reg.applicantPhone,
-        prepareListing: async (tx) => {
+    // 신규 코드 발급 + 리스팅 삽입 — 사장님 신청과 이용자 제보가 같은 로직을 쓴다.
+    const prepareListing = async (tx: any) => {
             // 신규 코드 발급 — 수집분(C#####)과 구분되는 n#####. 소문자인 이유: 파트너 매장
             // slug 가 code.toLowerCase() 로 파생되므로 처음부터 소문자가 왕복 일관적이다.
             // unique(code) 제약이 동시 승인 경쟁을 막는다(충돌 시 트랜잭션 실패 → 재시도).
@@ -437,29 +435,49 @@ router.post("/store-registrations/:id/approve", checkSuperAdmin, asyncHandler(as
                 flatPocket: reg.flatPocket,
             }).returning();
             return listing as any;
-        },
-        finalizeTx: async (tx, listing) => {
-            await tx.update(storeRegistrations)
-                .set({ status: "approved", processedAt: new Date(), listingCode: listing.code })
-                .where(eq(storeRegistrations.id, reg.id));
-        },
-    });
-    if (!out.ok) return sendError(res, out.status, out.message);
-
+    };
+    const finalizeTx = async (tx: any, listing: ListingLike) => {
+        await tx.update(storeRegistrations)
+            .set({ status: "approved", processedAt: new Date(), listingCode: listing.code })
+            .where(eq(storeRegistrations.id, reg.id));
+    };
     // 지오코딩 — 실패해도 승인은 유효(좌표 없는 행은 배치 스크립트가 나중에 채운다).
     // 주소의 층·호 표기는 노이즈라 제거(geocode-listings.ts 와 동일 전처리).
-    try {
-        const { geocodeCity } = await import("../../lib/geocode.js");
-        const cleaned = reg.address.replace(/\s+(지하\s*)?\d+층.*$/, "").replace(/\s+[\dB]+호.*$/, "");
-        const geo = await geocodeCity(cleaned, "KR");
-        if (geo) {
-            await db.update(storeListings)
-                .set({ latitude: geo.lat, longitude: geo.lng })
-                .where(eq(storeListings.code, out.listing.code));
+    const geocode = async (code: string) => {
+        try {
+            const { geocodeCity } = await import("../../lib/geocode.js");
+            const cleaned = reg.address.replace(/\s+(지하\s*)?\d+층.*$/, "").replace(/\s+[\dB]+호.*$/, "");
+            const geo = await geocodeCity(cleaned, "KR");
+            if (geo) {
+                await db.update(storeListings)
+                    .set({ latitude: geo.lat, longitude: geo.lng })
+                    .where(eq(storeListings.code, code));
+            }
+        } catch (e) {
+            console.warn("[store-registration approve] 지오코딩 실패:", (e as Error)?.message);
         }
-    } catch (e) {
-        console.warn("[store-registration approve] 지오코딩 실패:", (e as Error)?.message);
+    };
+
+    // 이용자 제보 — 디렉토리에 미인증 매장으로만 올린다. 권한·PIN·파트너 매장은 발급하지
+    // 않는다(제보자는 사장님이 아니다). 사장님이 나중에 오면 기존 클레임 절차로 가져간다.
+    if ((reg as any).kind === "report") {
+        const listing = await db.transaction(async (tx) => {
+            const l = await prepareListing(tx);
+            await finalizeTx(tx, l);
+            return l;
+        });
+        await geocode(listing.code);
+        return sendSuccess(res, { approved: true, kind: "report", listingCode: listing.code });
     }
+
+    const out = await issueOwnership({
+        applicantName: reg.applicantName,
+        applicantPhone: reg.applicantPhone,
+        prepareListing,
+        finalizeTx,
+    });
+    if (!out.ok) return sendError(res, out.status, out.message);
+    await geocode(out.listing.code);
 
     if (out.issuedPin) {
         try {

@@ -181,6 +181,9 @@ router.post("/register", asyncHandler(async (req: any, res: Response) => {
     const address = String(req.body?.address || "").trim().slice(0, 120);
     const applicantName = String(req.body?.applicantName || "").trim().slice(0, 30);
     const applicantPhone = String(req.body?.applicantPhone || "").trim().slice(0, 20);
+    // owner = 사장님 신청(승인 시 권한·PIN 발급) / report = 이용자 제보(디렉토리 추가만).
+    // 유저 건의(2026-09-03): 사장님이 아닌 이용자도 검색에 없는 당구장을 올릴 수 있어야 한다.
+    const kind: "owner" | "report" = req.body?.kind === "report" ? "report" : "owner";
     if (name.length < 2) return sendError(res, 400, "매장 이름을 입력해주세요");
     if (!REGIONS.has(region)) return sendError(res, 400, "지역(시/도)을 선택해주세요");
     if (address.length < 5) return sendError(res, 400, "주소를 입력해주세요");
@@ -219,9 +222,9 @@ router.post("/register", asyncHandler(async (req: any, res: Response) => {
         flatLarge: intOr(req.body?.flatLarge, 1_000_000),
         flatMedium: intOr(req.body?.flatMedium, 1_000_000),
         flatPocket: intOr(req.body?.flatPocket, 1_000_000),
-        applicantName, applicantPhone,
+        applicantName, applicantPhone, kind,
     });
-    return sendSuccess(res, { submitted: true });
+    return sendSuccess(res, { submitted: true, kind });
 }));
 
 // POST /listings/:code/suggest — 정보 수정 제안 (폐업·이전·오기)

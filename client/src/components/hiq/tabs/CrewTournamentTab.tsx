@@ -14,7 +14,6 @@ import { BallDot } from "@/components/hiq/BallDot";
 import { TournamentBracket, type BracketMatch, type BracketPlayer, type SlotRef } from "@/components/hiq/tournament/TournamentBracket";
 import { CreateCrewTournamentDialog } from "@/components/hiq/tournament/CreateCrewTournamentDialog";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
-import { shouldUseLeague } from "@shared/tournamentBracket";
 import type { HiqMember, HiqGameHistory } from "@shared/schema";
 
 // 크루 대회 탭. 목록 ↔ 상세를 한 컴포넌트에서 오간다(정모·투표 탭과 같은 결).
@@ -37,7 +36,7 @@ interface Props {
 interface TournamentRow {
     id: string; title: string; description: string | null;
     gameType: "3c" | "4c"; format: "knockout" | "league";
-    maxPlayers: number; status: string; championId: string | null;
+    maxPlayers: number; status: string; championId: string | null; bestOf?: number;
     prize: string | null; startAt: string | null; recruitEnd: string | null;
     creatorId: string; participantCount: number; championName?: string | null;
 }
@@ -271,9 +270,11 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
     const { tournament: tr, participants, matches } = data;
     const joined = participants.some((p) => p.memberId === me?.id);
     const isLeague = tr.format === "league";
-    const canDraw = isAdmin && tr.status !== "ended" && participants.length >= 2;
+    // 대회는 4명부터(오너 결정 2026-09-03) — 서버도 같은 기준으로 거절한다.
+    const canDraw = isAdmin && tr.status !== "ended" && participants.length >= 4;
     const drawn = matches.length > 0;
-    const willBeLeague = shouldUseLeague(participants.length);
+    const willBeLeague = tr.format === "league";
+    const bestOf = tr.bestOf ?? 1;
 
     // 자리 조정 — 두 자리를 차례로 누르면 맞바꾼다.
     const onSlotClick = (ref: SlotRef, memberId: string | null) => {
@@ -335,6 +336,12 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
                 <span className="rk-num">{participants.length}/{tr.maxPlayers}</span>
                 <span className="text-ink-4">·</span>
                 <span>{isLeague ? t("crewTournament.league") : t("crewTournament.knockout")}</span>
+                {bestOf > 1 && (
+                    <>
+                        <span className="text-ink-4">·</span>
+                        <span className="rk-num">{t("crewTournament.bestOfN").replace("{n}", String(bestOf))}</span>
+                    </>
+                )}
                 {tr.prize && (
                     <>
                         <span className="text-ink-4">·</span>
@@ -348,13 +355,14 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
             {drawn && (
                 <div className="px-5">
                     {isLeague ? (
-                        <LeagueTable participants={participants} matches={matches} players={players} onMatchClick={onMatchClick} canPlay={myTurn} />
+                        <LeagueTable participants={participants} matches={matches} players={players} onMatchClick={onMatchClick} canPlay={myTurn} bestOf={bestOf} />
                     ) : (
                         <TournamentBracket
                             matches={matches}
                             players={players}
                             playerCount={participants.length}
                             meId={me?.id}
+                            bestOf={bestOf}
                             onMatchClick={onMatchClick}
                             swapMode={swapMode}
                             selectedSlot={picked}
@@ -376,8 +384,8 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
                     <h3 className="text-[13px] font-semibold text-ink-3">
                         {t("crewTournament.roster")} <span className="rk-num text-ink-4">{participants.length}/{tr.maxPlayers}</span>
                     </h3>
-                    {!drawn && participants.length > 0 && participants.length < 4 && (
-                        <span className="text-[11.5px] text-ink-4">{t("crewTournament.leagueHint")}</span>
+                    {!drawn && participants.length < 4 && (
+                        <span className="text-[11.5px] text-ink-4">{t("crewTournament.minPlayersHint")}</span>
                     )}
                 </div>
                 <div className="rk-card overflow-hidden">
@@ -484,12 +492,13 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
 }
 
 /** 풀리그 — 대진표 대신 순위표 + 경기 목록. 3명 이하일 때 쓴다. */
-function LeagueTable({ participants, matches, players, onMatchClick, canPlay }: {
+function LeagueTable({ participants, matches, players, onMatchClick, canPlay, bestOf = 1 }: {
     participants: Detail["participants"];
     matches: BracketMatch[];
     players: Record<string, BracketPlayer>;
     onMatchClick: (m: BracketMatch) => void;
     canPlay: (m: BracketMatch) => boolean;
+    bestOf?: number;
 }) {
     const { t } = useT();
     const ranked = [...participants].sort((a, b) => (b.wins - a.wins) || (a.losses - b.losses));
@@ -524,7 +533,7 @@ function LeagueTable({ participants, matches, players, onMatchClick, canPlay }: 
                                 {m.p1Id ? players[m.p1Id]?.nickname : "-"}
                             </span>
                             <span className="rk-num text-ink-3 shrink-0">
-                                {done ? `${m.p1Score ?? 0} : ${m.p2Score ?? 0}` : playable ? <LucidePlay className="w-3.5 h-3.5 text-brand" /> : "vs"}
+                                {bestOf > 1 && (m.p1Wins || m.p2Wins || done) ? `${m.p1Wins}-${m.p2Wins}` : done ? `${m.p1Score ?? 0} : ${m.p2Score ?? 0}` : playable ? <LucidePlay className="w-3.5 h-3.5 text-brand" /> : "vs"}
                             </span>
                             <span className={cn("flex-1 min-w-0 truncate text-right", m.winnerId === m.p2Id ? "font-semibold text-ink-1" : "text-ink-3")}>
                                 {m.p2Id ? players[m.p2Id]?.nickname : "-"}
