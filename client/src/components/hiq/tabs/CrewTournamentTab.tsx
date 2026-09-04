@@ -270,8 +270,8 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
     const { tournament: tr, participants, matches } = data;
     const joined = participants.some((p) => p.memberId === me?.id);
     const isLeague = tr.format === "league";
-    // 대회는 4명부터(오너 결정 2026-09-03) — 서버도 같은 기준으로 거절한다.
-    const canDraw = isAdmin && tr.status !== "ended" && participants.length >= 4;
+    // 대회는 2명부터(오너 결정 2026-09-04) — 서버도 같은 기준으로 거절한다.
+    const canDraw = isAdmin && tr.status !== "ended" && participants.length >= 2;
     const drawn = matches.length > 0;
     const willBeLeague = tr.format === "league";
     const bestOf = tr.bestOf ?? 1;
@@ -335,11 +335,13 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
                 <span className="text-ink-4">·</span>
                 <span className="rk-num">{participants.length}/{tr.maxPlayers}</span>
                 <span className="text-ink-4">·</span>
-                <span>{isLeague ? t("crewTournament.league") : t("crewTournament.knockout")}</span>
+                {/* 2인 대회는 토너먼트라 부를 게 없다 — 판 수가 곧 형식이다. */}
+                {participants.length > 2 && !isLeague && <span>{t("crewTournament.knockout")}</span>}
+                {isLeague && <span>{t("crewTournament.league")}</span>}
                 {bestOf > 1 && (
                     <>
                         <span className="text-ink-4">·</span>
-                        <span className="rk-num">{t("crewTournament.bestOfN").replace("{n}", String(bestOf))}</span>
+                        <span className="rk-num">{bestOf === 1 ? t("crewTournament.bestOf1") : t("crewTournament.bestOfWin").replace("{n}", String(bestOf)).replace("{w}", String(Math.ceil(bestOf / 2)))}</span>
                     </>
                 )}
                 {tr.prize && (
@@ -384,7 +386,7 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
                     <h3 className="text-[13px] font-semibold text-ink-3">
                         {t("crewTournament.roster")} <span className="rk-num text-ink-4">{participants.length}/{tr.maxPlayers}</span>
                     </h3>
-                    {!drawn && participants.length < 4 && (
+                    {!drawn && participants.length < 2 && (
                         <span className="text-[11.5px] text-ink-4">{t("crewTournament.minPlayersHint")}</span>
                     )}
                 </div>

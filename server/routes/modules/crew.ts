@@ -698,8 +698,11 @@ router.post("/:id/tournaments", requireAuth, asyncHandler(async (req: AuthReques
     const gameType = req.body?.gameType;
     if (gameType !== "3c" && gameType !== "4c") return sendError(res, 400, "종목을 선택해주세요");
     const maxPlayers = Number(req.body?.maxPlayers ?? 8);
-    if (![4, 8, 16].includes(maxPlayers)) return sendError(res, 400, "정원은 4·8·16명 중에서 고를 수 있습니다");
-    const format = req.body?.format === "league" ? "league" : "knockout";
+    // 2의 거듭제곱만 허용 — 대진표가 딱 떨어진다. 2인은 곧 단판(또는 N판) 승부다
+    // (오너 결정 2026-09-04: 2명 대회 허용, 풀리그는 당분간 접는다).
+    if (![2, 4, 8, 16].includes(maxPlayers)) return sendError(res, 400, "정원은 2·4·8·16명 중에서 고를 수 있습니다");
+    // 풀리그 UI 를 뺐으므로 항상 토너먼트다. 컬럼은 남겨 둔다 — 나중에 되살릴 때 쓴다.
+    const format = "knockout";
     const bestOf = Number(req.body?.bestOf ?? 1);
     if (![1, 3, 5].includes(bestOf)) return sendError(res, 400, "판 수는 1·3·5판 중에서 고를 수 있습니다");
 

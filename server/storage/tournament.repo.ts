@@ -259,8 +259,9 @@ export class TournamentRepository {
                 .from(hiqCrewTournamentParticipants)
                 .innerJoin(hiqMembers, eq(hiqMembers.id, hiqCrewTournamentParticipants.memberId))
                 .where(eq(hiqCrewTournamentParticipants.tournamentId, tournamentId));
-            // 오너 결정(2026-09-03): 대회는 4명부터. 2명은 대회가 아니라 매칭이고 3명 풀리그는 어색하다.
-            if (parts.length < 4) throw badRequest("대회는 4명부터 대진을 짤 수 있습니다");
+            // 오너 결정(2026-09-04): 2명부터. 유저가 "둘이 타이틀 걸고" 쓰던 방식을 되살린다 —
+            // 2인 대회는 곧 단판(또는 N판) 승부이고, 그 결과도 명예의 전당에 남는다.
+            if (parts.length < 2) throw badRequest("대회는 2명부터 대진을 짤 수 있습니다");
 
             const ratingOf = (p: typeof parts[number]) => (t.gameType === "3c" ? p.rating3c : p.rating4c) ?? 0;
             const ordered = [...parts].sort((a, b) => ratingOf(b) - ratingOf(a));

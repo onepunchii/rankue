@@ -1688,11 +1688,12 @@ const tr: Dict = {
   "loginGate.linkPba": "PBA Tour sıralaması",
   "loginGate.linkCommunity": "Topluluğa göz at",
   "community.myLanguage": "Dilim",
-  "crewTournament.fieldFormat": "Format",
-  "crewTournament.minPlayersHint": "Her iki format için en az 4 oyuncu gerekir",
+  "crewTournament.minPlayersHint": "Fikstür için en az 2 oyuncu gerekir",
   "crewTournament.fieldBestOf": "Maç başına oyun",
-  "crewTournament.bestOfN": "{n} maçlık",
   "crewTournament.bestOfHint": "3 maçlık = 2 galibiyet alan kazanır. Her oyun yeni skor tablosu açar.",
   "notificationInbox.readAll": "Tümünü okundu yap",
+  "crewTournament.bestOf1": "Tek maç",
+  "crewTournament.bestOfWin": "{n} maç · ilk {w}",
+  "crewTournament.sizeHint2": "Kafa kafaya bir unvan maçı. Daha fazla oyun daha çekici yapar.",
 };
 export default tr;

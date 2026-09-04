@@ -1688,11 +1688,12 @@ const vi: Dict = {
   "loginGate.linkPba": "Xếp hạng PBA Tour",
   "loginGate.linkCommunity": "Khám phá cộng đồng",
   "community.myLanguage": "Ngôn ngữ của tôi",
-  "crewTournament.fieldFormat": "Thể thức",
-  "crewTournament.minPlayersHint": "Cả hai thể thức cần ít nhất 4 người",
+  "crewTournament.minPlayersHint": "Cần ít nhất 2 người để bốc thăm",
   "crewTournament.fieldBestOf": "Số ván mỗi trận",
-  "crewTournament.bestOfN": "{n} ván",
   "crewTournament.bestOfHint": "3 ván = thắng 2 trước. Mỗi ván mở bảng điểm mới.",
   "notificationInbox.readAll": "Đọc tất cả",
+  "crewTournament.bestOf1": "Một ván",
+  "crewTournament.bestOfWin": "{n} ván · thắng {w} trước",
+  "crewTournament.sizeHint2": "Trận tranh danh hiệu tay đôi. Nhiều ván sẽ hấp dẫn hơn.",
 };
 export default vi;

@@ -1688,11 +1688,12 @@ const en: Dict = {
   "loginGate.linkPba": "PBA Tour ranking",
   "loginGate.linkCommunity": "Browse the community",
   "community.myLanguage": "My language",
-  "crewTournament.fieldFormat": "Format",
-  "crewTournament.minPlayersHint": "Both formats need at least 4 players to draw",
+  "crewTournament.minPlayersHint": "You need at least 2 players to draw",
   "crewTournament.fieldBestOf": "Games per match",
-  "crewTournament.bestOfN": "Best of {n}",
   "crewTournament.bestOfHint": "Best of 3 = first to 2 wins. Each game opens a fresh scoreboard.",
   "notificationInbox.readAll": "Mark all read",
+  "crewTournament.bestOf1": "Single game",
+  "crewTournament.bestOfWin": "Best of {n} · first to {w}",
+  "crewTournament.sizeHint2": "A head-to-head title match. More games make it feel like a real event.",
 };
 export default en;
