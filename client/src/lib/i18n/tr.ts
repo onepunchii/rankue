@@ -1690,10 +1690,8 @@ const tr: Dict = {
   "community.myLanguage": "Dilim",
   "crewTournament.minPlayersHint": "Fikstür için en az 2 oyuncu gerekir",
   "crewTournament.fieldBestOf": "Maç başına oyun",
-  "crewTournament.bestOfHint": "3 maçlık = 2 galibiyet alan kazanır. Her oyun yeni skor tablosu açar.",
   "notificationInbox.readAll": "Tümünü okundu yap",
   "crewTournament.bestOf1": "Tek maç",
   "crewTournament.bestOfWin": "{n} maç · ilk {w}",
-  "crewTournament.sizeHint2": "Kafa kafaya bir unvan maçı. Daha fazla oyun daha çekici yapar.",
 };
 export default tr;

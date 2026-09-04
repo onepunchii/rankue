@@ -1690,10 +1690,8 @@ const es: Dict = {
   "community.myLanguage": "Mi idioma",
   "crewTournament.minPlayersHint": "Necesitas al menos 2 jugadores",
   "crewTournament.fieldBestOf": "Partidas por cruce",
-  "crewTournament.bestOfHint": "Al mejor de 3 = primero en ganar 2. Cada partida abre un marcador nuevo.",
   "notificationInbox.readAll": "Marcar todo",
   "crewTournament.bestOf1": "Partida única",
   "crewTournament.bestOfWin": "Al mejor de {n} · primero a {w}",
-  "crewTournament.sizeHint2": "Un duelo por el título. Más partidas lo hacen más competitivo.",
 };
 export default es;

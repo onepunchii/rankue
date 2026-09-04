@@ -127,7 +127,10 @@ export function CreateCrewTournamentDialog({ open, onOpenChange, crewId }: Props
                                 </button>
                             ))}
                         </div>
-                        <p className="text-[11.5px] text-ink-4 leading-relaxed">{maxPlayers === 2 ? t("crewTournament.sizeHint2") : t("crewTournament.sizeHint")}</p>
+                        {/* 2인은 설명이 필요 없다 — 정원 2가 곧 둘이 붙는다는 뜻이다(오너 지적 2026-09-04). */}
+                        {maxPlayers !== 2 && (
+                            <p className="text-[11.5px] text-ink-4 leading-relaxed">{t("crewTournament.sizeHint")}</p>
+                        )}
                     </div>
 
                     <div className="space-y-1.5">
@@ -145,7 +148,6 @@ export function CreateCrewTournamentDialog({ open, onOpenChange, crewId }: Props
                                 </button>
                             ))}
                         </div>
-                        <p className="text-[11.5px] text-ink-4 leading-relaxed">{t("crewTournament.bestOfHint")}</p>
                     </div>
 
                     <div className="space-y-1.5">

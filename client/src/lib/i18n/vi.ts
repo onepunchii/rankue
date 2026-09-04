@@ -1690,10 +1690,8 @@ const vi: Dict = {
   "community.myLanguage": "Ngôn ngữ của tôi",
   "crewTournament.minPlayersHint": "Cần ít nhất 2 người để bốc thăm",
   "crewTournament.fieldBestOf": "Số ván mỗi trận",
-  "crewTournament.bestOfHint": "3 ván = thắng 2 trước. Mỗi ván mở bảng điểm mới.",
   "notificationInbox.readAll": "Đọc tất cả",
   "crewTournament.bestOf1": "Một ván",
   "crewTournament.bestOfWin": "{n} ván · thắng {w} trước",
-  "crewTournament.sizeHint2": "Trận tranh danh hiệu tay đôi. Nhiều ván sẽ hấp dẫn hơn.",
 };
 export default vi;

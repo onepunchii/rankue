@@ -1692,9 +1692,7 @@ export const ko: Dict = {
   "community.myLanguage": "내 언어만",
   "crewTournament.minPlayersHint": "대회는 2명부터 대진을 짤 수 있어요",
   "crewTournament.fieldBestOf": "판 수",
-  "crewTournament.bestOfHint": "3판이면 2선승, 5판이면 3선승이에요. 판마다 점수판이 새로 열려요.",
   "notificationInbox.readAll": "모두 읽음",
   "crewTournament.bestOf1": "단판 승부",
   "crewTournament.bestOfWin": "{n}판 {w}선승",
-  "crewTournament.sizeHint2": "둘이 타이틀 걸고 붙는 대회예요. 판 수를 늘리면 더 대회다워집니다.",
 };
