@@ -1633,7 +1633,6 @@ const tr: Dict = {
   "crewTournament.player": "Oyuncu",
   "crewTournament.record": "Puan",
   "crewTournament.newTitle": "Yeni turnuva",
-  "crewTournament.newDesc": "Hedef skorlar maç başlarken ayarlanır",
   "crewTournament.fieldTitle": "Ad",
   "crewTournament.titlePlaceholder": "1. Kulüp Kupamız",
   "crewTournament.fieldGameType": "Branş",

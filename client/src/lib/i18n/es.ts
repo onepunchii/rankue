@@ -1633,7 +1633,6 @@ const es: Dict = {
   "crewTournament.player": "Jugador",
   "crewTournament.record": "Récord",
   "crewTournament.newTitle": "Nuevo torneo",
-  "crewTournament.newDesc": "Los objetivos se ajustan al iniciar cada partido",
   "crewTournament.fieldTitle": "Nombre",
   "crewTournament.titlePlaceholder": "Primera copa del club",
   "crewTournament.fieldGameType": "Modalidad",

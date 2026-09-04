@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -79,13 +79,14 @@ export function CreateCrewTournamentDialog({ open, onOpenChange, crewId }: Props
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[420px] rounded-card">
-                <DialogHeader>
+            {/* 항목이 6개라 폰 세로 화면을 넘는다 — 본문만 스크롤하고 제목·개설 버튼은 고정한다.
+                안 그러면 맨 아래 "대회 열기" 버튼이 화면 밖으로 잘려 누를 수가 없다. */}
+            <DialogContent aria-describedby={undefined} className="max-w-[420px] max-h-[88dvh] rounded-card flex flex-col gap-0 p-0">
+                <DialogHeader className="shrink-0 px-6 pt-6 pb-3">
                     <DialogTitle>{t("crewTournament.newTitle")}</DialogTitle>
-                    <DialogDescription>{t("crewTournament.newDesc")}</DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-1">
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 space-y-4">
                     <div className="space-y-1.5">
                         <Label htmlFor="ct-title">{t("crewTournament.fieldTitle")}</Label>
                         <Input
@@ -186,7 +187,7 @@ export function CreateCrewTournamentDialog({ open, onOpenChange, crewId }: Props
                     </div>
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="shrink-0 px-6 pb-6 pt-3">
                     <Button
                         onClick={submit} disabled={createM.isPending}
                         className="w-full h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl"

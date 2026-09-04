@@ -1633,7 +1633,6 @@ const vi: Dict = {
   "crewTournament.player": "Người chơi",
   "crewTournament.record": "Thành tích",
   "crewTournament.newTitle": "Tạo giải đấu",
-  "crewTournament.newDesc": "Điểm mục tiêu sẽ chỉnh khi bắt đầu mỗi trận",
   "crewTournament.fieldTitle": "Tên giải",
   "crewTournament.titlePlaceholder": "Cúp crew lần 1",
   "crewTournament.fieldGameType": "Bộ môn",

@@ -1633,7 +1633,6 @@ const en: Dict = {
   "crewTournament.player": "Player",
   "crewTournament.record": "Record",
   "crewTournament.newTitle": "New tournament",
-  "crewTournament.newDesc": "Set target scores later, when each match starts",
   "crewTournament.fieldTitle": "Name",
   "crewTournament.titlePlaceholder": "Our first crew cup",
   "crewTournament.fieldGameType": "Discipline",

@@ -1635,7 +1635,6 @@ export const ko: Dict = {
   "crewTournament.player": "선수",
   "crewTournament.record": "전적",
   "crewTournament.newTitle": "대회 열기",
-  "crewTournament.newDesc": "목표 점수는 대진에서 경기를 시작할 때 맞추면 돼요",
   "crewTournament.fieldTitle": "대회 이름",
   "crewTournament.titlePlaceholder": "제1회 우리 크루 컵",
   "crewTournament.fieldGameType": "종목",
