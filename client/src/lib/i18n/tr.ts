@@ -1693,5 +1693,6 @@ const tr: Dict = {
   "crewTournament.fieldBestOf": "Maç başına oyun",
   "crewTournament.bestOfN": "{n} maçlık",
   "crewTournament.bestOfHint": "3 maçlık = 2 galibiyet alan kazanır. Her oyun yeni skor tablosu açar.",
+  "notificationInbox.readAll": "Tümünü okundu yap",
 };
 export default tr;

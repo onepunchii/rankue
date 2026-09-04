@@ -13,6 +13,13 @@ router.get("/notifications", requireAuth, asyncHandler(async (req: AuthRequest, 
     return sendSuccess(res, notifications);
 }));
 
+// PATCH /notifications/read-all - 모두 읽음 (오너 요청 2026-09-04: 하나씩 누르기 힘들다)
+// ⚠️ /:id/read 보다 위에 둬야 한다 — 아래면 Express 가 "read-all" 을 알림 id 로 받는다.
+router.patch("/notifications/read-all", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const count = await storage.markAllNotificationsAsRead(req.userId!);
+    return sendSuccess(res, { count });
+}));
+
 // PATCH /notifications/:id/read - 읽음 처리
 router.patch("/notifications/:id/read", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     await storage.markNotificationAsRead(req.params.id, req.userId!);

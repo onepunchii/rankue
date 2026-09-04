@@ -356,6 +356,15 @@ export class AdminRepository {
         return await db.select().from(suggestions).orderBy(desc(suggestions.createdAt));
     }
 
+    /** 안 읽은 건의 전부 읽음 처리. 어드민이 하나씩 누르던 걸 한 번에. */
+    async markAllSuggestionsRead(): Promise<number> {
+        const rows = await db.update(suggestions)
+            .set({ isRead: true })
+            .where(eq(suggestions.isRead, false))
+            .returning({ id: suggestions.id });
+        return rows.length;
+    }
+
     async markSuggestionRead(id: string, isRead: boolean): Promise<Suggestion> {
         const [updated] = await db.update(suggestions)
             .set({ isRead })

@@ -22,6 +22,18 @@ export class NotificationRepository {
             .where(and(eq(hiqNotifications.id, id), eq(hiqNotifications.memberId, memberId)));
     }
 
+    /**
+     * 내 알림 전부 읽음 처리. 이미 읽은 건 건드리지 않는다(updatedAt 이 있는 스키마가
+     * 아니라 실익은 없지만, 쓰기 행 수를 줄이고 반환값으로 "몇 건이 새로 읽혔는지"를 준다).
+     */
+    async markAllNotificationsAsRead(memberId: string): Promise<number> {
+        const rows = await db.update(hiqNotifications)
+            .set({ isRead: true })
+            .where(and(eq(hiqNotifications.memberId, memberId), eq(hiqNotifications.isRead, false)))
+            .returning({ id: hiqNotifications.id });
+        return rows.length;
+    }
+
     async deleteNotification(id: string, memberId: string): Promise<void> {
         await db.delete(hiqNotifications)
             .where(and(eq(hiqNotifications.id, id), eq(hiqNotifications.memberId, memberId)));

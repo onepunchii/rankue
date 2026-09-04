@@ -174,11 +174,13 @@ class Storage {
     async createSuggestion(d: any) { return this.admin.createSuggestion(d); }
     async getSuggestions() { return this.admin.getSuggestions(); }
     async markSuggestionRead(id: string, isRead: boolean) { return this.admin.markSuggestionRead(id, isRead); }
+    async markAllSuggestionsRead() { return this.admin.markAllSuggestionsRead(); }
 
     // Notifications
     async getNotifications(id: string) { return this.notifs.getNotifications(id); }
     async createNotification(data: any) { return this.notifs.createNotification(data); }
     async markNotificationAsRead(id: string, mid: string) { return this.notifs.markNotificationAsRead(id, mid); }
+    async markAllNotificationsAsRead(mid: string) { return this.notifs.markAllNotificationsAsRead(mid); }
     async deleteNotification(id: string, mid: string) { return this.notifs.deleteNotification(id, mid); }
 }
 

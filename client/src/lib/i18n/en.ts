@@ -1693,5 +1693,6 @@ const en: Dict = {
   "crewTournament.fieldBestOf": "Games per match",
   "crewTournament.bestOfN": "Best of {n}",
   "crewTournament.bestOfHint": "Best of 3 = first to 2 wins. Each game opens a fresh scoreboard.",
+  "notificationInbox.readAll": "Mark all read",
 };
 export default en;

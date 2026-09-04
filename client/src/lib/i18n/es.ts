@@ -1693,5 +1693,6 @@ const es: Dict = {
   "crewTournament.fieldBestOf": "Partidas por cruce",
   "crewTournament.bestOfN": "Al mejor de {n}",
   "crewTournament.bestOfHint": "Al mejor de 3 = primero en ganar 2. Cada partida abre un marcador nuevo.",
+  "notificationInbox.readAll": "Marcar todo",
 };
 export default es;

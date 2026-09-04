@@ -1695,4 +1695,5 @@ export const ko: Dict = {
   "crewTournament.fieldBestOf": "판 수",
   "crewTournament.bestOfN": "{n}판",
   "crewTournament.bestOfHint": "3판이면 2선승, 5판이면 3선승이에요. 판마다 점수판이 새로 열려요.",
+  "notificationInbox.readAll": "모두 읽음",
 };

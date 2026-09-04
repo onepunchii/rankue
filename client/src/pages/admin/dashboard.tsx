@@ -162,6 +162,15 @@ export default function AdminDashboard() {
     const { data: notices = [] } = useQuery<Notice[]>({ queryKey: ["/api/hiq/admin/notices"] });
     const { data: reports = [] } = useQuery<ReportedUser[]>({ queryKey: ["/api/hiq/admin/reports"] });
     const { data: suggestions = [] } = useQuery<Suggestion[]>({ queryKey: ["/api/hiq/admin/suggestions"] });
+    // 건의 모두 읽음 — 하나씩 누르는 게 일이다(오너 요청 2026-09-04).
+    const readAllSuggestionsMutation = useMutation({
+        mutationFn: async () => apiRequest("/api/hiq/admin/suggestions/read-all", { method: "PATCH" }),
+        onSuccess: (r: any) => {
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/suggestions"] });
+            toast({ title: `${r?.count ?? 0}건 읽음 처리` });
+        },
+        onError: (e: any) => toast({ title: e?.message || "처리 실패", variant: "destructive" }),
+    });
     const { data: members = [] } = useQuery<any[]>({ queryKey: ["/api/hiq/admin/members"] });
 
     // Filter crews
@@ -740,6 +749,21 @@ export default function AdminDashboard() {
 
                     {tab === "suggestions" && (
                         <div className="grid gap-4">
+                            {/* 안 읽은 게 있을 때만 — 없으면 눌러도 아무 일이 없어 버튼이 거짓말이 된다 */}
+                            {suggestions.some((x) => !x.isRead) && (
+                                <div className="flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-black/[0.07]">
+                                    <span className="text-[13px] text-black/60">
+                                        안 읽은 건의 <b className="text-[rgba(0,0,0,0.87)] tabular-nums">{suggestions.filter((x) => !x.isRead).length}</b>건
+                                    </span>
+                                    <Button
+                                        size="sm" variant="outline" className="h-8 text-xs"
+                                        disabled={readAllSuggestionsMutation.isPending}
+                                        onClick={() => readAllSuggestionsMutation.mutate()}
+                                    >
+                                        <LucideCheckCircle className="w-3 h-3 mr-1" /> 모두 읽음
+                                    </Button>
+                                </div>
+                            )}
                             {suggestions.map((suggestion) => (
                                 <div key={suggestion.id} className={`bg-white p-5 rounded-2xl border shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex flex-col gap-3 transition-opacity ${suggestion.isRead ? 'border-black/[0.07] opacity-50' : 'border-black/[0.07]'}`}>
                                     <div className="flex justify-between items-start">

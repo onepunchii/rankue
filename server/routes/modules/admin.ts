@@ -188,6 +188,12 @@ router.post("/suggestions/:id/reply", checkSuperAdmin, asyncHandler(async (req: 
     return sendSuccess(res, { sent: true, memberName: member.name });
 }));
 
+// 모두 읽음 — /suggestions/:id 보다 위에 둬야 "read-all" 이 id 로 안 먹힌다.
+router.patch("/suggestions/read-all", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    const count = await storage.markAllSuggestionsRead();
+    return sendSuccess(res, { count });
+}));
+
 router.patch("/suggestions/:id", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const { isRead } = req.body;
     const suggestion = await storage.markSuggestionRead(req.params.id, isRead === true);

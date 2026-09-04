@@ -1693,5 +1693,6 @@ const vi: Dict = {
   "crewTournament.fieldBestOf": "Số ván mỗi trận",
   "crewTournament.bestOfN": "{n} ván",
   "crewTournament.bestOfHint": "3 ván = thắng 2 trước. Mỗi ván mở bảng điểm mới.",
+  "notificationInbox.readAll": "Đọc tất cả",
 };
 export default vi;

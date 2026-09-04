@@ -32,6 +32,14 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
         },
     });
 
+    // 모두 읽음 — 알림이 쌓이면 하나씩 누르는 게 일이다(오너 요청 2026-09-04).
+    const readAllMutation = useMutation({
+        mutationFn: async () => await apiRequest("/api/hiq/notifications/read-all", { method: "PATCH" }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/notifications"] });
+        },
+    });
+
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
             await apiRequest(`/api/hiq/notifications/${id}`, { method: "DELETE" });
@@ -40,6 +48,8 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/notifications"] });
         },
     });
+
+    const unreadCount = (notifications ?? []).filter((n: any) => !n.isRead).length;
 
     const handleItemClick = (notif: any) => {
         if (!notif.isRead) {
@@ -96,6 +106,17 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                     <p className="text-[12px] text-black/55">{t("notificationInbox.subtitle")}</p>
                                 </div>
                             </div>
+                            <div className="flex items-center gap-1">
+                            {/* 안 읽은 게 있을 때만 — 없으면 눌러도 아무 일이 없어 버튼이 거짓말이 된다 */}
+                            {unreadCount > 0 && (
+                                <button
+                                    onClick={() => readAllMutation.mutate()}
+                                    disabled={readAllMutation.isPending}
+                                    className="h-9 px-3 rounded-pill text-[12.5px] font-semibold text-brand hover:bg-brand/[0.06] transition-colors disabled:opacity-50"
+                                >
+                                    {t("notificationInbox.readAll")}
+                                </button>
+                            )}
                             <button
                                 onClick={onClose}
                                 title={t("notificationInbox.close")}
@@ -103,6 +124,7 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                             >
                                 <LucideX className="w-5 h-5 text-black/40" />
                             </button>
+                            </div>
                         </div>
 
                         {/* Content */}
