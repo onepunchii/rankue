@@ -1,9 +1,11 @@
 
 /**
  * physics-core.ts
- * 
- * Ported from tailuge/billiards (MIT License)
- * Consolidated core physics logic for 2D Billiards
+ *
+ * 출처 정정(2026-09-07): 이 파일은 tailuge/billiards 에서 옮겨온 파생물이며, 원본 라이선스는
+ * MIT 가 아니라 GPL-3.0 이다. 스토어 배포 앱에는 GPL 코드를 넣을 수 없으므로 shared/sim 의
+ * 클린룸 엔진(논문 + pooltool Apache-2.0 기반)이 완성되는 즉시 이 파일과 physics-engine-2d.ts 를
+ * 삭제한다. 그때까지 이 파일에 기능을 추가하지 말 것.
  */
 
 import { Vector3 } from "three";
