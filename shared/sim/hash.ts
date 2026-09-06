@@ -13,10 +13,15 @@
  *   lo·0x1b3 은 2^41 미만이라 double 로 정확하고, hi·0x1b3 의 하위 32비트는 Math.imul 이 정확하다.
  * (hash.test.ts 가 BigInt 참조 구현과 비트 단위로 대조한다.)
  *
- * 바이트 스트림 규약 (버전 2.0.0 — 바꾸면 golden 픽스처가 전부 갈리므로 ENGINE_VERSION 을 올릴 것)
+ * 바이트 스트림 규약 (버전 2.1.0 — 바꾸면 golden 픽스처가 전부 갈리므로 ENGINE_VERSION 을 올릴 것)
  *   u32 이벤트 수, 이벤트마다 [str type][f64 t][u32 ids 수][str id…][str cushion|from|to…]
- *   u32 공 수, 공마다 [str id][f64 r×3][f64 v×3][f64 w×3][str state]
+ *   u32 공 수, 공마다 **id 사전순(UTF-16 코드 단위)** 으로 [str id][f64 r×3][f64 v×3][f64 w×3][str state]
  *   str = u32 길이 + UTF-16 코드 단위(각 2바이트 LE). 길이 접두사가 있어 "ab"+"c" 와 "a"+"bc" 가 구분된다.
+ *   f64 는 비트 패턴 그대로이되 NaN 은 정규 quiet NaN(0x7ff8000000000000) 하나로 통일한다 — NaN 페이로드·부호 비트는
+ *   엔진마다 다르게 보존되므로(V8 14.9 는 −NaN 의 부호를 남긴다) 그대로 넣으면 같은 계산이 다른 해시를 낼 수 있다.
+ *   (simulate 가 입력을 검증하므로 정상 경로에 NaN 은 없다. 이건 마지막 방어선이다.)
+ *   공을 id 순으로 넣는 이유: 물리 결과는 공 배열 순서와 무관한데(감지·해석은 id 로 결정) 해시가 순서를 타면
+ *   같은 배치를 다른 순서로 넘긴 두 기기가 같은 물리에 다른 해시를 갖게 된다(41-determinism-review 2.10).
  * 초월함수·Node API 없음. 입력 불변.
  */
 import type { BallState, SimEvent } from "./types";
@@ -94,9 +99,15 @@ export class HashWriter {
         fnv64Byte(this.h, (v >>> 24) & 0xff);
     }
 
-    /** double 의 IEEE-754 비트 패턴 8바이트(LE). −0 과 +0, NaN 페이로드까지 구분한다. */
+    /** double 의 IEEE-754 비트 패턴 8바이트(LE). −0 과 +0, 1 ulp 를 구분한다. NaN 은 전부 정규 quiet NaN 으로 쓴다. */
     f64bits(x: number): void {
-        this.view.setFloat64(0, x, true);
+        if (x !== x) {
+            // 0x7ff8000000000000 (LE: 00 00 00 00 00 00 f8 7f)
+            this.view.setUint32(0, 0, true);
+            this.view.setUint32(4, 0x7ff80000, true);
+        } else {
+            this.view.setFloat64(0, x, true);
+        }
         for (let i = 0; i < 8; i++) fnv64Byte(this.h, this.bytes[i]);
     }
 
@@ -143,8 +154,22 @@ export function writeBall(w: HashWriter, b: BallState): void {
     w.str(b.state);
 }
 
+/** final 을 id 사전순으로 읽는 인덱스 순열. 같은 id 는 원래 순서(안정) — 비교자가 전순서라 sort 의 안정성에 기대지 않는다. */
+function sortedByIdIndices(final: readonly BallState[]): number[] {
+    const idx: number[] = new Array(final.length);
+    for (let i = 0; i < final.length; i++) idx[i] = i;
+    idx.sort((i, j) => {
+        const a = final[i].id, b = final[j].id;
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return i - j;
+    });
+    return idx;
+}
+
 /**
  * 이벤트 목록 + 최종 상태의 비트 단위 해시 (16진 16자리). 두 기기의 값이 다르면 결정론이 깨진 것이다.
+ * 최종 상태는 id 사전순으로 넣으므로 final 배열의 순서는 값에 영향이 없다.
  * 계약: README "hash.ts". 입력은 읽기만 한다.
  */
 export function hashResult(events: readonly SimEvent[], final: readonly BallState[]): string {
@@ -152,6 +177,7 @@ export function hashResult(events: readonly SimEvent[], final: readonly BallStat
     w.u32(events.length);
     for (let i = 0; i < events.length; i++) writeEvent(w, events[i]);
     w.u32(final.length);
-    for (let i = 0; i < final.length; i++) writeBall(w, final[i]);
+    const order = sortedByIdIndices(final);
+    for (let i = 0; i < order.length; i++) writeBall(w, final[order[i]]);
     return w.hex();
 }

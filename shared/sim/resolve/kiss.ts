@@ -11,6 +11,10 @@
  *    |(r2 − r1) + (v2 − v1) t| = 2R + spacer 를 푸는 |t| 가 가장 작은 시각만큼 움직여 분리한다.
  *    둘 다 병진하지 않거나, 근이 없거나(같은 속도), 중점이 5·spacer 넘게 움직이면(속도가 거의 같아 t 가
  *    커진 경우) 중심선을 따라 대칭으로 밀어 벌리는 폴백을 쓴다.
+ *    spacer 는 pooltool 의 const.MIN_DIST = 1e-6 m 가 아니라 1e-9 m 다(README 계약). 오라클 비교
+ *    (42-oracle-report)에서 이 상수 하나가 두 엔진 차이의 사실상 전부였고(1 µm 재배치가 25이벤트 뒤 수 cm 로 증폭),
+ *    1e-9 는 궤적 교란이 1000배 작으면서 겹침 재감지 폭풍은 시험 층 A 가 없음을 확인한다. pooltool 과 비교할 때는
+ *    oracle.py --min-dist 1e-9 로 스페이서를 맞춰야 한다.
  *
  * 2. resolveContinuallyTouching — 충돌 해석 뒤 반경 방향 분리 속도가 거의 0 이고 두 공이 같은 방향으로
  *    움직이면(뒤 공이 앞 공을 밀고 가는 뉴턴 요람 꼴), 순간 충돌 모델은 마이크로초 간격의 미세 충돌을
@@ -23,6 +27,9 @@
  *       외부 싱크로 본다(이 계는 원래 운동량이 보존되지 않는다).
  *     - "쫓는 공"은 라벨 순서가 아니라 기하로 정한다: 두 공이 함께 움직이는 방향의 뒤쪽 공. pooltool 은
  *       반경 속도가 큰 쪽을 쫓는 공으로 잡아, 앞 공이 조금 더 빠른(이미 벌어지는) 경우 오히려 접근시킨다.
+ *     - 문턱 CONTINUAL_TOUCH_EPS 는 README 대로 1e-3 m/s 다. pooltool 의 docstring 은 "1 mm/s" 라 하지만 코드는
+ *       0.01 m/s 를 쓴다 — 우리는 문서화된 쪽(1e-3)을 **의도적으로** 택했다: 발동이 덜해 물리 결과를 덜 건드리고,
+ *       뉴턴 요람·무작위 1800샷에서 두 값 모두 폭풍 0 이었다(40-physics-review Finding 4).
  *
  * 초월함수 없음. 입력 불변.
  */
@@ -33,7 +40,7 @@ import { solveQuadratic } from "../roots/quadratic";
 
 /** README 계약 기본값. 감지기의 "접촉" 판정 폭(EVENT_EPS = 1e-9 m)과 같다. */
 export const DEFAULT_SPACER = 1e-9;
-/** 이 값(m/s) 미만의 반경 방향 분리 속도는 "계속 닿아 있음"으로 본다 (README: 1e-3). */
+/** 이 값(m/s) 미만의 반경 방향 분리 속도는 "계속 닿아 있음"으로 본다 (README: 1e-3; pooltool 코드는 0.01 — 파일 머리 주석). */
 export const CONTINUAL_TOUCH_EPS = 1e-3;
 /** 쫓기는 공이 가져가는 비율. */
 export const THEFT_FRACTION = 0.1;

@@ -2,7 +2,7 @@
  * continuize.ts 검증: stateAt 이 직전 스냅샷에서 닫힌 식으로 전진하고 이벤트를 넘지 않는다, frames 의 경계·간격.
  */
 import { describe, it, expect } from "vitest";
-import { stateAt, frames } from "./continuize";
+import { stateAt, frames, MAX_FRAMES } from "./continuize";
 import { simulateFrom } from "./simulate";
 import { evolveBall } from "./evolve";
 import { TABLES, DEFAULT_CUE, type SimParams } from "./params";
@@ -123,5 +123,31 @@ describe("frames", () => {
         expect(() => frames(result, 0, T.ball)).toThrow(RangeError);
         expect(() => frames(result, -1, T.ball)).toThrow(RangeError);
         expect(() => frames(result, Infinity, T.ball)).toThrow(RangeError);
+        expect(() => frames(result, NaN, T.ball)).toThrow(RangeError);
+    });
+
+    it("병적으로 작은 dt: 프레임 수 상한(MAX_FRAMES) 초과면 RangeError, 시각이 멈추면 끝 프레임만 남기고 종료 (무한 루프 없음)", () => {
+        const fake: Pick<SimResult, "history"> = {
+            history: [
+                { t: 3, balls: [still("a", 0.5, 0.5)] },
+                { t: 3.5, balls: [still("a", 0.5, 0.5)] },
+            ],
+        };
+        expect(3 + 1e-17).toBe(3);                                 // 흡수되는 dt
+        expect(() => frames(fake, 1e-17, T.ball)).toThrow(RangeError);
+        expect(() => frames(fake, 1e-300, T.ball)).toThrow(RangeError);
+        expect(() => frames(fake, 0.5 / (MAX_FRAMES + 1), T.ball)).toThrow(RangeError);
+        // 상한 안이지만 t0 + k·dt 가 t0 에서 움직이지 않는 경우: 구간이 극히 짧고 dt 가 ulp 아래
+        const tiny: Pick<SimResult, "history"> = {
+            history: [
+                { t: 3, balls: [still("a", 0.5, 0.5)] },
+                { t: 3 + 1e-12, balls: [still("a", 0.5, 0.5)] },
+            ],
+        };
+        const fr = frames(tiny, 1e-18, T.ball);                     // (1e-12)/1e-18 = 1e6 ≤ MAX_FRAMES
+        expect(fr.length).toBeLessThan(10);
+        expect(fr[0].t).toBe(3);
+        expect(fr[fr.length - 1].t).toBe(3 + 1e-12);
+        for (let k = 1; k < fr.length; k++) expect(fr[k].t).toBeGreaterThan(fr[k - 1].t);
     });
 });

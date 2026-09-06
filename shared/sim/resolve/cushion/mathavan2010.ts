@@ -76,6 +76,8 @@ interface Consts {
 const KAPPA_TANGENT = 3.5;
 /** 압축 종료 정제의 이분 단계 수 (pooltool 과 동일). */
 const REFINE_STEPS = 8;
+/** 기본 임펄스 스텝 수. */
+const DEFAULT_STEPS = 2000;
 
 /**
  * 법선 임펄스 dP 하나를 세 부분 임펄스(법선 I → 마찰 I → 마찰 C)로 순차 적용해 a → o 로 전진시킨다.
@@ -193,16 +195,16 @@ function solveCushionFrame(k: Consts, e: number, v0: Reg, steps: number): Reg {
  *
  * @param b             충돌 순간의 공 (검출기가 코 라인까지 거리 R 인 시각에 전진시켜 둔 상태)
  * @param seg           맞은 쿠션 세그먼트. normal 은 테이블 안쪽 단위 법선
- * @param p             공 파라미터 — m, R, fC(μ_w), muS(μ_s), eC(e_e) 를 쓴다
+ * @param p             공 파라미터 — m, R, fC(μ_w), muS(μ_s), eE(에너지 반발 계수 e_e; Han/SHS 의 운동학적 eC 와 별개) 를 쓴다
  * @param cushionHeight 쿠션 코 높이 h (m). sinθ = (h − R)/R
- * @param steps         충돌 전체를 나누는 임펄스 스텝 수. 고정값이라 결과가 결정론적이다
+ * @param steps         충돌 전체를 나누는 임펄스 스텝 수. 고정값이라 결과가 결정론적이다. 유한하지 않으면 기본값 2000
  */
 export function resolveCushionMathavan(
     b: BallState,
     seg: CushionSegment,
     p: BallParams,
     cushionHeight: number,
-    steps = 2000,
+    steps = DEFAULT_STEPS,
 ): BallState {
     // ── 쿠션 프레임: ŷ' 는 공에서 쿠션으로(= −normal), x̂' = ŷ' × ẑ 로 오른손 좌표계. 축 정렬 법선이면 정확한 회전.
     const nx0 = seg.normal[0], ny0 = seg.normal[1];
@@ -243,8 +245,9 @@ export function resolveCushionMathavan(
         muS: p.muS,
         kY: s * s + 2.5,
     };
-    const n = Math.max(1, Math.floor(steps));
-    const out = solveCushionFrame(k, p.eC, v0, n);
+    // steps 가 NaN 이면 Math.max(1, NaN) = NaN 이 되어 전체가 NaN 으로 번진다 — 기본값으로 방어.
+    const n = Number.isFinite(steps) ? Math.max(1, Math.floor(steps)) : DEFAULT_STEPS;
+    const out = solveCushionFrame(k, p.eE, v0, n);
 
     // ── 테이블 프레임으로 되돌리기: v = v_x' x̂' + v_y' ŷ'
     return {

@@ -1,19 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { quarticComplexRoots, smallestPositiveRoot, solveCubic, solveQuartic } from "./quartic";
+import { mulberry32 } from "../rng";
 
 // ---------------------------------------------------------------------------
 // 도우미 — 시드 PRNG, 근 → 계수 전개, 근 대조. 내장 난수·거듭제곱 함수는 쓰지 않는다(절대 규칙 1·3).
 // ---------------------------------------------------------------------------
-
-function mulberry32(seed: number): () => number {
-    let s = seed | 0;
-    return () => {
-        s = (s + 0x6d2b79f5) | 0;
-        let t = Math.imul(s ^ (s >>> 15), 1 | s);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
 
 const POW10 = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3];
 

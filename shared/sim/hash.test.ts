@@ -72,6 +72,24 @@ describe("HashWriter", () => {
         expect(e.hex()).toBe(refFnv([0, 0, 0, 0, 0, 0, 0xf0, 0x3f]));
     });
 
+    it("NaN 은 페이로드·부호와 무관하게 정규 quiet NaN 하나로 쓴다 (엔진별 NaN 비트 차이 방어)", () => {
+        const f = new Float64Array(1);
+        const u8 = new Uint8Array(f.buffer);
+        // 부호 비트가 켜진 NaN 을 비트 조작으로 만든다 (V8 14.9 가 −NaN 에서 보존하는 패턴)
+        u8.set([0, 0, 0, 0, 0, 0, 0xf8, 0xff]);
+        const negNaN = f[0];
+        expect(negNaN !== negNaN).toBe(true);
+        const a = new HashWriter(); a.f64bits(NaN);
+        const b = new HashWriter(); b.f64bits(negNaN);
+        const c = new HashWriter(); c.f64bits(0 / 0);
+        expect(a.hex()).toBe(b.hex());
+        expect(a.hex()).toBe(c.hex());
+        expect(a.hex()).toBe(refFnv([0, 0, 0, 0, 0, 0, 0xf8, 0x7f]));
+        // Infinity 는 NaN 이 아니므로 그대로
+        const d = new HashWriter(); d.f64bits(Infinity);
+        expect(d.hex()).toBe(refFnv([0, 0, 0, 0, 0, 0, 0xf0, 0x7f]));
+    });
+
     it("str 는 길이 접두사를 붙여 경계가 구분된다", () => {
         const a = new HashWriter(); a.str("ab"); a.str("c");
         const b = new HashWriter(); b.str("a"); b.str("bc");
@@ -127,8 +145,16 @@ describe("hashResult", () => {
         expect(mutate(1, { w: [0, 0, 1e-300] })).not.toBe(base);
         expect(mutate(1, { state: "rolling" })).not.toBe(base);
         expect(mutate(1, { id: "red1" })).not.toBe(base);
-        expect(hashResult(events, [final[1], final[0]])).not.toBe(base);
         expect(hashResult(events, final.slice(0, 1))).not.toBe(base);
+    });
+
+    it("final 의 배열 순서는 값에 영향이 없다 (id 사전순으로 넣는다)", () => {
+        expect(hashResult(events, [final[1], final[0]])).toBe(base);
+        const three: BallState[] = [...final, { id: "yellow", r: [0.1, 0.2, R], v: [0, 0, 0], w: [0, 0, 0], state: "stationary" }];
+        const h = hashResult(events, three);
+        expect(hashResult(events, [three[2], three[0], three[1]])).toBe(h);
+        expect(hashResult(events, [three[1], three[2], three[0]])).toBe(h);
+        expect(h).not.toBe(base);
     });
 
     it("입력을 변형하지 않는다 (얼린 입력)", () => {

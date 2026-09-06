@@ -26,38 +26,7 @@
  */
 import type { BallState, EventCandidate, Vec3 } from "./types";
 import type { BallParams } from "./params";
-
-// ---------------------------------------------------------------------------
-// 최소 벡터 도우미. vec.ts 가 생기면 그쪽으로 import 를 바꾼다(같은 이름·같은 의미).
-// ---------------------------------------------------------------------------
-
-function add(a: Vec3, b: Vec3): Vec3 {
-    return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-}
-
-function scale(v: Vec3, s: number): Vec3 {
-    return [v[0] * s, v[1] * s, v[2] * s];
-}
-
-function dot(a: Vec3, b: Vec3): number {
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-function length(v: Vec3): number {
-    return Math.sqrt(dot(v, v));
-}
-
-/** 단위벡터. 영벡터면 [0, 0, 0]. */
-function unit(v: Vec3): Vec3 {
-    const n = length(v);
-    if (n === 0) return [0, 0, 0];
-    return [v[0] / n, v[1] / n, v[2] / n];
-}
-
-/** k̂ × v = (−v_y, v_x, 0). 위에서 봐서 v 를 반시계 90° 돌린 것. */
-function upCross(v: Vec3): Vec3 {
-    return [-v[1], v[0], 0];
-}
+import { add, dot, length, scale, unit, upCross } from "./vec";
 
 // ---------------------------------------------------------------------------
 // 접점 미끄럼 속도

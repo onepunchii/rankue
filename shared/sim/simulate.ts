@@ -30,11 +30,18 @@
  *   - 볼–볼 해석 뒤 resolveContinuallyTouching 이 발동하면 continuallyTouching 을 센다.
  *   README 대로 이 안전장치들은 결과에 경고를 남기거나 throw 하지 않는다.
  *
+ * 입력 검증 (41-determinism-review 2.1 / 2.9)
+ *   NaN·∞ 가 들어오면 물리 경로에는 방어가 없어 최종 상태와 해시까지 NaN 이 흘러간다. NaN 의 비트 패턴은 IEEE 가
+ *   규정하지 않아 엔진마다 다르므로(V8 14.9 는 −NaN 부호 비트 보존) 그 해시는 기기 간에 갈릴 수 있다. 그래서 API 경계
+ *   (simulateShot·simulateFrom)에서 유한성·범위·id 유일성·condition > 0 을 검사해 RangeError 로 거부한다.
+ *   공 배열 순서는 결과 물리에 영향이 없고(감지·해석은 id 로 결정) 해시도 id 정렬로 계산하므로 순서는 계약이 아니다.
+ *
  * 초월함수 없음(strike 가 dmath 를 쓴다). 입력 불변. Date·난수 없음.
  */
-import type { BallState, CushionSegment, EventCandidate, ShotInput, SimEvent, SimResult, Snapshot } from "./types";
+import type { BallState, CushionSegment, EventCandidate, MotionState, ShotInput, SimEvent, SimResult, Snapshot, Vec3 } from "./types";
 import type { BallParams, SimParams } from "./params";
 import { applyCondition, cushionSegments } from "./params";
+import { HALF_PI } from "./dmath";
 import { evolveBall, nextTransition } from "./evolve";
 import { compareTied, EVENT_EPS, nextEvent } from "./detect/index";
 import { strike } from "./resolve/stickBall";
@@ -79,6 +86,42 @@ function copyBall(b: BallState): BallState {
         w: [b.w[0], b.w[1], b.w[2]],
         state: b.state,
     };
+}
+
+// ---------------------------------------------------------------------------
+// 입력 검증
+// ---------------------------------------------------------------------------
+
+const MOTION_STATES: readonly MotionState[] = ["stationary", "spinning", "rolling", "sliding", "airborne"];
+
+function isFiniteVec(v: Vec3): boolean {
+    return Number.isFinite(v[0]) && Number.isFinite(v[1]) && Number.isFinite(v[2]);
+}
+
+/** 공 목록: id 는 비지 않은 문자열이고 유일, r·v·w 는 유한, state 는 알려진 값. 아니면 RangeError. */
+export function validateBalls(balls: readonly BallState[]): void {
+    const seen = new Set<string>();
+    for (let i = 0; i < balls.length; i++) {
+        const b = balls[i];
+        if (typeof b.id !== "string" || b.id.length === 0) throw new RangeError(`ball #${i}: id must be a non-empty string`);
+        if (seen.has(b.id)) throw new RangeError(`duplicate ball id: ${b.id}`);
+        seen.add(b.id);
+        if (!isFiniteVec(b.r) || !isFiniteVec(b.v) || !isFiniteVec(b.w)) throw new RangeError(`ball ${b.id}: r, v, w must be finite`);
+        if (MOTION_STATES.indexOf(b.state) < 0) throw new RangeError(`ball ${b.id}: unknown state ${String(b.state)}`);
+    }
+}
+
+/** 타격 입력: phi·V0·a·b·theta 유한, V0 ≥ 0, 0 ≤ theta < π/2. (a·b 의 미스큐 범위는 strike 가 검사한다.) */
+export function validateShotInput(input: ShotInput): void {
+    if (!Number.isFinite(input.phi)) throw new RangeError("shot: phi must be finite");
+    if (!Number.isFinite(input.V0) || input.V0 < 0) throw new RangeError("shot: V0 must be finite and ≥ 0");
+    if (!Number.isFinite(input.a) || !Number.isFinite(input.b)) throw new RangeError("shot: a, b must be finite");
+    if (!Number.isFinite(input.theta) || input.theta < 0 || input.theta >= HALF_PI) throw new RangeError("shot: theta must be in [0, π/2)");
+}
+
+/** 파라미터: condition 은 양의 유한수 (0 이면 마찰이 ∞, 음수면 eC 가 NaN). */
+export function validateParams(params: SimParams): void {
+    if (!Number.isFinite(params.condition) || !(params.condition > 0)) throw new RangeError("params: condition must be a positive finite number");
 }
 
 /** 후보의 event.t(지연값)를 절대 시각 t 로 바꾼 새 이벤트. */
@@ -313,9 +356,13 @@ function run(initial: readonly BallState[], params: SimParams, t0: number): Omit
 /**
  * 큐 타격부터 전부 정지까지. 큐볼(input.cueBallId)을 strike 로 때린 뒤 루프를 돈다.
  * 타격 결과 속도·각속도가 모두 0(V0 = 0)이면 이벤트 없이 정지 상태로 끝난다(규칙의 no-shot).
+ * 입력이 유한하지 않거나 범위 밖이면(validateBalls·validateShotInput·validateParams) RangeError,
  * 큐볼 id 가 없으면 RangeError, 미스큐면 strike 의 RangeError("miscue") 가 그대로 올라온다.
  */
 export function simulateShot(balls: readonly BallState[], input: ShotInput, params: SimParams): SimResult {
+    validateBalls(balls);
+    validateShotInput(input);
+    validateParams(params);
     let idx = -1;
     for (let i = 0; i < balls.length; i++) if (balls[i].id === input.cueBallId) { idx = i; break; }
     if (idx < 0) throw new RangeError(`unknown cue ball id: ${input.cueBallId}`);
@@ -332,7 +379,10 @@ export function simulateShot(balls: readonly BallState[], input: ShotInput, para
     return { ...core, input };
 }
 
-/** 주어진 상태(움직이는 공 포함)에서 전부 정지까지. history 의 시각은 t0 부터 센다. */
+/** 주어진 상태(움직이는 공 포함)에서 전부 정지까지. history 의 시각은 t0 부터 센다. 입력 검증은 simulateShot 과 같다(t0 도 유한해야 한다). */
 export function simulateFrom(balls: readonly BallState[], params: SimParams, t0 = 0): Omit<SimResult, "input"> {
+    validateBalls(balls);
+    validateParams(params);
+    if (!Number.isFinite(t0)) throw new RangeError("simulateFrom: t0 must be finite");
     return run(balls, params, t0);
 }

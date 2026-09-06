@@ -43,9 +43,14 @@ export function stateAt(result: Pick<SimResult, "history">, t: number, p: BallPa
     return evolveSnapshot(h[snapshotIndexAt(h, t)], t, p);
 }
 
+/** frames 가 만들 수 있는 프레임 수 상한. 60 fps 로 46 시간 — 정상 샷(≤ 30 s)의 어떤 dt 도 여기 걸리지 않는다. */
+export const MAX_FRAMES = 1e7;
+
 /**
  * history[0].t 부터 마지막 스냅샷 시각까지 dt 간격의 프레임. 마지막 프레임은 항상 끝 시각이다.
- * dt 가 양의 유한수가 아니면 RangeError.
+ * dt 가 양의 유한수가 아니거나 프레임 수가 MAX_FRAMES 를 넘으면 RangeError.
+ * t0 + k·dt 가 t0 에서 움직이지 않을 만큼 dt 가 작으면(dt ≤ ulp(t0)/2) 영원히 돌 수 있으므로,
+ * 시각이 엄격히 증가하지 않는 순간 루프를 끊는다(41-determinism-review 2.5).
  */
 export function frames(result: Pick<SimResult, "history">, dt: number, p: BallParams): readonly Snapshot[] {
     if (!(dt > 0) || !Number.isFinite(dt)) throw new RangeError("frames: dt must be a positive finite number");
@@ -53,11 +58,15 @@ export function frames(result: Pick<SimResult, "history">, dt: number, p: BallPa
     if (h.length === 0) return [];
     const t0 = h[0].t;
     const tEnd = h[h.length - 1].t;
+    if ((tEnd - t0) / dt > MAX_FRAMES) throw new RangeError(`frames: (tEnd - t0)/dt exceeds ${MAX_FRAMES}`);
     const out: Snapshot[] = [];
     let idx = 0;
-    for (let k = 0; ; k++) {
+    let prevT = -Infinity;
+    for (let k = 0; k <= MAX_FRAMES; k++) {
         const t = t0 + k * dt;
         if (t > tEnd) break;
+        if (!(t > prevT)) break;                   // 부동소수점 흡수로 시각이 멈추면 끝 프레임만 남기고 종료
+        prevT = t;
         while (idx + 1 < h.length && h[idx + 1].t <= t) idx++;
         out.push({ t, balls: evolveSnapshot(h[idx], t, p) });
     }

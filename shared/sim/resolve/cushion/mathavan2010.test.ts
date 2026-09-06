@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { BallState, CushionSegment, Vec3 } from "../../types";
+import { mulberry32 } from "../../rng";
 import { TABLES, cushionSegments } from "../../params";
 import { kineticEnergy } from "../../evolve";
 import { PI, atan2, sin, cos } from "../../dmath";
@@ -42,16 +43,6 @@ function betaDeg(v: Vec3): number {
     return (atan2(-v[1], v[0]) * 180) / PI;
 }
 
-function mulberry32(seed: number): () => number {
-    let s = seed | 0;
-    return () => {
-        s = (s + 0x6d2b79f5) | 0;
-        let t = Math.imul(s ^ (s >>> 15), 1 | s);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
-
 /** 시드 난수로 top 쿠션을 향해 들어가는 상태 하나. 속도 0.05–3 m/s, 스핀은 |ω| ≤ 1.5·v/R. */
 function randomIncident(rnd: () => number): BallState {
     const sp = 0.05 + 3 * rnd();
@@ -87,6 +78,33 @@ describe("resolveCushionMathavan — 기본 계약", () => {
         expect(o.w[1]).toBe(0);
         expect(o.w[2]).toBe(0);
         expect(o.v[1]).toBeLessThan(0);
+    });
+});
+
+describe("resolveCushionMathavan — 파라미터", () => {
+    it("에너지 반발 계수는 eE 를 읽는다: eC 만 바꾸면 결과가 같고 eE 를 바꾸면 달라진다", () => {
+        const b = ball([0.3, 1.2], [5, -3, 20]);
+        const base = resolveCushionMathavan(b, TOP, P, H);
+        expect(resolveCushionMathavan(b, TOP, { ...P, eC: 0.5 }, H)).toEqual(base);
+        const hi = resolveCushionMathavan(b, TOP, { ...P, eE: 0.98 }, H);
+        expect(hi.v).not.toEqual(base.v);
+        expect(-hi.v[1]).toBeGreaterThan(-base.v[1]);                 // 더 탄력 → 더 빠르게 되튄다
+    });
+
+    it("수직 입사 구름 공의 반발 속도비 ≈ eE (eE=0.88 → 0.88; 0.98 이면 실측 대역 0.82–0.91 밖 — params.ts 주석)", () => {
+        const roll = (vy: number): BallState => ({ id: "c", r: [0.7, 1, R], v: [0, vy, 0], w: [-vy / R, 0, 0], state: "rolling" });
+        const o88 = resolveCushionMathavan(roll(2), TOP, P, H);
+        expect(-o88.v[1] / 2).toBeCloseTo(0.88, 2);
+        const o98 = resolveCushionMathavan(roll(2), TOP, { ...P, eE: 0.98 }, H);
+        expect(-o98.v[1] / 2).toBeCloseTo(0.98, 2);
+    });
+
+    it("steps 가 NaN·비유한이면 기본값(2000)으로 계산한다 (NaN 전파 없음)", () => {
+        const b = ball([0.3, 1.2], [5, -3, 20]);
+        const base = resolveCushionMathavan(b, TOP, P, H);
+        expect(resolveCushionMathavan(b, TOP, P, H, NaN)).toEqual(base);
+        expect(resolveCushionMathavan(b, TOP, P, H, Infinity)).toEqual(base);
+        expect(resolveCushionMathavan(b, TOP, P, H, 2000)).toEqual(base);
     });
 });
 

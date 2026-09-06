@@ -19,8 +19,17 @@ export interface BallParams {
     readonly eB: number;
     /** 공–공 마찰 μ(v) = a + b·exp(−c·v_rel). Alciatore TP A.14 / pooltool 수렴 피팅 */
     readonly muBB: { readonly a: number; readonly b: number; readonly c: number };
-    /** 쿠션 반발 계수 (Han 2005 / sphere-half-space 모델용 상수). pooltool 0.85, 캐롬 히팅 테이블은 더 탄력 → 0.88 */
+    /** 쿠션 운동학적 반발 계수 (Han 2005 / sphere-half-space 모델용 상수). pooltool 0.85, 캐롬 히팅 테이블은 더 탄력 → 0.88 */
     readonly eC: number;
+    /**
+     * 쿠션 **에너지** 반발 계수 e_e (Stronge) — mathavan2010 모델 전용. eC 와 뜻이 다르므로 따로 둔다.
+     * Mathavan 2010 의 피팅값은 0.98(스누커 강체 쿠션, v_n < 1.5 m/s)이지만 우리 구현에서는 수직 입사 구름 공의
+     * 반발 속도비가 e_e 와 같게 나와(40-physics-review Finding 3: 0.98 이면 0.980) 실측 운동학 COR 대역
+     * 0.82–0.91(Mathavan 2009)을 벗어난다. 그래서 보정 전까지 대역 안의 0.88 을 쓴다.
+     * 보정 항목: 문헌 노트 §9.1 의 e_e(v_n) — 1 m/s 아래 0.98 에서 3.5 m/s 에 ≈ 0.85 로 감소 — 는 아직 상수다
+     * (세 모델 모두 e·μ 가 상수라 반사각·속도비가 입사 속도와 무관하다; "빠를수록 짧게" 는 재현되지 않는다).
+     */
+    readonly eE: number;
     /** 쿠션 마찰 계수. pooltool 캐롬 프리셋 0.15, Mathavan 2010 μ_w 0.14–0.2 */
     readonly fC: number;
     /** 중력 가속도 */
@@ -58,8 +67,8 @@ export interface SimParams {
     readonly cue: CueParams;
     readonly cushionModel: CushionModelId;
     /**
-     * 테이블 컨디션 스칼라(1.0 = 문헌값). 히팅·습도 느낌을 한 숫자로:
-     * muR·muS 는 1/condition 배, eC 는 condition^0.25 배로 스케일한다(구현은 applyCondition 참고).
+     * 테이블 컨디션 스칼라(1.0 = 문헌값, 양의 유한수). 히팅·습도 느낌을 한 숫자로:
+     * muR·muS 는 1/condition 배, eC·eE 는 condition^0.25 배로 스케일한다(구현은 applyCondition 참고).
      */
     readonly condition: number;
 }
@@ -73,6 +82,7 @@ const CAROM_BALL_61_5: BallParams = {
     eB: 0.93,
     muBB: { a: 9.951e-3, b: 0.108, c: 1.088 },
     eC: 0.88,
+    eE: 0.88,
     fC: 0.15,
     g: 9.81,
 };
@@ -129,6 +139,7 @@ export function applyCondition(ball: BallParams, condition: number): BallParams 
         muS: ball.muS * inv,
         muR: ball.muR * inv,
         eC: Math.min(0.98, ball.eC * eScale),
+        eE: Math.min(0.98, ball.eE * eScale),
     };
 }
 

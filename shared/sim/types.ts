@@ -76,11 +76,17 @@ export interface ShotInput {
     readonly phi: number;
     /** 큐 속도 (m/s). 큐볼 속도가 아니다 — 타격 모델이 변환한다. */
     readonly V0: number;
-    /** 팁 가로 오프셋, R 의 비율. 양수 = 큐 진행 방향 기준 오른쪽(오른쪽 사이드스핀). |a| ≤ cue.maxOffset */
+    /**
+     * 팁 가로 오프셋, R 의 비율. **큐 축에 수직한 평면**(선수가 큐를 따라 내려다본 공 면)에서 잰다 — TP A.19.
+     * 양수 = 큐 진행 방향 기준 오른쪽(오른쪽 사이드스핀). |a| ≤ cue.maxOffset
+     */
     readonly a: number;
-    /** 팁 세로 오프셋, R 의 비율. 양수 = 중심 위(밀어치기). |b| ≤ cue.maxOffset, a²+b² ≤ maxOffset² */
+    /**
+     * 팁 세로 오프셋, R 의 비율. 같은 평면에서 큐 축 기준 위가 양수(밀어치기). 큐를 들어도(theta > 0) 이 값이
+     * 그대로 밀어치기·끌어치기 스핀을 정한다(테이블 수직 오프셋이 아니다). |b| ≤ cue.maxOffset, a²+b² ≤ maxOffset²
+     */
     readonly b: number;
-    /** 큐 들림각 (rad, 0 = 수평). v2.0 은 이 값으로 스핀 축만 기울인다(마세이 커브는 미끄럼 상태에서 자연히 나온다). */
+    /** 큐 들림각 (rad, 0 = 수평, [0, π/2)). v2.0 은 이 값으로 스핀 축만 기울인다(마세이 커브는 미끄럼 상태에서 자연히 나온다). */
     readonly theta: number;
 }
 

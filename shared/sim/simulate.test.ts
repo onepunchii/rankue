@@ -1,7 +1,8 @@
 /**
  * simulate.ts 검증 (README 시험 층 A + 시나리오).
- *  A 불변량: 시드 7 무작위 샷 1000개(대대/중대 × 3구/4구 × 개시/무작위 배치) — 매 이벤트 후 운동에너지 비증가
- *    (허용 1e-9·E0), 모든 공 테이블 안(+1e-9), 겹침 없음(2R − 1e-9), 이벤트 시각 단조, 종료(truncated=false),
+ *  A 불변량: 시드 7 무작위 샷 1000개(대대/중대 × 3구/4구 × 개시/무작위 배치) — 매 이벤트의 resolve 직전(직전 스냅샷을
+ *    dt 만큼 evolveBall 한 상태) 대비 직후 운동에너지 비증가(허용 1e-9·E0; 천 마찰 소산에 가려지지 않도록 resolve 만 본다),
+ *    모든 공 테이블 안(+1e-9), 겹침 없음(2R − 1e-9), 이벤트 시각 단조, 종료(truncated=false),
  *    같은 입력 두 번 → 같은 해시, 쿠션 이벤트 뒤 안쪽 법선 방향 속도 > 0, 이벤트 폭풍 없음, 샷당 최대 이벤트 < 300.
  *  시나리오: 장축 구름 샷의 쿠션 수, 정확한 코너 입사, 정면 풀히트 속도 전달, 개시 배치의 장각(3쿠션) 존재,
  *    쿠션 모델별 해시 상이, 프로즌 공·뉴턴 요람, 0 파워, 미스큐, 상한 절단, 입력 불변.
@@ -12,7 +13,7 @@ import {
     simulateShot, simulateFrom, MAX_EVENTS, debugCounters, resetDebugCounters,
 } from "./simulate";
 import { generateShotCases, paramsOf, type ShotCase } from "./fixtures/shots";
-import { kineticEnergy } from "./evolve";
+import { evolveBall, kineticEnergy } from "./evolve";
 import { TABLES, DEFAULT_CUE, applyCondition, cushionSegments, type SimParams, type CushionModelId } from "./params";
 import { openingLayout } from "./layouts";
 import { evaluateShot, DEFAULT_3C_RULES } from "./rules/evaluate";
@@ -50,7 +51,6 @@ function checkInvariants(r: AnyResult, params: SimParams): string[] {
     const ke = (balls: readonly BallState[]) => balls.reduce((s, b) => s + kineticEnergy(b, ball), 0);
     const h = r.history;
     const E0 = ke(h[0].balls);
-    let prevE = E0;
     let prevT = h[0].t;
 
     if (r.truncated) problems.push("truncated");
@@ -60,12 +60,16 @@ function checkInvariants(r: AnyResult, params: SimParams): string[] {
     for (let k = 1; k < h.length; k++) {
         const snap = h[k];
         if (snap.t < prevT) problems.push(`snapshot time decreased at ${k}`);
+        // resolve 직전 상태 = 직전 스냅샷을 dt 만큼 닫힌 식으로 전진한 것. 이벤트 사이의 마찰 소산은 여기 포함되지 않으므로
+        // resolve 자체(전이·쿠션·볼–볼·kiss·fixOverlaps)가 에너지를 늘리면 바로 드러난다.
+        const dt = snap.t - prevT;
+        const pre = h[k - 1].balls.map((b) => (b.state === "stationary" ? b : evolveBall(b, dt, ball)));
         prevT = snap.t;
+        const Epre = ke(pre);
         const E = ke(snap.balls);
-        if (E > prevE + 1e-9 * E0) {
-            problems.push(`energy increased after event ${k - 1} ${JSON.stringify(r.events[k - 1])} by ${(E - prevE) / E0} E0`);
+        if (E > Epre + 1e-9 * E0) {
+            problems.push(`energy increased by resolve of event ${k - 1} ${JSON.stringify(r.events[k - 1])} by ${(E - Epre) / E0} E0`);
         }
-        prevE = E;
         for (const b of snap.balls) {
             if (b.r[0] < Rb - 1e-9 || b.r[0] > W - Rb + 1e-9 || b.r[1] < Rb - 1e-9 || b.r[1] > L - Rb + 1e-9) {
                 problems.push(`ball ${b.id} outside at event ${k - 1}: ${b.r}`);
@@ -163,7 +167,7 @@ describe("A 불변량: 시드 7 무작위 샷 1000개 (han2005)", () => {
             expect(r.history.length).toBe(r.events.length + 1);
             expect(r.history[r.history.length - 1].balls).toEqual(r.final);
             expect(r.duration).toBe(r.history[r.history.length - 1].t);
-            expect(r.engineVersion).toBe("2.0.0");
+            expect(r.engineVersion).toBe("2.1.0");
             expect(r.paramsHash).toMatch(/^[0-9a-f]{16}$/);
             expect(r.input).toEqual(c.input);
             expect(r.hash).toMatch(/^[0-9a-f]{16}$/);
@@ -362,6 +366,42 @@ describe("시나리오", () => {
         expect(r.duration).toBe(r.history[r.history.length - 1].t - 2.5);
         expect(r.truncated).toBe(false);
         expect(checkInvariants(r, HAN)).toEqual([]);
+    });
+
+    it("입력 검증: NaN·∞·범위 밖 입력, 중복 id, condition ≤ 0, t0 비유한 → RangeError (해시에 NaN 이 들어가지 않는다)", () => {
+        const balls = openingLayout("3c", T, "white");
+        const ok = { cueBallId: "white", phi: 1, V0: 3, a: 0.1, b: 0.1, theta: 0.1 };
+        const bad: Partial<typeof ok>[] = [
+            { phi: NaN }, { phi: Infinity }, { V0: NaN }, { V0: Infinity }, { V0: -1 }, { a: NaN }, { b: Infinity },
+            { theta: NaN }, { theta: -0.1 }, { theta: HALF_PI }, { theta: 2 },
+        ];
+        for (const patch of bad) {
+            expect(() => simulateShot(balls, { ...ok, ...patch }, HAN), JSON.stringify(patch)).toThrow(RangeError);
+        }
+        expect(() => simulateShot(balls, ok, { ...HAN, condition: 0 })).toThrow(RangeError);
+        expect(() => simulateShot(balls, ok, { ...HAN, condition: -1 })).toThrow(RangeError);
+        expect(() => simulateShot(balls, ok, { ...HAN, condition: NaN })).toThrow(RangeError);
+        expect(() => simulateShot(balls, ok, { ...HAN, condition: Infinity })).toThrow(RangeError);
+        const dup = [balls[0], { ...balls[1], id: "white" }, balls[2]];
+        expect(() => simulateShot(dup, ok, HAN)).toThrow(/duplicate/);
+        expect(() => simulateFrom(dup, HAN)).toThrow(/duplicate/);
+        expect(() => simulateShot([balls[0], { ...balls[1], r: [NaN, 1, R] }, balls[2]], ok, HAN)).toThrow(RangeError);
+        expect(() => simulateFrom([{ ...balls[0], v: [1, Infinity, 0], state: "sliding" }], HAN)).toThrow(RangeError);
+        expect(() => simulateFrom([{ ...balls[0], state: "flying" as BallState["state"] }], HAN)).toThrow(RangeError);
+        expect(() => simulateFrom([{ ...balls[0], id: "" }], HAN)).toThrow(RangeError);
+        expect(() => simulateFrom(balls, HAN, NaN)).toThrow(RangeError);
+        // 경계값은 허용: V0 = 0, theta = 0, condition 양수
+        expect(() => simulateShot(balls, { ...ok, V0: 0, theta: 0 }, { ...HAN, condition: 0.7 })).not.toThrow();
+    });
+
+    it("공 배열 순서는 결과 물리·해시에 영향이 없다 (final 은 id 순으로 해시)", () => {
+        const balls = openingLayout("3c", T, "white");
+        const input = { cueBallId: "white", phi: 1.3, V0: 3, a: 0.1, b: 0.1, theta: 0 };
+        const r1 = simulateShot(balls, input, HAN);
+        const r2 = simulateShot([balls[2], balls[0], balls[1]], input, HAN);
+        expect(r2.events).toEqual(r1.events);
+        expect(r2.hash).toBe(r1.hash);
+        for (const b of r1.final) expect(r2.final.find((x) => x.id === b.id)).toEqual(b);
     });
 
     it("입력 불변: 깊이 얼린 공·입력·파라미터로도 동작하고 입력이 그대로다", () => {

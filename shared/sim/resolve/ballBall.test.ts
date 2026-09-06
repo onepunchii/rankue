@@ -11,6 +11,7 @@ import { HALF_PI, PI, TWO_PI, atan2, cos, exp, sin } from "../dmath";
 import { add, cross, dot, length, scale, sub, unit, upCross } from "../vec";
 import { kineticEnergy } from "../evolve";
 import { ballBallFriction, resolveBallBall } from "./ballBall";
+import { mulberry32 } from "../rng";
 
 const P = TABLES.DAEDAE.ball;
 const R = P.R;
@@ -61,18 +62,6 @@ function clone(b: BallState): BallState {
 
 function bitEqual(a: Vec3, b: Vec3): boolean {
     return Object.is(a[0], b[0]) && Object.is(a[1], b[1]) && Object.is(a[2], b[2]);
-}
-
-/** 시드 PRNG (mulberry32). rng.ts 와 같은 알고리즘이지만 테스트가 독립적으로 든다. */
-function mulberry32(seed: number): () => number {
-    let a = seed >>> 0;
-    return () => {
-        a = (a + 0x6d2b79f5) >>> 0;
-        let t = a;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
 }
 
 /** 접근 중인(중심선 상대속도 > 0) 무작위 충돌 쌍 N 개. */

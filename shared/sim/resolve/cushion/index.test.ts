@@ -12,14 +12,8 @@ describe("resolveCushion 디스패치", () => {
     it("sphereHalfSpace → resolveCushionSHS", () => {
         expect(resolveCushion("sphereHalfSpace", b, LEFT, P, H)).toEqual(resolveCushionSHS(b, LEFT, P, H));
     });
-    it("mathavan2010 → resolveCushionMathavan (구현이 없으면 같은 예외)", () => {
-        let direct: unknown, directErr: unknown;
-        try { direct = resolveCushionMathavan(b, LEFT, P, H); } catch (e) { directErr = e; }
-        if (directErr) {
-            expect(() => resolveCushion("mathavan2010", b, LEFT, P, H)).toThrow();
-        } else {
-            expect(resolveCushion("mathavan2010", b, LEFT, P, H)).toEqual(direct);
-        }
+    it("mathavan2010 → resolveCushionMathavan", () => {
+        expect(resolveCushion("mathavan2010", b, LEFT, P, H)).toEqual(resolveCushionMathavan(b, LEFT, P, H));
     });
     it("모델별 결과가 서로 다르다(같은 함수로 라우팅되지 않았음)", () => {
         const han = resolveCushion("han2005", b, LEFT, P, H);

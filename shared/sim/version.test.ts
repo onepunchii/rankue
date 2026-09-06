@@ -2,12 +2,12 @@
  * version.ts 검증: ENGINE_VERSION 형식, paramsHash 의 키 순서 독립성·민감도, stableStringify.
  */
 import { describe, it, expect } from "vitest";
-import { ENGINE_VERSION, paramsHash, stableStringify } from "./version";
+import { ENGINE_VERSION, paramsHash, physicsParams, stableStringify } from "./version";
 import { DEFAULT_PARAMS, TABLES, DEFAULT_CUE, type SimParams } from "./params";
 
 describe("version", () => {
-    it("ENGINE_VERSION 은 semver 2.0.0", () => {
-        expect(ENGINE_VERSION).toBe("2.0.0");
+    it("ENGINE_VERSION 은 semver 2.1.0", () => {
+        expect(ENGINE_VERSION).toBe("2.1.0");
         expect(ENGINE_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
     });
 
@@ -37,5 +37,25 @@ describe("version", () => {
         expect(paramsHash({ ...DEFAULT_PARAMS, cue: { ...DEFAULT_CUE, M: 0.53 } })).not.toBe(h);
         expect(paramsHash({ ...DEFAULT_PARAMS, cushionModel: "mathavan2010" })).not.toBe(h);
         expect(paramsHash({ ...DEFAULT_PARAMS, condition: 1.05 })).not.toBe(h);
+        expect(paramsHash({ ...DEFAULT_PARAMS, table: { ...TABLES.DAEDAE, cushionHeight: 0.0371 } })).not.toBe(h);
+        expect(paramsHash({ ...DEFAULT_PARAMS, table: { ...TABLES.DAEDAE, ball: { ...TABLES.DAEDAE.ball, eE: 0.9 } } })).not.toBe(h);
+    });
+
+    it("paramsHash: 물리와 무관한 table.name 은 무시한다 (표시명·i18n 이 래더를 가르지 않는다)", () => {
+        const h = paramsHash(DEFAULT_PARAMS);
+        expect(paramsHash({ ...DEFAULT_PARAMS, table: { ...TABLES.DAEDAE, name: "대대 (구형)" } })).toBe(h);
+        expect(paramsHash({ ...DEFAULT_PARAMS, table: { ...TABLES.DAEDAE, name: "" } })).toBe(h);
+        // 알 수 없는 추가 속성도 무시
+        expect(paramsHash({ ...DEFAULT_PARAMS, extra: 1 } as unknown as SimParams)).toBe(h);
+    });
+
+    it("physicsParams 는 BallParams·CueParams·TableSpec(name 제외)의 모든 키를 담는다 — 새 물리 필드를 빠뜨리면 실패", () => {
+        const pp = physicsParams(DEFAULT_PARAMS) as { table: Record<string, unknown> & { ball: Record<string, unknown> }; cue: Record<string, unknown> };
+        for (const k of Object.keys(TABLES.DAEDAE.ball)) expect(pp.table.ball, `ball.${k}`).toHaveProperty(k);
+        for (const k of Object.keys(DEFAULT_CUE)) expect(pp.cue, `cue.${k}`).toHaveProperty(k);
+        for (const k of Object.keys(TABLES.DAEDAE)) if (k !== "name") expect(pp.table, `table.${k}`).toHaveProperty(k);
+        expect(pp.table).not.toHaveProperty("name");
+        expect(pp).toHaveProperty("cushionModel");
+        expect(pp).toHaveProperty("condition");
     });
 });

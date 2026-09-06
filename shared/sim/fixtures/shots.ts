@@ -76,12 +76,15 @@ export function randomShotInput(rnd: () => number, balls: readonly BallState[], 
 export interface GenerateOptions {
     /** i → 쿠션 모델. 기본 전부 han2005. */
     readonly modelFor?: (i: number) => CushionModelId;
+    /** i → 테이블 컨디션. 기본 전부 1. (난수 소비에 영향이 없으므로 배치·입력은 그대로다.) */
+    readonly conditionFor?: (i: number) => number;
 }
 
 /** seed 에서 n 개의 샷 케이스. 테이블·종목·배치는 난수로 고른다. */
 export function generateShotCases(seed: number, n: number, opts: GenerateOptions = {}): readonly ShotCase[] {
     const rnd = mulberry32(seed);
     const modelFor = opts.modelFor ?? (() => "han2005" as const);
+    const conditionFor = opts.conditionFor ?? (() => 1);
     const out: ShotCase[] = [];
     for (let i = 0; i < n; i++) {
         const tableId: TableSpec["id"] = rnd() < 0.5 ? "DAEDAE" : "JUNGDAE_KR";
@@ -92,7 +95,7 @@ export function generateShotCases(seed: number, n: number, opts: GenerateOptions
             ? openingLayout(gameType, table, "white", rnd() < 0.5 ? "right" : "left")
             : randomLegalLayout(rnd, table, gameType);
         const input = randomShotInput(rnd, balls, "white");
-        out.push({ i, tableId, gameType, layout, cushionModel: modelFor(i), condition: 1, balls, input });
+        out.push({ i, tableId, gameType, layout, cushionModel: modelFor(i), condition: conditionFor(i), balls, input });
     }
     return out;
 }

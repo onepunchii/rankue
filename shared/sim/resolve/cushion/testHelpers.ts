@@ -8,6 +8,9 @@ import { TABLES, cushionSegments } from "../../params";
 import { atan2, cos, sin, PI } from "../../dmath";
 import { kineticEnergy } from "../../evolve";
 
+/** 시드 PRNG 는 rng.ts 하나만 쓴다(사본 금지 — 41-determinism-review 2.11). */
+export { mulberry32 } from "../../rng";
+
 export const P: BallParams = TABLES.DAEDAE.ball;
 export const R = P.R;
 export const H = TABLES.DAEDAE.cushionHeight;
@@ -16,18 +19,6 @@ export const LEFT = SEGS.find((s) => s.id === "left")!;
 
 export function ball(v: Vec3, w: Vec3 = [0, 0, 0], id = "cue"): BallState {
     return { id, r: [R, 1.0, R], v, w, state: "sliding" };
-}
-
-/** 시드 PRNG (mulberry32). rng.ts 가 아직 없어 테스트 안에 둔다. */
-export function mulberry32(seed: number): () => number {
-    let a = seed >>> 0;
-    return () => {
-        a = (a + 0x6d2b79f5) >>> 0;
-        let t = a;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
 }
 
 /**

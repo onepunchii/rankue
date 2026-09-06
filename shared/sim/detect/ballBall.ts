@@ -15,8 +15,13 @@
  *  - 두 공의 가속도가 같으면(p2 = 0 — 둘 다 정지/스핀이거나 같은 방향으로 같은 마찰로 감속) c4 = c3 = 0 이라
  *    2차식으로 강등한다(pooltool 의 FIXME 분기와 같다).
  *  - 근 중에서 "접근 중"인 것만 충돌이다: d/dt|p|² = 2 p(t)·p′(t) < 0. 같은 거리 2R 을 멀어지며 지나는
- *    근(충돌 직후 분리)은 버린다. 이미 접촉·겹침 상태(|p0| ≤ 2R + 1e-9)에서 멀어지는 중이면 Infinity —
- *    방금 해결한 충돌을 다시 잡아 이벤트 폭풍이 되는 것을 막는다.
+ *    근(충돌 직후 분리)은 버린다.
+ *  - 이미 접촉·겹침 상태(|p0| ≤ 2R + 1e-9)에서 멀어지는 중이고 **상대 가속도가 0 이면** Infinity — 곡률이
+ *    없으니 다시 만날 수 없고, 방금 해결한 충돌을 다시 잡는 이벤트 폭풍도 막는다. 상대 가속도 p2 ≠ 0 이면
+ *    근 탐색으로 넘긴다: 마찰이 만드는 포물선 곡률로 스핀 공이 느리게 멀어지다 같은 이벤트 구간 안에서
+ *    되돌아와 다시 닿는 경우(예: 접촉한 채 마세이 스핀으로 살짝 밀어난 공, 40-physics-review Finding 1)가
+ *    있고, pooltool 도 이 상태에서 4차식을 그대로 푼다(is_overlapping 은 2R 미만에서만 발동). 방금 해결한
+ *    접촉 자신은 t > 1e-9 와 p·p′ < 0 필터가, 겹친 쌍의 탈출 근은 p·p′ > 0 이라 자연히 걸러진다.
  *  - 1e-9 s 이하의 근은 현재 이벤트 자신이므로 버린다(pooltool EPS 와 같은 규약).
  *
  * 유효 구간(horizon)
@@ -54,7 +59,7 @@ function isZero(v: Vec3): boolean {
 /**
  * 두 공의 다음 충돌까지의 시간 (s). 충돌하지 않으면 Infinity.
  *  - 둘 다 이동하지 않으면(r1 = r2 = 0) Infinity.
- *  - 이미 접촉·겹침 중이고 멀어지는(또는 접선 방향) 중이면 Infinity.
+ *  - 이미 접촉·겹침 중이고 멀어지는(또는 접선 방향) 중이며 상대 가속도가 0 이면 Infinity.
  *  - 그 외에는 |p(t)| = 2R 의 근 중 t > 1e-9, 두 공의 유효 구간 안(t ≤ 이른 전이 시각),
  *    그 순간 접근 중(p·p′ < 0)인 가장 작은 것.
  */
@@ -69,11 +74,11 @@ export function ballBallTime(b1: BallState, b2: BallState, p: BallParams): numbe
     const p2 = sub(A.r2, B.r2);
     const D = 2 * p.R;
 
-    // 이미 닿아 있거나 겹친 상태: 멀어지는 중이면 충돌 없음. 접근 중이면 아래 근 탐색이 자연히
-    // (2R 을 접근하며 지나는 미래 근이 없으므로) Infinity 를 돌려준다.
-    if (lengthSq(p0) <= (D + EVENT_EPS) * (D + EVENT_EPS)) {
-        if (dot(p0, p1) >= 0) return Infinity;
-    }
+    // 이미 닿아 있거나 겹친 상태에서 멀어지는 중: 상대 가속도가 없으면(둘 다 등속·정지) 다시 만날 수 없다.
+    // p2 ≠ 0 이면 곡률로 되돌아올 수 있으므로 근 탐색에 맡긴다(파일 머리 주석). 겹친 채 접근 중이면 아래
+    // 근 탐색이 (2R 을 접근하며 지나는 미래 근이 없으므로) 자연히 Infinity 를 돌려준다.
+    const touching = lengthSq(p0) <= (D + EVENT_EPS) * (D + EVENT_EPS);
+    if (touching && dot(p0, p1) >= 0 && isZero(p2)) return Infinity;
 
     // f(t) = ½(|p|² − D²) 의 계수, 낮은 차수부터 (pooltool quartic_coefficients.py)
     const c0 = 0.5 * (lengthSq(p0) - D * D);

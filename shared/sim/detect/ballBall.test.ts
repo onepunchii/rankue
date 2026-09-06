@@ -149,6 +149,42 @@ describe("ballBallTime — 충돌 없음", () => {
     });
 });
 
+describe("ballBallTime — 접촉 대역(2R + 1e-9) 안에서 멀어지다 곡률로 되돌아오는 쌍 (40-physics-review Finding 1)", () => {
+    // 접촉한 채 v = (−0.01, 0.05) 로 살짝 멀어지지만 ω_y = 40 rad/s 의 미끄럼 마찰이 상대 공 쪽(+x)으로 가속한다.
+    const curving = (dx: number) => {
+        const a = ball("a", [0.5 + dx, 1.0], [-0.01, 0.05, 0], "sliding", [0, 40, 0]);
+        const b = ball("b", [0.5 + 2 * R + 1e-9, 1.0], [0, 0, 0], "stationary");
+        return { a, b };
+    };
+
+    it("대역 안(정확히 2R + 1e-9)에서도 되돌아오는 시각(≈ 1.04e-2 s)을 잡고 이분법과 1e-10 안에서 일치", () => {
+        const { a, b } = curving(0);
+        const t = ballBallTime(a, b, P);
+        expect(Number.isFinite(t)).toBe(true);
+        expect(t).toBeGreaterThan(1e-9);
+        expect(t).toBeLessThan(0.02);
+        // 오라클: 처음엔 벌어지므로 gap 이 양수였다가 음수로 바뀌는 첫 구간을 찾는다
+        const ref = bisect(gap(a, b), 0.05, 50000);
+        expect(Math.abs(t - ref)).toBeLessThan(1e-10);
+    });
+
+    it("대역 밖 1e-8 m 에서 시작해도 같은 시각(1e-6 안)", () => {
+        const inside = ballBallTime(curving(0).a, curving(0).b, P);
+        const outside = ballBallTime(curving(-1e-8).a, curving(-1e-8).b, P);
+        expect(Math.abs(inside - outside)).toBeLessThan(1e-6);
+    });
+
+    it("방금 해결한 접촉(멀어지는 중, 곡률이 되돌리지 않음)은 여전히 Infinity — 이벤트 폭풍 없음", () => {
+        // 스핀 없이 곧장 멀어지는 미끄럼 공: 가속도는 −v̂ 라 감속만 하고 유효 구간 안에서 되돌아오지 않는다
+        const a = ball("a", [0.5, 1.0], [-0.3, 0.02, 0], "sliding");
+        const b = ball("b", [0.5 + 2 * R + 1e-9, 1.0], [0, 0, 0], "stationary");
+        expect(ballBallTime(a, b, P)).toBe(Infinity);
+        // 상대 가속도 0(정지 + 스핀) 이면 조기 종료
+        const c = ball("a", [0.5, 1.0], [0, 0, 0], "spinning", [0, 0, 30]);
+        expect(ballBallTime(c, b, P)).toBe(Infinity);
+    });
+});
+
 describe("ballBallTime — 스침(grazing) 여유 1e-9", () => {
     const grazeTime = (delta: number) => {
         const a = ball("a", [0.7, 1.5], [0, 0, 0], "stationary");

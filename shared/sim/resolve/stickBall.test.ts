@@ -156,34 +156,52 @@ describe("strike — TP A.31 스쿼트", () => {
     });
 });
 
-describe("strike — 큐 들림각 θ", () => {
-    it("θ=0.3, a=0.4, b=0 → 큐 방향 축 스핀 성분 ω_d = (v/I_m)·aR·sinθ ≠ 0, ω_z = (v/I_m)·aR·cosθ", () => {
+describe("strike — 큐 들림각 θ (오프셋은 큐 축에 수직한 평면에서 잰다: TP A.19 / pooltool 3D)", () => {
+    it("θ=0.3, a=0.4, b=0 → 큐 방향 축 스핀 성분 ω_d = (v/I_m)·aR·sinθ ≠ 0, ω_z = (v/I_m)·aR·cosθ, L̂ 성분 0", () => {
         const theta = 0.3, a = 0.4, phi = 0.9;
         const out = strike(cueBall(), shot({ a, theta, phi }), P, CUE);
         const alpha = squirtAngle(a, CUE.endmassRatio);
         const dRot = dir(phi + alpha);                                 // 스쿼트 후 큐 방향
         const wD = dot(out.w, dRot);
         expect(Math.abs(wD)).toBeGreaterThan(1);
-        // v (전체 크기) 는 |v_h|/cosθ
+        // v (전체 크기) 는 |v_h|/cosθ 이고 c 항이 없으므로 TP A.30 식 7 그대로
         const vFull = length(out.v) / Math.cos(theta);
         const Im = 0.4 * R * R;
+        expect(vFull).toBeCloseTo(((2 * 3) / (1 + P.m / CUE.M + 2.5 * a * a)) * CUE.tipEfficiency, 12);
         expect(wD).toBeCloseTo((vFull / Im) * a * R * Math.sin(theta), 8);
         expect(out.w[2]).toBeCloseTo((vFull / Im) * a * R * Math.cos(theta), 8);
-        // 남은 L̂ 성분은 −c sinθ (끌어치기 성분)
-        const c = Math.sqrt(1 - a * a);
-        expect(dot(out.w, leftOf(dRot))).toBeCloseTo((vFull / Im) * (-c * R * Math.sin(theta)), 8);
+        // b = 0 이면 L̂ 성분(밀어치기·끌어치기)은 없다 — 테이블 프레임 해석의 가짜 −c sinθ 끌어치기가 사라졌다
+        expect(dot(out.w, leftOf(dRot))).toBeCloseTo(0, 9);
     });
 
-    it("θ>0 이면 수평 속도만 남고(z=0) 크기는 v·cosθ; 중심 타격은 −c sinθ 의 끌어치기 스핀", () => {
-        const theta = 0.5;
-        const out = strike(cueBall(), shot({ theta }), P, CUE);
+    it("θ>0 중심 타격(a=b=0): 임펄스가 중심을 지나 ω = 0, 수평 속도만 남고(z=0) 크기는 v·cosθ", () => {
+        for (const theta of [0.2, 0.5, 20 * PI / 180]) {
+            const out = strike(cueBall(), shot({ theta }), P, CUE);
+            const vFull = ((2 * 3) / (1 + P.m / CUE.M)) * CUE.tipEfficiency;
+            expect(out.v[2]).toBe(0);
+            expect(length(out.v)).toBeCloseTo(vFull * Math.cos(theta), 12);
+            expect(out.w).toEqual([0, 0, 0]);
+        }
+    });
+
+    it("밀어치기 b 의 L̂ 스핀은 θ 와 무관 (TP A.19 ω_x ∝ b): θ=0 과 θ=0.4 에서 (v/I_m)·bR 로 같다", () => {
+        const b = 0.3;
+        const flat = strike(cueBall(), shot({ b, theta: 0 }), P, CUE);
+        const up = strike(cueBall(), shot({ b, theta: 0.4 }), P, CUE);
         const Im = 0.4 * R * R;
-        const temp = R * R * Math.sin(theta) * Math.sin(theta);        // (c sinθ)², c = R
-        const vFull = ((2 * 3) / (1 + P.m / CUE.M + temp / Im)) * CUE.tipEfficiency;
-        expect(out.v[2]).toBe(0);
-        expect(length(out.v)).toBeCloseTo(vFull * Math.cos(theta), 12);
-        expect(out.w[1]).toBeLessThan(0);                              // d = x̂, L̂ = ŷ, 성분 음수 = 끌어치기
-        expect(out.w[2]).toBeCloseTo(0, 12);
+        // 두 경우 모두 v(전체)는 같고(θ 는 v 식에 안 들어감) L̂ = ŷ 성분이 (v/I_m)·bR
+        const vFlat = length(flat.v), vUp = length(up.v) / Math.cos(0.4);
+        expect(vUp).toBeCloseTo(vFlat, 12);
+        expect(flat.w[1]).toBeCloseTo((vFlat / Im) * b * R, 9);
+        expect(up.w[1]).toBeCloseTo((vFlat / Im) * b * R, 9);
+        expect(up.w[0]).toBeCloseTo(0, 12);
+        expect(up.w[2]).toBeCloseTo(0, 12);
+    });
+
+    it("미스큐 경계도 큐 프레임: θ=20° 에서 b=+0.4 는 허용, b=−0.6 은 미스큐 (테이블 프레임이면 반대였다)", () => {
+        const theta = 20 * PI / 180;
+        expect(() => strike(cueBall(), shot({ b: 0.4, theta }), P, CUE)).not.toThrow();
+        expect(() => strike(cueBall(), shot({ b: -0.6, theta }), P, CUE)).toThrow("miscue");
     });
 });
 
@@ -247,7 +265,7 @@ describe("stickBall.ts 는 Math 초월함수·시각·난수를 참조하지 않
         const here = dirname(fileURLToPath(import.meta.url));
         const src = readFileSync(join(here, "stickBall.ts"), "utf8");
         const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-        const banned = /Math\.(sin|cos|tan|atan|atan2|asin|acos|exp|log|pow|hypot|cbrt|random|fround)\b/g;
+        const banned = /Math\.(sin|cos|tan|atan|atan2|asin|acos|asinh|acosh|atanh|sinh|cosh|tanh|exp|expm1|log|log2|log10|log1p|pow|hypot|cbrt|random|fround)\b/g;
         expect(code.match(banned) ?? []).toEqual([]);
         expect(/\b(Date|performance)\b/.test(code)).toBe(false);
         expect(/\*\*/.test(code)).toBe(false);

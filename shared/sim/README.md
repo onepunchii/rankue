@@ -10,16 +10,21 @@
 2. **입력 불변.** 어떤 함수도 인자로 받은 배열·객체를 바꾸지 않는다. 새 값을 만들어 돌려준다.
 3. **시각·난수 금지.** `Date`, `performance`, `Math.random` 사용 금지. 난수는 `rng.ts` 의 시드 PRNG 만.
 4. **DOM·three.js·Node 금지.** import 는 이 폴더 안의 상대 경로만.
-5. **동시 이벤트 순서 고정.** 두 후보의 dt 차이가 1e-9 s 이하이면 (type 순위: transition < ball-cushion < ball-ball) →
-   ids 사전순 → cushion id 사전순으로 결정한다. 이 규칙이 리플레이를 재현 가능하게 만든다.
+5. **동시 이벤트 순서 고정.** 최소 dt 로부터 1e-9 s 이내의 후보들 중에서 (type 순위: transition < ball-cushion < ball-ball) →
+   ids 사전순 → cushion id 사전순(UTF-16 코드 단위 비교)으로 결정한다. 창은 최솟값에 고정되므로(쌍별 비교가 아니다)
+   0 / +0.8 ns / +1.6 ns 체인에서 +1.6 ns 는 창 밖이다. 이 규칙이 리플레이를 재현 가능하게 만든다.
 6. **테스트 동반.** 모듈마다 `*.test.ts` 를 같은 폴더에 둔다. `npm test` 는 `vitest run`.
+7. **입력 검증.** simulateShot·simulateFrom 은 NaN·∞·범위 밖 입력(phi·V0·a·b·theta, 공의 r·v·w, condition ≤ 0, t0),
+   중복 공 id, 알 수 없는 state 를 RangeError 로 거부한다. NaN 비트 패턴은 엔진마다 달라 해시에 들어가면 안 된다.
 
 ## 좌표·부호 규약
 - x ∈ [0, width] 짧은 변, y ∈ [0, length] 긴 변, z 위. 공 중심 z = R (v2.0 은 z 운동 없음).
 - 각속도 ω: 오른손 법칙. 구르는 공: ω_xy = (1/R)·(k̂ × v). 접점 미끄럼 속도 u = v + ω × (−R k̂) = (v_x − R ω_y, v_y + R ω_x, 0).
 - 큐 방향 d = (cos φ, sin φ). "오른쪽" = d 를 −90° 돌린 (sin φ, −cos φ).
-  팁 오프셋 a>0 (오른쪽 사이드) 는 토크 (a R right) × (F d) = +aRF k̂ 이므로 **ω_z > 0 (위에서 봐서 반시계)**.
-  b>0 (중심 위, 밀어치기) 는 진행 방향 앞으로 구르는 스핀: ω_xy 가 k̂ × d 방향(+).
+  팁 오프셋 (a, b) 는 **큐 축에 수직한 평면**(선수가 큐를 따라 내려다본 공 면)에서 잰다 — TP A.19, pooltool 3D 와 같다.
+  a>0 (오른쪽 사이드) 는 토크 (a R right) × (F d) = +aRF k̂ 이므로 **ω_z > 0 (위에서 봐서 반시계)**.
+  b>0 (큐 축 기준 위, 밀어치기) 는 진행 방향 앞으로 구르는 스핀: ω_xy 가 k̂ × d 방향(+), 크기는 θ 와 무관.
+  큐를 들고(θ>0) 중심(a=b=0)을 치면 ω = 0 이다 — 테이블 수직 오프셋이 아니다. UI 는 변환 없이 그대로 넘긴다.
 - 쿠션 법선은 테이블 안쪽. 쿠션 코 높이 h 로 접촉 법선이 기울어진 각 θ: sin θ = (h − R)/R.
 
 ## 모듈과 시그니처
@@ -55,7 +60,9 @@ evolve.ts   (Leckie & Greenspan / pooltool evolve, 닫힌 식)
 
 detect/ballBall.ts
   export function ballBallTime(b1: BallState, b2: BallState, p: BallParams): number
-    // 두 공의 상대 위치 다항식으로 |Δr(t)|² = (2R)² 의 최소 양근. 이미 접촉 중이고 멀어지는 중이면 Infinity. 둘 다 정지면 Infinity.
+    // 두 공의 상대 위치 다항식으로 |Δr(t)|² = (2R)² 의 최소 양근(t > 1e-9, 그 순간 접근 중, 이른 전이 시각 이전).
+    // 이미 접촉 중(≤ 2R + 1e-9)이고 멀어지는 중이며 상대 가속도가 0 이면 Infinity; 상대 가속도가 있으면 근 탐색
+    // (마찰 곡률로 되돌아오는 재접촉을 잡는다 — pooltool 과 같다). 둘 다 정지면 Infinity.
 detect/ballCushion.ts
   export function ballCushionTime(b: BallState, seg: CushionSegment, p: BallParams): number
     // 코 라인까지 부호 거리 = R 이 되는 최소 양근(2차). 세그먼트 범위 안 + 쿠션 쪽으로 이동 중일 때만.
@@ -65,9 +72,12 @@ detect/index.ts
 
 resolve/stickBall.ts
   export function strike(cueBall: BallState, input: ShotInput, p: BallParams, cue: CueParams): BallState
-    // TP A.30 (pooltool instantaneous point): v = 2V0/(1 + m/M + [a² + (b cosθ)² + (c sinθ)² − 2bc cosθ sinθ]/((2/5)R²)) × tipEfficiency,
-    // ω = (v/((2/5)R²))·(−c sinθ + b cosθ, a sinθ, −a cosθ) 큐 프레임 → 테이블 프레임 회전.
-    // TP A.31 스쿼트: α = atan2(2.5·a·√(1−a²), 1 + endmassRatio + 2.5(1−a²)) 만큼 v 와 ω 를 오프셋 반대쪽으로 회전.
+    // TP A.30 / pooltool InstantaneousPoint3D. (a, b) 는 큐 축에 수직한 평면의 오프셋(R 비율). pooltool 의 큐→볼 프레임 회전
+    // (ball_b = sinθ·c + cosθ·b, ball_c = cosθ·c − sinθ·b) 을 θ-식에 넣으면 c 가 소거되어
+    //   v = 2V0/(1 + m/M + (a² + b²)R²/((2/5)R²)) × tipEfficiency,
+    //   ω = (v/((2/5)R²))·R·(b, a sinθ, a cosθ)  — (왼쪽 L̂, 큐 방향 d̂, 위 k̂) 성분. 수평 속도 v cosθ 만 남긴다(z 운동 없음).
+    // TP A.31 스쿼트: α = atan2(2.5·a·√(1−a²), 1 + endmassRatio + 2.5(1−a²)) 만큼 v 와 ω 를 오프셋 반대쪽으로 회전
+    //   (pooltool 은 v 만 돌린다 — 의도된 차이, 42-oracle-report §4.2).
     // |a|,|b| ≤ maxOffset, a²+b² ≤ maxOffset² 아니면 throw RangeError("miscue"). 결과 state = 'sliding'.
 resolve/ballBall.ts
   export function ballBallFriction(vRel: number, p: BallParams): number       // a + b·exp(−c·vRel)
@@ -84,38 +94,46 @@ resolve/cushion/sphereHalfSpace.ts
 resolve/cushion/mathavan2010.ts
   export function resolveCushionMathavan(b, seg, p, cushionHeight, steps = 2000): BallState
     // Mathavan 2010 임펄스 스텝(압축: v_y ≤ 0 까지 + 8단계 이분 정제, 복원: W ≥ e_e²·W_c 까지). 고정 steps 라 결정론적.
+    // e_e 는 p.eE(에너지 반발 계수, Han/SHS 의 운동학적 p.eC 와 별개; 기본 0.88 — params.ts 주석의 보정 항목).
 resolve/cushion/index.ts
   export function resolveCushion(model: CushionModelId, b, seg, p, cushionHeight): BallState
+    // sphereHalfSpace 는 수직 벽이라 탑스핀–반발속도 결합이 없다(Mathavan Fig. 9 위배) — 3쿠션 기본값 금지, 기본은 han2005.
 resolve/transition.ts
   export function applyTransition(b: BallState, to: MotionState, p: BallParams): BallState
     // 정준 전이: rolling 진입 시 ω_xy 를 정확히 (1/R)k̂×v 로, spinning 진입 시 v=0·ω_xy=0, stationary 진입 시 전부 0. |x|<1e-12 스냅.
 resolve/kiss.ts
   export function makeKiss(b1, b2, p, spacer = 1e-9): readonly [BallState, BallState]   // 궤적을 따라 정확히 2R+spacer 로 분리
   export function resolveContinuallyTouching(b1, b2, p): readonly [BallState, BallState] // 반경 방향 상대속도 < 1e-3 m/s 면 쫓기는 공이 10% 운동량을 가져감
+    // 문턱 1e-3 은 의도된 값(pooltool 코드는 0.01, docstring 은 1 mm/s). spacer 1e-9 도 pooltool MIN_DIST 1e-6 과 다른 의도된 값 — kiss.ts 머리.
 
 simulate.ts
   export const MAX_EVENTS = 2000
+  export function validateBalls(balls), validateShotInput(input), validateParams(params): void   // 절대 규칙 7. 위반 시 RangeError
   export function simulateShot(balls: readonly BallState[], input: ShotInput, params: SimParams): SimResult
   export function simulateFrom(balls: readonly BallState[], params: SimParams, t0 = 0): Omit<SimResult, "input">
+    // 둘 다 진입에서 검증한다. 공 배열 순서는 물리·해시에 영향이 없다(감지·해석은 id 로 결정, 해시는 id 순).
     // 루프: nextEvent → 모든 공 evolveBall(dt) → 해당 이벤트 하나만 resolve → history 에 스냅샷 push → 반복.
     // 이벤트 없음(전부 stationary) 이면 종료. MAX_EVENTS 초과면 truncated=true.
     // 각 resolve 후 불변 검사(디버그): 겹침 없음, 에너지 비증가(허용 1e-9 상대) — 위반 시 console 이 아니라 결과의 warnings 에 기록하지 말고 throw 하지도 말 것; 테스트에서만 검사한다.
 continuize.ts
   export function stateAt(result: Pick<SimResult,"history">, t: number, p: BallParams): readonly BallState[]   // 직전 스냅샷에서 evolveBall
-  export function frames(result, dt, p): readonly Snapshot[]
+  export const MAX_FRAMES = 1e7
+  export function frames(result, dt, p): readonly Snapshot[]   // dt 가 양의 유한수가 아니거나 프레임 수 > MAX_FRAMES 면 RangeError; 시각이 멈추면 종료
 hash.ts
   export function hashResult(events: readonly SimEvent[], final: readonly BallState[]): string
-    // FNV-1a 64비트(두 개의 32비트, Math.imul). 입력은 이벤트의 (type, t, ids, cushion/from/to) 와 최종 상태 (id, r, v, w, state) 의 Float64 비트 패턴. 16진 16자리.
+    // FNV-1a 64비트(두 개의 32비트, Math.imul). 입력은 이벤트의 (type, t, ids, cushion/from/to) 와 최종 상태 (id, r, v, w, state) 의
+    // Float64 비트 패턴. final 은 **id 사전순**으로 넣고(배열 순서 무관), NaN 은 정규 quiet NaN 0x7ff8000000000000 으로 통일. 16진 16자리.
 rng.ts
   export function mulberry32(seed: number): () => number
 version.ts
-  export const ENGINE_VERSION = "2.0.0"
-  export function paramsHash(params: SimParams): string    // JSON 정렬 직렬화 → FNV-1a
+  export const ENGINE_VERSION = "2.1.0"
+  export function physicsParams(params: SimParams): object  // 물리에 영향 주는 필드만(table.name 제외) — 새 물리 필드는 여기 추가
+  export function paramsHash(params: SimParams): string    // physicsParams → JSON 정렬 직렬화 → FNV-1a
 index.ts   전부 재수출
 ```
 
 ## 테스트 층
-- **A 불변량**(`simulate.test.ts`): 시드 고정 무작위 샷 1000개 × 대대/중대 × 3구/4구 배치. 매 이벤트 후 운동에너지 비증가, 모든 공 [R, W−R]×[R, L−R] 안, 어떤 두 공도 2R − 1e-9 미만으로 안 겹침, 이벤트 시각 단조증가, 종료(truncated=false), 같은 입력 두 번 → 해시 동일.
-- **B 물리 단위**: pooltool 의 테스트 불변량(정면 무스핀, e_b 분리비, 대칭 쌍 유지, z-스핀 → 던지기 방향, 기어링 스핀 → 던지기 0, 낮은 상대속도 → 접점 상대속도 0, 쿠션 에너지 비증가, y 대칭), TP A.4 5/7 법칙, TP A.16 자연구름 정지거리, 45° 무스핀 입사 = 반사, 순방향 잉글리시 → 반사각 커짐·속도 증가 가능, 역방향 잉글리시 80–90° 입사 → 같은 쪽으로 되돌아옴, 코너 정확 입사 → 쿠션 이벤트 2개, 반두께(8 m/s) 분리각 ≈ 60° ± 3°(던지기 포함), 3 m/s 구름 공이 대대에서 쿠션 4개 이상 통과.
-- **C 적합성**: 200개 픽스처 샷의 해시를 `fixtures/golden.json` 에 고정. 갱신은 `UPDATE_GOLDEN=1 npm test` 로만. 금지 함수 grep 테스트.
+- **A 불변량**(`simulate.test.ts`): 시드 고정 무작위 샷 1000개 × 대대/중대 × 3구/4구 배치. 매 이벤트의 resolve 직전(직전 스냅샷을 dt 만큼 전진한 상태) 대비 직후 운동에너지 비증가(천 마찰 소산에 가려지지 않게), 모든 공 [R, W−R]×[R, L−R] 안, 어떤 두 공도 2R − 1e-9 미만으로 안 겹침, 이벤트 시각 단조증가, 종료(truncated=false), 같은 입력 두 번 → 해시 동일, 공 배열 순서 무관.
+- **B 물리 단위**: pooltool 의 테스트 불변량(정면 무스핀, e_b 분리비, 대칭 쌍 유지, z-스핀 → 던지기 방향, 기어링 스핀 → 던지기 0, 낮은 상대속도 → 접점 상대속도 0, 쿠션 에너지 비증가, y 대칭), TP A.4 5/7 법칙, TP A.16 자연구름 정지거리, 45° 구름 무스핀 입사 → 반사각 ≈ 42–44°(정반사보다 짧음, Mathavan 2010 Fig. 8; 세 모델 모두 입사 속도와 무관), 순방향 잉글리시 → 반사각 커짐·속도 증가 가능, 역방향 잉글리시를 쿠션 선 기준 80–90°(법선에서 0–10°) 입사 → 같은 쪽으로 되돌아옴(법선에서 80° 이상의 스침에서는 되돌아오지 않는 게 맞다), 코너 정확 입사 → 쿠션 이벤트 2개, 반두께(8 m/s) 분리각 ≈ 60° ± 3°(던지기 포함), 3 m/s 구름 공이 대대 장축 왕복에서 쿠션 3개 이상(대각선이면 5개) 통과 — 파라미터 재보정 뒤 조일 것, 큐를 든 중심 타격은 ω = 0.
+- **C 적합성**: 200개 픽스처 샷(han2005 160 · sphereHalfSpace 20 · mathavan2010 20, condition 1/0.8/1.25 = 160/20/20) + 움직이는 시작 상태 20개(simulateFrom, t0 ≠ 0)의 해시를 `fixtures/golden.json` 에 고정. 갱신은 `UPDATE_GOLDEN=1 npm test` 로만. 금지 함수 grep 테스트(asinh 등·`Math[`·`= Math` 별칭 포함). 교차 엔진: `npm run sim:conformance`(Node vm · WebKit · Chromium, Playwright) 와 `npm run sim:xengine`(Bun/JSC 로 golden 재실행, `scripts/sim-conformance/xengine-check.ts`; deno 도 가능).
 - **D 오라클**: Python pooltool 로 같은 샷을 돌려 최종 위치를 비교(별도 스크립트, `scripts/sim-oracle/`).
