@@ -1,0 +1,388 @@
+/**
+ * 조준 오버레이. 렌더러 마운트 위에 겹치는 투명 <canvas> 하나를 소유하고, 디바이스 픽셀로
+ * 조준선·고스트볼·예측 경로·쿠션 번호·두께 라벨을 그린다. 포인터 이벤트는 받지 않는다(pointer-events:none) —
+ * 페이지가 래퍼에 핸들러를 단다. 좌표 변환은 state.project(Renderer.project)에 맡긴다.
+ *
+ * 색은 캔버스 안이지만 UI 요소(선·라벨)이므로 :root 의 디자인 토큰(--brand, --ink-1, --surface-1 …)을
+ * 리사이즈마다 한 번 읽어 쓴다. 읽을 수 없으면(테스트·초기화 전) index.css 의 기본값으로 대체한다.
+ * 그림자·블러·그라데이션 없음. draw 는 매 프레임 호출될 수 있으니 할당을 최소화한다.
+ *
+ * 마운트는 position 이 static 이면 relative 로 바꾼다(겹치기 위해). 그 외 마운트 스타일은 건드리지 않는다.
+ */
+import type { BallState } from "@shared/sim/types";
+import type { TableSpec } from "@shared/sim/params";
+import { straightGuide, thicknessLabel, type BallPath, type CushionMark, type StraightGuide } from "./paths";
+import { DEFAULT_PALETTE, readPalette, rgba, type Palette } from "../render/tokens";
+
+export type Project = (x: number, y: number) => readonly [number, number];
+
+export interface OverlayPreview {
+    readonly paths: readonly BallPath[];
+    readonly cushions: readonly CushionMark[];
+    readonly cushionCount: number;
+    readonly contactIds: readonly string[];
+}
+
+export interface OverlayState {
+    readonly balls: readonly BallState[];
+    readonly phi: number;
+    readonly cueBallId: string;
+    readonly table: TableSpec;
+    /** straight = 직선 안내만, preview = simulateShot 결과 경로(없으면 straight 로 대체). */
+    readonly guide: "straight" | "preview";
+    readonly preview?: OverlayPreview | null;
+    /** 라벨에 쓸 두께. 없으면 직선 안내의 접촉 두께를 쓴다. */
+    readonly thickness?: { readonly value: number; readonly side: "left" | "right" | "center" } | null;
+    /** 테이블 좌표(m) → 마운트 CSS 픽셀. */
+    readonly project: Project;
+}
+
+/* ------------------------------------------------------------------ 색 */
+
+// 토큰 읽기·파싱은 render/tokens.ts 에 있다(렌더러와 공유). 기존 import 경로 호환을 위해 다시 내보낸다.
+export { parseColor, rgba, type RGBA } from "../render/tokens";
+
+/**
+ * draw 마다 rgba() 문자열을 다시 만들지 않도록 resize() 에서 한 번 계산해 두는 색 문자열 묶음.
+ * 팔레트가 바뀌는 시점(리사이즈 = 토큰 재읽기)에만 갱신된다.
+ */
+interface ColourStrings {
+    readonly brand: string;
+    readonly brandFaint: string;
+    readonly ink1: string;
+    readonly surface1: string;
+    readonly surfaceLine: string;
+    /** 적구 경로용(60%). 공 id 접두어별. */
+    readonly pathWhite: string;
+    readonly pathYellow: string;
+    readonly pathRed: string;
+}
+
+function buildColours(p: Palette): ColourStrings {
+    return {
+        brand: rgba(p.brand),
+        brandFaint: rgba(p.brand, AIM_BEYOND_ALPHA),
+        ink1: rgba(p.ink1),
+        surface1: rgba(p.surface1),
+        surfaceLine: rgba(p.surfaceLine),
+        pathWhite: rgba(p.ballWhite, OBJECT_PATH_ALPHA),
+        pathYellow: rgba(p.ballYellow, OBJECT_PATH_ALPHA),
+        pathRed: rgba(p.ballRed, OBJECT_PATH_ALPHA),
+    };
+}
+
+/* ------------------------------------------------------------------ 상수 */
+
+const FONT = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+const AIM_WIDTH = 1.5;
+const AIM_BEYOND_ALPHA = 0.3;
+const OBJECT_PATH_WIDTH = 1;
+const OBJECT_PATH_ALPHA = 0.6;
+const GHOST_DASH: readonly number[] = [4, 3];
+const NO_DASH: readonly number[] = [];
+const MARK_RADIUS = 8;
+const LABEL_HEIGHT = 20;
+const LABEL_PAD_X = 7;
+
+/* ------------------------------------------------------------------ 오버레이 */
+
+export interface OverlayOptions {
+    /** DPR 상한. 기본 2. */
+    readonly maxDpr?: number;
+    /** 화면 문구(i18n). fullBall = 정면 두께 라벨(`sim.aim.fullBall`). 없으면 "100%". */
+    readonly labels?: { readonly fullBall?: string };
+}
+
+export class Overlay {
+    readonly canvas: HTMLCanvasElement;
+    private readonly ctx: CanvasRenderingContext2D;
+    private readonly mount: HTMLElement;
+    private readonly maxDpr: number;
+    private readonly fullLabel: string | undefined;
+    private palette: Palette = DEFAULT_PALETTE;
+    private col: ColourStrings = buildColours(DEFAULT_PALETTE);
+    private dpr = 1;
+    private w = 0;
+    private h = 0;
+    private last: OverlayState | null = null;
+    private ro: ResizeObserver | null = null;
+    private disposed = false;
+
+    constructor(mount: HTMLElement, opts: OverlayOptions = {}) {
+        this.mount = mount;
+        this.maxDpr = opts.maxDpr ?? 2;
+        this.fullLabel = opts.labels?.fullBall;
+        const doc = mount.ownerDocument;
+        const canvas = doc.createElement("canvas");
+        const st = canvas.style;
+        st.position = "absolute";
+        st.left = "0";
+        st.top = "0";
+        st.width = "100%";
+        st.height = "100%";
+        st.pointerEvents = "none";
+        st.zIndex = "2";
+        if (typeof getComputedStyle === "function") {
+            try {
+                if (getComputedStyle(mount).position === "static") mount.style.position = "relative";
+            } catch { /* 계산 불가 환경 — 무시 */ }
+        }
+        mount.appendChild(canvas);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("overlay: 2d context unavailable");
+        this.canvas = canvas;
+        this.ctx = ctx;
+        if (typeof ResizeObserver === "function") {
+            this.ro = new ResizeObserver(() => this.resize());
+            this.ro.observe(mount);
+        }
+        this.resize();
+    }
+
+    /** 마운트 크기·DPR·토큰 색을 다시 읽고, 마지막 상태가 있으면 다시 그린다. */
+    resize(): void {
+        if (this.disposed) return;
+        const w = this.mount.clientWidth || 0;
+        const h = this.mount.clientHeight || 0;
+        const rawDpr = typeof window !== "undefined" && window.devicePixelRatio ? window.devicePixelRatio : 1;
+        this.dpr = Math.max(1, Math.min(this.maxDpr, rawDpr));
+        this.w = w;
+        this.h = h;
+        this.canvas.width = Math.max(1, Math.round(w * this.dpr));
+        this.canvas.height = Math.max(1, Math.round(h * this.dpr));
+        this.palette = readPalette(this.mount.ownerDocument);
+        this.col = buildColours(this.palette);
+        if (this.last) this.draw(this.last);
+    }
+
+    clear(): void {
+        this.last = null;
+        const c = this.ctx;
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    dispose(): void {
+        if (this.disposed) return;
+        this.disposed = true;
+        this.last = null;
+        this.ro?.disconnect();
+        this.ro = null;
+        if (this.canvas.parentNode) this.canvas.parentNode.removeChild(this.canvas);
+    }
+
+    draw(state: OverlayState): void {
+        if (this.disposed) return;
+        this.last = state;
+        const c = this.ctx;
+        c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        c.clearRect(0, 0, this.w, this.h);
+        if (this.w === 0 || this.h === 0) return;
+
+        const cueBall = findBall(state.balls, state.cueBallId);
+        if (!cueBall) return;
+        const rPx = this.ballRadiusPx(state, cueBall);
+        const guide = straightGuide(cueBall, state.balls, state.phi, state.table);
+
+        c.lineCap = "round";
+        c.lineJoin = "round";
+
+        const preview = state.guide === "preview" ? state.preview ?? null : null;
+        if (preview) {
+            this.drawPreview(state, preview, rPx);
+        } else if (guide) {
+            this.drawStraight(state, guide);
+        }
+
+        if (guide) {
+            this.drawGhost(state, guide, rPx);
+            const th = state.thickness ?? (guide.ball ? { value: guide.ball.thickness, side: guide.ball.side } : null);
+            if (th) this.drawThicknessLabel(state, guide, rPx, th.value);
+        }
+    }
+
+    /* ------------------------------------------------ 그리기 조각 */
+
+    private ballRadiusPx(state: OverlayState, cueBall: BallState): number {
+        const R = state.table.ball.R;
+        const a = state.project(cueBall.r[0], cueBall.r[1]);
+        const b = state.project(cueBall.r[0] + R, cueBall.r[1]);
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        return Math.max(2, Math.sqrt(dx * dx + dy * dy));
+    }
+
+    /** 적구 경로 색(공 색 60%). 미리 만든 문자열이라 draw 안에서 할당이 없다. */
+    private ballPathColor(id: string): string {
+        if (id.startsWith("red")) return this.col.pathRed;
+        if (id === "yellow") return this.col.pathYellow;
+        return this.col.pathWhite;
+    }
+
+    /** 직선 안내: 큐볼 → 고스트(실선), 고스트 → 너머(30%). */
+    private drawStraight(state: OverlayState, g: StraightGuide): void {
+        const c = this.ctx;
+        const p0 = state.project(g.cue[0], g.cue[1]);
+        const p1 = state.project(g.ghost[0], g.ghost[1]);
+        c.lineWidth = AIM_WIDTH;
+        c.setLineDash(NO_DASH as number[]);
+        c.strokeStyle = this.col.brand;
+        c.beginPath();
+        c.moveTo(p0[0], p0[1]);
+        c.lineTo(p1[0], p1[1]);
+        c.stroke();
+        if (g.beyond) {
+            const p2 = state.project(g.beyond[0], g.beyond[1]);
+            c.strokeStyle = this.col.brandFaint;
+            c.beginPath();
+            c.moveTo(p1[0], p1[1]);
+            c.lineTo(p2[0], p2[1]);
+            c.stroke();
+        }
+    }
+
+    /** 예측 경로: 큐볼 실선(brand), 적구 얇게(공 색 60%), 큐볼 쿠션 번호. */
+    private drawPreview(state: OverlayState, preview: OverlayPreview, rPx: number): void {
+        const c = this.ctx;
+        c.setLineDash(NO_DASH as number[]);
+        for (const path of preview.paths) {
+            if (path.id === state.cueBallId) continue;
+            c.lineWidth = OBJECT_PATH_WIDTH;
+            c.strokeStyle = this.ballPathColor(path.id);
+            this.strokePolyline(state, path);
+        }
+        for (const path of preview.paths) {
+            if (path.id !== state.cueBallId) continue;
+            c.lineWidth = AIM_WIDTH;
+            c.strokeStyle = this.col.brand;
+            this.strokePolyline(state, path);
+        }
+        if (preview.cushions.length) this.drawCushionMarks(state, preview.cushions, rPx);
+    }
+
+    private strokePolyline(state: OverlayState, path: BallPath): void {
+        const pts = path.points;
+        if (pts.length < 2) return;
+        const c = this.ctx;
+        c.beginPath();
+        const s = state.project(pts[0].x, pts[0].y);
+        c.moveTo(s[0], s[1]);
+        for (let i = 1; i < pts.length; i++) {
+            const p = state.project(pts[i].x, pts[i].y);
+            c.lineTo(p[0], p[1]);
+        }
+        c.stroke();
+    }
+
+    private drawCushionMarks(state: OverlayState, marks: readonly CushionMark[], rPx: number): void {
+        const c = this.ctx;
+        c.font = FONT;
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        const r = Math.min(MARK_RADIUS, Math.max(6, rPx * 0.7));
+        for (const m of marks) {
+            const p = state.project(m.x, m.y);
+            c.beginPath();
+            c.arc(p[0], p[1], r, 0, Math.PI * 2);
+            c.fillStyle = this.col.surface1;
+            c.fill();
+            c.lineWidth = 1;
+            c.strokeStyle = this.col.brand;
+            c.stroke();
+            c.fillStyle = this.col.ink1;
+            c.fillText(String(m.index), p[0], p[1] + 0.5);
+        }
+    }
+
+    /** 고스트볼(점선 원) + 접촉 표시(접촉점 쪽 원호·적구 진행 방향 짧은 선). */
+    private drawGhost(state: OverlayState, g: StraightGuide, rPx: number): void {
+        const c = this.ctx;
+        const p = state.project(g.ghost[0], g.ghost[1]);
+        c.lineWidth = 1;
+        c.strokeStyle = this.col.brand;
+        c.setLineDash(GHOST_DASH as number[]);
+        c.beginPath();
+        c.arc(p[0], p[1], rPx, 0, Math.PI * 2);
+        c.stroke();
+        c.setLineDash(NO_DASH as number[]);
+
+        if (!g.ball) return;
+        const cp = state.project(g.ball.contactPoint[0], g.ball.contactPoint[1]);
+        // 접촉점을 중심으로 한 짧은 원호(화면 각도는 project 를 거친 방향으로 계산)
+        const ang = Math.atan2(cp[1] - p[1], cp[0] - p[0]);
+        c.lineWidth = 2.5;
+        c.beginPath();
+        c.arc(p[0], p[1], rPx, ang - 0.6, ang + 0.6);
+        c.stroke();
+        // 적구 진행 방향 안내선(적구 색, 60%)
+        const R = state.table.ball.R;
+        const len = 2.5 * R;
+        const q = state.project(g.ball.contactPoint[0] + g.ball.objectDir[0] * len, g.ball.contactPoint[1] + g.ball.objectDir[1] * len);
+        c.lineWidth = OBJECT_PATH_WIDTH;
+        c.strokeStyle = this.ballPathColor(g.ball.id);
+        c.beginPath();
+        c.moveTo(cp[0], cp[1]);
+        c.lineTo(q[0], q[1]);
+        c.stroke();
+    }
+
+    /** 고스트볼 옆 두께 라벨(알약). 적구 반대쪽에 두고 캔버스 안으로 클램프. */
+    private drawThicknessLabel(state: OverlayState, g: StraightGuide, rPx: number, value: number): void {
+        const c = this.ctx;
+        const text = thicknessLabel(value, undefined, this.fullLabel);
+        c.font = FONT;
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        const tw = c.measureText(text).width;
+        const bw = tw + LABEL_PAD_X * 2;
+        const bh = LABEL_HEIGHT;
+
+        const p = state.project(g.ghost[0], g.ghost[1]);
+        // 적구 방향의 화면상 반대쪽으로 밀어낸다. 적구가 없으면(쿠션) 조준 방향 반대쪽.
+        let ox: number, oy: number;
+        if (g.ball) {
+            const t = state.project(g.ghost[0] + g.ball.objectDir[0], g.ghost[1] + g.ball.objectDir[1]);
+            ox = p[0] - t[0]; oy = p[1] - t[1];
+        } else {
+            const t = state.project(g.ghost[0] + g.dir[0], g.ghost[1] + g.dir[1]);
+            ox = p[0] - t[0]; oy = p[1] - t[1];
+        }
+        const ol = Math.sqrt(ox * ox + oy * oy) || 1;
+        const dist = rPx + 14;
+        let x = p[0] + (ox / ol) * dist - bw / 2;
+        let y = p[1] + (oy / ol) * dist - bh / 2;
+        x = Math.max(4, Math.min(this.w - bw - 4, x));
+        y = Math.max(4, Math.min(this.h - bh - 4, y));
+
+        c.setLineDash(NO_DASH as number[]);
+        roundRectPath(c, x, y, bw, bh, bh / 2);
+        c.fillStyle = this.col.surface1;
+        c.fill();
+        c.lineWidth = 1;
+        c.strokeStyle = this.col.surfaceLine;
+        c.stroke();
+        c.fillStyle = this.col.ink1;
+        c.fillText(text, x + bw / 2, y + bh / 2 + 0.5);
+    }
+}
+
+/* ------------------------------------------------------------------ 헬퍼 */
+
+function findBall(balls: readonly BallState[], id: string): BallState | null {
+    for (let i = 0; i < balls.length; i++) if (balls[i].id === id) return balls[i];
+    return null;
+}
+
+/** roundRect 가 없는 브라우저(구형 iOS)용 폴백 포함. */
+function roundRectPath(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+    c.beginPath();
+    if (typeof (c as { roundRect?: unknown }).roundRect === "function") {
+        c.roundRect(x, y, w, h, r);
+        return;
+    }
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+}

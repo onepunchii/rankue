@@ -9,12 +9,18 @@
 client/src/sim/
   aim.ts                  순수 수학: 포인터→phi, 고스트볼, 두께(0~1)와 두께 단계(½·⅓·¼), 방향↔두께 변환, 다이아몬드 좌표. 테스트 동반.
   playback.ts             결과 history 를 벽시계로 재생하는 순수 헬퍼: makePlayback(result, params) → {duration, at(t)}. 1/120 s 키프레임 캐시.
-  render/Renderer.ts      interface Renderer { mount(el, table): void; resize(): void; draw(frame: RenderFrame): void; project(x,y): [px,py]; unproject(px,py): [x,y]; screenshot(): Promise<Blob|null>; dispose(): void }
-                          RenderFrame = { balls: readonly BallState[]; cue?: {phi, pullback 0..1, visible}; highlightBallId?: string }
-  render/Canvas2DRenderer.ts  1차 렌더러. 정적 층(라사·레일·다이아몬드) 오프스크린 캐시, 공은 2D 원+명암(ctx.filter 금지: iOS 미지원). DPR 은 min(devicePixelRatio, 2).
+  render/Renderer.ts      interface Renderer { mount(el, table): void; setTable(table): void; resize(): void; draw(frame: RenderFrame): void; project(x,y): [px,py]; unproject(px,py): [x,y]; viewport(): Viewport | null; screenshot(): Promise<Blob|null>; dispose(): void }
+                          RenderFrame = { balls: readonly BallState[]; cue?: {phi, pullback 0..1, visible, ballId?}; highlightBallId?: string }  (cue.ballId 없으면 highlightBallId → 첫 공)
+                          Viewport = { width, height: 마운트 CSS px; dpr; insets: SafeInsets; scale: px/m }. 화면 좌표는 마운트 요소(패딩 박스) 기준 CSS px.
+  render/Canvas2DRenderer.ts  1차 렌더러. `new Canvas2DRenderer({ insets?: SafeInsets | () => SafeInsets, centreSpots?, dpr?, createCanvas? })`. 정적 층(라사·레일·다이아몬드) 오프스크린 캐시, 공은 색별 스프라이트+명암(ctx.filter 금지: iOS 미지원).
+                          DPR 은 min(devicePixelRatio, 2) 를 resize 마다 다시 읽는다. 캔버스는 마운트에 absolute·inset 0 으로 얹힌다(Overlay 와 같은 좌표계) — 마운트는 스스로 크기를 가져야 하며 static 이면 relative 로 바뀐다.
+                          `getLayout(): TableLayout | null` — 플레이 면 히트테스트(tableGeometry.isOnPlaySurface) 용. 공 색·강조 링은 토큰(render/tokens.ts) 에서 읽어 Overlay 의 경로 색과 맞춘다.
+  render/tokens.ts        캔버스용 디자인 토큰 읽기(--brand, --ink-1, --surface-1, --surface-line, --ball-*): parseColor / rgba / readPalette. 렌더러·오버레이 공용, 못 읽으면 index.css 기본값.
   render/ThreeRenderer.ts     2차 렌더러(별도 단계). 오소 탑다운 카메라, 조명 구체, 접촉 그림자 스프라이트, 컨텍스트 손실 2회 → Canvas2D 폴백.
-  overlay/Overlay.ts      조준선·고스트볼·예측 경로(큐볼 + 적구 첫 구간 + 두 번째 적구 접촉 전 쿠션 수)·두께 표시를 별도 2D 캔버스에 디바이스 픽셀로 그림. Renderer.project 로 좌표 변환.
-  audio.ts                샘플 기반 SFX(큐 타격·공·쿠션, 임펄스로 게인), 이벤트 시각에 스케줄. 기존 useGameAudio 의 unlock 재사용. iOS: navigator.audioSession.type='playback' 시도.
+  overlay/Overlay.ts      `new Overlay(mount, { maxDpr?, labels?: { fullBall: t("sim.aim.fullBall") } })` → draw(state: OverlayState) / resize / clear / dispose. state.project 에 renderer.project 를 넘긴다.
+                          조준선·고스트볼·예측 경로(큐볼 + 적구 첫 구간 + 두 번째 적구 접촉 전 쿠션 수)·두께 표시를 별도 2D 캔버스에 디바이스 픽셀로 그림. 색 문자열은 resize 때 한 번만 만든다.
+  audio.ts                절차 합성 SFX(큐 타격·공·쿠션, 임펄스로 게인), 이벤트 시각에 스케줄. `new SimAudio(getCtx: () => AudioContext | null)` — getCtx 는 useGameAudio 가 제스처로 잠금 해제한 컨텍스트를 돌려주는 게터여야 한다.
+                          ※ 현재 useGameAudio 는 getCtx 를 return 하지 않는다. useSimulator 를 잇기 전에 hooks/useGameAudio.ts 의 return 에 `getCtx` 를 추가할 것(두 번째 AudioContext 를 만들면 모바일 웹뷰 컨텍스트 상한·제스처 잠금 해제를 잃는다). iOS: navigator.audioSession.type='playback' 시도.
   haptics.ts              @capacitor/haptics impact, 50 ms 스로틀, 시뮬 루프 밖에서만.
   useSimulator.ts         상태 기계 훅(아래). 엔진·세션·서버 동기화·재생을 소유.
   SimSetupDialog.tsx      종목·테이블·규칙(UMB/PBA, 4구 옵션)·다마수·이닝 상한·(고급) 쿠션 모델·컨디션. QuickActions 의 기존 모달을 대체.
