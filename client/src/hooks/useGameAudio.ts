@@ -180,5 +180,7 @@ export function useGameAudio() {
         }
     }, [isMuted, getCtx]);
 
-    return { speak, playEffect, isMuted, setIsMuted };
+    // getCtx: 시뮬레이터(client/src/sim/audio.ts)가 같은 잠금 해제된 컨텍스트를 쓰게 한다.
+    // 두 번째 AudioContext 를 만들면 모바일 웹뷰의 컨텍스트 상한과 제스처 잠금 해제를 잃는다.
+    return { speak, playEffect, isMuted, setIsMuted, getCtx };
 }
