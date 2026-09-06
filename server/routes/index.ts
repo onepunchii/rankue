@@ -7,6 +7,7 @@ import partnerRouter from "./modules/partner.js";
 import memberRouter from "./modules/member.js";
 import gameRouter from "./modules/game.js";
 import notificationRouter from "./modules/notification.js";
+import simRouter from "./modules/sim.js";
 import regionRouter from "./modules/region.js";
 import communityRouter from "./modules/community.js";
 import umbRouter from "./modules/umb.js";
@@ -48,6 +49,9 @@ router.use("/", notificationRouter);
 // 8. Game / Billiards / Core (Root)
 // - /game, /history, /stores, /branding, /invite, /settlements
 router.use("/", gameRouter);
+
+// 시뮬레이터 v2: /sim/sessions, /sim/ladder — 서버가 shared/sim 으로 재시뮬해 정본을 만든다
+router.use("/", simRouter);
 
 
 // 9. Regions (/regions)
