@@ -1505,3 +1505,88 @@ export type InsertHiqReport = typeof hiqReports.$inferInsert;
 export type HiqBlock = typeof hiqBlocks.$inferSelect;
 
 
+
+// --- 8.10 시뮬레이터 v2 (shared/sim) ---
+// 불변: 시뮬은 hiq_games 행을 만들지 않고 finishHiqGame 을 부르지 않으며, hiqMembers 의
+// rating/avg/handi 컬럼을 절대 건드리지 않는다(2026-08-30 RP 오염 사고 참고). 그래서 이 테이블들은
+// hiq_games 로의 FK 가 없고, 시뮬 레이팅은 별도 테이블에 산다.
+
+export const hiqSimSessions = pgTable("hiq_sim_sessions", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  kind: text("kind", { enum: ["solo", "drill", "match"] }).default("solo").notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  tableId: text("table_id", { enum: ["DAEDAE", "JUNGDAE_KR"] }).notNull(),
+  cushionModel: text("cushion_model").default("han2005").notNull(),
+  condition: doublePrecision("condition").default(1).notNull(),
+  /** 규칙 세트 전체(shared/sim/rules Rules). 3쿠션 umb/pba, 4구 옵션 등 */
+  rules: jsonb("rules").notNull(),
+  finishType: text("finish_type", { enum: ["none", "3c", "bank"] }).default("none").notNull(),
+  targetScore: integer("target_score").notNull(),
+  inningCap: integer("inning_cap").default(0).notNull(),
+  /** 서버가 유지하는 정본 세션 상태(shared/sim/rules SessionState). 클라이언트 값은 참고용. */
+  state: jsonb("state").notNull(),
+  /** 현재 공 배치(BallState[]). 다음 샷의 preState 는 이것과 같아야 한다. */
+  balls: jsonb("balls").notNull(),
+  // 아래는 목록·랭킹 조회용 비정규화 값(state 에서 복사)
+  score: integer("score").default(0).notNull(),
+  innings: integer("innings").default(0).notNull(),
+  highRun: integer("high_run").default(0).notNull(),
+  shots: integer("shots").default(0).notNull(),
+  status: text("status", { enum: ["playing", "finished", "abandoned"] }).default("playing").notNull(),
+  engineVersion: text("engine_version").notNull(),
+  paramsHash: text("params_hash").notNull(),
+  /** 클라이언트 해시가 서버 재시뮬과 달랐던 샷 수(결정론 텔레메트리) */
+  mismatches: integer("mismatches").default(0).notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  finishedAt: timestamp("finished_at"),
+  lastShotAt: timestamp("last_shot_at"),
+}, (t) => ({
+  idxMember: index("idx_sim_sessions_member").on(t.memberId, t.startedAt),
+  idxLadder: index("idx_sim_sessions_ladder").on(t.gameType, t.tableId, t.status),
+}));
+
+export const hiqSimShots = pgTable("hiq_sim_shots", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  sessionId: uuid("session_id").references(() => hiqSimSessions.id, { onDelete: "cascade" }).notNull(),
+  idx: integer("idx").notNull(),
+  playerIndex: integer("player_index").default(0).notNull(),
+  /** 샷 직전 공 배치(BallState[]) — 이것 + input 만 있으면 리플레이가 된다 */
+  preState: jsonb("pre_state").notNull(),
+  /** ShotInput */
+  input: jsonb("input").notNull(),
+  /** 서버 재시뮬 해시(정본) */
+  hash: text("hash").notNull(),
+  /** 클라이언트가 보낸 해시. 서버와 다르면 mismatch */
+  clientHash: text("client_hash"),
+  eventCount: integer("event_count").notNull(),
+  outcomeCode: text("outcome_code").notNull(),
+  points: integer("points").notNull(),
+  cushions: integer("cushions").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.sessionId, t.idx),
+}));
+
+/** 시뮬 전용 성적. hiqMembers 의 rating·avg 컬럼과 완전히 분리. */
+export const hiqSimRatings = pgTable("hiq_sim_ratings", {
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  tableId: text("table_id", { enum: ["DAEDAE", "JUNGDAE_KR"] }).notNull(),
+  sessions: integer("sessions").default(0).notNull(),
+  totalScore: integer("total_score").default(0).notNull(),
+  totalInnings: integer("total_innings").default(0).notNull(),
+  bestAvg: doublePrecision("best_avg").default(0).notNull(),
+  bestHighRun: integer("best_high_run").default(0).notNull(),
+  /** 네트워크 대전용 Elo(Phase 6+). 솔로는 건드리지 않는다. */
+  simRating: integer("sim_rating").default(1000).notNull(),
+  matches: integer("matches").default(0).notNull(),
+  wins: integer("wins").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.memberId, t.gameType, t.tableId] }),
+}));
+
+export type HiqSimSession = typeof hiqSimSessions.$inferSelect;
+export type HiqSimShot = typeof hiqSimShots.$inferSelect;
+export type HiqSimRating = typeof hiqSimRatings.$inferSelect;

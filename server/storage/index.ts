@@ -8,6 +8,7 @@ import { CommunityRepository } from "./community.repo.js";
 import { UmbRepository } from "./umb.repo.js";
 import { PbaRepository } from "./pba.repo.js";
 import { TournamentRepository } from "./tournament.repo.js";
+import { SimRepository } from "./sim.repo.js";
 
 class Storage {
     public users = new UserRepository();
@@ -20,6 +21,7 @@ class Storage {
     public umb = new UmbRepository();
     public pba = new PbaRepository();
     public tournaments = new TournamentRepository();
+    public sim = new SimRepository();
 
     // --- Backward Compatibility Wrappers ---
     // User / Member
