@@ -91,8 +91,6 @@ class Storage {
     async getHeadToHeadGames(id1: string, id2: string, sport?: string) { return this.games.getHeadToHeadGames(id1, id2, sport); }
     async claimGameRecord(gid: string, mid: string, idx: number) { return this.games.claimGameRecord(gid, mid, idx); }
     async getGameHistoryById(id: string) { return this.games.getGameHistoryById(id); }
-    async recordSuccessfulShot(data: any) { return this.games.recordSuccessfulShot(data); }
-    async searchSuccessfulShots(type: any, pos: any) { return this.games.searchSuccessfulShots(type, pos); }
     async createInvite(id: string) { return this.games.createInvite(id); }
     async getInviteStatus(code: string) { return this.games.getInviteStatus(code); }
     async joinInvite(code: string, id: string) { return this.games.joinInvite(code, id); }

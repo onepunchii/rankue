@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
 import NotFound from "@/pages/not-found";
-import { useEffect, type ComponentType, type FunctionComponent } from "react";
+import { useEffect, lazy, Suspense, type ComponentType, type FunctionComponent } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 // HiQ Pages
@@ -25,7 +25,6 @@ import HiqCreateClub from "@/pages/hiq/create-club";
 import HiqClubDetail from "@/pages/hiq/club-detail";
 import CrewHallOfFame from "@/pages/hiq/crew-hall-of-fame";
 import HiqJoin from "@/pages/hiq/join";
-import HiqOnlineGame from "@/pages/hiq/online-game";
 import HiqCommunity from "@/pages/hiq/community";
 import HiqCommunityPost from "@/pages/hiq/community-post";
 import HiqWorldRanking from "@/pages/hiq/world-ranking";
@@ -125,6 +124,16 @@ export async function syncPushToken() {
   } catch {
     // 미인증/네트워크 오류 등은 무시 (다음 인증 시점에 재시도)
   }
+}
+
+// 시뮬레이터 페이지는 물리 엔진·캔버스 렌더러를 포함해 메인 청크에서 분리한다.
+const SimulatorPage = lazy(() => import("@/sim/SimulatorPage"));
+function SimulatorLazy() {
+  return (
+    <Suspense fallback={<div className="min-h-[100dvh] bg-surface-1" aria-busy="true" />}>
+      <SimulatorPage />
+    </Suspense>
+  );
 }
 
 function AppRoutes() {
@@ -258,7 +267,8 @@ function AppRoutes() {
       {/* 호환성 라우트 */}
       <Route path="/hiq" component={HiqLanding} />
       <Route path="/hiq/dashboard" component={FramedDashboard} />
-      <Route path="/online-game" component={HiqOnlineGame} />
+      {/* 시뮬레이터 v2 — 엔진·렌더러가 무거워 별도 청크로 지연 로드 */}
+      <Route path="/online-game" component={SimulatorLazy} />
 
       {/* 404 페이지 */}
       <Route component={NotFound} />

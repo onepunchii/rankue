@@ -1,7 +1,5 @@
 import { Router } from "express";
-import { z } from "zod";
 import { storage } from "../../storage/index.js";
-import { insertHiqSuccessfulShotSchema } from "../../../shared/schema.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { hiqService } from "../../services/hiqService.js";
 import { notificationService } from "../../services/notificationService.js";
@@ -436,37 +434,6 @@ router.get("/stats/analysis", requireAuth, asyncHandler(async (req: AuthRequest,
 router.get("/stats/h2h/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const stats = await storage.getHeadToHeadStats(req.userId!, req.params.id);
     return sendSuccess(res, stats);
-}));
-
-
-// --- AI / Simulation ---
-
-// Strict shot payload validation. createInsertSchema types jsonb columns as unknown, so
-// insertHiqSuccessfulShotSchema.parse alone accepts garbage jsonb — extend with concrete
-// shapes so the AI-solution dataset cannot be poisoned.
-const shotCoord = z.object({ x: z.number().finite(), y: z.number().finite() });
-const successfulShotSchema = insertHiqSuccessfulShotSchema.extend({
-    ballPositions: z.record(z.string(), shotCoord).refine(p => "white" in p, "white ball required"),
-    shotParams: z.object({
-        angle: z.number().finite(),
-        power: z.number().finite(),
-        spinX: z.number().finite(),
-        spinY: z.number().finite(),
-    }),
-    cushionCount: z.number().int().min(0).optional(),
-});
-
-router.post("/successful-shot", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const parsed = successfulShotSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, "유효하지 않은 샷 데이터입니다");
-    const shot = await storage.recordSuccessfulShot(parsed.data as any);
-    return sendSuccess(res, shot);
-}));
-
-router.post("/ai-solutions", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const { gameType, ballPositions } = req.body;
-    const solutions = await storage.searchSuccessfulShots(gameType, ballPositions);
-    return sendSuccess(res, solutions);
 }));
 
 

@@ -3,7 +3,6 @@ import {
     hiqMembers,
     hiqGames,
     hiqGameHistory,
-    hiqSuccessfulShots,
     hiqInvites,
     hiqFriendships,
     profiles
@@ -12,7 +11,6 @@ import type {
     InsertHiqGame,
     HiqGame,
     HiqGameHistory,
-    InsertHiqSuccessfulShot,
     HiqMember
 } from "../../shared/schema.js";
 import { eq, ne, desc, asc, and, or, sql, gt, inArray } from "drizzle-orm";
@@ -452,58 +450,6 @@ export class GameRepository {
         });
 
         return true;
-    }
-
-    async recordSuccessfulShot(data: InsertHiqSuccessfulShot): Promise<any> {
-        const [shot] = await db.insert(hiqSuccessfulShots).values(data).returning();
-        return shot;
-    }
-
-    async searchSuccessfulShots(gameType: "3c" | "4c", currentPositions: any, limit: number = 5): Promise<any[]> {
-        // Fetch a bounded pool of recent candidates, then rank by how closely their
-        // stored ball layout matches the user's current layout. Distance math is done
-        // in Node (ball-position keys are free-form jsonb entries, so summed-distance
-        // SQL over jsonb would be brittle). Both sides are already in meters.
-        const CANDIDATE_CAP = 300;
-        const candidates = await db.select().from(hiqSuccessfulShots)
-            .where(eq(hiqSuccessfulShots.gameType, gameType))
-            .orderBy(desc(hiqSuccessfulShots.createdAt))
-            .limit(CANDIDATE_CAP);
-
-        // If the client sent no usable layout, fall back to the newest shots.
-        if (!currentPositions || typeof currentPositions !== "object") {
-            return candidates.slice(0, limit);
-        }
-
-        // Summed Euclidean distance over the ball keys common to both layouts.
-        const layoutDistance = (a: any, b: any): number => {
-            if (!a || !b || typeof a !== "object" || typeof b !== "object") return Infinity;
-            let sum = 0;
-            let matched = 0;
-            for (const key of Object.keys(a)) {
-                const pa = a[key];
-                const pb = b[key];
-                if (!pa || !pb) continue;
-                if (typeof pa.x !== "number" || typeof pa.y !== "number") continue;
-                if (typeof pb.x !== "number" || typeof pb.y !== "number") continue;
-                const dx = pa.x - pb.x;
-                const dy = pa.y - pb.y;
-                sum += Math.sqrt(dx * dx + dy * dy);
-                matched++;
-            }
-            return matched > 0 ? sum : Infinity;
-        };
-
-        // Summed-distance threshold (meters). Genuinely unrelated layouts are excluded;
-        // the client shows a "조회 결과 없음" toast for an empty result.
-        const MAX_DISTANCE = 1.5;
-
-        return candidates
-            .map(shot => ({ shot, distance: layoutDistance(currentPositions, (shot as any).ballPositions) }))
-            .filter(entry => Number.isFinite(entry.distance) && entry.distance <= MAX_DISTANCE)
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, limit)
-            .map(entry => entry.shot);
     }
 
     // Set of member ids who accepted an invite from this host and whose invite is still
