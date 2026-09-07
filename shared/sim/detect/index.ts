@@ -20,14 +20,14 @@
  * 반환 후보의 event.t 는 절대 시각이 아니라 dt 와 같은 지연값이다(nextTransition 과 같은 규약).
  * 호출자(simulate)가 현재 시각을 더한다.
  */
-import type { BallState, CushionSegment, EventCandidate, SimEvent } from "../types";
-import type { BallParams } from "../params";
-import { nextTransition } from "../evolve";
-import { ballBallTime } from "./ballBall";
-import { ballCushionTime } from "./ballCushion";
+import type { BallState, CushionSegment, EventCandidate, SimEvent } from "../types.js";
+import type { BallParams } from "../params.js";
+import { nextTransition } from "../evolve.js";
+import { ballBallTime } from "./ballBall.js";
+import { ballCushionTime } from "./ballCushion.js";
 
-export { ballBallTime, EVENT_EPS, polynomialHorizon } from "./ballBall";
-export { ballCushionTime } from "./ballCushion";
+export { ballBallTime, EVENT_EPS, polynomialHorizon } from "./ballBall.js";
+export { ballCushionTime } from "./ballCushion.js";
 
 /** 동률로 보는 dt 차이 (s). README 절대 규칙 5. */
 export const TIE_EPS = 1e-9;

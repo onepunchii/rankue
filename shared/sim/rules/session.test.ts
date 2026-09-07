@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { createSession, applyShot, currentPlayer } from "./session";
-import { DEFAULT_3C_RULES, DEFAULT_4C_RULES } from "./evaluate";
-import type { ShotOutcome } from "./types";
+import { createSession, applyShot, currentPlayer } from "./session.js";
+import { DEFAULT_3C_RULES, DEFAULT_4C_RULES } from "./evaluate.js";
+import type { ShotOutcome } from "./types.js";
 
 const base = { cushionsBeforeSecond: 3, cushionsBeforeFirst: 0, contacts: ["yellow", "red"], kisses: 0 };
 const POINT: ShotOutcome = { code: "point", points: 1, scored: true, consumesInning: false, ...base };

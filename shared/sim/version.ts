@@ -12,8 +12,8 @@
  * 왕복 표현이라(ECMAScript 규정) 엔진 간에 같다. 물리 필드를 새로 추가하면 physicsParams 에도 넣어야 한다
  * (version.test.ts 가 BallParams·CueParams·TableSpec 의 모든 키가 포함됐는지 검사한다).
  */
-import type { SimParams } from "./params";
-import { fnv1a64String } from "./hash";
+import type { SimParams } from "./params.js";
+import { fnv1a64String } from "./hash.js";
 
 export const ENGINE_VERSION = "2.1.0";
 

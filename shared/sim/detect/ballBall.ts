@@ -32,12 +32,12 @@
  *  (pooltool 은 이 필터가 없고 전이 이벤트에만 의존한다.)
  * 초월함수는 쓰지 않는다. 입력은 변형하지 않는다.
  */
-import type { BallState, Vec3 } from "../types";
-import type { BallParams } from "../params";
-import { positionPolynomial, rollTime, slideTime } from "../evolve";
-import { dot, sub, lengthSq } from "../vec";
-import { solveQuadratic } from "../roots/quadratic";
-import { solveQuartic } from "../roots/quartic";
+import type { BallState, Vec3 } from "../types.js";
+import type { BallParams } from "../params.js";
+import { positionPolynomial, rollTime, slideTime } from "../evolve.js";
+import { dot, sub, lengthSq } from "../vec.js";
+import { solveQuadratic } from "../roots/quadratic.js";
+import { solveQuartic } from "../roots/quartic.js";
 
 /** 현재 이벤트 자신(t ≈ 0)을 다음 이벤트로 잡지 않기 위한 최소 시간 (s). */
 export const EVENT_EPS = 1e-9;

@@ -23,10 +23,10 @@
  * 벡터 형태로 직접 쓴다(회전 두 번의 반올림이 빠지고 초월함수도 필요 없다). 결정론을 위해 마찰 계수의
  * exp 만 dmath 를 쓴다.
  */
-import type { BallState, Vec3 } from "../types";
-import type { BallParams } from "../params";
-import { add, cross, dot, length, scale, sub, unit } from "../vec";
-import { exp } from "../dmath";
+import type { BallState, Vec3 } from "../types.js";
+import type { BallParams } from "../params.js";
+import { add, cross, dot, length, scale, sub, unit } from "../vec.js";
+import { exp } from "../dmath.js";
 
 /** pooltool `const.EPS` = 100 × DBL_EPSILON. 이보다 작은 접점 상대속도는 0 으로 본다. */
 const EPS = 100 * 2.220446049250313e-16;

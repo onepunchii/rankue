@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { SimEvent } from "../types";
-import { evaluateShot, DEFAULT_3C_RULES, DEFAULT_4C_RULES, objectBallIds } from "./evaluate";
-import type { Rules } from "./types";
+import type { SimEvent } from "../types.js";
+import { evaluateShot, DEFAULT_3C_RULES, DEFAULT_4C_RULES, objectBallIds } from "./evaluate.js";
+import type { Rules } from "./types.js";
 
 // 합성 이벤트 로그 빌더. 시간은 순서만 의미 있다.
 let clock = 0;

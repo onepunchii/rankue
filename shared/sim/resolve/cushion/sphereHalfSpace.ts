@@ -25,8 +25,8 @@
  * 에너지: 법선(e ≤ 1)·접선(미끄럼 반대, 크기 ≤ 정지 임펄스) 임펄스 모두 소산적이고 버리는 v_z 도 감소분이라
  * 결과 운동에너지 ≤ 입력.
  */
-import type { BallState, CushionSegment, Vec3 } from "../../types";
-import type { BallParams } from "../../params";
+import type { BallState, CushionSegment, Vec3 } from "../../types.js";
+import type { BallParams } from "../../params.js";
 
 /** 접점 상대속도를 0 으로 보는 문턱 (m/s). pooltool const.EPS 역할. */
 const SLIP_EPS = 1e-12;

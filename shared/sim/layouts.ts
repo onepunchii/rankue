@@ -6,8 +6,8 @@
  * 4구(국내 관행): 빨간 공 둘을 세로 중심선 상단 스팟과 중앙 스팟에, 큐볼은 3쿠션과 같게.
  *   ※ 4구 배치는 당구장마다 다르다 — 오너 확인 대상(2026-09-07).
  */
-import type { BallState } from "./types";
-import type { TableSpec } from "./params";
+import type { BallState } from "./types.js";
+import type { TableSpec } from "./params.js";
 
 function still(id: string, x: number, y: number, R: number): BallState {
     return { id, r: [x, y, R], v: [0, 0, 0], w: [0, 0, 0], state: "stationary" };

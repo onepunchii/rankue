@@ -43,8 +43,8 @@
  * 초월함수는 필요 없다: 미끄럼 방향은 cosΦ = u_x/|u| 로, cosθ = √(1 − sin²θ) 로, 프레임 회전은 법선 성분으로.
  * 결과: v_z = 0, 위치·id 유지, state 'sliding'.
  */
-import type { BallState, CushionSegment } from "../../types";
-import type { BallParams } from "../../params";
+import type { BallState, CushionSegment } from "../../types.js";
+import type { BallParams } from "../../params.js";
 
 /** 한 스텝의 상태 레지스터. 이 모듈 안에서만 쓰는 가변 스크래치 — 입력 BallState 는 절대 건드리지 않는다. */
 interface Reg {

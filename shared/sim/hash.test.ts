@@ -2,9 +2,9 @@
  * hash.ts 검증: FNV-1a 64 두 레인 구현을 BigInt 참조와 비트 단위 대조, 표준 벡터, 결과 해시의 민감도·결정론·불변.
  */
 import { describe, it, expect } from "vitest";
-import { fnv64Init, fnv64Byte, fnv64Bytes, fnv64Hex, fnv1a64String, hashResult, HashWriter } from "./hash";
-import { mulberry32 } from "./rng";
-import type { BallState, SimEvent } from "./types";
+import { fnv64Init, fnv64Byte, fnv64Bytes, fnv64Hex, fnv1a64String, hashResult, HashWriter } from "./hash.js";
+import { mulberry32 } from "./rng.js";
+import type { BallState, SimEvent } from "./types.js";
 
 function refFnv(bytes: Iterable<number>): string {
     let h = 0xcbf29ce484222325n;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { CushionModelId } from "../../params";
-import { resolveCushion, resolveCushionHan, resolveCushionMathavan, resolveCushionSHS } from "./index";
-import { H, LEFT, P, ball, deepFreeze, incidentVelocity, rad } from "./testHelpers";
+import type { CushionModelId } from "../../params.js";
+import { resolveCushion, resolveCushionHan, resolveCushionMathavan, resolveCushionSHS } from "./index.js";
+import { H, LEFT, P, ball, deepFreeze, incidentVelocity, rad } from "./testHelpers.js";
 
 const b = deepFreeze(ball(incidentVelocity(LEFT, 2, rad(30)), [10, -20, 60]));
 

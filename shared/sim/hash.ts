@@ -24,7 +24,7 @@
  *   같은 배치를 다른 순서로 넘긴 두 기기가 같은 물리에 다른 해시를 갖게 된다(41-determinism-review 2.10).
  * 초월함수·Node API 없음. 입력 불변.
  */
-import type { BallState, SimEvent } from "./types";
+import type { BallState, SimEvent } from "./types.js";
 
 const FNV_OFFSET_HI = 0xcbf29ce4;
 const FNV_OFFSET_LO = 0x84222325;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { quarticComplexRoots, smallestPositiveRoot, solveCubic, solveQuartic } from "./quartic";
-import { mulberry32 } from "../rng";
+import { quarticComplexRoots, smallestPositiveRoot, solveCubic, solveQuartic } from "./quartic.js";
+import { mulberry32 } from "../rng.js";
 
 // ---------------------------------------------------------------------------
 // 도우미 — 시드 PRNG, 근 → 계수 전개, 근 대조. 내장 난수·거듭제곱 함수는 쓰지 않는다(절대 규칙 1·3).

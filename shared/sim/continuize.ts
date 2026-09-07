@@ -11,9 +11,9 @@
  *
  * 초월함수 없음. 입력 불변.
  */
-import type { BallState, SimResult, Snapshot } from "./types";
-import type { BallParams } from "./params";
-import { evolveBall } from "./evolve";
+import type { BallState, SimResult, Snapshot } from "./types.js";
+import type { BallParams } from "./params.js";
+import { evolveBall } from "./evolve.js";
 
 /** history 에서 t_i ≤ t 인 마지막 인덱스. t 가 첫 스냅샷보다 앞이면 0. */
 function snapshotIndexAt(history: readonly Snapshot[], t: number): number {

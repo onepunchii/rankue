@@ -43,9 +43,9 @@
  * 결과 state 는 'sliding'. 중심 타격이라도 접점 미끄럼 u = v ≠ 0 이므로 미끄럼이 맞고, 전이는 evolve 가 처리한다.
  * 초월함수는 dmath 만 쓴다(sin/cos/atan2). 입력은 변형하지 않는다.
  */
-import type { BallState, ShotInput, Vec3 } from "../types";
-import type { BallParams, CueParams } from "../params";
-import { atan2, cos, sin } from "../dmath";
+import type { BallState, ShotInput, Vec3 } from "../types.js";
+import type { BallParams, CueParams } from "../params.js";
+import { atan2, cos, sin } from "../dmath.js";
 
 /**
  * TP A.31 스쿼트 각 (rad). a 는 R 비율의 가로 오프셋(오른쪽 양수), endmassRatio = m_b/m_e.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { BallState, Vec3 } from "./types";
-import { TABLES } from "./params";
+import type { BallState, Vec3 } from "./types.js";
+import { TABLES } from "./params.js";
 import {
     evolveBall,
     kineticEnergy,
@@ -10,7 +10,7 @@ import {
     slideTime,
     slipVelocity,
     spinTime,
-} from "./evolve";
+} from "./evolve.js";
 
 const P = TABLES.DAEDAE.ball;
 const R = P.R;

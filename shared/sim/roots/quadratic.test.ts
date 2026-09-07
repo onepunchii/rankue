@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { solveQuadratic } from "./quadratic";
+import { solveQuadratic } from "./quadratic.js";
 
 describe("solveQuadratic", () => {
     it("두 실근을 오름차순으로", () => {

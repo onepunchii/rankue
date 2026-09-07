@@ -5,16 +5,16 @@
  *                      반발 속도비가 같음 — Mathavan 2010 Fig. 9 와 어긋남). 값싼 폴백일 뿐이며 **3쿠션 기본값으로 쓰지 말 것**.
  *  - mathavan2010    : 임펄스 스텝 수치 모델 (정밀, 느림). 에너지 반발 계수는 params.eE.
  */
-import type { BallState, CushionSegment } from "../../types";
-import type { BallParams, CushionModelId } from "../../params";
-import { resolveCushionHan } from "./han2005";
-import { resolveCushionSHS } from "./sphereHalfSpace";
-import { resolveCushionMathavan } from "./mathavan2010";
+import type { BallState, CushionSegment } from "../../types.js";
+import type { BallParams, CushionModelId } from "../../params.js";
+import { resolveCushionHan } from "./han2005.js";
+import { resolveCushionSHS } from "./sphereHalfSpace.js";
+import { resolveCushionMathavan } from "./mathavan2010.js";
 
-export { resolveCushionHan, hanRegime, noseAngle } from "./han2005";
-export type { HanRegime } from "./han2005";
-export { resolveCushionSHS } from "./sphereHalfSpace";
-export { resolveCushionMathavan } from "./mathavan2010";
+export { resolveCushionHan, hanRegime, noseAngle } from "./han2005.js";
+export type { HanRegime } from "./han2005.js";
+export { resolveCushionSHS } from "./sphereHalfSpace.js";
+export { resolveCushionMathavan } from "./mathavan2010.js";
 
 export function resolveCushion(
     model: CushionModelId,

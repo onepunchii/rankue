@@ -32,8 +32,8 @@
  *
  * 초월함수 없음: 프레임은 법선 성분으로, θ 는 sqrt 로 만든다.
  */
-import type { BallState, CushionSegment, Vec3 } from "../../types";
-import type { BallParams } from "../../params";
+import type { BallState, CushionSegment, Vec3 } from "../../types.js";
+import type { BallParams } from "../../params.js";
 
 export type HanRegime = "grip" | "slip";
 

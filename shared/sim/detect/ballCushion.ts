@@ -20,11 +20,11 @@
  *
  * 초월함수 없음. 입력 불변.
  */
-import type { BallState, CushionSegment } from "../types";
-import type { BallParams } from "../params";
-import { positionPolynomial } from "../evolve";
-import { solveQuadratic } from "../roots/quadratic";
-import { EVENT_EPS, polynomialHorizon } from "./ballBall";
+import type { BallState, CushionSegment } from "../types.js";
+import type { BallParams } from "../params.js";
+import { positionPolynomial } from "../evolve.js";
+import { solveQuadratic } from "../roots/quadratic.js";
+import { EVENT_EPS, polynomialHorizon } from "./ballBall.js";
 
 /**
  * 공이 세그먼트 seg 에 닿을 때까지의 시간 (s). 닿지 않으면 Infinity.

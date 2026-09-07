@@ -2,14 +2,14 @@
  * 쿠션 모델 테스트 공용 도우미. 테스트 파일에서만 import 한다.
  * 초월함수 금지 규칙은 이 폴더 전체에 걸리므로 각도는 dmath 로 만든다.
  */
-import type { BallState, CushionSegment, Vec3 } from "../../types";
-import type { BallParams } from "../../params";
-import { TABLES, cushionSegments } from "../../params";
-import { atan2, cos, sin, PI } from "../../dmath";
-import { kineticEnergy } from "../../evolve";
+import type { BallState, CushionSegment, Vec3 } from "../../types.js";
+import type { BallParams } from "../../params.js";
+import { TABLES, cushionSegments } from "../../params.js";
+import { atan2, cos, sin, PI } from "../../dmath.js";
+import { kineticEnergy } from "../../evolve.js";
 
 /** 시드 PRNG 는 rng.ts 하나만 쓴다(사본 금지 — 41-determinism-review 2.11). */
-export { mulberry32 } from "../../rng";
+export { mulberry32 } from "../../rng.js";
 
 export const P: BallParams = TABLES.DAEDAE.ball;
 export const R = P.R;

@@ -16,8 +16,8 @@
  *
  * 초월함수 없음. 입력 불변, 반환 튜플은 모두 새 배열.
  */
-import type { BallState, MotionState, Vec3 } from "../types";
-import type { BallParams } from "../params";
+import type { BallState, MotionState, Vec3 } from "../types.js";
+import type { BallParams } from "../params.js";
 
 /** 이 값 미만의 속도·각속도 성분은 0 으로 본다 (pooltool CanonicalTransition._TOLERANCE). */
 export const SNAP_TOLERANCE = 1e-12;

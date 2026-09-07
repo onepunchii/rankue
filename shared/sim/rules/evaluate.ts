@@ -8,8 +8,8 @@
  * 코너에서 두 면에 닿으면 이벤트가 2개이므로 자연히 2로 센다. 같은 면 두 번도 2.
  * 적구가 밟은 쿠션은 세지 않는다(이벤트 ids 로 구분).
  */
-import type { SimEvent } from "../types";
-import type { Rules, ShotOutcome, ShotOutcomeCode } from "./types";
+import type { SimEvent } from "../types.js";
+import type { Rules, ShotOutcome, ShotOutcomeCode } from "./types.js";
 
 export const CUE_BALL_IDS = ["white", "yellow"] as const;
 

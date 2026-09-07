@@ -5,7 +5,7 @@
  * 점수판 앱의 규약을 그대로 따른다: 다마수 = 선수별 목표 점수(hiqGames.playerNTarget),
  * 마무리 규칙 ruleFinishType none | 3c | bank, 음수 점수 정상(clamp 금지).
  */
-import type { Rules, ShotOutcome } from "./types";
+import type { Rules, ShotOutcome } from "./types.js";
 
 export type FinishType = "none" | "3c" | "bank";
 

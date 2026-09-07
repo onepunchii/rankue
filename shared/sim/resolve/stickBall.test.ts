@@ -5,12 +5,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BallState, ShotInput, Vec3 } from "../types";
-import { DEFAULT_CUE, TABLES } from "../params";
-import { HALF_PI, PI } from "../dmath";
-import { dot, length } from "../vec";
-import { slipVelocity } from "../evolve";
-import { squirtAngle, strike } from "./stickBall";
+import type { BallState, ShotInput, Vec3 } from "../types.js";
+import { DEFAULT_CUE, TABLES } from "../params.js";
+import { HALF_PI, PI } from "../dmath.js";
+import { dot, length } from "../vec.js";
+import { slipVelocity } from "../evolve.js";
+import { squirtAngle, strike } from "./stickBall.js";
 
 const P = TABLES.DAEDAE.ball;
 const R = P.R;

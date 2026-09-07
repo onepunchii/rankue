@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Vec3 } from "../../types";
-import { hanRegime, noseAngle, resolveCushionHan } from "./han2005";
+import type { Vec3 } from "../../types.js";
+import { hanRegime, noseAngle, resolveCushionHan } from "./han2005.js";
 import {
     H, LEFT, P, R, SEGS,
     angleFromNormal, ball, deepFreeze, deg, expectVecClose, incidentVelocity, ke,
     mirrorY, mulberry32, normalComponent, rad, randomIncident, rollingSpin, tangentComponent,
-} from "./testHelpers";
+} from "./testHelpers.js";
 
 describe("noseAngle", () => {
     it("sinθ = (h − R)/R, 대대 ≈ 0.203", () => {

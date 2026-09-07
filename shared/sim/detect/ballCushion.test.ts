@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { BallState, CushionId, CushionSegment, Vec3 } from "../types";
-import { cushionSegments, TABLES } from "../params";
-import { evolveBall } from "../evolve";
-import { ballCushionTime } from "./ballCushion";
+import type { BallState, CushionId, CushionSegment, Vec3 } from "../types.js";
+import { cushionSegments, TABLES } from "../params.js";
+import { evolveBall } from "../evolve.js";
+import { ballCushionTime } from "./ballCushion.js";
 
 const T = TABLES.DAEDAE;
 const P = T.ball;

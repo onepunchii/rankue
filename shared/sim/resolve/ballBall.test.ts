@@ -4,14 +4,14 @@
  * 각도→벡터 변환은 절대 규칙 1 에 따라 dmath 만 쓴다.
  */
 import { describe, expect, it } from "vitest";
-import type { BallState, Vec3 } from "../types";
-import type { BallParams } from "../params";
-import { TABLES } from "../params";
-import { HALF_PI, PI, TWO_PI, atan2, cos, exp, sin } from "../dmath";
-import { add, cross, dot, length, scale, sub, unit, upCross } from "../vec";
-import { kineticEnergy } from "../evolve";
-import { ballBallFriction, resolveBallBall } from "./ballBall";
-import { mulberry32 } from "../rng";
+import type { BallState, Vec3 } from "../types.js";
+import type { BallParams } from "../params.js";
+import { TABLES } from "../params.js";
+import { HALF_PI, PI, TWO_PI, atan2, cos, exp, sin } from "../dmath.js";
+import { add, cross, dot, length, scale, sub, unit, upCross } from "../vec.js";
+import { kineticEnergy } from "../evolve.js";
+import { ballBallFriction, resolveBallBall } from "./ballBall.js";
+import { mulberry32 } from "../rng.js";
 
 const P = TABLES.DAEDAE.ball;
 const R = P.R;

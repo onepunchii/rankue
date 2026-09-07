@@ -11,14 +11,14 @@
 import { describe, it, expect } from "vitest";
 import {
     simulateShot, simulateFrom, MAX_EVENTS, debugCounters, resetDebugCounters,
-} from "./simulate";
-import { generateShotCases, paramsOf, type ShotCase } from "./fixtures/shots";
-import { evolveBall, kineticEnergy } from "./evolve";
-import { TABLES, DEFAULT_CUE, applyCondition, cushionSegments, type SimParams, type CushionModelId } from "./params";
-import { openingLayout } from "./layouts";
-import { evaluateShot, DEFAULT_3C_RULES } from "./rules/evaluate";
-import { atan2, HALF_PI } from "./dmath";
-import type { BallState, SimEvent, SimResult } from "./types";
+} from "./simulate.js";
+import { generateShotCases, paramsOf, type ShotCase } from "./fixtures/shots.js";
+import { evolveBall, kineticEnergy } from "./evolve.js";
+import { TABLES, DEFAULT_CUE, applyCondition, cushionSegments, type SimParams, type CushionModelId } from "./params.js";
+import { openingLayout } from "./layouts.js";
+import { evaluateShot, DEFAULT_3C_RULES } from "./rules/evaluate.js";
+import { atan2, HALF_PI } from "./dmath.js";
+import type { BallState, SimEvent, SimResult } from "./types.js";
 
 const T = TABLES.DAEDAE;
 const R = T.ball.R;

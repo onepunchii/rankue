@@ -2,7 +2,7 @@
  * rng.ts 검증: 시드 재현성, 범위, 대략 균등, 시드별 상이.
  */
 import { describe, it, expect } from "vitest";
-import { mulberry32, uniform, uniformInt } from "./rng";
+import { mulberry32, uniform, uniformInt } from "./rng.js";
 
 describe("mulberry32", () => {
     it("같은 시드 → 같은 수열, 다른 시드 → 다른 수열", () => {

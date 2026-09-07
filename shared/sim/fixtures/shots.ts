@@ -8,12 +8,12 @@
  * 입력: 큐볼이 다른 공 하나를 향하는 각 ± 0.35 rad, V0 ∈ [0.8, 9] m/s, (a, b) 는 반지름 0.5 원판 안,
  *       theta ∈ [0, 0.35] rad. 큐볼은 항상 "white".
  */
-import type { BallState, ShotInput } from "../types";
-import type { CushionModelId, SimParams, TableSpec } from "../params";
-import { DEFAULT_CUE, TABLES } from "../params";
-import { openingLayout } from "../layouts";
-import { atan2, TWO_PI } from "../dmath";
-import { mulberry32, uniform } from "../rng";
+import type { BallState, ShotInput } from "../types.js";
+import type { CushionModelId, SimParams, TableSpec } from "../params.js";
+import { DEFAULT_CUE, TABLES } from "../params.js";
+import { openingLayout } from "../layouts.js";
+import { atan2, TWO_PI } from "../dmath.js";
+import { mulberry32, uniform } from "../rng.js";
 
 export type LayoutKind = "opening" | "random";
 

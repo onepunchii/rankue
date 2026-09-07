@@ -12,11 +12,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
-import { simulateFrom, simulateShot } from "./simulate";
-import { generateShotCases, paramsOf, type ShotCase } from "./fixtures/shots";
-import { ENGINE_VERSION } from "./version";
-import type { BallState, ShotInput } from "./types";
-import type { CushionModelId, TableSpec } from "./params";
+import { simulateFrom, simulateShot } from "./simulate.js";
+import { generateShotCases, paramsOf, type ShotCase } from "./fixtures/shots.js";
+import { ENGINE_VERSION } from "./version.js";
+import type { BallState, ShotInput } from "./types.js";
+import type { CushionModelId, TableSpec } from "./params.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GOLDEN_PATH = join(here, "fixtures", "golden.json");

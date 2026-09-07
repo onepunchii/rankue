@@ -6,8 +6,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import * as dm from "./dmath";
-import { mulberry32 } from "./rng";
+import * as dm from "./dmath.js";
+import { mulberry32 } from "./rng.js";
 
 // ── ulp 거리 ────────────────────────────────────────────────────────────────
 const buf = new Float64Array(1);

@@ -2,11 +2,11 @@
  * resolve/transition.ts 검증: 각 상태 진입의 정준화, 1e-12 스냅, 미끄럼 끝에서 접점 속도가 정확히 0, 입력 불변.
  */
 import { describe, it, expect } from "vitest";
-import { applyTransition, SNAP_TOLERANCE } from "./transition";
-import { evolveBall, kineticEnergy, slideTime, slipVelocity } from "../evolve";
-import { TABLES } from "../params";
-import { scale, upCross } from "../vec";
-import type { BallState } from "../types";
+import { applyTransition, SNAP_TOLERANCE } from "./transition.js";
+import { evolveBall, kineticEnergy, slideTime, slipVelocity } from "../evolve.js";
+import { TABLES } from "../params.js";
+import { scale, upCross } from "../vec.js";
+import type { BallState } from "../types.js";
 
 const P = TABLES.DAEDAE.ball;
 const R = P.R;

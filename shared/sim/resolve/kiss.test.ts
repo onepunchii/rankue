@@ -5,10 +5,10 @@ import { describe, it, expect } from "vitest";
 import {
     makeKiss, resolveContinuallyTouching, kissDebug,
     DEFAULT_SPACER, CONTINUAL_TOUCH_EPS,
-} from "./kiss";
-import { TABLES } from "../params";
-import { length, sub, dot, unit } from "../vec";
-import type { BallState, Vec3 } from "../types";
+} from "./kiss.js";
+import { TABLES } from "../params.js";
+import { length, sub, dot, unit } from "../vec.js";
+import type { BallState, Vec3 } from "../types.js";
 
 const P = TABLES.DAEDAE.ball;
 const R = P.R;

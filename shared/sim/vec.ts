@@ -2,8 +2,8 @@
  * Vec3 순수 함수. 모든 함수는 새 튜플을 만들어 돌려주고 인자는 건드리지 않는다(README 절대 규칙 2).
  * 초월함수는 쓰지 않는다 — 각도가 필요한 angleOf 만 dmath.atan2 를 쓴다(절대 규칙 1).
  */
-import type { Vec3 } from "./types";
-import { atan2 } from "./dmath";
+import type { Vec3 } from "./types.js";
+import { atan2 } from "./dmath.js";
 
 export function add(a: Vec3, b: Vec3): Vec3 {
     return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];

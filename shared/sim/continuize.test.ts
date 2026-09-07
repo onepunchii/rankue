@@ -2,11 +2,11 @@
  * continuize.ts 검증: stateAt 이 직전 스냅샷에서 닫힌 식으로 전진하고 이벤트를 넘지 않는다, frames 의 경계·간격.
  */
 import { describe, it, expect } from "vitest";
-import { stateAt, frames, MAX_FRAMES } from "./continuize";
-import { simulateFrom } from "./simulate";
-import { evolveBall } from "./evolve";
-import { TABLES, DEFAULT_CUE, type SimParams } from "./params";
-import type { BallState, SimResult } from "./types";
+import { stateAt, frames, MAX_FRAMES } from "./continuize.js";
+import { simulateFrom } from "./simulate.js";
+import { evolveBall } from "./evolve.js";
+import { TABLES, DEFAULT_CUE, type SimParams } from "./params.js";
+import type { BallState, SimResult } from "./types.js";
 
 const T = TABLES.DAEDAE;
 const R = T.ball.R;

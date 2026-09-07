@@ -2,8 +2,8 @@
  * version.ts 검증: ENGINE_VERSION 형식, paramsHash 의 키 순서 독립성·민감도, stableStringify.
  */
 import { describe, it, expect } from "vitest";
-import { ENGINE_VERSION, paramsHash, physicsParams, stableStringify } from "./version";
-import { DEFAULT_PARAMS, TABLES, DEFAULT_CUE, type SimParams } from "./params";
+import { ENGINE_VERSION, paramsHash, physicsParams, stableStringify } from "./version.js";
+import { DEFAULT_PARAMS, TABLES, DEFAULT_CUE, type SimParams } from "./params.js";
 
 describe("version", () => {
     it("ENGINE_VERSION 은 semver 2.1.0", () => {

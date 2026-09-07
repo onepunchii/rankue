@@ -2,7 +2,7 @@
  * 물리 파라미터와 테이블·큐 프리셋. 값의 출처는 각 항목 옆에 적는다.
  * 숫자를 바꾸면 paramsHash 가 바뀌어 리플레이·래더 기간이 갈린다 — 바꿀 때는 ENGINE_VERSION 도 올릴 것.
  */
-import type { CushionSegment } from "./types";
+import type { CushionSegment } from "./types.js";
 
 export interface BallParams {
     /** 질량 (kg) */

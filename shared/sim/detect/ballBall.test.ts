@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { BallState, Vec3 } from "../types";
-import { TABLES } from "../params";
-import { evolveBall } from "../evolve";
-import { ballBallTime } from "./ballBall";
+import type { BallState, Vec3 } from "../types.js";
+import { TABLES } from "../params.js";
+import { evolveBall } from "../evolve.js";
+import { ballBallTime } from "./ballBall.js";
 
 const P = TABLES.DAEDAE.ball;
 const R = P.R;

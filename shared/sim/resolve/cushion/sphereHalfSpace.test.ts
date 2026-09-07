@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Vec3 } from "../../types";
-import { resolveCushionSHS } from "./sphereHalfSpace";
+import type { Vec3 } from "../../types.js";
+import { resolveCushionSHS } from "./sphereHalfSpace.js";
 import {
     H, LEFT, P, R, SEGS,
     angleFromNormal, ball, deepFreeze, deg, expectVecClose, incidentVelocity, ke,
     mirrorY, mulberry32, normalComponent, rad, randomIncident, rollingSpin, tangentComponent,
-} from "./testHelpers";
+} from "./testHelpers.js";
 
 describe("resolveCushionSHS — 불변량", () => {
     it("5000 개 시드 무작위 입사 상태에서 운동에너지가 늘지 않는다", () => {

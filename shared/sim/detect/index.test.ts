@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { BallState, EventCandidate, Vec3 } from "../types";
-import { cushionSegments, TABLES } from "../params";
-import { rollTime, slideTime } from "../evolve";
-import { ballBallTime, ballCushionTime, compareTied, nextEvent, pickEvent, TIE_EPS } from "./index";
+import type { BallState, EventCandidate, Vec3 } from "../types.js";
+import { cushionSegments, TABLES } from "../params.js";
+import { rollTime, slideTime } from "../evolve.js";
+import { ballBallTime, ballCushionTime, compareTied, nextEvent, pickEvent, TIE_EPS } from "./index.js";
 
 const T = TABLES.DAEDAE;
 const P = T.ball;

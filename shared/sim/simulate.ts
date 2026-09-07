@@ -38,19 +38,19 @@
  *
  * 초월함수 없음(strike 가 dmath 를 쓴다). 입력 불변. Date·난수 없음.
  */
-import type { BallState, CushionSegment, EventCandidate, MotionState, ShotInput, SimEvent, SimResult, Snapshot, Vec3 } from "./types";
-import type { BallParams, SimParams } from "./params";
-import { applyCondition, cushionSegments } from "./params";
-import { HALF_PI } from "./dmath";
-import { evolveBall, nextTransition } from "./evolve";
-import { compareTied, EVENT_EPS, nextEvent } from "./detect/index";
-import { strike } from "./resolve/stickBall";
-import { resolveBallBall } from "./resolve/ballBall";
-import { resolveCushion } from "./resolve/cushion/index";
-import { applyTransition } from "./resolve/transition";
-import { DEFAULT_SPACER, makeKiss, resolveContinuallyTouching } from "./resolve/kiss";
-import { hashResult } from "./hash";
-import { ENGINE_VERSION, paramsHash } from "./version";
+import type { BallState, CushionSegment, EventCandidate, MotionState, ShotInput, SimEvent, SimResult, Snapshot, Vec3 } from "./types.js";
+import type { BallParams, SimParams } from "./params.js";
+import { applyCondition, cushionSegments } from "./params.js";
+import { HALF_PI } from "./dmath.js";
+import { evolveBall, nextTransition } from "./evolve.js";
+import { compareTied, EVENT_EPS, nextEvent } from "./detect/index.js";
+import { strike } from "./resolve/stickBall.js";
+import { resolveBallBall } from "./resolve/ballBall.js";
+import { resolveCushion } from "./resolve/cushion/index.js";
+import { applyTransition } from "./resolve/transition.js";
+import { DEFAULT_SPACER, makeKiss, resolveContinuallyTouching } from "./resolve/kiss.js";
+import { hashResult } from "./hash.js";
+import { ENGINE_VERSION, paramsHash } from "./version.js";
 
 /** 이벤트 상한. 넘으면 truncated = true 로 강제 종료(규칙은 이 샷을 무효로 본다). */
 export const MAX_EVENTS = 2000;

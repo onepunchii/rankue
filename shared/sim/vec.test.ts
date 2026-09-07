@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Vec3 } from "./types";
-import { HALF_PI, PI } from "./dmath";
-import { add, angleOf, cross, dot, length, lengthSq, lerp, negate, scale, sub, unit, upCross } from "./vec";
+import type { Vec3 } from "./types.js";
+import { HALF_PI, PI } from "./dmath.js";
+import { add, angleOf, cross, dot, length, lengthSq, lerp, negate, scale, sub, unit, upCross } from "./vec.js";
 
 const A: Vec3 = [1, 2, 3];
 const B: Vec3 = [-4, 0.5, 2];

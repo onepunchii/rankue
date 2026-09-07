@@ -5,7 +5,7 @@
  * −b ± √D 를 그대로 쓰면 |b| ≫ |ac| 일 때 한쪽 근이 자릿수를 잃는다(예: t² − (1e8+1e-8)t + 1).
  * pooltool ptmath/roots/quadratic.py 도 같은 부호 트릭 + 곱 항등식을 쓴다.
  */
-import { isRealRoot, sortedAscending } from "./common";
+import { isRealRoot, sortedAscending } from "./common.js";
 
 /**
  * 실근만, 오름차순. 중근은 두 번 들어간다.

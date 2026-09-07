@@ -33,10 +33,10 @@
  *
  * 초월함수 없음. 입력 불변.
  */
-import type { BallState, Vec3 } from "../types";
-import type { BallParams } from "../params";
-import { add, dot, length, scale, sub, unit } from "../vec";
-import { solveQuadratic } from "../roots/quadratic";
+import type { BallState, Vec3 } from "../types.js";
+import type { BallParams } from "../params.js";
+import { add, dot, length, scale, sub, unit } from "../vec.js";
+import { solveQuadratic } from "../roots/quadratic.js";
 
 /** README 계약 기본값. 감지기의 "접촉" 판정 폭(EVENT_EPS = 1e-9 m)과 같다. */
 export const DEFAULT_SPACER = 1e-9;

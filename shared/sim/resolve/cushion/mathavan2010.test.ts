@@ -4,12 +4,12 @@
  * 각도는 dmath.atan2 로만 잰다(테스트 파일도 초월함수 grep 대상일 수 있다).
  */
 import { describe, expect, it } from "vitest";
-import type { BallState, CushionSegment, Vec3 } from "../../types";
-import { mulberry32 } from "../../rng";
-import { TABLES, cushionSegments } from "../../params";
-import { kineticEnergy } from "../../evolve";
-import { PI, atan2, sin, cos } from "../../dmath";
-import { resolveCushionMathavan } from "./mathavan2010";
+import type { BallState, CushionSegment, Vec3 } from "../../types.js";
+import { mulberry32 } from "../../rng.js";
+import { TABLES, cushionSegments } from "../../params.js";
+import { kineticEnergy } from "../../evolve.js";
+import { PI, atan2, sin, cos } from "../../dmath.js";
+import { resolveCushionMathavan } from "./mathavan2010.js";
 
 const T = TABLES.DAEDAE;
 const P = T.ball;

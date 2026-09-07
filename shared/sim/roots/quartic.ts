@@ -24,9 +24,9 @@
  *
  * 절대 규칙: 입력 불변, Math.* 초월함수 금지, 결정론(모든 연산이 IEEE 기본 연산).
  */
-import { cbrt } from "../dmath";
-import { isRealRoot, MACHEPS, sortedAscending } from "./common";
-import { solveQuadratic } from "./quadratic";
+import { cbrt } from "../dmath.js";
+import { isRealRoot, MACHEPS, sortedAscending } from "./common.js";
+import { solveQuadratic } from "./quadratic.js";
 
 const CUBIC_RESCAL_FACT = 3.488062113727083e102;
 const QUART_RESCAL_FACT = 7.156344627944542e76;

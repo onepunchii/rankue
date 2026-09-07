@@ -24,9 +24,9 @@
  *
  * 초월함수는 전혀 필요 없다: 단위벡터는 sqrt 로만 만든다.
  */
-import type { BallState, EventCandidate, Vec3 } from "./types";
-import type { BallParams } from "./params";
-import { add, dot, length, scale, unit, upCross } from "./vec";
+import type { BallState, EventCandidate, Vec3 } from "./types.js";
+import type { BallParams } from "./params.js";
+import { add, dot, length, scale, unit, upCross } from "./vec.js";
 
 // ---------------------------------------------------------------------------
 // 접점 미끄럼 속도
