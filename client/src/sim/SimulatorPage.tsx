@@ -1,6 +1,8 @@
 /**
  * 시뮬레이터 화면(DOM 셸). 물리·판정·재생·서버 동기화는 useSimulator 가 전부 맡고, 여기서는
- *  - 렌더러(Canvas2DRenderer)·오버레이(Overlay)를 테이블 래퍼에 얹고 rAF 루프에서 frameAt() 으로 그리며(React 상태 없음),
+ *  - 렌더러·오버레이(Overlay)를 테이블 래퍼에 얹고 rAF 루프에서 frameAt() 으로 그리며(React 상태 없음),
+ *    렌더러는 기기 저장값(rendererChoice: "rankue.sim.renderer")과 WebGL2 탐색으로 ThreeRenderer 를 고르고, 생성 실패나
+ *    컨텍스트 손실 2회면 Canvas2DRenderer 로 내려간다(같은 Renderer 계약이라 루프·오버레이·제스처는 모른다),
  *  - 테이블 포인터 제스처(조준 드래그 · 연습 모드 공 배치 · 재생 중 길게 눌러 4×)를 tableGestures 로 해석하고,
  *  - HUD · 조작 패널 · 결과 배너 · 이닝 시트 · 종료/나가기 다이얼로그를 그린다.
  * 설정은 `?cfg=<base64url JSON>`(pageConfig) 으로 받고, 없거나 깨졌으면 SimSetupDialog 를 위에 연다.
@@ -16,7 +18,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useSimulator, type OfflineReason } from "./useSimulator";
+import type { Renderer } from "./render/Renderer";
 import { Canvas2DRenderer } from "./render/Canvas2DRenderer";
+import { CONTEXT_LOSS_LIMIT, safeLocalStorage, selectRendererKind, writeRendererPref, type RendererKind } from "./render/rendererChoice";
 import { Overlay, type Project } from "./overlay/Overlay";
 import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
 import { decodePageConfig, readCfgParam } from "./pageConfig";
@@ -107,19 +111,70 @@ export function SimulatorPage() {
 
     // ── 렌더러·오버레이 ───────────────────────────────────────────────────
     const tableRef = useRef<HTMLDivElement>(null);
-    const rendererRef = useRef<Canvas2DRenderer | null>(null);
+    const rendererRef = useRef<Renderer | null>(null);
     const overlayRef = useRef<Overlay | null>(null);
     const dirtyRef = useRef(true);
     const tableSpecRef = useRef(table);
     tableSpecRef.current = table;
     const fullLabel = t("sim.aim.fullBall");
     const projectRef = useRef<Project>((x, y) => rendererRef.current?.project(x, y) ?? [0, 0]);
+    // 렌더러 종류는 화면 인스턴스마다 한 번 고른다(저장값 → WebGL2 탐색). 컨텍스트 손실이 쌓이면 세션 동안 canvas 로 고정.
+    const rendererKindRef = useRef<RendererKind | null>(null);
+    if (rendererKindRef.current === null) rendererKindRef.current = selectRendererKind();
+    const contextLossesRef = useRef(0);
 
     useEffect(() => {
         const el = tableRef.current;
         if (!el) return;
-        const renderer = new Canvas2DRenderer();
-        renderer.mount(el, tableSpecRef.current);
+        let alive = true;
+        let swapTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const mountCanvas2d = (): Renderer => {
+            const r = new Canvas2DRenderer();
+            r.mount(el, tableSpecRef.current);
+            return r;
+        };
+        // WebGL 컨텍스트를 CONTEXT_LOSS_LIMIT 회 잃으면 기기 설정을 canvas 로 저장하고, 이벤트 핸들러 밖에서 렌더러를 교체한다.
+        // rAF 루프·오버레이·제스처는 rendererRef 만 보므로 교체를 모른다(오버레이 캔버스는 z-index 로 위에 남는다).
+        const onContextLost = () => {
+            contextLossesRef.current += 1;
+            if (contextLossesRef.current < CONTEXT_LOSS_LIMIT || rendererKindRef.current === "canvas") return;
+            rendererKindRef.current = "canvas";
+            writeRendererPref(safeLocalStorage(), "canvas");
+            swapTimer = setTimeout(() => {
+                swapTimer = null;
+                if (!alive) return;
+                rendererRef.current?.dispose();
+                rendererRef.current = mountCanvas2d();
+                dirtyRef.current = true;
+            }, 0);
+        };
+
+        // 먼저 Canvas2D 를 올려 테이블이 즉시 보이게 하고, three.js 는 필요한 기기에서만 동적으로 내려받아
+        // 준비되면 바꿔 끼운다(three 청크 ~540 kB 를 canvas 사용자는 받지 않는다).
+        let renderer: Renderer = mountCanvas2d();
+        if (rendererKindRef.current === "three") {
+            import("./render/ThreeRenderer").then(({ ThreeRenderer }) => {
+                if (!alive || rendererKindRef.current !== "three") return;
+                let three: InstanceType<typeof ThreeRenderer> | null = null;
+                try {
+                    three = new ThreeRenderer({ onContextLost });
+                    three.mount(el, tableSpecRef.current);
+                } catch {
+                    // WebGL2 를 못 열었다(드라이버 차단·컨텍스트 상한) — 이 화면에선 canvas 유지
+                    try { three?.dispose(); } catch { /* 이미 망가진 상태 */ }
+                    rendererKindRef.current = "canvas";
+                    return;
+                }
+                rendererRef.current?.dispose();
+                rendererRef.current = three;
+                dirtyRef.current = true;
+            }).catch(() => {
+                // 청크 로드 실패(오프라인 등) — canvas 유지
+                rendererKindRef.current = "canvas";
+            });
+        }
+
         let overlay: Overlay | null = null;
         try {
             overlay = new Overlay(el, { labels: { fullBall: fullLabel } });
@@ -130,8 +185,10 @@ export function SimulatorPage() {
         overlayRef.current = overlay;
         dirtyRef.current = true;
         return () => {
+            alive = false;
+            if (swapTimer) clearTimeout(swapTimer);
             overlay?.dispose();
-            renderer.dispose();
+            rendererRef.current?.dispose();
             rendererRef.current = null;
             overlayRef.current = null;
         };

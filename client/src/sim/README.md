@@ -16,7 +16,14 @@ client/src/sim/
                           DPR 은 min(devicePixelRatio, 2) 를 resize 마다 다시 읽는다. 캔버스는 마운트에 absolute·inset 0 으로 얹힌다(Overlay 와 같은 좌표계) — 마운트는 스스로 크기를 가져야 하며 static 이면 relative 로 바뀐다.
                           `getLayout(): TableLayout | null` — 플레이 면 히트테스트(tableGeometry.isOnPlaySurface) 용. 공 색·강조 링은 토큰(render/tokens.ts) 에서 읽어 Overlay 의 경로 색과 맞춘다.
   render/tokens.ts        캔버스용 디자인 토큰 읽기(--brand, --ink-1, --surface-1, --surface-line, --ball-*): parseColor / rgba / readPalette. 렌더러·오버레이 공용, 못 읽으면 index.css 기본값.
-  render/ThreeRenderer.ts     2차 렌더러(별도 단계). 오소 탑다운 카메라, 조명 구체, 접촉 그림자 스프라이트, 컨텍스트 손실 2회 → Canvas2D 폴백.
+  render/ThreeRenderer.ts     2차 렌더러(three r182, WebGL2). `new ThreeRenderer({ insets?, centreSpots?, dpr?, shadows?, onContextLost?, onContextRestored?, createCanvas?, canvas?, now? })`.
+                          같은 Renderer 계약 + `getLayout()` + `stats()`. 오소 탑다운 카메라(절두체 = threeMath.orthoFrustum, computeLayout 과 1:1 px), 라사 텍스처 평면·압출 레일·다이아몬드 인스턴스,
+                          조명 구체(토큰 색 6점 무늬 텍스처, ω 를 벽시계 dt 로 적분한 자세, id 가 사라지면 초기화), 접촉 그림자 사각형, 큐대 원기둥 4토막, 강조 링.
+                          그리기는 draw()/resize() 때만, draw 는 할당 없음. WebGL2 를 못 열면 생성자가 던진다. 컨텍스트 손실마다 onContextLost, 복구 시 마지막 프레임 재그리기.
+                          레터박스는 alpha:false 라 마운트 배경(surface-3 를 surface-1 위에 합성)으로 지운다. dispose 는 GL 자원 해제 + forceContextLoss(재마운트 불가).
+  render/threeMath.ts     ThreeRenderer 의 순수 수학(테스트 동반): orthoFrustum / projectOrtho / unprojectOrtho, integrateOrientation(q ← Δq(ω̂,|ω|dt) ⊗ q), cueGap / cueRotationZ, diamondWorld.
+  render/rendererChoice.ts 렌더러 선택: localStorage "rankue.sim.renderer" = "three" | "canvas". 없으면 WebGL2 탐색(탐색 컨텍스트는 즉시 loseContext) → 되면 three, 아니면 canvas. 저장값이 three 여도 WebGL2 가 안 되면 canvas.
+                          `selectRendererKind()`(페이지용) · `chooseRendererKind(pref, webgl2)` · `read/writeRendererPref(storage, kind)` · `CONTEXT_LOSS_LIMIT = 2`.
   overlay/Overlay.ts      `new Overlay(mount, { maxDpr?, labels?: { fullBall: t("sim.aim.fullBall") } })` → draw(state: OverlayState) / resize / clear / dispose. state.project 에 renderer.project 를 넘긴다.
                           조준선·고스트볼·예측 경로(큐볼 + 적구 첫 구간 + 두 번째 적구 접촉 전 쿠션 수)·두께 표시를 별도 2D 캔버스에 디바이스 픽셀로 그림. 색 문자열은 resize 때 한 번만 만든다.
   audio.ts                절차 합성 SFX(큐 타격·공·쿠션, 임펄스로 게인), 이벤트 시각에 스케줄. `new SimAudio(getCtx: () => AudioContext | null)` — getCtx 는 useGameAudio 가 제스처로 잠금 해제한 컨텍스트를 돌려주는 게터여야 한다.
@@ -163,8 +170,13 @@ interface SimulatorActions {
 
 ### 레이아웃(세로 고정)
 `fixed inset-0` 컬럼 + `env(safe-area-inset-*)` 패딩, 내용은 `max-w-[640px]`. 위에서부터 HUD(규칙·테이블 배지 / 상태 칩 / 소리 토글 / 선수 카드) → 테이블 래퍼(`relative flex-1 touch-none`,
-Canvas2DRenderer 와 Overlay 가 absolute 캔버스로 얹힘, 태블릿은 렌더러가 letterbox) → 조작 패널(두께 5단계 / 좌·우 · ±0.1° · 되돌리기 · 이닝 시트 · 나가기 / 당점 패드 · 세기 · 샷).
+렌더러(ThreeRenderer | Canvas2DRenderer)와 Overlay 가 absolute 캔버스로 얹힘, 태블릿은 렌더러가 letterbox) → 조작 패널(두께 5단계 / 좌·우 · ±0.1° · 되돌리기 · 이닝 시트 · 나가기 / 당점 패드 · 세기 · 샷).
 모든 탭 대상 ≥ 44 px, 텍스트 ≥ 12 px, 토큰만 사용.
+
+### 렌더러 선택(자동, UI 없음)
+화면 인스턴스마다 한 번 `selectRendererKind()`(저장값 → WebGL2 탐색). three 면 `new ThreeRenderer({ onContextLost })` 를 try/catch 로 만들고 실패하면 Canvas2DRenderer.
+컨텍스트 손실이 `CONTEXT_LOSS_LIMIT`(2)회 쌓이면 "canvas" 를 저장하고 이벤트 밖(setTimeout 0)에서 ThreeRenderer 를 dispose → Canvas2DRenderer 를 같은 래퍼에 마운트.
+rAF 루프·오버레이(`project`)·제스처(`unproject`)는 `rendererRef` 만 보므로 교체를 모른다. 사용자 토글은 아직 없다(설정 화면에서 `writeRendererPref` 로 붙일 것).
 
 ### 그리기 루프
 rAF 마다 `sim.frameAt(performance.now())` → 재생 중이거나 dirty 일 때만 `renderer.draw({ balls, cue: { phi, pullback: pullbackFor(V0), visible: phase==="aim", ballId: cueBallId }, highlightBallId })`.
