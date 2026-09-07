@@ -1890,5 +1890,15 @@ const en: Dict = {
   "sim.coach.spin": "Set spin by dragging inside the circle; the dashed ring is the miscue limit",
   "sim.coach.power": "Power is the slider; ± nudges 0.05 m/s",
   "sim.coach.start": "Got it",
+  "sim.share.button": "Share",
+  "sim.share.title3c": "3-cushion point · {n} cushions",
+  "sim.share.title4c": "4-ball point",
+  "sim.share.titlePractice": "Practice shot",
+  "sim.share.stats": "{score}/{target} · {innings} innings · avg {avg}",
+  "sim.share.footer": "Rankue Simulator · rankue.co.kr",
+  "sim.share.copied": "Replay link copied",
+  "sim.share.failed": "Couldn't share",
+  "sim.share.replayChip": "Replay",
+  "sim.share.replayMismatch": "Result differs",
 };
 export default en;

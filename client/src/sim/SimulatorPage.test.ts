@@ -2,14 +2,20 @@
  * SimulatorPage 스모크 테스트(jsdom 직접 기동 — SimSetupDialog.test 와 같은 방식). 앱 모듈("@/...")은 vi.mock 으로 대체하고
  * 훅·컨트롤러·엔진·렌더러는 진짜를 쓴다(캔버스 2D 컨텍스트만 없어 그리기는 no-op).
  * 검증: ?cfg 로 연습 세션이 바로 열린다 · 샷 → 재생 → 시계를 앞당기면 공이 멈추고 결과 배너·이닝 시트에 기록된다 ·
- *      연습 모드는 서버를 부르지 않는다 · cfg 가 없으면 설정 창이 열리고 시작하기로 세션이 열린다.
+ *      연습 모드는 서버를 부르지 않는다 · cfg 가 없으면 설정 창이 열리고 시작하기로 세션이 열린다 ·
+ *      샷이 끝나면 공유 알약이 생긴다 · ?replay= 는 연습 세션을 열어 한 번 자동으로 치고 해시 칩을 보인다.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
 import { JSDOM, VirtualConsole } from "jsdom";
 import { ko } from "../lib/i18n/ko";
+import { simulateShot } from "@shared/sim/simulate";
+import { openingLayout } from "@shared/sim/layouts";
+import { TABLES } from "@shared/sim/params";
 import { buildConfig } from "./setupPresets";
 import { encodePageConfig } from "./pageConfig";
+import { paramsFromConfig } from "./simReducer";
+import { encodeReplay, replaySource } from "./share/replayLink";
 
 const nav = vi.hoisted(() => ({ search: "", navigate: vi.fn(), apiRequest: vi.fn(), toast: vi.fn() }));
 
@@ -230,5 +236,63 @@ describe("SimulatorPage", () => {
         expect(h.container.textContent).toContain(ko["sim.exit.descPractice"]);
         await React.act(async () => { click(byText(h, ko["sim.exit.confirm"])!); await new Promise((r) => setTimeout(r, 10)); });
         expect(nav.navigate).toHaveBeenCalledWith("/dashboard");
+    });
+
+    it("샷이 끝나면 테이블 오른쪽 위에 공유 알약이 생기고, 누르면 결과 토스트가 뜬다(jsdom 은 캔버스가 없어 실패 문구)", async () => {
+        nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
+        const h = mount();
+        expect(byText(h, ko["sim.share.button"])).toBeNull();
+        click(byText(h, ko["sim.controls.shoot"])!);
+        expect(byText(h, ko["sim.share.button"])).toBeNull();   // 재생 중엔 없다
+        performance.now = () => realNow() + 1_000_000;
+        await frames(4);
+        const share = byText(h, ko["sim.share.button"]);
+        expect(share).not.toBeNull();
+        expect(share!.disabled).toBe(false);
+        click(share!);
+        await frames(3);
+        const titles = nav.toast.mock.calls.map((c) => (c[0] as { title: string }).title);
+        expect(titles.some((x) => x === ko["sim.share.failed"] || x === ko["sim.share.copied"])).toBe(true);
+        expect(nav.apiRequest).not.toHaveBeenCalled();
+    });
+
+    it("?replay= 는 연습 세션을 그 배치로 열어 한 번 자동으로 치고, 해시가 맞으면 리플레이 칩만 보인다", async () => {
+        const cfg = buildConfig({ gameType: "3c", target: 15 });
+        const result = simulateShot(openingLayout("3c", TABLES.DAEDAE, "white"), { cueBallId: "white", phi: 1.3, V0: 2.8, a: 0.1, b: 0.05, theta: 0 }, paramsFromConfig(cfg));
+        nav.search = `replay=${encodeReplay(replaySource(result, cfg))}`;
+        const h = mount();
+        await frames(2);
+        expect(h.container.querySelector("[role=dialog]")).toBeNull();
+        expect(h.container.textContent).toContain(ko["sim.hud.practice"]);
+        expect(h.container.textContent).toContain(ko["sim.share.replayChip"]);
+        expect(h.container.textContent).not.toContain(ko["sim.share.replayMismatch"]);
+        // 자동 샷이 재생 중이고 서버는 부르지 않는다
+        expect(byText(h, ko["sim.controls.playing"])).not.toBeNull();
+        expect(nav.apiRequest).not.toHaveBeenCalled();
+        performance.now = () => realNow() + 1_000_000;
+        await frames(4);
+        // 재생이 끝나면 보통 연습처럼 이어서 칠 수 있고 공유도 된다
+        expect(byText(h, ko["sim.controls.shoot"])).not.toBeNull();
+        expect(byText(h, ko["sim.share.button"])).not.toBeNull();
+        expect(h.container.textContent).toContain(ko["sim.share.replayChip"]);
+        // 되돌리면(연습) 리플레이 샷이 사라지므로 칩도 사라진다
+        click(byLabel(h, ko["sim.controls.undo"])!);
+        expect(h.container.textContent).not.toContain(ko["sim.share.replayChip"]);
+    });
+
+    it("해시가 다른 리플레이는 '결과가 달라요' 칩을 함께 보이고, 깨진 리플레이는 설정 창으로 떨어진다", async () => {
+        const cfg = buildConfig({ gameType: "4c", target: 80 });
+        const result = simulateShot(openingLayout("4c", TABLES.JUNGDAE_KR, "white"), { cueBallId: "white", phi: 1.6, V0: 2.2, a: 0, b: 0, theta: 0 }, paramsFromConfig(cfg));
+        nav.search = `replay=${encodeReplay({ ...replaySource(result, cfg), hash: "0000000000000000" })}`;
+        const h = mount();
+        await frames(2);
+        expect(h.container.textContent).toContain(ko["sim.share.replayChip"]);
+        expect(h.container.textContent).toContain(ko["sim.share.replayMismatch"]);
+        expect(h.container.textContent).toContain(ko["sim.hud.rule4c"]);
+
+        nav.search = "replay=not-a-real-payload";
+        const broken = mount();
+        expect(broken.container.querySelector("[role=dialog]")).not.toBeNull();
+        expect(broken.container.textContent).toContain(ko["sim.setup.title"]);
     });
 });

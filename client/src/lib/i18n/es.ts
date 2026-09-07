@@ -1890,5 +1890,15 @@ const es: Dict = {
   "sim.coach.spin": "El efecto se pone arrastrando en el círculo; la línea punteada es el límite",
   "sim.coach.power": "La fuerza es el deslizador; ± ajusta 0,05 m/s",
   "sim.coach.start": "Entendido",
+  "sim.share.button": "Compartir",
+  "sim.share.title3c": "Punto a tres bandas · {n} bandas",
+  "sim.share.title4c": "Punto de cuatro bolas",
+  "sim.share.titlePractice": "Tiro de práctica",
+  "sim.share.stats": "{score}/{target} · {innings} entradas · promedio {avg}",
+  "sim.share.footer": "Simulador Rankue · rankue.co.kr",
+  "sim.share.copied": "Enlace de repetición copiado",
+  "sim.share.failed": "No se pudo compartir",
+  "sim.share.replayChip": "Repetición",
+  "sim.share.replayMismatch": "El resultado difiere",
 };
 export default es;

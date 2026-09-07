@@ -7,7 +7,7 @@ import type { SessionState } from "@shared/sim/rules";
 import type { Phase } from "../simReducer";
 import { displayAverage, endTitle, formatAverage, inningsForAverage } from "../hudMath";
 
-// 종료 다이얼로그. 승자(gold — 우승 의례 전용 색)·점수/다마수·이닝·에버리지·하이런, 다시하기(같은 설정으로 새 세션)·나가기.
+// 종료 다이얼로그. 승자(gold — 우승 의례 전용 색)·점수/다마수·이닝·에버리지·하이런, (공유: 마지막 샷 카드 + 세션 통계)·다시하기(같은 설정으로 새 세션)·나가기.
 // 닫아도(바깥 탭) 화면은 finished 상태로 남는다 — 연습 모드는 되돌리기로 이어서 칠 수 있다.
 interface Props {
     open: boolean;
@@ -25,6 +25,8 @@ interface Props {
     subtitle?: string | null;
     /** 대전에는 다시하기가 없다 */
     hideRestart?: boolean;
+    /** 마지막 샷 공유(카드 PNG + 리플레이 링크). 없으면 버튼을 그리지 않는다(대전·샷 없음) */
+    onShare?: () => void;
 }
 
 export const EndDialog = memo(function EndDialog(p: Props) {
@@ -67,6 +69,14 @@ export const EndDialog = memo(function EndDialog(p: Props) {
                     )}
                 </div>
                 <DialogFooter className="shrink-0 px-6 pb-6 pt-4 flex-row gap-2">
+                    {p.onShare && (
+                        <Button
+                            type="button" variant="outline" onClick={p.onShare} disabled={p.busy}
+                            className="flex-1 h-12 rounded-xl border-surface-line text-ink-2 font-semibold"
+                        >
+                            {t("sim.share.button")}
+                        </Button>
+                    )}
                     {!p.hideRestart && (
                         <Button
                             type="button" variant="outline" onClick={p.onRestart} disabled={p.busy}

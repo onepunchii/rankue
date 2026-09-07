@@ -8,6 +8,9 @@
  *  - 다이아몬드 시스템 훈련(3쿠션만): HUD 토글(localStorage "rankue.sim.diamond", 기본 꺼짐)이 켜지면 rAF 경로에서
  *    overlay/diamondSystem.overlayDiamond 로 레일 숫자·조준 분석을 오버레이에 넘기고, 샷이 끝나면 sim.lastResult 로
  *    "시스템 {예측} · 실제 {3쿠션수}" 를 결과 배너 아래 한 줄로 보인다.
+ *  - 공유·리플레이(share/): 솔로·연습·드릴에서 샷이 끝나면 테이블 오른쪽 위 "공유" 알약(종료 다이얼로그에도) → 카드 PNG +
+ *    `?replay=` 링크(useShare). `?replay=<payload>` 로 열면 연습 세션을 그 배치로 열어 한 번 자동으로 치고, 결과 해시가
+ *    원본과 같은지 칩("리플레이" / "결과가 달라요")으로 보인다 — 그 뒤엔 보통 연습처럼 이어서 칠 수 있다.
  * 설정은 `?cfg=<base64url JSON>`(pageConfig) 으로 받고, 없거나 깨졌으면 SimSetupDialog 를 위에 연다.
  * 세로 고정 레이아웃, env(safe-area-inset-*) 패딩, 태블릿에서는 렌더러가 letterbox 해서 테이블이 잘리지 않는다.
  * 레거시 Expo ReactNativeWebView 방향 브리지는 옮기지 않는다 — 이 화면은 세로 레이아웃 그 자체다.
@@ -40,10 +43,13 @@ import { DrillPanel, DRILL_WEEK_QUERY_KEY, DRILL_LADDER_QUERY_KEY } from "./dril
 import { drillApi, type DrillWeek, type WeekDrill } from "./drill/drillApi";
 import { buildConfig } from "./setupPresets";
 import { decodePageConfig, readCfgParam } from "./pageConfig";
+import { decodeReplay, encodeReplay, forSoloSession, replaySource, replayUrl, REPLAY_PARAM, toReplayConfig, type ReplayPayload } from "./share/replayLink";
+import { fileNameFor, gameBadge, replayShortText, sessionStatsLine, shotSubtitle, shotTitle } from "./share/shareCard";
+import { useShare } from "./share/useShare";
 import { activeThickness, FINE_STEP_RAD, pullbackFor, type ThicknessStep } from "./controlsMath";
 import { appendShot, EMPTY_LOG, popShot, type InningLog } from "./inningLog";
 import { beginGesture, moveGesture, type Gesture } from "./tableGestures";
-import { playerLabel } from "./hudMath";
+import { playerLabel, tableLabel } from "./hudMath";
 import type { CueInput, Phase } from "./simReducer";
 import type { SimPreview } from "./simController";
 import { HUD } from "./components/HUD";
@@ -93,8 +99,10 @@ export function SimulatorPage() {
     const matchId = params.get("match");
     const lobby = params.get("lobby") === "1";
     const drillsView = params.get("drills") === "1";
-    const [initial] = useState(() => (matchId || lobby || drillsView ? null : decodePageConfig(readCfgParam(search))));
-    const [setupOpen, setSetupOpen] = useState(initial === null && !matchId && !lobby && !drillsView);
+    // 리플레이 링크(?replay=): 대전·로비·드릴이 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
+    const [replay] = useState<ReplayPayload | null>(() => (matchId || lobby || drillsView ? null : decodeReplay(params.get(REPLAY_PARAM))));
+    const [initial] = useState(() => (matchId || lobby || drillsView || replay ? null : decodePageConfig(readCfgParam(search))));
+    const [setupOpen, setSetupOpen] = useState(initial === null && replay === null && !matchId && !lobby && !drillsView);
     // 드릴 모드: 고정 배치에서 첫 샷만 서버가 채점(문제당 1회), 그 뒤는 연습. scored 전엔 공 배치를 막는다.
     const [drill, setDrill] = useState<{ drill: WeekDrill; week: DrillWeek; scored: boolean; result: { success: boolean; cushions: number } | null } | null>(null);
     const drillRef = useRef(drill);
@@ -180,6 +188,31 @@ export function SimulatorPage() {
         startedRef.current = true;
         actions.start(initial.config, { record: initial.record });
     }, [actions, initial]);
+
+    // ?replay=<payload>: 연습 세션을 그 배치로 열고 입력을 넣은 뒤, aim 이 되면 한 번만 자동으로 친다(단계 ref 가드).
+    // 재생이 시작되면(lastResult) 해시를 원본과 견줘 "리플레이" / "결과가 달라요"(엔진 버전이 다름) 칩을 정한다.
+    const replaySolo = useMemo(() => (replay ? forSoloSession(replay) : null), [replay]);
+    const replayStageRef = useRef<"idle" | "started" | "shot" | "done">("idle");
+    const [replayChip, setReplayChip] = useState<"ok" | "mismatch" | null>(null);
+    useEffect(() => {
+        if (!replay || !replaySolo || startedRef.current) return;
+        startedRef.current = true;
+        actions.start(toReplayConfig(replay), { record: false, balls: replaySolo.balls });
+        const i = replaySolo.input;
+        actions.setInput({ phi: i.phi, V0: i.V0, a: i.a, b: i.b, theta: i.theta });
+        replayStageRef.current = "started";
+    }, [replay, replaySolo, actions]);
+    useEffect(() => {
+        if (replayStageRef.current !== "started" || sim.phase !== "aim") return;
+        replayStageRef.current = "shot";
+        void actions.shoot();
+    }, [sim.phase, actions]);
+    useEffect(() => {
+        const r = sim.lastResult;
+        if (replayStageRef.current !== "shot" || !r || !replay || !replaySolo) return;
+        replayStageRef.current = "done";
+        setReplayChip(!replaySolo.verifiable || r.hash === replay.hash ? "ok" : "mismatch");
+    }, [sim.lastResult, replay, replaySolo]);
 
     // ?match=<id> (푸시 딥링크·목록에서 열기): 서버에서 받아 대전 모드로 연다
     useEffect(() => {
@@ -489,6 +522,37 @@ export function SimulatorPage() {
     // HUD 는 memo — 토글 객체는 값이 바뀔 때만 새로 만든다. 4구에서는 버튼을 숨긴다(시스템은 3쿠션 훈련용).
     const diamondHud = useMemo(() => (is3c ? { on: diamond, onToggle: onToggleDiamond } : undefined), [is3c, diamond, onToggleDiamond]);
 
+    // ── 공유(카드 PNG + 리플레이 링크). 솔로·연습·드릴에서 샷이 끝난 뒤(aim/finished)만 ──
+    const { share, busy: sharing } = useShare();
+    const canShare = sim.mode === "solo" && sim.lastResult !== null && (sim.phase === "aim" || sim.phase === "finished");
+    // 드릴 "다시 배치" 는 공유 알약과 같은 줄(오른쪽 위)에 놓인다
+    const drillReset = drill !== null && !isMatch && sim.phase !== "shooting";
+    const shareLast = useCallback((withStats: boolean) => {
+        const result = lastResultRef.current;
+        const config = sim.config;
+        const session = sim.session;
+        if (!result || !config || !session) return;
+        const gt = session.rules.gameType;
+        const url = replayUrl(encodeReplay(replaySource(result, config)));
+        const outcomeTitle = shotTitle(t, sim.outcomeLast, gt);
+        const d = drillRef.current;
+        // 통계는 1인 세션의 그 선수(2인이면 승자, 없으면 첫 선수)
+        const statsFor = session.players[session.players.length === 1 ? 0 : (session.winnerIndex ?? 0)];
+        void share(result, {
+            table: TABLES[config.tableId], gameType: gt, cueBallId: result.input.cueBallId,
+            badge: gameBadge(t, gt),
+            title: d ? t(d.drill.nameKey) : outcomeTitle,
+            subtitle: d ? `${outcomeTitle} · ${tableLabel(config, t)}` : shotSubtitle(t, config, result.input),
+            stats: withStats && statsFor ? sessionStatsLine(t, statsFor, sim.phase) : null,
+            footer: t("sim.share.footer"),
+            replayText: replayShortText(url),
+            replayUrl: url,
+            filename: fileNameFor(result),
+        });
+    }, [share, sim.config, sim.session, sim.outcomeLast, sim.phase, t]);
+    const onShareShot = useCallback(() => shareLast(false), [shareLast]);
+    const onShareEnd = useCallback(() => shareLast(true), [shareLast]);
+
     const exitNow = useCallback(async () => {
         setExiting(true);
         try {
@@ -600,18 +664,38 @@ export function SimulatorPage() {
                                     : t("sim.drill.chipPractice")}
                         </span>
                     )}
-                    {drill && !isMatch && sim.phase !== "shooting" && (
-                        <button
-                            type="button" onClick={onRestart}
-                            className="absolute top-3 right-3 z-[3] h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-3"
-                        >
-                            {t("sim.drill.reset")}
-                        </button>
+                    {(canShare || drillReset) && (
+                        <div className="absolute top-3 right-3 z-[3] flex items-center gap-2">
+                            {canShare && (
+                                <button
+                                    type="button" onClick={onShareShot} disabled={sharing}
+                                    className="h-9 px-3 rounded-pill bg-brand text-brand-fg text-[12px] font-semibold active:bg-brand-strong disabled:opacity-60"
+                                >
+                                    {t("sim.share.button")}
+                                </button>
+                            )}
+                            {drillReset && (
+                                <button
+                                    type="button" onClick={onRestart}
+                                    className="h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-3"
+                                >
+                                    {t("sim.drill.reset")}
+                                </button>
+                            )}
+                        </div>
                     )}
                     {!drill && sim.canPlace && sim.session && sim.session.shotCount === 0 && (
                         <span className="absolute top-3 left-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">
                             {t("sim.hud.placeHint")}
                         </span>
+                    )}
+                    {replayChip && sim.session?.shotCount === 1 && (
+                        <div className="absolute top-3 left-3 z-[3] flex items-center gap-2 pointer-events-none">
+                            <span className="rk-chip bg-brand text-brand-fg">{t("sim.share.replayChip")}</span>
+                            {replayChip === "mismatch" && (
+                                <span className="rk-chip bg-surface-1 border border-surface-line text-ink-3">{t("sim.share.replayMismatch")}</span>
+                            )}
+                        </div>
                     )}
                     {finished && !endOpen && (
                         <span className="absolute top-3 left-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">
@@ -708,6 +792,7 @@ export function SimulatorPage() {
                 session={sim.session} phase={sim.phase} names={names}
                 record={sim.record} offline={isMatch ? false : sim.offline} mismatches={sim.mismatches} busy={exiting}
                 onRestart={onRestart} onExit={() => { void exitNow(); }}
+                onShare={canShare ? onShareEnd : undefined}
                 subtitle={endSubtitle} hideRestart={isMatch}
             />
             <ExitConfirm

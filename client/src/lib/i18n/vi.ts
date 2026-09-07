@@ -1890,5 +1890,15 @@ const vi: Dict = {
   "sim.coach.spin": "Xoáy: kéo trong vòng tròn; vòng đứt là giới hạn trượt cơ",
   "sim.coach.power": "Lực là thanh trượt; ± chỉnh 0,05 m/s",
   "sim.coach.start": "Đã hiểu",
+  "sim.share.button": "Chia sẻ",
+  "sim.share.title3c": "Điểm 3 băng · {n} băng",
+  "sim.share.title4c": "Điểm 4 bi",
+  "sim.share.titlePractice": "Cú tập",
+  "sim.share.stats": "{score}/{target} · {innings} lượt · trung bình {avg}",
+  "sim.share.footer": "Trình mô phỏng Rankue · rankue.co.kr",
+  "sim.share.copied": "Đã sao chép liên kết xem lại",
+  "sim.share.failed": "Không thể chia sẻ",
+  "sim.share.replayChip": "Xem lại",
+  "sim.share.replayMismatch": "Kết quả khác",
 };
 export default vi;

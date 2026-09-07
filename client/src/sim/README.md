@@ -324,3 +324,12 @@ const openMatch = useCallback((m: MatchPublic) => {
 - `matchApi.test.ts`(18) · `simReducer.test.ts` 대전 블록(18) · `simController.match.test.ts`(21, FakeMatchServer 가 실제 엔진으로 서버 규칙을 흉내) · `useSimulator.test.ts`(4) · `match/matchView.test.ts`(5) · `match/MatchLobby.test.ts`(8, 로비·목록 jsdom 스모크).
 - 테스트에서 `matchApi`/`useSimulator`/`MatchLobby` 를 import 하면 `vi.mock("@/lib/queryClient", ...)` 를 먼저 둔다(기존 규칙과 같다). 컨트롤러엔 `matchApi`·`wallClock`·`onWake` 를 주입한다.
 - i18n: `sim.match.*` 68개, 5개 로케일 키 집합 동일(스크립트로 검증).
+
+## 리플레이 공유 (share/)
+```
+share/replayLink.ts   encodeReplay/decodeReplay/parseReplay — `?replay=<base64url JSON>` {v:1, table, cushionModel, condition?, balls, input, engineVersion, hash}.
+                      숫자는 반올림하지 않아(JSON 최단 왕복) 재시뮬 해시가 비트 단위로 같다. 디코더는 모든 필드를 검사하고 하나라도 어긋나면 null.
+share/shareCard.ts    renderShareCard(result, opts) → 1080×1350 캔버스(세로 테이블·큐볼 경로·쿠션 번호·최종 배치·제목/통계/푸터). 렌더러 인스턴스 의존 없음.
+share/useShare.ts     shareShot(): 링크 클립보드 복사(제스처 직후) → PNG → Capacitor Filesystem+Share / Web Share(files) / 다운로드.
+페이지: 솔로·연습·드릴에서 lastResult 가 있으면 테이블 오른쪽 위 "공유", EndDialog 에도 "공유". `?replay=` 는 연습 세션으로 열어 자동으로 한 번 치고 해시를 비교해 "리플레이" 칩을 띄운다.
+```

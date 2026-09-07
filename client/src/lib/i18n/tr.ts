@@ -1890,5 +1890,15 @@ const tr: Dict = {
   "sim.coach.spin": "Falso için daire içinde sürükle; kesikli halka miscue sınırı",
   "sim.coach.power": "Güç kaydırıcıda; ± 0,05 m/s ince ayar",
   "sim.coach.start": "Anladım",
+  "sim.share.button": "Paylaş",
+  "sim.share.title3c": "3 bant sayı · {n} bant",
+  "sim.share.title4c": "4 top sayı",
+  "sim.share.titlePractice": "Antrenman vuruşu",
+  "sim.share.stats": "{score}/{target} · {innings} el · ortalama {avg}",
+  "sim.share.footer": "Rankue Simülatör · rankue.co.kr",
+  "sim.share.copied": "Tekrar bağlantısı kopyalandı",
+  "sim.share.failed": "Paylaşılamadı",
+  "sim.share.replayChip": "Tekrar",
+  "sim.share.replayMismatch": "Sonuç farklı",
 };
 export default tr;
