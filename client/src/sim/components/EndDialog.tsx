@@ -21,6 +21,10 @@ interface Props {
     busy: boolean;
     onRestart: () => void;
     onExit: () => void;
+    /** 대전 종료 사유 등 부제 아래 한 줄 */
+    subtitle?: string | null;
+    /** 대전에는 다시하기가 없다 */
+    hideRestart?: boolean;
 }
 
 export const EndDialog = memo(function EndDialog(p: Props) {
@@ -33,6 +37,7 @@ export const EndDialog = memo(function EndDialog(p: Props) {
                     <DialogTitle>{t("sim.end.title")}</DialogTitle>
                     <DialogDescription className="text-[13px] font-medium text-ink-3">
                         {s ? endTitle(s, p.names, t) : ""}
+                        {p.subtitle ? <span className="block mt-0.5">{p.subtitle}</span> : null}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="px-6 space-y-2">
@@ -62,12 +67,14 @@ export const EndDialog = memo(function EndDialog(p: Props) {
                     )}
                 </div>
                 <DialogFooter className="shrink-0 px-6 pb-6 pt-4 flex-row gap-2">
-                    <Button
-                        type="button" variant="outline" onClick={p.onRestart} disabled={p.busy}
-                        className="flex-1 h-12 rounded-xl border-surface-line text-ink-2 font-semibold"
-                    >
-                        {t("sim.end.restart")}
-                    </Button>
+                    {!p.hideRestart && (
+                        <Button
+                            type="button" variant="outline" onClick={p.onRestart} disabled={p.busy}
+                            className="flex-1 h-12 rounded-xl border-surface-line text-ink-2 font-semibold"
+                        >
+                            {t("sim.end.restart")}
+                        </Button>
+                    )}
                     <Button
                         type="button" onClick={p.onExit} disabled={p.busy}
                         className="flex-1 h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl"

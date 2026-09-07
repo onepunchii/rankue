@@ -4,6 +4,7 @@
  * 검증: ?cfg 로 연습 세션이 바로 열린다 · 샷 → 재생 → 시계를 앞당기면 공이 멈추고 결과 배너·이닝 시트에 기록된다 ·
  *      연습 모드는 서버를 부르지 않는다 · cfg 가 없으면 설정 창이 열리고 시작하기로 세션이 열린다.
  */
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
 import { JSDOM, VirtualConsole } from "jsdom";
 import { ko } from "../lib/i18n/ko";
@@ -131,7 +132,9 @@ function mount(): Harness {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
-    React.act(() => { root.render(React.createElement(SimulatorPage)); });
+    // 페이지가 useQueryClient 를 쓰므로(대전 목록 갱신) 앱과 같이 Provider 로 감싼다
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    React.act(() => { root.render(React.createElement(QueryClientProvider, { client: qc }, React.createElement(SimulatorPage))); });
     const h: Harness = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); } };
     live.push(h);
     return h;

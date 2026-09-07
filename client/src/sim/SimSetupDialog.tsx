@@ -37,6 +37,8 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onStart: (config: SimSetupConfig, opts: SimStartOptions) => void;
+    /** "친구와 대전" 진입(로비로 이동). 없으면 링크를 그리지 않는다. */
+    onMatch?: () => void;
 }
 
 const TABLE_IDS: readonly TableId[] = ["DAEDAE", "JUNGDAE_KR"];
@@ -95,7 +97,7 @@ function ToggleRow({ id, checked, onCheckedChange, title, desc }: {
     );
 }
 
-export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
+export function SimSetupDialog({ open, onOpenChange, onStart, onMatch }: Props) {
     const { t } = useT();
     // 회원 핸디는 다마수 기본값으로만 읽는다. 절대 쓰지 않는다(짠다마 방지: PATCH /me 가 핸디를 받지 않는 설계).
     const { member } = useAuth();
@@ -335,7 +337,17 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
                     </Collapsible>
                 </div>
 
-                <DialogFooter className="shrink-0 px-6 pb-6 pt-3 flex-row gap-2">
+                <DialogFooter className="shrink-0 px-6 pb-6 pt-3 flex-col gap-2">
+                    {onMatch && (
+                        <button
+                            type="button" onClick={onMatch}
+                            className="w-full h-12 rounded-xl border border-brand/40 bg-brand/[0.06] text-[14px] font-semibold text-brand flex flex-col items-center justify-center leading-tight"
+                        >
+                            <span>{t("sim.match.entry")}</span>
+                            <span className="text-[12px] font-medium text-ink-4">{t("sim.match.entryDesc")}</span>
+                        </button>
+                    )}
+                    <div className="flex flex-row gap-2 w-full">
                     <Button
                         type="button" variant="outline" onClick={() => onOpenChange(false)}
                         className="h-12 px-5 rounded-xl border-surface-line text-ink-2 font-semibold"
@@ -348,6 +360,7 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
                     >
                         {t("sim.setup.start")}
                     </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

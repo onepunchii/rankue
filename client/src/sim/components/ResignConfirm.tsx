@@ -1,32 +1,24 @@
 import { memo } from "react";
-import { useT } from "@/lib/i18n";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 
-// 나가기 확인. 기록 세션이 진행 중이면 "중단으로 기록", 연습이면 "저장 안 됨", 끝난 경기면 "이미 기록됨".
+// 대전 기권 확인. 기권하면 상대 승리로 기록된다(서버 simMatch resign).
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    record: boolean;
-    offline: boolean;
-    finished: boolean;
     busy: boolean;
     onConfirm: () => void;
-    /** 설명 문구 덮어쓰기(대전: 서버에 남는다는 안내) */
-    desc?: string;
 }
 
-export const ExitConfirm = memo(function ExitConfirm(p: Props) {
+export const ResignConfirm = memo(function ResignConfirm(p: Props) {
     const { t } = useT();
-    const desc = p.desc ?? (!p.record || p.offline
-        ? t("sim.exit.descPractice")
-        : p.finished ? t("sim.exit.descFinished") : t("sim.exit.descRecord"));
     return (
         <Dialog open={p.open} onOpenChange={(o) => { if (!p.busy) p.onOpenChange(o); }}>
             <DialogContent className="max-w-[360px] rounded-card p-0 gap-0 flex flex-col">
                 <DialogHeader className="px-6 pt-6 pb-2 text-left">
-                    <DialogTitle>{t("sim.exit.title")}</DialogTitle>
-                    <DialogDescription className="text-[13px] font-medium text-ink-3">{desc}</DialogDescription>
+                    <DialogTitle>{t("sim.match.resignTitle")}</DialogTitle>
+                    <DialogDescription className="text-[13px] font-medium text-ink-3">{t("sim.match.resignDesc")}</DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="px-6 pb-6 pt-4 flex-row gap-2">
                     <Button
@@ -39,7 +31,7 @@ export const ExitConfirm = memo(function ExitConfirm(p: Props) {
                         type="button" onClick={p.onConfirm} disabled={p.busy}
                         className="flex-1 h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl"
                     >
-                        {t("sim.exit.confirm")}
+                        {t("sim.match.resignConfirm")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

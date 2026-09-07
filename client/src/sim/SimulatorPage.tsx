@@ -10,6 +10,7 @@
  * 레거시 Expo ReactNativeWebView 방향 브리지는 옮기지 않는다 — 이 화면은 세로 레이아웃 그 자체다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
 import type { ShotOutcome } from "@shared/sim/rules";
@@ -23,6 +24,11 @@ import { Canvas2DRenderer } from "./render/Canvas2DRenderer";
 import { CONTEXT_LOSS_LIMIT, safeLocalStorage, selectRendererKind, writeRendererPref, type RendererKind } from "./render/rendererChoice";
 import { Overlay, type Project } from "./overlay/Overlay";
 import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
+import { matchApi, type MatchPublic } from "./matchApi";
+import { MatchLobby } from "./match/MatchLobby";
+import { MatchList, MATCH_LIST_QUERY_KEY } from "./match/MatchList";
+import { endReasonText } from "./match/matchView";
+import { ResignConfirm } from "./components/ResignConfirm";
 import { decodePageConfig, readCfgParam } from "./pageConfig";
 import { activeThickness, FINE_STEP_RAD, pullbackFor, type ThicknessStep } from "./controlsMath";
 import { appendShot, EMPTY_LOG, popShot, type InningLog } from "./inningLog";
@@ -70,9 +76,16 @@ export function SimulatorPage() {
     const [, navigate] = useLocation();
     const search = useSearch();
 
-    // ── 설정 (URL → 없으면 설정 창) ───────────────────────────────────────
-    const [initial] = useState(() => decodePageConfig(readCfgParam(search)));
-    const [setupOpen, setSetupOpen] = useState(initial === null);
+    // ── 설정 (URL → 없으면 설정 창). 대전(?match=)·로비(?lobby=1)는 설정 창을 열지 않는다 ──
+    const params = useMemo(() => new URLSearchParams(search.startsWith("?") ? search.slice(1) : search), [search]);
+    const matchId = params.get("match");
+    const lobby = params.get("lobby") === "1";
+    const [initial] = useState(() => (matchId || lobby ? null : decodePageConfig(readCfgParam(search))));
+    const [setupOpen, setSetupOpen] = useState(initial === null && !matchId && !lobby);
+    const [matchLoad, setMatchLoad] = useState<"idle" | "loading" | "error" | "notMine">("idle");
+    const [resignOpen, setResignOpen] = useState(false);
+    const [turnChip, setTurnChip] = useState(false);
+    const queryClient = useQueryClient();
 
     // ── 화면 상태 ─────────────────────────────────────────────────────────
     const [muted, setMuted] = useState(false);
@@ -96,6 +109,15 @@ export function SimulatorPage() {
         onOutcome: (outcome, session) => {
             setLog((l) => appendShot(l, outcome, session));
             setBanner({ outcome, id: session.shotCount });
+            void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
+        },
+        matchApi,
+        onMatch: (e) => {
+            if (e === "offline") toast({ title: t("sim.match.offline") });
+            else if (e === "online") toast({ title: t("sim.match.online") });
+            else if (e === "resynced") toast({ title: t("sim.match.resynced") });
+            else if (e === "finished") { toast({ title: t("sim.match.finishedByServer") }); void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }
+            else if (e === "claim-too-early") toast({ title: t("sim.match.claimTooEarly") });
         },
     });
     const { actions } = sim;
@@ -108,6 +130,30 @@ export function SimulatorPage() {
         startedRef.current = true;
         actions.start(initial.config, { record: initial.record });
     }, [actions, initial]);
+
+    // ?match=<id> (푸시 딥링크·목록에서 열기): 서버에서 받아 대전 모드로 연다
+    useEffect(() => {
+        if (!matchId || startedRef.current) return;
+        startedRef.current = true;
+        setMatchLoad("loading");
+        matchApi.getMatch(matchId).then((m) => {
+            if (m.myIndex < 0) { setMatchLoad("notMine"); return; }
+            if (m.status === "waiting") { setMatchLoad("idle"); navigate("/online-game?lobby=1", { replace: true }); return; }
+            setMatchLoad(actions.startMatch(m) ? "idle" : "error");
+        }, () => setMatchLoad("error"));
+    }, [matchId, actions, navigate]);
+
+    // 대전에서 내 차례가 돌아오면 짧게 알린다
+    const prevPhaseRef = useRef<Phase>(sim.phase);
+    useEffect(() => {
+        const prev = prevPhaseRef.current;
+        prevPhaseRef.current = sim.phase;
+        if (sim.mode === "match" && sim.phase === "aim" && prev === "waiting") {
+            setTurnChip(true);
+            const h = setTimeout(() => setTurnChip(false), BANNER_MS);
+            return () => clearTimeout(h);
+        }
+    }, [sim.phase, sim.mode]);
 
     // ── 렌더러·오버레이 ───────────────────────────────────────────────────
     const tableRef = useRef<HTMLDivElement>(null);
@@ -324,10 +370,13 @@ export function SimulatorPage() {
     }, [sim.phase]);
 
     // ── 파생값 ───────────────────────────────────────────────────────────
+    const matchNames = sim.match?.names;
     const names = useMemo(() => {
+        if (matchNames) return matchNames;
         const n = sim.session?.players.length ?? 0;
         return Array.from({ length: n }, (_, i) => playerLabel(i, n, member?.nickname, t));
-    }, [sim.session?.players.length, member?.nickname, t]);
+    }, [matchNames, sim.session?.players.length, member?.nickname, t]);
+    const isMatch = sim.mode === "match";
 
     const active = useMemo(() => {
         if (!sim.session || !sim.params) return null;
@@ -361,9 +410,33 @@ export function SimulatorPage() {
         try {
             await actions.exit();
         } finally {
-            navigate(EXIT_PATH);
+            // 대전은 서버에 남으므로 목록(로비)으로 돌아간다
+            navigate(isMatch ? "/online-game?lobby=1" : EXIT_PATH);
+            setExiting(false);
         }
+    }, [actions, navigate, isMatch]);
+
+    const openMatch = useCallback((m: MatchPublic) => {
+        if (m.status === "waiting") return;
+        if (actions.startMatch(m)) navigate(`/online-game?match=${m.id}`, { replace: true });
     }, [actions, navigate]);
+
+    const onResign = useCallback(async () => {
+        setExiting(true);
+        try {
+            await actions.resign();
+        } finally {
+            setExiting(false);
+            setResignOpen(false);
+            void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
+        }
+    }, [actions, queryClient]);
+
+    const onClaim = useCallback(async () => {
+        const ok = await actions.claim();
+        if (!ok) toast({ title: t("sim.match.claimTooEarly") });
+        else void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
+    }, [actions, toast, t, queryClient]);
 
     const onSetupStart = useCallback((config: SimSetupConfig, opts: { record: boolean }) => {
         setSetupOpen(false);
@@ -380,6 +453,10 @@ export function SimulatorPage() {
 
     const finished = sim.session?.status === "finished";
     const endOpen = sim.phase === "finished" && !endDismissed && !exitOpen;
+    const showLobby = lobby && sim.phase === "setup";
+    const endSubtitle = sim.match
+        ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t)
+        : null;
 
     return (
         <div
@@ -394,7 +471,7 @@ export function SimulatorPage() {
             <div className="flex-1 min-h-0 w-full max-w-[640px] mx-auto flex flex-col">
                 <HUD
                     session={sim.session} config={sim.config} phase={sim.phase} names={names}
-                    record={sim.record} offline={sim.offline} syncing={sim.syncing} queued={sim.queued}
+                    record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
                     muted={muted} onToggleMute={onToggleMute}
                 />
 
@@ -423,6 +500,53 @@ export function SimulatorPage() {
                             {t("sim.hud.finished")}
                         </span>
                     )}
+                    {/* ── 대전 전용 표시 ── */}
+                    {matchLoad === "loading" && (
+                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">{t("sim.match.loading")}</span>
+                    )}
+                    {(matchLoad === "error" || matchLoad === "notMine") && (
+                        <div className="absolute inset-0 z-[4] flex items-center justify-center p-6">
+                            <div className="rounded-card bg-surface-1 border border-surface-line px-5 py-4 text-center max-w-[300px]">
+                                <p className="text-[14px] font-semibold text-ink-1">{t(matchLoad === "notMine" ? "sim.match.notMine" : "sim.match.loadFailed")}</p>
+                                <button type="button" onClick={() => navigate("/online-game?lobby=1", { replace: true })} className="mt-3 h-11 px-5 rounded-xl bg-brand text-brand-fg text-[14px] font-semibold">
+                                    {t("sim.match.listTitle")}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    {isMatch && sim.offline && (
+                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">{t("sim.match.offline")}</span>
+                    )}
+                    {isMatch && sim.replaying && sim.match?.opponentShot && (
+                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-brand text-brand-fg pointer-events-none">{t("sim.match.opponentShot")}</span>
+                    )}
+                    {isMatch && turnChip && sim.phase === "aim" && (
+                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-brand text-brand-fg pointer-events-none">{t("sim.match.yourTurn")}</span>
+                    )}
+                    {isMatch && sim.phase === "waiting" && sim.match && (
+                        <div className="absolute inset-x-0 bottom-3 z-[3] flex flex-col items-center gap-2 px-4">
+                            <div className="rounded-card bg-surface-1 border border-surface-line px-4 py-3 text-center max-w-[320px] w-full">
+                                <p className="text-[12px] font-medium text-ink-4">{sim.match.opponentName}</p>
+                                <p className="text-[14px] font-semibold text-ink-1">{t("sim.match.waitingTurn")}</p>
+                                <p className="text-[12px] font-medium text-ink-4 mt-0.5">{t("sim.match.waitingHint")}</p>
+                                {sim.match.canClaim ? (
+                                    <button type="button" onClick={() => { void onClaim(); }} className="mt-2 h-11 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
+                                        {t("sim.match.claim")}
+                                    </button>
+                                ) : (
+                                    <p className="text-[12px] font-medium text-ink-4 mt-1">{t("sim.match.claimWait")}</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {isMatch && sim.match?.canResign && sim.phase !== "finished" && (
+                        <button
+                            type="button" onClick={() => setResignOpen(true)}
+                            className="absolute top-3 right-3 z-[3] h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-3"
+                        >
+                            {t("sim.match.resign")}
+                        </button>
+                    )}
                     <div className="absolute inset-0 z-[3] pointer-events-none">
                         <OutcomeBanner outcome={banner?.outcome ?? null} visible={bannerVisible} />
                     </div>
@@ -437,17 +561,28 @@ export function SimulatorPage() {
                 />
             </div>
 
-            <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} />
+            {showLobby && (
+                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                    <MatchLobby onStarted={openMatch} onClose={() => navigate(EXIT_PATH)} />
+                    <div className="w-full max-w-[420px] mx-auto px-5 pb-8">
+                        <MatchList onOpen={openMatch} />
+                    </div>
+                </div>
+            )}
+            <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} onMatch={() => navigate("/online-game?lobby=1", { replace: true })} />
+            <ResignConfirm open={resignOpen} onOpenChange={setResignOpen} busy={exiting} onConfirm={() => { void onResign(); }} />
             <InningSheet open={sheetOpen} onOpenChange={setSheetOpen} log={log} session={sim.session} names={names} phase={sim.phase} />
             <EndDialog
                 open={endOpen} onOpenChange={(o) => { if (!o) setEndDismissed(true); }}
                 session={sim.session} phase={sim.phase} names={names}
-                record={sim.record} offline={sim.offline} mismatches={sim.mismatches} busy={exiting}
+                record={sim.record} offline={isMatch ? false : sim.offline} mismatches={sim.mismatches} busy={exiting}
                 onRestart={onRestart} onExit={() => { void exitNow(); }}
+                subtitle={endSubtitle} hideRestart={isMatch}
             />
             <ExitConfirm
                 open={exitOpen} onOpenChange={setExitOpen}
-                record={sim.record} offline={sim.offline} finished={!!finished} busy={exiting}
+                record={sim.record} offline={isMatch ? false : sim.offline} finished={!!finished} busy={exiting}
+                desc={isMatch ? t("sim.match.leaveDesc") : undefined}
                 onConfirm={() => { void exitNow(); }}
             />
         </div>
