@@ -5,7 +5,7 @@ import { phiForThickness } from "./aim";
 import { V0_MAX, V0_MIN, clampSpin } from "./simReducer";
 import {
     activeThickness, FINE_STEP_RAD, formatPower, formatSpeed, formatSpin, nearestStep, padOffsetFor, powerFromSlider,
-    powerPercent, pullbackFor, spinFromPad, stepPower, THICKNESS_UI_STEPS, thicknessStepLabel,, nextElevationRad, elevationDeg } from "./controlsMath";
+    powerPercent, pullbackFor, spinFromPad, stepPower, THICKNESS_UI_STEPS, thicknessStepLabel, nextElevationRad, elevationDeg } from "./controlsMath";
 
 const table = TABLES.DAEDAE;
 const R = table.ball.R;

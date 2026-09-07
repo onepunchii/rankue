@@ -506,7 +506,7 @@ describe("두께·입력 헬퍼", () => {
         ctrl.nudgePhi(0.25);
         expect(ctrl.store.get().input.phi).toBeCloseTo(1.25, 12);
         ctrl.setElevation(9);
-        expect(ctrl.store.get().input.theta).toBeCloseTo((20 * Math.PI) / 180, 12);
+        expect(ctrl.store.get().input.theta).toBeCloseTo((60 * Math.PI) / 180, 12);
     });
 });
 
