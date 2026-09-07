@@ -2,7 +2,7 @@
  * resolve/transition.ts 검증: 각 상태 진입의 정준화, 1e-12 스냅, 미끄럼 끝에서 접점 속도가 정확히 0, 입력 불변.
  */
 import { describe, it, expect } from "vitest";
-import { applyTransition, SNAP_TOLERANCE } from "./transition.js";
+import { applyTransition, postImpactState, SNAP_TOLERANCE } from "./transition.js";
 import { evolveBall, kineticEnergy, slideTime, slipVelocity } from "../evolve.js";
 import { TABLES } from "../params.js";
 import { scale, upCross } from "../vec.js";
@@ -85,6 +85,20 @@ describe("applyTransition", () => {
             const e0 = kineticEnergy(before, P), e1 = kineticEnergy(after, P);
             expect(Math.abs(e1 - e0)).toBeLessThan(1e-12 * Math.max(e0, 1e-30));
         }
+    });
+
+    it("airborne 진입(v2.2): v_z 를 지운 채 스냅만 하고 상태를 붙인다", () => {
+        const out = applyTransition(ball([1, 2, -0.3], [3, 4, 5]), "airborne", P);
+        expect(out).toEqual({ id: "x", r: [0.3, 0.4, R], v: [1, 2, -0.3], w: [3, 4, 5], state: "airborne" });
+        expect(applyTransition(ball([1, 2, 1e-13], [0, 0, 0]), "airborne", P).v).toEqual([1, 2, 0]);
+    });
+
+    it("postImpactState: v_z ≠ 0 이거나 z ≠ R 이면 airborne, z === R 이고 v_z === 0 이면 sliding", () => {
+        expect(postImpactState([0.3, 0.4, R], [1, 2, 0], R)).toBe("sliding");
+        expect(postImpactState([0.3, 0.4, R], [1, 2, 1e-300], R)).toBe("airborne");
+        expect(postImpactState([0.3, 0.4, R], [1, 2, -1e-300], R)).toBe("airborne");
+        expect(postImpactState([0.3, 0.4, R + 1e-9], [1, 2, 0], R)).toBe("airborne");
+        expect(postImpactState([0.3, 0.4, R], [0, 0, 0], R)).toBe("sliding");
     });
 
     it("입력 불변: 얼린 입력으로도 동작하고 반환 튜플은 새 배열", () => {

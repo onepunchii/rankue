@@ -105,7 +105,8 @@ export function mapSoundEvents(
     if (strike > IMPULSE_SILENT) out.push({ t: 0, kind: "strike", impulse: strike });
 
     for (const ev of events) {
-        if (ev.type === "transition") continue;
+        // 착지(ball-table, 엔진 2.2)는 아직 소리를 내지 않는다 — 전이처럼 건너뛴다.
+        if (ev.type === "transition" || ev.type === "ball-table") continue;
         const before = history[snapshotBefore(history, ev.t)];
         if (ev.type === "ball-cushion") {
             const b = findBall(before, ev.ids[0]);

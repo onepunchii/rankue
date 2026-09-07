@@ -28,8 +28,11 @@
  *    40-physics-review Finding 2).
  *  - 팁 효율 η(tipEfficiency): 가죽 팁의 비탄성으로 실제 임펄스가 탄성 해보다 작다. η 는 v 에 정의된 값이므로
  *    v 에 곱하고, ω 는 그 v 로부터 (v/I_m)(Q × Ĵ) 로 계산한다 — 임펄스가 하나이므로 ω 도 같은 비율로 준다.
- *  - v2.0 은 z 운동이 없다: 속도의 수직 성분(−v sinθ)은 슬레이트가 흡수한다고 보고 수평 성분 v cosθ 만 남긴다
- *    (pooltool InstantaneousPoint2D 가 v_z 를 0 으로 두는 것과 같다. TP A.19 의 v_yo = v_e cosφ).
+ *  - 속도는 큐 축을 따라 나간다(v2.2, pooltool InstantaneousPoint3D 의 v_B = −v(0, cosθ, sinθ)): 수평 v cosθ, 수직 −v sinθ
+ *    (슬레이트 쪽). θ > 0 이면 state 'airborne' 이고 z = R 이라 simulate 의 즉시 스윕이 dt = 0 착지(ball-table)를 해석한다 —
+ *    그 착지의 반발(eT)이 점프를, 슬레이트 마찰과 이어지는 미끄럼이 마세이 커브를 만든다(TP A.19 의 v_yo = v_e cosφ 는
+ *    착지 뒤 수평 속도에 해당). θ = 0 이면 v_z 는 정확히 +0 이고 state 'sliding' 으로 2.1.0 과 비트 단위로 같다
+ *    (0 − v·sinθ 로 계산해 −0 이 나오지 않게 한다 — 해시가 부호를 구분한다).
  *  - 스쿼트(TP A.31 식 13, pooltool get_squirt_angle): 샤프트 엔드매스 m_e 가 오프셋 쪽으로 밀려나고 그 반작용으로
  *    공은 오프셋 반대쪽으로 α 만큼 튼다.
  *      tan α = (5/2)·a·√(1 − a²) / (1 + m_b/m_e + (5/2)(1 − a²))     (a 는 R 비율)
@@ -40,7 +43,8 @@
  *    해석을 유지한다. 실측(사이드 샷의 커브 방향)과 어긋나면 재검토.
  *  - 미스큐: |a|, |b| ≤ maxOffset, a² + b² ≤ maxOffset² 를 넘으면 RangeError("miscue"). NaN 도 걸리도록 부정형으로 검사.
  *
- * 결과 state 는 'sliding'. 중심 타격이라도 접점 미끄럼 u = v ≠ 0 이므로 미끄럼이 맞고, 전이는 evolve 가 처리한다.
+ * 결과 state 는 θ = 0 이면 'sliding'(중심 타격이라도 접점 미끄럼 u = v ≠ 0 이므로 미끄럼이 맞고, 전이는 evolve 가 처리한다),
+ * θ > 0 이면 'airborne'(v_z < 0).
  * 초월함수는 dmath 만 쓴다(sin/cos/atan2). 입력은 변형하지 않는다.
  */
 import type { BallState, ShotInput, Vec3 } from "../types.js";
@@ -88,15 +92,16 @@ export function strike(cueBall: BallState, input: ShotInput, p: BallParams, cue:
     const wD = k * aM * st;
     const wZ = k * aM * ct;
 
-    // 수평 속도만 남긴다 (v2.0: z 운동 없음)
+    // 큐 축을 따라: 수평 v cosθ, 수직 −v sinθ. v ≥ 0, sinθ ≥ 0 이라 v·st ≥ +0 이고 0 − (+0) = +0 (θ = 0 에서 −0 금지).
     const vH = v * ct;
+    const vZ = 0 - v * st;
 
     // 스쿼트: 기저를 φ + α 로 만들어 v 와 ω_xy 를 함께 돌린다
     const psi = phi + squirtAngle(a, cue.endmassRatio);
     const cp = cos(psi);
     const sp = sin(psi);
     // d̂' = (cp, sp, 0), L̂' = k̂ × d̂' = (−sp, cp, 0)
-    const vOut: Vec3 = [vH * cp, vH * sp, 0];
+    const vOut: Vec3 = [vH * cp, vH * sp, vZ];
     const wOut: Vec3 = [wD * cp - wL * sp, wD * sp + wL * cp, wZ];
 
     return {
@@ -104,6 +109,6 @@ export function strike(cueBall: BallState, input: ShotInput, p: BallParams, cue:
         r: [cueBall.r[0], cueBall.r[1], cueBall.r[2]],
         v: vOut,
         w: wOut,
-        state: "sliding",
+        state: vZ !== 0 ? "airborne" : "sliding",
     };
 }

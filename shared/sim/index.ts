@@ -13,6 +13,7 @@ export * from "./evolve.js";
 export * from "./detect/index.js";
 export * from "./resolve/stickBall.js";
 export * from "./resolve/ballBall.js";
+export * from "./resolve/ballTable.js";
 export * from "./resolve/cushion/index.js";
 export * from "./resolve/transition.js";
 export * from "./resolve/kiss.js";

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Vec3 } from "../../types.js";
 import { resolveCushionSHS } from "./sphereHalfSpace.js";
+import { resolveCushionHan } from "./han2005.js";
+import { resolveCushionMathavan } from "./mathavan2010.js";
 import {
     H, LEFT, P, R, SEGS,
     angleFromNormal, ball, deepFreeze, deg, expectVecClose, incidentVelocity, ke,
@@ -121,5 +123,42 @@ describe("resolveCushionSHS — 물리", () => {
         const v = incidentVelocity(LEFT, 2, 0);
         const out = resolveCushionSHS(ball(v, [0, 0, 300]), LEFT, P, H);
         expect(Math.abs(out.v[1])).toBeCloseTo(P.fC * (1 + P.eC) * 2, 12);
+    });
+});
+
+describe("v2.2 공중 공(airborne) — 무한 높이 수직 벽, 자유 구 임펄스 전체", () => {
+    const airborne = (v: Vec3, w: Vec3 = [0, 0, 0], z = R + 0.03) => ({ ...ball(v, w), r: [R, 1.0, z] as Vec3, state: "airborne" as const });
+
+    it("v_z 를 지우지 않는다: 마찰의 수직 성분만큼 바뀌고 상태는 airborne, 법선 속도는 반전(e)", () => {
+        const b = airborne(incidentVelocity(LEFT, 2, rad(30)).map((x, i) => (i === 2 ? -0.8 : x)) as unknown as Vec3, [0, 0, 0]);
+        const out = resolveCushionSHS(b, LEFT, P, H);
+        expect(out.state).toBe("airborne");
+        expect(out.r).toEqual(b.r);
+        expect(normalComponent(out.v, LEFT)).toBeCloseTo(-P.eC * normalComponent(b.v, LEFT), 12);
+        // 접점이 아래로 미끄러지므로(v_z < 0) 마찰은 위로: v_z 가 커진다
+        expect(out.v[2]).toBeGreaterThan(b.v[2]);
+        expect(ke(out)).toBeLessThanOrEqual(ke(b) * (1 + 1e-9));
+    });
+
+    it("5000개 무작위 공중 입사: 에너지 비증가, 법선 속도 반전, airborne 유지", () => {
+        const rng = mulberry32(77);
+        for (let i = 0; i < 5000; i++) {
+            const { b: flat, seg } = randomIncident(rng, i);
+            const b = { ...flat, r: [flat.r[0], flat.r[1], R + 0.1 * rng()] as Vec3, v: [flat.v[0], flat.v[1], 6 * rng() - 3] as Vec3, state: "airborne" as const };
+            const out = resolveCushionSHS(b, seg, P, H);
+            expect(ke(out)).toBeLessThanOrEqual(ke(b) * (1 + 1e-9));
+            expect(normalComponent(out.v, seg)).toBeGreaterThan(0);
+            expect(out.state === "airborne" || (out.v[2] === 0 && out.r[2] === R)).toBe(true);
+        }
+    });
+
+    it("han2005·mathavan2010 은 공중 공을 sphereHalfSpace 로 넘긴다(결과 동일)", () => {
+        const b = airborne(incidentVelocity(LEFT, 3, rad(40)), [20, -30, 90]);
+        const ref = resolveCushionSHS(b, LEFT, P, H);
+        expect(resolveCushionHan(b, LEFT, P, H)).toEqual(ref);
+        expect(resolveCushionMathavan(b, LEFT, P, H)).toEqual(ref);
+        // 천 위의 공은 모델마다 다르다(회귀 방지: 위임은 airborne 에만)
+        const flat = ball(incidentVelocity(LEFT, 3, rad(40)), [20, -30, 90]);
+        expect(resolveCushionHan(flat, LEFT, P, H)).not.toEqual(resolveCushionSHS(flat, LEFT, P, H));
     });
 });

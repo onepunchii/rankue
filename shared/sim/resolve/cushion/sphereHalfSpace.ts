@@ -20,13 +20,17 @@
  *   물리는 법선 둘레 회전에 불변이라 기저 선택이 결과를 바꾸지 않는다.
  *
  * 벽이 수직이라 구르는 공(ω ⊥ v)의 접점은 벽에서 아래로 미끄러지고, 마찰이 공을 위로 튕긴다.
- * 2D 라 그 테이블 z 속도는 버린다(pooltool *2D 변형과 동일). 상태는 'sliding'.
+ * 천 위의 공은 그 테이블 z 속도를 버린다(pooltool *2D 변형과 동일, 슬레이트가 받는다). 상태는 'sliding'.
+ * 공중의 공(airborne, v2.2)은 벽을 무한 높이의 수직면으로 보고 자유 구 임펄스 전체(z 성분 포함)를 적용해 v_z 를
+ * 남긴다 — Han·Mathavan 도 공중 공은 여기로 보낸다(cushion/index.ts). solveZNormal 은 resolve/ballTable.ts 가
+ * 법선 = 테이블 ẑ, μ = μ_s, e = e_t 로 재사용한다(착지도 같은 구–반공간 충돌이다).
  *
- * 에너지: 법선(e ≤ 1)·접선(미끄럼 반대, 크기 ≤ 정지 임펄스) 임펄스 모두 소산적이고 버리는 v_z 도 감소분이라
- * 결과 운동에너지 ≤ 입력.
+ * 에너지: 법선(e ≤ 1)·접선(미끄럼 반대, 크기 ≤ 정지 임펄스) 임펄스 모두 자유 구에 소산적이고, 천 위의 공이
+ * 버리는 v_z 도 감소분이라 결과 운동에너지 ≤ 입력. 공중 공은 임펄스 전체를 적용하므로 자유 구 논증 그대로다.
  */
 import type { BallState, CushionSegment, Vec3 } from "../../types.js";
 import type { BallParams } from "../../params.js";
+import { postImpactState } from "../transition.js";
 
 /** 접점 상대속도를 0 으로 보는 문턱 (m/s). pooltool const.EPS 역할. */
 const SLIP_EPS = 1e-12;
@@ -49,9 +53,10 @@ function fromLocal(v: Vec3, e2: Vec3, e3: Vec3): Vec3 {
 
 /**
  * 법선이 국소 +ẑ 인 프레임에서의 해결(pooltool resolve_sphere_half_space_collision_z_normal).
- * vi[2] < 0 이어야 한다.
+ * vi[2] < 0 이어야 한다. 접점은 −R ẑ, 법선 축 스핀 wi[2] 는 보존(접점 마찰은 법선 둘레 토크를 못 준다).
+ * 테이블 착지(resolve/ballTable.ts)는 테이블 프레임을 그대로 국소 프레임으로 쓴다(법선이 ẑ 이므로).
  */
-function solveZNormal(vi: Vec3, wi: Vec3, R: number, muK: number, e: number): { v: Vec3; w: Vec3 } {
+export function solveZNormal(vi: Vec3, wi: Vec3, R: number, muK: number, e: number): { v: Vec3; w: Vec3 } {
     const dPerp = (1 + e) * -vi[2];
 
     // 법선 성분을 뺀 접선 속도·스핀. (스핀의 법선 성분은 임펄스에 영향이 없고 보존된다.)
@@ -100,8 +105,9 @@ function solveZNormal(vi: Vec3, wi: Vec3, R: number, muK: number, e: number): { 
 }
 
 /**
- * 구–반공간 2D 쿠션 충돌. cushionHeight 는 시그니처 통일용이며 이 모델은 쓰지 않는다(수직 벽).
- * 결과 v_z = 0, state 'sliding'. 공이 쿠션에서 멀어지는 중이면 입력을 그대로 돌려준다.
+ * 구–반공간 쿠션 충돌. cushionHeight 는 시그니처 통일용이며 이 모델은 쓰지 않는다(수직 벽).
+ * 천 위의 공: 결과 v_z = 0, state 'sliding'. 공중의 공: 자유 구 임펄스 전체를 적용해 v_z 를 남기고 상태는
+ * postImpactState. 공이 쿠션에서 멀어지는 중이면 입력을 그대로 돌려준다.
  */
 export function resolveCushionSHS(b: BallState, seg: CushionSegment, p: BallParams, _cushionHeight: number): BallState {
     const { e2, e3 } = wallBasis(seg);
@@ -109,14 +115,14 @@ export function resolveCushionSHS(b: BallState, seg: CushionSegment, p: BallPara
     if (!(vl[2] < 0)) return b;
     const wl = toLocal(b.w, e2, e3);
     const out = solveZNormal(vl, wl, p.R, p.fC, p.eC);
-    // 국소 e1 = 테이블 ẑ 성분(튀어오름)은 2D 라 버린다.
-    const v = fromLocal([0, out.v[1], out.v[2]], e2, e3);
     const w = fromLocal(out.w, e2, e3);
-    return {
-        id: b.id,
-        r: [b.r[0], b.r[1], b.r[2]],
-        v,
-        w,
-        state: "sliding",
-    };
+    const r: Vec3 = [b.r[0], b.r[1], b.r[2]];
+    if (b.state === "airborne") {
+        // 공중의 공(v2.2): 무한 높이 수직 벽, 슬레이트 반력 없음 → 국소 e1(테이블 ẑ) 성분까지 그대로 적용한다.
+        const v = fromLocal(out.v, e2, e3);
+        return { id: b.id, r, v, w, state: postImpactState(r, v, p.R) };
+    }
+    // 천 위의 공: 국소 e1 = 테이블 ẑ 성분(튀어오름)은 슬레이트가 받는다고 보고 버린다.
+    const v = fromLocal([0, out.v[1], out.v[2]], e2, e3);
+    return { id: b.id, r, v, w, state: "sliding" };
 }

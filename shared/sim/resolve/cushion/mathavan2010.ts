@@ -45,6 +45,7 @@
  */
 import type { BallState, CushionSegment } from "../../types.js";
 import type { BallParams } from "../../params.js";
+import { resolveCushionSHS } from "./sphereHalfSpace.js";
 
 /** 한 스텝의 상태 레지스터. 이 모듈 안에서만 쓰는 가변 스크래치 — 입력 BallState 는 절대 건드리지 않는다. */
 interface Reg {
@@ -198,6 +199,7 @@ function solveCushionFrame(k: Consts, e: number, v0: Reg, steps: number): Reg {
  * @param p             공 파라미터 — m, R, fC(μ_w), muS(μ_s), eE(에너지 반발 계수 e_e; Han/SHS 의 운동학적 eC 와 별개) 를 쓴다
  * @param cushionHeight 쿠션 코 높이 h (m). sinθ = (h − R)/R
  * @param steps         충돌 전체를 나누는 임펄스 스텝 수. 고정값이라 결과가 결정론적이다. 유한하지 않으면 기본값 2000
+ * 공중의 공(airborne, v2.2)은 식 (3c)(ż_G = 0)·테이블 접점 C 가 없으므로 무한 높이 수직 벽(sphereHalfSpace 3D)으로 넘긴다.
  */
 export function resolveCushionMathavan(
     b: BallState,
@@ -206,6 +208,7 @@ export function resolveCushionMathavan(
     cushionHeight: number,
     steps = DEFAULT_STEPS,
 ): BallState {
+    if (b.state === "airborne") return resolveCushionSHS(b, seg, p, cushionHeight);
     // ── 쿠션 프레임: ŷ' 는 공에서 쿠션으로(= −normal), x̂' = ŷ' × ẑ 로 오른손 좌표계. 축 정렬 법선이면 정확한 회전.
     const nx0 = seg.normal[0], ny0 = seg.normal[1];
     const nLen = Math.sqrt(nx0 * nx0 + ny0 * ny0);

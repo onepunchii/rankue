@@ -5,7 +5,7 @@
  *       pooltool <pooltool/physics/evolve/__init__.py>, <pooltool/physics/utils.py>,
  *       <pooltool/evolution/event_based/detect/ball_position_polynomial.py> (Apache-2.0, NOTICE.md).
  *
- * 물리 요약 (모두 테이블 프레임, z 는 항상 R 로 고정)
+ * 물리 요약 (모두 테이블 프레임. 천 위의 공은 z = R 고정, airborne 만 z 가 움직인다)
  *  - 접점 미끄럼 속도 u = v + ω × (−R k̂) = (v_x − R ω_y, v_y + R ω_x, 0).
  *  - 미끄럼(sliding): 천이 접점에 −μ_s m g û 의 마찰력을 준다. TP A.4 식 (10) 이 보이듯
  *    du/dt = −(7/2) μ_s g û 라서 미끄럼 방향 û 는 시간이 지나도 돌지 않는다. 따라서
@@ -17,6 +17,9 @@
  *  - 수직축 스핀 ω_z 는 어느 상태에서든 독립적으로 spinDecel(rad/s²) 만큼 0 을 향해 선형 감소하고 0 에서 멈춘다.
  *    pooltool 은 μ_sp 계수로 α = 5 μ_sp g/(2R) 를 만들지만, 우리는 params.ts 의 spinDecel 을 α 로 바로 쓴다.
  *  - 스핀(spinning): 위치·속도 불변, ω_z 만 감소. 정지(stationary): 아무것도 변하지 않는다.
+ *  - 공중(airborne, v2.2): 중력 포물선 r(t) = r0 + v0 t − ½ g t² ẑ, v_z(t) = v_z0 − g t, ω 불변(공기 저항·마그누스 없음,
+ *    ω_z 감쇠도 천에 닿아 있지 않으니 없다 — pooltool _evolve_airborne_state 와 같다). 착지는 전이가 아니라 감지 이벤트
+ *    (ball-table)다: landingTime 이 시각을 주고 detect/ballTable.ts 가 후보로 낸다.
  *
  * 이 모듈은 상태 전이를 하지 않는다. 호출자(simulate.ts)는 nextTransition 이 돌려준 시각까지만 evolveBall 을
  * 부르고, 전이 자체는 resolve/transition.ts 의 applyTransition 이 맡는다. 전이 시각을 넘겨 부르면 식이 그대로
@@ -27,6 +30,7 @@
 import type { BallState, EventCandidate, Vec3 } from "./types.js";
 import type { BallParams } from "./params.js";
 import { add, dot, length, scale, unit, upCross } from "./vec.js";
+import { solveQuadratic } from "./roots/quadratic.js";
 
 // ---------------------------------------------------------------------------
 // 접점 미끄럼 속도
@@ -108,17 +112,30 @@ function copyBall(b: BallState): BallState {
     };
 }
 
+function evolveAirborne(b: BallState, t: number, p: BallParams): BallState {
+    const g = p.g;
+    // r = r0 + v0 t − ½ g t² ẑ,  v = v0 − g t ẑ,  ω 불변 (pooltool _evolve_airborne_state)
+    return {
+        id: b.id,
+        r: [b.r[0] + b.v[0] * t, b.r[1] + b.v[1] * t, b.r[2] + b.v[2] * t - 0.5 * g * t * t],
+        v: [b.v[0], b.v[1], b.v[2] - g * t],
+        w: [b.w[0], b.w[1], b.w[2]],
+        state: b.state,
+    };
+}
+
 /**
  * 현재 운동 상태의 닫힌 식으로 dt 초만큼 전진한 새 BallState 를 돌려준다. 상태 전이는 하지 않는다
  * (state 필드는 입력 그대로). 입력은 절대 변형하지 않으며, 반환값의 튜플은 모두 새 배열이다.
- * airborne 은 v2.0 에서 지원하지 않으므로 stationary 처럼 그대로 복사한다.
+ * airborne 은 착지 시각(landingTime)까지만 물리적으로 맞다 — 넘겨 부르면 포물선이 z < R 로 외삽된다.
  */
 export function evolveBall(b: BallState, dt: number, p: BallParams): BallState {
-    if (dt === 0 || b.state === "stationary" || b.state === "airborne") return copyBall(b);
+    if (dt === 0 || b.state === "stationary") return copyBall(b);
     switch (b.state) {
         case "sliding": return evolveSliding(b, dt, p);
         case "rolling": return evolveRolling(b, dt, p);
         case "spinning": return evolveSpinning(b, dt, p);
+        case "airborne": return evolveAirborne(b, dt, p);
         default: return copyBall(b);
     }
 }
@@ -151,7 +168,30 @@ export function spinTime(b: BallState, p: BallParams): number {
 }
 
 /**
- * 이 공의 다음 상태 전이 후보. 전이가 없으면(정지·airborne·마찰 0) null.
+ * 공중 공이 슬레이트에 닿는(중심 z = R, 하강 중) 시각 (s). airborne 이 아니면 Infinity.
+ *  z(t) − R = (z0 − R) + v_z t − ½ g t² 의 근 중 t ≥ 0 이고 그 순간 v_z(t) = v_z − g t ≤ 0 인 가장 작은 것
+ *  (pooltool get_airborne_time 은 큰 근을 고른다 — 정상 상태에서는 같은 값이다).
+ *  이미 z ≤ R 이고 내려가는 중(v_z ≤ 0)이면 0(타격 직후가 이 경우). 근이 없는 병적 상태(z < R 인데 올라가는 중이라
+ *  R 에 못 미침)도 0 — simulate 의 즉시 스윕이 dt = 0 착지로 닫아 공이 슬레이트 아래로 새지 않게 한다.
+ *  감지기(detect/ballTable.ts)는 1e-9 s(EVENT_EPS) 이하를 현재 이벤트 자신으로 보고 버린다.
+ */
+export function landingTime(b: BallState, p: BallParams): number {
+    if (b.state !== "airborne") return Infinity;
+    const h = b.r[2] - p.R;
+    const vz = b.v[2];
+    if (h <= 0 && vz <= 0) return 0;
+    const g = p.g;
+    const roots = solveQuadratic(-0.5 * g, vz, h);
+    for (let i = 0; i < roots.length; i++) {
+        const t = roots[i];
+        if (!(t >= 0)) continue;
+        if (vz - g * t <= 0) return t;
+    }
+    return h < 0 ? 0 : Infinity;
+}
+
+/**
+ * 이 공의 다음 상태 전이 후보. 전이가 없으면(정지·airborne·마찰 0) null — 착지는 전이가 아니라 detect 의 ball-table 이벤트다.
  *  - sliding → rolling (t_s)
  *  - rolling → spinning (구름이 끝난 순간 ω_z 가 남아 있으면) / stationary (아니면)
  *  - spinning → stationary
@@ -185,7 +225,9 @@ export function nextTransition(b: BallState, p: BallParams): EventCandidate | nu
 /**
  * 현재 상태에서의 위치 다항식 r(t) = r0 + r1 t + r2 t². r2 는 가속도의 절반이다.
  * pooltool <pooltool/evolution/event_based/detect/ball_position_polynomial.py>
- *  - sliding: r2 = −½ μ_s g û0,  rolling: r2 = −½ μ_r g v̂0,  spinning·stationary: r2 = 0.
+ *  - sliding: r2 = −½ μ_s g û0,  rolling: r2 = −½ μ_r g v̂0,  airborne: r2 = −½ g ẑ,  spinning·stationary: r2 = 0.
+ *  z 항이 들어 있으므로 볼–볼 4차식은 공중 공이 다른 공 위를 넘거나(xy 만 보면 겹치지만 3D 거리 > 2R) 위에 떨어지는
+ *  경우(|Δr| = 2R 를 3차원에서)를 그대로 잡는다.
  * 이벤트 감지기(detect/*)가 이 계수로 볼–볼(4차)·볼–쿠션(2차) 방정식을 세운다.
  */
 export function positionPolynomial(b: BallState, p: BallParams): { r0: Vec3; r1: Vec3; r2: Vec3 } {
@@ -196,14 +238,21 @@ export function positionPolynomial(b: BallState, p: BallParams): { r0: Vec3; r1:
         r2 = scale(unit(slipVelocity(b, p)), -0.5 * p.muS * p.g);
     } else if (b.state === "rolling") {
         r2 = scale(unit(b.v), -0.5 * p.muR * p.g);
+    } else if (b.state === "airborne") {
+        r2 = [0, 0, -0.5 * p.g];
     } else {
         r2 = [0, 0, 0];
     }
     return { r0, r1, r2 };
 }
 
-/** 운동에너지 ½ m |v|² + ½ I |ω|², I = (2/5) m R². */
+/**
+ * 역학적 에너지 ½ m |v|² + ½ I |ω|² + m g (z − R), I = (2/5) m R².
+ * 위치에너지 항은 v2.2 의 공중 운동 때문에 들어갔다: 포물선 비행 중 운동에너지는 오르내리지만 KE + PE 는 일정하고,
+ * 모든 resolve(반발·마찰·정착)는 이 합을 늘리지 않는다 — 시험 층 A 의 "에너지 비증가" 불변량이 그대로 성립한다.
+ * 천 위의 공은 z − R = 0 이라 값이 2.1.0 의 운동에너지와 비트 단위로 같다. 이름은 계약(README) 그대로 둔다.
+ */
 export function kineticEnergy(b: BallState, p: BallParams): number {
     const I = 0.4 * p.m * p.R * p.R;
-    return 0.5 * p.m * dot(b.v, b.v) + 0.5 * I * dot(b.w, b.w);
+    return 0.5 * p.m * dot(b.v, b.v) + 0.5 * I * dot(b.w, b.w) + p.m * p.g * (b.r[2] - p.R);
 }

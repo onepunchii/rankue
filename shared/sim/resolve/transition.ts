@@ -12,7 +12,8 @@
  *  - spinning 진입: 병진 속도와 ω_xy 는 0, 수직축 스핀 ω_z 만 남는다.
  *  - stationary 진입: 모두 0.
  *  - sliding 진입(충돌 직후 등): 값은 그대로 두고 상태만 바꾼다.
- *  절댓값 1e-12 미만 성분은 0 으로 스냅한다(pooltool _TOLERANCE). v2.0 은 z 운동이 없으므로 v_z 는 0.
+ *  절댓값 1e-12 미만 성분은 0 으로 스냅한다(pooltool _TOLERANCE). 천 위 상태(rolling·sliding·spinning·stationary)의
+ *  v_z 는 0 이고 airborne 만 v_z 를 지닌다. postImpactState 는 충돌 해석 직후 'airborne' 과 'sliding' 을 가른다.
  *
  * 초월함수 없음. 입력 불변, 반환 튜플은 모두 새 배열.
  */
@@ -61,7 +62,17 @@ export function applyTransition(b: BallState, to: MotionState, p: BallParams): B
             return { id: b.id, r, v: [v[0], v[1], 0], w: snapVec(b.w), state: "sliding" };
         }
         default:
-            // airborne: v2.0 미지원 — 값은 건드리지 않고 상태만 붙인다.
+            // airborne: 값은 스냅만 하고 상태를 붙인다(공중에서는 v_z 가 있으므로 0 으로 만들지 않는다).
             return { id: b.id, r, v: snapVec(b.v), w: snapVec(b.w), state: to };
     }
+}
+
+/**
+ * 충돌 해석 직후의 상태 분류 (pooltool ball_table/core.py final_ball_motion_state 의 앞 두 분기):
+ * v_z ≠ 0 이거나 중심이 천 높이(z === R — 착지가 정확히 스냅한 값)가 아니면 'airborne', 아니면 'sliding'
+ * (구름·정지 여부는 다음 전이 판정이 정한다). 공중 공이 낀 볼–볼·쿠션 해석이 쓴다. v_z 가 아주 작은 airborne 은
+ * simulate 의 즉시 스윕이 1e-9 s 안의 착지로 잡아 정착시킨다.
+ */
+export function postImpactState(r: Vec3, v: Vec3, R: number): "airborne" | "sliding" {
+    return v[2] !== 0 || r[2] !== R ? "airborne" : "sliding";
 }

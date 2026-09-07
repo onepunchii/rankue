@@ -369,3 +369,36 @@ describe("resolveBallBall — 반두께 8 m/s, 구르는 큐볼", () => {
         expect(separationDeg).toBeLessThan(63);
     });
 });
+
+// ── v2.2 공중 공 ─────────────────────────────────────────────────────────────
+
+describe("resolveBallBall — 공중 공(airborne)이 끼면 3D 임펄스를 유지한다", () => {
+    it("위에서 수직으로 떨어지는 공: 위 공은 튀어오르고(v_z > 0, airborne) 아래 공은 슬레이트 쪽 v_z 를 받아 airborne(즉시 착지 대상)", () => {
+        const top: BallState = { id: "top", r: [0.5, 1.0, R + 2 * R], v: [0, 0, -2], w: [0, 0, 0], state: "airborne" };
+        const bottom: BallState = { id: "bottom", r: [0.5, 1.0, R], v: [0, 0, 0], w: [0, 0, 0], state: "stationary" };
+        const [t, b] = resolveBallBall(top, bottom, P);
+        // n̂ = (bottom − top)/|·| = −ẑ, v1n = 2, v2n = 0 → v1n' = ½(1−e)·2 (n̂ 방향) → v_z' = −½(1−e)·2 = −0.07 (거의 멈춤)
+        expect(t.v[2]).toBeCloseTo(-0.5 * (1 - P.eB) * 2, 12);
+        expect(t.v[2]).toBeGreaterThan(-2);
+        expect(b.v[2]).toBeLessThan(0);
+        expect(t.state).toBe("airborne");
+        expect(b.state).toBe("airborne");
+        // 운동량·에너지
+        expect(t.v[2] + b.v[2]).toBeCloseTo(-2, 12);
+        expect(kineticEnergy(t, P) + kineticEnergy(b, P)).toBeLessThanOrEqual((kineticEnergy(top, P) + kineticEnergy(bottom, P)) * (1 + 1e-9));
+    });
+
+    it("둘 다 천 위면 2.1.0 경로 그대로: z 속도 제거·sliding (공중 공이 끼면 z 를 남긴다)", () => {
+        const [cb, ob] = headOn();
+        const spun = { ...cb, w: [0, 0, 80] as Vec3 };
+        const [c1, o1] = resolveBallBall(spun, ob, P);
+        expect(c1.v[2]).toBe(0);
+        expect(o1.v[2]).toBe(0);
+        expect(c1.state).toBe("sliding");
+        const [c2, o2] = resolveBallBall({ ...spun, state: "airborne", v: [1, 0, -1e-3] }, ob, P);
+        expect(c2.state).toBe("airborne");
+        expect(o2.v[2] !== 0 || o2.state === "sliding").toBe(true);
+        // 수평 성분은 두 경우 거의 같다(z 속도가 아주 작으니)
+        expect(o2.v[0]).toBeCloseTo(o1.v[0], 3);
+    });
+});

@@ -248,7 +248,8 @@ export function analyzeAim(cueBall: BallState, balls: readonly BallState[], phi:
 export function analyzeShot(events: readonly SimEvent[], history: readonly Snapshot[], cueBallId: string, table: TableSpec): ShotAnalysis | null {
     const cushions: { t: number; cushion: CushionId }[] = [];
     for (const e of events) {
-        if (e.type === "transition") continue;
+        // 전이·착지(ball-table, 엔진 2.2)는 쿠션 접촉이 아니다
+        if (e.type === "transition" || e.type === "ball-table") continue;
         if (!(e.ids as readonly string[]).includes(cueBallId)) continue;
         if (e.type === "ball-ball") return null;
         cushions.push({ t: e.t, cushion: e.cushion });

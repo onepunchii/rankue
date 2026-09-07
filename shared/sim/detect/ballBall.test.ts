@@ -224,3 +224,38 @@ describe("ballBallTime — 입력 불변", () => {
         expect(JSON.stringify(b)).toBe(sb);
     });
 });
+
+describe("ballBallTime — v2.2 공중 공 (3차원 |Δr| = 2R)", () => {
+    it("정점이 2R 를 넘는 포물선으로 정지한 공 위를 지나면 Infinity, 낮게 날면 유한하고 그 순간 3D 거리 2R", () => {
+        const y = 0.8 + (2 * 2.2) / P.g;   // 정점 자리
+        const red = ball("red", [0.7, y], [0, 0, 0], "stationary");
+        const high: BallState = { id: "white", r: [0.7, 0.8, R], v: [0, 2, 2.2], w: [0, 0, 0], state: "airborne" };
+        expect(ballBallTime(high, red, P)).toBe(Infinity);
+        const low: BallState = { id: "white", r: [0.7, 0.8, R], v: [0, 2, 0.5], w: [0, 0, 0], state: "airborne" };   // 정점 12.7 mm
+        const redLow = ball("red", [0.7, 0.8 + 2 * (0.5 / P.g)], [0, 0, 0], "stationary");                    // 낮은 포물선의 정점 자리
+        const t = ballBallTime(low, redLow, P);
+        expect(Number.isFinite(t)).toBe(true);
+        expect(t).toBeLessThan((2 * 0.5) / P.g);      // 착지 전에 닿는다
+        expect(Math.abs(dist(evolveBall(low, t, P), evolveBall(redLow, t, P)) - 2 * R)).toBeLessThan(1e-12);
+        const ref = bisect(gap(low, redLow), (2 * 0.5) / P.g);
+        expect(Math.abs(t - ref)).toBeLessThan(1e-10);
+        // 같은 자리라도 높이 나는 공은 지나간다
+        expect(ballBallTime(high, redLow, P)).toBe(Infinity);
+    });
+
+    it("착지 시각 뒤의 근은 버린다(유효 구간 = landingTime)", () => {
+        // 착지 뒤에 포물선을 외삽하면 슬레이트 아래에서 red 와 만나지만 그 근은 유효 구간 밖이다
+        const flyer: BallState = { id: "white", r: [0.7, 0.8, R], v: [0, 1, 1], w: [0, 0, 0], state: "airborne" };
+        const tLand = (2 * 1) / P.g;
+        const red = ball("red", [0.7, 0.8 + 1 * tLand + 0.02], [0, 0, 0], "stationary");   // 착지 자리 바로 앞
+        const t = ballBallTime(flyer, red, P);
+        expect(t === Infinity || t <= tLand).toBe(true);
+    });
+
+    it("두 공 모두 공중에서 서로 다가가면 상대 가속도가 0 이라 2차식으로 강등되고 정확히 잡는다", () => {
+        const a: BallState = { id: "a", r: [0.5, 1.0, R + 0.1], v: [1, 0, 0.3], w: [0, 0, 0], state: "airborne" };
+        const b: BallState = { id: "b", r: [0.9, 1.0, R + 0.1], v: [-1, 0, 0.3], w: [0, 0, 0], state: "airborne" };
+        const t = ballBallTime(a, b, P);
+        expect(t).toBeCloseTo((0.4 - 2 * R) / 2, 12);
+    });
+});

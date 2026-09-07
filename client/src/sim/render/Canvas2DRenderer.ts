@@ -7,6 +7,8 @@
  *
  * 공은 색별 스프라이트(오프스크린 캔버스)로 한 번 렌더해 두고 drawImage 로 찍는다 — draw() 안에서는
  * 그라데이션·경로 객체를 만들지 않는다(할당 없음). ctx.filter 는 iOS 가 지원하지 않아 쓰지 않는다.
+ * 떠 있는 공(엔진 2.2 airborne, z > R)은 높이만큼 그림자를 오른쪽 아래로 밀고 옅게 따로 그린 뒤, 스프라이트를 원으로
+ * 잘라(구운 접촉 그림자 제거) 1 + 0.25·(z − R)/R(상한 1.5)배로 찍는다 — 새 캔버스·객체 없이 경로 연산만 쓴다.
  *
  * 캔버스 내부 색은 물리적 사물(천·나무·큐대)이라 리터럴을 쓴다. 다만 공 색과 강조 링은 오버레이(경로·조준선)와
  * 같은 색이어야 하므로 디자인 토큰(--ball-*, --brand, --surface-1)을 resize 마다 읽는다(render/tokens.ts).
@@ -69,6 +71,18 @@ const CUE_TIP_L = 0.008;
 
 /** 스프라이트 한 변 = 3R(공 지름 + 그림자 여백). */
 const SPRITE_RADII = 3;
+/** 접촉 그림자의 오프셋·타원 비율(R 배). 스프라이트와 떠 있는 공의 그림자가 같은 값을 쓴다. */
+const SHADOW_DX = 0.16;
+const SHADOW_DY = 0.22;
+const SHADOW_RX = 1.02;
+const SHADOW_RY = 0.92;
+/** 떠 있는 공: 이 높이(m) 아래는 천 위로 본다. */
+const AIR_EPS = 1e-6;
+/** 높이(R 단위) 상한과 그 안에서의 공 확대율·그림자 확대·그림자 페이드. */
+const AIR_LIFT_MAX = 2;
+const AIR_SCALE_PER_R = 0.25;
+const AIR_SHADOW_GROW_PER_R = 0.18;
+const AIR_SHADOW_FADE_PER_R = 0.9;
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
     ctx.beginPath();
@@ -251,12 +265,18 @@ export class Canvas2DRenderer implements Renderer {
         }
 
         const half = this.spriteSide / 2;
+        const Rm = L.table.ball.R;
         for (let i = 0; i < balls.length; i++) {
             const b = balls[i];
             const sprite = this.sprites[ballColour(b.id)];
             if (!sprite) continue;
             const px = L.originX + b.r[0] * L.scale;
             const py = L.originY - b.r[1] * L.scale;
+            const lift = b.r[2] - Rm;
+            if (lift > AIR_EPS) {
+                this.drawAirborne(ctx, sprite, px, py, lift / Rm);
+                continue;
+            }
             ctx.drawImage(sprite, px - half, py - half, this.spriteSide, this.spriteSide);
         }
 
@@ -278,6 +298,31 @@ export class Canvas2DRenderer implements Renderer {
                 break;
             }
         }
+    }
+
+    /**
+     * 떠 있는 공. lift 는 R 단위 높이. 그림자는 (R + h) 에 비례해 오른쪽 아래로 밀리고 커지며 옅어지고(globalAlpha),
+     * 공은 1 + 0.25·lift(상한)배로 찍되 원으로 잘라 스프라이트에 구운 접촉 그림자를 숨긴다. 객체 할당 없음(경로 연산만).
+     */
+    private drawAirborne(ctx: CanvasRenderingContext2D, sprite: HTMLCanvasElement, px: number, py: number, lift: number): void {
+        const Rpx = this.ballPx;
+        const l = lift < AIR_LIFT_MAX ? lift : AIR_LIFT_MAX;
+        const grow = 1 + AIR_SHADOW_GROW_PER_R * l;
+        ctx.globalAlpha = 1 / (1 + AIR_SHADOW_FADE_PER_R * l);
+        ctx.beginPath();
+        ctx.ellipse(px + Rpx * SHADOW_DX * (1 + lift), py + Rpx * SHADOW_DY * (1 + lift), Rpx * SHADOW_RX * grow, Rpx * SHADOW_RY * grow, 0, 0, Math.PI * 2);
+        ctx.fillStyle = SHADOW;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        const scale = 1 + AIR_SCALE_PER_R * l;
+        const side = this.spriteSide * scale;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, Rpx * scale + 0.75, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(sprite, px - side / 2, py - side / 2, side, side);
+        ctx.restore();
     }
 
     private blitStatic(): void {
@@ -473,7 +518,7 @@ export class Canvas2DRenderer implements Renderer {
     private paintBall(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number, colour: BallColour): void {
         // 접촉 그림자: 오른쪽 아래로 살짝 밀린 타원(블러 없이 알파로만)
         ctx.beginPath();
-        ctx.ellipse(cx + R * 0.16, cy + R * 0.22, R * 1.02, R * 0.92, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx + R * SHADOW_DX, cy + R * SHADOW_DY, R * SHADOW_RX, R * SHADOW_RY, 0, 0, Math.PI * 2);
         ctx.fillStyle = SHADOW;
         ctx.fill();
 

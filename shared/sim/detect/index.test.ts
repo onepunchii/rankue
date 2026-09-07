@@ -20,12 +20,18 @@ const cu = (dt: number, id: string, cushion: "left" | "right" | "bottom" | "top"
     ({ dt, event: { type: "ball-cushion", t: dt, ids: [id], cushion } });
 const bb = (dt: number, a: string, b: string): EventCandidate =>
     ({ dt, event: { type: "ball-ball", t: dt, ids: [a, b] } });
+const bt = (dt: number, id: string): EventCandidate =>
+    ({ dt, event: { type: "ball-table", t: dt, ids: [id] } });
 
 describe("pickEvent — 동률 규칙 (README 절대 규칙 5)", () => {
-    it("같은 dt: transition < ball-cushion < ball-ball", () => {
-        const c = [bb(0.5, "a", "b"), cu(0.5, "a", "left"), tr(0.5, "a")];
+    it("같은 dt: transition < ball-table < ball-cushion < ball-ball", () => {
+        const c = [bb(0.5, "a", "b"), cu(0.5, "a", "left"), bt(0.5, "a"), tr(0.5, "a")];
         expect(pickEvent(c)!.event.type).toBe("transition");
+        expect(pickEvent([bb(0.5, "a", "b"), cu(0.5, "a", "left"), bt(0.5, "a")])!.event.type).toBe("ball-table");
         expect(pickEvent([bb(0.5, "a", "b"), cu(0.5, "a", "left")])!.event.type).toBe("ball-cushion");
+        expect(compareTied(bt(1, "z"), cu(1, "a", "left"))).toBeLessThan(0);
+        expect(compareTied(bt(1, "b"), bt(1, "a"))).toBeGreaterThan(0);
+        expect(compareTied(tr(1, "z"), bt(1, "a"))).toBeLessThan(0);
     });
 
     it("1e-9 이내는 동률, 그보다 크면 dt 가 작은 쪽", () => {
@@ -167,6 +173,24 @@ describe("nextEvent — 물리 시나리오", () => {
         expect(ev.event.type).toBe("ball-cushion");
         expect(ev.event.ids).toEqual(["red"]);
         expect(ev.event.type === "ball-cushion" && ev.event.cushion).toBe("right");
+    });
+
+    it("v2.2 공중 공: 다른 공 위를 넘어가면 볼–볼이 아니라 착지(ball-table)가 다음 이벤트, 위에 떨어지면 볼–볼", () => {
+        // 정점 높이 2R 를 넘는 포물선으로 red 위를 지난다: v_z = 2.2 → 정점 0.247 m
+        const flyer: BallState = { id: "white", r: [0.7, 0.8, R], v: [0, 2, 2.2], w: [0, 0, 0], state: "airborne" };
+        const red = ball("red", [0.7, 0.8 + 2 * 2.2 / P.g], [0, 0, 0], "stationary");   // 정점 xy 자리
+        const ev = nextEvent([flyer, red], SEGS, P)!;
+        expect(ev.event.type).toBe("ball-table");
+        expect(ev.event.ids).toEqual(["white"]);
+        expect(ev.dt).toBeCloseTo((2 * 2.2) / P.g, 12);
+        // 같은 자리에 수직으로 떨어지는 공은 red 위에 볼–볼로 닿는다(3D 거리 2R)
+        const dropper: BallState = { id: "white", r: [0.7, red.r[1], R + 0.2], v: [0, 0, 0], w: [0, 0, 0], state: "airborne" };
+        const ev2 = nextEvent([dropper, red], SEGS, P)!;
+        expect(ev2.event.type).toBe("ball-ball");
+        expect(ev2.event.ids).toEqual(["red", "white"]);
+        expect(ev2.dt).toBeCloseTo(Math.sqrt((2 * (0.2 - 2 * R + R - R)) / P.g), 9);
+        // 천 위의 공(state sliding 등)은 착지 후보를 내지 않는다
+        expect(nextEvent([ball("white", [0.7, 0.8], [0, 2, 0], "rolling")], SEGS, P)!.event.type).not.toBe("ball-table");
     });
 
     it("입력을 바꾸지 않는다", () => {

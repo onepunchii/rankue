@@ -8,12 +8,13 @@
  *
  * 후보
  *  - 각 공의 상태 전이 (evolve.nextTransition)
+ *  - 공중 공의 착지 (ballTableTime, v2.2)
  *  - 모든 공 쌍의 충돌 (ballBallTime)
  *  - 모든 공 × 세그먼트의 쿠션 충돌 (ballCushionTime)
  * dt ≤ 0 이거나 유한하지 않은 후보는 버린다.
  *
  * 동률 (README 절대 규칙 5)
- *  최소 dt 후보와 1e-9 s 이내인 후보들을 모아 (type 순위: transition < ball-cushion < ball-ball) →
+ *  최소 dt 후보와 1e-9 s 이내인 후보들을 모아 (type 순위: transition < ball-table < ball-cushion < ball-ball) →
  *  ids 사전순 → cushion id 사전순으로 정렬해 첫 번째를 고른다. 이 순서가 리플레이를 두 기기에서
  *  같은 이벤트 열로 재현하게 만든다. 문자열 비교는 UTF-16 코드 단위 `<` 로 — 로케일에 의존하지 않는다.
  *
@@ -25,17 +26,20 @@ import type { BallParams } from "../params.js";
 import { nextTransition } from "../evolve.js";
 import { ballBallTime } from "./ballBall.js";
 import { ballCushionTime } from "./ballCushion.js";
+import { ballTableTime } from "./ballTable.js";
 
 export { ballBallTime, EVENT_EPS, polynomialHorizon } from "./ballBall.js";
 export { ballCushionTime } from "./ballCushion.js";
+export { ballTableTime } from "./ballTable.js";
 
 /** 동률로 보는 dt 차이 (s). README 절대 규칙 5. */
 export const TIE_EPS = 1e-9;
 
 const TYPE_RANK: Record<SimEvent["type"], number> = {
     "transition": 0,
-    "ball-cushion": 1,
-    "ball-ball": 2,
+    "ball-table": 1,
+    "ball-cushion": 2,
+    "ball-ball": 3,
 };
 
 function compareStrings(a: string, b: string): number {
@@ -91,7 +95,7 @@ export function pickEvent(candidates: readonly EventCandidate[]): EventCandidate
 }
 
 /**
- * 모든 후보(전이·볼–볼·볼–쿠션) 중 가장 이른 이벤트. 전부 정지면 null.
+ * 모든 후보(전이·착지·볼–볼·볼–쿠션) 중 가장 이른 이벤트. 전부 정지면 null.
  * balls 의 순서는 결과에 영향을 주지 않는다(동률 규칙이 id 로 결정하므로).
  */
 export function nextEvent(
@@ -105,6 +109,11 @@ export function nextEvent(
         const b = balls[i];
         const tr = nextTransition(b, p);
         if (tr !== null) candidates.push(tr);
+
+        if (b.state === "airborne") {
+            const dt = ballTableTime(b, p);
+            if (Number.isFinite(dt)) candidates.push({ dt, event: { type: "ball-table", t: dt, ids: [b.id] } });
+        }
 
         for (let k = 0; k < segs.length; k++) {
             const dt = ballCushionTime(b, segs[k], p);

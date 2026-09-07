@@ -13,8 +13,9 @@
  *   lo·0x1b3 은 2^41 미만이라 double 로 정확하고, hi·0x1b3 의 하위 32비트는 Math.imul 이 정확하다.
  * (hash.test.ts 가 BigInt 참조 구현과 비트 단위로 대조한다.)
  *
- * 바이트 스트림 규약 (버전 2.1.0 — 바꾸면 golden 픽스처가 전부 갈리므로 ENGINE_VERSION 을 올릴 것)
+ * 바이트 스트림 규약 (버전 2.1.0 에서 정함, 2.2.0 도 같다 — 바꾸면 golden 픽스처가 전부 갈리므로 ENGINE_VERSION 을 올릴 것)
  *   u32 이벤트 수, 이벤트마다 [str type][f64 t][u32 ids 수][str id…][str cushion|from|to…]
+ *   (ball-table 은 부가 필드가 없다 — type 문자열 "ball-table" 과 ids 만으로 구분된다)
  *   u32 공 수, 공마다 **id 사전순(UTF-16 코드 단위)** 으로 [str id][f64 r×3][f64 v×3][f64 w×3][str state]
  *   str = u32 길이 + UTF-16 코드 단위(각 2바이트 LE). 길이 접두사가 있어 "ab"+"c" 와 "a"+"bc" 가 구분된다.
  *   f64 는 비트 패턴 그대로이되 NaN 은 정규 quiet NaN(0x7ff8000000000000) 하나로 통일한다 — NaN 페이로드·부호 비트는
@@ -144,6 +145,7 @@ export function writeEvent(w: HashWriter, e: SimEvent): void {
         w.str(e.from);
         w.str(e.to);
     }
+    // ball-ball · ball-table: 부가 필드 없음
 }
 
 export function writeBall(w: HashWriter, b: BallState): void {

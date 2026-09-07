@@ -10,8 +10,8 @@
  *   t = t0, history[0] = 시작 스냅샷
  *   반복: c = nextEvent → 없으면 종료 → 정지가 아닌 모든 공을 evolveBall(dt) → t += dt →
  *         그 이벤트 하나만 resolve → events·history 에 push. MAX_EVENTS 에 닿으면 truncated.
- *   전이 → applyTransition, 볼–쿠션 → resolveCushion(모델, 코 높이), 볼–볼 → makeKiss → resolveBallBall →
- *   resolveContinuallyTouching.
+ *   전이 → applyTransition, 착지(ball-table, v2.2) → resolveBallTable, 볼–쿠션 → resolveCushion(모델, 코 높이),
+ *   볼–볼 → makeKiss → resolveBallBall → resolveContinuallyTouching.
  *
  * 즉시 접촉 스윕 (detect 의 근 하한 1e-9 s 를 보완)
  *   감지기는 t ≤ 1e-9 s 의 근을 "현재 이벤트 자신"으로 보고 버린다. 그래서 이미 닿은 채 접근 중인 쌍은
@@ -20,13 +20,15 @@
  *   pooltool 은 EPS 가 2e-14 s 라 이 문제가 실질적으로 없지만 우리는 규칙 5 의 동률 폭 1e-9 를 하한으로 쓰므로
  *   감지기를 부르기 전에 "근이 (0, 1e-9] 에 있을 접촉"을 직접 찾아 dt = 0 이벤트로 해석한다:
  *     쿠션: 코 라인까지 여유 gap ≤ |v_n|·1e-9 + 1e-12 이고 쿠션 쪽으로 이동 중, 세그먼트 범위 안
- *     볼–볼: |Δr| − 2R ≤ |Δv_n|·1e-9 + 1e-12 이고 접근 중
+ *     볼–볼: |Δr| − 2R ≤ |Δv_n|·1e-9 + 1e-12 이고 접근 중 (3차원 거리)
+ *     착지: airborne 이고 landingTime ≤ 1e-9 — 큐를 든 타격 직후(z = R, v_z < 0)와 v_z ≈ +0 으로 떠난 공이 여기 걸린다
  *     전이: nextTransition 의 dt ≤ 0
  *   동률 순서는 감지기와 같은 compareTied. 같은 시각의 연쇄는 MAX_IMMEDIATE_PER_INSTANT 로 상한을 둔다.
  *
  * 그 밖의 안전장치 (테스트가 debugCounters 로 발동 횟수를 읽는다)
  *   - 쿠션 해석 전에 공이 코 라인을 넘어 있으면(gap < 0) 라인 위로 되민다(cushionSnaps).
  *   - 어떤 resolve 뒤에도 두 공이 2R − 1e-9 보다 가까우면 중심선을 따라 대칭으로 2R + spacer 로 벌린다(overlapFixes).
+ *     3차원 중심선이므로 공중 공이 끼면 z 로도 밀리는데, 천 위의 공을 슬레이트 아래(z < R)로 밀지는 않는다(z 를 R 로 자른다).
  *   - 볼–볼 해석 뒤 resolveContinuallyTouching 이 발동하면 continuallyTouching 을 센다.
  *   README 대로 이 안전장치들은 결과에 경고를 남기거나 throw 하지 않는다.
  *
@@ -42,10 +44,11 @@ import type { BallState, CushionSegment, EventCandidate, MotionState, ShotInput,
 import type { BallParams, SimParams } from "./params.js";
 import { applyCondition, cushionSegments } from "./params.js";
 import { HALF_PI } from "./dmath.js";
-import { evolveBall, nextTransition } from "./evolve.js";
+import { evolveBall, landingTime, nextTransition } from "./evolve.js";
 import { compareTied, EVENT_EPS, nextEvent } from "./detect/index.js";
 import { strike } from "./resolve/stickBall.js";
 import { resolveBallBall } from "./resolve/ballBall.js";
+import { resolveBallTable } from "./resolve/ballTable.js";
 import { resolveCushion } from "./resolve/cushion/index.js";
 import { applyTransition } from "./resolve/transition.js";
 import { DEFAULT_SPACER, makeKiss, resolveContinuallyTouching } from "./resolve/kiss.js";
@@ -131,6 +134,8 @@ function eventAt(e: SimEvent, t: number): SimEvent {
             return { type: "ball-ball", t, ids: [e.ids[0], e.ids[1]] };
         case "ball-cushion":
             return { type: "ball-cushion", t, ids: [e.ids[0]], cushion: e.cushion };
+        case "ball-table":
+            return { type: "ball-table", t, ids: [e.ids[0]] };
         default:
             return { type: "transition", t, ids: [e.ids[0]], from: e.from, to: e.to };
     }
@@ -197,7 +202,12 @@ function immediateCandidate(balls: readonly BallState[], segs: readonly CushionS
         const tr = nextTransition(b, p);
         if (tr !== null && !(tr.dt > 0)) consider({ dt: 0, event: tr.event });
 
-        if (b.v[0] === 0 && b.v[1] === 0) continue;   // 병진하지 않으면 접근할 수 없다
+        // 착지: 감지기가 버리는 (0, 1e-9] 의 근과, 이미 z ≤ R 로 내려온(타격 직후) 공. landingTime 이 두 경우를 0 으로 준다.
+        if (b.state === "airborne" && landingTime(b, p) <= EVENT_EPS) {
+            consider({ dt: 0, event: { type: "ball-table", t: 0, ids: [b.id] } });
+        }
+
+        if (b.v[0] === 0 && b.v[1] === 0) continue;   // 병진하지 않으면 쿠션에 접근할 수 없다
         for (let k = 0; k < segs.length; k++) {
             const g = cushionGap(b, segs[k], R);
             if (!(g.vn < 0) || !g.inRange) continue;
@@ -244,6 +254,11 @@ function resolveEvent(balls: BallState[], ev: SimEvent, ctx: Ctx): void {
         balls[i] = applyTransition(balls[i], ev.to, p);
         return;
     }
+    if (ev.type === "ball-table") {
+        const i = ctx.index.get(ev.ids[0])!;
+        balls[i] = resolveBallTable(balls[i], p);
+        return;
+    }
     if (ev.type === "ball-cushion") {
         const i = ctx.index.get(ev.ids[0])!;
         let seg: CushionSegment | undefined;
@@ -263,9 +278,10 @@ function resolveEvent(balls: BallState[], ev: SimEvent, ctx: Ctx): void {
     balls[j] = out[1];
 }
 
-/** 2R − OVERLAP_TOL 보다 가까운 쌍을 중심선을 따라 대칭으로 2R + spacer 로 벌린다. */
+/** 2R − OVERLAP_TOL 보다 가까운 쌍을 (3차원) 중심선을 따라 대칭으로 2R + spacer 로 벌린다. z 는 R 아래로 내리지 않는다. */
 function fixOverlaps(balls: BallState[], p: BallParams): void {
     const D = 2 * p.R;
+    const R = p.R;
     for (let i = 0; i < balls.length; i++) {
         for (let j = i + 1; j < balls.length; j++) {
             const a = balls[i], o = balls[j];
@@ -276,8 +292,10 @@ function fixOverlaps(balls: BallState[], p: BallParams): void {
             let nx = 1, ny = 0, nz = 0;
             if (dist > 0) { nx = dx / dist; ny = dy / dist; nz = dz / dist; }
             const half = 0.5 * (D + DEFAULT_SPACER - dist);
-            balls[i] = { ...a, r: [a.r[0] - nx * half, a.r[1] - ny * half, a.r[2] - nz * half] };
-            balls[j] = { ...o, r: [o.r[0] + nx * half, o.r[1] + ny * half, o.r[2] + nz * half] };
+            const za = a.r[2] - nz * half;
+            const zo = o.r[2] + nz * half;
+            balls[i] = { ...a, r: [a.r[0] - nx * half, a.r[1] - ny * half, za < R ? R : za] };
+            balls[j] = { ...o, r: [o.r[0] + nx * half, o.r[1] + ny * half, zo < R ? R : zo] };
         }
     }
 }
@@ -336,8 +354,11 @@ function run(initial: readonly BallState[], params: SimParams, t0: number): Omit
     }
 
     if (truncated) {
-        // pooltool stop_balls: 상한에 걸리면 모든 공을 세워 결과를 닫는다.
-        balls = balls.map((b) => applyTransition(b, "stationary", p));
+        // pooltool stop_balls: 상한에 걸리면 모든 공을 세워 결과를 닫는다. 공중에 있던 공은 천 높이로 내린다(정지 = 천 위).
+        balls = balls.map((b) => {
+            const s = applyTransition(b, "stationary", p);
+            return s.r[2] === p.R ? s : { id: s.id, r: [s.r[0], s.r[1], p.R], v: s.v, w: s.w, state: s.state };
+        });
         history.push({ t, balls });
     }
 
@@ -356,6 +377,7 @@ function run(initial: readonly BallState[], params: SimParams, t0: number): Omit
 /**
  * 큐 타격부터 전부 정지까지. 큐볼(input.cueBallId)을 strike 로 때린 뒤 루프를 돈다.
  * 타격 결과 속도·각속도가 모두 0(V0 = 0)이면 이벤트 없이 정지 상태로 끝난다(규칙의 no-shot).
+ * θ > 0 이면 큐볼은 airborne(v_z < 0)으로 시작하고 첫 이벤트는 t = 0 의 착지(ball-table)다.
  * 입력이 유한하지 않거나 범위 밖이면(validateBalls·validateShotInput·validateParams) RangeError,
  * 큐볼 id 가 없으면 RangeError, 미스큐면 strike 의 RangeError("miscue") 가 그대로 올라온다.
  */

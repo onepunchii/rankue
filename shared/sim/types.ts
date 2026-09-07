@@ -21,14 +21,17 @@
 /** 3차원 벡터. 항상 길이 3 의 새 배열을 만들어 돌려주고, 인자 배열은 변형하지 않는다. */
 export type Vec3 = readonly [number, number, number];
 
-/** 공의 운동 상태. `airborne` 는 v2.1(점프·마세이 z축)용으로 예약만 해 둔다. */
+/**
+ * 공의 운동 상태. `airborne` 는 v2.2 부터 실제 상태다: 큐를 들어 친 직후(v_z < 0, 즉시 슬레이트에 착지)와
+ * 착지에서 튀어오른 뒤(점프·마세이 홉). 공중에서는 중력 포물선(evolve.ts)으로 움직이고 ω 는 변하지 않는다.
+ */
 export type MotionState = "stationary" | "spinning" | "rolling" | "sliding" | "airborne";
 
 export interface BallState {
     readonly id: string;
-    /** 위치 (m). z 는 v2.0 에서 항상 R(공 중심 높이)이다. */
+    /** 위치 (m). 천 위의 공은 z 가 정확히 R(착지가 스냅한다), airborne 이면 z ≥ R. */
     readonly r: Vec3;
-    /** 속도 (m/s). */
+    /** 속도 (m/s). 천 위의 공은 v_z = 0 이고 airborne 만 v_z ≠ 0 을 가진다. */
     readonly v: Vec3;
     /** 각속도 (rad/s). x·y 성분은 구름/미끄럼, z 성분은 사이드스핀(잉글리시). */
     readonly w: Vec3;
@@ -62,6 +65,12 @@ export type SimEvent =
         readonly cushion: CushionId;
     }
     | {
+        /** 공중의 공이 슬레이트(z = R)에 닿는 순간(v2.2). resolve/ballTable.ts 가 튕김(airborne 유지) 또는 정착(sliding)을 정한다. */
+        readonly type: "ball-table";
+        readonly t: number;
+        readonly ids: readonly [string];
+    }
+    | {
         readonly type: "transition";
         readonly t: number;
         readonly ids: readonly [string];
@@ -86,7 +95,10 @@ export interface ShotInput {
      * 그대로 밀어치기·끌어치기 스핀을 정한다(테이블 수직 오프셋이 아니다). |b| ≤ cue.maxOffset, a²+b² ≤ maxOffset²
      */
     readonly b: number;
-    /** 큐 들림각 (rad, 0 = 수평, [0, π/2)). v2.0 은 이 값으로 스핀 축만 기울인다(마세이 커브는 미끄럼 상태에서 자연히 나온다). */
+    /**
+     * 큐 들림각 (rad, 0 = 수평, [0, π/2)). 속도는 큐 축을 따라 나간다(수평 v cosθ, 수직 −v sinθ, v2.2) — 즉시 착지의
+     * 슬레이트 마찰과 이후 미끄럼이 마세이 커브를, 슬레이트 반발(eT)이 점프를 만든다. θ = 0 은 2.1.0 과 비트 단위로 같다.
+     */
     readonly theta: number;
 }
 

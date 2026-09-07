@@ -6,7 +6,8 @@
  *
  * 배치: 공식 개시 배치(layouts.openingLayout) 또는 무작위 합법 배치(테이블 안, 서로 2R + 2 mm 이상).
  * 입력: 큐볼이 다른 공 하나를 향하는 각 ± 0.35 rad, V0 ∈ [0.8, 9] m/s, (a, b) 는 반지름 0.5 원판 안,
- *       theta ∈ [0, 0.35] rad. 큐볼은 항상 "white".
+ *       theta ∈ [0, thetaMax] rad (기본 0.35 — 골든 픽스처의 입력이 이 값에 묶여 있다; 시험 층 A 는 0.6 까지 올려
+ *       점프·마세이를 섞는다. 난수 소비 순서는 같으므로 배치·다른 입력은 변하지 않는다). 큐볼은 항상 "white".
  */
 import type { BallState, ShotInput } from "../types.js";
 import type { CushionModelId, SimParams, TableSpec } from "../params.js";
@@ -55,8 +56,8 @@ export function randomLegalLayout(rnd: () => number, table: TableSpec, gameType:
     return out;
 }
 
-/** 큐볼이 다른 공 하나를 향하는 각 ± spread 의 무작위 입력. */
-export function randomShotInput(rnd: () => number, balls: readonly BallState[], cueBallId = "white", spread = 0.35): ShotInput {
+/** 큐볼이 다른 공 하나를 향하는 각 ± spread 의 무작위 입력. theta ∈ [0, thetaMax). */
+export function randomShotInput(rnd: () => number, balls: readonly BallState[], cueBallId = "white", spread = 0.35, thetaMax = 0.35): ShotInput {
     const cue = balls.find((b) => b.id === cueBallId) ?? balls[0];
     const others = balls.filter((b) => b.id !== cue.id);
     const target = others.length > 0 ? others[Math.floor(rnd() * others.length)] : cue;
@@ -69,7 +70,7 @@ export function randomShotInput(rnd: () => number, balls: readonly BallState[], 
         b = uniform(rnd, -0.5, 0.5);
         if (a * a + b * b <= 0.25) break;
     }
-    const theta = uniform(rnd, 0, 0.35);
+    const theta = uniform(rnd, 0, thetaMax);
     return { cueBallId: cue.id, phi, V0, a, b, theta };
 }
 
@@ -78,6 +79,8 @@ export interface GenerateOptions {
     readonly modelFor?: (i: number) => CushionModelId;
     /** i → 테이블 컨디션. 기본 전부 1. (난수 소비에 영향이 없으므로 배치·입력은 그대로다.) */
     readonly conditionFor?: (i: number) => number;
+    /** 큐 들림각 상한 (rad). 기본 0.35(골든 픽스처). 난수 소비는 같아 다른 입력은 변하지 않는다. */
+    readonly thetaMax?: number;
 }
 
 /** seed 에서 n 개의 샷 케이스. 테이블·종목·배치는 난수로 고른다. */
@@ -85,6 +88,7 @@ export function generateShotCases(seed: number, n: number, opts: GenerateOptions
     const rnd = mulberry32(seed);
     const modelFor = opts.modelFor ?? (() => "han2005" as const);
     const conditionFor = opts.conditionFor ?? (() => 1);
+    const thetaMax = opts.thetaMax ?? 0.35;
     const out: ShotCase[] = [];
     for (let i = 0; i < n; i++) {
         const tableId: TableSpec["id"] = rnd() < 0.5 ? "DAEDAE" : "JUNGDAE_KR";
@@ -94,7 +98,7 @@ export function generateShotCases(seed: number, n: number, opts: GenerateOptions
         const balls = layout === "opening"
             ? openingLayout(gameType, table, "white", rnd() < 0.5 ? "right" : "left")
             : randomLegalLayout(rnd, table, gameType);
-        const input = randomShotInput(rnd, balls, "white");
+        const input = randomShotInput(rnd, balls, "white", 0.35, thetaMax);
         out.push({ i, tableId, gameType, layout, cushionModel: modelFor(i), condition: conditionFor(i), balls, input });
     }
     return out;

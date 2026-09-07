@@ -100,6 +100,7 @@ describe("HashWriter", () => {
 describe("hashResult", () => {
     const R = 0.03075;
     const events: SimEvent[] = [
+        { type: "ball-table", t: 0, ids: ["white"] },
         { type: "transition", t: 0.1, ids: ["white"], from: "sliding", to: "rolling" },
         { type: "ball-cushion", t: 0.5, ids: ["white"], cushion: "top" },
         { type: "ball-ball", t: 0.9, ids: ["red", "white"] },
@@ -122,16 +123,20 @@ describe("hashResult", () => {
             const ev = events.map((e, k) => (k === i ? ({ ...e, ...patch } as SimEvent) : e));
             return hashResult(ev, final);
         };
-        expect(mutate(0, { t: 0.1 + Number.EPSILON * 0.1 })).not.toBe(base);     // 1 ulp
-        expect(mutate(0, { to: "spinning" } as Partial<SimEvent>)).not.toBe(base);
-        expect(mutate(0, { from: "rolling" } as Partial<SimEvent>)).not.toBe(base);
-        expect(mutate(1, { cushion: "bottom" } as Partial<SimEvent>)).not.toBe(base);
-        expect(mutate(1, { ids: ["red"] } as Partial<SimEvent>)).not.toBe(base);
-        expect(mutate(2, { ids: ["white", "red"] } as Partial<SimEvent>)).not.toBe(base);
-        expect(mutate(2, { type: "ball-cushion", cushion: "left", ids: ["red"] } as Partial<SimEvent>)).not.toBe(base);
+        expect(mutate(1, { t: 0.1 + Number.EPSILON * 0.1 })).not.toBe(base);     // 1 ulp
+        expect(mutate(1, { to: "spinning" } as Partial<SimEvent>)).not.toBe(base);
+        expect(mutate(1, { from: "rolling" } as Partial<SimEvent>)).not.toBe(base);
+        expect(mutate(2, { cushion: "bottom" } as Partial<SimEvent>)).not.toBe(base);
+        expect(mutate(2, { ids: ["red"] } as Partial<SimEvent>)).not.toBe(base);
+        expect(mutate(3, { ids: ["white", "red"] } as Partial<SimEvent>)).not.toBe(base);
+        expect(mutate(3, { type: "ball-cushion", cushion: "left", ids: ["red"] } as Partial<SimEvent>)).not.toBe(base);
+        // 착지(ball-table, 2.2.0): type 문자열과 ids 만으로 구분된다
+        expect(mutate(0, { ids: ["red"] } as Partial<SimEvent>)).not.toBe(base);
+        expect(mutate(0, { t: 1e-300 })).not.toBe(base);
+        expect(hashResult([{ type: "transition", t: 0, ids: ["white"], from: "airborne", to: "sliding" }, ...events.slice(1)], final)).not.toBe(base);
         // 순서·개수
-        expect(hashResult([events[1], events[0], events[2]], final)).not.toBe(base);
-        expect(hashResult(events.slice(0, 2), final)).not.toBe(base);
+        expect(hashResult([events[1], events[0], events[2], events[3]], final)).not.toBe(base);
+        expect(hashResult(events.slice(0, 3), final)).not.toBe(base);
         expect(hashResult([], final)).not.toBe(base);
     });
 
@@ -144,6 +149,7 @@ describe("hashResult", () => {
         expect(mutate(0, { v: [0, -0, 0] })).not.toBe(base);                     // −0
         expect(mutate(1, { w: [0, 0, 1e-300] })).not.toBe(base);
         expect(mutate(1, { state: "rolling" })).not.toBe(base);
+        expect(mutate(1, { state: "airborne", r: [0.7, 1.9, R + 0.02], v: [0, 0, 0.5] })).not.toBe(base);
         expect(mutate(1, { id: "red1" })).not.toBe(base);
         expect(hashResult(events, final.slice(0, 1))).not.toBe(base);
     });

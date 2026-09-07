@@ -16,8 +16,11 @@
  *     pooltool 방식대로 (i) 를 먼저 적용해 보고, 그 결과 접점 상대속도의 방향이 뒤집혔으면(v_c·v_c' ≤ 0) (ii) 로 바꾼다.
  *  3. 스핀: 임펄스가 접점(중심에서 R·n̂)에 걸리므로 Δω = (R n̂ × m ΔV_t)/I = (2.5/R)·n̂ × ΔV_t.
  *     공 2 는 접점이 −R n̂ 이고 임펄스도 −ΔV_t 라 토크 부호가 같다 → 두 공에 같은 Δω 를 더한다.
- *  4. v2.0 은 평면 운동만 다루므로 결과 속도의 z 성분을 버리고 두 공 모두 'sliding' 으로 둔다
- *     (구름 조건이 깨졌는지는 다음 전이 판정이 결정한다).
+ *  4. 두 공 다 천 위면(2D) 결과 속도의 z 성분 — 접점 마찰의 수직 성분으로 생기는 미소 v_z — 을 슬레이트가 받는다고
+ *     보고 버리고 두 공 모두 'sliding' 으로 둔다(구름 조건이 깨졌는지는 다음 전이 판정이 결정한다). 이 경로는 2.1.0 과
+ *     비트 단위로 같다. 공중 공(airborne, v2.2)이 하나라도 끼면 3D 법선·접선 임펄스를 그대로 두고(z 를 버리지 않는다)
+ *     각 공의 상태를 결과 z·v_z 로 정한다(postImpactState) — 위에서 떨어지는 공은 튀어오르고, 맞은 공은 v_z 를 얻을 수
+ *     있다(z = R 에서 v_z < 0 이면 즉시 착지가 해석한다).
  *
  * pooltool 은 n̂ 이 +x 가 되도록 쿼터니언으로 프레임을 돌린 뒤 성분 계산을 하지만, 여기서는 같은 식을
  * 벡터 형태로 직접 쓴다(회전 두 번의 반올림이 빠지고 초월함수도 필요 없다). 결정론을 위해 마찰 계수의
@@ -27,6 +30,7 @@ import type { BallState, Vec3 } from "../types.js";
 import type { BallParams } from "../params.js";
 import { add, cross, dot, length, scale, sub, unit } from "../vec.js";
 import { exp } from "../dmath.js";
+import { postImpactState } from "./transition.js";
 
 /** pooltool `const.EPS` = 100 × DBL_EPSILON. 이보다 작은 접점 상대속도는 0 으로 본다. */
 const EPS = 100 * 2.220446049250313e-16;
@@ -106,14 +110,22 @@ export function resolveBallBall(b1: BallState, b2: BallState, p: BallParams): re
     }
     const dW = scale(cross(n, dV1t), 2.5 / R);
 
-    // ── 4. 접선 갱신 + 법선 성분 복원, z 속도 제거 ───────────────────────────
+    // ── 4. 접선 갱신 + 법선 성분 복원 ────────────────────────────────────────
     const v1 = add(add(v1t, dV1t), scale(n, v1nF));
     const v2 = add(sub(v2t, dV1t), scale(n, v2nF));
     const w1 = add(add(w1t, dW), scale(n, w1n));
     const w2 = add(add(w2t, dW), scale(n, w2n));
 
+    if (b1.state !== "airborne" && b2.state !== "airborne") {
+        // 둘 다 천 위: z 속도 제거, 'sliding' (2.1.0 경로 그대로)
+        return [
+            { ...b1, v: [v1[0], v1[1], 0], w: w1, state: "sliding" },
+            { ...b2, v: [v2[0], v2[1], 0], w: w2, state: "sliding" },
+        ];
+    }
+    // 공중 공이 끼면 3D 임펄스를 그대로 둔다
     return [
-        { ...b1, v: [v1[0], v1[1], 0], w: w1, state: "sliding" },
-        { ...b2, v: [v2[0], v2[1], 0], w: w2, state: "sliding" },
+        { ...b1, v: [v1[0], v1[1], v1[2]], w: w1, state: postImpactState(b1.r, v1, R) },
+        { ...b2, v: [v2[0], v2[1], v2[2]], w: w2, state: postImpactState(b2.r, v2, R) },
     ];
 }

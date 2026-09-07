@@ -7,7 +7,9 @@
  *  - 정적 층: 라사(비네트·쿠션 그늘·미세 노이즈를 구운 캔버스 텍스처 평면), 레일(둥근 모서리 링을 압출한 나무 상자 +
  *    어두운 받침 테두리), 쿠션 코 라인(1 CSS px 어두운 띠), 다이아몬드 20개·센터 스팟(인스턴스 원판).
  *    테이블이 바뀌면 다시 만들고, px 단위가 섞인 것(코 라인·다이아몬드 반지름·강조 링)은 resize 때 다시 만든다.
- *  - 공: 구(MeshStandardMaterial roughness 0.25, metalness 0) + 접촉 그림자(방사형 알파 텍스처 사각형). 색은 토큰
+ *  - 공: 구(MeshStandardMaterial roughness 0.25, metalness 0) + 접촉 그림자(방사형 알파 텍스처 사각형). 구는 물리의 z(r[2]) 에
+ *    그대로 놓아 점프·마세이 홉(엔진 2.2 airborne)이 보이고, 그림자는 높이에 따라 램프 반대쪽으로 더 밀리고 커지며 옅어진다
+ *    (공마다 그림자 재질을 복제해 알파를 따로 준다 — 복제는 새 id 가 나타나는 acquire 때뿐). 색은 토큰
  *    (--ball-*)을 구운 작은 캔버스 텍스처 — 흰·노란 공은 6점 무늬라 회전이 보인다. BallState 에 자세가 없으므로
  *    각속도 ω 를 draw() 마다 벽시계 dt 로 적분한 쿼터니언을 공 id 별로 유지하고, id 가 사라지면 초기화한다.
  *    (재생 4× 빨리감기 중에는 벽시계라 회전이 이동보다 느리게 보인다 — 계약에 시각이 없어 감수하는 시각 효과.)
@@ -111,6 +113,10 @@ const SHADOW_RX = 1.02;
 const SHADOW_RY = 0.92;
 /** 텍스처 가장자리가 흐려지므로 살짝 키운다. */
 const SHADOW_GROW = 1.12;
+/** 떠 있는 공의 그림자: 높이(R 단위, 상한 SHADOW_LIFT_MAX)에 비례해 크기 +18 %/R, 알파 1/(1 + 0.9·높이). 오프셋은 (R + h) 에 비례. */
+const SHADOW_LIFT_MAX = 3;
+const SHADOW_GROW_PER_R = 0.18;
+const SHADOW_FADE_PER_R = 0.9;
 /** 6점 무늬 각반지름(rad) ≈ 지름 10 mm. */
 const DOT_ANGLE = 0.16;
 
@@ -131,6 +137,8 @@ interface BallEntry {
     colour: BallColour;
     readonly mesh: Mesh;
     readonly shadow: Mesh;
+    /** 공별 그림자 재질(공용 shadowMat 의 복제 — 텍스처는 공유). 높이에 따라 opacity 를 따로 준다. */
+    readonly shadowMat: MeshBasicMaterial;
     stamp: number;
 }
 
@@ -418,6 +426,8 @@ export class ThreeRenderer implements Renderer {
             this.ballTex[c]?.dispose();
             this.ballMats[c].dispose();
         }
+        for (const e of this.active) e.shadowMat.dispose();
+        for (const e of this.pool) e.shadowMat.dispose();
         for (const g of this.cueGeos) g.dispose();
         for (const m of this.cueMats) m.dispose();
         this.clothMat.dispose();
@@ -581,9 +591,16 @@ export class ThreeRenderer implements Renderer {
 
     private placeBall(e: BallEntry, b: BallState, R: number, dt: number, stamp: number): void {
         e.stamp = stamp;
+        // 구는 물리의 z 그대로(천 위 R, 공중이면 그 이상)
         e.mesh.position.set(b.r[0], b.r[1], b.r[2]);
         integrateOrientation(e.mesh.quaternion, b.w, dt, this.tmpAxis, this.tmpQ);
-        e.shadow.position.set(b.r[0] + R * SHADOW_DX, b.r[1] - R * SHADOW_DY, SHADOW_Z);
+        // 접촉 그림자: 램프가 좌상단 위에 있으므로 떠오른 공의 그림자는 오른쪽 아래로 (R + h) 에 비례해 밀리고, 커지며 옅어진다
+        const h = b.r[2] - R > 0 ? b.r[2] - R : 0;
+        const lift = h / R < SHADOW_LIFT_MAX ? h / R : SHADOW_LIFT_MAX;
+        e.shadow.position.set(b.r[0] + (R + h) * SHADOW_DX, b.r[1] - (R + h) * SHADOW_DY, SHADOW_Z);
+        const grow = 1 + SHADOW_GROW_PER_R * lift;
+        e.shadow.scale.set(2 * R * SHADOW_RX * SHADOW_GROW * grow, 2 * R * SHADOW_RY * SHADOW_GROW * grow, 1);
+        e.shadowMat.opacity = this.shadowMat.opacity / (1 + SHADOW_FADE_PER_R * lift);
     }
 
     /** 풀에서 꺼내거나(없으면 생성 — 새 id 가 나타날 때만) 색·크기를 맞춰 활성화. */
@@ -593,10 +610,11 @@ export class ThreeRenderer implements Renderer {
             const mesh = new Mesh(this.ballGeo, this.ballMats.white);
             mesh.frustumCulled = false;
             if (this.opts.shadows) mesh.castShadow = true;
-            const shadow = new Mesh(this.shadowGeo, this.shadowMat);
+            const shadowMat = this.shadowMat.clone();
+            const shadow = new Mesh(this.shadowGeo, shadowMat);
             shadow.frustumCulled = false;
             this.scene.add(mesh, shadow);
-            e = { id, colour: "white", mesh, shadow, stamp: 0 };
+            e = { id, colour: "white", mesh, shadow, shadowMat, stamp: 0 };
         }
         e.id = id;
         const colour = ballColour(id);

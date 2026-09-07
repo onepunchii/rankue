@@ -23,6 +23,8 @@
  *    있고, pooltool 도 이 상태에서 4차식을 그대로 푼다(is_overlapping 은 2R 미만에서만 발동). 방금 해결한
  *    접촉 자신은 t > 1e-9 와 p·p′ < 0 필터가, 겹친 쌍의 탈출 근은 p·p′ > 0 이라 자연히 걸러진다.
  *  - 1e-9 s 이하의 근은 현재 이벤트 자신이므로 버린다(pooltool EPS 와 같은 규약).
+ *  - 벡터는 3차원이다(v2.2): 공중 공의 z 다항식(v_z t − ½ g t²)까지 들어가므로 다른 공 위를 지나는 공(xy 에서는 겹치지만
+ *    3D 거리 > 2R)은 충돌이 아니고, 위에서 떨어지는 공은 |Δr| = 2R 인 순간 잡힌다. 유효 구간은 착지 시각까지다.
  *
  * 유효 구간(horizon)
  *  다항식은 그 공의 다음 상태 전이까지만 물리적으로 맞다. 그 뒤로 외삽하면 멈춘 구름 공의 포물선이
@@ -34,7 +36,7 @@
  */
 import type { BallState, Vec3 } from "../types.js";
 import type { BallParams } from "../params.js";
-import { positionPolynomial, rollTime, slideTime } from "../evolve.js";
+import { landingTime, positionPolynomial, rollTime, slideTime } from "../evolve.js";
 import { dot, sub, lengthSq } from "../vec.js";
 import { solveQuadratic } from "../roots/quadratic.js";
 import { solveQuartic } from "../roots/quartic.js";
@@ -43,12 +45,14 @@ import { solveQuartic } from "../roots/quartic.js";
 export const EVENT_EPS = 1e-9;
 
 /**
- * 이 공의 positionPolynomial 이 유효한 시간 상한 = 다음 상태 전이까지의 시간.
- * sliding → slideTime, rolling → rollTime, 그 외(정지·스핀: 위치가 변하지 않으므로 다항식은 영원히 맞다) → Infinity.
+ * 이 공의 positionPolynomial 이 유효한 시간 상한 = 다음 상태 전이(또는 착지)까지의 시간.
+ * sliding → slideTime, rolling → rollTime, airborne → landingTime(착지 뒤에는 포물선이 슬레이트 아래로 외삽된다),
+ * 그 외(정지·스핀: 위치가 변하지 않으므로 다항식은 영원히 맞다) → Infinity.
  */
 export function polynomialHorizon(b: BallState, p: BallParams): number {
     if (b.state === "sliding") return slideTime(b, p);
     if (b.state === "rolling") return rollTime(b, p);
+    if (b.state === "airborne") return landingTime(b, p);
     return Infinity;
 }
 

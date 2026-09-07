@@ -164,24 +164,44 @@ describe("strike — 큐 들림각 θ (오프셋은 큐 축에 수직한 평면�
         const dRot = dir(phi + alpha);                                 // 스쿼트 후 큐 방향
         const wD = dot(out.w, dRot);
         expect(Math.abs(wD)).toBeGreaterThan(1);
-        // v (전체 크기) 는 |v_h|/cosθ 이고 c 항이 없으므로 TP A.30 식 7 그대로
-        const vFull = length(out.v) / Math.cos(theta);
+        // 속도는 큐 축을 따라 나가므로(v2.2) |v| 가 곧 v 이고, c 항이 없어 TP A.30 식 7 그대로. 수평 v cosθ, 수직 −v sinθ.
+        const vFull = length(out.v);
         const Im = 0.4 * R * R;
         expect(vFull).toBeCloseTo(((2 * 3) / (1 + P.m / CUE.M + 2.5 * a * a)) * CUE.tipEfficiency, 12);
+        expect(Math.hypot(out.v[0], out.v[1])).toBeCloseTo(vFull * Math.cos(theta), 12);
+        expect(out.v[2]).toBeCloseTo(-vFull * Math.sin(theta), 12);
+        expect(out.state).toBe("airborne");
         expect(wD).toBeCloseTo((vFull / Im) * a * R * Math.sin(theta), 8);
         expect(out.w[2]).toBeCloseTo((vFull / Im) * a * R * Math.cos(theta), 8);
         // b = 0 이면 L̂ 성분(밀어치기·끌어치기)은 없다 — 테이블 프레임 해석의 가짜 −c sinθ 끌어치기가 사라졌다
         expect(dot(out.w, leftOf(dRot))).toBeCloseTo(0, 9);
     });
 
-    it("θ>0 중심 타격(a=b=0): 임펄스가 중심을 지나 ω = 0, 수평 속도만 남고(z=0) 크기는 v·cosθ", () => {
+    it("θ>0 중심 타격(a=b=0): 임펄스가 중심을 지나 ω = 0, 속도는 큐 축을 따라(수평 v cosθ, 수직 −v sinθ) 'airborne'", () => {
         for (const theta of [0.2, 0.5, 20 * PI / 180]) {
             const out = strike(cueBall(), shot({ theta }), P, CUE);
             const vFull = ((2 * 3) / (1 + P.m / CUE.M)) * CUE.tipEfficiency;
-            expect(out.v[2]).toBe(0);
-            expect(length(out.v)).toBeCloseTo(vFull * Math.cos(theta), 12);
+            expect(out.v[2]).toBeCloseTo(-vFull * Math.sin(theta), 12);
+            expect(out.v[2]).toBeLessThan(0);
+            expect(Math.hypot(out.v[0], out.v[1])).toBeCloseTo(vFull * Math.cos(theta), 12);
+            expect(length(out.v)).toBeCloseTo(vFull, 12);
             expect(out.w).toEqual([0, 0, 0]);
+            expect(out.state).toBe("airborne");
+            expect(out.r[2]).toBe(R);                                      // 위치는 그대로 — 착지는 simulate 가 t = 0 에 해석
         }
+    });
+
+    it("θ = 0 이면 v_z 는 정확히 +0(−0 아님)이고 state 'sliding' — 2.1.0 과 비트 동일해야 하는 경로", () => {
+        for (const s of [shot(), shot({ a: 0.3, b: -0.2, phi: 2.2 }), shot({ b: 0.45, V0: 0.8 }), shot({ V0: 0 })]) {
+            const out = strike(cueBall(), s, P, CUE);
+            expect(Object.is(out.v[2], 0)).toBe(true);
+            expect(out.state).toBe("sliding");
+        }
+        // 아주 작은 θ 도 airborne 이지만 v_z 는 −v sinθ 로 연속
+        const tiny = strike(cueBall(), shot({ theta: 1e-9 }), P, CUE);
+        expect(tiny.state).toBe("airborne");
+        expect(tiny.v[2]).toBeLessThan(0);
+        expect(tiny.v[2]).toBeGreaterThan(-1e-8);
     });
 
     it("밀어치기 b 의 L̂ 스핀은 θ 와 무관 (TP A.19 ω_x ∝ b): θ=0 과 θ=0.4 에서 (v/I_m)·bR 로 같다", () => {
@@ -190,7 +210,7 @@ describe("strike — 큐 들림각 θ (오프셋은 큐 축에 수직한 평면�
         const up = strike(cueBall(), shot({ b, theta: 0.4 }), P, CUE);
         const Im = 0.4 * R * R;
         // 두 경우 모두 v(전체)는 같고(θ 는 v 식에 안 들어감) L̂ = ŷ 성분이 (v/I_m)·bR
-        const vFlat = length(flat.v), vUp = length(up.v) / Math.cos(0.4);
+        const vFlat = length(flat.v), vUp = length(up.v);
         expect(vUp).toBeCloseTo(vFlat, 12);
         expect(flat.w[1]).toBeCloseTo((vFlat / Im) * b * R, 9);
         expect(up.w[1]).toBeCloseTo((vFlat / Im) * b * R, 9);

@@ -1,11 +1,14 @@
 /**
  * simulate.ts 검증 (README 시험 층 A + 시나리오).
- *  A 불변량: 시드 7 무작위 샷 1000개(대대/중대 × 3구/4구 × 개시/무작위 배치) — 매 이벤트의 resolve 직전(직전 스냅샷을
- *    dt 만큼 evolveBall 한 상태) 대비 직후 운동에너지 비증가(허용 1e-9·E0; 천 마찰 소산에 가려지지 않도록 resolve 만 본다),
- *    모든 공 테이블 안(+1e-9), 겹침 없음(2R − 1e-9), 이벤트 시각 단조, 종료(truncated=false),
- *    같은 입력 두 번 → 같은 해시, 쿠션 이벤트 뒤 안쪽 법선 방향 속도 > 0, 이벤트 폭풍 없음, 샷당 최대 이벤트 < 300.
+ *  A 불변량: 시드 7 무작위 샷 1000개(대대/중대 × 3구/4구 × 개시/무작위 배치, θ ∈ [0, 0.6] rad · V0 ≤ 9 m/s 라 점프·마세이가
+ *    섞인다) — 매 이벤트의 resolve 직전(직전 스냅샷을 dt 만큼 evolveBall 한 상태) 대비 직후 역학적 에너지(KE + m g (z − R))
+ *    비증가(허용 1e-9·E0 + kiss·스냅이 옮긴 z 의 위치에너지; 천 마찰 소산에 가려지지 않도록 resolve 만 본다),
+ *    모든 공 테이블 안(+1e-9)·슬레이트 위(z ≥ R − 1e-9), 3차원 겹침 없음(2R − 1e-9), 이벤트 시각 단조, 종료(truncated=false),
+ *    같은 입력 두 번 → 같은 해시, 쿠션 이벤트 뒤 안쪽 법선 방향 속도 > 0, 착지 이벤트 뒤 z = R 이고 튕김(v_z > 0, airborne)
+ *    또는 정착(v_z = 0, sliding), 이벤트 폭풍 없음, 샷당 최대 이벤트 < 300.
  *  시나리오: 장축 구름 샷의 쿠션 수, 정확한 코너 입사, 정면 풀히트 속도 전달, 개시 배치의 장각(3쿠션) 존재,
- *    쿠션 모델별 해시 상이, 프로즌 공·뉴턴 요람, 0 파워, 미스큐, 상한 절단, 입력 불변.
+ *    쿠션 모델별 해시 상이, 프로즌 공·뉴턴 요람, 0 파워, 미스큐, 상한 절단, 입력 불변,
+ *    v2.2: 큐를 든 타격의 t = 0 착지, 마세이 커브(TP A.19 최종 방향과 일치), 점프(공 위를 넘음), 공중 공의 결정론.
  *  벤치마크는 RUN_BENCH=1 일 때만.
  */
 import { describe, it, expect } from "vitest";
@@ -13,7 +16,9 @@ import {
     simulateShot, simulateFrom, MAX_EVENTS, debugCounters, resetDebugCounters,
 } from "./simulate.js";
 import { generateShotCases, paramsOf, type ShotCase } from "./fixtures/shots.js";
-import { evolveBall, kineticEnergy } from "./evolve.js";
+import { evolveBall, kineticEnergy, landingTime } from "./evolve.js";
+import { stateAt } from "./continuize.js";
+import { MIN_BOUNCE_HEIGHT } from "./resolve/ballTable.js";
 import { TABLES, DEFAULT_CUE, applyCondition, cushionSegments, type SimParams, type CushionModelId } from "./params.js";
 import { openingLayout } from "./layouts.js";
 import { evaluateShot, DEFAULT_3C_RULES } from "./rules/evaluate.js";
@@ -67,19 +72,25 @@ function checkInvariants(r: AnyResult, params: SimParams): string[] {
         prevT = snap.t;
         const Epre = ke(pre);
         const E = ke(snap.balls);
-        if (E > Epre + 1e-9 * E0) {
+        // resolve 가 위치를 바꾸는 것은 kiss·겹침 교정(1e-9 m 급)·착지의 z 스냅뿐이라, 그 z 이동의 위치에너지만 허용한다.
+        let dz = 0;
+        for (let i = 0; i < snap.balls.length; i++) dz += Math.abs(snap.balls[i].r[2] - pre[i].r[2]);
+        if (E > Epre + 1e-9 * E0 + ball.m * ball.g * dz) {
             problems.push(`energy increased by resolve of event ${k - 1} ${JSON.stringify(r.events[k - 1])} by ${(E - Epre) / E0} E0`);
         }
         for (const b of snap.balls) {
             if (b.r[0] < Rb - 1e-9 || b.r[0] > W - Rb + 1e-9 || b.r[1] < Rb - 1e-9 || b.r[1] > L - Rb + 1e-9) {
                 problems.push(`ball ${b.id} outside at event ${k - 1}: ${b.r}`);
             }
+            if (b.r[2] < Rb - 1e-9) problems.push(`ball ${b.id} below slate at event ${k - 1}: z = ${b.r[2]}`);
+            if (b.state !== "airborne" && (b.r[2] !== Rb || b.v[2] !== 0)) problems.push(`ball ${b.id} ${b.state} off the cloth at event ${k - 1}: z = ${b.r[2]}, v_z = ${b.v[2]}`);
         }
         for (let a = 0; a < snap.balls.length; a++) {
             for (let c = a + 1; c < snap.balls.length; c++) {
                 const dx = snap.balls[a].r[0] - snap.balls[c].r[0];
                 const dy = snap.balls[a].r[1] - snap.balls[c].r[1];
-                const d = Math.sqrt(dx * dx + dy * dy);
+                const dzc = snap.balls[a].r[2] - snap.balls[c].r[2];
+                const d = Math.sqrt(dx * dx + dy * dy + dzc * dzc);
                 if (d < 2 * Rb - 1e-9) problems.push(`overlap ${snap.balls[a].id}-${snap.balls[c].id} at event ${k - 1}: ${d - 2 * Rb}`);
             }
         }
@@ -89,6 +100,13 @@ function checkInvariants(r: AnyResult, params: SimParams): string[] {
             const seg = segs.find((s) => s.id === ev.cushion)!;
             const vn = seg.normal[0] * b.v[0] + seg.normal[1] * b.v[1];
             if (!(vn > 0)) problems.push(`cushion ${ev.cushion} at event ${k - 1}: inward velocity ${vn}`);
+        }
+        if (ev && ev.type === "ball-table") {
+            const b = snap.balls.find((x) => x.id === ev.ids[0])!;
+            if (b.r[2] !== Rb) problems.push(`landing at event ${k - 1}: z ${b.r[2]} != R`);
+            const bounced = b.state === "airborne" && b.v[2] > 0 && 0.5 * b.v[2] * b.v[2] / ball.g >= MIN_BOUNCE_HEIGHT;
+            const settled = b.state === "sliding" && b.v[2] === 0;
+            if (!bounced && !settled) problems.push(`landing at event ${k - 1}: state ${b.state}, v_z ${b.v[2]}`);
         }
     }
     // 마지막 스냅샷은 전부 정지
@@ -115,17 +133,38 @@ function runCase(c: ShotCase, model?: CushionModelId): { r: SimResult; p: SimPar
     return { r: simulateShot(c.balls, c.input, p), p };
 }
 
-describe("A 불변량: 시드 7 무작위 샷 1000개 (han2005)", () => {
-    const cases = generateShotCases(7, 1000);
+describe("A 불변량: 시드 7 무작위 샷 1000개 (han2005, θ ≤ 0.6 rad)", () => {
+    const cases = generateShotCases(7, 1000, { thetaMax: 0.6 });
     const results: { c: ShotCase; r: SimResult; p: SimParams }[] = [];
     resetDebugCounters();
     for (const c of cases) results.push({ c, ...runCase(c) });
     const counters = { ...debugCounters };
 
-    it("배치가 계약대로 섞여 있다", () => {
+    it("배치가 계약대로 섞여 있다 (θ 는 0.35 를 넘는 것도, V0 는 8 m/s 를 넘는 것도 있다)", () => {
         expect(cases.filter((c) => c.tableId === "JUNGDAE_KR").length).toBeGreaterThan(300);
         expect(cases.filter((c) => c.gameType === "4c").length).toBeGreaterThan(300);
         expect(cases.filter((c) => c.layout === "random").length).toBeGreaterThan(300);
+        expect(cases.filter((c) => c.input.theta > 0.35).length).toBeGreaterThan(300);
+        expect(cases.filter((c) => c.input.V0 > 8).length).toBeGreaterThan(50);
+        expect(cases.every((c) => c.input.theta <= 0.6 && c.input.V0 <= 9)).toBe(true);
+    });
+
+    it("v2.2: 큐를 든 샷은 t = 0 착지로 시작하고, 상당수가 실제로 떠오르며(튕김), 공중 공이 쿠션·다른 공과도 만난다", () => {
+        let bounced = 0, airCushion = 0, airBallBall = 0;
+        for (const { r } of results) {
+            expect(r.events[0]).toEqual({ type: "ball-table", t: 0, ids: ["white"] });
+            if (r.events.some((e, k) => e.type === "ball-table" && k > 0)) bounced++;
+            for (let k = 1; k < r.history.length; k++) {
+                const ev = r.events[k - 1];
+                const prev = r.history[k - 1].balls;
+                if (ev.type === "ball-cushion" && prev.find((b) => b.id === ev.ids[0])!.state === "airborne") airCushion++;
+                if (ev.type === "ball-ball" && ev.ids.some((id) => prev.find((b) => b.id === id)!.state === "airborne")) airBallBall++;
+            }
+        }
+        console.log(`[simulate] v2.2 1000샷: 튕긴 샷 ${bounced}, 공중 쿠션 ${airCushion}, 공중 볼–볼 ${airBallBall}`);
+        expect(bounced).toBeGreaterThan(200);
+        expect(airCushion).toBeGreaterThan(10);
+        expect(airBallBall).toBeGreaterThan(10);
     });
 
     it("에너지 비증가·테이블 안·겹침 없음·시각 단조·종료·쿠션 뒤 안쪽 속도", () => {
@@ -167,12 +206,14 @@ describe("A 불변량: 시드 7 무작위 샷 1000개 (han2005)", () => {
             expect(r.history.length).toBe(r.events.length + 1);
             expect(r.history[r.history.length - 1].balls).toEqual(r.final);
             expect(r.duration).toBe(r.history[r.history.length - 1].t);
-            expect(r.engineVersion).toBe("2.1.0");
+            expect(r.engineVersion).toBe("2.2.0");
             expect(r.paramsHash).toMatch(/^[0-9a-f]{16}$/);
             expect(r.input).toEqual(c.input);
             expect(r.hash).toMatch(/^[0-9a-f]{16}$/);
             const cue = r.history[0].balls.find((b) => b.id === "white")!;
-            expect(cue.state).toBe("sliding");
+            // θ > 0 이면 큐 축을 따라 아래로 향하는 v_z 를 가진 airborne, θ = 0 이면 sliding
+            expect(cue.state).toBe(c.input.theta > 0 ? "airborne" : "sliding");
+            expect(cue.v[2] <= 0).toBe(true);
             expect(Math.sqrt(cue.v[0] ** 2 + cue.v[1] ** 2)).toBeGreaterThan(0);
         }
     });
@@ -180,8 +221,8 @@ describe("A 불변량: 시드 7 무작위 샷 1000개 (han2005)", () => {
 
 describe("A 불변량: 다른 쿠션 모델·컨디션", () => {
     for (const model of ["mathavan2010", "sphereHalfSpace"] as const) {
-        it(`${model} 100샷`, () => {
-            const cases = generateShotCases(7, 100, { modelFor: () => model });
+        it(`${model} 100샷 (θ ≤ 0.6)`, () => {
+            const cases = generateShotCases(7, 100, { modelFor: () => model, thetaMax: 0.6 });
             const bad: string[] = [];
             let max = 0;
             for (const c of cases) {
@@ -197,7 +238,7 @@ describe("A 불변량: 다른 쿠션 모델·컨디션", () => {
     }
 
     it("condition 0.8 / 1.25 에서도 불변량 유지", () => {
-        const cases = generateShotCases(11, 60);
+        const cases = generateShotCases(11, 60, { thetaMax: 0.6 });
         for (const c of cases) {
             for (const condition of [0.8, 1.25]) {
                 const p: SimParams = { ...paramsOf(c), condition };
@@ -392,6 +433,118 @@ describe("시나리오", () => {
         expect(() => simulateFrom(balls, HAN, NaN)).toThrow(RangeError);
         // 경계값은 허용: V0 = 0, theta = 0, condition 양수
         expect(() => simulateShot(balls, { ...ok, V0: 0, theta: 0 }, { ...HAN, condition: 0.7 })).not.toThrow();
+    });
+
+    it("(vi) v2.2 마세이: θ = 0.5 rad, a = 0.4 → t = 0 착지·튕김 뒤 진행 방향이 TP A.19 의 최종 방향으로 꺾인다 (a > 0 은 오른쪽으로)", () => {
+        const balls = [still("white", 0.7, 0.8), still("red", 0.7, 2.6), still("yellow", 0.3, 2.7)];
+        const run = (a: number, theta: number, V0 = 3) => simulateShot(balls, { cueBallId: "white", phi: HALF_PI, V0, a, b: 0, theta }, HAN);
+        /** 첫 rolling 진입 직후 큐볼 속도 방향과 타격 직후 수평 방향의 부호 있는 각(rad, 반시계 양수). */
+        const turn = (r: SimResult) => {
+            const cue0 = r.history[0].balls.find((b) => b.id === "white")!;
+            const k = r.events.findIndex((e) => e.type === "transition" && e.ids[0] === "white" && e.to === "rolling");
+            expect(k).toBeGreaterThan(0);
+            const cue = r.history[k + 1].balls.find((b) => b.id === "white")!;
+            return { cue0, cue, angle: atan2(cue0.v[0] * cue.v[1] - cue0.v[1] * cue.v[0], cue0.v[0] * cue.v[0] + cue0.v[1] * cue.v[1]) };
+        };
+        const r = run(0.4, 0.5);
+        expect(checkInvariants(r, HAN)).toEqual([]);
+        expect(r.events[0]).toEqual({ type: "ball-table", t: 0, ids: ["white"] });
+        const { cue0, cue, angle } = turn(r);
+        expect(cue0.state).toBe("airborne");
+        expect(cue0.v[2]).toBeLessThan(0);
+        // 튕김: 두 번째 착지가 있고 그 사이 50 ms 넘게 떠 있으며 정점 > 5 mm
+        const second = r.events.find((e, k) => k > 0 && e.type === "ball-table")!;
+        expect(second).toBeDefined();
+        expect(second.t).toBeGreaterThan(0.05);
+        const bounce = r.history[1].balls.find((b) => b.id === "white")!;
+        expect(bounce.state).toBe("airborne");
+        expect((0.5 * bounce.v[2] * bounce.v[2]) / T.ball.g).toBeGreaterThan(MIN_BOUNCE_HEIGHT);
+        // TP A.19 / A.4: 최종 구름 방향 v_f = (5/7) v_h + (2/7) R (ω × k̂) — 착지 마찰 임펄스는 미끄럼 마찰과 같은 운동학(Δu = 3.5 Δv)이라
+        // 어떻게 나눠 소진되든 최종 방향은 같다. 타격 직후 상태로 계산한 값과 0.3° 안에서 일치.
+        const vh: [number, number] = [cue0.v[0], cue0.v[1]];
+        const wxk: [number, number] = [cue0.w[1], -cue0.w[0]];
+        const vf: [number, number] = [(5 / 7) * vh[0] + (2 / 7) * R * wxk[0], (5 / 7) * vh[1] + (2 / 7) * R * wxk[1]];
+        const expected = atan2(vh[0] * vf[1] - vh[1] * vf[0], vh[0] * vf[0] + vh[1] * vf[1]);
+        expect(Math.abs(angle - expected)).toBeLessThan((0.3 * Math.PI) / 180);
+        // 크기: θ = 0.5, a = 0.4 는 ≈ 12.3°(TP A.19 값), θ = 0.6, a = 0.5 는 15° 를 넘는다. 오른쪽 사이드 → 진행의 오른쪽(시계 방향, 음수)
+        expect(angle).toBeLessThan((-10 * Math.PI) / 180);
+        expect(angle).toBeGreaterThan((-15 * Math.PI) / 180);
+        const strong = turn(run(0.5, 0.6));
+        expect(strong.angle).toBeLessThan((-15 * Math.PI) / 180);
+        // 거울: a → −a 면 각의 부호만 뒤집힌다
+        const mirror = turn(run(-0.4, 0.5));
+        expect(mirror.angle).toBeCloseTo(-angle, 9);
+        // 구름 진입 뒤에는 방향이 더 변하지 않는다(구름은 직진)
+        const later = stateAt(r, r.history[r.events.findIndex((e) => e.type === "transition" && e.to === "rolling") + 1].t + 0.3, T.ball).find((b) => b.id === "white")!;
+        expect(atan2(cue.v[1], cue.v[0])).toBeCloseTo(atan2(later.v[1], later.v[0]), 9);
+    });
+
+    it("(vii) v2.2 점프: θ = 0.6, V0 = 6, b = −0.3 → 50 ms 넘게 떠 있고 정점 > 15 mm, 정점 자리의 공 위를 넘어간다(θ = 0 이면 그 공을 맞힌다)", () => {
+        const cueAt = still("white", 0.7, 0.5);
+        const far = still("yellow", 0.3, 2.7);
+        const input = { cueBallId: "white", phi: HALF_PI, V0: 6, a: 0, b: -0.3, theta: 0.6 };
+        const solo = simulateShot([cueAt, far], input, HAN);
+        expect(checkInvariants(solo, HAN)).toEqual([]);
+        expect(solo.events[0]).toEqual({ type: "ball-table", t: 0, ids: ["white"] });
+        const up = solo.history[1].balls.find((b) => b.id === "white")!;
+        expect(up.state).toBe("airborne");
+        expect(up.v[2]).toBeGreaterThan(0);
+        expect(up.r[2]).toBe(R);
+        const landing2 = solo.events.findIndex((e, k) => k > 0 && e.type === "ball-table");
+        expect(landing2).toBeGreaterThan(0);
+        const flight = solo.events[landing2].t;
+        expect(flight).toBeGreaterThan(0.05);
+        expect(landingTime(up, T.ball)).toBeCloseTo(flight, 9);
+        // 정점: 비행 중 z − R 의 최대 = v_z²/(2g) > 15 mm (실제로 2R 도 넘는다)
+        const tApex = up.v[2] / T.ball.g;
+        const atApex = stateAt(solo, tApex, T.ball).find((b) => b.id === "white")!;
+        expect(atApex.r[2] - R).toBeCloseTo((0.5 * up.v[2] * up.v[2]) / T.ball.g, 9);
+        expect(atApex.r[2] - R).toBeGreaterThan(0.015);
+        expect(atApex.r[2] - R).toBeGreaterThan(2 * R);
+        // 비행 중 역학적 에너지는 일정하다(중력 포물선)
+        const E = (t: number) => stateAt(solo, t, T.ball).reduce((s, b) => s + kineticEnergy(b, T.ball), 0);
+        for (const f of [0.1, 0.5, 0.9]) expect(E(flight * f)).toBeCloseTo(E(1e-6), 9);
+
+        // 정점 자리에 공을 놓으면 그 위를 넘어간다: 두 번째 착지 전에 볼–볼 이벤트가 없다
+        const red = still("red", atApex.r[0], atApex.r[1]);
+        const over = simulateShot([cueAt, red, far], input, HAN);
+        expect(checkInvariants(over, HAN)).toEqual([]);
+        const overLanding2 = over.events.findIndex((e, k) => k > 0 && e.type === "ball-table");
+        const firstBB = over.events.findIndex((e) => e.type === "ball-ball");
+        expect(overLanding2).toBeGreaterThan(0);
+        expect(firstBB === -1 || firstBB > overLanding2).toBe(true);
+        // 같은 배치에서 큐를 들지 않으면(θ = 0) 빨간 공을 바로 맞힌다
+        const flat = simulateShot([cueAt, red, far], { ...input, theta: 0 }, HAN);
+        expect(flat.events.find((e) => e.type === "ball-ball")!.ids).toEqual(["red", "white"]);
+        expect(flat.events.some((e) => e.type === "ball-table")).toBe(false);
+    });
+
+    it("(viii) v2.2 결정론·연속성: 공중 공이 있는 샷도 두 번 돌리면 비트 동일, 배열 순서 무관, θ = 1e-9 는 θ = 0 과 착지 하나만 다르다", () => {
+        const balls = [still("white", 0.7, 0.8), still("red", 0.7, 2.0), still("yellow", 0.3, 2.7)];
+        for (const input of [
+            { cueBallId: "white", phi: HALF_PI, V0: 3, a: 0.4, b: 0, theta: 0.5 },
+            { cueBallId: "white", phi: 1.2, V0: 9, a: 0.3, b: 0.3, theta: 0.6 },
+        ]) {
+            const r1 = simulateShot(balls, input, HAN);
+            const r2 = simulateShot(balls, input, HAN);
+            const r3 = simulateShot([balls[2], balls[0], balls[1]], input, HAN);
+            expect(r1.events.some((e) => e.type === "ball-table")).toBe(true);
+            expect(r2.hash).toBe(r1.hash);
+            expect(r2.events).toEqual(r1.events);
+            expect(r2.final).toEqual(r1.final);
+            expect(r3.hash).toBe(r1.hash);
+            expect(checkInvariants(r1, HAN)).toEqual([]);
+        }
+        const flat = simulateShot(balls, { cueBallId: "white", phi: HALF_PI, V0: 3, a: 0.2, b: 0.1, theta: 0 }, HAN);
+        const tiny = simulateShot(balls, { cueBallId: "white", phi: HALF_PI, V0: 3, a: 0.2, b: 0.1, theta: 1e-9 }, HAN);
+        expect(flat.history[0].balls.find((b) => b.id === "white")!.state).toBe("sliding");
+        expect(tiny.events[0]).toEqual({ type: "ball-table", t: 0, ids: ["white"] });
+        expect(tiny.history[1].balls.find((b) => b.id === "white")!.state).toBe("sliding");   // 정점 ≪ 5 mm → 정착
+        expect(tiny.events.slice(1).map((e) => e.type + e.ids.join())).toEqual(flat.events.map((e) => e.type + e.ids.join()));
+        for (const b of flat.final) {
+            const q = tiny.final.find((x) => x.id === b.id)!;
+            for (let d = 0; d < 3; d++) expect(Math.abs(q.r[d] - b.r[d])).toBeLessThan(1e-6);
+        }
     });
 
     it("공 배열 순서는 결과 물리·해시에 영향이 없다 (final 은 id 순으로 해시)", () => {

@@ -4,6 +4,9 @@
  *     condition 1 / 0.8 / 1.25 섞음) + 움직이는 시작 상태 20개(fromShots: 샷의 3번째 이벤트 직후 스냅샷에서 simulateFrom,
  *     t0 ≠ 0)를 다시 돌려 해시·이벤트 수·최종 위치가 비트 단위로 같아야 한다.
  *     갱신은 `UPDATE_GOLDEN=1 npx vitest run shared/sim/conformance.test.ts` 로만.
+ *  1b. θ = 0 골든: 같은 200 케이스의 theta 를 0 으로 둔 변형의 해시·이벤트 수·지속시간·최종 위치를 `fixtures/golden-theta0.json`
+ *     에 고정한다. 이 파일은 엔진 2.1.0 이 만들었고(generatedBy), 2.2.0 의 z 축 도입이 큐를 들지 않은 샷을 비트 하나도
+ *     바꾸지 않았음을 증명한다. θ = 0 물리를 **의도적으로** 바꿀 때만 `UPDATE_GOLDEN_THETA0=1` 로 재생성한다.
  *  2. 금지 함수 grep: shared/sim/**\/*.ts (dmath.ts·*.test.ts 제외) 의 주석을 걷어낸 소스에
  *     Math 초월함수(asinh·acosh·atanh 포함)·Math.random·`Math[`·`= Math` 별칭·Date·performance·`**` 가 없고,
  *     import 는 전부 상대 경로다.
@@ -20,6 +23,7 @@ import type { CushionModelId, TableSpec } from "./params.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GOLDEN_PATH = join(here, "fixtures", "golden.json");
+const GOLDEN_THETA0_PATH = join(here, "fixtures", "golden-theta0.json");
 const GOLDEN_SEED = 20260907;
 const GOLDEN_N = 200;
 /** [0, SHS_FROM) han2005, [SHS_FROM, MATHAVAN_FROM) sphereHalfSpace, [MATHAVAN_FROM, N) mathavan2010 */
@@ -69,6 +73,23 @@ interface GoldenFile {
     readonly fromShots: readonly GoldenFromEntry[];
 }
 
+/** θ = 0 골든 항목. 입력은 generateShotCases 가 재현하므로(theta 만 0 으로) 결과만 담는다. */
+interface GoldenTheta0Entry {
+    readonly i: number;
+    readonly hash: string;
+    readonly eventCount: number;
+    readonly duration: number;
+    readonly final: readonly { readonly id: string; readonly r: readonly [number, number, number] }[];
+}
+
+interface GoldenTheta0File {
+    /** 이 파일을 만든 엔진 버전. 2.1.0 — θ = 0 물리가 바뀌지 않는 한 그대로 둔다. */
+    readonly generatedBy: string;
+    readonly seed: number;
+    readonly theta: number;
+    readonly shots: readonly GoldenTheta0Entry[];
+}
+
 function modelFor(i: number): CushionModelId {
     return i < SHS_FROM ? "han2005" : i < MATHAVAN_FROM ? "sphereHalfSpace" : "mathavan2010";
 }
@@ -95,6 +116,19 @@ function fromCaseOf(c: ShotCase): Pick<GoldenFromEntry, "i" | "tableId" | "cushi
 
 function goldenFromCases() {
     return goldenCases().filter((c) => c.i % FROM_EVERY === 0).map(fromCaseOf);
+}
+
+/** 골든 200 케이스의 θ = 0 변형. */
+function theta0Cases(): readonly ShotCase[] {
+    return goldenCases().map((c) => ({ ...c, input: { ...c.input, theta: 0 } }));
+}
+
+function generateTheta0(): GoldenTheta0File {
+    const shots = theta0Cases().map((c): GoldenTheta0Entry => {
+        const r = runCase(c);
+        return { i: c.i, hash: r.hash, eventCount: r.events.length, duration: r.duration, final: r.final.map((b) => ({ id: b.id, r: b.r })) };
+    });
+    return { generatedBy: ENGINE_VERSION, seed: GOLDEN_SEED, theta: 0, shots };
 }
 
 function generateGolden(): GoldenFile {
@@ -221,6 +255,51 @@ describe("골든 픽스처", () => {
                 if (!b) { mismatches.push(`from#${s.i} missing ball ${s.final[k].id}`); continue; }
                 for (let d = 0; d < 3; d++) {
                     if (!Object.is(b.r[d], s.final[k].r[d])) mismatches.push(`from#${s.i} ${b.id}.r[${d}]`);
+                }
+            }
+        }
+        expect(mismatches, mismatches.slice(0, 10).join("\n")).toEqual([]);
+    });
+});
+
+describe("θ = 0 골든 (엔진 2.1.0 참조 — 큐를 들지 않은 샷은 z 축 도입 뒤에도 비트 단위로 같다)", () => {
+    const update = process.env.UPDATE_GOLDEN_THETA0 === "1";
+    if (update) {
+        it("UPDATE_GOLDEN_THETA0=1: fixtures/golden-theta0.json 재생성 (θ = 0 물리를 의도적으로 바꿀 때만)", () => {
+            const g = generateTheta0();
+            writeFileSync(GOLDEN_THETA0_PATH, JSON.stringify(g, null, 1) + "\n");
+            expect(g.shots.length).toBe(GOLDEN_N);
+        });
+    }
+    const golden: GoldenTheta0File | null = existsSync(GOLDEN_THETA0_PATH) || update
+        ? (update ? generateTheta0() : (JSON.parse(readFileSync(GOLDEN_THETA0_PATH, "utf8")) as GoldenTheta0File))
+        : null;
+
+    it("픽스처가 있고 200개, seed·theta 가 맞다", () => {
+        expect(golden, "fixtures/golden-theta0.json 이 없다 — UPDATE_GOLDEN_THETA0=1 로 생성").not.toBeNull();
+        expect(golden!.shots.length).toBe(GOLDEN_N);
+        expect(golden!.seed).toBe(GOLDEN_SEED);
+        expect(golden!.theta).toBe(0);
+        expect(golden!.generatedBy).toMatch(/^\d+\.\d+\.\d+$/);
+    });
+
+    it("200개 θ = 0 샷의 해시·이벤트 수·지속시간·최종 위치가 참조와 정확히 같고, 착지 이벤트가 없다", () => {
+        expect(golden).not.toBeNull();
+        const mismatches: string[] = [];
+        const cases = theta0Cases();
+        for (let k = 0; k < cases.length; k++) {
+            const s = golden!.shots[k];
+            const r = runCase(cases[k]);
+            if (r.hash !== s.hash) mismatches.push(`θ0#${s.i} hash ${r.hash} != ${s.hash}`);
+            if (r.events.length !== s.eventCount) mismatches.push(`θ0#${s.i} events ${r.events.length} != ${s.eventCount}`);
+            if (r.duration !== s.duration) mismatches.push(`θ0#${s.i} duration`);
+            if (r.events.some((e) => e.type === "ball-table")) mismatches.push(`θ0#${s.i} has ball-table`);
+            if (r.history[0].balls.find((b) => b.id === "white")!.state !== "sliding") mismatches.push(`θ0#${s.i} cue not sliding`);
+            for (let j = 0; j < s.final.length; j++) {
+                const b = r.final.find((x) => x.id === s.final[j].id);
+                if (!b) { mismatches.push(`θ0#${s.i} missing ball ${s.final[j].id}`); continue; }
+                for (let d = 0; d < 3; d++) {
+                    if (!Object.is(b.r[d], s.final[j].r[d])) mismatches.push(`θ0#${s.i} ${b.id}.r[${d}]`);
                 }
             }
         }

@@ -34,6 +34,7 @@
  */
 import type { BallState, CushionSegment, Vec3 } from "../../types.js";
 import type { BallParams } from "../../params.js";
+import { resolveCushionSHS } from "./sphereHalfSpace.js";
 
 export type HanRegime = "grip" | "slip";
 
@@ -134,8 +135,11 @@ export function hanRegime(b: BallState, seg: CushionSegment, p: BallParams, cush
 /**
  * Han 2005 쿠션 충돌 해결. 결과는 v_z = 0, state 'sliding' 인 새 BallState.
  * 공이 쿠션에서 멀어지는 중이면(감지기가 부르지 않는 경우) 입력을 그대로 돌려준다.
+ * 공중의 공(airborne, v2.2)은 Han 의 식이 전제하는 슬레이트 반력(코가 공을 누르고 테이블이 받친다)이 없으므로
+ * 무한 높이 수직 벽(sphereHalfSpace 3D)으로 넘긴다 — cushion/index.ts 머리 주석.
  */
 export function resolveCushionHan(b: BallState, seg: CushionSegment, p: BallParams, cushionHeight: number): BallState {
+    if (b.state === "airborne") return resolveCushionSHS(b, seg, p, cushionHeight);
     const { ex, ey } = cushionBasis(seg);
     const sol = solveHan(toFrame(b.v, ex, ey), toFrame(b.w, ex, ey), p, cushionHeight);
     if (!sol) return b;

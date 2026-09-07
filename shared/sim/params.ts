@@ -32,6 +32,11 @@ export interface BallParams {
     readonly eE: number;
     /** 쿠션 마찰 계수. pooltool 캐롬 프리셋 0.15, Mathavan 2010 μ_w 0.14–0.2 */
     readonly fC: number;
+    /**
+     * 공–슬레이트(테이블 면) 운동학적 반발 계수 e_t — 점프·마세이 착지의 수직 속도비(resolve/ballTable.ts, v2.2).
+     * pooltool e_t 0.5, Dr. Dave 0.5–0.7. 슬레이트 특성이라 applyCondition(천 컨디션)은 건드리지 않는다.
+     */
+    readonly eT: number;
     /** 중력 가속도 */
     readonly g: number;
 }
@@ -68,7 +73,7 @@ export interface SimParams {
     readonly cushionModel: CushionModelId;
     /**
      * 테이블 컨디션 스칼라(1.0 = 문헌값, 양의 유한수). 히팅·습도 느낌을 한 숫자로:
-     * muR·muS 는 1/condition 배, eC·eE 는 condition^0.25 배로 스케일한다(구현은 applyCondition 참고).
+     * muR·muS 는 1/condition 배, eC·eE 는 condition^0.25 배로 스케일한다(구현은 applyCondition 참고). eT(슬레이트)는 그대로.
      */
     readonly condition: number;
 }
@@ -84,6 +89,7 @@ const CAROM_BALL_61_5: BallParams = {
     eC: 0.88,
     eE: 0.88,
     fC: 0.15,
+    eT: 0.5,
     g: 9.81,
 };
 

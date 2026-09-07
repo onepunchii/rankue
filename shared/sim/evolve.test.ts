@@ -4,6 +4,7 @@ import { TABLES } from "./params.js";
 import {
     evolveBall,
     kineticEnergy,
+    landingTime,
     nextTransition,
     positionPolynomial,
     rollTime,
@@ -259,6 +260,7 @@ describe("positionPolynomial", () => {
         ball({ state: "rolling", v: [2, 3, 0], w: [-3 / R, 2 / R, 4] }),
         ball({ state: "spinning", w: [0, 0, 9] }),
         ball({ state: "stationary" }),
+        ball({ state: "airborne", r: [0.5, 1.0, R + 0.02], v: [1.5, -0.5, 2.5], w: [10, 25, -8] }),  // 착지까지 ≈ 0.52 s
     ];
     it("r(t) = r0 + r1 t + r2 t² 이 evolveBall 과 1e-12 안에서 일치 (t = 0.01, 0.1, 0.5)", () => {
         for (const b of cases) {
@@ -275,19 +277,30 @@ describe("positionPolynomial", () => {
             }
         }
     });
-    it("가속도 크기: sliding ½μ_s g, rolling ½μ_r g, 그 외 0", () => {
+    it("가속도 크기: sliding ½μ_s g, rolling ½μ_r g, airborne (0, 0, −½g), 그 외 0", () => {
         expect(norm(positionPolynomial(cases[0], P).r2)).toBeCloseTo(0.5 * P.muS * P.g, 12);
         expect(norm(positionPolynomial(cases[1], P).r2)).toBeCloseTo(0.5 * P.muR * P.g, 12);
         expect(positionPolynomial(cases[2], P).r2).toEqual([0, 0, 0]);
         expect(positionPolynomial(cases[3], P).r2).toEqual([0, 0, 0]);
+        expect(positionPolynomial(cases[4], P).r2).toEqual([0, 0, -0.5 * P.g]);
     });
 });
 
 describe("kineticEnergy", () => {
-    it("½ m v² + ½ (2/5 m R²) ω²", () => {
+    it("½ m v² + ½ (2/5 m R²) ω² (천 위: 위치에너지 항이 정확히 0 이라 2.1.0 값과 비트 동일)", () => {
         const b = ball({ state: "sliding", v: [3, 4, 0], w: [0, 0, 10] });
+        expect(kineticEnergy(b, P)).toBe(0.5 * P.m * (3 * 3 + 4 * 4 + 0 * 0) + 0.5 * (0.4 * P.m * R * R) * (0 * 0 + 0 * 0 + 10 * 10));
         expect(kineticEnergy(b, P)).toBeCloseTo(0.5 * P.m * 25 + 0.5 * 0.4 * P.m * R * R * 100, 14);
         expect(kineticEnergy(ball({ state: "stationary" }), P)).toBe(0);
+    });
+
+    it("v2.2: 위치에너지 m g (z − R) 가 더해진다 — 공중 공의 KE + PE 는 비행 중 일정", () => {
+        const b = ball({ state: "airborne", r: [0.5, 1.0, R + 0.03], v: [1, 0, 2], w: [0, 0, 0] });
+        expect(kineticEnergy(b, P)).toBeCloseTo(0.5 * P.m * 5 + P.m * P.g * 0.03, 14);
+        const E0 = kineticEnergy(b, P);
+        for (const t of [0.05, 0.1, 0.2, 0.3, 0.4]) {
+            expect(Math.abs(kineticEnergy(evolveBall(b, t, P), P) - E0)).toBeLessThan(1e-12 * E0);
+        }
     });
 
     it("모든 상태에서 시간에 대해 단조 비증가", () => {
@@ -299,9 +312,10 @@ describe("kineticEnergy", () => {
             ball({ state: "rolling", v: v0, w: [-v0[1] / R, v0[0] / R, -12] }),
             ball({ state: "spinning", w: [0, 0, 30] }),
             ball({ state: "stationary" }),
+            ball({ state: "airborne", r: [0.5, 1.0, R], v: [1, 1, 1.5], w: [5, 5, 5] }),   // KE + PE 일정(비증가로 통과)
         ];
         for (const b of balls) {
-            const T = Math.min(slideTime(b, P), rollTime(b, P), spinTime(b, P), 5);
+            const T = Math.min(slideTime(b, P), rollTime(b, P), spinTime(b, P), landingTime(b, P), 5);
             const horizon = Number.isFinite(T) ? T : 1;
             let prev = kineticEnergy(b, P);
             for (let i = 1; i <= 200; i++) {
@@ -313,6 +327,36 @@ describe("kineticEnergy", () => {
     });
 });
 
+describe("airborne (v2.2)", () => {
+    it("포물선: r = r0 + v0 t − ½ g t² ẑ, v_z = v_z0 − g t, xy 등속, ω 불변(ω_z 도 감쇠하지 않는다), state 유지", () => {
+        const b = ball({ state: "airborne", r: [0.5, 1.0, R + 0.01], v: [1.2, -0.4, 1.8], w: [3, -7, 25] });
+        for (const t of [0.01, 0.1, 0.25]) {
+            const e = evolveBall(b, t, P);
+            expect(e.r[0]).toBeCloseTo(0.5 + 1.2 * t, 14);
+            expect(e.r[1]).toBeCloseTo(1.0 - 0.4 * t, 14);
+            expect(e.r[2]).toBeCloseTo(R + 0.01 + 1.8 * t - 0.5 * P.g * t * t, 14);
+            expect(e.v).toEqual([1.2, -0.4, 1.8 - P.g * t]);
+            expect(e.w).toEqual([3, -7, 25]);
+            expect(e.state).toBe("airborne");
+        }
+        expect(evolveBall(b, 0, P)).toEqual(b);
+    });
+
+    it("landingTime: z = R 에서 위로 v_z 면 2 v_z/g, 높이 h 정지면 √(2h/g), 그 시각에 z = R; 전이 함수들은 airborne 에서 Infinity / null", () => {
+        const up = ball({ state: "airborne", r: [0.5, 1.0, R], v: [1, 0, 1.5] });
+        expect(landingTime(up, P)).toBeCloseTo(3 / P.g, 12);
+        expect(Math.abs(evolveBall(up, landingTime(up, P), P).r[2] - R)).toBeLessThan(1e-12);
+        const drop = ball({ state: "airborne", r: [0.5, 1.0, R + 0.05], v: [0, 0, 0] });
+        expect(landingTime(drop, P)).toBeCloseTo(Math.sqrt(0.1 / P.g), 12);
+        expect(landingTime(ball({ state: "airborne", r: [0.5, 1.0, R], v: [1, 0, -2] }), P)).toBe(0);
+        expect(landingTime(ball({ state: "sliding", v: [1, 0, 0] }), P)).toBe(Infinity);
+        expect(slideTime(up, P)).toBe(Infinity);
+        expect(rollTime(up, P)).toBe(Infinity);
+        expect(spinTime(up, P)).toBe(Infinity);
+        expect(nextTransition(up, P)).toBeNull();
+    });
+});
+
 describe("입력 불변", () => {
     it("어떤 함수도 인자를 바꾸지 않고, 반환 튜플은 입력과 별개의 배열이다", () => {
         const v0: Vec3 = [1.7, -0.3, 0];
@@ -321,12 +365,13 @@ describe("입력 불변", () => {
             deepFreeze(ball({ state: "rolling", v: v0, w: [-v0[1] / R, v0[0] / R, 6] })),
             deepFreeze(ball({ state: "spinning", w: [0, 0, 6] })),
             deepFreeze(ball({ state: "stationary" })),
+            deepFreeze(ball({ state: "airborne", r: [0.5, 1.0, R + 0.02], v: [1, 1, 1], w: [1, 2, 3] })),
         ];
         const frozenP = Object.freeze({ ...P });
         for (const b of balls) {
             const before = snapshot(b);
             slipVelocity(b, frozenP);
-            slideTime(b, frozenP); rollTime(b, frozenP); spinTime(b, frozenP);
+            slideTime(b, frozenP); rollTime(b, frozenP); spinTime(b, frozenP); landingTime(b, frozenP);
             nextTransition(b, frozenP);
             positionPolynomial(b, frozenP);
             kineticEnergy(b, frozenP);

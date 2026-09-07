@@ -6,8 +6,8 @@ import { ENGINE_VERSION, paramsHash, physicsParams, stableStringify } from "./ve
 import { DEFAULT_PARAMS, TABLES, DEFAULT_CUE, type SimParams } from "./params.js";
 
 describe("version", () => {
-    it("ENGINE_VERSION 은 semver 2.1.0", () => {
-        expect(ENGINE_VERSION).toBe("2.1.0");
+    it("ENGINE_VERSION 은 semver 2.2.0", () => {
+        expect(ENGINE_VERSION).toBe("2.2.0");
         expect(ENGINE_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
     });
 
@@ -39,6 +39,7 @@ describe("version", () => {
         expect(paramsHash({ ...DEFAULT_PARAMS, condition: 1.05 })).not.toBe(h);
         expect(paramsHash({ ...DEFAULT_PARAMS, table: { ...TABLES.DAEDAE, cushionHeight: 0.0371 } })).not.toBe(h);
         expect(paramsHash({ ...DEFAULT_PARAMS, table: { ...TABLES.DAEDAE, ball: { ...TABLES.DAEDAE.ball, eE: 0.9 } } })).not.toBe(h);
+        expect(paramsHash({ ...DEFAULT_PARAMS, table: { ...TABLES.DAEDAE, ball: { ...TABLES.DAEDAE.ball, eT: 0.6 } } })).not.toBe(h);
     });
 
     it("paramsHash: 물리와 무관한 table.name 은 무시한다 (표시명·i18n 이 래더를 가르지 않는다)", () => {
