@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { ChevronLeft, ChevronRight, LayoutList, LucideUndo2, X } from "@/lib/icons";
+import { ChevronLeft, ChevronRight, LayoutList, LucideUndo2, X, LucideSparkles } from "@/lib/icons";
 import type { CueInput, Phase } from "../simReducer";
 import { THICKNESS_UI_STEPS, thicknessStepLabel, type ActiveThickness, type ThicknessStep } from "../controlsMath";
 import { HoldButton } from "./HoldButton";
@@ -30,6 +30,8 @@ export interface ControlsProps {
     onUndo: () => void;
     onInnings: () => void;
     onExit: () => void;
+    /** 해법 찾기(연습·드릴에서만 넘긴다 — 기록 세션·대전엔 없다) */
+    onSolve?: () => void;
 }
 
 const ICON_BTN = "h-11 w-11 rounded-tile border border-surface-line bg-surface-1 text-ink-2 flex items-center justify-center active:bg-surface-3 disabled:opacity-40 disabled:pointer-events-none";
@@ -97,6 +99,11 @@ export const Controls = memo(function Controls(p: ControlsProps) {
                 {p.canUndo && (
                     <IconButton label={t("sim.controls.undo")} onClick={p.onUndo}>
                         <LucideUndo2 className="w-4 h-4" />
+                    </IconButton>
+                )}
+                {p.onSolve && (
+                    <IconButton label={t("sim.solver.button")} onClick={p.onSolve} disabled={p.phase !== "aim"}>
+                        <LucideSparkles className="w-4 h-4" />
                     </IconButton>
                 )}
                 <IconButton label={t("sim.controls.innings")} onClick={p.onInnings}>

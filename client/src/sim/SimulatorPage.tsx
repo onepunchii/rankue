@@ -39,6 +39,10 @@ import { MatchList, MATCH_LIST_QUERY_KEY } from "./match/MatchList";
 import { endReasonText } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
 import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
+import { useSolver } from "./solver/useSolver";
+import { SolverSheet } from "./solver/SolverSheet";
+import type { SolveCandidate } from "./solver/search";
+import { buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
 import { DrillPanel, DRILL_WEEK_QUERY_KEY, DRILL_LADDER_QUERY_KEY } from "./drill/DrillPanel";
 import { drillApi, type DrillWeek, type WeekDrill } from "./drill/drillApi";
 import { buildConfig } from "./setupPresets";
@@ -84,6 +88,8 @@ interface View {
     placing: string | null;
     /** 다이아몬드 시스템 오버레이(토글 켜짐 + 3쿠션). */
     diamond: boolean;
+    /** 해법 찾기에서 "경로 보기"를 켠 후보 — 조준선·경로를 그 후보로 그린다 */
+    solverPreview: { candidate: SolveCandidate; paths: PreviewPaths } | null;
 }
 
 export function SimulatorPage() {
@@ -151,6 +157,11 @@ export function SimulatorPage() {
     });
     const { actions } = sim;
     const table = sim.params?.table ?? TABLES.DAEDAE;
+    // ── 해법 찾기(연습·드릴 전용, 워커) ─────────────────────────────────
+    const solver = useSolver();
+    const [solverOpen, setSolverOpen] = useState(false);
+    const [solverPreview, setSolverPreview] = useState<{ candidate: SolveCandidate; paths: PreviewPaths } | null>(null);
+    const solverSeedRef = useRef(1);
     const lastResultRef = useRef(sim.lastResult);
     lastResultRef.current = sim.lastResult;
     const drillLocked = !!drill && !drill.scored;
@@ -343,15 +354,15 @@ export function SimulatorPage() {
     // rAF 루프가 읽는 뷰 — 렌더마다 갱신(할당만, 재렌더 없음)
     const viewRef = useRef<View>({
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview,
     });
     viewRef.current = {
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview,
     };
     useEffect(() => {
         dirtyRef.current = true;
-    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn]);
+    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview]);
 
     const { frameAt } = sim;
     useEffect(() => {
@@ -375,10 +386,11 @@ export function SimulatorPage() {
             if (!overlay) return;
             if (v.phase === "aim") {
                 // 드래그 중엔 직선 안내(미리보기는 30 ms 뒤에 오므로), 손을 떼면 예측 경로
+                const sp = v.solverPreview;
                 overlay.draw({
-                    balls: v.balls, phi: v.input.phi, cueBallId: v.cueBallId, table: v.table,
-                    guide: v.dragging || !v.preview ? "straight" : "preview",
-                    preview: v.preview?.paths ?? null,
+                    balls: v.balls, phi: sp ? sp.candidate.input.phi : v.input.phi, cueBallId: v.cueBallId, table: v.table,
+                    guide: sp || (!v.dragging && v.preview) ? "preview" : "straight",
+                    preview: sp ? sp.paths : (v.preview?.paths ?? null),
                     // 다이아몬드 시스템: 조준 분석은 싸다(광선 하나·산술 몇 줄) — dirty 프레임에만 다시 계산된다
                     diamond: v.diamond ? overlayDiamond(v.balls, v.cueBallId, v.input.phi, v.table, numbersCacheRef.current) : null,
                     project: projectRef.current,
@@ -597,6 +609,31 @@ export function SimulatorPage() {
         actions.start(buildConfig({ gameType: "3c", tableId: week.tableId, target: 100, rules: { ruleSet: "umb" } }), { record: false, balls: d.balls });
     }, [actions]);
 
+    const openSolver = useCallback(() => {
+        if (!sim.config || !sim.params || sim.phase !== "aim") return;
+        setSolverOpen(true);
+        void solver.solve({
+            balls: sim.balls, cueBallId: sim.cueBallId, gameType: sim.config.gameType, rules: sim.config.rules,
+            params: sim.params, seed: solverSeedRef.current,
+        });
+    }, [sim.config, sim.params, sim.phase, sim.balls, sim.cueBallId, solver]);
+    const retrySolver = useCallback(() => { solverSeedRef.current += 1; openSolver(); }, [openSolver]);
+    const onSolverPreview = useCallback((c: SolveCandidate | null) => {
+        if (!c || !sim.config) { setSolverPreview(null); return; }
+        setSolverPreview({ candidate: c, paths: buildPreviewPaths(c.result, { cueBallId: sim.cueBallId, gameType: sim.config.gameType }) });
+    }, [sim.config, sim.cueBallId]);
+    const onSolverApply = useCallback((c: SolveCandidate) => {
+        // 반올림 없이 그대로 → 샷 해시가 후보와 같다
+        actions.setInput({ phi: c.input.phi, V0: c.input.V0, a: c.input.a, b: c.input.b, theta: 0 });
+        setSolverPreview(null);
+        setSolverOpen(false);
+        toast({ title: t("sim.solver.applied") });
+    }, [actions, toast, t]);
+    // 배치가 바뀌면(샷·되돌리기·공 옮기기) 후보는 낡은 것 — 경로를 끄고 시트를 닫는다
+    useEffect(() => { setSolverPreview(null); setSolverOpen(false); }, [sim.balls]);
+    // 연습·드릴(채점 뒤)에서만. 기록 세션·대전엔 넘기지 않는다.
+    const solverAllowed = sim.mode === "solo" && !sim.record && !drillLocked;
+
     const onSetupStart = useCallback((config: SimSetupConfig, opts: { record: boolean }) => {
         setDrill(null);
         setSetupOpen(false);
@@ -762,6 +799,7 @@ export function SimulatorPage() {
                     onThickness={onThickness} onSide={onSide} onNudge={onNudge}
                     onSpin={onSpin} onPower={onPower} onShoot={onShoot} onRestart={onRestart}
                     onUndo={onUndo} onInnings={onInnings} onExit={onExitRequest}
+                    onSolve={solverAllowed ? openSolver : undefined}
                 />
             </div>
 
@@ -784,6 +822,14 @@ export function SimulatorPage() {
                 </div>
             )}
             <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} onMatch={() => navigate("/online-game?lobby=1", { replace: true })} onDrills={() => navigate("/online-game?drills=1", { replace: true })} />
+            <SolverSheet
+                open={solverOpen}
+                onOpenChange={(o) => { if (!o) solver.cancel(); setSolverOpen(o); }}
+                status={solver.status} progress={solver.progress}
+                candidates={solver.result?.candidates ?? []}
+                onApply={onSolverApply} onPreview={onSolverPreview}
+                onCancel={solver.cancel} onRetry={retrySolver}
+            />
             <ResignConfirm open={resignOpen} onOpenChange={setResignOpen} busy={exiting} onConfirm={() => { void onResign(); }} />
             <InningSheet open={sheetOpen} onOpenChange={setSheetOpen} log={log} session={sim.session} names={names} phase={sim.phase} />
             <EndDialog
