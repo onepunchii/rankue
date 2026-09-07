@@ -11,6 +11,23 @@ import { DEFAULT_3C_RULES, DEFAULT_4C_RULES, type FinishType } from "@shared/sim
 
 export type TableId = TableSpec["id"];
 
+/**
+ * 플레이 모드(2026-09-07 오너). normal = 일반: 조준 보정(스쿼트 자동) 켜짐, 한 2005, 컨디션 보통.
+ * reality = 리얼리티: 조준선이 큐 방향 그대로(보정은 선수 몫), 마타반 2010, 대회 테이블(1.10). 물리값은 세부 설정에서 바꿀 수 있다.
+ */
+export type SimMode = "normal" | "reality";
+export const SIM_MODES: readonly SimMode[] = ["normal", "reality"];
+
+/** 모드가 채우는 물리 기본값. */
+export function modePreset(mode: SimMode): { readonly cushionModel: CushionModelId; readonly condition: number } {
+    return mode === "reality" ? { cushionModel: "mathavan2010", condition: 1.1 } : { cushionModel: "han2005", condition: 1 };
+}
+
+/** 조준 보정(스쿼트 자동 보정): 일반 모드만. */
+export function aimAssistFor(mode: SimMode): boolean {
+    return mode === "normal";
+}
+
 /** 다이얼로그가 onStart 로 내보내는 세션 설정. 서버 POST /sim/sessions 본문과 필드가 같다. */
 export interface SimSetupConfig {
     readonly gameType: GameType;
@@ -24,6 +41,8 @@ export interface SimSetupConfig {
     readonly cushionModel: CushionModelId;
     /** 테이블 컨디션 스칼라. 0.8(느림) ~ 1.2(빠름) */
     readonly condition: number;
+    /** 플레이 모드. 화면 조준 보정만 좌우하고 서버 재판정엔 관여하지 않는다(대전은 방장 설정을 둘 다 따른다). */
+    readonly mode: SimMode;
 }
 
 /** 규칙 빌더 옵션. 종목에 맞지 않는 항목은 무시한다. */
@@ -123,10 +142,14 @@ export interface BuildConfigInput {
     readonly inningCap?: number;
     readonly cushionModel?: CushionModelId;
     readonly condition?: number;
+    /** 기본 normal. 쿠션 모델·컨디션을 주지 않으면 모드 프리셋으로 채운다. */
+    readonly mode?: SimMode;
 }
 
 /** 폼 상태 → 세션 설정. 범위를 벗어난 값은 여기서 한 번 더 정리해 서버 400 을 막는다. */
 export function buildConfig(i: BuildConfigInput): SimSetupConfig {
+    const mode: SimMode = i.mode ?? "normal";
+    const preset = modePreset(mode);
     return {
         gameType: i.gameType,
         tableId: i.tableId ?? defaultTableFor(i.gameType),
@@ -134,7 +157,8 @@ export function buildConfig(i: BuildConfigInput): SimSetupConfig {
         rules: buildRules(i.gameType, i.rules),
         finishType: "none",
         inningCap: INNING_CAPS.includes(i.inningCap ?? 0) ? (i.inningCap ?? 0) : 0,
-        cushionModel: i.cushionModel ?? "han2005",
-        condition: clampCondition(i.condition ?? CONDITION_DEFAULT),
+        cushionModel: i.cushionModel ?? preset.cushionModel,
+        condition: clampCondition(i.condition ?? preset.condition),
+        mode,
     };
 }

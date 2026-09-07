@@ -68,3 +68,15 @@ describe("pageConfig", () => {
         expect(decodePageConfig(readCfgParam(search))).toEqual({ config: cfg3c, record: true });
     });
 });
+
+describe("플레이 모드 왕복", () => {
+    it("reality 는 그대로 살아오고, 모르는 값·없음은 normal", () => {
+        const reality = buildConfig({ gameType: "3c", target: 15, mode: "reality" });
+        const pc = decodePageConfig(encodePageConfig({ config: reality, record: false }));
+        expect(pc!.config.mode).toBe("reality");
+        expect(pc!.config.cushionModel).toBe("mathavan2010");
+        expect(pc!.config.condition).toBe(1.1);
+        expect(parsePageConfig({ gameType: "3c", target: 15, mode: "weird" })!.config.mode).toBe("normal");
+        expect(parsePageConfig({ gameType: "3c", target: 15 })!.config.mode).toBe("normal");
+    });
+});

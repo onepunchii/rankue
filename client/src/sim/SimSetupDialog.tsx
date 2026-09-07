@@ -16,7 +16,7 @@ import type { CushionModelId } from "@shared/sim/params";
 import type { GameType, ThreeCushionRuleSet } from "@shared/sim/rules/types";
 import {
     buildConfig, defaultTableFor, defaultTarget, isValidTarget, conditionLabel, clampCondition,
-    TARGET_CHIPS, TARGET_MIN, TARGET_MAX, INNING_CAPS, CUSHION_MODELS,
+    TARGET_CHIPS, TARGET_MIN, TARGET_MAX, INNING_CAPS, CUSHION_MODELS, SIM_MODES, modePreset, type SimMode,
     CONDITION_MIN, CONDITION_MAX, CONDITION_STEP, CONDITION_DEFAULT,
     type SimSetupConfig, type TableId,
 } from "./setupPresets";
@@ -119,6 +119,15 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
     const [condition, setCondition] = useState<number>(CONDITION_DEFAULT);
     // 기록 여부. 끄면 연습 모드(useSimulator record=false: 서버 호출 없음, 되돌리기·공 배치 허용). 기본 켜짐.
     const [record, setRecord] = useState(true);
+    // 플레이 모드. 일반 = 조준 보정 자동, 리얼리티 = 큐 방향 그대로 + 마타반 2010 + 대회 테이블. 모드가 물리 기본값을 채우고 세부 설정에서 바꿀 수 있다.
+    const [mode, setMode] = useState<SimMode>("normal");
+    const pickMode = (m: SimMode) => {
+        if (m === mode) return;
+        setMode(m);
+        const preset = modePreset(m);
+        setCushionModel(preset.cushionModel);
+        setCondition(preset.condition);
+    };
 
     const handicap = gameType === "3c" ? member?.handi3c : member?.handi4c;
 
@@ -165,7 +174,7 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
     const submit = () => {
         if (!targetOk) return;
         onStart(buildConfig({
-            gameType, tableId, target: targetNum, inningCap, cushionModel, condition,
+            gameType, tableId, target: targetNum, inningCap, cushionModel, condition, mode,
             rules: gameType === "3c"
                 ? { ruleSet }
                 : { threeCushionDouble, passiveOpponentContactIsFoul: passiveFoul },
@@ -184,6 +193,23 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
                 </DialogHeader>
 
                 <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 space-y-4 pb-2">
+                    {/* 모드 — 일반(조준 보정 자동) / 리얼리티(큐 방향 그대로 · 마타반 2010 · 대회 테이블). 설명 한 줄이 따라 붙는다. */}
+                    <div className="space-y-1.5">
+                        <Label>{t("sim.setup.mode")}</Label>
+                        <div className="flex gap-2">
+                            {SIM_MODES.map((m) => (
+                                <SegmentTwoLine
+                                    key={m} selected={mode === m} onClick={() => pickMode(m)}
+                                    title={m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality")}
+                                    desc={m === "normal" ? t("sim.setup.modeNormalDesc") : t("sim.setup.modeRealityDesc")}
+                                />
+                            ))}
+                        </div>
+                        <p className="text-[12px] font-medium leading-relaxed text-ink-4">
+                            {mode === "normal" ? t("sim.setup.modeNormalHint") : t("sim.setup.modeRealityHint")}
+                        </p>
+                    </div>
+
                     {/* 종목 */}
                     <div className="space-y-1.5">
                         <Label>{t("sim.setup.gameType")}</Label>

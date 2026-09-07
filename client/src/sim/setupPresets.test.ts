@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { aimAssistFor, buildConfig as buildConfigForMode, modePreset } from "./setupPresets";
 import { DEFAULT_3C_RULES, DEFAULT_4C_RULES } from "@shared/sim/rules";
 import {
     buildRules, buildConfig, defaultTarget, defaultTableFor, clampTarget, isValidTarget,
@@ -106,6 +107,7 @@ describe("buildConfig", () => {
             inningCap: 0,
             cushionModel: "han2005",
             condition: 1,
+            mode: "normal",
         });
     });
     it("범위 밖 값을 정리한다", () => {
@@ -115,5 +117,25 @@ describe("buildConfig", () => {
         expect(c.condition).toBe(CONDITION_MAX);
         expect(c.cushionModel).toBe("mathavan2010");
         expect(c.rules).toEqual({ gameType: "3c", ruleSet: "pba", bankShotPoint: 2 });
+    });
+});
+
+describe("플레이 모드", () => {
+    it("기본은 일반(보정 켜짐 · 한 2005 · 1.00), 리얼리티는 보정 꺼짐 · 마타반 2010 · 1.10", () => {
+        const normal = buildConfigForMode({ gameType: "3c", target: 15 });
+        expect(normal.mode).toBe("normal");
+        expect(normal.cushionModel).toBe("han2005");
+        expect(normal.condition).toBe(1);
+        expect(aimAssistFor(normal.mode)).toBe(true);
+        const reality = buildConfigForMode({ gameType: "3c", target: 15, mode: "reality" });
+        expect(reality.mode).toBe("reality");
+        expect(reality.cushionModel).toBe("mathavan2010");
+        expect(reality.condition).toBe(1.1);
+        expect(aimAssistFor(reality.mode)).toBe(false);
+        expect(modePreset("reality")).toEqual({ cushionModel: "mathavan2010", condition: 1.1 });
+    });
+    it("모드 프리셋은 명시한 물리값을 덮지 않는다", () => {
+        const c = buildConfigForMode({ gameType: "4c", target: 80, mode: "reality", cushionModel: "han2005", condition: 0.9 });
+        expect(c).toMatchObject({ mode: "reality", cushionModel: "han2005", condition: 0.9 });
     });
 });

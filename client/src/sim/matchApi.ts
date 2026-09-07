@@ -13,6 +13,7 @@ import type { BallState, ShotInput, SimEvent, Snapshot } from "@shared/sim/types
 import type { CushionModelId, TableSpec } from "@shared/sim/params";
 import type { FinishType, GameType, Rules, SessionState, ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
+import { aimAssistFor } from "./setupPresets";
 import {
     SIM_API_BASE, classifyApiError, isBallArray, isSessionState, toShotBody,
     type ApiFailure, type RequestFn, type ShotRequest,
@@ -63,6 +64,8 @@ export interface MatchPublic {
     readonly tableId: TableSpec["id"];
     readonly cushionModel: CushionModelId;
     readonly condition: number;
+    /** 조준 보정(일반 모드 true). 방장 설정을 둘 다 따른다. 예전 서버 응답엔 없을 수 있어 선택 — 없으면 true. */
+    readonly aimAssist?: boolean;
     readonly rules: Rules;
     readonly finishType: FinishType;
     readonly inningCap: number;
@@ -148,6 +151,8 @@ export interface CreateMatchBody {
     readonly finishType: FinishType;
     readonly target: number;
     readonly inningCap: number;
+    /** 조준 보정(일반 모드). 서버가 저장해 게스트도 같은 모드로 친다. */
+    readonly aimAssist: boolean;
 }
 
 export interface JoinMatchBody {
@@ -167,6 +172,7 @@ export function toCreateMatchBody(config: SimSetupConfig): CreateMatchBody {
         finishType: config.finishType,
         target: config.target,
         inningCap: config.inningCap,
+        aimAssist: aimAssistFor(config.mode),
     };
 }
 
@@ -405,6 +411,7 @@ export function matchConfig(m: MatchPublic): SimSetupConfig {
         inningCap: m.inningCap,
         cushionModel: m.cushionModel,
         condition: m.condition,
+        mode: m.aimAssist === false ? "reality" : "normal",
     };
 }
 

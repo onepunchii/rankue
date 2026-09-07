@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { TABLES } from "@shared/sim/params";
 import type { GameType, ThreeCushionRuleSet } from "@shared/sim/rules/types";
-import {
+import { SIM_MODES, type SimMode,
     buildConfig, defaultTableFor, defaultTarget, isValidTarget,
     TARGET_CHIPS, TARGET_MIN, TARGET_MAX, INNING_CAPS, type TableId,
 } from "../setupPresets";
@@ -134,6 +134,8 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
     const [ruleSet, setRuleSet] = useState<ThreeCushionRuleSet>("umb");
     const [threeCushionDouble, setThreeCushionDouble] = useState(false);
     const [passiveFoul, setPassiveFoul] = useState(false);
+    // 플레이 모드: 방장이 고르면 게스트도 같은 모드(서버 aimAssist). 물리 기본값은 buildConfig 의 모드 프리셋이 채운다.
+    const [mode, setMode] = useState<SimMode>("normal");
     const [inningCap, setInningCap] = useState<number>(0);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -159,7 +161,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
         setError(null);
         try {
             const m = await api.createMatch(buildConfig({
-                gameType, tableId, target: targetNum, inningCap,
+                gameType, tableId, target: targetNum, inningCap, mode,
                 rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: passiveFoul },
             }));
             setCreated(m);
@@ -281,6 +283,22 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
             </div>
 
             <TargetPicker id="sim-match-target" gameType={gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+
+            <div className="space-y-1.5">
+                <Label>{t("sim.setup.mode")}</Label>
+                <div className="flex gap-2">
+                    {SIM_MODES.map((m) => (
+                        <SegmentTwoLine
+                            key={m} selected={mode === m} onClick={() => setMode(m)}
+                            title={m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality")}
+                            desc={m === "normal" ? t("sim.setup.modeNormalDesc") : t("sim.setup.modeRealityDesc")}
+                        />
+                    ))}
+                </div>
+                <p className="text-[12px] font-medium leading-relaxed text-ink-4">
+                    {mode === "normal" ? t("sim.setup.modeNormalHint") : t("sim.setup.modeRealityHint")}
+                </p>
+            </div>
 
             <div className="space-y-1.5">
                 <Label>{t("sim.setup.rules")}</Label>

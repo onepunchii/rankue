@@ -40,6 +40,8 @@ const createSchema = z.object({
     finishType: z.enum(["none", "3c", "bank"]).default("none"),
     target: z.number().int().min(1).max(999),
     inningCap: z.number().int().min(0).max(200).default(0),
+    /** 조준 보정(일반 모드 true, 리얼리티 false). 화면 조준선만 좌우하고 판정엔 무관 — 게스트도 같은 모드로 치게 저장한다. */
+    aimAssist: z.boolean().default(true),
 });
 const joinSchema = z.object({ target: z.number().int().min(1).max(999).optional() });
 const shotSchema = z.object({
@@ -61,7 +63,7 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
     const myIndex = m.hostId === viewerId ? 0 : m.guestId === viewerId ? 1 : -1;
     return {
         id: m.id, code: m.code, status: m.status,
-        gameType: m.gameType, tableId: m.tableId, cushionModel: m.cushionModel, condition: m.condition,
+        gameType: m.gameType, tableId: m.tableId, cushionModel: m.cushionModel, condition: m.condition, aimAssist: m.aimAssist,
         rules: m.rules, finishType: m.finishType, inningCap: m.inningCap,
         hostName: m.hostName, guestName: m.guestName, hostTarget: m.hostTarget, guestTarget: m.guestTarget,
         myIndex, turn: m.turn, shots: m.shots, version: m.version,
@@ -91,7 +93,7 @@ router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, r
     const params = paramsFor({ tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition });
     const row = await storage.simMatch.create({
         hostId: req.userId!, gameType: b.gameType, tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition,
-        rules, finishType: b.finishType, hostTarget: b.target, inningCap: b.inningCap,
+        aimAssist: b.aimAssist, rules, finishType: b.finishType, hostTarget: b.target, inningCap: b.inningCap,
         engineVersion: ENGINE_VERSION, paramsHash: paramsHash(params),
     });
     const full = await storage.simMatch.get(row.id);

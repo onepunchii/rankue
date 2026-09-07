@@ -4,6 +4,7 @@ import { openingLayout } from "@shared/sim/layouts";
 import { applyShot, createSession, currentPlayer, DEFAULT_3C_RULES, DEFAULT_4C_RULES, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { BallState, ShotInput } from "@shared/sim/types";
 import { thicknessFor } from "./aim";
+import { squirtFor } from "./aimAssist";
 import { buildConfig } from "./setupPresets";
 import {
     simReducer, createSimStore, INITIAL_STATE,
@@ -649,5 +650,35 @@ describe("대전: 내 샷 응답과 재전송", () => {
         // 응답 도착 → 큐에서 제거
         const acked = simReducer(back, { type: "matchShotAck", idx: 0, match: meta({ turn: 1 }), mismatch: false, final: null, session: null });
         expect(acked.queue.map((e) => e.idx)).toEqual([1]);
+    });
+});
+
+describe("조준 보정(스쿼트) — 일반 모드는 당점을 바꿔도 화면 조준(공 방향)이 고정", () => {
+    it("옆당점 a 가 바뀌면 큐 방향 phi 가 스쿼트 차이만큼 돌아 phi + squirt(a) 가 그대로다", () => {
+        const s0 = simReducer(INITIAL_STATE, { type: "start", session: session3(), balls: balls3, record: false, aimAssist: true });
+        expect(s0.aimAssist).toBe(true);
+        const aim0 = s0.input.phi + squirtFor(s0.input.a);
+        const s1 = simReducer(s0, { type: "setInput", patch: { a: 0.4 } });
+        expect(s1.input.a).toBe(0.4);
+        expect(s1.input.phi).not.toBe(s0.input.phi);
+        expect(s1.input.phi + squirtFor(0.4)).toBeCloseTo(aim0, 12);
+        const s2 = simReducer(s1, { type: "setInput", patch: { a: -0.3, b: 0.1 } });
+        expect(s2.input.phi + squirtFor(-0.3)).toBeCloseTo(aim0, 12);
+        // 세로 당점만 바꾸면 phi 그대로
+        const s3 = simReducer(s2, { type: "setInput", patch: { b: -0.2 } });
+        expect(s3.input.phi).toBe(s2.input.phi);
+    });
+    it("phi 를 같이 주면(해법 적용) 보정하지 않고 그 값을 큐 방향으로 쓴다", () => {
+        const s0 = simReducer(INITIAL_STATE, { type: "start", session: session3(), balls: balls3, record: false, aimAssist: true });
+        const s1 = simReducer(s0, { type: "setInput", patch: { phi: 1.234, a: 0.4 } });
+        expect(s1.input.phi).toBeCloseTo(1.234, 12);
+        expect(s1.input.a).toBe(0.4);
+    });
+    it("리얼리티(보정 꺼짐)는 당점을 바꿔도 phi 그대로, 기본값은 켜짐", () => {
+        const s0 = simReducer(INITIAL_STATE, { type: "start", session: session3(), balls: balls3, record: false, aimAssist: false });
+        expect(s0.aimAssist).toBe(false);
+        const s1 = simReducer(s0, { type: "setInput", patch: { a: 0.5 } });
+        expect(s1.input.phi).toBe(s0.input.phi);
+        expect(simReducer(INITIAL_STATE, { type: "start", session: session3(), balls: balls3, record: false }).aimAssist).toBe(true);
     });
 });

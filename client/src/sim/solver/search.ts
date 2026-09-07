@@ -30,6 +30,7 @@ import type { BallState, CushionId, ShotInput, SimResult } from "@shared/sim/typ
 import type { SimParams, TableSpec } from "@shared/sim/params";
 import { simulateShot } from "@shared/sim/simulate";
 import { evaluateShot, objectBallIds } from "@shared/sim/rules/evaluate";
+import { squirtAngle } from "@shared/sim/resolve/stickBall";
 import type { GameType, Rules, ShotOutcome } from "@shared/sim/rules/types";
 import { mulberry32 } from "@shared/sim/rng";
 import { firstContact, normalizeAngle, phiForThickness, type XY } from "../aim";
@@ -507,7 +508,8 @@ export function createShotSearch(req: SolveRequest, opts: SearchOptions = {}): S
                 const cand: SolveCandidate = {
                     input: f.best.input, outcome: f.best.outcome, result: f.best.result,
                     score: sumTerms(terms), tried: f.best.tried,
-                    aim: aimLabelFor(balls, cueBallId, f.best.input.phi, table),
+                    // 라벨은 공이 실제 출발하는 방향(큐 방향 + 스쿼트)으로 — 옆당점 후보의 "½ 우" 가 미리보기와 맞는다
+                    aim: aimLabelFor(balls, cueBallId, f.best.input.phi + squirtAngle(f.best.input.a, params.cue.endmassRatio), table),
                     robustness, terms,
                 };
                 return cand;

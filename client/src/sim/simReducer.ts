@@ -24,6 +24,7 @@ import { isValidLayout } from "@shared/sim/layouts";
 import type { SimSetupConfig } from "./setupPresets";
 import type { MatchEndReason, MatchPublic, MatchStatus, PlayerIndex } from "./matchApi";
 import { angleBetween, nearestObjectBall, normalizeAngle, phiForThickness, type XY } from "./aim";
+import { cuePhiForAim, squirtFor } from "./aimAssist";
 
 /** waiting = 네트워크 대전에서 상대 차례(입력 잠금, 폴링 중). */
 export type Phase = "setup" | "aim" | "waiting" | "shooting" | "finished";
@@ -228,6 +229,8 @@ export interface SimCoreState {
     readonly replayOf: number | null;
     /** 서버 기록 여부. false = 연습(되돌리기·자유 배치 허용, 서버 호출 없음). 대전은 항상 true. */
     readonly record: boolean;
+    /** 조준 보정(스쿼트 자동 보정): 일반 모드 true, 리얼리티 false. 저장된 phi 는 늘 큐 방향이고, 화면 조준·두께·당점 변경에서만 변환한다. */
+    readonly aimAssist: boolean;
     readonly session: SessionState | null;
     readonly balls: readonly BallState[];
     readonly input: CueInput;
@@ -253,6 +256,7 @@ export const INITIAL_STATE: SimCoreState = {
     match: null,
     replayOf: null,
     record: true,
+    aimAssist: true,
     session: null,
     balls: [],
     input: NO_INPUT,
@@ -269,7 +273,7 @@ export const INITIAL_STATE: SimCoreState = {
 /* ------------------------------------------------------------------ 액션 */
 
 export type SimAction =
-    | { readonly type: "start"; readonly session: SessionState; readonly balls: readonly BallState[]; readonly record: boolean }
+    | { readonly type: "start"; readonly session: SessionState; readonly balls: readonly BallState[]; readonly record: boolean; readonly aimAssist?: boolean }
     /** 서버 세션 개설 응답. shotIdx 0 이면 서버 state(선수 id 가 회원 id)를 정본으로 받아들인다. */
     | { readonly type: "serverSession"; readonly id: string; readonly session?: SessionState }
     | { readonly type: "serverUnavailable" }
@@ -299,11 +303,11 @@ export type SimAction =
     | { readonly type: "serverFail"; readonly idx: number; readonly input: ShotInput; readonly clientHash: string; readonly retryable: boolean }
     | { readonly type: "undo" }
     | { readonly type: "placeBall"; readonly id: string; readonly x: number; readonly y: number; readonly table: TableSpec }
-    | { readonly type: "restart"; readonly session: SessionState; readonly balls: readonly BallState[] }
+    | { readonly type: "restart"; readonly session: SessionState; readonly balls: readonly BallState[]; readonly aimAssist?: boolean }
     | { readonly type: "exit" }
     /* ---- 네트워크 대전 ---- */
     /** 서버 대전 행으로 시작. shots = 서버 샷 수(다음 idx). */
-    | { readonly type: "startMatch"; readonly match: MatchState; readonly session: SessionState; readonly balls: readonly BallState[]; readonly shots: number }
+    | { readonly type: "startMatch"; readonly match: MatchState; readonly session: SessionState; readonly balls: readonly BallState[]; readonly shots: number; readonly aimAssist?: boolean }
     /** 폴링·응답의 메타. 연결이 살아 있다는 뜻이므로 offline 을 풀고 큐의 시도 횟수를 0 으로 돌린다. */
     | { readonly type: "matchSync"; readonly match: MatchState }
     /** 서버 정본으로 통째로 갈아타기. mismatch 면 누적 카운트 +1. 큐·pendingSnap 은 버린다. */
@@ -346,7 +350,8 @@ function phaseFor(s: Pick<SimCoreState, "mode" | "match">, session: SessionState
 }
 
 function reAim(s: SimCoreState, balls: readonly BallState[], session: SessionState): CueInput {
-    return { ...s.input, phi: defaultPhi(balls, cueBallIdOf(session), session.rules.gameType, isOpeningShot(session, balls)) };
+    const aim = defaultPhi(balls, cueBallIdOf(session), session.rules.gameType, isOpeningShot(session, balls));
+    return { ...s.input, phi: cuePhiForAim(aim, s.input.a, s.aimAssist) };
 }
 
 function withoutIdx(queue: readonly PendingShot[], idx: number): readonly PendingShot[] {
@@ -393,6 +398,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
                 ...INITIAL_STATE,
                 phase: a.session.status === "finished" ? "finished" : "aim",
                 record: a.record,
+                aimAssist: a.aimAssist ?? true,
                 session: a.session,
                 balls: a.balls,
                 input: initialInput(a.balls, cueBallId, a.session.rules.gameType, isOpeningShot(a.session, a.balls)),
@@ -406,6 +412,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
                 ...INITIAL_STATE,
                 phase: a.session.status === "finished" ? "finished" : "aim",
                 record: s.record,
+                aimAssist: a.aimAssist ?? s.aimAssist,
                 session: a.session,
                 balls: a.balls,
                 input: { ...initialInput(a.balls, cueBallId, a.session.rules.gameType, isOpeningShot(a.session, a.balls)), V0: s.input.V0 },
@@ -440,6 +447,11 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             if (p.theta !== undefined) out.theta = clampElevation(p.theta);
             if (p.a !== undefined || p.b !== undefined) {
                 const c = clampSpin(p.a ?? s.input.a, p.b ?? s.input.b);
+                // 보정 켜짐: 옆당점이 바뀌면 화면 조준(공 방향)은 그대로 두고 큐 방향을 스쿼트 차이만큼 돌린다.
+                // phi 를 같이 주면(해법 적용·리플레이) 그 값이 큐 방향이므로 손대지 않는다.
+                if (s.aimAssist && p.phi === undefined && c.a !== s.input.a) {
+                    out.phi = normalizeAngle(out.phi + squirtFor(s.input.a) - squirtFor(c.a));
+                }
                 out.a = c.a;
                 out.b = c.b;
             }
@@ -536,7 +548,9 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             const balls = s.balls.map((b, k) => (k === i ? moved : b));
             if (!isValidLayout(balls, a.table)) return s;
             const cueBallId = cueBallIdOf(s.session);
-            const input = a.id === cueBallId ? { ...s.input, phi: defaultPhi(balls, cueBallId, gameTypeOf(s), openingFor(s.session, balls)) } : s.input;
+            const input = a.id === cueBallId
+                ? { ...s.input, phi: cuePhiForAim(defaultPhi(balls, cueBallId, gameTypeOf(s), openingFor(s.session, balls)), s.input.a, s.aimAssist) }
+                : s.input;
             return { ...s, balls, input };
         }
 
@@ -549,6 +563,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
                 mode: "match",
                 match: a.match,
                 record: true,
+                aimAssist: a.aimAssist ?? true,
                 session,
                 balls: a.balls,
                 shotIdx: a.shots,

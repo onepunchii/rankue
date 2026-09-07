@@ -225,3 +225,18 @@ describe("SimSetupDialog", () => {
         expect(targetInput(h).value).toBe("100");
     });
 });
+
+describe("플레이 모드", () => {
+    it("리얼리티를 고르면 마타반 2010 · 컨디션 1.10 · mode reality 로 시작한다(기본은 일반)", () => {
+        const h = mount();
+        setInput(targetInput(h), "20");
+        const realityBtn = Array.from(h.container.querySelectorAll("button")).find((b) => b.textContent?.includes(ko["sim.setup.modeReality"]))!;
+        expect(realityBtn).toBeTruthy();
+        expect(h.container.textContent).toContain(ko["sim.setup.modeNormalHint"]);
+        click(realityBtn);
+        expect(h.container.textContent).toContain(ko["sim.setup.modeRealityHint"]);
+        click(startButton(h));
+        expect(h.onStart).toHaveBeenCalledTimes(1);
+        expect(h.onStart.mock.calls[0][0]).toMatchObject({ mode: "reality", cushionModel: "mathavan2010", condition: 1.1, target: 20 });
+    });
+});

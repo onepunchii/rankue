@@ -31,6 +31,8 @@ import type { BallState, ShotInput, SimResult } from "@shared/sim/types";
 import type { SimParams } from "@shared/sim/params";
 import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout, isValidLayout } from "@shared/sim/layouts";
+import { cuePhiForAim } from "./aimAssist";
+import { aimAssistFor } from "./setupPresets";
 import { applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
 import { buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
@@ -335,7 +337,7 @@ export class SimController {
         const custom = opts.balls && isValidLayout(opts.balls, params.table) ? opts.balls : undefined;
         const balls = custom ?? openingLayout(config.gameType, params.table, "white");
         this.setAux({ setup: { config, params, players, balls: custom }, preview: null, duration: 0, speed: 1, lastResult: null });
-        this.store.dispatch({ type: "start", session, balls, record });
+        this.store.dispatch({ type: "start", session, balls, record, aimAssist: aimAssistFor(config.mode) });
         if (record) this.openServerSession(config, balls, players);
     }
 
@@ -362,7 +364,7 @@ export class SimController {
         const match = matchStateFrom(m, m.myIndex);
         this.waitingSince = this.now();
         this.setAux({ setup: { config, params }, preview: null, duration: 0, speed: 1, lastResult: null });
-        this.store.dispatch({ type: "startMatch", match, session: m.state, balls: m.balls, shots: m.shots });
+        this.store.dispatch({ type: "startMatch", match, session: m.state, balls: m.balls, shots: m.shots, aimAssist: m.aimAssist ?? true });
         this.unwake = (this.deps.onWake ?? defaultOnWake)(() => this.wake());
         this.schedulePoll();
         return true;
@@ -384,7 +386,7 @@ export class SimController {
         });
         const balls = setup.balls ?? openingLayout(config.gameType, params.table, "white");
         this.setAux({ preview: null, duration: 0, speed: 1, lastResult: null });
-        this.store.dispatch({ type: "restart", session, balls });
+        this.store.dispatch({ type: "restart", session, balls, aimAssist: aimAssistFor(config.mode) });
         if (s.record) this.openServerSession(config, balls, players);
     }
 
@@ -460,8 +462,9 @@ export class SimController {
         const s = this.store.get();
         const setup = this.aux.setup;
         if (s.phase !== "aim" || !s.session || !setup) return;
-        const phi = thicknessPhi(s.balls, cueBallIdOf(s.session), s.session.rules.gameType, step, side, setup.params.table.ball.R, isOpeningShot(s.session, s.balls));
-        if (phi !== null) this.setInput({ phi });
+        const aim = thicknessPhi(s.balls, cueBallIdOf(s.session), s.session.rules.gameType, step, side, setup.params.table.ball.R, isOpeningShot(s.session, s.balls));
+        // 두께는 공이 가는 방향으로 정해지므로, 보정 켜짐이면 큐 방향으로 바꿔 저장한다(옆당점이 있으면 스쿼트만큼 반대로)
+        if (aim !== null) this.setInput({ phi: cuePhiForAim(aim, s.input.a, s.aimAssist) });
     }
     /** 당점 (a, b) — R 비율. 반지름 0.5R 밖은 미스큐 링으로 클램프된다. */
     setSpin(a: number, b: number): void {

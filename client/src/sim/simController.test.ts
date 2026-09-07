@@ -12,6 +12,7 @@ import { openingLayout } from "@shared/sim/layouts";
 import { applyShot, createSession, evaluateShot, isOpeningShot, type SessionState } from "@shared/sim/rules";
 import type { BallState } from "@shared/sim/types";
 import { buildConfig } from "./setupPresets";
+import { squirtFor } from "./aimAssist";
 import { paramsFromConfig, MAX_RETRIES } from "./simReducer";
 import type { ShotRequest, ShotResponse, SimApi, SimSessionRow } from "./simApi";
 import { SimController, closeStatusFor, type OfflineReason } from "./simController";
@@ -606,5 +607,30 @@ describe("종료·재시작·정리", () => {
         expect(api.closeSession).toHaveBeenCalledWith("srv-1", "abandoned");
         expect(ctrl.store.get().record).toBe(false);
         expect(ctrl.store.get().serverSessionId).toBeNull();
+    });
+});
+
+describe("두께 버튼과 조준 보정", () => {
+    it("일반 모드: 옆당점이 있으면 두께 버튼이 공 방향 − 스쿼트를 큐 방향으로 저장한다(화면 조준 = 공 방향)", () => {
+        const { ctrl } = make({ record: false });
+        const cue = opening.find((b) => b.id === "white")!;
+        const red = opening.find((b) => b.id === "red")!;
+        const toRed = Math.atan2(red.r[1] - cue.r[1], red.r[0] - cue.r[0]);
+        ctrl.setSpin(0.4, 0);
+        ctrl.setThickness(1, "left");
+        const phi = ctrl.store.get().input.phi;
+        expect(phi + squirtFor(0.4)).toBeCloseTo(toRed, 9);
+        expect(phi).not.toBeCloseTo(toRed, 3);
+    });
+    it("리얼리티 모드: 두께 버튼이 공 방향을 그대로 큐 방향으로 저장한다", () => {
+        const { ctrl } = make({ record: false });
+        ctrl.start(buildConfig({ gameType: "3c", target: 20, mode: "reality" }), { record: false });
+        expect(ctrl.store.get().aimAssist).toBe(false);
+        const cue = opening.find((b) => b.id === "white")!;
+        const red = opening.find((b) => b.id === "red")!;
+        const toRed = Math.atan2(red.r[1] - cue.r[1], red.r[0] - cue.r[0]);
+        ctrl.setSpin(0.4, 0);
+        ctrl.setThickness(1, "left");
+        expect(ctrl.store.get().input.phi).toBeCloseTo(toRed, 9);
     });
 });

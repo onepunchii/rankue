@@ -1603,6 +1603,8 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   tableId: text("table_id", { enum: ["DAEDAE", "JUNGDAE_KR"] }).notNull(),
   cushionModel: text("cushion_model").default("han2005").notNull(),
   condition: doublePrecision("condition").default(1).notNull(),
+  /** 조준 보정(일반 모드). 리얼리티 모드 방은 false — 게스트 화면도 같은 모드로. 판정·해시엔 무관. */
+  aimAssist: boolean("aim_assist").default(true).notNull(),
   rules: jsonb("rules").notNull(),
   finishType: text("finish_type", { enum: ["none", "3c", "bank"] }).default("none").notNull(),
   hostTarget: integer("host_target").notNull(),

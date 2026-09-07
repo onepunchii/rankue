@@ -7,7 +7,7 @@
  */
 import type { CushionModelId } from "@shared/sim/params";
 import type { FinishType } from "@shared/sim/rules";
-import { buildConfig, isValidTarget, type SimSetupConfig, type TableId } from "./setupPresets";
+import { buildConfig, isValidTarget, type SimMode, type SimSetupConfig, type TableId } from "./setupPresets";
 
 export interface PageConfig {
     readonly config: SimSetupConfig;
@@ -77,13 +77,15 @@ export function parsePageConfig(raw: unknown): PageConfig | null {
     const condition = typeof raw.condition === "number" && Number.isFinite(raw.condition) ? raw.condition : undefined;
     const inningCap = typeof raw.inningCap === "number" && Number.isFinite(raw.inningCap) ? raw.inningCap : undefined;
     const finishType = FINISH_TYPES.includes(raw.finishType as FinishType) ? (raw.finishType as FinishType) : "none";
+    // 플레이 모드(조준 보정). 모르는 값은 일반. 모드 프리셋보다 명시한 쿠션 모델·컨디션이 우선(buildConfig 규약).
+    const mode: SimMode = raw.mode === "reality" ? "reality" : "normal";
 
     const rules = isRecord(raw.rules) ? raw.rules : {};
     // 규칙 객체가 있으면 종목과 맞아야 한다(3쿠션 설정에 4구 규칙이 실려 오면 거부).
     if ("gameType" in rules && rules.gameType !== gameType) return null;
 
     const built = buildConfig({
-        gameType, tableId, target: raw.target, inningCap, cushionModel, condition,
+        gameType, tableId, target: raw.target, inningCap, cushionModel, condition, mode,
         rules: gameType === "3c"
             ? { ruleSet: rules.ruleSet === "pba" ? "pba" : "umb" }
             : {

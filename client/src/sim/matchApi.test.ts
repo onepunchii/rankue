@@ -63,8 +63,9 @@ describe("요청 매핑", () => {
         expect(body).toEqual({
             gameType: "4c", tableId: "JUNGDAE_KR", cushionModel: "mathavan2010", condition: 0.9,
             rules: { ...DEFAULT_4C_RULES, threeCushionDouble: true }, finishType: "none", target: 80, inningCap: 15,
+            aimAssist: true,
         });
-        expect(Object.keys(body)).toHaveLength(8);
+        expect(Object.keys(body)).toHaveLength(9);
     });
     it("toJoinBody: 유효한 정수 다마수만 싣고 아니면 빈 본문(서버가 호스트 다마수를 쓴다)", () => {
         expect(toJoinBody(15)).toEqual({ target: 15 });
@@ -216,7 +217,8 @@ describe("파생값", () => {
     });
     it("matchConfig: HUD·파라미터용 설정, target 은 내 다마수", () => {
         const c = matchConfig(m);
-        expect(c).toEqual({ gameType: "3c", tableId: "DAEDAE", target: 20, rules: DEFAULT_3C_RULES, finishType: "none", inningCap: 0, cushionModel: "han2005", condition: 1 });
+        expect(c).toEqual({ gameType: "3c", tableId: "DAEDAE", target: 20, rules: DEFAULT_3C_RULES, finishType: "none", inningCap: 0, cushionModel: "han2005", condition: 1, mode: "normal" });
+        expect(matchConfig({ ...m, aimAssist: false }).mode).toBe("reality");
         expect(matchConfig({ ...m, myIndex: 1 }).target).toBe(15);
     });
 });

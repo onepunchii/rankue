@@ -53,13 +53,15 @@ import { MatchList, MATCH_LIST_QUERY_KEY } from "./match/MatchList";
 import { endReasonText } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
 import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
+import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
+import { aimPhi } from "./aimAssist";
 import { useSolver } from "./solver/useSolver";
 import { SolverSheet } from "./solver/SolverSheet";
 import type { SolveCandidate } from "./solver/search";
 import { buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
 import { DrillPanel, DRILL_WEEK_QUERY_KEY, DRILL_LADDER_QUERY_KEY } from "./drill/DrillPanel";
 import { drillApi, type DrillWeek, type WeekDrill } from "./drill/drillApi";
-import { buildConfig } from "./setupPresets";
+import { aimAssistFor, buildConfig } from "./setupPresets";
 import { decodePageConfig, readCfgParam } from "./pageConfig";
 import { decodeReplay, encodeReplay, forSoloSession, replaySource, replayUrl, REPLAY_PARAM, toReplayConfig, type ReplayPayload } from "./share/replayLink";
 import { fileNameFor, gameBadge, replayShortText, sessionStatsLine, shotSubtitle, shotTitle } from "./share/shareCard";
@@ -132,6 +134,8 @@ interface View {
     solverPreview: { candidate: SolveCandidate; paths: PreviewPaths } | null;
     /** 카메라 뷰(HUD "3D 보기"). 렌더러가 지원하지 않으면 top 으로 남는다. */
     cameraView: RendererView;
+    /** 조준 보정(일반 모드). 오버레이·카메라·두께 활성은 aimPhi(큐 방향 + 스쿼트)로 본다. */
+    assist: boolean;
 }
 
 export function SimulatorPage() {
@@ -160,6 +164,8 @@ export function SimulatorPage() {
     // 첫 세션 안내: 기기에 저장된 적 없으면 첫 aim 단계에서 한 번
     const [coachOpen, setCoachOpen] = useState(() => { try { return safeLocalStorage()?.getItem(COACH_PREF_KEY) !== "1"; } catch { return false; } });
     const closeCoach = useCallback(() => { setCoachOpen(false); try { safeLocalStorage()?.setItem(COACH_PREF_KEY, "1"); } catch { /* 저장 불가 */ } }, []);
+    const [realityOpen, setRealityOpen] = useState(() => { try { return safeLocalStorage()?.getItem(REALITY_PREF_KEY) !== "1"; } catch { return false; } });
+    const closeReality = useCallback(() => { setRealityOpen(false); try { safeLocalStorage()?.setItem(REALITY_PREF_KEY, "1"); } catch { /* 저장 불가 */ } }, []);
     const [turnChip, setTurnChip] = useState(false);
     const queryClient = useQueryClient();
 
@@ -239,6 +245,8 @@ export function SimulatorPage() {
         void queryClient.invalidateQueries({ queryKey: DRILL_LADDER_QUERY_KEY });
     }, [drillPending, sim.phase, toast, t, queryClient]);
     const gameType: GameType | null = sim.session?.rules.gameType ?? null;
+    const assist = sim.config ? aimAssistFor(sim.config.mode) : true;
+    const reality = sim.config?.mode === "reality";
     const is3c = gameType === "3c";
     const diamondOn = diamond && is3c;
 
@@ -413,15 +421,15 @@ export function SimulatorPage() {
     // rAF 루프가 읽는 뷰 — 렌더마다 갱신(할당만, 재렌더 없음)
     const viewRef = useRef<View>({
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist,
     });
     viewRef.current = {
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist,
     };
     useEffect(() => {
         dirtyRef.current = true;
-    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview, cameraView]);
+    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview, cameraView, assist]);
 
     const { frameAt } = sim;
     useEffect(() => {
@@ -444,8 +452,8 @@ export function SimulatorPage() {
                 // 선수 시점 카메라 대상: 조준 중엔 큐볼 뒤(follow), 재생 중엔 부감(overview — 테이블 전체가 보이게 올라갔다가 조준으로
                 // 돌아오면 큐볼 뒤로 내려온다). 공 옮기기 중(끌리는 공을 카메라가 따라가면 손가락 아래 테이블 점이 같이 밀려 되먹임된다)·
                 // 상대 차례 대기·종료엔 빼서 카메라가 그 자리에 머문다.
-                view: v.phase === "aim" && !v.placing ? { cueBallId: v.cueBallId, phi: v.input.phi }
-                    : v.phase === "shooting" ? { cueBallId: v.cueBallId, phi: v.input.phi, mode: "overview" as const } : undefined,
+                view: v.phase === "aim" && !v.placing ? { cueBallId: v.cueBallId, phi: aimPhi(v.input.phi, v.input.a, v.assist) }
+                    : v.phase === "shooting" ? { cueBallId: v.cueBallId, phi: aimPhi(v.input.phi, v.input.a, v.assist), mode: "overview" as const } : undefined,
             });
             const overlay = overlayRef.current;
             if (!overlay) return;
@@ -453,12 +461,13 @@ export function SimulatorPage() {
                 // 드래그 중엔 직선 안내(미리보기는 30 ms 뒤에 오므로), 손을 떼면 예측 경로
                 const sp = v.solverPreview;
                 overlay.draw({
-                    balls: v.balls, phi: sp ? sp.candidate.input.phi : v.input.phi, cueBallId: v.cueBallId, table: v.table,
+                    // 조준선은 화면 조준 방향(보정 켜짐 = 큐 방향 + 스쿼트, 리얼리티 = 큐 방향). 큐대 그림만 큐 방향이다.
+                    balls: v.balls, phi: sp ? aimPhi(sp.candidate.input.phi, sp.candidate.input.a, v.assist) : aimPhi(v.input.phi, v.input.a, v.assist), cueBallId: v.cueBallId, table: v.table,
                     guide: sp || (!v.dragging && v.preview) ? "preview" : "straight",
                     preview: sp ? sp.paths : (v.preview?.paths ?? null),
                     // 다이아몬드 시스템: 조준 분석은 싸다(광선 하나·산술 몇 줄) — dirty 프레임에만 다시 계산된다.
                     // player 뷰에선 그리지 않는다: 먼 레일의 숫자 알약(레일당 7개 + 바깥 행)이 원근으로 몇 px 간격에 몰려 겹친다.
-                    diamond: v.diamond && v.cameraView === "top" ? overlayDiamond(v.balls, v.cueBallId, v.input.phi, v.table, numbersCacheRef.current) : null,
+                    diamond: v.diamond && v.cameraView === "top" ? overlayDiamond(v.balls, v.cueBallId, aimPhi(v.input.phi, v.input.a, v.assist), v.table, numbersCacheRef.current) : null,
                     project: projectRef.current,
                 });
                 overlayCleared = false;
@@ -616,8 +625,8 @@ export function SimulatorPage() {
 
     const active = useMemo(() => {
         if (!sim.session || !sim.params) return null;
-        return activeThickness(sim.balls, sim.cueBallId, sim.session.rules.gameType, sim.input.phi, sim.params.table.ball.R);
-    }, [sim.balls, sim.cueBallId, sim.session, sim.params, sim.input.phi]);
+        return activeThickness(sim.balls, sim.cueBallId, sim.session.rules.gameType, aimPhi(sim.input.phi, sim.input.a, assist), sim.params.table.ball.R);
+    }, [sim.balls, sim.cueBallId, sim.session, sim.params, sim.input.phi, sim.input.a, assist]);
 
     // 다이아몬드 시스템 읽기: 결과 배너와 같은 타이밍에 "시스템 {예측} · 실제 {3쿠션수}" 한 줄.
     // banner 는 onOutcome(재생 끝) 에, lastResult 는 재생 시작에 갱신되므로 둘은 같은 샷을 가리킨다.
@@ -898,6 +907,7 @@ export function SimulatorPage() {
                         {!drill && sim.canPlace && sim.session && sim.session.shotCount === 0 && (
                             <span className={chipNeutral}>{t("sim.hud.placeHint")}</span>
                         )}
+                        {reality && sim.phase === "aim" && <span className={chipNeutral}>{t("sim.hud.realityChip")}</span>}
                         {risk && sim.phase === "aim" && (
                             <span role="status" className={cn(chipNeutral, "inline-flex items-center gap-1", risk.level === "warn" && "text-ink-1")}>
                                 <WarnIcon className="w-4 h-4 shrink-0" />
@@ -984,6 +994,7 @@ export function SimulatorPage() {
                         </div>
                     )}
                     {coachOpen && sim.phase === "aim" && sim.mode === "solo" && <CoachHint onClose={closeCoach} />}
+                    {!coachOpen && realityOpen && reality && sim.phase === "aim" && <RealityHint onClose={closeReality} />}
                     {/* 결과 배너: 두께 독 위, 오른쪽 열 왼쪽 — 테이블 아래쪽 가운데 */}
                     <div className="absolute left-0 right-[60px] top-0 z-[3] pointer-events-none" style={{ bottom: DOCK_HEIGHT + 8 }}>
                         <OutcomeBanner outcome={banner?.outcome ?? null} visible={bannerVisible} sub={readoutText} />
