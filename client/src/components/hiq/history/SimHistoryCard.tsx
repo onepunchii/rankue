@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { BallDot } from "@/components/hiq/BallDot";
 import { cn } from "@/lib/utils";
 import type { FilterType } from "./types";
+import { drillApi, weekProgress } from "@/sim/drill/drillApi";
 
 /**
  * 기록 페이지의 시뮬레이터 섹션. 실전 전적(RP·에버리지)과는 다른 테이블(hiq_sim_*)에서 읽고,
@@ -57,6 +58,13 @@ export function SimHistoryCard({ filter }: Props) {
         queryFn: async () => (await apiRequest("/api/hiq/sim/sessions")) ?? [],
     });
 
+    const { data: week } = useQuery({
+        queryKey: ["sim-drills", "week"],
+        queryFn: () => drillApi.getWeek(),
+        staleTime: 30_000,
+    });
+    const drillProgress = week ? weekProgress(week) : null;
+
     const wanted = (g: "3c" | "4c") => filter === "all" || filter === g;
     const shownRatings = ratings.filter((r) => wanted(r.gameType));
     const shownSessions = sessions.filter((s) => wanted(s.gameType) && s.shots > 0).slice(0, 5);
@@ -83,6 +91,18 @@ export function SimHistoryCard({ filter }: Props) {
             </h3>
 
             <div className="bg-surface-1 rounded-card p-4">
+                {drillProgress && filter !== "4c" && (
+                    <button
+                        type="button"
+                        onClick={() => setLocation("/online-game?drills=1")}
+                        className="w-full mb-3 rounded-tile bg-surface-2 px-3 py-2.5 flex items-center justify-between gap-2 text-left"
+                    >
+                        <span className="text-[13px] font-semibold text-ink-1">{t("sim.drill.title")}</span>
+                        <span className="rk-num text-[13px] font-medium text-ink-3">
+                            {t("sim.drill.progress").replace("{s}", String(drillProgress.successes)).replace("{a}", String(drillProgress.attempted)).replace("{n}", String(drillProgress.total))}
+                        </span>
+                    </button>
+                )}
                 {totals.sessions === 0 && shownSessions.length === 0 ? (
                     <div className="text-center py-4">
                         <p className="text-[13px] font-medium text-ink-3 mb-3">{t("sim.history.empty")}</p>

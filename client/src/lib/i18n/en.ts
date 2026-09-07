@@ -1885,5 +1885,10 @@ const en: Dict = {
   "sim.drill.hint.double1": "Same long rail twice",
   "sim.drill.hint.short1": "Thin hit, short return",
   "sim.drill.hint.long1": "Push it long to the far end",
+  "sim.coach.title": "New here? Three controls",
+  "sim.coach.aim": "Drag on the table to aim. Thickness buttons (½·⅓) set it directly",
+  "sim.coach.spin": "Set spin by dragging inside the circle; the dashed ring is the miscue limit",
+  "sim.coach.power": "Power is the slider; ± nudges 0.05 m/s",
+  "sim.coach.start": "Got it",
 };
 export default en;

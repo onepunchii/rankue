@@ -1885,5 +1885,10 @@ const vi: Dict = {
   "sim.drill.hint.double1": "Cùng một băng dài hai lần",
   "sim.drill.hint.short1": "Đánh mỏng, quay ngắn",
   "sim.drill.hint.long1": "Đẩy dài tới cuối bàn",
+  "sim.coach.title": "Lần đầu? Ba thao tác",
+  "sim.coach.aim": "Kéo trên bàn để ngắm. Nút độ dày (½·⅓) đặt ngay",
+  "sim.coach.spin": "Xoáy: kéo trong vòng tròn; vòng đứt là giới hạn trượt cơ",
+  "sim.coach.power": "Lực là thanh trượt; ± chỉnh 0,05 m/s",
+  "sim.coach.start": "Đã hiểu",
 };
 export default vi;

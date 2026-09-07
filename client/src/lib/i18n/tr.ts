@@ -1885,5 +1885,10 @@ const tr: Dict = {
   "sim.drill.hint.double1": "Aynı uzun banda iki kez",
   "sim.drill.hint.short1": "İnce vur, kısa dön",
   "sim.drill.hint.long1": "Uzun vur, sonuna kadar",
+  "sim.coach.title": "Yeni misin? Üç kontrol",
+  "sim.coach.aim": "Nişan için masada sürükle. Kalınlık düğmeleri (½·⅓) doğrudan ayarlar",
+  "sim.coach.spin": "Falso için daire içinde sürükle; kesikli halka miscue sınırı",
+  "sim.coach.power": "Güç kaydırıcıda; ± 0,05 m/s ince ayar",
+  "sim.coach.start": "Anladım",
 };
 export default tr;

@@ -1885,5 +1885,10 @@ const es: Dict = {
   "sim.drill.hint.double1": "La misma banda larga dos veces",
   "sim.drill.hint.short1": "Fino y vuelta corta",
   "sim.drill.hint.long1": "Largo hasta el fondo",
+  "sim.coach.title": "¿Primera vez? Tres controles",
+  "sim.coach.aim": "Arrastra en la mesa para apuntar. Los botones de grosor (½·⅓) lo fijan directo",
+  "sim.coach.spin": "El efecto se pone arrastrando en el círculo; la línea punteada es el límite",
+  "sim.coach.power": "La fuerza es el deslizador; ± ajusta 0,05 m/s",
+  "sim.coach.start": "Entendido",
 };
 export default es;

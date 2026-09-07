@@ -35,6 +35,7 @@ import { MatchLobby } from "./match/MatchLobby";
 import { MatchList, MATCH_LIST_QUERY_KEY } from "./match/MatchList";
 import { endReasonText } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
+import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
 import { DrillPanel, DRILL_WEEK_QUERY_KEY, DRILL_LADDER_QUERY_KEY } from "./drill/DrillPanel";
 import { drillApi, type DrillWeek, type WeekDrill } from "./drill/drillApi";
 import { buildConfig } from "./setupPresets";
@@ -100,6 +101,9 @@ export function SimulatorPage() {
     drillRef.current = drill;
     const [matchLoad, setMatchLoad] = useState<"idle" | "loading" | "error" | "notMine">("idle");
     const [resignOpen, setResignOpen] = useState(false);
+    // 첫 세션 안내: 기기에 저장된 적 없으면 첫 aim 단계에서 한 번
+    const [coachOpen, setCoachOpen] = useState(() => { try { return safeLocalStorage()?.getItem(COACH_PREF_KEY) !== "1"; } catch { return false; } });
+    const closeCoach = useCallback(() => { setCoachOpen(false); try { safeLocalStorage()?.setItem(COACH_PREF_KEY, "1"); } catch { /* 저장 불가 */ } }, []);
     const [turnChip, setTurnChip] = useState(false);
     const queryClient = useQueryClient();
 
@@ -661,6 +665,7 @@ export function SimulatorPage() {
                             {t("sim.match.resign")}
                         </button>
                     )}
+                    {coachOpen && sim.phase === "aim" && sim.mode === "solo" && <CoachHint onClose={closeCoach} />}
                     <div className="absolute inset-0 z-[3] pointer-events-none">
                         <OutcomeBanner outcome={banner?.outcome ?? null} visible={bannerVisible} sub={readoutText} />
                     </div>

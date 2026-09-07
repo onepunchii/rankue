@@ -1887,4 +1887,9 @@ export const ko: Dict = {
   "sim.drill.hint.double1": "같은 긴 쿠션을 두 번",
   "sim.drill.hint.short1": "얇게 맞혀 짧게 돌아오기",
   "sim.drill.hint.long1": "길게 밀어 끝까지 보내기",
+  "sim.coach.title": "처음이세요? 조작은 세 가지예요",
+  "sim.coach.aim": "테이블을 드래그하면 조준이 돌아가요. 두께 버튼(½·⅓)으로 바로 맞출 수도 있어요",
+  "sim.coach.spin": "당점은 왼쪽 원 안에서 드래그 — 바깥 점선은 미스큐 한계예요",
+  "sim.coach.power": "세기는 슬라이더로, ±로 0.05 m/s 씩 미세 조절해요",
+  "sim.coach.start": "알겠어요",
 };
