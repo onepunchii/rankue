@@ -39,6 +39,8 @@ interface Props {
     onStart: (config: SimSetupConfig, opts: SimStartOptions) => void;
     /** "친구와 대전" 진입(로비로 이동). 없으면 링크를 그리지 않는다. */
     onMatch?: () => void;
+    /** "이번 주 드릴" 진입. 없으면 링크를 그리지 않는다. */
+    onDrills?: () => void;
 }
 
 const TABLE_IDS: readonly TableId[] = ["DAEDAE", "JUNGDAE_KR"];
@@ -97,7 +99,7 @@ function ToggleRow({ id, checked, onCheckedChange, title, desc }: {
     );
 }
 
-export function SimSetupDialog({ open, onOpenChange, onStart, onMatch }: Props) {
+export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills }: Props) {
     const { t } = useT();
     // 회원 핸디는 다마수 기본값으로만 읽는다. 절대 쓰지 않는다(짠다마 방지: PATCH /me 가 핸디를 받지 않는 설계).
     const { member } = useAuth();
@@ -345,6 +347,15 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch }: Props) 
                         >
                             <span>{t("sim.match.entry")}</span>
                             <span className="text-[12px] font-medium text-ink-4">{t("sim.match.entryDesc")}</span>
+                        </button>
+                    )}
+                    {onDrills && (
+                        <button
+                            type="button" onClick={onDrills}
+                            className="w-full h-12 rounded-xl border border-surface-line bg-surface-2 text-[14px] font-semibold text-ink-1 flex flex-col items-center justify-center leading-tight"
+                        >
+                            <span>{t("sim.drill.entry")}</span>
+                            <span className="text-[12px] font-medium text-ink-4">{t("sim.drill.entryDesc")}</span>
                         </button>
                     )}
                     <div className="flex flex-row gap-2 w-full">

@@ -180,6 +180,10 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     setIsOnlineGameModalOpen(false);
                     setLocation("/online-game?lobby=1");
                 }}
+                onDrills={() => {
+                    setIsOnlineGameModalOpen(false);
+                    setLocation("/online-game?drills=1");
+                }}
             />
 
             {/* 처음 오는 사람을 위한 메뉴 안내 모달 */}

@@ -30,7 +30,7 @@
 import type { BallState, ShotInput, SimResult } from "@shared/sim/types";
 import type { SimParams } from "@shared/sim/params";
 import { simulateShot } from "@shared/sim/simulate";
-import { openingLayout } from "@shared/sim/layouts";
+import { openingLayout, isValidLayout } from "@shared/sim/layouts";
 import { applyShot, createSession, evaluateShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
 import { buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
@@ -78,6 +78,8 @@ export interface StartOptions {
     readonly record?: boolean;
     /** 2인 로컬 대전. 생략하면 1인(서버가 요청자 회원으로 기록). */
     readonly players?: readonly SessionPlayer[];
+    /** 개시 배치 대신 쓸 공 배치(드릴). 유효하지 않으면 개시 배치. restart() 도 이 배치로 돌아간다. */
+    readonly balls?: readonly BallState[];
 }
 
 export type OfflineReason = "session-create" | "shot-retries" | "shot-rejected";
@@ -110,6 +112,8 @@ export interface SimSetup {
     readonly config: SimSetupConfig;
     readonly params: SimParams;
     readonly players?: readonly SessionPlayer[];
+    /** 드릴 등 사용자 지정 시작 배치 */
+    readonly balls?: readonly BallState[];
 }
 
 /** 스토어 밖의 화면 상태(드물게 바뀌는 것만). 프레임 값은 frameAt 으로. */
@@ -328,8 +332,9 @@ export class SimController {
             rules: config.rules, finishType: config.finishType, inningCap: config.inningCap,
             players: players ?? [{ id: "p1", target: config.target }],
         });
-        const balls = openingLayout(config.gameType, params.table, "white");
-        this.setAux({ setup: { config, params, players }, preview: null, duration: 0, speed: 1, lastResult: null });
+        const custom = opts.balls && isValidLayout(opts.balls, params.table) ? opts.balls : undefined;
+        const balls = custom ?? openingLayout(config.gameType, params.table, "white");
+        this.setAux({ setup: { config, params, players, balls: custom }, preview: null, duration: 0, speed: 1, lastResult: null });
         this.store.dispatch({ type: "start", session, balls, record });
         if (record) this.openServerSession(config, balls, players);
     }
@@ -377,7 +382,7 @@ export class SimController {
             rules: config.rules, finishType: config.finishType, inningCap: config.inningCap,
             players: players ?? [{ id: "p1", target: config.target }],
         });
-        const balls = openingLayout(config.gameType, params.table, "white");
+        const balls = setup.balls ?? openingLayout(config.gameType, params.table, "white");
         this.setAux({ preview: null, duration: 0, speed: 1, lastResult: null });
         this.store.dispatch({ type: "restart", session, balls });
         if (s.record) this.openServerSession(config, balls, players);

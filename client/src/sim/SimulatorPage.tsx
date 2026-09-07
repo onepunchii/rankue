@@ -19,6 +19,7 @@ import { TABLES, type TableSpec } from "@shared/sim/params";
 import type { ShotOutcome } from "@shared/sim/rules";
 import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,6 +35,9 @@ import { MatchLobby } from "./match/MatchLobby";
 import { MatchList, MATCH_LIST_QUERY_KEY } from "./match/MatchList";
 import { endReasonText } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
+import { DrillPanel, DRILL_WEEK_QUERY_KEY, DRILL_LADDER_QUERY_KEY } from "./drill/DrillPanel";
+import { drillApi, type DrillWeek, type WeekDrill } from "./drill/drillApi";
+import { buildConfig } from "./setupPresets";
 import { decodePageConfig, readCfgParam } from "./pageConfig";
 import { activeThickness, FINE_STEP_RAD, pullbackFor, type ThicknessStep } from "./controlsMath";
 import { appendShot, EMPTY_LOG, popShot, type InningLog } from "./inningLog";
@@ -87,8 +91,13 @@ export function SimulatorPage() {
     const params = useMemo(() => new URLSearchParams(search.startsWith("?") ? search.slice(1) : search), [search]);
     const matchId = params.get("match");
     const lobby = params.get("lobby") === "1";
-    const [initial] = useState(() => (matchId || lobby ? null : decodePageConfig(readCfgParam(search))));
-    const [setupOpen, setSetupOpen] = useState(initial === null && !matchId && !lobby);
+    const drillsView = params.get("drills") === "1";
+    const [initial] = useState(() => (matchId || lobby || drillsView ? null : decodePageConfig(readCfgParam(search))));
+    const [setupOpen, setSetupOpen] = useState(initial === null && !matchId && !lobby && !drillsView);
+    // 드릴 모드: 고정 배치에서 첫 샷만 서버가 채점(문제당 1회), 그 뒤는 연습. scored 전엔 공 배치를 막는다.
+    const [drill, setDrill] = useState<{ drill: WeekDrill; week: DrillWeek; scored: boolean; result: { success: boolean; cushions: number } | null } | null>(null);
+    const drillRef = useRef(drill);
+    drillRef.current = drill;
     const [matchLoad, setMatchLoad] = useState<"idle" | "loading" | "error" | "notMine">("idle");
     const [resignOpen, setResignOpen] = useState(false);
     const [turnChip, setTurnChip] = useState(false);
@@ -130,6 +139,32 @@ export function SimulatorPage() {
     });
     const { actions } = sim;
     const table = sim.params?.table ?? TABLES.DAEDAE;
+    const lastResultRef = useRef(sim.lastResult);
+    lastResultRef.current = sim.lastResult;
+    const drillLocked = !!drill && !drill.scored;
+    // 드릴 채점은 샷 직후 바로 보낸다(재생이 끝나길 기다리지 않는다) — 치자마자 앱을 꺼도 채점이 남고,
+    // 서버가 고정 배치에서 다시 시뮬하므로 클라이언트 재생과 무관하게 정본이 된다. 결과 표시는 재생이 끝난 뒤.
+    const [drillPending, setDrillPending] = useState<{ success: boolean; cushions: number } | null>(null);
+    useEffect(() => {
+        const r = sim.lastResult;
+        const d = drillRef.current;
+        if (!r || !d || d.scored || sim.mode !== "solo") return;
+        setDrill((x) => (x ? { ...x, scored: true } : x));
+        drillApi.attempt(d.drill.id, r.input, r.hash).then((res) => {
+            setDrillPending({ success: res.outcome.scored, cushions: res.outcome.cushionsBeforeSecond });
+        }).catch((e: unknown) => {
+            const code = (e as { code?: string; data?: { code?: string } })?.code ?? (e as { data?: { code?: string } })?.data?.code;
+            if (code !== "ALREADY_ATTEMPTED") toast({ title: t("sim.drill.scoreFailed") });
+        });
+    }, [sim.lastResult, sim.mode, toast, t]);
+    useEffect(() => {
+        if (!drillPending || sim.phase === "shooting") return;
+        setDrill((x) => (x ? { ...x, result: drillPending } : x));
+        toast({ title: t(drillPending.success ? "sim.drill.scoredToastSuccess" : "sim.drill.scoredToastFail").replace("{n}", String(drillPending.cushions)) });
+        setDrillPending(null);
+        void queryClient.invalidateQueries({ queryKey: DRILL_WEEK_QUERY_KEY });
+        void queryClient.invalidateQueries({ queryKey: DRILL_LADDER_QUERY_KEY });
+    }, [drillPending, sim.phase, toast, t, queryClient]);
     const gameType: GameType | null = sim.session?.rules.gameType ?? null;
     const is3c = gameType === "3c";
     const diamondOn = diamond && is3c;
@@ -271,11 +306,11 @@ export function SimulatorPage() {
     // rAF 루프가 읽는 뷰 — 렌더마다 갱신(할당만, 재렌더 없음)
     const viewRef = useRef<View>({
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace, dragging, placing, diamond: diamondOn,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn,
     });
     viewRef.current = {
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace, dragging, placing, diamond: diamondOn,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn,
     };
     useEffect(() => {
         dirtyRef.current = true;
@@ -456,7 +491,8 @@ export function SimulatorPage() {
             await actions.exit();
         } finally {
             // 대전은 서버에 남으므로 목록(로비)으로 돌아간다
-            navigate(isMatch ? "/online-game?lobby=1" : EXIT_PATH);
+            navigate(isMatch ? "/online-game?lobby=1" : drillRef.current ? "/online-game?drills=1" : EXIT_PATH);
+            setDrill(null);
             setExiting(false);
         }
     }, [actions, navigate, isMatch]);
@@ -483,7 +519,18 @@ export function SimulatorPage() {
         else void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
     }, [actions, toast, t, queryClient]);
 
+    const onPlayDrill = useCallback((d: WeekDrill, week: DrillWeek) => {
+        setDrill({
+            drill: d, week, scored: !!d.attempt,
+            result: d.attempt ? { success: d.attempt.success, cushions: d.attempt.cushions } : null,
+        });
+        setLog(EMPTY_LOG);
+        setBanner(null);
+        actions.start(buildConfig({ gameType: "3c", tableId: week.tableId, target: 100, rules: { ruleSet: "umb" } }), { record: false, balls: d.balls });
+    }, [actions]);
+
     const onSetupStart = useCallback((config: SimSetupConfig, opts: { record: boolean }) => {
+        setDrill(null);
         setSetupOpen(false);
         setLog(EMPTY_LOG);
         setBanner(null);
@@ -499,6 +546,7 @@ export function SimulatorPage() {
     const finished = sim.session?.status === "finished";
     const endOpen = sim.phase === "finished" && !endDismissed && !exitOpen;
     const showLobby = lobby && sim.phase === "setup";
+    const showDrills = drillsView && sim.phase === "setup";
     const endSubtitle = sim.match
         ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t)
         : null;
@@ -536,7 +584,27 @@ export function SimulatorPage() {
                             {sim.playback.speed === 4 ? t("sim.hud.fastForward") : t("sim.hud.holdToFastForward")}
                         </span>
                     )}
-                    {sim.canPlace && sim.session && sim.session.shotCount === 0 && (
+                    {drill && (
+                        <span className={cn(
+                            "absolute top-3 left-3 z-[3] rk-chip pointer-events-none",
+                            drillLocked ? "bg-brand text-brand-fg" : "bg-surface-1 border border-surface-line text-ink-3",
+                        )}>
+                            {drillLocked
+                                ? t("sim.drill.chipScoring").replace("{name}", t(drill.drill.nameKey))
+                                : drill.result
+                                    ? t(drill.result.success ? "sim.drill.chipScoredSuccess" : "sim.drill.chipScoredFail").replace("{n}", String(drill.result.cushions))
+                                    : t("sim.drill.chipPractice")}
+                        </span>
+                    )}
+                    {drill && !isMatch && sim.phase !== "shooting" && (
+                        <button
+                            type="button" onClick={onRestart}
+                            className="absolute top-3 right-3 z-[3] h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-3"
+                        >
+                            {t("sim.drill.reset")}
+                        </button>
+                    )}
+                    {!drill && sim.canPlace && sim.session && sim.session.shotCount === 0 && (
                         <span className="absolute top-3 left-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">
                             {t("sim.hud.placeHint")}
                         </span>
@@ -607,6 +675,18 @@ export function SimulatorPage() {
                 />
             </div>
 
+            {showDrills && (
+                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                    <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8 flex flex-col gap-4">
+                        <div className="flex justify-end">
+                            <button type="button" onClick={() => navigate(EXIT_PATH)} className="h-11 px-4 rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2">
+                                {t("sim.common.close")}
+                            </button>
+                        </div>
+                        <DrillPanel onPlay={onPlayDrill} myMemberId={member?.id} />
+                    </div>
+                </div>
+            )}
             {showLobby && (
                 <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <MatchLobby onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate(EXIT_PATH)} />
@@ -615,7 +695,7 @@ export function SimulatorPage() {
                     </div>
                 </div>
             )}
-            <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} onMatch={() => navigate("/online-game?lobby=1", { replace: true })} />
+            <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} onMatch={() => navigate("/online-game?lobby=1", { replace: true })} onDrills={() => navigate("/online-game?drills=1", { replace: true })} />
             <ResignConfirm open={resignOpen} onOpenChange={setResignOpen} busy={exiting} onConfirm={() => { void onResign(); }} />
             <InningSheet open={sheetOpen} onOpenChange={setSheetOpen} log={log} session={sim.session} names={names} phase={sim.phase} />
             <EndDialog
