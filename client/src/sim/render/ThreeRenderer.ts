@@ -42,10 +42,10 @@ import type { RenderFrame, Renderer, RendererView, SafeInsets, Viewport } from "
 import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, parseColor, readPalette, rgba, scaleColor, type Palette, type RGBA } from "./tokens";
 import {
-    CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, CUE_BUTT_W, CUE_FERRULE_L, CUE_LENGTH, CUE_TIP_L, CUE_TIP_W, cameraBasis, cueGap, cueRotationZ,
-    dampRig, diamondWorld, integrateOrientation, makeBasis, makePose, makeRig, MAX_DT, orthoFrustum, PLAYER_FAR, PLAYER_FOV_DEG,
-    PLAYER_NEAR, PLAYER_SMOOTH_S, playerPose, projectPerspective, snapRig, unprojectPerspective, type CameraBasis, type CameraPose,
-    type CameraRig,
+    CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, copyPose, CUE_BUTT_W, CUE_FERRULE_L, CUE_LENGTH, CUE_TIP_L, CUE_TIP_W, cameraBasis, cueGap,
+    cueRotationZ, dampRig, diamondWorld, integrateOrientation, makeBasis, makePose, makeRig, MAX_DT, orthoFrustum, overviewPose, PLAYER_FAR,
+    PLAYER_FOV_DEG, PLAYER_NEAR, playerPose, projectPerspective, rigSmoothTime, snapRig, unprojectPerspective, type CameraBasis,
+    type CameraPose, type CameraRig,
 } from "./threeMath";
 
 export interface ThreeRendererOptions {
@@ -253,6 +253,9 @@ export class ThreeRenderer implements Renderer {
     private readonly rigTarget: CameraPose = makePose();
     private readonly basis: CameraBasis = makeBasis();
     private cameraMoving = false;
+    /** 재생 중 부감 자세(테이블·aspect 별로 한 번 계산). overviewAspect 가 현재 aspect 와 다르면 다시 만든다. */
+    private readonly overview: CameraPose = makePose();
+    private overviewAspect = -1;
     /** player 뷰의 절두체 비율 = 인셋 사각형 비율. */
     private aspect = 1;
     /** 인셋 사각형(CSS px, 마운트 기준) — player 뷰의 뷰포트, top 뷰의 scissor. resize 마다 갱신(draw 에선 읽기만). */
@@ -415,6 +418,7 @@ export class ThreeRenderer implements Renderer {
 
     setTable(table: TableSpec): void {
         this.table = table;
+        this.overviewAspect = -1;
         if (this.disposed) return;
         this.buildTable(table);
         // 공 크기가 바뀌었을 수 있으니 풀·활성 항목의 스케일을 새로 잡는다
@@ -576,10 +580,19 @@ export class ThreeRenderer implements Renderer {
         return this.view === "player" ? this.persp : this.camera;
     }
 
-    /** 프레임의 view 로 카메라 목표를 갱신. 큐볼 id 가 없으면 첫 공. 공이 없으면 false(목표 유지). */
+    /** 프레임의 view 로 카메라 목표를 갱신. overview 면 부감 자세(aspect 별 캐시), 아니면 큐볼 뒤(id 가 없으면 첫 공). 공이 없으면 false(목표 유지). */
     private retarget(frame: RenderFrame): boolean {
         const vf = frame.view;
-        if (!vf || !this.table || frame.balls.length === 0) return false;
+        if (!vf || !this.table) return false;
+        if (vf.mode === "overview") {
+            if (this.overviewAspect !== this.aspect) {
+                overviewPose(this.overview, this.table, this.aspect);
+                this.overviewAspect = this.aspect;
+            }
+            copyPose(this.rigTarget, this.overview);
+            return true;
+        }
+        if (frame.balls.length === 0) return false;
         let cb = frame.balls[0];
         for (let i = 0; i < frame.balls.length; i++) {
             if (frame.balls[i].id === vf.cueBallId) { cb = frame.balls[i]; break; }
@@ -712,10 +725,11 @@ export class ThreeRenderer implements Renderer {
             this.ringGroup.visible = false;
         }
 
-        // 선수 시점 카메라: view 가 있으면 목표를 갱신(재생 중엔 페이지가 view 를 빼 카메라가 그 자리에 머문다), 감쇠로 전진
+        // 선수 시점 카메라: view 가 있으면 목표를 갱신(follow = 큐볼 뒤, overview = 재생 중 부감; 없으면 그 자리에 머문다), 감쇠로 전진.
+        // 감쇠 시간은 목표까지 거리로 섞는다 — 부감 비행은 느긋하게, 조준 회전은 즉각.
         if (this.view === "player") {
             this.retarget(frame);
-            this.cameraMoving = dampRig(this.rig, this.rigTarget, PLAYER_SMOOTH_S, dt);
+            this.cameraMoving = dampRig(this.rig, this.rigTarget, rigSmoothTime(this.rig, this.rigTarget), dt);
             this.applyRig();
         }
 

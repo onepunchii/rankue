@@ -15,7 +15,7 @@ import {
     CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, CUE_GAP, CUE_PULLBACK_MAX, cameraBasis, cueGap, cueRotationZ, dampRig, diamondWorld,
     integrateOrientation, makeBasis, makePose, makeRig, orthoFrustum, PLAYER_AHEAD, PLAYER_BACK, PLAYER_FAR, PLAYER_FOV_DEG, PLAYER_HEIGHT,
     PLAYER_MARGIN, PLAYER_MIN_Z, PLAYER_NEAR, PLAYER_SMOOTH_S, playerPose, projectOrtho, projectPerspective, snapRig, unprojectOrtho,
-    unprojectPerspective, type CameraPose,
+    unprojectPerspective, overviewPose, OVERVIEW_EDGE, OVERVIEW_MARGIN_M, OVERVIEW_SMOOTH_S, rigSmoothTime, type CameraPose,
 } from "./threeMath";
 import { ThreeRenderer, type ThreeRendererOptions } from "./ThreeRenderer";
 
@@ -894,5 +894,102 @@ describe("ThreeRenderer 스모크(가짜 WebGL2)", () => {
         expect(uy).toBeCloseTo(pose.ty, 6);
         r.dispose();
         r.setView("top"); // dispose 뒤엔 무시(던지지 않는다)
+    });
+});
+
+describe("overviewPose — 재생 중 부감: 테이블 전체(+여유)가 뷰 사각형에 들어오는 가장 가까운 자세", () => {
+    const corners: ReadonlyArray<readonly [number, number]> = [
+        [-OVERVIEW_MARGIN_M, -OVERVIEW_MARGIN_M], [T.width + OVERVIEW_MARGIN_M, -OVERVIEW_MARGIN_M],
+        [-OVERVIEW_MARGIN_M, T.length + OVERVIEW_MARGIN_M], [T.width + OVERVIEW_MARGIN_M, T.length + OVERVIEW_MARGIN_M],
+    ];
+    it("네 모서리가 NDC 안(가장자리 여유 포함), 눈은 헤드 레일 쪽 위, 목표는 테이블 중심", () => {
+        for (const aspect of [0.45, 0.75, 1, 1.8]) {
+            const p = overviewPose(makePose(), T, aspect);
+            expect(p.tx).toBeCloseTo(T.width / 2, 12);
+            expect(p.ty).toBeCloseTo(T.length / 2, 12);
+            expect(p.tz).toBe(0);
+            expect(p.ex).toBeCloseTo(T.width / 2, 12);
+            expect(p.ey).toBeLessThan(T.length / 2);
+            expect(p.ez).toBeGreaterThan(1);
+            const b = cameraBasis(makeBasis(), p);
+            const size = { width: 2, height: 2 };
+            let maxEdge = 0;
+            for (const [x, y] of corners) {
+                const q = projectPerspective(b, p, PLAYER_FOV_DEG, aspect, size, x, y, 0);
+                expect(q[0]).toBeGreaterThanOrEqual(2 * OVERVIEW_EDGE - 1e-9);
+                expect(q[0]).toBeLessThanOrEqual(2 - 2 * OVERVIEW_EDGE + 1e-9);
+                expect(q[1]).toBeGreaterThanOrEqual(2 * OVERVIEW_EDGE - 1e-9);
+                expect(q[1]).toBeLessThanOrEqual(2 - 2 * OVERVIEW_EDGE + 1e-9);
+                maxEdge = Math.max(maxEdge, Math.abs(q[0] - 1), Math.abs(q[1] - 1));
+            }
+            // 가장 가까운 거리: 어느 모서리든 가장자리 여유에 닿아 있다(더 가까우면 벗어난다)
+            expect(maxEdge).toBeCloseTo(1 - 2 * OVERVIEW_EDGE, 6);
+        }
+    });
+    it("좁은 화면일수록 더 멀리서 본다, 같은 입력은 같은 결과(결정론)", () => {
+        const narrow = overviewPose(makePose(), T, 0.45);
+        const square = overviewPose(makePose(), T, 1);
+        expect(narrow.ez).toBeGreaterThan(square.ez);
+        expect(overviewPose(makePose(), T, 0.45)).toEqual(narrow);
+    });
+    it("rigSmoothTime: 목표에 있으면 PLAYER_SMOOTH_S, 1 m 이상 멀면 OVERVIEW_SMOOTH_S, 사이는 선형", () => {
+        const rig = makeRig();
+        const target = playerPose(makePose(), T, 0.7, 1.4, Math.PI / 2);
+        snapRig(rig, target);
+        expect(rigSmoothTime(rig, target)).toBeCloseTo(PLAYER_SMOOTH_S, 12);
+        rig.pose.ez = target.ez + 0.5;
+        expect(rigSmoothTime(rig, target)).toBeCloseTo((PLAYER_SMOOTH_S + OVERVIEW_SMOOTH_S) / 2, 12);
+        rig.pose.ez = target.ez + 3;
+        expect(rigSmoothTime(rig, target)).toBeCloseTo(OVERVIEW_SMOOTH_S, 12);
+    });
+});
+
+describe("ThreeRenderer 재생 중 부감(view.mode = 'overview')", () => {
+    it("재생 프레임을 돌리면 카메라가 테이블 전체가 보이는 높이로 날아올라 정지하고, 조준(follow)으로 돌아오면 큐볼 뒤로 내려온다", () => {
+        const { r, el, setTime } = make();
+        r.mount(el, T);
+        const balls = openingLayout("3c", T, "white");
+        const white = balls.find((b) => b.id === "white")!;
+        const follow = { cueBallId: "white", phi: Math.PI / 2 };
+        r.draw({ balls, view: follow });
+        r.setView("player");
+        expect(r.getCameraPose(makePose()).ez).toBe(PLAYER_HEIGHT);
+        let t = 0;
+        let rose = false;
+        for (let i = 0; i < 600; i++) {
+            t += 1000 / 60;
+            setTime(t);
+            r.draw({ balls, view: { ...follow, mode: "overview" } });
+            if (i === 10) rose = r.needsFrame() && r.getCameraPose(makePose()).ez > PLAYER_HEIGHT;
+        }
+        expect(rose).toBe(true);
+        const top = r.getCameraPose(makePose());
+        expect(top.ez).toBeGreaterThan(2);
+        expect(top.tx).toBeCloseTo(T.width / 2, 6);
+        expect(top.ty).toBeCloseTo(T.length / 2, 6);
+        expect(r.needsFrame()).toBe(false);
+        // 플레이 면 네 모서리가 인셋 사각형(조작 층 밖) 안에 보인다
+        for (const [x, y] of [[0, 0], [T.width, 0], [0, T.length], [T.width, T.length]] as const) {
+            const q = r.project(x, y);
+            expect(q[0]).toBeGreaterThan(0);
+            expect(q[0]).toBeLessThan(390);
+            expect(q[1]).toBeGreaterThan(INSETS.top);
+            expect(q[1]).toBeLessThan(844 - INSETS.bottom);
+        }
+        // follow 로 돌아오면 큐볼 뒤 선수 시점으로 내려온다
+        for (let i = 0; i < 600; i++) {
+            t += 1000 / 60;
+            setTime(t);
+            r.draw({ balls, view: follow });
+        }
+        const back = r.getCameraPose(makePose());
+        expect(back.ex).toBeCloseTo(white.r[0], 6);
+        expect(back.ey).toBeCloseTo(white.r[1] - PLAYER_BACK, 6);
+        expect(back.ez).toBeCloseTo(PLAYER_HEIGHT, 6);
+        expect(r.needsFrame()).toBe(false);
+        // view 가 없으면 그 자리에 머문다(상대 차례 대기)
+        t += 1000; setTime(t);
+        r.draw({ balls });
+        expect(r.getCameraPose(makePose())).toEqual(back);
     });
 });

@@ -439,9 +439,11 @@ export function SimulatorPage() {
                 cue: { phi: v.input.phi, pullback: pullbackFor(v.input.V0), visible: v.phase === "aim", ballId: v.cueBallId },
                 // 큐볼은 큐 스틱이 가리키므로 링을 두르지 않는다 — 8px 남짓한 공에 링이 겹치면 속이 빈 공처럼 보였다(실측).
                 highlightBallId: v.placing ?? undefined,
-                // 선수 시점 카메라 대상: 조준 중에만. 재생 중(움직이는 공을 쫓지 않는다)·공 옮기기 중(끌리는 공을 카메라가 따라가면
-                // 손가락 아래 테이블 점이 같이 밀려 되먹임된다)엔 빼서 카메라가 그 자리에 머문다. 놓으면 새 자리 뒤로 옮겨 간다.
-                view: v.phase === "aim" && !v.placing ? { cueBallId: v.cueBallId, phi: v.input.phi } : undefined,
+                // 선수 시점 카메라 대상: 조준 중엔 큐볼 뒤(follow), 재생 중엔 부감(overview — 테이블 전체가 보이게 올라갔다가 조준으로
+                // 돌아오면 큐볼 뒤로 내려온다). 공 옮기기 중(끌리는 공을 카메라가 따라가면 손가락 아래 테이블 점이 같이 밀려 되먹임된다)·
+                // 상대 차례 대기·종료엔 빼서 카메라가 그 자리에 머문다.
+                view: v.phase === "aim" && !v.placing ? { cueBallId: v.cueBallId, phi: v.input.phi }
+                    : v.phase === "shooting" ? { cueBallId: v.cueBallId, phi: v.input.phi, mode: "overview" as const } : undefined,
             });
             const overlay = overlayRef.current;
             if (!overlay) return;

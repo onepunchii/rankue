@@ -13,6 +13,8 @@
  *    cameraBasis 가 three 의 Matrix4.lookAt 과 같은 규칙으로 카메라 축을 만들며, projectPerspective / unprojectPerspective 가
  *    GPU 의 원근 투영(PerspectiveCamera.updateProjectionMatrix → makePerspective)을 CPU 에서 재현한다. dampRig 는
  *    임계 감쇠 스프링으로 카메라를 목표 자세로 부드럽게 옮긴다(할당 없음).
+ *  - 재생 중 부감: overviewPose 가 테이블 전체가 뷰 사각형에 들어오는 가장 가까운 부감 자세를 이분법으로 찾고,
+ *    rigSmoothTime 이 목표까지 거리로 감쇠 시간을 섞어 먼 비행은 느긋하게, 조준 회전은 즉각 따라오게 한다.
  */
 import type { Quaternion, Vector3 } from "three";
 import type { Vec3 } from "@shared/sim/types";
@@ -320,4 +322,66 @@ export function dampRig(rig: CameraRig, target: CameraPose, smoothTime: number, 
         return false;
     }
     return true;
+}
+
+// ── 재생 중 부감(俯瞰) 카메라 ─────────────────────────────────────────────
+/**
+ * 부감 피치(수평 기준 °). 90 이면 바로 아래(탑다운과 같아진다), 낮을수록 원근이 세지만 다 보이려면 더 멀어진다.
+ * 세로 폰(뷰 비율 0.45)에선 가로가 먼저 걸려 66° 는 테이블이 화면 높이의 56 %, 78° 는 63 %, 90° 는 68 % — 원근감을 조금 남기고 78°(실측 2026-09-07).
+ */
+export const OVERVIEW_PITCH_DEG = 78;
+/** 플레이 면 둘레 여유(m): 레일 폭 + 조금. 네 모서리가 이 여유를 더한 채로 화면 안에 들어온다. */
+export const OVERVIEW_MARGIN_M = RAIL_WIDTH_M + 0.04;
+/** 화면 가장자리 여유(NDC 반폭 비율). */
+export const OVERVIEW_EDGE = 0.04;
+/** 부감 ↔ 선수 시점 비행의 감쇠 시간(s). 큰 이동은 이 값, 조준 회전 같은 작은 이동은 PLAYER_SMOOTH_S 로 이어진다. */
+export const OVERVIEW_SMOOTH_S = 0.45;
+/** 감쇠 시간을 섞는 기준 거리(m): 눈이 목표에서 이보다 멀면 OVERVIEW_SMOOTH_S, 가까울수록 PLAYER_SMOOTH_S 쪽. */
+export const OVERVIEW_BLEND_M = 1.0;
+
+const overviewBasis = makeBasis();
+const overviewProbe = makePose();
+const NDC_SIZE: Size = { width: 2, height: 2 };
+
+/**
+ * 재생 중 부감 자세(제자리): 테이블 중심을 헤드 레일 쪽에서 OVERVIEW_PITCH_DEG 로 내려다보되, 플레이 면 네 모서리
+ * (+ OVERVIEW_MARGIN_M)가 모두 뷰 사각형(aspect) 안에 들어오는 가장 가까운 거리. 이분법 40회(단조: 같은 방향에서 멀수록 다 들어온다).
+ * 모드가 바뀌거나 aspect 가 바뀔 때만 부르면 된다(렌더러가 캐시).
+ */
+export function overviewPose(out: CameraPose, table: TableSpec, aspect: number, fovDeg = PLAYER_FOV_DEG, pitchDeg = OVERVIEW_PITCH_DEG): CameraPose {
+    const cx = table.width / 2, cy = table.length / 2;
+    const pr = pitchDeg * DEG2RAD;
+    const dy = -Math.cos(pr), dz = Math.sin(pr);
+    const m = OVERVIEW_MARGIN_M;
+    const lo = 2 * OVERVIEW_EDGE, hi = 2 - 2 * OVERVIEW_EDGE;
+    const p = overviewProbe;
+    p.tx = cx; p.ty = cy; p.tz = 0;
+    const fits = (d: number): boolean => {
+        p.ex = cx; p.ey = cy + dy * d; p.ez = dz * d;
+        cameraBasis(overviewBasis, p);
+        for (let i = 0; i < 4; i++) {
+            const x = i & 1 ? table.width + m : -m;
+            const y = i & 2 ? table.length + m : -m;
+            const q = projectPerspective(overviewBasis, p, fovDeg, aspect, NDC_SIZE, x, y, 0);
+            if (q[0] < lo || q[0] > hi || q[1] < lo || q[1] > hi) return false;
+        }
+        return true;
+    };
+    let a = 0.5, b = 40;
+    for (let i = 0; i < 40; i++) {
+        const mid = (a + b) / 2;
+        if (fits(mid)) b = mid; else a = mid;
+    }
+    out.ex = cx; out.ey = cy + dy * b; out.ez = dz * b;
+    out.tx = cx; out.ty = cy; out.tz = 0;
+    return out;
+}
+
+/** 목표까지 눈 거리에 따라 감쇠 시간을 섞는다: 부감 비행처럼 먼 이동은 느긋하게(OVERVIEW_SMOOTH_S), 조준 회전은 즉각(PLAYER_SMOOTH_S). */
+export function rigSmoothTime(rig: CameraRig, target: CameraPose): number {
+    const p = rig.pose;
+    const dx = p.ex - target.ex, dy = p.ey - target.ey, dz = p.ez - target.ez;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const k = d >= OVERVIEW_BLEND_M ? 1 : d / OVERVIEW_BLEND_M;
+    return PLAYER_SMOOTH_S + (OVERVIEW_SMOOTH_S - PLAYER_SMOOTH_S) * k;
 }

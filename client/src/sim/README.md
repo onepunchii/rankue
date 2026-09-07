@@ -22,12 +22,16 @@ client/src/sim/
                           그리기는 draw()/resize() 때만, draw 는 할당 없음. WebGL2 를 못 열면 생성자가 던진다. 컨텍스트 손실마다 onContextLost, 복구 시 마지막 프레임 재그리기.
                           레터박스는 alpha:false 라 마운트 배경(surface-3 를 surface-1 위에 합성)으로 지운다 — top 뷰는 바닥 평면을 숨겨 Canvas2D 와 같은 레터박스이고, 그리기를
                           인셋 사각형으로 scissor 해 큐대가 조작 층 아래로 비치지 않는다. player 뷰는 인셋 사각형을 원근 뷰로 삼는다(persp.setViewOffset; project/unproject 도 그 사각형 기준).
+                          player 뷰 카메라는 frame.view 를 따른다: follow(조준) = 큐볼 뒤, overview(재생) = 테이블 전체가 뷰에 들어오는 부감(threeMath.overviewPose, aspect 별 캐시)으로
+                          감쇠 비행(rigSmoothTime: 먼 이동은 0.45 s, 조준 회전은 0.12 s). view 가 없으면(공 옮기기·상대 차례 대기·종료) 그 자리에 머문다.
                           바닥 재질 색은 레터박스 색(팔레트). dispose 는 GL 자원 해제 + forceContextLoss(재마운트 불가).
   render/threeMath.ts     ThreeRenderer 의 순수 수학(테스트 동반): orthoFrustum / projectOrtho / unprojectOrtho, integrateOrientation(q ← Δq(ω̂,|ω|dt) ⊗ q), cueGap / cueRotationZ, diamondWorld.
   render/rendererChoice.ts 렌더러 선택: localStorage "rankue.sim.renderer" = "three" | "canvas". 없으면 WebGL2 탐색(탐색 컨텍스트는 즉시 loseContext) → 되면 three, 아니면 canvas. 저장값이 three 여도 WebGL2 가 안 되면 canvas.
                           `selectRendererKind()`(페이지용) · `chooseRendererKind(pref, webgl2)` · `read/writeRendererPref(storage, kind)` · `CONTEXT_LOSS_LIMIT = 2`.
   overlay/Overlay.ts      `new Overlay(mount, { maxDpr?, labels?: { fullBall: t("sim.aim.fullBall") } })` → draw(state: OverlayState) / resize / clear / dispose. state.project 에 renderer.project 를 넘긴다.
                           조준선·고스트볼·예측 경로(큐볼 + 적구 첫 구간 + 두 번째 적구 접촉 전 쿠션 수)·두께 표시를 별도 2D 캔버스에 디바이스 픽셀로 그림. 색 문자열은 resize 때 한 번만 만든다.
+                          색 규약: 조준선·큐볼 경로는 큐볼 색(흰/노랑 92 %), 고스트볼은 큐볼 색 35 % 채움 + surface-1 테두리(원근 뷰에선 적구 위에 겹쳐 두께가 보인다 — 반지름은 고스트 자리에서 잰다),
+                          적구 첫 구간은 공 색 60 %. brand(초록)는 라사 위에서 안 보여 선에 쓰지 않는다(쿠션 번호·다이아몬드 알약 테두리만). 두께 알약은 [겹침 그림] ½ — 큐 뒤에서 본 두 공.
   audio.ts                절차 합성 SFX(큐 타격·공·쿠션, 임펄스로 게인), 이벤트 시각에 스케줄. `new SimAudio(getCtx: () => AudioContext | null)` — getCtx 는 useGameAudio 가 제스처로 잠금 해제한 컨텍스트를 돌려주는 게터여야 한다.
                           ※ 현재 useGameAudio 는 getCtx 를 return 하지 않는다. useSimulator 를 잇기 전에 hooks/useGameAudio.ts 의 return 에 `getCtx` 를 추가할 것(두 번째 AudioContext 를 만들면 모바일 웹뷰 컨텍스트 상한·제스처 잠금 해제를 잃는다). iOS: navigator.audioSession.type='playback' 시도.
   haptics.ts              @capacitor/haptics impact, 50 ms 스로틀, 시뮬 루프 밖에서만.
@@ -197,7 +201,8 @@ interface SimulatorActions {
 rAF 루프·오버레이(`project`)·제스처(`unproject`)는 `rendererRef` 만 보므로 교체를 모른다. 사용자 토글은 아직 없다(설정 화면에서 `writeRendererPref` 로 붙일 것).
 
 ### 그리기 루프
-rAF 마다 `sim.frameAt(performance.now())` → 재생 중이거나 dirty 일 때만 `renderer.draw({ balls, cue: { phi, pullback: pullbackFor(V0), visible: phase==="aim", ballId: cueBallId }, highlightBallId })`.
+rAF 마다 `sim.frameAt(performance.now())` → 재생 중이거나 dirty 일 때만 `renderer.draw({ balls, cue: { phi, pullback: pullbackFor(V0), visible: phase==="aim", ballId: cueBallId }, highlightBallId, view })`.
+`view` 는 aim(공 옮기기 제외)이면 `{ cueBallId, phi }`(큐볼 뒤), shooting 이면 `{ …, mode: "overview" }`(부감), 그 밖엔 없음(카메라 정지). 카메라가 움직이는 동안은 `renderer.needsFrame()` 이 루프를 더 돌린다.
 Overlay 는 aim 에서만: 드래그 중엔 `guide: "straight"`, 손을 떼면 `preview`(훅의 미리보기 경로). 재생 중엔 `overlay.clear()` 한 번. React 상태는 프레임마다 건드리지 않는다(뷰는 ref).
 
 ### 제스처(tableGestures.ts, 테이블 좌표 m 로 해석)

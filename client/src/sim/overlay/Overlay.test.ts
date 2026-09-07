@@ -38,7 +38,7 @@ function fakeMount() {
             if (name in props) return props[name];
             return (..._args: unknown[]) => { calls.push(name); };
         },
-        set(_t, name: string, v) { props[name] = v; return true; },
+        set(_t, name: string, v) { props[name] = v; if (typeof v === "string") calls.push(`${name}=${v}`); return true; },
     }) as unknown as CanvasRenderingContext2D;
     const canvas = { width: 0, height: 0, style: {} as Record<string, string>, parentNode: null as unknown, getContext: () => ctx };
     const children: unknown[] = [];
@@ -71,7 +71,7 @@ describe("Overlay (가짜 캔버스)", () => {
         expect(f.children.length).toBe(0);
     });
 
-    it("직선 안내: 선·점선 원·라벨을 그린다", () => {
+    it("직선 안내: 선·고스트 공(채움 + 테두리)·라벨을 그린다", () => {
         const f = fakeMount();
         const ov = new Overlay(f.mount);
         f.calls.length = 0;
@@ -79,10 +79,42 @@ describe("Overlay (가짜 캔버스)", () => {
         expect(f.calls).toContain("clearRect");
         expect(f.calls).toContain("lineTo");
         expect(f.calls).toContain("arc");
+        expect(f.calls).toContain("fill");
         expect(f.calls).toContain("fillText");
         expect(f.calls).toContain("setLineDash");
         expect(f.props.font).toMatch(/^12px /);
         expect(String(f.props.strokeStyle)).toMatch(/^rgba\(/);
+    });
+
+    it("색 규약: 조준선·고스트는 큐볼 색(흰 92 % / 채움 35 %), 테두리는 surface-1 — brand 초록은 선에 쓰지 않는다", () => {
+        const f = fakeMount();
+        const ov = new Overlay(f.mount);
+        f.calls.length = 0;
+        ov.draw({ ...base, guide: "straight" });
+        expect(f.calls).toContain("strokeStyle=rgba(247,244,237,0.92)");   // 흰 큐볼 조준선
+        expect(f.calls).toContain("fillStyle=rgba(247,244,237,0.35)");     // 고스트 채움
+        expect(f.calls).toContain("strokeStyle=rgba(255,255,255,0.85)");   // 고스트 테두리
+        expect(f.calls.filter((c) => c === "strokeStyle=rgba(0,98,65,1)")).toEqual([]);
+        // 노란 큐볼이면 노란 선·노란 고스트
+        f.calls.length = 0;
+        ov.draw({ ...base, cueBallId: "yellow", phi: -Math.PI / 2, guide: "straight" });
+        expect(f.calls).toContain("strokeStyle=rgba(232,179,37,0.92)");
+        expect(f.calls).toContain("fillStyle=rgba(232,179,37,0.35)");
+    });
+
+    it("두께 알약: 공 조준이면 겹침 그림(적구 원 + 큐볼 원) 뒤에 글자, 쿠션 조준이면 글자만", () => {
+        const f = fakeMount();
+        const ov = new Overlay(f.mount);
+        f.calls.length = 0;
+        ov.draw({ ...base, guide: "straight", thickness: { value: 0.5, side: "left" } });
+        const arcs = f.calls.filter((c) => c === "arc").length;
+        expect(f.calls).toContain("fillStyle=rgba(200,68,46,1)");          // 적구(빨간 공) 원
+        expect(f.calls).toContain("fillStyle=rgba(247,244,237,0.85)");     // 큐볼 원
+        // 쿠션 조준(공을 안 맞히는 방향): 고스트 원만, 겹침 그림 없음
+        f.calls.length = 0;
+        ov.draw({ ...base, phi: Math.PI, guide: "straight" });
+        expect(f.calls.filter((c) => c === "arc").length).toBeLessThan(arcs);
+        expect(f.calls).not.toContain("fillStyle=rgba(200,68,46,1)");
     });
 
     it("예측 모드: 경로와 쿠션 번호를 그린다", () => {

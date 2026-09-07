@@ -2,6 +2,11 @@
  * 조준 오버레이. 렌더러 마운트 위에 겹치는 투명 <canvas> 하나를 소유하고, 디바이스 픽셀로
  * 조준선·고스트볼·예측 경로·쿠션 번호·두께 라벨을 그린다. 포인터 이벤트는 받지 않는다(pointer-events:none) —
  * 페이지가 래퍼에 핸들러를 단다. 좌표 변환은 state.project(Renderer.project)에 맡긴다.
+ *
+ * 색 규약(초록 라사 위 가독성, 2026-09-07 오너 리뷰): 조준선·큐볼 예측 경로는 **큐볼 색**(흰/노랑 92 %), 고스트볼은 큐볼 색 35 % 채움 +
+ * surface-1 테두리 — 원근(player) 뷰에선 적구 위에 은은히 겹쳐 두께가 보이고, 탑다운에선 적구에 붙은 반투명 공으로 보인다.
+ * brand(초록)는 라사와 겹쳐 안 보이므로 선에는 쓰지 않고 쿠션 번호 알약 테두리·다이아몬드 알약에만 남긴다.
+ * 두께 알약은 [겹침 그림] 두께 — 큐 뒤에서 본 두 공(적구 원 앞에 큐볼 원이 (1 − 두께)·2r 만큼 비켜 선다).
  * state.diamond 가 있으면(다이아몬드 시스템 훈련) 레일 숫자 라벨을 경로 아래에 깔고, 유효한 조준이면 1쿠션 조준수·출발수·
  * 예측 3쿠션수를 brand 알약으로 위에 그린다(overlay/diamondSystem). 없으면 그리기는 예전과 완전히 같다.
  *
@@ -66,6 +71,21 @@ interface ColourStrings {
     readonly pathWhite: string;
     readonly pathYellow: string;
     readonly pathRed: string;
+    /** 큐볼 색: 조준선·큐볼 경로(92%), 너머(30%), 고스트 채움(35%). 큐볼 id(white | yellow)별. */
+    readonly cueWhite: string;
+    readonly cueYellow: string;
+    readonly cueWhiteFaint: string;
+    readonly cueYellowFaint: string;
+    readonly ghostWhite: string;
+    readonly ghostYellow: string;
+    /** 고스트 테두리·접촉 원호 — 초록 라사 위에서 가장 잘 보이는 surface-1(85%). */
+    readonly ghostEdge: string;
+    /** 두께 알약 겹침 그림: 적구 원(100%)·큐볼 원(85%). */
+    readonly ballWhite: string;
+    readonly ballYellow: string;
+    readonly ballRed: string;
+    readonly overlapWhite: string;
+    readonly overlapYellow: string;
 }
 
 function buildColours(p: Palette): ColourStrings {
@@ -79,6 +99,18 @@ function buildColours(p: Palette): ColourStrings {
         pathWhite: rgba(p.ballWhite, OBJECT_PATH_ALPHA),
         pathYellow: rgba(p.ballYellow, OBJECT_PATH_ALPHA),
         pathRed: rgba(p.ballRed, OBJECT_PATH_ALPHA),
+        cueWhite: rgba(p.ballWhite, CUE_PATH_ALPHA),
+        cueYellow: rgba(p.ballYellow, CUE_PATH_ALPHA),
+        cueWhiteFaint: rgba(p.ballWhite, AIM_BEYOND_ALPHA),
+        cueYellowFaint: rgba(p.ballYellow, AIM_BEYOND_ALPHA),
+        ghostWhite: rgba(p.ballWhite, GHOST_FILL_ALPHA),
+        ghostYellow: rgba(p.ballYellow, GHOST_FILL_ALPHA),
+        ghostEdge: rgba(p.surface1, GHOST_EDGE_ALPHA),
+        ballWhite: rgba(p.ballWhite),
+        ballYellow: rgba(p.ballYellow),
+        ballRed: rgba(p.ballRed),
+        overlapWhite: rgba(p.ballWhite, OVERLAP_CUE_ALPHA),
+        overlapYellow: rgba(p.ballYellow, OVERLAP_CUE_ALPHA),
     };
 }
 
@@ -89,11 +121,23 @@ const AIM_WIDTH = 1.5;
 const AIM_BEYOND_ALPHA = 0.3;
 const OBJECT_PATH_WIDTH = 1;
 const OBJECT_PATH_ALPHA = 0.6;
-const GHOST_DASH: readonly number[] = [4, 3];
+const CUE_PATH_ALPHA = 0.92;
+const GHOST_FILL_ALPHA = 0.35;
+const GHOST_EDGE_ALPHA = 0.85;
+const GHOST_EDGE_WIDTH = 1.5;
+const CONTACT_ARC_WIDTH = 2.5;
+const CONTACT_ARC_HALF = 0.6;
+/** 두께 알약 안 겹침 그림: 공 반지름·상자 폭·글자와의 간격·큐볼 원 불투명도. */
+const OVERLAP_R = 6;
+const OVERLAP_BOX = 38;
+const OVERLAP_GAP = 4;
+const OVERLAP_CUE_ALPHA = 0.85;
 const NO_DASH: readonly number[] = [];
 const MARK_RADIUS = 8;
 const LABEL_HEIGHT = 20;
 const LABEL_PAD_X = 7;
+/** 두께 알약과 고스트 테두리 사이 여유(px). */
+const LABEL_CLEARANCE = 8;
 /** 출발선(출발점 → 큐볼) 점선. */
 const DIAMOND_DASH: readonly number[] = [3, 3];
 /** 레일 바깥 행(출발수)과 레일 사이 간격 px. */
@@ -221,9 +265,11 @@ export class Overlay {
         }
 
         if (guide) {
-            this.drawGhost(state, guide, rPx);
+            // 고스트는 제 자리의 반지름으로(원근에선 큐볼보다 멀어 작다) — 적구와 겹치는 정도가 실제와 같아진다
+            const gPx = this.radiusPxAt(state, guide.ghost[0], guide.ghost[1]);
+            this.drawGhost(state, guide, gPx);
             const th = state.thickness ?? (guide.ball ? { value: guide.ball.thickness, side: guide.ball.side } : null);
-            if (th) this.drawThicknessLabel(state, guide, rPx, th.value);
+            if (th) this.drawThicknessLabel(state, guide, gPx, th.value, th.side);
         }
 
         if (diamond && diamond.aim) this.drawDiamondAim(state, diamond.aim, cueBall);
@@ -232,11 +278,42 @@ export class Overlay {
     /* ------------------------------------------------ 그리기 조각 */
 
     private ballRadiusPx(state: OverlayState, cueBall: BallState): number {
+        return this.radiusPxAt(state, cueBall.r[0], cueBall.r[1]);
+    }
+
+    /** (x, y) 자리의 공 반지름(px). 원근에선 먼 공이 작다 — x·y 두 방향으로 R 만큼 옮긴 점 중 더 긴 쪽(실루엣 반지름). */
+    private radiusPxAt(state: OverlayState, x: number, y: number): number {
         const R = state.table.ball.R;
-        const a = state.project(cueBall.r[0], cueBall.r[1]);
-        const b = state.project(cueBall.r[0] + R, cueBall.r[1]);
-        const dx = b[0] - a[0], dy = b[1] - a[1];
-        return Math.max(2, Math.sqrt(dx * dx + dy * dy));
+        const a = state.project(x, y);
+        const b = state.project(x + R, y);
+        const d = state.project(x, y + R);
+        const bx = b[0] - a[0], by = b[1] - a[1];
+        const dx = d[0] - a[0], dy = d[1] - a[1];
+        const rb = Math.sqrt(bx * bx + by * by);
+        const rd = Math.sqrt(dx * dx + dy * dy);
+        return Math.max(2, rb > rd ? rb : rd);
+    }
+
+    private cueColour(id: string): string {
+        return id === "yellow" ? this.col.cueYellow : this.col.cueWhite;
+    }
+
+    private cueFaint(id: string): string {
+        return id === "yellow" ? this.col.cueYellowFaint : this.col.cueWhiteFaint;
+    }
+
+    private ghostFill(id: string): string {
+        return id === "yellow" ? this.col.ghostYellow : this.col.ghostWhite;
+    }
+
+    private ballColour(id: string): string {
+        if (id.startsWith("red")) return this.col.ballRed;
+        if (id === "yellow") return this.col.ballYellow;
+        return this.col.ballWhite;
+    }
+
+    private overlapCue(id: string): string {
+        return id === "yellow" ? this.col.overlapYellow : this.col.overlapWhite;
     }
 
     /** 적구 경로 색(공 색 60%). 미리 만든 문자열이라 draw 안에서 할당이 없다. */
@@ -246,21 +323,21 @@ export class Overlay {
         return this.col.pathWhite;
     }
 
-    /** 직선 안내: 큐볼 → 고스트(실선), 고스트 → 너머(30%). */
+    /** 직선 안내: 큐볼 → 고스트(큐볼 색 실선), 고스트 → 너머(30%). */
     private drawStraight(state: OverlayState, g: StraightGuide): void {
         const c = this.ctx;
         const p0 = state.project(g.cue[0], g.cue[1]);
         const p1 = state.project(g.ghost[0], g.ghost[1]);
         c.lineWidth = AIM_WIDTH;
         c.setLineDash(NO_DASH as number[]);
-        c.strokeStyle = this.col.brand;
+        c.strokeStyle = this.cueColour(state.cueBallId);
         c.beginPath();
         c.moveTo(p0[0], p0[1]);
         c.lineTo(p1[0], p1[1]);
         c.stroke();
         if (g.beyond) {
             const p2 = state.project(g.beyond[0], g.beyond[1]);
-            c.strokeStyle = this.col.brandFaint;
+            c.strokeStyle = this.cueFaint(state.cueBallId);
             c.beginPath();
             c.moveTo(p1[0], p1[1]);
             c.lineTo(p2[0], p2[1]);
@@ -268,7 +345,7 @@ export class Overlay {
         }
     }
 
-    /** 예측 경로: 큐볼 실선(brand), 적구 얇게(공 색 60%), 큐볼 쿠션 번호. */
+    /** 예측 경로: 큐볼 실선(큐볼 색), 적구 얇게(공 색 60%), 큐볼 쿠션 번호. */
     private drawPreview(state: OverlayState, preview: OverlayPreview, rPx: number): void {
         const c = this.ctx;
         c.setLineDash(NO_DASH as number[]);
@@ -281,7 +358,7 @@ export class Overlay {
         for (const path of preview.paths) {
             if (path.id !== state.cueBallId) continue;
             c.lineWidth = AIM_WIDTH;
-            c.strokeStyle = this.col.brand;
+            c.strokeStyle = this.cueColour(state.cueBallId);
             this.strokePolyline(state, path);
         }
         if (preview.cushions.length) this.drawCushionMarks(state, preview.cushions, rPx);
@@ -321,25 +398,29 @@ export class Overlay {
         }
     }
 
-    /** 고스트볼(점선 원) + 접촉 표시(접촉점 쪽 원호·적구 진행 방향 짧은 선). */
+    /**
+     * 고스트볼: 큐볼 색 35 % 채움 + surface-1 테두리(반투명 공 — 원근 뷰에선 적구 위에 은은히 겹쳐 두께가 보인다)
+     * + 접촉 표시(접촉점 쪽 굵은 원호·적구 진행 방향 짧은 선).
+     */
     private drawGhost(state: OverlayState, g: StraightGuide, rPx: number): void {
         const c = this.ctx;
         const p = state.project(g.ghost[0], g.ghost[1]);
-        c.lineWidth = 1;
-        c.strokeStyle = this.col.brand;
-        c.setLineDash(GHOST_DASH as number[]);
+        c.setLineDash(NO_DASH as number[]);
         c.beginPath();
         c.arc(p[0], p[1], rPx, 0, Math.PI * 2);
+        c.fillStyle = this.ghostFill(state.cueBallId);
+        c.fill();
+        c.lineWidth = GHOST_EDGE_WIDTH;
+        c.strokeStyle = this.col.ghostEdge;
         c.stroke();
-        c.setLineDash(NO_DASH as number[]);
 
         if (!g.ball) return;
         const cp = state.project(g.ball.contactPoint[0], g.ball.contactPoint[1]);
         // 접촉점을 중심으로 한 짧은 원호(화면 각도는 project 를 거친 방향으로 계산)
         const ang = Math.atan2(cp[1] - p[1], cp[0] - p[0]);
-        c.lineWidth = 2.5;
+        c.lineWidth = CONTACT_ARC_WIDTH;
         c.beginPath();
-        c.arc(p[0], p[1], rPx, ang - 0.6, ang + 0.6);
+        c.arc(p[0], p[1], rPx, ang - CONTACT_ARC_HALF, ang + CONTACT_ARC_HALF);
         c.stroke();
         // 적구 진행 방향 안내선(적구 색, 60%)
         const R = state.table.ball.R;
@@ -353,15 +434,20 @@ export class Overlay {
         c.stroke();
     }
 
-    /** 고스트볼 옆 두께 라벨(알약). 적구 반대쪽에 두고 캔버스 안으로 클램프. */
-    private drawThicknessLabel(state: OverlayState, g: StraightGuide, rPx: number, value: number): void {
+    /**
+     * 고스트볼 옆 두께 알약: [겹침 그림] 두께. 그림은 큐 뒤에서 본 두 공 — 적구 원 앞에 큐볼 원이 (1 − 두께)·2r 만큼 비켜 서서
+     * 적구가 그만큼 보인다(side "left" = 적구 중심이 조준선 왼쪽 = 적구의 오른쪽을 맞힘 → 큐볼 원이 오른쪽으로). 쿠션 조준(g.ball 없음)은 글자만.
+     * 조준선에 수직인 쪽으로 밀어 두고 캔버스 안으로 클램프.
+     */
+    private drawThicknessLabel(state: OverlayState, g: StraightGuide, rPx: number, value: number, side: "left" | "right" | "center"): void {
         const c = this.ctx;
         const text = thicknessLabel(value, undefined, this.fullLabel);
         c.font = FONT;
         c.textAlign = "center";
         c.textBaseline = "middle";
         const tw = c.measureText(text).width;
-        const bw = tw + LABEL_PAD_X * 2;
+        const gw = g.ball ? OVERLAP_BOX + OVERLAP_GAP : 0;
+        const bw = tw + gw + LABEL_PAD_X * 2;
         const bh = LABEL_HEIGHT;
 
         const p = state.project(g.ghost[0], g.ghost[1]);
@@ -372,7 +458,9 @@ export class Overlay {
         let ox = -dy, oy = dx;
         if (oy > 0) { ox = -ox; oy = -oy; }
         const ol = Math.sqrt(ox * ox + oy * oy) || 1;
-        const dist = rPx + 16;
+        // 알약이 고스트·적구를 덮지 않게: 고스트 반지름 + 여유 + 밀어내는 방향으로 잰 알약의 반폭(겹침 그림이 들어가 넓어졌다)
+        const ext = (Math.abs(ox / ol) * bw + Math.abs(oy / ol) * bh) / 2;
+        const dist = rPx + LABEL_CLEARANCE + ext;
         let x = p[0] + (ox / ol) * dist - bw / 2;
         let y = p[1] + (oy / ol) * dist - bh / 2;
         x = Math.max(4, Math.min(this.w - bw - 4, x));
@@ -385,8 +473,26 @@ export class Overlay {
         c.lineWidth = 1;
         c.strokeStyle = this.col.surfaceLine;
         c.stroke();
+        if (g.ball) {
+            const ox = x + LABEL_PAD_X + OVERLAP_BOX / 2;
+            const oy = y + bh / 2;
+            const v = value < 0 ? 0 : value > 1 ? 1 : value;
+            const dir = side === "right" ? -1 : side === "left" ? 1 : 0;
+            const off = (1 - v) * 2 * OVERLAP_R * dir;
+            c.beginPath();
+            c.arc(ox, oy, OVERLAP_R, 0, Math.PI * 2);
+            c.fillStyle = this.ballColour(g.ball.id);
+            c.fill();
+            c.beginPath();
+            c.arc(ox + off, oy, OVERLAP_R, 0, Math.PI * 2);
+            c.fillStyle = this.overlapCue(state.cueBallId);
+            c.fill();
+            c.lineWidth = 1;
+            c.strokeStyle = this.col.ink3;
+            c.stroke();
+        }
         c.fillStyle = this.col.ink1;
-        c.fillText(text, x + bw / 2, y + bh / 2 + 0.5);
+        c.fillText(text, x + LABEL_PAD_X + gw + tw / 2, y + bh / 2 + 0.5);
     }
 
     /* ------------------------------------------------ 다이아몬드 시스템 */

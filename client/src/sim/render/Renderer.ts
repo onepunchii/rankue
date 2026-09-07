@@ -24,11 +24,16 @@ export interface CueFrame {
  */
 export type RendererView = "top" | "player";
 
-/** 선수 시점 카메라가 따라갈 대상. 없으면 카메라는 마지막 자리에 머문다(재생 중 움직이는 공을 쫓지 않는다). */
+/** 선수 시점 카메라의 목표. 없으면 카메라는 마지막 자리에 머문다(공 옮기기·상대 차례 대기). */
 export interface ViewFrame {
     readonly cueBallId: string;
-    /** 조준 방향(rad). 카메라는 큐볼 뒤(−phi)에 서서 +phi 쪽을 본다. */
+    /** 조준 방향(rad). follow 에서 카메라는 큐볼 뒤(−phi)에 서서 +phi 쪽을 본다. */
     readonly phi: number;
+    /**
+     * "follow"(기본): 큐볼 뒤 선수 시점. "overview": 재생 중 부감 — 테이블 전체가 뷰에 들어오는 높이로 감쇠 비행해 올라가
+     * 공이 어디로 가든 보이게 하고(움직이는 공을 쫓으면 3쿠션마다 화면이 돈다), 조준으로 돌아오면 다시 큐볼 뒤로 내려온다.
+     */
+    readonly mode?: "follow" | "overview";
 }
 
 export interface RenderFrame {
