@@ -1,9 +1,10 @@
 /**
  * SimulatorPage 스모크 테스트(jsdom 직접 기동 — SimSetupDialog.test 와 같은 방식). 앱 모듈("@/...")은 vi.mock 으로 대체하고
  * 훅·컨트롤러·엔진·렌더러는 진짜를 쓴다(캔버스 2D 컨텍스트만 없어 그리기는 no-op).
- * 검증: ?cfg 로 연습 세션이 바로 열린다 · 샷 → 재생 → 시계를 앞당기면 공이 멈추고 결과 배너·이닝 시트에 기록된다 ·
+ * 검증: ?cfg 로 연습 세션이 바로 열린다 · 샷 → 재생(조작 층이 흐려짐) → 시계를 앞당기면 공이 멈추고 결과 배너·이닝 시트에 기록된다 ·
  *      연습 모드는 서버를 부르지 않는다 · cfg 가 없으면 설정 창이 열리고 시작하기로 세션이 열린다 ·
- *      샷이 끝나면 공유 알약이 생긴다 · ?replay= 는 연습 세션을 열어 한 번 자동으로 치고 해시 칩을 보인다.
+ *      샷이 끝나면 툴바에 공유 버튼이 생긴다 · ?replay= 는 연습 세션을 열어 한 번 자동으로 치고 해시 칩을 보인다 ·
+ *      툴바 당점·큐 각 버튼이 시트를 열고 단계 칩이 큐 각을 바꾼다(레이아웃 B).
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
@@ -153,16 +154,16 @@ const byLabel = (h: Harness, label: string) => buttons(h).find((b) => b.getAttri
 const frames = (n: number) => React.act(async () => { for (let i = 0; i < n; i++) await new Promise((r) => setTimeout(r, 20)); });
 
 describe("SimulatorPage", () => {
-    it("?cfg 로 연습 세션이 바로 열리고 HUD 에 이름·점수·규칙·테이블이 보인다", () => {
+    it("?cfg 로 연습 세션이 바로 열리고 상단 띠에 점수·규칙·테이블이 보인다(1인 요약엔 이름이 없다)", () => {
         nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
         const h = mount();
         expect(h.container.querySelector("[role=dialog]")).toBeNull();
         const text = h.container.textContent ?? "";
-        expect(text).toContain("테스터");
-        expect(text).toContain("/ 5");
+        expect(text).not.toContain("테스터");
+        expect(text).toContain("0/5");
         expect(text).toContain(ko["sim.hud.ruleUmb"]);
         expect(text).toContain(ko["sim.setup.tableDaedae"]);
-        expect(text).toContain(ko["sim.hud.practice"]);
+        expect(text).toContain(ko["sim.top.practice"]);
         expect(text).toContain(ko["sim.hud.placeHint"]);
         // 렌더러 캔버스가 테이블 래퍼에 얹혔다
         expect(h.container.querySelectorAll("canvas").length).toBeGreaterThanOrEqual(1);
@@ -173,12 +174,11 @@ describe("SimulatorPage", () => {
         expect(byLabel(h, ko["sim.controls.undo"])).toBeNull();
     });
 
-    it("3쿠션이면 HUD 에 다이아몬드 시스템 토글(기본 꺼짐)이 있고, 누르면 켜진다 · 4구엔 없다", () => {
+    it("3쿠션이면 툴바에 다이아몬드 시스템 토글(기본 꺼짐)이 있고, 누르면 켜진다 · 4구엔 없다", () => {
         nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
         const h = mount();
         const btn = byLabel(h, ko["sim.diamond.toggleLabel"]);
         expect(btn).not.toBeNull();
-        expect(btn!.textContent).toBe(ko["sim.diamond.toggle"]);
         expect(btn!.getAttribute("aria-pressed")).toBe("false");
         click(btn!);
         expect(byLabel(h, ko["sim.diamond.toggleLabel"])!.getAttribute("aria-pressed")).toBe("true");
@@ -199,21 +199,31 @@ describe("SimulatorPage", () => {
         expect(byLabel(h, ko["sim.diamond.toggleLabel"])).not.toBeNull();
     });
 
-    it("샷 → 재생(잠금) → 시계를 앞당기면 정지 · 결과 배너 · 이닝 시트 한 줄 · 되돌리기", async () => {
+    it("샷 → 재생(잠금 · 조작 층 흐림) → 시계를 앞당기면 정지 · 결과 배너 · 이닝 시트 한 줄 · 되돌리기", async () => {
         nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
         const h = mount();
+        const controls = () => h.container.querySelector("[data-sim-controls=right]")!;
+        const dock = () => h.container.querySelector("[role=group][aria-label=\"" + ko["sim.controls.thickness"] + "\"]")!;
+        expect(controls().className).not.toContain("opacity-0");
+        expect(dock().className).not.toContain("opacity-0");
         click(byText(h, ko["sim.controls.shoot"])!);
-        // 재생 중: 샷 잠금 + 빨리감기 안내
-        const playing = byText(h, ko["sim.controls.playing"]);
-        expect(playing).not.toBeNull();
-        expect(playing!.disabled).toBe(true);
+        // 재생 중: 샷 잠금(빈 원, 비활성) + 빨리감기 안내 + 툴바·큐 슬라이더·두께 독이 흐려지고 포인터를 막는다(상단 띠·칩은 남는다)
+        const shot = byLabel(h, ko["sim.controls.shoot"]);
+        expect(shot).not.toBeNull();
+        expect(shot!.disabled).toBe(true);
         expect(h.container.textContent).toContain(ko["sim.hud.holdToFastForward"]);
         expect(byText(h, ko["sim.controls.shoot"])).toBeNull();
+        expect(controls().className).toContain("opacity-0");
+        expect(controls().className).toContain("pointer-events-none");
+        expect(dock().className).toContain("opacity-0");
+        expect(h.container.textContent).toContain(ko["sim.hud.ruleUmb"]);
 
-        // 시계를 1000 초 앞당기면 다음 rAF 에서 재생이 끝난다
+        // 시계를 1000 초 앞당기면 다음 rAF 에서 재생이 끝난다 → 조작 층이 돌아온다
         performance.now = () => realNow() + 1_000_000;
         await frames(4);
         expect(byText(h, ko["sim.controls.shoot"])).not.toBeNull();
+        expect(controls().className).not.toContain("opacity-0");
+        expect(dock().className).not.toContain("opacity-0");
         const text = h.container.textContent ?? "";
         const outcomes = ["point", "missNoContact", "missOneBall", "missCushions"].map((k) => ko[`sim.outcome.${k}`].split(" ·")[0]);
         expect(outcomes.some((o) => text.includes(o))).toBe(true);
@@ -223,8 +233,11 @@ describe("SimulatorPage", () => {
         expect(sheet).not.toBeNull();
         expect(sheet!.querySelectorAll("tbody tr")).toHaveLength(1);
         expect(sheet!.textContent).toContain(ko["sim.hud.sheetTotal"]);
-        // 연습 모드라 되돌리기가 생겼다
-        expect(byLabel(h, ko["sim.controls.undo"])).not.toBeNull();
+        // 연습 모드라 되돌리기가 생겼다 — 두께 독 둘째 줄에(툴바가 아니라)
+        const undo = byLabel(h, ko["sim.controls.undo"]);
+        expect(undo).not.toBeNull();
+        expect(dock().contains(undo)).toBe(true);
+        expect(controls().contains(undo)).toBe(false);
         expect(nav.apiRequest).not.toHaveBeenCalled();
     });
 
@@ -237,7 +250,7 @@ describe("SimulatorPage", () => {
         click(h.container.querySelector("#sim-opt-record")!);
         click(byText(h, ko["sim.setup.start"])!);
         expect(h.container.querySelector("[role=dialog]")).toBeNull();
-        expect(h.container.textContent).toContain("/ 15");
+        expect(h.container.textContent).toContain("0/15");
         expect(nav.apiRequest).not.toHaveBeenCalled();
 
         click(byLabel(h, ko["sim.controls.exit"])!);
@@ -247,17 +260,18 @@ describe("SimulatorPage", () => {
         expect(nav.navigate).toHaveBeenCalledWith("/dashboard");
     });
 
-    it("샷이 끝나면 테이블 오른쪽 위에 공유 알약이 생기고, 누르면 결과 토스트가 뜬다(jsdom 은 캔버스가 없어 실패 문구)", async () => {
+    it("샷이 끝나면 왼쪽 위 칩 열에 공유 알약이 생기고(툴바 밖), 누르면 결과 토스트가 뜬다(jsdom 은 캔버스가 없어 실패 문구)", async () => {
         nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
         const h = mount();
-        expect(byText(h, ko["sim.share.button"])).toBeNull();
+        expect(byLabel(h, ko["sim.share.button"])).toBeNull();
         click(byText(h, ko["sim.controls.shoot"])!);
-        expect(byText(h, ko["sim.share.button"])).toBeNull();   // 재생 중엔 없다
+        expect(byLabel(h, ko["sim.share.button"])).toBeNull();   // 재생 중엔 없다
         performance.now = () => realNow() + 1_000_000;
         await frames(4);
-        const share = byText(h, ko["sim.share.button"]);
+        const share = byLabel(h, ko["sim.share.button"]);
         expect(share).not.toBeNull();
         expect(share!.disabled).toBe(false);
+        expect(h.container.querySelector("[data-sim-controls=right]")!.contains(share)).toBe(false);
         click(share!);
         await frames(3);
         const titles = nav.toast.mock.calls.map((c) => (c[0] as { title: string }).title);
@@ -272,21 +286,49 @@ describe("SimulatorPage", () => {
         const h = mount();
         await frames(2);
         expect(h.container.querySelector("[role=dialog]")).toBeNull();
-        expect(h.container.textContent).toContain(ko["sim.hud.practice"]);
+        expect(h.container.textContent).toContain(ko["sim.top.practice"]);
         expect(h.container.textContent).toContain(ko["sim.share.replayChip"]);
         expect(h.container.textContent).not.toContain(ko["sim.share.replayMismatch"]);
-        // 자동 샷이 재생 중이고 서버는 부르지 않는다
-        expect(byText(h, ko["sim.controls.playing"])).not.toBeNull();
+        // 자동 샷이 재생 중이고(샷 버튼 잠금 · 빨리감기 안내) 서버는 부르지 않는다
+        expect(byLabel(h, ko["sim.controls.shoot"])!.disabled).toBe(true);
+        expect(h.container.textContent).toContain(ko["sim.hud.holdToFastForward"]);
         expect(nav.apiRequest).not.toHaveBeenCalled();
         performance.now = () => realNow() + 1_000_000;
         await frames(4);
         // 재생이 끝나면 보통 연습처럼 이어서 칠 수 있고 공유도 된다
         expect(byText(h, ko["sim.controls.shoot"])).not.toBeNull();
-        expect(byText(h, ko["sim.share.button"])).not.toBeNull();
+        expect(byLabel(h, ko["sim.share.button"])).not.toBeNull();
         expect(h.container.textContent).toContain(ko["sim.share.replayChip"]);
         // 되돌리면(연습) 리플레이 샷이 사라지므로 칩도 사라진다
         click(byLabel(h, ko["sim.controls.undo"])!);
         expect(h.container.textContent).not.toContain(ko["sim.share.replayChip"]);
+    });
+
+    it("툴바 당점 버튼은 당점 탭으로, 큐 각 버튼은 큐 각 탭으로 시트를 열고, 단계 칩을 누르면 툴바에 각도가 보인다", () => {
+        nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
+        const h = mount();
+        expect(h.container.querySelector("[data-sheet]")).toBeNull();
+        click(byLabel(h, ko["sim.controls.spin"])!);
+        let sheet = h.container.querySelector("[data-sheet]");
+        expect(sheet).not.toBeNull();
+        expect(sheet!.textContent).toContain(ko["sim.spin.title"]);
+        const tabs = () => Array.from(sheet!.querySelectorAll("[role=tab]"));
+        expect(tabs().map((b) => b.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+        expect(sheet!.textContent).toContain(ko["sim.controls.spinCenter"]);
+        // 닫기 → 큐 각 버튼으로 다시 열면 큐 각 탭
+        click(byText(h, ko["sim.common.close"])!);
+        expect(h.container.querySelector("[data-sheet]")).toBeNull();
+        click(byLabel(h, ko["sim.rail.elevation"])!);
+        sheet = h.container.querySelector("[data-sheet]");
+        expect(sheet).not.toBeNull();
+        expect(tabs().map((b) => b.getAttribute("aria-selected"))).toEqual(["false", "true"]);
+        const chip20 = Array.from(sheet!.querySelectorAll("button")).find((b) => b.textContent === "20°")!;
+        expect(chip20.getAttribute("aria-pressed")).toBe("false");
+        click(chip20);
+        expect(Array.from(h.container.querySelectorAll("[data-sheet] button")).find((b) => b.textContent === "20°")!.getAttribute("aria-pressed")).toBe("true");
+        // 툴바의 큐 각 버튼 아래에 "20°" 캡션
+        expect(byLabel(h, ko["sim.rail.elevation"])!.textContent).toContain("20°");
+        expect(nav.apiRequest).not.toHaveBeenCalled();
     });
 
     it("해시가 다른 리플레이는 '결과가 달라요' 칩을 함께 보이고, 깨진 리플레이는 설정 창으로 떨어진다", async () => {

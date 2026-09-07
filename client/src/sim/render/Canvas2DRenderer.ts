@@ -252,7 +252,8 @@ export class Canvas2DRenderer implements Renderer {
         const balls = frame.balls;
         const cue = frame.cue;
 
-        // 큐대는 공보다 먼저(뒤에) 그린다
+        // 큐대는 공보다 먼저(뒤에) 그린다. 인셋 사각형(조작 층 밖)으로 클립 — 1.45 m 큐대는 테이블 밖으로 길게 나가 오른쪽
+        // 열의 슬라이더·버튼 틈으로 비쳤다(2026-09-07 리뷰). ThreeRenderer 는 같은 사각형을 scissor 로 자른다.
         if (cue && cue.visible && balls.length > 0) {
             const cueId = cue.ballId ?? frame.highlightBallId;
             let cb = balls[0];
@@ -261,7 +262,13 @@ export class Canvas2DRenderer implements Renderer {
                     if (balls[i].id === cueId) { cb = balls[i]; break; }
                 }
             }
+            const ins = L.insets;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(ins.left, ins.top, Math.max(0, L.container.width - ins.left - ins.right), Math.max(0, L.container.height - ins.top - ins.bottom));
+            ctx.clip();
             this.drawCue(ctx, L, cb.r[0], cb.r[1], cue.phi, cue.pullback);
+            ctx.restore();
         }
 
         const half = this.spriteSide / 2;

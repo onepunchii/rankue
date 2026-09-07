@@ -4,15 +4,22 @@
  *    렌더러는 기기 저장값(rendererChoice: "rankue.sim.renderer")과 WebGL2 탐색으로 ThreeRenderer 를 고르고, 생성 실패나
  *    컨텍스트 손실 2회면 Canvas2DRenderer 로 내려간다(같은 Renderer 계약이라 루프·오버레이·제스처는 모른다),
  *  - 테이블 포인터 제스처(조준 드래그 · 연습 모드 공 배치 · 재생 중 길게 눌러 4×)를 tableGestures 로 해석하고,
- *  - HUD · 조작 패널 · 결과 배너 · 이닝 시트 · 종료/나가기 다이얼로그를 그린다.
- *  - 다이아몬드 시스템 훈련(3쿠션만): HUD 토글(localStorage "rankue.sim.diamond", 기본 꺼짐)이 켜지면 rAF 경로에서
+ *  - 레이아웃 B("오른쪽 툴바형", 2026-09-07 오너 선택): 상단 띠(TopBar 44 px) 아래가 전부 테이블 영역이고, 조작은 그 위에 얹힌다 —
+ *    오른쪽 열(툴바 ToolRail → 세로 큐 슬라이더 PowerRail(흰 알약) → ± → 샷 ShotButton), 왼쪽 아래 두께 독(ThicknessDock, 둘째 줄에
+ *    되돌리기), 당점·큐 각은 시트(SpinSheet), 공유는 왼쪽 위 칩 열의 알약 버튼(샷 뒤). 렌더러는 TABLE_INSETS 만큼 비워 탑다운 테이블을
+ *    조작 층 밖에 letterbox 하고(player 뷰는 그 사각형을 원근 뷰로 삼는다), 큐대도 그 사각형 안에서만 그린다. 재생·상대 차례엔 조작 층이
+ *    150 ms 로 흐려지고(opacity 0 + pointer-events none) 조준으로 돌아오면 되살아난다. 결과 배너 · 이닝 시트 · 종료/나가기 다이얼로그.
+ *    조작 층은 테이블 마운트의 형제(자식이 아님) — 자식이면 슬라이더·버튼의 pointerdown 이 테이블 제스처로 번진다.
+ *    툴바 버튼 수는 모드에 따라 6~9개 — railLayout.railFitsMd 로 md(44 px) 가 열에 들어가는지 세어 안 들어가면 compact(40 px) 로 내린다
+ *    (스크롤은 마지막 수단: 잘린 버튼은 있는 줄 모른다).
+ *  - 다이아몬드 시스템 훈련(3쿠션만): 툴바 토글(localStorage "rankue.sim.diamond", 기본 꺼짐)이 켜지면 rAF 경로에서
  *    overlay/diamondSystem.overlayDiamond 로 레일 숫자·조준 분석을 오버레이에 넘기고, 샷이 끝나면 sim.lastResult 로
  *    "시스템 {예측} · 실제 {3쿠션수}" 를 결과 배너 아래 한 줄로 보인다.
- *  - 선수 시점("3D 보기", localStorage "rankue.sim.view", 기본 top): ThreeRenderer 가 올라오면 HUD 토글이 생기고, rAF 가 매 프레임
+ *  - 선수 시점("3D 보기", localStorage "rankue.sim.view", 기본 top): ThreeRenderer 가 올라오면 툴바 토글이 생기고, rAF 가 매 프레임
  *    큐볼·phi 를 draw 의 view 로 넘겨 카메라가 조준을 따라간다(재생·공 옮기기 중엔 빼서 카메라가 멈춘다). 오버레이는 renderer.project
  *    만 쓰므로 두 뷰에서 그대로 공 위에 얹히고, 다이아몬드 시스템 숫자는 원근에서 겹쳐 player 뷰에선 그리지 않는다.
  *    조준 드래그는 직전 포인터를 현재 카메라로 다시 unproject 해 각을 재므로 카메라가 따라 도는 만큼이 되먹임되지 않는다.
- *  - 공유·리플레이(share/): 솔로·연습·드릴에서 샷이 끝나면 테이블 오른쪽 위 "공유" 알약(종료 다이얼로그에도) → 카드 PNG +
+ *  - 공유·리플레이(share/): 솔로·연습·드릴에서 샷이 끝나면 툴바 아래쪽 "공유" 버튼(종료 다이얼로그에도) → 카드 PNG +
  *    `?replay=` 링크(useShare). `?replay=<payload>` 로 열면 연습 세션을 그 배치로 열어 한 번 자동으로 치고, 결과 해시가
  *    원본과 같은지 칩("리플레이" / "결과가 달라요")으로 보인다 — 그 뒤엔 보통 연습처럼 이어서 칠 수 있다.
  * 설정은 `?cfg=<base64url JSON>`(pageConfig) 으로 받고, 없거나 깨졌으면 SimSetupDialog 를 위에 연다.
@@ -31,7 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useSimulator, type OfflineReason } from "./useSimulator";
-import type { Renderer, RendererView } from "./render/Renderer";
+import type { Renderer, RendererView, SafeInsets } from "./render/Renderer";
 import { Canvas2DRenderer } from "./render/Canvas2DRenderer";
 import {
     CONTEXT_LOSS_LIMIT, readViewPref, safeLocalStorage, selectRendererKind, writeRendererPref, writeViewPref, type RendererKind,
@@ -56,14 +63,24 @@ import { decodePageConfig, readCfgParam } from "./pageConfig";
 import { decodeReplay, encodeReplay, forSoloSession, replaySource, replayUrl, REPLAY_PARAM, toReplayConfig, type ReplayPayload } from "./share/replayLink";
 import { fileNameFor, gameBadge, replayShortText, sessionStatsLine, shotSubtitle, shotTitle } from "./share/shareCard";
 import { useShare } from "./share/useShare";
-import { activeThickness, FINE_STEP_RAD, pullbackFor, type ThicknessStep } from "./controlsMath";
+import { activeThickness, elevationDeg, FINE_STEP_RAD, pullbackFor, stepPower, type ThicknessStep } from "./controlsMath";
 import { appendShot, EMPTY_LOG, popShot, type InningLog } from "./inningLog";
 import { beginGesture, moveGesture, type Gesture } from "./tableGestures";
 import { playerLabel, tableLabel } from "./hudMath";
 import type { CueInput, Phase } from "./simReducer";
 import type { SimPreview } from "./simController";
-import { HUD } from "./components/HUD";
-import { Controls } from "./components/Controls";
+import { TopBar } from "./components/TopBar";
+import { ToolRail, type RailItem } from "./components/ToolRail";
+import {
+    CloseIcon, CubeIcon, DiamondIcon, ElevationIcon, FlagIcon, ListIcon, MinusIcon, PlusIcon, ResetIcon, ShareIcon, SolverIcon, SoundIcon,
+    SpinIcon,
+} from "./components/railIcons";
+import { POWER_RAIL_MIN_MD, PowerRail } from "./components/PowerRail";
+import { DOCK_HEIGHT, ThicknessDock } from "./components/ThicknessDock";
+import { railFitsMd } from "./railLayout";
+import { ShotButton } from "./components/ShotButton";
+import { SpinSheet, type SpinSheetTab } from "./components/SpinSheet";
+import { HoldButton } from "./components/HoldButton";
 import { OutcomeBanner } from "./components/OutcomeBanner";
 import { InningSheet } from "./components/InningSheet";
 import { EndDialog } from "./components/EndDialog";
@@ -80,6 +97,21 @@ const HOLD_FF_MS = 200;
 /** 결과 배너 표시 시간 */
 const BANNER_MS = 2400;
 const EXIT_PATH = "/dashboard";
+/**
+ * 테이블이 조작 층을 피해 letterbox 되는 인셋(CSS px). 오른쪽 68 = 툴바 44 + 여백, 아래 = 두께 독(두 줄 106) + 여백 8.
+ * 세로가 남는 폰(375×812)에선 폭이 배율을 정하므로 인셋이 테이블 크기를 줄이지 않는다.
+ * player 뷰(3D)도 이 사각형을 원근 뷰(카메라 화면)로 삼는다 — 캔버스 전체를 뷰로 쓰면 큐볼이 슬라이더·± 아래에 투영됐다(2026-09-07 리뷰).
+ * 큐대(1.45 m)도 두 렌더러 모두 이 사각형 안에서만 그려 오른쪽 열 틈으로 비치지 않는다.
+ */
+const TABLE_INSETS: SafeInsets = { top: 8, right: 68, bottom: DOCK_HEIGHT + 8, left: 8 };
+/**
+ * 테이블 영역이 이보다 낮으면(iPhone SE 375×667 → 623, 세이프 에어리어 있는 6.1" 폰 ≈ 715) compact: 툴바 40 px·간격 6, 큐대 80 px, 샷 56 px.
+ * 그 밖에도 툴바 버튼 수(모드·렌더러·드릴에 따라 6~9)가 md 로 열에 안 들어가면(railFitsMd) compact. 그래도 넘치면 툴바가 스크롤된다
+ * (큐 슬라이더 최소 높이가 우선). 375×812 는 768 이라 8개까지 기본.
+ */
+const COMPACT_BELOW_PX = 720;
+/** 오른쪽 열에서 툴바를 뺀 고정 높이(md, px): 열 상하 여백(top/bottom-1.5) 12 + 큐 슬라이더 알약 최소 + 간격 8×3 + ± 36 + 샷 64. */
+const RIGHT_FIXED_MD = 12 + POWER_RAIL_MIN_MD + 8 * 3 + 36 + 64;
 
 /** rAF 루프가 읽는 화면 상태. React 상태를 ref 로 비춰 두어 프레임마다 재렌더하지 않는다. */
 interface View {
@@ -141,11 +173,15 @@ export function SimulatorPage() {
     const [banner, setBanner] = useState<{ outcome: ShotOutcome; id: number } | null>(null);
     const [bannerVisible, setBannerVisible] = useState(false);
     const [sheetOpen, setSheetOpen] = useState(false);
+    // 당점·큐 각 시트. 툴바의 두 버튼이 각자 탭으로 연다
+    const [spinSheet, setSpinSheet] = useState<{ open: boolean; tab: SpinSheetTab }>({ open: false, tab: "spin" });
     const [exitOpen, setExitOpen] = useState(false);
     const [exiting, setExiting] = useState(false);
     const [endDismissed, setEndDismissed] = useState(false);
     const [dragging, setDragging] = useState(false);
     const [placing, setPlacing] = useState<string | null>(null);
+    // 테이블 영역 높이(ResizeObserver). 오른쪽 열의 compact 여부를 여기서(높이 + 툴바 버튼 수) 정한다
+    const [tableH, setTableH] = useState(0);
 
     const sim = useSimulator({
         getAudioContext: getCtx,
@@ -284,7 +320,7 @@ export function SimulatorPage() {
         let swapTimer: ReturnType<typeof setTimeout> | null = null;
 
         const mountCanvas2d = (): Renderer => {
-            const r = new Canvas2DRenderer();
+            const r = new Canvas2DRenderer({ insets: TABLE_INSETS });
             r.mount(el, tableSpecRef.current);
             return r;
         };
@@ -313,7 +349,7 @@ export function SimulatorPage() {
                 if (!alive || rendererKindRef.current !== "three") return;
                 let three: InstanceType<typeof ThreeRenderer> | null = null;
                 try {
-                    three = new ThreeRenderer({ onContextLost });
+                    three = new ThreeRenderer({ onContextLost, insets: TABLE_INSETS });
                     three.mount(el, tableSpecRef.current);
                 } catch {
                     // WebGL2 를 못 열었다(드라이버 차단·컨텍스트 상한) — 이 화면에선 canvas 유지
@@ -323,7 +359,7 @@ export function SimulatorPage() {
                 }
                 rendererRef.current?.dispose();
                 rendererRef.current = three;
-                // 저장된 카메라 뷰를 적용하고 HUD 에 "3D 보기" 토글을 연다
+                // 저장된 카메라 뷰를 적용하고 툴바에 "3D 보기" 토글을 연다
                 three.setView(cameraViewRef.current);
                 setViewSupported(true);
                 dirtyRef.current = true;
@@ -362,8 +398,13 @@ export function SimulatorPage() {
     useEffect(() => {
         const el = tableRef.current;
         if (!el || typeof ResizeObserver === "undefined") return;
-        const ro = new ResizeObserver(() => { dirtyRef.current = true; });
+        const measure = () => {
+            dirtyRef.current = true;
+            setTableH(el.clientHeight);
+        };
+        const ro = new ResizeObserver(measure);
         ro.observe(el);
+        measure();
         return () => ro.disconnect();
     }, []);
 
@@ -567,8 +608,6 @@ export function SimulatorPage() {
             return next;
         });
     }, []);
-    // HUD 는 memo — 토글 객체는 값이 바뀔 때만 새로 만든다. 4구에서는 버튼을 숨긴다(시스템은 3쿠션 훈련용).
-    const diamondHud = useMemo(() => (is3c ? { on: diamond, onToggle: onToggleDiamond } : undefined), [is3c, diamond, onToggleDiamond]);
     // "3D 보기": 렌더러에 바로 적용하고(스냅) 기기에 저장. 다음 프레임에 새 카메라로 다시 그린다.
     const onToggleView = useCallback(() => {
         const next: RendererView = cameraViewRef.current === "player" ? "top" : "player";
@@ -578,13 +617,22 @@ export function SimulatorPage() {
         dirtyRef.current = true;
         setCameraView(next);
     }, []);
-    const viewHud = useMemo(() => (viewSupported ? { on: cameraView === "player", onToggle: onToggleView } : undefined), [viewSupported, cameraView, onToggleView]);
+    const openSpinSheet = useCallback((tab: SpinSheetTab) => setSpinSheet({ open: true, tab }), []);
+    const onSpinSheetOpen = useCallback((open: boolean) => setSpinSheet((x) => ({ ...x, open })), []);
+    const onSpinSheetTab = useCallback((tab: SpinSheetTab) => setSpinSheet((x) => ({ ...x, tab })), []);
+    // 길게 누르는 동안 누적되도록 최신 세기를 ref 로 읽는다
+    const v0Ref = useRef(sim.input.V0);
+    v0Ref.current = sim.input.V0;
+    const onPowerDown = useCallback(() => actions.setPower(stepPower(v0Ref.current, -1)), [actions]);
+    const onPowerUp = useCallback(() => actions.setPower(stepPower(v0Ref.current, 1)), [actions]);
 
     // ── 공유(카드 PNG + 리플레이 링크). 솔로·연습·드릴에서 샷이 끝난 뒤(aim/finished)만 ──
     const { share, busy: sharing } = useShare();
     const canShare = sim.mode === "solo" && sim.lastResult !== null && (sim.phase === "aim" || sim.phase === "finished");
-    // 드릴 "다시 배치" 는 공유 알약과 같은 줄(오른쪽 위)에 놓인다
+    // 드릴 "다시 배치" 는 툴바(토글 묶음 끝)에 놓인다
     const drillReset = drill !== null && !isMatch && sim.phase !== "shooting";
+    // 되돌리기는 두께 독 둘째 줄(툴바에 두면 샷 뒤 버튼 수가 늘어 열을 넘쳤다). 독은 재생 중 페이지가 통째로 흐린다
+    const undoInDock = sim.canUndo;
     const shareLast = useCallback((withStats: boolean) => {
         const result = lastResultRef.current;
         const config = sim.config;
@@ -701,6 +749,37 @@ export function SimulatorPage() {
     const endSubtitle = sim.match
         ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t)
         : null;
+    const aiming = sim.phase === "aim";
+    // 재생(내 샷·상대 샷 따라잡기)·상대 차례·시작 전엔 조작 층을 통째로 흐린다. 상단 띠·칩·결과 배너는 남는다.
+    const controlsHidden = sim.phase === "shooting" || sim.phase === "waiting" || sim.phase === "setup";
+    const thetaDeg = elevationDeg(sim.input.theta);
+    const canResign = isMatch && !!sim.match?.canResign && sim.phase !== "finished";
+
+    // ── 툴바 묶음: 조준 도구 / 토글·동작 / 나가기(대전은 기권). 되돌리기는 독, 공유는 왼쪽 위 알약 — 툴바는 최대 9개 ──
+    const railAim: RailItem[] = [
+        { id: "spin", label: t("sim.controls.spin"), icon: <SpinIcon a={sim.input.a} b={sim.input.b} />, onPress: () => openSpinSheet("spin"), disabled: !aiming },
+        {
+            id: "elevation", label: t("sim.rail.elevation"), icon: <ElevationIcon />, onPress: () => openSpinSheet("elevation"),
+            active: thetaDeg > 0, caption: thetaDeg > 0 ? `${thetaDeg}°` : null, disabled: !aiming,
+        },
+    ];
+    if (solverAllowed) railAim.push({ id: "solver", label: t("sim.solver.button"), icon: <SolverIcon />, onPress: openSolver, disabled: !aiming });
+    const railToggles: RailItem[] = [];
+    if (is3c) railToggles.push({ id: "diamond", label: t("sim.diamond.toggleLabel"), hint: t("sim.diamond.toggle"), icon: <DiamondIcon />, toggle: true, active: diamond, onPress: onToggleDiamond });
+    if (viewSupported) railToggles.push({ id: "view", label: t("sim.hud.view3d"), icon: <CubeIcon />, toggle: true, active: cameraView === "player", onPress: onToggleView });
+    railToggles.push({ id: "sound", label: muted ? t("sim.hud.unmute") : t("sim.hud.mute"), icon: <SoundIcon muted={muted} />, toggle: true, active: false, dim: muted, onPress: onToggleMute });
+    railToggles.push({ id: "innings", label: t("sim.controls.innings"), icon: <ListIcon />, onPress: onInnings });
+    if (drillReset) railToggles.push({ id: "reset", label: t("sim.drill.reset"), icon: <ResetIcon />, onPress: onRestart });
+    const railBottom: RailItem[] = [];
+    railBottom.push(canResign
+        ? { id: "resign", label: t("sim.match.resign"), icon: <FlagIcon />, onPress: () => setResignOpen(true) }
+        : { id: "exit", label: t("sim.controls.exit"), icon: <CloseIcon />, onPress: onExitRequest });
+    const railGroups = [railAim, railToggles, railBottom];
+    // compact: 짧은 화면이거나 md 툴바가 열에 안 들어갈 때(측정 전엔 기본)
+    const compact = tableH > 0 && (tableH < COMPACT_BELOW_PX || !railFitsMd(tableH, [railAim.length, railToggles.length, railBottom.length], RIGHT_FIXED_MD));
+
+    const chipNeutral = "rk-chip bg-surface-1 border border-surface-line text-ink-3 max-w-full truncate";
+    const chipBrand = "rk-chip bg-brand text-brand-fg max-w-full truncate";
 
     return (
         <div
@@ -713,83 +792,106 @@ export function SimulatorPage() {
             }}
         >
             <div className="flex-1 min-h-0 w-full max-w-[640px] mx-auto flex flex-col">
-                <HUD
+                <TopBar
                     session={sim.session} config={sim.config} phase={sim.phase} names={names}
                     record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
-                    muted={muted} onToggleMute={onToggleMute}
-                    diamond={diamondHud} view={viewHud}
+                    drillName={drill ? t(drill.drill.nameKey) : null}
+                    onSummary={onInnings}
+                    onBack={isMatch ? onExitRequest : undefined}
                 />
 
-                {/* 테이블: 남은 높이를 전부 차지. 렌더러·오버레이가 absolute 캔버스로 얹힌다. */}
-                <div
-                    ref={tableRef}
-                    className="relative flex-1 min-h-0 touch-none overflow-hidden bg-surface-3"
-                    onPointerDown={onPointerDown}
-                    onPointerMove={onPointerMove}
-                    onPointerUp={onPointerEnd}
-                    onPointerCancel={onPointerEnd}
-                    onContextMenu={(e) => e.preventDefault()}
-                >
-                    {sim.phase === "shooting" && (
-                        <span className="absolute top-3 right-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">
-                            {sim.playback.speed === 4 ? t("sim.hud.fastForward") : t("sim.hud.holdToFastForward")}
-                        </span>
-                    )}
-                    {drill && (
-                        <span className={cn(
-                            "absolute top-3 left-3 z-[3] rk-chip pointer-events-none",
-                            drillLocked ? "bg-brand text-brand-fg" : "bg-surface-1 border border-surface-line text-ink-3",
-                        )}>
-                            {drillLocked
-                                ? t("sim.drill.chipScoring").replace("{name}", t(drill.drill.nameKey))
-                                : drill.result
-                                    ? t(drill.result.success ? "sim.drill.chipScoredSuccess" : "sim.drill.chipScoredFail").replace("{n}", String(drill.result.cushions))
-                                    : t("sim.drill.chipPractice")}
-                        </span>
-                    )}
-                    {/* 테이블 위 알약(공유·다시 배치·기권)은 전부 중립 — 이 화면의 초록은 샷 버튼 하나다 */}
-                    {(canShare || drillReset) && (
-                        <div className="absolute top-3 right-3 z-[3] flex items-center gap-2">
-                            {canShare && (
-                                <button
-                                    type="button" onClick={onShareShot} disabled={sharing}
-                                    className="h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-2 active:bg-surface-3 disabled:opacity-60"
-                                >
-                                    {t("sim.share.button")}
-                                </button>
-                            )}
-                            {drillReset && (
-                                <button
-                                    type="button" onClick={onRestart}
-                                    className="h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-2 active:bg-surface-3"
-                                >
-                                    {t("sim.drill.reset")}
-                                </button>
-                            )}
+                {/* 테이블 영역: 남은 높이 전부. 렌더러·오버레이는 absolute 마운트(tableRef)에, 조작·칩은 그 형제로 얹힌다. */}
+                <div className="relative flex-1 min-h-0 overflow-hidden bg-surface-3">
+                    <div
+                        ref={tableRef}
+                        className="absolute inset-0 touch-none bg-surface-3"
+                        onPointerDown={onPointerDown}
+                        onPointerMove={onPointerMove}
+                        onPointerUp={onPointerEnd}
+                        onPointerCancel={onPointerEnd}
+                        onContextMenu={(e) => e.preventDefault()}
+                    />
+
+                    {/* 왼쪽 위 칩 열(상단 띠 바로 아래): 공유 알약(샷 뒤) · 빨리감기 안내 · 드릴 · 배치 안내 · 리플레이 · 종료 · 대전 상태. 겹치지 않게 세로로 쌓는다. */}
+                    <div className="absolute top-2 left-2 z-[3] flex flex-col items-start gap-1 pointer-events-none max-w-[calc(100%-64px)]">
+                        {canShare && (
+                            <button
+                                type="button" onClick={onShareShot} disabled={sharing}
+                                aria-label={t("sim.share.button")} title={t("sim.share.button")}
+                                className="pointer-events-auto h-11 px-4 inline-flex items-center gap-1.5 rounded-pill bg-surface-1 border border-surface-line rk-shadow text-[13px] font-semibold text-ink-2 active:bg-surface-3 disabled:opacity-40"
+                            >
+                                <ShareIcon />
+                                {t("sim.share.button")}
+                            </button>
+                        )}
+                        {sim.phase === "shooting" && (
+                            <span className={chipNeutral}>{sim.playback.speed === 4 ? t("sim.hud.fastForward") : t("sim.hud.holdToFastForward")}</span>
+                        )}
+                        {drill && (
+                            <span className={drillLocked ? chipBrand : chipNeutral}>
+                                {drillLocked
+                                    ? t("sim.drill.chipScoring").replace("{name}", t(drill.drill.nameKey))
+                                    : drill.result
+                                        ? t(drill.result.success ? "sim.drill.chipScoredSuccess" : "sim.drill.chipScoredFail").replace("{n}", String(drill.result.cushions))
+                                        : t("sim.drill.chipPractice")}
+                            </span>
+                        )}
+                        {!drill && sim.canPlace && sim.session && sim.session.shotCount === 0 && (
+                            <span className={chipNeutral}>{t("sim.hud.placeHint")}</span>
+                        )}
+                        {replayChip && sim.session?.shotCount === 1 && (
+                            <>
+                                <span className={chipBrand}>{t("sim.share.replayChip")}</span>
+                                {replayChip === "mismatch" && <span className={chipNeutral}>{t("sim.share.replayMismatch")}</span>}
+                            </>
+                        )}
+                        {finished && !endOpen && <span className={chipNeutral}>{t("sim.hud.finished")}</span>}
+                        {matchLoad === "loading" && <span className={chipNeutral}>{t("sim.match.loading")}</span>}
+                        {isMatch && sim.offline && <span className={chipNeutral}>{t("sim.match.offline")}</span>}
+                        {isMatch && sim.replaying && sim.match?.opponentShot && <span className={chipBrand}>{t("sim.match.opponentShot")}</span>}
+                        {isMatch && turnChip && sim.phase === "aim" && <span className={chipBrand}>{t("sim.match.yourTurn")}</span>}
+                    </div>
+
+                    {/* 오른쪽 열: 툴바 → 세로 큐 슬라이더(남은 높이) → ± → 샷. 이 화면의 초록은 샷 하나다. */}
+                    <div
+                        data-sim-controls="right"
+                        data-compact={compact ? "1" : undefined}
+                        aria-hidden={controlsHidden || undefined}
+                        className={cn(
+                            "absolute right-2 z-[3] flex flex-col items-end transition-opacity duration-150",
+                            compact ? "top-1 bottom-1 gap-1.5" : "top-1.5 bottom-1.5 gap-2",
+                            controlsHidden ? "opacity-0 pointer-events-none" : "opacity-100",
+                        )}
+                    >
+                        {/* 툴바는 남는 높이가 없으면(compact 로도) 줄어들며 스크롤된다 — 큐 슬라이더(최소 높이)·±·샷은 항상 보인다 */}
+                        <ToolRail groups={railGroups} size={compact ? "sm" : "md"} className="shrink min-h-0 overflow-y-auto overscroll-contain" />
+                        <PowerRail V0={sim.input.V0} disabled={!aiming} onChange={onPower} compact={compact} className="flex-1" />
+                        {/* ± 0.05 m/s: 36 px 원 두 개, 사이 8 px(탭 대상 간격 규칙) */}
+                        <div className="shrink-0 flex gap-2">
+                            <HoldButton label={t("sim.controls.powerDown")} disabled={!aiming} onTick={onPowerDown} className="h-9 w-9 rounded-pill">
+                                <MinusIcon />
+                            </HoldButton>
+                            <HoldButton label={t("sim.controls.powerUp")} disabled={!aiming} onTick={onPowerUp} className="h-9 w-9 rounded-pill">
+                                <PlusIcon />
+                            </HoldButton>
                         </div>
-                    )}
-                    {!drill && sim.canPlace && sim.session && sim.session.shotCount === 0 && (
-                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">
-                            {t("sim.hud.placeHint")}
-                        </span>
-                    )}
-                    {replayChip && sim.session?.shotCount === 1 && (
-                        <div className="absolute top-3 left-3 z-[3] flex items-center gap-2 pointer-events-none">
-                            <span className="rk-chip bg-brand text-brand-fg">{t("sim.share.replayChip")}</span>
-                            {replayChip === "mismatch" && (
-                                <span className="rk-chip bg-surface-1 border border-surface-line text-ink-3">{t("sim.share.replayMismatch")}</span>
-                            )}
-                        </div>
-                    )}
-                    {finished && !endOpen && (
-                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">
-                            {t("sim.hud.finished")}
-                        </span>
-                    )}
+                        {!(isMatch && sim.phase === "finished") && (
+                            <ShotButton phase={sim.phase} onShoot={onShoot} onRestart={onRestart} compact={compact} className="shrink-0" />
+                        )}
+                    </div>
+
+                    {/* 왼쪽 아래: 두께 독(둘째 줄에 되돌리기) */}
+                    <ThicknessDock
+                        active={active} side={side} disabled={!aiming}
+                        onThickness={onThickness} onSide={onSide} onNudge={onNudge}
+                        onUndo={undoInDock ? onUndo : null}
+                        className={cn(
+                            "absolute left-2 bottom-2 z-[3] transition-opacity duration-150",
+                            controlsHidden ? "opacity-0 pointer-events-none" : "opacity-100",
+                        )}
+                    />
+
                     {/* ── 대전 전용 표시 ── */}
-                    {matchLoad === "loading" && (
-                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">{t("sim.match.loading")}</span>
-                    )}
                     {(matchLoad === "error" || matchLoad === "notMine") && (
                         <div className="absolute inset-0 z-[4] flex items-center justify-center p-6">
                             <div className="rounded-card bg-surface-1 border border-surface-line px-5 py-4 text-center max-w-[300px]">
@@ -799,15 +901,6 @@ export function SimulatorPage() {
                                 </button>
                             </div>
                         </div>
-                    )}
-                    {isMatch && sim.offline && (
-                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-surface-1 border border-surface-line text-ink-3 pointer-events-none">{t("sim.match.offline")}</span>
-                    )}
-                    {isMatch && sim.replaying && sim.match?.opponentShot && (
-                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-brand text-brand-fg pointer-events-none">{t("sim.match.opponentShot")}</span>
-                    )}
-                    {isMatch && turnChip && sim.phase === "aim" && (
-                        <span className="absolute top-3 left-3 z-[3] rk-chip bg-brand text-brand-fg pointer-events-none">{t("sim.match.yourTurn")}</span>
                     )}
                     {isMatch && sim.phase === "waiting" && sim.match && !bannerVisible && (
                         <div className="absolute inset-x-0 bottom-3 z-[3] flex flex-col items-center gap-2 px-4">
@@ -825,28 +918,12 @@ export function SimulatorPage() {
                             </div>
                         </div>
                     )}
-                    {isMatch && sim.match?.canResign && sim.phase !== "finished" && (
-                        <button
-                            type="button" onClick={() => setResignOpen(true)}
-                            className="absolute top-3 right-3 z-[3] h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-2 active:bg-surface-3"
-                        >
-                            {t("sim.match.resign")}
-                        </button>
-                    )}
                     {coachOpen && sim.phase === "aim" && sim.mode === "solo" && <CoachHint onClose={closeCoach} />}
-                    <div className="absolute inset-0 z-[3] pointer-events-none">
+                    {/* 결과 배너: 두께 독 위, 오른쪽 열 왼쪽 — 테이블 아래쪽 가운데 */}
+                    <div className="absolute left-0 right-[60px] top-0 z-[3] pointer-events-none" style={{ bottom: DOCK_HEIGHT + 8 }}>
                         <OutcomeBanner outcome={banner?.outcome ?? null} visible={bannerVisible} sub={readoutText} />
                     </div>
                 </div>
-
-                <Controls
-                    phase={sim.phase} canUndo={sim.canUndo} input={sim.input} cueBallId={sim.cueBallId}
-                    active={active} side={side}
-                    onThickness={onThickness} onSide={onSide} onNudge={onNudge}
-                    onSpin={onSpin} onElevation={onElevation} onPower={onPower} onShoot={onShoot} onRestart={onRestart}
-                    onUndo={onUndo} onInnings={onInnings} onExit={onExitRequest}
-                    onSolve={solverAllowed ? openSolver : undefined}
-                />
             </div>
 
             {/* 드릴·로비 전체 화면: 머리글(제목 + 닫기 알약)은 각 패널이 로비와 같은 꼴로 그린다. 폭·여백은 여기서 한 번만. */}
@@ -868,6 +945,11 @@ export function SimulatorPage() {
                 </div>
             )}
             <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} onMatch={() => navigate("/online-game?lobby=1", { replace: true })} onDrills={() => navigate("/online-game?drills=1", { replace: true })} />
+            <SpinSheet
+                open={spinSheet.open} tab={spinSheet.tab} onOpenChange={onSpinSheetOpen} onTab={onSpinSheetTab}
+                a={sim.input.a} b={sim.input.b} theta={sim.input.theta} cueBallId={sim.cueBallId} disabled={!aiming}
+                onSpin={onSpin} onElevation={onElevation}
+            />
             <SolverSheet
                 open={solverOpen}
                 onOpenChange={(o) => { if (!o) solver.cancel(); setSolverOpen(o); }}

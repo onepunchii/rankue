@@ -4,8 +4,9 @@ import { openingLayout } from "@shared/sim/layouts";
 import { phiForThickness } from "./aim";
 import { V0_MAX, V0_MIN, clampSpin } from "./simReducer";
 import {
-    activeThickness, FINE_STEP_RAD, formatPower, formatSpeed, formatSpin, nearestStep, padOffsetFor, powerFromSlider,
-    powerPercent, pullbackFor, spinFromPad, stepPower, THICKNESS_UI_STEPS, thicknessStepLabel, nextElevationRad, elevationDeg } from "./controlsMath";
+    activeThickness, ELEVATION_MAX_DEG, ELEVATION_STEPS_DEG, elevationFromArc, FINE_STEP_RAD, formatPower, formatSpeed, formatSpin, nearestStep,
+    padOffsetFor, powerFromSlider, powerPercent, pullbackFor, snapElevationDeg, spinFromPad, spinReadout, stepPower, THICKNESS_UI_STEPS,
+    thicknessStepLabel, nextElevationRad, elevationDeg } from "./controlsMath";
 
 const table = TABLES.DAEDAE;
 const R = table.ball.R;
@@ -107,5 +108,37 @@ describe("큐 각 단계", () => {
     });
     it("단계 사이 값은 다음 단계로 올라간다", () => {
         expect(elevationDeg(nextElevationRad((12 * Math.PI) / 180))).toBe(20);
+    });
+});
+
+describe("controlsMath 당점 읽기·큐 각 단계(레이아웃 B 시트)", () => {
+    const t = (k: string) => ({ "sim.spin.left": "좌 {n}%", "sim.spin.right": "우 {n}%", "sim.spin.top": "상 {n}%", "sim.spin.bottom": "하 {n}%", "sim.controls.spinCenter": "중앙" } as Record<string, string>)[k] ?? k;
+
+    it("spinReadout 은 100 % = 미스큐 링(해법 시트와 같은 눈금), 중앙은 '중앙'", () => {
+        expect(spinReadout(0, 0, t)).toBe("중앙");
+        expect(spinReadout(0.2, 0.1, t)).toBe("우 40% · 상 20%");
+        expect(spinReadout(-0.25, -0.5, t)).toBe("좌 50% · 하 100%");
+        expect(spinReadout(0.003, 0, t)).toBe("중앙"); // 반올림 잡음은 중앙
+    });
+
+    it("snapElevationDeg 는 가장 가까운 단계로, 범위 밖은 양 끝", () => {
+        expect(ELEVATION_STEPS_DEG).toEqual([0, 10, 20, 30, 45]);
+        expect(ELEVATION_MAX_DEG).toBe(45);
+        expect(snapElevationDeg(4)).toBe(0);
+        expect(snapElevationDeg(6)).toBe(10);
+        expect(snapElevationDeg(36)).toBe(30);
+        expect(snapElevationDeg(39)).toBe(45);
+        expect(snapElevationDeg(90)).toBe(45);
+        expect(snapElevationDeg(-3)).toBe(0);
+        expect(snapElevationDeg(NaN)).toBe(0);
+    });
+
+    it("elevationFromArc: 피벗 오른쪽 수평은 0°, 45° 위는 45°, 그 이상은 상한, 왼쪽·아래는 0", () => {
+        expect(elevationFromArc(10, 0)).toBe(0);
+        expect(elevationFromArc(10, -10)).toBeCloseTo(45, 6);
+        expect(elevationFromArc(0, -10)).toBe(ELEVATION_MAX_DEG);
+        expect(elevationFromArc(10, 10)).toBe(0);   // 아래쪽(화면 y 아래 양수)
+        expect(elevationFromArc(-10, -1)).toBeCloseTo(45, 6); // 왼쪽 위는 상한으로 클램프
+        expect(elevationFromArc(-10, 5)).toBe(0);
     });
 });

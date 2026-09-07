@@ -19,8 +19,11 @@
  *  - draw() 는 할당하지 않는다(Vector3·Quaternion·Matrix4 스크래치, 공 항목 풀). 그리기는 draw()/resize() 때만.
  *  - 컨텍스트 손실: three 가 preventDefault 하고 복구 때 GL 자원을 다시 올린다. 여기서는 횟수를 세어 onContextLost 를
  *    알리고(페이지가 CONTEXT_LOSS_LIMIT 회면 Canvas2D 로 교체), 복구 직후 마지막 프레임을 다시 그린다.
- *  - 레터박스(캔버스 밖)는 alpha:false 라 투명일 수 없어 마운트 배경색(surface-3 를 surface-1 위에 합성)으로 지운다.
- *  - 선수 시점(setView("player")): 원근 카메라(세로 fov 45°, 컨테이너 비율 — 레터박스 없이 캔버스 전체가 뷰)가 큐볼 뒤 −phi 쪽
+ *  - 레터박스(캔버스 밖)는 alpha:false 라 투명일 수 없어 마운트 배경색(surface-3 를 surface-1 위에 합성)으로 지운다. 탑다운에선 바닥 평면을
+ *    숨겨 테이블 둘레가 그 색(Canvas2DRenderer 의 레터박스와 같다)이고, 그리기는 인셋 사각형(조작 층 밖)으로 scissor 해 1.45 m 큐대가
+ *    오른쪽 열 틈으로 비치지 않는다(2026-09-07 리뷰). 바닥 색도 그 색(팔레트) — player 뷰에서 테이블 너머가 페이지 바탕으로 이어진다.
+ *  - 선수 시점(setView("player")): 원근 카메라(세로 fov 45°)의 뷰는 인셋 사각형 — persp.setViewOffset 으로 그 사각형이 "전체 화면" 이 되게
+ *    절두체를 옮기고 캔버스 나머지는 그 바깥을 이어 그린다(큐볼이 조작 층 아래가 아니라 빈 영역 가운데에 온다). 카메라는 큐볼 뒤 −phi 쪽
  *    0.7 m·높이 0.9 m 에 서서 큐볼 앞 0.35 m 를 본다(threeMath.playerPose — 테이블 밖 0.5 m·최저 0.25 m 클램프, up=+z).
  *    프레임의 view {cueBallId, phi} 가 있을 때만 목표를 갱신하고(재생 중엔 페이지가 빼서 카메라가 멈춰 있다), 임계 감쇠
  *    스프링(dampRig, 0.12 s)으로 옮긴다 — 움직이는 동안 needsFrame() 이 true 라 페이지가 다음 프레임도 그린다.
@@ -89,7 +92,6 @@ const RAIL_WOOD_EDGE = 0x3e2716;
 const APRON_H = 0.72;
 const APRON_COLOR = 0x2f1d10;
 const FLOOR_SIZE = 40;
-const FLOOR_COLOR = 0x2b2926;
 const RAIL_NOSE_ALPHA = 0.45;
 const DIAMOND: RGBA = [240, 233, 214, 1];
 const SPOT_ALPHA = 0.14;
@@ -251,7 +253,10 @@ export class ThreeRenderer implements Renderer {
     private readonly rigTarget: CameraPose = makePose();
     private readonly basis: CameraBasis = makeBasis();
     private cameraMoving = false;
+    /** player 뷰의 절두체 비율 = 인셋 사각형 비율. */
     private aspect = 1;
+    /** 인셋 사각형(CSS px, 마운트 기준) — player 뷰의 뷰포트, top 뷰의 scissor. resize 마다 갱신(draw 에선 읽기만). */
+    private readonly viewRect = { x: 0, y: 0, width: 1, height: 1 };
 
     private el: HTMLElement | null = null;
     private table: TableSpec | null = null;
@@ -275,7 +280,8 @@ export class ThreeRenderer implements Renderer {
     private readonly railMat = new MeshStandardMaterial({ color: RAIL_WOOD, roughness: 0.9, metalness: 0 });
     private readonly plinthMat = new MeshStandardMaterial({ color: RAIL_WOOD_EDGE, roughness: 0.9, metalness: 0 });
     private readonly apronMat = new MeshStandardMaterial({ color: APRON_COLOR, roughness: 0.95, metalness: 0 });
-    private readonly floorMat = new MeshStandardMaterial({ color: FLOOR_COLOR, roughness: 1, metalness: 0 });
+    // 바닥 색은 applyClearColor 가 레터박스 색(페이지 바탕)으로 맞춘다
+    private readonly floorMat = new MeshStandardMaterial({ roughness: 1, metalness: 0 });
     private readonly noseMat = new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: RAIL_NOSE_ALPHA, depthWrite: false });
     private readonly diamondMat = new MeshBasicMaterial();
     private readonly spotMat = new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: SPOT_ALPHA, depthWrite: false });
@@ -336,6 +342,8 @@ export class ThreeRenderer implements Renderer {
         });
         this.gl.setPixelRatio(this.dpr);
         this.gl.outputColorSpace = SRGBColorSpace;
+        // render() 가 scissor 를 끄고 한 번 지운 뒤 인셋 사각형만 그린다 — three 의 자동 지우기는 scissor 안만 지워 바깥이 남는다
+        this.gl.autoClear = false;
         if (opts.shadows) {
             this.gl.shadowMap.enabled = true;
             this.gl.shadowMap.type = PCFSoftShadowMap;
@@ -438,9 +446,15 @@ export class ThreeRenderer implements Renderer {
         cam.top = f.top;
         cam.bottom = f.bottom;
         cam.updateProjectionMatrix();
-        // 선수 시점은 레터박스 없이 컨테이너 비율 그대로
-        this.aspect = Math.max(1, w) / Math.max(1, h);
+        // 선수 시점: 인셋 사각형이 뷰. 절두체 비율은 그 사각형, setViewOffset 으로 캔버스가 사각형 바깥까지 이어 그리게 옮긴다
+        const vr = this.viewRect;
+        vr.x = insets.left;
+        vr.y = insets.top;
+        vr.width = Math.max(1, w - insets.left - insets.right);
+        vr.height = Math.max(1, h - insets.top - insets.bottom);
+        this.aspect = vr.width / vr.height;
         this.persp.aspect = this.aspect;
+        this.persp.setViewOffset(vr.width, vr.height, -vr.x, -vr.y, Math.max(1, w), Math.max(1, h));
         this.persp.updateProjectionMatrix();
 
         this.rebuildPxDependent(L);
@@ -499,11 +513,18 @@ export class ThreeRenderer implements Renderer {
     }
 
     // ── 좌표 ─────────────────────────────────────────────────────────────
-    /** top: tableGeometry 와 같은 px. player: 공 중심 높이(z = R)의 점을 현재 카메라 자세로 원근 투영(카메라 뒤도 유한). */
+    /**
+     * top: tableGeometry 와 같은 px. player: 공 중심 높이(z = R)의 점을 현재 카메라 자세로 원근 투영(카메라 뒤도 유한) —
+     * 인셋 사각형(viewRect) 기준 NDC 이므로 사각형 원점을 더한다(setViewOffset 과 같은 배치).
+     */
     project(x: number, y: number): [number, number] {
         if (!this.layout) return [0, 0];
         if (this.view === "player" && this.table) {
-            return projectPerspective(this.basis, this.rig.pose, PLAYER_FOV_DEG, this.aspect, this.layout.container, x, y, this.table.ball.R);
+            const vr = this.viewRect;
+            const p = projectPerspective(this.basis, this.rig.pose, PLAYER_FOV_DEG, this.aspect, vr, x, y, this.table.ball.R);
+            p[0] += vr.x;
+            p[1] += vr.y;
+            return p;
         }
         return worldToScreen(this.layout, x, y);
     }
@@ -512,7 +533,8 @@ export class ThreeRenderer implements Renderer {
     unproject(px: number, py: number): [number, number] {
         if (!this.layout) return [0, 0];
         if (this.view === "player" && this.table) {
-            return unprojectPerspective(this.basis, this.rig.pose, PLAYER_FOV_DEG, this.aspect, this.layout.container, px, py, this.table.ball.R, this.table);
+            const vr = this.viewRect;
+            return unprojectPerspective(this.basis, this.rig.pose, PLAYER_FOV_DEG, this.aspect, vr, px - vr.x, py - vr.y, this.table.ball.R, this.table);
         }
         return screenToWorld(this.layout, px, py);
     }
@@ -526,6 +548,8 @@ export class ThreeRenderer implements Renderer {
         if (view === this.view) return;
         this.view = view;
         this.sun.intensity = view === "player" ? SUN_INTENSITY_PLAYER : SUN_INTENSITY;
+        // 바닥은 player 뷰에서만(탑다운의 테이블 둘레는 레터박스 색 = Canvas2DRenderer 와 같게)
+        if (this.floor) this.floor.visible = view === "player";
         if (view === "player" && this.table) {
             const frame = this.lastFrame;
             if (!frame || !this.retarget(frame)) {
@@ -698,9 +722,23 @@ export class ThreeRenderer implements Renderer {
         this.render();
     }
 
+    /**
+     * 캔버스 전체를 레터박스 색으로 지운 뒤(scissor 끔), top 뷰는 인셋 사각형으로 scissor 해 그린다 — 테이블 밖으로 뻗는 큐대가
+     * 조작 층 아래에서 잘린다. player 뷰는 캔버스 전체(setViewOffset 이 사각형 바깥을 이어 그린다).
+     */
     private render(): void {
         if (this.disposed || this.lost || !this.layout) return;
-        this.gl.render(this.scene, this.activeCamera());
+        const gl = this.gl;
+        gl.setScissorTest(false);
+        gl.clear();
+        if (this.view === "top") {
+            const vr = this.viewRect;
+            // WebGL 의 scissor 원점은 왼쪽 아래
+            gl.setScissor(vr.x, Math.max(0, this.cssH - vr.y - vr.height), vr.width, vr.height);
+            gl.setScissorTest(true);
+        }
+        gl.render(this.scene, this.activeCamera());
+        gl.setScissorTest(false);
     }
 
     private findEntry(id: string): BallEntry | null {
@@ -848,6 +886,7 @@ export class ThreeRenderer implements Renderer {
         const floor = new Mesh(new PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE), this.floorMat);
         floor.position.set(cx, cy, -PLINTH_DEPTH - 0.002 - APRON_H - 0.001);
         floor.frustumCulled = false;
+        floor.visible = this.view === "player";
         this.floor = floor;
 
         this.tableGroup.add(floor, apron, plinth, rail, cloth);
@@ -999,7 +1038,7 @@ export class ThreeRenderer implements Renderer {
         }
     }
 
-    /** 마운트 배경(보통 surface-3 = 반투명 검정)을 surface-1 위에 합성한 불투명 색으로 지운다. */
+    /** 마운트 배경(보통 surface-3 = 반투명 검정)을 surface-1 위에 합성한 불투명 색으로 지운다. 바닥 재질도 이 색. */
     private applyClearColor(el: HTMLElement): void {
         let bg: RGBA | null = null;
         if (typeof getComputedStyle === "function") {
@@ -1013,6 +1052,8 @@ export class ThreeRenderer implements Renderer {
         const b = over[2] * a + base[2] * (1 - a);
         this.clearColor.setRGB(r / 255, g / 255, b / 255, SRGBColorSpace);
         this.gl.setClearColor(this.clearColor, 1);
+        // 바닥(player 뷰)도 같은 색 — 조도 합이 ≈ π 라 수평면은 알베도 그대로 보여 레터박스와 이어진다
+        this.floorMat.color.copy(this.clearColor);
     }
 
     private buildShadowTexture(): void {

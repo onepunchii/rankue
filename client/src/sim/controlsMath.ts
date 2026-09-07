@@ -5,6 +5,7 @@
 import type { BallState } from "@shared/sim/types";
 import type { GameType } from "@shared/sim/rules/types";
 import { thicknessFor } from "./aim";
+import { DEFAULT_CUE } from "@shared/sim/params";
 import { clampPower, clampSpin, objectTargetFor, V0_MAX, V0_MIN } from "./simReducer";
 
 /* ------------------------------------------------------------------ 두께 */
@@ -113,8 +114,41 @@ export function formatSpin(a: number, b: number): string {
     return `a ${f(a)} · b ${f(b)}`;
 }
 
-/** 큐 각 단계(도). 탭할 때마다 다음 단계로 돈다: 0 → 10 → 20 → 30 → 45 → 0 */
+/**
+ * 당점 읽기(퍼센트, 100 % = 미스큐 링 maxOffset·R): "우 40% · 상 20%", 중앙이면 `sim.controls.spinCenter`.
+ * 해법 시트(SolverSheet.spinText)와 같은 눈금이라 적용한 해법이 당점 시트에서 같은 숫자로 읽힌다. +a = 우, +b = 상.
+ */
+export function spinReadout(a: number, b: number, t: (key: string) => string, maxOffset: number = DEFAULT_CUE.maxOffset): string {
+    const pct = (v: number) => String(Math.round((Math.abs(v) / maxOffset) * 100));
+    const parts: string[] = [];
+    if (Math.abs(a) >= 0.005) parts.push(t(a > 0 ? "sim.spin.right" : "sim.spin.left").replace("{n}", pct(a)));
+    if (Math.abs(b) >= 0.005) parts.push(t(b > 0 ? "sim.spin.top" : "sim.spin.bottom").replace("{n}", pct(b)));
+    return parts.length ? parts.join(" · ") : t("sim.controls.spinCenter");
+}
+
+/** 큐 각 단계(도). 당점 시트의 단계 칩·원호 드래그가 이 값에 스냅한다: 0 · 10 · 20 · 30 · 45 */
 export const ELEVATION_STEPS_DEG = [0, 10, 20, 30, 45] as const;
+/** 화면에서 고를 수 있는 큐 각 상한(도). 엔진 상한(simReducer.THETA_MAX 60°)보다 낮다 — 그 위는 점프 영역이라 화면에서 막는다. */
+export const ELEVATION_MAX_DEG = 45;
+
+/** 임의의 각(도)을 가장 가까운 단계로. 범위 밖은 양 끝 단계. */
+export function snapElevationDeg(deg: number): number {
+    if (!Number.isFinite(deg)) return ELEVATION_STEPS_DEG[0];
+    let best: number = ELEVATION_STEPS_DEG[0];
+    let bestD = Infinity;
+    for (const d of ELEVATION_STEPS_DEG) {
+        const x = Math.abs(d - deg);
+        if (x < bestD) { bestD = x; best = d; }
+    }
+    return best;
+}
+
+/** 원호 위 포인터(피벗 기준 dx 오른쪽 +, dy 아래 +) → 큐 각(도, 0..ELEVATION_MAX_DEG). 피벗 왼쪽·아래는 0. */
+export function elevationFromArc(dx: number, dy: number): number {
+    if (dx <= 0 && -dy <= 0) return 0;
+    const deg = (Math.atan2(-dy, dx) * 180) / Math.PI;
+    return Math.max(0, Math.min(ELEVATION_MAX_DEG, deg));
+}
 
 export function elevationDeg(thetaRad: number): number {
     return Math.round((thetaRad * 180) / Math.PI);

@@ -586,6 +586,10 @@ body {
     font-weight: 600;
     line-height: 1;
   }
+  /* 카드 그림자 토큰을 임의 요소에 — 시뮬레이터 조작 알약·독처럼 rk-card 의 배경·모서리는 쓰지 않는 곳용 */
+  .rk-shadow {
+    box-shadow: var(--shadow-card);
+  }
   .rk-btn-primary {
     background: rgb(var(--brand));
     color: rgb(var(--brand-fg));

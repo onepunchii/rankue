@@ -20,7 +20,9 @@ client/src/sim/
                           같은 Renderer 계약 + `getLayout()` + `stats()`. 오소 탑다운 카메라(절두체 = threeMath.orthoFrustum, computeLayout 과 1:1 px), 라사 텍스처 평면·압출 레일·다이아몬드 인스턴스,
                           조명 구체(토큰 색 6점 무늬 텍스처, ω 를 벽시계 dt 로 적분한 자세, id 가 사라지면 초기화), 접촉 그림자 사각형, 큐대 원기둥 4토막, 강조 링.
                           그리기는 draw()/resize() 때만, draw 는 할당 없음. WebGL2 를 못 열면 생성자가 던진다. 컨텍스트 손실마다 onContextLost, 복구 시 마지막 프레임 재그리기.
-                          레터박스는 alpha:false 라 마운트 배경(surface-3 를 surface-1 위에 합성)으로 지운다. dispose 는 GL 자원 해제 + forceContextLoss(재마운트 불가).
+                          레터박스는 alpha:false 라 마운트 배경(surface-3 를 surface-1 위에 합성)으로 지운다 — top 뷰는 바닥 평면을 숨겨 Canvas2D 와 같은 레터박스이고, 그리기를
+                          인셋 사각형으로 scissor 해 큐대가 조작 층 아래로 비치지 않는다. player 뷰는 인셋 사각형을 원근 뷰로 삼는다(persp.setViewOffset; project/unproject 도 그 사각형 기준).
+                          바닥 재질 색은 레터박스 색(팔레트). dispose 는 GL 자원 해제 + forceContextLoss(재마운트 불가).
   render/threeMath.ts     ThreeRenderer 의 순수 수학(테스트 동반): orthoFrustum / projectOrtho / unprojectOrtho, integrateOrientation(q ← Δq(ω̂,|ω|dt) ⊗ q), cueGap / cueRotationZ, diamondWorld.
   render/rendererChoice.ts 렌더러 선택: localStorage "rankue.sim.renderer" = "three" | "canvas". 없으면 WebGL2 탐색(탐색 컨텍스트는 즉시 loseContext) → 되면 three, 아니면 canvas. 저장값이 three 여도 WebGL2 가 안 되면 canvas.
                           `selectRendererKind()`(페이지용) · `chooseRendererKind(pref, webgl2)` · `read/writeRendererPref(storage, kind)` · `CONTEXT_LOSS_LIMIT = 2`.
@@ -31,7 +33,7 @@ client/src/sim/
   haptics.ts              @capacitor/haptics impact, 50 ms 스로틀, 시뮬 루프 밖에서만.
   useSimulator.ts         상태 기계 훅(아래). 엔진·세션·서버 동기화·재생을 소유.
   SimSetupDialog.tsx      종목·테이블·규칙(UMB/PBA, 4구 옵션)·다마수·이닝 상한·(고급) 쿠션 모델·컨디션. QuickActions 의 기존 모달을 대체.
-  SimulatorPage.tsx       DOM 셸: HUD·조작·이닝 시트·종료 다이얼로그. React.lazy 로 /online-game 에 연결(App.tsx).
+  SimulatorPage.tsx       DOM 셸(레이아웃 B): 상단 띠·테이블 위 조작 층(툴바·큐 슬라이더·두께 독·샷)·시트·종료 다이얼로그. React.lazy 로 /online-game 에 연결(App.tsx).
 ```
 
 ## useSimulator 상태 기계
@@ -50,7 +52,8 @@ client/src/sim/
 - 재생 중엔 모든 입력 잠금. 재생 배속 1×, 길게 누르면 4× 빨리감기(이벤트 예약 오디오는 유지).
 
 ## HUD
-- 상단: 선수별 점수/다마수, 이닝, 에버리지(score/innings, 진행 중 이닝 포함 여부는 점수판 앱과 같게 "진행 중 포함"), 하이런, 현재 런 배지, 규칙 배지(UMB·PBA·4구 옵션), 테이블 이름.
+- 상단 띠(TopBar, 44 px 한 줄): 규칙 배지(UMB·PBA·4구 옵션)·테이블 이름 · 상태 칩(연습/기록되지 않음/동기화 중) · 선수 요약(점수/다마수 · 이닝 · 에버리지,
+  2인은 차례 점). 요약을 누르면 이닝 시트 — 하이런·에버리지 등 자세한 통계는 거기. 에버리지는 score/innings, 진행 중 이닝 포함(점수판 앱과 같다).
 - 샷 결과 토스트: i18n 코드 → 문구(`sim.outcome.point`, `sim.outcome.missCushions` …). 이모지 금지.
 - 이닝 시트(시트 형태), 종료 다이얼로그(결과·다시하기·나가기). 나가기 = `close`(abandoned) 확인 후.
 
@@ -160,7 +163,7 @@ interface SimulatorActions {
 ## SimulatorPage (화면 계층)
 
 파일: `SimulatorPage.tsx`(DOM 셸, default export 도 있음 — `React.lazy(() => import("@/sim/SimulatorPage"))` 로 `/online-game` 에 연결)
-→ `components/`(HUD · Controls · SpinPad · PowerControl · HoldButton · OutcomeBanner · InningSheet · EndDialog · ExitConfirm, 전부 memo 의 얇은 컴포넌트)
+→ `components/`(TopBar · ToolRail(+railIcons) · PowerRail · ThicknessDock · ShotButton · SpinSheet · HoldButton · OutcomeBanner · InningSheet · EndDialog · ExitConfirm · ResignConfirm · CoachHint, 전부 memo 의 얇은 컴포넌트)
 → 순수 모듈(테스트 동반): `pageConfig.ts` · `hudMath.ts` · `inningLog.ts` · `outcomeText.ts` · `controlsMath.ts` · `tableGestures.ts` · `holdRepeat.ts`.
 
 ### 설정 전달 `?cfg=`
@@ -168,10 +171,23 @@ interface SimulatorActions {
 `decodePageConfig(readCfgParam(search))` 로 읽는다(신뢰하지 않는 입력: 필드 검사 뒤 `buildConfig` 로 정규화, 깨졌으면 null → 페이지가 `SimSetupDialog` 를 위에 연다).
 `SimSetupDialog.onStart(config, { record })` — 고급 섹션의 "기록하기" 스위치(기본 켜짐). 세션 없이 설정 창을 닫으면 `/dashboard` 로 돌아간다.
 
-### 레이아웃(세로 고정)
-`fixed inset-0` 컬럼 + `env(safe-area-inset-*)` 패딩, 내용은 `max-w-[640px]`. 위에서부터 HUD(규칙·테이블 배지 / 상태 칩 / 소리 토글 / 선수 카드) → 테이블 래퍼(`relative flex-1 touch-none`,
-렌더러(ThreeRenderer | Canvas2DRenderer)와 Overlay 가 absolute 캔버스로 얹힘, 태블릿은 렌더러가 letterbox) → 조작 패널(두께 5단계 / 좌·우 · ±0.1° · 되돌리기 · 이닝 시트 · 나가기 / 당점 패드 · 세기 · 샷).
-모든 탭 대상 ≥ 44 px, 텍스트 ≥ 12 px, 토큰만 사용.
+### 레이아웃 B — 오른쪽 툴바형(세로 고정, 2026-09-07 오너 선택)
+`fixed inset-0` 컬럼 + `env(safe-area-inset-*)` 패딩, 내용은 `max-w-[640px]`. 위에서부터 TopBar(44 px) → 테이블 영역(`relative flex-1`, 나머지 전부). 테이블 영역 안:
+- 마운트 `tableRef`(`absolute inset-0 touch-none`) 에 렌더러(ThreeRenderer | Canvas2DRenderer)와 Overlay 가 얹힌다. 렌더러 생성자에 `TABLE_INSETS = {top 8, right 68, bottom DOCK_HEIGHT+8 (114), left 8}` 를
+  넘겨 테이블을 조작 층 밖에 letterbox 한다(375×812 에선 폭이 배율을 정하므로 테이블은 옛 레이아웃보다 크다). 두 렌더러 모두 큐대를 그 사각형 안에서만 그리고(clip / scissor), ThreeRenderer 의
+  player 뷰는 그 사각형을 원근 뷰로 삼아 큐볼이 조작 층 아래가 아니라 빈 영역 가운데에 온다. 조작 층·칩은 마운트의 **형제**(자식이면 pointerdown 이 테이블 제스처로 번진다).
+- 왼쪽 위 칩 열: 공유 알약 버튼(솔로에서 샷 뒤, 44 px) · 빨리감기 안내 · 드릴 · 배치 안내 · 리플레이 · 종료 · 대전 상태(세로로 쌓여 겹치지 않는다).
+- 오른쪽 열(`data-sim-controls="right"`): ToolRail(44 px 원형 아이콘 버튼, 묶음 안 8 px·사이 12 px, 묶음 = 조준 도구[당점·큐 각·해법] / 토글·동작[다이아몬드·3D·소리·이닝 시트·다시 배치] / 나가기(대전은 기권))
+  → PowerRail(흰 알약 안의 세로 inverted 슬라이더 + "m/s" 한 줄, 큐대 엄지 100 px, 남은 높이) → ± 0.05 m/s(36 px, 사이 8) → ShotButton(64 px 원, finished 면 다시하기). 툴바 버튼은 탭 뒤 1.2 s 이름 알약.
+  compact(툴바 40 px·큐대 80·샷 56)는 테이블 영역 < 720 px 이거나 `railLayout.railFitsMd`(버튼 수 산술) 가 md 는 안 들어간다고 할 때 — 375×812 는 8개까지 md, 드릴(9개)은 compact.
+- 왼쪽 아래 ThicknessDock(두 줄: 정면·½·⅓·¼·⅛ / 좌·우·[되돌리기]·±0.1°, 44 px 칩·간격 8, 높이 `DOCK_HEIGHT` 106). 결과 배너는 독 위(bottom DOCK_HEIGHT+8)·오른쪽 열 왼쪽(right 60) 안에서 가운데.
+- SpinSheet(아래 시트 ≤ 40dvh, 오버레이 투명 — 뒤 테이블의 큐볼·경로 미리보기가 보인다. 첫 줄 탭[당점 | 큐 각] + 닫기, 당점 탭 = 공(≤160 px) 옆 설명·"우 40% · 상 20%"(100 % = 미스큐 링)·중앙,
+  큐 각 탭 = 원호 드래그(≤260) + 0·10·20·30·45° 칩). 툴바 당점/큐 각 버튼이 각 탭으로 연다. 시트(당점·이닝·해법)는 기본 X 대신 44 px 닫기 알약(`SheetContent hideClose`).
+- CoachHint(첫 세션 안내)는 오른쪽 열을 비운 영역(right 64) 세로 가운데 — 독·툴바·슬라이더가 읽는 동안 보인다.
+- 재생(`shooting`)·상대 차례(`waiting`)·`setup` 엔 오른쪽 열과 독이 `opacity-0 pointer-events-none`(150 ms) — 상단 띠·칩·결과 배너·대기 배너는 남는다.
+- 대전: 툴바 맨 아래 X 가 깃발(기권)이 되고 나가기는 상단 띠 왼쪽 뒤로 화살표.
+모든 탭 대상 ≥ 40 px(툴바·샷·시트는 44 이상), 탭 대상 사이 ≥ 6 px(md 8), 텍스트 ≥ 12 px, 토큰만 사용(독 배경은 불투명 surface-1 — var() 토큰엔 Tailwind 투명도 수식어가 안 먹는다;
+그림자는 `.rk-shadow` = `--shadow-card`).
 
 ### 렌더러 선택(자동, UI 없음)
 화면 인스턴스마다 한 번 `selectRendererKind()`(저장값 → WebGL2 탐색). three 면 `new ThreeRenderer({ onContextLost })` 를 try/catch 로 만들고 실패하면 Canvas2DRenderer.
@@ -192,7 +208,7 @@ Overlay 는 aim 에서만: 드래그 중엔 `guide: "straight"`, 손을 떼면 `
 - 이닝 시트는 `inningLog.ts` 가 `onOutcome(outcome, sessionAfter)` 마다 쌓는다(친 선수는 `applyShot` 규칙에서 역산). 되돌리기 = `popShot`, 다시하기·나가기 = `EMPTY_LOG`.
 - 결과 배너: `outcomeText.outcomeMessage(t, outcome)` — `sim.outcome.*`, 3쿠션 미스는 "쿠션 {n}개". 2.4 s 뒤 사라짐.
 - 종료: `session.status === "finished"` → EndDialog(승자 이름만 gold). 다시하기 = `actions.restart()`(같은 설정, 새 서버 세션). 나가기 = ExitConfirm → `await actions.exit()` → `/dashboard`.
-- 소리: `useGameAudio().getCtx` 를 훅에 넘기고, HUD 토글이 `muted` 만 바꾼다.
+- 소리: `useGameAudio().getCtx` 를 훅에 넘기고, 툴바 토글이 `muted` 만 바꾼다.
 
 ### 테스트
 `SimulatorPage.test.ts` 는 jsdom 을 직접 띄우고("@" 별칭 없음 → `vi.mock`) 진짜 훅·컨트롤러·엔진·렌더러로 페이지를 마운트한다: ?cfg 연습 세션 → 샷 → `performance.now` 를 앞당겨 재생 종료 → 배너·이닝 시트·되돌리기, 설정 창 → 시작 → 나가기.
@@ -278,17 +294,17 @@ useEffect(() => {
 `matchLoad === "loading"` 동안 테이블 위에 `t("sim.match.loading")` 칩. `onMatch` 토스트 매핑:
 `offline → sim.match.offline`, `online → sim.match.online`, `resynced → sim.match.resynced`, `finished → sim.match.finishedByServer`, `claim-too-early → sim.match.claimTooEarly`, `opponent-shot` 은 칩으로 충분(토스트 생략).
 
-### (b) HUD — 두 선수
+### (b) 상단 띠 — 두 선수
 - `names`: `sim.match ? sim.match.names : (기존 playerLabel 배열)`. players[0]=호스트(흰 공), players[1]=게스트(노란 공) — 순서가 `session.players` 와 같다.
-- 차례 강조는 HUD 가 이미 `session.turn` 으로 한다(`sim.hud.turn` 칩). 상대 이름은 `names` 로 들어간다.
+- 차례 강조는 TopBar 가 `session.turn` 으로 한다(이름 앞 brand 점, sr-only `sim.hud.turn`). 상대 이름은 `names` 로 들어간다.
 - 상태 칩: 대전에선 `offline` 의 뜻이 "지금 끊김·재시도 중"이라 HUD 에 `offline={false}` 를 주고, 대신 `sim.mode === "match" && sim.offline` 일 때 테이블 위 칩 `t("sim.match.offline")`. `record`/`syncing`/`queued` 는 그대로.
 - 규칙·테이블 배지는 `sim.config`(matchConfig) 로 기존과 같다.
 
 ### (c) waiting 단계
-- `Controls` 는 `phase="waiting"` 을 받으면 이미 전부 잠긴다(aim 이 아니면 locked, 샷 버튼 disabled). 되돌리기는 `canUndo=false` 라 안 보인다.
+- `phase="waiting"` 이면 오른쪽 열·두께 독이 통째로 흐려진다(controlsHidden). 되돌리기는 `canUndo=false` 라 툴바에 없다.
 - 테이블 위 배너(포인터 이벤트 없음): `t("sim.match.waitingTurn")` + `t("sim.match.waitingHint")`, 상대 이름은 `sim.match.opponentName`. 재생 중 `sim.match.opponentShot` 이면 칩 `t("sim.match.opponentShot")`.
 - 내 차례가 되면(`phase === "aim"`) 짧은 칩 `t("sim.match.yourTurn")`(2.4 s, OutcomeBanner 와 같은 리듬).
-- 기권 버튼(h-11, 나가기 옆): `phase !== "finished" && sim.match?.canResign` → 확인 다이얼로그(`sim.match.resignTitle` / `resignDesc` / `resignConfirm`) → `await actions.resign()`.
+- 기권: `phase !== "finished" && sim.match?.canResign` 이면 툴바 맨 아래 X 대신 깃발 → 확인 다이얼로그(`sim.match.resignTitle` / `resignDesc` / `resignConfirm`) → `await actions.resign()`. 나가기는 상단 띠 뒤로 화살표.
 - 승리 주장 버튼: `sim.match?.canClaim` 일 때만 배너 아래에 `t("sim.match.claim")` + `t("sim.match.claimDesc")`; `const ok = await actions.claim(); if (!ok) toast(t("sim.match.claimTooEarly"))`. claim 불가일 땐 `t("sim.match.claimWait")` 한 줄.
 - 나가기(ExitConfirm): 대전이면 설명을 `t("sim.match.leaveDesc")` 로, 확인 시 `await actions.exit()` 뒤 `/online-game?lobby=1`(목록으로) 또는 `/dashboard`.
 - 폴링은 훅이 맡는다(가시성·포커스 wake 포함). 페이지는 당겨서 새로고침 같은 명시적 갱신에만 `actions.sync()`.
@@ -331,7 +347,7 @@ share/replayLink.ts   encodeReplay/decodeReplay/parseReplay — `?replay=<base64
                       숫자는 반올림하지 않아(JSON 최단 왕복) 재시뮬 해시가 비트 단위로 같다. 디코더는 모든 필드를 검사하고 하나라도 어긋나면 null.
 share/shareCard.ts    renderShareCard(result, opts) → 1080×1350 캔버스(세로 테이블·큐볼 경로·쿠션 번호·최종 배치·제목/통계/푸터). 렌더러 인스턴스 의존 없음.
 share/useShare.ts     shareShot(): 링크 클립보드 복사(제스처 직후) → PNG → Capacitor Filesystem+Share / Web Share(files) / 다운로드.
-페이지: 솔로·연습·드릴에서 lastResult 가 있으면 테이블 오른쪽 위 "공유", EndDialog 에도 "공유". `?replay=` 는 연습 세션으로 열어 자동으로 한 번 치고 해시를 비교해 "리플레이" 칩을 띄운다.
+페이지: 솔로·연습·드릴에서 lastResult 가 있으면 툴바 아래쪽(나가기 위) "공유" 버튼, EndDialog 에도 "공유". `?replay=` 는 연습 세션으로 열어 자동으로 한 번 치고 해시를 비교해 "리플레이" 칩을 띄운다.
 ```
 
 ## 드릴 모드 (drill/)

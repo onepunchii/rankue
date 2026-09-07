@@ -127,9 +127,18 @@ export const SolverSheet = memo(function SolverSheet(p: SolverSheetProps) {
 
     return (
         <Sheet open={open} onOpenChange={handleOpenChange}>
-            <SheetContent side="bottom" className="rounded-t-card p-0 max-h-[56dvh] flex flex-col gap-0 pb-safe">
-                <SheetHeader className="shrink-0 px-6 pt-6 pb-2 text-left">
-                    <SheetTitle className="text-[17px] font-bold text-ink-1">{t("sim.solver.title")}</SheetTitle>
+            <SheetContent side="bottom" hideClose className="rounded-t-card p-0 max-h-[56dvh] flex flex-col gap-0 pb-safe">
+                <SheetHeader className="shrink-0 px-6 pt-5 pb-2 text-left">
+                    <div className="flex items-center gap-3">
+                        <SheetTitle className="flex-1 min-w-0 text-[17px] font-bold text-ink-1">{t("sim.solver.title")}</SheetTitle>
+                        {/* 기본 16 px X(영문 sr-only) 대신 44 px 닫기 알약 */}
+                        <button
+                            type="button" onClick={() => handleOpenChange(false)}
+                            className="h-11 px-4 shrink-0 rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3"
+                        >
+                            {t("sim.common.close")}
+                        </button>
+                    </div>
                     <SheetDescription className="text-[13px] font-medium text-ink-3">{t("sim.solver.desc")}</SheetDescription>
                 </SheetHeader>
 

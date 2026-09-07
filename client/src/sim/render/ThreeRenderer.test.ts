@@ -803,13 +803,17 @@ describe("ThreeRenderer 스모크(가짜 WebGL2)", () => {
         expect(pose.ez).toBe(PLAYER_HEIGHT);
         expect(pose.ty).toBeCloseTo(white.r[1] + PLAYER_AHEAD, 9);
         expect(r.needsFrame()).toBe(false);
-        // project: 유한하고, 큐볼은 화면 가로 가운데·아래쪽, 먼 쿠션은 위쪽
+        // project: 유한하고, 큐볼은 인셋 사각형(조작 층 밖) 가로 가운데·아래쪽, 먼 쿠션은 위쪽
         const cue = r.project(white.r[0], white.r[1]);
         const far = r.project(T.width / 2, T.length);
         expect(Number.isFinite(cue[0]) && Number.isFinite(cue[1])).toBe(true);
         expect(cue[0]).toBeCloseTo(195, 6);
-        expect(cue[1]).toBeGreaterThan(422);
+        expect(cue[1]).toBeGreaterThan(INSETS.top + (844 - INSETS.top - INSETS.bottom) / 2);
         expect(far[1]).toBeLessThan(cue[1]);
+        // 카메라 목표(큐볼 앞)는 인셋 사각형의 정중앙 — 캔버스 중앙(422)이 아니다(조작 층 아래로 밀리지 않는다)
+        const tgt = r.project(pose.tx, pose.ty);
+        expect(tgt[0]).toBeCloseTo(195, 6);
+        expect(tgt[1]).toBeCloseTo(INSETS.top + (844 - INSETS.top - INSETS.bottom) / 2, 6);
         // 카메라 뒤(헤드 레일 뒤 멀리)도 유한
         const behind = r.project(white.r[0], -3);
         expect(Number.isFinite(behind[0]) && Number.isFinite(behind[1])).toBe(true);
@@ -865,7 +869,7 @@ describe("ThreeRenderer 스모크(가짜 WebGL2)", () => {
         expect(r.needsFrame()).toBe(true);
     });
 
-    it("player 뷰에서 resize 는 컨테이너 비율을 카메라에 주고 다시 그린다 · 마지막 프레임 없이 켜도 기본 자세로 그린다", () => {
+    it("player 뷰에서 resize 는 인셋 사각형 비율을 카메라에 주고 다시 그린다 · 마지막 프레임 없이 켜도 기본 자세로 그린다", () => {
         const { r, el, glc } = make();
         r.mount(el, T);
         glc.calls.length = 0;
@@ -880,10 +884,14 @@ describe("ThreeRenderer 스모크(가짜 WebGL2)", () => {
         glc.calls.length = 0;
         r.resize();
         expect(clearCount(glc.calls)).toBe(1);
-        // 가로 화면: 가운데 목표는 여전히 화면 중앙
+        // 가로 화면: 가운데 목표는 인셋 사각형(위 47 · 아래 34 를 뺀 영역)의 중앙
         const tgt = r.project(pose.tx, pose.ty);
         expect(tgt[0]).toBeCloseTo(512, 6);
-        expect(tgt[1]).toBeCloseTo(300, 6);
+        expect(tgt[1]).toBeCloseTo(INSETS.top + (600 - INSETS.top - INSETS.bottom) / 2, 6);
+        // 왕복
+        const [ux, uy] = r.unproject(tgt[0], tgt[1]);
+        expect(ux).toBeCloseTo(pose.tx, 6);
+        expect(uy).toBeCloseTo(pose.ty, 6);
         r.dispose();
         r.setView("top"); // dispose 뒤엔 무시(던지지 않는다)
     });
