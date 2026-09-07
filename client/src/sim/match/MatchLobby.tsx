@@ -23,6 +23,7 @@ import {
     type MatchApi, type MatchPublic,
 } from "../matchApi";
 import { gameLabel, inningCapLabel, joinErrorKey, rulesLabel, shareText } from "./matchView";
+import { ChevronRightIcon, MinusIcon, PlusIcon } from "../components/railIcons";
 
 export type LobbyTab = "create" | "join";
 
@@ -103,21 +104,32 @@ function TargetPicker({ id, gameType, text, onText, label }: {
     const { t } = useT();
     const n = text.trim() === "" ? NaN : Number(text);
     const ok = isValidTarget(n);
+    // ± 한 단계: 3쿠션 1점, 4구 10점. 빈 칸이면 종목 기본값에서 시작. 설정 창(SimSetupDialog)과 같은 큰 숫자 꼴.
+    const step = gameType === "4c" ? 10 : 1;
+    const bump = (dir: -1 | 1) => {
+        const cur = ok ? n : defaultTarget(gameType);
+        onText(String(Math.max(TARGET_MIN, Math.min(TARGET_MAX, cur + dir * step))));
+    };
+    const roundBtn = "w-11 h-11 rounded-pill border border-surface-line bg-surface-1 text-ink-2 flex items-center justify-center active:bg-surface-3 shrink-0";
     return (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
             <Label htmlFor={id}>{label}</Label>
+            <div className="flex items-center justify-center gap-3">
+                <button type="button" onClick={() => bump(-1)} aria-label={t("sim.setup.targetMinus").replace("{n}", String(step))} className={roundBtn}><MinusIcon /></button>
+                <Input
+                    id={id} inputMode="numeric" pattern="[0-9]*" maxLength={3} value={text}
+                    onChange={(e) => onText(e.target.value.replace(/[^0-9]/g, ""))}
+                    aria-invalid={!ok}
+                    className={cn("h-14 w-[132px] rounded-xl rk-num text-[32px] font-bold text-center bg-surface-3 border-transparent", !ok && "border-ink-3")}
+                />
+                <button type="button" onClick={() => bump(1)} aria-label={t("sim.setup.targetPlus").replace("{n}", String(step))} className={roundBtn}><PlusIcon /></button>
+            </div>
             <div className="flex gap-2">
                 {TARGET_CHIPS[gameType].map((c) => (
                     <Segment key={c} selected={ok && n === c} onClick={() => onText(String(c))} className="rk-num px-0">{c}</Segment>
                 ))}
             </div>
-            <Input
-                id={id} inputMode="numeric" pattern="[0-9]*" maxLength={3} value={text}
-                onChange={(e) => onText(e.target.value.replace(/[^0-9]/g, ""))}
-                aria-invalid={!ok}
-                className={cn("h-11 rounded-xl rk-num text-[15px] font-semibold", !ok && "border-ink-3")}
-            />
-            <p className={cn("text-[12px] font-medium leading-relaxed", ok ? "text-ink-4" : "text-ink-2")}>
+            <p className={cn("text-[12px] font-medium leading-relaxed text-center", ok ? "text-ink-4" : "text-ink-2")}>
                 {ok ? `${TARGET_MIN}~${TARGET_MAX}` : t("sim.setup.targetRange")}
             </p>
         </div>
@@ -136,6 +148,8 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
     const [passiveFoul, setPassiveFoul] = useState(false);
     // 플레이 모드: 방장이 고르면 게스트도 같은 모드(서버 aimAssist). 물리 기본값은 buildConfig 의 모드 프리셋이 채운다.
     const [mode, setMode] = useState<SimMode>("normal");
+    // 세부 설정(규칙 · 이닝 제한)은 접어 둔다 — 대전 만들기는 종목·테이블·다마수·모드면 충분하다(2026-09-07 오너)
+    const [advancedOpen, setAdvancedOpen] = useState(false);
     const [inningCap, setInningCap] = useState<number>(0);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -300,41 +314,61 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
                 </p>
             </div>
 
-            <div className="space-y-1.5">
-                <Label>{t("sim.setup.rules")}</Label>
-                {gameType === "3c" ? (
-                    <div className="flex gap-2">
-                        {(["umb", "pba"] as const).map((r) => (
-                            <SegmentTwoLine
-                                key={r} selected={ruleSet === r} onClick={() => setRuleSet(r)}
-                                title={r === "umb" ? t("sim.setup.ruleUmb") : t("sim.setup.rulePba")}
-                                desc={r === "umb" ? t("sim.setup.ruleUmbHint") : t("sim.setup.rulePbaHint")}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        <ToggleRow
-                            id="sim-match-3c-double" checked={threeCushionDouble} onCheckedChange={setThreeCushionDouble}
-                            title={t("sim.setup.opt3cDouble")} desc={t("sim.setup.opt3cDoubleDesc")}
-                        />
-                        <ToggleRow
-                            id="sim-match-passive-foul" checked={passiveFoul} onCheckedChange={setPassiveFoul}
-                            title={t("sim.setup.optPassiveFoul")} desc={t("sim.setup.optPassiveFoulDesc")}
-                        />
+            {/* 세부 설정 — 규칙 · 이닝 제한. 요약 한 줄이 접힌 상태를 말한다. */}
+            <div>
+                <button type="button" onClick={() => setAdvancedOpen((o) => !o)} aria-expanded={advancedOpen} className="w-full min-h-11 py-2 flex items-center justify-between gap-3 text-left">
+                    <span className="min-w-0">
+                        <span className="block text-[13px] font-semibold text-ink-2">{t("sim.setup.advanced")}</span>
+                        <span className="block text-[12px] font-medium text-ink-4 truncate">
+                            {(gameType === "3c"
+                                ? (ruleSet === "umb" ? t("sim.setup.ruleUmb") : t("sim.setup.rulePba"))
+                                : ([threeCushionDouble ? t("sim.setup.opt3cDouble") : null, passiveFoul ? t("sim.setup.optPassiveFoul") : null].filter(Boolean).join(" · ") || t("sim.setup.ruleBasic4c")))}
+                            {" · "}
+                            {inningCap === 0 ? `${t("sim.setup.inningCap")} ${t("sim.setup.inningNone")}` : t("sim.setup.inningN").replace("{n}", String(inningCap))}
+                        </span>
+                    </span>
+                    <span className={cn("text-ink-3 shrink-0 transition-transform", advancedOpen ? "rotate-90" : "")}><ChevronRightIcon /></span>
+                </button>
+                {advancedOpen && (
+                    <div className="space-y-4 pt-1">
+                        <div className="space-y-1.5">
+                            <Label>{t("sim.setup.rules")}</Label>
+                            {gameType === "3c" ? (
+                                <div className="flex gap-2">
+                                    {(["umb", "pba"] as const).map((r) => (
+                                        <SegmentTwoLine
+                                            key={r} selected={ruleSet === r} onClick={() => setRuleSet(r)}
+                                            title={r === "umb" ? t("sim.setup.ruleUmb") : t("sim.setup.rulePba")}
+                                            desc={r === "umb" ? t("sim.setup.ruleUmbHint") : t("sim.setup.rulePbaHint")}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <ToggleRow
+                                        id="sim-match-3c-double" checked={threeCushionDouble} onCheckedChange={setThreeCushionDouble}
+                                        title={t("sim.setup.opt3cDouble")} desc={t("sim.setup.opt3cDoubleDesc")}
+                                    />
+                                    <ToggleRow
+                                        id="sim-match-passive-foul" checked={passiveFoul} onCheckedChange={setPassiveFoul}
+                                        title={t("sim.setup.optPassiveFoul")} desc={t("sim.setup.optPassiveFoulDesc")}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>{t("sim.setup.inningCap")}</Label>
+                            <div className="flex gap-2">
+                                {INNING_CAPS.map((n) => (
+                                    <Segment key={n} selected={inningCap === n} onClick={() => setInningCap(n)} className="rk-num px-0">
+                                        {n === 0 ? t("sim.setup.inningNone") : t("sim.setup.inningN").replace("{n}", String(n))}
+                                    </Segment>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 )}
-            </div>
-
-            <div className="space-y-1.5">
-                <Label>{t("sim.setup.inningCap")}</Label>
-                <div className="flex gap-2">
-                    {INNING_CAPS.map((n) => (
-                        <Segment key={n} selected={inningCap === n} onClick={() => setInningCap(n)} className="rk-num px-0">
-                            {n === 0 ? t("sim.setup.inningNone") : t("sim.setup.inningN").replace("{n}", String(n))}
-                        </Segment>
-                    ))}
-                </div>
             </div>
 
             {error && <p className="text-[12px] font-medium text-ink-2">{error}</p>}

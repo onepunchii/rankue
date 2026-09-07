@@ -7,7 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BallDot } from "@/components/hiq/BallDot";
-import { ChevronDown, ChevronRight } from "@/lib/icons";
+import { ChevronDown } from "@/lib/icons";
+import { MinusIcon, PlusIcon } from "./components/railIcons";
+import { BallMotif } from "./entry/BallMotif";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
@@ -39,10 +41,6 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onStart: (config: SimSetupConfig, opts: SimStartOptions) => void;
-    /** "친구와 대전" 진입(로비로 이동). 없으면 링크를 그리지 않는다. */
-    onMatch?: () => void;
-    /** "이번 주 드릴" 진입. 없으면 링크를 그리지 않는다. */
-    onDrills?: () => void;
 }
 
 const TABLE_IDS: readonly TableId[] = ["DAEDAE", "JUNGDAE_KR"];
@@ -101,7 +99,7 @@ function ToggleRow({ id, checked, onCheckedChange, title, desc }: {
     );
 }
 
-export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills }: Props) {
+export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
     const { t } = useT();
     // 회원 핸디는 다마수 기본값으로만 읽는다. 절대 쓰지 않는다(짠다마 방지: PATCH /me 가 핸디를 받지 않는 설계).
     const { member } = useAuth();
@@ -184,32 +182,34 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
     const tableName = (id: TableId) => (id === "DAEDAE" ? t("sim.setup.tableDaedae") : t("sim.setup.tableJungdae"));
     const tableSize = (id: TableId) => `${TABLES[id].width.toFixed(2)} × ${TABLES[id].length.toFixed(2)} m`;
 
+    // ± 한 단계: 3쿠션 1점, 4구 10점(다마수 단위). 빈 칸이면 종목 기본값에서 시작. 범위 밖은 경계에서 멈춘다.
+    const targetStep = gameType === "4c" ? 10 : 1;
+    const stepTarget = (dir: -1 | 1) => {
+        const cur = targetOk ? targetNum : defaultTarget(gameType, handicap);
+        editTarget(String(Math.max(TARGET_MIN, Math.min(TARGET_MAX, cur + dir * targetStep))));
+    };
+    // 세부 설정 요약 한 줄 — 접혀 있어도 규칙·이닝·기록 상태가 보인다
+    const ruleSummary = gameType === "3c"
+        ? (ruleSet === "umb" ? t("sim.setup.ruleUmb") : t("sim.setup.rulePba"))
+        : ([threeCushionDouble ? t("sim.setup.opt3cDouble") : null, passiveFoul ? t("sim.setup.optPassiveFoul") : null].filter(Boolean).join(" · ") || t("sim.setup.ruleBasic4c"));
+    const inningSummary = inningCap === 0 ? `${t("sim.setup.inningCap")} ${t("sim.setup.inningNone")}` : t("sim.setup.inningN").replace("{n}", String(inningCap));
+    const advancedSummary = `${ruleSummary} · ${inningSummary} · ${record ? t("sim.setup.record") : t("sim.setup.practiceMode")}`;
+    const roundBtn = "w-11 h-11 rounded-pill border border-surface-line bg-surface-1 text-ink-2 flex items-center justify-center active:bg-surface-3 shrink-0";
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[420px] max-h-[88dvh] rounded-card flex flex-col gap-0 p-0">
                 <DialogHeader className="shrink-0 px-6 pt-6 pb-3 text-left">
-                    <DialogTitle>{t("sim.setup.title")}</DialogTitle>
-                    <DialogDescription className="text-[13px] font-medium text-ink-3">{t("sim.setup.desc")}</DialogDescription>
+                    <div className="flex items-center gap-3">
+                        <BallMotif kind="single" size={44} />
+                        <div className="min-w-0">
+                            <DialogTitle>{t("sim.setup.title")}</DialogTitle>
+                            <DialogDescription className="text-[13px] font-medium text-ink-3">{t("sim.setup.desc")}</DialogDescription>
+                        </div>
+                    </div>
                 </DialogHeader>
 
                 <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 space-y-4 pb-2">
-                    {/* 모드 — 일반(조준 보정 자동) / 리얼리티(큐 방향 그대로 · 마타반 2010 · 대회 테이블). 설명 한 줄이 따라 붙는다. */}
-                    <div className="space-y-1.5">
-                        <Label>{t("sim.setup.mode")}</Label>
-                        <div className="flex gap-2">
-                            {SIM_MODES.map((m) => (
-                                <SegmentTwoLine
-                                    key={m} selected={mode === m} onClick={() => pickMode(m)}
-                                    title={m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality")}
-                                    desc={m === "normal" ? t("sim.setup.modeNormalDesc") : t("sim.setup.modeRealityDesc")}
-                                />
-                            ))}
-                        </div>
-                        <p className="text-[12px] font-medium leading-relaxed text-ink-4">
-                            {mode === "normal" ? t("sim.setup.modeNormalHint") : t("sim.setup.modeRealityHint")}
-                        </p>
-                    </div>
-
                     {/* 종목 */}
                     <div className="space-y-1.5">
                         <Label>{t("sim.setup.gameType")}</Label>
@@ -236,9 +236,25 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
                         </div>
                     </div>
 
-                    {/* 다마수 */}
-                    <div className="space-y-1.5">
+                    {/* 다마수 — 큰 숫자 + ± + 칩. 시작 화면의 주인공 */}
+                    <div className="space-y-2">
                         <Label htmlFor="sim-target">{t("sim.setup.target")}</Label>
+                        <div className="flex items-center justify-center gap-3">
+                            <button type="button" onClick={() => stepTarget(-1)} aria-label={t("sim.setup.targetMinus").replace("{n}", String(targetStep))} className={roundBtn}>
+                                <MinusIcon />
+                            </button>
+                            <Input
+                                id="sim-target"
+                                inputMode="numeric" pattern="[0-9]*" maxLength={3}
+                                value={targetText}
+                                onChange={(e) => editTarget(e.target.value.replace(/[^0-9]/g, ""))}
+                                aria-invalid={!targetOk}
+                                className={cn("h-14 w-[132px] rounded-xl rk-num text-[32px] font-bold text-center bg-surface-3 border-transparent", !targetOk && "border-ink-3")}
+                            />
+                            <button type="button" onClick={() => stepTarget(1)} aria-label={t("sim.setup.targetPlus").replace("{n}", String(targetStep))} className={roundBtn}>
+                                <PlusIcon />
+                            </button>
+                        </div>
                         <div className="flex gap-2">
                             {chips.map((n) => (
                                 <Segment
@@ -249,16 +265,8 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
                                 </Segment>
                             ))}
                         </div>
-                        <Input
-                            id="sim-target"
-                            inputMode="numeric" pattern="[0-9]*" maxLength={3}
-                            value={targetText}
-                            onChange={(e) => editTarget(e.target.value.replace(/[^0-9]/g, ""))}
-                            aria-invalid={!targetOk}
-                            className={cn("h-11 rounded-xl rk-num text-[15px] font-semibold", !targetOk && "border-ink-3")}
-                        />
                         {/* 잘못된 값은 진한 테두리 + 안내 문구로만 말한다(README 토큰 목록 안에서). aria-invalid 가 상태를 전달한다. */}
-                        <p className={cn("text-[12px] font-medium leading-relaxed", targetOk ? "text-ink-4" : "text-ink-2")}>
+                        <p className={cn("text-[12px] font-medium leading-relaxed text-center", targetOk ? "text-ink-4" : "text-ink-2")}>
                             {!targetOk
                                 ? t("sim.setup.targetRange")
                                 : handicapUsed
@@ -267,63 +275,80 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
                         </p>
                     </div>
 
-                    {/* 규칙 — 종목별로 다른 폼 */}
+                    {/* 모드 — 일반(조준 보정 자동) / 리얼리티(큐 방향 그대로 · 마타반 2010 · 대회 테이블). 설명 한 줄이 따라 붙는다. */}
                     <div className="space-y-1.5">
-                        <Label>{t("sim.setup.rules")}</Label>
-                        {gameType === "3c" ? (
-                            <div className="flex gap-2">
-                                {(["umb", "pba"] as const).map((r) => (
-                                    <SegmentTwoLine
-                                        key={r} selected={ruleSet === r} onClick={() => setRuleSet(r)}
-                                        title={r === "umb" ? t("sim.setup.ruleUmb") : t("sim.setup.rulePba")}
-                                        desc={r === "umb" ? t("sim.setup.ruleUmbHint") : t("sim.setup.rulePbaHint")}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                <ToggleRow
-                                    id="sim-opt-3c-double" checked={threeCushionDouble} onCheckedChange={setThreeCushionDouble}
-                                    title={t("sim.setup.opt3cDouble")} desc={t("sim.setup.opt3cDoubleDesc")}
-                                />
-                                <ToggleRow
-                                    id="sim-opt-passive-foul" checked={passiveFoul} onCheckedChange={setPassiveFoul}
-                                    title={t("sim.setup.optPassiveFoul")} desc={t("sim.setup.optPassiveFoulDesc")}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 이닝 제한 */}
-                    <div className="space-y-1.5">
-                        <Label>{t("sim.setup.inningCap")}</Label>
+                        <Label>{t("sim.setup.mode")}</Label>
                         <div className="flex gap-2">
-                            {INNING_CAPS.map((n) => (
-                                <Segment key={n} selected={inningCap === n} onClick={() => setInningCap(n)} className="rk-num px-0">
-                                    {n === 0 ? t("sim.setup.inningNone") : t("sim.setup.inningN").replace("{n}", String(n))}
-                                </Segment>
+                            {SIM_MODES.map((m) => (
+                                <SegmentTwoLine
+                                    key={m} selected={mode === m} onClick={() => pickMode(m)}
+                                    title={m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality")}
+                                    desc={m === "normal" ? t("sim.setup.modeNormalDesc") : t("sim.setup.modeRealityDesc")}
+                                />
                             ))}
                         </div>
+                        <p className="text-[12px] font-medium leading-relaxed text-ink-4">
+                            {mode === "normal" ? t("sim.setup.modeNormalHint") : t("sim.setup.modeRealityHint")}
+                        </p>
                     </div>
 
-                    {/* 기록하기 — 끄면 연습 모드(되돌리기·공 배치). 기본 켜짐 */}
-                    <ToggleRow
-                        id="sim-opt-record" checked={record} onCheckedChange={setRecord}
-                        title={t("sim.setup.record")} desc={t("sim.setup.recordDesc")}
-                    />
-
-                    {/* 고급 — 접힘. 물리 파라미터라 대부분은 건드릴 일이 없다. */}
+                    {/* 세부 설정 — 접힘. 규칙 · 이닝 제한 · 기록하기 · 쿠션 모델 · 컨디션. 요약 한 줄이 접힌 상태를 대신 말한다(2026-09-07 오너). */}
                     <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
                         <CollapsibleTrigger asChild>
-                            <button
-                                type="button"
-                                className="w-full h-11 flex items-center justify-between text-[13px] font-semibold text-ink-2"
-                            >
-                                {t("sim.setup.advanced")}
-                                <ChevronDown className={cn("w-4 h-4 text-ink-3 transition-transform", advancedOpen && "rotate-180")} />
+                            <button type="button" className="w-full min-h-11 py-2 flex items-center justify-between gap-3 text-left">
+                                <span className="min-w-0">
+                                    <span className="block text-[13px] font-semibold text-ink-2">{t("sim.setup.advanced")}</span>
+                                    <span className="block text-[12px] font-medium text-ink-4 truncate">{advancedSummary}</span>
+                                </span>
+                                <ChevronDown className={cn("w-4 h-4 text-ink-3 shrink-0 transition-transform", advancedOpen && "rotate-180")} />
                             </button>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-4 pt-1">
+                            {/* 규칙 — 종목별로 다른 폼 */}
+                            <div className="space-y-1.5">
+                                <Label>{t("sim.setup.rules")}</Label>
+                                {gameType === "3c" ? (
+                                    <div className="flex gap-2">
+                                        {(["umb", "pba"] as const).map((r) => (
+                                            <SegmentTwoLine
+                                                key={r} selected={ruleSet === r} onClick={() => setRuleSet(r)}
+                                                title={r === "umb" ? t("sim.setup.ruleUmb") : t("sim.setup.rulePba")}
+                                                desc={r === "umb" ? t("sim.setup.ruleUmbHint") : t("sim.setup.rulePbaHint")}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <ToggleRow
+                                            id="sim-opt-3c-double" checked={threeCushionDouble} onCheckedChange={setThreeCushionDouble}
+                                            title={t("sim.setup.opt3cDouble")} desc={t("sim.setup.opt3cDoubleDesc")}
+                                        />
+                                        <ToggleRow
+                                            id="sim-opt-passive-foul" checked={passiveFoul} onCheckedChange={setPassiveFoul}
+                                            title={t("sim.setup.optPassiveFoul")} desc={t("sim.setup.optPassiveFoulDesc")}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 이닝 제한 */}
+                            <div className="space-y-1.5">
+                                <Label>{t("sim.setup.inningCap")}</Label>
+                                <div className="flex gap-2">
+                                    {INNING_CAPS.map((n) => (
+                                        <Segment key={n} selected={inningCap === n} onClick={() => setInningCap(n)} className="rk-num px-0">
+                                            {n === 0 ? t("sim.setup.inningNone") : t("sim.setup.inningN").replace("{n}", String(n))}
+                                        </Segment>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 기록하기 — 끄면 연습 모드(되돌리기·공 배치). 기본 켜짐 */}
+                            <ToggleRow
+                                id="sim-opt-record" checked={record} onCheckedChange={setRecord}
+                                title={t("sim.setup.record")} desc={t("sim.setup.recordDesc")}
+                            />
+
                             <div className="space-y-1.5">
                                 <Label>{t("sim.setup.cushionModel")}</Label>
                                 <div className="flex gap-2">
@@ -368,29 +393,6 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
                 </div>
 
                 <DialogFooter className="shrink-0 px-6 pb-6 pt-3 flex-col gap-3">
-                    {/* 다른 길 — 친구와 대전 · 이번 주 드릴. 한 줄 두 칸, 꺾쇠가 '이동'을 말한다 */}
-                    {(onMatch || onDrills) && (
-                        <div className="flex w-full rounded-xl border border-surface-line divide-x divide-surface-line overflow-hidden">
-                            {onMatch && (
-                                <button
-                                    type="button" onClick={onMatch}
-                                    className="flex-1 min-w-0 h-11 px-2 flex items-center justify-center gap-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3"
-                                >
-                                    <span className="truncate">{t("sim.match.entry")}</span>
-                                    <ChevronRight className="w-3.5 h-3.5 shrink-0 text-ink-3" aria-hidden="true" />
-                                </button>
-                            )}
-                            {onDrills && (
-                                <button
-                                    type="button" onClick={onDrills}
-                                    className="flex-1 min-w-0 h-11 px-2 flex items-center justify-center gap-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3"
-                                >
-                                    <span className="truncate">{t("sim.drill.entry")}</span>
-                                    <ChevronRight className="w-3.5 h-3.5 shrink-0 text-ink-3" aria-hidden="true" />
-                                </button>
-                            )}
-                        </div>
-                    )}
                     <div className="flex flex-row gap-2 w-full">
                         <Button
                             type="button" variant="outline" onClick={() => onOpenChange(false)}

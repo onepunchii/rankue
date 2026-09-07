@@ -1036,7 +1036,7 @@ export function SimulatorPage() {
                     </div>
                 </div>
             )}
-            <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} onMatch={() => navigate("/online-game?lobby=1", { replace: true })} onDrills={() => navigate("/online-game?drills=1", { replace: true })} />
+            <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} />
             <SpinSheet
                 open={spinSheet.open} tab={spinSheet.tab} onOpenChange={onSpinSheetOpen} onTab={onSpinSheetTab}
                 a={sim.input.a} b={sim.input.b} theta={sim.input.theta} cueBallId={sim.cueBallId} disabled={!aiming}
