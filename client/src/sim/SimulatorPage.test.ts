@@ -248,7 +248,7 @@ describe("SimulatorPage", () => {
         expect(h.container.querySelector("[role=dialog]")).toBeNull();
         expect(h.container.textContent).toContain(ko["sim.entry.single"]);
         expect(h.container.textContent).toContain(ko["sim.entry.multi"]);
-        expect(h.container.textContent).toContain(ko["sim.entry.empty"]);
+        expect(h.container.textContent).toContain(ko["sim.entry.singleEmpty"]);
         click(h.container.querySelector('[data-entry="single"]')!);
         expect(h.container.querySelector("[role=dialog]")).not.toBeNull();
         expect(h.container.textContent).toContain(ko["sim.setup.title"]);
