@@ -21,7 +21,7 @@ export const CoachHint = memo(function CoachHint({ onClose }: Props) {
                 <ol className="mt-2 flex flex-col gap-1.5">
                     {tips.map((tip, i) => (
                         <li key={i} className="flex gap-2 text-[13px] font-medium text-ink-2">
-                            <span className="rk-num w-4 shrink-0 text-ink-4">{i + 1}</span>
+                            <span className="rk-num w-4 shrink-0 text-ink-3">{i + 1}</span>
                             <span>{tip}</span>
                         </li>
                     ))}

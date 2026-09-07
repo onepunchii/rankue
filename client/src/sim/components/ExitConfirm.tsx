@@ -23,7 +23,8 @@ export const ExitConfirm = memo(function ExitConfirm(p: Props) {
         : p.finished ? t("sim.exit.descFinished") : t("sim.exit.descRecord"));
     return (
         <Dialog open={p.open} onOpenChange={(o) => { if (!p.busy) p.onOpenChange(o); }}>
-            <DialogContent className="max-w-[360px] rounded-card p-0 gap-0 flex flex-col">
+            {/* 취소·나가기 두 갈래면 충분하다 — 오른쪽 위 X 까지 있으면 닫는 길이 셋이 된다 */}
+            <DialogContent hideClose className="max-w-[360px] rounded-card p-0 gap-0 flex flex-col">
                 <DialogHeader className="px-6 pt-6 pb-2 text-left">
                     <DialogTitle>{t("sim.exit.title")}</DialogTitle>
                     <DialogDescription className="text-[13px] font-medium text-ink-3">{desc}</DialogDescription>

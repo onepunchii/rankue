@@ -59,9 +59,10 @@ export function MatchList({ onOpen, api = defaultApi }: MatchListProps) {
     });
     const rows = useMemo(() => (q.data ? sortForList(q.data) : []), [q.data]);
 
+    // 폭·좌우 여백은 부모(SimulatorPage 의 로비 래퍼)가 준다 — 여기서 또 px-5 를 주면 제목이 폼보다 20px 안으로 들어가 보였다.
     return (
-        <section className="w-full max-w-[420px] mx-auto px-5 space-y-2" aria-label={t("sim.match.listTitle")}>
-            <h3 className="text-[13px] font-semibold text-ink-3 min-h-11 flex items-center">{t("sim.match.listTitle")}</h3>
+        <section className="space-y-2" aria-label={t("sim.match.listTitle")}>
+            <h3 className="text-[15px] font-semibold text-ink-1 min-h-11 flex items-center">{t("sim.match.listTitle")}</h3>
             {q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.match.listLoading")}</p>}
             {q.isError && (
                 <div className="flex items-center justify-between gap-3 min-h-11">

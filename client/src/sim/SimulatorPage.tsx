@@ -664,12 +664,13 @@ export function SimulatorPage() {
                                     : t("sim.drill.chipPractice")}
                         </span>
                     )}
+                    {/* 테이블 위 알약(공유·다시 배치·기권)은 전부 중립 — 이 화면의 초록은 샷 버튼 하나다 */}
                     {(canShare || drillReset) && (
                         <div className="absolute top-3 right-3 z-[3] flex items-center gap-2">
                             {canShare && (
                                 <button
                                     type="button" onClick={onShareShot} disabled={sharing}
-                                    className="h-9 px-3 rounded-pill bg-brand text-brand-fg text-[12px] font-semibold active:bg-brand-strong disabled:opacity-60"
+                                    className="h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-2 active:bg-surface-3 disabled:opacity-60"
                                 >
                                     {t("sim.share.button")}
                                 </button>
@@ -677,7 +678,7 @@ export function SimulatorPage() {
                             {drillReset && (
                                 <button
                                     type="button" onClick={onRestart}
-                                    className="h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-3"
+                                    className="h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-2 active:bg-surface-3"
                                 >
                                     {t("sim.drill.reset")}
                                 </button>
@@ -744,7 +745,7 @@ export function SimulatorPage() {
                     {isMatch && sim.match?.canResign && sim.phase !== "finished" && (
                         <button
                             type="button" onClick={() => setResignOpen(true)}
-                            className="absolute top-3 right-3 z-[3] h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-3"
+                            className="absolute top-3 right-3 z-[3] h-9 px-3 rounded-pill bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-2 active:bg-surface-3"
                         >
                             {t("sim.match.resign")}
                         </button>
@@ -764,15 +765,11 @@ export function SimulatorPage() {
                 />
             </div>
 
+            {/* 드릴·로비 전체 화면: 머리글(제목 + 닫기 알약)은 각 패널이 로비와 같은 꼴로 그린다. 폭·여백은 여기서 한 번만. */}
             {showDrills && (
                 <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8 flex flex-col gap-4">
-                        <div className="flex justify-end">
-                            <button type="button" onClick={() => navigate(EXIT_PATH)} className="h-11 px-4 rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2">
-                                {t("sim.common.close")}
-                            </button>
-                        </div>
-                        <DrillPanel onPlay={onPlayDrill} myMemberId={member?.id} />
+                    <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
+                        <DrillPanel onPlay={onPlayDrill} myMemberId={member?.id} onClose={() => navigate(EXIT_PATH)} />
                     </div>
                 </div>
             )}
@@ -780,7 +777,9 @@ export function SimulatorPage() {
                 <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <MatchLobby onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate(EXIT_PATH)} />
                     <div className="w-full max-w-[420px] mx-auto px-5 pb-8">
-                        <MatchList onOpen={openMatch} />
+                        <div className="border-t border-surface-line pt-2">
+                            <MatchList onOpen={openMatch} />
+                        </div>
                     </div>
                 </div>
             )}

@@ -7,7 +7,8 @@ import type { SessionState } from "@shared/sim/rules";
 import type { Phase } from "../simReducer";
 import { displayAverage, endTitle, formatAverage, inningsForAverage } from "../hudMath";
 
-// 종료 다이얼로그. 승자(gold — 우승 의례 전용 색)·점수/다마수·이닝·에버리지·하이런, (공유: 마지막 샷 카드 + 세션 통계)·다시하기(같은 설정으로 새 세션)·나가기.
+// 종료 다이얼로그. 승자(gold — 우승 의례 전용 색, 이름에만)·점수/다마수·이닝·에버리지·하이런, (공유: 마지막 샷 카드 + 세션 통계)·다시하기(같은 설정으로 새 세션)·나가기.
+// 초록은 나가기(주 동작) 하나뿐 — 승자 카드 테두리까지 초록이면 색이 두 가지 뜻을 갖는다.
 // 닫아도(바깥 탭) 화면은 finished 상태로 남는다 — 연습 모드는 되돌리기로 이어서 칠 수 있다.
 interface Props {
     open: boolean;
@@ -46,9 +47,9 @@ export const EndDialog = memo(function EndDialog(p: Props) {
                     {s?.players.map((pl, i) => {
                         const winner = s.winnerIndex === i;
                         return (
-                            <div key={pl.id} className={cn("rounded-tile border px-4 py-3", winner ? "border-brand" : "border-surface-line")}>
+                            <div key={pl.id} className="rounded-tile border border-surface-line px-4 py-3">
                                 <div className="flex items-baseline justify-between gap-2">
-                                    <span className={cn("text-[14px] font-semibold truncate", winner ? "text-gold" : "text-ink-2")}>{p.names[i] ?? pl.id}</span>
+                                    <span className={cn("text-[14px] font-semibold truncate", winner ? "text-gold" : "text-ink-1")}>{p.names[i] ?? pl.id}</span>
                                     <span className="rk-num text-[22px] font-bold text-ink-1 leading-none">
                                         {pl.score}<span className="text-[13px] font-medium text-ink-4"> / {pl.target}</span>
                                     </span>

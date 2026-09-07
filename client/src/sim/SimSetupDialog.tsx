@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BallDot } from "@/components/hiq/BallDot";
-import { ChevronDown } from "@/lib/icons";
+import { ChevronDown, ChevronRight } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,7 +24,9 @@ import {
 // 시뮬레이터 세션 설정. QuickActions 의 "게임 모드 선택" 모달을 대신한다.
 // 형태는 CreateCrewTournamentDialog 와 같다 — 제목·시작 버튼 고정, 본문만 스크롤.
 // 항목이 많아 보이지만 첫 화면에서 정할 건 종목·다마수뿐이고 나머지는 기본값이 맞다.
-// 쿠션 모델·컨디션은 물리 파라미터라 고급 설정 안에 접어 둔다.
+// 쿠션 모델·컨디션은 물리 파라미터라 고급 설정 안에 접어 둔다. 기록하기(연습 모드)는 물리가 아니라 '어떻게 칠지'라
+// 고급 밖, 이닝 제한 아래에 둔다 — 접힌 곳에 있으면 연습 모드를 아무도 못 찾는다.
+// 초록은 시작하기 하나뿐. 대전·드릴 진입은 중립 두 칸(꺾쇠) — 여기서 고르는 값이 아니라 다른 화면으로 가는 길이다.
 
 export type { SimSetupConfig } from "./setupPresets";
 
@@ -278,6 +280,12 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
                         </div>
                     </div>
 
+                    {/* 기록하기 — 끄면 연습 모드(되돌리기·공 배치). 기본 켜짐 */}
+                    <ToggleRow
+                        id="sim-opt-record" checked={record} onCheckedChange={setRecord}
+                        title={t("sim.setup.record")} desc={t("sim.setup.recordDesc")}
+                    />
+
                     {/* 고급 — 접힘. 물리 파라미터라 대부분은 건드릴 일이 없다. */}
                     <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
                         <CollapsibleTrigger asChild>
@@ -329,48 +337,47 @@ export function SimSetupDialog({ open, onOpenChange, onStart, onMatch, onDrills 
                                     <span>{condText.fast}</span>
                                 </div>
                             </div>
-
-                            {/* 기록하기 — 끄면 연습 모드 */}
-                            <ToggleRow
-                                id="sim-opt-record" checked={record} onCheckedChange={setRecord}
-                                title={t("sim.setup.record")} desc={t("sim.setup.recordDesc")}
-                            />
                         </CollapsibleContent>
                     </Collapsible>
                 </div>
 
-                <DialogFooter className="shrink-0 px-6 pb-6 pt-3 flex-col gap-2">
-                    {onMatch && (
-                        <button
-                            type="button" onClick={onMatch}
-                            className="w-full h-12 rounded-xl border border-brand/40 bg-brand/[0.06] text-[14px] font-semibold text-brand flex flex-col items-center justify-center leading-tight"
-                        >
-                            <span>{t("sim.match.entry")}</span>
-                            <span className="text-[12px] font-medium text-ink-4">{t("sim.match.entryDesc")}</span>
-                        </button>
-                    )}
-                    {onDrills && (
-                        <button
-                            type="button" onClick={onDrills}
-                            className="w-full h-12 rounded-xl border border-surface-line bg-surface-2 text-[14px] font-semibold text-ink-1 flex flex-col items-center justify-center leading-tight"
-                        >
-                            <span>{t("sim.drill.entry")}</span>
-                            <span className="text-[12px] font-medium text-ink-4">{t("sim.drill.entryDesc")}</span>
-                        </button>
+                <DialogFooter className="shrink-0 px-6 pb-6 pt-3 flex-col gap-3">
+                    {/* 다른 길 — 친구와 대전 · 이번 주 드릴. 한 줄 두 칸, 꺾쇠가 '이동'을 말한다 */}
+                    {(onMatch || onDrills) && (
+                        <div className="flex w-full rounded-xl border border-surface-line divide-x divide-surface-line overflow-hidden">
+                            {onMatch && (
+                                <button
+                                    type="button" onClick={onMatch}
+                                    className="flex-1 min-w-0 h-11 px-2 flex items-center justify-center gap-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3"
+                                >
+                                    <span className="truncate">{t("sim.match.entry")}</span>
+                                    <ChevronRight className="w-3.5 h-3.5 shrink-0 text-ink-3" aria-hidden="true" />
+                                </button>
+                            )}
+                            {onDrills && (
+                                <button
+                                    type="button" onClick={onDrills}
+                                    className="flex-1 min-w-0 h-11 px-2 flex items-center justify-center gap-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3"
+                                >
+                                    <span className="truncate">{t("sim.drill.entry")}</span>
+                                    <ChevronRight className="w-3.5 h-3.5 shrink-0 text-ink-3" aria-hidden="true" />
+                                </button>
+                            )}
+                        </div>
                     )}
                     <div className="flex flex-row gap-2 w-full">
-                    <Button
-                        type="button" variant="outline" onClick={() => onOpenChange(false)}
-                        className="h-12 px-5 rounded-xl border-surface-line text-ink-2 font-semibold"
-                    >
-                        {t("sim.common.cancel")}
-                    </Button>
-                    <Button
-                        type="button" onClick={submit} disabled={!targetOk}
-                        className="flex-1 h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl"
-                    >
-                        {t("sim.setup.start")}
-                    </Button>
+                        <Button
+                            type="button" variant="outline" onClick={() => onOpenChange(false)}
+                            className="h-12 px-5 rounded-xl border-surface-line text-ink-2 font-semibold"
+                        >
+                            {t("sim.common.cancel")}
+                        </Button>
+                        <Button
+                            type="button" onClick={submit} disabled={!targetOk}
+                            className="flex-1 h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl"
+                        >
+                            {t("sim.setup.start")}
+                        </Button>
                     </div>
                 </DialogFooter>
             </DialogContent>

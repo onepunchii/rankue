@@ -1,12 +1,13 @@
 import { memo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { formatSpin, padOffsetFor, spinFromPad } from "../controlsMath";
+import { padOffsetFor, spinFromPad } from "../controlsMath";
 import { DEFAULT_CUE } from "@shared/sim/params";
 
 // 당점 패드. 큐볼 크기의 원(지름 PAD px) 안에서 누르거나 끌어 (a, b) 를 고른다.
 // 반지름 0.5 R 의 미스큐 링(surface-line 원) 밖은 controlsMath.spinFromPad 가 링 위로 클램프한다.
 // 두 번 탭(300 ms 안, 거의 안 움직임)하면 중앙(0, 0). 색은 현재 큐볼 색(ball-white / ball-yellow) — 공 색 코드 용도.
+// 아래 한 줄은 "당점 중앙" / "당점 우 0.20 · 상 0.10" — 엔진 좌표 이름(a·b)은 화면에 내지 않는다.
 export const PAD_PX = 112;
 const R_PX = PAD_PX / 2;
 const RING_PX = R_PX * DEFAULT_CUE.maxOffset;
@@ -19,6 +20,17 @@ interface Props {
     cueBallId: "white" | "yellow";
     disabled?: boolean;
     onChange: (a: number, b: number) => void;
+}
+
+/** 당점 읽기: 중앙이면 "중앙", 아니면 "우 0.20 · 상 0.10"(R 비율, +a = 오른쪽, +b = 위). */
+export function spinLabel(a: number, b: number, t: (key: string) => string): string {
+    const ra = Math.round(a * 100) / 100;
+    const rb = Math.round(b * 100) / 100;
+    if (ra === 0 && rb === 0) return t("sim.controls.spinCenter");
+    const parts: string[] = [];
+    if (ra !== 0) parts.push(`${t(ra > 0 ? "sim.controls.spinRight" : "sim.controls.spinLeft")} ${Math.abs(ra).toFixed(2)}`);
+    if (rb !== 0) parts.push(`${t(rb > 0 ? "sim.controls.spinTop" : "sim.controls.spinBottom")} ${Math.abs(rb).toFixed(2)}`);
+    return parts.join(" · ");
 }
 
 export const SpinPad = memo(function SpinPad({ a, b, cueBallId, disabled, onChange }: Props) {
@@ -89,7 +101,10 @@ export const SpinPad = memo(function SpinPad({ a, b, cueBallId, disabled, onChan
                     style={{ left: R_PX + dot.x - 7, top: R_PX + dot.y - 7 }}
                 />
             </div>
-            <span className="rk-num text-[12px] font-medium text-ink-4 leading-none">{formatSpin(a, b)}</span>
+            <span className="text-[12px] leading-none whitespace-nowrap">
+                <span className="font-medium text-ink-3">{t("sim.controls.spin")}</span>
+                <span className="rk-num font-semibold text-ink-2 ml-1">{spinLabel(a, b, t)}</span>
+            </span>
         </div>
     );
 });

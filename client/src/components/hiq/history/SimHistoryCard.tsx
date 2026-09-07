@@ -11,6 +11,7 @@ import { drillApi, weekProgress } from "@/sim/drill/drillApi";
 /**
  * 기록 페이지의 시뮬레이터 섹션. 실전 전적(RP·에버리지)과는 다른 테이블(hiq_sim_*)에서 읽고,
  * 화면에서도 "별개로 집계" 라고 못 박는다 — 실전 기록과 섞이면 안 된다(RP 오염 사고 이후 원칙).
+ * 흰 카드 안의 통계 타일·상태 칩은 surface-3(5% 먹) — surface-2 는 흰색이라 카드 바탕과 구분이 안 됐다(실측 2026-09-07).
  */
 interface SimRating {
     gameType: "3c" | "4c";
@@ -95,7 +96,7 @@ export function SimHistoryCard({ filter }: Props) {
                     <button
                         type="button"
                         onClick={() => setLocation("/online-game?drills=1")}
-                        className="w-full mb-3 rounded-tile bg-surface-2 px-3 py-2.5 flex items-center justify-between gap-2 text-left"
+                        className="w-full mb-3 rounded-tile bg-surface-3 px-3 min-h-11 py-2.5 flex items-center justify-between gap-2 text-left"
                     >
                         <span className="text-[13px] font-semibold text-ink-1">{t("sim.drill.title")}</span>
                         <span className="rk-num text-[13px] font-medium text-ink-3">
@@ -109,7 +110,7 @@ export function SimHistoryCard({ filter }: Props) {
                         <button
                             type="button"
                             onClick={() => setLocation("/online-game")}
-                            className="h-10 px-4 rounded-pill bg-brand text-brand-fg text-[13px] font-semibold"
+                            className="h-11 px-5 rounded-pill bg-brand text-brand-fg text-[13px] font-semibold active:bg-brand-strong"
                         >
                             {t("sim.history.open")}
                         </button>
@@ -122,7 +123,7 @@ export function SimHistoryCard({ filter }: Props) {
                                 { label: t("sim.history.bestAvg"), value: totals.bestAvg.toFixed(3) },
                                 { label: t("sim.history.bestHighRun"), value: String(totals.bestHighRun) },
                             ].map((c) => (
-                                <div key={c.label} className="rounded-tile bg-surface-2 px-3 py-2.5">
+                                <div key={c.label} className="rounded-tile bg-surface-3 px-3 py-2.5 min-w-0">
                                     <div className="text-[12px] font-medium text-ink-4">{c.label}</div>
                                     <div className="rk-num text-[18px] font-semibold text-ink-1 leading-tight mt-0.5">{c.value}</div>
                                 </div>
@@ -149,8 +150,8 @@ export function SimHistoryCard({ filter }: Props) {
                                         </div>
                                         <span
                                             className={cn(
-                                                "px-2 py-0.5 rounded-lg text-[12px] font-semibold",
-                                                s.status === "finished" ? "bg-brand/[0.08] text-brand" : "bg-surface-2 text-ink-3",
+                                                "rk-chip shrink-0",
+                                                s.status === "finished" ? "bg-brand/[0.1] text-brand" : "bg-surface-3 text-ink-2",
                                             )}
                                         >
                                             {statusLabel(s.status)}
