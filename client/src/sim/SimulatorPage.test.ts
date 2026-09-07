@@ -241,9 +241,15 @@ describe("SimulatorPage", () => {
         expect(nav.apiRequest).not.toHaveBeenCalled();
     });
 
-    it("cfg 가 없으면 설정 창이 열리고 시작하기로 세션이 열린다 · 나가기는 확인 뒤 대시보드로", async () => {
+    it("파라미터가 없으면 진입 화면(싱글 / 친구와 대전)이 먼저, 싱글을 누르면 설정 창 · 시작하기로 세션 · 나가기는 확인 뒤 대시보드로", async () => {
         nav.search = "";
         const h = mount();
+        // 진입 화면: 카드 둘, 설정 창은 아직
+        expect(h.container.querySelector("[role=dialog]")).toBeNull();
+        expect(h.container.textContent).toContain(ko["sim.entry.single"]);
+        expect(h.container.textContent).toContain(ko["sim.entry.multi"]);
+        expect(h.container.textContent).toContain(ko["sim.entry.empty"]);
+        click(h.container.querySelector('[data-entry="single"]')!);
         expect(h.container.querySelector("[role=dialog]")).not.toBeNull();
         expect(h.container.textContent).toContain(ko["sim.setup.title"]);
         // 기록 끄고 시작(서버 없이)
@@ -251,7 +257,8 @@ describe("SimulatorPage", () => {
         click(byText(h, ko["sim.setup.start"])!);
         expect(h.container.querySelector("[role=dialog]")).toBeNull();
         expect(h.container.textContent).toContain("0/15");
-        expect(nav.apiRequest).not.toHaveBeenCalled();
+        // 진입 화면의 기록 읽기(레이팅·대전·드릴)만 서버를 부르고, 세션은 만들지 않는다
+        expect(nav.apiRequest.mock.calls.filter((c) => !/ratings|matches|drills/.test(String(c[0])))).toHaveLength(0);
 
         click(byLabel(h, ko["sim.controls.exit"])!);
         expect(h.container.textContent).toContain(ko["sim.exit.title"]);

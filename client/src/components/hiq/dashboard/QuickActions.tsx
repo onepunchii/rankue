@@ -4,8 +4,6 @@ import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { useT } from "@/lib/i18n";
-import { SimSetupDialog } from "@/sim/SimSetupDialog";
-import { simulatorPath } from "@/sim/pageConfig";
 
 interface QuickActionsProps {
     onStartGame: (mode: "practice" | "match") => void;
@@ -17,8 +15,8 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
     const { t } = useT();
 
     const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-    const [isOnlineGameModalOpen, setIsOnlineGameModalOpen] = useState(false);
-    const handleOnlineGameClick = () => setIsOnlineGameModalOpen(true);
+    // 시뮬레이터: 진입 화면(싱글 / 친구와 대전)으로. 설정 창은 그 화면 안에서 연다.
+    const handleOnlineGameClick = () => setLocation("/online-game");
 
     // 처음 오는 사람을 위한 각 메뉴 안내 — 매칭 대결이 핵심이라 강조 표기
     const guideItems = [
@@ -152,7 +150,7 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
 
-                {/* 시뮬레이터 (1x1) — 온라인 가상 당구대 (/online-game 모드 선택 모달) */}
+                {/* 시뮬레이터 (1x1) — /online-game 진입 화면(싱글 / 친구와 대전) */}
                 <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={handleOnlineGameClick}
@@ -167,24 +165,6 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
             </div>
-
-            {/* 시뮬레이터 세션 설정 → /online-game?cfg= 로 이동 (설정은 SimSetupDialog 가 만든다) */}
-            <SimSetupDialog
-                open={isOnlineGameModalOpen}
-                onOpenChange={setIsOnlineGameModalOpen}
-                onStart={(config, opts) => {
-                    setIsOnlineGameModalOpen(false);
-                    setLocation(simulatorPath({ config, record: opts.record }));
-                }}
-                onMatch={() => {
-                    setIsOnlineGameModalOpen(false);
-                    setLocation("/online-game?lobby=1");
-                }}
-                onDrills={() => {
-                    setIsOnlineGameModalOpen(false);
-                    setLocation("/online-game?drills=1");
-                }}
-            />
 
             {/* 처음 오는 사람을 위한 메뉴 안내 모달 */}
             <Dialog open={isHelpModalOpen} onOpenChange={setIsHelpModalOpen}>

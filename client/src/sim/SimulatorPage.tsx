@@ -47,6 +47,7 @@ import {
 import { Overlay, type Project } from "./overlay/Overlay";
 import { createNumbersCache, overlayDiamond, readDiamondPref, shotReadout, writeDiamondPref } from "./overlay/diamondSystem";
 import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
+import { SimEntry } from "./entry/SimEntry";
 import { matchApi, type MatchPublic } from "./matchApi";
 import { MatchLobby } from "./match/MatchLobby";
 import { MatchList, MATCH_LIST_QUERY_KEY } from "./match/MatchList";
@@ -154,7 +155,10 @@ export function SimulatorPage() {
     // 리플레이 링크(?replay=): 대전·로비·드릴이 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
     const [replay] = useState<ReplayPayload | null>(() => (matchId || lobby || drillsView ? null : decodeReplay(params.get(REPLAY_PARAM))));
     const [initial] = useState(() => (matchId || lobby || drillsView || replay ? null : decodePageConfig(readCfgParam(search))));
-    const [setupOpen, setSetupOpen] = useState(initial === null && replay === null && !matchId && !lobby && !drillsView);
+    // 파라미터가 하나도 없으면 진입 화면(싱글 / 친구와 대전)부터. cfg 가 있는데 깨졌으면 예전처럼 설정 창을 바로 연다.
+    const entryView = !matchId && !lobby && !drillsView && !replay && readCfgParam(search) === null && params.get(REPLAY_PARAM) === null;
+    const [setupOpen, setSetupOpen] = useState(!entryView && initial === null && replay === null && !matchId && !lobby && !drillsView);
+    const lobbyTab = params.get("tab") === "join" ? "join" as const : undefined;
     // 드릴 모드: 고정 배치에서 첫 샷만 서버가 채점(문제당 1회), 그 뒤는 연습. scored 전엔 공 배치를 막는다.
     const [drill, setDrill] = useState<{ drill: WeekDrill; week: DrillWeek; scored: boolean; result: { success: boolean; cushions: number } | null } | null>(null);
     const drillRef = useRef(drill);
@@ -806,14 +810,15 @@ export function SimulatorPage() {
 
     const onSetupOpenChange = useCallback((open: boolean) => {
         setSetupOpen(open);
-        // 세션 없이 설정을 닫으면 돌아간다
-        if (!open && sim.phase === "setup") navigate(EXIT_PATH);
-    }, [navigate, sim.phase]);
+        // 세션 없이 설정을 닫으면 돌아간다 — 진입 화면에서 열었으면 진입 화면으로(setupOpen=false 만), 바로 열렸으면(cfg 깨짐) 대시보드로
+        if (!open && sim.phase === "setup" && !entryView) navigate(EXIT_PATH);
+    }, [navigate, sim.phase, entryView]);
 
     const finished = sim.session?.status === "finished";
     const endOpen = sim.phase === "finished" && !endDismissed && !exitOpen;
     const showLobby = lobby && sim.phase === "setup";
     const showDrills = drillsView && sim.phase === "setup";
+    const showEntry = entryView && sim.phase === "setup" && !setupOpen;
     const endSubtitle = sim.match
         ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t)
         : null;
@@ -1010,9 +1015,20 @@ export function SimulatorPage() {
                     </div>
                 </div>
             )}
+            {showEntry && (
+                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                    <SimEntry
+                        onSingle={() => setSetupOpen(true)}
+                        onDrills={() => navigate("/online-game?drills=1", { replace: true })}
+                        onMulti={() => navigate("/online-game?lobby=1", { replace: true })}
+                        onJoin={() => navigate("/online-game?lobby=1&tab=join", { replace: true })}
+                        onClose={() => navigate(EXIT_PATH)}
+                    />
+                </div>
+            )}
             {showLobby && (
                 <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    <MatchLobby onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate(EXIT_PATH)} />
+                    <MatchLobby initialTab={lobbyTab} onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate(EXIT_PATH)} />
                     <div className="w-full max-w-[420px] mx-auto px-5 pb-8">
                         <div className="border-t border-surface-line pt-2">
                             <MatchList onOpen={openMatch} />
