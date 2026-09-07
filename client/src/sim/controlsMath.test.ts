@@ -5,8 +5,7 @@ import { phiForThickness } from "./aim";
 import { V0_MAX, V0_MIN, clampSpin } from "./simReducer";
 import {
     activeThickness, FINE_STEP_RAD, formatPower, formatSpeed, formatSpin, nearestStep, padOffsetFor, powerFromSlider,
-    powerPercent, pullbackFor, spinFromPad, stepPower, THICKNESS_UI_STEPS, thicknessStepLabel,
-} from "./controlsMath";
+    powerPercent, pullbackFor, spinFromPad, stepPower, THICKNESS_UI_STEPS, thicknessStepLabel,, nextElevationRad, elevationDeg } from "./controlsMath";
 
 const table = TABLES.DAEDAE;
 const R = table.ball.R;
@@ -96,5 +95,17 @@ describe("controlsMath 당점", () => {
     it("라벨", () => {
         expect(formatSpin(0, 0)).toBe("a 0.00 · b 0.00");
         expect(formatSpin(0.2, -0.1)).toBe("a +0.20 · b −0.10");
+    });
+});
+
+describe("큐 각 단계", () => {
+    it("0 → 10 → 20 → 30 → 45 → 0 으로 돈다", () => {
+        let th = 0;
+        const seq: number[] = [];
+        for (let i = 0; i < 6; i++) { th = nextElevationRad(th); seq.push(elevationDeg(th)); }
+        expect(seq).toEqual([10, 20, 30, 45, 0, 10]);
+    });
+    it("단계 사이 값은 다음 단계로 올라간다", () => {
+        expect(elevationDeg(nextElevationRad((12 * Math.PI) / 180))).toBe(20);
     });
 });

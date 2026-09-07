@@ -112,3 +112,17 @@ export function formatSpin(a: number, b: number): string {
     };
     return `a ${f(a)} · b ${f(b)}`;
 }
+
+/** 큐 각 단계(도). 탭할 때마다 다음 단계로 돈다: 0 → 10 → 20 → 30 → 45 → 0 */
+export const ELEVATION_STEPS_DEG = [0, 10, 20, 30, 45] as const;
+
+export function elevationDeg(thetaRad: number): number {
+    return Math.round((thetaRad * 180) / Math.PI);
+}
+
+export function nextElevationRad(thetaRad: number): number {
+    const deg = elevationDeg(thetaRad);
+    const i = ELEVATION_STEPS_DEG.findIndex((d) => d >= deg);
+    const next = i < 0 || i === ELEVATION_STEPS_DEG.length - 1 ? ELEVATION_STEPS_DEG[0] : ELEVATION_STEPS_DEG[i + (ELEVATION_STEPS_DEG[i] === deg ? 1 : 0)];
+    return (next * Math.PI) / 180;
+}

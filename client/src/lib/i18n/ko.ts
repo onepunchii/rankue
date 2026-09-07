@@ -1942,4 +1942,6 @@ export const ko: Dict = {
   "sim.solver.cushion.top": "위 쿠션",
   "sim.solver.applied": "해법을 적용했어요. 샷을 눌러 확인해 보세요",
   "sim.solver.practiceOnly": "해법 찾기는 연습·드릴에서만 쓸 수 있어요",
+  "sim.controls.elevation": "큐 각 {deg}°",
+  "sim.controls.elevationLabel": "큐 각도 (탭하면 0·10·20·30·45° 순서로 바뀌어요)",
 };

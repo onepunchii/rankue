@@ -1940,5 +1940,7 @@ const tr: Dict = {
   "sim.solver.cushion.top": "üst bant",
   "sim.solver.applied": "Çözüm uygulandı. Denemek için Vur'a dokunun",
   "sim.solver.practiceOnly": "Çözüm bulma yalnızca antrenman ve alıştırmalarda kullanılabilir",
+  "sim.controls.elevation": "Isteka {deg}°",
+  "sim.controls.elevationLabel": "Isteka açısı (0·10·20·30·45° için dokun)",
 };
 export default tr;

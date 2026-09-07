@@ -24,6 +24,7 @@ export interface ControlsProps {
     onSide: (side: "left" | "right") => void;
     onNudge: (dir: -1 | 1) => void;
     onSpin: (a: number, b: number) => void;
+    onElevation?: (theta: number) => void;
     onPower: (V0: number) => void;
     onShoot: () => void;
     onRestart: () => void;
@@ -116,7 +117,7 @@ export const Controls = memo(function Controls(p: ControlsProps) {
 
             {/* 3. 당점 · 세기 · 샷 */}
             <div className="flex items-stretch gap-2">
-                <SpinPad a={p.input.a} b={p.input.b} cueBallId={p.cueBallId} disabled={locked} onChange={p.onSpin} />
+                <SpinPad a={p.input.a} b={p.input.b} theta={p.input.theta} cueBallId={p.cueBallId} disabled={locked} onChange={p.onSpin} onElevation={p.onElevation} />
                 <PowerControl V0={p.input.V0} disabled={locked} onChange={p.onPower} />
                 {p.phase === "finished" ? (
                     <button

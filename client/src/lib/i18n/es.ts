@@ -1940,5 +1940,7 @@ const es: Dict = {
   "sim.solver.cushion.top": "banda superior",
   "sim.solver.applied": "Solución aplicada. Toca Tirar para probarla",
   "sim.solver.practiceOnly": "Las soluciones solo están disponibles en práctica y ejercicios",
+  "sim.controls.elevation": "Taco {deg}°",
+  "sim.controls.elevationLabel": "Elevación del taco (toca para 0·10·20·30·45°)",
 };
 export default es;

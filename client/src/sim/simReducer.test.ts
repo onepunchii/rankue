@@ -53,7 +53,7 @@ describe("헬퍼", () => {
         expect(clampPower(12)).toBe(V0_MAX);
         expect(clampPower(0)).toBe(V0_MIN);
         expect(clampPower(Number.NaN)).toBe(V0_DEFAULT);
-        expect(clampElevation(1)).toBe(THETA_MAX);
+        expect(clampElevation(2)).toBe(THETA_MAX);
         expect(clampElevation(-0.1)).toBe(0);
     });
     it("당점 클램프: 링 밖은 같은 방향으로 링 위, strike 의 경계 조건을 만족", () => {

@@ -1940,5 +1940,7 @@ const en: Dict = {
   "sim.solver.cushion.top": "top cushion",
   "sim.solver.applied": "Solution applied. Tap Shoot to try it",
   "sim.solver.practiceOnly": "Solutions are available in practice and drills only",
+  "sim.controls.elevation": "Cue {deg}°",
+  "sim.controls.elevationLabel": "Cue elevation (tap to cycle 0·10·20·30·45°)",
 };
 export default en;

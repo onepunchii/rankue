@@ -42,7 +42,8 @@ export const V0_DEFAULT = 2.5;
 export const V0_MIN = 0.2;
 export const V0_MAX = 9;
 /** 큐 들림각 상한 (rad). README: v2.0 은 고급 패널에서 0~20°. */
-export const THETA_MAX = (20 * Math.PI) / 180;
+// 큐 각 상한. 엔진 v2.2 가 공중·착지를 풀어 마세이(30°+)·점프(35°+)가 실제로 나온다. 서버는 1.2 rad 까지 받는다.
+export const THETA_MAX = (60 * Math.PI) / 180;
 /** 샷 재전송 시도 상한. 넘으면 이 세션은 더 기록하지 않는다(offline). 대전에선 다음 폴링 성공 때 다시 시도한다. */
 export const MAX_RETRIES = 3;
 /** 미스큐 경계 안쪽 여유. strike 는 a²+b² ≤ max² 를 요구하므로 스케일링 반올림이 경계를 넘지 않게 한다. */

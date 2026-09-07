@@ -1940,5 +1940,7 @@ const vi: Dict = {
   "sim.solver.cushion.top": "băng trên",
   "sim.solver.applied": "Đã áp dụng lời giải. Nhấn Đánh để thử",
   "sim.solver.practiceOnly": "Tìm lời giải chỉ dùng được ở chế độ luyện tập và bài tập",
+  "sim.controls.elevation": "Cơ {deg}°",
+  "sim.controls.elevationLabel": "Góc cơ (chạm để đổi 0·10·20·30·45°)",
 };
 export default vi;

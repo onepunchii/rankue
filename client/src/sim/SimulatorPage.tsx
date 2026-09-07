@@ -512,6 +512,7 @@ export function SimulatorPage() {
     }, [actions, active?.step]);
     const onNudge = useCallback((dir: -1 | 1) => actions.nudgePhi(dir * FINE_STEP_RAD), [actions]);
     const onSpin = useCallback((a: number, b: number) => actions.setSpin(a, b), [actions]);
+    const onElevation = useCallback((theta: number) => actions.setElevation(theta), [actions]);
     const onPower = useCallback((V0: number) => actions.setPower(V0), [actions]);
     const onShoot = useCallback(() => { void actions.shoot(); }, [actions]);
     const onUndo = useCallback(() => { actions.undo(); setLog(popShot); setBanner(null); }, [actions]);
@@ -797,7 +798,7 @@ export function SimulatorPage() {
                     phase={sim.phase} canUndo={sim.canUndo} input={sim.input} cueBallId={sim.cueBallId}
                     active={active} side={side}
                     onThickness={onThickness} onSide={onSide} onNudge={onNudge}
-                    onSpin={onSpin} onPower={onPower} onShoot={onShoot} onRestart={onRestart}
+                    onSpin={onSpin} onElevation={onElevation} onPower={onPower} onShoot={onShoot} onRestart={onRestart}
                     onUndo={onUndo} onInnings={onInnings} onExit={onExitRequest}
                     onSolve={solverAllowed ? openSolver : undefined}
                 />

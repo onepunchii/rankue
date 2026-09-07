@@ -1,7 +1,7 @@
 import { memo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { padOffsetFor, spinFromPad } from "../controlsMath";
+import { padOffsetFor, spinFromPad, elevationDeg, nextElevationRad } from "../controlsMath";
 import { DEFAULT_CUE } from "@shared/sim/params";
 
 // 당점 패드. 큐볼 크기의 원(지름 PAD px) 안에서 누르거나 끌어 (a, b) 를 고른다.
@@ -15,6 +15,9 @@ const DOUBLE_TAP_MS = 300;
 const DOUBLE_TAP_MOVE_PX = 8;
 
 interface Props {
+    /** 큐 각(rad). 라벨 옆 버튼을 탭하면 단계가 돈다(0·10·20·30·45°). */
+    theta?: number;
+    onElevation?: (theta: number) => void;
     a: number;
     b: number;
     cueBallId: "white" | "yellow";
@@ -33,7 +36,7 @@ export function spinLabel(a: number, b: number, t: (key: string) => string): str
     return parts.join(" · ");
 }
 
-export const SpinPad = memo(function SpinPad({ a, b, cueBallId, disabled, onChange }: Props) {
+export const SpinPad = memo(function SpinPad({ a, b, cueBallId, disabled, onChange, theta = 0, onElevation }: Props) {
     const { t } = useT();
     const pointerRef = useRef<number | null>(null);
     const lastTapRef = useRef<{ at: number; x: number; y: number } | null>(null);
@@ -105,6 +108,20 @@ export const SpinPad = memo(function SpinPad({ a, b, cueBallId, disabled, onChan
                 <span className="font-medium text-ink-3">{t("sim.controls.spin")}</span>
                 <span className="rk-num font-semibold text-ink-2 ml-1">{spinLabel(a, b, t)}</span>
             </span>
+            {onElevation && (
+                <button
+                    type="button"
+                    onClick={() => onElevation(nextElevationRad(theta))}
+                    disabled={disabled}
+                    aria-label={t("sim.controls.elevationLabel")}
+                    className={cn(
+                        "h-8 px-2.5 rounded-pill border text-[12px] font-semibold rk-num disabled:opacity-40",
+                        elevationDeg(theta) > 0 ? "border-brand/40 bg-brand/[0.06] text-brand" : "border-surface-line bg-surface-1 text-ink-3",
+                    )}
+                >
+                    {t("sim.controls.elevation").replace("{deg}", String(elevationDeg(theta)))}
+                </button>
+            )}
         </div>
     );
 });
