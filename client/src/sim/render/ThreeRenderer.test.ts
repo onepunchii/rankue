@@ -234,9 +234,11 @@ describe("playerPose — 큐볼 뒤 −phi 에 서서 큐볼 앞 +phi 를 본다
                 expect(dx * Math.cos(phi) + dy * Math.sin(phi)).toBeGreaterThan(0.4);
             }
         }
-        const corner = playerPose(makePose(), T, T.ball.R, T.ball.R, Math.PI / 4);
+        // 코너에서 +x 로 조준(phi=0)하면 눈은 x 축으로 PLAYER_BACK 만큼 뒤 → 여유(−0.5) 에 클램프된다
+        const corner = playerPose(makePose(), T, T.ball.R, T.ball.R, 0);
         expect(corner.ex).toBe(-PLAYER_MARGIN);
-        expect(corner.ey).toBe(-PLAYER_MARGIN);
+        const cornerY = playerPose(makePose(), T, T.ball.R, T.ball.R, Math.PI / 2);
+        expect(cornerY.ey).toBe(-PLAYER_MARGIN);
     });
 });
 
@@ -371,8 +373,9 @@ describe("unprojectPerspective — 평면 z=R 위 왕복 · 빗나간 광선", (
             expect(y).toBeGreaterThanOrEqual(0);
             expect(y).toBeLessThanOrEqual(T.length);
         }
-        // 위쪽 가운데는 먼 쪽(+y) 끝으로
-        expect(unprojectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, 195, 0, T.ball.R, T)[1]).toBe(T.length);
+        // 위쪽 가운데는 먼 쪽(+y) 끝 근처(카메라가 숙여져 화면 위가 먼 레일 언저리에 닿는다), 화면 밖 위는 끝으로 클램프
+        expect(unprojectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, 195, 0, T.ball.R, T)[1]).toBeGreaterThan(T.length * 0.85);
+        expect(unprojectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, 195, -100, T.ball.R, T)[1]).toBe(T.length);
     });
 });
 

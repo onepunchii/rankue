@@ -20,8 +20,8 @@
  *  - 컨텍스트 손실: three 가 preventDefault 하고 복구 때 GL 자원을 다시 올린다. 여기서는 횟수를 세어 onContextLost 를
  *    알리고(페이지가 CONTEXT_LOSS_LIMIT 회면 Canvas2D 로 교체), 복구 직후 마지막 프레임을 다시 그린다.
  *  - 레터박스(캔버스 밖)는 alpha:false 라 투명일 수 없어 마운트 배경색(surface-3 를 surface-1 위에 합성)으로 지운다.
- *  - 선수 시점(setView("player")): 원근 카메라(세로 fov 50°, 컨테이너 비율 — 레터박스 없이 캔버스 전체가 뷰)가 큐볼 뒤 −phi 쪽
- *    0.9 m·높이 0.55 m 에 서서 큐볼 앞 0.6 m 를 본다(threeMath.playerPose — 테이블 밖 0.5 m·최저 0.25 m 클램프, up=+z).
+ *  - 선수 시점(setView("player")): 원근 카메라(세로 fov 45°, 컨테이너 비율 — 레터박스 없이 캔버스 전체가 뷰)가 큐볼 뒤 −phi 쪽
+ *    0.7 m·높이 0.9 m 에 서서 큐볼 앞 0.35 m 를 본다(threeMath.playerPose — 테이블 밖 0.5 m·최저 0.25 m 클램프, up=+z).
  *    프레임의 view {cueBallId, phi} 가 있을 때만 목표를 갱신하고(재생 중엔 페이지가 빼서 카메라가 멈춰 있다), 임계 감쇠
  *    스프링(dampRig, 0.12 s)으로 옮긴다 — 움직이는 동안 needsFrame() 이 true 라 페이지가 다음 프레임도 그린다.
  *    project/unproject 는 같은 자세로 CPU 원근 투영(projectPerspective — 카메라 뒤는 near 깊이로 클램프해 유한) ·
@@ -32,8 +32,7 @@ import {
     BufferGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DirectionalLight, ExtrudeGeometry,
     Float32BufferAttribute, Group, HemisphereLight, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial,
     MeshStandardMaterial, OrthographicCamera, Path, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Quaternion, RingGeometry,
-    Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer,
-} from "three";
+    Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, BoxGeometry } from "three";
 import type { BallState } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
 import type { RenderFrame, Renderer, RendererView, SafeInsets, Viewport } from "./Renderer";
@@ -86,6 +85,11 @@ const FELT_EDGE = "#0B5D3B";
 const FELT_VIGNETTE = "rgba(0, 0, 0, 0.38)";
 const RAIL_WOOD = 0x5a3a22;
 const RAIL_WOOD_EDGE = 0x3e2716;
+/** 테이블 몸체(에이프런) 높이와 바닥 크기 — 플레이어 뷰에서 테이블 너머가 빈 배경으로 보이지 않게(2026-09-07 실측) */
+const APRON_H = 0.72;
+const APRON_COLOR = 0x2f1d10;
+const FLOOR_SIZE = 40;
+const FLOOR_COLOR = 0x2b2926;
 const RAIL_NOSE_ALPHA = 0.45;
 const DIAMOND: RGBA = [240, 233, 214, 1];
 const SPOT_ALPHA = 0.14;
@@ -270,6 +274,8 @@ export class ThreeRenderer implements Renderer {
     // 거칠기를 높게: 수직에 가까운 램프의 넓은 정반사가 상판을 뿌옇게 밝히지 않도록(실측: b 채널 +15). 나무 리터럴 톤 유지.
     private readonly railMat = new MeshStandardMaterial({ color: RAIL_WOOD, roughness: 0.9, metalness: 0 });
     private readonly plinthMat = new MeshStandardMaterial({ color: RAIL_WOOD_EDGE, roughness: 0.9, metalness: 0 });
+    private readonly apronMat = new MeshStandardMaterial({ color: APRON_COLOR, roughness: 0.95, metalness: 0 });
+    private readonly floorMat = new MeshStandardMaterial({ color: FLOOR_COLOR, roughness: 1, metalness: 0 });
     private readonly noseMat = new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: RAIL_NOSE_ALPHA, depthWrite: false });
     private readonly diamondMat = new MeshBasicMaterial();
     private readonly spotMat = new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: SPOT_ALPHA, depthWrite: false });
@@ -277,6 +283,8 @@ export class ThreeRenderer implements Renderer {
     private cloth: Mesh | null = null;
     private clothTex: CanvasTexture | null = null;
     private rail: Mesh | null = null;
+    private apron: Mesh | null = null;
+    private floor: Mesh | null = null;
     private plinth: Mesh | null = null;
     private nose: Mesh | null = null;
     private readonly diamonds: InstancedMesh;
@@ -465,6 +473,8 @@ export class ThreeRenderer implements Renderer {
         this.clothMat.dispose();
         this.railMat.dispose();
         this.plinthMat.dispose();
+        this.apronMat.dispose();
+        this.floorMat.dispose();
         this.noseMat.dispose();
         this.diamondMat.dispose();
         this.spotMat.dispose();
@@ -830,7 +840,17 @@ export class ThreeRenderer implements Renderer {
         plinth.frustumCulled = false;
         this.plinth = plinth;
 
-        this.tableGroup.add(plinth, rail, cloth);
+        // 몸체(에이프런)와 바닥 — 탑다운에선 라사·레일에 가려 보이지 않고, 플레이어 뷰에서 테이블 너머를 채운다
+        const apron = new Mesh(new BoxGeometry(w + 2 * po, l + 2 * po, APRON_H), this.apronMat);
+        apron.position.set(cx, cy, -PLINTH_DEPTH - 0.002 - APRON_H / 2);
+        apron.frustumCulled = false;
+        this.apron = apron;
+        const floor = new Mesh(new PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE), this.floorMat);
+        floor.position.set(cx, cy, -PLINTH_DEPTH - 0.002 - APRON_H - 0.001);
+        floor.frustumCulled = false;
+        this.floor = floor;
+
+        this.tableGroup.add(floor, apron, plinth, rail, cloth);
 
         // 램프: 테이블 중심 기준
         this.sun.position.set(cx + SUN_OFFSET[0], cy + SUN_OFFSET[1], SUN_OFFSET[2]);
@@ -850,6 +870,16 @@ export class ThreeRenderer implements Renderer {
     }
 
     private disposeTable(): void {
+        if (this.apron) {
+            this.tableGroup.remove(this.apron);
+            this.apron.geometry.dispose();
+            this.apron = null;
+        }
+        if (this.floor) {
+            this.tableGroup.remove(this.floor);
+            this.floor.geometry.dispose();
+            this.floor = null;
+        }
         if (this.cloth) {
             this.tableGroup.remove(this.cloth);
             this.cloth.geometry.dispose();

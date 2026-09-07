@@ -130,13 +130,13 @@ export function diamondWorld(table: TableSpec): readonly DiamondWorld[] {
 
 // ── 선수 시점 카메라(원근) ───────────────────────────────────────────────
 /** 세로 시야각(°). 세로 화면에서는 가로 시야가 2·atan(tan(25°)·aspect) 로 좁아진다(폰 ≈ 40°). */
-export const PLAYER_FOV_DEG = 50;
+export const PLAYER_FOV_DEG = 45;
 export const PLAYER_NEAR = 0.05;
 export const PLAYER_FAR = 20;
 /** 눈 위치: 큐볼 뒤(−phi) 거리·높이(m). 시선 목표: 큐볼 앞(+phi) 거리(m), 높이는 공 중심(R). */
-export const PLAYER_BACK = 0.9;
-export const PLAYER_HEIGHT = 0.55;
-export const PLAYER_AHEAD = 0.6;
+export const PLAYER_BACK = 0.7;
+export const PLAYER_HEIGHT = 0.9;    // 실측(2026-09-07): 0.55 면 화면 위 40% 가 빈 배경 — 더 높이서 더 숙여 본다
+export const PLAYER_AHEAD = 0.35;
 /** 눈이 플레이 면 밖으로 나갈 수 있는 여유(m) — 큐볼이 쿠션에 붙어도 눈은 이 안에 선다. */
 export const PLAYER_MARGIN = 0.5;
 /** 눈의 최저 높이(m). */
@@ -258,7 +258,8 @@ export function unprojectPerspective(
     const dy = b.xy * cx + b.yy * cy - b.zy;
     const dz = b.xz * cx + b.yz * cy - b.zz;
     const s = (planeZ - p.ez) / dz;
-    if (s > 0 && Number.isFinite(s)) return [p.ex + dx * s, p.ey + dy * s];
+    // 평면과 만나도 테이블 밖(먼 레일 너머 등)이면 테이블 안으로 클램프 — 드래그 조준·공 배치 모두 테이블 안 점만 다룬다
+    if (s > 0 && Number.isFinite(s)) return [clamp(p.ex + dx * s, 0, table.width), clamp(p.ey + dy * s, 0, table.length)];
     const hl = Math.sqrt(dx * dx + dy * dy);
     let fx = p.ex, fy = p.ey;
     if (hl > 1e-12) { fx += (dx / hl) * MISS_FAR; fy += (dy / hl) * MISS_FAR; }
