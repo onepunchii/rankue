@@ -382,3 +382,254 @@ describe("createSimStore", () => {
         expect(calls).toEqual(["a", "b", "b"]);
     });
 });
+
+/* ------------------------------------------------------------------ 네트워크 대전(mode="match") */
+
+import { cueBallIdOf, matchStateFrom, sameBalls, sameMatchMeta } from "./simReducer";
+import type { MatchPublic } from "./matchApi";
+
+const matchSession = (target = 20): SessionState => createSession({
+    rules: DEFAULT_3C_RULES,
+    players: [{ id: "host-uuid", target, cueBallId: "white" }, { id: "guest-uuid", target, cueBallId: "yellow" }],
+});
+
+function publicMatch(over: Partial<MatchPublic> = {}): MatchPublic {
+    return {
+        id: "m-1", code: "123456", status: "playing",
+        gameType: "3c", tableId: "DAEDAE", cushionModel: "han2005", condition: 1,
+        rules: DEFAULT_3C_RULES, finishType: "none", inningCap: 0,
+        hostName: "호스트", guestName: "게스트", hostTarget: 20, guestTarget: 20,
+        myIndex: 0, turn: 0, shots: 0, version: 1,
+        state: matchSession(), balls: balls3,
+        winnerIndex: null, endReason: null, engineVersion: "2.1.0", paramsHash: "0".repeat(16),
+        createdAt: "2026-09-07T00:00:00.000Z", startedAt: "2026-09-07T00:01:00.000Z", lastShotAt: null, finishedAt: null,
+        claimableAt: "2026-09-09T00:01:00.000Z",
+        ...over,
+    };
+}
+
+function startMatch(myIndex: 0 | 1, m: MatchPublic = publicMatch(), sess: SessionState = m.state!): SimCoreState {
+    return simReducer(INITIAL_STATE, { type: "startMatch", match: matchStateFrom(m, myIndex), session: sess, balls: m.balls!, shots: m.shots });
+}
+
+/** 상대(또는 다른 기기)의 샷을 따라잡기 재생으로 넣는다. */
+function replay(s: SimCoreState, outcome: ShotOutcome, playerIndex: number, mismatch = false, dy = 0.1): SimCoreState {
+    const applied = applyShot(s.session!, outcome);
+    const cue = s.session!.players[playerIndex].cueBallId;
+    return simReducer(s, { type: "replayShot", input: { ...input, cueBallId: cue }, final: shifted(s.balls, dy), session: applied.session, outcome: applied.outcome, playerIndex, mismatch });
+}
+
+describe("대전: 메타 헬퍼", () => {
+    it("matchStateFrom: 내 자리에 따라 내 이름·상대 이름, sameMatchMeta 는 필드 비교", () => {
+        const m = publicMatch();
+        const host = matchStateFrom(m, 0);
+        expect(host).toEqual({ matchId: "m-1", myIndex: 0, version: 1, myName: "호스트", opponentName: "게스트", turn: 0, status: "playing", claimableAt: m.claimableAt, endReason: null, winnerIndex: null });
+        const guest = matchStateFrom(m, 1);
+        expect(guest.myName).toBe("게스트");
+        expect(guest.opponentName).toBe("호스트");
+        expect(sameMatchMeta(host, matchStateFrom(m, 0))).toBe(true);
+        expect(sameMatchMeta(host, matchStateFrom({ ...m, version: 2 }, 0))).toBe(false);
+    });
+    it("sameBalls: 순서·id·위치(허용 오차)", () => {
+        expect(sameBalls(balls3, balls3.map((b) => ({ ...b })))).toBe(true);
+        expect(sameBalls(balls3, shifted(balls3, 1e-12))).toBe(true);
+        expect(sameBalls(balls3, shifted(balls3, 1e-6))).toBe(false);
+        expect(sameBalls(balls3, balls3.slice(1))).toBe(false);
+        expect(sameBalls(balls3, [balls3[1], balls3[0], balls3[2]])).toBe(false);
+    });
+});
+
+describe("대전: 시작과 잠금", () => {
+    it("호스트(내 차례) → aim, 게스트(상대 차례) → waiting. record 는 항상 true, idx 는 서버 샷 수", () => {
+        const host = startMatch(0);
+        expect(host.mode).toBe("match");
+        expect(host.phase).toBe("aim");
+        expect(host.record).toBe(true);
+        expect(host.match!.myIndex).toBe(0);
+        expect(host.input.phi).toBeCloseTo(defaultPhi(balls3, "white", "3c"), 12);
+        const guest = startMatch(1);
+        expect(guest.phase).toBe("waiting");
+        expect(guest.match!.opponentName).toBe("호스트");
+        const later = startMatch(1, publicMatch({ shots: 7, turn: 1, state: { ...matchSession(), turn: 1 } }));
+        expect(later.phase).toBe("aim");
+        expect(later.shotIdx).toBe(7);
+        expect(cueBallIdOf(later.session)).toBe("yellow");
+    });
+    it("끝난 대전으로 시작하면 finished(기권으로 끝나 세션은 playing 이어도)", () => {
+        const s = startMatch(0, publicMatch({ status: "finished", winnerIndex: 1, endReason: "resign" }));
+        expect(s.phase).toBe("finished");
+        expect(s.session!.status).toBe("finished");
+        expect(s.session!.winnerIndex).toBe(1);
+    });
+    it("waiting 에선 입력·샷이 잠기고, 되돌리기·배치·다시하기는 대전에 없다", () => {
+        const g = startMatch(1);
+        expect(simReducer(g, { type: "setInput", patch: { V0: 3 } })).toBe(g);
+        expect(shoot(g, MISS)).toBe(g);
+        const h = simReducer(shoot(startMatch(0), MISS), { type: "playbackEnd" });
+        expect(simReducer(h, { type: "undo" })).toBe(h);
+        expect(simReducer(h, { type: "placeBall", id: "red", x: 0.5, y: 1.0, table })).toBe(h);
+        expect(simReducer(h, { type: "restart", session: matchSession(), balls: balls3 })).toBe(h);
+        // 솔로 전용 서버 액션은 무시
+        expect(simReducer(h, { type: "serverSession", id: "srv" })).toBe(h);
+        expect(simReducer(h, { type: "serverUnavailable" })).toBe(h);
+        expect(simReducer(h, { type: "serverAck", idx: 0, mismatch: true, final: balls3, session: h.session! })).toBe(h);
+        expect(simReducer(h, { type: "serverFail", idx: 0, input, clientHash: "x", retryable: true })).toBe(h);
+    });
+    it("내 샷: 이닝을 넘기면 재생 뒤 waiting, 득점이면 aim 으로 이어 친다", () => {
+        const s = startMatch(0);
+        const miss = simReducer(shoot(s, MISS), { type: "playbackEnd" });
+        expect(miss.phase).toBe("waiting");
+        expect(miss.replayOf).toBeNull();
+        expect(miss.shotIdx).toBe(1);
+        const point = simReducer(shoot(s, POINT), { type: "playbackEnd" });
+        expect(point.phase).toBe("aim");
+        expect(point.input.phi).toBeCloseTo(defaultPhi(point.balls, "white", "3c"), 12);
+    });
+});
+
+describe("대전: 따라잡기 재생", () => {
+    it("waiting → replayShot(상대) → shooting(replayOf=상대) → playbackEnd → 내 차례면 aim", () => {
+        const g = startMatch(1);
+        const r = replay(g, MISS, 0);
+        expect(r.phase).toBe("shooting");
+        expect(r.replayOf).toBe(0);
+        expect(r.shotIdx).toBe(1);
+        expect(r.session!.turn).toBe(1);
+        expect(r.outcomeLast!.code).toBe("miss-cushions");
+        const u = simReducer(r, { type: "playbackEnd" });
+        expect(u.phase).toBe("aim");
+        expect(u.replayOf).toBeNull();
+        expect(u.input.phi).toBeCloseTo(defaultPhi(u.balls, "yellow", "3c"), 12);
+        expect(simReducer(u, { type: "setInput", patch: { V0: 3 } }).input.V0).toBe(3);
+    });
+    it("상대가 득점하면 재생 뒤에도 waiting", () => {
+        const u = simReducer(replay(startMatch(1), POINT, 0), { type: "playbackEnd" });
+        expect(u.phase).toBe("waiting");
+        expect(u.session!.players[0].score).toBe(1);
+    });
+    it("상대의 결승 샷 → 재생 뒤 finished(승자 상대)", () => {
+        const g = startMatch(1, publicMatch({ state: matchSession(1) }));
+        const u = simReducer(replay(g, POINT, 0), { type: "playbackEnd" });
+        expect(u.phase).toBe("finished");
+        expect(u.session!.winnerIndex).toBe(0);
+    });
+    it("해시 불일치는 누적 카운트에 들어가고, 재생 중·setup·솔로에선 무시", () => {
+        const g = startMatch(1);
+        const r = replay(g, MISS, 0, true);
+        expect(r.mismatches).toBe(1);
+        expect(replay(r, MISS, 1)).toBe(r);                                  // shooting
+        expect(simReducer(INITIAL_STATE, { type: "replayShot", input, final: balls3, session: matchSession(), outcome: MISS, playerIndex: 0, mismatch: false })).toBe(INITIAL_STATE);
+        const solo = started();
+        expect(simReducer(solo, { type: "replayShot", input, final: balls3, session: solo.session!, outcome: MISS, playerIndex: 0, mismatch: false })).toBe(solo);
+    });
+    it("aim 에서도(다시 맞춘 뒤 놓친 샷) 재생을 시작할 수 있다", () => {
+        const h = startMatch(0);
+        const r = replay(h, MISS, 0);        // 다른 기기에서 친 내 샷
+        expect(r.phase).toBe("shooting");
+        expect(r.replayOf).toBe(0);
+        expect(simReducer(r, { type: "playbackEnd" }).phase).toBe("waiting");
+    });
+});
+
+describe("대전: 서버 메타·스냅", () => {
+    it("matchSync: 같은 메타면 같은 참조, 바뀌면 갱신하고 offline 을 푼다", () => {
+        const g = startMatch(1);
+        const same = simReducer(g, { type: "matchSync", match: matchStateFrom(publicMatch(), 1) });
+        expect(same).toBe(g);
+        const v2 = simReducer(g, { type: "matchSync", match: matchStateFrom(publicMatch({ version: 2, claimableAt: "2026-09-10T00:00:00.000Z" }), 1) });
+        expect(v2.match!.version).toBe(2);
+        expect(v2.phase).toBe("waiting");
+        expect(v2.balls).toBe(g.balls);
+    });
+    it("matchSync: 서버가 끝냈으면(기권·무응답) 세션도 finished + 승자, 단계 finished", () => {
+        const g = startMatch(1);
+        const fin = simReducer(g, { type: "matchSync", match: matchStateFrom(publicMatch({ status: "finished", winnerIndex: 1, endReason: "resign", claimableAt: null }), 1) });
+        expect(fin.phase).toBe("finished");
+        expect(fin.session!.status).toBe("finished");
+        expect(fin.session!.winnerIndex).toBe(1);
+        expect(fin.match!.endReason).toBe("resign");
+        // 재생 중이면 단계는 그대로, playbackEnd 에서 finished
+        const r = replay(startMatch(1), MISS, 0);
+        const during = simReducer(r, { type: "matchSync", match: matchStateFrom(publicMatch({ status: "finished", winnerIndex: 0, endReason: "claim" }), 1) });
+        expect(during.phase).toBe("shooting");
+        expect(simReducer(during, { type: "playbackEnd" }).phase).toBe("finished");
+    });
+    it("matchSnap: 공·세션·샷 수를 서버로, 큐·pendingSnap 은 버리고, mismatch 면 +1, 단계는 차례로", () => {
+        let s = simReducer(shoot(startMatch(0), MISS), { type: "playbackEnd" });        // 내 샷 뒤 waiting, idx 1
+        s = simReducer(s, { type: "matchShotFail", idx: 0, input, clientHash: "h".repeat(16) });
+        expect(s.queue).toHaveLength(1);
+        const serverBalls = shifted(balls3, 0.5);
+        const serverState = { ...matchSession(), turn: 0, shotCount: 2 };
+        const snapped = simReducer(s, { type: "matchSnap", match: matchStateFrom(publicMatch({ shots: 2, version: 3 }), 0), session: serverState, balls: serverBalls, shots: 2, mismatch: true });
+        expect(snapped.phase).toBe("aim");
+        expect(snapped.balls).toBe(serverBalls);
+        expect(snapped.session).toBe(serverState);
+        expect(snapped.shotIdx).toBe(2);
+        expect(snapped.queue).toEqual([]);
+        expect(snapped.offline).toBe(false);
+        expect(snapped.mismatches).toBe(1);
+        expect(snapped.input.phi).toBeCloseTo(defaultPhi(serverBalls, "white", "3c"), 12);
+        // 재생 중 스냅: 값은 바꾸되 단계는 shooting 유지, playbackEnd 가 정리
+        const r = replay(startMatch(1), MISS, 0);
+        const rs = simReducer(r, { type: "matchSnap", match: matchStateFrom(publicMatch({ shots: 1, turn: 1 }), 1), session: { ...matchSession(), turn: 1 }, balls: serverBalls, shots: 1, mismatch: false });
+        expect(rs.phase).toBe("shooting");
+        const end = simReducer(rs, { type: "playbackEnd" });
+        expect(end.phase).toBe("aim");
+        expect(end.balls).toBe(serverBalls);
+        const solo = started();
+        expect(simReducer(solo, { type: "matchSnap", match: matchStateFrom(publicMatch(), 0), session: serverState, balls: serverBalls, shots: 2, mismatch: false })).toBe(solo);
+    });
+});
+
+describe("대전: 내 샷 응답과 재전송", () => {
+    const meta = (over: Partial<MatchPublic> = {}) => matchStateFrom(publicMatch({ version: 2, ...over }), 0);
+    it("일치 응답: 큐에서 빼고 메타만(공·세션 유지)", () => {
+        const t = shoot(startMatch(0), MISS);
+        const u = simReducer(t, { type: "matchShotAck", idx: 0, match: meta({ turn: 1 }), mismatch: false, final: null, session: null });
+        expect(u.balls).toBe(t.balls);
+        expect(u.session).toBe(t.session);
+        expect(u.match!.turn).toBe(1);
+        expect(u.phase).toBe("shooting");
+        expect(simReducer(u, { type: "playbackEnd" }).phase).toBe("waiting");
+    });
+    it("미스매치 응답: 재생 중이면 pendingSnap, 재생 끝에 서버 상태로 + 단계는 서버 차례 기준", () => {
+        const s = startMatch(0);
+        const t = shoot(s, MISS, 0.1);
+        const serverFinal = shifted(balls3, 0.4);
+        const serverSession = applyShot(s.session!, POINT).session;     // 서버는 득점으로 봤다 → 내 차례 유지
+        const u = simReducer(t, { type: "matchShotAck", idx: 0, match: meta({ turn: 0 }), mismatch: true, final: serverFinal, session: serverSession, outcome: POINT });
+        expect(u.pendingSnap).not.toBeNull();
+        expect(u.mismatches).toBe(1);
+        const v = simReducer(u, { type: "playbackEnd" });
+        expect(v.balls).toBe(serverFinal);
+        expect(v.session).toBe(serverSession);
+        expect(v.outcomeLast).toBe(POINT);
+        expect(v.phase).toBe("aim");
+    });
+    it("응답이 끝을 알리면(목표 도달) finished", () => {
+        const s = startMatch(0, publicMatch({ state: matchSession(1) }));
+        const t = shoot(s, POINT);
+        const u = simReducer(t, { type: "matchShotAck", idx: 0, match: meta({ status: "finished", winnerIndex: 0, endReason: "target" }), mismatch: false, final: null, session: null });
+        expect(simReducer(u, { type: "playbackEnd" }).phase).toBe("finished");
+    });
+    it(`네트워크 실패: 큐에 남기고 tries 를 세다 ${MAX_RETRIES}번째에 offline — 항목은 버리지 않는다; 폴링 성공(matchSync)이 풀어 준다`, () => {
+        let s = simReducer(shoot(startMatch(0), MISS), { type: "playbackEnd" });
+        const fail = (x: SimCoreState) => simReducer(x, { type: "matchShotFail", idx: 0, input, clientHash: "h".repeat(16) });
+        s = fail(s);
+        expect(s.queue).toEqual([{ idx: 0, input, clientHash: "h".repeat(16), tries: 1 }]);
+        expect(s.offline).toBe(false);
+        s = fail(fail(s));
+        expect(s.queue[0].tries).toBe(3);
+        expect(s.offline).toBe(true);
+        // offline 이어도 다음 샷은 큐에 들어간다(연결이 돌아오면 순서대로 나간다)
+        const q = simReducer(s, { type: "queueShot", idx: 1, input, clientHash: "i".repeat(16) });
+        expect(q.queue.map((e) => e.idx)).toEqual([0, 1]);
+        // 폴링 성공 → offline 해제 + tries 0
+        const back = simReducer(q, { type: "matchSync", match: meta() });
+        expect(back.offline).toBe(false);
+        expect(back.queue.map((e) => e.tries)).toEqual([0, 0]);
+        // 응답 도착 → 큐에서 제거
+        const acked = simReducer(back, { type: "matchShotAck", idx: 0, match: meta({ turn: 1 }), mismatch: false, final: null, session: null });
+        expect(acked.queue.map((e) => e.idx)).toEqual([1]);
+    });
+});

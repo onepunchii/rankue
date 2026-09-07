@@ -1,0 +1,462 @@
+/**
+ * server/routes/modules/simMatch.ts 의 타입 클라이언트 — 네트워크 대전 A(비동기 2인, 폴링).
+ * 요청·응답 모양은 서버 파일이 정본이며 여기서는 그것을 그대로 옮긴다(publicMatch() ↔ MatchPublic).
+ *
+ *  - 순수 부분(테스트 대상): URL, 요청 본문 매핑, 응답 검증, 오류 분류, 대전 행에서 파생하는 값(내 차례·상대 이름·승패·설정).
+ *  - 네트워크: createMatchApi(request) 에 주입한다. 기본 인스턴스 matchApi 는 @/lib/queryClient 의 apiRequest 를 쓴다
+ *    ({success,data} 언랩·쿠키 인증·JSON 직렬화는 apiRequest 가 맡는다).
+ *  - 샷 본문은 simApi.toShotBody 와 같다(입력 숫자를 손대지 않는다 — 서버 재시뮬 해시와 비트 단위로 맞아야 한다).
+ *
+ * 실전 경기 API(/api/hiq/game/*)는 절대 부르지 않는다 — 시뮬 대전 성적은 hiqSimRatings 에만 쓰이고 RP 와 분리돼 있다.
+ */
+import type { BallState, ShotInput, SimEvent, Snapshot } from "@shared/sim/types";
+import type { CushionModelId, TableSpec } from "@shared/sim/params";
+import type { FinishType, GameType, Rules, SessionState, ShotOutcome } from "@shared/sim/rules";
+import type { SimSetupConfig } from "./setupPresets";
+import {
+    SIM_API_BASE, classifyApiError, isBallArray, isSessionState, toShotBody,
+    type ApiFailure, type RequestFn, type ShotRequest,
+} from "./simApi";
+import { apiRequest } from "@/lib/queryClient";
+
+/* ------------------------------------------------------------------ URL */
+
+export function matchesUrl(): string {
+    return `${SIM_API_BASE}/matches`;
+}
+export function matchUrl(id: string): string {
+    return `${SIM_API_BASE}/matches/${encodeURIComponent(id)}`;
+}
+export function matchCodeUrl(code: string): string {
+    return `${SIM_API_BASE}/matches/code/${encodeURIComponent(code)}`;
+}
+export function matchJoinUrl(code: string): string {
+    return `${matchCodeUrl(code)}/join`;
+}
+export function matchShotsUrl(id: string, from?: number): string {
+    const base = `${matchUrl(id)}/shots`;
+    return from !== undefined && from > 0 ? `${base}?from=${Math.floor(from)}` : base;
+}
+export function matchResignUrl(id: string): string {
+    return `${matchUrl(id)}/resign`;
+}
+export function matchClaimUrl(id: string): string {
+    return `${matchUrl(id)}/claim`;
+}
+
+/* ------------------------------------------------------------------ 타입 (publicMatch / shots / post 응답) */
+
+export type MatchStatus = "waiting" | "playing" | "finished" | "canceled";
+/** finished 사유. target 목표 도달 · inningCap 이닝 상한 · resign 기권 · claim 무응답 승리 */
+export type MatchEndReason = "target" | "inningCap" | "resign" | "claim";
+export type PlayerIndex = 0 | 1;
+
+/** 참가 코드 자릿수(서버 randomCode). */
+export const MATCH_CODE_LENGTH = 6;
+
+/** GET/POST 응답의 대전 행(publicMatch). 상대 회원 id 는 오지 않고 이름만 온다. 날짜는 ISO 문자열. */
+export interface MatchPublic {
+    readonly id: string;
+    readonly code: string;
+    readonly status: MatchStatus;
+    readonly gameType: GameType;
+    readonly tableId: TableSpec["id"];
+    readonly cushionModel: CushionModelId;
+    readonly condition: number;
+    readonly rules: Rules;
+    readonly finishType: FinishType;
+    readonly inningCap: number;
+    readonly hostName: string;
+    readonly guestName: string | null;
+    readonly hostTarget: number;
+    /** 게스트 다마수. 참가 전엔 null */
+    readonly guestTarget: number | null;
+    /** 보는 사람의 자리. 0 = 호스트(흰 공), 1 = 게스트(노란 공), -1 = 참가자 아님(코드 조회 화면) */
+    readonly myIndex: -1 | PlayerIndex;
+    readonly turn: number;
+    /** 기록된 샷 수 = 다음 샷의 idx */
+    readonly shots: number;
+    readonly version: number;
+    /** 정본 세션 상태. waiting 이면 null. players[0]=호스트(white), players[1]=게스트(yellow) */
+    readonly state: SessionState | null;
+    readonly balls: readonly BallState[] | null;
+    readonly winnerIndex: PlayerIndex | null;
+    readonly endReason: MatchEndReason | null;
+    readonly engineVersion: string;
+    readonly paramsHash: string;
+    readonly createdAt: string;
+    readonly startedAt: string | null;
+    readonly lastShotAt: string | null;
+    readonly finishedAt: string | null;
+    /** playing 일 때만. 이 시각부터 차례가 아닌 쪽이 승리를 주장할 수 있다(마지막 샷 + 48 h). */
+    readonly claimableAt: string | null;
+}
+
+/** GET /sim/matches/:id/shots 의 한 줄. preState + input 으로 로컬에서 같은 샷을 재시뮬한다. */
+export interface MatchShot {
+    readonly idx: number;
+    readonly playerIndex: number;
+    readonly preState: readonly BallState[];
+    readonly input: ShotInput;
+    /** 서버 재시뮬 해시. 로컬 재시뮬과 다르면 결정론이 깨진 것 → 서버 상태로 스냅 */
+    readonly hash: string;
+    readonly outcomeCode: string;
+    readonly points: number;
+    readonly cushions: number;
+    readonly createdAt: string;
+}
+
+/**
+ * POST /sim/matches/:id/shots 응답. duplicate(응답을 못 받은 재전송에 대한 멱등 응답)엔 final·outcome·events 가 없고
+ * state·turn·version·status 는 "지금" 대전 값이다(그 뒤 상대 샷이 있었을 수 있다).
+ */
+export interface PostShotResponse {
+    readonly duplicate: boolean;
+    /** clientHash 와 서버 재시뮬 해시가 다름 → final/state 로 스냅해야 한다. duplicate 면 항상 false */
+    readonly mismatch: boolean;
+    readonly hash: string;
+    readonly state: SessionState;
+    readonly turn: number;
+    readonly version: number;
+    readonly status: MatchStatus;
+    readonly winnerIndex: PlayerIndex | null;
+    readonly final: readonly BallState[] | null;
+    readonly outcome: ShotOutcome | null;
+    readonly events: readonly SimEvent[];
+    readonly duration: number;
+    readonly truncated: boolean;
+    /** mismatch 일 때만(전체 궤적) */
+    readonly history?: readonly Snapshot[];
+}
+
+export type ResignResponse =
+    | { readonly status: "canceled" }
+    | { readonly status: "finished"; readonly winnerIndex: PlayerIndex };
+
+export interface ClaimResponse {
+    readonly status: "finished";
+    readonly winnerIndex: PlayerIndex;
+}
+
+/** POST /sim/matches 본문. 서버 createSchema 와 필드가 같다(players·balls 없음 — 게스트가 참가할 때 서버가 개시 배치를 만든다). */
+export interface CreateMatchBody {
+    readonly gameType: GameType;
+    readonly tableId: TableSpec["id"];
+    readonly cushionModel: CushionModelId;
+    readonly condition: number;
+    readonly rules: Rules;
+    readonly finishType: FinishType;
+    readonly target: number;
+    readonly inningCap: number;
+}
+
+export interface JoinMatchBody {
+    readonly target?: number;
+}
+
+/* ------------------------------------------------------------------ 요청 매핑 */
+
+/** 설정의 알려진 필드만 옮긴다(여분 필드는 새지 않는다). */
+export function toCreateMatchBody(config: SimSetupConfig): CreateMatchBody {
+    return {
+        gameType: config.gameType,
+        tableId: config.tableId,
+        cushionModel: config.cushionModel,
+        condition: config.condition,
+        rules: config.rules,
+        finishType: config.finishType,
+        target: config.target,
+        inningCap: config.inningCap,
+    };
+}
+
+/** 게스트 다마수. 생략하면 서버가 호스트 다마수를 쓴다. 정수가 아니거나 범위 밖이면 생략. */
+export function toJoinBody(target?: number): JoinMatchBody {
+    if (target === undefined || !Number.isInteger(target) || target < 1 || target > 999) return {};
+    return { target };
+}
+
+/** 코드 입력 정리: 숫자만, 최대 6자리. */
+export function sanitizeCode(text: string): string {
+    return text.replace(/[^0-9]/g, "").slice(0, MATCH_CODE_LENGTH);
+}
+
+export function isCompleteCode(code: string): boolean {
+    return new RegExp(`^[0-9]{${MATCH_CODE_LENGTH}}$`).test(code);
+}
+
+/** "123456" → "123 456" (읽기용) */
+export function formatCode(code: string): string {
+    const c = sanitizeCode(code);
+    return c.length > 3 ? `${c.slice(0, 3)} ${c.slice(3)}` : c;
+}
+
+/* ------------------------------------------------------------------ 응답 검증 */
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+    return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+const STATUSES: readonly MatchStatus[] = ["waiting", "playing", "finished", "canceled"];
+const END_REASONS: readonly MatchEndReason[] = ["target", "inningCap", "resign", "claim"];
+
+function isoOrNull(v: unknown): string | null {
+    return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+function playerIndexOrNull(v: unknown): PlayerIndex | null {
+    return v === 0 || v === 1 ? v : null;
+}
+
+export function parseMatch(raw: unknown): MatchPublic {
+    if (!isRecord(raw) || typeof raw.id !== "string" || typeof raw.code !== "string") throw new TypeError("match api: malformed match");
+    if (!STATUSES.includes(raw.status as MatchStatus)) throw new TypeError("match api: malformed match status");
+    if (raw.gameType !== "3c" && raw.gameType !== "4c") throw new TypeError("match api: malformed game type");
+    if (raw.tableId !== "DAEDAE" && raw.tableId !== "JUNGDAE_KR") throw new TypeError("match api: malformed table");
+    if (!isRecord(raw.rules) || raw.rules.gameType !== raw.gameType) throw new TypeError("match api: malformed rules");
+    if (typeof raw.turn !== "number" || typeof raw.shots !== "number" || typeof raw.version !== "number") throw new TypeError("match api: malformed counters");
+    const myIndex = raw.myIndex === 0 || raw.myIndex === 1 ? raw.myIndex : -1;
+    const state = isSessionState(raw.state) ? raw.state : null;
+    const balls = isBallArray(raw.balls) ? raw.balls : null;
+    const endReason = END_REASONS.includes(raw.endReason as MatchEndReason) ? (raw.endReason as MatchEndReason) : null;
+    return {
+        id: raw.id,
+        code: raw.code,
+        status: raw.status as MatchStatus,
+        gameType: raw.gameType,
+        tableId: raw.tableId,
+        cushionModel: (typeof raw.cushionModel === "string" ? raw.cushionModel : "han2005") as CushionModelId,
+        condition: typeof raw.condition === "number" && Number.isFinite(raw.condition) ? raw.condition : 1,
+        rules: raw.rules as unknown as Rules,
+        finishType: raw.finishType === "3c" || raw.finishType === "bank" ? raw.finishType : "none",
+        inningCap: typeof raw.inningCap === "number" ? raw.inningCap : 0,
+        hostName: typeof raw.hostName === "string" ? raw.hostName : "",
+        guestName: typeof raw.guestName === "string" ? raw.guestName : null,
+        hostTarget: typeof raw.hostTarget === "number" ? raw.hostTarget : 1,
+        guestTarget: typeof raw.guestTarget === "number" ? raw.guestTarget : null,
+        myIndex,
+        turn: raw.turn,
+        shots: raw.shots,
+        version: raw.version,
+        state,
+        balls,
+        winnerIndex: playerIndexOrNull(raw.winnerIndex),
+        endReason,
+        engineVersion: typeof raw.engineVersion === "string" ? raw.engineVersion : "",
+        paramsHash: typeof raw.paramsHash === "string" ? raw.paramsHash : "",
+        createdAt: isoOrNull(raw.createdAt) ?? "",
+        startedAt: isoOrNull(raw.startedAt),
+        lastShotAt: isoOrNull(raw.lastShotAt),
+        finishedAt: isoOrNull(raw.finishedAt),
+        claimableAt: isoOrNull(raw.claimableAt),
+    };
+}
+
+export function parseMatchList(raw: unknown): readonly MatchPublic[] {
+    if (!Array.isArray(raw)) throw new TypeError("match api: malformed match list");
+    return raw.map(parseMatch);
+}
+
+function isShotInput(v: unknown): v is ShotInput {
+    return isRecord(v) && (v.cueBallId === "white" || v.cueBallId === "yellow")
+        && [v.phi, v.V0, v.a, v.b, v.theta].every((n) => typeof n === "number" && Number.isFinite(n));
+}
+
+export function parseMatchShot(raw: unknown): MatchShot {
+    if (!isRecord(raw) || typeof raw.idx !== "number" || typeof raw.hash !== "string") throw new TypeError("match api: malformed shot");
+    if (!isBallArray(raw.preState)) throw new TypeError("match api: malformed shot preState");
+    if (!isShotInput(raw.input)) throw new TypeError("match api: malformed shot input");
+    return {
+        idx: raw.idx,
+        playerIndex: typeof raw.playerIndex === "number" ? raw.playerIndex : 0,
+        preState: raw.preState,
+        input: { cueBallId: raw.input.cueBallId, phi: raw.input.phi, V0: raw.input.V0, a: raw.input.a, b: raw.input.b, theta: raw.input.theta },
+        hash: raw.hash,
+        outcomeCode: typeof raw.outcomeCode === "string" ? raw.outcomeCode : "",
+        points: typeof raw.points === "number" ? raw.points : 0,
+        cushions: typeof raw.cushions === "number" ? raw.cushions : 0,
+        createdAt: isoOrNull(raw.createdAt) ?? "",
+    };
+}
+
+export function parseMatchShots(raw: unknown): readonly MatchShot[] {
+    if (!Array.isArray(raw)) throw new TypeError("match api: malformed shot list");
+    return raw.map(parseMatchShot);
+}
+
+export function parsePostShotResponse(raw: unknown): PostShotResponse {
+    if (!isRecord(raw) || typeof raw.hash !== "string") throw new TypeError("match api: malformed shot response");
+    if (!isSessionState(raw.state)) throw new TypeError("match api: malformed session state");
+    if (typeof raw.turn !== "number" || typeof raw.version !== "number") throw new TypeError("match api: malformed shot response");
+    if (!STATUSES.includes(raw.status as MatchStatus)) throw new TypeError("match api: malformed match status");
+    const duplicate = raw.duplicate === true;
+    const final = isBallArray(raw.final) ? raw.final : null;
+    const outcome = isRecord(raw.outcome) && typeof raw.outcome.code === "string" ? (raw.outcome as unknown as ShotOutcome) : null;
+    if (!duplicate && (final === null || outcome === null)) throw new TypeError("match api: malformed shot response");
+    const mismatch = !duplicate && raw.mismatch === true;
+    return {
+        duplicate,
+        mismatch,
+        hash: raw.hash,
+        state: raw.state,
+        turn: raw.turn,
+        version: raw.version,
+        status: raw.status as MatchStatus,
+        winnerIndex: playerIndexOrNull(raw.winnerIndex),
+        final,
+        outcome,
+        events: Array.isArray(raw.events) ? (raw.events as SimEvent[]) : [],
+        duration: typeof raw.duration === "number" ? raw.duration : 0,
+        truncated: raw.truncated === true,
+        ...(Array.isArray(raw.history) ? { history: raw.history as Snapshot[] } : {}),
+    };
+}
+
+export function parseResignResponse(raw: unknown): ResignResponse {
+    if (!isRecord(raw)) throw new TypeError("match api: malformed resign response");
+    if (raw.status === "canceled") return { status: "canceled" };
+    const w = playerIndexOrNull(raw.winnerIndex);
+    if (raw.status !== "finished" || w === null) throw new TypeError("match api: malformed resign response");
+    return { status: "finished", winnerIndex: w };
+}
+
+export function parseClaimResponse(raw: unknown): ClaimResponse {
+    if (!isRecord(raw) || raw.status !== "finished") throw new TypeError("match api: malformed claim response");
+    const w = playerIndexOrNull(raw.winnerIndex);
+    if (w === null) throw new TypeError("match api: malformed claim response");
+    return { status: "finished", winnerIndex: w };
+}
+
+/* ------------------------------------------------------------------ 오류 분류 */
+
+/** 서버 sendError 의 code. 409 응답에 실린다. */
+export type MatchErrorCode = "NOT_YOUR_TURN" | "IDX_MISMATCH" | "RECORD_CONFLICT" | "TOO_EARLY";
+
+export function matchErrorCode(err: unknown): MatchErrorCode | null {
+    if (!isRecord(err)) return null;
+    const data = isRecord(err.data) ? err.data : null;
+    const code = data && typeof data.code === "string" ? data.code : null;
+    return code === "NOT_YOUR_TURN" || code === "IDX_MISMATCH" || code === "RECORD_CONFLICT" || code === "TOO_EARLY" ? code : null;
+}
+
+/**
+ * simApi.classifyApiError 에 대전 전용 두 가지를 얹는다.
+ *  not-your-turn — 409 NOT_YOUR_TURN: 로컬이 차례를 잘못 알고 있다 → 서버로 다시 맞춘다.
+ *  too-early     — 409 TOO_EARLY: 승리 주장이 아직 이르다.
+ * 나머지(network / idx-mismatch / session-closed / unauthorized / rejected)는 simApi 와 같다.
+ */
+export type MatchFailure = ApiFailure | "not-your-turn" | "too-early";
+
+export function classifyMatchError(err: unknown): MatchFailure {
+    const code = matchErrorCode(err);
+    if (code === "NOT_YOUR_TURN") return "not-your-turn";
+    if (code === "TOO_EARLY") return "too-early";
+    return classifyApiError(err);
+}
+
+/* ------------------------------------------------------------------ 파생값 (순수) */
+
+export function isMyTurn(m: Pick<MatchPublic, "status" | "myIndex" | "turn">): boolean {
+    return m.status === "playing" && m.myIndex >= 0 && m.turn === m.myIndex;
+}
+
+/** players 순서(0 호스트, 1 게스트)의 이름. 게스트가 아직 없으면 빈 문자열. */
+export function playerNames(m: Pick<MatchPublic, "hostName" | "guestName">): readonly [string, string] {
+    return [m.hostName, m.guestName ?? ""];
+}
+
+export function myName(m: Pick<MatchPublic, "hostName" | "guestName" | "myIndex">): string {
+    return m.myIndex === 1 ? (m.guestName ?? "") : m.hostName;
+}
+
+export function opponentName(m: Pick<MatchPublic, "hostName" | "guestName" | "myIndex">): string {
+    return m.myIndex === 1 ? m.hostName : (m.guestName ?? "");
+}
+
+/** 지금 승리를 주장할 수 있는가(playing · 상대 차례 · claimableAt 지남). nowMs 는 epoch ms. */
+export function claimableNow(m: Pick<MatchPublic, "status" | "myIndex" | "turn" | "claimableAt">, nowMs: number): boolean {
+    if (m.status !== "playing" || m.myIndex < 0 || m.turn === m.myIndex || m.claimableAt === null) return false;
+    const at = Date.parse(m.claimableAt);
+    return Number.isFinite(at) && at <= nowMs;
+}
+
+export type MatchResult = "win" | "loss" | "draw";
+
+/** 끝난 대전의 내 결과. 진행 중·참가자 아님이면 null. */
+export function matchResult(m: Pick<MatchPublic, "status" | "myIndex" | "winnerIndex">): MatchResult | null {
+    if (m.status !== "finished" || m.myIndex < 0) return null;
+    if (m.winnerIndex === null) return "draw";
+    return m.winnerIndex === m.myIndex ? "win" : "loss";
+}
+
+/** 내 다마수(호스트/게스트 자리별). 참가자가 아니면 호스트 다마수. */
+export function myTarget(m: Pick<MatchPublic, "myIndex" | "hostTarget" | "guestTarget">): number {
+    return m.myIndex === 1 ? (m.guestTarget ?? m.hostTarget) : m.hostTarget;
+}
+
+/** 대전 행 → HUD·파라미터용 세션 설정(useSimulator 의 config). target 은 내 다마수. */
+export function matchConfig(m: MatchPublic): SimSetupConfig {
+    return {
+        gameType: m.gameType,
+        tableId: m.tableId,
+        target: myTarget(m),
+        rules: m.rules,
+        finishType: m.finishType,
+        inningCap: m.inningCap,
+        cushionModel: m.cushionModel,
+        condition: m.condition,
+    };
+}
+
+/* ------------------------------------------------------------------ 클라이언트 */
+
+export interface MatchApi {
+    createMatch(config: SimSetupConfig): Promise<MatchPublic>;
+    listMatches(): Promise<readonly MatchPublic[]>;
+    lookupCode(code: string): Promise<MatchPublic>;
+    joinMatch(code: string, target?: number): Promise<MatchPublic>;
+    getMatch(id: string): Promise<MatchPublic>;
+    /** from = 로컬 샷 수 → 놓친 샷(idx ≥ from) */
+    getShots(id: string, from?: number): Promise<readonly MatchShot[]>;
+    postShot(id: string, req: ShotRequest): Promise<PostShotResponse>;
+    /** waiting 인 내 대전이면 취소(canceled), playing 이면 기권(finished, 상대 승) */
+    resign(id: string): Promise<ResignResponse>;
+    /** 상대가 48시간 넘게 안 쳤을 때만(409 TOO_EARLY 아니면). */
+    claim(id: string): Promise<ClaimResponse>;
+}
+
+/** request 를 주입해 만든다(테스트는 가짜 request). 응답은 {success,data} 가 이미 벗겨진 data 여야 한다. */
+export function createMatchApi(request: RequestFn): MatchApi {
+    return {
+        async createMatch(config) {
+            return parseMatch(await request(matchesUrl(), { method: "POST", body: toCreateMatchBody(config) }));
+        },
+        async listMatches() {
+            return parseMatchList(await request(matchesUrl(), { method: "GET" }));
+        },
+        async lookupCode(code) {
+            return parseMatch(await request(matchCodeUrl(sanitizeCode(code)), { method: "GET" }));
+        },
+        async joinMatch(code, target) {
+            return parseMatch(await request(matchJoinUrl(sanitizeCode(code)), { method: "POST", body: toJoinBody(target) }));
+        },
+        async getMatch(id) {
+            return parseMatch(await request(matchUrl(id), { method: "GET" }));
+        },
+        async getShots(id, from) {
+            return parseMatchShots(await request(matchShotsUrl(id, from), { method: "GET" }));
+        },
+        async postShot(id, req) {
+            return parsePostShotResponse(await request(matchShotsUrl(id), { method: "POST", body: toShotBody(req) }));
+        },
+        async resign(id) {
+            return parseResignResponse(await request(matchResignUrl(id), { method: "POST" }));
+        },
+        async claim(id) {
+            return parseClaimResponse(await request(matchClaimUrl(id), { method: "POST" }));
+        },
+    };
+}
+
+/** 앱용 기본 인스턴스. */
+export const matchApi: MatchApi = createMatchApi((url, options) => apiRequest(url, options));

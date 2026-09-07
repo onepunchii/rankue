@@ -196,3 +196,131 @@ Overlay 는 aim 에서만: 드래그 중엔 `guide: "straight"`, 손을 떼면 `
 
 ### 테스트
 `SimulatorPage.test.ts` 는 jsdom 을 직접 띄우고("@" 별칭 없음 → `vi.mock`) 진짜 훅·컨트롤러·엔진·렌더러로 페이지를 마운트한다: ?cfg 연습 세션 → 샷 → `performance.now` 를 앞당겨 재생 종료 → 배너·이닝 시트·되돌리기, 설정 창 → 시작 → 나가기.
+
+## 네트워크 대전 A — 페이지 통합 메모
+
+비동기 2인 대전(코드로 초대 → 번갈아 샷 → 폴링으로 따라잡기). 서버 계약은 `server/routes/modules/simMatch.ts`(정본), 클라이언트는 아래 파일이 전부다.
+SimulatorPage.tsx · render/* · App.tsx · QuickActions.tsx 는 이 작업에서 건드리지 않았다 — 아래 (a)~(e) 대로 잇는다.
+
+```
+client/src/sim/
+  matchApi.ts             simMatch 라우트 타입 클라이언트. MatchPublic(=publicMatch) · MatchShot · PostShotResponse · createMatchApi(request) · matchApi.
+                          순수: URL · toCreateMatchBody/toJoinBody · parse* · classifyMatchError("not-your-turn"|"too-early"|simApi 분류) ·
+                          isMyTurn/myName/opponentName/playerNames/claimableNow/matchResult/myTarget/matchConfig · sanitizeCode/isCompleteCode/formatCode.
+  simReducer.ts           mode "solo"|"match", match: MatchState, replayOf, Phase 에 "waiting" 추가. 액션 startMatch/matchSync/matchSnap/replayShot/matchShotAck/matchShotFail.
+  simController.ts        startMatch/resign/claim/sync/canClaim, 폴링(2 s → 1분 뒤 5 s, wake 즉시), 따라잡기 재생, 백오프 재전송, resync. deps: matchApi·wallClock·onWake.
+  useSimulator.ts         Simulator.mode/match(MatchView)/replaying, actions.startMatch/resign/claim/sync, options.matchApi/onMatch.
+  match/MatchLobby.tsx    로비(만들기 / 코드로 참가). props { onStarted(match), onClose, api?, initialTab?, pollMs? }
+  match/MatchList.tsx     내 대전 목록(TanStack Query, 키 ["sim-matches"], 진행 중이면 10 s 재조회). props { onOpen(match), api? }
+  match/matchView.ts      목록·로비 표시값(배지 키·정렬·상대 이름·종목 문구·종료 사유 문구·joinErrorKey·shareText). 테스트 동반.
+```
+
+### 훅 API 델타(위 "useSimulator API" 에 더해지는 것)
+```ts
+type Phase = "setup" | "aim" | "waiting" | "shooting" | "finished";   // waiting = 상대 차례(입력 잠금·폴링)
+type MatchEvent = "offline" | "online" | "opponent-shot" | "finished" | "resynced" | "claim-too-early";
+
+useSimulator({ ..., matchApi?: MatchApi, onMatch?: (e: MatchEvent) => void });
+
+interface Simulator {
+    mode: "solo" | "match";
+    match: MatchView | null;          // 아래
+    replaying: boolean;               // 따라잡기 재생 중(이 기기에서 친 샷이 아님) — "상대 샷" 칩
+    ...                               // 나머지는 그대로. 대전에선 record=true, canUndo=canPlace=false, config.target = 내 다마수
+}
+interface MatchView {
+    id: string; myIndex: 0 | 1; myCueBallId: "white" | "yellow";
+    names: readonly [string, string];   // players 순서: [호스트(흰 공), 게스트(노란 공)]
+    myName: string; opponentName: string;
+    turn: number; isMyTurn: boolean;
+    status: "waiting" | "playing" | "finished" | "canceled"; version: number;
+    winnerIndex: 0 | 1 | null; endReason: "target" | "inningCap" | "resign" | "claim" | null;
+    claimableAt: string | null; canClaim: boolean;   // 상대 차례 + 48 h 지남(폴링마다 다시 계산)
+    canResign: boolean;                              // playing
+    opponentShot: boolean;                           // 재생 중인 샷이 상대 샷
+}
+interface SimulatorActions {
+    ...
+    startMatch(match: MatchPublic): boolean;   // 내 차례 → aim, 상대 차례 → waiting, 끝남 → finished. state/balls 없거나(참가 전) myIndex<0 이면 false
+    resign(): Promise<boolean>;                // 성공하면 phase finished(상대 승, endReason "resign")
+    claim(): Promise<boolean>;                 // false 면 onMatch("claim-too-early") 가 먼저 온다
+    sync(): void;                              // 지금 한 번 GET(당겨서 새로고침)
+}
+```
+동작: 내 샷 = `shoot()` 그대로(로컬 시뮬·재생 → `POST /sim/matches/:id/shots {idx,input,clientHash}`). 409 NOT_YOUR_TURN/IDX_MISMATCH/끝난 대전/400 은 재시도 큐 대신
+서버 정본으로 스냅(`onMatch("resynced")`), 네트워크 실패는 1·2·4 s 백오프로 3번 → `offline=true` + `onMatch("offline")`(항목은 큐에 남고 폴링이 성공하면 다시 보낸다 → `onMatch("online")`).
+상대 샷은 `GET /shots?from=` 으로 받아 `simulateShot(preState, input)` 으로 재시뮬, 해시가 다르면 `mismatches+1` 후 재생이 끝나고 서버 상태로 스냅(`onMismatch`). 재생은 로컬 샷과 같은 경로(오디오·햅틱·`onOutcome`).
+서버가 끝냈으면(상대 결승 샷·기권·무응답 승리) `session.status="finished"` + `session.winnerIndex` 를 채워 주므로 기존 HUD·EndDialog 가 그대로 승자를 그린다.
+`exit()` 는 서버 close 없이 setup 으로(대전은 남는다). 실전 경기 API(`/api/hiq/game/*`)는 여전히 부르지 않는다.
+
+### (a) `?match=<id>` 로 열기
+서버 알림 딥링크가 `/online-game?match=<id>` 다(simMatch.ts notify). `?cfg` 보다 우선한다.
+```tsx
+import { matchApi, type MatchPublic } from "./matchApi";
+const params = useMemo(() => new URLSearchParams(search.startsWith("?") ? search.slice(1) : search), [search]);
+const matchId = params.get("match");
+const lobby = params.get("lobby") === "1";
+const [initial] = useState(() => (matchId || lobby ? null : decodePageConfig(readCfgParam(search))));
+const [setupOpen, setSetupOpen] = useState(initial === null && !matchId && !lobby);   // 대전·로비에선 설정 창을 열지 않는다
+const [matchLoad, setMatchLoad] = useState<"idle" | "loading" | "error" | "notMine">("idle");
+
+useEffect(() => {
+    if (!matchId || startedRef.current) return;
+    startedRef.current = true;
+    setMatchLoad("loading");
+    matchApi.getMatch(matchId).then((m) => {
+        if (m.myIndex < 0) { setMatchLoad("notMine"); return; }          // t("sim.match.notMine")
+        if (m.status === "waiting") { setMatchLoad("idle"); navigate("/online-game?lobby=1", { replace: true }); return; }   // 호스트가 아직 대기 중
+        setMatchLoad(actions.startMatch(m) ? "idle" : "error");           // t("sim.match.loadFailed")
+    }, () => setMatchLoad("error"));
+}, [matchId, actions, navigate]);
+```
+`matchLoad === "loading"` 동안 테이블 위에 `t("sim.match.loading")` 칩. `onMatch` 토스트 매핑:
+`offline → sim.match.offline`, `online → sim.match.online`, `resynced → sim.match.resynced`, `finished → sim.match.finishedByServer`, `claim-too-early → sim.match.claimTooEarly`, `opponent-shot` 은 칩으로 충분(토스트 생략).
+
+### (b) HUD — 두 선수
+- `names`: `sim.match ? sim.match.names : (기존 playerLabel 배열)`. players[0]=호스트(흰 공), players[1]=게스트(노란 공) — 순서가 `session.players` 와 같다.
+- 차례 강조는 HUD 가 이미 `session.turn` 으로 한다(`sim.hud.turn` 칩). 상대 이름은 `names` 로 들어간다.
+- 상태 칩: 대전에선 `offline` 의 뜻이 "지금 끊김·재시도 중"이라 HUD 에 `offline={false}` 를 주고, 대신 `sim.mode === "match" && sim.offline` 일 때 테이블 위 칩 `t("sim.match.offline")`. `record`/`syncing`/`queued` 는 그대로.
+- 규칙·테이블 배지는 `sim.config`(matchConfig) 로 기존과 같다.
+
+### (c) waiting 단계
+- `Controls` 는 `phase="waiting"` 을 받으면 이미 전부 잠긴다(aim 이 아니면 locked, 샷 버튼 disabled). 되돌리기는 `canUndo=false` 라 안 보인다.
+- 테이블 위 배너(포인터 이벤트 없음): `t("sim.match.waitingTurn")` + `t("sim.match.waitingHint")`, 상대 이름은 `sim.match.opponentName`. 재생 중 `sim.match.opponentShot` 이면 칩 `t("sim.match.opponentShot")`.
+- 내 차례가 되면(`phase === "aim"`) 짧은 칩 `t("sim.match.yourTurn")`(2.4 s, OutcomeBanner 와 같은 리듬).
+- 기권 버튼(h-11, 나가기 옆): `phase !== "finished" && sim.match?.canResign` → 확인 다이얼로그(`sim.match.resignTitle` / `resignDesc` / `resignConfirm`) → `await actions.resign()`.
+- 승리 주장 버튼: `sim.match?.canClaim` 일 때만 배너 아래에 `t("sim.match.claim")` + `t("sim.match.claimDesc")`; `const ok = await actions.claim(); if (!ok) toast(t("sim.match.claimTooEarly"))`. claim 불가일 땐 `t("sim.match.claimWait")` 한 줄.
+- 나가기(ExitConfirm): 대전이면 설명을 `t("sim.match.leaveDesc")` 로, 확인 시 `await actions.exit()` 뒤 `/online-game?lobby=1`(목록으로) 또는 `/dashboard`.
+- 폴링은 훅이 맡는다(가시성·포커스 wake 포함). 페이지는 당겨서 새로고침 같은 명시적 갱신에만 `actions.sync()`.
+
+### (d) 종료 다이얼로그
+`phase === "finished"` 에서 EndDialog 가 열리는 규칙은 그대로. `names={sim.match.names}`. 부제(`endTitle` 아래 한 줄)에 종료 사유:
+```tsx
+import { endReasonText } from "./match/matchView";
+const reason = sim.match ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t) : null;
+// "목표 점수에 도달했어요" / "이닝 제한으로 끝났어요" / "{name}님이 기권했어요" / "48시간 무응답으로 {name}님의 승리예요"
+```
+대전엔 "다시하기"가 없다(`actions.restart()` 는 no-op). EndDialog 에 `hideRestart?: boolean`(또는 `onRestart` 생략 시 숨김) 을 더해 대전이면 나가기만 두거나, 나가기 라벨을 `t("sim.end.exit")` 그대로 두고 `/online-game?lobby=1` 로 보낸다.
+`record`/`offline` 은 그대로 전달(대전은 record=true; offline 이면 "이 세션은 기록되지 않았어요" 대신 `sim.match.offline` 이 맞다 — `offline={false}` 로 주고 필요하면 별도 문구).
+
+### (e) 로비·목록 마운트
+- QuickActions: SimSetupDialog 의 시작 버튼 옆(또는 고급 위)에 "친구와 대전" 항목 — `t("sim.match.entry")` / `t("sim.match.entryDesc")` — 누르면 `setLocation("/online-game?lobby=1")`. (SimSetupDialog 에 `onMatch?: () => void` prop 을 더해 링크 버튼 한 줄을 그리면 된다; 설정 값은 로비가 자체 폼으로 다시 받는다.)
+- SimulatorPage: `lobby && sim.phase === "setup"` 이면 테이블 대신(또는 `fixed inset-0 z-[5] overflow-y-auto bg-surface-1` 로 위에) 렌더:
+```tsx
+import { MatchLobby } from "./match/MatchLobby";
+import { MatchList, MATCH_LIST_QUERY_KEY } from "./match/MatchList";
+const openMatch = useCallback((m: MatchPublic) => {
+    if (m.status === "waiting") return;                     // 호스트 대기 중: 로비 코드 화면이 이미 그 대전을 폴링한다(목록 탭은 안내만)
+    if (actions.startMatch(m)) navigate(`/online-game?match=${m.id}`, { replace: true });
+}, [actions, navigate]);
+<MatchLobby onStarted={openMatch} onClose={() => navigate("/dashboard")} />
+<MatchList onOpen={openMatch} />
+```
+  MatchList 는 QueryClientProvider 안이어야 한다(App 이 감싼다). 샷·기권·참가 뒤 `queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY })` 하면 목록이 바로 갱신된다.
+  MatchLobby 의 `onStarted` 는 호스트(상대 입장 → playing 폴링)·게스트(참가 응답) 모두 playing 행을 준다 → `actions.startMatch` 가 바로 aim/waiting 으로 연다.
+- 알림 권한·푸시는 서버가 이미 보낸다(차례·종료). 클라이언트는 딥링크만 처리하면 된다.
+
+### 검증·테스트
+- `matchApi.test.ts`(18) · `simReducer.test.ts` 대전 블록(18) · `simController.match.test.ts`(21, FakeMatchServer 가 실제 엔진으로 서버 규칙을 흉내) · `useSimulator.test.ts`(4) · `match/matchView.test.ts`(5) · `match/MatchLobby.test.ts`(8, 로비·목록 jsdom 스모크).
+- 테스트에서 `matchApi`/`useSimulator`/`MatchLobby` 를 import 하면 `vi.mock("@/lib/queryClient", ...)` 를 먼저 둔다(기존 규칙과 같다). 컨트롤러엔 `matchApi`·`wallClock`·`onWake` 를 주입한다.
+- i18n: `sim.match.*` 68개, 5개 로케일 키 집합 동일(스크립트로 검증).

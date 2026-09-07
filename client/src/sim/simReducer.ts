@@ -8,15 +8,26 @@
  *  - serverAck/serverFail: 서버 응답. 실패는 재전송 큐(idx 순)에 넣고 MAX_RETRIES 뒤에 포기(offline).
  *  - undo/placeBall: 연습 모드 + aim 에서만.
  * 모든 전이는 새 객체를 돌려주고, 바뀐 게 없으면 같은 참조를 돌려준다(React 재렌더 억제).
+ *
+ * 네트워크 대전(mode="match", README "네트워크 대전 A"): 같은 기계에 waiting 단계와 대전 메타(match)가 붙는다.
+ *  - startMatch: 서버 대전 행(state·balls)으로 시작. 내 차례면 aim, 아니면 waiting(입력 잠금).
+ *  - replayShot: 놓친(상대) 샷을 로컬 재시뮬로 따라잡는 재생. waiting/aim → shooting(replayOf = 친 선수), playbackEnd 가 다시 aim/waiting/finished.
+ *  - matchSync: 폴링·응답의 메타(차례·상태·claimableAt). 서버가 끝냈으면(기권·무응답 승리) 세션도 finished 로 표시한다.
+ *  - matchSnap: 서버 정본으로 통째로 갈아타기(공·세션·샷 수). 큐·pendingSnap 을 버린다.
+ *  - matchShotAck / matchShotFail: 내 샷 응답. 실패는 큐에 남기고 MAX_RETRIES 뒤 offline — 단 항목은 버리지 않는다(다음 폴링 성공 때 다시 보낸다).
+ *  - 되돌리기·자유 배치·다시하기는 대전에 없다. record 는 항상 true.
  */
 import type { BallState, ShotInput } from "@shared/sim/types";
 import { DEFAULT_CUE, TABLES, type SimParams, type TableSpec } from "@shared/sim/params";
 import { currentPlayer, opponentCueBall, type GameType, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import { isValidLayout } from "@shared/sim/layouts";
 import type { SimSetupConfig } from "./setupPresets";
+import type { MatchEndReason, MatchPublic, MatchStatus, PlayerIndex } from "./matchApi";
 import { angleBetween, nearestObjectBall, normalizeAngle, phiForThickness, type XY } from "./aim";
 
-export type Phase = "setup" | "aim" | "shooting" | "finished";
+/** waiting = 네트워크 대전에서 상대 차례(입력 잠금, 폴링 중). */
+export type Phase = "setup" | "aim" | "waiting" | "shooting" | "finished";
+export type SimMode = "solo" | "match";
 
 /** 큐 입력. cueBallId 는 세션의 현재 선수에서 나오므로 여기 없다. */
 export interface CueInput {
@@ -32,7 +43,7 @@ export const V0_MIN = 0.2;
 export const V0_MAX = 9;
 /** 큐 들림각 상한 (rad). README: v2.0 은 고급 패널에서 0~20°. */
 export const THETA_MAX = (20 * Math.PI) / 180;
-/** 샷 재전송 시도 상한. 넘으면 이 세션은 더 기록하지 않는다(offline). */
+/** 샷 재전송 시도 상한. 넘으면 이 세션은 더 기록하지 않는다(offline). 대전에선 다음 폴링 성공 때 다시 시도한다. */
 export const MAX_RETRIES = 3;
 /** 미스큐 경계 안쪽 여유. strike 는 a²+b² ≤ max² 를 요구하므로 스케일링 반올림이 경계를 넘지 않게 한다. */
 const SPIN_EPS = 1e-9;
@@ -106,6 +117,69 @@ export function initialInput(balls: readonly BallState[], cueBallId: string, gam
     return { phi: defaultPhi(balls, cueBallId, gameType), V0: V0_DEFAULT, a: 0, b: 0, theta: 0 };
 }
 
+/** 두 배치가 같은가(id 순서·위치). 서버 정본과 로컬 결과를 견줄 때. */
+export function sameBalls(a: readonly BallState[], b: readonly BallState[], eps = 1e-9): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        const x = a[i];
+        const y = b[i];
+        if (x.id !== y.id) return false;
+        if (Math.abs(x.r[0] - y.r[0]) > eps || Math.abs(x.r[1] - y.r[1]) > eps) return false;
+    }
+    return true;
+}
+
+/* ------------------------------------------------------------------ 대전 메타 */
+
+/** 네트워크 대전 메타. 공·세션은 SimCoreState.balls/session 이 그대로 맡고, 여기엔 서버 대전 행의 나머지만 둔다. */
+export interface MatchState {
+    readonly matchId: string;
+    /** 내 자리. 0 = 호스트(흰 공), 1 = 게스트(노란 공) */
+    readonly myIndex: PlayerIndex;
+    readonly version: number;
+    readonly opponentName: string;
+    readonly myName: string;
+    /** 서버가 아는 차례(세션 turn 과 같아야 한다 — 어긋나면 컨트롤러가 스냅한다) */
+    readonly turn: number;
+    readonly status: MatchStatus;
+    /** ISO. 이 시각부터 (상대 차례일 때) 승리 주장 가능 */
+    readonly claimableAt: string | null;
+    readonly endReason: MatchEndReason | null;
+    readonly winnerIndex: PlayerIndex | null;
+}
+
+/** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
+export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState {
+    const host = m.hostName;
+    const guest = m.guestName ?? "";
+    return {
+        matchId: m.id,
+        myIndex,
+        version: m.version,
+        myName: myIndex === 0 ? host : guest,
+        opponentName: myIndex === 0 ? guest : host,
+        turn: m.turn,
+        status: m.status,
+        claimableAt: m.claimableAt,
+        endReason: m.endReason,
+        winnerIndex: m.winnerIndex,
+    };
+}
+
+export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
+    return a.matchId === b.matchId && a.myIndex === b.myIndex && a.version === b.version && a.turn === b.turn
+        && a.status === b.status && a.claimableAt === b.claimableAt && a.endReason === b.endReason
+        && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName;
+}
+
+/** 서버가 끝냈는데(기권·무응답 승리) 세션은 아직 playing 이면 세션에도 종료를 표시한다. */
+function sessionForMatch(session: SessionState, match: MatchState): SessionState {
+    if (match.status === "finished" && session.status !== "finished") {
+        return { ...session, status: "finished", winnerIndex: match.winnerIndex };
+    }
+    return session;
+}
+
 /* ------------------------------------------------------------------ 상태 */
 
 export interface PendingShot {
@@ -134,18 +208,23 @@ export interface ServerSnap {
 
 export interface SimCoreState {
     readonly phase: Phase;
-    /** 서버 기록 여부. false = 연습(되돌리기·자유 배치 허용, 서버 호출 없음). */
+    readonly mode: SimMode;
+    /** 네트워크 대전 메타(mode="match" 에서만). */
+    readonly match: MatchState | null;
+    /** 따라잡기 재생 중이면 그 샷을 친 선수 인덱스. 이 기기에서 친 샷의 재생은 null. */
+    readonly replayOf: number | null;
+    /** 서버 기록 여부. false = 연습(되돌리기·자유 배치 허용, 서버 호출 없음). 대전은 항상 true. */
     readonly record: boolean;
     readonly session: SessionState | null;
     readonly balls: readonly BallState[];
     readonly input: CueInput;
-    /** 다음 샷 idx. 서버 세션의 shots 와 같아야 한다. */
+    /** 다음 샷 idx. 서버 세션(또는 대전)의 shots 와 같아야 한다. */
     readonly shotIdx: number;
     readonly serverSessionId: string | null;
     readonly outcomeLast: ShotOutcome | null;
     /** 서버 해시와 어긋난 샷 수(이 세션) */
     readonly mismatches: number;
-    /** 서버 기록을 포기했다(재전송 상한·거부·세션 개설 실패). 로컬 플레이는 계속된다. */
+    /** 서버 기록을 포기했다(재전송 상한·거부·세션 개설 실패). 로컬 플레이는 계속된다. 대전에선 "지금 연결이 끊김"(폴링 성공 시 풀린다). */
     readonly offline: boolean;
     /** 재전송 대기 샷(idx 오름차순) */
     readonly queue: readonly PendingShot[];
@@ -157,6 +236,9 @@ const NO_INPUT: CueInput = { phi: Math.PI / 2, V0: V0_DEFAULT, a: 0, b: 0, theta
 
 export const INITIAL_STATE: SimCoreState = {
     phase: "setup",
+    mode: "solo",
+    match: null,
+    replayOf: null,
     record: true,
     session: null,
     balls: [],
@@ -197,7 +279,7 @@ export type SimAction =
         readonly session: SessionState;
         readonly outcome?: ShotOutcome;
     }
-    /** 서버 세션이 아직 없을 때(개설 응답 대기) 친 샷. 시도 횟수 0 으로 큐에 넣는다. */
+    /** 서버 세션이 아직 없을 때(개설 응답 대기) 친 샷, 또는 앞 샷이 큐에 있어 뒤에 붙는 샷. 시도 횟수 0 으로 큐에 넣는다. */
     | { readonly type: "queueShot"; readonly idx: number; readonly input: ShotInput; readonly clientHash: string }
     /** 재전송했더니 이미 기록돼 있었다(IDX_MISMATCH 인데 서버 shots === idx+1). 큐에서만 뺀다. */
     | { readonly type: "serverLanded"; readonly idx: number }
@@ -205,14 +287,49 @@ export type SimAction =
     | { readonly type: "undo" }
     | { readonly type: "placeBall"; readonly id: string; readonly x: number; readonly y: number; readonly table: TableSpec }
     | { readonly type: "restart"; readonly session: SessionState; readonly balls: readonly BallState[] }
-    | { readonly type: "exit" };
+    | { readonly type: "exit" }
+    /* ---- 네트워크 대전 ---- */
+    /** 서버 대전 행으로 시작. shots = 서버 샷 수(다음 idx). */
+    | { readonly type: "startMatch"; readonly match: MatchState; readonly session: SessionState; readonly balls: readonly BallState[]; readonly shots: number }
+    /** 폴링·응답의 메타. 연결이 살아 있다는 뜻이므로 offline 을 풀고 큐의 시도 횟수를 0 으로 돌린다. */
+    | { readonly type: "matchSync"; readonly match: MatchState }
+    /** 서버 정본으로 통째로 갈아타기. mismatch 면 누적 카운트 +1. 큐·pendingSnap 은 버린다. */
+    | { readonly type: "matchSnap"; readonly match: MatchState; readonly session: SessionState; readonly balls: readonly BallState[]; readonly shots: number; readonly mismatch: boolean }
+    /** 놓친 샷 따라잡기 재생 시작(로컬 재시뮬 결과). mismatch = 로컬 해시가 서버 해시와 다름(또는 preState 가 로컬 배치와 다름). */
+    | {
+        readonly type: "replayShot";
+        readonly input: ShotInput;
+        readonly final: readonly BallState[];
+        readonly session: SessionState;
+        readonly outcome: ShotOutcome;
+        readonly playerIndex: number;
+        readonly mismatch: boolean;
+    }
+    /** 내 샷의 서버 응답. mismatch 면 final/session 으로 스냅(재생 중이면 끝난 뒤). duplicate(final 없음)면 메타만. */
+    | {
+        readonly type: "matchShotAck";
+        readonly idx: number;
+        readonly match: MatchState;
+        readonly mismatch: boolean;
+        readonly final: readonly BallState[] | null;
+        readonly session: SessionState | null;
+        readonly outcome?: ShotOutcome;
+    }
+    /** 내 샷 전송의 네트워크 실패. tries+1 로 큐에 두고 MAX_RETRIES 면 offline(항목은 남는다). */
+    | { readonly type: "matchShotFail"; readonly idx: number; readonly input: ShotInput; readonly clientHash: string };
 
 function gameTypeOf(s: SimCoreState): GameType {
     return s.session ? s.session.rules.gameType : "3c";
 }
 
-function phaseFor(session: SessionState): Phase {
-    return session.status === "finished" ? "finished" : "aim";
+/** 세션(그리고 대전이면 차례)에서 정지 단계를 정한다. */
+function phaseFor(s: Pick<SimCoreState, "mode" | "match">, session: SessionState): Phase {
+    if (session.status === "finished") return "finished";
+    if (s.mode === "match" && s.match) {
+        if (s.match.status !== "playing") return "finished";
+        return session.turn === s.match.myIndex ? "aim" : "waiting";
+    }
+    return "aim";
 }
 
 function reAim(s: SimCoreState, balls: readonly BallState[], session: SessionState): CueInput {
@@ -223,14 +340,15 @@ function withoutIdx(queue: readonly PendingShot[], idx: number): readonly Pendin
     return queue.some((q) => q.idx === idx) ? queue.filter((q) => q.idx !== idx) : queue;
 }
 
-/** 서버 상태로 즉시 갈아탄다(aim/finished 에서). */
+/** 서버 상태로 즉시 갈아탄다(aim/waiting/finished 에서). */
 function snapNow(s: SimCoreState, snap: ServerSnap): SimCoreState {
+    const session = s.match ? sessionForMatch(snap.session, s.match) : snap.session;
     return {
         ...s,
         balls: snap.balls,
-        session: snap.session,
-        phase: phaseFor(snap.session),
-        input: reAim(s, snap.balls, snap.session),
+        session,
+        phase: phaseFor(s, session),
+        input: reAim(s, snap.balls, session),
         outcomeLast: snap.outcome ?? s.outcomeLast,
         pendingSnap: null,
     };
@@ -242,13 +360,25 @@ function enqueue(queue: readonly PendingShot[], entry: PendingShot): readonly Pe
     return next.slice().sort((x, y) => x.idx - y.idx);
 }
 
+function resetTries(queue: readonly PendingShot[]): readonly PendingShot[] {
+    return queue.some((q) => q.tries !== 0) ? queue.map((q) => (q.tries === 0 ? q : { ...q, tries: 0 })) : queue;
+}
+
+/** 정지 단계라면 대전 메타에 맞춰 단계를 다시 정한다(재생 중엔 playbackEnd 가 맡는다). */
+function rephase(s: SimCoreState): SimCoreState {
+    if (s.phase === "setup" || s.phase === "shooting" || !s.session) return s;
+    const phase = phaseFor(s, s.session);
+    if (phase === s.phase) return s;
+    return { ...s, phase, input: phase === "aim" ? reAim(s, s.balls, s.session) : s.input };
+}
+
 export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
     switch (a.type) {
         case "start": {
             const cueBallId = cueBallIdOf(a.session);
             return {
                 ...INITIAL_STATE,
-                phase: phaseFor(a.session),
+                phase: a.session.status === "finished" ? "finished" : "aim",
                 record: a.record,
                 session: a.session,
                 balls: a.balls,
@@ -257,11 +387,11 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
         }
 
         case "restart": {
-            if (s.phase === "setup") return s;
+            if (s.phase === "setup" || s.mode === "match") return s;
             const cueBallId = cueBallIdOf(a.session);
             return {
                 ...INITIAL_STATE,
-                phase: phaseFor(a.session),
+                phase: a.session.status === "finished" ? "finished" : "aim",
                 record: s.record,
                 session: a.session,
                 balls: a.balls,
@@ -273,7 +403,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             return s === INITIAL_STATE ? s : INITIAL_STATE;
 
         case "serverSession": {
-            if (s.phase === "setup" || !s.record) return s;
+            if (s.phase === "setup" || !s.record || s.mode === "match") return s;
             const adopt = a.session !== undefined && s.shotIdx === 0 && s.phase === "aim" && s.session !== null
                 && a.session.players.length === s.session.players.length;
             return {
@@ -285,7 +415,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
         }
 
         case "serverUnavailable":
-            return s.phase === "setup" || s.offline ? s : { ...s, offline: true };
+            return s.phase === "setup" || s.offline || s.mode === "match" ? s : { ...s, offline: true };
 
         case "setInput": {
             if (s.phase !== "aim") return s;
@@ -313,6 +443,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             return {
                 ...s,
                 phase: "shooting",
+                replayOf: null,
                 balls: a.final,
                 session: a.session,
                 outcomeLast: a.outcome,
@@ -324,16 +455,19 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
 
         case "playbackEnd": {
             if (s.phase !== "shooting" || !s.session) return s;
-            if (s.pendingSnap) return snapNow(s, s.pendingSnap);
+            const base = s.replayOf === null ? s : { ...s, replayOf: null };
+            if (base.pendingSnap) return snapNow(base, base.pendingSnap);
+            const session = base.match ? sessionForMatch(base.session!, base.match) : base.session!;
             return {
-                ...s,
-                phase: phaseFor(s.session),
-                input: reAim(s, s.balls, s.session),
+                ...base,
+                session,
+                phase: phaseFor(base, session),
+                input: reAim(base, base.balls, session),
             };
         }
 
         case "serverAck": {
-            if (s.phase === "setup") return s;
+            if (s.phase === "setup" || s.mode === "match") return s;
             const queue = withoutIdx(s.queue, a.idx);
             if (!a.mismatch) return queue === s.queue ? s : { ...s, queue };
             const base = { ...s, queue, mismatches: s.mismatches + 1 };
@@ -344,7 +478,8 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
         }
 
         case "queueShot": {
-            if (s.phase === "setup" || s.offline || s.queue.some((q) => q.idx === a.idx)) return s;
+            // 대전은 offline(일시적 끊김)이어도 큐에 넣는다 — 폴링이 성공하면 다시 보낸다.
+            if (s.phase === "setup" || (s.mode === "solo" && s.offline) || s.queue.some((q) => q.idx === a.idx)) return s;
             return { ...s, queue: enqueue(s.queue, { idx: a.idx, input: a.input, clientHash: a.clientHash, tries: 0 }) };
         }
 
@@ -354,7 +489,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
         }
 
         case "serverFail": {
-            if (s.phase === "setup" || s.offline) return s;
+            if (s.phase === "setup" || s.offline || s.mode === "match") return s;
             const existing = s.queue.find((q) => q.idx === a.idx);
             if (!a.retryable) return { ...s, queue: withoutIdx(s.queue, a.idx), offline: true };
             const tries = (existing ? existing.tries : 0) + 1;
@@ -390,6 +525,90 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             const cueBallId = cueBallIdOf(s.session);
             const input = a.id === cueBallId ? { ...s.input, phi: defaultPhi(balls, cueBallId, gameTypeOf(s)) } : s.input;
             return { ...s, balls, input };
+        }
+
+        /* ---------------------------------------------------------- 네트워크 대전 */
+
+        case "startMatch": {
+            const session = sessionForMatch(a.session, a.match);
+            const base: SimCoreState = {
+                ...INITIAL_STATE,
+                mode: "match",
+                match: a.match,
+                record: true,
+                session,
+                balls: a.balls,
+                shotIdx: a.shots,
+            };
+            return {
+                ...base,
+                phase: phaseFor(base, session),
+                input: initialInput(a.balls, cueBallIdOf(session), session.rules.gameType),
+            };
+        }
+
+        case "matchSync": {
+            if (s.mode !== "match" || !s.match || !s.session || s.phase === "setup") return s;
+            const session = sessionForMatch(s.session, a.match);
+            const queue = resetTries(s.queue);
+            if (sameMatchMeta(s.match, a.match) && session === s.session && !s.offline && queue === s.queue) return s;
+            return rephase({ ...s, match: a.match, session, queue, offline: false });
+        }
+
+        case "matchSnap": {
+            if (s.mode !== "match" || s.phase === "setup") return s;
+            const session = sessionForMatch(a.session, a.match);
+            const base: SimCoreState = {
+                ...s,
+                match: a.match,
+                session,
+                balls: a.balls,
+                shotIdx: a.shots,
+                queue: [],
+                offline: false,
+                pendingSnap: null,
+                mismatches: s.mismatches + (a.mismatch ? 1 : 0),
+            };
+            // 재생 중엔 공을 바꿔도 화면은 재생(frameAt)을 그리고, playbackEnd 가 단계·조준을 다시 정한다.
+            if (s.phase === "shooting") return base;
+            return { ...base, replayOf: null, phase: phaseFor(base, session), input: reAim(base, a.balls, session) };
+        }
+
+        case "replayShot": {
+            if (s.mode !== "match" || !s.match || !s.session || (s.phase !== "waiting" && s.phase !== "aim")) return s;
+            return {
+                ...s,
+                phase: "shooting",
+                replayOf: a.playerIndex,
+                balls: a.final,
+                session: a.session,
+                outcomeLast: a.outcome,
+                shotIdx: s.shotIdx + 1,
+                mismatches: s.mismatches + (a.mismatch ? 1 : 0),
+                pendingSnap: null,
+            };
+        }
+
+        case "matchShotAck": {
+            if (s.mode !== "match" || !s.match || !s.session || s.phase === "setup") return s;
+            const queue = withoutIdx(s.queue, a.idx);
+            if (!a.mismatch || !a.final || !a.session) {
+                // 일치(또는 duplicate): 메타만. 컨트롤러가 duplicate 는 GET 으로 다시 확인한다.
+                const session = sessionForMatch(s.session, a.match);
+                return rephase({ ...s, match: a.match, queue, offline: false, session });
+            }
+            const base: SimCoreState = { ...s, match: a.match, queue, offline: false, mismatches: s.mismatches + 1 };
+            const snap: ServerSnap = { balls: a.final, session: a.session, ...(a.outcome ? { outcome: a.outcome } : {}) };
+            if (s.phase === "shooting") return { ...base, pendingSnap: snap };
+            return snapNow(base, snap);
+        }
+
+        case "matchShotFail": {
+            if (s.mode !== "match" || s.phase === "setup") return s;
+            const existing = s.queue.find((q) => q.idx === a.idx);
+            const tries = (existing ? existing.tries : 0) + 1;
+            const queue = enqueue(s.queue, { idx: a.idx, input: a.input, clientHash: a.clientHash, tries });
+            return { ...s, queue, offline: s.offline || tries >= MAX_RETRIES };
         }
     }
     return s;

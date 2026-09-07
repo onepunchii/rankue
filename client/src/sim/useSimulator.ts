@@ -5,7 +5,10 @@
  *
  * 재렌더 규칙: phase·session·balls·input·preview·outcome·speed·syncing 같은 드문 변화만 React 상태.
  * 재생 프레임 값(t, 그 시각의 공)은 frameAt(now) 로 읽는다 — rAF 마다 React 를 깨우지 않는다.
- * 토스트는 훅이 띄우지 않는다. onMismatch/onOffline/onOutcome/onMiscue 콜백으로 화면이 i18n 문구를 고른다.
+ * 토스트는 훅이 띄우지 않는다. onMismatch/onOffline/onOutcome/onMiscue/onMatch 콜백으로 화면이 i18n 문구를 고른다.
+ *
+ * 네트워크 대전(README "네트워크 대전 A"): actions.startMatch(match) 로 열면 mode="match", match 에 대전 뷰가 실린다.
+ * 상대 차례는 phase="waiting"(입력 잠금, 폴링), 상대 샷은 phase="shooting" + replaying 으로 재생된다.
  */
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import type { BallState } from "@shared/sim/types";
@@ -13,14 +16,16 @@ import type { SimParams } from "@shared/sim/params";
 import type { SessionState, ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
 import { simApi, type SimApi } from "./simApi";
-import { cueBallIdOf, type CueInput, type Phase } from "./simReducer";
+import type { MatchApi, MatchEndReason, MatchPublic, MatchStatus, PlayerIndex } from "./matchApi";
+import { cueBallIdOf, type CueInput, type Phase, type SimMode } from "./simReducer";
 import {
     SimController,
     type PlaybackSpeed, type SimCallbacks, type SimFrame, type SimPreview, type StartOptions,
 } from "./simController";
 
-export type { SimFrame, SimPreview, StartOptions, PlaybackSpeed, OfflineReason } from "./simController";
-export type { CueInput, Phase } from "./simReducer";
+export type { SimFrame, SimPreview, StartOptions, PlaybackSpeed, OfflineReason, MatchEvent } from "./simController";
+export type { CueInput, Phase, SimMode } from "./simReducer";
+export type { MatchPublic, MatchStatus, MatchEndReason, PlayerIndex } from "./matchApi";
 
 export interface UseSimulatorOptions extends SimCallbacks {
     /** useGameAudio().getCtx — 제스처로 잠금 해제된 공유 AudioContext. 없으면 무음. */
@@ -32,11 +37,18 @@ export interface UseSimulatorOptions extends SimCallbacks {
     readonly previewDelayMs?: number;
     /** 테스트·주입용. 기본 simApi */
     readonly api?: SimApi;
+    /** 테스트·주입용. 기본 matchApi */
+    readonly matchApi?: MatchApi;
 }
 
 export interface SimulatorActions {
     /** setup → aim. 서버 세션 개설은 record 일 때 백그라운드로. */
     start(config: SimSetupConfig, opts?: StartOptions): void;
+    /**
+     * 네트워크 대전 열기(GET /sim/matches/:id 의 행). 내 차례면 aim, 상대 차례면 waiting, 끝났으면 finished.
+     * 행에 state/balls 가 없거나(참가 전) 내가 참가자가 아니면 false.
+     */
+    startMatch(match: MatchPublic): boolean;
     setInput(patch: Partial<CueInput>): void;
     setPhi(phi: number): void;
     nudgePhi(deltaRad: number): void;
@@ -48,7 +60,7 @@ export interface SimulatorActions {
     setPower(V0: number): void;
     /** rad, [0, 20°] */
     setElevation(theta: number): void;
-    /** aim 에서만. 로컬 시뮬 → 판정 → 재생 시작 → (record) 서버 전송. */
+    /** aim 에서만. 로컬 시뮬 → 판정 → 재생 시작 → (record) 서버 전송. 대전이면 POST /sim/matches/:id/shots. */
     shoot(): Promise<void>;
     /** 재생 배속. 재생이 끝나면 1 로 돌아온다. */
     setSpeed(speed: PlaybackSpeed): void;
@@ -56,31 +68,69 @@ export interface SimulatorActions {
     placeBall(id: string, x: number, y: number): boolean;
     /** 연습 모드에서만. */
     undo(): void;
-    /** 같은 설정으로 새 세션. */
+    /** 같은 설정으로 새 세션(솔로만). */
     restart(): void;
-    /** 세션 닫기(finished 또는 abandoned) → setup. */
+    /** 세션 닫기(솔로: finished 또는 abandoned) → setup. 대전은 서버에 그대로 남는다. */
     exit(): Promise<void>;
+    /** 대전: 기권 → finished(상대 승). 성공하면 true. */
+    resign(): Promise<boolean>;
+    /** 대전: 승리 주장(match.canClaim 일 때만 뜻이 있다). 성공하면 true, 아직 이르면 false + onMatch("claim-too-early"). */
+    claim(): Promise<boolean>;
+    /** 대전: 지금 서버 상태를 한 번 읽는다(당겨서 새로고침). */
+    sync(): void;
+}
+
+/** 네트워크 대전 뷰(mode="match" 에서만). 이름은 players 순서(0 호스트·흰 공, 1 게스트·노란 공). */
+export interface MatchView {
+    readonly id: string;
+    readonly myIndex: PlayerIndex;
+    readonly myCueBallId: "white" | "yellow";
+    readonly names: readonly [string, string];
+    readonly myName: string;
+    readonly opponentName: string;
+    /** 서버가 아는 차례 */
+    readonly turn: number;
+    readonly isMyTurn: boolean;
+    readonly status: MatchStatus;
+    readonly version: number;
+    readonly winnerIndex: PlayerIndex | null;
+    /** finished 사유. target·inningCap(샷으로 끝남) / resign / claim */
+    readonly endReason: MatchEndReason | null;
+    /** ISO. 이 시각부터 상대가 안 치면 승리 주장 가능 */
+    readonly claimableAt: string | null;
+    /** 상대 차례 + claimableAt 지남(폴링마다 다시 계산) */
+    readonly canClaim: boolean;
+    /** playing 이면 기권 가능 */
+    readonly canResign: boolean;
+    /** 지금 재생 중인 샷이 상대 샷(따라잡기) */
+    readonly opponentShot: boolean;
 }
 
 export interface Simulator {
     readonly phase: Phase;
+    /** solo(연습·기록 세션) | match(네트워크 대전) */
+    readonly mode: SimMode;
+    /** 대전 뷰. 솔로면 null */
+    readonly match: MatchView | null;
+    /** 따라잡기 재생 중(이 기기에서 친 샷이 아니다). 화면은 "상대 샷" 칩을 띄운다 */
+    readonly replaying: boolean;
     readonly config: SimSetupConfig | null;
     readonly params: SimParams | null;
     readonly session: SessionState | null;
     /** 정지 상태의 공(마지막 샷의 final 또는 서버 스냅). 재생 중 그릴 공은 frameAt(). */
     readonly balls: readonly BallState[];
     readonly input: CueInput;
-    /** 현재 차례의 큐볼 */
+    /** 현재 차례의 큐볼(대전에서 상대 차례면 상대 큐볼) */
     readonly cueBallId: "white" | "yellow";
     /** aim 에서만 non-null. 입력이 바뀌면 30 ms 뒤 갱신. */
     readonly preview: SimPreview | null;
     readonly playback: { readonly duration: number; readonly playing: boolean; readonly speed: PlaybackSpeed };
     readonly outcomeLast: ShotOutcome | null;
     readonly mismatches: number;
-    /** 서버 기록 포기됨(로컬 플레이는 계속) */
+    /** 솔로: 서버 기록 포기됨(로컬 플레이는 계속). 대전: 내 샷 전송이 끊김(폴링 계속, 연결이 돌아오면 다시 보낸다) */
     readonly offline: boolean;
     readonly record: boolean;
-    /** 서버 호출 진행 중 */
+    /** 서버 호출 진행 중(대전 폴링 제외) */
     readonly syncing: boolean;
     /** 재전송 대기 샷 수 */
     readonly queued: number;
@@ -100,6 +150,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
     if (ctrlRef.current === null) {
         ctrlRef.current = new SimController({
             api: options.api ?? simApi,
+            matchApi: options.matchApi,
             // 최신 옵션을 읽는 안정적인 게터 — 컨텍스트 공급자가 바뀌어도 컨트롤러를 다시 만들지 않는다.
             getAudioContext: () => optRef.current.getAudioContext?.() ?? null,
             haptics: options.haptics,
@@ -114,6 +165,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         onOffline: options.onOffline,
         onOutcome: options.onOutcome,
         onMiscue: options.onMiscue,
+        onMatch: options.onMatch,
     });
 
     useEffect(() => { ctrl.setMuted(options.muted === true); }, [ctrl, options.muted]);
@@ -123,6 +175,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
 
     const actions = useMemo<SimulatorActions>(() => ({
         start: (config, opts) => ctrl.start(config, opts),
+        startMatch: (match) => ctrl.startMatch(match),
         setInput: (patch) => ctrl.setInput(patch),
         setPhi: (phi) => ctrl.setPhi(phi),
         nudgePhi: (d) => ctrl.nudgePhi(d),
@@ -136,12 +189,37 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         undo: () => ctrl.undo(),
         restart: () => ctrl.restart(),
         exit: () => ctrl.exit(),
+        resign: () => ctrl.resign(),
+        claim: () => ctrl.claim(),
+        sync: () => ctrl.sync(),
     }), [ctrl]);
 
     return useMemo<Simulator>(() => {
         const { core, aux } = snap;
+        const m = core.mode === "match" && core.match && core.session ? core.match : null;
+        const match: MatchView | null = m && core.session ? {
+            id: m.matchId,
+            myIndex: m.myIndex,
+            myCueBallId: core.session.players[m.myIndex]?.cueBallId ?? (m.myIndex === 0 ? "white" : "yellow"),
+            names: m.myIndex === 0 ? [m.myName, m.opponentName] : [m.opponentName, m.myName],
+            myName: m.myName,
+            opponentName: m.opponentName,
+            turn: m.turn,
+            isMyTurn: m.status === "playing" && core.session.turn === m.myIndex,
+            status: m.status,
+            version: m.version,
+            winnerIndex: m.winnerIndex,
+            endReason: m.endReason,
+            claimableAt: m.claimableAt,
+            canClaim: ctrl.canClaim(),
+            canResign: m.status === "playing",
+            opponentShot: core.replayOf !== null && core.replayOf !== m.myIndex,
+        } : null;
         return {
             phase: core.phase,
+            mode: core.mode,
+            match,
+            replaying: core.replayOf !== null,
             config: aux.setup?.config ?? null,
             params: aux.setup?.params ?? null,
             session: core.session,

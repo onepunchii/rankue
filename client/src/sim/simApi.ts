@@ -171,12 +171,13 @@ function isRecord(v: unknown): v is Record<string, unknown> {
     return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function isSessionState(v: unknown): v is SessionState {
+/** 서버 SessionState 모양 검사. matchApi 도 같은 검사를 쓴다. */
+export function isSessionState(v: unknown): v is SessionState {
     return isRecord(v) && Array.isArray(v.players) && typeof v.turn === "number"
         && (v.status === "playing" || v.status === "finished") && isRecord(v.rules);
 }
 
-function isBallArray(v: unknown): v is BallState[] {
+export function isBallArray(v: unknown): v is BallState[] {
     return Array.isArray(v) && v.every((b) => isRecord(b) && typeof b.id === "string" && Array.isArray(b.r));
 }
 
