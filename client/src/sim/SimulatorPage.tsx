@@ -170,7 +170,8 @@ export function SimulatorPage() {
             renderer.draw({
                 balls: frame.balls,
                 cue: { phi: v.input.phi, pullback: pullbackFor(v.input.V0), visible: v.phase === "aim", ballId: v.cueBallId },
-                highlightBallId: v.placing ?? v.cueBallId,
+                // 큐볼은 큐 스틱이 가리키므로 링을 두르지 않는다 — 8px 남짓한 공에 링이 겹치면 속이 빈 공처럼 보였다(실측).
+                highlightBallId: v.placing ?? undefined,
             });
             const overlay = overlayRef.current;
             if (!overlay) return;
