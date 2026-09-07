@@ -1756,5 +1756,18 @@ const en: Dict = {
   "sim.exit.descPractice": "Practice is not saved",
   "sim.exit.descFinished": "The result has already been recorded",
   "sim.exit.confirm": "Leave",
+  "sim.history.title": "시뮬레이터",
+  "sim.history.subtitle": "실전 기록과 별개로 집계돼요",
+  "sim.history.sessions": "세션",
+  "sim.history.bestAvg": "최고 에버리지",
+  "sim.history.bestHighRun": "최고 하이런",
+  "sim.history.empty": "아직 시뮬레이터 기록이 없어요",
+  "sim.history.open": "시뮬레이터 열기",
+  "sim.history.finished": "완료",
+  "sim.history.abandoned": "중단",
+  "sim.history.playing": "진행 중",
+  "sim.history.inningsN": "{n}이닝",
+  "sim.history.avg": "에버리지",
+  "sim.history.practice": "연습",
 };
 export default en;

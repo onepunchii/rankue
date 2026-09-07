@@ -145,6 +145,11 @@ export class SimRepository {
             .limit(limit);
     }
 
+
+    async myRatings(memberId: string) {
+        return db.select().from(hiqSimRatings).where(eq(hiqSimRatings.memberId, memberId));
+    }
+
     async myRating(memberId: string, gameType: "3c" | "4c", tableId: "DAEDAE" | "JUNGDAE_KR") {
         const [row] = await db.select().from(hiqSimRatings)
             .where(and(eq(hiqSimRatings.memberId, memberId), eq(hiqSimRatings.gameType, gameType), eq(hiqSimRatings.tableId, tableId)))

@@ -125,6 +125,12 @@ router.get("/sim/ladder", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, rows);
 }));
 
+// GET /sim/ratings/me — 내 시뮬 성적 요약(종목·테이블별). 실전 성적과 무관한 별도 집계.
+router.get("/sim/ratings/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const rows = await storage.sim.myRatings(req.userId!);
+    return sendSuccess(res, rows);
+}));
+
 // GET /sim/sessions/:id — 상세(샷 로그 포함, 리플레이용)
 router.get("/sim/sessions/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const s = await storage.sim.getSession(req.params.id);

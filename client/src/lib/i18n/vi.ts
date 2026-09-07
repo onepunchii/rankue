@@ -1756,5 +1756,18 @@ const vi: Dict = {
   "sim.exit.descPractice": "Nội dung tập không được lưu",
   "sim.exit.descFinished": "Kết quả đã được lưu",
   "sim.exit.confirm": "Thoát",
+  "sim.history.title": "Simülatör",
+  "sim.history.subtitle": "Gerçek masa kayıtlarından ayrı tutulur",
+  "sim.history.sessions": "Oturum",
+  "sim.history.bestAvg": "En iyi ortalama",
+  "sim.history.bestHighRun": "En iyi seri",
+  "sim.history.empty": "Henüz simülatör oturumu yok",
+  "sim.history.open": "Simülatörü aç",
+  "sim.history.finished": "Bitti",
+  "sim.history.abandoned": "Yarım",
+  "sim.history.playing": "Devam ediyor",
+  "sim.history.inningsN": "{n} devre",
+  "sim.history.avg": "Ort.",
+  "sim.history.practice": "Antrenman",
 };
 export default vi;

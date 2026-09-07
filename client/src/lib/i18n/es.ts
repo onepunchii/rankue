@@ -1756,5 +1756,18 @@ const es: Dict = {
   "sim.exit.descPractice": "La práctica no se guarda",
   "sim.exit.descFinished": "El resultado ya quedó guardado",
   "sim.exit.confirm": "Salir",
+  "sim.history.title": "Simulator",
+  "sim.history.subtitle": "Kept separate from real-table records",
+  "sim.history.sessions": "Sessions",
+  "sim.history.bestAvg": "Best average",
+  "sim.history.bestHighRun": "Best high run",
+  "sim.history.empty": "No simulator sessions yet",
+  "sim.history.open": "Open simulator",
+  "sim.history.finished": "Finished",
+  "sim.history.abandoned": "Stopped",
+  "sim.history.playing": "In progress",
+  "sim.history.inningsN": "{n} inn.",
+  "sim.history.avg": "Avg",
+  "sim.history.practice": "Practice",
 };
 export default es;

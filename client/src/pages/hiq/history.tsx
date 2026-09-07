@@ -16,6 +16,7 @@ import { GrowthChart } from "@/components/hiq/history/GrowthChart";
 import { HistoryList } from "@/components/hiq/history/HistoryList";
 import { GameDetailDialog } from "@/components/hiq/history/GameDetailDialog";
 import { AchievementCard } from "@/components/hiq/history/AchievementCard";
+import { SimHistoryCard } from "@/components/hiq/history/SimHistoryCard";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginGate } from "@/components/hiq/LoginGate";
@@ -143,6 +144,9 @@ export default function HiqHistory() {
 
             {/* 주간 달성률 — 득점÷다마수, '지난주의 나'와 대결 */}
             {currentSport !== "GOLF" && <AchievementCard filter={filter} />}
+
+            {/* 시뮬레이터 기록 — 실전 전적과 별개 테이블, 화면에서도 분리 표기 */}
+            {currentSport !== "GOLF" && <SimHistoryCard filter={filter} />}
 
             {/* History List */}
             <HistoryList

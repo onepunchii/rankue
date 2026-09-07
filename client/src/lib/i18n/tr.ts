@@ -1756,5 +1756,18 @@ const tr: Dict = {
   "sim.exit.descPractice": "Antrenman kaydedilmez",
   "sim.exit.descFinished": "Sonuç zaten kaydedildi",
   "sim.exit.confirm": "Çık",
+  "sim.history.title": "Simulador",
+  "sim.history.subtitle": "Se cuenta aparte de las partidas reales",
+  "sim.history.sessions": "Sesiones",
+  "sim.history.bestAvg": "Mejor promedio",
+  "sim.history.bestHighRun": "Mejor serie",
+  "sim.history.empty": "Aún no hay sesiones del simulador",
+  "sim.history.open": "Abrir simulador",
+  "sim.history.finished": "Terminada",
+  "sim.history.abandoned": "Abandonada",
+  "sim.history.playing": "En curso",
+  "sim.history.inningsN": "{n} entr.",
+  "sim.history.avg": "Prom.",
+  "sim.history.practice": "Práctica",
 };
 export default tr;
