@@ -29,7 +29,7 @@ vi.mock("wouter", () => ({ useLocation: () => ["/online-game", nav.navigate], us
 vi.mock("@/lib/icons", async () => {
     const React = await import("react");
     const I = () => React.createElement("span");
-    return { ChevronDown: I, ChevronLeft: I, ChevronRight: I, LayoutList: I, LucideUndo2: I, X: I, LucideMinus: I, LucidePlus: I };
+    return { ChevronDown: I, ChevronLeft: I, ChevronRight: I, LayoutList: I, LucideUndo2: I, X: I, LucideMinus: I, LucidePlus: I, LucideSparkles: I };
 });
 vi.mock("@/components/hiq/BallDot", async () => {
     const React = await import("react");
