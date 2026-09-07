@@ -276,6 +276,13 @@ function AppRoutes() {
   );
 }
 
+// 시뮬레이터 화면은 하단 조작부가 꽉 차 있어 설치 배너를 띄우지 않는다(실측 2026-09-07: 샷 버튼을 덮음).
+function InstallBannerGate() {
+  const [location] = useLocation();
+  if (location.startsWith("/online-game")) return null;
+  return <HiqInstallBanner />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -287,7 +294,7 @@ function App() {
             {/* 앱 설치 유도 — iOS/안드로이드 스토어 우선, 미출시 플랫폼은 PWA 폴백.
                 컴포넌트는 예전부터 있었지만 **어디에도 마운트돼 있지 않아 죽어 있었다**(번들에서도 빠졌다).
                 여기 붙여야 실제로 뜬다. 네이티브 앱 안에서는 컴포넌트가 스스로 숨는다. */}
-            <HiqInstallBanner />
+            <InstallBannerGate />
             {/* 일별 유니크 접속자 비콘 — 하루 1회만 전송 */}
             <VisitBeacon />
           </SportProvider>

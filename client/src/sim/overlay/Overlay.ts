@@ -337,17 +337,14 @@ export class Overlay {
         const bh = LABEL_HEIGHT;
 
         const p = state.project(g.ghost[0], g.ghost[1]);
-        // 적구 방향의 화면상 반대쪽으로 밀어낸다. 적구가 없으면(쿠션) 조준 방향 반대쪽.
-        let ox: number, oy: number;
-        if (g.ball) {
-            const t = state.project(g.ghost[0] + g.ball.objectDir[0], g.ghost[1] + g.ball.objectDir[1]);
-            ox = p[0] - t[0]; oy = p[1] - t[1];
-        } else {
-            const t = state.project(g.ghost[0] + g.dir[0], g.ghost[1] + g.dir[1]);
-            ox = p[0] - t[0]; oy = p[1] - t[1];
-        }
+        // 조준선에 수직인 쪽(화면에서 더 위쪽)으로 밀어낸다. 조준선 뒤쪽으로 놓으면 개시 배치처럼
+        // 큐볼과 적구가 18 cm 떨어진 경우 라벨이 큐볼을 덮는다(실측 2026-09-07).
+        const t = state.project(g.ghost[0] + g.dir[0], g.ghost[1] + g.dir[1]);
+        const dx = t[0] - p[0], dy = t[1] - p[1];
+        let ox = -dy, oy = dx;
+        if (oy > 0) { ox = -ox; oy = -oy; }
         const ol = Math.sqrt(ox * ox + oy * oy) || 1;
-        const dist = rPx + 14;
+        const dist = rPx + 16;
         let x = p[0] + (ox / ol) * dist - bw / 2;
         let y = p[1] + (oy / ol) * dist - bh / 2;
         x = Math.max(4, Math.min(this.w - bw - 4, x));
