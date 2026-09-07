@@ -245,6 +245,16 @@ export function SimulatorPage() {
         dirtyRef.current = true;
     }, [table]);
 
+    // 테이블 영역 크기가 바뀌면(두 선수 HUD 로 커짐·회전·키보드) 다음 프레임에 오버레이를 새 투영으로 다시 그린다.
+    // 렌더러·오버레이의 ResizeObserver 순서는 보장되지 않아, 오버레이가 옛 레이아웃으로 먼저 그려질 수 있었다(실측 2026-09-07).
+    useEffect(() => {
+        const el = tableRef.current;
+        if (!el || typeof ResizeObserver === "undefined") return;
+        const ro = new ResizeObserver(() => { dirtyRef.current = true; });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
     // rAF 루프가 읽는 뷰 — 렌더마다 갱신(할당만, 재렌더 없음)
     const viewRef = useRef<View>({
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
@@ -523,7 +533,7 @@ export function SimulatorPage() {
                     {isMatch && turnChip && sim.phase === "aim" && (
                         <span className="absolute top-3 left-3 z-[3] rk-chip bg-brand text-brand-fg pointer-events-none">{t("sim.match.yourTurn")}</span>
                     )}
-                    {isMatch && sim.phase === "waiting" && sim.match && (
+                    {isMatch && sim.phase === "waiting" && sim.match && !bannerVisible && (
                         <div className="absolute inset-x-0 bottom-3 z-[3] flex flex-col items-center gap-2 px-4">
                             <div className="rounded-card bg-surface-1 border border-surface-line px-4 py-3 text-center max-w-[320px] w-full">
                                 <p className="text-[12px] font-medium text-ink-4">{sim.match.opponentName}</p>
