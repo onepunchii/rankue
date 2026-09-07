@@ -29,6 +29,8 @@ export type LobbyTab = "create" | "join";
 export interface MatchLobbyProps {
     /** 대전이 playing 이 된 순간(호스트: 상대가 들어옴 / 게스트: 참가 성공). 페이지는 actions.startMatch(match). */
     onStarted: (match: MatchPublic) => void;
+    /** 대전 행이 생기거나 바뀐 직후(만들기 성공·참가 성공). 페이지는 목록 쿼리를 무효화한다. */
+    onCreated?: (match: MatchPublic) => void;
     onClose: () => void;
     /** 테스트·주입용. 기본 matchApi */
     api?: MatchApi;
@@ -124,7 +126,7 @@ function TargetPicker({ id, gameType, text, onText, label }: {
 
 /* ------------------------------------------------------------------ 만들기 */
 
-function CreateTab({ api, pollMs, onStarted }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void }) {
+function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void }) {
     const { t } = useT();
     const [gameType, setGameType] = useState<GameType>("3c");
     const [tableId, setTableId] = useState<TableId>(defaultTableFor("3c"));
@@ -161,6 +163,7 @@ function CreateTab({ api, pollMs, onStarted }: { api: MatchApi; pollMs: number; 
                 rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: passiveFoul },
             }));
             setCreated(m);
+            onCreated?.(m);
         } catch {
             setError(t("sim.match.createFailed"));
         } finally {
@@ -335,7 +338,7 @@ type Lookup =
     | { readonly status: "found"; readonly match: MatchPublic }
     | { readonly status: "error"; readonly key: string };
 
-function JoinTab({ api, onStarted }: { api: MatchApi; onStarted: (m: MatchPublic) => void }) {
+function JoinTab({ api, onStarted, onCreated }: { api: MatchApi; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void }) {
     const { t } = useT();
     const [code, setCode] = useState("");
     const [lookup, setLookup] = useState<Lookup>({ status: "idle" });
@@ -370,6 +373,7 @@ function JoinTab({ api, onStarted }: { api: MatchApi; onStarted: (m: MatchPublic
         setJoinError(null);
         try {
             const m = await api.joinMatch(code, targetNum);
+            onCreated?.(m);
             onStarted(m);
         } catch (e) {
             setJoinError(t(joinErrorKey(e)));
@@ -439,7 +443,7 @@ function JoinTab({ api, onStarted }: { api: MatchApi; onStarted: (m: MatchPublic
 
 /* ------------------------------------------------------------------ 로비 */
 
-export function MatchLobby({ onStarted, onClose, api = defaultApi, initialTab = "create", pollMs = 2000 }: MatchLobbyProps) {
+export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", pollMs = 2000 }: MatchLobbyProps) {
     const { t } = useT();
     const [tab, setTab] = useState<LobbyTab>(initialTab);
 
@@ -473,8 +477,8 @@ export function MatchLobby({ onStarted, onClose, api = defaultApi, initialTab = 
             </div>
 
             {tab === "create"
-                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} />
-                : <JoinTab api={api} onStarted={onStarted} />}
+                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} />
+                : <JoinTab api={api} onStarted={onStarted} onCreated={onCreated} />}
         </div>
     );
 }

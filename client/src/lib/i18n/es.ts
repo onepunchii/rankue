@@ -1837,5 +1837,9 @@ const es: Dict = {
   "sim.match.loading": "Cargando la partida",
   "sim.match.entry": "Jugar con un amigo",
   "sim.match.entryDesc": "Invita con un código y jueguen por turnos",
+  "sim.match.bannerTitle": "Partida del simulador: tu turno",
+  "sim.match.bannerSub": "{name} ya tiró",
+  "sim.match.bannerMore": "+{n} más",
+  "sim.match.bannerCta": "Continuar",
 };
 export default es;

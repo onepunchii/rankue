@@ -1837,5 +1837,9 @@ const tr: Dict = {
   "sim.match.loading": "Maç yükleniyor",
   "sim.match.entry": "Arkadaşınla oyna",
   "sim.match.entryDesc": "Kodla davet et, sırayla oyna",
+  "sim.match.bannerTitle": "Simülatör maçı: sıra sende",
+  "sim.match.bannerSub": "{name} vurdu",
+  "sim.match.bannerMore": "+{n} daha",
+  "sim.match.bannerCta": "Devam et",
 };
 export default tr;

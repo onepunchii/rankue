@@ -10,9 +10,9 @@ import { useT } from "@/lib/i18n";
 import { matchApi as defaultApi, formatCode, type MatchApi, type MatchPublic } from "../matchApi";
 import { gameLabel, matchBadge, opponentLabel, sortForList, type BadgeTone } from "./matchView";
 
-export const MATCH_LIST_QUERY_KEY = ["sim-matches"] as const;
+export { MATCH_LIST_QUERY_KEY, MATCH_LIST_REFETCH_MS } from "./queryKeys";
+import { MATCH_LIST_QUERY_KEY, MATCH_LIST_REFETCH_MS } from "./queryKeys";
 /** 진행 중인 대전이 있을 때의 재조회 주기 (ms) */
-export const MATCH_LIST_REFETCH_MS = 10_000;
 
 export interface MatchListProps {
     onOpen: (match: MatchPublic) => void;

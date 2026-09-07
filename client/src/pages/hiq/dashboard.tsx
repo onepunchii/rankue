@@ -13,6 +13,7 @@ import { RankingListCard } from "@/components/hiq/dashboard/RankingListCard";
 import { WorldRankingCard } from "@/components/hiq/umb/WorldRankingCard";
 import { PbaRankingCard, PBA_CARD_L } from "@/components/hiq/pba/PbaRankingCard";
 import { OngoingGameBanner } from "@/components/hiq/dashboard/OngoingGameBanner";
+import { SimMatchBanner } from "@/components/hiq/dashboard/SimMatchBanner";
 import { QuickActions } from "@/components/hiq/dashboard/QuickActions";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
 import { PinCodeModal } from "@/components/hiq/dashboard/PinCodeModal";
@@ -185,6 +186,8 @@ export default function HiqDashboard() {
             {/* 진행 중 경기 이어하기 — 이탈한 경기로 돌아갈 유일한 입구.
                 이게 없어서 앱을 껐다 켜면 경기가 영구히 미완료로 남았다(완주율 33% 실측). */}
             <OngoingGameBanner />
+            {/* 시뮬레이터 대전에서 내 차례 — 푸시를 놓쳐도 여기서 돌아간다 */}
+            <SimMatchBanner />
 
             {/* 프로필 완성 넛지 — 가입에서 설정으로 옮긴 선택 정보(성별·출생연도) 채움 유도 */}
             {member && (!(member as any).gender || !(member as any).birthYear) && (

@@ -1837,5 +1837,9 @@ const en: Dict = {
   "sim.match.loading": "Loading the match",
   "sim.match.entry": "Play a friend",
   "sim.match.entryDesc": "Invite with a code and take turns",
+  "sim.match.bannerTitle": "Simulator match: your turn",
+  "sim.match.bannerSub": "{name} has played",
+  "sim.match.bannerMore": "+{n} more",
+  "sim.match.bannerCta": "Continue",
 };
 export default en;

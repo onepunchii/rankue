@@ -573,7 +573,7 @@ export function SimulatorPage() {
 
             {showLobby && (
                 <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    <MatchLobby onStarted={openMatch} onClose={() => navigate(EXIT_PATH)} />
+                    <MatchLobby onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate(EXIT_PATH)} />
                     <div className="w-full max-w-[420px] mx-auto px-5 pb-8">
                         <MatchList onOpen={openMatch} />
                     </div>

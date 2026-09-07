@@ -1839,4 +1839,8 @@ export const ko: Dict = {
   "sim.match.loading": "대전을 불러오는 중",
   "sim.match.entry": "친구와 대전",
   "sim.match.entryDesc": "코드로 초대해 번갈아 쳐요",
+  "sim.match.bannerTitle": "시뮬레이터 대전, 내 차례예요",
+  "sim.match.bannerSub": "{name}님이 쳤어요",
+  "sim.match.bannerMore": "외 {n}건",
+  "sim.match.bannerCta": "이어가기",
 };

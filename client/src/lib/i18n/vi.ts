@@ -1837,5 +1837,9 @@ const vi: Dict = {
   "sim.match.loading": "Đang tải trận đấu",
   "sim.match.entry": "Đấu với bạn bè",
   "sim.match.entryDesc": "Mời bằng mã và đánh luân phiên",
+  "sim.match.bannerTitle": "Trận mô phỏng: đến lượt bạn",
+  "sim.match.bannerSub": "{name} đã đánh",
+  "sim.match.bannerMore": "+{n} trận nữa",
+  "sim.match.bannerCta": "Tiếp tục",
 };
 export default vi;
