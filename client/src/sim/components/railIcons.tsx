@@ -23,6 +23,17 @@ export function SpinIcon({ a, b }: { a: number; b: number }) {
     );
 }
 
+/** 경고: 삼각형 + 느낌표(미스큐·마세·점프 안내 칩). */
+export function WarnIcon({ className }: { className?: string }) {
+    return (
+        <Icon className={className}>
+            <path d="M12 4 3 19h18z" />
+            <path d="M12 10v4" />
+            <path d="M12 17h.01" />
+        </Icon>
+    );
+}
+
 /** 큐 각: 바닥선 위로 들린 큐대와 각도 원호. */
 export function ElevationIcon() {
     return (

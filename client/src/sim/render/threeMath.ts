@@ -21,6 +21,7 @@ import type { Vec3 } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
 import { diamondMarks } from "../aim";
 import { RAIL_WIDTH_M, type Size, type TableLayout } from "./tableGeometry";
+import { ZOOM_MIN } from "./Renderer";
 
 const DEG2RAD = Math.PI / 180;
 
@@ -384,4 +385,22 @@ export function rigSmoothTime(rig: CameraRig, target: CameraPose): number {
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
     const k = d >= OVERVIEW_BLEND_M ? 1 : d / OVERVIEW_BLEND_M;
     return PLAYER_SMOOTH_S + (OVERVIEW_SMOOTH_S - PLAYER_SMOOTH_S) * k;
+}
+
+// ── 핀치 축소(player 뷰) ───────────────────────────────────────────────
+/** 축소 감쇠 시간(s): 손가락을 따라올 땐 거의 즉각, 떼면 0.1~0.2 s 에 돌아온다. */
+export const ZOOM_SMOOTH_S = 0.08;
+
+/** 축소 배율 → 세로 시야각(°): tan(f/2) = tan(F/2) / zoom. zoom 0.7 이면 화면의 모든 것이 70 % 크기로 보인다(NDC 가 정확히 0.7 배). */
+export function zoomedFovDeg(baseDeg: number, zoom: number): number {
+    const z = zoom < ZOOM_MIN ? ZOOM_MIN : zoom > 1 ? 1 : zoom;
+    return (2 * Math.atan(Math.tan(baseDeg * DEG2RAD * 0.5) / z)) / DEG2RAD;
+}
+
+/** 스칼라 지수 감쇠: dt 뒤의 값. 목표와 1e-3 안이면 스냅한다(프레임 요청을 멈추기 위해). */
+export function dampScalar(value: number, target: number, smoothTime: number, dt: number): number {
+    if (!(dt > 0)) return value;
+    const k = 1 - Math.exp(-dt / smoothTime);
+    const v = value + (target - value) * k;
+    return Math.abs(v - target) < 1e-3 ? target : v;
 }

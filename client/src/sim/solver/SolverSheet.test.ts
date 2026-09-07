@@ -90,7 +90,7 @@ describe("SolverSheet", () => {
         const text = h.container.textContent ?? "";
         expect(text).toContain(ko["sim.solver.title"]);
         expect(text).toContain("400개 시도 · 해법 5개");
-        expect(text).toContain("m/s");
+        expect(text).toMatch(/\d+%/);   // 세기는 % 로
         expect(text).toContain("쿠션 " + candidates[0].outcome.cushionsBeforeSecond + "개");
         expect(text).toContain(aimText(candidates[0].aim, (k) => ko[k] ?? k));
         expect(h.buttons(ko["sim.solver.apply"])).toHaveLength(3);

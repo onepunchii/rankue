@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import type { CushionId } from "@shared/sim/types";
 import { DEFAULT_CUE } from "@shared/sim/params";
 import { thicknessLabel } from "../overlay/paths";
-import { formatSpeed } from "../controlsMath";
+import { powerPercent } from "../controlsMath";
 import type { AimLabel, SolveCandidate, SolveProgress } from "./search";
 import type { SolverStatus } from "./useSolver";
 
@@ -168,7 +168,7 @@ export const SolverSheet = memo(function SolverSheet(p: SolverSheetProps) {
                             {rows.map((c, i) => {
                                 const on = previewIdx === i;
                                 const details = [
-                                    `${formatSpeed(c.input.V0)} m/s`,
+                                    `${powerPercent(c.input.V0)}%`,
                                     spinText(c.input.a, c.input.b, DEFAULT_CUE.maxOffset, t),
                                     t("sim.solver.cushions").replace("{n}", String(c.outcome.cushionsBeforeSecond)),
                                 ];

@@ -15,8 +15,10 @@ import {
     CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, CUE_GAP, CUE_PULLBACK_MAX, cameraBasis, cueGap, cueRotationZ, dampRig, diamondWorld,
     integrateOrientation, makeBasis, makePose, makeRig, orthoFrustum, PLAYER_AHEAD, PLAYER_BACK, PLAYER_FAR, PLAYER_FOV_DEG, PLAYER_HEIGHT,
     PLAYER_MARGIN, PLAYER_MIN_Z, PLAYER_NEAR, PLAYER_SMOOTH_S, playerPose, projectOrtho, projectPerspective, snapRig, unprojectOrtho,
-    unprojectPerspective, overviewPose, OVERVIEW_EDGE, OVERVIEW_MARGIN_M, OVERVIEW_SMOOTH_S, rigSmoothTime, type CameraPose,
+    unprojectPerspective, overviewPose, OVERVIEW_EDGE, OVERVIEW_MARGIN_M, OVERVIEW_SMOOTH_S, rigSmoothTime, zoomedFovDeg, dampScalar,
+    type CameraPose,
 } from "./threeMath";
+import { ZOOM_MIN } from "./Renderer";
 import { ThreeRenderer, type ThreeRendererOptions } from "./ThreeRenderer";
 
 const VIEWPORTS = [
@@ -991,5 +993,63 @@ describe("ThreeRenderer 재생 중 부감(view.mode = 'overview')", () => {
         t += 1000; setTime(t);
         r.draw({ balls });
         expect(r.getCameraPose(makePose())).toEqual(back);
+    });
+});
+
+describe("핀치 축소 — zoomedFovDeg / dampScalar / ThreeRenderer.setZoom", () => {
+    it("zoomedFovDeg: 1 이면 그대로, 0.7 이면 tan(f/2) 가 1/0.7 배, ZOOM_MIN 아래·1 위는 클램프", () => {
+        expect(zoomedFovDeg(45, 1)).toBeCloseTo(45, 12);
+        const f = zoomedFovDeg(45, 0.7);
+        expect(Math.tan((f * Math.PI) / 360)).toBeCloseTo(Math.tan((45 * Math.PI) / 360) / 0.7, 12);
+        expect(zoomedFovDeg(45, 0.2)).toBeCloseTo(zoomedFovDeg(45, ZOOM_MIN), 12);
+        expect(zoomedFovDeg(45, 3)).toBeCloseTo(45, 12);
+    });
+    it("dampScalar: dt 0 이면 그대로, 목표로 단조 접근, 1e-3 안이면 스냅", () => {
+        expect(dampScalar(1, 0.7, 0.08, 0)).toBe(1);
+        let v = 1;
+        let prev = v;
+        for (let i = 0; i < 60; i++) {
+            v = dampScalar(v, 0.7, 0.08, 1 / 60);
+            expect(v).toBeLessThanOrEqual(prev);
+            prev = v;
+        }
+        expect(v).toBe(0.7);
+    });
+    it("setZoom(0.7): 감쇠로 시야가 넓어져 먼 쿠션이 화면 중심 쪽으로 정확히 0.7 배 당겨지고, setZoom(1) 이면 돌아온다", () => {
+        const { r, el, setTime } = make();
+        r.mount(el, T);
+        const balls = openingLayout("3c", T, "white");
+        const follow = { cueBallId: "white", phi: Math.PI / 2 };
+        r.draw({ balls, view: follow });
+        r.setView("player");
+        const pose = r.getCameraPose(makePose());
+        const centre = r.project(pose.tx, pose.ty);           // 시선 목표 = 인셋 사각형 중앙
+        const far0 = r.project(T.width / 2, T.length);
+        const d0 = centre[1] - far0[1];
+        expect(d0).toBeGreaterThan(10);
+        r.setZoom(0.7);
+        expect(r.needsFrame()).toBe(true);
+        let t = 0;
+        for (let i = 0; i < 120; i++) { t += 1000 / 60; setTime(t); r.draw({ balls, view: follow }); }
+        expect(r.needsFrame()).toBe(false);
+        expect(r.stats().zoom).toBe(0.7);
+        const far1 = r.project(T.width / 2, T.length);
+        expect((centre[1] - far1[1]) / d0).toBeCloseTo(0.7, 6);
+        // 중심은 그대로
+        const c1 = r.project(pose.tx, pose.ty);
+        expect(c1[0]).toBeCloseTo(centre[0], 6);
+        expect(c1[1]).toBeCloseTo(centre[1], 6);
+        // unproject 도 같은 시야각을 쓴다(왕복)
+        const [ux, uy] = r.unproject(far1[0], far1[1]);
+        expect(ux).toBeCloseTo(T.width / 2, 6);
+        expect(uy).toBeCloseTo(T.length, 6);
+        // 하한 클램프·되돌리기
+        r.setZoom(0.2);
+        for (let i = 0; i < 120; i++) { t += 1000 / 60; setTime(t); r.draw({ balls, view: follow }); }
+        expect(r.stats().zoom).toBe(ZOOM_MIN);
+        r.setZoom(1);
+        for (let i = 0; i < 120; i++) { t += 1000 / 60; setTime(t); r.draw({ balls, view: follow }); }
+        expect(r.stats().zoom).toBe(1);
+        expect(r.project(T.width / 2, T.length)[1]).toBeCloseTo(far0[1], 6);
     });
 });

@@ -24,6 +24,9 @@ export interface CueFrame {
  */
 export type RendererView = "top" | "player";
 
+/** 핀치 축소 하한: 0.7 = 30 % 축소(화면의 모든 것이 70 % 크기). 그 이상 작아지지 않는다. */
+export const ZOOM_MIN = 0.7;
+
 /** 선수 시점 카메라의 목표. 없으면 카메라는 마지막 자리에 머문다(공 옮기기·상대 차례 대기). */
 export interface ViewFrame {
     readonly cueBallId: string;
@@ -92,4 +95,10 @@ export interface Renderer {
     getView?(): RendererView;
     /** 카메라가 아직 움직이는 중이면 true — 페이지 rAF 루프가 dirty 가 아니어도 draw 를 한 번 더 부른다(선택). */
     needsFrame?(): boolean;
+    /**
+     * 임시 축소(선택, player 뷰만). 1 = 기본, ZOOM_MIN(0.7) = 30 % 축소 — 시야각을 넓혀 더 멀리까지 보인다. 감쇠로 따라가며
+     * project/unproject 도 같은 시야각을 쓴다. 두 손가락 핀치가 잡고 있는 동안만 < 1 이고, 손을 떼면 페이지가 1 로 되돌린다.
+     * 구현하지 않는 렌더러(Canvas2D)는 없음 — 페이지는 이 메서드가 있을 때만 핀치를 시작한다.
+     */
+    setZoom?(zoom: number): void;
 }

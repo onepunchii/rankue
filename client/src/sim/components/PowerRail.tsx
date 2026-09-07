@@ -9,7 +9,8 @@ import { V0_MAX, V0_MIN } from "../simReducer";
  * 세로 큐 슬라이더(세기 V0). 오른쪽 툴바 아래에 놓이고 남은 높이를 채운다.
  *  - 불투명 흰 알약(surface-1 + surface-line, 44 px 폭) 하나가 읽기·트랙·큐대를 모두 감싼다 — 캔버스 위에 바로 놓으면 3D 렌더러의
  *    바닥·라사 위에서 글자가 안 읽히고, 렌더러가 그리는 큐대(1.45 m)가 슬라이더 틈으로 비쳤다(2026-09-07 리뷰; 목업의 28×300 흰 알약).
- *  - 위에 "2.5 m/s" 읽기(rk-num 12 px) 한 줄, 그 아래 트랙. "%" 줄은 두지 않는다 — 오른쪽 열 높이 예산(375×812 에서 툴바 8개 md) 때문.
+ *  - 위에 "28%" 읽기(rk-num 12 px) 한 줄, 그 아래 트랙. m/s 는 title 로만(2026-09-07 오너: 깔끔하게 퍼센트로). 한 줄인 이유는
+ *    오른쪽 열 높이 예산(375×812 에서 툴바 8개 md).
  *  - 엄지(thumb)가 큐대 그림(SVG: 팁·페룰·샤프트·손잡이 — 그려진 사물이라 나무색 리터럴)이다. inverted 세로 슬라이더라
  *    아래로 끌수록 세지고, 큐대가 아래로(공에서 멀리) 당겨진다 — 참조 게임의 큐 슬라이더와 같은 손맛.
  *    radix 는 엄지를 트랙 안에 가두므로 큐대 길이만큼 이동 범위가 줄어든다(트랙 − CUE_PX). 그래서 큐대는 100 px 로 짧게.
@@ -61,8 +62,8 @@ export const PowerRail = memo(function PowerRail({ V0, disabled, onChange, compa
     const cuePx = compact ? CUE_PX_SM : CUE_PX;
     return (
         <div className={cn("flex flex-col items-center gap-1 w-11 py-2 rounded-pill bg-surface-1 border border-surface-line rk-shadow", className)}>
-            <span className="shrink-0 rk-num text-[12px] leading-none font-semibold text-ink-1 whitespace-nowrap" title={`${powerPercent(V0)}%`}>
-                {formatSpeed(V0)} m/s
+            <span className="shrink-0 rk-num text-[12px] leading-none font-semibold text-ink-1 whitespace-nowrap" title={`${formatSpeed(V0)} m/s`}>
+                {powerPercent(V0)}%
             </span>
             <SliderPrimitive.Root
                 aria-label={t("sim.controls.power")}

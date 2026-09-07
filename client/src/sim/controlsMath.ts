@@ -53,9 +53,10 @@ export const FINE_STEP_RAD = (0.1 * Math.PI) / 180;
 
 /* ------------------------------------------------------------------ 세기 */
 
-export const POWER_FINE_STEP = 0.05;
+/** 미세 조절·슬라이더 눈금: 상한의 1 % (9 m/s → 0.09). 화면은 % 로만 읽어 주므로 눈금도 % 단위(2026-09-07 오너 요청). */
+export const POWER_FINE_STEP = 0.09;
 
-/** 세기 % — 상한 9 m/s 기준. 2.5 m/s → 28 %. */
+/** 세기 % — 상한 9 m/s 기준. 2.5 m/s → 28 %. 슬라이더·± 눈금과 같은 단위. */
 export function powerPercent(V0: number): number {
     return Math.round((clampPower(V0) / V0_MAX) * 100);
 }
@@ -71,10 +72,10 @@ export function formatPower(V0: number): string {
     return `${formatSpeed(V0)} m/s · ${powerPercent(V0)}%`;
 }
 
-/** ±0.05 m/s 눈금으로 옮기고 격자에 맞춘다(부동소수 찌꺼기 없이). */
+/** ±1 % 눈금으로 옮기고 격자에 맞춘다(부동소수 찌꺼기 없이): 2.5 m/s(28 %) → 29 % = 2.61 m/s. */
 export function stepPower(V0: number, dir: -1 | 1): number {
-    const n = Math.round(clampPower(V0) / POWER_FINE_STEP) + dir;
-    return clampPower(Math.round(n * POWER_FINE_STEP * 100) / 100);
+    const pct = powerPercent(V0) + dir;
+    return clampPower(Math.round(pct * V0_MAX) / 100);
 }
 
 /** 슬라이더 값(0..1) ↔ m/s. */

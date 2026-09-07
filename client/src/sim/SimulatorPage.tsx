@@ -39,6 +39,7 @@ import { useGameAudio } from "@/hooks/useGameAudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useSimulator, type OfflineReason } from "./useSimulator";
 import type { Renderer, RendererView, SafeInsets } from "./render/Renderer";
+import { ZOOM_MIN } from "./render/Renderer";
 import { Canvas2DRenderer } from "./render/Canvas2DRenderer";
 import {
     CONTEXT_LOSS_LIMIT, readViewPref, safeLocalStorage, selectRendererKind, writeRendererPref, writeViewPref, type RendererKind,
@@ -66,13 +67,14 @@ import { useShare } from "./share/useShare";
 import { activeThickness, elevationDeg, FINE_STEP_RAD, pullbackFor, stepPower, type ThicknessStep } from "./controlsMath";
 import { appendShot, EMPTY_LOG, popShot, type InningLog } from "./inningLog";
 import { beginGesture, moveGesture, type Gesture } from "./tableGestures";
+import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
 import type { CueInput, Phase } from "./simReducer";
 import type { SimPreview } from "./simController";
 import { TopBar } from "./components/TopBar";
 import { ToolRail, type RailItem } from "./components/ToolRail";
 import {
-    CloseIcon, CubeIcon, DiamondIcon, ElevationIcon, FlagIcon, ListIcon, MinusIcon, PlusIcon, ResetIcon, ShareIcon, SolverIcon, SoundIcon,
+    CloseIcon, CubeIcon, DiamondIcon, ElevationIcon, FlagIcon, ListIcon, MinusIcon, PlusIcon, ResetIcon, ShareIcon, SolverIcon, SoundIcon, WarnIcon,
     SpinIcon,
 } from "./components/railIcons";
 import { POWER_RAIL_MIN_MD, PowerRail } from "./components/PowerRail";
@@ -473,6 +475,12 @@ export function SimulatorPage() {
     const gestureRef = useRef<Gesture | null>(null);
     const pointerIdRef = useRef<number | null>(null);
     const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /** 눌린 포인터 전부의 화면 px — 두 번째 손가락이 오면 핀치 축소(선수 시점 조준 중에만). */
+    const pointersRef = useRef(new Map<number, [number, number]>());
+    /** 핀치 중이면 시작 거리. 축소 배율 = 현재 거리 / 시작 거리(ZOOM_MIN..1, 벌리면 1). */
+    const pinchRef = useRef<{ d0: number } | null>(null);
+    /** 조준 드래그 시작 때의 phi — 핀치로 바뀌면 손가락 둘이 닿기 전 드래그된 몇 px 을 되돌린다. */
+    const phiAtDownRef = useRef(0);
     /** 직전 포인터의 화면 px(마운트 기준). 조준 드래그의 각 변화를 현재 카메라로 다시 재기 위해 둔다. */
     const lastScreenRef = useRef<[number, number] | null>(null);
 
@@ -489,9 +497,28 @@ export function SimulatorPage() {
         return renderer.unproject(s[0], s[1]);
     };
 
+    const pinchDistance = (): number => {
+        const pts = Array.from(pointersRef.current.values());
+        if (pts.length < 2) return 0;
+        return Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
+    };
+
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (pointerIdRef.current !== null) return; // 두 번째 손가락은 무시
         if (e.pointerType === "mouse" && e.button !== 0) return;
+        pointersRef.current.set(e.pointerId, screenPoint(e));
+        if (pointerIdRef.current !== null) {
+            // 두 번째 손가락: 선수 시점(3D)에서 조준 중이면 핀치 축소 — 조준 드래그는 취소하고 시작 각으로 되돌린다(2026-09-07 오너 요청:
+            // 30 % 까지만 작아지고 떼면 원래대로). 그 밖(공 옮기기·재생·top 뷰)에선 무시.
+            const g = gestureRef.current;
+            const renderer = rendererRef.current;
+            if (g?.kind === "aim" && !pinchRef.current && pointersRef.current.size === 2 && viewRef.current.cameraView === "player" && renderer?.setZoom) {
+                actions.setPhi(phiAtDownRef.current);
+                pinchRef.current = { d0: Math.max(1, pinchDistance()) };
+                try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
+                setDragging(false);
+            }
+            return;
+        }
         const p = unprojectEvent(e);
         if (!p) return;
         const v = viewRef.current;
@@ -503,6 +530,7 @@ export function SimulatorPage() {
         if (g.kind === "hold") {
             holdTimerRef.current = setTimeout(() => { holdTimerRef.current = null; actions.setSpeed(4); }, HOLD_FF_MS);
         } else if (g.kind === "aim") {
+            phiAtDownRef.current = v.input.phi;
             setDragging(true);
         } else {
             setPlacing(g.id);
@@ -510,6 +538,14 @@ export function SimulatorPage() {
     };
 
     const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        const pts = pointersRef.current;
+        if (pts.has(e.pointerId)) pts.set(e.pointerId, screenPoint(e));
+        const pinch = pinchRef.current;
+        if (pinch) {
+            // 핀치 중: 두 손가락 거리 비율로 축소(오므리면 작아지고, 벌려도 1 을 넘지 않는다)
+            if (pts.size >= 2) rendererRef.current?.setZoom?.(Math.max(ZOOM_MIN, Math.min(1, pinchDistance() / pinch.d0)));
+            return;
+        }
         if (e.pointerId !== pointerIdRef.current) return;
         let g = gestureRef.current;
         if (!g || g.kind === "hold") return;
@@ -527,6 +563,19 @@ export function SimulatorPage() {
     };
 
     const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+        pointersRef.current.delete(e.pointerId);
+        if (pinchRef.current) {
+            // 어느 손가락이든 떼면 핀치 끝: 원래 크기로 돌아가고 남은 손가락은 제스처를 잇지 않는다
+            pinchRef.current = null;
+            rendererRef.current?.setZoom?.(1);
+            gestureRef.current = null;
+            pointerIdRef.current = null;
+            lastScreenRef.current = null;
+            try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+            setDragging(false);
+            setPlacing(null);
+            return;
+        }
         if (e.pointerId !== pointerIdRef.current) return;
         const g = gestureRef.current;
         gestureRef.current = null;
@@ -629,6 +678,13 @@ export function SimulatorPage() {
     const onPowerUp = useCallback(() => actions.setPower(stepPower(v0Ref.current, 1)), [actions]);
 
     // ── 공유(카드 PNG + 리플레이 링크). 솔로·연습·드릴에서 샷이 끝난 뒤(aim/finished)만 ──
+    // 조준 위험 안내(미스큐·마세·점프): 입력·미리보기가 바뀔 때만 다시 계산. 문구는 왼쪽 위 칩 열.
+    const risk = useMemo(
+        () => (sim.phase === "aim" && sim.params
+            ? shotRisk(sim.input, sim.params.cue.maxOffset, sim.preview ? { result: sim.preview.result, cueBallId: sim.cueBallId, R: sim.params.table.ball.R } : null)
+            : null),
+        [sim.phase, sim.params, sim.input, sim.preview, sim.cueBallId],
+    );
     const { share, busy: sharing } = useShare();
     const canShare = sim.mode === "solo" && sim.lastResult !== null && (sim.phase === "aim" || sim.phase === "finished");
     // 드릴 "다시 배치" 는 툴바(토글 묶음 끝)에 놓인다
@@ -841,6 +897,12 @@ export function SimulatorPage() {
                         )}
                         {!drill && sim.canPlace && sim.session && sim.session.shotCount === 0 && (
                             <span className={chipNeutral}>{t("sim.hud.placeHint")}</span>
+                        )}
+                        {risk && sim.phase === "aim" && (
+                            <span role="status" className={cn(chipNeutral, "inline-flex items-center gap-1", risk.level === "warn" && "text-ink-1")}>
+                                <WarnIcon className="w-4 h-4 shrink-0" />
+                                {t(RISK_KEYS[risk.kind])}
+                            </span>
                         )}
                         {replayChip && sim.session?.shotCount === 1 && (
                             <>

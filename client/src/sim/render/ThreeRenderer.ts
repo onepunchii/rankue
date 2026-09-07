@@ -38,14 +38,14 @@ import {
     Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, BoxGeometry } from "three";
 import type { BallState } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
-import type { RenderFrame, Renderer, RendererView, SafeInsets, Viewport } from "./Renderer";
+import { ZOOM_MIN, type RenderFrame, type Renderer, type RendererView, type SafeInsets, type Viewport } from "./Renderer";
 import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, parseColor, readPalette, rgba, scaleColor, type Palette, type RGBA } from "./tokens";
 import {
     CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, copyPose, CUE_BUTT_W, CUE_FERRULE_L, CUE_LENGTH, CUE_TIP_L, CUE_TIP_W, cameraBasis, cueGap,
     cueRotationZ, dampRig, diamondWorld, integrateOrientation, makeBasis, makePose, makeRig, MAX_DT, orthoFrustum, overviewPose, PLAYER_FAR,
     PLAYER_FOV_DEG, PLAYER_NEAR, playerPose, projectPerspective, rigSmoothTime, snapRig, unprojectPerspective, type CameraBasis,
-    type CameraPose, type CameraRig,
+    type CameraPose, type CameraRig, dampScalar, ZOOM_SMOOTH_S, zoomedFovDeg,
 } from "./threeMath";
 
 export interface ThreeRendererOptions {
@@ -80,6 +80,7 @@ export interface ThreeRendererStats {
     readonly view: RendererView;
     /** player 뷰 카메라가 아직 목표로 움직이는 중. */
     readonly cameraMoving: boolean;
+    readonly zoom: number;
 }
 
 // ── 팔레트(WebGL 내부 전용 — 물리적 사물) ──────────────────────────────
@@ -256,6 +257,10 @@ export class ThreeRenderer implements Renderer {
     /** 재생 중 부감 자세(테이블·aspect 별로 한 번 계산). overviewAspect 가 현재 aspect 와 다르면 다시 만든다. */
     private readonly overview: CameraPose = makePose();
     private overviewAspect = -1;
+    /** 핀치 축소: 현재 배율·목표·그로 정한 세로 시야각(°). project/unproject 와 GPU 가 같은 값을 쓴다. */
+    private zoom = 1;
+    private zoomTarget = 1;
+    private fovDeg = PLAYER_FOV_DEG;
     /** player 뷰의 절두체 비율 = 인셋 사각형 비율. */
     private aspect = 1;
     /** 인셋 사각형(CSS px, 마운트 기준) — player 뷰의 뷰포트, top 뷰의 scissor. resize 마다 갱신(draw 에선 읽기만). */
@@ -458,6 +463,7 @@ export class ThreeRenderer implements Renderer {
         vr.height = Math.max(1, h - insets.top - insets.bottom);
         this.aspect = vr.width / vr.height;
         this.persp.aspect = this.aspect;
+        this.persp.fov = this.fovDeg;
         this.persp.setViewOffset(vr.width, vr.height, -vr.x, -vr.y, Math.max(1, w), Math.max(1, h));
         this.persp.updateProjectionMatrix();
 
@@ -525,7 +531,7 @@ export class ThreeRenderer implements Renderer {
         if (!this.layout) return [0, 0];
         if (this.view === "player" && this.table) {
             const vr = this.viewRect;
-            const p = projectPerspective(this.basis, this.rig.pose, PLAYER_FOV_DEG, this.aspect, vr, x, y, this.table.ball.R);
+            const p = projectPerspective(this.basis, this.rig.pose, this.fovDeg, this.aspect, vr, x, y, this.table.ball.R);
             p[0] += vr.x;
             p[1] += vr.y;
             return p;
@@ -538,7 +544,7 @@ export class ThreeRenderer implements Renderer {
         if (!this.layout) return [0, 0];
         if (this.view === "player" && this.table) {
             const vr = this.viewRect;
-            return unprojectPerspective(this.basis, this.rig.pose, PLAYER_FOV_DEG, this.aspect, vr, px - vr.x, py - vr.y, this.table.ball.R, this.table);
+            return unprojectPerspective(this.basis, this.rig.pose, this.fovDeg, this.aspect, vr, px - vr.x, py - vr.y, this.table.ball.R, this.table);
         }
         return screenToWorld(this.layout, px, py);
     }
@@ -573,7 +579,20 @@ export class ThreeRenderer implements Renderer {
     }
 
     needsFrame(): boolean {
-        return this.view === "player" && this.cameraMoving;
+        return this.view === "player" && (this.cameraMoving || this.zoom !== this.zoomTarget);
+    }
+
+    /** 핀치 축소 목표(ZOOM_MIN..1). 다음 draw 부터 감쇠로 따라간다 — needsFrame 이 페이지 루프를 돌린다. */
+    setZoom(zoom: number): void {
+        const z = Number.isFinite(zoom) ? Math.max(ZOOM_MIN, Math.min(1, zoom)) : 1;
+        this.zoomTarget = z;
+    }
+
+    /** 현재 배율의 시야각을 CPU 투영·GPU 카메라에 적용. */
+    private applyZoom(): void {
+        this.fovDeg = zoomedFovDeg(PLAYER_FOV_DEG, this.zoom);
+        this.persp.fov = this.fovDeg;
+        this.persp.updateProjectionMatrix();
     }
 
     private activeCamera(): OrthographicCamera | PerspectiveCamera {
@@ -631,6 +650,7 @@ export class ThreeRenderer implements Renderer {
             clothTextured: this.clothTex !== null,
             view: this.view,
             cameraMoving: this.cameraMoving,
+            zoom: this.zoom,
         };
     }
 
@@ -731,6 +751,10 @@ export class ThreeRenderer implements Renderer {
             this.retarget(frame);
             this.cameraMoving = dampRig(this.rig, this.rigTarget, rigSmoothTime(this.rig, this.rigTarget), dt);
             this.applyRig();
+            if (this.zoom !== this.zoomTarget) {
+                this.zoom = dampScalar(this.zoom, this.zoomTarget, ZOOM_SMOOTH_S, dt);
+                this.applyZoom();
+            }
         }
 
         this.render();

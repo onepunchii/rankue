@@ -54,15 +54,16 @@ describe("controlsMath 세기", () => {
         expect(powerPercent(0)).toBe(powerPercent(V0_MIN));
     });
 
-    it("±0.05 는 격자에 맞고 범위에서 멈춘다", () => {
-        expect(stepPower(2.5, 1)).toBe(2.55);
-        expect(stepPower(2.55, -1)).toBe(2.5);
-        expect(stepPower(2.5 + 1e-12, 1)).toBe(2.55);
+    it("±1 % 눈금(0.09 m/s)에 맞고 범위에서 멈춘다", () => {
+        expect(stepPower(2.5, 1)).toBe(2.61);      // 28 % → 29 %
+        expect(stepPower(2.61, -1)).toBe(2.52);    // 29 % → 28 %
+        expect(stepPower(2.5 + 1e-12, 1)).toBe(2.61);
         expect(stepPower(V0_MAX, 1)).toBe(V0_MAX);
         expect(stepPower(V0_MIN, -1)).toBe(V0_MIN);
         let v = 0.3;
         for (let i = 0; i < 10; i++) v = stepPower(v, 1);
-        expect(v).toBe(0.8);
+        expect(v).toBe(1.17);                       // 3 % + 10 = 13 %
+        expect(powerPercent(stepPower(4, 1))).toBe(powerPercent(4) + 1);
     });
 
     it("슬라이더·당김 매핑", () => {
