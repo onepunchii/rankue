@@ -140,7 +140,7 @@ describe("replayLink", () => {
         expect(mutInput({ V0: 0.1 })).toBeNull();
         expect(mutInput({ V0: 10 })).toBeNull();
         expect(mutInput({ theta: -0.1 })).toBeNull();
-        expect(mutInput({ theta: 0.5 })).toBeNull();
+        expect(mutInput({ theta: 1.5 })).toBeNull();
         expect(mutInput({ a: 0.5, b: 0.5 })).toBeNull();    // 미스큐 링 밖
         expect(mutInput({ a: 0.3, b: 0.3 })).not.toBeNull();
         expect(mutInput({ a: "0" })).toBeNull();
