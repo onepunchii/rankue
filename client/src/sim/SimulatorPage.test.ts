@@ -1,0 +1,214 @@
+/**
+ * SimulatorPage 스모크 테스트(jsdom 직접 기동 — SimSetupDialog.test 와 같은 방식). 앱 모듈("@/...")은 vi.mock 으로 대체하고
+ * 훅·컨트롤러·엔진·렌더러는 진짜를 쓴다(캔버스 2D 컨텍스트만 없어 그리기는 no-op).
+ * 검증: ?cfg 로 연습 세션이 바로 열린다 · 샷 → 재생 → 시계를 앞당기면 공이 멈추고 결과 배너·이닝 시트에 기록된다 ·
+ *      연습 모드는 서버를 부르지 않는다 · cfg 가 없으면 설정 창이 열리고 시작하기로 세션이 열린다.
+ */
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
+import { JSDOM, VirtualConsole } from "jsdom";
+import { ko } from "../lib/i18n/ko";
+import { buildConfig } from "./setupPresets";
+import { encodePageConfig } from "./pageConfig";
+
+const nav = vi.hoisted(() => ({ search: "", navigate: vi.fn(), apiRequest: vi.fn(), toast: vi.fn() }));
+
+vi.mock("@/lib/i18n", () => ({ useT: () => ({ t: (k: string) => ko[k] ?? k, locale: "ko" }) }));
+vi.mock("@/lib/utils", () => ({ cn: (...a: unknown[]) => a.filter((x) => typeof x === "string" && x).join(" ") }));
+vi.mock("@/lib/queryClient", () => ({ apiRequest: nav.apiRequest }));
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: nav.toast }) }));
+vi.mock("@/hooks/useGameAudio", () => ({ useGameAudio: () => ({ getCtx: () => null }) }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ member: { nickname: "테스터", handi3c: 15 }, isLoading: false, isLoggedIn: true, isGuest: false }) }));
+vi.mock("wouter", () => ({ useLocation: () => ["/online-game", nav.navigate], useSearch: () => nav.search }));
+vi.mock("@/lib/icons", async () => {
+    const React = await import("react");
+    const I = () => React.createElement("span");
+    return { ChevronDown: I, ChevronLeft: I, ChevronRight: I, LayoutList: I, LucideUndo2: I, X: I, LucideMinus: I, LucidePlus: I };
+});
+vi.mock("@/components/hiq/BallDot", async () => {
+    const React = await import("react");
+    return { BallDot: () => React.createElement("span") };
+});
+vi.mock("@radix-ui/react-slider", async () => {
+    const React = await import("react");
+    const box = (tag: string) => ({ children, className }: { children?: unknown; className?: string }) => React.createElement(tag, { className }, children as never);
+    return { Root: box("div"), Track: box("div"), Range: box("div"), Thumb: box("div") };
+});
+vi.mock("@/components/ui/dialog", async () => {
+    const React = await import("react");
+    const box = (tag: string) => ({ children, className }: { children?: unknown; className?: string }) => React.createElement(tag, { className }, children as never);
+    return {
+        Dialog: ({ open, children }: { open: boolean; children?: unknown }) => (open ? React.createElement("div", { role: "dialog" }, children as never) : null),
+        DialogContent: box("div"), DialogHeader: box("div"), DialogFooter: box("div"), DialogTitle: box("h2"), DialogDescription: box("p"),
+    };
+});
+vi.mock("@/components/ui/sheet", async () => {
+    const React = await import("react");
+    const box = (tag: string) => ({ children, className }: { children?: unknown; className?: string }) => React.createElement(tag, { className }, children as never);
+    return {
+        Sheet: ({ open, children }: { open: boolean; children?: unknown }) => (open ? React.createElement("div", { role: "dialog", "data-sheet": "1" }, children as never) : null),
+        SheetContent: box("div"), SheetHeader: box("div"), SheetTitle: box("h2"), SheetDescription: box("p"),
+    };
+});
+vi.mock("@/components/ui/button", async () => {
+    const React = await import("react");
+    return { Button: (p: Record<string, unknown>) => { const { children, variant: _v, ...rest } = p; return React.createElement("button", rest, children as never); } };
+});
+vi.mock("@/components/ui/input", async () => {
+    const React = await import("react");
+    return { Input: (p: Record<string, unknown>) => React.createElement("input", p) };
+});
+vi.mock("@/components/ui/label", async () => {
+    const React = await import("react");
+    return { Label: (p: Record<string, unknown>) => { const { children, ...rest } = p; return React.createElement("label", rest, children as never); } };
+});
+vi.mock("@/components/ui/switch", async () => {
+    const React = await import("react");
+    return {
+        Switch: ({ id, checked, onCheckedChange }: { id: string; checked: boolean; onCheckedChange: (v: boolean) => void }) =>
+            React.createElement("button", { type: "button", role: "switch", id, "aria-checked": checked, onClick: () => onCheckedChange(!checked) }),
+    };
+});
+vi.mock("@/components/ui/collapsible", async () => {
+    const React = await import("react");
+    return {
+        Collapsible: ({ children }: { children?: unknown }) => React.createElement("div", null, children as never),
+        CollapsibleTrigger: ({ children }: { children?: unknown }) => children as never,
+        CollapsibleContent: ({ children }: { children?: unknown }) => React.createElement("div", null, children as never),
+    };
+});
+
+type ReactMod = typeof import("react");
+type ClientMod = typeof import("react-dom/client");
+type PageMod = typeof import("./SimulatorPage");
+
+let React: ReactMod;
+let createRoot: ClientMod["createRoot"];
+let SimulatorPage: PageMod["SimulatorPage"];
+let dom: JSDOM;
+const globalsSet: string[] = [];
+const realNow = performance.now.bind(performance);
+
+beforeAll(async () => {
+    // 캔버스 getContext 미구현 경고를 조용히 삼킨다
+    const vc = new VirtualConsole();
+    vc.on("jsdomError", () => { /* 무시 */ });
+    dom = new JSDOM("<!doctype html><html><body></body></html>", { pretendToBeVisual: true, virtualConsole: vc });
+    const w = dom.window as unknown as Record<string, unknown>;
+    const g = globalThis as unknown as Record<string, unknown>;
+    for (const k of ["window", "document", "navigator", "HTMLElement", "HTMLInputElement", "HTMLCanvasElement", "Element", "Node", "Text", "Event",
+        "MouseEvent", "PointerEvent", "KeyboardEvent", "CustomEvent", "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame",
+        "DocumentFragment", "MutationObserver", "SVGElement"]) {
+        if (!(k in g) || g[k] === undefined) { g[k] = k === "window" ? dom.window : w[k]; globalsSet.push(k); }
+    }
+    if (!("ResizeObserver" in g)) {
+        g.ResizeObserver = class { observe() { /* noop */ } unobserve() { /* noop */ } disconnect() { /* noop */ } };
+        globalsSet.push("ResizeObserver");
+    }
+    g.IS_REACT_ACT_ENVIRONMENT = true;
+    React = await import("react");
+    if (!("React" in g)) { g.React = React; globalsSet.push("React"); }
+    ({ createRoot } = await import("react-dom/client"));
+    ({ SimulatorPage } = await import("./SimulatorPage"));
+});
+
+afterAll(() => {
+    const g = globalThis as unknown as Record<string, unknown>;
+    for (const k of globalsSet) delete g[k];
+    dom.window.close();
+});
+
+interface Harness { container: HTMLElement; unmount: () => void }
+const live: Harness[] = [];
+afterEach(() => {
+    while (live.length) live.pop()!.unmount();
+    performance.now = realNow;
+    nav.apiRequest.mockReset();
+    nav.navigate.mockReset();
+    nav.toast.mockReset();
+});
+
+function mount(): Harness {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    React.act(() => { root.render(React.createElement(SimulatorPage)); });
+    const h: Harness = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); } };
+    live.push(h);
+    return h;
+}
+
+const click = (el: Element) => React.act(() => { el.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); });
+const buttons = (h: Harness) => Array.from(h.container.querySelectorAll("button"));
+const byText = (h: Harness, text: string) => buttons(h).find((b) => b.textContent === text) ?? null;
+const byLabel = (h: Harness, label: string) => buttons(h).find((b) => b.getAttribute("aria-label") === label) ?? null;
+const frames = (n: number) => React.act(async () => { for (let i = 0; i < n; i++) await new Promise((r) => setTimeout(r, 20)); });
+
+describe("SimulatorPage", () => {
+    it("?cfg 로 연습 세션이 바로 열리고 HUD 에 이름·점수·규칙·테이블이 보인다", () => {
+        nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
+        const h = mount();
+        expect(h.container.querySelector("[role=dialog]")).toBeNull();
+        const text = h.container.textContent ?? "";
+        expect(text).toContain("테스터");
+        expect(text).toContain("/ 5");
+        expect(text).toContain(ko["sim.hud.ruleUmb"]);
+        expect(text).toContain(ko["sim.setup.tableDaedae"]);
+        expect(text).toContain(ko["sim.hud.practice"]);
+        expect(text).toContain(ko["sim.hud.placeHint"]);
+        // 렌더러 캔버스가 테이블 래퍼에 얹혔다
+        expect(h.container.querySelectorAll("canvas").length).toBeGreaterThanOrEqual(1);
+        // 연습 모드: 서버 호출 없음
+        expect(nav.apiRequest).not.toHaveBeenCalled();
+        // 조작: 샷 활성, 되돌리기는 아직 없음(스택 비어 있음)
+        expect(byText(h, ko["sim.controls.shoot"])?.disabled).toBe(false);
+        expect(byLabel(h, ko["sim.controls.undo"])).toBeNull();
+    });
+
+    it("샷 → 재생(잠금) → 시계를 앞당기면 정지 · 결과 배너 · 이닝 시트 한 줄 · 되돌리기", async () => {
+        nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
+        const h = mount();
+        click(byText(h, ko["sim.controls.shoot"])!);
+        // 재생 중: 샷 잠금 + 빨리감기 안내
+        const playing = byText(h, ko["sim.controls.playing"]);
+        expect(playing).not.toBeNull();
+        expect(playing!.disabled).toBe(true);
+        expect(h.container.textContent).toContain(ko["sim.hud.holdToFastForward"]);
+        expect(byText(h, ko["sim.controls.shoot"])).toBeNull();
+
+        // 시계를 1000 초 앞당기면 다음 rAF 에서 재생이 끝난다
+        performance.now = () => realNow() + 1_000_000;
+        await frames(4);
+        expect(byText(h, ko["sim.controls.shoot"])).not.toBeNull();
+        const text = h.container.textContent ?? "";
+        const outcomes = ["point", "missNoContact", "missOneBall", "missCushions"].map((k) => ko[`sim.outcome.${k}`].split(" ·")[0]);
+        expect(outcomes.some((o) => text.includes(o))).toBe(true);
+        // 이닝 시트에 1이닝이 기록됐다
+        click(byLabel(h, ko["sim.controls.innings"])!);
+        const sheet = h.container.querySelector("[data-sheet]");
+        expect(sheet).not.toBeNull();
+        expect(sheet!.querySelectorAll("tbody tr")).toHaveLength(1);
+        expect(sheet!.textContent).toContain(ko["sim.hud.sheetTotal"]);
+        // 연습 모드라 되돌리기가 생겼다
+        expect(byLabel(h, ko["sim.controls.undo"])).not.toBeNull();
+        expect(nav.apiRequest).not.toHaveBeenCalled();
+    });
+
+    it("cfg 가 없으면 설정 창이 열리고 시작하기로 세션이 열린다 · 나가기는 확인 뒤 대시보드로", async () => {
+        nav.search = "";
+        const h = mount();
+        expect(h.container.querySelector("[role=dialog]")).not.toBeNull();
+        expect(h.container.textContent).toContain(ko["sim.setup.title"]);
+        // 기록 끄고 시작(서버 없이)
+        click(h.container.querySelector("#sim-opt-record")!);
+        click(byText(h, ko["sim.setup.start"])!);
+        expect(h.container.querySelector("[role=dialog]")).toBeNull();
+        expect(h.container.textContent).toContain("/ 15");
+        expect(nav.apiRequest).not.toHaveBeenCalled();
+
+        click(byLabel(h, ko["sim.controls.exit"])!);
+        expect(h.container.textContent).toContain(ko["sim.exit.title"]);
+        expect(h.container.textContent).toContain(ko["sim.exit.descPractice"]);
+        await React.act(async () => { click(byText(h, ko["sim.exit.confirm"])!); await new Promise((r) => setTimeout(r, 10)); });
+        expect(nav.navigate).toHaveBeenCalledWith("/dashboard");
+    });
+});

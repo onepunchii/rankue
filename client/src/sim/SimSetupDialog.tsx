@@ -28,10 +28,15 @@ import {
 
 export type { SimSetupConfig } from "./setupPresets";
 
+export interface SimStartOptions {
+    /** false = 연습 모드(서버 기록 없음, 되돌리기·공 배치 허용). 기본 true. */
+    readonly record: boolean;
+}
+
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onStart: (config: SimSetupConfig) => void;
+    onStart: (config: SimSetupConfig, opts: SimStartOptions) => void;
 }
 
 const TABLE_IDS: readonly TableId[] = ["DAEDAE", "JUNGDAE_KR"];
@@ -106,6 +111,8 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const [cushionModel, setCushionModel] = useState<CushionModelId>("han2005");
     const [condition, setCondition] = useState<number>(CONDITION_DEFAULT);
+    // 기록 여부. 끄면 연습 모드(useSimulator record=false: 서버 호출 없음, 되돌리기·공 배치 허용). 기본 켜짐.
+    const [record, setRecord] = useState(true);
 
     const handicap = gameType === "3c" ? member?.handi3c : member?.handi4c;
 
@@ -156,7 +163,7 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
             rules: gameType === "3c"
                 ? { ruleSet }
                 : { threeCushionDouble, passiveOpponentContactIsFoul: passiveFoul },
-        }));
+        }), { record });
     };
 
     const tableName = (id: TableId) => (id === "DAEDAE" ? t("sim.setup.tableDaedae") : t("sim.setup.tableJungdae"));
@@ -318,6 +325,12 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
                                     <span>{condText.fast}</span>
                                 </div>
                             </div>
+
+                            {/* 기록하기 — 끄면 연습 모드 */}
+                            <ToggleRow
+                                id="sim-opt-record" checked={record} onCheckedChange={setRecord}
+                                title={t("sim.setup.record")} desc={t("sim.setup.recordDesc")}
+                            />
                         </CollapsibleContent>
                     </Collapsible>
                 </div>

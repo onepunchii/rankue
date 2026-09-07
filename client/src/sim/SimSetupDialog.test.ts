@@ -161,10 +161,12 @@ describe("SimSetupDialog", () => {
 
     it("4구로 바꾸면 규칙 스위치 두 개가 보이고 테이블·다마수가 4구 기본으로 바뀐다", () => {
         const h = mount();
-        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(0);
+        // 고급 섹션의 '기록하기' 스위치 하나는 항상 있다(Collapsible 대역은 접힘을 무시하고 내용을 그린다)
+        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(1);
+        expect(h.container.querySelector("#sim-opt-record")).not.toBeNull();
         click(segment(h, ko["sim.setup.type4c"]));
         const switches = h.container.querySelectorAll("[role=switch]");
-        expect(switches).toHaveLength(2);
+        expect(switches).toHaveLength(3);
         expect(h.container.textContent).toContain(ko["sim.setup.opt3cDouble"]);
         expect(h.container.textContent).toContain(ko["sim.setup.optPassiveFoul"]);
         expect(targetInput(h).value).toBe("80");
@@ -182,15 +184,20 @@ describe("SimSetupDialog", () => {
             gameType: "3c", tableId: "DAEDAE", target: 25, inningCap: 20, cushionModel: "han2005", condition: CONDITION_DEFAULT,
             rules: { ruleSet: "pba" },
         }));
+        // 기록하기는 기본 켜짐
+        expect(h.onStart.mock.calls[0][1]).toEqual({ record: true });
 
         click(segment(h, ko["sim.setup.type4c"]));
         click(h.container.querySelector("#sim-opt-3c-double")!);
+        // 기록하기를 끄면 연습 모드로 시작한다
+        click(h.container.querySelector("#sim-opt-record")!);
         click(startButton(h));
         expect(h.onStart).toHaveBeenCalledTimes(2);
         expect(h.onStart.mock.calls[1][0]).toEqual(buildConfig({
             gameType: "4c", tableId: "JUNGDAE_KR", target: 80, inningCap: 20, cushionModel: "han2005", condition: CONDITION_DEFAULT,
             rules: { threeCushionDouble: true, passiveOpponentContactIsFoul: false },
         }));
+        expect(h.onStart.mock.calls[1][1]).toEqual({ record: false });
     });
 
     it("늦게 온 핸디는 손대기 전까지만 반영되고, 안내 문구는 값이 핸디와 같을 때만 보인다", () => {
