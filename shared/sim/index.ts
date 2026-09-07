@@ -22,3 +22,4 @@ export * from "./hash.js";
 export * from "./rng.js";
 export * from "./version.js";
 export * from "./layouts.js";
+export * from "./drills.js";

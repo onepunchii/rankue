@@ -1653,3 +1653,25 @@ export const hiqSimMatchShots = pgTable("hiq_sim_match_shots", {
 
 export type HiqSimMatch = typeof hiqSimMatches.$inferSelect;
 export type HiqSimMatchShot = typeof hiqSimMatchShots.$inferSelect;
+
+// --- 8.12 시뮬레이터 드릴 래더 (주간 고정 문제, 문제당 채점 1회) ---
+export const hiqSimDrillAttempts = pgTable("hiq_sim_drill_attempts", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  weekId: text("week_id").notNull(),
+  drillId: text("drill_id").notNull(),
+  tableId: text("table_id", { enum: ["DAEDAE", "JUNGDAE_KR"] }).notNull(),
+  input: jsonb("input").notNull(),
+  hash: text("hash").notNull(),
+  clientHash: text("client_hash"),
+  success: boolean("success").notNull(),
+  cushions: integer("cushions").default(0).notNull(),
+  outcomeCode: text("outcome_code").notNull(),
+  engineVersion: text("engine_version").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.memberId, t.weekId, t.drillId),
+  idxWeek: index("idx_sim_drill_week").on(t.weekId, t.success),
+}));
+
+export type HiqSimDrillAttempt = typeof hiqSimDrillAttempts.$inferSelect;

@@ -14,6 +14,8 @@ const FILES = [
     "server/storage/sim.repo.ts",
     "server/routes/modules/simMatch.ts",
     "server/storage/simMatch.repo.ts",
+    "server/routes/modules/simDrill.ts",
+    "server/storage/simDrill.repo.ts",
 ];
 
 describe("시뮬레이터 ↔ 실전 성적 격리", () => {
