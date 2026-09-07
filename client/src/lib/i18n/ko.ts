@@ -1756,6 +1756,7 @@ export const ko: Dict = {
   "sim.outcome.missFinish": "마무리 조건 미충족 · 무득점",
   "sim.outcome.foulOpponent": "파울 · 상대 공 접촉",
   "sim.outcome.foulTruncated": "샷 무효 · 계산 한도 초과",
+  "sim.outcome.foulOpening": "파울 · 개시 샷은 빨간 공 먼저",
   "sim.outcome.noShot": "샷이 없었어요",
   "sim.end.title": "경기 종료",
   "sim.end.win": "목표 달성",

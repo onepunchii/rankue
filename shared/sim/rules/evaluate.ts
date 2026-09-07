@@ -7,9 +7,10 @@
  * 쿠션 수 = 큐볼의 ball-cushion 이벤트 중 '두 번째 적구 첫 접촉' 이전 것의 개수(UMB Art.24).
  * 코너에서 두 면에 닿으면 이벤트가 2개이므로 자연히 2로 센다. 같은 면 두 번도 2.
  * 적구가 밟은 쿠션은 세지 않는다(이벤트 ids 로 구분).
+ * 개시 샷(opts.opening, 3쿠션): 첫 접촉이 빨간 공이 아니면 foul-opening(UMB 개시 규칙). 접촉이 없으면 보통의 미스.
  */
 import type { SimEvent } from "../types.js";
-import type { Rules, ShotOutcome, ShotOutcomeCode } from "./types.js";
+import type { EvaluateOptions, Rules, ShotOutcome, ShotOutcomeCode } from "./types.js";
 
 export const CUE_BALL_IDS = ["white", "yellow"] as const;
 
@@ -85,6 +86,7 @@ export function evaluateShot(
     cueBallId: string,
     rules: Rules,
     truncated = false,
+    opts?: EvaluateOptions,
 ): ShotOutcome {
     const objectIds = objectBallIds(rules.gameType, cueBallId);
     const opponentId = rules.gameType === "4c" ? opponentCueBall(cueBallId) : null;
@@ -111,6 +113,9 @@ export function evaluateShot(
     }
 
     // 3쿠션
+    if (opts?.opening && walk.contacts.length > 0 && walk.contacts[0] !== "red") {
+        return outcome("foul-opening", 0, false, true, walk);
+    }
     if (walk.contacts.length < 2) {
         return outcome(walk.contacts.length === 1 ? "miss-one-ball" : "miss-no-contact", 0, false, true, walk);
     }

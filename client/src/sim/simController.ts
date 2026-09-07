@@ -31,7 +31,7 @@ import type { BallState, ShotInput, SimResult } from "@shared/sim/types";
 import type { SimParams } from "@shared/sim/params";
 import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout, isValidLayout } from "@shared/sim/layouts";
-import { applyShot, createSession, evaluateShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
+import { applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
 import { buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
 import { SimAudio } from "./audio";
@@ -460,7 +460,7 @@ export class SimController {
         const s = this.store.get();
         const setup = this.aux.setup;
         if (s.phase !== "aim" || !s.session || !setup) return;
-        const phi = thicknessPhi(s.balls, cueBallIdOf(s.session), s.session.rules.gameType, step, side, setup.params.table.ball.R);
+        const phi = thicknessPhi(s.balls, cueBallIdOf(s.session), s.session.rules.gameType, step, side, setup.params.table.ball.R, isOpeningShot(s.session, s.balls));
         if (phi !== null) this.setInput({ phi });
     }
     /** 당점 (a, b) — R 비율. 반지름 0.5R 밖은 미스큐 링으로 클램프된다. */
@@ -517,7 +517,7 @@ export class SimController {
                 this.callbacks.onMiscue?.();
                 return;
             }
-            const outcome = evaluateShot(result.events, cueBallId, s.session.rules, result.truncated);
+            const outcome = evaluateShot(result.events, cueBallId, s.session.rules, result.truncated, { opening: isOpeningShot(s.session, s.balls) });
             const applied = applyShot(s.session, outcome);
             const idx = s.shotIdx;
 
@@ -993,7 +993,7 @@ export class SimController {
             if (shot.idx !== s.shotIdx || s.session.status !== "playing" || (s.phase !== "waiting" && s.phase !== "aim")) { complete = false; break; }
             let result: SimResult;
             try { result = simulateShot(shot.preState, shot.input, setup.params); } catch { complete = false; break; }
-            const outcome = evaluateShot(result.events, shot.input.cueBallId, s.session.rules, result.truncated);
+            const outcome = evaluateShot(result.events, shot.input.cueBallId, s.session.rules, result.truncated, { opening: isOpeningShot(s.session, shot.preState) });
             let applied: ReturnType<typeof applyShot>;
             try { applied = applyShot(s.session, outcome); } catch { complete = false; break; }
             const mismatch = result.hash !== shot.hash || !sameBalls(shot.preState, s.balls);

@@ -1754,6 +1754,7 @@ const vi: Dict = {
   "sim.outcome.missFinish": "Chưa đạt điều kiện kết thúc · không điểm",
   "sim.outcome.foulOpponent": "Lỗi · chạm bi đối thủ",
   "sim.outcome.foulTruncated": "Cú đánh không hợp lệ · vượt giới hạn tính toán",
+  "sim.outcome.foulOpening": "Phạm lỗi · cú khai cuộc phải chạm bi đỏ trước",
   "sim.outcome.noShot": "Không có cú đánh",
   "sim.end.title": "Kết thúc ván",
   "sim.end.win": "Đạt mục tiêu",

@@ -15,7 +15,7 @@ import {
     type SimParams, type BallState, type ShotInput,
 } from "../../../shared/sim/index.js";
 import {
-    createSession, applyShot, currentPlayer, evaluateShot,
+    createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
@@ -191,7 +191,7 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
 
     const preState = m.balls as BallState[];
     const result = simulateShot(preState, input as ShotInput, paramsFor(m));
-    const outcome = evaluateShot(result.events, input.cueBallId, state.rules, result.truncated);
+    const outcome = evaluateShot(result.events, input.cueBallId, state.rules, result.truncated, { opening: isOpeningShot(state, preState) });
     const applied = applyShot(state, outcome);
     const finished = applied.session.status === "finished";
     const endReason = finished ? (applied.session.winnerIndex === null || applied.session.players.every((p) => p.innings >= state.inningCap && state.inningCap > 0) ? "inningCap" : "target") : null;

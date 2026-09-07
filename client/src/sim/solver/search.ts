@@ -50,6 +50,8 @@ export interface SolveRequest {
     readonly maxCandidates?: number;
     /** 셔플 시드(mulberry32). 같은 시드 → 같은 결과. */
     readonly seed: number;
+    /** 개시 샷(3쿠션): 첫 접촉이 빨간 공이 아닌 후보는 파울이라 득점으로 치지 않는다(session.isOpeningShot). */
+    readonly opening?: boolean;
 }
 
 /** 직선 조준 기준 첫 접촉 — 화면 라벨용("빨간 공 ½ 우", "뱅크 먼저"). */
@@ -394,7 +396,7 @@ export function createShotSearch(req: SolveRequest, opts: SearchOptions = {}): S
     function record(input: ShotInput, forced: Family | null): void {
         const result = simulateShot(balls, input, params);
         tried++;
-        const outcome = evaluateShot(result.events, cueBallId, rules, result.truncated);
+        const outcome = evaluateShot(result.events, cueBallId, rules, result.truncated, { opening: req.opening });
         if (forced) forced.neighbours++;
         if (!outcome.scored) return;
         found++;

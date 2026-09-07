@@ -1754,6 +1754,7 @@ const en: Dict = {
   "sim.outcome.missFinish": "Finish rule not met · no point",
   "sim.outcome.foulOpponent": "Foul · touched the opponent's ball",
   "sim.outcome.foulTruncated": "Shot void · calculation limit",
+  "sim.outcome.foulOpening": "Foul · opening shot must hit the red first",
   "sim.outcome.noShot": "No shot",
   "sim.end.title": "Game over",
   "sim.end.win": "Target reached",

@@ -19,7 +19,7 @@
  */
 import type { BallState, ShotInput } from "@shared/sim/types";
 import { DEFAULT_CUE, TABLES, type SimParams, type TableSpec } from "@shared/sim/params";
-import { currentPlayer, opponentCueBall, type GameType, type SessionState, type ShotOutcome } from "@shared/sim/rules";
+import { currentPlayer, isOpeningShot, opponentCueBall, type GameType, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import { isValidLayout } from "@shared/sim/layouts";
 import type { SimSetupConfig } from "./setupPresets";
 import type { MatchEndReason, MatchPublic, MatchStatus, PlayerIndex } from "./matchApi";
@@ -85,18 +85,30 @@ export function cueBallIdOf(session: SessionState | null): "white" | "yellow" {
     return session ? currentPlayer(session).cueBallId : "white";
 }
 
-/** 조준 기준 적구: 가장 가까운 적구. 4구는 상대 큐볼을 제외한다(맞히면 파울). */
-export function objectTargetFor(balls: readonly BallState[], cueBallId: string, gameType: GameType): BallState | null {
+/**
+ * 조준 기준 적구: 가장 가까운 적구. 4구는 상대 큐볼을 제외한다(맞히면 파울).
+ * 개시 샷(opening, 3쿠션 개시 배치의 첫 샷)은 규칙대로 빨간 공 — 첫 접촉이 빨간 공이 아니면 파울이라 기본 조준·두께 버튼도 빨간 공 기준.
+ */
+export function objectTargetFor(balls: readonly BallState[], cueBallId: string, gameType: GameType, opening = false): BallState | null {
     const cue = balls.find((b) => b.id === cueBallId);
     if (!cue) return null;
+    if (opening) {
+        const red = balls.find((b) => b.id === "red");
+        if (red) return red;
+    }
     const exclude = gameType === "4c" ? [opponentCueBall(cueBallId)] : [];
     return nearestObjectBall(cue, balls, exclude);
 }
 
-/** 기본 조준: 가장 가까운 적구 중심. 적구가 없으면 테이블 위쪽(+y). */
-export function defaultPhi(balls: readonly BallState[], cueBallId: string, gameType: GameType): number {
+/** 세션·배치로 개시 샷인지(없는 세션은 false). */
+export function openingFor(session: SessionState | null, balls: readonly BallState[]): boolean {
+    return session ? isOpeningShot(session, balls) : false;
+}
+
+/** 기본 조준: 기준 적구 중심(objectTargetFor). 적구가 없으면 테이블 위쪽(+y). */
+export function defaultPhi(balls: readonly BallState[], cueBallId: string, gameType: GameType, opening = false): number {
     const cue = balls.find((b) => b.id === cueBallId);
-    const target = objectTargetFor(balls, cueBallId, gameType);
+    const target = objectTargetFor(balls, cueBallId, gameType, opening);
     if (!cue || !target) return Math.PI / 2;
     return normalizeAngle(angleBetween([cue.r[0], cue.r[1]], [target.r[0], target.r[1]]));
 }
@@ -104,18 +116,18 @@ export function defaultPhi(balls: readonly BallState[], cueBallId: string, gameT
 /** 두께 단계 → phi. 적구가 없으면 null. */
 export function thicknessPhi(
     balls: readonly BallState[], cueBallId: string, gameType: GameType,
-    thickness: number, side: "left" | "right", R: number,
+    thickness: number, side: "left" | "right", R: number, opening = false,
 ): number | null {
     const cue = balls.find((b) => b.id === cueBallId);
-    const target = objectTargetFor(balls, cueBallId, gameType);
+    const target = objectTargetFor(balls, cueBallId, gameType, opening);
     if (!cue || !target) return null;
     const c: XY = [cue.r[0], cue.r[1]];
     const t: XY = [target.r[0], target.r[1]];
     return phiForThickness(c, t, thickness, side, R);
 }
 
-export function initialInput(balls: readonly BallState[], cueBallId: string, gameType: GameType): CueInput {
-    return { phi: defaultPhi(balls, cueBallId, gameType), V0: V0_DEFAULT, a: 0, b: 0, theta: 0 };
+export function initialInput(balls: readonly BallState[], cueBallId: string, gameType: GameType, opening = false): CueInput {
+    return { phi: defaultPhi(balls, cueBallId, gameType, opening), V0: V0_DEFAULT, a: 0, b: 0, theta: 0 };
 }
 
 /** 두 배치가 같은가(id 순서·위치). 서버 정본과 로컬 결과를 견줄 때. */
@@ -334,7 +346,7 @@ function phaseFor(s: Pick<SimCoreState, "mode" | "match">, session: SessionState
 }
 
 function reAim(s: SimCoreState, balls: readonly BallState[], session: SessionState): CueInput {
-    return { ...s.input, phi: defaultPhi(balls, cueBallIdOf(session), session.rules.gameType) };
+    return { ...s.input, phi: defaultPhi(balls, cueBallIdOf(session), session.rules.gameType, isOpeningShot(session, balls)) };
 }
 
 function withoutIdx(queue: readonly PendingShot[], idx: number): readonly PendingShot[] {
@@ -383,7 +395,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
                 record: a.record,
                 session: a.session,
                 balls: a.balls,
-                input: initialInput(a.balls, cueBallId, a.session.rules.gameType),
+                input: initialInput(a.balls, cueBallId, a.session.rules.gameType, isOpeningShot(a.session, a.balls)),
             };
         }
 
@@ -396,7 +408,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
                 record: s.record,
                 session: a.session,
                 balls: a.balls,
-                input: { ...initialInput(a.balls, cueBallId, a.session.rules.gameType), V0: s.input.V0 },
+                input: { ...initialInput(a.balls, cueBallId, a.session.rules.gameType, isOpeningShot(a.session, a.balls)), V0: s.input.V0 },
             };
         }
 
@@ -524,7 +536,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             const balls = s.balls.map((b, k) => (k === i ? moved : b));
             if (!isValidLayout(balls, a.table)) return s;
             const cueBallId = cueBallIdOf(s.session);
-            const input = a.id === cueBallId ? { ...s.input, phi: defaultPhi(balls, cueBallId, gameTypeOf(s)) } : s.input;
+            const input = a.id === cueBallId ? { ...s.input, phi: defaultPhi(balls, cueBallId, gameTypeOf(s), openingFor(s.session, balls)) } : s.input;
             return { ...s, balls, input };
         }
 
@@ -544,7 +556,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             return {
                 ...base,
                 phase: phaseFor(base, session),
-                input: initialInput(a.balls, cueBallIdOf(session), session.rules.gameType),
+                input: initialInput(a.balls, cueBallIdOf(session), session.rules.gameType, isOpeningShot(session, a.balls)),
             };
         }
 

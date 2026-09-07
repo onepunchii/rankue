@@ -15,7 +15,7 @@ import {
     type SimParams, type BallState, type ShotInput,
 } from "../../../shared/sim/index.js";
 import {
-    createSession, applyShot, currentPlayer, evaluateShot,
+    createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout, isValidLayout } from "../../../shared/sim/layouts.js";
@@ -158,7 +158,7 @@ router.post("/sim/sessions/:id/shots", requireAuth, asyncHandler(async (req: Aut
     const preState = s.balls as BallState[];
     const params = paramsFor(s);
     const result = simulateShot(preState, input as ShotInput, params);
-    const outcome = evaluateShot(result.events, input.cueBallId, state.rules, result.truncated);
+    const outcome = evaluateShot(result.events, input.cueBallId, state.rules, result.truncated, { opening: isOpeningShot(state, preState) });
     const applied = applyShot(state, outcome);
     const meAfter = applied.session.players[state.turn];
 

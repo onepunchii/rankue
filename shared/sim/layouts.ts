@@ -29,6 +29,45 @@ export function openingLayout(gameType: "3c" | "4c", table: TableSpec, cueBallId
     return [cue, opp, still("red1", cx, (3 * L) / 4, R), still("red2", cx, L / 2, R)];
 }
 
+/** 위치 비교 허용 오차(m). 개시 배치 생성값은 비트 동일하지만 3·(L/4) 와 (3·L)/4 같은 계산 차이를 흡수한다. */
+const OPENING_EPS = 1e-6;
+
+function near(a: number, b: number): boolean {
+    return Math.abs(a - b) <= OPENING_EPS;
+}
+
+/**
+ * 공이 개시 배치 그대로인가(선수가 옮기지 않음). 테이블 치수 없이 상대 위치로 판정한다:
+ * 큐볼·상대 큐볼이 같은 y(헤드 라인) 위에서 182.5 mm 떨어져 있고, 상대 큐볼과 빨간 공이 같은 x(세로 중심선),
+ * 빨간 공 y = 3 × 상대 큐볼 y(¼L → ¾L). 4구는 red1(¾L)·red2(½L = 2 × ¼L) 둘 다.
+ * white·yellow 어느 쪽이 큐볼이든, 좌·우 어느 쪽에 놓였든 참. 개시 규칙(3쿠션 첫 접촉은 빨간 공)과 기본 조준의 근거.
+ */
+export function isOpeningLayout(balls: readonly BallState[], gameType: "3c" | "4c"): boolean {
+    const expected = gameType === "3c" ? 3 : 4;
+    if (balls.length !== expected) return false;
+    const byId = new Map<string, BallState>();
+    for (const b of balls) byId.set(b.id, b);
+    if (byId.size !== expected) return false;
+    const white = byId.get("white"), yellow = byId.get("yellow");
+    if (!white || !yellow) return false;
+    const reds: BallState[] = [];
+    for (const id of gameType === "3c" ? ["red"] : ["red1", "red2"]) {
+        const r = byId.get(id);
+        if (!r) return false;
+        reds.push(r);
+    }
+    const pairs: ReadonlyArray<readonly [BallState, BallState]> = [[white, yellow], [yellow, white]];
+    for (const [cue, opp] of pairs) {
+        if (!near(cue.r[1], opp.r[1])) continue;
+        if (!near(Math.abs(cue.r[0] - opp.r[0]), OPENING_SIDE_OFFSET)) continue;
+        const cx = opp.r[0], q = opp.r[1];
+        if (!(near(reds[0].r[0], cx) && near(reds[0].r[1], 3 * q))) continue;
+        if (gameType === "4c" && !(near(reds[1].r[0], cx) && near(reds[1].r[1], 2 * q))) continue;
+        return true;
+    }
+    return false;
+}
+
 /** 배치 유효성: 테이블 안, 서로 겹치지 않음. 자유 배치(드래그) 입력 검증용. */
 export function isValidLayout(balls: readonly BallState[], table: TableSpec): boolean {
     const R = table.ball.R;

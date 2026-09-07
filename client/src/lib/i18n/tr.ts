@@ -1754,6 +1754,7 @@ const tr: Dict = {
   "sim.outcome.missFinish": "Bitiş kuralı sağlanmadı · sayı yok",
   "sim.outcome.foulOpponent": "Faul · rakip topa değdi",
   "sim.outcome.foulTruncated": "Vuruş geçersiz · hesap sınırı",
+  "sim.outcome.foulOpening": "Faul · açılış vuruşunda önce kırmızı top",
   "sim.outcome.noShot": "Vuruş olmadı",
   "sim.end.title": "Oyun bitti",
   "sim.end.win": "Hedefe ulaşıldı",

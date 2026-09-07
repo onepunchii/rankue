@@ -30,7 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
-import type { ShotOutcome } from "@shared/sim/rules";
+import { isOpeningShot, type ShotOutcome } from "@shared/sim/rules";
 import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -709,8 +709,9 @@ export function SimulatorPage() {
         void solver.solve({
             balls: sim.balls, cueBallId: sim.cueBallId, gameType: sim.config.gameType, rules: sim.config.rules,
             params: sim.params, seed: solverSeedRef.current,
+            opening: sim.session ? isOpeningShot(sim.session, sim.balls) : false,
         });
-    }, [sim.config, sim.params, sim.phase, sim.balls, sim.cueBallId, solver]);
+    }, [sim.config, sim.params, sim.phase, sim.balls, sim.cueBallId, sim.session, solver]);
     const retrySolver = useCallback(() => { solverSeedRef.current += 1; openSolver(); }, [openSolver]);
     const onSolverPreview = useCallback((c: SolveCandidate | null) => {
         if (!c || !sim.config) { setSolverPreview(null); return; }

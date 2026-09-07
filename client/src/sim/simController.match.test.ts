@@ -11,7 +11,7 @@ vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout } from "@shared/sim/layouts";
 import { DEFAULT_CUE, TABLES } from "@shared/sim/params";
-import { applyShot, createSession, evaluateShot, DEFAULT_3C_RULES, type SessionState } from "@shared/sim/rules";
+import { applyShot, createSession, evaluateShot, isOpeningShot, DEFAULT_3C_RULES, type SessionState } from "@shared/sim/rules";
 import type { BallState, ShotInput } from "@shared/sim/types";
 import { MAX_RETRIES } from "./simReducer";
 import type { ShotRequest, SimApi } from "./simApi";
@@ -23,7 +23,8 @@ import {
 
 const HOST = "host-uuid";
 /** 개시 배치(흰 공 선공)에서 3쿠션 득점이 나는 입력 — 실측(엔진 결정론이라 고정값). */
-const POINT_SHOT: Partial<ShotInput> = { phi: 1.6, V0: 5, a: 0 };
+/** 개시 배치에서 빨간 공 먼저 → 3쿠션 → 노란 공 득점(엔진 결정론 — 격자 탐색으로 찾은 입력, 이벤트 17개). 개시 규칙(빨간 공 먼저)을 지킨다. */
+const POINT_SHOT: Partial<ShotInput> = { phi: 1.65, V0: 3, a: -0.15, b: 0 };
 const GUEST = "guest-uuid";
 const CLAIM_AFTER_MS = 48 * 60 * 60 * 1000;
 
@@ -159,7 +160,7 @@ class FakeMatchServer {
         if (req.idx !== r.shots) throw { status: 409, data: { code: "IDX_MISMATCH" }, message: `샷 순서가 맞지 않습니다 (서버 ${r.shots})` };
         if (req.input.cueBallId !== r.state.players[r.turn].cueBallId) throw { status: 400, message: "이 차례의 큐볼이 아닙니다" };
         const result = simulateShot(r.balls, req.input, this.params);
-        const outcome = evaluateShot(result.events, req.input.cueBallId, r.state.rules, result.truncated);
+        const outcome = evaluateShot(result.events, req.input.cueBallId, r.state.rules, result.truncated, { opening: isOpeningShot(r.state, r.balls) });
         const applied = applyShot(r.state, outcome);
         const finished = applied.session.status === "finished";
         this.log.push({
@@ -363,7 +364,7 @@ describe("따라잡기 재생", () => {
     it("상대가 득점하고 이어 치면(두 샷) 샷마다 재생하고, 득점 뒤엔 계속 waiting, 미스 뒤에 aim", async () => {
         const m = (make(GUEST));
         m.ctrl.startMatch(m.srv.public(GUEST));
-        m.srv.shootAs(HOST, POINT_SHOT);                 // 개시 배치에서 3쿠션 득점(엔진 결정론 — 실측한 입력)
+        m.srv.shootAs(HOST, POINT_SHOT);                 // 개시 배치에서 빨간 공 먼저 3쿠션 득점(엔진 결정론)
         expect(m.srv.row.state.players[0].score).toBe(1);
         expect(m.srv.row.turn).toBe(0);
         m.srv.shootAs(HOST);                             // 이어 친 미스 → 게스트 차례

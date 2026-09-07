@@ -76,6 +76,24 @@ describe("헬퍼", () => {
         expect(defaultPhi([balls3[0]], "white", "3c")).toBe(Math.PI / 2);
         expect(initialInput(balls3, "white", "3c")).toEqual({ phi: Math.PI, V0: V0_DEFAULT, a: 0, b: 0, theta: 0 });
     });
+    it("개시 샷은 빨간 공 기준: 기본 조준·두께 버튼·initialInput 모두", () => {
+        const cue = balls3.find((b) => b.id === "white")!;
+        const red = balls3.find((b) => b.id === "red")!;
+        const toRed = Math.atan2(red.r[1] - cue.r[1], red.r[0] - cue.r[0]);
+        expect(objectTargetFor(balls3, "white", "3c", true)!.id).toBe("red");
+        expect(defaultPhi(balls3, "white", "3c", true)).toBeCloseTo(toRed, 9);
+        expect(initialInput(balls3, "white", "3c", true).phi).toBeCloseTo(toRed, 9);
+        const phi = thicknessPhi(balls3, "white", "3c", 0.5, "left", R, true)!;
+        expect(thicknessFor([cue.r[0], cue.r[1]], phi, [red.r[0], red.r[1]], R).thickness).toBeCloseTo(0.5, 6);
+        // 빨간 공이 없는 배치면 평소대로 가장 가까운 공
+        expect(objectTargetFor(balls3.filter((b) => b.id !== "red"), "white", "3c", true)!.id).toBe("yellow");
+        // 세션으로 시작하면(개시 배치·첫 샷) 조준이 빨간 공을 향한다
+        const st = simReducer(INITIAL_STATE, { type: "start", session: session3(), balls: balls3, record: false });
+        expect(st.input.phi).toBeCloseTo(toRed, 9);
+        // 공을 옮기면 개시 배치가 아니므로 가장 가까운 공(노란 공)으로 돌아간다
+        const st2 = simReducer(st, { type: "placeBall", id: "white", x: cue.r[0] + 0.05, y: cue.r[1], table });
+        expect(st2.input.phi).toBeCloseTo(Math.PI, 9);
+    });
     it("두께 단계 → phi: 반두께면 thicknessFor 가 0.5 를 돌려준다", () => {
         const cue = balls3.find((b) => b.id === "red")!;
         // 빨간 공을 큐볼로 가정해 멀리 있는 공을 조준(가까우면 asin 이 크다)
@@ -95,7 +113,7 @@ describe("start / setInput", () => {
         expect(s.phase).toBe("aim");
         expect(s.record).toBe(false);
         expect(s.shotIdx).toBe(0);
-        expect(s.input).toEqual(initialInput(balls3, "white", "3c"));
+        expect(s.input).toEqual(initialInput(balls3, "white", "3c", true));   // 개시 배치 첫 샷 → 빨간 공 기준
     });
     it("setInput 은 aim 에서만, 클램프·정규화, 변화 없으면 같은 참조", () => {
         const s = started();
@@ -446,7 +464,7 @@ describe("대전: 시작과 잠금", () => {
         expect(host.phase).toBe("aim");
         expect(host.record).toBe(true);
         expect(host.match!.myIndex).toBe(0);
-        expect(host.input.phi).toBeCloseTo(defaultPhi(balls3, "white", "3c"), 12);
+        expect(host.input.phi).toBeCloseTo(defaultPhi(balls3, "white", "3c", true), 12);
         const guest = startMatch(1);
         expect(guest.phase).toBe("waiting");
         expect(guest.match!.opponentName).toBe("호스트");

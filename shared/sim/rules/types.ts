@@ -39,7 +39,17 @@ export type ShotOutcomeCode =
     | "foul-opponent"    // 4구: 상대 큐볼 접촉
     | "miss-finish"      // 마무리 규칙(마지막 점수는 3쿠션/뱅크) 미충족 → 무득점
     | "foul-truncated"   // 물리 이벤트 상한 초과 → 샷 무효
+    | "foul-opening"     // 3쿠션 개시 샷: 첫 접촉이 빨간 공이 아님(UMB 개시 규칙) → 무득점·이닝 소모
     | "no-shot";         // 이벤트 없음(0 파워) → 이닝 소모 안 함
+
+/** evaluateShot 부가 옵션. */
+export interface EvaluateOptions {
+    /**
+     * 개시 샷인가(3쿠션). UMB 규칙: 개시 샷은 빨간 공을 먼저 맞혀야 한다 — 첫 접촉이 상대 큐볼이면 foul-opening.
+     * 아무 공도 못 맞히면 보통의 miss-no-contact. 4구는 무시. 개시 샷 판정은 session.isOpeningShot 가 맡는다.
+     */
+    readonly opening?: boolean;
+}
 
 export interface ShotOutcome {
     readonly code: ShotOutcomeCode;

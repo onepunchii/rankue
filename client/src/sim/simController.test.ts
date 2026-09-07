@@ -9,7 +9,7 @@ vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 
 import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout } from "@shared/sim/layouts";
-import { applyShot, createSession, evaluateShot, type SessionState } from "@shared/sim/rules";
+import { applyShot, createSession, evaluateShot, isOpeningShot, type SessionState } from "@shared/sim/rules";
 import type { BallState } from "@shared/sim/types";
 import { buildConfig } from "./setupPresets";
 import { paramsFromConfig, MAX_RETRIES } from "./simReducer";
@@ -86,7 +86,7 @@ function makeApi(opts: { createFails?: boolean } = {}) {
             if (mode === "landed") throw { status: 409, data: { code: "IDX_MISMATCH" }, message: `샷 순서가 맞지 않습니다 (서버 ${req.idx + 1})` };
             if (req.idx !== shots) throw { status: 409, data: { code: "IDX_MISMATCH" }, message: `샷 순서가 맞지 않습니다 (서버 ${shots})` };
             const result = simulateShot(serverBalls, req.input, params);
-            const outcome = evaluateShot(result.events, req.input.cueBallId, serverState.rules, result.truncated);
+            const outcome = evaluateShot(result.events, req.input.cueBallId, serverState.rules, result.truncated, { opening: isOpeningShot(serverState, serverBalls) });
             const applied = applyShot(serverState, outcome);
             serverBalls = result.final;
             serverState = applied.session;
@@ -492,13 +492,16 @@ describe("재생 배속·프레임", () => {
 });
 
 describe("두께·입력 헬퍼", () => {
-    it("setThickness 는 가장 가까운 적구 기준 phi, setSpin 은 미스큐 링 클램프, nudgePhi 누적", () => {
+    it("setThickness 는 기준 적구(개시 샷은 빨간 공) 기준 phi, setSpin 은 미스큐 링 클램프, nudgePhi 누적", () => {
         const { ctrl } = make({ record: false });
+        const cue = opening.find((b) => b.id === "white")!;
+        const red = opening.find((b) => b.id === "red")!;
+        const toRed = Math.atan2(red.r[1] - cue.r[1], red.r[0] - cue.r[0]);
         ctrl.setThickness(0.5, "left");
         const half = ctrl.store.get().input.phi;
         ctrl.setThickness(1, "left");
-        expect(ctrl.store.get().input.phi).toBeCloseTo(Math.PI, 9);
-        expect(half).not.toBeCloseTo(Math.PI, 3);
+        expect(ctrl.store.get().input.phi).toBeCloseTo(toRed, 9);
+        expect(half).not.toBeCloseTo(toRed, 3);
         ctrl.setSpin(0.6, 0);
         expect(ctrl.store.get().input.a).toBeLessThanOrEqual(0.5);
         expect(ctrl.store.get().input.a).toBeGreaterThan(0.49);

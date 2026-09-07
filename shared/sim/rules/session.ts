@@ -6,6 +6,8 @@
  * 마무리 규칙 ruleFinishType none | 3c | bank, 음수 점수 정상(clamp 금지).
  */
 import type { Rules, ShotOutcome } from "./types.js";
+import type { BallState } from "../types.js";
+import { isOpeningLayout } from "../layouts.js";
 
 export type FinishType = "none" | "3c" | "bank";
 
@@ -63,6 +65,17 @@ function finishSatisfied(s: SessionState, o: ShotOutcome): boolean {
     if (s.finishType === "none") return true;
     if (s.finishType === "3c") return o.cushionsBeforeSecond >= 3;
     return o.cushionsBeforeFirst >= 3; // bank
+}
+
+/**
+ * 이 샷이 개시 샷인가: 3쿠션이고, 아직 아무도 이닝을 마치거나 득점하지 않았고(첫 샷, 또는 0 파워 샷 뒤), 공이 개시 배치 그대로.
+ * 판정(evaluateShot 의 opening — 첫 접촉은 빨간 공)과 기본 조준·두께 버튼의 기준 적구(빨간 공)가 함께 쓴다.
+ * 자유 배치(공을 옮긴 연습)·드릴에는 적용되지 않는다. 4구는 항상 false. 서버·클라이언트·해법 찾기가 같은 함수를 쓴다.
+ */
+export function isOpeningShot(s: SessionState, balls: readonly BallState[]): boolean {
+    if (s.rules.gameType !== "3c") return false;
+    if (!s.players.every((p) => p.innings === 0 && p.score === 0)) return false;
+    return isOpeningLayout(balls, "3c");
 }
 
 export interface ApplyResult {

@@ -111,3 +111,35 @@ describe("4구 판정 (국내 관행)", () => {
         expect(evaluateShot([bb("white", "yellow")], "white", heavy).points).toBe(-20);
     });
 });
+
+describe("3쿠션 개시 샷(UMB: 빨간 공 먼저)", () => {
+    const OPEN = { opening: true };
+    it("상대 큐볼을 먼저 맞히면 3쿠션 득점 조건을 채워도 파울(무득점·이닝 소모)", () => {
+        const ev = [bb("white", "yellow"), cu("white"), cu("white", "top"), cu("white", "right"), bb("white", "red")];
+        const o = evaluateShot(ev, "white", DEFAULT_3C_RULES, false, OPEN);
+        expect(o).toMatchObject({ code: "foul-opening", points: 0, scored: false, consumesInning: true });
+        expect(o.contacts).toEqual(["yellow", "red"]);
+        // 같은 이벤트가 개시 샷이 아니면 평소대로 득점
+        expect(evaluateShot(ev, "white", DEFAULT_3C_RULES).code).toBe("point");
+        expect(evaluateShot(ev, "white", DEFAULT_3C_RULES, false, { opening: false }).code).toBe("point");
+    });
+    it("빨간 공을 먼저 맞히면 평소 판정(득점·쿠션 부족·한 공)", () => {
+        expect(evaluateShot([bb("white", "red"), cu("white"), cu("white"), cu("white"), bb("white", "yellow")], "white", DEFAULT_3C_RULES, false, OPEN).code).toBe("point");
+        expect(evaluateShot([bb("white", "red"), cu("white"), bb("white", "yellow")], "white", DEFAULT_3C_RULES, false, OPEN).code).toBe("miss-cushions");
+        expect(evaluateShot([bb("white", "red"), cu("white")], "white", DEFAULT_3C_RULES, false, OPEN).code).toBe("miss-one-ball");
+    });
+    it("아무 공도 못 맞히면 보통의 미스, 0 파워는 no-shot", () => {
+        expect(evaluateShot([cu("white"), cu("white")], "white", DEFAULT_3C_RULES, false, OPEN).code).toBe("miss-no-contact");
+        expect(evaluateShot([], "white", DEFAULT_3C_RULES, false, OPEN).code).toBe("no-shot");
+    });
+    it("노란 공 차례면 흰 공이 상대 큐볼 — 먼저 맞히면 파울", () => {
+        expect(evaluateShot([bb("yellow", "white")], "yellow", DEFAULT_3C_RULES, false, OPEN).code).toBe("foul-opening");
+        expect(evaluateShot([bb("yellow", "red")], "yellow", DEFAULT_3C_RULES, false, OPEN).code).toBe("miss-one-ball");
+    });
+    it("4구는 개시 옵션을 무시한다", () => {
+        expect(evaluateShot([bb("white", "red2"), bb("white", "red1")], "white", DEFAULT_4C_RULES, false, OPEN).code).toBe("point");
+    });
+    it("계산 한도 초과는 개시 파울보다 먼저", () => {
+        expect(evaluateShot([bb("white", "yellow")], "white", DEFAULT_3C_RULES, true, OPEN).code).toBe("foul-truncated");
+    });
+});

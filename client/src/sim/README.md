@@ -42,6 +42,8 @@ client/src/sim/
 - `shoot()`: local `simulateShot` → 즉시 재생 시작 → 동시에 `POST /api/hiq/sim/sessions/:id/shots` {idx, input, clientHash}. 응답이 `mismatch` 면 재생이 끝난 뒤 서버 `final`/`state` 로 스냅하고 토스트 1회("서버와 결과가 달라 맞췄습니다"). 응답 실패(오프라인)면 로컬 결과를 유지하고 큐에 넣어 다음 샷 전에 재전송(idx 순서 보장).
 - `undo()`: 마지막 샷 전 스냅샷으로 복귀(연습 모드만, 서버에는 close 후 새 세션이 아니라 **기록하지 않는 연습 샷**으로 취급 — 연습 모드에선 서버 기록 자체를 끄는 `practice: true` 옵션으로 단순화).
 - 판정은 `evaluateShot` + `applyShot` 을 로컬에서도 돌려 HUD 를 즉시 갱신하되, 정본은 서버 응답의 `state` 다.
+- 개시 샷(3쿠션, 아직 아무도 이닝·득점이 없고 공이 개시 배치 그대로 — `isOpeningShot`): UMB 규칙대로 첫 접촉이 빨간 공이 아니면 `foul-opening`(무득점·이닝 소모).
+  이때 기본 조준·두께 버튼의 기준 적구도 빨간 공이고, 해법 찾기(`SolveRequest.opening`)와 서버 재판정도 같은 함수를 쓴다. 공을 옮긴 자유 배치·드릴·4구엔 적용되지 않는다.
 - 오디오·햅틱은 재생 시작 시 result.events 의 t 로 예약한다(재생 중 이벤트를 다시 감지하지 않는다).
 
 ## 입력 규약
