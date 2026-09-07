@@ -474,14 +474,23 @@ export class GameRepository {
     }
 
     async createInvite(hostId: string): Promise<string> {
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        await db.insert(hiqInvites).values({
-            code,
-            hostId,
-            status: 'pending',
-            expiresAt: new Date(Date.now() + 30 * 60 * 1000)
-        });
-        return code;
+        // 살아 있는(pending, 미만료) 초대와 같은 코드가 나오면 다른 호스트의 방으로 들어가는 사고가 난다.
+        // 6자리 900,000개 중 동시 활성 초대는 수십 개 수준이라 재시도 몇 번이면 충분하다.
+        for (let attempt = 0; attempt < 8; attempt++) {
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+            const [live] = await db.select({ id: hiqInvites.id }).from(hiqInvites)
+                .where(and(eq(hiqInvites.code, code), eq(hiqInvites.status, 'pending'), gt(hiqInvites.expiresAt, new Date())))
+                .limit(1);
+            if (live) continue;
+            await db.insert(hiqInvites).values({
+                code,
+                hostId,
+                status: 'pending',
+                expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+            });
+            return code;
+        }
+        throw new Error("초대 코드 생성 실패");
     }
 
     // Consume the accepted invites a completed ranked game was built from, so a single PIN can't
