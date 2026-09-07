@@ -121,6 +121,12 @@ export interface SimAux {
     readonly syncing: boolean;
     /** 마지막 재생의 길이 (s) */
     readonly duration: number;
+    /**
+     * 마지막으로 시뮬레이션한 샷의 원본 결과(내 샷·따라잡기 재생 모두, 재생 시작 시점에 갱신). 화면의 샷 분석
+     * (다이아몬드 시스템 "시스템 vs 실제")용 읽기 전용 값. 세션 시작·다시하기·되돌리기·나가기에 지운다.
+     * 서버 스냅이 와도 이 값은 로컬 물리 결과 그대로다(이벤트는 서버 것으로 바꾸지 않는다).
+     */
+    readonly lastResult: SimResult | null;
 }
 
 export interface SimSnapshot {
@@ -150,7 +156,7 @@ export interface ControllerDeps {
     readonly previewDelayMs?: number;
 }
 
-const INITIAL_AUX: SimAux = { setup: null, preview: null, speed: 1, syncing: false, duration: 0 };
+const INITIAL_AUX: SimAux = { setup: null, preview: null, speed: 1, syncing: false, duration: 0, lastResult: null };
 /** exit 가 진행 중인 서버 호출을 기다리는 상한 (ms). */
 export const EXIT_SYNC_WAIT_MS = 3000;
 /** 대전 폴링 주기: 상대 차례가 된 뒤 처음 1분은 빠르게, 그 뒤 느리게. */
@@ -323,7 +329,7 @@ export class SimController {
             players: players ?? [{ id: "p1", target: config.target }],
         });
         const balls = openingLayout(config.gameType, params.table, "white");
-        this.setAux({ setup: { config, params, players }, preview: null, duration: 0, speed: 1 });
+        this.setAux({ setup: { config, params, players }, preview: null, duration: 0, speed: 1, lastResult: null });
         this.store.dispatch({ type: "start", session, balls, record });
         if (record) this.openServerSession(config, balls, players);
     }
@@ -350,7 +356,7 @@ export class SimController {
         const params = paramsFromConfig(config);
         const match = matchStateFrom(m, m.myIndex);
         this.waitingSince = this.now();
-        this.setAux({ setup: { config, params }, preview: null, duration: 0, speed: 1 });
+        this.setAux({ setup: { config, params }, preview: null, duration: 0, speed: 1, lastResult: null });
         this.store.dispatch({ type: "startMatch", match, session: m.state, balls: m.balls, shots: m.shots });
         this.unwake = (this.deps.onWake ?? defaultOnWake)(() => this.wake());
         this.schedulePoll();
@@ -372,7 +378,7 @@ export class SimController {
             players: players ?? [{ id: "p1", target: config.target }],
         });
         const balls = openingLayout(config.gameType, params.table, "white");
-        this.setAux({ preview: null, duration: 0, speed: 1 });
+        this.setAux({ preview: null, duration: 0, speed: 1, lastResult: null });
         this.store.dispatch({ type: "restart", session, balls });
         if (s.record) this.openServerSession(config, balls, players);
     }
@@ -474,6 +480,8 @@ export class SimController {
 
     undo(): void {
         this.store.dispatch({ type: "undo" });
+        // 되돌린 샷의 결과는 더 이상 "마지막 샷"이 아니다
+        if (this.aux.lastResult !== null) this.setAux({ lastResult: null });
     }
 
     /* ------------------------------------------------------------ 샷 */
@@ -513,7 +521,7 @@ export class SimController {
                 session: applied.session, outcome: applied.outcome,
             });
             this.scheduleFeedback(result);
-            this.startPlayback(makePlayback(result, effectiveBall(setup.params)));
+            this.startPlayback(makePlayback(result, effectiveBall(setup.params)), result);
 
             if (s.mode === "match") {
                 const cur = this.store.get();
@@ -549,10 +557,11 @@ export class SimController {
         this.setAux({ speed });
     }
 
-    private startPlayback(pb: Playback): void {
+    /** 재생 시작. result 는 그 재생의 원본 결과(aux.lastResult 로 화면에 노출). */
+    private startPlayback(pb: Playback, result: SimResult): void {
         this.pb = pb;
         this.clock = startClock(this.now(), this.aux.speed);
-        this.setAux({ duration: pb.duration });
+        this.setAux({ duration: pb.duration, lastResult: result });
         if (pb.duration <= 0) { this.endPlayback(); return; }
         this.loop();
     }
@@ -991,7 +1000,7 @@ export class SimController {
             });
             if (this.store.get().phase !== "shooting") { complete = false; break; }
             this.scheduleFeedback(result);
-            this.startPlayback(makePlayback(result, effectiveBall(setup.params)));
+            this.startPlayback(makePlayback(result, effectiveBall(setup.params)), result);
             await this.playbackDone();
         }
         if (gen !== this.gen) return;

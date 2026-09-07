@@ -167,6 +167,23 @@ describe("SimulatorPage", () => {
         expect(byLabel(h, ko["sim.controls.undo"])).toBeNull();
     });
 
+    it("3쿠션이면 HUD 에 다이아몬드 시스템 토글(기본 꺼짐)이 있고, 누르면 켜진다 · 4구엔 없다", () => {
+        nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
+        const h = mount();
+        const btn = byLabel(h, ko["sim.diamond.toggleLabel"]);
+        expect(btn).not.toBeNull();
+        expect(btn!.textContent).toBe(ko["sim.diamond.toggle"]);
+        expect(btn!.getAttribute("aria-pressed")).toBe("false");
+        click(btn!);
+        expect(byLabel(h, ko["sim.diamond.toggleLabel"])!.getAttribute("aria-pressed")).toBe("true");
+        click(byLabel(h, ko["sim.diamond.toggleLabel"])!);
+        expect(byLabel(h, ko["sim.diamond.toggleLabel"])!.getAttribute("aria-pressed")).toBe("false");
+
+        nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "4c", target: 5 }), record: false })}`;
+        const h4 = mount();
+        expect(byLabel(h4, ko["sim.diamond.toggleLabel"])).toBeNull();
+    });
+
     it("샷 → 재생(잠금) → 시계를 앞당기면 정지 · 결과 배너 · 이닝 시트 한 줄 · 되돌리기", async () => {
         nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
         const h = mount();

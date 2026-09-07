@@ -5,6 +5,9 @@
  *    컨텍스트 손실 2회면 Canvas2DRenderer 로 내려간다(같은 Renderer 계약이라 루프·오버레이·제스처는 모른다),
  *  - 테이블 포인터 제스처(조준 드래그 · 연습 모드 공 배치 · 재생 중 길게 눌러 4×)를 tableGestures 로 해석하고,
  *  - HUD · 조작 패널 · 결과 배너 · 이닝 시트 · 종료/나가기 다이얼로그를 그린다.
+ *  - 다이아몬드 시스템 훈련(3쿠션만): HUD 토글(localStorage "rankue.sim.diamond", 기본 꺼짐)이 켜지면 rAF 경로에서
+ *    overlay/diamondSystem.overlayDiamond 로 레일 숫자·조준 분석을 오버레이에 넘기고, 샷이 끝나면 sim.lastResult 로
+ *    "시스템 {예측} · 실제 {3쿠션수}" 를 결과 배너 아래 한 줄로 보인다.
  * 설정은 `?cfg=<base64url JSON>`(pageConfig) 으로 받고, 없거나 깨졌으면 SimSetupDialog 를 위에 연다.
  * 세로 고정 레이아웃, env(safe-area-inset-*) 패딩, 태블릿에서는 렌더러가 letterbox 해서 테이블이 잘리지 않는다.
  * 레거시 Expo ReactNativeWebView 방향 브리지는 옮기지 않는다 — 이 화면은 세로 레이아웃 그 자체다.
@@ -14,6 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
 import type { ShotOutcome } from "@shared/sim/rules";
+import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { useGameAudio } from "@/hooks/useGameAudio";
@@ -23,6 +27,7 @@ import type { Renderer } from "./render/Renderer";
 import { Canvas2DRenderer } from "./render/Canvas2DRenderer";
 import { CONTEXT_LOSS_LIMIT, safeLocalStorage, selectRendererKind, writeRendererPref, type RendererKind } from "./render/rendererChoice";
 import { Overlay, type Project } from "./overlay/Overlay";
+import { createNumbersCache, overlayDiamond, readDiamondPref, shotReadout, writeDiamondPref } from "./overlay/diamondSystem";
 import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
 import { matchApi, type MatchPublic } from "./matchApi";
 import { MatchLobby } from "./match/MatchLobby";
@@ -66,6 +71,8 @@ interface View {
     canPlace: boolean;
     dragging: boolean;
     placing: string | null;
+    /** 다이아몬드 시스템 오버레이(토글 켜짐 + 3쿠션). */
+    diamond: boolean;
 }
 
 export function SimulatorPage() {
@@ -89,6 +96,7 @@ export function SimulatorPage() {
 
     // ── 화면 상태 ─────────────────────────────────────────────────────────
     const [muted, setMuted] = useState(false);
+    const [diamond, setDiamond] = useState(() => readDiamondPref(safeLocalStorage()));
     const [side, setSide] = useState<"left" | "right">("right");
     const [log, setLog] = useState<InningLog>(EMPTY_LOG);
     const [banner, setBanner] = useState<{ outcome: ShotOutcome; id: number } | null>(null);
@@ -122,6 +130,9 @@ export function SimulatorPage() {
     });
     const { actions } = sim;
     const table = sim.params?.table ?? TABLES.DAEDAE;
+    const gameType: GameType | null = sim.session?.rules.gameType ?? null;
+    const is3c = gameType === "3c";
+    const diamondOn = diamond && is3c;
 
     // 처음 한 번: URL 설정이 있으면 바로 시작
     const startedRef = useRef(false);
@@ -168,6 +179,8 @@ export function SimulatorPage() {
     const rendererKindRef = useRef<RendererKind | null>(null);
     if (rendererKindRef.current === null) rendererKindRef.current = selectRendererKind();
     const contextLossesRef = useRef(0);
+    // 다이아몬드 시스템 라벨 캐시(테이블·방향이 같으면 같은 배열) — rAF 경로에서만 쓴다
+    const numbersCacheRef = useRef(createNumbersCache());
 
     useEffect(() => {
         const el = tableRef.current;
@@ -258,15 +271,15 @@ export function SimulatorPage() {
     // rAF 루프가 읽는 뷰 — 렌더마다 갱신(할당만, 재렌더 없음)
     const viewRef = useRef<View>({
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace, dragging, placing,
+        table, canPlace: sim.canPlace, dragging, placing, diamond: diamondOn,
     });
     viewRef.current = {
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace, dragging, placing,
+        table, canPlace: sim.canPlace, dragging, placing, diamond: diamondOn,
     };
     useEffect(() => {
         dirtyRef.current = true;
-    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing]);
+    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn]);
 
     const { frameAt } = sim;
     useEffect(() => {
@@ -294,6 +307,8 @@ export function SimulatorPage() {
                     balls: v.balls, phi: v.input.phi, cueBallId: v.cueBallId, table: v.table,
                     guide: v.dragging || !v.preview ? "straight" : "preview",
                     preview: v.preview?.paths ?? null,
+                    // 다이아몬드 시스템: 조준 분석은 싸다(광선 하나·산술 몇 줄) — dirty 프레임에만 다시 계산된다
+                    diamond: v.diamond ? overlayDiamond(v.balls, v.cueBallId, v.input.phi, v.table, numbersCacheRef.current) : null,
                     project: projectRef.current,
                 });
                 overlayCleared = false;
@@ -393,6 +408,17 @@ export function SimulatorPage() {
         return activeThickness(sim.balls, sim.cueBallId, sim.session.rules.gameType, sim.input.phi, sim.params.table.ball.R);
     }, [sim.balls, sim.cueBallId, sim.session, sim.params, sim.input.phi]);
 
+    // 다이아몬드 시스템 읽기: 결과 배너와 같은 타이밍에 "시스템 {예측} · 실제 {3쿠션수}" 한 줄.
+    // banner 는 onOutcome(재생 끝) 에, lastResult 는 재생 시작에 갱신되므로 둘은 같은 샷을 가리킨다.
+    const lastResult = sim.lastResult;
+    const readoutText = useMemo(() => {
+        if (!diamondOn || !banner || !lastResult) return null;
+        const r = shotReadout(lastResult, table);
+        if (!r) return null;
+        if (r.actual === null) return t("sim.diamond.readoutMissed").replace("{system}", String(r.system));
+        return t("sim.diamond.readout").replace("{system}", String(r.system)).replace("{actual}", String(r.actual));
+    }, [diamondOn, banner, lastResult, table, t]);
+
     // ── 조작 콜백(참조 안정 — Controls 는 memo) ──────────────────────────
     const onThickness = useCallback((step: ThicknessStep) => actions.setThickness(step, side), [actions, side]);
     const onSide = useCallback((s: "left" | "right") => {
@@ -414,6 +440,15 @@ export function SimulatorPage() {
     const onInnings = useCallback(() => setSheetOpen(true), []);
     const onExitRequest = useCallback(() => setExitOpen(true), []);
     const onToggleMute = useCallback(() => setMuted((m) => !m), []);
+    const onToggleDiamond = useCallback(() => {
+        setDiamond((d) => {
+            const next = !d;
+            writeDiamondPref(safeLocalStorage(), next);
+            return next;
+        });
+    }, []);
+    // HUD 는 memo — 토글 객체는 값이 바뀔 때만 새로 만든다. 4구에서는 버튼을 숨긴다(시스템은 3쿠션 훈련용).
+    const diamondHud = useMemo(() => (is3c ? { on: diamond, onToggle: onToggleDiamond } : undefined), [is3c, diamond, onToggleDiamond]);
 
     const exitNow = useCallback(async () => {
         setExiting(true);
@@ -483,6 +518,7 @@ export function SimulatorPage() {
                     session={sim.session} config={sim.config} phase={sim.phase} names={names}
                     record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
                     muted={muted} onToggleMute={onToggleMute}
+                    diamond={diamondHud}
                 />
 
                 {/* 테이블: 남은 높이를 전부 차지. 렌더러·오버레이가 absolute 캔버스로 얹힌다. */}
@@ -558,7 +594,7 @@ export function SimulatorPage() {
                         </button>
                     )}
                     <div className="absolute inset-0 z-[3] pointer-events-none">
-                        <OutcomeBanner outcome={banner?.outcome ?? null} visible={bannerVisible} />
+                        <OutcomeBanner outcome={banner?.outcome ?? null} visible={bannerVisible} sub={readoutText} />
                     </div>
                 </div>
 

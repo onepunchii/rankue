@@ -6,9 +6,9 @@ import type { SimSetupConfig } from "../setupPresets";
 import type { Phase } from "../simReducer";
 import { displayAverage, formatAverage, ruleBadge, tableLabel } from "../hudMath";
 
-// 상단 HUD. 한 줄의 규칙·테이블 배지 + 상태 칩 + 소리 토글, 그 아래 선수 카드(점수/다마수 · 이닝 · 에버리지 · 하이런 · 런).
+// 상단 HUD. 한 줄의 규칙·테이블 배지 + 상태 칩 + 소리 토글(+ 3쿠션이면 다이아몬드 시스템 토글), 그 아래 선수 카드(점수/다마수 · 이닝 · 에버리지 · 하이런 · 런).
 // 에버리지 규약은 hudMath.inningsForAverage 주석 참고(점수판 앱과 같이 진행 중 이닝 포함).
-// phi 드래그마다 페이지가 재렌더되므로 memo — HUD 의 props 는 샷 사이에만 바뀐다.
+// phi 드래그마다 페이지가 재렌더되므로 memo — HUD 의 props 는 샷 사이에만 바뀐다(diamond 객체는 페이지가 useMemo 로 고정).
 export interface HUDProps {
     session: SessionState | null;
     config: SimSetupConfig | null;
@@ -20,6 +20,8 @@ export interface HUDProps {
     queued: number;
     muted: boolean;
     onToggleMute: () => void;
+    /** 다이아몬드 시스템 오버레이 토글. 없으면(4구 등) 버튼을 그리지 않는다. */
+    diamond?: { on: boolean; onToggle: () => void };
 }
 
 export const HUD = memo(function HUD(p: HUDProps) {
@@ -42,6 +44,20 @@ export const HUD = memo(function HUD(p: HUDProps) {
                 )}
                 {status && <span className="rk-chip border border-surface-line text-ink-3 truncate">{status}</span>}
                 <div className="flex-1" />
+                {p.diamond && (
+                    <button
+                        type="button"
+                        aria-pressed={p.diamond.on}
+                        aria-label={t("sim.diamond.toggleLabel")}
+                        onClick={p.diamond.onToggle}
+                        className={cn(
+                            "h-11 px-3 rounded-pill border text-[13px] font-semibold",
+                            p.diamond.on ? "border-brand text-brand" : "border-surface-line text-ink-4",
+                        )}
+                    >
+                        {t("sim.diamond.toggle")}
+                    </button>
+                )}
                 <button
                     type="button"
                     aria-pressed={p.muted}

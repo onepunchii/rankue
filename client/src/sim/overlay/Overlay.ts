@@ -2,6 +2,8 @@
  * 조준 오버레이. 렌더러 마운트 위에 겹치는 투명 <canvas> 하나를 소유하고, 디바이스 픽셀로
  * 조준선·고스트볼·예측 경로·쿠션 번호·두께 라벨을 그린다. 포인터 이벤트는 받지 않는다(pointer-events:none) —
  * 페이지가 래퍼에 핸들러를 단다. 좌표 변환은 state.project(Renderer.project)에 맡긴다.
+ * state.diamond 가 있으면(다이아몬드 시스템 훈련) 레일 숫자 라벨을 경로 아래에 깔고, 유효한 조준이면 1쿠션 조준수·출발수·
+ * 예측 3쿠션수를 brand 알약으로 위에 그린다(overlay/diamondSystem). 없으면 그리기는 예전과 완전히 같다.
  *
  * 색은 캔버스 안이지만 UI 요소(선·라벨)이므로 :root 의 디자인 토큰(--brand, --ink-1, --surface-1 …)을
  * 리사이즈마다 한 번 읽어 쓴다. 읽을 수 없으면(테스트·초기화 전) index.css 의 기본값으로 대체한다.
@@ -9,10 +11,14 @@
  *
  * 마운트는 position 이 static 이면 relative 로 바꾼다(겹치기 위해). 그 외 마운트 스타일은 건드리지 않는다.
  */
-import type { BallState } from "@shared/sim/types";
+import type { BallState, CushionId } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
 import { straightGuide, thicknessLabel, type BallPath, type CushionMark, type StraightGuide } from "./paths";
+import type { AimAnalysis, OverlayDiamond, RailPoint, SystemLabel } from "./diamondSystem";
 import { DEFAULT_PALETTE, readPalette, rgba, type Palette } from "../render/tokens";
+import { RAIL_WIDTH_M } from "../render/tableGeometry";
+
+export type { OverlayDiamond } from "./diamondSystem";
 
 export type Project = (x: number, y: number) => readonly [number, number];
 
@@ -33,6 +39,8 @@ export interface OverlayState {
     readonly preview?: OverlayPreview | null;
     /** 라벨에 쓸 두께. 없으면 직선 안내의 접촉 두께를 쓴다. */
     readonly thickness?: { readonly value: number; readonly side: "left" | "right" | "center" } | null;
+    /** 다이아몬드 시스템(3쿠션 훈련): 현재 방향의 레일 숫자 + 조준 분석. 없으면 그리지 않는다. */
+    readonly diamond?: OverlayDiamond | null;
     /** 테이블 좌표(m) → 마운트 CSS 픽셀. */
     readonly project: Project;
 }
@@ -50,6 +58,8 @@ interface ColourStrings {
     readonly brand: string;
     readonly brandFaint: string;
     readonly ink1: string;
+    /** 레일 숫자 라벨 글자. */
+    readonly ink3: string;
     readonly surface1: string;
     readonly surfaceLine: string;
     /** 적구 경로용(60%). 공 id 접두어별. */
@@ -63,6 +73,7 @@ function buildColours(p: Palette): ColourStrings {
         brand: rgba(p.brand),
         brandFaint: rgba(p.brand, AIM_BEYOND_ALPHA),
         ink1: rgba(p.ink1),
+        ink3: rgba(p.ink3),
         surface1: rgba(p.surface1),
         surfaceLine: rgba(p.surfaceLine),
         pathWhite: rgba(p.ballWhite, OBJECT_PATH_ALPHA),
@@ -83,6 +94,14 @@ const NO_DASH: readonly number[] = [];
 const MARK_RADIUS = 8;
 const LABEL_HEIGHT = 20;
 const LABEL_PAD_X = 7;
+/** 출발선(출발점 → 큐볼) 점선. */
+const DIAMOND_DASH: readonly number[] = [3, 3];
+/** 레일 바깥 행(출발수)과 레일 사이 간격 px. */
+const DIAMOND_ROW_GAP = 4;
+/** 레일별 바깥쪽 단위 법선(월드). 조준 강조 알약 위치용. */
+const RAIL_NORMALS: Readonly<Record<CushionId, readonly [number, number]>> = {
+    left: [-1, 0], right: [1, 0], bottom: [0, -1], top: [0, 1],
+};
 
 /* ------------------------------------------------------------------ 오버레이 */
 
@@ -104,6 +123,9 @@ export class Overlay {
     private dpr = 1;
     private w = 0;
     private h = 0;
+    /** anchor() 결과(레일 라벨 화면 위치). 프레임마다 배열을 만들지 않으려고 필드에 둔다. */
+    private ax = 0;
+    private ay = 0;
     private last: OverlayState | null = null;
     private ro: ResizeObserver | null = null;
     private disposed = false;
@@ -187,6 +209,10 @@ export class Overlay {
         c.lineCap = "round";
         c.lineJoin = "round";
 
+        // 시스템 숫자는 경로 아래에 깔린다(조준 강조 알약은 맨 위)
+        const diamond = state.diamond ?? null;
+        if (diamond) this.drawDiamondLabels(state, diamond.numbers);
+
         const preview = state.guide === "preview" ? state.preview ?? null : null;
         if (preview) {
             this.drawPreview(state, preview, rPx);
@@ -199,6 +225,8 @@ export class Overlay {
             const th = state.thickness ?? (guide.ball ? { value: guide.ball.thickness, side: guide.ball.side } : null);
             if (th) this.drawThicknessLabel(state, guide, rPx, th.value);
         }
+
+        if (diamond && diamond.aim) this.drawDiamondAim(state, diamond.aim, cueBall);
     }
 
     /* ------------------------------------------------ 그리기 조각 */
@@ -359,6 +387,85 @@ export class Overlay {
         c.stroke();
         c.fillStyle = this.col.ink1;
         c.fillText(text, x + bw / 2, y + bh / 2 + 0.5);
+    }
+
+    /* ------------------------------------------------ 다이아몬드 시스템 */
+
+    /**
+     * 레일 라벨의 화면 위치. 코 라인 위 점과 바깥 법선(월드)을 project 로 옮겨 레일 폭을 화면에서 재고,
+     * row 0 이면 레일 띠 중앙, row 1 이면 레일 바깥 한 줄(출발수 행)에 놓는다. 결과는 this.ax/ay(할당 없음).
+     */
+    private anchor(state: OverlayState, x: number, y: number, nx: number, ny: number, row: 0 | 1): void {
+        const p0 = state.project(x, y);
+        const p1 = state.project(x + nx * RAIL_WIDTH_M, y + ny * RAIL_WIDTH_M);
+        if (row === 0) {
+            this.ax = (p0[0] + p1[0]) / 2;
+            this.ay = (p0[1] + p1[1]) / 2;
+            return;
+        }
+        const dx = p1[0] - p0[0], dy = p1[1] - p0[1];
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const off = LABEL_HEIGHT / 2 + DIAMOND_ROW_GAP;
+        this.ax = p1[0] + (dx / len) * off;
+        this.ay = p1[1] + (dy / len) * off;
+    }
+
+    /** 알약 하나(캔버스 안으로 클램프). 글꼴·정렬은 호출자가 한 번 설정한다. */
+    private pill(text: string, cx: number, cy: number, fill: string, stroke: string, ink: string): void {
+        const c = this.ctx;
+        const bw = c.measureText(text).width + LABEL_PAD_X * 2;
+        const bh = LABEL_HEIGHT;
+        const x = Math.max(2, Math.min(this.w - bw - 2, cx - bw / 2));
+        const y = Math.max(2, Math.min(this.h - bh - 2, cy - bh / 2));
+        roundRectPath(c, x, y, bw, bh, bh / 2);
+        c.fillStyle = fill;
+        c.fill();
+        c.strokeStyle = stroke;
+        c.stroke();
+        c.fillStyle = ink;
+        c.fillText(text, x + bw / 2, y + bh / 2 + 0.5);
+    }
+
+    /** 시스템 숫자 라벨: ink-3 글자, surface-1 알약, surface-line 테두리. 현재 방향의 레일만 온다. */
+    private drawDiamondLabels(state: OverlayState, labels: readonly SystemLabel[]): void {
+        const c = this.ctx;
+        c.font = FONT;
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.setLineDash(NO_DASH as number[]);
+        c.lineWidth = 1;
+        for (const l of labels) {
+            this.anchor(state, l.x, l.y, l.nx, l.ny, l.row);
+            this.pill(l.text, this.ax, this.ay, this.col.surface1, this.col.surfaceLine, this.col.ink3);
+        }
+    }
+
+    /** 조준 분석: 출발선(출발점 → 큐볼, 흐린 점선) + 1쿠션 조준수·출발수·예측 3쿠션수 강조 알약(brand). */
+    private drawDiamondAim(state: OverlayState, aim: AimAnalysis, cueBall: BallState): void {
+        const c = this.ctx;
+        const dp = state.project(aim.departure.point[0], aim.departure.point[1]);
+        const cp = state.project(cueBall.r[0], cueBall.r[1]);
+        c.lineWidth = 1;
+        c.strokeStyle = this.col.brandFaint;
+        c.setLineDash(DIAMOND_DASH as number[]);
+        c.beginPath();
+        c.moveTo(dp[0], dp[1]);
+        c.lineTo(cp[0], cp[1]);
+        c.stroke();
+        c.setLineDash(NO_DASH as number[]);
+
+        c.font = FONT;
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        this.railPill(state, aim.firstRail, 0);
+        this.railPill(state, aim.departure, aim.departure.side === "long" ? 1 : 0);
+        this.railPill(state, aim.predictedThird, 0);
+    }
+
+    private railPill(state: OverlayState, rp: RailPoint, row: 0 | 1): void {
+        const n = RAIL_NORMALS[rp.rail];
+        this.anchor(state, rp.point[0], rp.point[1], n[0], n[1], row);
+        this.pill(String(Math.round(rp.number)), this.ax, this.ay, this.col.surface1, this.col.brand, this.col.brand);
     }
 }
 

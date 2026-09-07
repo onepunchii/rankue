@@ -1,6 +1,6 @@
 /**
  * 캔버스 안에서 쓰는 디자인 토큰 읽기. 렌더러(강조 링·공 색)와 오버레이(조준선·라벨)가 같은 팔레트를 쓰도록
- * :root 의 CSS 변수(--brand, --ink-1, --surface-1, --surface-line, --ball-*)를 한 곳에서 읽는다.
+ * :root 의 CSS 변수(--brand, --ink-1, --ink-3, --surface-1, --surface-line, --ball-*)를 한 곳에서 읽는다.
  * 읽을 수 없으면(테스트·초기화 전) index.css 의 기본값으로 대체한다.
  *
  * 라사·레일·큐대 같은 물리적 사물의 색은 여기 두지 않는다 — 그건 렌더러 안의 리터럴이다.
@@ -58,6 +58,8 @@ export function scaleColor(c: RGBA, mul: number): RGBA {
 export interface Palette {
     readonly brand: RGBA;
     readonly ink1: RGBA;
+    /** 보조 잉크(캡션) — 오버레이의 레일 숫자 라벨용. */
+    readonly ink3: RGBA;
     readonly surface1: RGBA;
     readonly surfaceLine: RGBA;
     readonly ballWhite: RGBA;
@@ -69,6 +71,7 @@ export interface Palette {
 export const DEFAULT_PALETTE: Palette = {
     brand: [0, 98, 65, 1],
     ink1: [0, 0, 0, 0.87],
+    ink3: [0, 0, 0, 0.55],
     surface1: [255, 255, 255, 1],
     surfaceLine: [0, 0, 0, 0.09],
     ballWhite: [247, 244, 237, 1],
@@ -87,6 +90,7 @@ export function readPalette(doc: Document | null | undefined): Palette {
     return {
         brand: pick("--brand", DEFAULT_PALETTE.brand),
         ink1: pick("--ink-1", DEFAULT_PALETTE.ink1),
+        ink3: pick("--ink-3", DEFAULT_PALETTE.ink3),
         surface1: pick("--surface-1", DEFAULT_PALETTE.surface1),
         surfaceLine: pick("--surface-line", DEFAULT_PALETTE.surfaceLine),
         ballWhite: pick("--ball-white", DEFAULT_PALETTE.ballWhite),

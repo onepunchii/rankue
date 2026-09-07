@@ -11,7 +11,7 @@
  * 상대 차례는 phase="waiting"(입력 잠금, 폴링), 상대 샷은 phase="shooting" + replaying 으로 재생된다.
  */
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import type { BallState } from "@shared/sim/types";
+import type { BallState, SimResult } from "@shared/sim/types";
 import type { SimParams } from "@shared/sim/params";
 import type { SessionState, ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
@@ -126,6 +126,8 @@ export interface Simulator {
     readonly preview: SimPreview | null;
     readonly playback: { readonly duration: number; readonly playing: boolean; readonly speed: PlaybackSpeed };
     readonly outcomeLast: ShotOutcome | null;
+    /** 마지막으로 시뮬레이션한 샷의 원본 결과(재생 시작 시점 갱신, 되돌리기·새 세션에 null). 읽기 전용 — 샷 분석 표시용. */
+    readonly lastResult: SimResult | null;
     readonly mismatches: number;
     /** 솔로: 서버 기록 포기됨(로컬 플레이는 계속). 대전: 내 샷 전송이 끊김(폴링 계속, 연결이 돌아오면 다시 보낸다) */
     readonly offline: boolean;
@@ -229,6 +231,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             preview: aux.preview,
             playback: { duration: aux.duration, playing: core.phase === "shooting", speed: aux.speed },
             outcomeLast: core.outcomeLast,
+            lastResult: aux.lastResult,
             mismatches: core.mismatches,
             offline: core.offline,
             record: core.record,

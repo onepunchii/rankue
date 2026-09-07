@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { TABLES } from "@shared/sim/params";
 import type { BallState } from "@shared/sim/types";
 import { Overlay, parseColor, rgba, type OverlayState } from "./Overlay";
+import { createNumbersCache, overlayDiamond } from "./diamondSystem";
 
 const T = TABLES.DAEDAE;
 const R = T.ball.R;
@@ -131,6 +132,37 @@ describe("Overlay (가짜 캔버스)", () => {
         const ov = new Overlay(f.mount, { labels: { fullBall: "정면" } });
         ov.draw({ ...base, guide: "straight", thickness: { value: 1, side: "center" } });
         expect(texts).toContain("정면");
+        ov.dispose();
+    });
+
+    it("diamond: 레일 숫자 알약 19개 + 조준 강조 3개, 없으면 기존 그리기 그대로", () => {
+        const f = fakeMount();
+        const ov = new Overlay(f.mount);
+        const n = (name: string) => f.calls.filter((c) => c === name).length;
+        // 흰 공(0.5, 0.5) 에서 왼쪽 레일 (R, 2.0) 을 겨눈다 — 공을 안 만나므로 두께 라벨 없음
+        const phi = Math.atan2(1.5, R - 0.5);
+        f.calls.length = 0;
+        ov.draw({ ...base, phi, guide: "straight" });
+        expect(n("fillText")).toBe(0);
+        const plain = f.calls.slice();
+
+        const diamond = overlayDiamond(balls, "white", phi, T, createNumbersCache())!;
+        expect(diamond.aim).not.toBeNull();
+        f.calls.length = 0;
+        ov.draw({ ...base, phi, guide: "straight", diamond });
+        expect(n("fillText")).toBe(19 + 3);
+        expect(f.calls.length).toBeGreaterThan(plain.length);
+        expect(f.props.font).toMatch(/^12px /);
+
+        // 조준이 무효(aim=null)여도 라벨은 그린다
+        f.calls.length = 0;
+        ov.draw({ ...base, phi, guide: "straight", diamond: { numbers: diamond.numbers, aim: null } });
+        expect(n("fillText")).toBe(19);
+
+        // diamond 없음(undefined/null) → 이전과 같은 호출 순서
+        f.calls.length = 0;
+        ov.draw({ ...base, phi, guide: "straight", diamond: null });
+        expect(f.calls).toEqual(plain);
         ov.dispose();
     });
 
