@@ -12,6 +12,8 @@ const FORBIDDEN = /finishHiqGame|hiqGames\b|hiqGameHistory|rating3c|rating4c|avg
 const FILES = [
     "server/routes/modules/sim.ts",
     "server/storage/sim.repo.ts",
+    "server/routes/modules/simMatch.ts",
+    "server/storage/simMatch.repo.ts",
 ];
 
 describe("시뮬레이터 ↔ 실전 성적 격리", () => {

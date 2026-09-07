@@ -1590,3 +1590,66 @@ export const hiqSimRatings = pgTable("hiq_sim_ratings", {
 export type HiqSimSession = typeof hiqSimSessions.$inferSelect;
 export type HiqSimShot = typeof hiqSimShots.$inferSelect;
 export type HiqSimRating = typeof hiqSimRatings.$inferSelect;
+
+// --- 8.11 시뮬레이터 네트워크 대전 A (비동기·폴링) ---
+// 실전 경기 테이블과 무관. 초대 코드는 hiq_invites 를 쓰지 않고 자체 code 로 관리한다(실전 매칭의
+// consent/consume 로직과 얽히지 않게). 서버가 모든 샷을 재시뮬해 정본을 쓴다.
+export const hiqSimMatches = pgTable("hiq_sim_matches", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  code: text("code").notNull(),
+  hostId: uuid("host_id").references(() => hiqMembers.id).notNull(),
+  guestId: uuid("guest_id").references(() => hiqMembers.id),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  tableId: text("table_id", { enum: ["DAEDAE", "JUNGDAE_KR"] }).notNull(),
+  cushionModel: text("cushion_model").default("han2005").notNull(),
+  condition: doublePrecision("condition").default(1).notNull(),
+  rules: jsonb("rules").notNull(),
+  finishType: text("finish_type", { enum: ["none", "3c", "bank"] }).default("none").notNull(),
+  hostTarget: integer("host_target").notNull(),
+  /** 게스트 다마수. 참가 시 게스트가 정한다(없으면 hostTarget). */
+  guestTarget: integer("guest_target"),
+  inningCap: integer("inning_cap").default(0).notNull(),
+  status: text("status", { enum: ["waiting", "playing", "finished", "canceled"] }).default("waiting").notNull(),
+  /** 정본 세션 상태(SessionState). players[0]=host(white), players[1]=guest(yellow). */
+  state: jsonb("state"),
+  balls: jsonb("balls"),
+  turn: integer("turn").default(0).notNull(),
+  shots: integer("shots").default(0).notNull(),
+  version: integer("version").default(0).notNull(),
+  winnerId: uuid("winner_id").references(() => hiqMembers.id),
+  /** finished 사유: target | inningCap | resign | claim(무응답 승리) */
+  endReason: text("end_reason"),
+  engineVersion: text("engine_version").notNull(),
+  paramsHash: text("params_hash").notNull(),
+  mismatches: integer("mismatches").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"),
+  lastShotAt: timestamp("last_shot_at"),
+  finishedAt: timestamp("finished_at"),
+}, (t) => ({
+  idxCode: index("idx_sim_matches_code").on(t.code, t.status),
+  idxHost: index("idx_sim_matches_host").on(t.hostId, t.createdAt),
+  idxGuest: index("idx_sim_matches_guest").on(t.guestId, t.createdAt),
+}));
+
+export const hiqSimMatchShots = pgTable("hiq_sim_match_shots", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  matchId: uuid("match_id").references(() => hiqSimMatches.id, { onDelete: "cascade" }).notNull(),
+  idx: integer("idx").notNull(),
+  playerIndex: integer("player_index").notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  preState: jsonb("pre_state").notNull(),
+  input: jsonb("input").notNull(),
+  hash: text("hash").notNull(),
+  clientHash: text("client_hash"),
+  eventCount: integer("event_count").notNull(),
+  outcomeCode: text("outcome_code").notNull(),
+  points: integer("points").notNull(),
+  cushions: integer("cushions").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.matchId, t.idx),
+}));
+
+export type HiqSimMatch = typeof hiqSimMatches.$inferSelect;
+export type HiqSimMatchShot = typeof hiqSimMatchShots.$inferSelect;
