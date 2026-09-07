@@ -333,3 +333,13 @@ share/shareCard.ts    renderShareCard(result, opts) → 1080×1350 캔버스(세
 share/useShare.ts     shareShot(): 링크 클립보드 복사(제스처 직후) → PNG → Capacitor Filesystem+Share / Web Share(files) / 다운로드.
 페이지: 솔로·연습·드릴에서 lastResult 가 있으면 테이블 오른쪽 위 "공유", EndDialog 에도 "공유". `?replay=` 는 연습 세션으로 열어 자동으로 한 번 치고 해시를 비교해 "리플레이" 칩을 띄운다.
 ```
+
+## 드릴 모드 (drill/)
+```
+drill/drillApi.ts     GET /sim/drills/week · /ladder · POST /sim/drills/:id/attempt 타입 클라이언트, weekProgress().
+drill/DrillPanel.tsx  이번 주 5문제 목록(이름·힌트·상태 칩)과 주간 순위. onPlay(drill, week) 로 페이지가 드릴 세션을 연다.
+페이지(SimulatorPage): `?drills=1` 이면 setup 단계에서 DrillPanel 을 덮어 그린다. onPlay → actions.start(buildConfig({3c, table}), { record:false, balls: drill.balls }).
+  · 채점은 첫 샷 직후(재생을 기다리지 않고) drillApi.attempt(id, input, hash) 로 보낸다 — 서버가 고정 배치에서 재시뮬한 결과만 점수.
+  · 채점 전(drillLocked)엔 공 배치를 막고 칩 "이 샷이 채점돼요", 채점 뒤엔 "채점 완료 · 성공/실패 · 연습 중". "다시 배치" = actions.restart()(StartOptions.balls 를 기억).
+  · 결과 토스트·칩 갱신은 재생이 끝난 뒤(phase !== shooting) 적용한다.
+```
