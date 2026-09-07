@@ -1716,6 +1716,7 @@ const en: Dict = {
   "sim.hud.holdToFastForward": "Hold for 4×",
   "sim.hud.placeHint": "Drag a ball to move it",
   "sim.hud.finished": "Game over",
+  "sim.hud.view3d": "3D view",
   "sim.diamond.toggle": "Diamonds",
   "sim.diamond.toggleLabel": "Show diamond system",
   "sim.diamond.readout": "System {system} · Actual {actual}",

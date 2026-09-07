@@ -1716,6 +1716,7 @@ const vi: Dict = {
   "sim.hud.holdToFastForward": "Giữ để tua 4×",
   "sim.hud.placeHint": "Kéo bi để di chuyển",
   "sim.hud.finished": "Kết thúc ván",
+  "sim.hud.view3d": "Chế độ xem 3D",
   "sim.diamond.toggle": "Kim cương",
   "sim.diamond.toggleLabel": "Hiện hệ thống kim cương",
   "sim.diamond.readout": "Hệ thống {system} · Thực tế {actual}",

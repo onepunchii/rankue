@@ -1718,6 +1718,7 @@ export const ko: Dict = {
   "sim.hud.holdToFastForward": "길게 누르면 4×",
   "sim.hud.placeHint": "공을 끌어 옮길 수 있어요",
   "sim.hud.finished": "경기 종료",
+  "sim.hud.view3d": "3D 보기",
   "sim.diamond.toggle": "다이아몬드",
   "sim.diamond.toggleLabel": "다이아몬드 시스템 표시",
   "sim.diamond.readout": "시스템 {system} · 실제 {actual}",

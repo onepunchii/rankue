@@ -1716,6 +1716,7 @@ const es: Dict = {
   "sim.hud.holdToFastForward": "Mantén pulsado para 4×",
   "sim.hud.placeHint": "Arrastra una bola para moverla",
   "sim.hud.finished": "Fin de la partida",
+  "sim.hud.view3d": "Vista 3D",
   "sim.diamond.toggle": "Diamantes",
   "sim.diamond.toggleLabel": "Mostrar sistema de diamantes",
   "sim.diamond.readout": "Sistema {system} · Real {actual}",

@@ -8,6 +8,10 @@
  *  - 다이아몬드 시스템 훈련(3쿠션만): HUD 토글(localStorage "rankue.sim.diamond", 기본 꺼짐)이 켜지면 rAF 경로에서
  *    overlay/diamondSystem.overlayDiamond 로 레일 숫자·조준 분석을 오버레이에 넘기고, 샷이 끝나면 sim.lastResult 로
  *    "시스템 {예측} · 실제 {3쿠션수}" 를 결과 배너 아래 한 줄로 보인다.
+ *  - 선수 시점("3D 보기", localStorage "rankue.sim.view", 기본 top): ThreeRenderer 가 올라오면 HUD 토글이 생기고, rAF 가 매 프레임
+ *    큐볼·phi 를 draw 의 view 로 넘겨 카메라가 조준을 따라간다(재생·공 옮기기 중엔 빼서 카메라가 멈춘다). 오버레이는 renderer.project
+ *    만 쓰므로 두 뷰에서 그대로 공 위에 얹히고, 다이아몬드 시스템 숫자는 원근에서 겹쳐 player 뷰에선 그리지 않는다.
+ *    조준 드래그는 직전 포인터를 현재 카메라로 다시 unproject 해 각을 재므로 카메라가 따라 도는 만큼이 되먹임되지 않는다.
  *  - 공유·리플레이(share/): 솔로·연습·드릴에서 샷이 끝나면 테이블 오른쪽 위 "공유" 알약(종료 다이얼로그에도) → 카드 PNG +
  *    `?replay=` 링크(useShare). `?replay=<payload>` 로 열면 연습 세션을 그 배치로 열어 한 번 자동으로 치고, 결과 해시가
  *    원본과 같은지 칩("리플레이" / "결과가 달라요")으로 보인다 — 그 뒤엔 보통 연습처럼 이어서 칠 수 있다.
@@ -27,9 +31,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useSimulator, type OfflineReason } from "./useSimulator";
-import type { Renderer } from "./render/Renderer";
+import type { Renderer, RendererView } from "./render/Renderer";
 import { Canvas2DRenderer } from "./render/Canvas2DRenderer";
-import { CONTEXT_LOSS_LIMIT, safeLocalStorage, selectRendererKind, writeRendererPref, type RendererKind } from "./render/rendererChoice";
+import {
+    CONTEXT_LOSS_LIMIT, readViewPref, safeLocalStorage, selectRendererKind, writeRendererPref, writeViewPref, type RendererKind,
+} from "./render/rendererChoice";
 import { Overlay, type Project } from "./overlay/Overlay";
 import { createNumbersCache, overlayDiamond, readDiamondPref, shotReadout, writeDiamondPref } from "./overlay/diamondSystem";
 import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
@@ -86,10 +92,12 @@ interface View {
     canPlace: boolean;
     dragging: boolean;
     placing: string | null;
-    /** 다이아몬드 시스템 오버레이(토글 켜짐 + 3쿠션). */
+    /** 다이아몬드 시스템 오버레이(토글 켜짐 + 3쿠션). player 뷰에선 숫자가 원근으로 겹쳐 그리지 않는다. */
     diamond: boolean;
     /** 해법 찾기에서 "경로 보기"를 켠 후보 — 조준선·경로를 그 후보로 그린다 */
     solverPreview: { candidate: SolveCandidate; paths: PreviewPaths } | null;
+    /** 카메라 뷰(HUD "3D 보기"). 렌더러가 지원하지 않으면 top 으로 남는다. */
+    cameraView: RendererView;
 }
 
 export function SimulatorPage() {
@@ -124,6 +132,10 @@ export function SimulatorPage() {
     // ── 화면 상태 ─────────────────────────────────────────────────────────
     const [muted, setMuted] = useState(false);
     const [diamond, setDiamond] = useState(() => readDiamondPref(safeLocalStorage()));
+    // 카메라 뷰: 저장값으로 시작. ThreeRenderer 가 올라와야(setView 지원) HUD 토글이 보이고 실제로 적용된다.
+    const [cameraView, setCameraView] = useState<RendererView>(() => readViewPref(safeLocalStorage()));
+    const cameraViewRef = useRef(cameraView);
+    const [viewSupported, setViewSupported] = useState(false);
     const [side, setSide] = useState<"left" | "right">("right");
     const [log, setLog] = useState<InningLog>(EMPTY_LOG);
     const [banner, setBanner] = useState<{ outcome: ShotOutcome; id: number } | null>(null);
@@ -288,6 +300,7 @@ export function SimulatorPage() {
                 if (!alive) return;
                 rendererRef.current?.dispose();
                 rendererRef.current = mountCanvas2d();
+                setViewSupported(false); // Canvas2D 는 항상 top — 토글을 숨긴다(저장값은 남겨 다음에 three 가 되면 다시 쓴다)
                 dirtyRef.current = true;
             }, 0);
         };
@@ -310,6 +323,9 @@ export function SimulatorPage() {
                 }
                 rendererRef.current?.dispose();
                 rendererRef.current = three;
+                // 저장된 카메라 뷰를 적용하고 HUD 에 "3D 보기" 토글을 연다
+                three.setView(cameraViewRef.current);
+                setViewSupported(true);
                 dirtyRef.current = true;
             }).catch(() => {
                 // 청크 로드 실패(오프라인 등) — canvas 유지
@@ -354,15 +370,15 @@ export function SimulatorPage() {
     // rAF 루프가 읽는 뷰 — 렌더마다 갱신(할당만, 재렌더 없음)
     const viewRef = useRef<View>({
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView,
     });
     viewRef.current = {
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView,
     };
     useEffect(() => {
         dirtyRef.current = true;
-    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview]);
+    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview, cameraView]);
 
     const { frameAt } = sim;
     useEffect(() => {
@@ -373,7 +389,8 @@ export function SimulatorPage() {
             const renderer = rendererRef.current;
             if (!renderer) return;
             const frame = frameAt(performance.now());
-            if (!frame.playing && !dirtyRef.current) return;
+            // 선수 시점 카메라가 아직 움직이는 중이면(needsFrame) dirty 가 아니어도 그린다 — 오버레이도 같은 자세로 다시 얹힌다
+            if (!frame.playing && !dirtyRef.current && !renderer.needsFrame?.()) return;
             dirtyRef.current = false;
             const v = viewRef.current;
             renderer.draw({
@@ -381,6 +398,9 @@ export function SimulatorPage() {
                 cue: { phi: v.input.phi, pullback: pullbackFor(v.input.V0), visible: v.phase === "aim", ballId: v.cueBallId },
                 // 큐볼은 큐 스틱이 가리키므로 링을 두르지 않는다 — 8px 남짓한 공에 링이 겹치면 속이 빈 공처럼 보였다(실측).
                 highlightBallId: v.placing ?? undefined,
+                // 선수 시점 카메라 대상: 조준 중에만. 재생 중(움직이는 공을 쫓지 않는다)·공 옮기기 중(끌리는 공을 카메라가 따라가면
+                // 손가락 아래 테이블 점이 같이 밀려 되먹임된다)엔 빼서 카메라가 그 자리에 머문다. 놓으면 새 자리 뒤로 옮겨 간다.
+                view: v.phase === "aim" && !v.placing ? { cueBallId: v.cueBallId, phi: v.input.phi } : undefined,
             });
             const overlay = overlayRef.current;
             if (!overlay) return;
@@ -391,8 +411,9 @@ export function SimulatorPage() {
                     balls: v.balls, phi: sp ? sp.candidate.input.phi : v.input.phi, cueBallId: v.cueBallId, table: v.table,
                     guide: sp || (!v.dragging && v.preview) ? "preview" : "straight",
                     preview: sp ? sp.paths : (v.preview?.paths ?? null),
-                    // 다이아몬드 시스템: 조준 분석은 싸다(광선 하나·산술 몇 줄) — dirty 프레임에만 다시 계산된다
-                    diamond: v.diamond ? overlayDiamond(v.balls, v.cueBallId, v.input.phi, v.table, numbersCacheRef.current) : null,
+                    // 다이아몬드 시스템: 조준 분석은 싸다(광선 하나·산술 몇 줄) — dirty 프레임에만 다시 계산된다.
+                    // player 뷰에선 그리지 않는다: 먼 레일의 숫자 알약(레일당 7개 + 바깥 행)이 원근으로 몇 px 간격에 몰려 겹친다.
+                    diamond: v.diamond && v.cameraView === "top" ? overlayDiamond(v.balls, v.cueBallId, v.input.phi, v.table, numbersCacheRef.current) : null,
                     project: projectRef.current,
                 });
                 overlayCleared = false;
@@ -409,12 +430,20 @@ export function SimulatorPage() {
     const gestureRef = useRef<Gesture | null>(null);
     const pointerIdRef = useRef<number | null>(null);
     const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /** 직전 포인터의 화면 px(마운트 기준). 조준 드래그의 각 변화를 현재 카메라로 다시 재기 위해 둔다. */
+    const lastScreenRef = useRef<[number, number] | null>(null);
+
+    const screenPoint = (e: React.PointerEvent<HTMLDivElement>): [number, number] => {
+        const r = e.currentTarget.getBoundingClientRect();
+        return [e.clientX - r.left, e.clientY - r.top];
+    };
 
     const unprojectEvent = (e: React.PointerEvent<HTMLDivElement>): [number, number] | null => {
         const renderer = rendererRef.current;
         if (!renderer) return null;
-        const r = e.currentTarget.getBoundingClientRect();
-        return renderer.unproject(e.clientX - r.left, e.clientY - r.top);
+        const s = screenPoint(e);
+        lastScreenRef.current = s;
+        return renderer.unproject(s[0], s[1]);
     };
 
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -439,8 +468,13 @@ export function SimulatorPage() {
 
     const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
         if (e.pointerId !== pointerIdRef.current) return;
-        const g = gestureRef.current;
+        let g = gestureRef.current;
         if (!g || g.kind === "hold") return;
+        const renderer = rendererRef.current;
+        // 조준 드래그: 직전 포인터도 "현재" 카메라로 다시 unproject 해 둘의 각 차이만 쓴다. 선수 시점에선 카메라가 phi 를 따라
+        // 돌기 때문에 지난 이벤트 때의 테이블 점을 그대로 쓰면 카메라가 돈 만큼이 매번 더해져 회전이 폭주한다(top 뷰에선 같은 값).
+        const prevScreen = lastScreenRef.current;
+        if (g.kind === "aim" && renderer && prevScreen) g = { ...g, prev: renderer.unproject(prevScreen[0], prevScreen[1]) };
         const p = unprojectEvent(e);
         if (!p) return;
         const r = moveGesture(g, p, viewRef.current.input.phi);
@@ -454,6 +488,7 @@ export function SimulatorPage() {
         const g = gestureRef.current;
         gestureRef.current = null;
         pointerIdRef.current = null;
+        lastScreenRef.current = null;
         try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
         if (g?.kind === "hold") {
             if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
@@ -534,6 +569,16 @@ export function SimulatorPage() {
     }, []);
     // HUD 는 memo — 토글 객체는 값이 바뀔 때만 새로 만든다. 4구에서는 버튼을 숨긴다(시스템은 3쿠션 훈련용).
     const diamondHud = useMemo(() => (is3c ? { on: diamond, onToggle: onToggleDiamond } : undefined), [is3c, diamond, onToggleDiamond]);
+    // "3D 보기": 렌더러에 바로 적용하고(스냅) 기기에 저장. 다음 프레임에 새 카메라로 다시 그린다.
+    const onToggleView = useCallback(() => {
+        const next: RendererView = cameraViewRef.current === "player" ? "top" : "player";
+        cameraViewRef.current = next;
+        rendererRef.current?.setView?.(next);
+        writeViewPref(safeLocalStorage(), next);
+        dirtyRef.current = true;
+        setCameraView(next);
+    }, []);
+    const viewHud = useMemo(() => (viewSupported ? { on: cameraView === "player", onToggle: onToggleView } : undefined), [viewSupported, cameraView, onToggleView]);
 
     // ── 공유(카드 PNG + 리플레이 링크). 솔로·연습·드릴에서 샷이 끝난 뒤(aim/finished)만 ──
     const { share, busy: sharing } = useShare();
@@ -672,7 +717,7 @@ export function SimulatorPage() {
                     session={sim.session} config={sim.config} phase={sim.phase} names={names}
                     record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
                     muted={muted} onToggleMute={onToggleMute}
-                    diamond={diamondHud}
+                    diamond={diamondHud} view={viewHud}
                 />
 
                 {/* 테이블: 남은 높이를 전부 차지. 렌더러·오버레이가 absolute 캔버스로 얹힌다. */}

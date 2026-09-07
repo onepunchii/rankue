@@ -1716,6 +1716,7 @@ const tr: Dict = {
   "sim.hud.holdToFastForward": "4× için basılı tut",
   "sim.hud.placeHint": "Topu sürükleyerek taşıyabilirsin",
   "sim.hud.finished": "Oyun bitti",
+  "sim.hud.view3d": "3D görünüm",
   "sim.diamond.toggle": "Elmaslar",
   "sim.diamond.toggleLabel": "Elmas sistemini göster",
   "sim.diamond.readout": "Sistem {system} · Gerçek {actual}",

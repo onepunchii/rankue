@@ -7,9 +7,13 @@
  *  - 순수 함수는 저장소·문서를 인자로 받아 테스트한다. selectRendererKind() 는 브라우저 전역을 쓰는 편의 함수.
  */
 
+import type { RendererView } from "./Renderer";
+
 export type RendererKind = "three" | "canvas";
 
 export const RENDERER_PREF_KEY = "rankue.sim.renderer";
+/** 카메라 뷰 저장 키("top" | "player", 기본 top). ThreeRenderer 에서만 뜻이 있고 HUD "3D 보기" 토글이 쓴다. */
+export const VIEW_PREF_KEY = "rankue.sim.view";
 /** 이 횟수만큼 WebGL 컨텍스트를 잃으면 Canvas2D 로 내려간다. */
 export const CONTEXT_LOSS_LIMIT = 2;
 
@@ -33,6 +37,27 @@ export function writeRendererPref(storage: StorageLike | null | undefined, kind:
     if (!storage) return false;
     try {
         storage.setItem(RENDERER_PREF_KEY, kind);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** 저장값이 "player" 일 때만 선수 시점. 없거나 읽을 수 없으면 top(기본). */
+export function readViewPref(storage: StorageLike | null | undefined): RendererView {
+    if (!storage) return "top";
+    try {
+        return storage.getItem(VIEW_PREF_KEY) === "player" ? "player" : "top";
+    } catch {
+        return "top";
+    }
+}
+
+/** 저장 성공 여부. 쓰기 불가 환경에서는 false. */
+export function writeViewPref(storage: StorageLike | null | undefined, view: RendererView): boolean {
+    if (!storage) return false;
+    try {
+        storage.setItem(VIEW_PREF_KEY, view);
         return true;
     } catch {
         return false;

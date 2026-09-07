@@ -20,21 +20,30 @@
  *  - 컨텍스트 손실: three 가 preventDefault 하고 복구 때 GL 자원을 다시 올린다. 여기서는 횟수를 세어 onContextLost 를
  *    알리고(페이지가 CONTEXT_LOSS_LIMIT 회면 Canvas2D 로 교체), 복구 직후 마지막 프레임을 다시 그린다.
  *  - 레터박스(캔버스 밖)는 alpha:false 라 투명일 수 없어 마운트 배경색(surface-3 를 surface-1 위에 합성)으로 지운다.
+ *  - 선수 시점(setView("player")): 원근 카메라(세로 fov 50°, 컨테이너 비율 — 레터박스 없이 캔버스 전체가 뷰)가 큐볼 뒤 −phi 쪽
+ *    0.9 m·높이 0.55 m 에 서서 큐볼 앞 0.6 m 를 본다(threeMath.playerPose — 테이블 밖 0.5 m·최저 0.25 m 클램프, up=+z).
+ *    프레임의 view {cueBallId, phi} 가 있을 때만 목표를 갱신하고(재생 중엔 페이지가 빼서 카메라가 멈춰 있다), 임계 감쇠
+ *    스프링(dampRig, 0.12 s)으로 옮긴다 — 움직이는 동안 needsFrame() 이 true 라 페이지가 다음 프레임도 그린다.
+ *    project/unproject 는 같은 자세로 CPU 원근 투영(projectPerspective — 카메라 뒤는 near 깊이로 클램프해 유한) ·
+ *    광선–평면(z=R) 교점(unprojectPerspective — 빗나가면 테이블 안 가장 가까운 점)을 쓴다. 직사광은 조금 더 세게(라사 결).
+ *    top ↔ player 전환은 스냅(전환 애니메이션 없음). Canvas2DRenderer 에는 setView 가 없다(항상 top).
  */
 import {
     BufferGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DirectionalLight, ExtrudeGeometry,
     Float32BufferAttribute, Group, HemisphereLight, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial,
-    MeshStandardMaterial, OrthographicCamera, Path, PCFSoftShadowMap, PlaneGeometry, Quaternion, RingGeometry,
+    MeshStandardMaterial, OrthographicCamera, Path, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Quaternion, RingGeometry,
     Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer,
 } from "three";
 import type { BallState } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
-import type { RenderFrame, Renderer, SafeInsets, Viewport } from "./Renderer";
+import type { RenderFrame, Renderer, RendererView, SafeInsets, Viewport } from "./Renderer";
 import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, parseColor, readPalette, rgba, scaleColor, type Palette, type RGBA } from "./tokens";
 import {
-    CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, CUE_BUTT_W, CUE_FERRULE_L, CUE_LENGTH, CUE_TIP_L, CUE_TIP_W, cueGap, cueRotationZ,
-    diamondWorld, integrateOrientation, MAX_DT, orthoFrustum,
+    CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, CUE_BUTT_W, CUE_FERRULE_L, CUE_LENGTH, CUE_TIP_L, CUE_TIP_W, cameraBasis, cueGap, cueRotationZ,
+    dampRig, diamondWorld, integrateOrientation, makeBasis, makePose, makeRig, MAX_DT, orthoFrustum, PLAYER_FAR, PLAYER_FOV_DEG,
+    PLAYER_NEAR, PLAYER_SMOOTH_S, playerPose, projectPerspective, snapRig, unprojectPerspective, type CameraBasis, type CameraPose,
+    type CameraRig,
 } from "./threeMath";
 
 export interface ThreeRendererOptions {
@@ -66,6 +75,9 @@ export interface ThreeRendererStats {
     readonly cueVisible: boolean;
     readonly ringVisible: boolean;
     readonly clothTextured: boolean;
+    readonly view: RendererView;
+    /** player 뷰 카메라가 아직 목표로 움직이는 중. */
+    readonly cameraMoving: boolean;
 }
 
 // ── 팔레트(WebGL 내부 전용 — 물리적 사물) ──────────────────────────────
@@ -124,6 +136,10 @@ const DOT_ANGLE = 0.16;
 /** 수평면 조도 합 ≈ HEMI + SUN·cosθ ≈ π → 알베도 그대로. */
 const HEMI_INTENSITY = 1.0;
 const SUN_INTENSITY = 2.1;
+/** 선수 시점: 비스듬히 보는 라사가 밋밋하지 않게 직사광을 조금 더 세게(공의 하이라이트·레일 명암도 또렷해진다). */
+const SUN_INTENSITY_PLAYER = 2.6;
+/** 뷰 대상이 없을 때의 기본 카메라 자리: 헤드 스팟 근처에서 테이블 긴 방향(+y)을 본다. */
+const DEFAULT_VIEW_PHI = Math.PI / 2;
 /** 테이블 중심 기준 램프 위치(m). 화면 좌상단(−x, +y) 쪽에서 비춘다 — Canvas2D 의 좌상단 하이라이트와 같은 방향. */
 const SUN_OFFSET: readonly [number, number, number] = [-0.35, 0.55, 2.4];
 
@@ -224,6 +240,15 @@ export class ThreeRenderer implements Renderer {
     private readonly hemi: HemisphereLight;
     private readonly sun: DirectionalLight;
 
+    // 선수 시점 카메라. rig 가 현재 자세(GPU·project·unproject 가 전부 이것을 본다), rigTarget 이 마지막으로 받은 view 의 목표.
+    private readonly persp: PerspectiveCamera;
+    private view: RendererView = "top";
+    private readonly rig: CameraRig = makeRig();
+    private readonly rigTarget: CameraPose = makePose();
+    private readonly basis: CameraBasis = makeBasis();
+    private cameraMoving = false;
+    private aspect = 1;
+
     private el: HTMLElement | null = null;
     private table: TableSpec | null = null;
     private layout: TableLayout | null = null;
@@ -313,6 +338,9 @@ export class ThreeRenderer implements Renderer {
 
         this.camera = new OrthographicCamera(-1, 1, 1, -1, CAMERA_NEAR, CAMERA_FAR);
         this.camera.position.set(0, 0, CAMERA_Z); // 기본 자세: −z 를 보고 +y 가 위
+        this.persp = new PerspectiveCamera(PLAYER_FOV_DEG, 1, PLAYER_NEAR, PLAYER_FAR);
+        this.persp.up.set(0, 0, 1);
+        this.applyRig();
 
         this.hemi = new HemisphereLight(0xffffff, 0x2f3d33, HEMI_INTENSITY);
         this.sun = new DirectionalLight(0xffffff, SUN_INTENSITY);
@@ -365,8 +393,8 @@ export class ThreeRenderer implements Renderer {
             this.observer.observe(el);
         }
         this.resize();
-        // 셰이더를 첫 draw 전에 미리 컴파일(첫 프레임 끊김 방지)
-        try { this.gl.compile(this.scene, this.camera); } catch { /* 컨텍스트 없음 — draw 때 다시 */ }
+        // 셰이더를 첫 draw 전에 미리 컴파일(첫 프레임 끊김 방지). 프로그램은 재질·조명으로 정해져 두 카메라가 같은 것을 쓴다.
+        try { this.gl.compile(this.scene, this.activeCamera()); } catch { /* 컨텍스트 없음 — draw 때 다시 */ }
     }
 
     setTable(table: TableSpec): void {
@@ -402,6 +430,10 @@ export class ThreeRenderer implements Renderer {
         cam.top = f.top;
         cam.bottom = f.bottom;
         cam.updateProjectionMatrix();
+        // 선수 시점은 레터박스 없이 컨테이너 비율 그대로
+        this.aspect = Math.max(1, w) / Math.max(1, h);
+        this.persp.aspect = this.aspect;
+        this.persp.updateProjectionMatrix();
 
         this.rebuildPxDependent(L);
         if (this.lastFrame) this.draw(this.lastFrame);
@@ -457,14 +489,77 @@ export class ThreeRenderer implements Renderer {
     }
 
     // ── 좌표 ─────────────────────────────────────────────────────────────
+    /** top: tableGeometry 와 같은 px. player: 공 중심 높이(z = R)의 점을 현재 카메라 자세로 원근 투영(카메라 뒤도 유한). */
     project(x: number, y: number): [number, number] {
         if (!this.layout) return [0, 0];
+        if (this.view === "player" && this.table) {
+            return projectPerspective(this.basis, this.rig.pose, PLAYER_FOV_DEG, this.aspect, this.layout.container, x, y, this.table.ball.R);
+        }
         return worldToScreen(this.layout, x, y);
     }
 
+    /** top: tableGeometry 의 역. player: 눈→화면 점 광선과 평면 z = R 의 교점(빗나가면 테이블 안 가장 가까운 점). */
     unproject(px: number, py: number): [number, number] {
         if (!this.layout) return [0, 0];
+        if (this.view === "player" && this.table) {
+            return unprojectPerspective(this.basis, this.rig.pose, PLAYER_FOV_DEG, this.aspect, this.layout.container, px, py, this.table.ball.R, this.table);
+        }
         return screenToWorld(this.layout, px, py);
+    }
+
+    // ── 뷰 ───────────────────────────────────────────────────────────────
+    /**
+     * top ↔ player 전환(스냅). player 로 들어갈 땐 마지막 프레임의 view(없으면 첫 공·기본 방향)로 카메라를 바로 놓아
+     * 엉뚱한 곳에서 날아오지 않게 하고, 마지막 프레임을 새 카메라로 다시 그린다. dispose 뒤에는 무시.
+     */
+    setView(view: RendererView): void {
+        if (view === this.view) return;
+        this.view = view;
+        this.sun.intensity = view === "player" ? SUN_INTENSITY_PLAYER : SUN_INTENSITY;
+        if (view === "player" && this.table) {
+            const frame = this.lastFrame;
+            if (!frame || !this.retarget(frame)) {
+                playerPose(this.rigTarget, this.table, this.table.width / 2, this.table.length / 4, DEFAULT_VIEW_PHI);
+            }
+            snapRig(this.rig, this.rigTarget);
+            this.cameraMoving = false;
+            this.applyRig();
+        }
+        if (this.disposed) return;
+        if (this.lastFrame) this.draw(this.lastFrame);
+        else this.render();
+    }
+
+    getView(): RendererView {
+        return this.view;
+    }
+
+    needsFrame(): boolean {
+        return this.view === "player" && this.cameraMoving;
+    }
+
+    private activeCamera(): OrthographicCamera | PerspectiveCamera {
+        return this.view === "player" ? this.persp : this.camera;
+    }
+
+    /** 프레임의 view 로 카메라 목표를 갱신. 큐볼 id 가 없으면 첫 공. 공이 없으면 false(목표 유지). */
+    private retarget(frame: RenderFrame): boolean {
+        const vf = frame.view;
+        if (!vf || !this.table || frame.balls.length === 0) return false;
+        let cb = frame.balls[0];
+        for (let i = 0; i < frame.balls.length; i++) {
+            if (frame.balls[i].id === vf.cueBallId) { cb = frame.balls[i]; break; }
+        }
+        playerPose(this.rigTarget, this.table, cb.r[0], cb.r[1], vf.phi);
+        return true;
+    }
+
+    /** rig 의 현재 자세를 three 카메라·CPU 기저에 적용(할당 없음). */
+    private applyRig(): void {
+        const p = this.rig.pose;
+        this.persp.position.set(p.ex, p.ey, p.ez);
+        this.persp.lookAt(p.tx, p.ty, p.tz);
+        cameraBasis(this.basis, p);
     }
 
     viewport(): Viewport | null {
@@ -487,7 +582,17 @@ export class ThreeRenderer implements Renderer {
             cueVisible: this.cueGroup.visible,
             ringVisible: this.ringGroup.visible,
             clothTextured: this.clothTex !== null,
+            view: this.view,
+            cameraMoving: this.cameraMoving,
         };
+    }
+
+    /** 테스트용: 현재 카메라 자세(player 뷰의 rig)를 out 에 복사. */
+    getCameraPose(out: CameraPose): CameraPose {
+        const p = this.rig.pose;
+        out.ex = p.ex; out.ey = p.ey; out.ez = p.ez;
+        out.tx = p.tx; out.ty = p.ty; out.tz = p.tz;
+        return out;
     }
 
     /** 공의 누적 자세를 out 에 복사. 그 id 가 없으면 false. */
@@ -573,12 +678,19 @@ export class ThreeRenderer implements Renderer {
             this.ringGroup.visible = false;
         }
 
+        // 선수 시점 카메라: view 가 있으면 목표를 갱신(재생 중엔 페이지가 view 를 빼 카메라가 그 자리에 머문다), 감쇠로 전진
+        if (this.view === "player") {
+            this.retarget(frame);
+            this.cameraMoving = dampRig(this.rig, this.rigTarget, PLAYER_SMOOTH_S, dt);
+            this.applyRig();
+        }
+
         this.render();
     }
 
     private render(): void {
         if (this.disposed || this.lost || !this.layout) return;
-        this.gl.render(this.scene, this.camera);
+        this.gl.render(this.scene, this.activeCamera());
     }
 
     private findEntry(id: string): BallEntry | null {

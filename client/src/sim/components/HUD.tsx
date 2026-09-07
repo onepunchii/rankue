@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Diamond, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
+import { Cube, Diamond, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import type { SessionState } from "@shared/sim/rules";
@@ -7,11 +7,12 @@ import type { SimSetupConfig } from "../setupPresets";
 import type { Phase } from "../simReducer";
 import { displayAverage, formatAverage, ruleBadge, tableLabel } from "../hudMath";
 
-// 상단 HUD. 한 줄의 규칙·테이블 배지 + 상태 칩 + 아이콘 토글(3쿠션이면 다이아몬드 시스템 · 소리), 그 아래 선수 카드(점수/다마수 · 이닝 · 에버리지 · 하이런 · 런).
+// 상단 HUD. 한 줄의 규칙·테이블 배지 + 상태 칩 + 아이콘 토글(3쿠션이면 다이아몬드 시스템 · 3D 렌더러면 "3D 보기" · 소리),
+// 그 아래 선수 카드(점수/다마수 · 이닝 · 에버리지 · 하이런 · 런).
 // 토글은 44px 아이콘 버튼 — 글자 알약("다이아몬드"·"소리 끄기")은 375px 폰에서 두 줄로 꺾이고 왼쪽 칩을 잘라먹었다(실측 2026-09-07).
-// 초록은 '켜짐'을 말할 때만(다이아몬드 on · 2인 대전의 차례 카드). 1인 세션의 카드는 차례 강조가 뜻이 없어 중립.
+// 초록은 '켜짐'을 말할 때만(다이아몬드 on · 3D 보기 on · 2인 대전의 차례 카드). 1인 세션의 카드는 차례 강조가 뜻이 없어 중립.
 // 에버리지 규약은 hudMath.inningsForAverage 주석 참고(점수판 앱과 같이 진행 중 이닝 포함).
-// phi 드래그마다 페이지가 재렌더되므로 memo — HUD 의 props 는 샷 사이에만 바뀐다(diamond 객체는 페이지가 useMemo 로 고정).
+// phi 드래그마다 페이지가 재렌더되므로 memo — HUD 의 props 는 샷 사이에만 바뀐다(diamond·view 객체는 페이지가 useMemo 로 고정).
 export interface HUDProps {
     session: SessionState | null;
     config: SimSetupConfig | null;
@@ -25,6 +26,8 @@ export interface HUDProps {
     onToggleMute: () => void;
     /** 다이아몬드 시스템 오버레이 토글. 없으면(4구 등) 버튼을 그리지 않는다. */
     diamond?: { on: boolean; onToggle: () => void };
+    /** 선수 시점("3D 보기") 토글. 렌더러가 setView 를 지원할 때만(ThreeRenderer) 페이지가 넘긴다 — 없으면 버튼도 없다. */
+    view?: { on: boolean; onToggle: () => void };
 }
 
 const TOGGLE = "h-11 w-11 shrink-0 rounded-pill border flex items-center justify-center active:bg-surface-3";
@@ -63,6 +66,18 @@ export const HUD = memo(function HUD(p: HUDProps) {
                     >
                         <Diamond className="w-5 h-5" aria-hidden="true" />
                         <span className="sr-only">{t("sim.diamond.toggle")}</span>
+                    </button>
+                )}
+                {p.view && (
+                    <button
+                        type="button"
+                        aria-pressed={p.view.on}
+                        aria-label={t("sim.hud.view3d")}
+                        title={t("sim.hud.view3d")}
+                        onClick={p.view.onToggle}
+                        className={cn(TOGGLE, p.view.on ? "border-brand bg-brand/[0.06] text-brand" : "border-surface-line text-ink-2")}
+                    >
+                        <Cube className="w-5 h-5" aria-hidden="true" />
                     </button>
                 )}
                 <button

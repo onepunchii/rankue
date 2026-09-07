@@ -6,14 +6,16 @@
  *     가짜 GL 은 상수를 이름별 고유 숫자로, 함수는 no-op(getParameter/getProgramParameter 등 몇 개만 그럴듯한 값)으로 응답한다.
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import { OrthographicCamera, Quaternion, Vector3 } from "three";
+import { OrthographicCamera, PerspectiveCamera, Quaternion, Vector3 } from "three";
 import { TABLES } from "@shared/sim/params";
 import { openingLayout } from "@shared/sim/layouts";
 import type { BallState } from "@shared/sim/types";
 import { computeLayout, screenToWorld, worldToScreen } from "./tableGeometry";
 import {
-    CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, CUE_GAP, CUE_PULLBACK_MAX, cueGap, cueRotationZ, diamondWorld, integrateOrientation,
-    orthoFrustum, projectOrtho, unprojectOrtho,
+    CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, CUE_GAP, CUE_PULLBACK_MAX, cameraBasis, cueGap, cueRotationZ, dampRig, diamondWorld,
+    integrateOrientation, makeBasis, makePose, makeRig, orthoFrustum, PLAYER_AHEAD, PLAYER_BACK, PLAYER_FAR, PLAYER_FOV_DEG, PLAYER_HEIGHT,
+    PLAYER_MARGIN, PLAYER_MIN_Z, PLAYER_NEAR, PLAYER_SMOOTH_S, playerPose, projectOrtho, projectPerspective, snapRig, unprojectOrtho,
+    unprojectPerspective, type CameraPose,
 } from "./threeMath";
 import { ThreeRenderer, type ThreeRendererOptions } from "./ThreeRenderer";
 
@@ -180,6 +182,231 @@ describe("diamondWorld — tableGeometry 의 다이아몬드 화면 자리와 �
             });
         });
     }
+});
+
+/* ------------------------------------------------------------------ 선수 시점 카메라(순수) */
+
+/** 시험용 자세: 큐볼 위치·phi 조합(테이블 안쪽·쿠션 옆·코너·먼 끝에서 되돌아보기). */
+const POSES: readonly { name: string; cue: [number, number]; phi: number }[] = [
+    { name: "헤드 스팟에서 위로", cue: [T.width / 2, T.length / 4], phi: Math.PI / 2 },
+    { name: "가운데에서 대각선", cue: [0.5, 1.5], phi: 0.7 },
+    { name: "왼쪽 쿠션 옆에서 +x", cue: [T.ball.R + 0.001, 1.2], phi: 0 },
+    { name: "코너에서 대각선", cue: [T.ball.R, T.ball.R], phi: Math.PI / 4 },
+    { name: "먼 끝에서 되돌아보기", cue: [1.0, T.length - 0.1], phi: -Math.PI / 2 + 0.3 },
+    { name: "오른쪽 쿠션으로", cue: [1.2, 2.0], phi: 0.1 },
+];
+
+/** three 의 PerspectiveCamera 를 같은 자세로 세운다(GPU 가 하는 것과 같은 행렬). */
+function threeCamera(p: CameraPose, aspect: number): PerspectiveCamera {
+    const cam = new PerspectiveCamera(PLAYER_FOV_DEG, aspect, PLAYER_NEAR, PLAYER_FAR);
+    cam.up.set(0, 0, 1);
+    cam.position.set(p.ex, p.ey, p.ez);
+    cam.lookAt(p.tx, p.ty, p.tz);
+    cam.updateMatrixWorld(true);
+    cam.updateProjectionMatrix();
+    return cam;
+}
+
+describe("playerPose — 큐볼 뒤 −phi 에 서서 큐볼 앞 +phi 를 본다, 테이블 밖 여유·최저 높이로 클램프", () => {
+    it("안쪽 자세는 클램프되지 않는다", () => {
+        const p = playerPose(makePose(), T, 0.7, 1.4, 0.7);
+        expect(p.ex).toBeCloseTo(0.7 - Math.cos(0.7) * PLAYER_BACK, 12);
+        expect(p.ey).toBeCloseTo(1.4 - Math.sin(0.7) * PLAYER_BACK, 12);
+        expect(p.ez).toBe(PLAYER_HEIGHT);
+        expect(p.tx).toBeCloseTo(0.7 + Math.cos(0.7) * PLAYER_AHEAD, 12);
+        expect(p.ty).toBeCloseTo(1.4 + Math.sin(0.7) * PLAYER_AHEAD, 12);
+        expect(p.tz).toBe(T.ball.R);
+        expect(PLAYER_HEIGHT).toBeGreaterThanOrEqual(PLAYER_MIN_Z);
+    });
+
+    it("쿠션 옆·코너에서는 눈이 플레이 면 ± 여유 안에 머물고 큐볼을 지나치지 않는다", () => {
+        for (const cue of [[T.ball.R, T.ball.R], [T.width - T.ball.R, T.length - T.ball.R], [T.ball.R, 1.4], [0.7, T.ball.R]] as const) {
+            for (let k = 0; k < 16; k++) {
+                const phi = (k / 16) * Math.PI * 2;
+                const p = playerPose(makePose(), T, cue[0], cue[1], phi);
+                expect(p.ex).toBeGreaterThanOrEqual(-PLAYER_MARGIN);
+                expect(p.ex).toBeLessThanOrEqual(T.width + PLAYER_MARGIN);
+                expect(p.ey).toBeGreaterThanOrEqual(-PLAYER_MARGIN);
+                expect(p.ey).toBeLessThanOrEqual(T.length + PLAYER_MARGIN);
+                expect(p.ez).toBeGreaterThanOrEqual(PLAYER_MIN_Z);
+                // 눈 → 큐볼 방향이 여전히 +phi 쪽(뒤에 서 있다)이고 수평 거리는 0.4 m 이상
+                const dx = cue[0] - p.ex, dy = cue[1] - p.ey;
+                expect(dx * Math.cos(phi) + dy * Math.sin(phi)).toBeGreaterThan(0.4);
+            }
+        }
+        const corner = playerPose(makePose(), T, T.ball.R, T.ball.R, Math.PI / 4);
+        expect(corner.ex).toBe(-PLAYER_MARGIN);
+        expect(corner.ey).toBe(-PLAYER_MARGIN);
+    });
+});
+
+describe("cameraBasis / projectPerspective — three 의 PerspectiveCamera 와 같은 px", () => {
+    it("기저는 정규 직교이고 z 축이 눈 → 목표의 반대, y 축은 위(+z 성분 양수)", () => {
+        for (const pose of POSES) {
+            const p = playerPose(makePose(), T, pose.cue[0], pose.cue[1], pose.phi);
+            const b = cameraBasis(makeBasis(), p);
+            const dot = (ax: number, ay: number, az: number, bx: number, by: number, bz: number) => ax * bx + ay * by + az * bz;
+            expect(dot(b.xx, b.xy, b.xz, b.xx, b.xy, b.xz)).toBeCloseTo(1, 12);
+            expect(dot(b.yx, b.yy, b.yz, b.yx, b.yy, b.yz)).toBeCloseTo(1, 12);
+            expect(dot(b.zx, b.zy, b.zz, b.zx, b.zy, b.zz)).toBeCloseTo(1, 12);
+            expect(dot(b.xx, b.xy, b.xz, b.yx, b.yy, b.yz)).toBeCloseTo(0, 12);
+            expect(dot(b.xx, b.xy, b.xz, b.zx, b.zy, b.zz)).toBeCloseTo(0, 12);
+            expect(dot(b.yx, b.yy, b.yz, b.zx, b.zy, b.zz)).toBeCloseTo(0, 12);
+            expect(b.xz).toBe(0);
+            expect(b.yz).toBeGreaterThan(0);
+            expect(b.zz).toBeGreaterThan(0);
+            // 목표는 카메라 앞(−z)
+            const vz = b.zx * (p.tx - p.ex) + b.zy * (p.ty - p.ey) + b.zz * (p.tz - p.ez);
+            expect(vz).toBeLessThan(0);
+        }
+    });
+
+    it("바로 아래를 보는 퇴화 자세도 유한한 기저를 만든다(three 와 같은 1e-4 밀기)", () => {
+        const p: CameraPose = { ex: 0.5, ey: 0.5, ez: 1, tx: 0.5, ty: 0.5, tz: 0 };
+        const b = cameraBasis(makeBasis(), p);
+        for (const v of Object.values(b)) expect(Number.isFinite(v)).toBe(true);
+        const cam = threeCamera(p, 1);
+        const px = new Vector3(0.6, 0.55, 0).project(cam);
+        const mine = projectPerspective(b, p, PLAYER_FOV_DEG, 1, { width: 2, height: 2 }, 0.6, 0.55, 0);
+        expect(mine[0]).toBeCloseTo(px.x + 1, 9);
+        expect(mine[1]).toBeCloseTo(1 - px.y, 9);
+    });
+
+    for (const pose of POSES) {
+        for (const vp of VIEWPORTS) {
+            it(`${pose.name} / ${vp.name}: 진짜 카메라와 1e-9 안에서 같다`, () => {
+                const p = playerPose(makePose(), T, pose.cue[0], pose.cue[1], pose.phi);
+                const b = cameraBasis(makeBasis(), p);
+                const aspect = vp.width / vp.height;
+                const cam = threeCamera(p, aspect);
+                const R = T.ball.R;
+                const pts: [number, number, number][] = [
+                    [pose.cue[0], pose.cue[1], R], [p.tx, p.ty, p.tz], [T.width / 2, T.length / 2, R], [0, T.length, 0], [T.width, T.length, R],
+                    [pose.cue[0] + Math.cos(pose.phi) * 1.2, pose.cue[1] + Math.sin(pose.phi) * 1.2, R], [0.2, 2.6, 0.05],
+                ];
+                for (const [x, y, z] of pts) {
+                    const v = new Vector3(x, y, z).project(cam);
+                    if (v.z > 1 || v.z < -1) continue; // 절두체 밖(카메라 뒤·far 너머)은 비교하지 않는다
+                    const ex = (v.x + 1) / 2 * vp.width;
+                    const ey = (1 - v.y) / 2 * vp.height;
+                    const [px, py] = projectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, x, y, z);
+                    expect(Math.abs(px - ex)).toBeLessThan(1e-9);
+                    expect(Math.abs(py - ey)).toBeLessThan(1e-9);
+                }
+                // 큐볼은 화면 가로 가운데(카메라가 −phi 정면 뒤에 선다), 시선 목표는 정확히 화면 중앙, 큐볼은 목표보다 아래
+                const cue = projectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, pose.cue[0], pose.cue[1], R);
+                const tgt = projectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, p.tx, p.ty, p.tz);
+                expect(tgt[0]).toBeCloseTo(vp.width / 2, 9);
+                expect(tgt[1]).toBeCloseTo(vp.height / 2, 9);
+                expect(cue[1]).toBeGreaterThan(tgt[1]);
+                if (p.ex === pose.cue[0] - Math.cos(pose.phi) * PLAYER_BACK && p.ey === pose.cue[1] - Math.sin(pose.phi) * PLAYER_BACK) {
+                    expect(cue[0]).toBeCloseTo(vp.width / 2, 9);
+                }
+            });
+        }
+    }
+
+    it("카메라 뒤·near 안쪽의 점도 유한한 값을 돌려준다(near 깊이로 클램프)", () => {
+        const p = playerPose(makePose(), T, 0.7, 1.4, Math.PI / 2);
+        const b = cameraBasis(makeBasis(), p);
+        const vp = { width: 390, height: 844 };
+        for (const [x, y, z] of [[0.7, -0.5, T.ball.R], [p.ex, p.ey, p.ez], [p.ex, p.ey + 0.01, p.ez], [0.7, 0.4, 0.5]] as const) {
+            const [px, py] = projectPerspective(b, p, PLAYER_FOV_DEG, vp.width / vp.height, vp, x, y, z);
+            expect(Number.isFinite(px)).toBe(true);
+            expect(Number.isFinite(py)).toBe(true);
+        }
+    });
+});
+
+describe("unprojectPerspective — 평면 z=R 위 왕복 · 빗나간 광선", () => {
+    for (const pose of POSES) {
+        it(`${pose.name}: 카메라 앞 테이블 점은 project → unproject 왕복 오차 < 1e-6 m`, () => {
+            const p = playerPose(makePose(), T, pose.cue[0], pose.cue[1], pose.phi);
+            const b = cameraBasis(makeBasis(), p);
+            const R = T.ball.R;
+            let checked = 0;
+            for (const vp of VIEWPORTS) {
+                const aspect = vp.width / vp.height;
+                // 큐볼 앞쪽 부채꼴(옆으로 ±0.4 m, 앞으로 0 ~ 2.2 m) 중 테이블 안의 점
+                for (let d = 0; d <= 2.2; d += 0.2) {
+                    for (const side of [-0.4, -0.15, 0, 0.15, 0.4]) {
+                        const x = pose.cue[0] + Math.cos(pose.phi) * d - Math.sin(pose.phi) * side;
+                        const y = pose.cue[1] + Math.sin(pose.phi) * d + Math.cos(pose.phi) * side;
+                        if (x < 0 || x > T.width || y < 0 || y > T.length) continue;
+                        const [px, py] = projectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, x, y, R);
+                        const [wx, wy] = unprojectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, px, py, R, T);
+                        expect(Math.abs(wx - x)).toBeLessThan(1e-6);
+                        expect(Math.abs(wy - y)).toBeLessThan(1e-6);
+                        checked++;
+                    }
+                }
+            }
+            expect(checked).toBeGreaterThan(20); // 쿠션 쪽을 보는 자세는 부채꼴 대부분이 테이블 밖
+        });
+    }
+
+    it("화면 점을 unproject 한 뒤 다시 project 하면 같은 px(화면 아래쪽 = 테이블 면)", () => {
+        const p = playerPose(makePose(), T, T.width / 2, T.length / 4, Math.PI / 2);
+        const b = cameraBasis(makeBasis(), p);
+        const vp = { width: 390, height: 844 };
+        const aspect = vp.width / vp.height;
+        for (const [px, py] of [[195, 800], [40, 600], [350, 500], [195, 450]] as const) {
+            const [x, y] = unprojectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, px, py, T.ball.R, T);
+            const [qx, qy] = projectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, x, y, T.ball.R);
+            expect(qx).toBeCloseTo(px, 6);
+            expect(qy).toBeCloseTo(py, 6);
+        }
+    });
+
+    it("지평선 위(하늘)를 가리키면 테이블 안의 점을 돌려준다", () => {
+        const p = playerPose(makePose(), T, T.width / 2, T.length / 4, Math.PI / 2);
+        const b = cameraBasis(makeBasis(), p);
+        const vp = { width: 390, height: 844 };
+        const aspect = vp.width / vp.height;
+        for (const [px, py] of [[195, 0], [0, 0], [390, 5], [195, -100]] as const) {
+            const [x, y] = unprojectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, px, py, T.ball.R, T);
+            expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+            expect(x).toBeGreaterThanOrEqual(0);
+            expect(x).toBeLessThanOrEqual(T.width);
+            expect(y).toBeGreaterThanOrEqual(0);
+            expect(y).toBeLessThanOrEqual(T.length);
+        }
+        // 위쪽 가운데는 먼 쪽(+y) 끝으로
+        expect(unprojectPerspective(b, p, PLAYER_FOV_DEG, aspect, vp, 195, 0, T.ball.R, T)[1]).toBe(T.length);
+    });
+});
+
+describe("dampRig — 임계 감쇠로 목표에 수렴하고, 멈추면 정확히 스냅한다", () => {
+    it("60 fps 로 1 s 안에 정착(2 m 이동을 1e-4 m 까지) · 오버슈트 없음 · 마지막엔 false", () => {
+        const rig = makeRig();
+        const from = playerPose(makePose(), T, 0.3, 0.5, 0.2);
+        const to = playerPose(makePose(), T, 1.0, 2.0, 2.5);
+        snapRig(rig, from);
+        let moving = true;
+        let frames = 0;
+        let prevDist = Infinity;
+        while (moving && frames < 120) {
+            moving = dampRig(rig, to, PLAYER_SMOOTH_S, 1 / 60);
+            const d = Math.hypot(rig.pose.ex - to.ex, rig.pose.ey - to.ey, rig.pose.tx - to.tx, rig.pose.ty - to.ty);
+            expect(d).toBeLessThanOrEqual(prevDist + 1e-12); // 단조 접근(오버슈트 없음)
+            prevDist = d;
+            frames++;
+        }
+        expect(moving).toBe(false);
+        expect(frames).toBeLessThan(60);
+        expect(rig.pose).toEqual(to);
+        expect(rig.vel).toEqual({ ex: 0, ey: 0, ez: 0, tx: 0, ty: 0, tz: 0 });
+        // 이미 목표면 그대로 false
+        expect(dampRig(rig, to, PLAYER_SMOOTH_S, 1 / 60)).toBe(false);
+    });
+
+    it("dt=0 이면 자세는 그대로이고 아직 움직이는 중으로 본다", () => {
+        const rig = makeRig();
+        snapRig(rig, playerPose(makePose(), T, 0.3, 0.5, 0.2));
+        const before = { ...rig.pose };
+        expect(dampRig(rig, playerPose(makePose(), T, 1.0, 2.0, 2.5), PLAYER_SMOOTH_S, 0)).toBe(true);
+        expect(rig.pose).toEqual(before);
+    });
 });
 
 /* ------------------------------------------------------------------ 가짜 WebGL2 */
@@ -547,5 +774,114 @@ describe("ThreeRenderer 스모크(가짜 WebGL2)", () => {
         expect(r.stats().clothTextured).toBe(false);
         r.draw({ balls: openingLayout("3c", T), cue: { phi: 0, pullback: 0, visible: true } });
         expect(r.stats().balls).toBe(3);
+    });
+
+    it("setView('player'): 그려지고 project 가 유한하며 카메라가 큐볼 뒤에 선다 · 'top' 으로 돌아오면 tableGeometry 와 같다", () => {
+        const { r, el, glc } = make();
+        r.mount(el, T);
+        expect(r.getView()).toBe("top");
+        expect(r.needsFrame()).toBe(false);
+        const balls = openingLayout("3c", T, "white");
+        const white = balls.find((b) => b.id === "white")!;
+        r.draw({
+            balls, cue: { phi: Math.PI / 2, pullback: 0, visible: true, ballId: "white" }, highlightBallId: "white",
+            view: { cueBallId: "white", phi: Math.PI / 2 },
+        });
+        glc.calls.length = 0;
+        r.setView("player");
+        expect(r.getView()).toBe("player");
+        expect(r.stats().view).toBe("player");
+        expect(clearCount(glc.calls)).toBe(1); // 마지막 프레임을 새 카메라로 다시 그렸다
+        expect(drawCount(glc.calls)).toBeGreaterThanOrEqual(18);
+        // 전환은 스냅: 카메라가 바로 큐볼 뒤(−phi = −y) 0.9 m·높이 0.55 m
+        const pose = r.getCameraPose(makePose());
+        expect(pose.ex).toBeCloseTo(white.r[0], 9);
+        expect(pose.ey).toBeCloseTo(white.r[1] - PLAYER_BACK, 9);
+        expect(pose.ez).toBe(PLAYER_HEIGHT);
+        expect(pose.ty).toBeCloseTo(white.r[1] + PLAYER_AHEAD, 9);
+        expect(r.needsFrame()).toBe(false);
+        // project: 유한하고, 큐볼은 화면 가로 가운데·아래쪽, 먼 쿠션은 위쪽
+        const cue = r.project(white.r[0], white.r[1]);
+        const far = r.project(T.width / 2, T.length);
+        expect(Number.isFinite(cue[0]) && Number.isFinite(cue[1])).toBe(true);
+        expect(cue[0]).toBeCloseTo(195, 6);
+        expect(cue[1]).toBeGreaterThan(422);
+        expect(far[1]).toBeLessThan(cue[1]);
+        // 카메라 뒤(헤드 레일 뒤 멀리)도 유한
+        const behind = r.project(white.r[0], -3);
+        expect(Number.isFinite(behind[0]) && Number.isFinite(behind[1])).toBe(true);
+        // unproject 는 왕복한다
+        const [wx, wy] = r.unproject(cue[0], cue[1]);
+        expect(wx).toBeCloseTo(white.r[0], 6);
+        expect(wy).toBeCloseTo(white.r[1], 6);
+
+        r.setView("top");
+        const L = computeLayout({ width: 390, height: 844 }, T, INSETS);
+        expect(r.project(0.7, 1.9)).toEqual(worldToScreen(L, 0.7, 1.9));
+        expect(r.needsFrame()).toBe(false);
+        r.setView("top"); // 같은 뷰는 무시
+    });
+
+    it("player 뷰 카메라는 view 를 따라 감쇠 이동하고(needsFrame), view 가 없으면(재생) 그 자리에 머문다", () => {
+        const { r, el, setTime } = make();
+        r.mount(el, T);
+        const balls = openingLayout("3c", T, "white");
+        const white = balls.find((b) => b.id === "white")!;
+        setTime(0);
+        r.draw({ balls, view: { cueBallId: "white", phi: Math.PI / 2 } });
+        r.setView("player");
+        // 조준을 90° 돌리면 목표가 바뀌고 카메라가 움직이기 시작한다
+        setTime(16);
+        r.draw({ balls, view: { cueBallId: "white", phi: 0 } });
+        expect(r.needsFrame()).toBe(true);
+        expect(r.stats().cameraMoving).toBe(true);
+        const mid = r.getCameraPose(makePose());
+        expect(mid.ex).toBeGreaterThan(white.r[0] - PLAYER_BACK); // 아직 가는 중(x 는 −0.9 쪽으로 이동 중)
+        expect(mid.ex).toBeLessThan(white.r[0]);
+        let t = 16;
+        for (let i = 0; i < 90 && r.needsFrame(); i++) {
+            t += 16;
+            setTime(t);
+            r.draw({ balls, view: { cueBallId: "white", phi: 0 } });
+        }
+        expect(r.needsFrame()).toBe(false);
+        const settled = r.getCameraPose(makePose());
+        expect(settled.ex).toBeCloseTo(white.r[0] - PLAYER_BACK, 9);
+        expect(settled.ey).toBeCloseTo(white.r[1], 9);
+        // 재생: view 없이 공이 움직여도 카메라는 그대로
+        const moved: BallState[] = balls.map((b) => (b.id === "white" ? { ...b, r: [1.2, 2.5, b.r[2]] } : b));
+        t += 16;
+        setTime(t);
+        r.draw({ balls: moved });
+        expect(r.getCameraPose(makePose())).toEqual(settled);
+        expect(r.needsFrame()).toBe(false);
+        // 재생이 끝나 view 가 다시 오면 새 자리 뒤로 옮겨 간다
+        t += 16;
+        setTime(t);
+        r.draw({ balls: moved, view: { cueBallId: "white", phi: Math.PI } });
+        expect(r.needsFrame()).toBe(true);
+    });
+
+    it("player 뷰에서 resize 는 컨테이너 비율을 카메라에 주고 다시 그린다 · 마지막 프레임 없이 켜도 기본 자세로 그린다", () => {
+        const { r, el, glc } = make();
+        r.mount(el, T);
+        glc.calls.length = 0;
+        r.setView("player"); // lastFrame 없음 → 기본 자세(헤드 스팟에서 +y)
+        expect(clearCount(glc.calls)).toBe(1);
+        const pose = r.getCameraPose(makePose());
+        expect(pose.ex).toBeCloseTo(T.width / 2, 9);
+        expect(pose.ey).toBeCloseTo(T.length / 4 - PLAYER_BACK, 9);
+        expect(Number.isFinite(r.project(0.5, 0.5)[0])).toBe(true);
+        el.clientWidth = 1024;
+        el.clientHeight = 600;
+        glc.calls.length = 0;
+        r.resize();
+        expect(clearCount(glc.calls)).toBe(1);
+        // 가로 화면: 가운데 목표는 여전히 화면 중앙
+        const tgt = r.project(pose.tx, pose.ty);
+        expect(tgt[0]).toBeCloseTo(512, 6);
+        expect(tgt[1]).toBeCloseTo(300, 6);
+        r.dispose();
+        r.setView("top"); // dispose 뒤엔 무시(던지지 않는다)
     });
 });

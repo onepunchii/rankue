@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-    chooseRendererKind, CONTEXT_LOSS_LIMIT, probeWebGL2, readRendererPref, RENDERER_PREF_KEY, selectRendererKind, writeRendererPref,
-    type StorageLike,
+    chooseRendererKind, CONTEXT_LOSS_LIMIT, probeWebGL2, readRendererPref, readViewPref, RENDERER_PREF_KEY, selectRendererKind,
+    VIEW_PREF_KEY, writeRendererPref, writeViewPref, type StorageLike,
 } from "./rendererChoice";
 
 function memStorage(initial: Record<string, string> = {}): StorageLike & { data: Record<string, string> } {
@@ -30,6 +30,30 @@ describe("readRendererPref / writeRendererPref", () => {
         expect(writeRendererPref(s, "canvas")).toBe(true);
         expect(s.data).toEqual({ [RENDERER_PREF_KEY]: "canvas" });
         expect(readRendererPref(s)).toBe("canvas");
+    });
+});
+
+describe("readViewPref / writeViewPref — 카메라 뷰(기본 top)", () => {
+    it("저장값이 player 일 때만 player, 그 외·없음·읽기 불가는 top", () => {
+        expect(readViewPref(null)).toBe("top");
+        expect(readViewPref(memStorage())).toBe("top");
+        expect(readViewPref(memStorage({ [VIEW_PREF_KEY]: "player" }))).toBe("player");
+        expect(readViewPref(memStorage({ [VIEW_PREF_KEY]: "top" }))).toBe("top");
+        expect(readViewPref(memStorage({ [VIEW_PREF_KEY]: "iso" }))).toBe("top");
+        const throwing: StorageLike = { getItem: () => { throw new Error("denied"); }, setItem: () => { throw new Error("denied"); } };
+        expect(readViewPref(throwing)).toBe("top");
+        expect(writeViewPref(throwing, "player")).toBe(false);
+        expect(writeViewPref(null, "player")).toBe(false);
+    });
+
+    it("쓰기는 렌더러 키와 다른 키 하나에 남고 다시 읽힌다", () => {
+        const s = memStorage();
+        expect(writeViewPref(s, "player")).toBe(true);
+        expect(s.data).toEqual({ [VIEW_PREF_KEY]: "player" });
+        expect(VIEW_PREF_KEY).not.toBe(RENDERER_PREF_KEY);
+        expect(readViewPref(s)).toBe("player");
+        writeViewPref(s, "top");
+        expect(readViewPref(s)).toBe("top");
     });
 });
 

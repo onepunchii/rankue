@@ -190,6 +190,15 @@ describe("SimulatorPage", () => {
         expect(byLabel(h4, ko["sim.diamond.toggleLabel"])).toBeNull();
     });
 
+    it("\"3D 보기\" 토글은 ThreeRenderer 가 올라왔을 때만 — jsdom 은 WebGL2 가 없어 Canvas2D 라 버튼이 없다", async () => {
+        nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
+        const h = mount();
+        await frames(3); // three 청크가 오더라도(선택되지 않음) 토글이 생기지 않는다
+        expect(byLabel(h, ko["sim.hud.view3d"])).toBeNull();
+        expect(byLabel(h, ko["sim.hud.mute"])).not.toBeNull(); // 다른 토글은 그대로
+        expect(byLabel(h, ko["sim.diamond.toggleLabel"])).not.toBeNull();
+    });
+
     it("샷 → 재생(잠금) → 시계를 앞당기면 정지 · 결과 배너 · 이닝 시트 한 줄 · 되돌리기", async () => {
         nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
         const h = mount();

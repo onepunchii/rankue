@@ -9,12 +9,18 @@
  *  - integrateOrientation: BallState 에는 자세가 없으므로 각속도 ω(월드 좌표, rad/s)를 프레임마다 적분한다.
  *    q ← Δq(ω̂, |ω|·dt) ⊗ q  (월드 축 회전이므로 premultiply).
  *  - cueGap / cueRotationZ: Canvas2DRenderer 와 같은 큐대 배치. 간격 = R + 12 mm + pullback·0.25 m, 방향은 −phi.
+ *  - 선수 시점(player 뷰): playerPose 가 큐볼·phi 로 눈 위치·시선 목표를 만들고(테이블 밖 여유·최저 높이로 클램프),
+ *    cameraBasis 가 three 의 Matrix4.lookAt 과 같은 규칙으로 카메라 축을 만들며, projectPerspective / unprojectPerspective 가
+ *    GPU 의 원근 투영(PerspectiveCamera.updateProjectionMatrix → makePerspective)을 CPU 에서 재현한다. dampRig 는
+ *    임계 감쇠 스프링으로 카메라를 목표 자세로 부드럽게 옮긴다(할당 없음).
  */
 import type { Quaternion, Vector3 } from "three";
 import type { Vec3 } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
 import { diamondMarks } from "../aim";
 import { RAIL_WIDTH_M, type Size, type TableLayout } from "./tableGeometry";
+
+const DEG2RAD = Math.PI / 180;
 
 /** 카메라 높이(m). 테이블 위 물체(z ≤ 0.1 m)가 near/far 안에 넉넉히 든다. */
 export const CAMERA_Z = 5;
@@ -120,4 +126,197 @@ export function diamondWorld(table: TableSpec): readonly DiamondWorld[] {
         else y += half;
         return { x, y, rail: d.rail, index: d.index };
     });
+}
+
+// ── 선수 시점 카메라(원근) ───────────────────────────────────────────────
+/** 세로 시야각(°). 세로 화면에서는 가로 시야가 2·atan(tan(25°)·aspect) 로 좁아진다(폰 ≈ 40°). */
+export const PLAYER_FOV_DEG = 50;
+export const PLAYER_NEAR = 0.05;
+export const PLAYER_FAR = 20;
+/** 눈 위치: 큐볼 뒤(−phi) 거리·높이(m). 시선 목표: 큐볼 앞(+phi) 거리(m), 높이는 공 중심(R). */
+export const PLAYER_BACK = 0.9;
+export const PLAYER_HEIGHT = 0.55;
+export const PLAYER_AHEAD = 0.6;
+/** 눈이 플레이 면 밖으로 나갈 수 있는 여유(m) — 큐볼이 쿠션에 붙어도 눈은 이 안에 선다. */
+export const PLAYER_MARGIN = 0.5;
+/** 눈의 최저 높이(m). */
+export const PLAYER_MIN_Z = 0.25;
+/** 카메라 감쇠 시간(s) — 목표까지 ~95% 가 약 2·smoothTime 에 끝난다. 조준 드래그가 매끄럽게 따라오는 값. */
+export const PLAYER_SMOOTH_S = 0.12;
+/** 감쇠가 끝났다고 보는 문턱(m, m/s). 이 안이면 목표에 스냅하고 프레임 요청을 멈춘다. */
+const RIG_SETTLE_POS = 1e-4;
+const RIG_SETTLE_VEL = 1e-3;
+/** 빗나간 unproject 광선을 수평으로 이만큼 보낸 뒤 테이블 안으로 클램프한다(m). */
+const MISS_FAR = 100;
+
+/** 카메라 자세: 눈 e 와 시선 목표 t(월드 m, 위쪽은 +z). 제자리 갱신용 가변 구조. */
+export interface CameraPose {
+    ex: number; ey: number; ez: number;
+    tx: number; ty: number; tz: number;
+}
+
+export function makePose(): CameraPose {
+    return { ex: 0, ey: 0, ez: 1, tx: 0, ty: 1, tz: 0 };
+}
+
+export function copyPose(out: CameraPose, src: CameraPose): CameraPose {
+    out.ex = src.ex; out.ey = src.ey; out.ez = src.ez;
+    out.tx = src.tx; out.ty = src.ty; out.tz = src.tz;
+    return out;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+    return v < lo ? lo : v > hi ? hi : v;
+}
+
+/**
+ * 큐볼 (cueX, cueY)·조준 phi → 선수 시점 자세(제자리, 할당 없음).
+ * 눈은 큐볼 뒤 −phi 로 PLAYER_BACK, 높이 PLAYER_HEIGHT; x·y 는 플레이 면 ± PLAYER_MARGIN 안으로, z 는 PLAYER_MIN_Z 이상으로 클램프.
+ * 시선 목표는 큐볼 앞 +phi 로 PLAYER_AHEAD, 높이 R — 조준선이 화면 세로축을 따라 "멀어지는" 방향으로 놓인다.
+ * 클램프는 눈을 테이블 쪽(= 큐볼 쪽)으로만 당기므로 큐볼이 안에 있는 한 눈이 큐볼을 지나치지 않는다(수평 거리 ≥ ~0.5 m).
+ */
+export function playerPose(out: CameraPose, table: TableSpec, cueX: number, cueY: number, phi: number): CameraPose {
+    const c = Math.cos(phi), s = Math.sin(phi);
+    out.ex = clamp(cueX - c * PLAYER_BACK, -PLAYER_MARGIN, table.width + PLAYER_MARGIN);
+    out.ey = clamp(cueY - s * PLAYER_BACK, -PLAYER_MARGIN, table.length + PLAYER_MARGIN);
+    out.ez = Math.max(PLAYER_MIN_Z, PLAYER_HEIGHT);
+    out.tx = cueX + c * PLAYER_AHEAD;
+    out.ty = cueY + s * PLAYER_AHEAD;
+    out.tz = table.ball.R;
+    return out;
+}
+
+/** 카메라 축(월드 좌표). 카메라는 −z 를 보고 +y 가 위, up 은 월드 +z. three 의 Matrix4.lookAt(eye, target, up) 과 같은 규칙. */
+export interface CameraBasis {
+    xx: number; xy: number; xz: number;
+    yx: number; yy: number; yz: number;
+    zx: number; zy: number; zz: number;
+}
+
+export function makeBasis(): CameraBasis {
+    return { xx: 1, xy: 0, xz: 0, yx: 0, yy: 1, yz: 0, zx: 0, zy: 0, zz: 1 };
+}
+
+/** 자세 → 카메라 축(제자리). 눈=목표면 z=(0,0,1), 바로 아래를 보면(z ∥ up) three 처럼 z.x 를 1e-4 밀어 정한다. */
+export function cameraBasis(out: CameraBasis, p: CameraPose): CameraBasis {
+    let zx = p.ex - p.tx, zy = p.ey - p.ty, zz = p.ez - p.tz;
+    let len = Math.sqrt(zx * zx + zy * zy + zz * zz);
+    if (len === 0) { zz = 1; len = 1; }
+    zx /= len; zy /= len; zz /= len;
+    // x = up × z, up = (0, 0, 1)
+    let xx = -zy, xy = zx;
+    let xl = Math.sqrt(xx * xx + xy * xy);
+    if (xl === 0) {
+        zx += 0.0001;
+        len = Math.sqrt(zx * zx + zy * zy + zz * zz);
+        zx /= len; zy /= len; zz /= len;
+        xx = -zy; xy = zx;
+        xl = Math.sqrt(xx * xx + xy * xy);
+    }
+    xx /= xl; xy /= xl;
+    out.xx = xx; out.xy = xy; out.xz = 0;
+    // y = z × x
+    out.yx = -zz * xy;
+    out.yy = zz * xx;
+    out.yz = zx * xy - zy * xx;
+    out.zx = zx; out.zy = zy; out.zz = zz;
+    return out;
+}
+
+/**
+ * 월드 (x, y, z) → 화면 CSS px(원근). NDC = (vx / (−vz·tan(fov/2)·aspect), vy / (−vz·tan(fov/2))) — three 의 대칭 절두체와 같다.
+ * 카메라 뒤·near 안쪽의 점(−vz < near)은 깊이를 near 로 클램프해 항상 유한한 값을 돌려준다 — 위치는 뜻이 없고 보통 화면 밖이다
+ * (오버레이 경로가 카메라 뒤로 지나가면 그 구간은 엉뚱한 곳으로 그어진다 — 감수).
+ */
+export function projectPerspective(
+    b: CameraBasis, p: CameraPose, fovDeg: number, aspect: number, container: Size, x: number, y: number, z: number,
+): [number, number] {
+    const dx = x - p.ex, dy = y - p.ey, dz = z - p.ez;
+    const vx = b.xx * dx + b.xy * dy + b.xz * dz;
+    const vy = b.yx * dx + b.yy * dy + b.yz * dz;
+    const vz = b.zx * dx + b.zy * dy + b.zz * dz;
+    const depth = -vz > PLAYER_NEAR ? -vz : PLAYER_NEAR;
+    const t = Math.tan(fovDeg * DEG2RAD * 0.5);
+    const ndcX = vx / (depth * t * aspect);
+    const ndcY = vy / (depth * t);
+    return [(ndcX * 0.5 + 0.5) * container.width, (-ndcY * 0.5 + 0.5) * container.height];
+}
+
+/**
+ * 화면 CSS px → 평면 z = planeZ 위의 월드 (x, y). 눈에서 화면 점을 지나는 광선과 평면의 교점.
+ * 광선이 평면을 눈 앞에서 못 만나면(지평선 위·카메라 뒤) 눈에서 그 수평 방향으로 멀리 간 점을 플레이 면 안으로 클램프한
+ * "가장 가까운 테이블 안 점" 을 돌려준다 — 조준 드래그가 하늘을 가리켜도 phi 가 튀지 않는다.
+ */
+export function unprojectPerspective(
+    b: CameraBasis, p: CameraPose, fovDeg: number, aspect: number, container: Size, px: number, py: number, planeZ: number, table: TableSpec,
+): [number, number] {
+    const t = Math.tan(fovDeg * DEG2RAD * 0.5);
+    const cx = ((px / container.width) * 2 - 1) * t * aspect;
+    const cy = (1 - (py / container.height) * 2) * t;
+    // 카메라 공간 (cx, cy, −1) → 월드 방향
+    const dx = b.xx * cx + b.yx * cy - b.zx;
+    const dy = b.xy * cx + b.yy * cy - b.zy;
+    const dz = b.xz * cx + b.yz * cy - b.zz;
+    const s = (planeZ - p.ez) / dz;
+    if (s > 0 && Number.isFinite(s)) return [p.ex + dx * s, p.ey + dy * s];
+    const hl = Math.sqrt(dx * dx + dy * dy);
+    let fx = p.ex, fy = p.ey;
+    if (hl > 1e-12) { fx += (dx / hl) * MISS_FAR; fy += (dy / hl) * MISS_FAR; }
+    return [clamp(fx, 0, table.width), clamp(fy, 0, table.length)];
+}
+
+/** 감쇠 카메라: 현재 자세와 성분별 속도. 목표는 호출자가 playerPose 로 채운다. */
+export interface CameraRig {
+    readonly pose: CameraPose;
+    readonly vel: CameraPose;
+}
+
+export function makeRig(): CameraRig {
+    return { pose: makePose(), vel: { ex: 0, ey: 0, ez: 0, tx: 0, ty: 0, tz: 0 } };
+}
+
+/** 즉시 목표 자세로(속도 0). 뷰 전환·첫 프레임용. */
+export function snapRig(rig: CameraRig, target: CameraPose): void {
+    copyPose(rig.pose, target);
+    const v = rig.vel;
+    v.ex = v.ey = v.ez = v.tx = v.ty = v.tz = 0;
+}
+
+/** 임계 감쇠 스프링 한 성분(Unity SmoothDamp 근사). 새 위치를 돌려주고 속도는 out 에. */
+function damp1(x: number, v: number, target: number, omega: number, dt: number, out: { v: number }): number {
+    const k = omega * dt;
+    const e = 1 / (1 + k + 0.48 * k * k + 0.235 * k * k * k);
+    const change = x - target;
+    const temp = (v + omega * change) * dt;
+    out.v = (v - omega * temp) * e;
+    return target + (change + temp) * e;
+}
+
+const dampOut = { v: 0 };
+
+/**
+ * 카메라를 목표 쪽으로 dt 만큼 전진(제자리, 할당 없음). 아직 움직이는 중이면 true.
+ * 위치·속도가 문턱 안으로 들어오면 목표에 스냅하고 false — 이후 프레임을 더 요청하지 않는다.
+ */
+export function dampRig(rig: CameraRig, target: CameraPose, smoothTime: number, dt: number): boolean {
+    const p = rig.pose, v = rig.vel;
+    if (dt > 0) {
+        const omega = 2 / smoothTime;
+        p.ex = damp1(p.ex, v.ex, target.ex, omega, dt, dampOut); v.ex = dampOut.v;
+        p.ey = damp1(p.ey, v.ey, target.ey, omega, dt, dampOut); v.ey = dampOut.v;
+        p.ez = damp1(p.ez, v.ez, target.ez, omega, dt, dampOut); v.ez = dampOut.v;
+        p.tx = damp1(p.tx, v.tx, target.tx, omega, dt, dampOut); v.tx = dampOut.v;
+        p.ty = damp1(p.ty, v.ty, target.ty, omega, dt, dampOut); v.ty = dampOut.v;
+        p.tz = damp1(p.tz, v.tz, target.tz, omega, dt, dampOut); v.tz = dampOut.v;
+    }
+    const dp = Math.max(
+        Math.abs(p.ex - target.ex), Math.abs(p.ey - target.ey), Math.abs(p.ez - target.ez),
+        Math.abs(p.tx - target.tx), Math.abs(p.ty - target.ty), Math.abs(p.tz - target.tz),
+    );
+    const dv = Math.max(Math.abs(v.ex), Math.abs(v.ey), Math.abs(v.ez), Math.abs(v.tx), Math.abs(v.ty), Math.abs(v.tz));
+    if (dp < RIG_SETTLE_POS && dv < RIG_SETTLE_VEL) {
+        snapRig(rig, target);
+        return false;
+    }
+    return true;
 }

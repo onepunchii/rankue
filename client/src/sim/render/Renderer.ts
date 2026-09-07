@@ -18,11 +18,26 @@ export interface CueFrame {
     readonly ballId?: string;
 }
 
+/**
+ * 카메라 뷰. "top" = 오소그래픽 탑다운(기본, Canvas2D 와 px 동일). "player" = 큐볼 뒤 선수 시점(원근, ThreeRenderer 만).
+ * setView 를 구현하지 않는 렌더러는 항상 top 이다.
+ */
+export type RendererView = "top" | "player";
+
+/** 선수 시점 카메라가 따라갈 대상. 없으면 카메라는 마지막 자리에 머문다(재생 중 움직이는 공을 쫓지 않는다). */
+export interface ViewFrame {
+    readonly cueBallId: string;
+    /** 조준 방향(rad). 카메라는 큐볼 뒤(−phi)에 서서 +phi 쪽을 본다. */
+    readonly phi: number;
+}
+
 export interface RenderFrame {
     readonly balls: readonly BallState[];
     readonly cue?: CueFrame;
     /** 초록 링으로 강조할 공(보통 현재 큐볼). */
     readonly highlightBallId?: string;
+    /** 선수 시점 카메라 대상(player 뷰에서만 의미). 조준 단계에서 페이지가 매 프레임 넘긴다. */
+    readonly view?: ViewFrame;
 }
 
 /** 세이프 에어리어 인셋(CSS px). 테이블은 이 안쪽에 letterbox 된다. */
@@ -60,8 +75,16 @@ export interface Renderer {
     unproject(px: number, py: number): [number, number];
     /** 현재 화면의 PNG. 지원되지 않으면 null. */
     screenshot(): Promise<Blob | null>;
-    /** 현재 뷰포트 정보(마운트 전이면 null). */
+    /** 현재 뷰포트 정보(마운트 전이면 null). player 뷰에서도 scale 은 top 배치 기준이다(오버레이는 project 로 잰다). */
     viewport(): Viewport | null;
     /** 캔버스 제거·옵저버 해제. 이후 draw 는 무시된다. */
     dispose(): void;
+    /**
+     * 카메라 뷰 전환(선택). 구현하지 않으면 항상 top — 페이지는 이 메서드의 유무로 "3D 보기" 토글을 보인다.
+     * project/unproject 는 전환 직후부터 새 카메라를 따른다.
+     */
+    setView?(view: RendererView): void;
+    getView?(): RendererView;
+    /** 카메라가 아직 움직이는 중이면 true — 페이지 rAF 루프가 dirty 가 아니어도 draw 를 한 번 더 부른다(선택). */
+    needsFrame?(): boolean;
 }
