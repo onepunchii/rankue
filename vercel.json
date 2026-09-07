@@ -68,6 +68,10 @@
         {
             "path": "/api/cron/pba-sync",
             "schedule": "30 21 * * *"
+        },
+        {
+            "path": "/api/cron/sim-cleanup",
+            "schedule": "15 18 * * *"
         }
     ],
     "env": {

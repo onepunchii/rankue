@@ -107,6 +107,15 @@ export class SimMatchRepository {
         return res.length > 0;
     }
 
+    /** 상대가 hours 시간 넘게 안 들어온 waiting 대전을 canceled 로. */
+    async cleanupStaleWaiting(hours = 24): Promise<number> {
+        const rows = await db.update(hiqSimMatches)
+            .set({ status: "canceled", finishedAt: new Date() })
+            .where(and(eq(hiqSimMatches.status, "waiting"), sql`${hiqSimMatches.createdAt} < now() - make_interval(hours => ${hours})`))
+            .returning({ id: hiqSimMatches.id });
+        return rows.length;
+    }
+
     async getShots(matchId: string, fromIdx = 0): Promise<HiqSimMatchShot[]> {
         return db.select().from(hiqSimMatchShots)
             .where(and(eq(hiqSimMatchShots.matchId, matchId), gte(hiqSimMatchShots.idx, fromIdx)))

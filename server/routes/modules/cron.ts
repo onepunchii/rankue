@@ -2,6 +2,7 @@ import { Router } from "express";
 import { runReminders } from "../../services/notificationScheduler.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { storage } from "../../storage/index.js";
 
 const router = Router();
 
@@ -55,5 +56,18 @@ async function handlePbaSync(req: any, res: any) {
 }
 router.get("/pba-sync", asyncHandler(handlePbaSync));
 router.post("/pba-sync", asyncHandler(handlePbaSync));
+
+// 시뮬레이터 정리: 방치된 playing 세션(6시간) → abandoned, 상대가 안 들어온 waiting 대전(24시간) → canceled.
+// 실전 경기·성적과 무관한 시뮬 테이블만 건드린다.
+async function handleSimCleanup(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "unauthorized");
+    const sessions = await storage.sim.cleanupStale(6);
+    const matches = await storage.simMatch.cleanupStaleWaiting(24);
+    return sendSuccess(res, { sessions, matches });
+}
+router.get("/sim-cleanup", asyncHandler(handleSimCleanup));
+router.post("/sim-cleanup", asyncHandler(handleSimCleanup));
 
 export default router;

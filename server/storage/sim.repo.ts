@@ -127,6 +127,18 @@ export class SimRepository {
         });
     }
 
+    /** 방치된 playing 세션 정리: 마지막 샷(없으면 시작) 뒤 hours 시간이 지나면 abandoned. 성적 반영 없음. */
+    async cleanupStale(hours = 6): Promise<number> {
+        const rows = await db.update(hiqSimSessions)
+            .set({ status: "abandoned", finishedAt: new Date() })
+            .where(and(
+                eq(hiqSimSessions.status, "playing"),
+                sql`coalesce(${hiqSimSessions.lastShotAt}, ${hiqSimSessions.startedAt}) < now() - make_interval(hours => ${hours})`,
+            ))
+            .returning({ id: hiqSimSessions.id });
+        return rows.length;
+    }
+
     /** 연습 에버리지 랭킹. 최소 세션 수·이닝 수 조건은 호출자가 정한다. */
     async ladder(gameType: "3c" | "4c", tableId: "DAEDAE" | "JUNGDAE_KR", limit = 50) {
         return db.select({
