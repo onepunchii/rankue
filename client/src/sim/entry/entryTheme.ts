@@ -27,7 +27,7 @@ export const ENTRY_STYLE: EntryStyle = {
     page: "bg-[#121412]",
     title: "text-white",
     close: "border border-white/25 text-white/90 active:bg-white/10",
-    showcase: "relative h-[240px] -mx-5 -mt-4 w-[calc(100%+40px)] overflow-hidden bg-[#121412] mb-4",
+    showcase: "relative h-[240px] -mx-5 w-[calc(100%+40px)] overflow-hidden bg-[#121412] mb-4",
     card: "rounded-card bg-white/[0.06] border border-white/10 overflow-hidden",
     cardTitle: "text-white",
     cardSub: "text-white/55",

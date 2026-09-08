@@ -184,7 +184,7 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
     );
 
     const header = (
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
             <h1 className={cn("text-[20px] font-bold", st.title)}>{t("sim.entry.title")}</h1>
             <div className="flex items-center gap-2">
                 {/* 대시보드(닫기 옆, 2026-09-08 오너): 기록·그래프·내 대전 */}
