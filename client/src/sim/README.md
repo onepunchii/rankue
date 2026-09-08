@@ -448,3 +448,13 @@ entry/entryTheme.ts   ENTRY_STYLE 하나(검정 #121412). 테이블은 위를 �
                       tailwind 에 surface-0 유틸리티는 없다(토큰만) — 필요하면 bg-[var(--surface-0)].
 남은 일                로비·멀티방·랭킹·드릴·대시보드는 아직 흰 바탕이라 진입 화면에서 넘어갈 때 밝기 차가 크다(오너 확인 뒤 같이 어둡게 할지 결정).
 ```
+
+### 멀티방 로직 정리 (2026-09-08 오너: "중복방·꼬임 리뷰")
+```
+방은 한 번에 하나   POST /sim/matches 가 내가 열어 둔 다른 waiting 방을 접는다(cancelOtherWaiting, 응답에 closedRooms).
+                   시작된(playing) 대전은 건드리지 않는다. 초대를 보냈던 방이면 그 사람에게 "대전 초대가 닫혔어요" 알림.
+내 대전 목록        listMine 이 취소된 빈 방(guest_id null)은 빼고 준다 — 접힌 방이 "취소됨" 줄로 쌓이지 않게.
+코드 조회           GET /code/:code 는 이미 시작된 대전이면 참가자가 아닌 사람에게 409 — 코드를 찍어 본 남에게 공 배치·이름을 주지 않는다.
+그대로 둔 것        24시간 지난 waiting 방은 크론(/api/cron/sim-cleanup, 매일 18:15 UTC)이 접는다. 목록은 24시간 창.
+e2e                scripts/sim-e2e/rooms-dedupe.ts (두 번 만들면 먼저 방이 접힘·목록·코드 404·진행 중은 유지), rooms-audit.ts(읽기만 점검).
+```

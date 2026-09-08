@@ -92,9 +92,13 @@ export class SimMatchRepository {
         return row ? { ...row.m, hostName: row.hostName, guestName: row.guestName ?? null } : undefined;
     }
 
+    /** 내 대전 목록. 취소된 방(상대가 들어온 적 없다)은 빼고 준다 — 새 방을 열 때 접힌 방까지 줄로 남으면 목록이 지저분하다. */
     async listMine(memberId: string, limit = 20): Promise<MatchWithNames[]> {
         const { q } = this.withNames();
-        const rows = await q.where(or(eq(hiqSimMatches.hostId, memberId), eq(hiqSimMatches.guestId, memberId)))
+        const rows = await q.where(and(
+            or(eq(hiqSimMatches.hostId, memberId), eq(hiqSimMatches.guestId, memberId)),
+            sql`not (${hiqSimMatches.status} = 'canceled' and ${hiqSimMatches.guestId} is null)`,
+        ))
             .orderBy(desc(hiqSimMatches.createdAt)).limit(limit);
         return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
     }
@@ -130,6 +134,16 @@ export class SimMatchRepository {
         const res = await db.update(hiqSimMatches).set({ status: "canceled", finishedAt: new Date() })
             .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.hostId, hostId), eq(hiqSimMatches.status, "waiting"))).returning({ id: hiqSimMatches.id });
         return res.length > 0;
+    }
+
+    /**
+     * 내가 만든 다른 대기 방을 접는다(keepId 만 남긴다) — 방은 한 번에 하나(2026-09-08 오너: "중복방은 제거").
+     * 시작된(playing) 대전과 남의 방은 건드리지 않는다. 접은 방의 코드를 돌려준다(알림·로그용).
+     */
+    async cancelOtherWaiting(hostId: string, keepId: string): Promise<{ id: string; code: string; invitedId: string | null }[]> {
+        return db.update(hiqSimMatches).set({ status: "canceled", finishedAt: new Date() })
+            .where(and(eq(hiqSimMatches.hostId, hostId), eq(hiqSimMatches.status, "waiting"), sql`${hiqSimMatches.id} <> ${keepId}`))
+            .returning({ id: hiqSimMatches.id, code: hiqSimMatches.code, invitedId: hiqSimMatches.invitedId });
     }
 
     /** 상대가 hours 시간 넘게 안 들어온 waiting 대전을 canceled 로. */

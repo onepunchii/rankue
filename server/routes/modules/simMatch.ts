@@ -134,8 +134,14 @@ router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, r
         isPublic: b.isPublic, passwordHash: b.password ? hashRoomPassword(b.password) : null,
         engineVersion: ENGINE_VERSION, paramsHash: paramsHash(params),
     });
+    // 방은 한 번에 하나 — 새로 만들면 내가 열어 둔 다른 대기 방은 접는다(2026-09-08 오너: "중복방 제거").
+    // 시작된 대전은 그대로 둔다. 초대를 보냈던 방이면 그 사람에게 방이 닫혔다고 알린다.
+    const closed = await storage.simMatch.cancelOtherWaiting(req.userId!, row.id);
+    for (const c of closed) {
+        if (c.invitedId) notify(c.invitedId, "대전 초대가 닫혔어요", "상대가 새 방을 열었어요. 새 초대를 기다려 주세요.", row.id);
+    }
     const full = await storage.simMatch.get(row.id);
-    return sendSuccess(res, publicMatch(full!, req.userId!), 201);
+    return sendSuccess(res, { ...publicMatch(full!, req.userId!), closedRooms: closed.length }, 201);
 }));
 
 // GET /sim/matches — 내 대전 목록
@@ -148,6 +154,10 @@ router.get("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, re
 router.get("/sim/matches/code/:code", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const m = await storage.simMatch.findLiveByCode(String(req.params.code).trim());
     if (!m) return sendError(res, 404, "코드를 찾을 수 없습니다");
+    // 이미 시작된 대전은 참가자에게만 보여 준다 — 코드를 찍어 본 남에게 공 배치·이름을 주지 않는다
+    if (m.status === "playing" && m.hostId !== req.userId && m.guestId !== req.userId) {
+        return sendError(res, 409, "이미 시작된 대전입니다");
+    }
     return sendSuccess(res, publicMatch(m, req.userId!));
 }));
 
