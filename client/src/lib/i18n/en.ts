@@ -1906,6 +1906,8 @@ const en: Dict = {
   "sim.match.bannerSub": "{name} has played",
   "sim.match.bannerMore": "+{n} more",
   "sim.match.bannerCta": "Continue",
+  "sim.match.bannerOpen": "Open",
+  "sim.match.bannerSubWaiting": "{name}'s turn",
   "sim.drill.title": "This week's drills",
   "sim.drill.desc": "Everyone gets the same 5 positions. Only your first shot is scored; practice freely after",
   "sim.drill.week": "Week {week}, {year}",

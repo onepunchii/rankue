@@ -1906,6 +1906,8 @@ const vi: Dict = {
   "sim.match.bannerSub": "{name} đã đánh",
   "sim.match.bannerMore": "+{n} trận nữa",
   "sim.match.bannerCta": "Tiếp tục",
+  "sim.match.bannerOpen": "Mở",
+  "sim.match.bannerSubWaiting": "Đến lượt {name}",
   "sim.drill.title": "Bài tập tuần này",
   "sim.drill.desc": "Ai cũng nhận 5 thế giống nhau. Chỉ cú đầu được tính; sau đó luyện thoải mái",
   "sim.drill.week": "Tuần {week}, {year}",

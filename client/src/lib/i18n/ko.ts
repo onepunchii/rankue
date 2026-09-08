@@ -1908,6 +1908,8 @@ export const ko: Dict = {
   "sim.match.bannerSub": "{name}님이 쳤어요",
   "sim.match.bannerMore": "외 {n}건",
   "sim.match.bannerCta": "이어가기",
+  "sim.match.bannerOpen": "열기",
+  "sim.match.bannerSubWaiting": "{name}님 차례",
   "sim.drill.title": "이번 주 드릴",
   "sim.drill.desc": "모두 같은 5문제예요. 문제당 채점은 첫 샷 한 번, 그 뒤엔 마음껏 연습하세요",
   "sim.drill.week": "{year}년 {week}주차",

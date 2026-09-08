@@ -1906,6 +1906,8 @@ const tr: Dict = {
   "sim.match.bannerSub": "{name} vurdu",
   "sim.match.bannerMore": "+{n} daha",
   "sim.match.bannerCta": "Devam et",
+  "sim.match.bannerOpen": "Aç",
+  "sim.match.bannerSubWaiting": "Sıra {name} adlı oyuncuda",
   "sim.drill.title": "Bu haftanın çalışmaları",
   "sim.drill.desc": "Herkese aynı 5 pozisyon. Sadece ilk vuruş puanlanır; sonra serbestçe çalış",
   "sim.drill.week": "{year}, {week}. hafta",
