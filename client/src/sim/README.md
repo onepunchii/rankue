@@ -411,3 +411,13 @@ rank/RankPage.tsx   `?rank=1`: 종목·테이블 칩 → 범위(전체 / 내 나
                     내 나라가 없으면 기기 언어의 지역으로 한 번 저장. 진입: 멀티방 카드 "랭킹" 알약, 대시보드 온라인 레이팅 칸(티어 표시).
 테스트 shared/sim/rank.test.ts · rank/rankApi.test.ts · rank/RankPage.test.ts · e2e scripts/sim-e2e/rank.ts(임시 회원 넷, 삭제) · rank-capture.ts.
 ```
+
+## 40초 시계 — 접속 기반 시작 (2026-09-08 오너: "상대 차례예요 + 초")
+```
+서버   hiq_sim_matches.host_seen_at / guest_seen_at: GET /sim/matches/:id 폴링·POST shots 때 5 s 단위로 갱신(touchSeen).
+       차례가 넘어갈 때(recordShot·passTurn) 다음 차례가 PRESENCE_MS(20 s) 안에 접속했으면 turn_seen_at = now + REPLAY_GRACE_MS(10 s, 시간 초과엔 0) 로 바로 적는다(nextTurnSeenAt).
+       아니면 null → 조준 화면을 열 때 ?ack=1 로 시작(예전 규칙). 득점으로 같은 사람이 이어 칠 때도 재생 뒤 바로 돈다.
+클라이언트 clock.seconds 는 [0, 40] 로 자른다(미래 시각). 대기 패널은 상대 이름 · "상대 차례예요" · 상대 시계(role=timer, 돌 때만) · 48h 승리 주장 버튼(가능할 때만). 안내 문구 키 waitingHint/claimWait 는 삭제.
+e2e    scripts/sim-e2e/clock-presence.ts(접속 중 게스트 → 샷 + 10 s 시작 · 부재 호스트 → null → ack) · clock.ts(기존 40/50 s 흐름).
+어드민  GET /me 도 방문으로 센다(하루 1회). 회원 표 "온라인게임" 열(세션 · 대전). 푸시 발송에 링크 칸(params.url). scripts/push/online-game-launch.ts 언어별 오픈 알림(dry run 기본, --send).
+```

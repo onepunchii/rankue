@@ -685,7 +685,8 @@ export function SimulatorPage() {
         return () => clearInterval(id);
     }, [clockOn, clockSeenAt]);
     const clockRemaining = clockOn ? SHOT_CLOCK_S - (clockNow + (sim.match?.serverOffsetMs ?? 0) - clockSeenAt) / 1000 : null;
-    const clock = clockRemaining !== null && sim.match ? { seconds: Math.max(0, Math.ceil(clockRemaining)), mine: sim.match.isMyTurn } : null;
+    // 서버가 재생 여유(REPLAY_GRACE_MS)를 더해 미래 시각을 적을 수 있어 40 을 넘지 않게 자른다
+    const clock = clockRemaining !== null && sim.match ? { seconds: Math.max(0, Math.min(SHOT_CLOCK_S, Math.ceil(clockRemaining))), mine: sim.match.isMyTurn } : null;
     // 0 이 되면 서버에 시간 초과를 알린다. 서버가 아직 이르다고 하면(시계 오차) 3 초마다 다시 — 차례가 바뀌어 key 가 달라질 때까지.
     const timeoutFiredRef = useRef<{ key: string; at: number }>({ key: "", at: 0 });
     useEffect(() => {
@@ -1062,14 +1063,17 @@ export function SimulatorPage() {
                         <div className="absolute inset-x-0 bottom-3 z-[3] flex flex-col items-center gap-2 px-4">
                             <div className="rounded-card bg-surface-1 border border-surface-line px-4 py-3 text-center max-w-[320px] w-full">
                                 <p className="text-[12px] font-medium text-ink-4">{sim.match.opponentName}</p>
+                                {/* 깔끔하게: "상대 차례예요" + 상대 시계(접속 중이면 바로 돈다). 안내 문구는 없앴다(2026-09-08 오너). */}
                                 <p className="text-[14px] font-semibold text-ink-1">{t("sim.match.waitingTurn")}</p>
-                                <p className="text-[12px] font-medium text-ink-4 mt-0.5">{t("sim.match.waitingHint")}</p>
-                                {sim.match.canClaim ? (
+                                {clock && !clock.mine && (
+                                    <p className={cn("rk-num text-[28px] font-bold leading-tight mt-0.5", clock.seconds <= 10 ? "text-ink-1" : "text-ink-2")} role="timer" aria-label={t("sim.match.shotClockLabel")}>
+                                        {t("sim.match.shotClock").replace("{n}", String(clock.seconds))}
+                                    </p>
+                                )}
+                                {sim.match.canClaim && (
                                     <button type="button" onClick={() => { void onClaim(); }} className="mt-2 h-11 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
                                         {t("sim.match.claim")}
                                     </button>
-                                ) : (
-                                    <p className="text-[12px] font-medium text-ink-4 mt-1">{t("sim.match.claimWait")}</p>
                                 )}
                             </div>
                         </div>

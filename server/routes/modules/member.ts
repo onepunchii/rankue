@@ -60,6 +60,8 @@ router.post("/upload", requireAuth, asyncHandler(async (req: AuthRequest, res: a
 router.get("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
     if (!member) return sendError(res, 404, "회원 없음");
+    // 저장된 세션(토큰)으로 자동 로그인해 앱을 연 것도 방문이다 — 하루 한 번만 오른다(incrementVisitCount 가 같은 날은 건너뜀). 2026-09-08 오너.
+    storage.incrementVisitCount(member.id).catch((e: unknown) => console.error("[VisitCount]", e));
 
     let profile: any = null;
     if (member.profileId) {

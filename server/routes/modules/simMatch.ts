@@ -224,7 +224,9 @@ router.post("/sim/matches/:id/invite", requireAuth, asyncHandler(async (req: Aut
 router.get("/sim/matches/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     let m = await storage.simMatch.get(req.params.id);
     if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
-    // ?ack=1: 차례인 사람이 조준 화면에 들어왔다 → 40초 시계 시작(한 번만). 상대·재생 중 폴링은 ack 없이 온다.
+    // 접속 표시: 대전 화면을 보고 있다(폴링). 차례가 넘어올 때 시계를 바로 돌릴지 여기서 판단한다(PRESENCE_MS).
+    if (m.status === "playing") await storage.simMatch.touchSeen(m.id, m.hostId === req.userId ? 0 : 1);
+    // ?ack=1: 차례인 사람이 조준 화면에 들어왔다 → 40초 시계 시작(한 번만, 서버가 이미 적었으면 그대로). 상대·재생 중 폴링은 ack 없이 온다.
     if (req.query.ack === "1" && m.status === "playing" && !m.turnSeenAt) {
         const myIndex = m.hostId === req.userId ? 0 : 1;
         if (m.turn === myIndex) {
@@ -286,6 +288,8 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
     if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
     if (m.status !== "playing") return sendError(res, 409, "진행 중인 대전이 아닙니다");
     const myIndex = m.hostId === req.userId ? 0 : 1;
+    // 치는 사람도 접속 중 — 득점으로 차례가 이어지면 재생 뒤 내 시계가 바로 돈다
+    await storage.simMatch.touchSeen(m.id, myIndex);
     // 응답을 못 받은 클라이언트의 재전송: 이미 기록된 내 샷이면 같은 결과를 다시 준다(멱등).
     if (idx < m.shots) {
         const [prev] = await storage.simMatch.getShots(m.id, idx);

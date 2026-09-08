@@ -8,9 +8,20 @@ import { hiqSimMatches, hiqSimMatchShots, hiqSimRatings, hiqMembers } from "../.
 import { alias } from "drizzle-orm/pg-core";
 import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot } from "../../shared/schema.js";
+import { PRESENCE_MS, REPLAY_GRACE_MS } from "../../shared/sim/rules/session.js";
 
 const ELO_K = 24;
 const LIVE = ["waiting", "playing"] as const;
+/** 접속 표시 갱신 간격(폴링마다 쓰지 않고 이 간격이 지났을 때만) */
+const SEEN_THROTTLE_MS = 5_000;
+
+/** 다음 차례의 시계 시작 시각: 그 사람이 접속 중이면 now + grace, 아니면 null(조준 화면을 열 때 ack). */
+export function nextTurnSeenAt(m: { hostSeenAt: Date | null; guestSeenAt: Date | null }, nextTurn: number, finished: boolean, graceMs: number, now = Date.now()): Date | null {
+    if (finished) return null;
+    const seen = nextTurn === 0 ? m.hostSeenAt : m.guestSeenAt;
+    if (!seen || now - seen.getTime() > PRESENCE_MS) return null;
+    return new Date(now + graceMs);
+}
 
 export interface MatchShotArgs {
     matchId: string;
@@ -167,13 +178,22 @@ export class SimMatchRepository {
                 shots: m.shots + 1, version: m.version + 1,
                 mismatches: mismatch ? m.mismatches + 1 : m.mismatches,
                 lastShotAt: new Date(),
-                turnSeenAt: null,
+                // 다음 차례가 접속 중이면 재생 여유 뒤 시계가 바로 돈다(같은 사람이 이어 칠 때도). 아니면 조준 화면을 열 때.
+                turnSeenAt: nextTurnSeenAt(m, a.newTurn, a.finished, REPLAY_GRACE_MS),
                 ...(a.finished ? { status: "finished" as const, finishedAt: new Date(), winnerId, endReason: a.endReason } : {}),
             }).where(eq(hiqSimMatches.id, a.matchId)).returning();
 
             if (a.finished && m.guestId) await this.applyElo(tx, updated, winnerId);
             return { shot, duplicate: false, match: updated };
         });
+    }
+
+    /** 접속 표시: 대전 화면 폴링·샷 때 내 자리의 seen_at 을 적는다(5 s 에 한 번). */
+    async touchSeen(id: string, playerIndex: 0 | 1): Promise<void> {
+        const col = playerIndex === 0 ? hiqSimMatches.hostSeenAt : hiqSimMatches.guestSeenAt;
+        await db.update(hiqSimMatches).set(playerIndex === 0 ? { hostSeenAt: new Date() } : { guestSeenAt: new Date() })
+            .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.status, "playing"),
+                or(isNull(col), sql`${col} < now() - make_interval(secs => ${SEEN_THROTTLE_MS / 1000})`)));
     }
 
     /** 40초 룰: 차례인 사람이 조준 화면에 들어온 시각을 한 번만 적는다(이미 있으면 그대로 → undefined). */
@@ -191,7 +211,9 @@ export class SimMatchRepository {
             if (!m || m.status !== "playing" || m.turn !== a.turn) return null;
             const winnerId = a.finished ? (a.winnerIndex === 0 ? m.hostId : a.winnerIndex === 1 ? m.guestId : null) : null;
             const [row] = await tx.update(hiqSimMatches).set({
-                state: a.newState, turn: a.newTurn, version: m.version + 1, lastShotAt: new Date(), turnSeenAt: null,
+                state: a.newState, turn: a.newTurn, version: m.version + 1, lastShotAt: new Date(),
+                // 시간 초과엔 재생이 없다 — 접속 중이면 바로 시작
+                turnSeenAt: nextTurnSeenAt(m, a.newTurn, a.finished, 0),
                 ...(a.finished ? { status: "finished" as const, finishedAt: new Date(), winnerId, endReason: a.endReason } : {}),
             }).where(eq(hiqSimMatches.id, a.id)).returning();
             if (a.finished && m.guestId) await this.applyElo(tx, row, winnerId);

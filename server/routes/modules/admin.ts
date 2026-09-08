@@ -88,6 +88,9 @@ router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     const title = String(req.body?.title || "").trim().slice(0, 60);
     const body = String(req.body?.body || "").trim().slice(0, 200);
     if (!title || !body) return sendError(res, 400, "제목과 내용을 입력해주세요");
+    // 선택: 누르면 열 앱 내 경로(예 /online-game). 앱 안 경로만 받는다.
+    const rawUrl = String(req.body?.url || "").trim();
+    const url = /^\/[A-Za-z0-9_\-./?=&%]*$/.test(rawUrl) && !rawUrl.startsWith("//") ? rawUrl.slice(0, 200) : "";
 
     let memberIds: string[];
     if (req.body?.memberIds === "all") {
@@ -105,7 +108,7 @@ router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     let sent = 0;
     for (const memberId of memberIds) {
         try {
-            await notificationService.sendAndSaveNotification({ memberId, title, body, category: "admin", type: "broadcast" });
+            await notificationService.sendAndSaveNotification({ memberId, title, body, category: "admin", type: "broadcast", ...(url ? { params: { url } } : {}) });
             sent++;
         } catch (e) {
             console.warn(`[admin push] ${memberId} 실패:`, (e as Error)?.message);

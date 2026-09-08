@@ -194,6 +194,9 @@ export class AdminRepository {
                     WHEN ${profiles.pushToken} LIKE 'fcm:%' THEN 'android'
                     ELSE NULL
                 END`,
+            // 온라인게임(시뮬레이터) 이용: 연습 세션 수 · 대전 수(호스트/게스트) — 2026-09-08 오너
+            simSessions: sql<number>`(select count(*)::int from hiq_sim_sessions s where s.member_id = ${hiqMembers.id})`,
+            simMatches: sql<number>`(select count(*)::int from hiq_sim_matches x where x.host_id = ${hiqMembers.id} or x.guest_id = ${hiqMembers.id})`,
         }).from(hiqMembers)
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
             .orderBy(sql`${hiqMembers.createdAt} DESC`);

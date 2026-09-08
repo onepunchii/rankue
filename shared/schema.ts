@@ -1637,8 +1637,12 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   startedAt: timestamp("started_at"),
   lastShotAt: timestamp("last_shot_at"),
-  /** 40초 룰: 차례인 사람이 조준 화면에 들어온 시각(GET ?ack=1). 샷·시간 초과로 차례가 바뀌면 null. */
+  /** 40초 룰: 차례인 사람의 시계 시작 시각. 상대가 접속 중(host/guest_seen_at 이 PRESENCE_MS 안)이면 샷 직후 재생 여유(REPLAY_GRACE_MS)를 더해 서버가 바로 적고,
+   *  아니면 차례인 사람이 조준 화면을 열 때(GET ?ack=1). 샷·시간 초과로 차례가 바뀌면 다시 계산. */
   turnSeenAt: timestamp("turn_seen_at"),
+  /** 접속 표시: 각자가 대전 화면을 마지막으로 폴링·샷한 시각(5 s 단위 갱신). 차례가 넘어갈 때 상대 시계를 바로 돌릴지 정한다. */
+  hostSeenAt: timestamp("host_seen_at"),
+  guestSeenAt: timestamp("guest_seen_at"),
   finishedAt: timestamp("finished_at"),
 }, (t) => ({
   idxCode: index("idx_sim_matches_code").on(t.code, t.status),

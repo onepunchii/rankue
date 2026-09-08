@@ -240,17 +240,17 @@ export default function AdminDashboard() {
     });
 
     // 푸시함 — 전체/개별 회원 대상 발송
-    const [pushForm, setPushForm] = useState({ title: "", body: "" });
+    const [pushForm, setPushForm] = useState({ title: "", body: "", url: "" });
     const [pushTargets, setPushTargets] = useState<string[]>([]);
     const [pushAll, setPushAll] = useState(true);
     const sendPushMutation = useMutation({
         mutationFn: async () => apiRequest("/api/hiq/admin/push", {
             method: "POST",
-            body: { memberIds: pushAll ? "all" : pushTargets, title: pushForm.title, body: pushForm.body },
+            body: { memberIds: pushAll ? "all" : pushTargets, title: pushForm.title, body: pushForm.body, url: pushForm.url.trim() || undefined },
         }),
         onSuccess: (r: any) => {
             toast({ title: `발송 완료 — ${r.sent}/${r.total}명` });
-            setPushForm({ title: "", body: "" });
+            setPushForm({ title: "", body: "", url: "" });
             setPushTargets([]);
         },
         onError: (e: any) => toast({ title: e?.message || "발송 실패", variant: "destructive" }),
@@ -881,6 +881,13 @@ export default function AdminDashboard() {
                                     placeholder="내용 (200자 이내)"
                                     className="bg-black/[0.04] border-black/10 h-24"
                                 />
+                                <Input
+                                    value={pushForm.url}
+                                    onChange={(e) => setPushForm({ ...pushForm, url: e.target.value })}
+                                    maxLength={200}
+                                    placeholder="누르면 열 화면 (선택, 예: /online-game)"
+                                    className="bg-black/[0.04] border-black/10 h-12 font-mono"
+                                />
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setPushAll(true)}
@@ -1033,6 +1040,7 @@ export default function AdminDashboard() {
                                             <th className="p-4 font-black text-black/55 text-center">기기</th>
                                             <th className="p-4 font-black text-black/55 text-right">3쿠션 RP</th>
                                             <th className="p-4 font-black text-black/55 text-right">4구 RP</th>
+                                            <th className="p-4 font-black text-black/55 text-center">온라인게임</th>
                                             <th className="p-4 font-black text-black/55 text-right">방문</th>
                                             <th className="p-4 font-black text-black/55">가입일</th>
                                         </tr>
@@ -1057,12 +1065,17 @@ export default function AdminDashboard() {
                                                     </td>
                                                     <td className="p-4 text-right font-mono font-bold text-brand">{m.rating3c ?? 0}</td>
                                                     <td className="p-4 text-right font-mono font-bold text-brand">{m.rating4c ?? 0}</td>
+                                                    <td className="p-4 text-center font-mono text-black/60" title="연습 세션 · 대전">
+                                                        {(m.simSessions ?? 0) + (m.simMatches ?? 0) > 0
+                                                            ? <span><span className="font-bold text-[rgba(0,0,0,0.87)]">{m.simSessions ?? 0}</span><span className="text-black/35"> · </span><span className="font-bold text-[rgba(0,0,0,0.87)]">{m.simMatches ?? 0}</span></span>
+                                                            : <span className="text-black/25">-</span>}
+                                                    </td>
                                                     <td className="p-4 text-right text-black/60 font-mono">{m.visitCount ?? 0}</td>
                                                     <td className="p-4 text-black/50 font-mono">{m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "-"}</td>
                                                 </tr>
                                             ))}
                                         {members.length === 0 && (
-                                            <tr><td colSpan={9} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
+                                            <tr><td colSpan={10} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
