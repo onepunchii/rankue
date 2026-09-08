@@ -469,3 +469,13 @@ e2e                scripts/sim-e2e/rooms-dedupe.ts (두 번 만들면 먼저 방
 e2e           clock-penalty.ts(자리를 비워도 시간 초과가 걸리고 아웃이 쌓인다) · clock-visible.ts(브라우저: 여유 10 s 동안 안 보이다가 40부터 감소, 창을 안 만져도 뜬다) ·
               strikeout.ts · clock-presence.ts · clock.ts · purge-e2e.ts(임시 회원 남으면 정리 — 브라우저를 띄우면 hiq_visit_logs 도 생기니 회원보다 먼저 지운다)
 ```
+
+### 검은 배색 구역 `.sim-dark` (2026-09-08 오너: "로비·랭킹도 검은색으로 통일")
+```
+client/src/index.css  .sim-dark 가 색 토큰만 덮는다(surface-0~3·line·ink-1~4·shadow-card 없음 + shadcn 토큰 background/card/popover/muted/secondary/accent/border/input).
+                      brand(초록)·공 색·gold 은 그대로 — 초록은 어두운 화면에서도 "이걸 누르세요" 하나만 가리킨다.
+쓰는 곳                SimulatorPage 의 로비(?lobby=1)·랭킹(?rank=1) 껍데기, 로비에서 열리는 팝업 두 개(ModeInfoDialog·InviteDialog — 포털이라 껍데기 밖에 그려져 각자 클래스를 준다).
+주의                   shadcn 토큰을 같이 안 덮으면 Button variant="outline" 이 흰 알약 + 흰 글씨가 된다(실측 후 추가).
+아직 밝은 화면          멀티방 목록(?rooms=1)·드릴(?drills=1)·대시보드(?dash=1)·설정 창 — 필요하면 같은 클래스만 붙이면 된다.
+캡처                   scratchpad/shots/dark.mjs · dark2.mjs → dark-lobby.png · dark-rank.png · dark-modeinfo.png
+```

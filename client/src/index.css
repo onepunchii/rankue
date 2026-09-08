@@ -572,6 +572,41 @@ body {
     font-weight: 500;
     color: var(--ink-3);
   }
+  /**
+   * 온라인게임 구역의 검은 배색(2026-09-08 오너: "로비·랭킹도 검은색으로 통일").
+   * 색 토큰만 덮으면 그 안의 카드·글자·테두리가 전부 따라온다 — 컴포넌트는 그대로 두고 껍데기에만 이 클래스를 준다.
+   * brand(초록)·공 색·gold 은 그대로 둔다: 초록은 여기서도 "이걸 누르세요" 하나만 가리킨다.
+   */
+  .sim-dark {
+    --surface-0: #121412;
+    --surface-1: #1b1e1b;
+    --surface-2: #1b1e1b;
+    --surface-3: rgba(255, 255, 255, 0.08);
+    --surface-line: rgba(255, 255, 255, 0.12);
+    --surface-line-strong: rgba(255, 255, 255, 0.22);
+    --ink-1: rgba(255, 255, 255, 0.94);
+    --ink-2: rgba(255, 255, 255, 0.75);
+    --ink-3: rgba(255, 255, 255, 0.58);
+    --ink-4: rgba(255, 255, 255, 0.42);
+    --shadow-card: none;
+    color-scheme: dark;
+    /* UI 키트(shadcn) 토큰도 같이 — 안 덮으면 Button variant="outline" 이 흰 알약에 흰 글씨가 된다(실측) */
+    --background: #121412;
+    --foreground: rgba(255, 255, 255, 0.94);
+    --card: #1b1e1b;
+    --card-foreground: rgba(255, 255, 255, 0.94);
+    --popover: #1b1e1b;
+    --popover-foreground: rgba(255, 255, 255, 0.94);
+    --muted: rgba(255, 255, 255, 0.08);
+    --muted-foreground: rgba(255, 255, 255, 0.58);
+    --secondary: rgba(255, 255, 255, 0.10);
+    --secondary-foreground: rgba(255, 255, 255, 0.94);
+    --accent: rgba(255, 255, 255, 0.10);
+    --accent-foreground: rgba(255, 255, 255, 0.94);
+    --border: rgba(255, 255, 255, 0.14);
+    --input: rgba(255, 255, 255, 0.20);
+  }
+
   .rk-num {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;

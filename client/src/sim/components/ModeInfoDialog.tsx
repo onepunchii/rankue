@@ -83,7 +83,7 @@ export const ModeInfoDialog = memo(function ModeInfoDialog({ open, mode, onOpenC
     const panels: readonly SimMode[] = ["normal", "reality"];
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[420px] max-h-[88dvh] rounded-card flex flex-col gap-0 p-0">
+            <DialogContent className="sim-dark bg-[var(--surface-1)] max-w-[420px] max-h-[88dvh] rounded-card flex flex-col gap-0 p-0">
                 <DialogHeader className="shrink-0 px-6 pt-6 pb-2 text-left">
                     <DialogTitle>{t("sim.modeInfo.title")}</DialogTitle>
                     <DialogDescription className="text-[13px] font-medium text-ink-3">{t("sim.modeInfo.desc")}</DialogDescription>

@@ -1129,7 +1129,7 @@ export function SimulatorPage() {
                 </div>
             )}
             {showRank && (
-                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <RankPage onClose={() => navigate("/online-game", { replace: true })} />
                 </div>
             )}
@@ -1152,7 +1152,7 @@ export function SimulatorPage() {
                 </div>
             )}
             {showLobby && (
-                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <MatchLobby
                         initialTab={lobbyTab} initialPublic={lobbyPublic} initialCode={lobbyCode || undefined}
                         onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }}

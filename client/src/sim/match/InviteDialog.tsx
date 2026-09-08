@@ -58,7 +58,7 @@ export function InviteDialog({ open, onOpenChange, api, matchId }: InviteDialogP
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-surface-1 text-ink-1 max-w-md w-[92%] rounded-card p-5">
+            <DialogContent className="sim-dark bg-[var(--surface-1)] bg-surface-1 text-ink-1 max-w-md w-[92%] rounded-card p-5">
                 <DialogHeader className="text-left">
                     <DialogTitle className="text-[18px] font-bold text-ink-1">{t("sim.match.inviteTitle")}</DialogTitle>
                     <DialogDescription className="text-[13px] font-medium text-ink-3">{t("sim.match.inviteDesc")}</DialogDescription>
