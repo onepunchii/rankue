@@ -22,5 +22,6 @@ export * from "./continuize.js";
 export * from "./hash.js";
 export * from "./rng.js";
 export * from "./version.js";
+export * from "./rank.js";
 export * from "./layouts.js";
 export * from "./drills.js";

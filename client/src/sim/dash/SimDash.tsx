@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { drillsForWeek } from "@shared/sim/drills";
+import { rankStatus, PLACEMENT_MATCHES } from "@shared/sim/rank";
 import { matchApi as defaultMatchApi, type MatchApi, type MatchPublic } from "../matchApi";
 import { MATCH_LIST_QUERY_KEY, MATCH_LIST_REFETCH_MS } from "../match/queryKeys";
 import { MatchList, hasLiveMatch } from "../match/MatchList";
@@ -28,6 +29,8 @@ export interface SimDashProps {
     onPractice: () => void;
     onDrills: () => void;
     onLobby: () => void;
+    /** 온라인 레이팅 칸을 누르면 랭킹 화면 */
+    onRank?: () => void;
     /** "matches" 면 마운트 때 대전 섹션으로 스크롤(진입 화면의 "내 대전") */
     initialSection?: "matches";
     /** 테스트 주입 */
@@ -65,7 +68,7 @@ function CardHeader({ title, sub, action }: { title: string; sub?: string; actio
     );
 }
 
-export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, initialSection, statsApi = fetchSimStats, matchApi = defaultMatchApi, now }: SimDashProps) {
+export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, onRank, initialSection, statsApi = fetchSimStats, matchApi = defaultMatchApi, now }: SimDashProps) {
     const { t } = useT();
     const stats = useQuery({ queryKey: SIM_STATS_QUERY_KEY, queryFn: statsApi, staleTime: 15_000 });
     const matches = useQuery({
@@ -160,7 +163,12 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, i
                                 <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(rating?.bestAvg ?? Math.max(...series.map((p) => p.avg)))} />
                                 <Tile label={t("sim.dash.kHighRun")} value={n(rating?.bestHighRun ?? Math.max(...series.map((p) => p.highRun)))} />
                                 <Tile label={t("sim.dash.kRank")} value={rank ? t("sim.dash.rankValue").replace("{r}", n(rank.rank)) : "–"} sub={rank ? t("sim.dash.rankOf").replace("{n}", n(rank.total)) : undefined} />
-                                <Tile label={t("sim.dash.kRating")} value={n(rating?.simRating ?? 1000)} sub={t("sim.dash.ratingSub").replace("{n}", n(rating?.matches ?? 0))} />
+                                <button type="button" onClick={onRank} aria-label={t("sim.rank.title")} className="text-left rounded-tile active:opacity-80" disabled={!onRank}>
+                                    <Tile
+                                        label={t("sim.dash.kRating")} value={n(rating?.simRating ?? 1000)}
+                                        sub={(() => { const st = rankStatus(rating?.simRating ?? 1000, rating?.matches ?? 0); return st.tier ? t(st.tier.nameKey) : t("sim.rank.unranked").replace("{n}", n(rating?.matches ?? 0)).replace("{m}", n(PLACEMENT_MATCHES)); })()}
+                                    />
+                                </button>
                                 <Tile label={t("sim.dash.kRecord")} value={t("sim.entry.record").replace("{w}", n(ms.wins)).replace("{l}", n(ms.losses))} />
                             </div>
 

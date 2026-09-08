@@ -147,6 +147,12 @@ router.patch("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any)
     if (Number.isInteger(by) && by >= 1920 && by <= 2020) updateData.birthYear = by;
     // 커뮤니티 실력 뱃지 숨김 토글
     if (typeof req.body.hideSkillBadge === "boolean") updateData.hideSkillBadge = req.body.hideSkillBadge;
+    // 국가(ISO 3166-1 alpha-2) — 온라인당구 게임 랭킹의 국가별 보기. 빈 문자열이면 지운다.
+    if (typeof req.body.country === "string") {
+        const c = req.body.country.toUpperCase();
+        if (/^[A-Z]{2}$/.test(c)) updateData.country = c;
+        else if (c === "") updateData.country = null;
+    }
 
     if (Object.keys(updateData).length > 0) {
         await storage.updateMember(member.id, updateData);

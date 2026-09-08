@@ -1,0 +1,31 @@
+/** 랭킹 화면 캡처 — 오너 쿠키, 읽기만(내 나라 추정 저장은 일어날 수 있음). `npx tsx scripts/sim-e2e/rank-capture.ts [base]` */
+import "dotenv/config";
+import { createHmac } from "crypto";
+import { mkdirSync } from "fs";
+import { chromium } from "playwright";
+const BASE = process.argv[2] || process.env.E2E_BASE || "http://localhost:5001";
+const OUT = process.env.OUT || "/private/tmp/claude-501/-Users-choejeonghwan-rankue-app/5779d2d1-b7e1-40c7-9c95-65cf3e0c9ae9/scratchpad/shots";
+const MEMBER = process.env.MEMBER_ID || "02fce921-5170-4c0e-9cc2-5be2906f0bb0";
+const secret = process.env.COOKIE_SECRET!;
+const sig = (v: string) => createHmac("sha256", secret).update(v).digest("base64").replace(/=+$/, "");
+mkdirSync(OUT, { recursive: true });
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "ko-KR" });
+await ctx.addCookies([{ name: "hiq_user_id", value: `s:${MEMBER}.${sig(MEMBER)}`, url: BASE }]);
+const page = await ctx.newPage();
+const text = async () => (await page.evaluate(() => document.body.innerText)).replace(/\n+/g, " | ");
+await page.goto(`${BASE}/online-game?rank=1`, { waitUntil: "networkidle" });
+await page.waitForSelector("[data-testid=rank-me]", { timeout: 20000 });
+await page.waitForTimeout(700);
+console.log("rank 3c:", (await text()).slice(0, 420));
+await page.screenshot({ path: `${OUT}/rank-1-3c.png`, fullPage: true });
+const chips = page.locator('[role=group][aria-label="종목·테이블 선택"] button');
+await chips.nth(3).click();
+await page.waitForTimeout(900);
+console.log("rank 4c 중대:", (await text()).slice(0, 420));
+await page.screenshot({ path: `${OUT}/rank-2-4c.png`, fullPage: true });
+// 대시보드의 레이팅 칸(연습 기록이 있을 때만 그려진다)
+await page.goto(`${BASE}/online-game?dash=1`, { waitUntil: "networkidle" });
+await page.waitForTimeout(1500);
+console.log("dash rating tile:", await page.evaluate(() => document.querySelector('button[aria-label="랭킹"]')?.textContent ?? "(연습 기록 없음 → 칸 없음)"));
+await browser.close();

@@ -50,6 +50,7 @@ import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
 import { SimEntry } from "./entry/SimEntry";
 import { SimDash } from "./dash/SimDash";
 import { RoomList } from "./match/RoomList";
+import { RankPage } from "./rank/RankPage";
 import { isCompleteCode, sanitizeCode } from "./matchApi";
 import { matchApi, type MatchPublic } from "./matchApi";
 import { MatchLobby } from "./match/MatchLobby";
@@ -161,15 +162,16 @@ export function SimulatorPage() {
     // ?lobby=1&public=1: 멀티방으로 열기 토글이 켜진 채 · ?lobby=1&tab=join&code=: 코드가 채워진 참가 화면(비밀번호 초대 등)
     const lobbyPublic = params.get("public") === "1";
     const lobbyCode = sanitizeCode(params.get("code") ?? "");
-    // ?rooms=1 멀티방 목록(2026-09-08 오너: 별도 카드)
+    // ?rooms=1 멀티방 목록(2026-09-08 오너: 별도 카드) · ?rank=1 온라인 대전 랭킹
     const roomsView = params.get("rooms") === "1";
+    const rankView = params.get("rank") === "1";
     // ?join=<code>[&auto=1]: 푸시 초대 딥링크. auto 면 비밀번호 없는 대기 방에 바로 참가, 아니면 코드가 채워진 참가 화면
     const joinCodeRaw = sanitizeCode(params.get("join") ?? "");
     const joinCode = isCompleteCode(joinCodeRaw) ? joinCodeRaw : "";
     const autoJoin = params.get("auto") === "1";
     const drillsView = params.get("drills") === "1";
     // 리플레이 링크(?replay=): 대전·로비·드릴·대시보드가 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
-    const overlayParam = !!matchId || lobby || drillsView || dashView || roomsView || joinCode !== "";
+    const overlayParam = !!matchId || lobby || drillsView || dashView || roomsView || rankView || joinCode !== "";
     const [replay] = useState<ReplayPayload | null>(() => (overlayParam ? null : decodeReplay(params.get(REPLAY_PARAM))));
     const [initial] = useState(() => (overlayParam || replay ? null : decodePageConfig(readCfgParam(search))));
     // 파라미터가 하나도 없으면 진입 화면(싱글 / 친구와 대전 / 멀티방)부터. cfg 가 있는데 깨졌으면 예전처럼 설정 창을 바로 연다.
@@ -890,6 +892,7 @@ export function SimulatorPage() {
     const showDrills = drillsView && sim.phase === "setup";
     const showDash = dashView && sim.phase === "setup";
     const showRooms = roomsView && sim.phase === "setup";
+    const showRank = rankView && sim.phase === "setup";
     const showEntry = entryView && sim.phase === "setup" && !setupOpen;
     const endSubtitle = sim.match
         ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t)
@@ -1097,6 +1100,7 @@ export function SimulatorPage() {
                         onJoin={() => navigate("/online-game?lobby=1&tab=join", { replace: true })}
                         onRooms={() => navigate("/online-game?rooms=1", { replace: true })}
                         onCreateRoom={() => navigate("/online-game?lobby=1&public=1", { replace: true })}
+                        onRank={() => navigate("/online-game?rank=1", { replace: true })}
                         onDash={() => navigate("/online-game?dash=1", { replace: true })}
                         onClose={() => navigate(EXIT_PATH)}
                     />
@@ -1110,6 +1114,11 @@ export function SimulatorPage() {
                         onClose={() => navigate("/online-game", { replace: true })}
                         myHandi={member ? { handi3c: member.handi3c, handi4c: member.handi4c } : undefined}
                     />
+                </div>
+            )}
+            {showRank && (
+                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                    <RankPage onClose={() => navigate("/online-game", { replace: true })} />
                 </div>
             )}
             {joinCode !== "" && sim.phase === "setup" && (
@@ -1126,6 +1135,7 @@ export function SimulatorPage() {
                         onPractice={() => { navigate("/online-game", { replace: true }); setSetupOpen(true); }}
                         onDrills={() => navigate("/online-game?drills=1", { replace: true })}
                         onLobby={() => navigate("/online-game?lobby=1", { replace: true })}
+                        onRank={() => navigate("/online-game?rank=1", { replace: true })}
                     />
                 </div>
             )}

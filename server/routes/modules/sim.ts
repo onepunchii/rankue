@@ -13,7 +13,7 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import {
     simulateShot, TABLES, DEFAULT_CUE, ENGINE_VERSION, paramsHash,
     type SimParams, type BallState, type ShotInput,
-    weekIdFor,
+    weekIdFor, PLACEMENT_MATCHES,
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot,
@@ -143,6 +143,16 @@ router.get("/sim/stats/me", requireAuth, asyncHandler(async (req: AuthRequest, r
         storage.simDrill.myWeeks(memberId, 12),
     ]);
     return sendSuccess(res, { ratings, sessions, ranks, drillWeeks, currentWeekId: weekIdFor(Date.now()) });
+}));
+
+// GET /sim/rank?gameType&tableId&country=KR|all — 온라인 대전 랭킹(배치 3판 뒤). country 없음/all = 전체, 있으면 그 나라(순위 번호는 전역).
+router.get("/sim/rank", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const gameType = req.query.gameType === "4c" ? "4c" : "3c";
+    const tableId = req.query.tableId === "JUNGDAE_KR" ? "JUNGDAE_KR" : "DAEDAE";
+    const raw = typeof req.query.country === "string" ? req.query.country.toUpperCase() : "";
+    const country = /^[A-Z]{2}$/.test(raw) ? raw : null;
+    const limit = Math.min(200, Math.max(10, Number(req.query.limit) || 100));
+    return sendSuccess(res, await storage.sim.rankLadder(req.userId!, gameType, tableId, country, limit, PLACEMENT_MATCHES));
 }));
 
 // GET /sim/sessions/:id — 상세(샷 로그 포함, 리플레이용)

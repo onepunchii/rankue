@@ -399,3 +399,15 @@ match/MatchLobby.tsx  만들기: "멀티방으로 열기" 토글(+비밀번호 4
 어드민   /admin/dashboard "온라인당구 게임" 탭 — GET /admin/online-game(storage.sim.adminOverview): 활성 이용자·세션·대전·멀티방·드릴·일별·종목별·상위 이용자·최근 대전.
 e2e     scripts/sim-e2e/rooms.ts(임시 회원 셋, 전부 삭제) · rooms-capture.ts · admin-check.ts · cleanup-temp.ts.
 ```
+
+## 온라인 대전 랭킹 (rank/, 2026-09-08)
+```
+shared/sim/rank.ts   티어(아이언 <950 · 브론즈 950 · 실버 1050 · 골드 1150 · 플래티넘 1250 · 다이아 1350 · 마스터 1450+), 배치 PLACEMENT_MATCHES=3, rankStatus(rating, matches).
+서버   GET /sim/rank?gameType&tableId&country=KR — 배치를 마친 선수만, rank() 전역 + partition by country. country 필터는 행만 거르고 순위 번호는 전역. me 는 배치 전이어도 레이팅·판 수.
+       PATCH /me { country: "KR" | "" } — ISO alpha-2 대문자만, 빈 문자열은 지움.
+rank/country.ts     guessCountry(언어 태그 지역) · COUNTRY_OPTIONS · countryName(Intl.DisplayNames).
+rank/rankApi.ts     getLadder · setCountry, parseRankLadder.
+rank/RankPage.tsx   `?rank=1`: 종목·테이블 칩 → 범위(전체 / 내 나라 / 나라 고르기 select) → 내 카드(TierBadge·레이팅·#순위/전체·다음 티어까지·국가 순위·내 나라 select) → 목록(내 행 border-brand).
+                    내 나라가 없으면 기기 언어의 지역으로 한 번 저장. 진입: 멀티방 카드 "랭킹" 알약, 대시보드 온라인 레이팅 칸(티어 표시).
+테스트 shared/sim/rank.test.ts · rank/rankApi.test.ts · rank/RankPage.test.ts · e2e scripts/sim-e2e/rank.ts(임시 회원 넷, 삭제) · rank-capture.ts.
+```

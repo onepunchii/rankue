@@ -215,6 +215,43 @@ export class SimRepository {
         };
     }
 
+    /**
+     * 온라인 대전 랭킹(종목·테이블별). 배치(대전 3판) 를 마친 선수만 순위에 오르고, 전체 순위는 국가 필터와 무관하게 전역이다.
+     * country 가 있으면 그 나라 행만 돌려준다(순위 번호는 전역 그대로 + 국가 순위). me 는 배치 전이어도 레이팅·판 수를 준다.
+     */
+    async rankLadder(memberId: string, gameType: "3c" | "4c", tableId: "DAEDAE" | "JUNGDAE_KR", country: string | null, limit = 100, placement = 3) {
+        const ranked = sql`
+            select r.member_id, mem.name, mem.country, r.sim_rating, r.matches, r.wins,
+                   rank() over (order by r.sim_rating desc, r.wins desc, r.matches asc) as rank,
+                   rank() over (partition by mem.country order by r.sim_rating desc, r.wins desc, r.matches asc) as country_rank
+            from hiq_sim_ratings r join hiq_members mem on mem.id = r.member_id
+            where r.game_type = ${gameType} and r.table_id = ${tableId} and r.matches >= ${placement}`;
+        const rows = (await db.execute(sql`
+            select * from (${ranked}) x where ${country}::text is null or x.country = ${country}::text order by x.rank asc limit ${limit}`)).rows as Record<string, unknown>[];
+        const countries = (await db.execute(sql`
+            select country, count(*)::int as players from (${ranked}) x group by country order by players desc, country asc nulls last`)).rows as Record<string, unknown>[];
+        const [total] = (await db.execute(sql`select count(*)::int as n from (${ranked}) x`)).rows as { n: number }[];
+        const [meRanked] = (await db.execute(sql`select * from (${ranked}) x where x.member_id = ${memberId}`)).rows as Record<string, unknown>[];
+        const [meRow] = (await db.execute(sql`
+            select r.sim_rating, r.matches, r.wins, mem.country from hiq_sim_ratings r join hiq_members mem on mem.id = r.member_id
+            where r.member_id = ${memberId} and r.game_type = ${gameType} and r.table_id = ${tableId}`)).rows as Record<string, unknown>[];
+        const [meCountry] = (await db.execute(sql`select country from hiq_members where id = ${memberId}`)).rows as { country: string | null }[];
+        const n = (v: unknown) => Number(v ?? 0);
+        const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
+        return {
+            rows: rows.map((r) => ({
+                memberId: String(r.member_id), name: String(r.name), country: str(r.country),
+                rating: n(r.sim_rating), matches: n(r.matches), wins: n(r.wins), rank: n(r.rank), countryRank: n(r.country_rank),
+            })),
+            total: n(total?.n),
+            countries: countries.map((c) => ({ country: str(c.country), players: n(c.players) })),
+            me: meRow ? {
+                rating: n(meRow.sim_rating), matches: n(meRow.matches), wins: n(meRow.wins), country: str(meRow.country),
+                rank: meRanked ? n(meRanked.rank) : null, countryRank: meRanked && meRanked.country ? n(meRanked.country_rank) : null,
+            } : { rating: 1000, matches: 0, wins: 0, country: meCountry?.country ?? null, rank: null, countryRank: null },
+        };
+    }
+
     async getShots(sessionId: string): Promise<HiqSimShot[]> {
         return db.select().from(hiqSimShots)
             .where(eq(hiqSimShots.sessionId, sessionId))

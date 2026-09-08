@@ -19,7 +19,7 @@ import { ENTRY_LAST_KEY, entryOrder, formatAvg, matchRecord, practiceSummary, ty
  *  - 위: 살아 있는 3D 테이블(EntryShowcase) — 그림 파일 없이 렌더러가 그린다.
  *  - 싱글: 카드를 누르면 설정 창(SimSetupDialog). 큰 숫자는 연습 에버, 알약: 연습 시작 · 이번 주 드릴 s/n(점 다섯 개).
  *  - 친구와 대전: 카드를 누르면 로비(초대 만들기). 큰 숫자는 승·패, 내 차례가 있으면 brand 테두리 배지. 알약: 코드로 참가(노란색). 내 대전 목록은 대시보드(2026-09-08 오너: "내 대전은 빼고").
- *  - 멀티방(2026-09-08 오너, 별도 카드): 공개 방 목록 — 큰 숫자는 지금 열린 방 수. 알약: 방 목록 · 방 만들기.
+ *  - 멀티방(2026-09-08 오너, 별도 카드): 공개 방 목록 — 큰 숫자는 지금 열린 방 수. 알약: 방 목록 · 방 만들기 · 랭킹.
  *  - 마지막에 고른 쪽이 위(기기 저장 "rankue.sim.entry")이고, 위 카드의 주 동작만 초록 버튼이다(화면의 초록 하나).
  * 데이터는 대시보드 배너·기록 카드와 같은 쿼리 키를 써서 캐시를 공유한다.
  */
@@ -31,6 +31,8 @@ export interface SimEntryProps {
     /** 멀티방 목록 / 멀티방으로 열기(로비의 공개 토글 켜진 채) */
     onRooms: () => void;
     onCreateRoom: () => void;
+    /** 온라인 대전 랭킹(국가별·티어) */
+    onRank: () => void;
     /** 머리글 닫기 옆 "대시보드" — 기록·그래프·내 대전 */
     onDash: () => void;
     onClose: () => void;
@@ -46,7 +48,7 @@ function writeLast(v: EntryChoice): void {
 const pill = "h-10 px-3.5 inline-flex items-center gap-1.5 rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3";
 const primary = "h-11 px-5 inline-flex items-center rounded-pill bg-brand text-brand-fg text-[14px] font-semibold active:bg-brand-strong";
 
-export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreateRoom, onDash, onClose }: SimEntryProps) {
+export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreateRoom, onRank, onDash, onClose }: SimEntryProps) {
     const { t } = useT();
     const { member } = useAuth();
     const ratings = useQuery<EntryRating[]>({
@@ -173,6 +175,7 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
             <div className="px-5 pb-4 flex flex-wrap items-center gap-2">
                 <button type="button" onClick={() => pick("rooms")} className={top === "rooms" ? primary : pill}>{t("sim.entry.roomList")}</button>
                 <button type="button" onClick={() => { writeLast("rooms"); onCreateRoom(); }} className={pill}>{t("sim.entry.roomCreate")}</button>
+                <button type="button" onClick={() => { writeLast("rooms"); onRank(); }} className={pill}>{t("sim.rank.title")}</button>
             </div>
         </section>
     );

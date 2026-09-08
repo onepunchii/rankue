@@ -565,7 +565,7 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
 export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", showTabs = false, pollMs = 2000, initialPublic = false, initialCode }: MatchLobbyProps) {
     const { t } = useT();
     const [tab, setTab] = useState<LobbyTab>(initialTab);
-    const title = showTabs ? t("sim.match.title") : tab === "create" ? t("sim.entry.create") : t("sim.entry.join");
+    const title = showTabs ? t("sim.match.title") : tab === "create" ? (initialPublic ? t("sim.entry.roomCreate") : t("sim.entry.create")) : t("sim.entry.join");
 
     return (
         <div className="flex flex-col gap-4 w-full max-w-[420px] mx-auto px-5 pt-4 pb-6">

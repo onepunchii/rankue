@@ -1,0 +1,207 @@
+/**
+ * 온라인 대전 랭킹(2026-09-08 오너: "랭킹제 · 국가별 · 랭커 게임처럼"). `/online-game?rank=1`.
+ * 위: 종목·테이블 칩 → 범위(전체 / 내 나라 / 나라 고르기) → 내 카드(티어 배지·레이팅·전역 순위·국가 순위·전적, 배치 전엔 "배치 중 n/3") → 순위 목록.
+ * 내 나라가 없으면 기기 언어의 지역으로 한 번 저장하고(PATCH /me), 카드의 "내 나라 바꾸기"로 고친다. 값은 온라인 대전 Elo 뿐 — 실전 RP 와 무관.
+ */
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useT } from "@/lib/i18n";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
+import { rankStatus, tierFor, PLACEMENT_MATCHES, type Tier } from "@shared/sim/rank";
+import type { DashGameType, DashTableId } from "../dash/dashApi";
+import { gameLabel } from "../match/matchView";
+import { COUNTRY_OPTIONS, countryName, guessCountry, isCountryCode } from "./country";
+import { rankApi as defaultApi, RANK_QUERY_KEY, type RankApi, type RankRow } from "./rankApi";
+
+export interface RankPageProps {
+    onClose: () => void;
+    api?: RankApi;
+    /** 처음 보여줄 종목·테이블 */
+    initial?: { gameType: DashGameType; tableId: DashTableId };
+}
+
+const COMBOS: readonly { gameType: DashGameType; tableId: DashTableId }[] = [
+    { gameType: "3c", tableId: "DAEDAE" }, { gameType: "3c", tableId: "JUNGDAE_KR" }, { gameType: "4c", tableId: "DAEDAE" }, { gameType: "4c", tableId: "JUNGDAE_KR" },
+];
+const pill = "h-10 px-3.5 shrink-0 inline-flex items-center rounded-pill border text-[13px] font-semibold";
+const chipOn = "border-ink-1 bg-ink-1 text-surface-1";
+const chipOff = "border-surface-line bg-surface-1 text-ink-2 active:bg-surface-3";
+
+/** 티어 배지: 방패 모양(단색) + 이름. 마스터만 gold, 골드~다이아는 brand, 그 아래는 잉크. */
+export function TierBadge({ tier, size = "md" }: { tier: Tier | null; size?: "sm" | "md" }) {
+    const { t } = useT();
+    const tone = !tier ? "bg-surface-3 text-ink-3" : tier.id === "master" ? "text-gold" : tier.id === "gold" || tier.id === "platinum" || tier.id === "diamond" ? "bg-brand/[0.1] text-brand" : "bg-surface-3 text-ink-2";
+    const style = tier?.id === "master" ? { backgroundColor: "var(--gold-soft)" } : undefined;
+    return (
+        <span className={cn("inline-flex items-center gap-1 rounded-pill font-bold", size === "sm" ? "h-6 px-2 text-[11px]" : "h-8 px-3 text-[13px]", tone)} style={style}>
+            <svg width={size === "sm" ? 11 : 14} height={size === "sm" ? 12 : 16} viewBox="0 0 14 16" aria-hidden="true">
+                <path d="M7 1 12.5 3v5c0 3.4-2.3 5.9-5.5 7C3.8 13.9 1.5 11.4 1.5 8V3Z" fill="currentColor" opacity={tier ? 1 : 0.35} />
+            </svg>
+            {tier ? t(tier.nameKey) : t("sim.rank.unrankedShort")}
+        </span>
+    );
+}
+
+function Row({ r, me, locale }: { r: RankRow; me: boolean; locale: string }) {
+    const { t } = useT();
+    return (
+        <li className={cn("rounded-tile border bg-surface-1 px-4 py-3 flex items-center gap-3", me ? "border-brand" : "border-surface-line")} aria-current={me ? "true" : undefined}>
+            <span className="rk-num w-8 shrink-0 text-[16px] font-bold text-ink-1 text-center">{r.rank}</span>
+            <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[14px] font-semibold text-ink-1 truncate">{r.name}</span>
+                    {r.country && <span className="rk-chip bg-surface-3 text-ink-3 text-[10px]" title={countryName(r.country, locale)}>{r.country}</span>}
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <TierBadge tier={tierFor(r.rating)} size="sm" />
+                    <span className="rk-num text-[11px] font-medium text-ink-3">{t("sim.entry.record").replace("{w}", String(r.wins)).replace("{l}", String(r.matches - r.wins))}</span>
+                </span>
+            </span>
+            <span className="rk-num text-[18px] font-bold text-ink-1 shrink-0">{r.rating}</span>
+        </li>
+    );
+}
+
+export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) {
+    const { t, locale } = useT();
+    const { member } = useAuth();
+    const qc = useQueryClient();
+    const [combo, setCombo] = useState(initial ?? COMBOS[0]);
+    const [scope, setScope] = useState<"all" | "mine" | "pick">("all");
+    const [picked, setPicked] = useState<string>("");
+    const myCountry = member?.country && isCountryCode(member.country) ? member.country : null;
+    const country = scope === "all" ? null : scope === "mine" ? myCountry : picked || null;
+    const q = useQuery({
+        queryKey: [...RANK_QUERY_KEY, combo.gameType, combo.tableId, country ?? "all"],
+        queryFn: () => api.getLadder({ gameType: combo.gameType, tableId: combo.tableId, country }),
+        staleTime: 15_000,
+    });
+
+    // 내 나라가 비어 있으면 기기 언어의 지역으로 한 번 저장한다
+    const [guessed, setGuessed] = useState(false);
+    useEffect(() => {
+        if (!member || myCountry || guessed) return;
+        setGuessed(true);
+        const g = guessCountry();
+        if (!g) return;
+        api.setCountry(g).then(() => { void qc.invalidateQueries({ queryKey: ["/api/hiq/me"] }); void qc.invalidateQueries({ queryKey: RANK_QUERY_KEY }); }, () => undefined);
+    }, [member, myCountry, guessed, api, qc]);
+
+    const changeCountry = async (code: string) => {
+        if (!isCountryCode(code)) return;
+        try {
+            await api.setCountry(code);
+            void qc.invalidateQueries({ queryKey: ["/api/hiq/me"] });
+            void qc.invalidateQueries({ queryKey: RANK_QUERY_KEY });
+        } catch { /* 다음에 다시 */ }
+    };
+
+    const data = q.data;
+    const status = data ? rankStatus(data.me.rating, data.me.matches) : null;
+    const options = useMemo(() => {
+        const set = new Set<string>(COUNTRY_OPTIONS);
+        for (const c of data?.countries ?? []) if (c.country) set.add(c.country);
+        return [...set].map((code) => ({ code, name: countryName(code, locale) })).sort((a, b) => a.name.localeCompare(b.name, locale));
+    }, [data, locale]);
+    const n = (v: number) => String(v);
+
+    return (
+        <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
+            <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="min-w-0">
+                    <h1 className="text-[20px] font-bold text-ink-1 leading-tight">{t("sim.rank.title")}</h1>
+                    <p className="text-[12.5px] font-medium text-ink-3 mt-0.5">{t("sim.rank.sub").replace("{n}", n(PLACEMENT_MATCHES))}</p>
+                </div>
+                <button type="button" onClick={onClose} className="h-11 px-4 shrink-0 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2 active:bg-surface-3">
+                    {t("sim.common.close")}
+                </button>
+            </div>
+
+            <div role="group" aria-label={t("sim.dash.filterAria")} className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 mb-2">
+                {COMBOS.map((c) => {
+                    const sel = c.gameType === combo.gameType && c.tableId === combo.tableId;
+                    return (
+                        <button key={`${c.gameType}-${c.tableId}`} type="button" aria-pressed={sel} onClick={() => setCombo(c)} className={cn(pill, sel ? chipOn : chipOff)}>
+                            {gameLabel(c, t)}
+                        </button>
+                    );
+                })}
+            </div>
+            <div role="group" aria-label={t("sim.rank.scopeAria")} className="flex items-center gap-2 flex-wrap mb-3">
+                <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className={cn(pill, scope === "all" ? chipOn : chipOff)}>{t("sim.rank.scopeAll")}</button>
+                <button type="button" aria-pressed={scope === "mine"} onClick={() => setScope("mine")} disabled={!myCountry} className={cn(pill, scope === "mine" ? chipOn : chipOff, !myCountry && "opacity-40")}>
+                    {myCountry ? t("sim.rank.scopeMine").replace("{c}", myCountry) : t("sim.rank.countryUnset")}
+                </button>
+                <label className={cn(pill, scope === "pick" ? chipOn : chipOff, "gap-1.5 cursor-pointer")}>
+                    <span>{t("sim.rank.scopePick")}</span>
+                    <select
+                        aria-label={t("sim.rank.scopePick")} value={picked} onChange={(e) => { setPicked(e.target.value); setScope("pick"); }}
+                        className="bg-transparent text-inherit text-[13px] font-semibold outline-none max-w-[110px]"
+                    >
+                        <option value="">–</option>
+                        {options.map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}
+                    </select>
+                </label>
+            </div>
+
+            {q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.rank.loading")}</p>}
+            {q.isError && (
+                <div className="flex items-center justify-between gap-3 min-h-11">
+                    <p className="text-[13px] font-medium text-ink-2">{t("sim.rank.failed")}</p>
+                    <button type="button" onClick={() => { void q.refetch(); }} className={cn(pill, chipOff)}>{t("sim.match.retry")}</button>
+                </div>
+            )}
+
+            {data && status && (
+                <div className={cn("flex flex-col gap-3", q.isFetching && "opacity-80")}>
+                    <section className="rounded-card bg-surface-1 border border-surface-line rk-shadow p-4" aria-label={t("sim.rank.myTitle")} data-testid="rank-me">
+                        <div className="flex items-center justify-between gap-2">
+                            <TierBadge tier={status.tier} />
+                            <span className="rk-num text-[12px] font-medium text-ink-3">{t("sim.entry.record").replace("{w}", n(data.me.wins)).replace("{l}", n(data.me.matches - data.me.wins))}</span>
+                        </div>
+                        <div className="flex items-baseline gap-3 mt-2 flex-wrap">
+                            <span className="text-[44px] font-bold text-ink-1 leading-none tracking-tight" data-rating>{data.me.rating}</span>
+                            <span className="rk-num text-[13px] font-semibold text-ink-2">
+                                {status.placed && data.me.rank !== null
+                                    ? t("sim.rank.rankOf").replace("{r}", n(data.me.rank)).replace("{n}", n(data.total))
+                                    : t("sim.rank.unranked").replace("{n}", n(data.me.matches)).replace("{m}", n(PLACEMENT_MATCHES))}
+                            </span>
+                        </div>
+                        <p className="rk-num text-[12.5px] font-medium text-ink-3 mt-2">
+                            {!status.placed
+                                ? t("sim.rank.placementHint").replace("{n}", n(status.placementLeft))
+                                : status.toNext !== null
+                                    ? t("sim.rank.nextTier").replace("{tier}", t(tierFor(data.me.rating + status.toNext).nameKey)).replace("{n}", n(status.toNext))
+                                    : t("sim.rank.topTier")}
+                            {status.placed && myCountry && data.me.countryRank !== null && ` · ${t("sim.rank.countryRankOf").replace("{c}", myCountry).replace("{r}", n(data.me.countryRank))}`}
+                        </p>
+                        <label className="mt-3 flex items-center justify-between gap-2 text-[12px] font-medium text-ink-3">
+                            <span>{t("sim.rank.countryChange")}{myCountry ? ` · ${countryName(myCountry, locale)}` : ""}</span>
+                            <select
+                                aria-label={t("sim.rank.countryChange")} value={myCountry ?? ""} onChange={(e) => { void changeCountry(e.target.value); }}
+                                className="h-9 rounded-lg border border-surface-line bg-surface-1 px-2 text-[12px] font-semibold text-ink-2 max-w-[150px]"
+                            >
+                                <option value="">–</option>
+                                {options.map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}
+                            </select>
+                        </label>
+                    </section>
+
+                    {data.rows.length === 0 ? (
+                        <section className="rounded-card bg-surface-1 border border-surface-line rk-shadow p-4">
+                            <p className="text-[15px] font-bold text-ink-1">{t("sim.rank.empty")}</p>
+                            <p className="text-[13px] font-medium text-ink-3 mt-1">{t("sim.rank.emptyDesc").replace("{n}", n(PLACEMENT_MATCHES))}</p>
+                        </section>
+                    ) : (
+                        <ol className="space-y-2" aria-label={t("sim.rank.listAria")}>
+                            {data.rows.map((r) => <Row key={r.memberId} r={r} me={!!member && r.memberId === member.id} locale={locale} />)}
+                        </ol>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default RankPage;
