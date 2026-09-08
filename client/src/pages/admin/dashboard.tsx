@@ -104,8 +104,9 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
     ];
 
     return (
-        <div className="flex flex-col h-full bg-white border-r border-black/10">
-            <div className="p-6 border-b border-black/10">
+        // 모바일 서랍에서도 메뉴가 다 보이게: 가운데 목록만 스크롤(머리글·로그아웃은 고정), min-h-0 이 없으면 flex 자식이 안 줄어 스크롤이 안 생긴다
+        <div className="flex flex-col h-full min-h-0 bg-white border-r border-black/10">
+            <div className="shrink-0 p-6 border-b border-black/10">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                         <LucideGlobe className="w-5 h-5 text-white" />
@@ -117,7 +118,7 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
                 </div>
             </div>
 
-            <nav className="flex-1 p-4 space-y-1">
+            <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-1">
                 {menuItems.map((item) => (
                     <button
                         key={item.id}
@@ -136,7 +137,7 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
                 ))}
             </nav>
 
-            <div className="p-4 border-t border-black/10">
+            <div className="shrink-0 p-4 border-t border-black/10" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-500/10 transition">
                     <LucideLogOut size={18} />
                     로그아웃
@@ -152,6 +153,8 @@ export default function AdminDashboard() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    // 모바일 메뉴 서랍(열림 상태를 들고 있어야 메뉴를 고를 때 닫을 수 있다)
+    const [menuOpen, setMenuOpen] = useState(false);
     const [tab, setTab] = useState<"dashboard" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game">("dashboard");
     const [memberSearch, setMemberSearch] = useState("");
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
@@ -362,14 +365,15 @@ export default function AdminDashboard() {
                     </div>
                     <span className="font-black text-brand">ADMIN</span>
                 </div>
-                <Sheet>
+                <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
                     <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-[rgba(0,0,0,0.87)]">
+                        <Button variant="ghost" size="icon" aria-label="메뉴" className="text-[rgba(0,0,0,0.87)]">
                             <LucideMenu />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="p-0 border-r border-black/10 w-72 bg-white">
-                        <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} />
+                    {/* 서랍도 화면 높이에 맞춰 세로 flex — 안의 메뉴가 스크롤된다. 고르면 닫힌다. */}
+                    <SheetContent side="left" className="p-0 border-r border-black/10 w-72 max-w-[85vw] bg-white flex flex-col h-full">
+                        <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} closeMobileMenu={() => setMenuOpen(false)} />
                     </SheetContent>
                 </Sheet>
             </div>
@@ -1103,6 +1107,11 @@ function getTabTitle(tab: string) {
         case "moderation": return "신고/제재 센터";
         case "golf-orders": return "골프 회원권 접수 현황";
         case "online-game": return "온라인게임 이용 현황";
+        // 빠져 있던 탭들 — 모바일에선 머리글이 지금 어느 화면인지 알려 주는 유일한 표시라 전부 채운다(2026-09-08)
+        case "claims": return "매장 클레임";
+        case "registrations": return "신규 매장 등록";
+        case "crews": return "크루 현황";
+        case "push": return "푸시 발송";
         default: return "Admin";
     }
 }
