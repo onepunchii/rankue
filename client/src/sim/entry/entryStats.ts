@@ -53,12 +53,26 @@ export function formatAvg(avg: number): string {
     return (Number.isFinite(avg) ? avg : 0).toFixed(2);
 }
 
-export type EntryChoice = "single" | "multi" | "rooms";
+export type EntryChoice = "single" | "multi" | "rooms" | "path";
 export const ENTRY_LAST_KEY = "rankue.sim.entry";
-const ENTRY_DEFAULT: readonly EntryChoice[] = ["single", "multi", "rooms"];
+const ENTRY_DEFAULT: readonly EntryChoice[] = ["single", "multi", "rooms", "path"];
 
-/** 마지막에 고른 카드가 위, 나머지는 기본 순서(싱글 · 친구와 대전 · 멀티방). 저장값이 없거나 이상하면 기본 순서. */
+/** 마지막에 고른 카드가 위, 나머지는 기본 순서(싱글 · 친구와 대전 · 멀티방 · 길 찾기). 저장값이 없거나 이상하면 기본 순서. */
 export function entryOrder(last: string | null | undefined): readonly EntryChoice[] {
     const pick = ENTRY_DEFAULT.find((k) => k === last);
     return pick ? [pick, ...ENTRY_DEFAULT.filter((k) => k !== pick)] : ENTRY_DEFAULT;
+}
+
+/** 길 찾기: 이 기기에서 배치를 몇 번 찾아봤는지(서버에 남기지 않는다 — 개인 연습 기록). */
+export const PATH_COUNT_KEY = "rankue.sim.pathCount";
+export function readPathCount(store: { getItem(k: string): string | null } | null | undefined): number {
+    try {
+        const n = Number(store?.getItem(PATH_COUNT_KEY) ?? "0");
+        return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    } catch { return 0; }
+}
+export function bumpPathCount(store: { getItem(k: string): string | null; setItem(k: string, v: string): void } | null | undefined): number {
+    const next = readPathCount(store) + 1;
+    try { store?.setItem(PATH_COUNT_KEY, String(next)); } catch { /* 저장 불가 */ }
+    return next;
 }

@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
+import { randomLayout } from "@shared/sim/randomLayout";
 import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome, SHOT_CLOCK_STRIKES } from "@shared/sim/rules";
 import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
@@ -49,6 +50,7 @@ import { createNumbersCache, overlayDiamond, readDiamondPref, shotReadout, write
 import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
 import { SimEntry } from "./entry/SimEntry";
 import { ENTRY_STYLE } from "./entry/entryTheme";
+import { bumpPathCount } from "./entry/entryStats";
 import { SimDash } from "./dash/SimDash";
 import { RoomList } from "./match/RoomList";
 import { RankPage } from "./rank/RankPage";
@@ -172,8 +174,10 @@ export function SimulatorPage() {
     const joinCode = isCompleteCode(joinCodeRaw) ? joinCodeRaw : "";
     const autoJoin = params.get("auto") === "1";
     const drillsView = params.get("drills") === "1";
+    // 길 찾기(?path=1, 2026-09-08 오너): 공을 놓고 3쿠션 해법을 찾는 연습 세션. 오버레이가 아니라 세션이라 overlayParam 에는 넣지 않는다.
+    const pathView = params.get("path") === "1";
     // 리플레이 링크(?replay=): 대전·로비·드릴·대시보드가 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
-    const overlayParam = !!matchId || lobby || drillsView || dashView || roomsView || rankView || joinCode !== "";
+    const overlayParam = !!matchId || lobby || drillsView || dashView || roomsView || rankView || joinCode !== "" || pathView;
     const [replay] = useState<ReplayPayload | null>(() => (overlayParam ? null : decodeReplay(params.get(REPLAY_PARAM))));
     const [initial] = useState(() => (overlayParam || replay ? null : decodePageConfig(readCfgParam(search))));
     // 파라미터가 하나도 없으면 진입 화면(싱글 / 친구와 대전 / 멀티방)부터. cfg 가 있는데 깨졌으면 예전처럼 설정 창을 바로 연다.
@@ -858,6 +862,24 @@ export function SimulatorPage() {
         actions.start(buildConfig({ gameType: "3c", tableId: week.tableId, target: 100, rules: { ruleSet: "umb" } }), { record: false, balls: d.balls });
     }, [actions]);
 
+    // 길 찾기: 무작위 배치로 연습 세션을 연다(기록 없음). 공은 손가락으로 옮길 수 있고, 툴바의 "길 찾기"가 해법을 찾는다.
+    const pathSeedRef = useRef(1);
+    const startPath = useCallback((seed: number) => {
+        const table = TABLES.DAEDAE;
+        pathSeedRef.current = seed;
+        setLog(EMPTY_LOG);
+        setBanner(null);
+        actions.start(buildConfig({ gameType: "3c", tableId: "DAEDAE", target: 100, rules: { ruleSet: "umb" } }), {
+            record: false, balls: randomLayout("3c", table, seed),
+        });
+    }, [actions]);
+    const pathStartedRef = useRef(false);
+    useEffect(() => {
+        if (!pathView || pathStartedRef.current) return;
+        pathStartedRef.current = true;
+        startPath(Math.floor(Date.now() % 100000) + 1);
+    }, [pathView, startPath]);
+
     const openSolver = useCallback(() => {
         if (!sim.config || !sim.params || sim.phase !== "aim") return;
         setSolverOpen(true);
@@ -868,6 +890,15 @@ export function SimulatorPage() {
         });
     }, [sim.config, sim.params, sim.phase, sim.balls, sim.cueBallId, sim.session, solver]);
     const retrySolver = useCallback(() => { solverSeedRef.current += 1; openSolver(); }, [openSolver]);
+    // 길 찾기에서 결과가 나오면 이 기기의 "찾아본 배치" 수를 올린다(서버에 남기지 않는다)
+    const pathCountedRef = useRef("");
+    useEffect(() => {
+        if (!pathView || solver.status !== "done") return;
+        const key = `${solver.result?.candidates.length ?? 0}:${sim.balls.map((b) => b.r.join(",")).join("|")}`;
+        if (pathCountedRef.current === key) return;
+        pathCountedRef.current = key;
+        bumpPathCount(safeLocalStorage());
+    }, [pathView, solver.status, solver.result, sim.balls]);
     const onSolverPreview = useCallback((c: SolveCandidate | null) => {
         if (!c || !sim.config) { setSolverPreview(null); return; }
         setSolverPreview({ candidate: c, paths: buildPreviewPaths(c.result, { cueBallId: sim.cueBallId, gameType: sim.config.gameType }) });
@@ -923,7 +954,9 @@ export function SimulatorPage() {
             active: thetaDeg > 0, caption: thetaDeg > 0 ? `${thetaDeg}°` : null, disabled: !aiming,
         },
     ];
-    if (solverAllowed) railAim.push({ id: "solver", label: t("sim.solver.button"), icon: <SolverIcon />, onPress: openSolver, disabled: !aiming });
+    if (solverAllowed) railAim.push({ id: "solver", label: pathView ? t("sim.path.title") : t("sim.solver.button"), icon: <SolverIcon />, onPress: openSolver, disabled: !aiming });
+    // 길 찾기 전용: 배치를 새로 뽑는다(공은 손가락으로도 옮길 수 있다)
+    if (pathView) railAim.push({ id: "path-random", label: t("sim.path.random"), icon: <ResetIcon />, onPress: () => startPath(pathSeedRef.current + 1), disabled: sim.phase === "shooting" });
     const railToggles: RailItem[] = [];
     if (is3c) railToggles.push({ id: "diamond", label: t("sim.diamond.toggleLabel"), hint: t("sim.diamond.toggle"), icon: <DiamondIcon />, toggle: true, active: diamond, onPress: onToggleDiamond });
     if (viewSupported) railToggles.push({ id: "view", label: t("sim.hud.view3d"), icon: <CubeIcon />, toggle: true, active: cameraView === "player", onPress: onToggleView });
@@ -952,11 +985,12 @@ export function SimulatorPage() {
             }}
         >
             <div className="flex-1 min-h-0 w-full max-w-[640px] mx-auto flex flex-col">
+                {/* 길 찾기 화면에선 머리글의 "길 찾기" 알약이 곧 해법 찾기 버튼(이닝 시트 대신) */}
                 <TopBar
                     session={sim.session} config={sim.config} phase={sim.phase} names={names}
                     record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
-                    drillName={drill ? t(drill.drill.nameKey) : null}
-                    onSummary={onInnings}
+                    drillName={drill ? t(drill.drill.nameKey) : pathView ? t("sim.path.chip") : null}
+                    onSummary={pathView ? openSolver : onInnings}
                     onBack={isMatch ? onExitRequest : undefined}
                     clock={clock}
                     strikes={strikes}
@@ -1086,7 +1120,7 @@ export function SimulatorPage() {
                             </div>
                         </div>
                     )}
-                    {coachOpen && sim.phase === "aim" && sim.mode === "solo" && <CoachHint onClose={closeCoach} />}
+                    {coachOpen && !pathView && sim.phase === "aim" && sim.mode === "solo" && <CoachHint onClose={closeCoach} />}
                     {!coachOpen && realityOpen && reality && sim.phase === "aim" && <RealityHint onClose={closeReality} />}
                     {/* 결과 배너: 두께 독 위, 오른쪽 열 왼쪽 — 테이블 아래쪽 가운데 */}
                     <div className="absolute left-0 right-[60px] top-0 z-[3] pointer-events-none" style={{ bottom: DOCK_HEIGHT + 8 }}>
@@ -1113,6 +1147,7 @@ export function SimulatorPage() {
                         onRooms={() => navigate("/online-game?rooms=1", { replace: true })}
                         onCreateRoom={() => navigate("/online-game?lobby=1&public=1", { replace: true })}
                         onRank={() => navigate("/online-game?rank=1", { replace: true })}
+                        onPath={() => navigate("/online-game?path=1", { replace: true })}
                         onDash={() => navigate("/online-game?dash=1", { replace: true })}
                         onClose={() => navigate(EXIT_PATH)}
                     />
@@ -1173,6 +1208,7 @@ export function SimulatorPage() {
                 onSpin={onSpin} onElevation={onElevation}
             />
             <SolverSheet
+                titleKey={pathView ? "sim.path.title" : undefined}
                 open={solverOpen}
                 onOpenChange={(o) => { if (!o) solver.cancel(); setSolverOpen(o); }}
                 status={solver.status} progress={solver.progress}

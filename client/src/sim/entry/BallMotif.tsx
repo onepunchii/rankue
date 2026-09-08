@@ -1,6 +1,18 @@
-/** 카드·설정 창 모티프: 우리 공(크림 백구 + 빨간 점 둘 / 백구 + 노란 공 / 멀티방은 세 공). 색은 공 토큰(ball-*), 그라데이션 없음. */
-export function BallMotif({ kind, size = 52 }: { kind: "single" | "multi" | "rooms"; size?: number }) {
+/** 카드·설정 창 모티프: 우리 공(크림 백구 + 빨간 점 둘 / 백구 + 노란 공 / 멀티방은 세 공 / 길 찾기는 백구에서 뻗는 길). 색은 공 토큰(ball-*), 그라데이션 없음. */
+export function BallMotif({ kind, size = 52 }: { kind: "single" | "multi" | "rooms" | "path"; size?: number }) {
     const edge = "rgba(0,0,0,0.14)";
+    if (kind === "path") {
+        // 백구에서 나가 쿠션을 돌아 적구로 가는 길(점선) — 3쿠션 전용 카드
+        return (
+            <svg width={size} height={size} viewBox="0 0 52 52" aria-hidden="true" className="shrink-0">
+                <path d="M14 36 L46 22 L8 14 L40 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeDasharray="3 3" opacity="0.6" />
+                <circle cx="40" cy="8" r="6.5" className="fill-ball-red" stroke={edge} strokeWidth="1" />
+                <circle cx="44" cy="34" r="6.5" className="fill-ball-yellow" stroke={edge} strokeWidth="1" />
+                <circle cx="14" cy="36" r="9" className="fill-ball-white" stroke={edge} strokeWidth="1" />
+                <circle cx="12" cy="34" r="1.8" className="fill-ball-red" />
+            </svg>
+        );
+    }
     if (kind === "rooms") {
         return (
             <svg width={size} height={size} viewBox="0 0 52 52" aria-hidden="true" className="shrink-0">

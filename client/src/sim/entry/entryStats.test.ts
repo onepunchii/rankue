@@ -23,9 +23,9 @@ describe("entryStats", () => {
         expect(formatAvg(Number.NaN)).toBe("0.00");
     });
     it("마지막에 고른 카드가 위, 나머지는 기본 순서", () => {
-        expect(entryOrder(null)).toEqual(["single", "multi", "rooms"]);
-        expect(entryOrder("multi")).toEqual(["multi", "single", "rooms"]);
-        expect(entryOrder("rooms")).toEqual(["rooms", "single", "multi"]);
-        expect(entryOrder("junk")).toEqual(["single", "multi", "rooms"]);
+        expect(entryOrder(null)).toEqual(["single", "multi", "rooms", "path"]);
+        expect(entryOrder("multi")).toEqual(["multi", "single", "rooms", "path"]);
+        expect(entryOrder("rooms")).toEqual(["rooms", "single", "multi", "path"]);
+        expect(entryOrder("junk")).toEqual(["single", "multi", "rooms", "path"]);
     });
 });

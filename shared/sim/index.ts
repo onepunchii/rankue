@@ -24,4 +24,5 @@ export * from "./rng.js";
 export * from "./version.js";
 export * from "./rank.js";
 export * from "./layouts.js";
+export * from "./randomLayout.js";
 export * from "./drills.js";

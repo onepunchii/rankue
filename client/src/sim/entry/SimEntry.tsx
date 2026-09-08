@@ -11,7 +11,7 @@ import { DRILL_WEEK_QUERY_KEY } from "../drill/DrillPanel";
 import { ChartIcon, ChevronRightIcon } from "../components/railIcons";
 import { EntryShowcase } from "./EntryShowcase";
 import { BallMotif } from "./BallMotif";
-import { ENTRY_LAST_KEY, entryOrder, formatAvg, matchRecord, practiceSummary, type EntryChoice, type EntryMatchRow, type EntryRating } from "./entryStats";
+import { ENTRY_LAST_KEY, entryOrder, formatAvg, matchRecord, practiceSummary, readPathCount, type EntryChoice, type EntryMatchRow, type EntryRating } from "./entryStats";
 import { ENTRY_STYLE as st } from "./entryTheme";
 
 /**
@@ -34,6 +34,8 @@ export interface SimEntryProps {
     onCreateRoom: () => void;
     /** 온라인 대전 랭킹(국가별·티어) */
     onRank: () => void;
+    /** 길 찾기: 공을 놓고 3쿠션 해법을 찾는 화면 */
+    onPath: () => void;
     /** 머리글 닫기 옆 "대시보드" — 기록·그래프·내 대전 */
     onDash: () => void;
     onClose: () => void;
@@ -49,7 +51,7 @@ function writeLast(v: EntryChoice): void {
 const PILL = "h-10 px-3.5 inline-flex items-center gap-1.5 rounded-pill text-[13px] font-semibold";
 const PRIMARY = "h-11 px-5 inline-flex items-center rounded-pill text-[14px] font-semibold";
 
-export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreateRoom, onRank, onDash, onClose }: SimEntryProps) {
+export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreateRoom, onRank, onPath, onDash, onClose }: SimEntryProps) {
     const { t } = useT();
     const pill = cn(PILL, st.pill);
     const primary = cn(PRIMARY, st.primary);
@@ -74,11 +76,12 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
     const record = matchRecord(matches.data ?? []);
     const drill = week.data ? weekProgress(week.data) : null;
     const order = entryOrder(readLast());
+    const pathCount = readPathCount(typeof localStorage !== "undefined" ? localStorage : null);
     const top = order[0];
 
     const pick = (which: EntryChoice) => {
         writeLast(which);
-        if (which === "single") onSingle(); else if (which === "multi") onMulti(); else onRooms();
+        if (which === "single") onSingle(); else if (which === "multi") onMulti(); else if (which === "rooms") onRooms(); else onPath();
     };
     const openRooms = rooms.data?.length ?? 0;
 
@@ -198,12 +201,41 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
             </div>
         </div>
     );
+    const pathCard = (
+        <section key="path" className={st.card}>
+            <button type="button" data-entry="path" onClick={() => pick("path")} className="w-full text-left px-5 pt-5 pb-3 flex items-start gap-4 active:opacity-90">
+                <span className={st.cardSub}><BallMotif kind="path" /></span>
+                <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2 min-w-0">
+                            <span className={cn("text-[18px] font-bold leading-tight", st.cardTitle)}>{t("sim.path.title")}</span>
+                            <span className={cn("rk-chip shrink-0 text-[11px]", st.pill)}>{t("sim.path.threeOnly")}</span>
+                        </span>
+                        <ChevronRightIcon />
+                    </span>
+                    <span className={cn("block text-[12.5px] font-medium mt-0.5", st.cardSub)}>{t("sim.path.desc")}</span>
+                    {pathCount > 0 ? (
+                        <span className="flex items-baseline gap-2 mt-3">
+                            <span className={cn("rk-num text-[30px] font-bold leading-none", st.cardBig)}>{pathCount}</span>
+                            <span className={cn("text-[12px] font-medium", st.cardSub)}>{t("sim.path.count").replace("{n}", String(pathCount))}</span>
+                        </span>
+                    ) : (
+                        <span className={cn("block text-[13px] font-medium mt-3", st.cardNote)}>{t("sim.path.empty")}</span>
+                    )}
+                </span>
+            </button>
+            <div className="px-5 pb-4 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => pick("path")} className={top === "path" ? primary : pill}>{t("sim.path.open")}</button>
+            </div>
+        </section>
+    );
+
     return (
         <div className={cn("w-full max-w-[420px] mx-auto px-5 pt-4 pb-8", st.page)}>
             {header}
             <EntryShowcase className={st.showcase} />
             <div className={cn("flex flex-col", st.gap)}>
-                {order.map((k) => (k === "single" ? single : k === "multi" ? multi : roomsCard))}
+                {order.map((k) => (k === "single" ? single : k === "multi" ? multi : k === "rooms" ? roomsCard : pathCard))}
             </div>
         </div>
     );

@@ -28,6 +28,8 @@ export interface SolverSheetProps {
     onPreview: (candidate: SolveCandidate | null) => void;
     onCancel?: () => void;
     onRetry?: () => void;
+    /** 시트 제목 키(길 찾기 화면에선 "sim.path.title"). 없으면 "해법 찾기". */
+    titleKey?: string;
 }
 
 /** 화면에 내는 후보 수. */
@@ -90,7 +92,7 @@ const BTN_SECONDARY = "h-11 rounded-tile border border-surface-line bg-surface-1
 
 export const SolverSheet = memo(function SolverSheet(p: SolverSheetProps) {
     const { t } = useT();
-    const { open, onOpenChange, status, progress, candidates, onApply, onPreview, onCancel, onRetry } = p;
+    const { open, onOpenChange, status, progress, candidates, onApply, onPreview, onCancel, onRetry, titleKey } = p;
     const [previewIdx, setPreviewIdx] = useState<number | null>(null);
     const previewRef = useRef<number | null>(null);
     previewRef.current = previewIdx;
@@ -130,7 +132,7 @@ export const SolverSheet = memo(function SolverSheet(p: SolverSheetProps) {
             <SheetContent side="bottom" hideClose className="rounded-t-card p-0 max-h-[56dvh] flex flex-col gap-0 pb-safe">
                 <SheetHeader className="shrink-0 px-6 pt-5 pb-2 text-left">
                     <div className="flex items-center gap-3">
-                        <SheetTitle className="flex-1 min-w-0 text-[17px] font-bold text-ink-1">{t("sim.solver.title")}</SheetTitle>
+                        <SheetTitle className="flex-1 min-w-0 text-[17px] font-bold text-ink-1">{t(titleKey ?? "sim.solver.title")}</SheetTitle>
                         {/* 기본 16 px X(영문 sr-only) 대신 44 px 닫기 알약 */}
                         <button
                             type="button" onClick={() => handleOpenChange(false)}

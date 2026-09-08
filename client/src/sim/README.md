@@ -479,3 +479,15 @@ client/src/index.css  .sim-dark 가 색 토큰만 덮는다(surface-0~3·line·i
 아직 밝은 화면          멀티방 목록(?rooms=1)·드릴(?drills=1)·대시보드(?dash=1)·설정 창 — 필요하면 같은 클래스만 붙이면 된다.
 캡처                   scratchpad/shots/dark.mjs · dark2.mjs → dark-lobby.png · dark-rank.png · dark-modeinfo.png
 ```
+
+### 길 찾기 (`?path=1`, 2026-09-08 오너)
+```
+무엇          공을 원하는 자리에 놓고 3쿠션 해법(길)을 찾는 화면. 해법 엔진(solver/)을 연습·드릴 밖으로 처음 꺼낸 곳이다.
+어떻게        진입 화면 네 번째 카드 → /online-game?path=1 → 무작위 배치로 연습 세션(record 없음)을 연다. 공은 손가락으로 옮기고(canPlace),
+              머리글의 "길 찾기" 알약 또는 오른쪽 툴바의 "길 찾기"가 해법 시트를 연다(SolverSheet, titleKey 로 제목만 바꾼다).
+              툴바에 "무작위 배치"(seed+1)가 하나 더 붙는다. 첫 세션 안내(CoachHint)는 여기선 띄우지 않는다.
+배치          shared/sim/randomLayout.ts — 씨앗 하나로 결정론(공유·테스트), 쿠션에서 2.2R·공 사이 1.6D 이상 떨어뜨린다.
+              Math.hypot 은 결정론 규칙에서 금지라 제곱 비교로 판정한다(conformance.test).
+기록          서버에 남기지 않는다. "찾아본 배치 수"만 기기에 센다(entryStats readPathCount/bumpPathCount, 키 rankue.sim.pathCount).
+i18n          sim.path.* 10개 × 5개 로케일. 카드 제목 "길 찾기", 칩 "3쿠션 전용".
+```
