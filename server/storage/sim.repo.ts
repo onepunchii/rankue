@@ -48,6 +48,43 @@ export class SimRepository {
             .limit(limit);
     }
 
+    /** 대시보드용 세션 요약 — 무거운 jsonb(state·balls·rules) 없이 최근 limit 개, 시작 시각 내림차순. */
+    async listSessionSummaries(memberId: string, limit = 100) {
+        return db.select({
+            id: hiqSimSessions.id,
+            kind: hiqSimSessions.kind,
+            gameType: hiqSimSessions.gameType,
+            tableId: hiqSimSessions.tableId,
+            cushionModel: hiqSimSessions.cushionModel,
+            condition: hiqSimSessions.condition,
+            targetScore: hiqSimSessions.targetScore,
+            inningCap: hiqSimSessions.inningCap,
+            score: hiqSimSessions.score,
+            innings: hiqSimSessions.innings,
+            highRun: hiqSimSessions.highRun,
+            shots: hiqSimSessions.shots,
+            status: hiqSimSessions.status,
+            startedAt: hiqSimSessions.startedAt,
+            finishedAt: hiqSimSessions.finishedAt,
+        }).from(hiqSimSessions)
+            .where(eq(hiqSimSessions.memberId, memberId))
+            .orderBy(desc(hiqSimSessions.startedAt))
+            .limit(limit);
+    }
+
+    /** 연습 래더에서의 내 순위(종목·테이블별). 세션이 있는 회원끼리 최고 에버 → 하이런 순(ladder 와 같은 정렬). total = 그 래더의 인원. */
+    async myRanks(memberId: string): Promise<{ gameType: "3c" | "4c"; tableId: "DAEDAE" | "JUNGDAE_KR"; rank: number; total: number }[]> {
+        const res = await db.execute(sql`
+            select game_type, table_id, rank, total from (
+                select member_id, game_type, table_id,
+                    rank() over (partition by game_type, table_id order by best_avg desc, best_high_run desc) as rank,
+                    count(*) over (partition by game_type, table_id) as total
+                from hiq_sim_ratings where sessions > 0
+            ) r where member_id = ${memberId}`);
+        return (res.rows as { game_type: "3c" | "4c"; table_id: "DAEDAE" | "JUNGDAE_KR"; rank: string | number; total: string | number }[])
+            .map((r) => ({ gameType: r.game_type, tableId: r.table_id, rank: Number(r.rank), total: Number(r.total) }));
+    }
+
     async getShots(sessionId: string): Promise<HiqSimShot[]> {
         return db.select().from(hiqSimShots)
             .where(eq(hiqSimShots.sessionId, sessionId))

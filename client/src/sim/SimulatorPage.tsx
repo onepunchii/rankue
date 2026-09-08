@@ -48,9 +48,10 @@ import { Overlay, type Project } from "./overlay/Overlay";
 import { createNumbersCache, overlayDiamond, readDiamondPref, shotReadout, writeDiamondPref } from "./overlay/diamondSystem";
 import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
 import { SimEntry } from "./entry/SimEntry";
+import { SimDash } from "./dash/SimDash";
 import { matchApi, type MatchPublic } from "./matchApi";
 import { MatchLobby } from "./match/MatchLobby";
-import { MatchList, MATCH_LIST_QUERY_KEY } from "./match/MatchList";
+import { MATCH_LIST_QUERY_KEY } from "./match/queryKeys";
 import { endReasonText } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
 import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
@@ -150,17 +151,19 @@ export function SimulatorPage() {
     // ── 설정 (URL → 없으면 설정 창). 대전(?match=)·로비(?lobby=1)는 설정 창을 열지 않는다 ──
     const params = useMemo(() => new URLSearchParams(search.startsWith("?") ? search.slice(1) : search), [search]);
     const matchId = params.get("match");
-    const lobby = params.get("lobby") === "1";
+    // ?dash=1 대시보드(기록·그래프·내 대전, 2026-09-08 오너). 예전 링크 ?lobby=1&tab=list(내 대전 목록)도 대시보드의 대전 섹션으로 보낸다.
+    const legacyList = params.get("lobby") === "1" && params.get("tab") === "list";
+    const dashView = params.get("dash") === "1" || legacyList;
+    const dashSection = params.get("sec") === "matches" || legacyList ? "matches" as const : undefined;
+    const lobby = params.get("lobby") === "1" && !legacyList;
     const drillsView = params.get("drills") === "1";
-    // 리플레이 링크(?replay=): 대전·로비·드릴이 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
-    const [replay] = useState<ReplayPayload | null>(() => (matchId || lobby || drillsView ? null : decodeReplay(params.get(REPLAY_PARAM))));
-    const [initial] = useState(() => (matchId || lobby || drillsView || replay ? null : decodePageConfig(readCfgParam(search))));
+    // 리플레이 링크(?replay=): 대전·로비·드릴·대시보드가 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
+    const [replay] = useState<ReplayPayload | null>(() => (matchId || lobby || drillsView || dashView ? null : decodeReplay(params.get(REPLAY_PARAM))));
+    const [initial] = useState(() => (matchId || lobby || drillsView || dashView || replay ? null : decodePageConfig(readCfgParam(search))));
     // 파라미터가 하나도 없으면 진입 화면(싱글 / 친구와 대전)부터. cfg 가 있는데 깨졌으면 예전처럼 설정 창을 바로 연다.
-    const entryView = !matchId && !lobby && !drillsView && !replay && readCfgParam(search) === null && params.get(REPLAY_PARAM) === null;
-    const [setupOpen, setSetupOpen] = useState(!entryView && initial === null && replay === null && !matchId && !lobby && !drillsView);
+    const entryView = !matchId && !lobby && !drillsView && !dashView && !replay && readCfgParam(search) === null && params.get(REPLAY_PARAM) === null;
+    const [setupOpen, setSetupOpen] = useState(!entryView && initial === null && replay === null && !matchId && !lobby && !drillsView && !dashView);
     const lobbyTab = params.get("tab") === "join" ? "join" as const : undefined;
-    // ?lobby=1&tab=list: 만들기 폼 없이 내 대전 목록만(진입 화면의 "내 대전")
-    const lobbyList = params.get("tab") === "list";
     // 드릴 모드: 고정 배치에서 첫 샷만 서버가 채점(문제당 1회), 그 뒤는 연습. scored 전엔 공 배치를 막는다.
     const [drill, setDrill] = useState<{ drill: WeekDrill; week: DrillWeek; scored: boolean; result: { success: boolean; cushions: number } | null } | null>(null);
     const drillRef = useRef(drill);
@@ -846,6 +849,7 @@ export function SimulatorPage() {
     const endOpen = sim.phase === "finished" && !endDismissed && !exitOpen;
     const showLobby = lobby && sim.phase === "setup";
     const showDrills = drillsView && sim.phase === "setup";
+    const showDash = dashView && sim.phase === "setup";
     const showEntry = entryView && sim.phase === "setup" && !setupOpen;
     const endSubtitle = sim.match
         ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t)
@@ -1051,33 +1055,33 @@ export function SimulatorPage() {
                         onDrills={() => navigate("/online-game?drills=1", { replace: true })}
                         onMulti={() => navigate("/online-game?lobby=1", { replace: true })}
                         onJoin={() => navigate("/online-game?lobby=1&tab=join", { replace: true })}
-                        onMyMatches={() => navigate("/online-game?lobby=1&tab=list", { replace: true })}
+                        onMyMatches={() => navigate("/online-game?dash=1&sec=matches", { replace: true })}
+                        onDash={() => navigate("/online-game?dash=1", { replace: true })}
                         onClose={() => navigate(EXIT_PATH)}
+                    />
+                </div>
+            )}
+            {showDash && (
+                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                    <SimDash
+                        initialSection={dashSection}
+                        onClose={() => navigate("/online-game", { replace: true })}
+                        onOpenMatch={openMatch}
+                        onPractice={() => { navigate("/online-game", { replace: true }); setSetupOpen(true); }}
+                        onDrills={() => navigate("/online-game?drills=1", { replace: true })}
+                        onLobby={() => navigate("/online-game?lobby=1", { replace: true })}
                     />
                 </div>
             )}
             {showLobby && (
                 <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    {lobbyList ? (
-                        <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
-                            <div className="flex items-center justify-between gap-3 mb-2">
-                                <h2 className="text-[18px] font-semibold text-ink-1 leading-tight">{t("sim.match.listTitle")}</h2>
-                                <button type="button" onClick={() => navigate("/online-game", { replace: true })} className="shrink-0 h-11 px-3 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2">
-                                    {t("sim.common.close")}
-                                </button>
-                            </div>
-                            <MatchList onOpen={openMatch} />
-                        </div>
-                    ) : (
-                        <>
-                            <MatchLobby initialTab={lobbyTab} onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate("/online-game", { replace: true })} />
-                            <div className="w-full max-w-[420px] mx-auto px-5 pb-8">
-                                <div className="border-t border-surface-line pt-2">
-                                    <MatchList onOpen={openMatch} />
-                                </div>
-                            </div>
-                        </>
-                    )}
+                    <MatchLobby initialTab={lobbyTab} onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate("/online-game", { replace: true })} />
+                    {/* 내 대전 목록은 대시보드의 대전 섹션으로 옮겼다(2026-09-08 오너) — 로비는 만들기·참가만 */}
+                    <div className="w-full max-w-[420px] mx-auto px-5 pb-8">
+                        <button type="button" onClick={() => navigate("/online-game?dash=1&sec=matches", { replace: true })} className="w-full h-12 rounded-tile border border-surface-line bg-surface-1 text-[14px] font-semibold text-ink-2 active:bg-surface-3">
+                            {t("sim.dash.myMatchesLink")}
+                        </button>
+                    </div>
                 </div>
             )}
             <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} />

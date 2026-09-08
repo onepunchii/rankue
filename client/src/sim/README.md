@@ -371,3 +371,16 @@ drill/DrillPanel.tsx  이번 주 5문제 목록(이름·힌트·상태 칩)과 �
   · 채점 전(drillLocked)엔 공 배치를 막고 칩 "이 샷이 채점돼요", 채점 뒤엔 "채점 완료 · 성공/실패 · 연습 중". "다시 배치" = actions.restart()(StartOptions.balls 를 기억).
   · 결과 토스트·칩 갱신은 재생이 끝난 뒤(phase !== shooting) 적용한다.
 ```
+
+## 시뮬레이터 대시보드 (dash/)
+```
+dash/dashApi.ts      GET /sim/stats/me → { ratings(hiq_sim_ratings 행), sessions(최근 100, jsonb 없는 요약), ranks(연습 래더 순위·인원), drillWeeks(주별 시도·성공·쿠션), currentWeekId }. parseSimStats 가 느슨하게 정규화.
+dash/dashStats.ts    순수 함수: availableCombos(최근 활동순 종목·테이블) · sessionSeries(마친 솔로 세션, 오래된 순) · recentForm(최근 10세션 점수합/이닝합 + 이전 블록 대비) · matchSummary(승·패·연속·최근 흐름·내 차례) · drillSeries(최근 8주, 빈 주 0) · shortDate · signedAvg.
+dash/chartLayout.ts  niceTicks(1·2·2.5·5 단계) · scale · xPositions · linePath/areaPath(직선) · columnLayout(두께 ≤ 24 px, 2 px 간격) · columnPath(위만 4 px 둥글게) · nearestIndex.
+dash/charts.tsx      TrendLine(선 2 px + 10 % 워시 + 마지막 점 마커·값 라벨) · Columns(막대 + 최댓값 라벨) · FormStrip(승/패 글자 칩). 플롯 위 읽기 줄이 마지막 점을 보여 주고 문지르기·방향키로 다른 점을 고른다. 색은 CSS 변수만.
+dash/SimDash.tsx     `/online-game?dash=1`(진입 화면 머리글 "대시보드", 닫기 옆). `&sec=matches` 면 대전 섹션으로 스크롤(진입 화면 "내 대전", 예전 `?lobby=1&tab=list` 링크도 여기로).
+                     칩(종목·테이블, 둘 이상일 때) → 큰 숫자(최근 10세션 에버 + 이전 대비) → 지표 6칸(세션·최고 에버·하이런·연습 랭킹·시뮬 레이팅·대전 전적) → 에버리지 추이 → 세션별 하이런
+                     → 친구와 대전(전적·연속·내 차례·최근 흐름 + MatchList: 열기·기권·취소, "초대 만들기") → 드릴(이번 주 점·주별 성공 막대, "드릴 열기") → 최근 세션 표(차트의 표 버전, 10행 → 모두 보기).
+                     기록이 없으면 "연습 시작"(화면의 초록 하나). 로비 아래 목록은 없앴고 "내 대전은 대시보드에서" 버튼만 둔다.
+테스트: dash/dashStats.test.ts · dash/chartLayout.test.ts · dash/SimDash.test.ts(jsdom, statsApi·matchApi 주입). i18n `sim.dash.*` 56개, 5개 로케일.
+```

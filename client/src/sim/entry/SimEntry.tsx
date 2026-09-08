@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { MATCH_LIST_QUERY_KEY, MATCH_LIST_REFETCH_MS } from "../match/queryKeys";
 import { drillApi, weekProgress } from "../drill/drillApi";
 import { DRILL_WEEK_QUERY_KEY } from "../drill/DrillPanel";
-import { ChevronRightIcon } from "../components/railIcons";
+import { ChartIcon, ChevronRightIcon } from "../components/railIcons";
 import { EntryShowcase } from "./EntryShowcase";
 import { BallMotif } from "./BallMotif";
 import { ENTRY_LAST_KEY, entryOrder, formatAvg, matchRecord, practiceSummary, type EntryChoice, type EntryMatchRow, type EntryRating } from "./entryStats";
@@ -25,8 +25,10 @@ export interface SimEntryProps {
     onDrills: () => void;
     onMulti: () => void;
     onJoin: () => void;
-    /** 내 대전 목록만(진행 중·끝난 대전 정리). */
+    /** 내 대전 — 대시보드의 대전 섹션(진행 중·끝난 대전 정리, 2026-09-08 오너: 내 대전도 대시보드로). */
     onMyMatches: () => void;
+    /** 머리글 닫기 옆 "대시보드" — 기록·그래프·내 대전 */
+    onDash: () => void;
     onClose: () => void;
 }
 
@@ -40,7 +42,7 @@ function writeLast(v: EntryChoice): void {
 const pill = "h-10 px-3.5 inline-flex items-center gap-1.5 rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3";
 const primary = "h-11 px-5 inline-flex items-center rounded-pill bg-brand text-brand-fg text-[14px] font-semibold active:bg-brand-strong";
 
-export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onMyMatches, onClose }: SimEntryProps) {
+export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onMyMatches, onDash, onClose }: SimEntryProps) {
     const { t } = useT();
     const { member } = useAuth();
     const ratings = useQuery<EntryRating[]>({
@@ -149,9 +151,16 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onMyMatches, onC
         <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
             <div className="flex items-center justify-between mb-3">
                 <h1 className="text-[20px] font-bold text-ink-1">{t("sim.entry.title")}</h1>
-                <button type="button" onClick={onClose} className="h-11 px-4 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2 active:bg-surface-3">
-                    {t("sim.entry.close")}
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* 대시보드(닫기 옆, 2026-09-08 오너): 기록·그래프·내 대전 */}
+                    <button type="button" data-entry="dash" onClick={onDash} className="h-11 px-3.5 inline-flex items-center gap-1.5 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2 active:bg-surface-3">
+                        <ChartIcon />
+                        {t("sim.dash.open")}
+                    </button>
+                    <button type="button" onClick={onClose} className="h-11 px-4 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2 active:bg-surface-3">
+                        {t("sim.entry.close")}
+                    </button>
+                </div>
             </div>
             <EntryShowcase className="relative w-full h-[228px] rounded-card overflow-hidden bg-surface-3 mb-4" />
             <div className="flex flex-col gap-3">

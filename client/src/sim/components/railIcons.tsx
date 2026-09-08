@@ -159,6 +159,15 @@ export function ChevronLeftIcon() {
     );
 }
 
+/** 대시보드(막대 셋) — 진입 화면 머리글 */
+export function ChartIcon() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 20V11" /><path d="M12 20V4" /><path d="M20 20v-6" />
+        </svg>
+    );
+}
+
 export function ChevronRightIcon() {
     return (
         <svg {...SVG} width={16} height={16}><path d="m9 5 7 7-7 7" /></svg>

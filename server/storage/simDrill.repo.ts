@@ -18,6 +18,21 @@ export class SimDrillRepository {
         return rows[0] ?? null;
     }
 
+    /** 대시보드: 내 주별 시도·성공·쿠션 합(최근 limit 주, 최신 주 먼저). 문제당 첫 시도만 남으므로 attempts ≤ 5. */
+    async myWeeks(memberId: string, limit = 12) {
+        return db.select({
+            weekId: hiqSimDrillAttempts.weekId,
+            attempts: sql<number>`count(*)::int`,
+            successes: sql<number>`sum(case when ${hiqSimDrillAttempts.success} then 1 else 0 end)::int`,
+            cushions: sql<number>`sum(${hiqSimDrillAttempts.cushions})::int`,
+        })
+            .from(hiqSimDrillAttempts)
+            .where(eq(hiqSimDrillAttempts.memberId, memberId))
+            .groupBy(hiqSimDrillAttempts.weekId)
+            .orderBy(desc(hiqSimDrillAttempts.weekId))
+            .limit(limit);
+    }
+
     /** 주간 래더: 성공 수 → 쿠션 합 → 먼저 끝낸 순. */
     async ladder(weekId: string, limit = 50) {
         return db.select({

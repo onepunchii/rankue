@@ -13,6 +13,7 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import {
     simulateShot, TABLES, DEFAULT_CUE, ENGINE_VERSION, paramsHash,
     type SimParams, type BallState, type ShotInput,
+    weekIdFor,
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot,
@@ -129,6 +130,19 @@ router.get("/sim/ladder", asyncHandler(async (req: any, res: any) => {
 router.get("/sim/ratings/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const rows = await storage.sim.myRatings(req.userId!);
     return sendSuccess(res, rows);
+}));
+
+// GET /sim/stats/me — 대시보드 한 번에: 성적 행·세션 요약(최근 100, jsonb 없음)·연습 래더 순위·드릴 주별 집계.
+// 대전 목록은 /sim/matches 를 그대로 쓴다(목록 화면과 캐시 공유). 실전 성적(RP·에버리지)은 절대 섞지 않는다.
+router.get("/sim/stats/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const memberId = req.userId!;
+    const [ratings, sessions, ranks, drillWeeks] = await Promise.all([
+        storage.sim.myRatings(memberId),
+        storage.sim.listSessionSummaries(memberId, 100),
+        storage.sim.myRanks(memberId),
+        storage.simDrill.myWeeks(memberId, 12),
+    ]);
+    return sendSuccess(res, { ratings, sessions, ranks, drillWeeks, currentWeekId: weekIdFor(Date.now()) });
 }));
 
 // GET /sim/sessions/:id — 상세(샷 로그 포함, 리플레이용)
