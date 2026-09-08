@@ -128,13 +128,13 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     onClick={() => onStartGame("match")}
                     className="row-span-2 h-[276px] rounded-3xl bg-[#F5B721] flex flex-col justify-between p-6 text-left shadow-[0_8px_24px_rgba(245,183,33,0.35)] transition-colors hover:bg-[#F0B01A]"
                 >
-                    {/* 노란 바탕엔 검정 글씨 — 흰 글씨는 대비 1.9:1 로 못 읽는다 */}
-                    <div className="w-14 h-14 rounded-3xl bg-black/[0.12] flex items-center justify-center">
-                        <Swords className="w-7 h-7 text-ink-1" strokeWidth={2} />
+                    {/* 아이콘·글씨는 흰색(2026-09-08 오너). 노란 바탕과 대비가 약해서 아이콘 자리는 진하게 깔고 설명은 흰색 90 %로 둔다 */}
+                    <div className="w-14 h-14 rounded-3xl bg-black/[0.18] flex items-center justify-center">
+                        <Swords className="w-7 h-7 text-white" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[21px] font-bold text-ink-1 leading-tight">{t("quickActions.matchTitle")}</span>
-                        <span className="block text-[13px] font-medium text-black/65 mt-2 leading-snug">{t("quickActions.matchDescLine1")}<br />{t("quickActions.matchDescLine2")}</span>
+                        <span className="block text-[21px] font-bold text-white leading-tight">{t("quickActions.matchTitle")}</span>
+                        <span className="block text-[13px] font-medium text-white/90 mt-2 leading-snug">{t("quickActions.matchDescLine1")}<br />{t("quickActions.matchDescLine2")}</span>
                     </div>
                 </motion.button>
 
