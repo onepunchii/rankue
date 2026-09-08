@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Target, Swords, LogIn, Cpu, HelpCircle, LucideMessageCircle, LucideStore } from "@/lib/icons";
+import { Target, Swords, LogIn, GameController, HelpCircle, LucideMessageCircle, LucideStore } from "@/lib/icons";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { useState } from "react";
@@ -45,7 +45,7 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
             highlight: false,
         },
         {
-            icon: Cpu,
+            icon: GameController,
             titleKey: "quickActions.simTitle",
             descKey: "quickActions.guideSimDesc",
             highlight: false,
@@ -127,7 +127,7 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     className="row-span-2 h-[276px] rounded-3xl bg-[#F5B721] flex flex-col justify-between p-6 text-left shadow-[0_8px_24px_rgba(245,183,33,0.35)] transition-colors hover:bg-[#F0B01A]"
                 >
                     <div className="w-14 h-14 rounded-3xl bg-white/20 flex items-center justify-center">
-                        <Cpu className="w-7 h-7 text-white" strokeWidth={2} />
+                        <GameController className="w-7 h-7 text-white" strokeWidth={2} />
                     </div>
                     <div>
                         <span className="block text-[21px] font-bold text-white leading-tight">{t("quickActions.simTitle")}</span>

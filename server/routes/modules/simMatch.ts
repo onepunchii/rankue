@@ -170,7 +170,7 @@ async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body:
     const started = await storage.simMatch.start(m.id, req.userId!, guestTarget, state, balls);
     if (!started) return sendError(res, 409, "이미 시작됐거나 참가할 수 없는 대전입니다");
     const guest = await storage.getMemberById(req.userId!);
-    notify(m.hostId, "온라인당구 대전 시작", `${guest?.name ?? "상대"}님이 들어왔어요. 첫 샷은 당신 차례입니다.`, m.id);
+    notify(m.hostId, "온라인게임 대전 시작", `${guest?.name ?? "상대"}님이 들어왔어요. 첫 샷은 당신 차례입니다.`, m.id);
     const full = await storage.simMatch.get(m.id);
     return sendSuccess(res, publicMatch(full!, req.userId!));
 }
@@ -213,7 +213,7 @@ router.post("/sim/matches/:id/invite", requireAuth, asyncHandler(async (req: Aut
     await storage.simMatch.setInvited(m.id, target.id);
     notifyUrl(
         target.id,
-        `${m.hostName}님의 온라인당구 대전 초대`,
+        `${m.hostName}님의 온라인게임 대전 초대`,
         `${gameText(m)} · ${m.hostTarget}점${m.passwordHash ? " · 비밀번호 방" : ""} — 누르면 바로 시작돼요`,
         `/online-game?join=${m.code}&auto=1`,
     );
@@ -256,7 +256,7 @@ router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: Au
     if (!row) return sendError(res, 409, "이미 차례가 바뀌었습니다", "STALE");
     const timedOutId = m.turn === 0 ? m.hostId : m.guestId;
     const otherId = m.turn === 0 ? m.guestId : m.hostId;
-    if (finished) notify(otherId, "온라인당구 대전 종료", "결과를 확인해 보세요.", m.id);
+    if (finished) notify(otherId, "온라인게임 대전 종료", "결과를 확인해 보세요.", m.id);
     else if (m.turn === myIndex) notify(otherId, "당신 차례예요", "상대가 40초를 넘겨 차례가 넘어왔어요.", m.id);
     else notify(timedOutId, "시간 초과", "40초를 넘겨 이닝이 넘어갔어요.", m.id);
     const full = await storage.simMatch.get(m.id);
@@ -331,9 +331,9 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
     if (finished) {
         const winnerIdx = applied.session.winnerIndex;
         const iWon = winnerIdx === myIndex;
-        notify(opponentId, "온라인당구 대전 종료", iWon ? `${meName}님이 이겼어요. 결과를 확인해 보세요.` : "당신이 이겼어요! 결과를 확인해 보세요.", m.id);
+        notify(opponentId, "온라인게임 대전 종료", iWon ? `${meName}님이 이겼어요. 결과를 확인해 보세요.` : "당신이 이겼어요! 결과를 확인해 보세요.", m.id);
     } else if (applied.session.turn !== myIndex) {
-        notify(opponentId, "당신 차례예요", `${meName}님이 쳤어요. 온라인당구 대전을 이어가세요.`, m.id);
+        notify(opponentId, "당신 차례예요", `${meName}님이 쳤어요. 온라인게임 대전을 이어가세요.`, m.id);
     }
 
     const mismatch = clientHash !== undefined && clientHash !== result.hash;
@@ -360,7 +360,7 @@ router.post("/sim/matches/:id/resign", requireAuth, asyncHandler(async (req: Aut
     const row = await storage.simMatch.finish(m.id, winnerId ?? null, "resign");
     if (!row) return sendError(res, 409, "이미 끝난 대전입니다");
     const meName = (m.hostId === req.userId ? m.hostName : m.guestName) ?? "상대";
-    notify(winnerId, "온라인당구 대전 종료", `${meName}님이 기권했어요. 당신의 승리입니다.`, m.id);
+    notify(winnerId, "온라인게임 대전 종료", `${meName}님이 기권했어요. 당신의 승리입니다.`, m.id);
     return sendSuccess(res, { status: "finished", winnerIndex: winnerId === m.hostId ? 0 : 1 });
 }));
 
@@ -375,7 +375,7 @@ router.post("/sim/matches/:id/claim", requireAuth, asyncHandler(async (req: Auth
     if (Date.now() - since < CLAIM_AFTER_MS) return sendError(res, 409, "아직 기다려야 합니다", "TOO_EARLY");
     const row = await storage.simMatch.finish(m.id, req.userId!, "claim");
     if (!row) return sendError(res, 409, "이미 끝난 대전입니다");
-    notify(myIndex === 0 ? m.guestId : m.hostId, "온라인당구 대전 종료", "48시간 동안 응답이 없어 상대의 승리로 끝났어요.", m.id);
+    notify(myIndex === 0 ? m.guestId : m.hostId, "온라인게임 대전 종료", "48시간 동안 응답이 없어 상대의 승리로 끝났어요.", m.id);
     return sendSuccess(res, { status: "finished", winnerIndex: myIndex });
 }));
 

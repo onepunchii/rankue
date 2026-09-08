@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Cpu } from "@/lib/icons";
+import { GameController } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { useT } from "@/lib/i18n";
 import { BallDot } from "@/components/hiq/BallDot";
@@ -86,7 +86,7 @@ export function SimHistoryCard({ filter }: Props) {
     return (
         <section className="mb-6">
             <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2 text-black/55">
-                <Cpu className="w-4 h-4" />
+                <GameController className="w-4 h-4" />
                 {t("sim.history.title")}
                 <span className="text-[12px] font-medium text-ink-4 ml-auto">{t("sim.history.subtitle")}</span>
             </h3>

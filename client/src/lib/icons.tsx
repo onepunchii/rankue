@@ -20,6 +20,8 @@ export const ChevronsUpDown = ((Ph as any).ArrowsDownUp ?? F) as Ph.Icon;
 export const Circle = ((Ph as any).Circle ?? F) as Ph.Icon;
 export const CircleDashed = ((Ph as any).CircleDashed ?? F) as Ph.Icon;
 export const Cpu = ((Ph as any).Cpu ?? F) as Ph.Icon;
+/** 온라인게임(시뮬레이터) — 홈 타일·배너·기록 카드·어드민 메뉴(2026-09-08 오너: 아이콘 변경) */
+export const GameController = ((Ph as any).GameController ?? F) as Ph.Icon;
 export const Crosshair = ((Ph as any).Crosshair ?? F) as Ph.Icon;
 export const Delete = ((Ph as any).Backspace ?? F) as Ph.Icon;
 export const Dot = ((Ph as any).Circle ?? F) as Ph.Icon;

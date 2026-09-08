@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ResignConfirm } from "@/sim/components/ResignConfirm";
 import { useLocation } from "wouter";
-import { Cpu } from "@/lib/icons";
+import { GameController } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
@@ -65,7 +65,7 @@ export function SimMatchBanner() {
                 className="flex-1 min-w-0 px-4 py-3.5 flex items-center gap-3 text-left active:bg-surface-3 rounded-tile"
             >
                 <span className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                    <Cpu className="w-4 h-4" />
+                    <GameController className="w-4 h-4" />
                 </span>
                 <span className="min-w-0 flex-1">
                     <span className="block text-[13.5px] font-bold text-ink-1">{isMine ? t("sim.match.bannerTitle") : t("sim.match.waitingTurn")}</span>

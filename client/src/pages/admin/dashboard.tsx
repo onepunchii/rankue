@@ -11,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideArrowRight, LucideCheckCircle, LucideLogOut,
-    LucideSearch, LucideTrendingUp, LucideBell, LucideCreditCard, LucideSettings, LucideShieldAlert, LucideMenu, LucideX, LucideUsersRound, LucideMail, LucideFlag, Cpu
+    LucideSearch, LucideTrendingUp, LucideBell, LucideCreditCard, LucideSettings, LucideShieldAlert, LucideMenu, LucideX, LucideUsersRound, LucideMail, LucideFlag, GameController
 } from "@/lib/icons";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -88,7 +88,7 @@ type Suggestion = {
 function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
     const menuItems = [
         { id: "dashboard", label: "Dashboard", icon: LucideLayoutDashboard },
-        { id: "online-game", label: "온라인당구 게임", icon: Cpu },
+        { id: "online-game", label: "온라인게임", icon: GameController },
         { id: "claims", label: "매장 클레임", icon: LucideStore },
         { id: "registrations", label: "신규 매장 등록", icon: LucideStore },
         { id: "leads", label: "입점 문의", icon: LucidePhone },
@@ -1089,7 +1089,7 @@ function getTabTitle(tab: string) {
         case "notices": return "공지사항 관리";
         case "moderation": return "신고/제재 센터";
         case "golf-orders": return "골프 회원권 접수 현황";
-        case "online-game": return "온라인당구 게임 이용 현황";
+        case "online-game": return "온라인게임 이용 현황";
         default: return "Admin";
     }
 }

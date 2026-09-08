@@ -395,8 +395,8 @@ match/InviteDialog.tsx 대기 화면 "친구에게 보내기": GET /api/hiq/oppo
 match/MatchLobby.tsx  만들기: "멀티방으로 열기" 토글(+비밀번호 4~20자, `?public=1` 이면 켜진 채) · 참가: `?code=` 로 채워진 코드, 비밀번호 방이면 입력.
 페이지   `?join=<code>&auto=1`: 조회 → 대기·비밀번호 없음이면 바로 참가(다마수 = 내 실전 핸디 → 없으면 방장) → `?match=`; 비밀번호 방·auto 없음 → 참가 화면; 없어졌으면 토스트 + 진입.
 진입 화면 카드 셋: 싱글 · 친구와 대전(초대 만들기 · 코드로 참가; 내 대전은 대시보드) · 멀티방(열린 방 n · 방 목록 · 방 만들기). 마지막에 고른 카드가 위.
-이름     화면의 "시뮬레이터" 는 "온라인당구 게임"(오너 2026-09-08). 코드·문서의 sim/시뮬레이터 는 그대로.
-어드민   /admin/dashboard "온라인당구 게임" 탭 — GET /admin/online-game(storage.sim.adminOverview): 활성 이용자·세션·대전·멀티방·드릴·일별·종목별·상위 이용자·최근 대전.
+이름     화면의 "시뮬레이터" 는 "온라인게임"(오너 2026-09-08). 코드·문서의 sim/시뮬레이터 는 그대로.
+어드민   /admin/dashboard "온라인게임" 탭 — GET /admin/online-game(storage.sim.adminOverview): 활성 이용자·세션·대전·멀티방·드릴·일별·종목별·상위 이용자·최근 대전.
 e2e     scripts/sim-e2e/rooms.ts(임시 회원 셋, 전부 삭제) · rooms-capture.ts · admin-check.ts · cleanup-temp.ts.
 ```
 
