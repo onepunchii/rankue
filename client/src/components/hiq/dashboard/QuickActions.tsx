@@ -120,18 +120,18 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
 
-                {/* 커뮤니티 (세로 2칸, 좌측 히어로) — 매칭(우측 히어로)과 지그재그. 우측엔 매장 찾기+시뮬레이터 */}
+                {/* 시뮬레이터 (세로 2칸, 좌측 히어로) — 매칭(우측 히어로)과 지그재그. 커뮤니티와 자리를 바꿨다(2026-09-08 오너: 시뮬레이터가 더 중요). /online-game 진입 화면 */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setLocation("/community")}
+                    onClick={handleOnlineGameClick}
                     className="row-span-2 h-[276px] rounded-3xl bg-[#F5B721] flex flex-col justify-between p-6 text-left shadow-[0_8px_24px_rgba(245,183,33,0.35)] transition-colors hover:bg-[#F0B01A]"
                 >
                     <div className="w-14 h-14 rounded-3xl bg-white/20 flex items-center justify-center">
-                        <LucideMessageCircle className="w-7 h-7 text-white" strokeWidth={2} />
+                        <Cpu className="w-7 h-7 text-white" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[21px] font-bold text-white leading-tight">{t("quickActions.communityTitle")}</span>
-                        <span className="block text-[13px] font-medium text-white/85 mt-2 leading-snug">{t("quickActions.communityDesc")}</span>
+                        <span className="block text-[21px] font-bold text-white leading-tight">{t("quickActions.simTitle")}</span>
+                        <span className="block text-[13px] font-medium text-white/85 mt-2 leading-snug">{t("quickActions.simDesc")}</span>
                     </div>
                 </motion.button>
 
@@ -150,18 +150,18 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
 
-                {/* 시뮬레이터 (1x1) — /online-game 진입 화면(싱글 / 친구와 대전) */}
+                {/* 커뮤니티 (1x1, 흰색) — 예전 시뮬레이터 자리 */}
                 <motion.button
                     whileTap={{ scale: 0.97 }}
-                    onClick={handleOnlineGameClick}
+                    onClick={() => setLocation("/community")}
                     className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
                 >
                     <div className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center">
-                        <Cpu className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
+                        <LucideMessageCircle className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
                     </div>
                     <div>
-                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.simTitle")}</span>
-                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.simDesc")}</span>
+                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.communityTitle")}</span>
+                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.communityDesc")}</span>
                     </div>
                 </motion.button>
             </div>

@@ -1754,6 +1754,7 @@ const es: Dict = {
   "sim.controls.restart": "Jugar otra vez",
   "sim.top.practice": "Práctica",
   "sim.top.avg": "Prom.",
+  "sim.top.score": "Puntos",
   "sim.rail.elevation": "Ángulo del taco",
   "sim.spin.title": "Efecto · Ángulo del taco",
   "sim.spin.desc": "Toca o arrastra sobre la bola para el efecto. Fuera del anillo punteado es fallo de taco",

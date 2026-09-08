@@ -76,11 +76,15 @@ describe("TopBar", () => {
         expect(text).toContain(ko["sim.top.practice"]);
         expect(text).not.toContain("나");
         expect(text).toContain("0/15");
-        expect(text).toContain(`${ko["sim.hud.inning"]} 1 · ${ko["sim.top.avg"]} 0.00`);
+        // 항목별 독립 칩: 점수 · 이닝 · 에버 — 각각 버튼이고 모두 이닝 시트를 연다
+        expect(byLabel(h, ko["sim.top.score"])).not.toBeNull();
+        expect(byLabel(h, ko["sim.controls.innings"])!.textContent).toBe(`${ko["sim.hud.inning"]}1`);
+        expect(byLabel(h, ko["sim.top.avg"])!.textContent).toBe(`${ko["sim.top.avg"]}0.00`);
         expect(byLabel(h, ko["sim.controls.exit"])).toBeNull(); // 뒤로는 대전에서만
-        const summary = byLabel(h, ko["sim.controls.innings"])!;
-        click(summary);
-        expect(onSummary).toHaveBeenCalledTimes(1);
+        click(byLabel(h, ko["sim.controls.innings"])!);
+        click(byLabel(h, ko["sim.top.score"])!);
+        click(byLabel(h, ko["sim.top.avg"])!);
+        expect(onSummary).toHaveBeenCalledTimes(3);
     });
 
     it("기록 세션: 연습 칩 대신 오프라인/동기화 칩", () => {

@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { Fragment, memo } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import type { SessionState } from "@shared/sim/rules";
@@ -36,6 +36,10 @@ export interface TopBarProps {
 
 const SCORE = "rk-num text-[16px] font-bold text-ink-1 leading-none";
 const TARGET = "rk-num text-[12px] font-medium text-ink-3";
+/** 요약 칩: 32 px 알약 버튼(44 px 띠 안). 값은 rk-num, 라벨은 작은 잉크. */
+const CHIP = "h-8 px-2.5 rounded-pill border bg-surface-1 flex items-baseline gap-1 shrink-0 whitespace-nowrap active:bg-surface-3";
+const LABEL = "text-[11px] font-medium text-ink-3 leading-none";
+const VALUE = "rk-num text-[14px] font-bold text-ink-1 leading-none";
 
 export const TopBar = memo(function TopBar(p: TopBarProps) {
     const { t } = useT();
@@ -60,7 +64,7 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
             )}
             {/* 규칙·테이블 배지는 시계가 없을 때만 — 40초 시계가 서면 자리를 내줘 두 선수 이름이 잘리지 않게 한다 */}
             {p.config && !p.clock && (
-                <span className="rk-chip bg-surface-3 text-ink-2 shrink-0 whitespace-nowrap">
+                <span className="rk-chip bg-surface-3 text-ink-2 min-w-0 truncate whitespace-nowrap">
                     {ruleBadge(p.config, t)} · {tableLabel(p.config, t)}
                 </span>
             )}
@@ -77,51 +81,56 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                 </span>
             )}
             <div className="flex-1 min-w-0" />
-            {s && (
-                <button
-                    type="button" onClick={p.onSummary} aria-label={t("sim.controls.innings")} title={t("sim.controls.innings")}
-                    className="h-11 min-w-0 px-1.5 -mr-1 flex items-center gap-1.5 rounded-tile text-left active:bg-surface-3"
-                >
-                    {p.drillName ? (
-                        <span className="text-[12px] font-semibold text-ink-1 truncate">{p.drillName}</span>
-                    ) : twoPlayers ? (
-                        s.players.map((pl, i) => {
+            {/* 요약은 항목별 독립 칩 버튼(2026-09-08 오너): 1인 = 점수 · 이닝 · 에버, 2인 = 선수마다 [이름 점수/다마수](차례는 brand 테두리 + 점). 어느 칩이든 이닝 시트. */}
+            {s && p.drillName && (
+                <button type="button" onClick={p.onSummary} aria-label={t("sim.controls.innings")} title={t("sim.controls.innings")} className={cn(CHIP, "border-surface-line min-w-0")}>
+                    <span className="text-[12px] font-semibold text-ink-1 truncate">{p.drillName}</span>
+                </button>
+            )}
+            {s && !p.drillName && (
+                <div className="flex items-center gap-1.5 min-w-0 -mr-1">
+                    {twoPlayers
+                        ? s.players.map((pl, i) => {
                             const isTurn = playing && s.turn === i;
                             const isWinner = s.status === "finished" && s.winnerIndex === i;
                             return (
-                                <span key={pl.id} className="flex items-center gap-1 min-w-0">
-                                    {i > 0 && <span className="text-[12px] text-ink-4" aria-hidden="true">·</span>}
+                                <button
+                                    key={pl.id} type="button" onClick={p.onSummary}
+                                    aria-label={`${p.names[i] ?? pl.id} · ${t("sim.controls.innings")}`} title={t("sim.controls.innings")}
+                                    className={cn(CHIP, "min-w-0", isTurn ? "border-brand" : "border-surface-line")}
+                                >
                                     {isTurn && (
-                                        <span className="inline-block w-1.5 h-1.5 rounded-pill bg-brand shrink-0" title={t("sim.hud.turn")}>
+                                        <span className="self-center inline-block w-1.5 h-1.5 rounded-pill bg-brand shrink-0">
                                             <span className="sr-only">{t("sim.hud.turn")}</span>
                                         </span>
                                     )}
-                                    <span className={cn("text-[12px] font-semibold truncate max-w-[64px]", isWinner ? "text-gold" : "text-ink-1")}>
-                                        {p.names[i] ?? pl.id}
-                                    </span>
-                                    <span className="rk-num text-[14px] font-bold text-ink-1 leading-none shrink-0">
+                                    <span className={cn("text-[12px] font-semibold truncate max-w-[64px]", isWinner ? "text-gold" : "text-ink-1")}>{p.names[i] ?? pl.id}</span>
+                                    <span className={cn("rk-num text-[14px] font-bold leading-none shrink-0", isWinner ? "text-gold" : "text-ink-1")}>
                                         {pl.score}<span className={TARGET}>/{pl.target}</span>
                                     </span>
-                                </span>
+                                </button>
                             );
                         })
-                    ) : (
-                        s.players.map((pl, i) => {
+                        : s.players.map((pl, i) => {
                             const isWinner = s.status === "finished" && s.winnerIndex === i;
                             const inning = pl.innings + (playing ? 1 : 0);
                             return (
-                                <span key={pl.id} className="flex items-center gap-1.5 min-w-0">
-                                    <span className={cn(SCORE, "shrink-0", isWinner && "text-gold")}>
-                                        {pl.score}<span className={TARGET}>/{pl.target}</span>
-                                    </span>
-                                    <span className="rk-num text-[12px] font-medium text-ink-3 whitespace-nowrap shrink-0">
-                                        {t("sim.hud.inning")} {inning} · {t("sim.top.avg")} {formatAverage(displayAverage(pl, p.phase))}
-                                    </span>
-                                </span>
+                                <Fragment key={pl.id}>
+                                    <button type="button" onClick={p.onSummary} aria-label={t("sim.top.score")} title={t("sim.top.score")} className={cn(CHIP, "border-surface-line")}>
+                                        <span className={cn(SCORE, isWinner && "text-gold")}>{pl.score}<span className={TARGET}>/{pl.target}</span></span>
+                                    </button>
+                                    <button type="button" onClick={p.onSummary} aria-label={t("sim.controls.innings")} title={t("sim.controls.innings")} className={cn(CHIP, "border-surface-line")}>
+                                        <span className={LABEL}>{t("sim.hud.inning")}</span>
+                                        <span className={VALUE}>{inning}</span>
+                                    </button>
+                                    <button type="button" onClick={p.onSummary} aria-label={t("sim.top.avg")} title={t("sim.top.avg")} className={cn(CHIP, "border-surface-line")}>
+                                        <span className={LABEL}>{t("sim.top.avg")}</span>
+                                        <span className={VALUE}>{formatAverage(displayAverage(pl, p.phase))}</span>
+                                    </button>
+                                </Fragment>
                             );
-                        })
-                    )}
-                </button>
+                        })}
+                </div>
             )}
         </div>
     );

@@ -1754,6 +1754,7 @@ const en: Dict = {
   "sim.controls.restart": "Play again",
   "sim.top.practice": "Practice",
   "sim.top.avg": "Avg",
+  "sim.top.score": "Score",
   "sim.rail.elevation": "Cue angle",
   "sim.spin.title": "Spin · Cue angle",
   "sim.spin.desc": "Tap or drag on the ball to set spin. Outside the dashed ring is a miscue",

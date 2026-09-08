@@ -1756,6 +1756,7 @@ export const ko: Dict = {
   "sim.controls.restart": "다시하기",
   "sim.top.practice": "연습",
   "sim.top.avg": "에버",
+  "sim.top.score": "점수",
   "sim.rail.elevation": "큐 각",
   "sim.spin.title": "당점 · 큐 각",
   "sim.spin.desc": "공 위를 누르거나 끌어 당점을 고르세요. 점선 링 밖은 미스큐예요",

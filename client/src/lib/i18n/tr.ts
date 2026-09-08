@@ -1754,6 +1754,7 @@ const tr: Dict = {
   "sim.controls.restart": "Yeniden oyna",
   "sim.top.practice": "Antrenman",
   "sim.top.avg": "Ort.",
+  "sim.top.score": "Skor",
   "sim.rail.elevation": "Isteka açısı",
   "sim.spin.title": "Falso · Isteka açısı",
   "sim.spin.desc": "Falso için topa dokun ya da sürükle. Kesikli halkanın dışı miscue",

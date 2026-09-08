@@ -25,6 +25,8 @@ export interface SimEntryProps {
     onDrills: () => void;
     onMulti: () => void;
     onJoin: () => void;
+    /** 내 대전 목록만(진행 중·끝난 대전 정리). */
+    onMyMatches: () => void;
     onClose: () => void;
 }
 
@@ -38,7 +40,7 @@ function writeLast(v: EntryChoice): void {
 const pill = "h-10 px-3.5 inline-flex items-center gap-1.5 rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3";
 const primary = "h-11 px-5 inline-flex items-center rounded-pill bg-brand text-brand-fg text-[14px] font-semibold active:bg-brand-strong";
 
-export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onClose }: SimEntryProps) {
+export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onMyMatches, onClose }: SimEntryProps) {
     const { t } = useT();
     const { member } = useAuth();
     const ratings = useQuery<EntryRating[]>({
@@ -135,7 +137,7 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onClose }: SimEn
             <div className="px-5 pb-4 flex flex-wrap items-center gap-2">
                 <button type="button" onClick={() => pick("multi")} className={top === "multi" ? primary : pill}>{t("sim.entry.create")}</button>
                 <button type="button" onClick={() => { writeLast("multi"); onJoin(); }} className={pill}>{t("sim.entry.join")}</button>
-                <button type="button" onClick={() => pick("multi")} className={cn(pill, "rk-num")}>
+                <button type="button" onClick={() => { writeLast("multi"); onMyMatches(); }} className={cn(pill, "rk-num")}>
                     {record.active > 0 ? t("sim.entry.myMatches").replace("{n}", String(record.active)) : t("sim.entry.myMatches").replace(/\s*\{n\}/, "")}
                 </button>
             </div>

@@ -37,6 +37,8 @@ export interface MatchLobbyProps {
     /** 테스트·주입용. 기본 matchApi */
     api?: MatchApi;
     initialTab?: LobbyTab;
+    /** 만들기/코드로 참가 탭 줄을 보일지. 기본 false — 진입 화면 카드가 이미 둘을 나눠 주므로 한 화면엔 한 가지만(2026-09-08 오너). */
+    showTabs?: boolean;
     /** 호스트가 상대를 기다리는 동안의 폴링 주기 (ms). 기본 2000 */
     pollMs?: number;
 }
@@ -498,15 +500,16 @@ function JoinTab({ api, onStarted, onCreated }: { api: MatchApi; onStarted: (m: 
 
 /* ------------------------------------------------------------------ 로비 */
 
-export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", pollMs = 2000 }: MatchLobbyProps) {
+export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", showTabs = false, pollMs = 2000 }: MatchLobbyProps) {
     const { t } = useT();
     const [tab, setTab] = useState<LobbyTab>(initialTab);
+    const title = showTabs ? t("sim.match.title") : tab === "create" ? t("sim.entry.create") : t("sim.entry.join");
 
     return (
         <div className="flex flex-col gap-4 w-full max-w-[420px] mx-auto px-5 pt-4 pb-6">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <h2 className="text-[18px] font-semibold text-ink-1 leading-tight">{t("sim.match.title")}</h2>
+                    <h2 className="text-[18px] font-semibold text-ink-1 leading-tight">{title}</h2>
                 </div>
                 <button
                     type="button" onClick={onClose}
@@ -516,6 +519,7 @@ export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, in
                 </button>
             </div>
 
+            {showTabs && (
             <div className="flex gap-2" role="tablist" aria-label={t("sim.match.title")}>
                 {(["create", "join"] as const).map((k) => (
                     <button
@@ -529,6 +533,7 @@ export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, in
                     </button>
                 ))}
             </div>
+            )}
 
             {tab === "create"
                 ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} />

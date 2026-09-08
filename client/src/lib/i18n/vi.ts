@@ -1754,6 +1754,7 @@ const vi: Dict = {
   "sim.controls.restart": "Chơi lại",
   "sim.top.practice": "Tập",
   "sim.top.avg": "TB",
+  "sim.top.score": "Điểm",
   "sim.rail.elevation": "Góc cơ",
   "sim.spin.title": "Điểm cơ · Góc cơ",
   "sim.spin.desc": "Chạm hoặc kéo trên bi để chọn điểm cơ. Ngoài vòng đứt là trượt cơ",

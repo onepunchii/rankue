@@ -144,7 +144,7 @@ describe("MatchLobby · 만들기", () => {
         const api = fakeApi({ getMatch: vi.fn(async () => (++polls >= 2 ? playing : match())) });
         const onStarted = vi.fn();
         const h = mountEl(React.createElement(MatchLobby, { onStarted, onClose: () => undefined, api, pollMs: 5 }));
-        expect(h.container.textContent).toContain(ko["sim.match.title"]);
+        expect(h.container.textContent).toContain(ko["sim.entry.create"]);
         click(byText(h, ko["sim.match.create"])!);
         await flush();
         expect(api.createMatch).toHaveBeenCalledTimes(1);
@@ -236,7 +236,7 @@ describe("MatchLobby · 코드로 참가", () => {
     });
     it("탭 전환과 닫기", () => {
         const onClose = vi.fn();
-        const h = mountEl(React.createElement(MatchLobby, { onStarted: vi.fn(), onClose, api: fakeApi() }));
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: vi.fn(), onClose, api: fakeApi(), showTabs: true }));
         expect(h.container.querySelector("#sim-match-code")).toBeNull();
         click(byText(h, ko["sim.match.tabJoin"])!);
         expect(h.container.querySelector("#sim-match-code")).not.toBeNull();

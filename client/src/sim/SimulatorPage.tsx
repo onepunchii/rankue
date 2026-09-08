@@ -159,6 +159,8 @@ export function SimulatorPage() {
     const entryView = !matchId && !lobby && !drillsView && !replay && readCfgParam(search) === null && params.get(REPLAY_PARAM) === null;
     const [setupOpen, setSetupOpen] = useState(!entryView && initial === null && replay === null && !matchId && !lobby && !drillsView);
     const lobbyTab = params.get("tab") === "join" ? "join" as const : undefined;
+    // ?lobby=1&tab=list: 만들기 폼 없이 내 대전 목록만(진입 화면의 "내 대전")
+    const lobbyList = params.get("tab") === "list";
     // 드릴 모드: 고정 배치에서 첫 샷만 서버가 채점(문제당 1회), 그 뒤는 연습. scored 전엔 공 배치를 막는다.
     const [drill, setDrill] = useState<{ drill: WeekDrill; week: DrillWeek; scored: boolean; result: { success: boolean; cushions: number } | null } | null>(null);
     const drillRef = useRef(drill);
@@ -1046,18 +1048,33 @@ export function SimulatorPage() {
                         onDrills={() => navigate("/online-game?drills=1", { replace: true })}
                         onMulti={() => navigate("/online-game?lobby=1", { replace: true })}
                         onJoin={() => navigate("/online-game?lobby=1&tab=join", { replace: true })}
+                        onMyMatches={() => navigate("/online-game?lobby=1&tab=list", { replace: true })}
                         onClose={() => navigate(EXIT_PATH)}
                     />
                 </div>
             )}
             {showLobby && (
                 <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    <MatchLobby initialTab={lobbyTab} onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate(EXIT_PATH)} />
-                    <div className="w-full max-w-[420px] mx-auto px-5 pb-8">
-                        <div className="border-t border-surface-line pt-2">
+                    {lobbyList ? (
+                        <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                                <h2 className="text-[18px] font-semibold text-ink-1 leading-tight">{t("sim.match.listTitle")}</h2>
+                                <button type="button" onClick={() => navigate("/online-game", { replace: true })} className="shrink-0 h-11 px-3 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2">
+                                    {t("sim.common.close")}
+                                </button>
+                            </div>
                             <MatchList onOpen={openMatch} />
                         </div>
-                    </div>
+                    ) : (
+                        <>
+                            <MatchLobby initialTab={lobbyTab} onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate("/online-game", { replace: true })} />
+                            <div className="w-full max-w-[420px] mx-auto px-5 pb-8">
+                                <div className="border-t border-surface-line pt-2">
+                                    <MatchList onOpen={openMatch} />
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
             <SimSetupDialog open={setupOpen} onOpenChange={onSetupOpenChange} onStart={onSetupStart} />
