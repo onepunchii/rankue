@@ -118,6 +118,10 @@ const EXIT_PATH = "/dashboard";
  * player 뷰(3D)도 이 사각형을 원근 뷰(카메라 화면)로 삼는다 — 캔버스 전체를 뷰로 쓰면 큐볼이 슬라이더·± 아래에 투영됐다(2026-09-07 리뷰).
  * 큐대(1.45 m)도 두 렌더러 모두 이 사각형 안에서만 그려 오른쪽 열 틈으로 비치지 않는다.
  */
+/** 길 찾기 화면의 탐색 예산(ms) — 기본 1.5 s 보다 길게 본다. */
+const PATH_BUDGET_MS = 3500;
+/** 오른쪽 바에 세울 길 수(오너: 확률 좋은 길 다섯 개). */
+const PATH_TOP_N = 5;
 const TABLE_INSETS: SafeInsets = { top: 8, right: 68, bottom: DOCK_HEIGHT + 8, left: 8 };
 /**
  * 테이블 영역이 이보다 낮으면(iPhone SE 375×667 → 623, 세이프 에어리어 있는 6.1" 폰 ≈ 715) compact: 툴바 40 px·간격 6, 큐대 80 px, 샷 56 px.
@@ -871,6 +875,8 @@ export function SimulatorPage() {
 
     // 길 찾기: 무작위 배치로 연습 세션을 연다(기록 없음). 공은 손가락으로 옮길 수 있고, 툴바의 "길 찾기"가 해법을 찾는다.
     const pathSeedRef = useRef(1);
+    const pathViewRef = useRef(false);
+    pathViewRef.current = pathView;
     const startPath = useCallback((seed: number) => {
         const table = TABLES.DAEDAE;
         pathSeedRef.current = seed;
@@ -894,7 +900,7 @@ export function SimulatorPage() {
     // 찾은 길은 그때의 배치에만 유효하다 — 공이 움직이면(샷·손으로 옮김) 목록을 비운다
     const pathStale = solvedKeyRef.current !== ballsKey;
     const paths = useMemo(
-        () => (pathView && !pathStale ? rankedPaths(solver.result?.candidates ?? [], 3) : []),
+        () => (pathView && !pathStale ? rankedPaths(solver.result?.candidates ?? [], PATH_TOP_N) : []),
         [pathView, pathStale, solver.result],
     );
     const [pathPick, setPathPick] = useState(0);
@@ -908,6 +914,8 @@ export function SimulatorPage() {
             balls: sim.balls, cueBallId: sim.cueBallId, gameType: sim.config.gameType, rules: sim.config.rules,
             params: sim.params, seed: solverSeedRef.current,
             opening: sim.session ? isOpeningShot(sim.session, sim.balls) : false,
+            // 길 찾기는 전용 화면이라 예산을 넉넉히 준다 — 전수 탐색이 더 돌고 오차 허용(여유) 추정이 안정된다
+            ...(pathViewRef.current ? { budgetMs: PATH_BUDGET_MS } : {}),
         });
     }, [sim.config, sim.params, sim.phase, sim.balls, sim.cueBallId, sim.session, solver]);
     const retrySolver = useCallback(() => { solverSeedRef.current += 1; openSolver(); }, [openSolver]);
@@ -1014,7 +1022,8 @@ export function SimulatorPage() {
     if (!pathView) railToggles.push({ id: "innings", label: t("sim.controls.innings"), icon: <ListIcon />, onPress: onInnings });
     if (drillReset) railToggles.push({ id: "reset", label: t("sim.drill.reset"), icon: <ResetIcon />, onPress: onRestart });
     const railBottom: RailItem[] = [];
-    railBottom.push(canResign
+    // 길 찾기에선 나가기가 머리글의 닫기 알약이다(툴바엔 두지 않는다 — 오너)
+    if (!pathView) railBottom.push(canResign
         ? { id: "resign", label: t("sim.match.resign"), icon: <FlagIcon />, onPress: () => setResignOpen(true) }
         : { id: "exit", label: t("sim.controls.exit"), icon: <CloseIcon />, onPress: onExitRequest });
     const railGroups = [railAim, railToggles, railBottom];
@@ -1039,9 +1048,10 @@ export function SimulatorPage() {
                 <TopBar
                     session={sim.session} config={sim.config} phase={sim.phase} names={names}
                     record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
-                    drillName={drill ? t(drill.drill.nameKey) : pathView ? t("sim.path.chip") : null}
+                    drillName={drill ? t(drill.drill.nameKey) : null}
                     hideStatus={pathView}
-                    drillNameStatic={pathView}
+                    hideSummary={pathView}
+                    onClose={pathView ? onExitRequest : undefined}
                     onSummary={pathView ? openSolver : onInnings}
                     onBack={isMatch ? onExitRequest : undefined}
                     clock={clock}
@@ -1085,7 +1095,7 @@ export function SimulatorPage() {
                             </span>
                         )}
                         {!drill && sim.canPlace && sim.session && sim.session.shotCount === 0 && (
-                            <span className={chipNeutral}>{t("sim.hud.placeHint")}</span>
+                            <span className={cn(chipNeutral, pathView && "hidden")}>{t("sim.hud.placeHint")}</span>
                         )}
                         {reality && sim.phase === "aim" && <span className={chipNeutral}>{t("sim.hud.realityChip")}</span>}
                         {risk && sim.phase === "aim" && (
@@ -1130,12 +1140,8 @@ export function SimulatorPage() {
                                 <PlusIcon />
                             </HoldButton>
                         </div>
-                        {!(isMatch && sim.phase === "finished") && (
-                            <ShotButton
-                                phase={sim.phase}
-                                onShoot={pathView ? onShootPath : onShoot}
-                                onRestart={onRestart} compact={compact} className="shrink-0"
-                            />
+                        {!pathView && !(isMatch && sim.phase === "finished") && (
+                            <ShotButton phase={sim.phase} onShoot={onShoot} onRestart={onRestart} compact={compact} className="shrink-0" />
                         )}
                     </div>
 
@@ -1144,9 +1150,9 @@ export function SimulatorPage() {
                     {pathView ? (
                         <BestPathCard
                             status={pathStale ? "idle" : solver.status} progress={solver.progress} candidate={pickedPath}
-                            maxOffset={DEFAULT_CUE.maxOffset} onSearch={openSolver}
+                            maxOffset={DEFAULT_CUE.maxOffset} onSearch={openSolver} onShoot={onShootPath} shooting={sim.phase === "shooting"}
                             className={cn(
-                                "absolute left-2 right-[76px] bottom-2 z-[3] transition-opacity duration-150",
+                                "absolute left-2 right-2 bottom-2 z-[3] transition-opacity duration-150",
                                 controlsHidden ? "opacity-0 pointer-events-none" : "opacity-100",
                             )}
                         />

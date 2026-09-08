@@ -37,6 +37,10 @@ export interface TopBarProps {
     hideStatus?: boolean;
     /** drillName 을 누를 수 없는 이름표로 그린다(길 찾기: 여긴 이닝 시트가 없다). */
     drillNameStatic?: boolean;
+    /** 오른쪽 요약(점수·이닝·에버)을 감춘다 — 길 찾기는 점수를 세는 화면이 아니다. */
+    hideSummary?: boolean;
+    /** 오른쪽 닫기 알약(길 찾기: 툴바의 X 대신 여기). */
+    onClose?: () => void;
     /** 쓰리아웃: 지금 차례인 사람의 시간 초과 횟수(used/total). 대전에서만. */
     strikes?: { readonly used: number; readonly total: number; readonly mine: boolean } | null;
 }
@@ -97,6 +101,14 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                 </span>
             )}
             <div className="flex-1 min-w-0" />
+            {p.onClose && (
+                <button
+                    type="button" onClick={p.onClose} aria-label={t("sim.common.close")}
+                    className="h-9 px-3.5 shrink-0 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2 active:bg-surface-3"
+                >
+                    {t("sim.common.close")}
+                </button>
+            )}
             {/* 요약은 항목별 독립 칩 버튼(2026-09-08 오너): 1인 = 점수 · 이닝 · 에버, 2인 = 선수마다 [이름 점수/다마수](차례는 brand 테두리 + 점). 어느 칩이든 이닝 시트. */}
             {s && p.drillName && (p.drillNameStatic ? (
                 <span className="h-9 px-3 rounded-xl bg-surface-3 flex items-center shrink-0">
@@ -107,7 +119,7 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                     <span className="text-[12px] font-semibold text-ink-1 truncate max-w-[160px]">{p.drillName}</span>
                 </button>
             ))}
-            {s && !p.drillName && (
+            {s && !p.drillName && !p.hideSummary && (
                 <div className="flex items-center gap-1.5 min-w-0 -mr-1">
                     {twoPlayers
                         ? s.players.map((pl, i) => {

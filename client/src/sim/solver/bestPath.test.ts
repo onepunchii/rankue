@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { bestCandidate, successPct, cushionCount, rankedPaths } from "./bestPath";
+import { bestCandidate, successPct, cushionCount, rankedPaths, marginLevel, tipSpot } from "./bestPath";
 import type { SolveCandidate } from "./search";
 
 /** 필요한 필드만 채운 가짜 후보 — 카드는 순수 함수 세 개만 테스트한다(그리기는 jsdom 스모크가 따로 없다). */
@@ -46,5 +46,22 @@ describe("길 찾기 카드", () => {
         expect(top.map((c) => c.robustness)).toEqual([0.9, 0.5, 0.3]);
         expect(rankedPaths(list, 2).length).toBe(2);
         expect(rankedPaths([])).toEqual([]);
+    });
+    it("여유 등급: 30% 이상 넉넉 · 15% 이상 보통 · 그 아래 까다로움", () => {
+        expect(marginLevel(candidate({ score: 1, robustness: 0.64 }))).toBe("wide");
+        expect(marginLevel(candidate({ score: 1, robustness: 0.30 }))).toBe("wide");
+        expect(marginLevel(candidate({ score: 1, robustness: 0.29 }))).toBe("mid");
+        expect(marginLevel(candidate({ score: 1, robustness: 0.15 }))).toBe("mid");
+        expect(marginLevel(candidate({ score: 1, robustness: 0.07 }))).toBe("tight");
+        expect(marginLevel(candidate({ score: 1, robustness: null }))).toBeNull();
+    });
+    it("당점은 팁 표기: 최대 옆당점이 3팁, 위아래는 상·중·하단", () => {
+        const M = 0.5;
+        expect(tipSpot(0, 0, M)).toEqual({ tips: 0, side: null, vertical: "mid" });
+        expect(tipSpot(0.5, 0, M)).toEqual({ tips: 3, side: "right", vertical: "mid" });
+        expect(tipSpot(-0.33, 0, M)).toEqual({ tips: 2, side: "left", vertical: "mid" });
+        expect(tipSpot(0.17, 0.25, M)).toEqual({ tips: 1, side: "right", vertical: "high" });
+        expect(tipSpot(0, -0.25, M).vertical).toBe("low");
+        expect(tipSpot(0.02, 0.05, M)).toEqual({ tips: 0, side: null, vertical: "mid" });
     });
 });

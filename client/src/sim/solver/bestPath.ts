@@ -23,3 +23,32 @@ export function cushionCount(c: SolveCandidate): number {
 export function successPct(c: SolveCandidate): number | null {
     return c.robustness === null ? null : Math.round(c.robustness * 100);
 }
+
+/** 여유 등급 — 넉넉(30 % 이상) · 보통(15~29 %) · 까다로움(그 아래). 못 잰 후보는 null. */
+export type MarginLevel = "wide" | "mid" | "tight";
+export function marginLevel(c: SolveCandidate): MarginLevel | null {
+    const pct = successPct(c);
+    if (pct === null) return null;
+    return pct >= 30 ? "wide" : pct >= 15 ? "mid" : "tight";
+}
+
+/** 최대 옆당점을 몇 팁으로 볼지(한국 당구 표기: 1~3팁). */
+export const MAX_TIPS = 3;
+
+export interface TipSpot {
+    /** 좌/우 옆당점 팁 수(0 = 중앙) */
+    readonly tips: number;
+    readonly side: "left" | "right" | null;
+    /** 위아래: 상단 · 중단 · 하단 */
+    readonly vertical: "high" | "mid" | "low";
+}
+
+/** 당점(a, b)을 팁 표기로. maxOffset 이 3팁이다. 아주 작은 값은 중앙으로 본다. */
+export function tipSpot(a: number, b: number, maxOffset: number): TipSpot {
+    const ax = Math.abs(a) / maxOffset;
+    const tips = Math.min(MAX_TIPS, Math.round(ax * MAX_TIPS));
+    const side = tips === 0 ? null : a > 0 ? "right" : "left";
+    const by = b / maxOffset;
+    const vertical = by > 0.2 ? "high" : by < -0.2 ? "low" : "mid";
+    return { tips, side, vertical };
+}
