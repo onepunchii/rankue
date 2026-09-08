@@ -424,13 +424,13 @@ export function parseClaimResponse(raw: unknown): ClaimResponse {
 /* ------------------------------------------------------------------ 오류 분류 */
 
 /** 서버 sendError 의 code. 409 응답에 실린다. */
-export type MatchErrorCode = "NOT_YOUR_TURN" | "IDX_MISMATCH" | "RECORD_CONFLICT" | "TOO_EARLY" | "BAD_PASSWORD" | "AWAY";
+export type MatchErrorCode = "NOT_YOUR_TURN" | "IDX_MISMATCH" | "RECORD_CONFLICT" | "TOO_EARLY" | "BAD_PASSWORD";
 
 export function matchErrorCode(err: unknown): MatchErrorCode | null {
     if (!isRecord(err)) return null;
     const data = isRecord(err.data) ? err.data : null;
     const code = data && typeof data.code === "string" ? data.code : null;
-    return code === "NOT_YOUR_TURN" || code === "IDX_MISMATCH" || code === "RECORD_CONFLICT" || code === "TOO_EARLY" || code === "BAD_PASSWORD" || code === "AWAY" ? code : null;
+    return code === "NOT_YOUR_TURN" || code === "IDX_MISMATCH" || code === "RECORD_CONFLICT" || code === "TOO_EARLY" || code === "BAD_PASSWORD" ? code : null;
 }
 
 /**
@@ -444,7 +444,7 @@ export type MatchFailure = ApiFailure | "not-your-turn" | "too-early" | "bad-pas
 export function classifyMatchError(err: unknown): MatchFailure {
     const code = matchErrorCode(err);
     if (code === "NOT_YOUR_TURN") return "not-your-turn";
-    if (code === "TOO_EARLY" || code === "AWAY") return "too-early";   // 둘 다 "아직 아니다" — 리싱크 없이 다음 폴링에 맡긴다
+    if (code === "TOO_EARLY") return "too-early";
     if (code === "BAD_PASSWORD") return "bad-password";
     return classifyApiError(err);
 }

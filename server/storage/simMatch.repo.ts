@@ -205,24 +205,9 @@ export class SimMatchRepository {
     /** 접속 표시: 대전 화면 폴링·샷 때 내 자리의 seen_at 을 적는다(5 s 에 한 번). */
     async touchSeen(id: string, playerIndex: 0 | 1): Promise<void> {
         const col = playerIndex === 0 ? hiqSimMatches.hostSeenAt : hiqSimMatches.guestSeenAt;
-        const secs = PRESENCE_MS / 1000;
-        // 내 자리 seen 갱신 + (내가 차례인데 자리를 비웠다 돌아왔으면) 40초 시계를 지금부터 다시 센다.
-        // 자리를 비운 동안 시계가 계속 돌면 돌아오자마자 시간 초과가 나서 칠 기회조차 없다(2026-09-08 리뷰).
-        // CASE 안의 seen 은 갱신 전 값(SQL 은 문장 시작 시점의 값을 본다) — 그래서 "직전에 얼마나 오래 비웠나"를 그대로 볼 수 있다.
-        await db.update(hiqSimMatches).set({
-            ...(playerIndex === 0 ? { hostSeenAt: new Date() } : { guestSeenAt: new Date() }),
-            turnSeenAt: sql`CASE WHEN ${hiqSimMatches.turn} = ${playerIndex} AND ${hiqSimMatches.turnSeenAt} IS NOT NULL
-                AND (${col} IS NULL OR ${col} < now() - make_interval(secs => ${secs}))
-                THEN now() ELSE ${hiqSimMatches.turnSeenAt} END`,
-        })
+        await db.update(hiqSimMatches).set(playerIndex === 0 ? { hostSeenAt: new Date() } : { guestSeenAt: new Date() })
             .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.status, "playing"),
                 or(isNull(col), sql`${col} < now() - make_interval(secs => ${SEEN_THROTTLE_MS / 1000})`)));
-    }
-
-    /** 시계를 지운다(자리를 비운 사람에게는 40초를 재지 않는다 — 돌아와 조준 화면을 열면 ack 로 다시 시작). */
-    async clearTurnSeen(id: string, turn: number): Promise<void> {
-        await db.update(hiqSimMatches).set({ turnSeenAt: null })
-            .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.status, "playing"), eq(hiqSimMatches.turn, turn)));
     }
 
     /** 40초 룰: 차례인 사람이 조준 화면에 들어온 시각을 한 번만 적는다(이미 있으면 그대로 → undefined). */

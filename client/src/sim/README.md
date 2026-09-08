@@ -461,12 +461,10 @@ e2e                scripts/sim-e2e/rooms-dedupe.ts (두 번 만들면 먼저 방
 
 ### 40초 시계 — 리뷰에서 고친 것 (2026-09-08)
 ```
-자리 비움      차례인 사람이 대전 화면을 20 s(PRESENCE_MS) 넘게 안 보면 그 사람에겐 시간 초과를 매기지 않는다.
-              상대가 건 timeout 은 409 AWAY 로 거절하고 turn_seen_at 을 지운다 → 돌아와 폴링하면 40 s 가 처음부터. 앱을 닫아 둔 사람은 48 h 승리 주장으로.
-              자기 차례인 사람이 스스로 보낸 timeout 은 그 자체가 자리에 있다는 증거라 이 검사를 건너뛴다.
-돌아오면 리셋   touchSeen 이 "내가 차례인데 직전 seen 이 20 s 넘게 오래됐다" 면 turn_seen_at 을 now 로 다시 적는다(한 문장 UPDATE — CASE 안의 seen 은 갱신 전 값).
-조준 중 폴링   shouldPoll 에 phase "aim" 추가(5 s 고정). 이게 없으면 자리 표시가 끊겨 상대의 정당한 시간 초과가 AWAY 로 무효가 된다.
-              덤으로 시계 시작(ack)이 focus 이벤트에 기대지 않고 확실히 걸린다(예전엔 wake() 로만 걸렸다).
+자리 비움      시계는 한 번 시작하면 자리를 비워도 계속 돈다 — 자리를 비우는 것 자체가 패널티다(오너 결정).
+              한때 "비우면 시계를 멈추고 돌아오면 리셋"으로 바꿨다가 되돌렸다. 아예 앱을 안 연 사람은 시계가 시작되지 않아 48 h 승리 주장으로 간다.
+조준 중 폴링   shouldPoll 에 phase "aim" 추가(5 s 고정). 자리 표시(host/guest_seen_at)를 살려 두고, 시계 시작(ack)이 focus 이벤트에 기대지 않게 한다
+              (예전엔 wake() 로만 걸려 앱을 계속 열어 둔 채 차례가 오면 시계가 안 걸릴 수 있었다 — "초시간이 안 나온다"의 원인).
 재생 여유 표시  remaining > 40(재생 여유 10 s 동안)이면 시계를 아예 그리지 않는다 — 40 에 멈춘 숫자가 고장처럼 보였다.
-e2e           scripts/sim-e2e/clock-away.ts (AWAY 거절·시계 삭제·복귀 리셋), strikeout.ts, clock-presence.ts, clock.ts
+e2e           scripts/sim-e2e/clock-penalty.ts(자리를 비워도 시간 초과가 걸리고 아웃이 쌓인다) · strikeout.ts · clock-presence.ts · clock.ts
 ```

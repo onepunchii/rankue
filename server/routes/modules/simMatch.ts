@@ -17,7 +17,7 @@ import {
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
-    SHOT_CLOCK_STRIKES, PRESENCE_MS,
+    SHOT_CLOCK_STRIKES,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
@@ -259,16 +259,8 @@ router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: Au
     if (!m.turnSeenAt) return sendError(res, 409, "아직 시계가 시작되지 않았습니다", "TOO_EARLY");
     const myIndex = m.hostId === req.userId ? 0 : 1;
     await storage.simMatch.touchSeen(m.id, myIndex);
-    // 상대가 대신 거는 시간 초과는 그 사람이 실제로 자리에 있었을 때만 매긴다. 앱을 닫아 둔 사람은 시간 초과가 아니라
-    // 48시간 무응답 승리 주장으로 처리한다(2026-09-08 리뷰: 돌아오자마자 실격되는 걸 막는다). 시계는 지워 두고 돌아오면 다시 센다.
-    // 자기 차례인 사람이 스스로 알린 건 그 자체가 자리에 있다는 증거라 이 검사를 건너뛴다.
-    if (m.turn !== myIndex) {
-        const onClockSeen = m.turn === 0 ? m.hostSeenAt : m.guestSeenAt;
-        if (!onClockSeen || Date.now() - onClockSeen.getTime() > PRESENCE_MS) {
-            await storage.simMatch.clearTurnSeen(m.id, m.turn);
-            return sendError(res, 409, "상대가 자리를 비웠어요", "AWAY");
-        }
-    }
+    // 시계는 한 번 시작하면 자리를 비워도 계속 돈다 — 자리를 비우는 것 자체가 패널티다(2026-09-08 오너 결정).
+    // 아예 앱을 안 연 사람은 시계가 시작되지 않으므로 48시간 무응답 승리 주장으로 처리된다.
     const elapsed = Date.now() - m.turnSeenAt.getTime();
     const needMs = (m.turn === myIndex ? SHOT_CLOCK_S : SHOT_CLOCK_S + SHOT_CLOCK_GRACE_S) * 1000 - 1500;   // 네트워크 지연 여유 1.5 s
     if (elapsed < needMs) return sendError(res, 409, "아직 기다려야 합니다", "TOO_EARLY");
