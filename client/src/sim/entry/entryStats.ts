@@ -53,10 +53,12 @@ export function formatAvg(avg: number): string {
     return (Number.isFinite(avg) ? avg : 0).toFixed(2);
 }
 
-export type EntryChoice = "single" | "multi";
+export type EntryChoice = "single" | "multi" | "rooms";
 export const ENTRY_LAST_KEY = "rankue.sim.entry";
+const ENTRY_DEFAULT: readonly EntryChoice[] = ["single", "multi", "rooms"];
 
-/** 마지막에 고른 쪽이 위. 저장값이 없거나 이상하면 싱글이 위. */
-export function entryOrder(last: string | null | undefined): readonly [EntryChoice, EntryChoice] {
-    return last === "multi" ? ["multi", "single"] : ["single", "multi"];
+/** 마지막에 고른 카드가 위, 나머지는 기본 순서(싱글 · 친구와 대전 · 멀티방). 저장값이 없거나 이상하면 기본 순서. */
+export function entryOrder(last: string | null | undefined): readonly EntryChoice[] {
+    const pick = ENTRY_DEFAULT.find((k) => k === last);
+    return pick ? [pick, ...ENTRY_DEFAULT.filter((k) => k !== pick)] : ENTRY_DEFAULT;
 }

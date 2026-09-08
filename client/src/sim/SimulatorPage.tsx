@@ -49,6 +49,8 @@ import { createNumbersCache, overlayDiamond, readDiamondPref, shotReadout, write
 import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
 import { SimEntry } from "./entry/SimEntry";
 import { SimDash } from "./dash/SimDash";
+import { RoomList } from "./match/RoomList";
+import { isCompleteCode, sanitizeCode } from "./matchApi";
 import { matchApi, type MatchPublic } from "./matchApi";
 import { MatchLobby } from "./match/MatchLobby";
 import { MATCH_LIST_QUERY_KEY } from "./match/queryKeys";
@@ -156,13 +158,23 @@ export function SimulatorPage() {
     const dashView = params.get("dash") === "1" || legacyList;
     const dashSection = params.get("sec") === "matches" || legacyList ? "matches" as const : undefined;
     const lobby = params.get("lobby") === "1" && !legacyList;
+    // ?lobby=1&public=1: 멀티방으로 열기 토글이 켜진 채 · ?lobby=1&tab=join&code=: 코드가 채워진 참가 화면(비밀번호 초대 등)
+    const lobbyPublic = params.get("public") === "1";
+    const lobbyCode = sanitizeCode(params.get("code") ?? "");
+    // ?rooms=1 멀티방 목록(2026-09-08 오너: 별도 카드)
+    const roomsView = params.get("rooms") === "1";
+    // ?join=<code>[&auto=1]: 푸시 초대 딥링크. auto 면 비밀번호 없는 대기 방에 바로 참가, 아니면 코드가 채워진 참가 화면
+    const joinCodeRaw = sanitizeCode(params.get("join") ?? "");
+    const joinCode = isCompleteCode(joinCodeRaw) ? joinCodeRaw : "";
+    const autoJoin = params.get("auto") === "1";
     const drillsView = params.get("drills") === "1";
     // 리플레이 링크(?replay=): 대전·로비·드릴·대시보드가 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
-    const [replay] = useState<ReplayPayload | null>(() => (matchId || lobby || drillsView || dashView ? null : decodeReplay(params.get(REPLAY_PARAM))));
-    const [initial] = useState(() => (matchId || lobby || drillsView || dashView || replay ? null : decodePageConfig(readCfgParam(search))));
-    // 파라미터가 하나도 없으면 진입 화면(싱글 / 친구와 대전)부터. cfg 가 있는데 깨졌으면 예전처럼 설정 창을 바로 연다.
-    const entryView = !matchId && !lobby && !drillsView && !dashView && !replay && readCfgParam(search) === null && params.get(REPLAY_PARAM) === null;
-    const [setupOpen, setSetupOpen] = useState(!entryView && initial === null && replay === null && !matchId && !lobby && !drillsView && !dashView);
+    const overlayParam = !!matchId || lobby || drillsView || dashView || roomsView || joinCode !== "";
+    const [replay] = useState<ReplayPayload | null>(() => (overlayParam ? null : decodeReplay(params.get(REPLAY_PARAM))));
+    const [initial] = useState(() => (overlayParam || replay ? null : decodePageConfig(readCfgParam(search))));
+    // 파라미터가 하나도 없으면 진입 화면(싱글 / 친구와 대전 / 멀티방)부터. cfg 가 있는데 깨졌으면 예전처럼 설정 창을 바로 연다.
+    const entryView = !overlayParam && !replay && readCfgParam(search) === null && params.get(REPLAY_PARAM) === null;
+    const [setupOpen, setSetupOpen] = useState(!entryView && initial === null && replay === null && !overlayParam);
     const lobbyTab = params.get("tab") === "join" ? "join" as const : undefined;
     // 드릴 모드: 고정 배치에서 첫 샷만 서버가 채점(문제당 1회), 그 뒤는 연습. scored 전엔 공 배치를 막는다.
     const [drill, setDrill] = useState<{ drill: WeekDrill; week: DrillWeek; scored: boolean; result: { success: boolean; cushions: number } | null } | null>(null);
@@ -293,6 +305,33 @@ export function SimulatorPage() {
         replayStageRef.current = "done";
         setReplayChip(!replaySolo.verifiable || r.hash === replay.hash ? "ok" : "mismatch");
     }, [sim.lastResult, replay, replaySolo]);
+
+    // ?join=<code>&auto=1 (푸시 초대): 대기 중이고 비밀번호가 없으면 바로 참가해 ?match= 로 넘어간다.
+    // 비밀번호 방·auto 아님 → 코드가 채워진 참가 화면. 내 대전이면 그대로 연다. 없어졌으면 안내하고 진입 화면으로.
+    const joinRef = useRef("");
+    useEffect(() => {
+        if (!joinCode || joinRef.current === joinCode) return;
+        joinRef.current = joinCode;
+        const toJoinScreen = () => navigate(`/online-game?lobby=1&tab=join&code=${joinCode}`, { replace: true });
+        (async () => {
+            try {
+                const m = await matchApi.lookupCode(joinCode);
+                if (m.myIndex >= 0) {
+                    navigate(m.status === "playing" ? `/online-game?match=${m.id}` : "/online-game?lobby=1", { replace: true });
+                    return;
+                }
+                if (!autoJoin || m.hasPassword) { toJoinScreen(); return; }
+                const handi = member ? (m.gameType === "3c" ? member.handi3c : member.handi4c) : null;
+                const target = handi !== null && handi !== undefined && handi >= 1 && handi <= 999 ? handi : m.hostTarget;
+                const joined = await matchApi.joinMatch(joinCode, target);
+                void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
+                navigate(`/online-game?match=${joined.id}`, { replace: true });
+            } catch {
+                toast({ title: t("sim.match.inviteGone") });
+                navigate("/online-game", { replace: true });
+            }
+        })();
+    }, [joinCode, autoJoin, member, navigate, queryClient, toast, t]);
 
     // ?match=<id> (푸시 딥링크·목록에서 열기): 서버에서 받아 대전 모드로 연다
     useEffect(() => {
@@ -850,6 +889,7 @@ export function SimulatorPage() {
     const showLobby = lobby && sim.phase === "setup";
     const showDrills = drillsView && sim.phase === "setup";
     const showDash = dashView && sim.phase === "setup";
+    const showRooms = roomsView && sim.phase === "setup";
     const showEntry = entryView && sim.phase === "setup" && !setupOpen;
     const endSubtitle = sim.match
         ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t)
@@ -1055,10 +1095,26 @@ export function SimulatorPage() {
                         onDrills={() => navigate("/online-game?drills=1", { replace: true })}
                         onMulti={() => navigate("/online-game?lobby=1", { replace: true })}
                         onJoin={() => navigate("/online-game?lobby=1&tab=join", { replace: true })}
-                        onMyMatches={() => navigate("/online-game?dash=1&sec=matches", { replace: true })}
+                        onRooms={() => navigate("/online-game?rooms=1", { replace: true })}
+                        onCreateRoom={() => navigate("/online-game?lobby=1&public=1", { replace: true })}
                         onDash={() => navigate("/online-game?dash=1", { replace: true })}
                         onClose={() => navigate(EXIT_PATH)}
                     />
+                </div>
+            )}
+            {showRooms && (
+                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                    <RoomList
+                        onOpen={openMatch}
+                        onCreate={() => navigate("/online-game?lobby=1&public=1", { replace: true })}
+                        onClose={() => navigate("/online-game", { replace: true })}
+                        myHandi={member ? { handi3c: member.handi3c, handi4c: member.handi4c } : undefined}
+                    />
+                </div>
+            )}
+            {joinCode !== "" && sim.phase === "setup" && (
+                <div className="fixed inset-0 z-[5] bg-surface-1 flex items-center justify-center" role="status">
+                    <p className="text-[14px] font-semibold text-ink-2">{t("sim.match.joiningInvite")}</p>
                 </div>
             )}
             {showDash && (
@@ -1075,7 +1131,11 @@ export function SimulatorPage() {
             )}
             {showLobby && (
                 <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    <MatchLobby initialTab={lobbyTab} onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }} onClose={() => navigate("/online-game", { replace: true })} />
+                    <MatchLobby
+                        initialTab={lobbyTab} initialPublic={lobbyPublic} initialCode={lobbyCode || undefined}
+                        onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }}
+                        onClose={() => navigate("/online-game", { replace: true })}
+                    />
                     {/* 내 대전 목록은 대시보드의 대전 섹션으로 옮겼다(2026-09-08 오너) — 로비는 만들기·참가만 */}
                     <div className="w-full max-w-[420px] mx-auto px-5 pb-8">
                         <button type="button" onClick={() => navigate("/online-game?dash=1&sec=matches", { replace: true })} className="w-full h-12 rounded-tile border border-surface-line bg-surface-1 text-[14px] font-semibold text-ink-2 active:bg-surface-3">

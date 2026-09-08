@@ -88,6 +88,20 @@ export class SimMatchRepository {
         return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
     }
 
+    /** 멀티방 목록: 공개·대기 중·내 방 아님·sinceMs 이후 만든 방, 최신순. */
+    async listPublicWaiting(viewerId: string, sinceMs: number, limit = 50): Promise<MatchWithNames[]> {
+        const { q } = this.withNames();
+        const rows = await q.where(and(
+            eq(hiqSimMatches.isPublic, true), eq(hiqSimMatches.status, "waiting"),
+            sql`${hiqSimMatches.hostId} <> ${viewerId}`, gte(hiqSimMatches.createdAt, new Date(sinceMs)),
+        )).orderBy(desc(hiqSimMatches.createdAt)).limit(limit);
+        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
+    }
+
+    async setInvited(id: string, memberId: string): Promise<void> {
+        await db.update(hiqSimMatches).set({ invitedId: memberId }).where(eq(hiqSimMatches.id, id));
+    }
+
     /** 게스트 참가 → playing. waiting 상태의 행을 잠그고 한 번만 성공한다. */
     async start(id: string, guestId: string, guestTarget: number, state: unknown, balls: unknown): Promise<HiqSimMatch | null> {
         return db.transaction(async (tx) => {

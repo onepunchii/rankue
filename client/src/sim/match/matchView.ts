@@ -88,6 +88,7 @@ export function joinErrorKey(err: unknown): string {
         ? (err as { status: number }).status
         : null;
     if (status === 404) return "sim.match.notFound";
+    if (status === 403) return "sim.match.badPassword";
     if (status === 409) return "sim.match.alreadyStarted";
     if (status === 400) return "sim.match.ownMatch";
     return "sim.match.error";

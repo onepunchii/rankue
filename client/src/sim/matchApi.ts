@@ -48,6 +48,18 @@ export function matchTimeoutUrl(id: string): string {
     return `${matchUrl(id)}/timeout`;
 }
 /** ack=1: 차례인 내가 조준 화면에 들어왔다고 알려 40초 시계를 시작한다(서버가 한 번만 적는다). */
+export function roomsUrl(): string {
+    return `${SIM_API_BASE}/rooms`;
+}
+export function matchJoinByIdUrl(id: string): string {
+    return `${SIM_API_BASE}/matches/${encodeURIComponent(id)}/join`;
+}
+export function matchInviteUrl(id: string): string {
+    return `${SIM_API_BASE}/matches/${encodeURIComponent(id)}/invite`;
+}
+export function opponentsUrl(): string {
+    return "/api/hiq/opponents";
+}
 export function matchAckUrl(id: string): string {
     return `${matchUrl(id)}?ack=1`;
 }
@@ -75,6 +87,10 @@ export interface MatchPublic {
     readonly aimAssist?: boolean;
     /** 미리보기 전체(연습처럼 쿠션 뒤 경로까지). 없거나 false 면 짧게(첫 접촉 + 꼬리). */
     readonly fullPreview?: boolean;
+    /** 멀티방(공개 방). 목록(GET /sim/rooms)에 뜬다. 예전 응답엔 없다. */
+    readonly isPublic?: boolean;
+    /** 비밀번호 방 — 참가할 때 password 가 필요하다. */
+    readonly hasPassword?: boolean;
     readonly rules: Rules;
     readonly finishType: FinishType;
     readonly inningCap: number;
@@ -168,16 +184,43 @@ export interface CreateMatchBody {
     readonly aimAssist: boolean;
     /** 미리보기 전체 여부(기본 false = 첫 접촉 + 꼬리). */
     readonly fullPreview: boolean;
+    /** 멀티방(공개 방)으로 열기. */
+    readonly isPublic: boolean;
+    /** 방 비밀번호(4~20자). 없으면 보내지 않는다. */
+    readonly password?: string;
+}
+
+/** 방 옵션(로비의 "멀티방으로 열기" 토글·비밀번호). 설정(SimSetupConfig)과 별개다. */
+export interface RoomOptions {
+    readonly isPublic?: boolean;
+    readonly password?: string;
+}
+
+export const ROOM_PASSWORD_MIN = 4;
+export const ROOM_PASSWORD_MAX = 20;
+/** 비어 있거나 4~20자. */
+export function isValidRoomPassword(pw: string): boolean {
+    return pw === "" || (pw.length >= ROOM_PASSWORD_MIN && pw.length <= ROOM_PASSWORD_MAX);
 }
 
 export interface JoinMatchBody {
     readonly target?: number;
+    readonly password?: string;
+}
+
+/** 초대 보낼 수 있는 상대(GET /api/hiq/opponents 의 필요한 부분만). */
+export interface OpponentLite {
+    readonly id: string;
+    readonly name: string;
+    readonly handi3c: number | null;
+    readonly handi4c: number | null;
 }
 
 /* ------------------------------------------------------------------ 요청 매핑 */
 
-/** 설정의 알려진 필드만 옮긴다(여분 필드는 새지 않는다). */
-export function toCreateMatchBody(config: SimSetupConfig): CreateMatchBody {
+/** 설정의 알려진 필드만 옮긴다(여분 필드는 새지 않는다). 방 옵션은 따로. */
+export function toCreateMatchBody(config: SimSetupConfig, room?: RoomOptions): CreateMatchBody {
+    const password = room?.isPublic && room.password && isValidRoomPassword(room.password) && room.password !== "" ? room.password : undefined;
     return {
         gameType: config.gameType,
         tableId: config.tableId,
@@ -189,13 +232,31 @@ export function toCreateMatchBody(config: SimSetupConfig): CreateMatchBody {
         inningCap: config.inningCap,
         aimAssist: aimAssistFor(config.mode),
         fullPreview: config.matchPreview === "full",
+        isPublic: room?.isPublic === true,
+        ...(password ? { password } : {}),
     };
 }
 
-/** 게스트 다마수. 생략하면 서버가 호스트 다마수를 쓴다. 정수가 아니거나 범위 밖이면 생략. */
-export function toJoinBody(target?: number): JoinMatchBody {
-    if (target === undefined || !Number.isInteger(target) || target < 1 || target > 999) return {};
-    return { target };
+/** 게스트 다마수. 생략하면 서버가 호스트 다마수를 쓴다. 정수가 아니거나 범위 밖이면 생략. 비밀번호는 있을 때만. */
+export function toJoinBody(target?: number, password?: string): JoinMatchBody {
+    const body: { target?: number; password?: string } = {};
+    if (target !== undefined && Number.isInteger(target) && target >= 1 && target <= 999) body.target = target;
+    if (password) body.password = password;
+    return body;
+}
+
+export function parseOpponents(raw: unknown): readonly OpponentLite[] {
+    if (!Array.isArray(raw)) return [];
+    const out: OpponentLite[] = [];
+    for (const r of raw) {
+        if (!isRecord(r) || typeof r.id !== "string" || typeof r.name !== "string") continue;
+        out.push({
+            id: r.id, name: r.name,
+            handi3c: typeof r.handi3c === "number" ? r.handi3c : null,
+            handi4c: typeof r.handi4c === "number" ? r.handi4c : null,
+        });
+    }
+    return out;
 }
 
 /** 코드 입력 정리: 숫자만, 최대 6자리. */
@@ -251,6 +312,8 @@ export function parseMatch(raw: unknown): MatchPublic {
         condition: typeof raw.condition === "number" && Number.isFinite(raw.condition) ? raw.condition : 1,
         aimAssist: typeof raw.aimAssist === "boolean" ? raw.aimAssist : undefined,
         fullPreview: typeof raw.fullPreview === "boolean" ? raw.fullPreview : undefined,
+        isPublic: typeof raw.isPublic === "boolean" ? raw.isPublic : undefined,
+        hasPassword: typeof raw.hasPassword === "boolean" ? raw.hasPassword : undefined,
         rules: raw.rules as unknown as Rules,
         finishType: raw.finishType === "3c" || raw.finishType === "bank" ? raw.finishType : "none",
         inningCap: typeof raw.inningCap === "number" ? raw.inningCap : 0,
@@ -356,13 +419,13 @@ export function parseClaimResponse(raw: unknown): ClaimResponse {
 /* ------------------------------------------------------------------ 오류 분류 */
 
 /** 서버 sendError 의 code. 409 응답에 실린다. */
-export type MatchErrorCode = "NOT_YOUR_TURN" | "IDX_MISMATCH" | "RECORD_CONFLICT" | "TOO_EARLY";
+export type MatchErrorCode = "NOT_YOUR_TURN" | "IDX_MISMATCH" | "RECORD_CONFLICT" | "TOO_EARLY" | "BAD_PASSWORD";
 
 export function matchErrorCode(err: unknown): MatchErrorCode | null {
     if (!isRecord(err)) return null;
     const data = isRecord(err.data) ? err.data : null;
     const code = data && typeof data.code === "string" ? data.code : null;
-    return code === "NOT_YOUR_TURN" || code === "IDX_MISMATCH" || code === "RECORD_CONFLICT" || code === "TOO_EARLY" ? code : null;
+    return code === "NOT_YOUR_TURN" || code === "IDX_MISMATCH" || code === "RECORD_CONFLICT" || code === "TOO_EARLY" || code === "BAD_PASSWORD" ? code : null;
 }
 
 /**
@@ -371,12 +434,13 @@ export function matchErrorCode(err: unknown): MatchErrorCode | null {
  *  too-early     — 409 TOO_EARLY: 승리 주장이 아직 이르다.
  * 나머지(network / idx-mismatch / session-closed / unauthorized / rejected)는 simApi 와 같다.
  */
-export type MatchFailure = ApiFailure | "not-your-turn" | "too-early";
+export type MatchFailure = ApiFailure | "not-your-turn" | "too-early" | "bad-password";
 
 export function classifyMatchError(err: unknown): MatchFailure {
     const code = matchErrorCode(err);
     if (code === "NOT_YOUR_TURN") return "not-your-turn";
     if (code === "TOO_EARLY") return "too-early";
+    if (code === "BAD_PASSWORD") return "bad-password";
     return classifyApiError(err);
 }
 
@@ -439,10 +503,20 @@ export function matchConfig(m: MatchPublic): SimSetupConfig {
 /* ------------------------------------------------------------------ 클라이언트 */
 
 export interface MatchApi {
-    createMatch(config: SimSetupConfig): Promise<MatchPublic>;
+    /** room: 멀티방(공개)·비밀번호. 없으면 코드·초대로만 들어오는 방. */
+    createMatch(config: SimSetupConfig, room?: RoomOptions): Promise<MatchPublic>;
     listMatches(): Promise<readonly MatchPublic[]>;
     lookupCode(code: string): Promise<MatchPublic>;
-    joinMatch(code: string, target?: number): Promise<MatchPublic>;
+    /** password: 비밀번호 방일 때(hasPassword). */
+    joinMatch(code: string, target?: number, password?: string): Promise<MatchPublic>;
+    /** 멀티방 목록(공개·대기 중·내 방 아님). 코드는 비어 있다. */
+    listRooms(): Promise<readonly MatchPublic[]>;
+    /** 목록의 방에 참가(id). 비밀번호 방이면 password. 403 BAD_PASSWORD. */
+    joinRoom(id: string, target?: number, password?: string): Promise<MatchPublic>;
+    /** 호스트가 친구에게 푸시 초대. 돌아오는 name 은 받은 사람 이름. */
+    invite(id: string, memberId: string): Promise<{ name: string }>;
+    /** 초대 보낼 수 있는 상대(같은 매장 회원 — 실전 매칭과 같은 목록). */
+    listOpponents(): Promise<readonly OpponentLite[]>;
     /** opts.ack: 내 차례 조준 화면에 들어왔음을 알린다(40초 시계 시작). */
     getMatch(id: string, opts?: { ack?: boolean }): Promise<MatchPublic>;
     /** from = 로컬 샷 수 → 놓친 샷(idx ≥ from) */
@@ -459,8 +533,8 @@ export interface MatchApi {
 /** request 를 주입해 만든다(테스트는 가짜 request). 응답은 {success,data} 가 이미 벗겨진 data 여야 한다. */
 export function createMatchApi(request: RequestFn): MatchApi {
     return {
-        async createMatch(config) {
-            return parseMatch(await request(matchesUrl(), { method: "POST", body: toCreateMatchBody(config) }));
+        async createMatch(config, room) {
+            return parseMatch(await request(matchesUrl(), { method: "POST", body: toCreateMatchBody(config, room) }));
         },
         async listMatches() {
             return parseMatchList(await request(matchesUrl(), { method: "GET" }));
@@ -468,8 +542,21 @@ export function createMatchApi(request: RequestFn): MatchApi {
         async lookupCode(code) {
             return parseMatch(await request(matchCodeUrl(sanitizeCode(code)), { method: "GET" }));
         },
-        async joinMatch(code, target) {
-            return parseMatch(await request(matchJoinUrl(sanitizeCode(code)), { method: "POST", body: toJoinBody(target) }));
+        async joinMatch(code, target, password) {
+            return parseMatch(await request(matchJoinUrl(sanitizeCode(code)), { method: "POST", body: toJoinBody(target, password) }));
+        },
+        async listRooms() {
+            return parseMatchList(await request(roomsUrl(), { method: "GET" }));
+        },
+        async joinRoom(id, target, password) {
+            return parseMatch(await request(matchJoinByIdUrl(id), { method: "POST", body: toJoinBody(target, password) }));
+        },
+        async invite(id, memberId) {
+            const raw = await request(matchInviteUrl(id), { method: "POST", body: { memberId } });
+            return { name: isRecord(raw) && typeof raw.name === "string" ? raw.name : "" };
+        },
+        async listOpponents() {
+            return parseOpponents(await request(opponentsUrl(), { method: "GET" }));
         },
         async getMatch(id, opts) {
             return parseMatch(await request(opts?.ack ? matchAckUrl(id) : matchUrl(id), { method: "GET" }));

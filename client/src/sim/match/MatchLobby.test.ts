@@ -110,6 +110,10 @@ function fakeApi(over: Partial<MatchApi> = {}): MatchApi {
         postShot: vi.fn(),
         resign: vi.fn(async () => ({ status: "canceled" as const })),
         claim: vi.fn(),
+        listRooms: vi.fn(async () => []),
+        joinRoom: vi.fn(async () => match({ status: "playing", myIndex: 1 })),
+        invite: vi.fn(async () => ({ name: "홍길동" })),
+        listOpponents: vi.fn(async () => [{ id: "op-1", name: "홍길동", handi3c: 20, handi4c: 80 }, { id: "op-2", name: "김철수", handi3c: null, handi4c: null }]),
         ...over,
     };
 }
@@ -166,9 +170,9 @@ describe("MatchLobby · 만들기", () => {
         const h = mountEl(React.createElement(MatchLobby, { onStarted: vi.fn(), onClose: () => undefined, api, pollMs: 1000 }));
         click(byText(h, ko["sim.setup.type4c"])!);
         // 규칙 스위치는 세부 설정 안(접힘) — 펼쳐야 보인다
-        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(0);
+        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(1);   // 멀티방으로 열기
         click(Array.from(h.container.querySelectorAll("button")).find((b) => b.textContent?.startsWith(ko["sim.setup.advanced"]))!);
-        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(3);   // 4구 규칙 2 + 미리보기 전체
+        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(4);   // 멀티방 + 4구 규칙 2 + 미리보기 전체
         expect((h.container.querySelector("#sim-match-target") as HTMLInputElement).value).toBe("80");
         click(byText(h, ko["sim.match.create"])!);
         await flush();
@@ -291,5 +295,66 @@ describe("MatchList", () => {
         expect(h2.container.textContent).toContain(ko["sim.match.listFailed"]);
         expect(byText(h2, ko["sim.match.retry"])).not.toBeNull();
         client2.clear();
+    });
+});
+
+describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () => {
+    it("멀티방으로 열기 + 비밀번호 → createMatch 에 방 옵션, 대기 화면은 공개 문구·칩, 친구에게 보내기 → 초대 푸시", async () => {
+        const api = fakeApi({ createMatch: vi.fn(async () => match({ isPublic: true, hasPassword: true })) });
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000 }));
+        expect(h.container.querySelector("#sim-match-password")).toBeNull();
+        click(h.container.querySelector("#sim-match-public")!);
+        const pw = h.container.querySelector("#sim-match-password") as HTMLInputElement;
+        expect(pw).not.toBeNull();
+        type(pw, "12");
+        expect(h.container.textContent).toContain(ko["sim.match.passwordInvalid"]);
+        expect((byText(h, ko["sim.match.create"]) as HTMLButtonElement).disabled).toBe(true);
+        type(pw, "1234");
+        expect((byText(h, ko["sim.match.create"]) as HTMLButtonElement).disabled).toBe(false);
+        click(byText(h, ko["sim.match.create"])!);
+        await flush();
+        expect(api.createMatch).toHaveBeenCalledTimes(1);
+        expect((api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual({ isPublic: true, password: "1234" });
+        expect(h.container.textContent).toContain(ko["sim.match.publicWaiting"]);
+        expect(h.container.textContent).toContain(ko["sim.match.publicLocked"]);
+        // 친구에게 보내기
+        click(byText(h, ko["sim.match.invite"])!);
+        await flush();
+        const dlg = h.container.querySelector("[role=dialog]")!;
+        expect(dlg).not.toBeNull();
+        expect(api.listOpponents).toHaveBeenCalledTimes(1);
+        expect(dlg.textContent).toContain("홍길동");
+        expect(dlg.textContent).toContain("김철수");
+        click(Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent?.includes("홍길동"))!);
+        await flush();
+        expect(api.invite).toHaveBeenCalledWith("m-1", "op-1");
+        expect(h.container.textContent).toContain(ko["sim.match.inviteSent"].replace("{name}", "홍길동"));
+    });
+
+    it("멀티방 토글 없이 만들면 방 옵션은 비공개·비밀번호 없음, initialPublic 은 켜진 채 시작", async () => {
+        const api = fakeApi();
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000 }));
+        click(byText(h, ko["sim.match.create"])!);
+        await flush();
+        expect((api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual({ isPublic: false, password: undefined });
+        const h2 = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api: fakeApi(), pollMs: 1000, initialPublic: true }));
+        expect(h2.container.querySelector("#sim-match-password")).not.toBeNull();
+    });
+
+    it("코드가 채워진 참가 화면(initialCode): 비밀번호 방이면 비밀번호를 넣어야 참가 → joinMatch(code, 다마수, 비밀번호)", async () => {
+        const api = fakeApi({ lookupCode: vi.fn(async () => match({ myIndex: -1, hasPassword: true })) });
+        const onStarted = vi.fn();
+        const h = mountEl(React.createElement(MatchLobby, { onStarted, onClose: () => undefined, api, initialTab: "join", initialCode: "123456" }));
+        await flush();
+        expect(api.lookupCode).toHaveBeenCalledWith("123456");
+        expect(h.container.querySelector("[data-testid=lobby-found]")).not.toBeNull();
+        const join = byText(h, ko["sim.match.join"]) as HTMLButtonElement;
+        expect(join.disabled).toBe(true);
+        type(h.container.querySelector("#sim-match-join-password") as HTMLInputElement, "abcd");
+        expect(join.disabled).toBe(false);
+        click(join);
+        await flush();
+        expect(api.joinMatch).toHaveBeenCalledWith("123456", 20, "abcd");
+        expect(onStarted).toHaveBeenCalledTimes(1);
     });
 });

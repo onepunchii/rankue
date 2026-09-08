@@ -85,6 +85,136 @@ export class SimRepository {
             .map((r) => ({ gameType: r.game_type, tableId: r.table_id, rank: Number(r.rank), total: Number(r.total) }));
     }
 
+    /**
+     * 어드민 "온라인당구 게임" 화면(2026-09-08 오너): 얼마나 쓰는지 — 싱글(세션)·멀티(대전)·드릴 활동을 한 번에.
+     * hiq_sim_* 와 회원 이름만 읽는다. 실전 성적 테이블은 건드리지 않는다.
+     */
+    async adminOverview(days = 30) {
+        const one = async (q: ReturnType<typeof sql>) => ((await db.execute(q)).rows[0] ?? {}) as Record<string, string | number | null>;
+        const many = async (q: ReturnType<typeof sql>) => (await db.execute(q)).rows as Record<string, string | number | null>[];
+        const n = (v: string | number | null | undefined) => (v === null || v === undefined ? 0 : Number(v));
+
+        const sessions = await one(sql`
+            select count(*) as total,
+                   count(*) filter (where status = 'finished') as finished,
+                   count(*) filter (where status = 'playing') as playing,
+                   count(*) filter (where kind = 'drill') as drill_kind,
+                   count(distinct member_id) as players,
+                   coalesce(sum(shots), 0) as shots,
+                   coalesce(sum(innings), 0) as innings,
+                   coalesce(sum(mismatches), 0) as mismatches,
+                   count(*) filter (where started_at >= now() - interval '1 day') as d1,
+                   count(*) filter (where started_at >= now() - interval '7 days') as d7,
+                   count(*) filter (where started_at >= now() - interval '30 days') as d30,
+                   avg(innings) filter (where status = 'finished' and innings > 0) as avg_innings,
+                   avg(extract(epoch from (finished_at - started_at)) / 60) filter (where finished_at is not null and status = 'finished') as avg_minutes
+            from hiq_sim_sessions`);
+        const matches = await one(sql`
+            select count(*) as total,
+                   count(*) filter (where status = 'finished') as finished,
+                   count(*) filter (where status = 'playing') as playing,
+                   count(*) filter (where status = 'waiting') as waiting,
+                   count(*) filter (where status = 'canceled') as canceled,
+                   count(*) filter (where status = 'waiting' and is_public) as open_rooms,
+                   count(*) filter (where is_public) as public_total,
+                   count(*) filter (where password_hash is not null) as password_total,
+                   count(*) filter (where invited_id is not null) as invited_total,
+                   count(*) filter (where aim_assist = false) as reality,
+                   count(*) filter (where end_reason = 'target') as end_target,
+                   count(*) filter (where end_reason = 'inningCap') as end_inning_cap,
+                   count(*) filter (where end_reason = 'resign') as end_resign,
+                   count(*) filter (where end_reason = 'claim') as end_claim,
+                   coalesce(sum(shots), 0) as shots,
+                   coalesce(sum(mismatches), 0) as mismatches,
+                   count(*) filter (where created_at >= now() - interval '1 day') as d1,
+                   count(*) filter (where created_at >= now() - interval '7 days') as d7,
+                   count(*) filter (where created_at >= now() - interval '30 days') as d30
+            from hiq_sim_matches`);
+        const matchPlayers = await one(sql`
+            select count(distinct id) as players from (
+                select host_id as id from hiq_sim_matches union select guest_id from hiq_sim_matches where guest_id is not null) u`);
+        const drills = await one(sql`
+            select count(*) as attempts, count(*) filter (where success) as successes, count(distinct member_id) as players,
+                   count(distinct week_id) as weeks,
+                   count(*) filter (where created_at >= now() - interval '7 days') as d7
+            from hiq_sim_drill_attempts`);
+        const active = async (interval: string) => n((await one(sql`
+            select count(distinct id) as c from (
+                select member_id as id from hiq_sim_sessions where started_at >= now() - ${interval}::interval
+                union select host_id from hiq_sim_matches where created_at >= now() - ${interval}::interval
+                union select guest_id from hiq_sim_matches where guest_id is not null and started_at >= now() - ${interval}::interval
+                union select member_id from hiq_sim_drill_attempts where created_at >= now() - ${interval}::interval) u`)).c);
+        const [a1, a7, a30] = await Promise.all([active("1 day"), active("7 days"), active("30 days")]);
+
+        const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+        const daily = new Map<string, { day: string; sessions: number; matches: number; drills: number; players: number }>();
+        for (let k = days - 1; k >= 0; k--) {
+            const day = dayKey(new Date(Date.now() - k * 86_400_000));
+            daily.set(day, { day, sessions: 0, matches: 0, drills: 0, players: 0 });
+        }
+        const bump = (rows: Record<string, string | number | null>[], key: "sessions" | "matches" | "drills") => {
+            for (const r of rows) { const d = daily.get(String(r.day)); if (d) d[key] = n(r.c); }
+        };
+        bump(await many(sql`select to_char(started_at at time zone 'utc', 'YYYY-MM-DD') as day, count(*) as c from hiq_sim_sessions where started_at >= now() - ${`${days} days`}::interval group by 1`), "sessions");
+        bump(await many(sql`select to_char(created_at at time zone 'utc', 'YYYY-MM-DD') as day, count(*) as c from hiq_sim_matches where created_at >= now() - ${`${days} days`}::interval group by 1`), "matches");
+        bump(await many(sql`select to_char(created_at at time zone 'utc', 'YYYY-MM-DD') as day, count(*) as c from hiq_sim_drill_attempts where created_at >= now() - ${`${days} days`}::interval group by 1`), "drills");
+        for (const r of await many(sql`
+            select day, count(distinct id) as c from (
+                select to_char(started_at at time zone 'utc', 'YYYY-MM-DD') as day, member_id as id from hiq_sim_sessions where started_at >= now() - ${`${days} days`}::interval
+                union select to_char(created_at at time zone 'utc', 'YYYY-MM-DD'), host_id from hiq_sim_matches where created_at >= now() - ${`${days} days`}::interval
+                union select to_char(created_at at time zone 'utc', 'YYYY-MM-DD'), member_id from hiq_sim_drill_attempts where created_at >= now() - ${`${days} days`}::interval) u group by 1`)) {
+            const d = daily.get(String(r.day)); if (d) d.players = n(r.c);
+        }
+
+        const byGame = await many(sql`
+            select g.game_type, g.table_id, coalesce(s.c, 0) as sessions, coalesce(m.c, 0) as matches from
+              (select distinct game_type, table_id from hiq_sim_sessions union select distinct game_type, table_id from hiq_sim_matches) g
+              left join (select game_type, table_id, count(*) as c from hiq_sim_sessions group by 1, 2) s on s.game_type = g.game_type and s.table_id = g.table_id
+              left join (select game_type, table_id, count(*) as c from hiq_sim_matches group by 1, 2) m on m.game_type = g.game_type and m.table_id = g.table_id
+            order by 1, 2`);
+        const topPlayers = await many(sql`
+            select mem.name, r.member_id, sum(r.sessions) as sessions, sum(r.matches) as matches, sum(r.wins) as wins, max(r.sim_rating) as rating, max(r.best_avg) as best_avg, max(r.updated_at) as last_at
+            from hiq_sim_ratings r join hiq_members mem on mem.id = r.member_id
+            group by 1, 2 order by (sum(r.sessions) + sum(r.matches)) desc, max(r.updated_at) desc limit 10`);
+        const recentMatches = await many(sql`
+            select m.id, m.status, m.game_type, m.table_id, m.is_public, m.end_reason, m.shots, m.created_at, m.finished_at,
+                   h.name as host_name, g.name as guest_name
+            from hiq_sim_matches m join hiq_members h on h.id = m.host_id left join hiq_members g on g.id = m.guest_id
+            order by m.created_at desc limit 10`);
+
+        return {
+            generatedAt: new Date().toISOString(),
+            days,
+            sessions: {
+                total: n(sessions.total), finished: n(sessions.finished), playing: n(sessions.playing), drillKind: n(sessions.drill_kind),
+                players: n(sessions.players), shots: n(sessions.shots), innings: n(sessions.innings), mismatches: n(sessions.mismatches),
+                d1: n(sessions.d1), d7: n(sessions.d7), d30: n(sessions.d30),
+                avgInnings: sessions.avg_innings === null ? null : Number(sessions.avg_innings),
+                avgMinutes: sessions.avg_minutes === null ? null : Number(sessions.avg_minutes),
+            },
+            matches: {
+                total: n(matches.total), finished: n(matches.finished), playing: n(matches.playing), waiting: n(matches.waiting), canceled: n(matches.canceled),
+                openRooms: n(matches.open_rooms), publicTotal: n(matches.public_total), passwordTotal: n(matches.password_total), invitedTotal: n(matches.invited_total),
+                reality: n(matches.reality), players: n(matchPlayers.players), shots: n(matches.shots), mismatches: n(matches.mismatches),
+                endReasons: { target: n(matches.end_target), inningCap: n(matches.end_inning_cap), resign: n(matches.end_resign), claim: n(matches.end_claim) },
+                d1: n(matches.d1), d7: n(matches.d7), d30: n(matches.d30),
+            },
+            drills: { attempts: n(drills.attempts), successes: n(drills.successes), players: n(drills.players), weeks: n(drills.weeks), d7: n(drills.d7) },
+            activePlayers: { d1: a1, d7: a7, d30: a30 },
+            daily: [...daily.values()],
+            byGame: byGame.map((r) => ({ gameType: String(r.game_type), tableId: String(r.table_id), sessions: n(r.sessions), matches: n(r.matches) })),
+            topPlayers: topPlayers.map((r) => ({
+                memberId: String(r.member_id), name: String(r.name), sessions: n(r.sessions), matches: n(r.matches), wins: n(r.wins),
+                rating: n(r.rating), bestAvg: Number(r.best_avg ?? 0), lastAt: r.last_at ? new Date(String(r.last_at)).toISOString() : null,
+            })),
+            recentMatches: recentMatches.map((r) => ({
+                id: String(r.id), status: String(r.status), gameType: String(r.game_type), tableId: String(r.table_id), isPublic: !!r.is_public,
+                endReason: r.end_reason ? String(r.end_reason) : null, shots: n(r.shots), hostName: String(r.host_name), guestName: r.guest_name ? String(r.guest_name) : null,
+                createdAt: new Date(String(r.created_at)).toISOString(), finishedAt: r.finished_at ? new Date(String(r.finished_at)).toISOString() : null,
+            })),
+        };
+    }
+
     async getShots(sessionId: string): Promise<HiqSimShot[]> {
         return db.select().from(hiqSimShots)
             .where(eq(hiqSimShots.sessionId, sessionId))

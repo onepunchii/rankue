@@ -25,6 +25,8 @@ import {
 import { gameLabel, inningCapLabel, joinErrorKey, rulesLabel, shareText } from "./matchView";
 import { ChevronRightIcon, MinusIcon, PlusIcon } from "../components/railIcons";
 import { ModeInfoDialog } from "../components/ModeInfoDialog";
+import { InviteDialog } from "./InviteDialog";
+import { isValidRoomPassword } from "../matchApi";
 
 export type LobbyTab = "create" | "join";
 
@@ -41,6 +43,10 @@ export interface MatchLobbyProps {
     showTabs?: boolean;
     /** 호스트가 상대를 기다리는 동안의 폴링 주기 (ms). 기본 2000 */
     pollMs?: number;
+    /** 만들기 폼의 "멀티방으로 열기" 토글 초기값(진입 화면 "방 만들기"·목록의 "방 만들기") */
+    initialPublic?: boolean;
+    /** 참가 탭의 코드 초기값(푸시 초대 딥링크·비밀번호 방) */
+    initialCode?: string;
 }
 
 const TABLE_IDS: readonly TableId[] = ["DAEDAE", "JUNGDAE_KR"];
@@ -101,7 +107,7 @@ function ToggleRow({ id, checked, onCheckedChange, title, desc }: {
 }
 
 /** 다마수 칩 줄 + 직접 입력. 값은 문자열(지우는 도중의 빈 칸을 0 으로 바꾸지 않기 위해). */
-function TargetPicker({ id, gameType, text, onText, label }: {
+export function TargetPicker({ id, gameType, text, onText, label }: {
     id: string; gameType: GameType; text: string; onText: (v: string) => void; label: string;
 }) {
     const { t } = useT();
@@ -141,7 +147,7 @@ function TargetPicker({ id, gameType, text, onText, label }: {
 
 /* ------------------------------------------------------------------ 만들기 */
 
-function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void }) {
+function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void; initialPublic?: boolean }) {
     const { t } = useT();
     const [gameType, setGameType] = useState<GameType>("3c");
     const [tableId, setTableId] = useState<TableId>(defaultTableFor("3c"));
@@ -157,6 +163,10 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
     const [inningCap, setInningCap] = useState<number>(0);
     // 대전 미리보기: 기본 짧게(첫 접촉 + 꺾임 꼬리). 켜면 연습처럼 전체 경로(친구끼리 편하게 칠 때).
     const [fullPreview, setFullPreview] = useState(false);
+    // 멀티방(공개 방, 2026-09-08 오너): 목록에 떠서 누구나 참가. 비밀번호(선택 4~20자)는 공개 방에서만 받는다.
+    const [isPublic, setIsPublic] = useState(initialPublic);
+    const [password, setPassword] = useState("");
+    const [inviteOpen, setInviteOpen] = useState(false);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [created, setCreated] = useState<MatchPublic | null>(null);
@@ -167,6 +177,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
 
     const targetNum = targetText.trim() === "" ? NaN : Number(targetText);
     const targetOk = isValidTarget(targetNum);
+    const passwordOk = !isPublic || isValidRoomPassword(password);
 
     const pickGameType = (g: GameType) => {
         if (g === gameType) return;
@@ -176,14 +187,14 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
     };
 
     const create = async () => {
-        if (!targetOk || creating) return;
+        if (!targetOk || !passwordOk || creating) return;
         setCreating(true);
         setError(null);
         try {
             const m = await api.createMatch(buildConfig({
                 gameType, tableId, target: targetNum, inningCap, mode, matchPreview: fullPreview ? "full" : "short",
                 rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: passiveFoul },
-            }));
+            }), { isPublic, password: isPublic && password !== "" ? password : undefined });
             setCreated(m);
             onCreated?.(m);
         } catch {
@@ -250,8 +261,22 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
                 <div className="rounded-card border border-surface-line bg-surface-2 px-5 py-6 text-center space-y-2">
                     <p className="text-[13px] font-semibold text-ink-3">{t("sim.match.codeTitle")}</p>
                     <p className="rk-num text-[40px] leading-none font-bold text-ink-1" aria-label={t("sim.match.codeTitle")}>{formatCode(created.code)}</p>
-                    <p className="text-[12px] font-medium text-ink-4 leading-relaxed">{t("sim.match.codeHint")}</p>
+                    <p className="text-[12px] font-medium text-ink-4 leading-relaxed">{created.isPublic ? t("sim.match.publicWaiting") : t("sim.match.codeHint")}</p>
+                    {created.isPublic && (
+                        <p className="flex justify-center gap-1.5">
+                            <span className="rk-chip bg-surface-3 text-ink-2">{t("sim.entry.rooms")}</span>
+                            {created.hasPassword && <span className="rk-chip bg-surface-3 text-ink-2">{t("sim.match.publicLocked")}</span>}
+                        </p>
+                    )}
                 </div>
+                {/* 친구에게 보내기: 푸시 초대 → 받은 쪽이 누르면 바로 참가 */}
+                <Button
+                    type="button" variant="outline" onClick={() => setInviteOpen(true)}
+                    className="w-full h-12 rounded-xl border-surface-line text-ink-2 font-semibold"
+                >
+                    {t("sim.match.invite")}
+                </Button>
+                <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} api={api} matchId={created.id} />
                 <div className="flex gap-2">
                     <Button
                         type="button" variant="outline" onClick={() => { void copyCode(created.code); }}
@@ -321,6 +346,22 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
                 />
             </div>
 
+            {/* 멀티방으로 열기(공개 방) + 비밀번호(선택) */}
+            <div className="space-y-2">
+                <ToggleRow id="sim-match-public" checked={isPublic} onCheckedChange={setIsPublic} title={t("sim.match.publicRoom")} desc={t("sim.match.publicRoomDesc")} />
+                {isPublic && (
+                    <div className="space-y-1.5">
+                        <Label htmlFor="sim-match-password">{t("sim.match.passwordLabel")}</Label>
+                        <Input
+                            id="sim-match-password" type="password" autoComplete="off" value={password}
+                            onChange={(e) => setPassword(e.target.value)} placeholder={t("sim.match.passwordPlaceholder")}
+                            aria-invalid={!passwordOk} className="h-12 rounded-xl"
+                        />
+                        {!passwordOk && <p className="text-[12px] font-medium text-ink-2">{t("sim.match.passwordInvalid")}</p>}
+                    </div>
+                )}
+            </div>
+
             {/* 세부 설정 — 규칙 · 이닝 제한. 요약 한 줄이 접힌 상태를 말한다. */}
             <div>
                 <button type="button" onClick={() => setAdvancedOpen((o) => !o)} aria-expanded={advancedOpen} className="w-full min-h-11 py-2 flex items-center justify-between gap-3 text-left">
@@ -385,7 +426,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
 
             {error && <p className="text-[12px] font-medium text-ink-2">{error}</p>}
             <Button
-                type="button" onClick={() => { void create(); }} disabled={!targetOk || creating}
+                type="button" onClick={() => { void create(); }} disabled={!targetOk || !passwordOk || creating}
                 className="w-full h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl"
             >
                 {creating ? t("sim.match.creating") : t("sim.match.create")}
@@ -402,9 +443,11 @@ type Lookup =
     | { readonly status: "found"; readonly match: MatchPublic }
     | { readonly status: "error"; readonly key: string };
 
-function JoinTab({ api, onStarted, onCreated }: { api: MatchApi; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void }) {
+function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void; initialCode?: string }) {
     const { t } = useT();
-    const [code, setCode] = useState("");
+    const [code, setCode] = useState(initialCode ? sanitizeCode(initialCode) : "");
+    // 비밀번호 방(hasPassword)일 때만 묻는다
+    const [password, setPassword] = useState("");
     const [lookup, setLookup] = useState<Lookup>({ status: "idle" });
     const [targetText, setTargetText] = useState("");
     const [joining, setJoining] = useState(false);
@@ -430,13 +473,15 @@ function JoinTab({ api, onStarted, onCreated }: { api: MatchApi; onStarted: (m: 
     const found = lookup.status === "found" ? lookup.match : null;
     const targetNum = targetText.trim() === "" ? NaN : Number(targetText);
     const targetOk = isValidTarget(targetNum);
+    const needsPassword = !!found?.hasPassword;
+    const canJoin = !!found && targetOk && (!needsPassword || password !== "");
 
     const join = async () => {
-        if (!found || !targetOk || joining) return;
+        if (!found || !canJoin || joining) return;
         setJoining(true);
         setJoinError(null);
         try {
-            const m = await api.joinMatch(code, targetNum);
+            const m = needsPassword ? await api.joinMatch(code, targetNum, password) : await api.joinMatch(code, targetNum);
             onCreated?.(m);
             onStarted(m);
         } catch (e) {
@@ -492,9 +537,19 @@ function JoinTab({ api, onStarted, onCreated }: { api: MatchApi; onStarted: (m: 
 
                     <TargetPicker id="sim-match-guest-target" gameType={found.gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
 
+                    {needsPassword && (
+                        <div className="space-y-1.5">
+                            <Label htmlFor="sim-match-join-password">{t("sim.rooms.password")}</Label>
+                            <Input
+                                id="sim-match-join-password" type="password" autoComplete="off" value={password}
+                                onChange={(e) => setPassword(e.target.value)} placeholder={t("sim.rooms.passwordHint")} className="h-12 rounded-xl"
+                            />
+                        </div>
+                    )}
+
                     {joinError && <p className="text-[12px] font-medium text-ink-2">{joinError}</p>}
                     <Button
-                        type="button" onClick={() => { void join(); }} disabled={!targetOk || joining}
+                        type="button" onClick={() => { void join(); }} disabled={!canJoin || joining}
                         className="w-full h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl"
                     >
                         {joining ? t("sim.match.joining") : t("sim.match.join")}
@@ -507,7 +562,7 @@ function JoinTab({ api, onStarted, onCreated }: { api: MatchApi; onStarted: (m: 
 
 /* ------------------------------------------------------------------ 로비 */
 
-export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", showTabs = false, pollMs = 2000 }: MatchLobbyProps) {
+export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", showTabs = false, pollMs = 2000, initialPublic = false, initialCode }: MatchLobbyProps) {
     const { t } = useT();
     const [tab, setTab] = useState<LobbyTab>(initialTab);
     const title = showTabs ? t("sim.match.title") : tab === "create" ? t("sim.entry.create") : t("sim.entry.join");
@@ -543,8 +598,8 @@ export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, in
             )}
 
             {tab === "create"
-                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} />
-                : <JoinTab api={api} onStarted={onStarted} onCreated={onCreated} />}
+                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} initialPublic={initialPublic} />
+                : <JoinTab api={api} onStarted={onStarted} onCreated={onCreated} initialCode={initialCode} />}
         </div>
     );
 }

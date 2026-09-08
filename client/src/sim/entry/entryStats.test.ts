@@ -22,9 +22,10 @@ describe("entryStats", () => {
         expect(formatAvg(0.6234)).toBe("0.62");
         expect(formatAvg(Number.NaN)).toBe("0.00");
     });
-    it("마지막에 고른 쪽이 위", () => {
-        expect(entryOrder(null)).toEqual(["single", "multi"]);
-        expect(entryOrder("multi")).toEqual(["multi", "single"]);
-        expect(entryOrder("weird")).toEqual(["single", "multi"]);
+    it("마지막에 고른 카드가 위, 나머지는 기본 순서", () => {
+        expect(entryOrder(null)).toEqual(["single", "multi", "rooms"]);
+        expect(entryOrder("multi")).toEqual(["multi", "single", "rooms"]);
+        expect(entryOrder("rooms")).toEqual(["rooms", "single", "multi"]);
+        expect(entryOrder("junk")).toEqual(["single", "multi", "rooms"]);
     });
 });

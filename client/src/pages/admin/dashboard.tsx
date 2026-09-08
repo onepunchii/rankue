@@ -1,5 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import OnlineGameView from "./OnlineGameView";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideArrowRight, LucideCheckCircle, LucideLogOut,
-    LucideSearch, LucideTrendingUp, LucideBell, LucideCreditCard, LucideSettings, LucideShieldAlert, LucideMenu, LucideX, LucideUsersRound, LucideMail, LucideFlag
+    LucideSearch, LucideTrendingUp, LucideBell, LucideCreditCard, LucideSettings, LucideShieldAlert, LucideMenu, LucideX, LucideUsersRound, LucideMail, LucideFlag, Cpu
 } from "@/lib/icons";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -87,6 +88,7 @@ type Suggestion = {
 function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
     const menuItems = [
         { id: "dashboard", label: "Dashboard", icon: LucideLayoutDashboard },
+        { id: "online-game", label: "온라인당구 게임", icon: Cpu },
         { id: "claims", label: "매장 클레임", icon: LucideStore },
         { id: "registrations", label: "신규 매장 등록", icon: LucideStore },
         { id: "leads", label: "입점 문의", icon: LucidePhone },
@@ -150,7 +152,7 @@ export default function AdminDashboard() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [tab, setTab] = useState<"dashboard" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders">("dashboard");
+    const [tab, setTab] = useState<"dashboard" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game">("dashboard");
     const [memberSearch, setMemberSearch] = useState("");
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
@@ -1069,6 +1071,7 @@ export default function AdminDashboard() {
                     )}
 
                     {tab === "golf-orders" && <GolfOrdersView />}
+                    {tab === "online-game" && <OnlineGameView />}
                 </div>
             </main>
         </div>
@@ -1086,6 +1089,7 @@ function getTabTitle(tab: string) {
         case "notices": return "공지사항 관리";
         case "moderation": return "신고/제재 센터";
         case "golf-orders": return "골프 회원권 접수 현황";
+        case "online-game": return "온라인당구 게임 이용 현황";
         default: return "Admin";
     }
 }

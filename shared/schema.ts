@@ -155,6 +155,8 @@ export const hiqMembers = pgTable("hiq_members", {
   defaultAccountHolder: text("default_account_holder"),
   introduction: text("introduction"),
   hideSkillBadge: boolean("hide_skill_badge").default(false).notNull(), // 커뮤니티 실력 뱃지 숨김
+  /** 국가(ISO 3166-1 alpha-2, 예 "KR"). 시뮬레이터 랭킹의 국가별 보기용 — 기기 언어에서 추정하거나 본인이 고른다. */
+  country: text("country"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1607,6 +1609,12 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   aimAssist: boolean("aim_assist").default(true).notNull(),
   /** 대전 미리보기 전체(연습처럼 쿠션 뒤까지). 기본 false = 첫 접촉 + 꼬리. 방장 설정, 게스트도 따른다. */
   fullPreview: boolean("full_preview").default(false).notNull(),
+  /** 멀티방(공개 방): 방 목록에 떠서 누구나 참가. 기본 false = 코드·푸시 초대로만. */
+  isPublic: boolean("is_public").default(false).notNull(),
+  /** 방 비밀번호(선택) "salt:sha256(salt+pw)". 있으면 참가(코드·목록 모두)에 password 가 맞아야 한다. */
+  passwordHash: text("password_hash"),
+  /** 호스트가 마지막으로 푸시 초대한 회원(친구에게 보내기). */
+  invitedId: uuid("invited_id").references(() => hiqMembers.id),
   rules: jsonb("rules").notNull(),
   finishType: text("finish_type", { enum: ["none", "3c", "bank"] }).default("none").notNull(),
   hostTarget: integer("host_target").notNull(),
@@ -1634,6 +1642,7 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   finishedAt: timestamp("finished_at"),
 }, (t) => ({
   idxCode: index("idx_sim_matches_code").on(t.code, t.status),
+  idxPublic: index("idx_sim_matches_public").on(t.isPublic, t.status, t.createdAt),
   idxHost: index("idx_sim_matches_host").on(t.hostId, t.createdAt),
   idxGuest: index("idx_sim_matches_guest").on(t.guestId, t.createdAt),
 }));

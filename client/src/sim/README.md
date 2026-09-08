@@ -384,3 +384,18 @@ dash/SimDash.tsx     `/online-game?dash=1`(진입 화면 머리글 "대시보드
                      기록이 없으면 "연습 시작"(화면의 초록 하나). 로비 아래 목록은 없앴고 "내 대전은 대시보드에서" 버튼만 둔다.
 테스트: dash/dashStats.test.ts · dash/chartLayout.test.ts · dash/SimDash.test.ts(jsdom, statsApi·matchApi 주입). i18n `sim.dash.*` 56개, 5개 로케일.
 ```
+
+## 멀티방 · 푸시 초대 · 자동 참가 (2026-09-08)
+```
+서버   hiq_sim_matches.is_public / password_hash("salt:sha256") / invited_id · GET /sim/rooms(공개·대기·내 방 아님·24h, 코드 숨김) ·
+       POST /sim/matches/:id/join(멀티방; 초대받은 사람도) · POST /sim/matches/:id/invite {memberId}(호스트, 푸시 → `/online-game?join=<code>&auto=1`) ·
+       코드 참가에도 password 검사(403 BAD_PASSWORD). 회원 hiq_members.country(국가별 랭킹용).
+match/RoomList.tsx    `?rooms=1` 목록(10 s 폴링) → 참가 다이얼로그(내 핸디가 다마수 기본값, 비밀번호 방은 비밀번호) → joinRoom → openMatch.
+match/InviteDialog.tsx 대기 화면 "친구에게 보내기": GET /api/hiq/opponents(같은 매장 회원) → invite → "OO님에게 보냈어요".
+match/MatchLobby.tsx  만들기: "멀티방으로 열기" 토글(+비밀번호 4~20자, `?public=1` 이면 켜진 채) · 참가: `?code=` 로 채워진 코드, 비밀번호 방이면 입력.
+페이지   `?join=<code>&auto=1`: 조회 → 대기·비밀번호 없음이면 바로 참가(다마수 = 내 실전 핸디 → 없으면 방장) → `?match=`; 비밀번호 방·auto 없음 → 참가 화면; 없어졌으면 토스트 + 진입.
+진입 화면 카드 셋: 싱글 · 친구와 대전(초대 만들기 · 코드로 참가; 내 대전은 대시보드) · 멀티방(열린 방 n · 방 목록 · 방 만들기). 마지막에 고른 카드가 위.
+이름     화면의 "시뮬레이터" 는 "온라인당구 게임"(오너 2026-09-08). 코드·문서의 sim/시뮬레이터 는 그대로.
+어드민   /admin/dashboard "온라인당구 게임" 탭 — GET /admin/online-game(storage.sim.adminOverview): 활성 이용자·세션·대전·멀티방·드릴·일별·종목별·상위 이용자·최근 대전.
+e2e     scripts/sim-e2e/rooms.ts(임시 회원 셋, 전부 삭제) · rooms-capture.ts · admin-check.ts · cleanup-temp.ts.
+```
