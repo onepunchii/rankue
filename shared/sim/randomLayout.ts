@@ -3,9 +3,9 @@
  * 규칙: 쿠션에서 공 반지름 + 여유만큼 떨어지고, 공끼리도 지름 + 여유만큼 떨어진다(붙은 공은 길이 없다시피 해서 뺀다).
  * 배치가 실패하는 일이 없도록 후보를 여러 번 뽑고, 그래도 안 되면 개시 배치를 준다.
  */
-import type { BallState } from "./types";
-import type { TableSpec } from "./params";
-import { openingLayout } from "./layouts";
+import type { BallState } from "./types.js";
+import type { TableSpec } from "./params.js";
+import { openingLayout } from "./layouts.js";
 
 /** 쿠션에서 최소 이만큼(공 반지름의 배수) 떨어뜨린다. */
 const RAIL_MARGIN_R = 2.2;
