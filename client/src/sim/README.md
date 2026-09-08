@@ -458,3 +458,15 @@ entry/entryTheme.ts   ENTRY_STYLE 하나(검정 #121412). 테이블은 위를 �
 그대로 둔 것        24시간 지난 waiting 방은 크론(/api/cron/sim-cleanup, 매일 18:15 UTC)이 접는다. 목록은 24시간 창.
 e2e                scripts/sim-e2e/rooms-dedupe.ts (두 번 만들면 먼저 방이 접힘·목록·코드 404·진행 중은 유지), rooms-audit.ts(읽기만 점검).
 ```
+
+### 40초 시계 — 리뷰에서 고친 것 (2026-09-08)
+```
+자리 비움      차례인 사람이 대전 화면을 20 s(PRESENCE_MS) 넘게 안 보면 그 사람에겐 시간 초과를 매기지 않는다.
+              상대가 건 timeout 은 409 AWAY 로 거절하고 turn_seen_at 을 지운다 → 돌아와 폴링하면 40 s 가 처음부터. 앱을 닫아 둔 사람은 48 h 승리 주장으로.
+              자기 차례인 사람이 스스로 보낸 timeout 은 그 자체가 자리에 있다는 증거라 이 검사를 건너뛴다.
+돌아오면 리셋   touchSeen 이 "내가 차례인데 직전 seen 이 20 s 넘게 오래됐다" 면 turn_seen_at 을 now 로 다시 적는다(한 문장 UPDATE — CASE 안의 seen 은 갱신 전 값).
+조준 중 폴링   shouldPoll 에 phase "aim" 추가(5 s 고정). 이게 없으면 자리 표시가 끊겨 상대의 정당한 시간 초과가 AWAY 로 무효가 된다.
+              덤으로 시계 시작(ack)이 focus 이벤트에 기대지 않고 확실히 걸린다(예전엔 wake() 로만 걸렸다).
+재생 여유 표시  remaining > 40(재생 여유 10 s 동안)이면 시계를 아예 그리지 않는다 — 40 에 멈춘 숫자가 고장처럼 보였다.
+e2e           scripts/sim-e2e/clock-away.ts (AWAY 거절·시계 삭제·복귀 리셋), strikeout.ts, clock-presence.ts, clock.ts
+```
