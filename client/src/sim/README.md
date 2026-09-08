@@ -466,5 +466,6 @@ e2e                scripts/sim-e2e/rooms-dedupe.ts (두 번 만들면 먼저 방
 조준 중 폴링   shouldPoll 에 phase "aim" 추가(5 s 고정). 자리 표시(host/guest_seen_at)를 살려 두고, 시계 시작(ack)이 focus 이벤트에 기대지 않게 한다
               (예전엔 wake() 로만 걸려 앱을 계속 열어 둔 채 차례가 오면 시계가 안 걸릴 수 있었다 — "초시간이 안 나온다"의 원인).
 재생 여유 표시  remaining > 40(재생 여유 10 s 동안)이면 시계를 아예 그리지 않는다 — 40 에 멈춘 숫자가 고장처럼 보였다.
-e2e           scripts/sim-e2e/clock-penalty.ts(자리를 비워도 시간 초과가 걸리고 아웃이 쌓인다) · strikeout.ts · clock-presence.ts · clock.ts
+e2e           clock-penalty.ts(자리를 비워도 시간 초과가 걸리고 아웃이 쌓인다) · clock-visible.ts(브라우저: 여유 10 s 동안 안 보이다가 40부터 감소, 창을 안 만져도 뜬다) ·
+              strikeout.ts · clock-presence.ts · clock.ts · purge-e2e.ts(임시 회원 남으면 정리 — 브라우저를 띄우면 hiq_visit_logs 도 생기니 회원보다 먼저 지운다)
 ```
