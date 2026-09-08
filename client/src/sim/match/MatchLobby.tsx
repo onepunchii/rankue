@@ -24,6 +24,7 @@ import {
 } from "../matchApi";
 import { gameLabel, inningCapLabel, joinErrorKey, rulesLabel, shareText } from "./matchView";
 import { ChevronRightIcon, MinusIcon, PlusIcon } from "../components/railIcons";
+import { ModeInfoDialog } from "../components/ModeInfoDialog";
 
 export type LobbyTab = "create" | "join";
 
@@ -148,6 +149,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
     const [passiveFoul, setPassiveFoul] = useState(false);
     // 플레이 모드: 방장이 고르면 게스트도 같은 모드(서버 aimAssist). 물리 기본값은 buildConfig 의 모드 프리셋이 채운다.
     const [mode, setMode] = useState<SimMode>("normal");
+    const [modeInfo, setModeInfo] = useState<SimMode | null>(null);
     // 세부 설정(규칙 · 이닝 제한)은 접어 둔다 — 대전 만들기는 종목·테이블·다마수·모드면 충분하다(2026-09-07 오너)
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const [inningCap, setInningCap] = useState<number>(0);
@@ -302,16 +304,17 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
                 <Label>{t("sim.setup.mode")}</Label>
                 <div className="flex gap-2">
                     {SIM_MODES.map((m) => (
-                        <SegmentTwoLine
-                            key={m} selected={mode === m} onClick={() => setMode(m)}
-                            title={m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality")}
-                            desc={m === "normal" ? t("sim.setup.modeNormalDesc") : t("sim.setup.modeRealityDesc")}
-                        />
+                        <Segment key={m} selected={mode === m} onClick={() => setModeInfo(m)}>
+                            {m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality")}
+                        </Segment>
                     ))}
                 </div>
-                <p className="text-[12px] font-medium leading-relaxed text-ink-4">
-                    {mode === "normal" ? t("sim.setup.modeNormalHint") : t("sim.setup.modeRealityHint")}
-                </p>
+                <ModeInfoDialog
+                    open={modeInfo !== null} mode={modeInfo ?? mode}
+                    onOpenChange={(o) => { if (!o) setModeInfo(null); }}
+                    onView={setModeInfo}
+                    onPick={(m) => { setMode(m); setModeInfo(null); }}
+                />
             </div>
 
             {/* 세부 설정 — 규칙 · 이닝 제한. 요약 한 줄이 접힌 상태를 말한다. */}
@@ -504,7 +507,6 @@ export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, in
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <h2 className="text-[18px] font-semibold text-ink-1 leading-tight">{t("sim.match.title")}</h2>
-                    <p className="text-[13px] font-medium text-ink-3 mt-1 leading-relaxed">{t("sim.match.subtitle")}</p>
                 </div>
                 <button
                     type="button" onClick={onClose}

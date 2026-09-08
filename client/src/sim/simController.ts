@@ -95,7 +95,7 @@ export type OfflineReason = "session-create" | "shot-retries" | "shot-rejected";
  *  resynced        결과가 어긋나 서버 정본으로 갈아탔다(해시 미스매치는 onMismatch 로 간다)
  *  claim-too-early 승리 주장이 아직 이르다(서버 TOO_EARLY)
  */
-export type MatchEvent = "offline" | "online" | "opponent-shot" | "finished" | "resynced" | "claim-too-early";
+export type MatchEvent = "offline" | "online" | "opponent-shot" | "finished" | "resynced" | "claim-too-early" | "timeout-me" | "timeout-opponent";
 
 export interface SimCallbacks {
     /** 서버 결과로 스냅한 직후(샷당 최대 1회). 인자는 이 세션의 누적 미스매치 수. */
@@ -133,6 +133,8 @@ export interface SimAux {
      * 서버 스냅이 와도 이 값은 로컬 물리 결과 그대로다(이벤트는 서버 것으로 바꾸지 않는다).
      */
     readonly lastResult: SimResult | null;
+    /** 서버 시각 − 이 기기 시각(ms). 대전 폴링마다 갱신 — 40초 시계는 서버 시각 기준으로 센다. */
+    readonly serverOffsetMs: number;
 }
 
 export interface SimSnapshot {
@@ -162,7 +164,7 @@ export interface ControllerDeps {
     readonly previewDelayMs?: number;
 }
 
-const INITIAL_AUX: SimAux = { setup: null, preview: null, speed: 1, syncing: false, duration: 0, lastResult: null };
+const INITIAL_AUX: SimAux = { setup: null, preview: null, speed: 1, syncing: false, duration: 0, lastResult: null, serverOffsetMs: 0 };
 /** exit 가 진행 중인 서버 호출을 기다리는 상한 (ms). */
 export const EXIT_SYNC_WAIT_MS = 3000;
 /** 대전 폴링 주기: 상대 차례가 된 뒤 처음 1분은 빠르게, 그 뒤 느리게. */
@@ -213,6 +215,17 @@ export function endReasonFor(res: Pick<PostShotResponse, "winnerIndex" | "state"
     return p && p.score >= p.target ? "target" : "inningCap";
 }
 
+/** 세션의 핵심(차례·상태·샷 수·선수 점수/이닝)이 같은가 — 샷 없이 차례가 넘어간 것(시간 초과)을 알아채는 용도. */
+function sameSessionCore(a: SessionState, b: SessionState): boolean {
+    if (a.turn !== b.turn || a.status !== b.status || a.shotCount !== b.shotCount || a.winnerIndex !== b.winnerIndex) return false;
+    if (a.players.length !== b.players.length) return false;
+    for (let i = 0; i < a.players.length; i++) {
+        const p = a.players[i], q = b.players[i];
+        if (p.score !== q.score || p.innings !== q.innings || p.highRun !== q.highRun || p.currentRun !== q.currentRun) return false;
+    }
+    return true;
+}
+
 export class SimController {
     readonly store: SimStore;
     private readonly deps: ControllerDeps;
@@ -240,6 +253,8 @@ export class SimController {
     /* 네트워크 대전 */
     private pollTimer: unknown = null;
     private pollInFlight = false;
+    /** 40초 시계 시작(ack)을 이미 시도한 대전 버전 — 서버가 거부해도 같은 버전엔 다시 안 보낸다. */
+    private ackedVersion = -1;
     private waitingSince = 0;
     private lastPhase: Phase = "setup";
     private retryTimer: unknown = null;
@@ -808,6 +823,36 @@ export class SimController {
         return Number.isFinite(at) && at <= (this.deps.wallClock ?? Date.now)();
     }
 
+    /**
+     * 40초 룰 시간 초과 처리. 내 차례면 40초, 상대 차례면 50초(유예 10초) 뒤에 화면이 부른다 — 판정은 서버 시계.
+     * 성공하면 응답의 대전 행으로 맞춘다(샷 없이 차례가 바뀌므로 세션 스냅). 아직 이르면(409 TOO_EARLY) 조용히 false.
+     */
+    async timeout(): Promise<boolean> {
+        const s = this.store.get();
+        if (this.disposed || s.mode !== "match" || !s.match || s.match.status !== "playing" || !this.matchApi.timeout) return false;
+        const gen = this.gen;
+        const id = s.match.matchId;
+        let ok = false;
+        await this.serial(async () => {
+            try {
+                const m = await this.matchApi.timeout!(id);
+                if (gen !== this.gen) return;
+                await this.applyMatchUpdate(gen, m);
+                ok = true;
+            } catch (e) {
+                if (gen !== this.gen) return;
+                if (classifyMatchError(e) !== "too-early") await this.resync(gen);
+            }
+        });
+        return ok;
+    }
+
+    /** 40초 시계를 시작해야 하는가: 내 차례 조준 화면인데 서버에 아직 시각이 없다. 버전당 한 번만 시도한다(서버가 거부해도 루프 없음). */
+    private needsAck(s: SimCoreState): boolean {
+        return s.mode === "match" && !!s.match && s.match.status === "playing" && s.phase === "aim"
+            && s.match.turn === s.match.myIndex && s.match.turnSeenAt === null && this.ackedVersion !== s.match.version;
+    }
+
     /** 지금 서버 상태를 한 번 읽는다(당겨서 새로고침). 상대 차례가 아니어도 된다. */
     sync(): void {
         this.pollNow();
@@ -887,7 +932,8 @@ export class SimController {
         const s = this.store.get();
         if (!this.shouldPoll(s)) { this.clearPollTimer(); return; }
         if (this.pollTimer !== null || this.pollInFlight) return;
-        const delay = this.now() - this.waitingSince < POLL_FAST_WINDOW_MS ? POLL_FAST_MS : POLL_SLOW_MS;
+        // 40초 시계를 시작해야 하면 바로(ack 폴링), 아니면 평소 주기
+        const delay = this.needsAck(s) ? 0 : this.now() - this.waitingSince < POLL_FAST_WINDOW_MS ? POLL_FAST_MS : POLL_SLOW_MS;
         this.pollTimer = this.setTimer(() => { this.pollTimer = null; this.pollNow(); }, delay);
     }
 
@@ -905,10 +951,13 @@ export class SimController {
         this.pollInFlight = true;
         const gen = this.gen;
         const id = s.match.matchId;
+        const version = s.match.version;
+        const ack = this.needsAck(s);
+        if (ack) this.ackedVersion = version;
         void this.serial(async () => {
             try {
                 let m: MatchPublic;
-                try { m = await this.matchApi.getMatch(id); } catch { return; }   // 다음 주기에 다시
+                try { m = await this.matchApi.getMatch(id, ack ? { ack: true } : undefined); } catch { return; }   // 다음 주기에 다시
                 if (gen !== this.gen) return;
                 await this.applyMatchUpdate(gen, m);
             } finally {
@@ -955,6 +1004,14 @@ export class SimController {
     private async applyMatchUpdate(gen: number, m: MatchPublic): Promise<void> {
         let s = this.store.get();
         if (gen !== this.gen || s.mode !== "match" || !s.match || s.match.matchId !== m.id) return;
+        // 서버 시각 보정(40초 시계) — 응답마다 갱신. 이 기기 시계가 몇 초 틀려도 두 사람이 같은 시계를 본다.
+        if (m.serverNow) {
+            const st = Date.parse(m.serverNow);
+            if (Number.isFinite(st)) {
+                const off = st - (this.deps.wallClock ?? Date.now)();
+                if (Math.abs(off - this.aux.serverOffsetMs) > 500) this.setAux({ serverOffsetMs: off });
+            }
+        }
         if (s.phase === "shooting") {
             await this.playbackDone();
             if (gen !== this.gen) return;
@@ -975,6 +1032,15 @@ export class SimController {
         if (m.shots > s.shotIdx) { await this.replayMissed(gen, m, meta); return; }
         if (m.shots < s.shotIdx) { this.snapToServer(m, meta, { count: false, notify: "resynced" }); return; }
         if (!sameBalls(m.balls, s.balls)) { this.snapToServer(m, meta, { count: true, notify: "mismatch" }); return; }
+        // 샷 수·공은 같은데 세션이 다르다 = 샷 없이 차례가 넘어갔다(40초 시간 초과). 서버 정본으로 스냅하고 누가 넘겼는지 알린다.
+        if (s.session && !sameSessionCore(m.state, s.session)) {
+            const iTimedOut = s.session.turn === meta.myIndex && m.state.turn !== s.session.turn;
+            const theyTimedOut = s.session.turn !== meta.myIndex && m.state.turn !== s.session.turn;
+            this.snapToServer(m, meta, { count: false, notify: null });
+            if (iTimedOut) this.callbacks.onMatch?.("timeout-me");
+            else if (theyTimedOut) this.callbacks.onMatch?.("timeout-opponent");
+            return;
+        }
         this.dispatchMeta(meta);
     }
 

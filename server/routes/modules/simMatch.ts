@@ -15,7 +15,7 @@ import {
     type SimParams, type BallState, type ShotInput,
 } from "../../../shared/sim/index.js";
 import {
-    createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot,
+    createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
@@ -71,6 +71,8 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         winnerIndex: m.winnerId === null ? null : m.winnerId === m.hostId ? 0 : 1,
         endReason: m.endReason, engineVersion: m.engineVersion, paramsHash: m.paramsHash,
         createdAt: m.createdAt, startedAt: m.startedAt, lastShotAt: m.lastShotAt, finishedAt: m.finishedAt,
+        // 40초 룰: 시계 기준 시각과 서버 시각(클라이언트 시계 보정용)
+        turnSeenAt: m.turnSeenAt, serverNow: new Date(),
         claimableAt: m.status === "playing" ? new Date((m.lastShotAt ?? m.startedAt ?? m.createdAt).getTime() + CLAIM_AFTER_MS) : null,
     };
 }
@@ -144,9 +146,45 @@ router.post("/sim/matches/code/:code/join", requireAuth, asyncHandler(async (req
 
 // GET /sim/matches/:id — 상태(폴링용)
 router.get("/sim/matches/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    let m = await storage.simMatch.get(req.params.id);
+    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
+    // ?ack=1: 차례인 사람이 조준 화면에 들어왔다 → 40초 시계 시작(한 번만). 상대·재생 중 폴링은 ack 없이 온다.
+    if (req.query.ack === "1" && m.status === "playing" && !m.turnSeenAt) {
+        const myIndex = m.hostId === req.userId ? 0 : 1;
+        if (m.turn === myIndex) {
+            const row = await storage.simMatch.markTurnSeen(m.id, myIndex);
+            if (row) m = { ...m, turnSeenAt: row.turnSeenAt };
+        }
+    }
+    return sendSuccess(res, publicMatch(m, req.userId!));
+}));
+
+// POST /sim/matches/:id/timeout — 40초 룰 시간 초과: 차례인 사람은 40초, 상대는 50초(유예 10초) 뒤부터. 서버 시계가 판정한다.
+// 샷 없이 이닝을 넘기고(foul-timeout) 차례를 바꾼다. 클라이언트는 응답의 대전 행으로 스냅한다.
+router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const m = await storage.simMatch.get(req.params.id);
     if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
-    return sendSuccess(res, publicMatch(m, req.userId!));
+    if (m.status !== "playing") return sendError(res, 409, "진행 중인 대전이 아닙니다");
+    if (!m.turnSeenAt) return sendError(res, 409, "아직 시계가 시작되지 않았습니다", "TOO_EARLY");
+    const myIndex = m.hostId === req.userId ? 0 : 1;
+    const elapsed = Date.now() - m.turnSeenAt.getTime();
+    const needMs = (m.turn === myIndex ? SHOT_CLOCK_S : SHOT_CLOCK_S + SHOT_CLOCK_GRACE_S) * 1000 - 1500;   // 네트워크 지연 여유 1.5 s
+    if (elapsed < needMs) return sendError(res, 409, "아직 기다려야 합니다", "TOO_EARLY");
+    const state = m.state as SessionState;
+    const applied = applyShot(state, timeoutOutcome());
+    const finished = applied.session.status === "finished";
+    const row = await storage.simMatch.passTurn({
+        id: m.id, turn: m.turn, newState: applied.session, newTurn: applied.session.turn,
+        finished, winnerIndex: applied.session.winnerIndex, endReason: finished ? "inningCap" : null,
+    });
+    if (!row) return sendError(res, 409, "이미 차례가 바뀌었습니다", "STALE");
+    const timedOutId = m.turn === 0 ? m.hostId : m.guestId;
+    const otherId = m.turn === 0 ? m.guestId : m.hostId;
+    if (finished) notify(otherId, "시뮬레이터 대전 종료", "결과를 확인해 보세요.", m.id);
+    else if (m.turn === myIndex) notify(otherId, "당신 차례예요", "상대가 40초를 넘겨 차례가 넘어왔어요.", m.id);
+    else notify(timedOutId, "시간 초과", "40초를 넘겨 이닝이 넘어갔어요.", m.id);
+    const full = await storage.simMatch.get(m.id);
+    return sendSuccess(res, publicMatch(full!, req.userId!));
 }));
 
 // GET /sim/matches/:id/shots?from=N — 놓친 샷 따라잡기(preState+input 으로 로컬 재시뮬)

@@ -232,9 +232,13 @@ describe("플레이 모드", () => {
         setInput(targetInput(h), "20");
         const realityBtn = Array.from(h.container.querySelectorAll("button")).find((b) => b.textContent?.includes(ko["sim.setup.modeReality"]))!;
         expect(realityBtn).toBeTruthy();
-        expect(h.container.textContent).toContain(ko["sim.setup.modeNormalHint"]);
+        // 메인엔 설명이 없고, 버튼을 누르면 그림 설명 팝업이 열린다 → 팝업의 초록 버튼이 정한다
+        expect(h.container.textContent).not.toContain(ko["sim.setup.modeRealityHint"]);
         click(realityBtn);
         expect(h.container.textContent).toContain(ko["sim.setup.modeRealityHint"]);
+        expect(h.container.textContent).toContain(ko["sim.modeInfo.title"]);
+        click(Array.from(h.container.querySelectorAll("button")).find((b) => b.textContent === ko["sim.modeInfo.pickReality"])!);
+        expect(h.container.textContent).not.toContain(ko["sim.modeInfo.title"]);
         click(startButton(h));
         expect(h.onStart).toHaveBeenCalledTimes(1);
         expect(h.onStart.mock.calls[0][0]).toMatchObject({ mode: "reality", cushionModel: "mathavan2010", condition: 1.1, target: 20 });

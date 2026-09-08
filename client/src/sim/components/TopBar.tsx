@@ -30,6 +30,8 @@ export interface TopBarProps {
     onSummary: () => void;
     /** 대전에서만: 툴바 X 가 기권이 되므로 나가기는 여기 뒤로 화살표. */
     onBack?: () => void;
+    /** 대전 40초 룰 시계: 남은 초와 누구 차례인지. 없으면 안 그린다. 10초 이하는 진한 칩. */
+    clock?: { readonly seconds: number; readonly mine: boolean } | null;
 }
 
 const SCORE = "rk-num text-[16px] font-bold text-ink-1 leading-none";
@@ -56,12 +58,24 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                     <BackIcon />
                 </button>
             )}
-            {p.config && (
+            {/* 규칙·테이블 배지는 시계가 없을 때만 — 40초 시계가 서면 자리를 내줘 두 선수 이름이 잘리지 않게 한다 */}
+            {p.config && !p.clock && (
                 <span className="rk-chip bg-surface-3 text-ink-2 shrink-0 whitespace-nowrap">
                     {ruleBadge(p.config, t)} · {tableLabel(p.config, t)}
                 </span>
             )}
             {status && <span className="rk-chip border border-surface-line text-ink-3 shrink-0 whitespace-nowrap">{status}</span>}
+            {p.clock && (
+                <span
+                    role="timer" aria-live="polite" aria-label={t("sim.match.shotClockLabel")}
+                    className={cn(
+                        "rk-chip rk-num shrink-0 whitespace-nowrap min-w-[44px] justify-center",
+                        p.clock.seconds <= 10 ? "bg-ink-1 text-surface-1" : p.clock.mine ? "border border-brand text-brand" : "border border-surface-line text-ink-3",
+                    )}
+                >
+                    {t("sim.match.shotClock").replace("{n}", String(p.clock.seconds))}
+                </span>
+            )}
             <div className="flex-1 min-w-0" />
             {s && (
                 <button

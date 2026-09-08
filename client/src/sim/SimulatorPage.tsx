@@ -30,7 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
-import { isOpeningShot, type ShotOutcome } from "@shared/sim/rules";
+import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome } from "@shared/sim/rules";
 import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -213,6 +213,8 @@ export function SimulatorPage() {
             else if (e === "resynced") toast({ title: t("sim.match.resynced") });
             else if (e === "finished") { toast({ title: t("sim.match.finishedByServer") }); void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }
             else if (e === "claim-too-early") toast({ title: t("sim.match.claimTooEarly") });
+            else if (e === "timeout-me") toast({ title: t("sim.match.timeoutMe") });
+            else if (e === "timeout-opponent") toast({ title: t("sim.match.timeoutOpponent") });
         },
     });
     const { actions } = sim;
@@ -626,6 +628,27 @@ export function SimulatorPage() {
         return Array.from({ length: n }, (_, i) => playerLabel(i, n, member?.nickname, t));
     }, [matchNames, sim.session?.players.length, member?.nickname, t]);
     const isMatch = sim.mode === "match";
+    // ── 40초 룰 시계(대전): 서버가 적은 turnSeenAt 부터 센다(서버 시각 보정). 0 이 되면 내 차례는 스스로, 상대 차례는 10초 유예 뒤 서버에 알린다.
+    const clockSeenAt = isMatch && sim.match?.status === "playing" && sim.match.turnSeenAt ? Date.parse(sim.match.turnSeenAt) : NaN;
+    const clockOn = Number.isFinite(clockSeenAt) && (sim.phase === "aim" || sim.phase === "waiting");
+    const [clockNow, setClockNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!clockOn) return;
+        setClockNow(Date.now());
+        const id = setInterval(() => setClockNow(Date.now()), 250);
+        return () => clearInterval(id);
+    }, [clockOn, clockSeenAt]);
+    const clockRemaining = clockOn ? SHOT_CLOCK_S - (clockNow + (sim.match?.serverOffsetMs ?? 0) - clockSeenAt) / 1000 : null;
+    const clock = clockRemaining !== null && sim.match ? { seconds: Math.max(0, Math.ceil(clockRemaining)), mine: sim.match.isMyTurn } : null;
+    const timeoutFiredRef = useRef<string>("");
+    useEffect(() => {
+        if (clockRemaining === null || !sim.match) return;
+        const key = `${sim.match.id}:${sim.match.version}:${sim.match.turnSeenAt}`;
+        const due = sim.match.isMyTurn ? clockRemaining <= 0 : clockRemaining <= -SHOT_CLOCK_GRACE_S;
+        if (!due || timeoutFiredRef.current === key) return;
+        timeoutFiredRef.current = key;
+        void actions.timeout();
+    }, [clockRemaining, sim.match, actions]);
 
     const active = useMemo(() => {
         if (!sim.session || !sim.params) return null;
@@ -871,6 +894,7 @@ export function SimulatorPage() {
                     drillName={drill ? t(drill.drill.nameKey) : null}
                     onSummary={onInnings}
                     onBack={isMatch ? onExitRequest : undefined}
+                    clock={clock}
                 />
 
                 {/* 테이블 영역: 남은 높이 전부. 렌더러·오버레이는 absolute 마운트(tableRef)에, 조작·칩은 그 형제로 얹힌다. */}

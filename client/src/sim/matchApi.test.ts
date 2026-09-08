@@ -276,3 +276,20 @@ describe("createMatchApi", () => {
         expect(r.id).toBe("m-1");
     });
 });
+
+describe("40초 룰 필드·요청", () => {
+    it("parseMatch 는 turnSeenAt·serverNow 를 ISO 로 읽고 없으면 null", () => {
+        const m = parseMatch({ ...rawMatch, turnSeenAt: "2026-09-07T10:00:00.000Z", serverNow: "2026-09-07T10:00:05.000Z" });
+        expect(m.turnSeenAt).toBe("2026-09-07T10:00:00.000Z");
+        expect(m.serverNow).toBe("2026-09-07T10:00:05.000Z");
+        expect(parseMatch(rawMatch).turnSeenAt).toBeNull();
+    });
+    it("getMatch(ack) 는 ?ack=1, timeout 은 POST /timeout", async () => {
+        const request = vi.fn(async () => rawMatch);
+        const a = createMatchApi(request);
+        await a.getMatch("m-1", { ack: true });
+        expect(request).toHaveBeenLastCalledWith("/api/hiq/sim/matches/m-1?ack=1", { method: "GET" });
+        await a.timeout!("m-1");
+        expect(request).toHaveBeenLastCalledWith("/api/hiq/sim/matches/m-1/timeout", { method: "POST" });
+    });
+});

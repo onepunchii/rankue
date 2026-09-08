@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { BallDot } from "@/components/hiq/BallDot";
 import { ChevronDown } from "@/lib/icons";
 import { MinusIcon, PlusIcon } from "./components/railIcons";
+import { ModeInfoDialog } from "./components/ModeInfoDialog";
 import { BallMotif } from "./entry/BallMotif";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
@@ -119,6 +120,8 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
     const [record, setRecord] = useState(true);
     // 플레이 모드. 일반 = 조준 보정 자동, 리얼리티 = 큐 방향 그대로 + 마타반 2010 + 대회 테이블. 모드가 물리 기본값을 채우고 세부 설정에서 바꿀 수 있다.
     const [mode, setMode] = useState<SimMode>("normal");
+    // 모드 버튼은 바로 바꾸지 않고 그림 설명 팝업을 연다 — 팝업의 초록 버튼이 정한다(메인은 깔끔하게, 2026-09-07 오너)
+    const [modeInfo, setModeInfo] = useState<SimMode | null>(null);
     const pickMode = (m: SimMode) => {
         if (m === mode) return;
         setMode(m);
@@ -275,21 +278,16 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
                         </p>
                     </div>
 
-                    {/* 모드 — 일반(조준 보정 자동) / 리얼리티(큐 방향 그대로 · 마타반 2010 · 대회 테이블). 설명 한 줄이 따라 붙는다. */}
+                    {/* 모드 — 일반 / 리얼리티. 누르면 그림 설명 팝업(ModeInfoDialog)이 열리고 거기서 정한다. */}
                     <div className="space-y-1.5">
                         <Label>{t("sim.setup.mode")}</Label>
                         <div className="flex gap-2">
                             {SIM_MODES.map((m) => (
-                                <SegmentTwoLine
-                                    key={m} selected={mode === m} onClick={() => pickMode(m)}
-                                    title={m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality")}
-                                    desc={m === "normal" ? t("sim.setup.modeNormalDesc") : t("sim.setup.modeRealityDesc")}
-                                />
+                                <Segment key={m} selected={mode === m} onClick={() => setModeInfo(m)}>
+                                    {m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality")}
+                                </Segment>
                             ))}
                         </div>
-                        <p className="text-[12px] font-medium leading-relaxed text-ink-4">
-                            {mode === "normal" ? t("sim.setup.modeNormalHint") : t("sim.setup.modeRealityHint")}
-                        </p>
                     </div>
 
                     {/* 세부 설정 — 접힘. 규칙 · 이닝 제한 · 기록하기 · 쿠션 모델 · 컨디션. 요약 한 줄이 접힌 상태를 대신 말한다(2026-09-07 오너). */}
@@ -409,6 +407,12 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
                     </div>
                 </DialogFooter>
             </DialogContent>
+            <ModeInfoDialog
+                open={modeInfo !== null} mode={modeInfo ?? mode}
+                onOpenChange={(o) => { if (!o) setModeInfo(null); }}
+                onView={setModeInfo}
+                onPick={(m) => { pickMode(m); setModeInfo(null); }}
+            />
         </Dialog>
     );
 }

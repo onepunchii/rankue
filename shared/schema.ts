@@ -1627,6 +1627,8 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   startedAt: timestamp("started_at"),
   lastShotAt: timestamp("last_shot_at"),
+  /** 40초 룰: 차례인 사람이 조준 화면에 들어온 시각(GET ?ack=1). 샷·시간 초과로 차례가 바뀌면 null. */
+  turnSeenAt: timestamp("turn_seen_at"),
   finishedAt: timestamp("finished_at"),
 }, (t) => ({
   idxCode: index("idx_sim_matches_code").on(t.code, t.status),

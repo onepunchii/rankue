@@ -44,6 +44,13 @@ export function matchResignUrl(id: string): string {
 export function matchClaimUrl(id: string): string {
     return `${matchUrl(id)}/claim`;
 }
+export function matchTimeoutUrl(id: string): string {
+    return `${matchUrl(id)}/timeout`;
+}
+/** ack=1: 차례인 내가 조준 화면에 들어왔다고 알려 40초 시계를 시작한다(서버가 한 번만 적는다). */
+export function matchAckUrl(id: string): string {
+    return `${matchUrl(id)}?ack=1`;
+}
 
 /* ------------------------------------------------------------------ 타입 (publicMatch / shots / post 응답) */
 
@@ -93,6 +100,10 @@ export interface MatchPublic {
     readonly finishedAt: string | null;
     /** playing 일 때만. 이 시각부터 차례가 아닌 쪽이 승리를 주장할 수 있다(마지막 샷 + 48 h). */
     readonly claimableAt: string | null;
+    /** 40초 룰: 차례인 사람이 조준 화면에 들어온 시각(ISO). 없으면 시계가 아직 안 돈다. */
+    readonly turnSeenAt: string | null;
+    /** 응답을 만든 서버 시각(ISO) — 클라이언트 시계 보정용. 예전 서버 응답엔 없다. */
+    readonly serverNow: string | null;
 }
 
 /** GET /sim/matches/:id/shots 의 한 줄. preState + input 으로 로컬에서 같은 샷을 재시뮬한다. */
@@ -255,6 +266,8 @@ export function parseMatch(raw: unknown): MatchPublic {
         lastShotAt: isoOrNull(raw.lastShotAt),
         finishedAt: isoOrNull(raw.finishedAt),
         claimableAt: isoOrNull(raw.claimableAt),
+        turnSeenAt: isoOrNull(raw.turnSeenAt),
+        serverNow: isoOrNull(raw.serverNow),
     };
 }
 
@@ -422,7 +435,8 @@ export interface MatchApi {
     listMatches(): Promise<readonly MatchPublic[]>;
     lookupCode(code: string): Promise<MatchPublic>;
     joinMatch(code: string, target?: number): Promise<MatchPublic>;
-    getMatch(id: string): Promise<MatchPublic>;
+    /** opts.ack: 내 차례 조준 화면에 들어왔음을 알린다(40초 시계 시작). */
+    getMatch(id: string, opts?: { ack?: boolean }): Promise<MatchPublic>;
     /** from = 로컬 샷 수 → 놓친 샷(idx ≥ from) */
     getShots(id: string, from?: number): Promise<readonly MatchShot[]>;
     postShot(id: string, req: ShotRequest): Promise<PostShotResponse>;
@@ -430,6 +444,8 @@ export interface MatchApi {
     resign(id: string): Promise<ResignResponse>;
     /** 상대가 48시간 넘게 안 쳤을 때만(409 TOO_EARLY 아니면). */
     claim(id: string): Promise<ClaimResponse>;
+    /** 40초 룰 시간 초과 처리(내 차례 40초 / 상대 차례 50초 뒤). 서버가 시각을 판정하고 갱신된 대전 행을 돌려준다. 없으면 시계 기능 없음. */
+    timeout?(id: string): Promise<MatchPublic>;
 }
 
 /** request 를 주입해 만든다(테스트는 가짜 request). 응답은 {success,data} 가 이미 벗겨진 data 여야 한다. */
@@ -447,8 +463,11 @@ export function createMatchApi(request: RequestFn): MatchApi {
         async joinMatch(code, target) {
             return parseMatch(await request(matchJoinUrl(sanitizeCode(code)), { method: "POST", body: toJoinBody(target) }));
         },
-        async getMatch(id) {
-            return parseMatch(await request(matchUrl(id), { method: "GET" }));
+        async getMatch(id, opts) {
+            return parseMatch(await request(opts?.ack ? matchAckUrl(id) : matchUrl(id), { method: "GET" }));
+        },
+        async timeout(id) {
+            return parseMatch(await request(matchTimeoutUrl(id), { method: "POST" }));
         },
         async getShots(id, from) {
             return parseMatchShots(await request(matchShotsUrl(id, from), { method: "GET" }));

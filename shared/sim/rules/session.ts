@@ -78,6 +78,16 @@ export function isOpeningShot(s: SessionState, balls: readonly BallState[]): boo
     return isOpeningLayout(balls, "3c");
 }
 
+/** 대전 샷 클럭(초): 차례가 된 사람이 조준 화면에 들어온 뒤 이만큼 안에 쳐야 한다. UMB 40초 룰. */
+export const SHOT_CLOCK_S = 40;
+/** 상대가 시간 초과를 대신 처리할 수 있기까지의 유예(초) — 치는 사람 쪽 네트워크 지연을 봐준다. */
+export const SHOT_CLOCK_GRACE_S = 10;
+
+/** 시간 초과: 샷 없이 이닝을 넘기는 결과(무득점·이닝 소모). applyShot 에 그대로 넣는다. */
+export function timeoutOutcome(): ShotOutcome {
+    return { code: "foul-timeout", points: 0, scored: false, consumesInning: true, cushionsBeforeSecond: 0, cushionsBeforeFirst: 0, contacts: [], kisses: 0 };
+}
+
 export interface ApplyResult {
     readonly session: SessionState;
     /** 마무리 규칙 때문에 득점이 무효 처리됐으면 원래 outcome 을 이렇게 바꾼 것 */

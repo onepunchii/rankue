@@ -158,6 +158,8 @@ export interface MatchState {
     readonly status: MatchStatus;
     /** ISO. 이 시각부터 (상대 차례일 때) 승리 주장 가능 */
     readonly claimableAt: string | null;
+    /** 40초 룰 시계 기준(ISO). 없으면 시계 없음. */
+    readonly turnSeenAt: string | null;
     readonly endReason: MatchEndReason | null;
     readonly winnerIndex: PlayerIndex | null;
 }
@@ -175,6 +177,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         turn: m.turn,
         status: m.status,
         claimableAt: m.claimableAt,
+        turnSeenAt: m.turnSeenAt ?? null,
         endReason: m.endReason,
         winnerIndex: m.winnerIndex,
     };
@@ -182,7 +185,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
 
 export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
     return a.matchId === b.matchId && a.myIndex === b.myIndex && a.version === b.version && a.turn === b.turn
-        && a.status === b.status && a.claimableAt === b.claimableAt && a.endReason === b.endReason
+        && a.status === b.status && a.claimableAt === b.claimableAt && a.turnSeenAt === b.turnSeenAt && a.endReason === b.endReason
         && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName;
 }
 

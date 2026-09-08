@@ -17,6 +17,7 @@ export const OUTCOME_KEYS: Readonly<Record<ShotOutcomeCode, string>> = {
     "foul-opponent": "sim.outcome.foulOpponent",
     "foul-truncated": "sim.outcome.foulTruncated",
     "foul-opening": "sim.outcome.foulOpening",
+    "foul-timeout": "sim.outcome.foulTimeout",
     "no-shot": "sim.outcome.noShot",
 };
 

@@ -78,6 +78,8 @@ export interface SimulatorActions {
     claim(): Promise<boolean>;
     /** 대전: 지금 서버 상태를 한 번 읽는다(당겨서 새로고침). */
     sync(): void;
+    /** 대전: 40초 룰 시간 초과 처리(화면의 시계가 0 이 되면 부른다 — 내 차례 40초 / 상대 차례 50초). 성공하면 true. */
+    timeout(): Promise<boolean>;
 }
 
 /** 네트워크 대전 뷰(mode="match" 에서만). 이름은 players 순서(0 호스트·흰 공, 1 게스트·노란 공). */
@@ -104,6 +106,10 @@ export interface MatchView {
     readonly canResign: boolean;
     /** 지금 재생 중인 샷이 상대 샷(따라잡기) */
     readonly opponentShot: boolean;
+    /** 40초 룰: 시계 기준 시각(ISO, 서버 시계). 없으면 시계가 안 돈다. */
+    readonly turnSeenAt: string | null;
+    /** 서버 시각 − 이 기기 시각(ms). 남은 초 = 40 − (Date.now() + offset − turnSeenAt)/1000 */
+    readonly serverOffsetMs: number;
 }
 
 export interface Simulator {
@@ -194,6 +200,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         resign: () => ctrl.resign(),
         claim: () => ctrl.claim(),
         sync: () => ctrl.sync(),
+        timeout: () => ctrl.timeout(),
     }), [ctrl]);
 
     return useMemo<Simulator>(() => {
@@ -216,6 +223,8 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             canClaim: ctrl.canClaim(),
             canResign: m.status === "playing",
             opponentShot: core.replayOf !== null && core.replayOf !== m.myIndex,
+            turnSeenAt: m.turnSeenAt,
+            serverOffsetMs: aux.serverOffsetMs,
         } : null;
         return {
             phase: core.phase,

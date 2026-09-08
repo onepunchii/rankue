@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createSession, applyShot, currentPlayer } from "./session.js";
+import { createSession, applyShot, currentPlayer, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S } from "./session.js";
 import { DEFAULT_3C_RULES, DEFAULT_4C_RULES } from "./evaluate.js";
 import type { ShotOutcome } from "./types.js";
 
@@ -84,5 +84,19 @@ describe("2인 세션", () => {
     });
     it("같은 큐볼은 거부", () => {
         expect(() => createSession({ rules: DEFAULT_3C_RULES, players: [{ id: "a", target: 1, cueBallId: "white" }, { id: "b", target: 1, cueBallId: "white" }] })).toThrow();
+    });
+});
+
+describe("시간 초과(40초 룰)", () => {
+    it("timeoutOutcome 을 applyShot 에 넣으면 무득점으로 이닝이 소모되고 차례가 넘어간다", () => {
+        const s = createSession({ rules: DEFAULT_3C_RULES, players: [{ id: "a", target: 15 }, { id: "b", target: 15 }] });
+        const r = applyShot(s, timeoutOutcome());
+        expect(r.outcome.code).toBe("foul-timeout");
+        expect(r.session.turn).toBe(1);
+        expect(r.session.players[0].innings).toBe(1);
+        expect(r.session.players[0].score).toBe(0);
+        expect(r.session.shotCount).toBe(1);
+        expect(SHOT_CLOCK_S).toBe(40);
+        expect(SHOT_CLOCK_GRACE_S).toBe(10);
     });
 });

@@ -27,6 +27,14 @@ vi.mock("@/components/ui/label", async () => {
     const React = await import("react");
     return { Label: (p: Record<string, unknown>) => { const { children, ...rest } = p; return React.createElement("label", rest, children as never); } };
 });
+vi.mock("@/components/ui/dialog", async () => {
+    const React = await import("react");
+    const box = (tag: string) => ({ children, className }: { children?: unknown; className?: string }) => React.createElement(tag, { className }, children as never);
+    return {
+        Dialog: ({ open, children }: { open: boolean; children?: unknown }) => (open ? React.createElement("div", { role: "dialog" }, children as never) : null),
+        DialogContent: box("div"), DialogHeader: box("div"), DialogFooter: box("div"), DialogTitle: box("h2"), DialogDescription: box("p"),
+    };
+});
 vi.mock("@/components/ui/switch", async () => {
     const React = await import("react");
     return {
@@ -252,8 +260,12 @@ describe("MatchList", () => {
         expect(h.container.textContent).toContain(ko["sim.match.listLoading"]);
         await flush();
         await flush();
-        const rows = buttons(h);
+        // 행 버튼만(기권·취소 버튼은 aria-label 이 있다)
+        const rows = buttons(h).filter((b) => !b.getAttribute("aria-label"));
         expect(rows).toHaveLength(4);
+        // 진행 중 두 건은 기권, 내가 연 대기 방은 취소 버튼이 붙는다
+        expect(buttons(h).filter((b) => b.getAttribute("aria-label") === ko["sim.match.resign"])).toHaveLength(2);
+        expect(buttons(h).filter((b) => b.getAttribute("aria-label") === ko["sim.match.cancelShort"])).toHaveLength(1);
         expect(rows[0].textContent).toContain("친구");
         expect(rows[0].textContent).toContain(ko["sim.match.statusMyTurn"]);
         expect(rows[1].textContent).toContain(ko["sim.match.statusTheirTurn"]);

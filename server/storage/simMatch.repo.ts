@@ -6,7 +6,7 @@
 import { db } from "../db.js";
 import { hiqSimMatches, hiqSimMatchShots, hiqSimRatings, hiqMembers } from "../../shared/schema.js";
 import { alias } from "drizzle-orm/pg-core";
-import { eq, and, or, desc, sql, inArray, gte } from "drizzle-orm";
+import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot } from "../../shared/schema.js";
 
 const ELO_K = 24;
@@ -153,11 +153,35 @@ export class SimMatchRepository {
                 shots: m.shots + 1, version: m.version + 1,
                 mismatches: mismatch ? m.mismatches + 1 : m.mismatches,
                 lastShotAt: new Date(),
+                turnSeenAt: null,
                 ...(a.finished ? { status: "finished" as const, finishedAt: new Date(), winnerId, endReason: a.endReason } : {}),
             }).where(eq(hiqSimMatches.id, a.matchId)).returning();
 
             if (a.finished && m.guestId) await this.applyElo(tx, updated, winnerId);
             return { shot, duplicate: false, match: updated };
+        });
+    }
+
+    /** 40초 룰: 차례인 사람이 조준 화면에 들어온 시각을 한 번만 적는다(이미 있으면 그대로 → undefined). */
+    async markTurnSeen(id: string, turn: number): Promise<HiqSimMatch | undefined> {
+        const [row] = await db.update(hiqSimMatches).set({ turnSeenAt: new Date() })
+            .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.status, "playing"), eq(hiqSimMatches.turn, turn), isNull(hiqSimMatches.turnSeenAt)))
+            .returning();
+        return row;
+    }
+
+    /** 40초 룰 시간 초과: 샷 행 없이 이닝을 넘긴다(상태·차례·버전 갱신). 차례가 이미 바뀌었으면 null. */
+    async passTurn(a: { id: string; turn: number; newState: unknown; newTurn: number; finished: boolean; winnerIndex: number | null; endReason: string | null }): Promise<HiqSimMatch | null> {
+        return db.transaction(async (tx) => {
+            const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, a.id)).for("update");
+            if (!m || m.status !== "playing" || m.turn !== a.turn) return null;
+            const winnerId = a.finished ? (a.winnerIndex === 0 ? m.hostId : a.winnerIndex === 1 ? m.guestId : null) : null;
+            const [row] = await tx.update(hiqSimMatches).set({
+                state: a.newState, turn: a.newTurn, version: m.version + 1, lastShotAt: new Date(), turnSeenAt: null,
+                ...(a.finished ? { status: "finished" as const, finishedAt: new Date(), winnerId, endReason: a.endReason } : {}),
+            }).where(eq(hiqSimMatches.id, a.id)).returning();
+            if (a.finished && m.guestId) await this.applyElo(tx, row, winnerId);
+            return row;
         });
     }
 

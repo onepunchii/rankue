@@ -40,6 +40,7 @@ export type ShotOutcomeCode =
     | "miss-finish"      // 마무리 규칙(마지막 점수는 3쿠션/뱅크) 미충족 → 무득점
     | "foul-truncated"   // 물리 이벤트 상한 초과 → 샷 무효
     | "foul-opening"     // 3쿠션 개시 샷: 첫 접촉이 빨간 공이 아님(UMB 개시 규칙) → 무득점·이닝 소모
+    | "foul-timeout"     // 대전 40초 룰: 시간 초과 → 무득점·이닝 소모(샷 없이 서버가 넘긴다)
     | "no-shot";         // 이벤트 없음(0 파워) → 이닝 소모 안 함
 
 /** evaluateShot 부가 옵션. */
