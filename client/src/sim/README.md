@@ -421,3 +421,11 @@ rank/RankPage.tsx   `?rank=1`: 종목·테이블 칩 → 범위(전체 / 내 나
 e2e    scripts/sim-e2e/clock-presence.ts(접속 중 게스트 → 샷 + 10 s 시작 · 부재 호스트 → null → ack) · clock.ts(기존 40/50 s 흐름).
 어드민  GET /me 도 방문으로 센다(하루 1회). 회원 표 "온라인게임" 열(세션 · 대전). 푸시 발송에 링크 칸(params.url). scripts/push/online-game-launch.ts 언어별 오픈 알림(dry run 기본, --send).
 ```
+
+### 홈 타일의 살아 있는 테이블 (2026-09-08 오너)
+```
+QuickActions 의 온라인게임 타일 배경 = EntryShowcase(진입 화면과 같은 컴포넌트). 홈 첫 화면 부담을 안 주려고 lazy + requestIdleCallback + IntersectionObserver 로
+화면이 뜨고 타일이 보일 때 붙이고, 화면 밖이면 paused(RAF 중단, resume 이 다시 건다). three.js 가 안 되는 기기는 Canvas2D, 동작 줄이기 설정이면 정지 화면.
+타일엔 아이콘 없이 아래쪽 검정 35% 띠 위에 글만. 매칭 대결 타일이 노란색(#F5B721)을 넘겨받고 글씨는 검정(흰 글씨는 대비 1.9:1).
+캡처: scripts/sim-e2e/home-capture.ts (오너 쿠키, 읽기만 — 캔버스가 늦게 붙는지·콘솔 오류 0 확인).
+```

@@ -19,10 +19,16 @@ const BREATH_PERIOD_S = 3.2;
 interface Props {
     table?: TableSpec;
     className?: string;
+    /** true 면 그리기 루프를 멈춘다(홈 타일이 화면 밖일 때). 다시 false 가 되면 이어서 돈다. */
+    paused?: boolean;
 }
 
-export function EntryShowcase({ table = TABLES.DAEDAE, className }: Props) {
+export function EntryShowcase({ table = TABLES.DAEDAE, className, paused = false }: Props) {
     const ref = useRef<HTMLDivElement>(null);
+    const pausedRef = useRef(paused);
+    const resumeRef = useRef<() => void>(() => undefined);
+    pausedRef.current = paused;
+    useEffect(() => { if (!paused) resumeRef.current(); }, [paused]);
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
@@ -37,17 +43,23 @@ export function EntryShowcase({ table = TABLES.DAEDAE, className }: Props) {
         try { reduced = typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { reduced = false; }
         const start = typeof performance !== "undefined" ? performance.now() : 0;
         const frame = (now: number) => {
+            raf = 0;
             if (disposed || !renderer) return;
             const t = (now - start) / 1000;
             const phi = base + (reduced ? 0 : Math.sin((t * 2 * Math.PI) / SWEEP_PERIOD_S) * SWEEP_RAD);
             const pullback = reduced ? 0.25 : 0.25 + 0.1 * Math.sin((t * 2 * Math.PI) / BREATH_PERIOD_S);
             renderer.draw({ balls, cue: { phi, pullback, visible: true, ballId: "white" }, view: { cueBallId: "white", phi } });
-            if (!reduced || renderer.needsFrame?.()) raf = requestAnimationFrame(frame);
+            // 멈춰 있으면 다음 프레임을 잡지 않는다 — resume 이 다시 건다
+            if (!pausedRef.current && (!reduced || renderer.needsFrame?.())) raf = requestAnimationFrame(frame);
         };
         const begin = (r: Renderer) => {
             renderer = r;
             if (typeof requestAnimationFrame === "function") raf = requestAnimationFrame(frame);
             else frame(start);
+        };
+        resumeRef.current = () => {
+            if (disposed || !renderer || raf || typeof requestAnimationFrame !== "function") return;
+            raf = requestAnimationFrame(frame);
         };
         const canvas2d = (): Renderer => {
             const r = new Canvas2DRenderer({ insets: NO_INSETS });
@@ -71,6 +83,7 @@ export function EntryShowcase({ table = TABLES.DAEDAE, className }: Props) {
         }
         return () => {
             disposed = true;
+            resumeRef.current = () => undefined;
             if (raf && typeof cancelAnimationFrame === "function") cancelAnimationFrame(raf);
             renderer?.dispose();
             renderer = null;
