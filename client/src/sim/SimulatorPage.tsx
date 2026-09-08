@@ -1221,7 +1221,8 @@ export function SimulatorPage() {
                     {!coachOpen && realityOpen && reality && sim.phase === "aim" && <RealityHint onClose={closeReality} />}
                     {/* 결과 배너: 두께 독 위, 오른쪽 열 왼쪽 — 테이블 아래쪽 가운데 */}
                     <div className="absolute left-0 right-[60px] top-0 z-[3] pointer-events-none" style={{ bottom: DOCK_HEIGHT + 8 }}>
-                        <OutcomeBanner outcome={banner?.outcome ?? null} visible={bannerVisible} sub={readoutText} />
+                        {/* 길 찾기는 점수를 세는 화면이 아니라 결과 배너(득점 +1)를 띄우지 않는다(2026-09-08 오너) */}
+                        <OutcomeBanner outcome={banner?.outcome ?? null} visible={bannerVisible && !pathView} sub={readoutText} />
                     </div>
                 </div>
             </div>
