@@ -923,9 +923,14 @@ export class SimController {
         this.resolvePlaybackWaiters();
     }
 
+    /**
+     * 대전 폴링: 상대 차례(waiting)와 보낼 샷이 남았을 때, 그리고 **내 차례 조준 중에도** 느린 주기로.
+     * 조준 중 폴링은 40초 룰의 자리 표시(host/guest_seen_at)를 살려 둔다 — 이게 없으면 서버가 나를 "자리 비움"으로 보고
+     * 상대가 건 시간 초과를 무르며 시계를 지운다(2026-09-08 리뷰).
+     */
     private shouldPoll(s: SimCoreState): boolean {
         return s.mode === "match" && s.match !== null && s.match.status === "playing"
-            && (s.phase === "waiting" || (s.queue.length > 0 && s.phase !== "shooting" && s.phase !== "setup"));
+            && (s.phase === "waiting" || s.phase === "aim" || (s.queue.length > 0 && s.phase !== "shooting" && s.phase !== "setup"));
     }
 
     private clearPollTimer(): void {
@@ -937,8 +942,11 @@ export class SimController {
         const s = this.store.get();
         if (!this.shouldPoll(s)) { this.clearPollTimer(); return; }
         if (this.pollTimer !== null || this.pollInFlight) return;
-        // 40초 시계를 시작해야 하면 바로(ack 폴링), 아니면 평소 주기
-        const delay = this.needsAck(s) ? 0 : this.now() - this.waitingSince < POLL_FAST_WINDOW_MS ? POLL_FAST_MS : POLL_SLOW_MS;
+        // 40초 시계를 시작해야 하면 바로(ack 폴링). 내 차례 조준 중에는 자리 표시만 살리면 되므로 언제나 느린 주기(5 s).
+        // 상대 차례(waiting)는 결과를 빨리 받아야 하니 처음 1분은 2 s.
+        const delay = this.needsAck(s) ? 0
+            : s.phase === "aim" ? POLL_SLOW_MS
+                : this.now() - this.waitingSince < POLL_FAST_WINDOW_MS ? POLL_FAST_MS : POLL_SLOW_MS;
         this.pollTimer = this.setTimer(() => { this.pollTimer = null; this.pollNow(); }, delay);
     }
 

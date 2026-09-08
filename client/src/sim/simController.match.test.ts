@@ -278,7 +278,7 @@ function aimAtYellow(ctrl: SimController): void {
 /* ------------------------------------------------------------ 테스트 */
 
 describe("대전 시작", () => {
-    it("호스트(내 차례): aim, 대전 설정·파라미터·이름, 솔로 API 는 안 부른다, 폴링 없음", async () => {
+    it("호스트(내 차례): aim, 대전 설정·파라미터·이름, 솔로 API 는 안 부른다, 조준 중에도 느린 폴링(자리 표시)", async () => {
         const m = (make(HOST));
         expect(m.ctrl.startMatch(m.srv.public(HOST))).toBe(true);
         const s = m.s();
@@ -289,9 +289,17 @@ describe("대전 시작", () => {
         expect(m.ctrl.getAux().setup!.config.target).toBe(20);
         expect(m.ctrl.getAux().setup!.params.table).toBe(TABLES.DAEDAE);
         expect(m.env.wakeAttached()).toBe(true);
+        // 내 차례로 들어오면 곧바로 한 번(ack — 40초 시계 시작), 그 뒤엔 5 s 주기로 자리 표시만 남긴다.
+        // 자리 표시가 끊기면 서버가 나를 "자리 비움"으로 보고 상대가 건 시간 초과를 무르며 시계를 지운다.
+        m.env.advance(1);
+        await settle();
+        expect(m.srv.calls.get).toBe(1);                 // ack 폴링(지연 0)
         m.env.advance(POLL_FAST_MS);
         await settle();
-        expect(m.srv.calls.get).toBe(0);                 // 내 차례엔 폴링하지 않는다
+        expect(m.srv.calls.get).toBe(1);                 // 조준 중엔 2 s 로 다시 부르지 않는다
+        m.env.advance(POLL_SLOW_MS);
+        await settle();
+        expect(m.srv.calls.get).toBe(2);
         expect(soloApi.createSession).not.toHaveBeenCalled();
     });
     it("게스트(상대 차례): waiting, 2 s 마다 폴링, 1분 뒤엔 5 s", async () => {

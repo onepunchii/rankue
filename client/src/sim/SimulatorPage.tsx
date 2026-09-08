@@ -677,8 +677,10 @@ export function SimulatorPage() {
     }, [matchNames, sim.session?.players.length, member?.nickname, t]);
     const isMatch = sim.mode === "match";
     // ── 40초 룰 시계(대전): 서버가 적은 turnSeenAt 부터 센다(서버 시각 보정). 0 이 되면 내 차례는 스스로, 상대 차례는 10초 유예 뒤 서버에 알린다.
-    const clockSeenAt = isMatch && sim.match?.status === "playing" && sim.match.turnSeenAt ? Date.parse(sim.match.turnSeenAt) : NaN;
-    const clockOn = Number.isFinite(clockSeenAt) && (sim.phase === "aim" || sim.phase === "waiting");
+    // 0 = 시계 없음(NaN 을 쓰면 NaN !== NaN 이라 아래 useEffect 가 매 렌더 다시 걸린다)
+    const clockSeenAt = isMatch && sim.match?.status === "playing" && sim.match.turnSeenAt ? Date.parse(sim.match.turnSeenAt) : 0;
+    const clockValid = clockSeenAt > 0 && Number.isFinite(clockSeenAt);
+    const clockOn = clockValid && (sim.phase === "aim" || sim.phase === "waiting");
     const [clockNow, setClockNow] = useState(() => Date.now());
     useEffect(() => {
         if (!clockOn) return;
@@ -687,8 +689,11 @@ export function SimulatorPage() {
         return () => clearInterval(id);
     }, [clockOn, clockSeenAt]);
     const clockRemaining = clockOn ? SHOT_CLOCK_S - (clockNow + (sim.match?.serverOffsetMs ?? 0) - clockSeenAt) / 1000 : null;
-    // 서버가 재생 여유(REPLAY_GRACE_MS)를 더해 미래 시각을 적을 수 있어 40 을 넘지 않게 자른다
-    const clock = clockRemaining !== null && sim.match ? { seconds: Math.max(0, Math.min(SHOT_CLOCK_S, Math.ceil(clockRemaining))), mine: sim.match.isMyTurn } : null;
+    // 서버가 재생 여유(REPLAY_GRACE_MS)를 더해 미래 시각을 적어 두는 동안(remaining > 40)은 시계를 그리지 않는다 —
+    // 40 에 멈춘 숫자가 고장처럼 보인다(2026-09-08 리뷰). 여유가 끝나는 순간 40 부터 자연스럽게 줄어든다.
+    const clock = clockRemaining !== null && clockRemaining <= SHOT_CLOCK_S && sim.match
+        ? { seconds: Math.max(0, Math.ceil(clockRemaining)), mine: sim.match.isMyTurn }
+        : null;
     // 쓰리아웃: 지금 차례인 사람이 이미 넘긴 횟수(대전·진행 중일 때만)
     const strikes = isMatch && sim.match && sim.match.status === "playing"
         ? { used: sim.match.timeouts[sim.match.turn] ?? 0, total: SHOT_CLOCK_STRIKES, mine: sim.match.isMyTurn }
