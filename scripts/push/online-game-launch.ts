@@ -7,29 +7,7 @@ import "dotenv/config";
 import { db } from "../../server/db";
 import { sql } from "drizzle-orm";
 import { notificationService } from "../../server/services/notificationService";
-
-type Lang = "ko" | "en" | "es" | "tr" | "vi";
-export const COPY: Record<Lang, { title: string; body: string }> = {
-  ko: { title: "온라인게임 오픈! 폰으로 치는 3쿠션·4구", body: "랭큐 온라인게임이 열렸어요. 혼자 연습하고, 친구를 초대하거나 멀티방에서 누구와도 대전해 보세요. 3판만 치면 랭킹에 오릅니다. 홈에서 온라인게임을 눌러 시작하세요." },
-  en: { title: "Online game is live — 3-cushion & 4-ball on your phone", body: "Rankue's online game is open. Practice solo, invite a friend, or play anyone in the multi rooms. Finish 3 matches to enter the ranking. Tap Online game on the home screen to start." },
-  es: { title: "¡Juego en línea disponible! 3 bandas y 4 bolas en tu móvil", body: "Ya está abierto el juego en línea de Rankue. Practica solo, invita a un amigo o juega con cualquiera en las salas. Con 3 partidas entras en el ranking. Toca Juego en línea en la pantalla de inicio." },
-  tr: { title: "Çevrimiçi oyun açıldı — telefonda 3 bant ve 4 top", body: "Rankue çevrimiçi oyunu açıldı. Tek başına antrenman yap, arkadaşını davet et ya da odalarda herkesle oyna. 3 maç bitirince sıralamaya girersin. Ana ekranda Çevrimiçi oyun'a dokun." },
-  vi: { title: "Trò chơi trực tuyến đã mở — 3 băng & 4 bi trên điện thoại", body: "Trò chơi trực tuyến của Rankue đã mở. Luyện tập một mình, mời bạn bè hoặc đấu với bất kỳ ai trong phòng chơi. Hoàn thành 3 trận để vào bảng xếp hạng. Nhấn Trò chơi trực tuyến ở màn hình chính." },
-};
-const ES = new Set(["MX", "ES", "CO", "AR", "PE", "CL", "VE", "EC", "GT", "DO", "PA", "UY", "BO", "PY", "HN", "SV", "NI", "CU", "PR", "CR"]);
-export function langFor(m: { country: string | null; countryCode: string | null; phone: string }): Lang {
-  const cc = (m.country || m.countryCode || "").toUpperCase();
-  if (cc === "KR") return "ko";
-  if (ES.has(cc)) return "es";
-  if (cc === "TR") return "tr";
-  if (cc === "VN") return "vi";
-  if (cc) return "en";
-  const ph = m.phone || "";
-  if (/^(\+?82|010)/.test(ph)) return "ko";
-  if (/kakao|naver/i.test(ph)) return "ko";
-  return "en";
-}
-for (const [k, v] of Object.entries(COPY)) { if (v.title.length > 60 || v.body.length > 200) throw new Error(`${k} 길이 초과 ${v.title.length}/${v.body.length}`); }
+import { COPY, langFor } from "./onlineGameCopy";
 
 const send = process.argv.includes("--send");
 const rows = (await db.execute(sql`
