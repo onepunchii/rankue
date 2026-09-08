@@ -12,7 +12,7 @@ import { ChartIcon, ChevronRightIcon } from "../components/railIcons";
 import { EntryShowcase } from "./EntryShowcase";
 import { BallMotif } from "./BallMotif";
 import { ENTRY_LAST_KEY, entryOrder, formatAvg, matchRecord, practiceSummary, type EntryChoice, type EntryMatchRow, type EntryRating } from "./entryStats";
-import { entryStyle, type EntryTheme } from "./entryTheme";
+import { ENTRY_STYLE as st } from "./entryTheme";
 
 /**
  * 시뮬레이터 진입 화면(2026-09-07 오너): `/online-game` 에 파라미터 없이 들어오면 먼저 **싱글 / 친구와 대전 / 멀티방** 카드를 고른다.
@@ -37,8 +37,6 @@ export interface SimEntryProps {
     /** 머리글 닫기 옆 "대시보드" — 기록·그래프·내 대전 */
     onDash: () => void;
     onClose: () => void;
-    /** 배경 샘플(?bg=arena|hero|board). 기본 clean = 지금 화면. 고르면 하나만 남긴다. */
-    theme?: EntryTheme;
 }
 
 function readLast(): string | null {
@@ -51,9 +49,8 @@ function writeLast(v: EntryChoice): void {
 const PILL = "h-10 px-3.5 inline-flex items-center gap-1.5 rounded-pill text-[13px] font-semibold";
 const PRIMARY = "h-11 px-5 inline-flex items-center rounded-pill text-[14px] font-semibold";
 
-export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreateRoom, onRank, onDash, onClose, theme = "clean" }: SimEntryProps) {
+export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreateRoom, onRank, onDash, onClose }: SimEntryProps) {
     const { t } = useT();
-    const st = entryStyle(theme);
     const pill = cn(PILL, st.pill);
     const primary = cn(PRIMARY, st.primary);
     const { member } = useAuth();
@@ -186,10 +183,8 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
         </section>
     );
 
-    // 히어로 샘플은 테이블이 머리글 위로 올라온다(첫 화면이 테이블로 시작)
-    const heroFirst = theme === "hero";
     const header = (
-        <div className={cn("flex items-center justify-between mb-3", heroFirst && "relative -mt-16 pb-2")}>
+        <div className="flex items-center justify-between mb-3">
             <h1 className={cn("text-[20px] font-bold", st.title)}>{t("sim.entry.title")}</h1>
             <div className="flex items-center gap-2">
                 {/* 대시보드(닫기 옆, 2026-09-08 오너): 기록·그래프·내 대전 */}
@@ -205,11 +200,9 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
     );
     return (
         <div className={cn("w-full max-w-[420px] mx-auto px-5 pt-4 pb-8", st.page)}>
-            {heroFirst ? <EntryShowcase className={st.showcase} /> : null}
             {header}
-            {heroFirst ? null : <EntryShowcase className={st.showcase} />}
-            {/* 히어로 샘플: 카드는 테이블 위로 올라오는 흰 판 위에(테이블이 카드 사이로 새지 않게) */}
-            <div className={cn("flex flex-col", st.gap, heroFirst && "-mx-5 px-5 pt-4 pb-2 bg-[var(--surface-0)] rounded-t-[28px] relative z-[1]")}>
+            <EntryShowcase className={st.showcase} />
+            <div className={cn("flex flex-col", st.gap)}>
                 {order.map((k) => (k === "single" ? single : k === "multi" ? multi : roomsCard))}
             </div>
         </div>

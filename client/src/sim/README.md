@@ -440,11 +440,11 @@ components/ShotClock.tsx  남은 시간만큼 줄어드는 고리 + 가운데 �
 e2e                       scripts/sim-e2e/strikeout.ts (호스트 2회를 미리 적고 3번째만 실제로 넘겨 실격패·알림까지 확인, 정리 포함).
 ```
 
-### 진입 화면 배경 샘플 (2026-09-08 오너: "게임스러운 디자인 샘플")
+### 진입 화면 배색 — 검정 (2026-09-08 오너가 샘플 셋 중 고름)
 ```
-entry/entryTheme.ts   clean(기본, 지금 화면) · arena(화면 전체가 라사, 어두운 유리 카드, 노란 주 버튼) · hero(테이블이 위를 꽉 채우고 카드가 그 위로 올라옴) · board(검은 판 + 노란 큰 숫자).
-                      `?bg=arena|hero|board` 로 열어 본다. 색은 전부 토큰(라사·먹·브랜드·공 노랑), 그라디언트·발광 없음. 오너가 고르면 하나만 남기고 파일과 파라미터를 지운다.
-주의                   ThreeRenderer 는 마운트 요소의 배경색으로 레터박스를 지운다 → 어두운 테마의 showcase 는 반투명(bg-black/20) 말고 불투명 색(bg-cloth 등)을 줘야 회색이 안 뜬다.
-                      tailwind 에 surface-0 유틸리티는 없다(토큰만 있다) — bg-[var(--surface-0)] 로 쓴다.
-캡처                   scratchpad/shots/bg.mjs → bg-clean/arena/hero/board.png
+entry/entryTheme.ts   ENTRY_STYLE 하나(검정 #121412). 테이블은 위를 가로로 꽉 채우고(-mx-5, 240 px), 카드는 white/6 판.
+                      큰 숫자 흰색 · 노란색은 "코드로 참가"와 내 차례 배지에만 · 초록(brand)은 주 동작 버튼에만 — 배경을 초록으로 덮지 않아 초록이 "누르세요"로 남는다.
+주의                   ThreeRenderer 는 마운트 요소의 배경색으로 레터박스를 지운다 → showcase 배경은 반드시 불투명(bg-[#121412]). 반투명(bg-black/20)이면 흰 바탕과 섞여 회색이 뜬다.
+                      tailwind 에 surface-0 유틸리티는 없다(토큰만) — 필요하면 bg-[var(--surface-0)].
+남은 일                로비·멀티방·랭킹·드릴·대시보드는 아직 흰 바탕이라 진입 화면에서 넘어갈 때 밝기 차가 크다(오너 확인 뒤 같이 어둡게 할지 결정).
 ```

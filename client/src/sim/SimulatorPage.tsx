@@ -48,7 +48,7 @@ import { Overlay, type Project } from "./overlay/Overlay";
 import { createNumbersCache, overlayDiamond, readDiamondPref, shotReadout, writeDiamondPref } from "./overlay/diamondSystem";
 import { SimSetupDialog, type SimSetupConfig } from "./SimSetupDialog";
 import { SimEntry } from "./entry/SimEntry";
-import { readEntryTheme, entryStyle } from "./entry/entryTheme";
+import { ENTRY_STYLE } from "./entry/entryTheme";
 import { SimDash } from "./dash/SimDash";
 import { RoomList } from "./match/RoomList";
 import { RankPage } from "./rank/RankPage";
@@ -167,8 +167,6 @@ export function SimulatorPage() {
     // ?rooms=1 멀티방 목록(2026-09-08 오너: 별도 카드) · ?rank=1 온라인 대전 랭킹
     const roomsView = params.get("rooms") === "1";
     const rankView = params.get("rank") === "1";
-    // 진입 화면 배경 샘플 고르기(?bg=arena|hero|board) — 기본은 지금 화면(clean). 오너가 고르면 하나만 남긴다.
-    const entryTheme = useMemo(() => readEntryTheme(search), [search]);
     // ?join=<code>[&auto=1]: 푸시 초대 딥링크. auto 면 비밀번호 없는 대기 방에 바로 참가, 아니면 코드가 채워진 참가 화면
     const joinCodeRaw = sanitizeCode(params.get("join") ?? "");
     const joinCode = isCompleteCode(joinCodeRaw) ? joinCodeRaw : "";
@@ -1101,9 +1099,8 @@ export function SimulatorPage() {
                 </div>
             )}
             {showEntry && (
-                <div className={cn("fixed inset-0 z-[5] overflow-y-auto", entryStyle(entryTheme).page)} style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                <div className={cn("fixed inset-0 z-[5] overflow-y-auto", ENTRY_STYLE.page)} style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <SimEntry
-                        theme={entryTheme}
                         onSingle={() => setSetupOpen(true)}
                         onDrills={() => navigate("/online-game?drills=1", { replace: true })}
                         onMulti={() => navigate("/online-game?lobby=1", { replace: true })}
