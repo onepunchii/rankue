@@ -34,12 +34,12 @@ export interface TopBarProps {
     clock?: { readonly seconds: number; readonly mine: boolean } | null;
 }
 
-const SCORE = "rk-num text-[16px] font-bold text-ink-1 leading-none";
-const TARGET = "rk-num text-[12px] font-medium text-ink-3";
-/** 요약 칩: 32 px 알약 버튼(44 px 띠 안). 값은 rk-num, 라벨은 작은 잉크. */
-const CHIP = "h-8 px-2.5 rounded-pill border bg-surface-1 flex items-baseline gap-1 shrink-0 whitespace-nowrap active:bg-surface-3";
-const LABEL = "text-[11px] font-medium text-ink-3 leading-none";
-const VALUE = "rk-num text-[14px] font-bold text-ink-1 leading-none";
+const SCORE = "rk-num text-[14px] font-bold text-ink-1 leading-none mt-1";
+const TARGET = "rk-num text-[11px] font-medium text-ink-3";
+/** 요약 칩: 36 px 타일 버튼(44 px 띠 안), 라벨(위 10 px) · 값(아래 rk-num 14 px) 두 줄을 가운데 정렬(2026-09-08 오너: 중앙 정렬·디자인 개선). */
+const CHIP = "h-9 min-w-[52px] px-2.5 rounded-xl border bg-surface-1 flex flex-col items-center justify-center text-center shrink-0 whitespace-nowrap active:bg-surface-3";
+const LABEL = "text-[10px] font-medium text-ink-3 leading-none";
+const VALUE = "rk-num text-[14px] font-bold text-ink-1 leading-none mt-1";
 
 export const TopBar = memo(function TopBar(p: TopBarProps) {
     const { t } = useT();
@@ -83,8 +83,8 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
             <div className="flex-1 min-w-0" />
             {/* 요약은 항목별 독립 칩 버튼(2026-09-08 오너): 1인 = 점수 · 이닝 · 에버, 2인 = 선수마다 [이름 점수/다마수](차례는 brand 테두리 + 점). 어느 칩이든 이닝 시트. */}
             {s && p.drillName && (
-                <button type="button" onClick={p.onSummary} aria-label={t("sim.controls.innings")} title={t("sim.controls.innings")} className={cn(CHIP, "border-surface-line min-w-0")}>
-                    <span className="text-[12px] font-semibold text-ink-1 truncate">{p.drillName}</span>
+                <button type="button" onClick={p.onSummary} aria-label={t("sim.controls.innings")} title={t("sim.controls.innings")} className={cn(CHIP, "border-surface-line min-w-0 justify-center")}>
+                    <span className="text-[12px] font-semibold text-ink-1 truncate max-w-[160px]">{p.drillName}</span>
                 </button>
             )}
             {s && !p.drillName && (
@@ -99,13 +99,15 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                                     aria-label={`${p.names[i] ?? pl.id} · ${t("sim.controls.innings")}`} title={t("sim.controls.innings")}
                                     className={cn(CHIP, "min-w-0", isTurn ? "border-brand" : "border-surface-line")}
                                 >
-                                    {isTurn && (
-                                        <span className="self-center inline-block w-1.5 h-1.5 rounded-pill bg-brand shrink-0">
-                                            <span className="sr-only">{t("sim.hud.turn")}</span>
-                                        </span>
-                                    )}
-                                    <span className={cn("text-[12px] font-semibold truncate max-w-[64px]", isWinner ? "text-gold" : "text-ink-1")}>{p.names[i] ?? pl.id}</span>
-                                    <span className={cn("rk-num text-[14px] font-bold leading-none shrink-0", isWinner ? "text-gold" : "text-ink-1")}>
+                                    <span className="flex items-center gap-1 min-w-0">
+                                        {isTurn && (
+                                            <span className="inline-block w-1.5 h-1.5 rounded-pill bg-brand shrink-0">
+                                                <span className="sr-only">{t("sim.hud.turn")}</span>
+                                            </span>
+                                        )}
+                                        <span className={cn(LABEL, "truncate max-w-[72px]", isTurn && "text-ink-1")}>{p.names[i] ?? pl.id}</span>
+                                    </span>
+                                    <span className={cn(SCORE, isWinner && "text-gold")}>
                                         {pl.score}<span className={TARGET}>/{pl.target}</span>
                                     </span>
                                 </button>
@@ -117,6 +119,7 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                             return (
                                 <Fragment key={pl.id}>
                                     <button type="button" onClick={p.onSummary} aria-label={t("sim.top.score")} title={t("sim.top.score")} className={cn(CHIP, "border-surface-line")}>
+                                        <span className={LABEL}>{t("sim.top.score")}</span>
                                         <span className={cn(SCORE, isWinner && "text-gold")}>{pl.score}<span className={TARGET}>/{pl.target}</span></span>
                                     </button>
                                     <button type="button" onClick={p.onSummary} aria-label={t("sim.controls.innings")} title={t("sim.controls.innings")} className={cn(CHIP, "border-surface-line")}>

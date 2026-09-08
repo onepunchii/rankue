@@ -1693,6 +1693,8 @@ const tr: Dict = {
   "sim.modeInfo.legend": "Topun üstündeki kırmızı nokta yan falso, ok dönüş yönü. Sapma açısı güce bağlı değil",
   "sim.modeInfo.pickNormal": "Normal ile oyna",
   "sim.modeInfo.pickReality": "Gerçekçi ile oyna",
+  "sim.modeInfo.normalPhysics": "Bantlar temel Han 2005 modeliyle, normal çuhada — toplar standart mesafe gider",
+  "sim.modeInfo.realityPhysics": "Bantlar ayrıntılı Mathavan 2010 modeliyle çalışır, falsolu top daha gerçekçi seker; hızlı turnuva çuhasında top daha uzağa gider ve banttan daha az hız kaybeder",
   "sim.match.cancelShort": "İptal",
   "sim.setup.condition": "Masa hızı",
   "sim.setup.condSlow": "Yavaş",

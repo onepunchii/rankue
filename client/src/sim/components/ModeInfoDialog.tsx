@@ -93,7 +93,7 @@ export const ModeInfoDialog = memo(function ModeInfoDialog({ open, mode, onOpenC
                         <button
                             key={m} type="button" onClick={() => onView(m)} aria-pressed={mode === m} data-mode-panel={m}
                             className={cn(
-                                "w-full text-left rounded-card border p-3 transition-colors",
+                                "w-full text-left rounded-card border p-3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
                                 mode === m ? "border-brand bg-brand/[0.06]" : "border-surface-line",
                             )}
                         >
@@ -104,6 +104,10 @@ export const ModeInfoDialog = memo(function ModeInfoDialog({ open, mode, onOpenC
                             </span>
                             <span className="block text-[12.5px] font-medium text-ink-3 mt-1 leading-relaxed">
                                 {m === "normal" ? t("sim.setup.modeNormalHint") : t("sim.setup.modeRealityHint")}
+                            </span>
+                            {/* 쿠션 공식 · 테이블 속도 한 줄(2026-09-08 오너: 큐 각만 말고 마타반·속도도) */}
+                            <span className="block text-[12px] font-medium text-ink-4 mt-1.5 leading-relaxed">
+                                {m === "normal" ? t("sim.modeInfo.normalPhysics") : t("sim.modeInfo.realityPhysics")}
                             </span>
                         </button>
                     ))}

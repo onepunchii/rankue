@@ -1693,6 +1693,8 @@ const vi: Dict = {
   "sim.modeInfo.legend": "Chấm đỏ trên bi cái là ép-phê ngang, mũi tên là chiều xoay. Góc lệch không phụ thuộc lực đánh",
   "sim.modeInfo.pickNormal": "Chơi chế độ Thường",
   "sim.modeInfo.pickReality": "Chơi chế độ Thực tế",
+  "sim.modeInfo.normalPhysics": "Băng dùng công thức cơ bản Han 2005, bàn vải thường — bi lăn khoảng cách tiêu chuẩn",
+  "sim.modeInfo.realityPhysics": "Băng dùng công thức chi tiết Mathavan 2010 nên bi xoáy bật băng sát thực tế hơn, và vải thi đấu (nhanh) khiến bi đi xa hơn, ít mất tốc khi chạm băng",
   "sim.match.cancelShort": "Hủy",
   "sim.setup.condition": "Độ nhanh của bàn",
   "sim.setup.condSlow": "Chậm",

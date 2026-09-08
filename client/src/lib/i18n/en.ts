@@ -1693,6 +1693,8 @@ const en: Dict = {
   "sim.modeInfo.legend": "The red dot on the cue ball is side spin and the arrow its rotation. The deflection angle does not depend on power",
   "sim.modeInfo.pickNormal": "Play Normal",
   "sim.modeInfo.pickReality": "Play Reality",
+  "sim.modeInfo.normalPhysics": "Cushions use the basic Han 2005 model on normal cloth — balls roll a standard distance",
+  "sim.modeInfo.realityPhysics": "Cushions use the detailed Mathavan 2010 model, so spinning balls rebound more realistically, and the fast tournament cloth lets balls travel farther and keep more speed off the rail",
   "sim.match.cancelShort": "Cancel",
   "sim.setup.condition": "Table speed",
   "sim.setup.condSlow": "Slow",

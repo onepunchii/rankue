@@ -1693,6 +1693,8 @@ const es: Dict = {
   "sim.modeInfo.legend": "El punto rojo de la bola es el efecto lateral y la flecha su giro. El ángulo no depende de la fuerza",
   "sim.modeInfo.pickNormal": "Jugar en Normal",
   "sim.modeInfo.pickReality": "Jugar en Realidad",
+  "sim.modeInfo.normalPhysics": "Las bandas usan el modelo básico Han 2005 sobre paño normal — las bolas ruedan una distancia estándar",
+  "sim.modeInfo.realityPhysics": "Las bandas usan el modelo detallado Mathavan 2010, así que las bolas con efecto rebotan más realistas, y el paño rápido de torneo hace que lleguen más lejos y pierdan menos velocidad en la banda",
   "sim.match.cancelShort": "Cancelar",
   "sim.setup.condition": "Velocidad de la mesa",
   "sim.setup.condSlow": "Lenta",

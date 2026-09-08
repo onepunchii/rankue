@@ -1695,6 +1695,8 @@ export const ko: Dict = {
   "sim.modeInfo.legend": "큐볼의 빨간 점이 옆당점, 화살표가 회전 방향이에요. 틀어지는 각은 세기와 관계없이 같아요",
   "sim.modeInfo.pickNormal": "일반으로 하기",
   "sim.modeInfo.pickReality": "리얼리티로 하기",
+  "sim.modeInfo.normalPhysics": "쿠션은 한 2005 기본 공식, 천은 보통 컨디션이에요. 공이 표준 거리만큼 굴러요",
+  "sim.modeInfo.realityPhysics": "쿠션은 마타반 2010 정밀 공식이라 회전 걸린 공의 반사가 실제에 가깝고, 대회 테이블(빠름)이라 공이 더 멀리 가고 쿠션에서 덜 죽어요",
   "sim.match.cancelShort": "취소",
   "sim.setup.condition": "테이블 컨디션",
   "sim.setup.condSlow": "느림",
