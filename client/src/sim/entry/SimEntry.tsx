@@ -12,6 +12,7 @@ import { ChartIcon, ChevronRightIcon } from "../components/railIcons";
 import { EntryShowcase } from "./EntryShowcase";
 import { BallMotif } from "./BallMotif";
 import { ENTRY_LAST_KEY, entryOrder, formatAvg, matchRecord, practiceSummary, type EntryChoice, type EntryMatchRow, type EntryRating } from "./entryStats";
+import { entryStyle, type EntryTheme } from "./entryTheme";
 
 /**
  * 시뮬레이터 진입 화면(2026-09-07 오너): `/online-game` 에 파라미터 없이 들어오면 먼저 **싱글 / 친구와 대전 / 멀티방** 카드를 고른다.
@@ -36,6 +37,8 @@ export interface SimEntryProps {
     /** 머리글 닫기 옆 "대시보드" — 기록·그래프·내 대전 */
     onDash: () => void;
     onClose: () => void;
+    /** 배경 샘플(?bg=arena|hero|board). 기본 clean = 지금 화면. 고르면 하나만 남긴다. */
+    theme?: EntryTheme;
 }
 
 function readLast(): string | null {
@@ -45,11 +48,14 @@ function writeLast(v: EntryChoice): void {
     try { if (typeof localStorage !== "undefined") localStorage.setItem(ENTRY_LAST_KEY, v); } catch { /* 저장 불가 */ }
 }
 
-const pill = "h-10 px-3.5 inline-flex items-center gap-1.5 rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3";
-const primary = "h-11 px-5 inline-flex items-center rounded-pill bg-brand text-brand-fg text-[14px] font-semibold active:bg-brand-strong";
+const PILL = "h-10 px-3.5 inline-flex items-center gap-1.5 rounded-pill text-[13px] font-semibold";
+const PRIMARY = "h-11 px-5 inline-flex items-center rounded-pill text-[14px] font-semibold";
 
-export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreateRoom, onRank, onDash, onClose }: SimEntryProps) {
+export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreateRoom, onRank, onDash, onClose, theme = "clean" }: SimEntryProps) {
     const { t } = useT();
+    const st = entryStyle(theme);
+    const pill = cn(PILL, st.pill);
+    const primary = cn(PRIMARY, st.primary);
     const { member } = useAuth();
     const ratings = useQuery<EntryRating[]>({
         queryKey: ["/api/hiq/sim/ratings/me"],
@@ -80,22 +86,22 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
     const openRooms = rooms.data?.length ?? 0;
 
     const single = (
-        <section key="single" className="rounded-card bg-surface-1 border border-surface-line rk-shadow overflow-hidden">
-            <button type="button" data-entry="single" onClick={() => pick("single")} className="w-full text-left px-5 pt-5 pb-3 flex items-start gap-4 active:bg-surface-3">
+        <section key="single" className={st.card}>
+            <button type="button" data-entry="single" onClick={() => pick("single")} className="w-full text-left px-5 pt-5 pb-3 flex items-start gap-4 active:opacity-90">
                 <BallMotif kind="single" />
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                        <span className="text-[18px] font-bold text-ink-1 leading-tight">{t("sim.entry.single")}</span>
+                        <span className={cn("text-[18px] font-bold leading-tight", st.cardTitle)}>{t("sim.entry.single")}</span>
                         <ChevronRightIcon />
                     </span>
-                    <span className="block text-[12.5px] font-medium text-ink-3 mt-0.5">{t("sim.entry.singleDesc")}</span>
+                    <span className={cn("block text-[12.5px] font-medium mt-0.5", st.cardSub)}>{t("sim.entry.singleDesc")}</span>
                     {practice ? (
                         <span className="flex items-baseline gap-2 mt-3">
-                            <span className="rk-num text-[30px] font-bold text-ink-1 leading-none">{formatAvg(practice.bestAvg)}</span>
-                            <span className="text-[12px] font-medium text-ink-3">{t("sim.entry.avgLabel").replace("{n}", String(practice.sessions))}</span>
+                            <span className={cn("rk-num text-[30px] font-bold leading-none", st.cardBig)}>{formatAvg(practice.bestAvg)}</span>
+                            <span className={cn("text-[12px] font-medium", st.cardSub)}>{t("sim.entry.avgLabel").replace("{n}", String(practice.sessions))}</span>
                         </span>
                     ) : (
-                        <span className="block text-[13px] font-medium text-ink-2 mt-3">{t("sim.entry.singleEmpty")}</span>
+                        <span className={cn("block text-[13px] font-medium mt-3", st.cardNote)}>{t("sim.entry.singleEmpty")}</span>
                     )}
                 </span>
             </button>
@@ -105,7 +111,7 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
                     {drill && (
                         <span className="inline-flex gap-1" aria-hidden="true">
                             {Array.from({ length: drill.total }, (_, i) => (
-                                <span key={i} className={cn("w-1.5 h-1.5 rounded-full", i < drill.successes ? "bg-ink-1" : "bg-surface-line")} />
+                                <span key={i} className={cn("w-1.5 h-1.5 rounded-full", i < drill.successes ? "bg-current" : "bg-current opacity-25")} />
                             ))}
                         </span>
                     )}
@@ -116,59 +122,59 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
     );
 
     const multi = (
-        <section key="multi" className="rounded-card bg-surface-1 border border-surface-line rk-shadow overflow-hidden">
-            <button type="button" data-entry="multi" onClick={() => pick("multi")} className="w-full text-left px-5 pt-5 pb-3 flex items-start gap-4 active:bg-surface-3">
+        <section key="multi" className={st.card}>
+            <button type="button" data-entry="multi" onClick={() => pick("multi")} className="w-full text-left px-5 pt-5 pb-3 flex items-start gap-4 active:opacity-90">
                 <BallMotif kind="multi" />
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
                         <span className="flex items-center gap-2 min-w-0">
-                            <span className="text-[18px] font-bold text-ink-1 leading-tight">{t("sim.entry.multi")}</span>
+                            <span className={cn("text-[18px] font-bold leading-tight", st.cardTitle)}>{t("sim.entry.multi")}</span>
                             {record.myTurn > 0 && (
-                                <span className="rk-num shrink-0 text-[12px] font-semibold border border-brand text-brand rounded-pill px-2 py-0.5">
+                                <span className={cn("rk-num shrink-0 text-[12px] font-semibold rounded-pill px-2 py-0.5", st.badge)}>
                                     {t("sim.entry.yourTurn").replace("{n}", String(record.myTurn))}
                                 </span>
                             )}
                         </span>
                         <ChevronRightIcon />
                     </span>
-                    <span className="block text-[12.5px] font-medium text-ink-3 mt-0.5">{t("sim.entry.multiDesc")}</span>
+                    <span className={cn("block text-[12.5px] font-medium mt-0.5", st.cardSub)}>{t("sim.entry.multiDesc")}</span>
                     {record.wins + record.losses > 0 ? (
                         <span className="flex items-baseline gap-2 mt-3">
-                            <span className="rk-num text-[24px] font-bold text-ink-1 leading-none">
+                            <span className={cn("rk-num text-[24px] font-bold leading-none", st.cardBig)}>
                                 {t("sim.entry.record").replace("{w}", String(record.wins)).replace("{l}", String(record.losses))}
                             </span>
-                            <span className="text-[12px] font-medium text-ink-3">{t("sim.entry.recordLabel")}</span>
+                            <span className={cn("text-[12px] font-medium", st.cardSub)}>{t("sim.entry.recordLabel")}</span>
                         </span>
                     ) : (
-                        <span className="block text-[13px] font-medium text-ink-2 mt-3">{t("sim.entry.multiEmpty")}</span>
+                        <span className={cn("block text-[13px] font-medium mt-3", st.cardNote)}>{t("sim.entry.multiEmpty")}</span>
                     )}
                 </span>
             </button>
             <div className="px-5 pb-4 flex flex-wrap items-center gap-2">
                 <button type="button" onClick={() => pick("multi")} className={top === "multi" ? primary : pill}>{t("sim.entry.create")}</button>
                 {/* 코드로 참가: 초대 만들기와 같은 크기, 노란색(공 토큰) — 2026-09-08 오너 */}
-                <button type="button" onClick={() => { writeLast("multi"); onJoin(); }} className="h-11 px-5 inline-flex items-center rounded-pill bg-ball-yellow text-ink-1 text-[14px] font-semibold active:opacity-90">{t("sim.entry.join")}</button>
+                <button type="button" onClick={() => { writeLast("multi"); onJoin(); }} className={cn(PRIMARY, "bg-ball-yellow text-ink-1 active:opacity-90")}>{t("sim.entry.join")}</button>
             </div>
         </section>
     );
 
     const roomsCard = (
-        <section key="rooms" className="rounded-card bg-surface-1 border border-surface-line rk-shadow overflow-hidden">
-            <button type="button" data-entry="rooms" onClick={() => pick("rooms")} className="w-full text-left px-5 pt-5 pb-3 flex items-start gap-4 active:bg-surface-3">
+        <section key="rooms" className={st.card}>
+            <button type="button" data-entry="rooms" onClick={() => pick("rooms")} className="w-full text-left px-5 pt-5 pb-3 flex items-start gap-4 active:opacity-90">
                 <BallMotif kind="rooms" />
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                        <span className="text-[18px] font-bold text-ink-1 leading-tight">{t("sim.entry.rooms")}</span>
+                        <span className={cn("text-[18px] font-bold leading-tight", st.cardTitle)}>{t("sim.entry.rooms")}</span>
                         <ChevronRightIcon />
                     </span>
-                    <span className="block text-[12.5px] font-medium text-ink-3 mt-0.5">{t("sim.entry.roomsDesc")}</span>
+                    <span className={cn("block text-[12.5px] font-medium mt-0.5", st.cardSub)}>{t("sim.entry.roomsDesc")}</span>
                     {openRooms > 0 ? (
                         <span className="flex items-baseline gap-2 mt-3">
-                            <span className="rk-num text-[30px] font-bold text-ink-1 leading-none">{openRooms}</span>
-                            <span className="text-[12px] font-medium text-ink-3">{t("sim.entry.roomsOpen")}</span>
+                            <span className={cn("rk-num text-[30px] font-bold leading-none", st.cardBig)}>{openRooms}</span>
+                            <span className={cn("text-[12px] font-medium", st.cardSub)}>{t("sim.entry.roomsOpen")}</span>
                         </span>
                     ) : (
-                        <span className="block text-[13px] font-medium text-ink-2 mt-3">{t("sim.entry.roomsEmpty")}</span>
+                        <span className={cn("block text-[13px] font-medium mt-3", st.cardNote)}>{t("sim.entry.roomsEmpty")}</span>
                     )}
                 </span>
             </button>
@@ -180,23 +186,30 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onCreat
         </section>
     );
 
-    return (
-        <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
-            <div className="flex items-center justify-between mb-3">
-                <h1 className="text-[20px] font-bold text-ink-1">{t("sim.entry.title")}</h1>
-                <div className="flex items-center gap-2">
-                    {/* 대시보드(닫기 옆, 2026-09-08 오너): 기록·그래프·내 대전 */}
-                    <button type="button" data-entry="dash" onClick={onDash} className="h-11 px-3.5 inline-flex items-center gap-1.5 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2 active:bg-surface-3">
-                        <ChartIcon />
-                        {t("sim.dash.open")}
-                    </button>
-                    <button type="button" onClick={onClose} className="h-11 px-4 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2 active:bg-surface-3">
-                        {t("sim.entry.close")}
-                    </button>
-                </div>
+    // 히어로 샘플은 테이블이 머리글 위로 올라온다(첫 화면이 테이블로 시작)
+    const heroFirst = theme === "hero";
+    const header = (
+        <div className={cn("flex items-center justify-between mb-3", heroFirst && "relative -mt-16 pb-2")}>
+            <h1 className={cn("text-[20px] font-bold", st.title)}>{t("sim.entry.title")}</h1>
+            <div className="flex items-center gap-2">
+                {/* 대시보드(닫기 옆, 2026-09-08 오너): 기록·그래프·내 대전 */}
+                <button type="button" data-entry="dash" onClick={onDash} className={cn("h-11 px-3.5 inline-flex items-center gap-1.5 rounded-pill text-[13px] font-semibold", st.close)}>
+                    <ChartIcon />
+                    {t("sim.dash.open")}
+                </button>
+                <button type="button" onClick={onClose} className={cn("h-11 px-4 rounded-pill text-[13px] font-semibold", st.close)}>
+                    {t("sim.entry.close")}
+                </button>
             </div>
-            <EntryShowcase className="relative w-full h-[228px] rounded-card overflow-hidden bg-surface-3 mb-4" />
-            <div className="flex flex-col gap-3">
+        </div>
+    );
+    return (
+        <div className={cn("w-full max-w-[420px] mx-auto px-5 pt-4 pb-8", st.page)}>
+            {heroFirst ? <EntryShowcase className={st.showcase} /> : null}
+            {header}
+            {heroFirst ? null : <EntryShowcase className={st.showcase} />}
+            {/* 히어로 샘플: 카드는 테이블 위로 올라오는 흰 판 위에(테이블이 카드 사이로 새지 않게) */}
+            <div className={cn("flex flex-col", st.gap, heroFirst && "-mx-5 px-5 pt-4 pb-2 bg-[var(--surface-0)] rounded-t-[28px] relative z-[1]")}>
                 {order.map((k) => (k === "single" ? single : k === "multi" ? multi : roomsCard))}
             </div>
         </div>
