@@ -83,6 +83,8 @@ export const SHOT_CLOCK_S = 40;
 /** 상대가 시간 초과를 대신 처리할 수 있기까지의 유예(초) — 치는 사람 쪽 네트워크 지연을 봐준다. */
 export const SHOT_CLOCK_GRACE_S = 10;
 /** 접속 중 판정: 대전 화면을 이 시간 안에 폴링·샷했으면 접속 중 → 차례가 넘어오면 시계가 바로(재생 여유 뒤) 시작한다. */
+/** 쓰리아웃: 시간 초과가 이만큼 쌓이면 그 사람의 실격패(2026-09-08 오너). */
+export const SHOT_CLOCK_STRIKES = 3;
 export const PRESENCE_MS = 20_000;
 /** 상대 샷을 재생하는 동안은 시계를 안 센다 — 접속 중인 다음 차례의 시계 시작 = 샷 시각 + 이 값. */
 export const REPLAY_GRACE_MS = 10_000;

@@ -252,6 +252,18 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
         setCreated(null);
     };
 
+    // 방을 연 뒤 흐른 시간(초 단위 갱신) — 대기 화면이 살아 있어 보이게
+    const [waited, setWaited] = useState(0);
+    useEffect(() => {
+        if (!created) { setWaited(0); return; }
+        const from = Date.parse(created.createdAt) || Date.now();
+        const tick = () => setWaited(Math.max(0, Math.floor((Date.now() - from) / 1000)));
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+    }, [created]);
+    const waitedLabel = `${Math.floor(waited / 60)}:${String(waited % 60).padStart(2, "0")}`;
+
     const tableName = (id: TableId) => (id === "DAEDAE" ? t("sim.setup.tableDaedae") : t("sim.setup.tableJungdae"));
     const tableSize = (id: TableId) => `${TABLES[id].width.toFixed(2)} × ${TABLES[id].length.toFixed(2)} m`;
 
@@ -291,9 +303,19 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
                         {t("sim.match.share")}
                     </Button>
                 </div>
-                <p className="text-[13px] font-medium text-ink-3 text-center min-h-11 flex items-center justify-center">
-                    {t("sim.match.waitingGuest")} · {gameLabel(created, t)} · {created.hostTarget}
-                </p>
+                {/* 멈춰 보이지 않게: 도는 점 + 경과 시간 + "앱을 닫아도 알림이 갑니다"(2026-09-08 오너) */}
+                <div className="rounded-card border border-surface-line bg-surface-1 px-4 py-3 text-center">
+                    <p className="text-[13px] font-semibold text-ink-1 flex items-center justify-center gap-2">
+                        <span className="relative inline-flex w-2 h-2" aria-hidden="true">
+                            <span className="absolute inset-0 rounded-pill bg-brand animate-ping opacity-60" />
+                            <span className="relative inline-flex w-2 h-2 rounded-pill bg-brand" />
+                        </span>
+                        {t("sim.match.waitingGuest")}
+                        <span className="rk-num text-ink-3 font-medium">{waitedLabel}</span>
+                    </p>
+                    <p className="text-[12px] font-medium text-ink-3 mt-1">{gameLabel(created, t)} · {created.hostTarget}</p>
+                    <p className="text-[12px] font-medium text-ink-4 mt-2 leading-relaxed">{t("sim.match.waitingPush")}</p>
+                </div>
                 <Button
                     type="button" variant="ghost" onClick={() => { void cancel(); }} disabled={canceling}
                     className="w-full h-11 rounded-xl text-ink-3 font-semibold"

@@ -76,6 +76,7 @@ export function endReasonText(m: Pick<MatchPublic, "status" | "endReason" | "win
     switch (m.endReason) {
         case "resign": return t("sim.match.endResign").replace("{name}", loser);
         case "claim": return t("sim.match.endClaim").replace("{name}", winner);
+        case "timeout": return t("sim.match.endTimeout").replace("{name}", loser);
         case "inningCap": return t("sim.match.endInningCap");
         case "target": return t("sim.match.endTarget");
         default: return null;

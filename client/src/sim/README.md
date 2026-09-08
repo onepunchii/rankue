@@ -429,3 +429,13 @@ QuickActions 의 온라인게임 타일 배경 = EntryShowcase(진입 화면과 
 타일엔 아이콘 없이 아래쪽 검정 35% 띠 위에 글만. 매칭 대결 타일이 노란색(#F5B721)을 넘겨받고 글씨는 검정(흰 글씨는 대비 1.9:1).
 캡처: scripts/sim-e2e/home-capture.ts (오너 쿠키, 읽기만 — 캔버스가 늦게 붙는지·콘솔 오류 0 확인).
 ```
+
+### 40초 시계 시각화 · 쓰리아웃 (2026-09-08 오너)
+```
+components/ShotClock.tsx  남은 시간만큼 줄어드는 고리 + 가운데 숫자(헤더 34 px, 대기 패널 56 px). 10초 이하 ink-1 · 내 차례 brand · 상대 ink-3. role="timer".
+쓰리아웃                   hiq_sim_matches.host/guest_timeouts. 시간 초과 때 그 사람 것을 +1 하고 SHOT_CLOCK_STRIKES(3) 가 되면 그 자리에서 실격패
+                          (status finished · endReason "timeout" · 승자는 상대, 양쪽에 알림). 사람마다 3번이라 번갈아 넘기면 안 끝난다.
+헤더 표시                  시계 옆 점 3개 — 채워진 만큼이 아웃(지금 차례인 사람 기준). MatchPublic.timeouts[호스트, 게스트] → MatchView·MatchState 로 흐른다.
+대기 방(멀티방)            도는 점 + 경과 시간(0:12) + "앱을 닫아도 상대가 들어오면 알림을 보내드릴게요". 참가 시 호스트에게 푸시(기존)와 자동 입장(폴링)은 그대로.
+e2e                       scripts/sim-e2e/strikeout.ts (호스트 2회를 미리 적고 3번째만 실제로 넘겨 실격패·알림까지 확인, 정리 포함).
+```

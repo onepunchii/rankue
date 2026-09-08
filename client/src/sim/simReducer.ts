@@ -162,6 +162,8 @@ export interface MatchState {
     readonly turnSeenAt: string | null;
     readonly endReason: MatchEndReason | null;
     readonly winnerIndex: PlayerIndex | null;
+    /** 쓰리아웃: [호스트, 게스트] 시간 초과 횟수 */
+    readonly timeouts: readonly [number, number];
 }
 
 /** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
@@ -176,6 +178,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         opponentName: myIndex === 0 ? guest : host,
         turn: m.turn,
         status: m.status,
+        timeouts: m.timeouts ?? [0, 0],
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
         endReason: m.endReason,
@@ -186,7 +189,8 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
 export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
     return a.matchId === b.matchId && a.myIndex === b.myIndex && a.version === b.version && a.turn === b.turn
         && a.status === b.status && a.claimableAt === b.claimableAt && a.turnSeenAt === b.turnSeenAt && a.endReason === b.endReason
-        && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName;
+        && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName
+        && a.timeouts[0] === b.timeouts[0] && a.timeouts[1] === b.timeouts[1];
 }
 
 /** 서버가 끝냈는데(기권·무응답 승리) 세션은 아직 playing 이면 세션에도 종료를 표시한다. */

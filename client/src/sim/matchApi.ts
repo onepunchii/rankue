@@ -68,7 +68,7 @@ export function matchAckUrl(id: string): string {
 
 export type MatchStatus = "waiting" | "playing" | "finished" | "canceled";
 /** finished 사유. target 목표 도달 · inningCap 이닝 상한 · resign 기권 · claim 무응답 승리 */
-export type MatchEndReason = "target" | "inningCap" | "resign" | "claim";
+export type MatchEndReason = "target" | "inningCap" | "resign" | "claim" | "timeout";
 export type PlayerIndex = 0 | 1;
 
 /** 참가 코드 자릿수(서버 randomCode). */
@@ -122,6 +122,8 @@ export interface MatchPublic {
     readonly turnSeenAt: string | null;
     /** 응답을 만든 서버 시각(ISO) — 클라이언트 시계 보정용. 예전 서버 응답엔 없다. */
     readonly serverNow: string | null;
+    /** 쓰리아웃: [호스트, 게스트] 의 40초 시간 초과 횟수. 예전 응답엔 없어 [0, 0]. */
+    readonly timeouts: readonly [number, number];
 }
 
 /** GET /sim/matches/:id/shots 의 한 줄. preState + input 으로 로컬에서 같은 샷을 재시뮬한다. */
@@ -281,7 +283,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 const STATUSES: readonly MatchStatus[] = ["waiting", "playing", "finished", "canceled"];
-const END_REASONS: readonly MatchEndReason[] = ["target", "inningCap", "resign", "claim"];
+const END_REASONS: readonly MatchEndReason[] = ["target", "inningCap", "resign", "claim", "timeout"];
 
 function isoOrNull(v: unknown): string | null {
     return typeof v === "string" && v.length > 0 ? v : null;
@@ -338,6 +340,9 @@ export function parseMatch(raw: unknown): MatchPublic {
         claimableAt: isoOrNull(raw.claimableAt),
         turnSeenAt: isoOrNull(raw.turnSeenAt),
         serverNow: isoOrNull(raw.serverNow),
+        timeouts: Array.isArray(raw.timeouts) && raw.timeouts.length === 2
+            ? [Number(raw.timeouts[0]) || 0, Number(raw.timeouts[1]) || 0] as const
+            : [0, 0] as const,
     };
 }
 

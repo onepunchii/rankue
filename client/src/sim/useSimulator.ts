@@ -110,6 +110,8 @@ export interface MatchView {
     readonly turnSeenAt: string | null;
     /** 서버 시각 − 이 기기 시각(ms). 남은 초 = 40 − (Date.now() + offset − turnSeenAt)/1000 */
     readonly serverOffsetMs: number;
+    /** 쓰리아웃: [호스트, 게스트] 시간 초과 횟수(SHOT_CLOCK_STRIKES 가 되면 실격패). */
+    readonly timeouts: readonly [number, number];
 }
 
 export interface Simulator {
@@ -225,6 +227,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             opponentShot: core.replayOf !== null && core.replayOf !== m.myIndex,
             turnSeenAt: m.turnSeenAt,
             serverOffsetMs: aux.serverOffsetMs,
+            timeouts: m.timeouts ?? [0, 0],
         } : null;
         return {
             phase: core.phase,

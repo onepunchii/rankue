@@ -17,6 +17,7 @@ import {
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
+    SHOT_CLOCK_STRIKES,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
@@ -102,6 +103,8 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         createdAt: m.createdAt, startedAt: m.startedAt, lastShotAt: m.lastShotAt, finishedAt: m.finishedAt,
         // 40초 룰: 시계 기준 시각과 서버 시각(클라이언트 시계 보정용)
         turnSeenAt: m.turnSeenAt, serverNow: new Date(),
+        // 쓰리아웃 표시용 [호스트, 게스트] 시간 초과 횟수
+        timeouts: [m.hostTimeouts, m.guestTimeouts] as const,
         claimableAt: m.status === "playing" ? new Date((m.lastShotAt ?? m.startedAt ?? m.createdAt).getTime() + CLAIM_AFTER_MS) : null,
     };
 }
@@ -250,17 +253,26 @@ router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: Au
     if (elapsed < needMs) return sendError(res, 409, "아직 기다려야 합니다", "TOO_EARLY");
     const state = m.state as SessionState;
     const applied = applyShot(state, timeoutOutcome());
-    const finished = applied.session.status === "finished";
+    // 쓰리아웃: 이번이 그 사람의 SHOT_CLOCK_STRIKES 번째 시간 초과면 실격패(2026-09-08 오너)
+    const strikes = (m.turn === 0 ? m.hostTimeouts : m.guestTimeouts) + 1;
+    const out = strikes >= SHOT_CLOCK_STRIKES;
+    const finished = out || applied.session.status === "finished";
+    const winnerIndex = out ? (m.turn === 0 ? 1 : 0) : applied.session.winnerIndex;
+    const newState = out ? { ...applied.session, status: "finished" as const, winnerIndex } : applied.session;
     const row = await storage.simMatch.passTurn({
-        id: m.id, turn: m.turn, newState: applied.session, newTurn: applied.session.turn,
-        finished, winnerIndex: applied.session.winnerIndex, endReason: finished ? "inningCap" : null,
+        id: m.id, turn: m.turn, newState, newTurn: applied.session.turn,
+        finished, winnerIndex, endReason: out ? "timeout" : finished ? "inningCap" : null,
+        strikeIndex: m.turn === 0 ? 0 : 1,
     });
     if (!row) return sendError(res, 409, "이미 차례가 바뀌었습니다", "STALE");
     const timedOutId = m.turn === 0 ? m.hostId : m.guestId;
     const otherId = m.turn === 0 ? m.guestId : m.hostId;
-    if (finished) notify(otherId, "온라인게임 대전 종료", "결과를 확인해 보세요.", m.id);
-    else if (m.turn === myIndex) notify(otherId, "당신 차례예요", "상대가 40초를 넘겨 차례가 넘어왔어요.", m.id);
-    else notify(timedOutId, "시간 초과", "40초를 넘겨 이닝이 넘어갔어요.", m.id);
+    if (out) {
+        notify(otherId, "온라인게임 대전 종료", `상대가 시간 초과 ${SHOT_CLOCK_STRIKES}번으로 실격했어요. 당신의 승리입니다.`, m.id);
+        notify(timedOutId, "실격패", `시간 초과 ${SHOT_CLOCK_STRIKES}번으로 대전이 끝났어요.`, m.id);
+    } else if (finished) notify(otherId, "온라인게임 대전 종료", "결과를 확인해 보세요.", m.id);
+    else if (m.turn === myIndex) notify(otherId, "당신 차례예요", `상대가 40초를 넘겨 차례가 넘어왔어요. (시간 초과 ${strikes}/${SHOT_CLOCK_STRIKES})`, m.id);
+    else notify(timedOutId, "시간 초과", `40초를 넘겨 이닝이 넘어갔어요. (${strikes}/${SHOT_CLOCK_STRIKES})`, m.id);
     const full = await storage.simMatch.get(m.id);
     return sendSuccess(res, publicMatch(full!, req.userId!));
 }));

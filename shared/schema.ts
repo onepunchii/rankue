@@ -1643,6 +1643,9 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   /** 접속 표시: 각자가 대전 화면을 마지막으로 폴링·샷한 시각(5 s 단위 갱신). 차례가 넘어갈 때 상대 시계를 바로 돌릴지 정한다. */
   hostSeenAt: timestamp("host_seen_at"),
   guestSeenAt: timestamp("guest_seen_at"),
+  /** 쓰리아웃: 각자의 40초 시간 초과 횟수. SHOT_CLOCK_STRIKES(3) 가 되면 그 사람의 실격패. */
+  hostTimeouts: integer("host_timeouts").default(0).notNull(),
+  guestTimeouts: integer("guest_timeouts").default(0).notNull(),
   finishedAt: timestamp("finished_at"),
 }, (t) => ({
   idxCode: index("idx_sim_matches_code").on(t.code, t.status),

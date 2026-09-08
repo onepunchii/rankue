@@ -30,7 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
-import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome } from "@shared/sim/rules";
+import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome, SHOT_CLOCK_STRIKES } from "@shared/sim/rules";
 import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -59,6 +59,7 @@ import { endReasonText } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
 import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
+import { ShotClock } from "./components/ShotClock";
 import { aimPhi } from "./aimAssist";
 import { useSolver } from "./solver/useSolver";
 import { SolverSheet } from "./solver/SolverSheet";
@@ -687,6 +688,10 @@ export function SimulatorPage() {
     const clockRemaining = clockOn ? SHOT_CLOCK_S - (clockNow + (sim.match?.serverOffsetMs ?? 0) - clockSeenAt) / 1000 : null;
     // 서버가 재생 여유(REPLAY_GRACE_MS)를 더해 미래 시각을 적을 수 있어 40 을 넘지 않게 자른다
     const clock = clockRemaining !== null && sim.match ? { seconds: Math.max(0, Math.min(SHOT_CLOCK_S, Math.ceil(clockRemaining))), mine: sim.match.isMyTurn } : null;
+    // 쓰리아웃: 지금 차례인 사람이 이미 넘긴 횟수(대전·진행 중일 때만)
+    const strikes = isMatch && sim.match && sim.match.status === "playing"
+        ? { used: sim.match.timeouts[sim.match.turn] ?? 0, total: SHOT_CLOCK_STRIKES, mine: sim.match.isMyTurn }
+        : null;
     // 0 이 되면 서버에 시간 초과를 알린다. 서버가 아직 이르다고 하면(시계 오차) 3 초마다 다시 — 차례가 바뀌어 key 가 달라질 때까지.
     const timeoutFiredRef = useRef<{ key: string; at: number }>({ key: "", at: 0 });
     useEffect(() => {
@@ -948,6 +953,7 @@ export function SimulatorPage() {
                     onSummary={onInnings}
                     onBack={isMatch ? onExitRequest : undefined}
                     clock={clock}
+                    strikes={strikes}
                 />
 
                 {/* 테이블 영역: 남은 높이 전부. 렌더러·오버레이는 absolute 마운트(tableRef)에, 조작·칩은 그 형제로 얹힌다. */}
@@ -1065,11 +1071,7 @@ export function SimulatorPage() {
                                 <p className="text-[12px] font-medium text-ink-4">{sim.match.opponentName}</p>
                                 {/* 깔끔하게: "상대 차례예요" + 상대 시계(접속 중이면 바로 돈다). 안내 문구는 없앴다(2026-09-08 오너). */}
                                 <p className="text-[14px] font-semibold text-ink-1">{t("sim.match.waitingTurn")}</p>
-                                {clock && !clock.mine && (
-                                    <p className={cn("rk-num text-[28px] font-bold leading-tight mt-0.5", clock.seconds <= 10 ? "text-ink-1" : "text-ink-2")} role="timer" aria-label={t("sim.match.shotClockLabel")}>
-                                        {t("sim.match.shotClock").replace("{n}", String(clock.seconds))}
-                                    </p>
-                                )}
+                                {clock && !clock.mine && <ShotClock seconds={clock.seconds} mine={false} size={56} className="mt-1.5" />}
                                 {sim.match.canClaim && (
                                     <button type="button" onClick={() => { void onClaim(); }} className="mt-2 h-11 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
                                         {t("sim.match.claim")}

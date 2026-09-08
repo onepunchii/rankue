@@ -205,7 +205,7 @@ export class SimMatchRepository {
     }
 
     /** 40초 룰 시간 초과: 샷 행 없이 이닝을 넘긴다(상태·차례·버전 갱신). 차례가 이미 바뀌었으면 null. */
-    async passTurn(a: { id: string; turn: number; newState: unknown; newTurn: number; finished: boolean; winnerIndex: number | null; endReason: string | null }): Promise<HiqSimMatch | null> {
+    async passTurn(a: { id: string; turn: number; newState: unknown; newTurn: number; finished: boolean; winnerIndex: number | null; endReason: string | null; strikeIndex?: 0 | 1 }): Promise<HiqSimMatch | null> {
         return db.transaction(async (tx) => {
             const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, a.id)).for("update");
             if (!m || m.status !== "playing" || m.turn !== a.turn) return null;
@@ -214,6 +214,7 @@ export class SimMatchRepository {
                 state: a.newState, turn: a.newTurn, version: m.version + 1, lastShotAt: new Date(),
                 // 시간 초과엔 재생이 없다 — 접속 중이면 바로 시작
                 turnSeenAt: nextTurnSeenAt(m, a.newTurn, a.finished, 0),
+                ...(a.strikeIndex === 0 ? { hostTimeouts: m.hostTimeouts + 1 } : a.strikeIndex === 1 ? { guestTimeouts: m.guestTimeouts + 1 } : {}),
                 ...(a.finished ? { status: "finished" as const, finishedAt: new Date(), winnerId, endReason: a.endReason } : {}),
             }).where(eq(hiqSimMatches.id, a.id)).returning();
             if (a.finished && m.guestId) await this.applyElo(tx, row, winnerId);
