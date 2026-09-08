@@ -423,7 +423,13 @@ export function createShotSearch(req: SolveRequest, opts: SearchOptions = {}): S
             families.push({ a: input.a, b: input.b, best: member, neighbours: 0, neighboursScored: 0, refined: false });
             return;
         }
+        // 정제 이웃이 대표가 될 땐 첫 접촉 종류(적구/쿠션)가 같아야 한다 — 얇은 적구 샷의 ±0.5° 이웃은 쿠션 먼저로 뒤집히곤 해서
+        // 그대로 두면 "적구 먼저" 로 자리를 받은 가족이 뱅크 라벨로 끝나고, 화면엔 정제 안 된 적구 먼저 후보가 올라온다(2026-09-08).
+        if (forced && aimKindOf(member.input) !== aimKindOf(family.best.input)) return;
         if (member.base > family.best.base || (member.base === family.best.base && member.tried < family.best.tried)) family.best = member;
+    }
+    function aimKindOf(input: ShotInput): AimLabel["kind"] {
+        return aimLabelFor(balls, cueBallId, input.phi + squirtAngle(input.a, params.cue.endmassRatio), table).kind;
     }
 
     function rankedFamilies(): Family[] {
@@ -431,19 +437,16 @@ export function createShotSearch(req: SolveRequest, opts: SearchOptions = {}): S
     }
     /** 이 가족의 대표 샷이 적구를 먼저 맞히는가(라벨과 같은 기준: 큐 방향 + 스쿼트). */
     function isBallFirst(f: Family): boolean {
-        return aimLabelFor(balls, cueBallId, f.best.input.phi + squirtAngle(f.best.input.a, params.cue.endmassRatio), table).kind === "ball";
+        return aimKindOf(f.best.input) === "ball";
     }
     /** 상위 n 가족 + 적구 먼저 가족 최소 BALL_FIRST_SLOTS(있을 때만). 순서는 기본 점수. */
     function pickFamilies(n: number): Family[] {
         const ranked = rankedFamilies();
-        const picked = ranked.slice(0, n);
-        const ballFirst = ranked.filter(isBallFirst);
-        for (const f of ballFirst.slice(0, BALL_FIRST_SLOTS)) {
-            if (picked.includes(f)) continue;
-            if (picked.length >= n && picked.length > 0) picked.pop();   // 맨 뒤(뱅크) 하나를 내리고 적구 먼저를 넣는다
-            picked.push(f);
-        }
-        return picked.sort((x, y) => (y.best.base - x.best.base) || (x.best.tried - y.best.tried));
+        // 적구 먼저 상위 BALL_FIRST_SLOTS 를 먼저 확보하고, 나머지 자리를 점수순으로 채운다
+        // (예전엔 "맨 뒤를 빼고 넣기" 를 반복해 방금 넣은 적구 먼저 가족을 다시 뺐다 — 결과에 하나만 남았다)
+        const reserved = ranked.filter(isBallFirst).slice(0, Math.min(BALL_FIRST_SLOTS, n));
+        const rest = ranked.filter((f) => !reserved.includes(f)).slice(0, Math.max(0, n - reserved.length));
+        return [...rest, ...reserved].sort((x, y) => (y.best.base - x.best.base) || (x.best.tried - y.best.tried));
     }
 
     function toRefine(): void {
@@ -537,15 +540,12 @@ export function createShotSearch(req: SolveRequest, opts: SearchOptions = {}): S
             });
             scored.sort((x, y) => (y.score - x.score) || (x.tried - y.tried));
             // 적구 먼저 후보에 최소 BALL_FIRST_SLOTS 자리(있을 때만) — 정제를 받은 것부터(여유가 있어야 화면이 줄 세울 수 있다)
-            const top = scored.slice(0, Math.max(0, maxCandidates));
-            const ballFirst = scored.filter((x) => x.aim.kind === "ball")
-                .sort((x, y) => (Number(y.robustness !== null) - Number(x.robustness !== null)) || (y.score - x.score) || (x.tried - y.tried));
-            for (const c of ballFirst.slice(0, BALL_FIRST_SLOTS)) {
-                if (top.includes(c)) continue;
-                if (top.length >= maxCandidates && top.length > 0) top.pop();
-                top.push(c);
-            }
-            top.sort((x, y) => (y.score - x.score) || (x.tried - y.tried));
+            const n = Math.max(0, maxCandidates);
+            const reserved = scored.filter((x) => x.aim.kind === "ball")
+                .sort((x, y) => (Number(y.robustness !== null) - Number(x.robustness !== null)) || (y.score - x.score) || (x.tried - y.tried))
+                .slice(0, Math.min(BALL_FIRST_SLOTS, n));
+            const rest = scored.filter((x) => !reserved.includes(x)).slice(0, Math.max(0, n - reserved.length));
+            const top = [...rest, ...reserved].sort((x, y) => (y.score - x.score) || (x.tried - y.tried));
             return {
                 candidates: top,
                 tried, found,
