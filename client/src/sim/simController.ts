@@ -35,7 +35,7 @@ import { cuePhiForAim } from "./aimAssist";
 import { aimAssistFor } from "./setupPresets";
 import { applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
-import { buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
+import { SHORT_PREVIEW_TAIL_M, buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
 import { SimAudio } from "./audio";
 import { SimHaptics } from "./haptics";
 import {
@@ -694,7 +694,12 @@ export class SimController {
         const shot = toShotInput(cueBallId, s.input);
         try {
             const result = simulateShot(s.balls, shot, setup.params);
-            const paths = buildPreviewPaths(result, { cueBallId, gameType: s.session.rules.gameType });
+            // 대전은 기본으로 짧은 미리보기(첫 접촉 + 꼬리, 쿠션 번호 없음) — 방장이 '미리보기 전체' 를 켜면 연습처럼
+            const short = s.mode === "match" && setup.config.matchPreview !== "full";
+            const paths = buildPreviewPaths(result, {
+                cueBallId, gameType: s.session.rules.gameType,
+                ...(short ? { cutoff: { kind: "first-contact" as const, tailM: SHORT_PREVIEW_TAIL_M } } : {}),
+            });
             this.setAux({ preview: { result, paths, input: shot } });
         } catch {
             if (this.aux.preview !== null) this.setAux({ preview: null });

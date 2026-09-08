@@ -1676,6 +1676,8 @@ const tr: Dict = {
   "sim.setup.targetPlus": "Hedef +{n}",
   "sim.setup.ruleBasic4c": "Temel kurallar",
   "sim.setup.practiceMode": "Antrenman modu",
+  "sim.setup.previewFull": "Tam önizleme",
+  "sim.setup.previewFullDesc": "Bant sonrası yolu da gösterir. Varsayılan yalnızca ilk temas ve sapma",
   "sim.setup.cushionModel": "Bant modeli",
   "sim.setup.cushionHan": "Han 2005",
   "sim.setup.cushionHanDesc": "Varsayılan",

@@ -155,6 +155,8 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
     // 세부 설정(규칙 · 이닝 제한)은 접어 둔다 — 대전 만들기는 종목·테이블·다마수·모드면 충분하다(2026-09-07 오너)
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const [inningCap, setInningCap] = useState<number>(0);
+    // 대전 미리보기: 기본 짧게(첫 접촉 + 꺾임 꼬리). 켜면 연습처럼 전체 경로(친구끼리 편하게 칠 때).
+    const [fullPreview, setFullPreview] = useState(false);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [created, setCreated] = useState<MatchPublic | null>(null);
@@ -179,7 +181,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
         setError(null);
         try {
             const m = await api.createMatch(buildConfig({
-                gameType, tableId, target: targetNum, inningCap, mode,
+                gameType, tableId, target: targetNum, inningCap, mode, matchPreview: fullPreview ? "full" : "short",
                 rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: passiveFoul },
             }));
             setCreated(m);
@@ -372,6 +374,11 @@ function CreateTab({ api, pollMs, onStarted, onCreated }: { api: MatchApi; pollM
                                 ))}
                             </div>
                         </div>
+
+                        <ToggleRow
+                            id="sim-match-full-preview" checked={fullPreview} onCheckedChange={setFullPreview}
+                            title={t("sim.setup.previewFull")} desc={t("sim.setup.previewFullDesc")}
+                        />
                     </div>
                 )}
             </div>

@@ -108,7 +108,9 @@ describe("buildConfig", () => {
             cushionModel: "han2005",
             condition: 1,
             mode: "normal",
+            matchPreview: "short",
         });
+        expect(buildConfig({ gameType: "3c", target: 15, matchPreview: "full" }).matchPreview).toBe("full");
     });
     it("범위 밖 값을 정리한다", () => {
         const c = buildConfig({ gameType: "3c", target: 5000, inningCap: 7, condition: 3, rules: { ruleSet: "pba" }, cushionModel: "mathavan2010" });

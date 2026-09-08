@@ -1676,6 +1676,8 @@ const en: Dict = {
   "sim.setup.targetPlus": "Target +{n}",
   "sim.setup.ruleBasic4c": "Basic rules",
   "sim.setup.practiceMode": "Practice mode",
+  "sim.setup.previewFull": "Full preview",
+  "sim.setup.previewFullDesc": "Show the path past the cushions. By default only up to the first contact and the deflection",
   "sim.setup.cushionModel": "Cushion model",
   "sim.setup.cushionHan": "Han 2005",
   "sim.setup.cushionHanDesc": "Default",

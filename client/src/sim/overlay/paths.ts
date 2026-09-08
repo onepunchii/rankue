@@ -25,7 +25,15 @@ export type PathCutoff =
     | { readonly kind: "second-contact" }
     | { readonly kind: "cushions"; readonly n: number }
     | { readonly kind: "time"; readonly t: number }
-    | { readonly kind: "end" };
+    | { readonly kind: "end" }
+    /**
+     * 대전용 짧은 미리보기(2026-09-08 오너): 첫 적구 접촉 뒤 큐볼이 tailM 만큼 간 곳까지. 적구 첫 구간도 tailM 까지, 쿠션 번호 없음.
+     * 아무 공도 못 맞히면 첫 쿠션까지(어디서 맞는지만). 쿠션 뒤 진로는 선수가 읽어야 한다.
+     */
+    | { readonly kind: "first-contact"; readonly tailM: number };
+
+/** 대전 짧은 미리보기의 꼬리 길이(m). */
+export const SHORT_PREVIEW_TAIL_M = 0.3;
 
 export interface PathPoint {
     readonly x: number;
@@ -121,9 +129,35 @@ export function countCushionsBeforeSecond(events: readonly SimEvent[], cueBallId
 }
 
 /** 컷오프 시각. history 끝을 넘지 않는다. */
-export function cutoffTime(src: PathSource, timeline: CueTimeline, cutoff: PathCutoff): number {
+/** id 공이 tFrom 부터 distM 만큼 움직인 시각(스냅샷 사이는 선형 보간). 그 전에 끝나면 마지막 시각. */
+export function timeAfterDistance(history: readonly Snapshot[], id: string, tFrom: number, distM: number): number {
+    const end = history.length ? history[history.length - 1].t : tFrom;
+    const start = positionAt(history, id, tFrom);
+    if (!start || !(distM > 0)) return tFrom;
+    let px = start[0], py = start[1], pt = tFrom, acc = 0;
+    for (let i = snapshotIndexAt(history, tFrom); i < history.length; i++) {
+        const s = history[i];
+        if (s.t <= tFrom + EPS_T) continue;
+        const b = ballIn(s, id);
+        if (!b) continue;
+        const d = Math.hypot(b.r[0] - px, b.r[1] - py);
+        if (acc + d >= distM) {
+            const f = d > 0 ? (distM - acc) / d : 1;
+            return pt + (s.t - pt) * f;
+        }
+        acc += d; px = b.r[0]; py = b.r[1]; pt = s.t;
+    }
+    return end;
+}
+
+export function cutoffTime(src: PathSource, timeline: CueTimeline, cutoff: PathCutoff, cueBallId = ""): number {
     const end = src.history.length ? src.history[src.history.length - 1].t : 0;
     switch (cutoff.kind) {
+        case "first-contact": {
+            const first = timeline.contacts[0];
+            if (!first) { const c = timeline.cushions[0]; return c ? Math.min(c.t, end) : end; }
+            return Math.min(end, timeAfterDistance(src.history, cueBallId, first.t, cutoff.tailM));
+        }
         case "second-contact":
             return timeline.secondContactT ?? end;
         case "cushions": {
@@ -240,7 +274,9 @@ export function buildPreviewPaths(src: PathSource, opts: PathOptions): PreviewPa
     const opponentId = gameType === "4c" ? opponentCueBall(cueBallId) : null;
 
     const timeline = cueTimeline(src.events, cueBallId, objectIds, opponentId);
-    const cutoffT = cutoffTime(src, timeline, opts.cutoff ?? { kind: "second-contact" });
+    const cutoff = opts.cutoff ?? { kind: "second-contact" as const };
+    const cutoffT = cutoffTime(src, timeline, cutoff, cueBallId);
+    const short = cutoff.kind === "first-contact";
     const cushionCount = walkEvents(src.events, cueBallId, objectIds, opponentId).cushionsBeforeSecond;
 
     const paths: BallPath[] = [];
@@ -252,6 +288,8 @@ export function buildPreviewPaths(src: PathSource, opts: PathOptions): PreviewPa
             if (!w || w.from > cutoffT + EPS_T) continue;
             from = w.from;
             to = w.to === null ? cutoffT : Math.min(w.to, cutoffT);
+            // 짧은 미리보기: 적구도 꼬리 길이만큼만(큐볼 컷오프와 무관하게 자기 출발점부터)
+            if (short) to = Math.min(w.to ?? Infinity, timeAfterDistance(src.history, id, w.from, cutoff.tailM));
         }
         const points = ballPolyline(src.history, id, from, to, maxInterp, step);
         if (points.length >= 2) paths.push({ id, points });
@@ -259,6 +297,7 @@ export function buildPreviewPaths(src: PathSource, opts: PathOptions): PreviewPa
 
     const cushions: CushionMark[] = [];
     for (const c of timeline.cushions) {
+        if (short) break;                       // 대전 짧은 미리보기: 쿠션 번호 없음
         if (c.t > cutoffT + EPS_T) break;
         const p = positionAt(src.history, cueBallId, c.t);
         if (!p) continue;

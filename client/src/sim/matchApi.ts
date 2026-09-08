@@ -73,6 +73,8 @@ export interface MatchPublic {
     readonly condition: number;
     /** 조준 보정(일반 모드 true). 방장 설정을 둘 다 따른다. 예전 서버 응답엔 없을 수 있어 선택 — 없으면 true. */
     readonly aimAssist?: boolean;
+    /** 미리보기 전체(연습처럼 쿠션 뒤 경로까지). 없거나 false 면 짧게(첫 접촉 + 꼬리). */
+    readonly fullPreview?: boolean;
     readonly rules: Rules;
     readonly finishType: FinishType;
     readonly inningCap: number;
@@ -164,6 +166,8 @@ export interface CreateMatchBody {
     readonly inningCap: number;
     /** 조준 보정(일반 모드). 서버가 저장해 게스트도 같은 모드로 친다. */
     readonly aimAssist: boolean;
+    /** 미리보기 전체 여부(기본 false = 첫 접촉 + 꼬리). */
+    readonly fullPreview: boolean;
 }
 
 export interface JoinMatchBody {
@@ -184,6 +188,7 @@ export function toCreateMatchBody(config: SimSetupConfig): CreateMatchBody {
         target: config.target,
         inningCap: config.inningCap,
         aimAssist: aimAssistFor(config.mode),
+        fullPreview: config.matchPreview === "full",
     };
 }
 
@@ -244,6 +249,8 @@ export function parseMatch(raw: unknown): MatchPublic {
         tableId: raw.tableId,
         cushionModel: (typeof raw.cushionModel === "string" ? raw.cushionModel : "han2005") as CushionModelId,
         condition: typeof raw.condition === "number" && Number.isFinite(raw.condition) ? raw.condition : 1,
+        aimAssist: typeof raw.aimAssist === "boolean" ? raw.aimAssist : undefined,
+        fullPreview: typeof raw.fullPreview === "boolean" ? raw.fullPreview : undefined,
         rules: raw.rules as unknown as Rules,
         finishType: raw.finishType === "3c" || raw.finishType === "bank" ? raw.finishType : "none",
         inningCap: typeof raw.inningCap === "number" ? raw.inningCap : 0,
@@ -425,6 +432,7 @@ export function matchConfig(m: MatchPublic): SimSetupConfig {
         cushionModel: m.cushionModel,
         condition: m.condition,
         mode: m.aimAssist === false ? "reality" : "normal",
+        matchPreview: m.fullPreview === true ? "full" : "short",
     };
 }
 

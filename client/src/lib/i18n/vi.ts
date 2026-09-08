@@ -1676,6 +1676,8 @@ const vi: Dict = {
   "sim.setup.targetPlus": "Mục tiêu +{n}",
   "sim.setup.ruleBasic4c": "Luật cơ bản",
   "sim.setup.practiceMode": "Chế độ luyện tập",
+  "sim.setup.previewFull": "Xem trước toàn bộ",
+  "sim.setup.previewFullDesc": "Hiện cả đường đi sau băng. Mặc định chỉ đến chạm bi đầu và hướng bật",
   "sim.setup.cushionModel": "Mô hình băng",
   "sim.setup.cushionHan": "Han 2005",
   "sim.setup.cushionHanDesc": "Mặc định",

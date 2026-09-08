@@ -1678,6 +1678,8 @@ export const ko: Dict = {
   "sim.setup.targetPlus": "다마수 +{n}",
   "sim.setup.ruleBasic4c": "기본 규칙",
   "sim.setup.practiceMode": "연습 모드",
+  "sim.setup.previewFull": "미리보기 전체",
+  "sim.setup.previewFullDesc": "쿠션 뒤 경로까지 보여 줘요. 기본은 첫 접촉과 꺾이는 방향까지만",
   "sim.setup.cushionModel": "쿠션 모델",
   "sim.setup.cushionHan": "한 2005",
   "sim.setup.cushionHanDesc": "기본",

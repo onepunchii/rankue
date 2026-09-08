@@ -1676,6 +1676,8 @@ const es: Dict = {
   "sim.setup.targetPlus": "Objetivo +{n}",
   "sim.setup.ruleBasic4c": "Reglas básicas",
   "sim.setup.practiceMode": "Modo práctica",
+  "sim.setup.previewFull": "Vista previa completa",
+  "sim.setup.previewFullDesc": "Muestra la trayectoria tras las bandas. Por defecto solo hasta el primer contacto y la desviación",
   "sim.setup.cushionModel": "Modelo de banda",
   "sim.setup.cushionHan": "Han 2005",
   "sim.setup.cushionHanDesc": "Predeterminado",

@@ -3,8 +3,7 @@ import { TABLES } from "@shared/sim/params";
 import type { BallState, SimEvent, Snapshot } from "@shared/sim/types";
 import { walkEvents, objectBallIds } from "@shared/sim/rules/evaluate";
 import {
-    buildPreviewPaths, cueTimeline, countCushionsBeforeSecond, cutoffTime, snapshotIndexAt, positionAt,
-    ballPolyline, firstLegWindow, straightGuide, thicknessLabel,
+    buildPreviewPaths, cueTimeline, countCushionsBeforeSecond, cutoffTime, snapshotIndexAt, positionAt, ballPolyline, firstLegWindow, straightGuide, thicknessLabel, SHORT_PREVIEW_TAIL_M,
 } from "./paths";
 
 const T = TABLES.DAEDAE;
@@ -228,5 +227,46 @@ describe("두께 라벨", () => {
         expect(thicknessLabel(0.7)).toBe("70%");
         expect(thicknessLabel(0.6)).toBe("60%");
         expect(thicknessLabel(-1)).toBe("0%");
+    });
+});
+
+describe("대전 짧은 미리보기(first-contact)", () => {
+    it("첫 적구 접촉 뒤 꼬리 길이까지만, 적구도 꼬리까지만, 쿠션 번호 없음 — 전체 미리보기는 그대로", async () => {
+        const { simulateShot } = await import("@shared/sim/simulate");
+        const { openingLayout } = await import("@shared/sim/layouts");
+        const { DEFAULT_CUE } = await import("@shared/sim/params");
+        const table = TABLES.DAEDAE;
+        const balls = openingLayout("3c", table, "white");
+        const params = { table, cue: DEFAULT_CUE, cushionModel: "han2005" as const, condition: 1 };
+        const res = simulateShot(balls, { cueBallId: "white", phi: 1.65, V0: 3, a: -0.15, b: 0, theta: 0 }, params);
+        const full = buildPreviewPaths(res, { cueBallId: "white", gameType: "3c" });
+        expect(full.cushions.length).toBeGreaterThanOrEqual(3);
+        const short = buildPreviewPaths(res, { cueBallId: "white", gameType: "3c", cutoff: { kind: "first-contact", tailM: SHORT_PREVIEW_TAIL_M } });
+        expect(short.cushions).toEqual([]);
+        expect(short.contactIds[0]).toBe("red");
+        const cue = short.paths.find((p) => p.id === "white")!;
+        const firstT = res.events.find((e) => e.type === "ball-ball")!.t;
+        expect(short.cutoffT).toBeGreaterThan(firstT);
+        expect(short.cutoffT).toBeLessThan(full.cutoffT);
+        // 접촉 뒤 큐볼이 간 거리 ≈ 꼬리 길이(보간 오차 안)
+        let after = 0;
+        for (let i = 1; i < cue.points.length; i++) {
+            if (cue.points[i].t <= firstT) continue;
+            const a = cue.points[i - 1], b = cue.points[i];
+            after += Math.hypot(b.x - a.x, b.y - a.y);
+        }
+        expect(after).toBeLessThanOrEqual(SHORT_PREVIEW_TAIL_M + 0.05);
+        const red = short.paths.find((p) => p.id === "red")!;
+        let redLen = 0;
+        for (let i = 1; i < red.points.length; i++) redLen += Math.hypot(red.points[i].x - red.points[i - 1].x, red.points[i].y - red.points[i - 1].y);
+        expect(redLen).toBeLessThanOrEqual(SHORT_PREVIEW_TAIL_M + 0.05);
+        // 못 맞히는 샷: 첫 쿠션까지
+        // 개시 배치에서 긴 축으로 똑바로(x 는 상대 큐볼·빨간 공과 18 cm 어긋나 아무 공도 안 맞는다)
+        const miss = simulateShot(balls, { cueBallId: "white", phi: Math.PI / 2, V0: 2, a: 0, b: 0, theta: 0 }, params);
+        const m = buildPreviewPaths(miss, { cueBallId: "white", gameType: "3c", cutoff: { kind: "first-contact", tailM: SHORT_PREVIEW_TAIL_M } });
+        expect(m.contactIds).toEqual([]);
+        const firstCushion = miss.events.find((e) => e.type === "ball-cushion")!.t;
+        expect(m.cutoffT).toBeCloseTo(firstCushion, 9);
+        expect(m.cushions).toEqual([]);
     });
 });

@@ -642,13 +642,16 @@ export function SimulatorPage() {
     }, [clockOn, clockSeenAt]);
     const clockRemaining = clockOn ? SHOT_CLOCK_S - (clockNow + (sim.match?.serverOffsetMs ?? 0) - clockSeenAt) / 1000 : null;
     const clock = clockRemaining !== null && sim.match ? { seconds: Math.max(0, Math.ceil(clockRemaining)), mine: sim.match.isMyTurn } : null;
-    const timeoutFiredRef = useRef<string>("");
+    // 0 이 되면 서버에 시간 초과를 알린다. 서버가 아직 이르다고 하면(시계 오차) 3 초마다 다시 — 차례가 바뀌어 key 가 달라질 때까지.
+    const timeoutFiredRef = useRef<{ key: string; at: number }>({ key: "", at: 0 });
     useEffect(() => {
         if (clockRemaining === null || !sim.match) return;
         const key = `${sim.match.id}:${sim.match.version}:${sim.match.turnSeenAt}`;
-        const due = sim.match.isMyTurn ? clockRemaining <= 0 : clockRemaining <= -SHOT_CLOCK_GRACE_S;
-        if (!due || timeoutFiredRef.current === key) return;
-        timeoutFiredRef.current = key;
+        const due = sim.match.isMyTurn ? clockRemaining <= -0.3 : clockRemaining <= -(SHOT_CLOCK_GRACE_S + 0.3);
+        if (!due) return;
+        const now = Date.now();
+        if (timeoutFiredRef.current.key === key && now - timeoutFiredRef.current.at < 3000) return;
+        timeoutFiredRef.current = { key, at: now };
         void actions.timeout();
     }, [clockRemaining, sim.match, actions]);
 

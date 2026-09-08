@@ -136,7 +136,8 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onMyMatches, onC
             </button>
             <div className="px-5 pb-4 flex flex-wrap items-center gap-2">
                 <button type="button" onClick={() => pick("multi")} className={top === "multi" ? primary : pill}>{t("sim.entry.create")}</button>
-                <button type="button" onClick={() => { writeLast("multi"); onJoin(); }} className={pill}>{t("sim.entry.join")}</button>
+                {/* 코드로 참가: 초대 만들기와 같은 크기, 노란색(공 토큰) — 2026-09-08 오너 */}
+                <button type="button" onClick={() => { writeLast("multi"); onJoin(); }} className="h-11 px-5 inline-flex items-center rounded-pill bg-ball-yellow text-ink-1 text-[14px] font-semibold active:opacity-90">{t("sim.entry.join")}</button>
                 <button type="button" onClick={() => { writeLast("multi"); onMyMatches(); }} className={cn(pill, "rk-num")}>
                     {record.active > 0 ? t("sim.entry.myMatches").replace("{n}", String(record.active)) : t("sim.entry.myMatches").replace(/\s*\{n\}/, "")}
                 </button>

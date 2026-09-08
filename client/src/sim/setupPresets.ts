@@ -43,6 +43,8 @@ export interface SimSetupConfig {
     readonly condition: number;
     /** 플레이 모드. 화면 조준 보정만 좌우하고 서버 재판정엔 관여하지 않는다(대전은 방장 설정을 둘 다 따른다). */
     readonly mode: SimMode;
+    /** 대전 미리보기 범위(대전에서만 뜻이 있다). short = 첫 접촉 + 꺾임 꼬리까지(기본), full = 연습처럼 전체 경로. 방장 설정을 둘 다 따른다. */
+    readonly matchPreview: "short" | "full";
 }
 
 /** 규칙 빌더 옵션. 종목에 맞지 않는 항목은 무시한다. */
@@ -144,6 +146,8 @@ export interface BuildConfigInput {
     readonly condition?: number;
     /** 기본 normal. 쿠션 모델·컨디션을 주지 않으면 모드 프리셋으로 채운다. */
     readonly mode?: SimMode;
+    /** 대전 미리보기. 기본 short. */
+    readonly matchPreview?: "short" | "full";
 }
 
 /** 폼 상태 → 세션 설정. 범위를 벗어난 값은 여기서 한 번 더 정리해 서버 400 을 막는다. */
@@ -160,5 +164,6 @@ export function buildConfig(i: BuildConfigInput): SimSetupConfig {
         cushionModel: i.cushionModel ?? preset.cushionModel,
         condition: clampCondition(i.condition ?? preset.condition),
         mode,
+        matchPreview: i.matchPreview === "full" ? "full" : "short",
     };
 }
