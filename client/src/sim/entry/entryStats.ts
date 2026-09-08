@@ -53,14 +53,17 @@ export function formatAvg(avg: number): string {
     return (Number.isFinite(avg) ? avg : 0).toFixed(2);
 }
 
-export type EntryChoice = "single" | "multi" | "rooms" | "path";
+/** 진입 화면의 두 그룹(2026-09-08 오너: 카드 넷을 "혼자 / 같이" 둘로) — 혼자 = 연습·드릴·길 찾기, 같이 = 친구 초대·코드 참가·멀티방·랭킹. */
+export type EntryChoice = "solo" | "together";
 export const ENTRY_LAST_KEY = "rankue.sim.entry";
-const ENTRY_DEFAULT: readonly EntryChoice[] = ["single", "multi", "rooms", "path"];
+const ENTRY_DEFAULT: readonly EntryChoice[] = ["solo", "together"];
+/** 예전 저장값(singles/multi/rooms/path)도 그룹으로 읽는다. */
+const LEGACY: Readonly<Record<string, EntryChoice>> = { single: "solo", path: "solo", multi: "together", rooms: "together" };
 
-/** 마지막에 고른 카드가 위, 나머지는 기본 순서(싱글 · 친구와 대전 · 멀티방 · 길 찾기). 저장값이 없거나 이상하면 기본 순서. */
+/** 마지막에 고른 그룹이 위, 나머지는 기본 순서(혼자 · 같이). 저장값이 없거나 이상하면 기본 순서. */
 export function entryOrder(last: string | null | undefined): readonly EntryChoice[] {
-    const pick = ENTRY_DEFAULT.find((k) => k === last);
-    return pick ? [pick, ...ENTRY_DEFAULT.filter((k) => k !== pick)] : ENTRY_DEFAULT;
+    const v = last && (LEGACY[last] ?? (ENTRY_DEFAULT.includes(last as EntryChoice) ? (last as EntryChoice) : undefined));
+    return v ? [v, ...ENTRY_DEFAULT.filter((k) => k !== v)] : ENTRY_DEFAULT;
 }
 
 /** 길 찾기: 이 기기에서 배치를 몇 번 찾아봤는지(서버에 남기지 않는다 — 개인 연습 기록). */

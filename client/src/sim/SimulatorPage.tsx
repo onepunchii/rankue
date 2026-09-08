@@ -1243,7 +1243,6 @@ export function SimulatorPage() {
                         onMulti={() => navigate("/online-game?lobby=1", { replace: true })}
                         onJoin={() => navigate("/online-game?lobby=1&tab=join", { replace: true })}
                         onRooms={() => navigate("/online-game?rooms=1", { replace: true })}
-                        onCreateRoom={() => navigate("/online-game?lobby=1&public=1", { replace: true })}
                         onRank={() => navigate("/online-game?rank=1", { replace: true })}
                         onPath={() => navigate("/online-game?path=1", { replace: true })}
                         onDash={() => navigate("/online-game?dash=1", { replace: true })}

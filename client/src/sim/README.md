@@ -505,3 +505,14 @@ client/src/index.css  .sim-dark 가 색 토큰만 덮는다(surface-0~3·line·i
 순수 계산      solver/bestPath.ts: rankedPaths(성공 확률 순 상위 n) · bestCandidate · successPct · cushionCount(테스트 4개).
 i18n          sim.path.* 16개 × 5개 로케일. 카드 제목 "길 찾기", 칩 "3쿠션 전용".
 ```
+
+### 진입 화면 — 혼자 / 같이 두 그룹, 드롭다운 (2026-09-08 오너)
+```
+entry/SimEntry.tsx    카드 넷(싱글·친구와 대전·멀티방·길 찾기)을 그룹 둘로. 그룹 머리(모티프·이름·설명·큰 숫자)를 누르면 옵션 버튼이 내려오고 다른 그룹은 접힌다
+                      (grid-template-rows 0fr↔1fr 전환, aria-expanded). 마지막에 쓴 그룹이 위이고 처음부터 펼쳐진다.
+                      혼자 = 연습 시작(초록) · 이번 주 드릴(점 5개 + s/n) · 길 찾기(3쿠션 전용) / 같이 = 친구 초대(초록) · 코드로 참가(노랑) · 멀티방(열린 방 n) · 랭킹.
+                      방 만들기는 멀티방 화면 안(onCreateRoom 프롭 제거).
+entry/entryIcons.tsx  옵션 아이콘 7개(22 px 선, currentColor): 연습·드릴·길·초대·코드·문·단상.
+entry/entryStats.ts   EntryChoice = "solo" | "together". 예전 저장값(single/path → solo, multi/rooms → together)도 읽는다.
+테스트                 entryStats.test(순서·예전 값), SimulatorPage.test 는 [data-entry="practice"] 옵션으로 설정 창을 연다. 캡처 shots/entry3.mjs.
+```

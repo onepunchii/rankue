@@ -251,10 +251,11 @@ describe("SimulatorPage", () => {
         const h = mount();
         // 진입 화면: 카드 둘, 설정 창은 아직
         expect(h.container.querySelector("[role=dialog]")).toBeNull();
-        expect(h.container.textContent).toContain(ko["sim.entry.single"]);
-        expect(h.container.textContent).toContain(ko["sim.entry.multi"]);
+        expect(h.container.textContent).toContain(ko["sim.entry.groupSolo"]);
+        expect(h.container.textContent).toContain(ko["sim.entry.groupTogether"]);
         expect(h.container.textContent).toContain(ko["sim.entry.singleEmpty"]);
-        click(h.container.querySelector('[data-entry="single"]')!);
+        // 그룹 머리는 펼치기, 실제 시작은 펼쳐진 옵션 "연습 시작"(혼자 그룹은 처음부터 펼쳐져 있다)
+        click(h.container.querySelector('[data-entry="practice"]')!);
         expect(h.container.querySelector("[role=dialog]")).not.toBeNull();
         expect(h.container.textContent).toContain(ko["sim.setup.title"]);
         // 기록 끄고 시작(서버 없이)
