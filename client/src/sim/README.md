@@ -489,5 +489,8 @@ client/src/index.css  .sim-dark 가 색 토큰만 덮는다(surface-0~3·line·i
 배치          shared/sim/randomLayout.ts — 씨앗 하나로 결정론(공유·테스트), 쿠션에서 2.2R·공 사이 1.6D 이상 떨어뜨린다.
               Math.hypot 은 결정론 규칙에서 금지라 제곱 비교로 판정한다(conformance.test).
 기록          서버에 남기지 않는다. "찾아본 배치 수"만 기기에 센다(entryStats readPathCount/bumpPathCount, 키 rankue.sim.pathCount).
-i18n          sim.path.* 10개 × 5개 로케일. 카드 제목 "길 찾기", 칩 "3쿠션 전용".
+아래 카드      두께 독 대신 solver/BestPathCard — "가장 잘 들어가는 길"(성공률 = 오차 허용이 가장 큰 후보, 점수가 아니다: 점수는 안전·쉬움까지 섞은 값).
+              조준 문구·당점·세기·쿠션은 시트와 같은 헬퍼(aimText·spinText·powerPercent), 순수 계산은 solver/bestPath.ts(테스트 3개).
+              버튼: 경로 보기(미리보기 토글) · 이대로 쳐 보기(적용) · 다른 길 n(시트 열기). 찾기 전엔 안내 + 길 찾기, 못 찾으면 "공을 옮겨 보세요".
+i18n          sim.path.* 16개 × 5개 로케일. 카드 제목 "길 찾기", 칩 "3쿠션 전용".
 ```

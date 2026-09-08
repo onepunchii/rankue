@@ -31,6 +31,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
 import { randomLayout } from "@shared/sim/randomLayout";
+import { DEFAULT_CUE } from "@shared/sim/params";
 import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome, SHOT_CLOCK_STRIKES } from "@shared/sim/rules";
 import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
@@ -90,6 +91,7 @@ import {
 } from "./components/railIcons";
 import { POWER_RAIL_MIN_MD, PowerRail } from "./components/PowerRail";
 import { DOCK_HEIGHT, ThicknessDock } from "./components/ThicknessDock";
+import { BestPathCard } from "./solver/BestPathCard";
 import { railFitsMd } from "./railLayout";
 import { ShotButton } from "./components/ShotButton";
 import { SpinSheet, type SpinSheetTab } from "./components/SpinSheet";
@@ -1084,15 +1086,28 @@ export function SimulatorPage() {
                     </div>
 
                     {/* 왼쪽 아래: 두께 독(둘째 줄에 되돌리기) */}
-                    <ThicknessDock
-                        active={active} side={side} disabled={!aiming}
-                        onThickness={onThickness} onSide={onSide} onNudge={onNudge}
-                        onUndo={undoInDock ? onUndo : null}
-                        className={cn(
-                            "absolute left-2 bottom-2 z-[3] transition-opacity duration-150",
-                            controlsHidden ? "opacity-0 pointer-events-none" : "opacity-100",
-                        )}
-                    />
+                    {/* 길 찾기 화면에선 두께 독 대신 "가장 잘 들어가는 길" 카드(2026-09-08 오너) — 조준은 해법을 적용해서 맞춘다 */}
+                    {pathView ? (
+                        <BestPathCard
+                            status={solver.status} progress={solver.progress} candidates={solver.result?.candidates ?? []}
+                            maxOffset={DEFAULT_CUE.maxOffset} previewing={solverPreview !== null}
+                            onSearch={openSolver} onPreview={onSolverPreview} onApply={onSolverApply} onMore={openSolver}
+                            className={cn(
+                                "absolute left-2 right-[76px] bottom-2 z-[3] transition-opacity duration-150",
+                                controlsHidden ? "opacity-0 pointer-events-none" : "opacity-100",
+                            )}
+                        />
+                    ) : (
+                        <ThicknessDock
+                            active={active} side={side} disabled={!aiming}
+                            onThickness={onThickness} onSide={onSide} onNudge={onNudge}
+                            onUndo={undoInDock ? onUndo : null}
+                            className={cn(
+                                "absolute left-2 bottom-2 z-[3] transition-opacity duration-150",
+                                controlsHidden ? "opacity-0 pointer-events-none" : "opacity-100",
+                            )}
+                        />
+                    )}
 
                     {/* ── 대전 전용 표시 ── */}
                     {(matchLoad === "error" || matchLoad === "notMine") && (
