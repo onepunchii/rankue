@@ -148,6 +148,11 @@ function mount(): Harness {
 }
 
 const click = (el: Element) => React.act(() => { el.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); });
+/** 샷 버튼: 큐대 스트로크(STROKE_MS ≈ 0.18 s) 뒤에 공이 출발한다 — 그만큼 기다려 준다(2026-09-08). */
+const shoot = async (h: Harness) => {
+    click(byText(h, ko["sim.controls.shoot"])!);
+    await React.act(async () => { await new Promise((r) => setTimeout(r, 260)); });
+};
 const buttons = (h: Harness) => Array.from(h.container.querySelectorAll("button"));
 const byText = (h: Harness, text: string) => buttons(h).find((b) => b.textContent === text) ?? null;
 const byLabel = (h: Harness, label: string) => buttons(h).find((b) => b.getAttribute("aria-label") === label) ?? null;
@@ -206,7 +211,7 @@ describe("SimulatorPage", () => {
         const dock = () => h.container.querySelector("[role=group][aria-label=\"" + ko["sim.controls.thickness"] + "\"]")!;
         expect(controls().className).not.toContain("opacity-0");
         expect(dock().className).not.toContain("opacity-0");
-        click(byText(h, ko["sim.controls.shoot"])!);
+        await shoot(h);
         // 재생 중: 샷 잠금(빈 원, 비활성) + 빨리감기 안내 + 툴바·큐 슬라이더·두께 독이 흐려지고 포인터를 막는다(상단 띠·칩은 남는다)
         const shot = byLabel(h, ko["sim.controls.shoot"]);
         expect(shot).not.toBeNull();
@@ -271,7 +276,7 @@ describe("SimulatorPage", () => {
         nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
         const h = mount();
         expect(byLabel(h, ko["sim.share.button"])).toBeNull();
-        click(byText(h, ko["sim.controls.shoot"])!);
+        await shoot(h);
         expect(byLabel(h, ko["sim.share.button"])).toBeNull();   // 재생 중엔 없다
         performance.now = () => realNow() + 1_000_000;
         await frames(4);

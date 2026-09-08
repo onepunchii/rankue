@@ -9,9 +9,24 @@ export function bestCandidate(candidates: readonly SolveCandidate[]): SolveCandi
     return [...candidates].sort((x, y) => (y.robustness ?? -1) - (x.robustness ?? -1) || y.score - x.score)[0];
 }
 
-/** 성공 확률 순으로 상위 n개(오른쪽 바의 "길 1·2·3"). 못 잰 후보는 뒤로. */
+const byMargin = (x: SolveCandidate, y: SolveCandidate) => (y.robustness ?? -1) - (x.robustness ?? -1) || y.score - x.score;
+
+/** 적구 먼저 길에 남겨 두는 최소 자리 수 — 무작위 배치에선 뱅크가 후보를 거의 다 차지한다(실측 58/60). */
+export const BALL_FIRST_QUOTA = 2;
+
+/**
+ * 여유 순으로 상위 n개. 다만 적구 먼저 길이 있으면 최소 BALL_FIRST_QUOTA 자리를 준다 —
+ * 쿠션은 표적이 크고 적구는 작아서, 여유만으로 줄 세우면 목록이 전부 뱅크가 된다.
+ */
 export function rankedPaths(candidates: readonly SolveCandidate[], n = 3): readonly SolveCandidate[] {
-    return [...candidates].sort((x, y) => (y.robustness ?? -1) - (x.robustness ?? -1) || y.score - x.score).slice(0, n);
+    const sorted = [...candidates].sort(byMargin);
+    const ballFirst = sorted.filter((c) => c.aim.kind !== "bank");
+    const picked: SolveCandidate[] = ballFirst.slice(0, Math.min(BALL_FIRST_QUOTA, n));
+    for (const c of sorted) {
+        if (picked.length >= n) break;
+        if (!picked.includes(c)) picked.push(c);
+    }
+    return picked.sort(byMargin);
 }
 
 /** 쿠션 수 — 시트와 같은 값(판정이 센 값). */

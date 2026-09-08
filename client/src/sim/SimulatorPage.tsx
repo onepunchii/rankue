@@ -87,7 +87,7 @@ import { TopBar } from "./components/TopBar";
 import { ToolRail, type RailItem } from "./components/ToolRail";
 import {
     CloseIcon, CubeIcon, DiamondIcon, ElevationIcon, FlagIcon, ListIcon, MinusIcon, PlusIcon, ResetIcon, ShareIcon, SolverIcon, SoundIcon, WarnIcon,
-    SpinIcon, PathNumIcon } from "./components/railIcons";
+    SpinIcon, PathChip } from "./components/railIcons";
 import { POWER_RAIL_MIN_MD, PowerRail } from "./components/PowerRail";
 import { DOCK_HEIGHT, ThicknessDock } from "./components/ThicknessDock";
 import { BestPathCard } from "./solver/BestPathCard";
@@ -119,6 +119,8 @@ const EXIT_PATH = "/dashboard";
  * 큐대(1.45 m)도 두 렌더러 모두 이 사각형 안에서만 그려 오른쪽 열 틈으로 비치지 않는다.
  */
 /** 길 찾기 화면의 탐색 예산(ms) — 기본 1.5 s 보다 길게 본다. */
+/** 샷을 누른 뒤 큐대가 앞으로 밀리는 시간(ms) — 이 뒤에 공이 출발한다. */
+const STROKE_MS = 180;
 const PATH_BUDGET_MS = 3500;
 /** 오른쪽 바에 세울 길 수(오너: 확률 좋은 길 다섯 개). */
 const PATH_TOP_N = 5;
@@ -507,12 +509,20 @@ export function SimulatorPage() {
             if (!renderer) return;
             const frame = frameAt(performance.now());
             // 선수 시점 카메라가 아직 움직이는 중이면(needsFrame) dirty 가 아니어도 그린다 — 오버레이도 같은 자세로 다시 얹힌다
-            if (!frame.playing && !dirtyRef.current && !renderer.needsFrame?.()) return;
+            if (!frame.playing && !dirtyRef.current && !renderer.needsFrame?.() && strokeRef.current === null) return;
             dirtyRef.current = false;
             const v = viewRef.current;
             renderer.draw({
                 balls: frame.balls,
-                cue: { phi: v.input.phi, pullback: pullbackFor(v.input.V0), visible: v.phase === "aim", ballId: v.cueBallId },
+                // 큐대는 조준 중에만. 샷을 누르면 STROKE_MS 동안 당김이 0 으로 줄며(앞으로 밀리며) 그 뒤 공이 출발한다.
+                cue: {
+                    phi: v.input.phi,
+                    pullback: strokeRef.current === null
+                        ? pullbackFor(v.input.V0)
+                        : pullbackFor(v.input.V0) * Math.max(0, 1 - (performance.now() - strokeRef.current) / STROKE_MS),
+                    visible: v.phase === "aim",
+                    ballId: v.cueBallId,
+                },
                 // 큐볼은 큐 스틱이 가리키므로 링을 두르지 않는다 — 8px 남짓한 공에 링이 겹치면 속이 빈 공처럼 보였다(실측).
                 highlightBallId: v.placing ?? undefined,
                 // 선수 시점 카메라 대상: 조준 중엔 큐볼 뒤(follow), 재생 중엔 부감(overview — 테이블 전체가 보이게 올라갔다가 조준으로
@@ -750,7 +760,15 @@ export function SimulatorPage() {
     const onSpin = useCallback((a: number, b: number) => actions.setSpin(a, b), [actions]);
     const onElevation = useCallback((theta: number) => actions.setElevation(theta), [actions]);
     const onPower = useCallback((V0: number) => actions.setPower(V0), [actions]);
-    const onShoot = useCallback(() => { void actions.shoot(); }, [actions]);
+    // 샷: 큐대가 STROKE_MS 동안 앞으로 밀린 뒤 공이 출발한다(조준 단계에서 그린다 — 예전엔 재생 중에 그려 큐가 굴러가는 공을 따라갔다)
+    const strokeRef = useRef<number | null>(null);
+    const beginShot = useCallback(() => {
+        if (strokeRef.current !== null) return;
+        strokeRef.current = performance.now();
+        dirtyRef.current = true;
+        window.setTimeout(() => { strokeRef.current = null; dirtyRef.current = true; void actions.shoot(); }, STROKE_MS);
+    }, [actions]);
+    const onShoot = useCallback(() => { beginShot(); }, [beginShot]);
     const onShootPathRef = useRef<() => void>(() => undefined);
     const onShootPath = useCallback(() => { onShootPathRef.current(); }, []);
     const onUndo = useCallback(() => { actions.undo(); setLog(popShot); setBanner(null); }, [actions]);
@@ -939,23 +957,28 @@ export function SimulatorPage() {
         setSolverOpen(false);
         toast({ title: t("sim.solver.applied") });
     }, [actions, toast, t]);
+    // 길을 고르면 큐대가 그 길로 향한다 — 입력(방향·세기·당점)을 그 샷으로 넣는다(2026-09-08 오너). 샷 버튼은 그대로 친다.
     const onPickPath = useCallback((i: number) => {
         setPathPick(i);
         const c = paths[i];
         if (!c || !sim.config) return;
-        setSolverPreview({ candidate: c, paths: buildPreviewPaths(c.result, { cueBallId: sim.cueBallId, gameType: sim.config.gameType }) });
-    }, [paths, sim.config, sim.cueBallId]);
-    // 길 찾기: "이대로 쳐 보기" 는 적용과 재생을 한 번에(샷 버튼이 없다)
-    const onPlayPath = useCallback((c: SolveCandidate) => {
         actions.setInput({ phi: c.input.phi, V0: c.input.V0, a: c.input.a, b: c.input.b, theta: 0 });
-        setSolverPreview(null);
-        setSolverOpen(false);
-        window.setTimeout(() => { void actions.shoot(); }, 60);   // 입력이 반영된 다음 프레임에 친다
-    }, [actions]);
-    // 길 찾기의 샷 버튼: 고른 길을 그대로 친다. 아직 길이 없으면 먼저 찾는다.
+        setSolverPreview({ candidate: c, paths: buildPreviewPaths(c.result, { cueBallId: sim.cueBallId, gameType: sim.config.gameType }) });
+    }, [paths, sim.config, sim.cueBallId, actions]);
+    // 길을 찾으면 1등 길을 바로 고른다 — 큐대가 그 길을 향하고 카드가 채워진다
+    const autoPickedRef = useRef<unknown>(null);
+    useEffect(() => {
+        if (!pathView || paths.length === 0 || autoPickedRef.current === solver.result) return;
+        autoPickedRef.current = solver.result;
+        onPickPath(0);
+    }, [pathView, paths, solver.result, onPickPath]);
+    // 길 찾기의 샷 버튼: 고른 길을 그대로 친다(큐대 스트로크 뒤). 아직 길이 없으면 먼저 찾는다.
     onShootPathRef.current = () => {
-        if (pickedPath) onPlayPath(pickedPath);
-        else openSolver();
+        if (pickedPath) {
+            actions.setInput({ phi: pickedPath.input.phi, V0: pickedPath.input.V0, a: pickedPath.input.a, b: pickedPath.input.b, theta: 0 });
+            setSolverPreview(null);
+            beginShot();
+        } else openSolver();
     };
     // 배치가 바뀌면(샷·되돌리기·공 옮기기) 후보는 낡은 것 — 경로를 끄고 시트를 닫는다
     useEffect(() => { setSolverPreview(null); setSolverOpen(false); }, [sim.balls]);
@@ -1009,7 +1032,7 @@ export function SimulatorPage() {
             paths.forEach((c, i) => railAim.push({
                 id: `path-${i}`, label: t("sim.path.nth").replace("{n}", String(i + 1)),
                 hint: t("sim.path.nth").replace("{n}", String(i + 1)),
-                icon: <PathNumIcon n={i + 1} />, caption: successPct(c) === null ? null : `${successPct(c)}%`,
+                icon: <PathChip rank={i + 1} pct={successPct(c)} active={pathPick === i} />, bare: true,
                 active: pathPick === i, onPress: () => onPickPath(i), disabled: !aiming,
             }));
         }

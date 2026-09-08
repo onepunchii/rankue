@@ -3,7 +3,7 @@
  * 시각은 now: () => 0 으로 고정해(예산 없음) 결정론적으로 검사한다.
  */
 import { describe, it, expect } from "vitest";
-import { DEFAULT_PARAMS } from "@shared/sim/params";
+import { DEFAULT_PARAMS, TABLES } from "@shared/sim/params";
 import { openingLayout } from "@shared/sim/layouts";
 import { simulateShot } from "@shared/sim/simulate";
 import { DEFAULT_3C_RULES, DEFAULT_4C_RULES } from "@shared/sim/rules";
@@ -230,5 +230,25 @@ describe("예산·단계", () => {
 
     it("큐볼 id 가 배치에 없으면 RangeError", () => {
         expect(() => searchShots(req3c({ cueBallId: "blue" }), NO_CLOCK)).toThrow(RangeError);
+    });
+});
+
+describe("적구 먼저 길 자리(BALL_FIRST_SLOTS)", () => {
+    it("무작위 배치에서 적구 먼저 득점 길이 있으면 후보에 최소 하나는 들어온다(정제도 받는다)", async () => {
+        const { randomLayout } = await import("@shared/sim/randomLayout");
+        let withBall = 0, checked = 0;
+        for (const seed of [1, 2, 3, 4]) {
+            const balls = randomLayout("3c", TABLES.DAEDAE, seed);
+            const r = searchShots({ balls, cueBallId: "white", gameType: "3c", rules: DEFAULT_3C_RULES, params: DEFAULT_PARAMS, seed }, { now: () => 0 });
+            const ballFirst = r.candidates.filter((c) => c.aim.kind === "ball");
+            checked++;
+            if (ballFirst.length > 0) {
+                withBall++;
+                // 자리를 받은 적구 먼저 후보 중 적어도 하나는 정제를 받아 여유가 있다(정제 뒤 대표가 바뀌며 라벨이 뒤집힐 수 있어 전부는 아니다)
+                expect(ballFirst.some((c) => c.robustness !== null)).toBe(true);
+            }
+        }
+        // 실측(0.1° 전수): 네 배치 모두 적구 먼저 득점 길이 있다 → 후보에도 있어야 한다
+        expect(withBall).toBe(checked);
     });
 });

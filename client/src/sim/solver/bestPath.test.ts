@@ -3,12 +3,13 @@ import { bestCandidate, successPct, cushionCount, rankedPaths, marginLevel, tipS
 import type { SolveCandidate } from "./search";
 
 /** 필요한 필드만 채운 가짜 후보 — 카드는 순수 함수 세 개만 테스트한다(그리기는 jsdom 스모크가 따로 없다). */
-function candidate(o: { score: number; robustness: number | null; cushions?: number }): SolveCandidate {
+function candidate(o: { score: number; robustness: number | null; cushions?: number; bank?: boolean }): SolveCandidate {
     return {
         input: { cueBallId: "white", phi: 1, V0: 3, a: 0, b: 0, theta: 0 },
         outcome: { code: "point", points: 1, cushionsBeforeSecond: o.cushions ?? 3, foul: false } as SolveCandidate["outcome"],
         result: { events: [], final: [], history: [], duration: 0, hash: "", truncated: false } as unknown as SolveCandidate["result"],
-        score: o.score, tried: 1, aim: { kind: "none" }, robustness: o.robustness,
+        score: o.score, tried: 1, robustness: o.robustness,
+        aim: o.bank ? { kind: "bank", cushion: "left" } : { kind: "none" },
         terms: {} as SolveCandidate["terms"],
     };
 }
@@ -63,5 +64,16 @@ describe("길 찾기 카드", () => {
         expect(tipSpot(0.17, 0.25, M)).toEqual({ tips: 1, side: "right", vertical: "high" });
         expect(tipSpot(0, -0.25, M).vertical).toBe("low");
         expect(tipSpot(0.02, 0.05, M)).toEqual({ tips: 0, side: null, vertical: "mid" });
+    });
+    it("뱅크가 다 차지하지 않게 적구 먼저 길에 두 자리를 남긴다", () => {
+        const banks = [0.9, 0.8, 0.7, 0.6, 0.5].map((r) => candidate({ score: 1, robustness: r, bank: true }));
+        const balls = [0.2, 0.1].map((r) => candidate({ score: 1, robustness: r }));
+        const top = rankedPaths([...banks, ...balls], 5);
+        expect(top.length).toBe(5);
+        expect(top.filter((c) => c.aim.kind !== "bank").length).toBe(2);
+        expect(top[0].robustness).toBe(0.9);                       // 1등은 그대로 여유가 가장 큰 길
+        expect(top.map((c) => c.robustness)).toEqual([0.9, 0.8, 0.7, 0.2, 0.1]);
+        // 적구 먼저 길이 없으면 그냥 여유 순
+        expect(rankedPaths(banks, 3).map((c) => c.robustness)).toEqual([0.9, 0.8, 0.7]);
     });
 });

@@ -30,6 +30,8 @@ export interface RailItem {
     readonly disabled?: boolean;
     /** 아이콘 아래 12 px 숫자. */
     readonly caption?: string | null;
+    /** 버튼 껍데기(흰 원·테두리·그림자) 없이 아이콘만 — 아이콘이 스스로 원을 그릴 때(길 찾기의 길 칩). */
+    readonly bare?: boolean;
 }
 
 export interface ToolRailProps {
@@ -83,11 +85,11 @@ export const ToolRail = memo(function ToolRail({ groups, size = "md", className 
                                 item.onPress();
                             }}
                             className={cn(
-                                BTN,
+                                item.bare ? "relative shrink-0 rounded-pill flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none" : BTN,
                                 sm ? "h-10 w-10" : "h-11 w-11",
-                                item.active
+                                !item.bare && (item.active
                                     ? "bg-brand/[0.08] border-brand/45 text-brand"
-                                    : cn("bg-surface-1 border-surface-line", item.dim ? "text-ink-4" : "text-ink-2"),
+                                    : cn("bg-surface-1 border-surface-line", item.dim ? "text-ink-4" : "text-ink-2")),
                             )}
                         >
                             {item.icon}

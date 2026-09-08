@@ -175,33 +175,24 @@ export function ChevronRightIcon() {
 }
 
 /**
- * 길 찾기 오른쪽 바의 길 아이콘 — 우리 공 색으로(길 1 백구 · 2 노란 공 · 3 빨간 공).
- * 숫자는 공 위에 얹는다. 빨간 공만 흰 글씨.
+ * 길 찾기 오른쪽 바의 길 칩(2026-09-08 오너: 원 안에 원 없이, 색 원 하나에 여유 % 만 — 번호 없음).
+ * 순위 색: 1 노란 공 · 2 빨간 공 · 3 백구 · 4·5 회색. 고른 칩은 진한 테두리.
  */
-const PATH_BALL = [
-    { fill: "fill-ball-white", text: "text-ink-1" },
-    { fill: "fill-ball-yellow", text: "text-ink-1" },
-    { fill: "fill-ball-red", text: "text-white" },
+const PATH_CHIP = [
+    "bg-ball-yellow text-ink-1",
+    "bg-ball-red text-white",
+    "bg-ball-white text-ink-1 border-surface-line-strong",
+    "bg-surface-line text-ink-2",
+    "bg-surface-line text-ink-2",
 ] as const;
 
-export function PathNumIcon({ n }: { n: number }) {
-    // 네 번째부터는 공 색이 없다 — 테두리만 있는 칩(순위가 낮은 길)
-    if (n > PATH_BALL.length) {
-        return (
-            <span className="rk-num inline-flex h-[22px] w-[22px] items-center justify-center shrink-0 rounded-pill border border-current text-[11px] font-bold leading-none">
-                {n}
-            </span>
-        );
-    }
-    const c = PATH_BALL[n - 1];
+export function PathChip({ rank, pct, active }: { rank: number; pct: number | null; active: boolean }) {
+    const cls = PATH_CHIP[Math.min(rank, PATH_CHIP.length) - 1];
     return (
-        <span className="relative inline-flex h-[22px] w-[22px] items-center justify-center shrink-0">
-            <svg viewBox="0 0 24 24" className="absolute inset-0 h-full w-full" aria-hidden="true">
-                <circle cx="12" cy="12" r="11" className={c.fill} stroke="rgba(0,0,0,0.18)" strokeWidth="1.2" />
-                {/* 공다운 하이라이트 한 점(그라데이션 없이) */}
-                <circle cx="8.5" cy="8" r="2.6" fill="rgba(255,255,255,0.5)" />
-            </svg>
-            <span className={`relative rk-num text-[11px] font-bold leading-none ${c.text}`}>{n}</span>
+        <span
+            className={`rk-num inline-flex h-full w-full items-center justify-center rounded-pill border text-[12px] font-bold leading-none ${cls} ${active ? "border-ink-1 border-2" : rank === 3 ? "" : "border-transparent"}`}
+        >
+            {pct === null ? "–" : `${pct}%`}
         </span>
     );
 }
