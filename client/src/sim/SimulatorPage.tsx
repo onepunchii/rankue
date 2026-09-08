@@ -747,6 +747,8 @@ export function SimulatorPage() {
     const onElevation = useCallback((theta: number) => actions.setElevation(theta), [actions]);
     const onPower = useCallback((V0: number) => actions.setPower(V0), [actions]);
     const onShoot = useCallback(() => { void actions.shoot(); }, [actions]);
+    const onShootPathRef = useRef<() => void>(() => undefined);
+    const onShootPath = useCallback(() => { onShootPathRef.current(); }, []);
     const onUndo = useCallback(() => { actions.undo(); setLog(popShot); setBanner(null); }, [actions]);
     const onRestart = useCallback(() => {
         actions.restart();
@@ -942,12 +944,11 @@ export function SimulatorPage() {
         setSolverOpen(false);
         window.setTimeout(() => { void actions.shoot(); }, 60);   // 입력이 반영된 다음 프레임에 친다
     }, [actions]);
-    // 이 배치 그대로 연습으로(직접 치고 싶을 때 — 길 찾기엔 조작이 없다)
-    const onPracticeHere = useCallback(() => {
-        const balls = sim.balls.map((b) => ({ ...b }));
-        navigate("/online-game", { replace: true });
-        actions.start(buildConfig({ gameType: "3c", tableId: "DAEDAE", target: 100, rules: { ruleSet: "umb" } }), { record: false, balls });
-    }, [actions, navigate, sim.balls]);
+    // 길 찾기의 샷 버튼: 고른 길을 그대로 친다. 아직 길이 없으면 먼저 찾는다.
+    onShootPathRef.current = () => {
+        if (pickedPath) onPlayPath(pickedPath);
+        else openSolver();
+    };
     // 배치가 바뀌면(샷·되돌리기·공 옮기기) 후보는 낡은 것 — 경로를 끄고 시트를 닫는다
     useEffect(() => { setSolverPreview(null); setSolverOpen(false); }, [sim.balls]);
     // 연습·드릴(채점 뒤)에서만. 기록 세션·대전엔 넘기지 않는다.
@@ -1004,10 +1005,6 @@ export function SimulatorPage() {
                 active: pathPick === i, onPress: () => onPickPath(i), disabled: !aiming,
             }));
         }
-        railAim.push({
-            id: "path-search", label: paths.length > 0 ? t("sim.solver.retry") : t("sim.path.title"),
-            icon: <SolverIcon />, onPress: openSolver, disabled: !aiming,
-        });
         railAim.push({ id: "path-random", label: t("sim.path.random"), icon: <ResetIcon />, onPress: () => startPath(pathSeedRef.current + 1), disabled: sim.phase === "shooting" });
     }
     const railToggles: RailItem[] = [];
@@ -1044,6 +1041,7 @@ export function SimulatorPage() {
                     record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
                     drillName={drill ? t(drill.drill.nameKey) : pathView ? t("sim.path.chip") : null}
                     hideStatus={pathView}
+                    drillNameStatic={pathView}
                     onSummary={pathView ? openSolver : onInnings}
                     onBack={isMatch ? onExitRequest : undefined}
                     clock={clock}
@@ -1132,8 +1130,12 @@ export function SimulatorPage() {
                                 <PlusIcon />
                             </HoldButton>
                         </div>
-                        {!pathView && !(isMatch && sim.phase === "finished") && (
-                            <ShotButton phase={sim.phase} onShoot={onShoot} onRestart={onRestart} compact={compact} className="shrink-0" />
+                        {!(isMatch && sim.phase === "finished") && (
+                            <ShotButton
+                                phase={sim.phase}
+                                onShoot={pathView ? onShootPath : onShoot}
+                                onRestart={onRestart} compact={compact} className="shrink-0"
+                            />
                         )}
                     </div>
 
@@ -1141,9 +1143,8 @@ export function SimulatorPage() {
                     {/* 길 찾기 화면에선 두께 독 대신 "가장 잘 들어가는 길" 카드(2026-09-08 오너) — 조준은 해법을 적용해서 맞춘다 */}
                     {pathView ? (
                         <BestPathCard
-                            status={pathStale ? "idle" : solver.status} progress={solver.progress} candidate={pickedPath} count={paths.length}
-                            maxOffset={DEFAULT_CUE.maxOffset}
-                            onSearch={openSolver} onPlay={onPlayPath} onPractice={onPracticeHere}
+                            status={pathStale ? "idle" : solver.status} progress={solver.progress} candidate={pickedPath}
+                            maxOffset={DEFAULT_CUE.maxOffset} onSearch={openSolver}
                             className={cn(
                                 "absolute left-2 right-[76px] bottom-2 z-[3] transition-opacity duration-150",
                                 controlsHidden ? "opacity-0 pointer-events-none" : "opacity-100",

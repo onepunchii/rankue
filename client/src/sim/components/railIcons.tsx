@@ -174,11 +174,24 @@ export function ChevronRightIcon() {
     );
 }
 
-/** 길 찾기 오른쪽 바의 번호 아이콘(길 1·2·3). */
+/**
+ * 길 찾기 오른쪽 바의 길 아이콘 — 우리 공 색으로(길 1 백구 · 2 노란 공 · 3 빨간 공).
+ * 숫자는 공 위에 얹는다. 빨간 공만 흰 글씨.
+ */
+const PATH_BALL = [
+    { fill: "fill-ball-white", text: "text-ink-1" },
+    { fill: "fill-ball-yellow", text: "text-ink-1" },
+    { fill: "fill-ball-red", text: "text-white" },
+] as const;
+
 export function PathNumIcon({ n }: { n: number }) {
+    const c = PATH_BALL[(n - 1) % PATH_BALL.length];
     return (
-        <span className="rk-num inline-flex h-6 w-6 items-center justify-center rounded-pill border border-current text-[13px] font-bold leading-none">
-            {n}
+        <span className="relative inline-flex h-6 w-6 items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" className="absolute inset-0 h-6 w-6" aria-hidden="true">
+                <circle cx="12" cy="12" r="11" className={c.fill} stroke="rgba(0,0,0,0.16)" strokeWidth="1" />
+            </svg>
+            <span className={`relative rk-num text-[12px] font-bold leading-none ${c.text}`}>{n}</span>
         </span>
     );
 }
