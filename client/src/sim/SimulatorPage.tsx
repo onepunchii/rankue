@@ -87,11 +87,11 @@ import { TopBar } from "./components/TopBar";
 import { ToolRail, type RailItem } from "./components/ToolRail";
 import {
     CloseIcon, CubeIcon, DiamondIcon, ElevationIcon, FlagIcon, ListIcon, MinusIcon, PlusIcon, ResetIcon, ShareIcon, SolverIcon, SoundIcon, WarnIcon,
-    SpinIcon,
-} from "./components/railIcons";
+    SpinIcon, PathNumIcon } from "./components/railIcons";
 import { POWER_RAIL_MIN_MD, PowerRail } from "./components/PowerRail";
 import { DOCK_HEIGHT, ThicknessDock } from "./components/ThicknessDock";
 import { BestPathCard } from "./solver/BestPathCard";
+import { rankedPaths, successPct } from "./solver/bestPath";
 import { railFitsMd } from "./railLayout";
 import { ShotButton } from "./components/ShotButton";
 import { SpinSheet, type SpinSheetTab } from "./components/SpinSheet";
@@ -203,6 +203,7 @@ export function SimulatorPage() {
     // ── 화면 상태 ─────────────────────────────────────────────────────────
     const [muted, setMuted] = useState(false);
     const [diamond, setDiamond] = useState(() => readDiamondPref(safeLocalStorage()));
+    const [diamondTouched, setDiamondTouched] = useState(false);
     // 카메라 뷰: 저장값으로 시작. ThreeRenderer 가 올라와야(setView 지원) HUD 토글이 보이고 실제로 적용된다.
     const [cameraView, setCameraView] = useState<RendererView>(() => readViewPref(safeLocalStorage()));
     const cameraViewRef = useRef(cameraView);
@@ -281,7 +282,8 @@ export function SimulatorPage() {
     const assist = sim.config ? aimAssistFor(sim.config.mode) : true;
     const reality = sim.config?.mode === "reality";
     const is3c = gameType === "3c";
-    const diamondOn = diamond && is3c;
+    // 길 찾기에선 다이아몬드가 기본(길을 다이아몬드 숫자로 읽는다) — 끄고 싶으면 툴바에서 끈다
+    const diamondOn = (diamond || (pathView && !diamondTouched)) && is3c;
 
     // 처음 한 번: URL 설정이 있으면 바로 시작
     const startedRef = useRef(false);
@@ -756,6 +758,7 @@ export function SimulatorPage() {
     const onExitRequest = useCallback(() => setExitOpen(true), []);
     const onToggleMute = useCallback(() => setMuted((m) => !m), []);
     const onToggleDiamond = useCallback(() => {
+        setDiamondTouched(true);
         setDiamond((d) => {
             const next = !d;
             writeDiamondPref(safeLocalStorage(), next);
@@ -882,6 +885,20 @@ export function SimulatorPage() {
         startPath(Math.floor(Date.now() % 100000) + 1);
     }, [pathView, startPath]);
 
+    // 오른쪽 바의 "길 1·2·3": 성공 확률 순 상위 세 개. 누르면 그 길을 고르고 경로를 그린다(2026-09-08 오너).
+    const ballsKey = useMemo(() => sim.balls.map((b) => `${b.id}:${b.r[0].toFixed(4)},${b.r[1].toFixed(4)}`).join("|"), [sim.balls]);
+    const solvedKeyRef = useRef("");
+    useEffect(() => { if (solver.status === "running") solvedKeyRef.current = ballsKey; }, [solver.status, ballsKey]);
+    // 찾은 길은 그때의 배치에만 유효하다 — 공이 움직이면(샷·손으로 옮김) 목록을 비운다
+    const pathStale = solvedKeyRef.current !== ballsKey;
+    const paths = useMemo(
+        () => (pathView && !pathStale ? rankedPaths(solver.result?.candidates ?? [], 3) : []),
+        [pathView, pathStale, solver.result],
+    );
+    const [pathPick, setPathPick] = useState(0);
+    useEffect(() => { setPathPick(0); }, [solver.result]);
+    const pickedPath = paths[pathPick] ?? paths[0] ?? null;
+
     const openSolver = useCallback(() => {
         if (!sim.config || !sim.params || sim.phase !== "aim") return;
         setSolverOpen(true);
@@ -912,6 +929,25 @@ export function SimulatorPage() {
         setSolverOpen(false);
         toast({ title: t("sim.solver.applied") });
     }, [actions, toast, t]);
+    const onPickPath = useCallback((i: number) => {
+        setPathPick(i);
+        const c = paths[i];
+        if (!c || !sim.config) return;
+        setSolverPreview({ candidate: c, paths: buildPreviewPaths(c.result, { cueBallId: sim.cueBallId, gameType: sim.config.gameType }) });
+    }, [paths, sim.config, sim.cueBallId]);
+    // 길 찾기: "이대로 쳐 보기" 는 적용과 재생을 한 번에(샷 버튼이 없다)
+    const onPlayPath = useCallback((c: SolveCandidate) => {
+        actions.setInput({ phi: c.input.phi, V0: c.input.V0, a: c.input.a, b: c.input.b, theta: 0 });
+        setSolverPreview(null);
+        setSolverOpen(false);
+        window.setTimeout(() => { void actions.shoot(); }, 60);   // 입력이 반영된 다음 프레임에 친다
+    }, [actions]);
+    // 이 배치 그대로 연습으로(직접 치고 싶을 때 — 길 찾기엔 조작이 없다)
+    const onPracticeHere = useCallback(() => {
+        const balls = sim.balls.map((b) => ({ ...b }));
+        navigate("/online-game", { replace: true });
+        actions.start(buildConfig({ gameType: "3c", tableId: "DAEDAE", target: 100, rules: { ruleSet: "umb" } }), { record: false, balls });
+    }, [actions, navigate, sim.balls]);
     // 배치가 바뀌면(샷·되돌리기·공 옮기기) 후보는 낡은 것 — 경로를 끄고 시트를 닫는다
     useEffect(() => { setSolverPreview(null); setSolverOpen(false); }, [sim.balls]);
     // 연습·드릴(채점 뒤)에서만. 기록 세션·대전엔 넘기지 않는다.
@@ -949,21 +985,36 @@ export function SimulatorPage() {
     const canResign = isMatch && !!sim.match?.canResign && sim.phase !== "finished";
 
     // ── 툴바 묶음: 조준 도구 / 토글·동작 / 나가기(대전은 기권). 되돌리기는 독, 공유는 왼쪽 위 알약 — 툴바는 최대 9개 ──
-    const railAim: RailItem[] = [
+    // 길 찾기 화면엔 당점·큐 각이 없다 — 해법이 값을 준다(2026-09-08 오너)
+    const railAim: RailItem[] = pathView ? [] : [
         { id: "spin", label: t("sim.controls.spin"), icon: <SpinIcon a={sim.input.a} b={sim.input.b} />, onPress: () => openSpinSheet("spin"), disabled: !aiming },
         {
             id: "elevation", label: t("sim.rail.elevation"), icon: <ElevationIcon />, onPress: () => openSpinSheet("elevation"),
             active: thetaDeg > 0, caption: thetaDeg > 0 ? `${thetaDeg}°` : null, disabled: !aiming,
         },
     ];
-    if (solverAllowed) railAim.push({ id: "solver", label: pathView ? t("sim.path.title") : t("sim.solver.button"), icon: <SolverIcon />, onPress: openSolver, disabled: !aiming });
-    // 길 찾기 전용: 배치를 새로 뽑는다(공은 손가락으로도 옮길 수 있다)
-    if (pathView) railAim.push({ id: "path-random", label: t("sim.path.random"), icon: <ResetIcon />, onPress: () => startPath(pathSeedRef.current + 1), disabled: sim.phase === "shooting" });
+    if (solverAllowed && !pathView) railAim.push({ id: "solver", label: t("sim.solver.button"), icon: <SolverIcon />, onPress: openSolver, disabled: !aiming });
+    // 길 찾기 화면의 오른쪽 바: 찾은 길 1·2·3(성공률이 캡션) + 다시 찾기/무작위 배치. 당점·큐 각·이닝·소리는 여기서 쓸 일이 없어 뺀다.
+    if (pathView) {
+        if (paths.length > 0) {
+            paths.forEach((c, i) => railAim.push({
+                id: `path-${i}`, label: t("sim.path.nth").replace("{n}", String(i + 1)),
+                hint: t("sim.path.nth").replace("{n}", String(i + 1)),
+                icon: <PathNumIcon n={i + 1} />, caption: successPct(c) === null ? null : `${successPct(c)}%`,
+                active: pathPick === i, onPress: () => onPickPath(i), disabled: !aiming,
+            }));
+        }
+        railAim.push({
+            id: "path-search", label: paths.length > 0 ? t("sim.solver.retry") : t("sim.path.title"),
+            icon: <SolverIcon />, onPress: openSolver, disabled: !aiming,
+        });
+        railAim.push({ id: "path-random", label: t("sim.path.random"), icon: <ResetIcon />, onPress: () => startPath(pathSeedRef.current + 1), disabled: sim.phase === "shooting" });
+    }
     const railToggles: RailItem[] = [];
-    if (is3c) railToggles.push({ id: "diamond", label: t("sim.diamond.toggleLabel"), hint: t("sim.diamond.toggle"), icon: <DiamondIcon />, toggle: true, active: diamond, onPress: onToggleDiamond });
+    if (is3c) railToggles.push({ id: "diamond", label: t("sim.diamond.toggleLabel"), hint: t("sim.diamond.toggle"), icon: <DiamondIcon />, toggle: true, active: diamondOn, onPress: onToggleDiamond });
     if (viewSupported) railToggles.push({ id: "view", label: t("sim.hud.view3d"), icon: <CubeIcon />, toggle: true, active: cameraView === "player", onPress: onToggleView });
-    railToggles.push({ id: "sound", label: muted ? t("sim.hud.unmute") : t("sim.hud.mute"), icon: <SoundIcon muted={muted} />, toggle: true, active: false, dim: muted, onPress: onToggleMute });
-    railToggles.push({ id: "innings", label: t("sim.controls.innings"), icon: <ListIcon />, onPress: onInnings });
+    if (!pathView) railToggles.push({ id: "sound", label: muted ? t("sim.hud.unmute") : t("sim.hud.mute"), icon: <SoundIcon muted={muted} />, toggle: true, active: false, dim: muted, onPress: onToggleMute });
+    if (!pathView) railToggles.push({ id: "innings", label: t("sim.controls.innings"), icon: <ListIcon />, onPress: onInnings });
     if (drillReset) railToggles.push({ id: "reset", label: t("sim.drill.reset"), icon: <ResetIcon />, onPress: onRestart });
     const railBottom: RailItem[] = [];
     railBottom.push(canResign
@@ -992,6 +1043,7 @@ export function SimulatorPage() {
                     session={sim.session} config={sim.config} phase={sim.phase} names={names}
                     record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
                     drillName={drill ? t(drill.drill.nameKey) : pathView ? t("sim.path.chip") : null}
+                    hideStatus={pathView}
                     onSummary={pathView ? openSolver : onInnings}
                     onBack={isMatch ? onExitRequest : undefined}
                     clock={clock}
@@ -1070,9 +1122,9 @@ export function SimulatorPage() {
                     >
                         {/* 툴바는 남는 높이가 없으면(compact 로도) 줄어들며 스크롤된다 — 큐 슬라이더(최소 높이)·±·샷은 항상 보인다 */}
                         <ToolRail groups={railGroups} size={compact ? "sm" : "md"} className="shrink min-h-0 overflow-y-auto overscroll-contain" />
-                        <PowerRail V0={sim.input.V0} disabled={!aiming} onChange={onPower} compact={compact} className="flex-1" />
+                        {pathView ? <div className="flex-1" /> : <PowerRail V0={sim.input.V0} disabled={!aiming} onChange={onPower} compact={compact} className="flex-1" />}
                         {/* ± 0.05 m/s: 36 px 원 두 개, 사이 8 px(탭 대상 간격 규칙) */}
-                        <div className="shrink-0 flex gap-2">
+                        <div className={cn("shrink-0 flex gap-2", pathView && "hidden")}>
                             <HoldButton label={t("sim.controls.powerDown")} disabled={!aiming} onTick={onPowerDown} className="h-9 w-9 rounded-pill">
                                 <MinusIcon />
                             </HoldButton>
@@ -1080,7 +1132,7 @@ export function SimulatorPage() {
                                 <PlusIcon />
                             </HoldButton>
                         </div>
-                        {!(isMatch && sim.phase === "finished") && (
+                        {!pathView && !(isMatch && sim.phase === "finished") && (
                             <ShotButton phase={sim.phase} onShoot={onShoot} onRestart={onRestart} compact={compact} className="shrink-0" />
                         )}
                     </div>
@@ -1089,9 +1141,9 @@ export function SimulatorPage() {
                     {/* 길 찾기 화면에선 두께 독 대신 "가장 잘 들어가는 길" 카드(2026-09-08 오너) — 조준은 해법을 적용해서 맞춘다 */}
                     {pathView ? (
                         <BestPathCard
-                            status={solver.status} progress={solver.progress} candidates={solver.result?.candidates ?? []}
-                            maxOffset={DEFAULT_CUE.maxOffset} previewing={solverPreview !== null}
-                            onSearch={openSolver} onPreview={onSolverPreview} onApply={onSolverApply} onMore={openSolver}
+                            status={pathStale ? "idle" : solver.status} progress={solver.progress} candidate={pickedPath} count={paths.length}
+                            maxOffset={DEFAULT_CUE.maxOffset}
+                            onSearch={openSolver} onPlay={onPlayPath} onPractice={onPracticeHere}
                             className={cn(
                                 "absolute left-2 right-[76px] bottom-2 z-[3] transition-opacity duration-150",
                                 controlsHidden ? "opacity-0 pointer-events-none" : "opacity-100",

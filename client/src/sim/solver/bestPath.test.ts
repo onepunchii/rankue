@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { bestCandidate, successPct, cushionCount } from "./bestPath";
+import { bestCandidate, successPct, cushionCount, rankedPaths } from "./bestPath";
 import type { SolveCandidate } from "./search";
 
 /** 필요한 필드만 채운 가짜 후보 — 카드는 순수 함수 세 개만 테스트한다(그리기는 jsdom 스모크가 따로 없다). */
@@ -33,5 +33,18 @@ describe("길 찾기 카드", () => {
         expect(successPct(candidate({ score: 1, robustness: 0.364 }))).toBe(36);
         expect(successPct(candidate({ score: 1, robustness: null }))).toBeNull();
         expect(cushionCount(candidate({ score: 1, robustness: 0, cushions: 5 }))).toBe(5);
+    });
+    it("길 1·2·3 은 성공 확률 순으로 최대 세 개", () => {
+        const list = [
+            candidate({ score: 9, robustness: 0.1 }),
+            candidate({ score: 1, robustness: 0.9 }),
+            candidate({ score: 1, robustness: 0.5 }),
+            candidate({ score: 1, robustness: 0.3 }),
+        ];
+        const top = rankedPaths(list);
+        expect(top.length).toBe(3);
+        expect(top.map((c) => c.robustness)).toEqual([0.9, 0.5, 0.3]);
+        expect(rankedPaths(list, 2).length).toBe(2);
+        expect(rankedPaths([])).toEqual([]);
     });
 });

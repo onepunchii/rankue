@@ -9,6 +9,11 @@ export function bestCandidate(candidates: readonly SolveCandidate[]): SolveCandi
     return [...candidates].sort((x, y) => (y.robustness ?? -1) - (x.robustness ?? -1) || y.score - x.score)[0];
 }
 
+/** 성공 확률 순으로 상위 n개(오른쪽 바의 "길 1·2·3"). 못 잰 후보는 뒤로. */
+export function rankedPaths(candidates: readonly SolveCandidate[], n = 3): readonly SolveCandidate[] {
+    return [...candidates].sort((x, y) => (y.robustness ?? -1) - (x.robustness ?? -1) || y.score - x.score).slice(0, n);
+}
+
 /** 쿠션 수 — 시트와 같은 값(판정이 센 값). */
 export function cushionCount(c: SolveCandidate): number {
     return c.outcome.cushionsBeforeSecond;

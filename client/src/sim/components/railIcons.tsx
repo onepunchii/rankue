@@ -173,3 +173,12 @@ export function ChevronRightIcon() {
         <svg {...SVG} width={16} height={16}><path d="m9 5 7 7-7 7" /></svg>
     );
 }
+
+/** 길 찾기 오른쪽 바의 번호 아이콘(길 1·2·3). */
+export function PathNumIcon({ n }: { n: number }) {
+    return (
+        <span className="rk-num inline-flex h-6 w-6 items-center justify-center rounded-pill border border-current text-[13px] font-bold leading-none">
+            {n}
+        </span>
+    );
+}

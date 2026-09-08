@@ -33,6 +33,8 @@ export interface TopBarProps {
     onBack?: () => void;
     /** 대전 40초 룰 시계: 남은 초와 누구 차례인지. 없으면 안 그린다. */
     clock?: { readonly seconds: number; readonly mine: boolean } | null;
+    /** 상태 칩(연습 / 기록되지 않음 / 동기화)을 감춘다 — 길 찾기 화면은 연습이 아니다. */
+    hideStatus?: boolean;
     /** 쓰리아웃: 지금 차례인 사람의 시간 초과 횟수(used/total). 대전에서만. */
     strikes?: { readonly used: number; readonly total: number; readonly mine: boolean } | null;
 }
@@ -51,7 +53,8 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
     const twoPlayers = (s?.players.length ?? 0) === 2;
 
     let status: string | null = null;
-    if (!p.record) status = t("sim.top.practice");
+    if (p.hideStatus) status = null;
+    else if (!p.record) status = t("sim.top.practice");
     else if (p.offline) status = t("sim.hud.offline");
     else if (p.queued > 0 || p.syncing) status = t("sim.hud.syncing");
 
