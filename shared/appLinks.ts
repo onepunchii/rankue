@@ -14,6 +14,7 @@ export const WEB_URL = "https://www.rankue.co.kr";
 /** 유입 자리 이름 — 스토어 콘솔에서 이 값으로 구분된다. */
 export type AppLinkSource =
     | "install_banner"
+    | "page_banner"      // 각 페이지 하단에 붙는 카드형 배너(2026-09-09 오너)
     | "desktop_side_panel"
     | "web_landing"
     | "share";          // 유저가 친구에게 직접 보낸 링크

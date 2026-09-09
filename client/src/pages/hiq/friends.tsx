@@ -7,6 +7,7 @@ import { LucideChevronLeft, LucideSearch, LucideUsers } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { HiqGame } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { AppInstallCard } from "@/components/hiq/AppInstallCard";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginGate } from "@/components/hiq/LoginGate";
 import { useStore } from "@/contexts/StoreContext";
@@ -187,6 +188,8 @@ export default function HiqRivals() {
                 isLoading={isLoadingVsGames}
                 me={me}
             />
+
+            <AppInstallCard className="mt-6" />
 
             <HiqNavigation />
         </div>

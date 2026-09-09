@@ -32,6 +32,7 @@ import { SuggestionModal } from "@/components/hiq/SuggestionModal";
 import { FamilyServices } from "@/components/hiq/FamilyServices";
 import { HiqMember } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { AppInstallCard } from "@/components/hiq/AppInstallCard";
 import { apiRequest } from "@/lib/queryClient";
 import { uploadImage } from "@/lib/imageUtils";
 import { GOLF_ENABLED } from "@/lib/features";
@@ -571,6 +572,8 @@ export default function HiqMenu() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <AppInstallCard className="mt-6" />
 
             <HiqNavigation />
         </div>

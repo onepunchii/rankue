@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { HiqMember } from "@shared/schema";
 import { useSport } from "@/contexts/SportContext";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { AppInstallCard } from "@/components/hiq/AppInstallCard";
 import GolfDashboard from "@/golf/pages/Dashboard";
 
 // New Components
@@ -270,6 +271,9 @@ export default function HiqDashboard() {
                     </>
                 )}
             </div>
+
+            {/* 앱 설치 카드 — 오너 지정 자리(세계랭킹 아래). 앱/PWA 안이면 스스로 안 그린다. */}
+            <AppInstallCard className="mt-6" />
 
             {/* Modals */}
             <GameCreationModal

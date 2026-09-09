@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { AppInstallCard } from "@/components/hiq/AppInstallCard";
 import { LucideSearch, LucidePlus } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { useT } from "@/lib/i18n";
@@ -64,6 +65,8 @@ export default function HiqClub() {
                     </section>
                 </div>
             </div>
+
+            <div className="max-w-md mx-auto px-5"><AppInstallCard className="mt-6" /></div>
 
             <HiqNavigation />
         </div>

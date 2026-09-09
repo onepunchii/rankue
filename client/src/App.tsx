@@ -277,9 +277,13 @@ function AppRoutes() {
 }
 
 // 시뮬레이터 화면은 하단 조작부가 꽉 차 있어 설치 배너를 띄우지 않는다(실측 2026-09-07: 샷 버튼을 덮음).
+// 본문 아래에 AppInstallCard 를 놓은 페이지에서도 띄우지 않는다 — 한 화면에 설치 권유가 둘이면 소음이다
+// (2026-09-09 오너: 각 페이지 하단에 카드형 배너). 나머지 화면은 떠 있는 배너가 계속 맡는다.
+const PAGE_BANNER_ROUTES = ["/dashboard", "/club", "/friends", "/history", "/menu"];
 function InstallBannerGate() {
   const [location] = useLocation();
   if (location.startsWith("/online-game")) return null;
+  if (PAGE_BANNER_ROUTES.includes(location)) return null;
   return <HiqInstallBanner />;
 }
 

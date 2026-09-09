@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { LucideChevronLeft, LucideTarget, LucideBarChart3, LucideLayers } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { AppInstallCard } from "@/components/hiq/AppInstallCard";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -164,6 +165,8 @@ export default function HiqHistory() {
                 config={config}
                 currentSport={currentSport}
             />
+
+            <AppInstallCard className="mt-6" />
 
             <HiqNavigation />
         </div>
