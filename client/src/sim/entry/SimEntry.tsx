@@ -116,7 +116,7 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
                         <span className={cn("text-[18px] font-bold leading-tight", st.cardTitle)}>{t("sim.entry.groupSolo")}</span>
-                        <span className={cn("transition-transform duration-200", open === "solo" && "rotate-90")}><ChevronRightIcon /></span>
+                        <span className={cn("transition-transform duration-200", st.chevron, open === "solo" && "rotate-90")}><ChevronRightIcon /></span>
                     </span>
                     <span className={cn("block text-[12.5px] font-medium mt-0.5", st.cardSub)}>{t("sim.entry.groupSoloDesc")}</span>
                     {practice ? (
@@ -163,7 +163,7 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
                                 </span>
                             )}
                         </span>
-                        <span className={cn("transition-transform duration-200", open === "together" && "rotate-90")}><ChevronRightIcon /></span>
+                        <span className={cn("transition-transform duration-200", st.chevron, open === "together" && "rotate-90")}><ChevronRightIcon /></span>
                     </span>
                     <span className={cn("block text-[12.5px] font-medium mt-0.5", st.cardSub)}>{t("sim.entry.groupTogetherDesc")}</span>
                     {record.wins + record.losses > 0 ? (

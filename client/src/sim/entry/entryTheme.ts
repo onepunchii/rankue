@@ -21,6 +21,8 @@ export interface EntryStyle {
     readonly gap: string;
     /** "내 차례 n" 배지 */
     readonly badge: string;
+    /** 그룹 펼침 화살표 — 색 클래스를 안 주면 바깥(밝은 테마)의 검은 글자색을 상속해 안 보인다. */
+    readonly chevron: string;
 }
 
 export const ENTRY_STYLE: EntryStyle = {
@@ -37,4 +39,5 @@ export const ENTRY_STYLE: EntryStyle = {
     primary: "bg-brand text-brand-fg active:bg-brand-strong",
     gap: "gap-3",
     badge: "border border-ball-yellow text-ball-yellow",
+    chevron: "text-white/70",
 };
