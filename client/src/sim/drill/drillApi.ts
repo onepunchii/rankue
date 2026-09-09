@@ -8,6 +8,15 @@ import type { DrillPattern } from "@shared/sim/drills";
 
 export const DRILL_API_BASE = "/api/hiq/sim/drills";
 
+/** 그 샷이 지나온 길(서버 계산). 실패한 시도나 입력이 깨진 옛 기록은 null. */
+export interface AttemptRoute {
+    /** 첫 적구 전에 밟은 쿠션 수. 1 이상이면 빈쿠션으로 시작했다. */
+    bankFirst: number;
+    cushions: number;
+    /** 이름표대로 갔는가. 판별 규칙이 없는 패턴(역회전·긴각)은 null. */
+    named: boolean | null;
+}
+
 export interface DrillAttemptRow {
     id: string;
     weekId: string;
@@ -16,6 +25,7 @@ export interface DrillAttemptRow {
     cushions: number;
     outcomeCode: string;
     createdAt: string;
+    route?: AttemptRoute | null;
 }
 
 export interface WeekDrill {

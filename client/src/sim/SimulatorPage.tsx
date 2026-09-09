@@ -1156,6 +1156,10 @@ export function SimulatorPage() {
                                         : t("sim.drill.chipPractice")}
                             </span>
                         )}
+                        {/* 채점 중엔 힌트를 곁에 둔다 — 예전엔 목록에만 있어서 정작 칠 때는 안 보였다(2026-09-09 오너) */}
+                        {drill && drillLocked && sim.phase === "aim" && (
+                            <span className={chipNeutral}>{t(drill.drill.hintKey)}</span>
+                        )}
                         {!drill && sim.canPlace && sim.session && sim.session.shotCount === 0 && (
                             <span className={cn(chipNeutral, pathView && "hidden")}>{t("sim.hud.placeHint")}</span>
                         )}

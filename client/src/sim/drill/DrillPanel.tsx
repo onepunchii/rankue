@@ -45,6 +45,12 @@ const Row = memo(function Row({ d, onPlay }: { d: WeekDrill; onPlay: () => void 
     const status = !a ? t("sim.drill.notTried") : a.success
         ? t("sim.drill.success").replace("{n}", String(a.cushions))
         : t("sim.drill.fail");
+    // 성공했으면 힌트 대신 '어떻게 넣었는지' 를 보여 준다 — 빈쿠션으로 때웠는지가 여기서 드러난다.
+    const r = a?.success ? a.route : null;
+    const sub = r
+        ? [r.named === true ? t("sim.drill.routeNamed").replace("{name}", t(d.nameKey)) : null,
+           r.bankFirst > 0 ? t("sim.drill.routeBank") : t("sim.drill.routeBall")].filter(Boolean).join(" · ")
+        : t(d.hintKey);
     return (
         <button
             type="button" onClick={onPlay}
@@ -56,7 +62,7 @@ const Row = memo(function Row({ d, onPlay }: { d: WeekDrill; onPlay: () => void 
             <Star state={state} size={22} />
             <span className="flex-1 min-w-0 flex flex-col gap-0.5">
                 <span className={cn("text-[14px] font-black truncate", state === "done" ? "text-[color:var(--arc-ink)]" : "text-white")}>{t(d.nameKey)}</span>
-                <span className={cn("text-[11px] font-bold truncate", state === "done" ? "text-[color:var(--arc-ink)] opacity-75" : "text-white/70")}>{t(d.hintKey)}</span>
+                <span className={cn("text-[11px] font-bold truncate", state === "done" ? "text-[color:var(--arc-ink)] opacity-75" : "text-white/70")}>{sub}</span>
             </span>
             <span className={cn("rk-num shrink-0 text-[11px] font-bold", state === "done" ? "text-[color:var(--arc-ink)]" : "text-white/75")}>{status}</span>
         </button>

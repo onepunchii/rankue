@@ -10,8 +10,8 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import {
     simulateShot, TABLES, DEFAULT_CUE, ENGINE_VERSION,
-    drillsForWeek, findDrill, drillLayout, weekIdFor,
-    type SimParams, type ShotInput,
+    drillsForWeek, findDrill, drillLayout, weekIdFor, readRoute, matchesPattern,
+    type SimParams, type ShotInput, type SimEvent, type Drill,
 } from "../../../shared/sim/index.js";
 import { evaluateShot, DEFAULT_3C_RULES } from "../../../shared/sim/rules/index.js";
 
@@ -20,6 +20,33 @@ const router = Router();
 /** 드릴은 대대·한 2005·컨디션 1 로 고정한다 — 래더가 비교 가능하려면 조건이 같아야 한다. */
 const DRILL_TABLE = "DAEDAE" as const;
 const DRILL_PARAMS: SimParams = { table: TABLES[DRILL_TABLE], cue: DEFAULT_CUE, cushionModel: "han2005", condition: 1 };
+
+/**
+ * 그 샷이 실제로 지나온 길. 채점(3쿠션 득점)은 그대로 두고 사실만 덧붙인다 — 빈쿠션으로 때웠는지,
+ * 이름표대로 갔는지. 저장하지 않고 매번 다시 시뮬해서 만든다(입력이 남아 있어 결과가 같다).
+ * 이름표 판별 규칙이 없는 패턴(역회전·긴각)만 null 이다 — 지어내지 않는다.
+ */
+export interface AttemptRoute {
+    readonly bankFirst: number;
+    readonly cushions: number;
+    readonly named: boolean | null;
+}
+
+function routeOf(drill: Drill, events: readonly SimEvent[]): AttemptRoute {
+    const balls = drillLayout(drill, TABLES[DRILL_TABLE]);
+    const cueY = balls.find((b) => b.id === "white")!.r[1];
+    const route = readRoute(events, "white", ["red", "yellow"]);
+    const named = matchesPattern(route, drill.pattern, cueY, TABLES[DRILL_TABLE].length);
+    return { bankFirst: route.bankFirst, cushions: route.rails.length, named };
+}
+
+/** 저장된 입력으로 다시 시뮬해 길을 읽는다. 입력이 깨졌으면 조용히 생략한다. */
+function routeOfStored(drill: Drill, input: unknown): AttemptRoute | null {
+    const p = attemptSchema.shape.input.safeParse(input);
+    if (!p.success) return null;
+    const balls = drillLayout(drill, TABLES[DRILL_TABLE]);
+    return routeOf(drill, simulateShot(balls, p.data as ShotInput, DRILL_PARAMS).events);
+}
 
 const attemptSchema = z.object({
     input: z.object({
@@ -45,7 +72,10 @@ router.get("/sim/drills/week", requireAuth, asyncHandler(async (req: AuthRequest
         drills: drills.map((d) => ({
             id: d.id, pattern: d.pattern, nameKey: d.nameKey, hintKey: d.hintKey,
             balls: drillLayout(d, TABLES[DRILL_TABLE]),
-            attempt: mine.find((a) => a.drillId === d.id) ?? null,
+            attempt: (() => {
+                const a = mine.find((x) => x.drillId === d.id);
+                return a ? { ...a, route: a.success ? routeOfStored(d, a.input) : null } : null;
+            })(),
         })),
     });
 }));
@@ -78,7 +108,8 @@ router.post("/sim/drills/:drillId/attempt", requireAuth, asyncHandler(async (req
     });
     if (!row) return sendError(res, 409, "이번 주 이 드릴은 이미 채점했어요", "ALREADY_ATTEMPTED");
     return sendSuccess(res, {
-        attempt: row, mismatch: clientHash !== undefined && clientHash !== result.hash,
+        attempt: { ...row, route: outcome.scored ? routeOf(drill, result.events) : null },
+        mismatch: clientHash !== undefined && clientHash !== result.hash,
         hash: result.hash, events: result.events, final: result.final, duration: result.duration, outcome,
     });
 }));
