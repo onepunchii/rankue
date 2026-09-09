@@ -9,7 +9,8 @@ const router = Router();
 
 // GET /notifications - 내 알림 목록
 router.get("/notifications", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const notifications = await storage.getNotifications(req.userId!);
+    const sport = (req.query.sport as string) === "GOLF" ? "GOLF" : "BILLIARDS";
+    const notifications = await storage.getNotifications(req.userId!, sport);
     return sendSuccess(res, notifications);
 }));
 

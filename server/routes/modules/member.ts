@@ -284,9 +284,12 @@ router.get("/rankings", requireAuth, asyncHandler(async (req: AuthRequest, res: 
     const member = await storage.getMemberById(req.userId!);
     const scope = req.query.scope as string; // 'store' | 'country' | 'national'(=global)
     const type = (req.query.type as '3c' | '4c') || '4c';
+    // 이웃 라우트들과 같은 방식으로 종목을 읽는다. 예전엔 이 라우트만 sport 를 안 읽어
+    // 골프 랭킹이 당구 RP 순으로 뽑혔다(2026-09-09 검토).
+    const sport = (req.query.sport as string) === "GOLF" ? "GOLF" : "BILLIARDS";
 
     if (!scope || scope === 'store') {
-        const rankings = await storage.getTopRankings(member?.storeId, 20, type);
+        const rankings = await storage.getTopRankings(member?.storeId, 20, type, undefined, sport);
         return sendSuccess(res, rankings.map(toPublicMember));
     }
 
@@ -297,12 +300,12 @@ router.get("/rankings", requireAuth, asyncHandler(async (req: AuthRequest, res: 
             const profile = await storage.getProfile(member.profileId);
             country = (profile as any)?.countryCode || "";
         }
-        const rankings = await storage.getTopRankings(undefined, 20, type, country || "KR");
+        const rankings = await storage.getTopRankings(undefined, 20, type, country || "KR", sport);
         return sendSuccess(res, { country: country || "KR", rankings: rankings.map(toPublicMember) });
     }
 
     // national(레거시 명칭) = 글로벌 전체
-    const rankings = await storage.getTopRankings(undefined, 20, type);
+    const rankings = await storage.getTopRankings(undefined, 20, type, undefined, sport);
     return sendSuccess(res, rankings.map(toPublicMember));
 }));
 

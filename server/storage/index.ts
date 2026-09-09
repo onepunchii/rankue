@@ -45,7 +45,7 @@ class Storage {
     async getFriends(id: string, sport?: string) { return this.users.getFriends(id, sport); }
     async requestFriend(reqId: string, recId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS") { return this.users.requestFriend(reqId, recId, sport); }
     async getStoreMembersWithStats(id: string) { return this.users.getStoreMembersWithStats(id); }
-    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c', countryCode?: string) { return this.users.getTopRankings(storeId, limit, type, countryCode); }
+    async getTopRankings(storeId?: string, limit?: number, type?: '3c' | '4c', countryCode?: string, sport?: 'BILLIARDS' | 'GOLF') { return this.users.getTopRankings(storeId, limit, type, countryCode, sport); }
     async getAvailableOpponents(storeId: string, currentUserId: string, sport: 'BILLIARDS' | 'GOLF' = 'BILLIARDS') { return this.users.getAvailableOpponents(storeId, currentUserId, sport); }
     async getAllMembers(storeId: string) { return this.users.getAllMembers(storeId); }
     async updatePushToken(memberId: string, token: string) { return this.users.updatePushToken(memberId, token); }
@@ -180,7 +180,7 @@ class Storage {
     async markAllSuggestionsRead() { return this.admin.markAllSuggestionsRead(); }
 
     // Notifications
-    async getNotifications(id: string) { return this.notifs.getNotifications(id); }
+    async getNotifications(id: string, sport?: "BILLIARDS" | "GOLF") { return this.notifs.getNotifications(id, sport); }
     async createNotification(data: any) { return this.notifs.createNotification(data); }
     async markNotificationAsRead(id: string, mid: string) { return this.notifs.markNotificationAsRead(id, mid); }
     async markAllNotificationsAsRead(mid: string) { return this.notifs.markAllNotificationsAsRead(mid); }

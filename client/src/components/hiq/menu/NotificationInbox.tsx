@@ -7,6 +7,7 @@ import { ko } from "date-fns/locale";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { useSport } from "@/contexts/SportContext";
 
 interface NotificationInboxProps {
     open: boolean;
@@ -17,9 +18,10 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
     const { t } = useT();
     const [, setLocation] = useLocation();
     const queryClient = useQueryClient();
+    const { currentSport } = useSport();
 
     const { data: notifications, isLoading } = useQuery<any[]>({
-        queryKey: ["/api/hiq/notifications"],
+        queryKey: ["/api/hiq/notifications", { sport: currentSport }],
         enabled: open,
     });
 

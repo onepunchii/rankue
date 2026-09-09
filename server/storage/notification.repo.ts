@@ -1,6 +1,6 @@
 import { db } from "../db.js";
 import { hiqNotifications, hiqMembers, profiles } from "../../shared/schema.js";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, or, ne, isNull, desc, sql } from "drizzle-orm";
 import type { HiqNotification, InsertHiqNotification, InsertHiqCrewNotificationSetting } from "../../shared/schema.js";
 
 export class NotificationRepository {
@@ -31,10 +31,20 @@ export class NotificationRepository {
         return (row?.n ?? 0) > 0;
     }
 
-    async getNotifications(memberId: string): Promise<HiqNotification[]> {
+    /**
+     * 알림함. **종목별로 가른다** — 예전엔 안 갈라서 당구 알림함에 골프 알림이, 골프 알림함에 당구 알림이
+     * 그대로 섞였다(2026-09-09 검토).
+     * category 가 비어 있는 옛 알림은 당구로 본다(골프가 열린 적이 없으니 전부 당구다).
+     */
+    async getNotifications(memberId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<HiqNotification[]> {
         return await db.select()
             .from(hiqNotifications)
-            .where(eq(hiqNotifications.memberId, memberId))
+            .where(and(
+                eq(hiqNotifications.memberId, memberId),
+                sport === "GOLF"
+                    ? eq(hiqNotifications.category, "GOLF")
+                    : or(isNull(hiqNotifications.category), ne(hiqNotifications.category, "GOLF"))!,
+            ))
             .orderBy(desc(hiqNotifications.createdAt));
     }
 

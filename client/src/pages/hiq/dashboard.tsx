@@ -31,15 +31,9 @@ import { useLocation } from "wouter";
 // 응답 길이가 이 값에 닿았다면 뒤에 몇 명이 더 있는지 알 수 없다.
 const RANKINGS_API_LIMIT = 20;
 
-export default function HiqDashboard() {
+function HiqDashboardBilliards() {
     const { t, locale } = useT();
     const [, setLocation] = useLocation();
-    const { currentSport } = useSport();
-
-    // Redirect to Golf Dashboard if sports mode is GOLF
-    if (currentSport === 'GOLF') {
-        return <GolfDashboard />;
-    }
 
     // Local State for Ranking Tab
     const [rankingTab, setRankingTab] = useState<'3c' | '4c'>('4c');
@@ -303,4 +297,15 @@ export default function HiqDashboard() {
             <HiqNavigation />
         </div>
     );
+}
+
+/**
+ * 홈 진입 — 종목에 따라 통째로 다른 화면을 마운트한다.
+ * 예전엔 당구 대시보드 **안에서** 훅을 부르기 전에 골프로 return 했다. 그러면 골프↔당구를 오갈 때
+ * 훅 개수가 달라져 React 가 화면을 통째로 떨어뜨렸다(2026-09-09 검토에서 확인).
+ * 두 화면을 형제로 두면 그런 일이 없다 — 애초에 서로 다른 플랫폼이라 섞을 이유도 없다.
+ */
+export default function HiqDashboard() {
+    const { currentSport } = useSport();
+    return currentSport === "GOLF" ? <GolfDashboard /> : <HiqDashboardBilliards />;
 }

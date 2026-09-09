@@ -160,15 +160,25 @@ export class UserRepository {
     }
 
     // 랭킹 — 매장(하이퍼로컬)·국가·글로벌을 같은 쿼리 축으로. countryCode 지정 시 국가 랭킹.
-    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c', countryCode?: string): Promise<any[]> {
+    /**
+     * 랭킹 상위 N명. **종목마다 줄 세우는 축이 다르다** — 당구는 RP 내림차순, 골프는 평균 타수 오름차순.
+     *
+     * 2026-09-09 이전엔 sport 인자가 아예 없었다. 골프 랭킹 화면도 이 함수를 썼는데 정렬축이 당구 RP 라,
+     * "당구 RP 상위 20명 중 골프 기록이 있는 사람"이 골프 랭킹으로 나왔다. 당구를 안 치는 순수 골퍼는
+     * RP 0 이라 꼬리로 밀려 잘렸고, 반대로 당구 고수가 골프 랭킹 위에 앉았다. 반대 방향 오염도 있었다 —
+     * 골프만 하는 사람이 당구 랭킹 20칸을 잠식했다.
+     */
+    async getTopRankings(storeId?: string, limit: number = 20, type: '3c' | '4c' = '4c', countryCode?: string, sport: 'BILLIARDS' | 'GOLF' = 'BILLIARDS'): Promise<any[]> {
+        const isGolf = sport === 'GOLF';
         const field = type === '3c' ? hiqMembers.rating3c : hiqMembers.rating4c;
 
         const conditions: any[] = [
             // 탈퇴 회원은 익명화만 하고 행을 남기므로(전적 보존) 명시적으로 걸러야 한다.
             ne(hiqMembers.name, "탈퇴회원"),
-            // 0 RP(=한 판도 안 친 신규 가입자)는 랭킹에서 뺀다. 단 이 엔드포인트는 골프 랭킹 화면도
-            // 같이 쓰는데 골퍼는 당구 RP가 0일 수 있어, 골프 활동이 있으면 남긴다.
-            or(gt(field, 0), gt(hiqMembers.totalGolfGames, 0), gt(hiqMembers.golfHandicap, 0)),
+            // 한 판도 안 친 사람은 뺀다. 기준은 그 종목의 기록이다.
+            isGolf
+                ? or(gt(hiqMembers.totalGolfGames, 0), gt(hiqMembers.golfHandicap, 0))
+                : gt(field, 0),
         ];
         if (storeId) {
             conditions.push(eq(hiqMembers.storeId, storeId));
@@ -185,10 +195,16 @@ export class UserRepository {
             .from(hiqMembers)
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
             .where(and(...conditions))
-            .orderBy(desc(field))
+            // 골프는 타수가 낮을수록 잘 친 것 — 평균이 없으면 핸디캡으로 어림잡는다(파 72 기준).
+            .orderBy(isGolf
+                ? asc(sql`COALESCE(NULLIF(${hiqMembers.golfAvgScore}, 0), ${hiqMembers.golfHandicap} + 72)`)
+                : desc(field))
             .limit(limit);
 
         const members = rows.map((r) => ({ ...r.member, handle: r.handle, countryCode: r.countryCode } as any));
+
+        // 아래 에버리지 보정은 당구 전용(3쿠션·4구 경기 기록을 센다) — 골프는 그대로 돌려준다.
+        if (isGolf) return members;
 
         // Calculate Official AVG for each member based on Game History
         const enhancedMembers = await Promise.all(members.map(async (member) => {
