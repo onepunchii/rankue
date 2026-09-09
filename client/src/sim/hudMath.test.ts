@@ -55,8 +55,9 @@ describe("hudMath 문구", () => {
         expect(ruleBadge(buildConfig({ gameType: "3c", target: 15 }), t)).toBe(ko["sim.hud.ruleUmb"]);
         expect(ruleBadge(buildConfig({ gameType: "3c", target: 15, rules: { ruleSet: "pba" } }), t)).toBe(ko["sim.hud.rulePba"]);
         expect(ruleBadge(buildConfig({ gameType: "4c", target: 80 }), t)).toBe(ko["sim.hud.rule4c"]);
+        // 옛 방에 남은 밀림 파울 값은 판정에서 안 쓰니 배지에도 안 적는다(2026-09-09 폐기)
         expect(ruleBadge(buildConfig({ gameType: "4c", target: 80, rules: { threeCushionDouble: true, passiveOpponentContactIsFoul: true } }), t))
-            .toBe(`${ko["sim.hud.rule4c"]} · ${ko["sim.hud.rule4cDouble"]} · ${ko["sim.hud.rule4cPassive"]}`);
+            .toBe(`${ko["sim.hud.rule4c"]} · ${ko["sim.hud.rule4cDouble"]}`);
         expect(tableLabel({ tableId: "DAEDAE" }, t)).toBe(ko["sim.setup.tableDaedae"]);
         expect(tableLabel({ tableId: "JUNGDAE_KR" }, t)).toBe(ko["sim.setup.tableJungdae"]);
     });

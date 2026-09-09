@@ -90,16 +90,14 @@ describe("4구 판정 (국내 관행)", () => {
         const o = evaluateShot([bb("white", "red1"), bb("white", "yellow"), bb("white", "red2")], "white", DEFAULT_4C_RULES);
         expect(o).toMatchObject({ code: "foul-opponent", points: -10, consumesInning: true });
     });
-    it("수동 접촉(적구가 상대 큐볼을 밀음)은 기본 무파울 — 옵션을 켜도 득점한 샷은 그대로 득점", () => {
-        // 2026-09-09 오너 신고: 내 공이 두 적구를 다 맞혔는데 적구가 상대공을 건드렸다고 -10 이 됐다(20점 뒤집힘).
+    it("적구가 상대 큐볼을 미는 건 파울이 아니다 — 실제 당구에 없는 규칙이라 옵션째로 없앴다(2026-09-09)", () => {
         const ev = [bb("white", "red1"), bb("red1", "yellow"), bb("white", "red2")];
         expect(evaluateShot(ev, "white", DEFAULT_4C_RULES).code).toBe("point");
-        const strict: Rules = { ...DEFAULT_4C_RULES, gameType: "4c", passiveOpponentContactIsFoul: true };
-        expect(evaluateShot(ev, "white", strict).code).toBe("point");
-        // 득점하지 못한 샷에서만 옵션이 파울로 만든다
+        // 옛 방에 남아 있는 값이 켜져 있어도 판정은 같다(호환 필드일 뿐)
+        const legacy: Rules = { ...DEFAULT_4C_RULES, gameType: "4c", passiveOpponentContactIsFoul: true };
+        expect(evaluateShot(ev, "white", legacy).code).toBe("point");
         const oneBall = [bb("white", "red1"), bb("red1", "yellow")];
-        expect(evaluateShot(oneBall, "white", strict).code).toBe("foul-opponent");
-        expect(evaluateShot(oneBall, "white", DEFAULT_4C_RULES).code).toBe("miss-one-ball");
+        expect(evaluateShot(oneBall, "white", legacy).code).toBe("miss-one-ball");
     });
     it("3쿠션 2배 옵션", () => {
         const ev = [bb("white", "red1"), cu("white"), cu("white"), cu("white"), bb("white", "red2")];

@@ -51,7 +51,6 @@ export function ruleBadge(config: Pick<SimSetupConfig, "rules">, t: T): string {
     if (r.gameType === "3c") return r.ruleSet === "pba" ? t("sim.hud.rulePba") : t("sim.hud.ruleUmb");
     const parts = [t("sim.hud.rule4c")];
     if (r.threeCushionDouble) parts.push(t("sim.hud.rule4cDouble"));
-    if (r.passiveOpponentContactIsFoul) parts.push(t("sim.hud.rule4cPassive"));
     return parts.join(" · ");
 }
 

@@ -2,7 +2,7 @@
  * SimSetupDialog 스모크 테스트. vitest 설정에 "@" 별칭이 없어(vitest.config.ts 는 @shared 만) 앱 모듈은
  * vi.mock 으로 대체하고, DOM 은 jsdom 을 직접 띄워 전역에 얹는다(환경 전환 없이 node 환경 유지 —
  * jsdom 환경에선 별칭 미해결 import 가 변환 단계에서 실패한다). UI 프리미티브는 뜻이 같은 얇은 대역이다.
- * 검증: 다마수를 비우면 시작이 잠긴다 · 4구로 바꾸면 규칙 스위치 두 개 · onStart 가 buildConfig 와 같은 설정을 받는다 ·
+ * 검증: 다마수를 비우면 시작이 잠긴다 · 4구로 바꾸면 3쿠션 2배 스위치 · onStart 가 buildConfig 와 같은 설정을 받는다 ·
  * 늦게 온 핸디는 손대기 전까지만 반영된다.
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
@@ -159,16 +159,15 @@ describe("SimSetupDialog", () => {
         expect(startButton(h).disabled).toBe(false);
     });
 
-    it("4구로 바꾸면 규칙 스위치 두 개가 보이고 테이블·다마수가 4구 기본으로 바뀐다", () => {
+    it("4구로 바꾸면 3쿠션 2배 스위치가 보이고 테이블·다마수가 4구 기본으로 바뀐다", () => {
         const h = mount();
         // 고급 섹션의 '기록하기' 스위치 하나는 항상 있다(Collapsible 대역은 접힘을 무시하고 내용을 그린다)
         expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(1);
         expect(h.container.querySelector("#sim-opt-record")).not.toBeNull();
         click(segment(h, ko["sim.setup.type4c"]));
         const switches = h.container.querySelectorAll("[role=switch]");
-        expect(switches).toHaveLength(3);
+        expect(switches).toHaveLength(2);   // 기록하기 + 3쿠션 2배 (밀림 파울은 2026-09-09 폐기)
         expect(h.container.textContent).toContain(ko["sim.setup.opt3cDouble"]);
-        expect(h.container.textContent).toContain(ko["sim.setup.optPassiveFoul"]);
         expect(targetInput(h).value).toBe("80");
         expect(segment(h, ko["sim.setup.tableJungdae"]).getAttribute("aria-pressed")).toBe("true");
     });

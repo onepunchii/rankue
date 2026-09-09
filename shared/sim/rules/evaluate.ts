@@ -101,10 +101,10 @@ export function evaluateShot(
     if (rules.gameType === "4c") {
         const unit = rules.pointUnit;
         const scored = walk.contacts.length === 2;
-        // 내 공이 상대공을 맞히면 언제나 파울(감점). 하지만 **적구가 굴러가 상대공을 건드린 것(간접)** 은
-        // 득점한 샷까지 파울로 뒤집지 않는다 — 실제로 두 적구를 다 맞힌 샷이 -10 이 되어 20점이 뒤집혔다(2026-09-09 오너 신고).
-        // 간접 접촉 파울은 옵션이고, 득점하지 못한 샷에만 적용한다.
-        const foul = walk.directOpponentContact || (!scored && rules.passiveOpponentContactIsFoul && walk.passiveOpponentContact);
+        // 파울은 **내 공이 상대공을 직접 맞혔을 때**뿐이다.
+        // 적구가 굴러가 상대공을 건드리는 건 어느 당구장에도 없는 규칙이라 2026-09-09 오너 확인 뒤 없앴다
+        // (옵션으로 두었더니 정상 득점이 -10 으로 뒤집혔다). rules.passiveOpponentContactIsFoul 은 옛 방 호환용으로 남아 있을 뿐 쓰지 않는다.
+        const foul = walk.directOpponentContact;
         if (foul) return outcome("foul-opponent", -unit * rules.foulPenaltyUnits, false, true, walk);
         if (scored) {
             if (rules.threeCushionDouble && walk.cushionsBeforeSecond >= 3) {

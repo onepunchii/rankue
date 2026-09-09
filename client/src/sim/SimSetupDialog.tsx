@@ -111,7 +111,6 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
     const [targetText, setTargetText] = useState<string>("");
     const [ruleSet, setRuleSet] = useState<ThreeCushionRuleSet>("umb");
     const [threeCushionDouble, setThreeCushionDouble] = useState(false);
-    const [passiveFoul, setPassiveFoul] = useState(false);
     const [inningCap, setInningCap] = useState<number>(0);
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const [cushionModel, setCushionModel] = useState<CushionModelId>("han2005");
@@ -178,7 +177,7 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
             gameType, tableId, target: targetNum, inningCap, cushionModel, condition, mode,
             rules: gameType === "3c"
                 ? { ruleSet }
-                : { threeCushionDouble, passiveOpponentContactIsFoul: passiveFoul },
+                : { threeCushionDouble, passiveOpponentContactIsFoul: false },
         }), { record });
     };
 
@@ -194,7 +193,7 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
     // 세부 설정 요약 한 줄 — 접혀 있어도 규칙·이닝·기록 상태가 보인다
     const ruleSummary = gameType === "3c"
         ? (ruleSet === "umb" ? t("sim.setup.ruleUmb") : t("sim.setup.rulePba"))
-        : ([threeCushionDouble ? t("sim.setup.opt3cDouble") : null, passiveFoul ? t("sim.setup.optPassiveFoul") : null].filter(Boolean).join(" · ") || t("sim.setup.ruleBasic4c"));
+        : ((threeCushionDouble ? t("sim.setup.opt3cDouble") : "") || t("sim.setup.ruleBasic4c"));
     const inningSummary = inningCap === 0 ? `${t("sim.setup.inningCap")} ${t("sim.setup.inningNone")}` : t("sim.setup.inningN").replace("{n}", String(inningCap));
     const advancedSummary = `${ruleSummary} · ${inningSummary} · ${record ? t("sim.setup.record") : t("sim.setup.practiceMode")}`;
     const roundBtn = "w-11 h-11 rounded-pill border border-surface-line bg-surface-1 text-ink-2 flex items-center justify-center active:bg-surface-3 shrink-0";
@@ -320,10 +319,6 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
                                         <ToggleRow
                                             id="sim-opt-3c-double" checked={threeCushionDouble} onCheckedChange={setThreeCushionDouble}
                                             title={t("sim.setup.opt3cDouble")} desc={t("sim.setup.opt3cDoubleDesc")}
-                                        />
-                                        <ToggleRow
-                                            id="sim-opt-passive-foul" checked={passiveFoul} onCheckedChange={setPassiveFoul}
-                                            title={t("sim.setup.optPassiveFoul")} desc={t("sim.setup.optPassiveFoulDesc")}
                                         />
                                     </div>
                                 )}

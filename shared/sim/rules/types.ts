@@ -21,7 +21,10 @@ export interface FourBallRules {
     readonly pointUnit: number;
     /** 3쿠션 이상으로 득점하면 2배(당구장 흔한 관행). */
     readonly threeCushionDouble: boolean;
-    /** 상대 큐볼에 '수동' 접촉(적구가 밀려가 닿음)도 파울로 볼지. 기본 false — 큐볼이 직접 닿을 때만 파울. */
+    /**
+     * @deprecated 2026-09-09 폐기. 실제 당구에 없는 규칙이라 판정에서 무시한다 —
+     * 예전 방에 저장된 값과의 호환을 위해 필드만 남겨 둔다(항상 false 로 만든다).
+     */
     readonly passiveOpponentContactIsFoul: boolean;
     /** 파울 감점(단위 배수). 기본 1 → −pointUnit. */
     readonly foulPenaltyUnits: number;

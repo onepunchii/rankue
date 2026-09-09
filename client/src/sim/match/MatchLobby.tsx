@@ -154,7 +154,6 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
     const [targetText, setTargetText] = useState<string>(String(defaultTarget("3c")));
     const [ruleSet, setRuleSet] = useState<ThreeCushionRuleSet>("umb");
     const [threeCushionDouble, setThreeCushionDouble] = useState(false);
-    const [passiveFoul, setPassiveFoul] = useState(false);
     // 플레이 모드: 방장이 고르면 게스트도 같은 모드(서버 aimAssist). 물리 기본값은 buildConfig 의 모드 프리셋이 채운다.
     const [mode, setMode] = useState<SimMode>("normal");
     const [modeInfo, setModeInfo] = useState<SimMode | null>(null);
@@ -194,7 +193,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
         try {
             const m = await api.createMatch(buildConfig({
                 gameType, tableId, target: targetNum, inningCap, mode, matchPreview: fullPreview ? "full" : "short",
-                rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: passiveFoul },
+                rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: false },
             }), { isPublic, password: isPublic && password !== "" ? password : undefined });
             setCreated(m);
             onCreated?.(m);
@@ -407,7 +406,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
                         <span className="block text-[12px] font-medium text-ink-4 truncate">
                             {(gameType === "3c"
                                 ? (ruleSet === "umb" ? t("sim.setup.ruleUmb") : t("sim.setup.rulePba"))
-                                : ([threeCushionDouble ? t("sim.setup.opt3cDouble") : null, passiveFoul ? t("sim.setup.optPassiveFoul") : null].filter(Boolean).join(" · ") || t("sim.setup.ruleBasic4c")))}
+                                : ((threeCushionDouble ? t("sim.setup.opt3cDouble") : "") || t("sim.setup.ruleBasic4c")))}
                             {" · "}
                             {inningCap === 0 ? `${t("sim.setup.inningCap")} ${t("sim.setup.inningNone")}` : t("sim.setup.inningN").replace("{n}", String(inningCap))}
                         </span>
@@ -433,10 +432,6 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
                                     <ToggleRow
                                         id="sim-match-3c-double" checked={threeCushionDouble} onCheckedChange={setThreeCushionDouble}
                                         title={t("sim.setup.opt3cDouble")} desc={t("sim.setup.opt3cDoubleDesc")}
-                                    />
-                                    <ToggleRow
-                                        id="sim-match-passive-foul" checked={passiveFoul} onCheckedChange={setPassiveFoul}
-                                        title={t("sim.setup.optPassiveFoul")} desc={t("sim.setup.optPassiveFoulDesc")}
                                     />
                                 </div>
                             )}
