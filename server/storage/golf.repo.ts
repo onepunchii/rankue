@@ -96,7 +96,8 @@ export class GolfRepository {
     }
 
     async getGolfBookings(date?: string, filters?: any): Promise<GolfBooking[]> {
-        const conditions: any[] = [];
+        // 신고 누적·운영자 조치로 가려진 매물은 목록에서 뺀다(행은 남는다 — 추적용)
+        const conditions: any[] = [eq(golfBookings.isBlinded, false)];
         if (date) {
             const targetDate = new Date(date);
             const start = new Date(targetDate);
@@ -234,7 +235,7 @@ export class GolfRepository {
     }
 
     async getGolfJoins(filters?: any): Promise<GolfJoin[]> {
-        const conditions: any[] = [];
+        const conditions: any[] = [eq(golfBookings.isBlinded, false)];
         conditions.push(eq(golfBookings.listingType, 'JOIN'));
 
         if (filters?.date) {

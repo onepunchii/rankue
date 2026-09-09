@@ -11,6 +11,7 @@ import {
     profiles,
     type InsertHiqCommunityPost,
     type InsertHiqCommunityComment,
+    golfBookings,
 } from "../../shared/schema.js";
 import { eq, and, desc, sql, lt, gte, inArray } from "drizzle-orm";
 
@@ -263,6 +264,13 @@ export class CommunityRepository {
                     autoBlinded = true;
                     authorId = post.authorId;
                 }
+            } else if (opts.targetType === "golf_booking") {
+                // 골프 매물도 지우지 않고 가린다 — 지우면 누가 무엇을 올렸는지 추적이 사라진다(2026-09-09).
+                const [row] = await db.update(golfBookings)
+                    .set({ isBlinded: true, blindReason: "신고 누적으로 자동 블라인드 처리되었습니다" })
+                    .where(and(eq(golfBookings.id, opts.targetId), eq(golfBookings.isBlinded, false)))
+                    .returning({ ownerId: golfBookings.ownerId });
+                if (row) { autoBlinded = true; authorId = row.ownerId ?? null; }
             } else if (opts.targetType === "community_comment") {
                 const comment = await this.getCommentRaw(opts.targetId);
                 if (comment && !comment.isBlinded) {

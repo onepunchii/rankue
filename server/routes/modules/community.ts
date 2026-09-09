@@ -196,7 +196,7 @@ router.post("/posts/:id/like", requireAuth, asyncHandler(async (req: AuthRequest
 
 // --- 신고 (커뮤니티 + 크루 콘텐츠 소급) ---
 
-const REPORT_TARGETS = ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_chat", "member"];
+const REPORT_TARGETS = ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_chat", "member", "golf_booking"];
 const REPORT_REASONS = ["abuse", "gambling", "trade", "privacy", "spam", "other"];
 
 router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {

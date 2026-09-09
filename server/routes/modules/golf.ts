@@ -55,8 +55,16 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
     for (const item of items) {
         // 클라이언트가 보낸 신원 값은 버린다(덮어쓰기가 아니라 제거 — 스키마가 넓어져도 새지 않게).
         const { managerPhone: _p, ownerId: _o, ...rest } = item ?? {};
+        // 공개되는 자유 입력은 서버에서 자른다 — 화면 maxLength 는 API 로 우회된다.
+        // 길이 제한이 없으면 글 본문에 계좌번호·안내문을 통째로 붙일 수 있다(2026-09-09 검토).
+        const cut = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : v);
         const data = {
             ...rest,
+            comment: cut(rest.comment, 300),
+            policyCustomText: cut(rest.policyCustomText, 300),
+            blindName: cut(rest.blindName, 30),
+            joinCondition: cut(rest.joinCondition, 200),
+            courseName: cut(rest.courseName, 60),
             datetime: new Date(item.datetime),
             ownerId: req.userId,
             managerPhone: phone,
@@ -77,8 +85,13 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
 router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
     if (!member?.phone) return sendError(res, 403, "권한이 없습니다");
-    // 등록자로 판정한다. 옛 행(owner_id 가 빈 행)만 번호로 되짚는다.
-    const deleted = await storage.deleteGolfBooking(req.params.id, member.phone, req.userId!);
+    // 운영자는 아무 매물이나 내릴 수 있다 — 사기 글을 내릴 방법이 없으면 신고가 무의미하다(2026-09-09).
+    const role = (member as any).role ?? (member.profileId ? (await storage.getProfile(member.profileId) as any)?.role : null);
+    const isAdmin = role === "admin" || role === "super_admin";
+    // 그 외에는 등록자 본인만. 옛 행(owner_id 가 빈 행)은 번호로 되짚는다.
+    const deleted = isAdmin
+        ? await storage.deleteGolfBooking(req.params.id)
+        : await storage.deleteGolfBooking(req.params.id, member.phone, req.userId!);
     if (!deleted) return sendError(res, 404, "삭제할 예약이 없거나 권한이 없습니다");
     return sendSuccess(res, { success: true });
 }));

@@ -659,6 +659,9 @@ export const golfBookings = pgTable("golf_bookings", {
   listingType: text("listing_type").default("BOOKING").notNull(),
   joinHeadcount: integer("join_headcount"),
   joinCondition: text("join_condition"),
+  /** 신고 누적·운영자 조치로 가려진 매물. 커뮤니티 글과 같은 방식이다(지우지 않고 가린다 — 추적이 남는다). */
+  isBlinded: boolean("is_blinded").default(false).notNull(),
+  blindReason: text("blind_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1318,7 +1321,8 @@ export const hiqCommunityLikes = pgTable("hiq_community_likes", {
 export const hiqReports = pgTable("hiq_reports", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   targetType: text("target_type", {
-    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_chat", "member"],
+    // golf_booking 추가(2026-09-09): 골프 매물에 신고·삭제가 하나도 없어 먹튀 글을 내릴 방법이 없었다
+    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_chat", "member", "golf_booking"],
   }).notNull(),
   targetId: uuid("target_id").notNull(),
   reporterId: uuid("reporter_id").references(() => hiqMembers.id).notNull(),

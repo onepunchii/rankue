@@ -11,7 +11,7 @@ import { invalidateCommunityPosts } from "./types";
 interface ReportDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    targetType: "community_post" | "community_comment" | "member";
+    targetType: "community_post" | "community_comment" | "member" | "golf_booking";
     targetId: string;
     targetAuthorId?: string; // 차단 대상 (본인 콘텐츠면 undefined로 숨김)
     targetAuthorName?: string;

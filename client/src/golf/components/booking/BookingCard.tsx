@@ -1,5 +1,7 @@
+import { ReportDialog } from "@/components/hiq/community/ReportDialog";
+import { useState } from "react";
 import { motion, AnimatePresence } from 'framer-motion';
-import { LucideChevronRight, LucideUsers, LucideCheckCircle2, LucideCircleDollarSign, LucideMessageSquare, LucideShare2 } from 'lucide-react';
+import { LucideChevronRight, LucideUsers, LucideCheckCircle2, LucideCircleDollarSign, LucideMessageSquare, LucideShare2, LucideFlag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { THEME_COLORS, SPECIAL_OPTIONS } from '../../constants/booking';
 
@@ -13,10 +15,12 @@ interface BookingCardProps {
 }
 
 export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onShare, viewType }: BookingCardProps) => {
+    const [reportOpen, setReportOpen] = useState(false);
     const isExpanded = expandedBookingId === item.id;
     const theme = viewType === 'JOIN' ? THEME_COLORS.JOIN : THEME_COLORS.BOOKING;
 
     return (
+        <>
         <motion.div
             layout
             initial={{ opacity: 0, y: 10 }}
@@ -220,11 +224,30 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onSh
                                 >
                                     <LucideShare2 className="w-5 h-5" />
                                 </button>
+                                {/* 신고 — 사기 매물을 내릴 방법이 코드에 하나도 없었다(2026-09-09 검토).
+                                    같은 사람 셋이 신고하면 서버가 자동으로 가린다. */}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setReportOpen(true); }}
+                                    className="w-14 h-14 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
+                                    title="신고하기"
+                                    aria-label="신고하기"
+                                >
+                                    <LucideFlag className="w-5 h-5" />
+                                </button>
                             </div>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
         </motion.div>
+        <ReportDialog
+            open={reportOpen}
+            onOpenChange={setReportOpen}
+            targetType="golf_booking"
+            targetId={item.id}
+            targetAuthorId={item.ownerId ?? undefined}
+            targetAuthorName={item.courseName}
+        />
+        </>
     );
 };
