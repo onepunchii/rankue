@@ -110,6 +110,20 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                     ))}
                 </span>
             )}
+            {/* 받은 인사: 보내기 버튼 옆 칩으로. 절대 위치 말풍선은 화면 오른쪽 밖으로 잘렸다(실측) */}
+            {p.emoji?.received && (
+                <span
+                    role="status" aria-live="polite"
+                    className={cn(
+                        "shrink-0 inline-flex items-center justify-center rounded-pill bg-surface-3 select-none",
+                        p.emoji.received.bubble
+                            ? "h-9 w-9 text-[20px] animate-in fade-in zoom-in-75 duration-200"
+                            : "h-7 w-7 text-[14px] opacity-70",
+                    )}
+                >
+                    {EMOJI_GLYPH[p.emoji.received.code as keyof typeof EMOJI_GLYPH] ?? "🙂"}
+                </span>
+            )}
             {p.emoji && <EmojiBar onSend={p.emoji.onSend} disabled={p.emoji.busy} className="shrink-0" />}
             <div className="flex-1 min-w-0" />
             {p.onClose && (
@@ -131,21 +145,7 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                 </button>
             ))}
             {s && !p.drillName && !p.hideSummary && (
-                <div className="relative flex items-center gap-1.5 min-w-0 -mr-1">
-                    {/* 받은 인사: 이름표 위에서 잠깐 떠오르고(말풍선) 그 뒤엔 작은 배지로 남는다 — 테이블은 가리지 않는다 */}
-                    {p.emoji?.received && (
-                        <span
-                            role="status"
-                            className={cn(
-                                "absolute right-0 z-[2] pointer-events-none select-none",
-                                p.emoji.received.bubble
-                                    ? "-top-1 text-[26px] leading-none animate-in fade-in slide-in-from-bottom-2 duration-200"
-                                    : "top-0 text-[14px] leading-none opacity-80",
-                            )}
-                        >
-                            {EMOJI_GLYPH[p.emoji.received.code as keyof typeof EMOJI_GLYPH] ?? "🙂"}
-                        </span>
-                    )}
+                <div className="flex items-center gap-1.5 min-w-0 -mr-1">
                     {twoPlayers
                         ? s.players.map((pl, i) => {
                             const isTurn = playing && s.turn === i;

@@ -159,7 +159,7 @@ describe("MatchLobby · 만들기", () => {
         expect(h.container.textContent).toContain("123 456");
         expect(h.container.textContent).toContain(ko["sim.match.waitingGuest"]);
         expect(byText(h, ko["sim.match.copy"])).not.toBeNull();
-        expect(byText(h, ko["sim.match.share"])).not.toBeNull();
+        expect(byText(h, ko["sim.match.shareLink"])).not.toBeNull();   // 공유 = 링크 공유(코드 복사와 다른 일)
         await wait(30);
         expect(polls).toBeGreaterThanOrEqual(2);
         expect(onStarted).toHaveBeenCalledTimes(1);

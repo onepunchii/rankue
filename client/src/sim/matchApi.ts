@@ -581,6 +581,9 @@ export function createMatchApi(request: RequestFn): MatchApi {
         async timeout(id) {
             return parseMatch(await request(matchTimeoutUrl(id), { method: "POST" }));
         },
+        async sendEmoji(id, code) {
+            return parseMatch(await request(matchEmojiUrl(id), { method: "POST", body: { code } }));
+        },
         async getShots(id, from) {
             return parseMatchShots(await request(matchShotsUrl(id, from), { method: "GET" }));
         },

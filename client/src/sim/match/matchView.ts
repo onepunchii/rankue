@@ -99,3 +99,16 @@ export function joinErrorKey(err: unknown): string {
 export function shareText(code: string, t: T): string {
     return t("sim.match.shareText").replace("{code}", code);
 }
+
+/**
+ * 초대 링크 — 받은 사람이 누르면 참가 화면이 열리고 코드가 이미 채워져 있다(?join=코드&auto=1, 푸시 초대와 같은 형식).
+ * origin 은 화면에서 넘긴다(테스트·서버 렌더 대비).
+ */
+export function inviteLink(code: string, origin: string): string {
+    return `${origin.replace(/\/$/, "")}/online-game?join=${encodeURIComponent(code)}&auto=1`;
+}
+
+/** 링크 공유 문구(링크 포함). 코드만 주는 shareText 와 달리 눌러서 바로 들어오게 한다. */
+export function shareLinkText(code: string, origin: string, t: T): string {
+    return t("sim.match.shareTextLink").replace("{url}", inviteLink(code, origin));
+}

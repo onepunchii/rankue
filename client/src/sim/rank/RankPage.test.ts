@@ -88,7 +88,7 @@ describe("RankPage", () => {
         expect(rows[1].textContent).toContain(ko["sim.rank.meMark"]);
         expect(rows[2].className).toContain("arc-row-3");
         expect(rows[0].textContent).toContain(ko["sim.rank.tier.master"]);
-        expect(rows[2].textContent).toContain("MX");
+        expect(rows[2].textContent).toContain("🇲🇽");            // 국가는 국기로(콤팩트)
         expect(h.api.setCountry).not.toHaveBeenCalled(); // 내 나라가 이미 있다
     });
 

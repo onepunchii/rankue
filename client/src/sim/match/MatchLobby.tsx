@@ -22,7 +22,7 @@ import {
     matchApi as defaultApi, formatCode, isCompleteCode, sanitizeCode, MATCH_CODE_LENGTH,
     type MatchApi, type MatchPublic,
 } from "../matchApi";
-import { gameLabel, inningCapLabel, joinErrorKey, rulesLabel, shareText } from "./matchView";
+import { gameLabel, inningCapLabel, joinErrorKey, rulesLabel, inviteLink, shareLinkText } from "./matchView";
 import { ChevronRightIcon, MinusIcon, PlusIcon } from "../components/railIcons";
 import { ModeInfoDialog } from "../components/ModeInfoDialog";
 import { InviteDialog } from "./InviteDialog";
@@ -171,6 +171,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
     const [error, setError] = useState<string | null>(null);
     const [created, setCreated] = useState<MatchPublic | null>(null);
     const [copied, setCopied] = useState(false);
+    const [linkCopied, setLinkCopied] = useState(false);
     const [canceling, setCanceling] = useState(false);
     const onStartedRef = useRef(onStarted);
     onStartedRef.current = onStarted;
@@ -223,6 +224,11 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
     }, [created, api, pollMs]);
 
     useEffect(() => {
+        if (!linkCopied) return;
+        const h = setTimeout(() => setLinkCopied(false), COPIED_MS);
+        return () => clearTimeout(h);
+    }, [linkCopied]);
+    useEffect(() => {
         if (!copied) return;
         const h = setTimeout(() => setCopied(false), COPIED_MS);
         return () => clearTimeout(h);
@@ -235,14 +241,23 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
         } catch { /* 클립보드 권한 없음 — 코드는 화면에 크게 보인다 */ }
     }, []);
 
+    /**
+     * 링크 공유(2026-09-09 오너: "공유는 코드 복사와 같은 버튼이면 안 된다"). 시스템 공유창을 띄우고,
+     * 없으면 링크를 클립보드에 복사한다. 받은 사람이 누르면 참가 화면이 코드가 채워진 채로 열린다(?join=코드&auto=1).
+     */
     const share = useCallback(async (code: string) => {
-        const text = shareText(code, t);
-        const nav = navigator as Navigator & { share?: (data: { text: string }) => Promise<void> };
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        const url = inviteLink(code, origin);
+        const text = shareLinkText(code, origin, t);
+        const nav = navigator as Navigator & { share?: (data: { text?: string; url?: string; title?: string }) => Promise<void> };
         if (typeof nav.share === "function") {
-            try { await nav.share({ text }); return; } catch { /* 취소 → 복사로 */ }
+            try { await nav.share({ title: t("sim.match.share"), text, url }); return; } catch { /* 취소 → 복사로 */ }
         }
-        await copyCode(code);
-    }, [t, copyCode]);
+        try {
+            await navigator.clipboard?.writeText(url);
+            setLinkCopied(true);
+        } catch { /* 클립보드 권한 없음 — 코드는 화면에 크게 보인다 */ }
+    }, [t]);
 
     const cancel = async () => {
         if (!created || canceling) return;
@@ -300,7 +315,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
                         type="button" onClick={() => { void share(created.code); }}
                         className="flex-1 h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl"
                     >
-                        {t("sim.match.share")}
+                        {linkCopied ? t("sim.match.linkCopied") : t("sim.match.shareLink")}
                     </Button>
                 </div>
                 {/* 멈춰 보이지 않게: 도는 점 + 경과 시간 + "앱을 닫아도 알림이 갑니다"(2026-09-08 오너) */}

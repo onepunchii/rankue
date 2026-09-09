@@ -6,8 +6,7 @@ vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 
 import type { MatchPublic } from "../matchApi";
 import {
-    matchBadge, listRank, sortForList, opponentLabel, gameLabel, rulesLabel, inningCapLabel, endReasonText, joinErrorKey, shareText,
-} from "./matchView";
+    matchBadge, listRank, sortForList, opponentLabel, gameLabel, rulesLabel, inningCapLabel, endReasonText, joinErrorKey, shareText, inviteLink, shareLinkText } from "./matchView";
 
 const t = (k: string) => ko[k] ?? k;
 
@@ -70,5 +69,16 @@ describe("matchView", () => {
         expect(joinErrorKey({ status: 400 })).toBe("sim.match.ownMatch");
         expect(joinErrorKey(new TypeError("Failed to fetch"))).toBe("sim.match.error");
         expect(shareText("123456", t)).toBe(ko["sim.match.shareText"].replace("{code}", "123456"));
+    });
+});
+
+describe("초대 링크", () => {
+    it("누르면 참가 화면이 코드가 채워진 채로 열린다(?join=코드&auto=1)", () => {
+        expect(inviteLink("123456", "https://www.rankue.co.kr")).toBe("https://www.rankue.co.kr/online-game?join=123456&auto=1");
+        expect(inviteLink("123456", "https://www.rankue.co.kr/")).toBe("https://www.rankue.co.kr/online-game?join=123456&auto=1");
+    });
+    it("링크 공유 문구에는 링크가 들어간다(코드만 주는 문구와 다르다)", () => {
+        const t = (k: string) => (k === "sim.match.shareTextLink" ? "초대 {url}" : k);
+        expect(shareLinkText("123456", "https://x.io", t)).toBe("초대 https://x.io/online-game?join=123456&auto=1");
     });
 });

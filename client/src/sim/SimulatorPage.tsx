@@ -734,6 +734,8 @@ export function SimulatorPage() {
         setEmojiBusy(false);
         if (r === "too-fast") toast({ title: t("sim.emoji.tooFast") });
         else if (r === "limit") toast({ title: t("sim.emoji.limit") });
+        // 조용히 실패하면 "눌렀는데 아무 일도 안 난다" — 실제로 API 등록이 빠져 그런 적이 있어 반드시 알린다
+        else if (r === "failed") toast({ title: t("sim.emoji.failed") });
     }, [actions, toast, t]);
     const emojiUi = isMatch && sim.match && sim.match.status === "playing"
         ? {

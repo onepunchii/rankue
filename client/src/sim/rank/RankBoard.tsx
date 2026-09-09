@@ -4,6 +4,7 @@ import { useT } from "@/lib/i18n";
 import { tierFor } from "@shared/sim/rank";
 import type { RankRow } from "./rankApi";
 import { countryName } from "./country";
+import { rankFlag } from "./flag";
 
 /**
  * 랭킹 리더보드(2026-09-09 오너: "이런 디자인 형태로 가도 돼 — 랭킹 페이지만 디자인 규칙 해제").
@@ -62,11 +63,11 @@ const Row = memo(function Row({ r, mine, locale }: { r: RankRow; mine: boolean; 
                 <span className={cn("text-[14px] font-black truncate", top3 ? "text-[color:var(--arc-ink)]" : "text-white")}>
                     {r.name}{mine ? ` · ${t("sim.rank.meMark")}` : ""}
                 </span>
-                <span className={cn("text-[11px] font-bold truncate", top3 ? "text-[color:var(--arc-ink)] opacity-70" : "text-white/70")}>
+                <span className={cn("text-[11px] font-bold truncate", top3 ? "text-[color:var(--arc-ink)] opacity-75" : "text-white/70")}>
+                    {r.country && <span title={countryName(r.country, locale)}>{rankFlag(r.country) || r.country} </span>}
                     {t(tier.nameKey)}
-                    {r.country ? ` · ${r.country}` : ""}
                     {` · ${t("sim.entry.record").replace("{w}", String(r.wins)).replace("{l}", String(r.matches - r.wins))}`}
-                    <span className="sr-only">{r.country ? ` ${countryName(r.country, locale)}` : ""}</span>
+                    <span className="sr-only">{r.country ? countryName(r.country, locale) : ""}</span>
                 </span>
             </span>
             <Coin value={r.rating} dark={top3} />
