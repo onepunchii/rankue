@@ -855,6 +855,8 @@ const es: Dict = {
   "hiqInstallBanner.title": "Instala la app RANKUE",
   "hiqNavigation.club": "Equipo",
   "hiqNavigation.friend": "Amigos",
+  "hiqNavigation.join": "Unirse",
+  "hiqNavigation.round": "Rondas",
   "hiqNavigation.home": "Inicio",
   "hiqNavigation.log": "Historial",
   "hiqNavigation.menu": "Menú",

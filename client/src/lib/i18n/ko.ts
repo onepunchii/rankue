@@ -857,6 +857,8 @@ export const ko: Dict = {
   "hiqInstallBanner.title": "랭큐 앱 설치하기",
   "hiqNavigation.club": "크루",
   "hiqNavigation.friend": "친구",
+  "hiqNavigation.join": "조인",
+  "hiqNavigation.round": "라운드",
   "hiqNavigation.home": "홈",
   "hiqNavigation.log": "기록",
   "hiqNavigation.menu": "전체",

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
+import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookingCreateForm } from "../components/BookingCreateForm";
 import { GlobalSearch } from "../components/GlobalSearch";
@@ -200,7 +201,7 @@ export default function BookingList() {
     }, [selectedDate, weekDates]);
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white pb-20 font-sans selection:bg-[#64DD17]/30">
+        <div className="min-h-screen bg-[#0A0A0A] text-white pb-nav font-sans selection:bg-[#64DD17]/30">
             {/* Header */}
             <div className="sticky top-0 z-50 bg-[#0A0A0A]/90 backdrop-blur-2xl border-b border-white/5">
                 <div className="px-6 h-16 flex items-center justify-between">
@@ -208,8 +209,9 @@ export default function BookingList() {
                         <button onClick={() => window.history.back()} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors" title="뒤로가기">
                             <LucideChevronLeft className="w-6 h-6" />
                         </button>
-                        <div className={cn("px-4 py-2 rounded-full border", viewType === 'JOIN' ? "bg-[#FF6B00]/10 border-[#FF6B00]/20" : "bg-[#64DD17]/10 border-[#64DD17]/20")}>
-                            <h1 className={cn("text-sm font-black tracking-tight", theme.text)}>
+                        {/* 날짜는 줄바꿈하지 않는다 — "9/9 수요일" 이 두 줄로 깨져 있었다(2026-09-09) */}
+                        <div className={cn("px-4 py-2 rounded-full border shrink-0", viewType === 'JOIN' ? "bg-[#FF6B00]/10 border-[#FF6B00]/20" : "bg-[#64DD17]/10 border-[#64DD17]/20")}>
+                            <h1 className={cn("text-sm font-black tracking-tight whitespace-nowrap", theme.text)}>
                                 {weekDates[selectedDate].displayDate}
                             </h1>
                         </div>
@@ -310,7 +312,8 @@ export default function BookingList() {
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => setIsCreateModalOpen(true)}
                                 className={cn(
-                                    "fixed bottom-8 right-6 z-[60] px-6 py-4 rounded-full font-black text-sm uppercase tracking-widest flex items-center gap-2 transition-all",
+                                    // 하단 네비 위로 띄운다 — bottom-8 이면 네비를 덮어 라운드·전체 탭이 안 눌린다(2026-09-09)
+                                    "fixed right-6 z-[60] bottom-[calc(5.5rem+env(safe-area-inset-bottom))] px-6 py-4 rounded-full font-black text-sm uppercase tracking-widest flex items-center gap-2 transition-all",
                                     theme.bg, theme.shadow,
                                     viewType === 'JOIN' ? 'text-white' : 'text-[#051907]'
                                 )}
@@ -356,6 +359,9 @@ export default function BookingList() {
                     }
                 }}
             />
+
+            {/* 하단 탭에서 들어오는 화면이라 네비를 단다 — 없으면 다른 탭으로 못 나간다(2026-09-09) */}
+            <HiqNavigation />
         </div >
     );
 }

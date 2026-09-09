@@ -7,7 +7,8 @@ import {
     LucideBarChart3,
     LucideMenu,
     LucideUsers,
-    LucideFlag
+    LucideFlag,
+    LucideCalendarDays
 } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
@@ -28,15 +29,34 @@ export function HiqNavigation() {
     const { currentSport } = useSport();
     const activeColor = "rgb(var(--brand))";
 
-    const tabs = [
-        { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
-        { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
-        { id: "friend", label: "hiqNavigation.friend", icon: LucideUsers, path: "/friends" },
-        { id: "log", label: "hiqNavigation.log", icon: LucideBarChart3, path: "/history" },
-        { id: "menu", label: "hiqNavigation.menu", icon: LucideMenu, path: "/menu" },
-    ];
+    /**
+     * 하단 탭은 종목마다 다르다(2026-09-09 오너).
+     * 당구: 홈 · 크루 · 친구 · 기록 · 전체
+     * 골프: 홈 · 크루 · 조인 · 라운드 · 전체
+     *   - 친구를 뺀 이유: 그 화면은 당구 상대전적을 보여주고, 크루 중심이면 사람은 크루 안에 있다.
+     *   - 조인을 넣은 이유: 자리가 나면 빨리 들어가야 하는 화면이라 두 번 눌러 가면 늦는다.
+     *   - 프로암·메세지는 넣지 않았다. 프로암은 응모 기간에만 의미가 있어 상시 탭이면 대부분 비고,
+     *     독립 대화 탭은 대화가 크루와 조인 글 안에서 일어나는 구조와 안 맞는다.
+     */
+    const isGolf = currentSport === "GOLF";
+    const tabs = isGolf
+        ? [
+            { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
+            { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
+            { id: "join", label: "hiqNavigation.join", icon: LucideCalendarDays, path: "/golf/booking-list" },
+            { id: "round", label: "hiqNavigation.round", icon: LucideBarChart3, path: "/history" },
+            { id: "menu", label: "hiqNavigation.menu", icon: LucideMenu, path: "/menu" },
+        ]
+        : [
+            { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
+            { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
+            { id: "friend", label: "hiqNavigation.friend", icon: LucideUsers, path: "/friends" },
+            { id: "log", label: "hiqNavigation.log", icon: LucideBarChart3, path: "/history" },
+            { id: "menu", label: "hiqNavigation.menu", icon: LucideMenu, path: "/menu" },
+        ];
 
-    const isActive = (path: string) => location === path;
+    // 조인은 상세(/golf/booking-list/:id)로 들어가도 그 탭이 켜져 있어야 한다 — 정확히 같을 때만 보면 꺼진다.
+    const isActive = (path: string) => location === path || location.startsWith(path + "/");
 
     return (
         <nav

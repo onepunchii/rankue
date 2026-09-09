@@ -855,6 +855,8 @@ const vi: Dict = {
   "hiqInstallBanner.title": "Cài đặt ứng dụng RANKUE",
   "hiqNavigation.club": "Nhóm",
   "hiqNavigation.friend": "Bạn bè",
+  "hiqNavigation.join": "Ghép nhóm",
+  "hiqNavigation.round": "Vòng đấu",
   "hiqNavigation.home": "Trang chủ",
   "hiqNavigation.log": "Lịch sử",
   "hiqNavigation.menu": "Menu",

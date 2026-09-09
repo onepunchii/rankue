@@ -855,6 +855,8 @@ const tr: Dict = {
   "hiqInstallBanner.title": "RANKUE uygulamasını yükle",
   "hiqNavigation.club": "Ekip",
   "hiqNavigation.friend": "Arkadaşlar",
+  "hiqNavigation.join": "Katıl",
+  "hiqNavigation.round": "Turlar",
   "hiqNavigation.home": "Ana Sayfa",
   "hiqNavigation.log": "Geçmiş",
   "hiqNavigation.menu": "Menü",
