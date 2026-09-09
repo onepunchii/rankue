@@ -82,6 +82,7 @@ class Storage {
     async getGolfClubCourses(clubId: string) { return this.golf.getGolfClubCourses(clubId); }
     async createGolfClub(data: any) { return this.golf.createGolfClub(data); }
     async createGolfClubCourse(data: any) { return this.golf.createGolfClubCourse(data); }
+    async addCourseNamesIfEmpty(clubId: string, names: string[]) { return this.golf.addCourseNamesIfEmpty(clubId, names); }
 
     // Golf Membership Orders
     async createGolfMembershipOrder(data: any) { return this.golf.createGolfMembershipOrder(data); }

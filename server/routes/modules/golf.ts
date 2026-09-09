@@ -393,6 +393,19 @@ router.get("/clubs/:clubId/courses", asyncHandler(async (req: any, res: any) => 
     return sendSuccess(res, courses);
 }));
 
+/**
+ * 코스 구성이 아직 없는 골프장에 **회원이 코스 이름을 알려 준다.**
+ * 전국 634곳 중 317곳이 자료가 없어, 그런 골프장을 고르면 전반/후반을 못 골라 라운드를 시작할 수 없었다.
+ * 이미 자료가 있는 골프장은 이 길로 못 바꾼다(저장소에서 막는다).
+ */
+router.post("/clubs/:clubId/courses", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.clubId)) return sendError(res, 404, "골프장을 찾을 수 없어요");
+    const names = Array.isArray(req.body?.names) ? req.body.names : [];
+    if (names.length === 0) return sendError(res, 400, "코스 이름을 적어 주세요");
+    const courses = await storage.addCourseNamesIfEmpty(req.params.clubId, names);
+    return sendSuccess(res, courses);
+}));
+
 // --- Golf Membership Routes ---
 router.post("/membership/orders", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const data = {

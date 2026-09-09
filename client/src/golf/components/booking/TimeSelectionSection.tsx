@@ -58,19 +58,33 @@ export function TimeSelectionSection({
         }
     }, [isPickerOpen]);
 
-    const handleConfirm = () => {
-        setCurrentTime(`${tempHour}:${tempMinute}`);
-        setIsPickerOpen(false);
-    };
-
-    const addTime = () => {
-        if (!currentTime) return;
-        if (timeList.includes(currentTime)) {
+    /**
+     * 고른 시간을 목록에 넣는다.
+     *
+     * 예전엔 '확인' 이 currentTime 만 채우고 끝이라, 그 다음에 옆의 **+** 를 눌러야 목록에 들어갔다.
+     * 그걸 모르면 시간을 골라 놓고도 목록이 비어 있어서 맨 아래 '등록하기' 가 계속 안 눌렸다 —
+     * 게다가 그 버튼은 뭐가 모자란지 말해 주지 않았다(2026-09-10 오너 제보).
+     * 이제 '확인' 이 곧 추가다. + 는 한 타임 더 넣을 때 쓴다.
+     */
+    const pushTime = (t: string) => {
+        if (!t) return;
+        if (timeList.includes(t)) {
             toast({ variant: "destructive", title: "중복된 시간", description: "이미 추가된 시간입니다." });
             return;
         }
-        setTimeList(prev => [...prev, currentTime].sort());
+        setTimeList(prev => [...prev, t].sort());
         setCurrentTime("");
+    };
+
+    const handleConfirm = () => {
+        pushTime(`${tempHour}:${tempMinute}`);
+        setIsPickerOpen(false);
+    };
+
+    // + 는 이미 고른 시간을 넣고, 고른 게 없으면 고르는 화면을 연다(아무 반응도 없던 것을 막는다).
+    const addTime = () => {
+        if (!currentTime) { setIsPickerOpen(true); return; }
+        pushTime(currentTime);
     };
 
     const removeTime = (t: string) => {

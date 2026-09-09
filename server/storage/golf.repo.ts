@@ -187,6 +187,36 @@ export class GolfRepository {
         return club;
     }
 
+    /**
+     * 회원이 알려 준 코스 이름을 원장에 남긴다 — 홀별 파는 아직 모르니 빈 배열로 둔다.
+     *
+     * 왜: 전국 634곳 중 317곳은 코스 구성 자료가 없다. 그 골프장을 고르면 전반/후반 목록이 비고,
+     * '방 만들기' 가 영영 안 눌린다(2026-09-10 오너 제보). 자기가 친 코스 이름은 회원이 안다.
+     * 한 사람이 적어 두면 다음 사람은 고르기만 하면 된다.
+     *
+     * 함부로 늘어나지 않게: 이미 코스가 등록된 골프장은 건드리지 않고, 한 곳당 6개까지, 이름은 20자까지.
+     * 파는 빈 배열이라 점수 계산은 기본 파 배치로 돌아간다(이미 그렇게 되어 있다).
+     */
+    async addCourseNamesIfEmpty(clubId: string, names: string[]): Promise<RankueGolfCourse[]> {
+        const clean = Array.from(new Set(
+            names.map((n) => String(n ?? "").trim().slice(0, 20)).filter(Boolean)
+        )).slice(0, 6);
+        if (clean.length === 0) return [];
+
+        const have = await db.select({ id: rankueGolfCourses.id })
+            .from(rankueGolfCourses).where(eq(rankueGolfCourses.clubId, clubId));
+        // 이미 자료가 있는 골프장은 회원 입력으로 덮지 않는다.
+        if (have.length > 0) return await this.getGolfClubCourses(clubId);
+
+        const [club] = await db.select({ id: rankueGolfClubs.id })
+            .from(rankueGolfClubs).where(eq(rankueGolfClubs.id, clubId)).limit(1);
+        if (!club) return [];
+
+        await db.insert(rankueGolfCourses)
+            .values(clean.map((name) => ({ clubId, name, pars: [] as number[] })));
+        return await this.getGolfClubCourses(clubId);
+    }
+
     async createGolfClubCourse(data: InsertGolfClubCourse): Promise<GolfClubCourse> {
         const [course] = await db.insert(golfClubCourses).values(data).returning();
         return course;

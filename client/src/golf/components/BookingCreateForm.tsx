@@ -111,7 +111,17 @@ export function BookingCreateForm({ onClose, initialMode }: BookingCreateFormPro
         }
     });
 
-    const isReady = selectedCourse && date && timeList.length > 0 && greenFee;
+    /**
+     * 못 채운 게 뭔지 **버튼이 말해 준다.**
+     * 예전엔 그냥 회색으로 죽어 있어서, 화면을 위아래로 훑으며 뭘 빠뜨렸는지 직접 찾아야 했다.
+     * 특히 시간은 골라 놓고 목록에 안 넣은 상태가 많았다(2026-09-10 오너 제보).
+     */
+    const missing = !selectedCourse ? "골프장을 선택해 주세요"
+        : !date ? "날짜를 골라 주세요"
+            : timeList.length === 0 ? "티오프 시간을 추가해 주세요"
+                : !greenFee ? "그린피를 입력해 주세요"
+                    : null;
+    const isReady = !missing;
 
     return (
         <div className="h-full flex flex-col bg-[#121212] text-white relative">
@@ -255,7 +265,7 @@ export function BookingCreateForm({ onClose, initialMode }: BookingCreateFormPro
                             "w-full h-14 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
                             isReady
                                 ? (listingType === 'JOIN' ? "bg-[#FF6B00] text-white hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#FF6B00]/20" : "bg-[#64DD17] text-[#051907] hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#64DD17]/20")
-                                : "bg-white/5 text-white/20 cursor-not-allowed"
+                                : "bg-white/5 text-white/40 cursor-not-allowed"
                         )}
                     >
                         {createMutation.isPending ? (
@@ -264,7 +274,7 @@ export function BookingCreateForm({ onClose, initialMode }: BookingCreateFormPro
                                 <span>등록 중...</span>
                             </>
                         ) : (
-                            <span>{timeList.length > 0 ? `${timeList.length}건 일괄 등록하기` : "등록하기"}</span>
+                            <span>{missing ?? (timeList.length > 1 ? `${timeList.length}건 일괄 등록하기` : "등록하기")}</span>
                         )}
                     </button>
                 </div>

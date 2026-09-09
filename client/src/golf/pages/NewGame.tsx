@@ -143,6 +143,20 @@ export default function GolfNewGame() {
     const filteredCourses = useMemo(() => dbClubs || [], [dbClubs]);
     const subCourses = useMemo(() => dbSubCourses || [], [dbSubCourses]);
 
+    const setupMissing = !selectedCourseData ? "골프장을 선택해 주세요"
+        : !selectedFrontCourse ? "전반 코스를 골라 주세요"
+            : !selectedBackCourse ? "후반 코스를 골라 주세요"
+                : null;
+
+    /** 회원이 직접 적어 준 코스 이름을 원장에 남긴다 — 다음 사람은 고르기만 하면 된다. 실패해도 라운드는 진행된다. */
+    const rememberTypedCourses = useCallback(() => {
+        if (!selectedCourseData?.id || subCourses.length > 0) return;
+        const names = [selectedFrontCourse, selectedBackCourse].map((n) => n.trim()).filter(Boolean);
+        if (names.length === 0) return;
+        apiRequest(`/api/hiq/golf/clubs/${selectedCourseData.id}/courses`, { method: "POST", body: { names } })
+            .catch(() => { /* 원장에 못 남겨도 오늘 라운드는 그대로 간다 */ });
+    }, [selectedCourseData?.id, subCourses.length, selectedFrontCourse, selectedBackCourse]);
+
     // 초기 골프장 설정 (데이터가 로드되면 88CC 우선 선택)
     useEffect(() => {
         if (filteredCourses.length > 0 && !selectedCourseData) {
@@ -374,6 +388,32 @@ export default function GolfNewGame() {
                                             </div>
                                         </div>
 
+                                        {/* 전국 634곳 중 317곳은 코스 구성 자료가 없다. 그런 골프장을 고르면 목록이 비어
+                                            '방 만들기' 가 영영 안 눌렸다 — 그래서 직접 적을 수 있게 한다.
+                                            적어 주면 원장에 남아서 다음 사람은 고르기만 하면 된다(2026-09-10). */}
+                                        {selectedCourseData && subCourses.length === 0 ? (
+                                            <div className="mt-4 space-y-2" onClick={(e) => e.stopPropagation()}>
+                                                <p className="text-[10px] font-bold text-white/50">
+                                                    이 골프장은 코스 정보가 아직 없어요. 오늘 도는 코스를 적어 주세요.
+                                                </p>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        value={selectedFrontCourse}
+                                                        onChange={(e) => setSelectedFrontCourse(e.target.value.slice(0, 20))}
+                                                        placeholder="전반 (예: 동코스)"
+                                                        aria-label="전반 코스 이름"
+                                                        className="flex-1 bg-black/40 border border-white/10 text-[11px] font-black h-12 rounded-xl px-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-[#64DD17]/50"
+                                                    />
+                                                    <input
+                                                        value={selectedBackCourse}
+                                                        onChange={(e) => setSelectedBackCourse(e.target.value.slice(0, 20))}
+                                                        placeholder="후반 (예: 서코스)"
+                                                        aria-label="후반 코스 이름"
+                                                        className="flex-1 bg-black/40 border border-white/10 text-[11px] font-black h-12 rounded-xl px-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-[#64DD17]/50"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
                                         <div className="flex items-center gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
                                             <Select
                                                 value={selectedFrontCourse}
@@ -408,6 +448,7 @@ export default function GolfNewGame() {
                                                 </SelectContent>
                                             </Select>
                                         </div>
+                                        )}
                                     </div>
                                 </div>
                             </section>
@@ -773,13 +814,14 @@ export default function GolfNewGame() {
             {step === 'setup' && (
                 <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#09090b] via-[#09090b]/95 to-transparent z-40">
                     <div className="max-w-md mx-auto">
+                        {/* 왜 안 눌리는지 버튼이 말해 준다 — 예전엔 회색으로 죽어 있기만 했다(2026-09-10) */}
                         <Button
                             className="w-full h-16 bg-[#64DD17] text-[#09090b] font-black text-lg rounded-2xl shadow-xl shadow-[#64DD17]/20 border-none active:scale-[0.98] transition-all hover:bg-[#52c41a] disabled:opacity-50 disabled:grayscale"
-                            onClick={() => createMatch.mutate()}
-                            disabled={createMatch.isPending || !selectedFrontCourse || !selectedBackCourse}
+                            onClick={() => { rememberTypedCourses(); createMatch.mutate(); }}
+                            disabled={createMatch.isPending || !!setupMissing}
                         >
                             {createMatch.isPending ? <LucideLoader2 className="w-6 h-6 animate-spin" /> : (
-                                <span>{selectedGame === 'stroke' && strokeMode === 'solo' ? "기록 시작" : "방 만들기"}</span>
+                                <span>{setupMissing ?? (selectedGame === 'stroke' && strokeMode === 'solo' ? "기록 시작" : "방 만들기")}</span>
                             )}
                         </Button>
                     </div>
