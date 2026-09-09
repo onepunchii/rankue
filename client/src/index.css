@@ -278,6 +278,11 @@ body {
 :root[data-sport="GOLF"] .border-black\/10,
 :root[data-sport="GOLF"] .border-black\/\[0\.08\] { border-color: var(--surface-line); }
 
+/* 입력창 안내 글자 — .text-black/xx 와 달리 별도 클래스라 위 규칙에 안 걸린다(2026-09-09 오너 지적) */
+:root[data-sport="GOLF"] .placeholder\:text-black\/40::placeholder,
+:root[data-sport="GOLF"] .placeholder\:text-black\/35::placeholder,
+:root[data-sport="GOLF"] .placeholder\:text-black\/30::placeholder { color: var(--ink-4); }
+
 @layer utilities {
 
   /* 스크롤바 숨김 */

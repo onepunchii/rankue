@@ -259,7 +259,7 @@ export function OptionSelectionSection({
                             <div className="flex items-center gap-3 mb-2">
                                 <div className={cn(
                                     "w-5 h-5 rounded-full border flex items-center justify-center",
-                                    policyType === "POLICY_CUSTOM" ? "border-white bg-white" : "border-white/20"
+                                    policyType === "POLICY_CUSTOM" ? "border-white bg-[#ffffff]" : "border-white/20"
                                 )}>
                                     {policyType === "POLICY_CUSTOM" && <LucideCheck className="w-3 h-3 text-black" />}
                                 </div>

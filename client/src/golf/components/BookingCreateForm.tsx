@@ -142,7 +142,7 @@ export function BookingCreateForm({ onClose, initialMode }: BookingCreateFormPro
                         className={cn(
                             "h-10 px-4 rounded-full border border-white/5 flex items-center gap-2 transition-all ml-2",
                             showHistory
-                                ? "bg-white text-black font-bold"
+                                ? "bg-[#ffffff] text-black font-bold"
                                 : "bg-[#1A1A1A] text-white/40 hover:text-white"
                         )}
                     >

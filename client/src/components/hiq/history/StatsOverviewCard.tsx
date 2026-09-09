@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { LucideFlag } from "@/lib/icons";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -82,11 +83,15 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
                 className="mb-8"
             >
                 <Card className="rounded-3xl overflow-hidden relative shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                    style={{ background: '#ffffff' }}>
+                    // 흰색을 인라인으로 박으면 종목별 배선이 못 이긴다(골프 모드에서 흰 카드에 흰 글씨였다, 2026-09-09)
+                    style={{ background: 'var(--surface-1)' }}>
                     <CardContent className="p-6 relative z-10">
                         {/* Tier Badge */}
                         <div className="flex items-center gap-3 mb-6">
-                            <BilliardBall color={tierBall(currentTier.label)} size={40} />
+                            {/* 골프 등급에 당구공을 두면 종목이 섞인다(2026-09-09 오너 지적) — 깃발로 */}
+                            <span className="w-10 h-10 rounded-2xl bg-brand/12 flex items-center justify-center shrink-0">
+                                <LucideFlag className="w-5 h-5 text-brand" />
+                            </span>
                             <div>
                                 <p className="text-[12px] font-medium text-black/55 uppercase tracking-[0.15em] mb-1">{t("statsOverview.tier")}</p>
                                 {/* statsOverview.topPercent("상위 15%")는 데이터와 무관한 고정 문자열이라 제거.

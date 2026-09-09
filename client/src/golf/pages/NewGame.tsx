@@ -549,7 +549,7 @@ export default function GolfNewGame() {
                                                 aria-label="배판 자동화 토글"
                                             >
                                                 <div className={cn(
-                                                    "w-4 h-4 rounded-full bg-white transition-transform duration-300",
+                                                    "w-4 h-4 rounded-full bg-[#ffffff] transition-transform duration-300",
                                                     useDouble ? "translate-x-6" : "translate-x-0"
                                                 )} />
                                             </button>
@@ -591,7 +591,7 @@ export default function GolfNewGame() {
                                                 title="특별 상금 활성화"
                                             >
                                                 <div className={cn(
-                                                    "w-4 h-4 rounded-full bg-white transition-transform duration-300",
+                                                    "w-4 h-4 rounded-full bg-[#ffffff] transition-transform duration-300",
                                                     isExtrasEnabled ? "translate-x-5" : "translate-x-0"
                                                 )} />
                                             </button>

@@ -17,7 +17,9 @@ export const ViewSwitcher = ({ current, onChange }: Props) => {
                     onClick={() => onChange(mode)}
                     className={cn(
                         "flex-1 flex items-center justify-center gap-2 py-3 rounded-[1rem] text-xs font-black transition-all uppercase tracking-widest",
-                        current === mode ? "bg-white text-[#050505] shadow-lg" : "text-white/40 hover:text-white/60"
+                        // 흰색은 어두운 화면 위의 '의도한' 강조라 종목 배선이 덮지 않게 명시한다.
+                        // 비활성은 white/40(대비 2.9:1)이라 안 보였다 — white/70 으로 올렸다(2026-09-09 오너 지적).
+                        current === mode ? "bg-[#ffffff] text-[#050505] shadow-lg" : "text-white/70 hover:text-white"
                     )}
                 >
                     {mode === 'map' && <LucideMap className="w-3.5 h-3.5" />}
