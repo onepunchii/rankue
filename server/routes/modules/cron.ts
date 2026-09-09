@@ -40,7 +40,11 @@ async function handleUmbSync(req: any, res: any) {
     if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
     const { syncUmbRankings } = await import("../../services/umbSync.js");
     const result = await syncUmbRankings();
-    return sendSuccess(res, result);
+    // 동기화 직후에 "새 데이터가 들어왔나"를 확인하고, 밀려 있으면 운영자에게 알린다(하루 한 번).
+    const { checkUmbHealth, alertIfUnhealthy } = await import("../../services/feedHealth.js");
+    const issues = await checkUmbHealth();
+    const alerted = await alertIfUnhealthy(issues);
+    return sendSuccess(res, { ...result, health: issues, alerted });
 }
 router.get("/umb-sync", asyncHandler(handleUmbSync));
 router.post("/umb-sync", asyncHandler(handleUmbSync));
@@ -52,7 +56,10 @@ async function handlePbaSync(req: any, res: any) {
     if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
     const { syncPba } = await import("../../services/pbaSync.js");
     const result = await syncPba();
-    return sendSuccess(res, result);
+    const { checkPbaHealth, alertIfUnhealthy } = await import("../../services/feedHealth.js");
+    const issues = await checkPbaHealth();
+    const alerted = await alertIfUnhealthy(issues);
+    return sendSuccess(res, { ...result, health: issues, alerted });
 }
 router.get("/pba-sync", asyncHandler(handlePbaSync));
 router.post("/pba-sync", asyncHandler(handlePbaSync));
