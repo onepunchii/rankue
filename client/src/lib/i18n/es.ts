@@ -420,6 +420,8 @@ const es: Dict = {
   "createClub.step1Title": "Identidad del crew",
   "createClub.step2Subtitle": "¿Tienen un lugar habitual para reunirse?",
   "createClub.step2Title": "Base camp",
+  "createClub.step2TitleGolf": "Zona de juego",
+  "createClub.step2SubtitleGolf": "¿Dónde juega normalmente tu crew?",
   "createClub.step3Subtitle": "¿Con quién quieres jugar?",
   "createClub.step3Title": "Estilo del crew",
   "createClub.stepSuffix": " / 3 pasos",

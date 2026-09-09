@@ -420,6 +420,8 @@ const vi: Dict = {
   "createClub.step1Title": "Bản sắc crew",
   "createClub.step2Subtitle": "Có địa điểm quen thường tụ tập không?",
   "createClub.step2Title": "Base camp",
+  "createClub.step2TitleGolf": "Khu vực hoạt động",
+  "createClub.step2SubtitleGolf": "Crew của bạn thường chơi ở đâu?",
   "createClub.step3Subtitle": "Bạn muốn chơi cùng những ai?",
   "createClub.step3Title": "Phong cách hoạt động",
   "createClub.stepSuffix": " / 3 bước",

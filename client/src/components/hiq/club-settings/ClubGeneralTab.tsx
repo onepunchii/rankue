@@ -239,6 +239,9 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
                 </div>
 
 
+                {/* 베이스캠프는 당구 크루만 — 골프 크루는 한 골프장에 매이지 않고, 이 검색은 당구 매장을 뒤진다
+                    (골프장 목록은 비어 있다). 골프는 아래 '주 활동 지역'이 그 역할을 한다(2026-09-09). */}
+                {crew?.sportCategory !== "GOLF" && (<>
                 {/* 베이스캠프(주 활동 매장) — 2026-08-05 에는 수정 제외였는데, 그 결과
                     생성 때 안 고른 크루는 영영 베이스가 비고 '내 주변 크루'가 죽는다.
                     실제로 크루 3개 전부 베이스가 없었다(오너 확인 2026-08-24). 크루장·운영진만 변경 가능. */}
@@ -296,6 +299,7 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
                         </>
                     )}
                 </div>
+                </>)}
 
                 {/* 활동 종목 — 생성 위저드(활동 성향)와 같은 선택지. */}
                 <div className="space-y-1.5">

@@ -420,6 +420,8 @@ const en: Dict = {
   "createClub.step1Title": "Crew identity",
   "createClub.step2Subtitle": "Got a regular spot where you meet up?",
   "createClub.step2Title": "Base camp",
+  "createClub.step2TitleGolf": "Home area",
+  "createClub.step2SubtitleGolf": "Where does your crew usually play?",
   "createClub.step3Subtitle": "Who do you want to play with?",
   "createClub.step3Title": "Crew vibe",
   "createClub.stepSuffix": " / 3 steps",

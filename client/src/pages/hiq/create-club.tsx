@@ -228,8 +228,13 @@ export default function CreateClub() {
                 </div>
 
                 <div className="mb-8">
-                    <h1 className="text-2xl font-bold mb-2 tracking-tight">{t(STEPS[step - 1].title)}</h1>
-                    <p className="text-black/55 text-sm">{t(STEPS[step - 1].subtitle)}</p>
+                    {/* 2단계는 골프에서 베이스캠프가 아니라 활동 지역만 받는다 — 제목도 그에 맞춘다 */}
+                    <h1 className="text-2xl font-bold mb-2 tracking-tight">
+                        {t(step === 2 && currentSport === "GOLF" ? "createClub.step2TitleGolf" : STEPS[step - 1].title)}
+                    </h1>
+                    <p className="text-black/55 text-sm">
+                        {t(step === 2 && currentSport === "GOLF" ? "createClub.step2SubtitleGolf" : STEPS[step - 1].subtitle)}
+                    </p>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -439,6 +444,10 @@ export default function CreateClub() {
                                         {formData.latitude ? `📍 ${t("createClub.locationSaved")}` : `📍 ${t("createClub.useMyLocation")}`}
                                     </button>
                                 </div>
+                                {/* 베이스캠프는 당구 크루만 — 당구 크루엔 단골 당구장이 있지만 골프 크루는 한 골프장에
+                                    매이지 않는다. 게다가 여기 검색은 당구 파트너 매장을 뒤진다(골프장 목록은 비어 있다).
+                                    골프는 위의 '주 활동 지역'이 그 역할을 한다(2026-09-09 오너: 골프 크루는 골프에 맞게). */}
+                                {currentSport !== "GOLF" && (<>
                                 <div className="relative">
                                     <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-black/55" />
                                     <Input
@@ -507,11 +516,13 @@ export default function CreateClub() {
                                         {t("createClub.baseCampTitle")}
                                     </h4>
                                     <p className="text-xs text-black/55 leading-relaxed">
-                                        {currentSport === "GOLF" ? t("createClub.baseCampIntroGolf") : t("createClub.baseCampIntroBilliards")}
-                                        <span className="text-black/70 font-bold">{currentSport === "GOLF" ? t("createClub.baseCampNotifyGolf") : t("createClub.baseCampNotifyBilliards")}</span>
+                                        {/* 이 카드는 당구 크루에서만 그려지므로 골프 분기는 없앴다 */}
+                                        {t("createClub.baseCampIntroBilliards")}
+                                        <span className="text-black/70 font-bold">{t("createClub.baseCampNotifyBilliards")}</span>
                                         {t("createClub.baseCampMid")}<span className="text-black/70 font-bold">{t("createClub.baseCampPerk")}</span>{t("createClub.baseCampEnd")}
                                     </p>
                                 </div>
+                                </>)}
                             </div>
                         </motion.div>
                     )}

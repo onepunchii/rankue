@@ -422,6 +422,8 @@ export const ko: Dict = {
   "createClub.step1Title": "크루 정체성",
   "createClub.step2Subtitle": "주로 모이는 단골 구장이 있나요?",
   "createClub.step2Title": "베이스 캠프",
+  "createClub.step2TitleGolf": "활동 지역",
+  "createClub.step2SubtitleGolf": "주로 어느 지역에서 라운드하시나요?",
   "createClub.step3Subtitle": "어떤 분들과 함께하고 싶으신가요?",
   "createClub.step3Title": "활동 성향",
   "createClub.stepSuffix": " / 3 단계",

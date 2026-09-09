@@ -420,6 +420,8 @@ const tr: Dict = {
   "createClub.step1Title": "Ekip kimliği",
   "createClub.step2Subtitle": "Sık buluştuğunuz bir mekân var mı?",
   "createClub.step2Title": "Base camp",
+  "createClub.step2TitleGolf": "Bölge",
+  "createClub.step2SubtitleGolf": "Ekibiniz genelde nerede oynuyor?",
   "createClub.step3Subtitle": "Kimlerle birlikte olmak istersin?",
   "createClub.step3Title": "Aktivite tarzı",
   "createClub.stepSuffix": " / 3 adım",
