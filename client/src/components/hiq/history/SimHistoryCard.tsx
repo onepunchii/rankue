@@ -10,6 +10,7 @@ import type { FilterType } from "./types";
  * 이유 둘: (1) 기록 페이지는 실전 기록(RP·에버리지)의 자리라 온라인게임 숫자가 섞이면 안 된다(RP 오염 사고 이후 원칙),
  * (2) 같은 내용을 온라인게임 대시보드가 더 잘 보여 준다. 그래서 대시보드로 가는 줄 하나만 남긴다.
  * 기록이 하나도 없으면 이 줄도 그리지 않는다(처음 온 사람에게 빈 안내를 늘리지 않는다).
+ * 2026-09-09 오너: 부제("연습·대전 기록은 대시보드에…")는 제목이 이미 말하고 있어 뺐다. 아래 매치 리스트와 붙어 보여 mb-6.
  */
 interface SimRating { sessions: number }
 interface SimMatchRow { status: string }
@@ -42,15 +43,12 @@ export function SimHistoryCard({ filter }: Props) {
         <button
             type="button"
             onClick={() => setLocation("/online-game?dash=1")}
-            className="w-full min-h-[64px] rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-3 flex items-center gap-3 text-left active:bg-black/[0.02]"
+            className="w-full min-h-[60px] mb-6 rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-3 flex items-center gap-3 text-left active:bg-black/[0.02]"
         >
             <span className="w-10 h-10 shrink-0 rounded-xl bg-brand/10 flex items-center justify-center">
                 <GameController className="w-5 h-5 text-brand" strokeWidth={2} />
             </span>
-            <span className="flex-1 min-w-0">
-                <span className="block text-[15px] font-bold text-ink-1">{t("sim.history.linkRow")}</span>
-                <span className="block text-[12.5px] font-medium text-black/55 mt-0.5 truncate">{t("sim.history.linkSub")}</span>
-            </span>
+            <span className="flex-1 min-w-0 text-[15px] font-bold text-ink-1">{t("sim.history.linkRow")}</span>
             <span className="shrink-0 text-black/30" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
             </span>

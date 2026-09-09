@@ -1829,7 +1829,6 @@ const tr: Dict = {
   "sim.history.empty": "Henüz çevrimiçi oyun kaydı yok",
   "sim.history.open": "Çevrimiçi oyunu aç",
   "sim.history.linkRow": "Çevrimiçi oyun kayıtlarını aç",
-  "sim.history.linkSub": "Antrenman ve maç kayıtları panelde",
   "sim.history.finished": "Bitti",
   "sim.history.abandoned": "Yarım",
   "sim.history.playing": "Devam ediyor",

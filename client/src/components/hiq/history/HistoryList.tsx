@@ -16,10 +16,8 @@ export const HistoryList = ({ history, config, onGameClick, currentSport }: Hist
     const { t } = useT();
     return (
         <>
-            <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2 text-black/55">
-                <config.mainIcon className="w-4 h-4 text-brand" />
-                {t(config.listTitle)}
-            </h3>
+            {/* 2026-09-09 오너: 제목 아이콘 제거 — 목록 안 카드마다 종목 배지가 이미 있어 중복이었다 */}
+            <h3 className="text-[15px] font-semibold mb-3 text-black/55">{t(config.listTitle)}</h3>
             <div className="space-y-2.5">
                 <AnimatePresence mode="popLayout">
                     {history.length > 0 ? (
