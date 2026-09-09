@@ -1303,7 +1303,7 @@ export function SimulatorPage() {
                 </div>
             )}
             {showDash && (
-                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <SimDash
                         initialSection={dashSection}
                         onClose={() => navigate("/online-game", { replace: true })}

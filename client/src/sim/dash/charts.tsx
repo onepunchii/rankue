@@ -243,11 +243,22 @@ export function Columns({ points, format, ariaLabel, emptyText, hint = "", heigh
 /** 최근 경기 흐름: 승·패 글자 칩(색만으로 말하지 않는다). */
 export function FormStrip({ results, winText, lossText, label }: { results: readonly ("W" | "L")[]; winText: string; lossText: string; label: string }) {
     if (results.length === 0) return null;
+    // 한 줄 막대 — 동그라미 열 개는 좁은 화면에서 두 줄로 접혀 흐름이 끊겨 보였다(2026-09-09).
+    // 최근 경기가 오른쪽 끝(results 는 최근 순이라 뒤집어 그린다).
+    const ordered = [...results].reverse();
     return (
-        <ol className="flex flex-wrap gap-1.5" aria-label={label}>
-            {results.map((r, i) => (
-                <li key={i} className={cn("w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold", r === "W" ? "bg-brand/[0.12] text-brand" : "bg-surface-3 text-ink-3")}>
-                    {r === "W" ? winText : lossText}
+        <ol className="flex items-end gap-1" aria-label={label}>
+            {ordered.map((r, i) => (
+                <li
+                    key={i}
+                    title={r === "W" ? winText : lossText}
+                    className={cn(
+                        // 높이는 같게, 색으로만 가른다 — 높이를 다르게 했더니 진 경기가 사라진 것처럼 보였다(실측)
+                        "flex-1 h-2.5 rounded-pill",
+                        r === "W" ? "bg-brand" : "bg-ink-4",
+                    )}
+                >
+                    <span className="sr-only">{r === "W" ? winText : lossText}</span>
                 </li>
             ))}
         </ol>

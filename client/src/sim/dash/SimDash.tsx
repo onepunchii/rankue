@@ -46,11 +46,12 @@ const card = "rounded-card bg-surface-1 border border-surface-line rk-shadow p-4
 const TREND_N = 30;
 const FORM_N = 10;
 
-function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "best" | "warn" }) {
     return (
         <div className="rounded-tile bg-surface-3 px-3 py-2.5 min-h-[64px] flex flex-col justify-center">
             <span className="text-[11px] font-semibold text-ink-3 truncate">{label}</span>
-            <span className="rk-num text-[18px] font-bold text-ink-1 leading-tight mt-0.5 truncate">{value}</span>
+            {/* 개인 최고 기록은 금색(의례 색), 연패는 흐리게 — 숫자만 늘어놓으면 무엇이 중요한지 안 보인다 */}
+            <span className={cn("rk-num text-[18px] font-bold leading-tight mt-0.5 truncate", tone === "best" ? "text-gold" : tone === "warn" ? "text-ink-3" : "text-ink-1")}>{value}</span>
             {sub && <span className="rk-num text-[11px] font-medium text-ink-4 truncate">{sub}</span>}
         </div>
     );
@@ -144,7 +145,7 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                             <section className={card} aria-label={t("sim.dash.heroAria")}>
                                 <p className="text-[12px] font-semibold text-ink-3">{t("sim.dash.heroLabel").replace("{n}", n(form.sessions))}</p>
                                 <div className="flex items-baseline gap-3 mt-1 flex-wrap">
-                                    <span data-hero className="text-[48px] font-bold text-ink-1 leading-none tracking-tight">{formatAvg(form.avg)}</span>
+                                    <span data-hero className="text-[48px] font-black text-ink-1 leading-none tracking-tight">{formatAvg(form.avg)}</span>
                                     {form.delta !== null ? (
                                         <span className={cn("rk-num text-[13px] font-semibold", form.delta >= 0 ? "text-brand" : "text-ink-3")}>
                                             {t("sim.dash.delta").replace("{d}", signedAvg(form.delta))}
@@ -160,8 +161,8 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
 
                             <div className="grid grid-cols-3 gap-2">
                                 <Tile label={t("sim.dash.kSessions")} value={n(rating?.sessions ?? series.length)} />
-                                <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(rating?.bestAvg ?? Math.max(...series.map((p) => p.avg)))} />
-                                <Tile label={t("sim.dash.kHighRun")} value={n(rating?.bestHighRun ?? Math.max(...series.map((p) => p.highRun)))} />
+                                <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(rating?.bestAvg ?? Math.max(...series.map((p) => p.avg)))} tone="best" />
+                                <Tile label={t("sim.dash.kHighRun")} value={n(rating?.bestHighRun ?? Math.max(...series.map((p) => p.highRun)))} tone="best" />
                                 <Tile label={t("sim.dash.kRank")} value={rank ? t("sim.dash.rankValue").replace("{r}", n(rank.rank)) : "–"} sub={rank ? t("sim.dash.rankOf").replace("{n}", n(rank.total)) : undefined} />
                                 <button type="button" onClick={onRank} aria-label={t("sim.rank.title")} className="text-left rounded-tile active:opacity-80" disabled={!onRank}>
                                     <Tile
@@ -210,6 +211,7 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                             <Tile
                                 label={t("sim.dash.kStreak")}
                                 value={ms.streak ? t(ms.streak.kind === "W" ? "sim.dash.streakWin" : "sim.dash.streakLoss").replace("{n}", n(ms.streak.n)) : "–"}
+                                tone={ms.streak?.kind === "L" ? "warn" : undefined}
                             />
                             <Tile label={t("sim.dash.kMyTurn")} value={n(ms.myTurn)} sub={t("sim.dash.activeSub").replace("{n}", n(ms.active))} />
                         </div>
