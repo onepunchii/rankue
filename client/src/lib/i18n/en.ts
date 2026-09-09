@@ -1667,7 +1667,7 @@ const en: Dict = {
   "sim.setup.opt3cDouble": "Double for 3 cushions",
   "sim.setup.opt3cDoubleDesc": "A point made with 3 or more cushions counts double",
   "sim.setup.optPassiveFoul": "Pushed-ball foul",
-  "sim.setup.optPassiveFoulDesc": "Foul if an object ball is pushed into the opponent's cue ball",
+  "sim.setup.optPassiveFoulDesc": "Foul if an object ball nudges the opponent's ball. A shot that hit both reds still scores",
   "sim.setup.inningCap": "Inning limit",
   "sim.setup.inningNone": "None",
   "sim.setup.inningN": "{n} innings",

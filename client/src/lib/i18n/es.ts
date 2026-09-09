@@ -1667,7 +1667,7 @@ const es: Dict = {
   "sim.setup.opt3cDouble": "Doble con 3 bandas",
   "sim.setup.opt3cDoubleDesc": "La carambola hecha con 3 o más bandas vale el doble",
   "sim.setup.optPassiveFoul": "Falta por bola empujada",
-  "sim.setup.optPassiveFoulDesc": "Es falta si una bola roja empujada toca la bola del rival",
+  "sim.setup.optPassiveFoulDesc": "Falta si una bola roja toca la del rival. Si tocaste las dos rojas, el punto cuenta",
   "sim.setup.inningCap": "Límite de entradas",
   "sim.setup.inningNone": "Sin límite",
   "sim.setup.inningN": "{n} entradas",

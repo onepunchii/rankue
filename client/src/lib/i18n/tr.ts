@@ -1667,7 +1667,7 @@ const tr: Dict = {
   "sim.setup.opt3cDouble": "3 bantta çift sayı",
   "sim.setup.opt3cDoubleDesc": "3 veya daha fazla bantla yapılan sayı iki kat sayılır",
   "sim.setup.optPassiveFoul": "İtilen top faulü",
-  "sim.setup.optPassiveFoulDesc": "İtilen kırmızı top rakibin topuna değerse faul sayılır",
+  "sim.setup.optPassiveFoulDesc": "Kırmızı top rakip topa değerse faul. İki kırmızıya da vurduysan sayı geçerli",
   "sim.setup.inningCap": "El sınırı",
   "sim.setup.inningNone": "Yok",
   "sim.setup.inningN": "{n} el",

@@ -1667,7 +1667,7 @@ const vi: Dict = {
   "sim.setup.opt3cDouble": "Nhân đôi khi 3 băng",
   "sim.setup.opt3cDoubleDesc": "Điểm ghi được từ 3 băng trở lên tính gấp đôi",
   "sim.setup.optPassiveFoul": "Lỗi bi bị đẩy",
-  "sim.setup.optPassiveFoulDesc": "Tính lỗi nếu bi đỏ bị đẩy chạm vào bi của đối thủ",
+  "sim.setup.optPassiveFoulDesc": "Phạm lỗi nếu bi đỏ chạm bi đối thủ. Nếu đã chạm cả hai bi đỏ thì vẫn tính điểm",
   "sim.setup.inningCap": "Giới hạn lượt",
   "sim.setup.inningNone": "Không",
   "sim.setup.inningN": "{n} lượt",

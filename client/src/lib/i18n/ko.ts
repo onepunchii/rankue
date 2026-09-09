@@ -1669,7 +1669,7 @@ export const ko: Dict = {
   "sim.setup.opt3cDouble": "3쿠션 2배",
   "sim.setup.opt3cDoubleDesc": "3쿠션 이상으로 득점하면 2배로 계산해요",
   "sim.setup.optPassiveFoul": "상대공 밀림 파울",
-  "sim.setup.optPassiveFoulDesc": "적구에 밀려 상대 공에 닿아도 파울로 봐요",
+  "sim.setup.optPassiveFoulDesc": "적구가 굴러가 상대공을 건드리면 파울. 두 적구를 다 맞힌 샷은 그대로 득점이에요",
   "sim.setup.inningCap": "이닝 제한",
   "sim.setup.inningNone": "없음",
   "sim.setup.inningN": "{n}이닝",
