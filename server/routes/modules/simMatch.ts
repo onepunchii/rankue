@@ -116,18 +116,24 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
  */
 const ROOM_BROADCAST_QUIET_MIN = 30;
 const ROOM_BROADCAST_LIMIT = 300;
+/** 방송을 기다려 주는 상한(ms) — 넘으면 남은 건 다음 요청 없이 그대로 끝난다. */
+const ROOM_BROADCAST_WAIT_MS = 6000;
 
 async function broadcastRoomOpened(hostId: string, hostName: string, m: { gameType: "3c" | "4c"; tableId: "DAEDAE" | "JUNGDAE_KR"; hostTarget: number }): Promise<number> {
     const title = "멀티방이 열렸어요";
     if (await storage.notifs.hasRecentTitle(title, ROOM_BROADCAST_QUIET_MIN)) return 0;
     const targets = await storage.notifs.listPushableMembers([hostId], ROOM_BROADCAST_LIMIT);
     const body = `${hostName}님이 ${gameText(m)} ${m.hostTarget}점 방을 열었어요. 지금 들어가면 바로 대전`;
-    for (const memberId of targets) {
-        notificationService.sendAndSaveNotification({
-            memberId, title, body, category: "BILLIARDS", type: "MATCH",
-            params: { url: "/online-game?rooms=1" },
-        }).catch((e) => console.error("[RoomBroadcast]", e));
-    }
+    // 서버리스는 응답을 보내면 함수를 얼려 버린다 — 응답 뒤에 남겨 두면 한 건도 안 나간다(실측: 로컬 16명 → 프로덕션 0명).
+    // 그래서 여기서 기다린다. 다만 상대 푸시 서버가 늘어져도 방 만들기가 인질이 되지 않게 상한을 둔다.
+    const sends = targets.map((memberId) => notificationService.sendAndSaveNotification({
+        memberId, title, body, category: "BILLIARDS", type: "MATCH",
+        params: { url: "/online-game?rooms=1" },
+    }).catch((e) => { console.error("[RoomBroadcast]", e); }));
+    await Promise.race([
+        Promise.allSettled(sends),
+        new Promise((r) => setTimeout(r, ROOM_BROADCAST_WAIT_MS)),
+    ]);
     return targets.length;
 }
 
@@ -165,7 +171,7 @@ router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, r
     const full = await storage.simMatch.get(row.id);
     // 멀티방(공개)이면 알림을 받을 수 있는 회원에게 방이 열렸다고 알린다. 응답을 기다리게 하지 않는다.
     if (b.isPublic && full) {
-        void broadcastRoomOpened(req.userId!, full.hostName, full).catch((e) => console.error("[RoomBroadcast]", e));
+        await broadcastRoomOpened(req.userId!, full.hostName, full).catch((e) => console.error("[RoomBroadcast]", e));
     }
     return sendSuccess(res, { ...publicMatch(full!, req.userId!), closedRooms: closed.length }, 201);
 }));
