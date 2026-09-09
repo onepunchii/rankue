@@ -2091,6 +2091,8 @@ const tr: Dict = {
   "sim.dash.colHighRun": "En yüksek seri",
   "sim.dash.showAll": "{n} seansın tümünü göster",
   "sim.entry.rooms": "Odalar",
+  "sim.push.roomOpenTitle": "Bir oda açıldı",
+  "sim.push.roomOpenBody": "{name} {game} {target} puanlık oda açtı. Hemen katıl",
   "sim.entry.roomsDesc": "Açık odalar · herkesle oyna · şifreli odalar",
   "sim.entry.roomsOpen": "Açık oda",
   "sim.entry.roomsEmpty": "Şu an açık oda yok · ilk odayı sen aç",

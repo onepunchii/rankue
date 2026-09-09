@@ -516,3 +516,14 @@ entry/entryIcons.tsx  옵션 아이콘 7개(22 px 선, currentColor): 연습·�
 entry/entryStats.ts   EntryChoice = "solo" | "together". 예전 저장값(single/path → solo, multi/rooms → together)도 읽는다.
 테스트                 entryStats.test(순서·예전 값), SimulatorPage.test 는 [data-entry="practice"] 옵션으로 설정 창을 연다. 캡처 shots/entry3.mjs.
 ```
+
+### 알림 (2026-09-09)
+```
+방 참가            게스트가 들어오면 방장에게 "{이름}님이 들어왔어요. 첫 샷은 당신 차례입니다" + 그 대전 딥링크(코드 참가·멀티방 참가 같은 경로).
+                  e2e scripts/sim-e2e/join-notify.ts · 실제 도달 점검 join-notify-audit.ts(받는 사람 푸시 토큰 유무).
+멀티방 개설 방송    공개 방을 만들면 기기 알림 가능한 회원 전원에게 "멀티방이 열렸어요 · {이름}님이 {종목} {점수}점 방을 열었어요"(링크 ?rooms=1).
+                  도배 방지: 같은 제목이 최근 30분 안에 있으면 건너뛴다(연속 개설해도 한 번). 비공개 방은 방송 없음.
+                  토큰 없는 회원은 제외 — 알림함에만 쌓여 방이 닫힌 뒤 읽히면 소음이다. e2e room-broadcast.ts.
+수집 정체 알림      services/feedHealth.ts — umb-sync·pba-sync 크론이 동기화 직후 "새 데이터가 들어왔나"를 보고 밀려 있으면 운영자에게 하루 한 번.
+                  점검 scripts/feed-health.ts · umb-state.ts · pba-state.ts.
+```

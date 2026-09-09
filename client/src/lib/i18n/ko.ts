@@ -2093,6 +2093,8 @@ export const ko: Dict = {
   "sim.dash.colHighRun": "하이런",
   "sim.dash.showAll": "{n}세션 모두 보기",
   "sim.entry.rooms": "멀티방",
+  "sim.push.roomOpenTitle": "멀티방이 열렸어요",
+  "sim.push.roomOpenBody": "{name}님이 {game} {target}점 방을 열었어요. 지금 들어가면 바로 대전",
   "sim.entry.roomsDesc": "공개 방 · 누구와도 대전 · 비밀번호 방",
   "sim.entry.roomsOpen": "열린 방",
   "sim.entry.roomsEmpty": "지금 열린 방이 없어요 · 먼저 열어 보세요",

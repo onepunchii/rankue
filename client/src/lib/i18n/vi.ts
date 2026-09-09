@@ -2091,6 +2091,8 @@ const vi: Dict = {
   "sim.dash.colHighRun": "Chuỗi",
   "sim.dash.showAll": "Xem tất cả {n} buổi",
   "sim.entry.rooms": "Phòng chơi",
+  "sim.push.roomOpenTitle": "Có phòng đang mở",
+  "sim.push.roomOpenBody": "{name} đã mở phòng {game} {target} điểm. Vào chơi ngay",
   "sim.entry.roomsDesc": "Phòng mở · đấu với bất kỳ ai · phòng có mật khẩu",
   "sim.entry.roomsOpen": "Phòng đang mở",
   "sim.entry.roomsEmpty": "Hiện chưa có phòng mở · hãy mở phòng đầu tiên",

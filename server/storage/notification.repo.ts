@@ -1,9 +1,36 @@
 import { db } from "../db.js";
-import { hiqNotifications } from "../../shared/schema.js";
-import { eq, and, desc } from "drizzle-orm";
+import { hiqNotifications, hiqMembers, profiles } from "../../shared/schema.js";
+import { eq, and, desc, sql } from "drizzle-orm";
 import type { HiqNotification, InsertHiqNotification, InsertHiqCrewNotificationSetting } from "../../shared/schema.js";
 
 export class NotificationRepository {
+    /**
+     * 지금 기기 알림을 받을 수 있는 회원(푸시 토큰 보유). 멀티방 알림 같은 "지금 오세요" 방송용 —
+     * 토큰 없는 회원은 알림함에만 쌓여 방이 닫힌 뒤에 읽히므로 제외한다.
+     */
+    async listPushableMembers(excludeIds: readonly string[], limit = 300): Promise<string[]> {
+        const rows = await db.select({ id: hiqMembers.id })
+            .from(hiqMembers)
+            .innerJoin(profiles, eq(profiles.id, hiqMembers.profileId))
+            .where(and(
+                sql`${profiles.pushToken} is not null`,
+                excludeIds.length ? sql`${hiqMembers.id} not in ${excludeIds}` : sql`true`,
+            ))
+            .limit(limit);
+        return rows.map((r) => r.id);
+    }
+
+    /** 같은 제목의 알림이 최근 minutes 분 안에 있었나(방송 도배 방지). */
+    async hasRecentTitle(title: string, minutes: number): Promise<boolean> {
+        const [row] = await db.select({ n: sql<number>`count(*)::int` })
+            .from(hiqNotifications)
+            .where(and(
+                eq(hiqNotifications.title, title),
+                sql`${hiqNotifications.createdAt} > now() - make_interval(mins => ${minutes})`,
+            ));
+        return (row?.n ?? 0) > 0;
+    }
+
     async getNotifications(memberId: string): Promise<HiqNotification[]> {
         return await db.select()
             .from(hiqNotifications)

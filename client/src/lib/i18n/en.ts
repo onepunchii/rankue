@@ -2091,6 +2091,8 @@ const en: Dict = {
   "sim.dash.colHighRun": "High run",
   "sim.dash.showAll": "Show all {n} sessions",
   "sim.entry.rooms": "Multi rooms",
+  "sim.push.roomOpenTitle": "A room is open",
+  "sim.push.roomOpenBody": "{name} opened a {game} {target}-point room. Join now to play",
   "sim.entry.roomsDesc": "Open rooms · play anyone · password rooms",
   "sim.entry.roomsOpen": "Open rooms",
   "sim.entry.roomsEmpty": "No open rooms right now · open the first one",

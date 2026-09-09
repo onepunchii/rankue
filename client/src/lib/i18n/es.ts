@@ -2091,6 +2091,8 @@ const es: Dict = {
   "sim.dash.colHighRun": "Mejor serie",
   "sim.dash.showAll": "Ver las {n} sesiones",
   "sim.entry.rooms": "Salas",
+  "sim.push.roomOpenTitle": "Hay una sala abierta",
+  "sim.push.roomOpenBody": "{name} abrió una sala de {game} a {target} puntos. Entra y juega",
   "sim.entry.roomsDesc": "Salas abiertas · juega con cualquiera · salas con contraseña",
   "sim.entry.roomsOpen": "Salas abiertas",
   "sim.entry.roomsEmpty": "No hay salas abiertas ahora · abre la primera",

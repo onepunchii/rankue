@@ -109,6 +109,28 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
     };
 }
 
+/**
+ * 멀티방을 열면 기기 알림을 받을 수 있는 회원 모두에게 "방이 열렸다"고 알린다(2026-09-09 오너: 아직 사람이 적어 모여야 한다).
+ * 도배 방지: 같은 제목이 최근 ROOM_BROADCAST_QUIET_MIN 분 안에 있으면 건너뛴다(방을 연속으로 열어도 한 번만).
+ * 토큰이 없는 회원은 제외한다 — 알림함에만 쌓여 방이 닫힌 뒤에 읽히면 안내가 아니라 소음이다.
+ */
+const ROOM_BROADCAST_QUIET_MIN = 30;
+const ROOM_BROADCAST_LIMIT = 300;
+
+async function broadcastRoomOpened(hostId: string, hostName: string, m: { gameType: "3c" | "4c"; tableId: "DAEDAE" | "JUNGDAE_KR"; hostTarget: number }): Promise<number> {
+    const title = "멀티방이 열렸어요";
+    if (await storage.notifs.hasRecentTitle(title, ROOM_BROADCAST_QUIET_MIN)) return 0;
+    const targets = await storage.notifs.listPushableMembers([hostId], ROOM_BROADCAST_LIMIT);
+    const body = `${hostName}님이 ${gameText(m)} ${m.hostTarget}점 방을 열었어요. 지금 들어가면 바로 대전`;
+    for (const memberId of targets) {
+        notificationService.sendAndSaveNotification({
+            memberId, title, body, category: "BILLIARDS", type: "MATCH",
+            params: { url: "/online-game?rooms=1" },
+        }).catch((e) => console.error("[RoomBroadcast]", e));
+    }
+    return targets.length;
+}
+
 function notify(memberId: string | null | undefined, title: string, body: string, matchId: string) {
     notifyUrl(memberId, title, body, `/online-game?match=${matchId}`);
 }
@@ -141,6 +163,10 @@ router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, r
         if (c.invitedId) notify(c.invitedId, "대전 초대가 닫혔어요", "상대가 새 방을 열었어요. 새 초대를 기다려 주세요.", row.id);
     }
     const full = await storage.simMatch.get(row.id);
+    // 멀티방(공개)이면 알림을 받을 수 있는 회원에게 방이 열렸다고 알린다. 응답을 기다리게 하지 않는다.
+    if (b.isPublic && full) {
+        void broadcastRoomOpened(req.userId!, full.hostName, full).catch((e) => console.error("[RoomBroadcast]", e));
+    }
     return sendSuccess(res, { ...publicMatch(full!, req.userId!), closedRooms: closed.length }, 201);
 }));
 
