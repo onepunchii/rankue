@@ -59,6 +59,9 @@ export default function HiqMenu() {
     const [isUploading, setIsUploading] = useState(false);
     const { currentSport, setSport } = useSport();
     const golfOk = useGolfAccess();
+    // 당구 전용 항목은 골프 모드에서 그리지 않는다 — 매장(당구장)·UMB·PBA·RP 안내·파트너는 골프와 무관하다
+    // (2026-09-09 오너: 당구는 당구 전체 페이지, 골프는 골프 전체 페이지).
+    const isGolf = currentSport === "GOLF";
 
     const [infoModal, setInfoModal] = useState<{ open: boolean, type: InfoModalType | null }>({ open: false, type: null });
     const openInfoModal = (type: InfoModalType) => setInfoModal({ open: true, type });
@@ -414,7 +417,7 @@ export default function HiqMenu() {
                         // 내 매장 관리 — 이미 가맹점인 사장님(store_owner)에게만.
                         // 예전에는 사장님도 '파트너 프로그램' 홍보 카드를 찾아 눌러야 했다.
                         // SSO 가 로그인 상태를 그대로 파트너 세션으로 바꿔주므로 재로그인이 없다.
-                        ...((member as any)?.role === "store_owner"
+                        ...((member as any)?.role === "store_owner" && !isGolf
                             ? [{ icon: LucideStore, label: "내 매장 관리", desc: "매장 정보 · 회원 · 통계", onClick: () => setLocation("/partner/dashboard") }]
                             : []),
                         // 관리자 콘솔 — role 이 admin/super_admin 인 계정에게만 노출 (진입점 부재 문제 해결)
@@ -422,11 +425,11 @@ export default function HiqMenu() {
                             ? [{ icon: LucideBriefcase, label: "관리자 콘솔", desc: "매장 클레임 · 입점 문의 · 회원 · 신고 관리", onClick: () => setLocation("/admin/dashboard") }]
                             : []),
                         // 매장 찾기 — 모바일의 유일한 상시 진입점 (하단 네비·홈에는 자리가 없다)
-                        { icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") },
+                        ...(isGolf ? [] : [{ icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") }]),
                         // 앱 공유 — 오픈 초기 유일한 유입 경로가 입소문이라 최우선. 기기에 맞는 스토어로.
                         { icon: LucideShare2, label: t("share.appTitle"), desc: t("share.appDesc"), onClick: () => shareApp() },
                         // 세계·PBA 랭킹은 로그인 없이도 보는 공개 콘텐츠 — 게스트에게 갈 곳을 준다
-                        ...(isGuest
+                        ...(isGuest && !isGolf
                             ? [
                                 { icon: LucideGlobe, label: "세계 랭킹", desc: "UMB 공식 세계 순위", onClick: () => setLocation("/world-ranking") },
                                 { icon: LucideTrophy, label: "PBA 투어", desc: "프로당구 시즌 랭킹·선수", onClick: () => setLocation("/pba") },
@@ -437,7 +440,7 @@ export default function HiqMenu() {
                             : []),
                         { icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') },
                         { icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') },
-                        { icon: LucideTrophy, label: t("menu.rankingSystem"), desc: t("menu.rankingSystemDesc"), onClick: () => openInfoModal('ranking') },
+                        ...(isGolf ? [] : [{ icon: LucideTrophy, label: t("menu.rankingSystem"), desc: t("menu.rankingSystemDesc"), onClick: () => openInfoModal('ranking') }]),
                         // 로그아웃·계정 삭제는 계정이 있어야 성립한다
                         ...(!isGuest
                             ? [
@@ -483,7 +486,7 @@ export default function HiqMenu() {
                 /partner/login 이 신청('내 매장 찾아 관리 신청')과 로그인을 모두 안내한다.
                 이미 가맹점인 사장님에겐 숨긴다 — 위에 '내 매장 관리'가 이미 있어 중복이고,
                 가입 권유를 계속 보는 건 이상하다. */}
-            {(member as any)?.role !== "store_owner" && (
+            {(member as any)?.role !== "store_owner" && !isGolf && (
             <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setLocation("/partner/login")}

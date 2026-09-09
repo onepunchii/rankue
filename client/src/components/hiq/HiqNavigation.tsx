@@ -61,10 +61,10 @@ export function HiqNavigation() {
                             <div className={`relative transition-all duration-300 ${active ? 'scale-110' : 'opacity-55 group-hover:opacity-100'}`}>
                                 <tab.icon
                                     className="w-7 h-7 transition-all duration-300"
-                                    style={active ? { color: activeColor } : { color: 'rgba(0, 0, 0, 0.55)' }}
+                                    style={active ? { color: activeColor } : { color: 'var(--nav-idle)' }}
                                 />
                             </div>
-                            <span className="text-[12px] font-semibold transition-all duration-300" style={active ? { color: activeColor } : { color: 'rgba(0, 0, 0, 0.55)' }}>
+                            <span className="text-[12px] font-semibold transition-all duration-300" style={active ? { color: activeColor } : { color: 'var(--nav-idle)' }}>
                                 {t(tab.label)}
                             </span>
                         </motion.button>

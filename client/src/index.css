@@ -250,6 +250,8 @@ body {
  * :root[data-sport="GOLF"] 아래라 당구 화면에는 한 글자도 닿지 않는다(픽셀 비교로 확인).
  * 원래 자리를 토큰으로 바꿔 나가면 이 블록은 그만큼 지우면 된다 — 임시라는 걸 잊지 말 것.
  */
+:root[data-sport="GOLF"] .bottom-navigation-container .opacity-55 { opacity: 1; }
+
 :root[data-sport="GOLF"] .bg-white,
 :root[data-sport="GOLF"] .bg-white\/95,
 :root[data-sport="GOLF"] .bg-white\/90,
@@ -520,6 +522,8 @@ body {
   --ink-2: rgba(0, 0, 0, 0.68);   /* secondary */
   --ink-3: rgba(0, 0, 0, 0.55);   /* tertiary / captions — Text Black Soft */
   --ink-4: rgba(0, 0, 0, 0.40);   /* disabled / hints only */
+  /* 하단 네비의 안 고른 탭 — 종목마다 바탕이 달라 따로 둔다(당구는 예전 값 그대로). */
+  --nav-idle: rgba(0, 0, 0, 0.55);
 
   /* Radius scale. Buttons go full-pill (Starbucks signature). */
   --r-sm: 0.75rem;   /* 12px — inputs, chips */
@@ -577,6 +581,8 @@ body {
   --ink-2: rgba(255, 255, 255, 0.75);
   --ink-3: rgba(255, 255, 255, 0.58);
   --ink-4: rgba(255, 255, 255, 0.52);
+  /* 검정 바탕에선 0.55 로는 안 보인다(오너 지적) — 회색으로 또렷하게. */
+  --nav-idle: rgba(255, 255, 255, 0.78);
   --shadow-card: none;
 
   /* UI 키트(shadcn) 토큰도 같이 — 안 덮으면 흰 알약에 흰 글씨가 된다(.sim-dark 에서 겪은 일) */
