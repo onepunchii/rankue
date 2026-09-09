@@ -212,13 +212,18 @@ export class GolfRepository {
             .groupBy(sql`to_char(${golfBookings.datetime} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`);
     }
 
-    async deleteGolfBooking(id: string, managerPhone?: string): Promise<boolean> {
-        // When an owner phone is supplied, scope the delete to that owner so a user can't
-        // delete someone else's booking by guessing the id (IDOR). Returns whether a row matched.
+    /**
+     * 등록자 본인만 지운다. 예전엔 manager_phone 문자열 하나로 판정했는데 그 값을 클라이언트가 보냈다 —
+     * 남의 번호를 박아 올린 글은 피해자만 지울 수 있고 올린 사람은 못 지우는 상태였다(2026-09-09).
+     * 이제 owner_id 로 본다. owner_id 가 없는 옛 행만 번호로 되짚는다.
+     */
+    async deleteGolfBooking(id: string, managerPhone?: string, ownerId?: string): Promise<boolean> {
+        const owns = ownerId
+            ? or(eq(golfBookings.ownerId, ownerId),
+                 managerPhone ? and(isNull(golfBookings.ownerId), eq(golfBookings.managerPhone, managerPhone)) : undefined)
+            : managerPhone ? eq(golfBookings.managerPhone, managerPhone) : undefined;
         const deleted = await db.delete(golfBookings)
-            .where(managerPhone
-                ? and(eq(golfBookings.id, id), eq(golfBookings.managerPhone, managerPhone))
-                : eq(golfBookings.id, id))
+            .where(owns ? and(eq(golfBookings.id, id), owns) : eq(golfBookings.id, id))
             .returning({ id: golfBookings.id });
         return deleted.length > 0;
     }

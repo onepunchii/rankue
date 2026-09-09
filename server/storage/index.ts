@@ -54,7 +54,7 @@ class Storage {
     // Golf
     async getGolfBookings(date?: string, filters?: any) { return this.golf.getGolfBookings(date, filters); }
     async createGolfBooking(data: any) { return this.golf.createGolfBooking(data); }
-    async deleteGolfBooking(id: string, managerPhone?: string) { return this.golf.deleteGolfBooking(id, managerPhone); }
+    async deleteGolfBooking(id: string, managerPhone?: string, ownerId?: string) { return this.golf.deleteGolfBooking(id, managerPhone, ownerId); }
     async getGolfJoins(filters?: any) { return this.golf.getGolfJoins(filters); }
     async createGolfJoin(data: any) { return this.golf.createGolfJoin(data); }
     async deleteGolfJoin(id: string, hostId?: string) { return this.golf.deleteGolfJoin(id, hostId); }

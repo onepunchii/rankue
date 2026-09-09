@@ -24,15 +24,42 @@ router.get("/bookings/counts", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, counts);
 }));
 
+/** 매물을 올릴 수 있는 역할. 화면(BookingList.tsx)과 같은 목록을 서버에서도 검사한다 — 화면만 가리면 주소로 뚫린다. */
+const BOOKING_WRITER_ROLES = ["admin", "super_admin", "store_owner", "booking_manager"];
+
+/** 연락 가능한 휴대폰인가. 소셜 가입 회원의 phone 은 "social:google:..." 이라 sms: 링크가 죽는다. */
+function usablePhone(phone: string | null | undefined): string | null {
+    if (!phone || phone.startsWith("social:")) return null;
+    const d = phone.replace(/\D/g, "");
+    return d.length >= 10 && d.length <= 11 ? phone : null;
+}
+
 router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    // 신원은 **서버가 정한다**. 예전엔 managerPhone 을 클라이언트가 보냈고 회원 id 컬럼도 없어서,
+    // 남의 번호를 매니저로 박아 매물을 올릴 수 있었다 — 문의 전화는 그 사람에게 가고, 그 사람 목록에
+    // 자기가 올린 적 없는 매물이 서고, 지울 수 있는 것도 그 사람뿐이었다(2026-09-09 검토).
+    const member = await storage.getMemberById(req.userId!);
+    if (!member) return sendError(res, 403, "권한이 없습니다");
+
+    const role = (member as any).role ?? (member.profileId ? (await storage.getProfile(member.profileId) as any)?.role : null);
+    if (!BOOKING_WRITER_ROLES.includes(String(role))) {
+        return sendError(res, 403, "티타임을 등록할 수 있는 계정이 아니에요", "NOT_BOOKING_MANAGER");
+    }
+    const phone = usablePhone(member.phone);
+    if (!phone) return sendError(res, 400, "연락 가능한 휴대폰 번호를 먼저 등록해 주세요", "NO_CONTACT_PHONE");
+
     // Multi-create support from frontend
     const items = Array.isArray(req.body) ? req.body : [req.body];
     const results: GolfBooking[] = [];
 
     for (const item of items) {
+        // 클라이언트가 보낸 신원 값은 버린다(덮어쓰기가 아니라 제거 — 스키마가 넓어져도 새지 않게).
+        const { managerPhone: _p, ownerId: _o, ...rest } = item ?? {};
         const data = {
-            ...item,
-            datetime: new Date(item.datetime)
+            ...rest,
+            datetime: new Date(item.datetime),
+            ownerId: req.userId,
+            managerPhone: phone,
         };
 
         const validation = insertGolfBookingSchema.safeParse(data);
@@ -50,7 +77,8 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
 router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
     if (!member?.phone) return sendError(res, 403, "권한이 없습니다");
-    const deleted = await storage.deleteGolfBooking(req.params.id, member.phone);
+    // 등록자로 판정한다. 옛 행(owner_id 가 빈 행)만 번호로 되짚는다.
+    const deleted = await storage.deleteGolfBooking(req.params.id, member.phone, req.userId!);
     if (!deleted) return sendError(res, 404, "삭제할 예약이 없거나 권한이 없습니다");
     return sendSuccess(res, { success: true });
 }));
@@ -127,8 +155,11 @@ router.post("/scorecard/ocr", requireAuth, asyncHandler(async (req: AuthRequest,
 }));
 
 // --- Golf Match Session (PIN based) ---
-router.post("/match/create", asyncHandler(async (req: any, res: any) => {
-    const session = await storage.createGolfMatchSession(req.body);
+// 경기 세션은 전부 로그인 뒤에만. 예전엔 requireAuth 도 없고 hostId·memberId 를 요청 본문에서 받아,
+// 남의 회원 번호로 가짜 라운드를 만들어 그 사람 평균·핸디캡·등급을 덮어쓸 수 있었다(2026-09-09 검토).
+router.post("/match/create", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { hostId: _h, ...rest } = req.body ?? {};
+    const session = await storage.createGolfMatchSession({ ...rest, hostId: req.userId });
     return sendSuccess(res, session);
 }));
 
@@ -138,9 +169,10 @@ router.get("/match/pin/:pin", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, session);
 }));
 
-router.post("/match/join", asyncHandler(async (req: any, res: any) => {
-    const { pin, memberId, name } = req.body;
-    const session = await storage.joinGolfMatchSession(pin, memberId, name);
+router.post("/match/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    // 참가자는 자기 자신뿐이다 — 본문의 memberId 는 무시한다.
+    const { pin, name } = req.body ?? {};
+    const session = await storage.joinGolfMatchSession(pin, req.userId!, name);
     return sendSuccess(res, session);
 }));
 
@@ -150,19 +182,32 @@ router.get("/match/:id", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, session);
 }));
 
-router.post("/match/:id/score", asyncHandler(async (req: any, res: any) => {
-    const { holeNo, players, nearHistory } = req.body;
+/** 그 경기에 참여한 사람만 점수를 만질 수 있다(방장 또는 참가자). */
+async function requireMatchMember(req: AuthRequest, res: any): Promise<any | null> {
+    const session: any = await storage.getGolfMatchSession(req.params.id);
+    if (!session) { sendError(res, 404, "게임을 찾을 수 없습니다."); return null; }
+    const players: any[] = Array.isArray(session.players) ? session.players : [];
+    const mine = session.hostId === req.userId || players.some((p) => p?.memberId === req.userId);
+    if (!mine) { sendError(res, 403, "이 경기의 참가자가 아니에요"); return null; }
+    return session;
+}
+
+router.post("/match/:id/score", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await requireMatchMember(req, res)) return;
+    const { holeNo, players, nearHistory } = req.body ?? {};
     const session = await storage.updateGolfMatchScore(req.params.id, holeNo, players, nearHistory);
     return sendSuccess(res, session);
 }));
 
-router.post("/match/:id/finish", asyncHandler(async (req: any, res: any) => {
+router.post("/match/:id/finish", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await requireMatchMember(req, res)) return;
     const session = await storage.finishGolfMatchSession(req.params.id);
     return sendSuccess(res, session);
 }));
 
-router.post("/match/:id/course", asyncHandler(async (req: any, res: any) => {
-    const { frontCourseName, backCourseName } = req.body;
+router.post("/match/:id/course", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await requireMatchMember(req, res)) return;
+    const { frontCourseName, backCourseName } = req.body ?? {};
     const session = await storage.updateGolfMatchCourse(req.params.id, frontCourseName, backCourseName);
     return sendSuccess(res, session);
 }));

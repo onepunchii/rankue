@@ -635,6 +635,13 @@ export const partnerLeads = pgTable("partner_leads", {
 // 9.1 골프 부킹 (Golf Booking)
 export const golfBookings = pgTable("golf_bookings", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
+  /**
+   * 이 글을 올린 회원. 2026-09-09 추가 — 그전엔 신원이 manager_phone 문자열 하나뿐이었고
+   * 그걸 클라이언트가 보냈다. 남의 번호를 매니저로 박아 매물을 올릴 수 있었고(문의 전화가 그 사람에게 가고
+   * 그 사람만 지울 수 있었다), 삭제 권한도 그 자기신고 문자열에 걸려 있었다.
+   * 옛 행은 null 이라 번호로 되짚는다. 새 글은 서버가 로그인 정보로 채운다.
+   */
+  ownerId: uuid("owner_id").references(() => hiqMembers.id),
   courseId: text("course_id").notNull(),
   courseName: text("course_name").notNull(),
   region: text("region").notNull(),

@@ -70,7 +70,9 @@ export function BookingCreateForm({ onClose, initialMode }: BookingCreateFormPro
 
             // Bulk create for multiple times
             const promises = timeList.map(time => {
-                const dateTimeStr = `${date}T${time}:00`;
+                // 시간대를 반드시 붙인다. 오프셋이 없으면 서버가 자기 시간(프로덕션은 UTC)으로 읽어
+                // 티오프가 9시간 밀린 채 저장됐다(2026-09-09 검토에서 실측 확인).
+                const dateTimeStr = `${date}T${time}:00+09:00`;
                 return apiRequest('/api/hiq/golf/bookings', {
                     method: 'POST',
                     body: {
@@ -89,7 +91,7 @@ export function BookingCreateForm({ onClose, initialMode }: BookingCreateFormPro
                         policyType,
                         policyCustomText,
                         comment,
-                        managerPhone: me.phone
+                        // 연락처와 등록자는 서버가 로그인 정보로 채운다 — 클라이언트가 보내면 남의 번호로 올릴 수 있다
                     }
                 });
             });
