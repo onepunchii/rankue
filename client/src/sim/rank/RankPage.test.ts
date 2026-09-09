@@ -68,7 +68,7 @@ const click = (el: Element) => React.act(() => { el.dispatchEvent(new window.Mou
 const text = (h: Harness) => h.container.textContent ?? "";
 
 describe("RankPage", () => {
-    it("내 카드: 골드 · 1160 · #2 전체 3명 · 플래티넘까지 90점 · KR #2, 목록 3행에 내 행 강조, 마스터는 gold", async () => {
+    it("내 카드: 골드 · 1160 · #2 전체 3명 · 플래티넘까지 90점 · KR #2, 톱 3 는 시상대(금·은·동)", async () => {
         const h = mount(ladder());
         await settle(h, () => text(h).includes("고수"));
         const me = h.container.querySelector("[data-testid=rank-me]")!;
@@ -78,12 +78,18 @@ describe("RankPage", () => {
         expect(me.textContent).toContain("플래티넘까지 90점");
         expect(me.textContent).toContain("KR #2");
         expect(me.textContent).toContain("4승 2패");
-        const rows = h.container.querySelectorAll("ol li");
-        expect(rows).toHaveLength(3);
-        expect(rows[1].getAttribute("aria-current")).toBe("true");
-        expect(rows[0].textContent).toContain(ko["sim.rank.tier.master"]);
-        expect(rows[0].innerHTML).toContain("text-gold");
-        expect(rows[2].textContent).toContain("MX");
+        // 톱 3 는 시상대로 나가고 4위부터 목록 — 여기선 세 명뿐이라 목록은 비고 시상대에 셋이 선다
+        const podium = h.container.querySelector(`[aria-label="${ko["sim.rank.podium"]}"]`)!;
+        expect(podium).not.toBeNull();
+        expect(podium.textContent).toContain("고수");          // 1위
+        expect(podium.textContent).toContain("나");            // 2위(나)
+        expect(podium.textContent).toContain("멕시코");        // 3위
+        expect(podium.textContent).toContain(ko["sim.rank.tier.master"]);
+        expect(podium.innerHTML).toContain("text-gold");       // 1위 자리는 금색
+        expect(podium.innerHTML).toContain("text-silver");
+        expect(podium.innerHTML).toContain("text-bronze");
+        expect(podium.textContent).toContain("MX");
+        expect(h.container.querySelectorAll("ol li")).toHaveLength(0);
         expect(h.api.setCountry).not.toHaveBeenCalled(); // 내 나라가 이미 있다
     });
 

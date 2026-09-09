@@ -8,7 +8,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { rankStatus, tierFor, PLACEMENT_MATCHES, type Tier } from "@shared/sim/rank";
+import { rankStatus, tierFor, TIERS, PLACEMENT_MATCHES, type Tier } from "@shared/sim/rank";
+import { RankPodium } from "./RankPodium";
 import type { DashGameType, DashTableId } from "../dash/dashApi";
 import { gameLabel } from "../match/matchView";
 import { COUNTRY_OPTIONS, countryName, guessCountry, isCountryCode } from "./country";
@@ -176,6 +177,36 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
                                     : t("sim.rank.topTier")}
                             {status.placed && myCountry && data.me.countryRank !== null && ` · ${t("sim.rank.countryRankOf").replace("{c}", myCountry).replace("{r}", n(data.me.countryRank))}`}
                         </p>
+                        {/* 티어 사다리(2026-09-09 오너: 재미 = 다음 목표가 보이는 것). 지금 티어에 표시, 다음 티어까지 몇 점인지 막대로. */}
+                        {status.placed && (
+                            <div className="mt-3" aria-label={t("sim.rank.ladder")}>
+                                <div className="flex items-center gap-1">
+                                    {TIERS.map((tier) => {
+                                        const cur = status.tier?.id === tier.id;
+                                        const passed = data.me.rating >= tier.min;
+                                        return (
+                                            <span
+                                                key={tier.id} title={t(tier.nameKey)}
+                                                className={cn(
+                                                    "flex-1 h-1.5 rounded-pill",
+                                                    cur ? "bg-gold" : passed ? "bg-ink-2" : "bg-surface-3",
+                                                )}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex items-center justify-between mt-1.5">
+                                    <span className="text-[11px] font-semibold text-ink-2">{status.tier ? t(status.tier.nameKey) : ""}</span>
+                                    {status.toNext !== null && (
+                                        <span className="rk-num text-[11px] font-medium text-ink-3">
+                                            {t("sim.rank.toNext")
+                                                .replace("{tier}", t(tierFor(data.me.rating + status.toNext).nameKey))
+                                                .replace("{n}", n(status.toNext))}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         <label className="mt-3 flex items-center justify-between gap-2 text-[12px] font-medium text-ink-3">
                             <span>{t("sim.rank.countryChange")}{myCountry ? ` · ${countryName(myCountry, locale)}` : ""}</span>
                             <select
@@ -194,9 +225,15 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
                             <p className="text-[13px] font-medium text-ink-3 mt-1">{t("sim.rank.emptyDesc").replace("{n}", n(PLACEMENT_MATCHES))}</p>
                         </section>
                     ) : (
-                        <ol className="space-y-2" aria-label={t("sim.rank.listAria")}>
-                            {data.rows.map((r) => <Row key={r.memberId} r={r} me={!!member && r.memberId === member.id} locale={locale} />)}
-                        </ol>
+                        <>
+                            {/* 톱 3 는 시상대로(명예), 4위부터는 목록으로 */}
+                            <RankPodium rows={data.rows.slice(0, 3)} myMemberId={member?.id} locale={locale} />
+                            {data.rows.length > 3 && (
+                                <ol className="space-y-2" aria-label={t("sim.rank.listAria")}>
+                                    {data.rows.slice(3).map((r) => <Row key={r.memberId} r={r} me={!!member && r.memberId === member.id} locale={locale} />)}
+                                </ol>
+                            )}
+                        </>
                     )}
                 </div>
             )}

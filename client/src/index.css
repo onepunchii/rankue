@@ -456,7 +456,10 @@ body {
   /* Deeper brand greens for immersive bands (game screen, feature strips). */
   --house-green: #1E3932;         /* near-black brand green — deep surfaces */
   --green-accent: #00754A;        /* luminous CTA green */
-  --gold: #cba258;                /* Rewards / tier ceremony only */
+  --gold: #cba258;
+  /* 시상대 2·3위 전용(2026-09-09 오너: 랭킹에 명예감). gold 와 한 세트라 여기 둔다 — 다른 화면에선 쓰지 않는다. */
+  --silver: #a8adb3;
+  --bronze: #b08157;                /* Rewards / tier ceremony only */
   --gold-soft: rgba(203, 162, 88, 0.14);  /* 우승 카드 바탕 — gold 는 알파를 못 받는 리터럴이라 따로 둔다 */
   --gold-fill: #BE8A0C;           /* 우승 카드처럼 금색을 꽉 채우고 그 위에 흰 글씨를 얹을 때.
                                      --gold(#cba258)는 흰 글씨 대비가 2.1:1 밖에 안 나온다. */
