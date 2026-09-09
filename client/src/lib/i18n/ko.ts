@@ -2155,6 +2155,8 @@ export const ko: Dict = {
   "sim.entry.drillsShort": "드릴 {s}/{n}",
   "sim.rank.title": "랭킹",
   "sim.rank.podium": "이번 시즌 톱 3",
+  "sim.rank.board": "리더보드",
+  "sim.rank.meMark": "나",
   "sim.rank.toNext": "{tier}까지 {n}점",
   "sim.rank.myRank": "내 순위",
   "sim.rank.noRank": "순위 밖",

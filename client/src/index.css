@@ -613,6 +613,42 @@ body {
     --input: rgba(255, 255, 255, 0.20);
   }
 
+  /**
+   * 랭킹 화면 전용 "아케이드" 배색(2026-09-09 오너: **이 페이지만 디자인 규칙 해제**).
+   * 여기서만 그라데이션·광택·진한 색 알약을 쓴다 — 게임 리더보드의 느낌을 그대로 가져오기로 했다.
+   * 이 클래스 밖으로는 새어 나가지 않게 전부 .rank-arcade 아래에만 둔다. 다른 화면에 복사하지 말 것.
+   */
+  .rank-arcade {
+    --arc-board: linear-gradient(180deg, #6d4bb8 0%, #5a3ba0 100%);
+    --arc-frame: #f0b429;
+    --arc-1: linear-gradient(180deg, #ffd76e 0%, #f5a623 100%);
+    --arc-2: linear-gradient(180deg, #7fd8ff 0%, #35a8e0 100%);
+    --arc-3: linear-gradient(180deg, #ff9a8b 0%, #f2585b 100%);
+    --arc-rest: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.16) 100%);
+    --arc-ink: #3a2566;
+  }
+  .rank-arcade .arc-board {
+    background: var(--arc-board);
+    border: 4px solid var(--arc-frame);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.18);
+  }
+  .rank-arcade .arc-ribbon {
+    background: linear-gradient(180deg, #ff6a5e 0%, #e33b41 100%);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+  }
+  .rank-arcade .arc-row {
+    background: var(--arc-rest);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 6px rgba(0, 0, 0, 0.18);
+  }
+  .rank-arcade .arc-row-1 { background: var(--arc-1); }
+  .rank-arcade .arc-row-2 { background: var(--arc-2); }
+  .rank-arcade .arc-row-3 { background: var(--arc-3); }
+  .rank-arcade .arc-coin {
+    background: linear-gradient(180deg, #ffd76e 0%, #e9a417 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+
   .rk-num {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;

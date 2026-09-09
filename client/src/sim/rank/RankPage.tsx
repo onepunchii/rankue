@@ -9,7 +9,7 @@ import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { rankStatus, tierFor, TIERS, PLACEMENT_MATCHES, type Tier } from "@shared/sim/rank";
-import { RankPodium } from "./RankPodium";
+import { RankBoard } from "./RankBoard";
 import type { DashGameType, DashTableId } from "../dash/dashApi";
 import { gameLabel } from "../match/matchView";
 import { COUNTRY_OPTIONS, countryName, guessCountry, isCountryCode } from "./country";
@@ -219,21 +219,14 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
                         </label>
                     </section>
 
+                    {/* 순위 목록은 게임 리더보드 형태(2026-09-09 오너: 랭킹 페이지만 디자인 규칙 해제) */}
                     {data.rows.length === 0 ? (
                         <section className="rounded-card bg-surface-1 border border-surface-line rk-shadow p-4">
                             <p className="text-[15px] font-bold text-ink-1">{t("sim.rank.empty")}</p>
                             <p className="text-[13px] font-medium text-ink-3 mt-1">{t("sim.rank.emptyDesc").replace("{n}", n(PLACEMENT_MATCHES))}</p>
                         </section>
                     ) : (
-                        <>
-                            {/* 톱 3 는 시상대로(명예), 4위부터는 목록으로 */}
-                            <RankPodium rows={data.rows.slice(0, 3)} myMemberId={member?.id} locale={locale} />
-                            {data.rows.length > 3 && (
-                                <ol className="space-y-2" aria-label={t("sim.rank.listAria")}>
-                                    {data.rows.slice(3).map((r) => <Row key={r.memberId} r={r} me={!!member && r.memberId === member.id} locale={locale} />)}
-                                </ol>
-                            )}
-                        </>
+                        <RankBoard rows={data.rows} myMemberId={member?.id} locale={locale} />
                     )}
                 </div>
             )}
