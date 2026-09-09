@@ -100,6 +100,20 @@ describe("SolverSheet", () => {
         expect(h.buttons(ko["sim.solver.retry"])).toHaveLength(0);
     });
 
+    it("길 찾기 화면(pickInRail)에선 목록 대신 오른쪽 바 안내만 — 두 목록이 다른 순서로 겹치지 않게", () => {
+        const h = mountSheet({ pickInRail: true });
+        expect(h.container.querySelectorAll("li")).toHaveLength(0);
+        expect(h.buttons(ko["sim.solver.apply"])).toHaveLength(0);
+        expect(h.buttons(ko["sim.solver.preview"])).toHaveLength(0);
+        const text = h.container.textContent ?? "";
+        expect(text).toContain(ko["sim.path.pickInRail"]);
+        expect(text).toContain("400개 시도 · 해법 5개");   // 상태 줄은 그대로 남는다
+        // 해법이 없으면 안내 대신 평소의 '없음' 문구
+        h.render({ status: "done", candidates: [], progress: { tried: 900, found: 0, phase: "done" } });
+        expect(h.container.textContent).toContain(ko["sim.solver.noneHint"]);
+        expect(h.container.textContent).not.toContain(ko["sim.path.pickInRail"]);
+    });
+
     it("적용은 그 줄의 후보를 넘긴다", () => {
         const h = mountSheet();
         React.act(() => { h.buttons(ko["sim.solver.apply"])[1].click(); });

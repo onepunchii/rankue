@@ -17,6 +17,7 @@ import type { SolverStatus } from "./useSolver";
  *  - onApply(candidate): 페이지가 actions.setInput({ phi, V0, a, b, theta: 0 }) 하고 시트를 닫는다.
  *  - onCancel/onRetry 는 선택: 있으면 찾는 중 "중단", 끝난 뒤 "다시 찾기"(idle 이면 "찾기") 버튼을 그린다.
  * 시트 높이는 테이블 위쪽이 보이게 낮게 잡았다(경로를 보면서 고를 수 있게). 토큰만, 텍스트 12 px 이상, 탭 대상 44 px.
+ *  - pickInRail: 길 찾기 화면에선 목록을 그리지 않고 오른쪽 바로 안내만 한다(아래 prop 설명 참고).
  */
 export interface SolverSheetProps {
     open: boolean;
@@ -30,6 +31,15 @@ export interface SolverSheetProps {
     onRetry?: () => void;
     /** 시트 제목 키(길 찾기 화면에선 "sim.path.title"). 없으면 "해법 찾기". */
     titleKey?: string;
+    /** 설명 키. 없으면 "…찾아 보여 드려요" — 목록을 안 그리는 화면에선 그 말이 거짓이라 바꿔 넣는다. */
+    descKey?: string;
+    /**
+     * 길 고르기를 오른쪽 바가 맡는 화면(길 찾기)에서 켠다 — 목록 대신 안내 한 줄만 둔다.
+     * 시트 목록은 엔진 점수 순, 오른쪽 바는 여유 순(적구 먼저 2자리 우선)이라 같은 번호가 다른 샷을 가리켰다.
+     * 한 화면에 두 목록이 서로 다른 순서로 있던 것을 2026-09-09 오너 지적으로 하나로 줄였다.
+     * 연습 모드엔 길 바가 없어 이 시트가 해법을 보는 유일한 창이다 — 거기선 목록을 그대로 둔다.
+     */
+    pickInRail?: boolean;
 }
 
 /** 화면에 내는 후보 수. */
@@ -92,7 +102,7 @@ const BTN_SECONDARY = "h-11 rounded-tile border border-surface-line bg-surface-1
 
 export const SolverSheet = memo(function SolverSheet(p: SolverSheetProps) {
     const { t } = useT();
-    const { open, onOpenChange, status, progress, candidates, onApply, onPreview, onCancel, onRetry, titleKey } = p;
+    const { open, onOpenChange, status, progress, candidates, onApply, onPreview, onCancel, onRetry, titleKey, descKey, pickInRail } = p;
     const [previewIdx, setPreviewIdx] = useState<number | null>(null);
     const previewRef = useRef<number | null>(null);
     previewRef.current = previewIdx;
@@ -141,7 +151,7 @@ export const SolverSheet = memo(function SolverSheet(p: SolverSheetProps) {
                             {t("sim.common.close")}
                         </button>
                     </div>
-                    <SheetDescription className="text-[13px] font-medium text-ink-3">{t("sim.solver.desc")}</SheetDescription>
+                    <SheetDescription className="text-[13px] font-medium text-ink-3">{t(descKey ?? "sim.solver.desc")}</SheetDescription>
                 </SheetHeader>
 
                 <div className="shrink-0 px-6 pb-2 flex items-center gap-2">
@@ -165,6 +175,8 @@ export const SolverSheet = memo(function SolverSheet(p: SolverSheetProps) {
                         status === "done" ? (
                             <p className="py-6 text-center text-[13px] font-medium text-ink-4">{t("sim.solver.noneHint")}</p>
                         ) : null
+                    ) : pickInRail ? (
+                        <p className="py-5 px-2 text-center text-[13px] font-medium text-ink-3 text-balance">{t("sim.path.pickInRail")}</p>
                     ) : (
                         <ol className="flex flex-col">
                             {rows.map((c, i) => {

@@ -2003,6 +2003,7 @@ export const ko: Dict = {
   "sim.path.searching": "길을 찾는 중…",
   "sim.path.none": "이 배치에선 길이 없어요. 공을 옮겨 보세요",
   "sim.path.nth": "길 {n}",
+  "sim.path.pickInRail": "길은 오른쪽 바에서 골라요. 고른 길은 아래 카드에 나와요",
   "sim.path.practice": "이 배치로 연습",
   "sim.path.spin": "당점",
   "sim.path.power": "세기",

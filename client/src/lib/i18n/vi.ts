@@ -2001,6 +2001,7 @@ const vi: Dict = {
   "sim.path.searching": "Đang tìm đường…",
   "sim.path.none": "Không có đường. Hãy dời bi",
   "sim.path.nth": "Đường {n}",
+  "sim.path.pickInRail": "Chọn đường ở thanh bên phải. Thẻ bên dưới hiển thị đường đó.",
   "sim.path.practice": "Luyện với thế bi này",
   "sim.path.spin": "Điểm chạm",
   "sim.path.power": "Lực",

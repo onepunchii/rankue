@@ -2001,6 +2001,7 @@ const es: Dict = {
   "sim.path.searching": "Buscando caminos…",
   "sim.path.none": "Aquí no hay camino. Mueve las bolas",
   "sim.path.nth": "Camino {n}",
+  "sim.path.pickInRail": "Elige un camino en la barra derecha. La tarjeta de abajo lo muestra.",
   "sim.path.practice": "Practicar esta posición",
   "sim.path.spin": "Punto",
   "sim.path.power": "Fuerza",

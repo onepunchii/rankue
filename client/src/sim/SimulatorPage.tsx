@@ -1338,8 +1338,12 @@ export function SimulatorPage() {
             />
             <SolverSheet
                 titleKey={pathView ? "sim.path.title" : undefined}
+                descKey={pathView ? "sim.path.desc" : undefined}
+                pickInRail={pathView}
                 open={solverOpen}
-                onOpenChange={(o) => { if (!o) solver.cancel(); setSolverOpen(o); }}
+                // 길 찾기에선 닫아도 탐색을 이어 간다 — 목록을 뺀 뒤로 "닫기" 가 오른쪽 바로 가는 기본 동작이 되어서,
+                // 여기서 취소하면 사용자가 모르는 채 탐색이 잘린다(예산이 있어 알아서 끝난다). 멈추려면 시트의 중단 버튼.
+                onOpenChange={(o) => { if (!o && !pathView) solver.cancel(); setSolverOpen(o); }}
                 status={solver.status} progress={solver.progress}
                 candidates={solver.result?.candidates ?? []}
                 onApply={onSolverApply} onPreview={onSolverPreview}

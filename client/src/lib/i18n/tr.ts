@@ -2001,6 +2001,7 @@ const tr: Dict = {
   "sim.path.searching": "Yollar aranıyor…",
   "sim.path.none": "Burada yol yok. Topları oynat",
   "sim.path.nth": "Yol {n}",
+  "sim.path.pickInRail": "Yolu sağdaki çubuktan seç. Aşağıdaki kart onu gösterir.",
   "sim.path.practice": "Bu dizilimle antrenman",
   "sim.path.spin": "Vuruş noktası",
   "sim.path.power": "Güç",

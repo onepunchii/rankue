@@ -2001,6 +2001,7 @@ const en: Dict = {
   "sim.path.searching": "Finding paths…",
   "sim.path.none": "No path here. Try moving the balls",
   "sim.path.nth": "Path {n}",
+  "sim.path.pickInRail": "Pick a path from the bar on the right. The card below shows it.",
   "sim.path.practice": "Practice this layout",
   "sim.path.spin": "Tip",
   "sim.path.power": "Power",
