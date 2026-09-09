@@ -101,10 +101,11 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                     </div>
                 </motion.button>
 
-                {/* 4. Member Market */}
+                {/* 4. 랭큐 프로암 — 예전엔 회원권 거래소였다. 거래는 랭큐가 할 일이 아니고(에스크로·본인확인·분쟁),
+                    프로암은 크루 성적에 이유를 준다(2026-09-09 오너). 회원권 시세 정보 자체는 남아 있다. */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setLocation('/golf/membership')}
+                    onClick={() => setLocation('/golf/proam')}
                     className="aspect-[4/5] rounded-[2rem] bg-white/[0.03] border border-white/10 p-6 flex flex-col justify-between items-start text-left hover:bg-white/[0.05] transition-colors group relative overflow-hidden backdrop-blur-sm shadow-xl"
                 >
                     <div className="absolute inset-0 bg-gradient-to-br from-[#64DD17]/10 to-transparent opacity-0 group-hover:opacity-30 transition-opacity" />
@@ -141,8 +142,8 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                     </div>
 
                     <div className="relative z-10 w-full">
-                        <h3 className="text-2xl font-extrabold text-white leading-none mb-1">MEMBER<br />MARKET</h3>
-                        <p className="text-[10px] font-bold text-[#64DD17] opacity-80">회원권 거래소</p>
+                        <h3 className="text-2xl font-extrabold text-white leading-none mb-1">RANKUE<br />PRO-AM</h3>
+                        <p className="text-[10px] font-bold text-[#64DD17] opacity-80">랭큐 프로암</p>
                     </div>
                 </motion.button>
             </div>

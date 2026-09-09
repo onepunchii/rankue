@@ -426,6 +426,9 @@ export default function HiqMenu() {
                             : []),
                         // 매장 찾기 — 모바일의 유일한 상시 진입점 (하단 네비·홈에는 자리가 없다)
                         ...(isGolf ? [] : [{ icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") }]),
+                        // 회원권은 시세·코스 정보만 남긴 자료 화면이다(거래 기능은 뺐다). 홈 타일이 프로암으로
+                        // 바뀌면서 진입로가 없어져 여기에 둔다 — 나중에 크루 골프장 검색의 재료로도 쓸 자료다.
+                        ...(isGolf ? [{ icon: LucideTrophy, label: t("menu.golfMembershipInfo"), desc: t("menu.golfMembershipInfoDesc"), onClick: () => setLocation("/golf/membership") }] : []),
                         // 앱 공유 — 오픈 초기 유일한 유입 경로가 입소문이라 최우선. 기기에 맞는 스토어로.
                         { icon: LucideShare2, label: t("share.appTitle"), desc: t("share.appDesc"), onClick: () => shareApp() },
                         // 세계·PBA 랭킹은 로그인 없이도 보는 공개 콘텐츠 — 게스트에게 갈 곳을 준다

@@ -999,6 +999,8 @@ const es: Dict = {
   "menu.editName": "Editar nombre",
   "menu.familyServices": "Servicios asociados",
   "menu.golf": "Golf",
+  "menu.golfMembershipInfo": "Precios de membresía",
+  "menu.golfMembershipInfoDesc": "Precios e info por campo · sin compraventa",
   "menu.golfMode": "Modo golf",
   "menu.guide": "Guía de uso",
   "menu.guideDesc": "Cómo usar Rankue",

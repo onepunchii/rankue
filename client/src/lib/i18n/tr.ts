@@ -999,6 +999,8 @@ const tr: Dict = {
   "menu.editName": "Adı düzenle",
   "menu.familyServices": "Aile servisleri",
   "menu.golf": "Golf",
+  "menu.golfMembershipInfo": "Üyelik fiyatları",
+  "menu.golfMembershipInfoDesc": "Saha fiyatları ve bilgi · alım satım yok",
   "menu.golfMode": "Golf modu",
   "menu.guide": "Kullanım kılavuzu",
   "menu.guideDesc": "Rankue kullanım rehberi",

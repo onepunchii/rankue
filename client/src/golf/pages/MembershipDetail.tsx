@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { useRoute, useLocation } from 'wouter';
 import { motion, AnimatePresence } from "framer-motion";
 import { formatPrice } from '../data/membershipData';
-import OrderModal from '../components/OrderModal';
 import { formatSimple } from '@/lib/membershipUtils';
 
 // Hooks
@@ -37,8 +36,6 @@ export default function MembershipDetail() {
 
     const [activeTab, setActiveTab] = useState<'COURSE' | 'BENEFIT' | 'MARKET' | 'CALC' | any>('COURSE');
     const [isTypeOpen, setIsTypeOpen] = useState(false);
-    const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-    const [orderType, setOrderType] = useState<'BUY' | 'SELL'>('BUY');
 
     const handleTabChange = (newTab: typeof activeTab) => {
         setActiveTab(newTab);
@@ -183,21 +180,8 @@ export default function MembershipDetail() {
                 )}
             </main>
 
-            <MembershipActionFooter
-                phone={hybridData.phone}
-                onBuySell={() => {
-                    setOrderType('BUY');
-                    setIsOrderModalOpen(true);
-                }}
-            />
-
-            <OrderModal
-                isOpen={isOrderModalOpen}
-                onClose={() => setIsOrderModalOpen(false)}
-                type={orderType}
-                defaultPrice={hybridData.currentPrice}
-                courseName={hybridData.name}
-            />
+            {/* 거래(매수/매도 주문)는 2026-09-09 오너 결정으로 뺐다 — 시세·코스 정보만 남긴다 */}
+            <MembershipActionFooter phone={hybridData.phone} />
         </div>
     );
 }

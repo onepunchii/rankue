@@ -999,6 +999,8 @@ const vi: Dict = {
   "menu.editName": "Sửa tên",
   "menu.familyServices": "Dịch vụ liên kết",
   "menu.golf": "Golf",
+  "menu.golfMembershipInfo": "Giá thẻ hội viên",
+  "menu.golfMembershipInfoDesc": "Giá và thông tin sân · không giao dịch",
   "menu.golfMode": "Chế độ golf",
   "menu.guide": "Hướng dẫn sử dụng",
   "menu.guideDesc": "Cách dùng Rankue",

@@ -41,6 +41,7 @@ import GolfCourseRanking from "@/golf/pages/CourseRanking";
 import GolfElite60 from "@/golf/pages/Elite60";
 import GolfCourseDetail from "@/golf/pages/CourseDetail";
 import GolfBookingList from "@/golf/pages/BookingList";
+import GolfProAm from "@/golf/pages/ProAm";
 import MembershipExchange from "@/golf/pages/MembershipExchange";
 import MembershipDetail from "@/golf/pages/MembershipDetail";
 import PartnerLogin from "@/pages/partner/login";
@@ -265,6 +266,7 @@ function AppRoutes() {
       <Route path="/golf/elite60"><GolfOnly><GolfElite60 /></GolfOnly></Route>
       <Route path="/golf/course/:id"><GolfOnly><GolfCourseDetail /></GolfOnly></Route>
       <Route path="/golf/booking-list/:id?"><GolfOnly><GolfBookingList /></GolfOnly></Route>
+      <Route path="/golf/proam"><GolfOnly><GolfProAm /></GolfOnly></Route>
       <Route path="/history" component={FramedHistory} />
       <Route path="/ranking" component={FramedRanking} />
       <Route path="/menu" component={FramedMenu} />

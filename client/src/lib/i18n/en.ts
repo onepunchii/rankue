@@ -999,6 +999,8 @@ const en: Dict = {
   "menu.editName": "Edit name",
   "menu.familyServices": "Family services",
   "menu.golf": "Golf",
+  "menu.golfMembershipInfo": "Membership prices",
+  "menu.golfMembershipInfoDesc": "Course prices and info · no trading",
   "menu.golfMode": "Golf mode",
   "menu.guide": "User guide",
   "menu.guideDesc": "How to use Rankue",

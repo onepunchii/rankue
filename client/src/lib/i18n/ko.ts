@@ -1001,6 +1001,8 @@ export const ko: Dict = {
   "menu.editName": "이름 수정",
   "menu.familyServices": "패밀리 서비스",
   "menu.golf": "골프",
+  "menu.golfMembershipInfo": "골프장 회원권 시세",
+  "menu.golfMembershipInfoDesc": "코스별 시세와 정보 · 거래는 하지 않아요",
   "menu.golfMode": "골프 모드",
   "menu.guide": "이용안내",
   "menu.guideDesc": "랭큐 서비스 사용 가이드",
