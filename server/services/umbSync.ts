@@ -13,9 +13,14 @@ export interface SyncResult {
     namesAdded?: number; // 이번 실행에서 새로 채워진 한글 이름 수
 }
 
-export async function syncUmbRankings(opts: { maxPerCategory?: number; delayMs?: number } = {}): Promise<SyncResult> {
+export async function syncUmbRankings(opts: { maxPerCategory?: number; delayMs?: number; onlyNewer?: boolean } = {}): Promise<SyncResult> {
     const maxPerCategory = opts.maxPerCategory ?? 2;
     const delayMs = opts.delayMs ?? 300;
+    // 크론은 "이미 가진 최신 회차보다 새것"만 본다(기본). 이게 없으면 파싱이 영영 안 되는 구형 회차
+    // (주니어 2025~2026 초 포맷)를 매일 다시 내려받아 파싱하다 서버리스 시간 제한에 걸려,
+    // 정작 새 회차를 못 넣고 끝난다 — 실제로 2026-08~09 내내 이렇게 조용히 멈춰 있었다.
+    // 과거 회차를 채우는 건 백필 스크립트의 몫(onlyNewer: false).
+    const onlyNewer = opts.onlyNewer !== false;
 
     const entries = await fetchArchive();
     // 아카이브에는 항상 수십 회차가 있다 — 0건은 마크업 변경 등 스크래핑 실패다.
@@ -35,10 +40,13 @@ export async function syncUmbRankings(opts: { maxPerCategory?: number; delayMs?:
     }
 
     let namesAdded = 0;
-    for (const [, list] of byCategory) {
+    for (const [category, list] of byCategory) {
         list.sort((a, b) => b.editionDate.getTime() - a.editionDate.getTime());
         let done = 0;
+        // 이 부문에서 우리가 가진 가장 최신 회차 — 그보다 오래된 건 크론에서 건너뛴다
+        const newestHave = onlyNewer ? await storage.umb.latestEditionDate(category) : null;
         for (const entry of list) {
+            if (newestHave && entry.editionDate.getTime() <= newestHave.getTime()) break;
             if (done >= maxPerCategory) break;
             try {
                 if (await storage.umb.hasEdition(entry.category, entry.edition)) continue;

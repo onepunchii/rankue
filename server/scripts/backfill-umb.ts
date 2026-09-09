@@ -6,7 +6,7 @@ import { syncUmbRankings } from "../services/umbSync.js";
 
 async function main() {
     const started = Date.now();
-    const result = await syncUmbRankings({ maxPerCategory: Infinity, delayMs: 400 });
+    const result = await syncUmbRankings({ maxPerCategory: Infinity, delayMs: 400, onlyNewer: false });
     console.log(`아카이브 항목: ${result.checked}`);
     console.log(`적재: ${result.ingested.length}회차`);
     for (const i of result.ingested) console.log(`  ✓ ${i.category} ${i.edition} (${i.rows}명)`);

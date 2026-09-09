@@ -14,6 +14,13 @@ const editionsCache = new Map<string, { at: number; data: Array<{ edition: strin
 
 export class UmbRepository {
 
+    /** 이 부문에서 우리가 가진 가장 최신 회차 날짜(없으면 null). 크론이 옛 회차를 건너뛰는 기준. */
+    async latestEditionDate(category: string): Promise<Date | null> {
+        const [row] = await db.select({ d: sql<Date>`max(${umbRankings.editionDate})` })
+            .from(umbRankings).where(eq(umbRankings.category, category as UmbCategory));
+        return row?.d ? new Date(row.d as unknown as string) : null;
+    }
+
     async hasEdition(category: UmbCategory, edition: string): Promise<boolean> {
         const [row] = await db.select({ id: umbRankings.id })
             .from(umbRankings)
