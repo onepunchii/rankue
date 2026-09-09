@@ -3,47 +3,19 @@ import { useLocation } from "wouter";
 import { GameController } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { useT } from "@/lib/i18n";
-import { BallDot } from "@/components/hiq/BallDot";
-import { cn } from "@/lib/utils";
 import type { FilterType } from "./types";
-import { drillApi, weekProgress } from "@/sim/drill/drillApi";
 
 /**
- * 기록 페이지의 시뮬레이터 섹션. 실전 전적(RP·에버리지)과는 다른 테이블(hiq_sim_*)에서 읽고,
- * 화면에서도 "별개로 집계" 라고 못 박는다 — 실전 기록과 섞이면 안 된다(RP 오염 사고 이후 원칙).
- * 흰 카드 안의 통계 타일·상태 칩은 surface-3(5% 먹) — surface-2 는 흰색이라 카드 바탕과 구분이 안 됐다(실측 2026-09-07).
+ * 기록 페이지의 온라인게임 자리 — 2026-09-09 오너 결정으로 **숫자를 모두 뺐다**.
+ * 이유 둘: (1) 기록 페이지는 실전 기록(RP·에버리지)의 자리라 온라인게임 숫자가 섞이면 안 된다(RP 오염 사고 이후 원칙),
+ * (2) 같은 내용을 온라인게임 대시보드가 더 잘 보여 준다. 그래서 대시보드로 가는 줄 하나만 남긴다.
+ * 기록이 하나도 없으면 이 줄도 그리지 않는다(처음 온 사람에게 빈 안내를 늘리지 않는다).
  */
-interface SimRating {
-    gameType: "3c" | "4c";
-    tableId: "DAEDAE" | "JUNGDAE_KR";
-    sessions: number;
-    totalScore: number;
-    totalInnings: number;
-    bestAvg: number;
-    bestHighRun: number;
-}
-
-interface SimSession {
-    id: string;
-    gameType: "3c" | "4c";
-    tableId: "DAEDAE" | "JUNGDAE_KR";
-    targetScore: number;
-    score: number;
-    innings: number;
-    highRun: number;
-    shots: number;
-    status: "playing" | "finished" | "abandoned";
-    startedAt: string;
-    rules: { gameType: "3c"; ruleSet: "umb" | "pba" } | { gameType: "4c" };
-}
+interface SimRating { sessions: number }
+interface SimMatchRow { status: string }
 
 interface Props {
     filter: FilterType;
-}
-
-function formatDate(iso: string): string {
-    const d = new Date(iso);
-    return `${d.getMonth() + 1}.${d.getDate()}`;
 }
 
 export function SimHistoryCard({ filter }: Props) {
@@ -53,116 +25,37 @@ export function SimHistoryCard({ filter }: Props) {
     const { data: ratings = [] } = useQuery<SimRating[]>({
         queryKey: ["/api/hiq/sim/ratings/me"],
         queryFn: async () => (await apiRequest("/api/hiq/sim/ratings/me")) ?? [],
+        staleTime: 60_000,
     });
-    const { data: sessions = [] } = useQuery<SimSession[]>({
-        queryKey: ["/api/hiq/sim/sessions"],
-        queryFn: async () => (await apiRequest("/api/hiq/sim/sessions")) ?? [],
+    const { data: matches = [] } = useQuery<SimMatchRow[]>({
+        queryKey: ["sim-matches"],
+        queryFn: async () => (await apiRequest("/api/hiq/sim/matches")) ?? [],
+        staleTime: 60_000,
     });
 
-    const { data: week } = useQuery({
-        queryKey: ["sim-drills", "week"],
-        queryFn: () => drillApi.getWeek(),
-        staleTime: 30_000,
-    });
-    const drillProgress = week ? weekProgress(week) : null;
-
-    const wanted = (g: "3c" | "4c") => filter === "all" || filter === g;
-    const shownRatings = ratings.filter((r) => wanted(r.gameType));
-    const shownSessions = sessions.filter((s) => wanted(s.gameType) && s.shots > 0).slice(0, 5);
-
-    const totals = shownRatings.reduce(
-        (acc, r) => ({
-            sessions: acc.sessions + r.sessions,
-            bestAvg: Math.max(acc.bestAvg, r.bestAvg),
-            bestHighRun: Math.max(acc.bestHighRun, r.bestHighRun),
-        }),
-        { sessions: 0, bestAvg: 0, bestHighRun: 0 },
-    );
-
-    const tableName = (id: SimSession["tableId"]) => (id === "DAEDAE" ? t("sim.setup.tableDaedae") : t("sim.setup.tableJungdae"));
-    const statusLabel = (s: SimSession["status"]) =>
-        s === "finished" ? t("sim.history.finished") : s === "playing" ? t("sim.history.playing") : t("sim.history.abandoned");
+    // 종목 필터는 호출부가 이미 거른다(골프 탭에선 아예 그리지 않는다) — 여기선 기록 유무만 본다.
+    void filter;
+    const hasRecord = ratings.some((r) => (r.sessions ?? 0) > 0) || matches.length > 0;
+    if (!hasRecord) return null;
 
     return (
-        <section className="mb-6">
-            <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2 text-black/55">
-                <GameController className="w-4 h-4" />
-                {t("sim.history.title")}
-                <span className="text-[12px] font-medium text-ink-4 ml-auto">{t("sim.history.subtitle")}</span>
-            </h3>
-
-            <div className="bg-surface-1 rounded-card p-4">
-                {drillProgress && filter !== "4c" && (
-                    <button
-                        type="button"
-                        onClick={() => setLocation("/online-game?drills=1")}
-                        className="w-full mb-3 rounded-tile bg-surface-3 px-3 min-h-11 py-2.5 flex items-center justify-between gap-2 text-left"
-                    >
-                        <span className="text-[13px] font-semibold text-ink-1">{t("sim.drill.title")}</span>
-                        <span className="rk-num text-[13px] font-medium text-ink-3">
-                            {t("sim.drill.progress").replace("{s}", String(drillProgress.successes)).replace("{a}", String(drillProgress.attempted)).replace("{n}", String(drillProgress.total))}
-                        </span>
-                    </button>
-                )}
-                {totals.sessions === 0 && shownSessions.length === 0 ? (
-                    <div className="text-center py-4">
-                        <p className="text-[13px] font-medium text-ink-3 mb-3">{t("sim.history.empty")}</p>
-                        <button
-                            type="button"
-                            onClick={() => setLocation("/online-game")}
-                            className="h-11 px-5 rounded-pill bg-brand text-brand-fg text-[13px] font-semibold active:bg-brand-strong"
-                        >
-                            {t("sim.history.open")}
-                        </button>
-                    </div>
-                ) : (
-                    <>
-                        <div className="grid grid-cols-3 gap-2 mb-3">
-                            {[
-                                { label: t("sim.history.sessions"), value: String(totals.sessions) },
-                                { label: t("sim.history.bestAvg"), value: totals.bestAvg.toFixed(3) },
-                                { label: t("sim.history.bestHighRun"), value: String(totals.bestHighRun) },
-                            ].map((c) => (
-                                <div key={c.label} className="rounded-tile bg-surface-3 px-3 py-2.5 min-w-0">
-                                    <div className="text-[12px] font-medium text-ink-4">{c.label}</div>
-                                    <div className="rk-num text-[18px] font-semibold text-ink-1 leading-tight mt-0.5">{c.value}</div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <ul className="divide-y divide-surface-line">
-                            {shownSessions.map((s) => {
-                                const avg = s.innings > 0 ? s.score / s.innings : 0;
-                                const badge = s.rules.gameType === "3c" ? s.rules.ruleSet.toUpperCase() : t("sim.setup.type4c");
-                                return (
-                                    <li key={s.id} className="flex items-center gap-3 py-2.5">
-                                        <BallDot type={s.gameType} size={12} />
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-1">
-                                                <span className="rk-num">{s.score}</span>
-                                                <span className="text-ink-4 font-medium">/ {s.targetScore}</span>
-                                                <span className="text-[12px] font-medium text-ink-4">· {t("sim.history.inningsN").replace("{n}", String(s.innings))}</span>
-                                                <span className="text-[12px] font-medium text-ink-4">· {t("sim.history.avg")} {avg.toFixed(3)}</span>
-                                            </div>
-                                            <div className="text-[12px] font-medium text-ink-4 mt-0.5">
-                                                {formatDate(s.startedAt)} · {tableName(s.tableId)} · {badge}
-                                            </div>
-                                        </div>
-                                        <span
-                                            className={cn(
-                                                "rk-chip shrink-0",
-                                                s.status === "finished" ? "bg-brand/[0.1] text-brand" : "bg-surface-3 text-ink-2",
-                                            )}
-                                        >
-                                            {statusLabel(s.status)}
-                                        </span>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </>
-                )}
-            </div>
-        </section>
+        <button
+            type="button"
+            onClick={() => setLocation("/online-game?dash=1")}
+            className="w-full min-h-[64px] rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-3 flex items-center gap-3 text-left active:bg-black/[0.02]"
+        >
+            <span className="w-10 h-10 shrink-0 rounded-xl bg-brand/10 flex items-center justify-center">
+                <GameController className="w-5 h-5 text-brand" strokeWidth={2} />
+            </span>
+            <span className="flex-1 min-w-0">
+                <span className="block text-[15px] font-bold text-ink-1">{t("sim.history.linkRow")}</span>
+                <span className="block text-[12.5px] font-medium text-black/55 mt-0.5 truncate">{t("sim.history.linkSub")}</span>
+            </span>
+            <span className="shrink-0 text-black/30" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+            </span>
+        </button>
     );
 }
+
+export default SimHistoryCard;

@@ -1833,6 +1833,8 @@ export const ko: Dict = {
   "sim.history.bestHighRun": "최고 하이런",
   "sim.history.empty": "아직 온라인게임 기록이 없어요",
   "sim.history.open": "온라인게임 열기",
+  "sim.history.linkRow": "온라인게임 기록 보기",
+  "sim.history.linkSub": "연습·대전 기록은 대시보드에 모아 뒀어요",
   "sim.history.finished": "완료",
   "sim.history.abandoned": "중단",
   "sim.history.playing": "진행 중",

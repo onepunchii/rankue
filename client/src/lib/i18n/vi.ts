@@ -1831,6 +1831,8 @@ const vi: Dict = {
   "sim.history.bestHighRun": "Sê-ri cao nhất",
   "sim.history.empty": "Chưa có dữ liệu trò chơi trực tuyến",
   "sim.history.open": "Mở trò chơi trực tuyến",
+  "sim.history.linkRow": "Xem dữ liệu trò chơi trực tuyến",
+  "sim.history.linkSub": "Dữ liệu luyện tập và trận đấu nằm ở bảng điều khiển",
   "sim.history.finished": "Hoàn thành",
   "sim.history.abandoned": "Bỏ dở",
   "sim.history.playing": "Đang chơi",

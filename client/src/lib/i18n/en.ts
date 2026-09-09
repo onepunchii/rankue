@@ -1831,6 +1831,8 @@ const en: Dict = {
   "sim.history.bestHighRun": "Best high run",
   "sim.history.empty": "No online game records yet",
   "sim.history.open": "Open online game",
+  "sim.history.linkRow": "Open online game records",
+  "sim.history.linkSub": "Practice and match records live in the dashboard",
   "sim.history.finished": "Finished",
   "sim.history.abandoned": "Stopped",
   "sim.history.playing": "In progress",
