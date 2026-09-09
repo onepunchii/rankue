@@ -214,8 +214,8 @@ export default function HiqClubDetail() {
         }
     });
 
-    if (isLoading) return <div className="h-[100dvh] bg-[#f2f0eb] flex items-center justify-center text-ink-3"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
-    if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-[#f2f0eb] flex items-center justify-center text-ink-3">{t("clubDetail.notFound")}</div>;
+    if (isLoading) return <div className="h-[100dvh] bg-surface-0 flex items-center justify-center text-ink-3"><LucideLoader2 className="animate-spin w-8 h-8" /></div>;
+    if (!crewData || !crewData.crew) return <div className="h-[100dvh] bg-surface-0 flex items-center justify-center text-ink-3">{t("clubDetail.notFound")}</div>;
 
     const { crew, baseStore, baseListing = null, members = [] } = crewData;
     const myMemberData = members.find((m: any) => m.member?.id === me?.id);
@@ -267,7 +267,7 @@ export default function HiqClubDetail() {
     // (App/Router 래퍼를 거쳐 렌더돼 음수 marginTop이 #root 패딩을 상쇄하지 못하던 이중 인셋 문제 해소.)
     // 노치 상단 인셋은 이제 아래 헤더의 pt-[env]가 유일하게 담당한다.
     return (
-        <div className="fixed inset-0 z-0 bg-[#f2f0eb] text-ink-1 font-sans flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-0 bg-surface-0 text-ink-1 font-sans flex flex-col overflow-hidden">
             {/* 1. 고정 헤더 영역 (4+2 구조 중 상단 +2) — 흰 배경이 노치까지 차오르고 본문은 상태바 아래에서 시작 */}
             <div className="shrink-0 z-30 bg-white/90 border-b border-black/10 pt-[env(safe-area-inset-top)]">
                 <div className="px-6 py-4 flex items-center justify-between">

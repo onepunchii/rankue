@@ -115,7 +115,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#f2f0eb] border-black/10 text-[rgba(0,0,0,0.87)] max-w-sm max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-card">
+            <DialogContent className="bg-surface-0 border-black/10 text-[rgba(0,0,0,0.87)] max-w-sm max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-card">
                 {/* Header Receipt Style */}
                 <div className="bg-white text-[rgba(0,0,0,0.87)] p-6 rounded-t-card relative overflow-hidden">
                     <div className="text-center mb-6">
@@ -265,7 +265,7 @@ export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }:
                     </AnimatePresence>
 
                     {/* Receipt Jagged Edge Bottom */}
-                    <div className="absolute bottom-0 left-0 w-full h-3 bg-[#f2f0eb] [clip-path:polygon(0%_0%,5%_100%,10%_0%,15%_100%,20%_0%,25%_100%,30%_0%,35%_100%,40%_0%,45%_100%,50%_0%,55%_100%,60%_0%,65%_100%,70%_0%,75%_100%,80%_0%,85%_100%,90%_0%,95%_100%,100%_0%)]"></div>
+                    <div className="absolute bottom-0 left-0 w-full h-3 bg-surface-0 [clip-path:polygon(0%_0%,5%_100%,10%_0%,15%_100%,20%_0%,25%_100%,30%_0%,35%_100%,40%_0%,45%_100%,50%_0%,55%_100%,60%_0%,65%_100%,70%_0%,75%_100%,80%_0%,85%_100%,90%_0%,95%_100%,100%_0%)]"></div>
                 </div>
 
                 <div className="p-6">

@@ -221,7 +221,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent hideClose className="w-screen h-screen max-w-none rounded-none border-none bg-[#f2f0eb] text-ink-1 p-0 flex flex-col focus:outline-none data-[state=open]:!zoom-in-100 data-[state=closed]:!zoom-out-100 data-[state=closed]:slide-out-to-bottom-100 data-[state=open]:slide-in-from-bottom-100 duration-200">
+            <DialogContent hideClose className="w-screen h-screen max-w-none rounded-none border-none bg-surface-0 text-ink-1 p-0 flex flex-col focus:outline-none data-[state=open]:!zoom-in-100 data-[state=closed]:!zoom-out-100 data-[state=closed]:slide-out-to-bottom-100 data-[state=open]:slide-in-from-bottom-100 duration-200">
                 {/* Custom Header */}
                 <DialogTitle className="sr-only">
                     {gameMode === "practice" ? t("gameCreationModal.practiceTitle") : t("gameCreationModal.matchTitle")}
@@ -231,7 +231,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                 </DialogDescription>
 
                 <div
-                    className="flex items-center justify-between px-4 py-2 border-b border-black/10 bg-[#f2f0eb] shrink-0"
+                    className="flex items-center justify-between px-4 py-2 border-b border-black/10 bg-surface-0 shrink-0"
                     style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}
                 >
                     <button
@@ -406,7 +406,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
 
                 {/* Footer Config Buttons */}
                 <div
-                    className="p-4 border-t border-black/10 bg-[#f2f0eb] shrink-0"
+                    className="p-4 border-t border-black/10 bg-surface-0 shrink-0"
                     style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
                 >
                     <Button

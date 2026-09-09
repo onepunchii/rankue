@@ -23,7 +23,7 @@ export function LandscapeGuard({ children }: { children: React.ReactNode }) {
         // env()는 회전(transform)된 컨테이너 안에서도 물리 기기값으로 정상 해석된다(실측 확인: 62px).
         return (
             <div
-                className="fixed top-1/2 left-1/2 bg-[#f2f0eb] overflow-hidden origin-center"
+                className="fixed top-1/2 left-1/2 bg-surface-0 overflow-hidden origin-center"
                 style={{
                     width: "100vh",
                     height: "100vw",

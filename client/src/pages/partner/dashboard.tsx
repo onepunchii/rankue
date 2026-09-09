@@ -182,13 +182,13 @@ export default function PartnerDashboard() {
         }
     }, [members, rankingTab]);
 
-    if (isStoreLoading) return <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-black/55">불러오는 중...</div>;
-    if (!store) return <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] p-6">매장을 찾을 수 없습니다</div>;
+    if (isStoreLoading) return <div className="min-h-screen bg-surface-0 flex items-center justify-center text-black/55">불러오는 중...</div>;
+    if (!store) return <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] p-6">매장을 찾을 수 없습니다</div>;
 
     const joinUrl = `${window.location.origin}/store/${store.slug}`;
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans pb-24">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans pb-24">
             {/* 1. Header & Pulse */}
             <div className="bg-brand/[0.06] p-6 pb-2 rounded-b-3xl">
                 <div className="flex items-center justify-between mb-8">

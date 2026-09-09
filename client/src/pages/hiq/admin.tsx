@@ -107,7 +107,7 @@ export default function HiqAdmin() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 p-4 md:p-8 font-sans">
+        <div className="min-h-screen bg-surface-0 text-ink-1 p-4 md:p-8 font-sans">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">

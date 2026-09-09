@@ -134,7 +134,7 @@ export default function MarketingLanding({ onStart }: { onStart: () => void }) {
     };
 
     return (
-        <div className="min-h-screen w-full bg-[#f2f0eb] text-ink-1 font-sans">
+        <div className="min-h-screen w-full bg-surface-0 text-ink-1 font-sans">
             {/* ── 히어로 (다크) ───────────────────────────────────────── */}
             <section className="relative overflow-hidden bg-[#07090a]">
                 {/* 배너 뒤 은은한 초록 번짐 — 키 비주얼의 네온이 검은 배경에서 끊겨 보이지 않게 잇는다 */}

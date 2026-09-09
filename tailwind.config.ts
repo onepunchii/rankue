@@ -48,6 +48,7 @@ export default {
           fg: "rgb(var(--brand-fg) / <alpha-value>)",
         },
         surface: {
+          0: "var(--surface-0)",   // 페이지 바탕(종목별로 달라진다)
           1: "var(--surface-1)",
           2: "var(--surface-2)",
           3: "var(--surface-3)",

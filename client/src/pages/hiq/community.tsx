@@ -70,7 +70,7 @@ export default function HiqCommunity() {
     const writeBoard: CommunityBoard = board === "all" ? "ask" : board;
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
             {/* Header */}
             <div className="flex items-center justify-between mb-6 relative z-10">
                 <div className="flex items-center gap-3">

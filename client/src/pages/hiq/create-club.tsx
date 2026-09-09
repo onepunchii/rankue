@@ -203,11 +203,11 @@ export default function CreateClub() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans pb-36">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans pb-36">
             {/* Header — 전역 .sticky.top-0 세이프에어리어 규칙(index.css)이 py-4의 상단
                 패딩을 env()로 덮어써 헤더가 위에 딱 붙었다. rk-no-safe로 제외하고
                 env+16px을 직접 준다 (웹=16px, 앱=상태바+16px). */}
-            <div className="rk-no-safe sticky top-0 z-10 bg-[#f2f0eb] border-b border-surface-line px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] mt-[calc(-1*env(safe-area-inset-top))] flex items-center justify-between">
+            <div className="rk-no-safe sticky top-0 z-10 bg-surface-0 border-b border-surface-line px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] mt-[calc(-1*env(safe-area-inset-top))] flex items-center justify-between">
                 <Button variant="ghost" className="p-0 h-auto text-black/60 hover:text-[rgba(0,0,0,0.87)]" onClick={() => step > 1 ? setStep(step - 1) : setLocation("/club")}>
                     <LucideChevronLeft className="w-6 h-6" />
                 </Button>
@@ -649,7 +649,7 @@ export default function CreateClub() {
 
             {/* Bottom Button */}
             <div
-                className="fixed bottom-0 left-0 right-0 px-5 py-6 bg-[#f2f0eb] border-t border-surface-line z-20"
+                className="fixed bottom-0 left-0 right-0 px-5 py-6 bg-surface-0 border-t border-surface-line z-20"
                 // 전역 `.fixed.bottom-0 { padding-bottom: env(...) }`가 py-6의 하단 1.5rem을 덮어써
                 // 웹에선 하단 여백이 사라지고 시뮬에선 인셋이 py-6 안으로 파고든다. 인라인으로 전역 규칙을
                 // 이겨, base(1.5rem)는 유지하고 홈인디케이터 인셋을 그 아래에 얹는다.

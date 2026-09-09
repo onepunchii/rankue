@@ -182,14 +182,14 @@ export default function HiqMenu() {
     // 로그인 확인 중 — 게스트인데 "사용자님 · Lv.1" 프로필이 먼저 깜빡이는 것을 막는다.
     if (isAuthLoading) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
+            <div className="min-h-screen bg-surface-0 flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-black/10 border-t-brand rounded-full animate-spin" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-nav font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav font-sans relative overflow-x-hidden">
             {/* Background Light Effect */}
             <div
                 className="absolute top-0 right-0 w-[80dvw] h-[50dvh] blur-[120px] rounded-full -mr-[30dvw] -mt-[10dvh] pointer-events-none transition-colors duration-700"

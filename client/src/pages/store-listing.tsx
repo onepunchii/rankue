@@ -219,7 +219,7 @@ export default function StoreListingPage() {
   ].filter(([, r, f]) => r != null || f != null) as Array<[string, number | null, number | null]> : [];
 
   return (
-    <div className="min-h-screen w-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans">
+    <div className="min-h-screen w-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans">
       <div className="mx-auto max-w-2xl px-5 py-12 pb-28 md:pb-12">
         <button onClick={() => setLocation("/stores")} className="text-[13.5px] font-semibold text-black/50 mb-5 hover:text-black/70">
           ← {t.back}

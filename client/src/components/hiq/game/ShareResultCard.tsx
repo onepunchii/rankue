@@ -422,7 +422,7 @@ export function ShareResultCard({ data, className }: { data: ShareResultData; cl
         players.length <= 1 ? PREVIEW_SCALE.solo : players.length === 2 ? PREVIEW_SCALE.duo : PREVIEW_SCALE.many;
 
     return (
-        <div className={cn("w-full rounded-2xl bg-[#f2f0eb] p-3", className)}>
+        <div className={cn("w-full rounded-2xl bg-surface-0 p-3", className)}>
             <div className="flex aspect-square w-full flex-col overflow-hidden rounded-xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                 <div className="flex flex-1 flex-col px-4 pt-4">
                     <div className="flex items-center justify-between">

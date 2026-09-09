@@ -140,7 +140,7 @@ function HiqDashboardBilliards() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
+            <div className="min-h-screen bg-surface-0 flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-black/10 border-t-brand rounded-full animate-spin" />
             </div>
         );
@@ -165,7 +165,7 @@ function HiqDashboardBilliards() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] px-5 pb-nav">
+        <div className="min-h-screen bg-surface-0 px-5 pb-nav">
 
             {/* Header / Profile */}
             <DashboardHeader

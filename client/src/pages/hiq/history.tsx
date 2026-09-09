@@ -49,7 +49,7 @@ export default function HiqHistory() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
+            <div className="min-h-screen bg-surface-0 flex items-center justify-center">
                 <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
@@ -78,10 +78,10 @@ export default function HiqHistory() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] px-5 pt-5 pb-nav font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] px-5 pt-5 pb-nav font-sans relative overflow-x-hidden">
             {/* iOS 상태바(black-translucent) 배경막 — 스크롤 시 콘텐츠가 반투명 상태바 밑으로 비쳐
                 시계·배터리와 겹치는 것을 막는다. 노치 없는 환경에선 높이 0이라 무영향. */}
-            <div className="fixed top-0 left-0 right-0 h-[env(safe-area-inset-top)] bg-[#f2f0eb] z-40 pointer-events-none" />
+            <div className="fixed top-0 left-0 right-0 h-[env(safe-area-inset-top)] bg-surface-0 z-40 pointer-events-none" />
             {/* Header */}
             <div className="flex items-center gap-3 mb-7 relative z-10">
                 <motion.button

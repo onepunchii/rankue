@@ -56,7 +56,7 @@ export default function About() {
   });
 
   return (
-    <div className="min-h-screen w-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans">
+    <div className="min-h-screen w-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans">
       <div className="mx-auto max-w-2xl px-5 py-12">
         {/* 언어 선택 */}
         <div className="flex items-center gap-2 flex-wrap mb-8" aria-label={c.langLabel}>

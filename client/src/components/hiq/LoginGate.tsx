@@ -37,7 +37,7 @@ export function LoginGate({ title, desc, icon: Icon = LucideLock, links, nav = t
     const [, setLocation] = useLocation();
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] px-5 pb-32 flex flex-col items-center justify-center">
+        <div className="min-h-screen bg-surface-0 px-5 pb-32 flex flex-col items-center justify-center">
             <div className="w-full max-w-[380px] rk-card p-7 flex flex-col items-center text-center">
                 <div className="w-14 h-14 rounded-full bg-brand/[0.08] flex items-center justify-center mb-4">
                     <Icon className="w-7 h-7 text-brand" />

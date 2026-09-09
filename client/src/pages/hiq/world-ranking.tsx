@@ -123,7 +123,7 @@ export default function HiqWorldRanking() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
             {/* Header */}
             <div className="flex items-center gap-3 mb-6 relative z-10">
                 <motion.button

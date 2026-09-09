@@ -110,14 +110,14 @@ export default function PartnerLogin() {
     // SSO 확인 중엔 폼을 깜빡이지 않는다 — 파트너면 이 화면을 스치듯 지나간다
     if (ssoChecking) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-black/45 text-[14px] font-medium">
+            <div className="min-h-screen bg-surface-0 flex items-center justify-center text-black/45 text-[14px] font-medium">
                 계정 확인 중...
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col p-6 font-sans">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] flex flex-col p-6 font-sans">
             <div className="flex items-center mb-10">
                 <button onClick={() => setLocation("/menu")} className="p-2 -ml-2 text-black/40 hover:text-[rgba(0,0,0,0.87)]" aria-label="뒤로 가기">
                     <LucideArrowLeft className="w-6 h-6" />

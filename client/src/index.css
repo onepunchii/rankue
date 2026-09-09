@@ -241,6 +241,41 @@ body {
   z-index: 1;
 }
 
+/**
+ * 골프 모드 임시 다리 — 공용 화면이 아직 색을 하드코딩해서(흰 카드 bg-white 192곳,
+ * 검정 글씨 text-black/xx 917곳, 검정 면 bg-black/xx 382곳) 토큰만 바꿔선 절반만 어두워진다.
+ * 그 자리를 전부 토큰으로 고치는 게 정답이지만 1,600곳이라 한 번에 못 한다.
+ *
+ * 그래서 **골프 구역 안에서만** 그 유틸리티를 토큰으로 되받는다. 선택자가 전부
+ * :root[data-sport="GOLF"] 아래라 당구 화면에는 한 글자도 닿지 않는다(픽셀 비교로 확인).
+ * 원래 자리를 토큰으로 바꿔 나가면 이 블록은 그만큼 지우면 된다 — 임시라는 걸 잊지 말 것.
+ */
+:root[data-sport="GOLF"] .bg-white,
+:root[data-sport="GOLF"] .bg-white\/95,
+:root[data-sport="GOLF"] .bg-white\/90,
+:root[data-sport="GOLF"] .bg-white\/80,
+:root[data-sport="GOLF"] .bg-card { background-color: var(--surface-1); }
+
+:root[data-sport="GOLF"] .text-black\/87,
+:root[data-sport="GOLF"] .text-black\/70 { color: var(--ink-1); }
+:root[data-sport="GOLF"] .text-black\/60,
+:root[data-sport="GOLF"] .text-black\/55,
+:root[data-sport="GOLF"] .text-black\/50 { color: var(--ink-2); }
+:root[data-sport="GOLF"] .text-black\/45,
+:root[data-sport="GOLF"] .text-black\/40,
+:root[data-sport="GOLF"] .text-black\/35 { color: var(--ink-3); }
+:root[data-sport="GOLF"] .text-\[rgba\(0\,0\,0\,0\.87\)\] { color: var(--ink-1); }
+
+:root[data-sport="GOLF"] .bg-black\/\[0\.03\],
+:root[data-sport="GOLF"] .bg-black\/\[0\.04\],
+:root[data-sport="GOLF"] .bg-black\/\[0\.05\],
+:root[data-sport="GOLF"] .bg-black\/\[0\.06\],
+:root[data-sport="GOLF"] .bg-black\/\[0\.08\],
+:root[data-sport="GOLF"] .bg-black\/10 { background-color: var(--surface-3); }
+
+:root[data-sport="GOLF"] .border-black\/10,
+:root[data-sport="GOLF"] .border-black\/\[0\.08\] { border-color: var(--surface-line); }
+
 @layer utilities {
 
   /* 스크롤바 숨김 */
@@ -510,11 +545,66 @@ body {
   --rankue-text-desc: rgba(0, 0, 0, 0.55);
 }
 
+/**
+ * 종목별 배선 — 골프 모드에선 토큰 층을 통째로 갈아 끼운다(2026-09-09 오너:
+ * "각 스포츠마다 배선을 줘서 색상을 차별화하고 싶다").
+ *
+ * 골프 홈(client/src/golf/)이 이미 검정 바탕 + 라임 그린이라 거기에 맞췄다. 이 스코프 하나로
+ * 공용 화면(크루·친구·기록·전체·하단 네비)이 따라온다 — 그 화면들은 색을 토큰으로만 쓰기 때문이다.
+ * 그래서 화면을 종목마다 두 벌 만들 필요가 없다.
+ *
+ * 다만 골프 홈의 네온 글로우·블러 원은 가져오지 않는다. 앱 전체 규칙이 그걸 금지하고 있고
+ * (design-system: 장식용 네온·그라데이션 워시 금지), 공용 화면에 퍼뜨리면 당구 쪽 톤까지 무너진다.
+ * 여기서 쓰는 건 어두운 면 + 라임 강조색 + 흰 글씨까지다.
+ */
+:root[data-sport="GOLF"] {
+  color: var(--ink-1);
+  color-scheme: dark;
+
+  --surface-0: #0a0a0a;                    /* 골프 홈과 같은 바탕 */
+  --surface-1: #17181a;                    /* 카드 */
+  --surface-2: #17181a;
+  --surface-3: rgba(255, 255, 255, 0.08);
+  --surface-line: rgba(255, 255, 255, 0.12);
+  --surface-line-strong: rgba(255, 255, 255, 0.22);
+
+  /* 라임 그린 #64DD17 — 골프 홈의 강조색. 검정 위에서 대비가 커서 글씨는 검정을 얹는다. */
+  --brand: 100 221 23;
+  --brand-strong: 86 190 20;
+  --brand-fg: 10 10 10;
+
+  --ink-1: rgba(255, 255, 255, 0.94);
+  --ink-2: rgba(255, 255, 255, 0.75);
+  --ink-3: rgba(255, 255, 255, 0.58);
+  --ink-4: rgba(255, 255, 255, 0.52);
+  --shadow-card: none;
+
+  /* UI 키트(shadcn) 토큰도 같이 — 안 덮으면 흰 알약에 흰 글씨가 된다(.sim-dark 에서 겪은 일) */
+  --background: #0a0a0a;
+  --foreground: rgba(255, 255, 255, 0.94);
+  --card: #17181a;
+  --card-foreground: rgba(255, 255, 255, 0.94);
+  --popover: #17181a;
+  --popover-foreground: rgba(255, 255, 255, 0.94);
+  --muted: rgba(255, 255, 255, 0.08);
+  --muted-foreground: rgba(255, 255, 255, 0.58);
+  --secondary: rgba(255, 255, 255, 0.10);
+  --secondary-foreground: rgba(255, 255, 255, 0.94);
+  --accent: rgba(255, 255, 255, 0.10);
+  --accent-foreground: rgba(255, 255, 255, 0.94);
+  --border: rgba(255, 255, 255, 0.14);
+  --input: rgba(255, 255, 255, 0.20);
+  --primary: #64DD17;
+  --primary-foreground: #0a0a0a;
+}
+
+
 @layer base {
 
   html,
   body {
-    background-color: #f2f0eb;
+    /* 종목별 배선이 여기까지 닿아야 한다 — 하드코딩이면 골프 모드에서 바탕만 크림으로 남는다(2026-09-09) */
+    background-color: var(--surface-0);
     overscroll-behavior-y: none;
   }
 

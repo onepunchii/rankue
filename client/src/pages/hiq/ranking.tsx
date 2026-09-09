@@ -82,7 +82,7 @@ export default function HiqRanking() {
     // 로그인 확인 중 — "아직 랭킹이 없습니다"가 먼저 깜빡이는 것을 막는다.
     if (isAuthLoading) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
+            <div className="min-h-screen bg-surface-0 flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-black/10 border-t-brand rounded-full animate-spin" />
             </div>
         );
@@ -106,7 +106,7 @@ export default function HiqRanking() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] px-5 pt-6 pb-nav font-sans relative overflow-x-hidden">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] px-5 pt-6 pb-nav font-sans relative overflow-x-hidden">
             <div className="relative z-10">
                 <header className="mb-7">
                     <h1 className="text-[26px] font-bold tracking-tight mb-1.5">

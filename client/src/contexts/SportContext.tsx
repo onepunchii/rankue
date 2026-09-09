@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
 
 export type SportType = "BILLIARDS" | "GOLF";
@@ -20,6 +20,12 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
 
     // 허용되지 않으면 저장값이 GOLF 여도 당구로 본다 — 로그인 확인이 끝나기 전에도 당구로 시작한다.
     const currentSport: SportType = golfOk ? saved : "BILLIARDS";
+
+    // 토큰 층을 갈아 끼우는 스위치. index.css 의 [data-sport="GOLF"] 가 이 값을 본다.
+    useEffect(() => {
+        document.documentElement.setAttribute("data-sport", currentSport);
+        return () => document.documentElement.removeAttribute("data-sport");
+    }, [currentSport]);
 
     const setSport = (sport: SportType) => {
         const next: SportType = sport === "GOLF" && !golfOk ? "BILLIARDS" : sport;

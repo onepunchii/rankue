@@ -58,7 +58,7 @@ export default function SharedResult() {
     });
 
     return (
-        <div className="min-h-screen w-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans">
+        <div className="min-h-screen w-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans">
             <div className="mx-auto max-w-md px-5 py-10">
                 {isLoading ? (
                     <div className="h-64 rounded-3xl bg-black/[0.04] animate-pulse" />

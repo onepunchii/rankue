@@ -123,7 +123,7 @@ export default function HiqPbaPlayer() {
     });
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
             <div className="flex items-center gap-3 mb-6">
                 <motion.button
                     whileTap={{ scale: 0.9 }}

@@ -48,7 +48,7 @@ export default function HiqJoin() {
 
     if (meLoading || inviteLoading) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-[rgba(0,0,0,0.87)]">
+            <div className="min-h-screen bg-surface-0 flex items-center justify-center text-[rgba(0,0,0,0.87)]">
                 <LucideLoader2 className="w-10 h-10 animate-spin text-brand" />
             </div>
         );
@@ -58,7 +58,7 @@ export default function HiqJoin() {
         // Not logged in -> Redirect to login (or landing) with return url
         // For MVP, just show message
         return (
-            <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center px-5 text-center space-y-6">
+            <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center px-5 text-center space-y-6">
                 <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                     <LucideXCircle className="w-10 h-10 text-red-500" />
                 </div>
@@ -81,7 +81,7 @@ export default function HiqJoin() {
 
     if (invite?.status !== 'pending' || isExpired) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center px-5 text-center space-y-6">
+            <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center px-5 text-center space-y-6">
                 <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                     <LucideXCircle className="w-10 h-10 text-red-500" />
                 </div>
@@ -92,7 +92,7 @@ export default function HiqJoin() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] px-5 flex flex-col items-center justify-center text-center">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] px-5 flex flex-col items-center justify-center text-center">
             <div className="mb-10">
                 <div className="w-24 h-24 mx-auto bg-brand rounded-card flex items-center justify-center mb-6">
                     <span className="text-4xl">🎱</span>

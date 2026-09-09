@@ -203,7 +203,7 @@ export default function Stores() {
   });
 
   return (
-    <div className="min-h-screen w-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans">
+    <div className="min-h-screen w-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans">
       <div className="mx-auto max-w-2xl px-5 py-12 pb-28 md:pb-12">
         <header className="mb-6">
           <h1 className="text-[28px] font-bold tracking-tight">{t.title}</h1>

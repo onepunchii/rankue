@@ -22,7 +22,7 @@ export default function HiqClub() {
     const { isGuest } = useAuth();
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 font-sans pb-nav relative overflow-hidden">
+        <div className="min-h-screen bg-surface-0 text-ink-1 font-sans pb-nav relative overflow-hidden">
             <div className="relative z-10 max-w-md mx-auto px-5 pt-6">
                 <h1 className="text-[26px] font-bold tracking-tight text-ink-1 mb-7">{t("club.title")}</h1>
                 <div className="space-y-8">

@@ -356,7 +356,7 @@ export default function AdminDashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans flex flex-col md:flex-row">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans flex flex-col md:flex-row">
             {/* Mobile Header */}
             <div className="md:hidden bg-white border-b border-black/10 p-4 sticky top-0 z-30 flex items-center justify-between">
                 <div className="flex items-center gap-2">

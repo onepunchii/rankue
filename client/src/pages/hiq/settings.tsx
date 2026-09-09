@@ -73,7 +73,7 @@ export default function HiqSettings() {
     ];
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-32 font-sans">
+        <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-32 font-sans">
             {/* Header */}
             <div className="flex items-center gap-3 mb-8 pt-5">
                 <button title={t("settings.back")} onClick={() => setLocation("/menu")} className="w-11 h-11 -ml-2 rounded-full flex items-center justify-center active:bg-black/[0.06]">

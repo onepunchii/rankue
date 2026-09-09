@@ -122,12 +122,12 @@ export default function PartnerSettings() {
         mutation.mutate(values);
     };
 
-    if (isLoading) return <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-black/55">Loading...</div>;
+    if (isLoading) return <div className="min-h-screen bg-surface-0 flex items-center justify-center text-black/55">Loading...</div>;
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans pb-24">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans pb-24">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-black/10 bg-[#f2f0eb] sticky top-0 z-10">
+            <div className="flex items-center justify-between p-6 border-b border-black/10 bg-surface-0 sticky top-0 z-10">
                 <Button variant="ghost" className="text-[rgba(0,0,0,0.87)] p-0 hover:bg-transparent" onClick={() => setLocation("/partner/dashboard")}>
                     <LucideArrowLeft className="w-6 h-6" />
                 </Button>

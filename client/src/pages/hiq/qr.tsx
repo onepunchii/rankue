@@ -12,7 +12,7 @@ export default function HiqQrPoster() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center p-4 print:p-0 print:bg-white print:text-black">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center p-4 print:p-0 print:bg-white print:text-black">
             {/* Poster Container */}
             <div className="max-w-md w-full aspect-[1/1.414] bg-surface-1 relative overflow-hidden rounded-card flex flex-col items-center justify-between p-12 print:shadow-none print:border-none print:rounded-none print:w-full print:h-full print:bg-white print:text-black">
 

@@ -129,7 +129,7 @@ export default function HiqRegister() {
 
     if (isCompleted) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center px-5 text-center">
+            <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center px-5 text-center">
                 <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
@@ -165,7 +165,7 @@ export default function HiqRegister() {
 
     return (
         <div
-            className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col font-sans overflow-hidden"
+            className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] flex flex-col font-sans overflow-hidden"
             style={{
                 ['--hiq-brand-color' as any]: brand.themeColor,
                 ['--hiq-brand-neon' as any]: brand.neonColor || brand.themeColor

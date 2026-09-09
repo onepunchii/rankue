@@ -78,12 +78,12 @@ export default function HiqScoreboard() {
     };
 
     if (isLoading || !game) {
-        return <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center text-[rgba(0,0,0,0.87)]">{t("gameScoreboard.loading")}</div>;
+        return <div className="min-h-screen bg-surface-0 flex items-center justify-center text-[rgba(0,0,0,0.87)]">{t("gameScoreboard.loading")}</div>;
     }
 
     return (
         <LandscapeGuard>
-            <div className="h-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
+            <div className="h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
                 <div className="flex-1 flex w-full relative z-0">
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                         <SortableContext items={playerOrder} strategy={horizontalListSortingStrategy}>

@@ -99,7 +99,7 @@ export default function HiqRivals() {
     // 로그인 확인 중 — 빈 목록을 먼저 그리면 "라이벌 0명"이 깜빡였다가 안내로 바뀐다.
     if (isAuthLoading) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center">
+            <div className="min-h-screen bg-surface-0 flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-black/10 border-t-brand rounded-full animate-spin" />
             </div>
         );
@@ -122,7 +122,7 @@ export default function HiqRivals() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
             {/* Header */}
             <div className="flex items-center justify-between mb-8 relative z-10">
                 <div className="flex items-center gap-3">

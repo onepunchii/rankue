@@ -53,7 +53,7 @@ export default function CrewHallOfFame() {
     const podiumOnly = (data?.honors ?? []).filter((h) => h.wins === 0 && (h.runnerUp > 0 || h.semi > 0));
 
     return (
-        <div className="min-h-[100dvh] bg-[#f2f0eb]">
+        <div className="min-h-[100dvh] bg-surface-0">
             {/* ── 라사 밴드: 헤더 + 현 챔피언 ─────────────────────────── */}
             <div className="relative bg-cloth text-white">
                 <div className="flex items-center gap-1 px-4 pt-[env(safe-area-inset-top)]">
@@ -92,7 +92,7 @@ export default function CrewHallOfFame() {
                 </div>
 
                 {/* 라사 아래로 카드가 걸치게 — 트로피룸 느낌 */}
-                <div className="absolute inset-x-0 -bottom-px h-6 bg-[#f2f0eb] rounded-t-[1.5rem]" />
+                <div className="absolute inset-x-0 -bottom-px h-6 bg-surface-0 rounded-t-[1.5rem]" />
             </div>
 
             <div className="px-5 pb-nav space-y-7 -mt-1">

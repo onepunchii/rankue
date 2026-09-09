@@ -69,7 +69,7 @@ export default function HiqGameResult() {
     }, [gameId]);
 
     if (!result) return (
-        <div className="min-h-screen bg-[#f2f0eb] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-surface-0 flex items-center justify-center p-6">
             <Card className="rk-card w-full max-w-sm">
                 <CardContent className="p-8 flex flex-col items-center text-center gap-2">
                     <LucideX className="w-8 h-8 text-black/40 mb-2" strokeWidth={2} />
@@ -245,7 +245,7 @@ export default function HiqGameResult() {
     );
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] p-6 flex flex-col items-center justify-center font-sans">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] p-6 flex flex-col items-center justify-center font-sans">
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}

@@ -43,7 +43,7 @@ export function DesktopFrame({ children, wide = false }: { children: ReactNode; 
         >
             {!wide && <SideLeft />}
             {/* 앱 본체. rk-frame 클래스는 index.css 의 하단 네비 보정이 잡는 훅이기도 하다. */}
-            <div className="rk-frame w-full lg:w-[var(--rk-frame-w)] lg:shrink-0 lg:bg-[#f2f0eb] lg:shadow-[var(--rk-frame-shadow)]">
+            <div className="rk-frame w-full lg:w-[var(--rk-frame-w)] lg:shrink-0 lg:bg-surface-0 lg:shadow-[var(--rk-frame-shadow)]">
                 {children}
             </div>
             {!wide && <SideRight />}

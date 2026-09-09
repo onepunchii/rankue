@@ -60,7 +60,7 @@ export default function PartnerSubscription() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center p-6 relative overflow-hidden">
             {/* Background Effects */}
 
             <div className="w-full max-w-md relative z-10">

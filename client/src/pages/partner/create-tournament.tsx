@@ -480,9 +480,9 @@ export default function CreateTournament() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans pb-10">
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans pb-10">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-black/10 sticky top-0 bg-[#f2f0eb] z-10">
+            <div className="flex items-center justify-between p-6 border-b border-black/10 sticky top-0 bg-surface-0 z-10">
                 <Button variant="ghost" className="text-[rgba(0,0,0,0.87)] p-0 hover:bg-transparent" onClick={() => setLocation("/partner/dashboard")}>
                     <LucideArrowLeft className="w-6 h-6" />
                 </Button>

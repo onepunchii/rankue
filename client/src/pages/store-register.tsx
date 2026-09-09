@@ -194,7 +194,7 @@ export default function StoreRegister() {
 
   if (done) {
     return (
-      <div className="min-h-screen w-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans flex items-center justify-center px-5">
+      <div className="min-h-screen w-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans flex items-center justify-center px-5">
         <div className="w-full max-w-md rk-card p-8 flex flex-col items-center text-center">
           <div className="w-14 h-14 rounded-full bg-brand/[0.08] flex items-center justify-center mb-4">
             <LucideCheckCircle className="w-7 h-7 text-brand" />
@@ -213,7 +213,7 @@ export default function StoreRegister() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#f2f0eb] text-[rgba(0,0,0,0.87)] font-sans">
+    <div className="min-h-screen w-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans">
       <div className="mx-auto max-w-2xl px-5 py-10 pb-16">
         <button onClick={() => setLocation("/stores")} className="text-[13.5px] font-semibold text-black/50 mb-4 hover:text-black/70">
           ← {t.back}

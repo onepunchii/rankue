@@ -176,7 +176,7 @@ export default function Landing() {
     // 로그인 폼 대신 스플래시를 유지한다. 이게 앱 실행 시 화면이 스쳐 지나가던 원인이었다.
     if (authState !== "out" || isBrandLoading || !brand) {
         return (
-            <div className="min-h-screen bg-[#f2f0eb] flex flex-col items-center justify-center gap-4">
+            <div className="min-h-screen bg-surface-0 flex flex-col items-center justify-center gap-4">
                 <div className="text-brand font-bold text-4xl animate-pulse">RANKUE</div>
                 {brandError ? (
                     <div className="text-red-500 font-semibold bg-black/[0.04] p-4 rounded-tile">
@@ -197,7 +197,7 @@ export default function Landing() {
     }
 
     return (
-        <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-5 relative overflow-hidden bg-[#f2f0eb] font-sans">
+        <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-5 relative overflow-hidden bg-surface-0 font-sans">
             {/* Main Container */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
