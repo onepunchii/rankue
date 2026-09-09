@@ -4,6 +4,7 @@ import { insertGolfBookingSchema, GolfBooking, insertGolfJoinSchema, GolfJoin, i
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { notifyCrewChat } from "../../services/crewChatNotify.js";
 
 const router = Router();
 
@@ -20,7 +21,8 @@ router.get("/bookings/counts", asyncHandler(async (req: any, res: any) => {
     if (!startDate || !endDate) {
         return sendError(res, 400, "시작일과 종료일은 필수입니다.");
     }
-    const counts = await storage.getGolfBookingCounts(startDate as string, endDate as string, viewType as string);
+    // 필터를 그대로 넘긴다 — 예전엔 안 넘겨서 날짜 칩이 "12개" 라고 하는데 목록엔 2개만 있었다(2026-09-09 검토).
+    const counts = await storage.getGolfBookingCounts(startDate as string, endDate as string, viewType as string, req.query);
     return sendSuccess(res, counts);
 }));
 
@@ -97,6 +99,19 @@ router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest
 }));
 
 
+/**
+ * 한 건만 조회. 공유 링크(/golf/booking-list/<id>)를 받은 사람이 그 티타임의 날짜를 모르면
+ * 목록이 오늘로 열려 글이 안 보인다 — 화면이 id 로 날짜를 되짚을 때 쓴다(2026-09-10).
+ * 가려진 매물은 안 준다.
+ */
+router.get("/bookings/:id", asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "티타임을 찾을 수 없어요");
+    const booking: any = await storage.getGolfBooking(req.params.id);
+    if (!booking || booking.isBlinded) return sendError(res, 404, "티타임을 찾을 수 없어요");
+    const [withCounts] = await withJoinCounts([booking], req.userId);
+    return sendSuccess(res, withCounts);
+}));
+
 // --- Golf Join Routes ---
 // ── 조인 신청 ──────────────────────────────────────────────────────────────
 // 그전엔 '조인 신청하기' 가 문자 앱만 열고 아무 기록도 안 남겼다. 누가 신청했는지·몇 명 찼는지·
@@ -104,6 +119,7 @@ router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest
 const DEFAULT_JOIN_CAPACITY = 3;   // 4인 1팀에서 방장을 뺀 자리
 
 router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "조인 글을 찾을 수 없어요");
     const booking: any = await storage.getGolfBooking(req.params.id);
     if (!booking || booking.isBlinded) return sendError(res, 404, "조인 글을 찾을 수 없어요");
     if (booking.listingType !== "JOIN") return sendError(res, 400, "조인 글이 아니에요");
@@ -118,9 +134,130 @@ router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthReq
 }));
 
 router.delete("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "신청 내역이 없어요");
+    // 티타임이 지난 뒤에는 못 무른다. 안 막으면 안 나타난 사람이 뒤늦게 '취소' 를 눌러
+    // 노쇼 표시를 피해 갈 수 있다 — 노쇼는 status 가 'applied' 인 사람만 찍을 수 있기 때문이다.
+    const booking: any = await storage.getGolfBooking(req.params.id);
+    if (booking && new Date(booking.datetime).getTime() <= Date.now()) {
+        return sendError(res, 400, "이미 지난 티타임이라 취소할 수 없어요", "TEE_TIME_PASSED");
+    }
     const ok = await storage.cancelJoinRequest(req.params.id, req.userId!);
     if (!ok) return sendError(res, 404, "신청 내역이 없어요");
     return sendSuccess(res, { applied: false });
+}));
+
+/**
+ * 이 조인 글의 주인인가. 운영자도 통과시킨다(사기 글 정리).
+ *
+ * 전화번호로 되짚는 길은 **일부러 안 둔다**. manager_phone 은 2026-09-09 이전에 클라이언트가 보내던
+ * 자기신고 문자열이라, 그걸 신원으로 쓰면 남의 번호를 박아 둔 글의 신청자 명단(이름·사진·노쇼 이력)이
+ * 그 번호의 주인에게 열린다. owner_id 가 빈 옛 글은 운영자가 맡는다.
+ */
+async function canManageBooking(req: AuthRequest, booking: any): Promise<boolean> {
+    if (booking.ownerId && booking.ownerId === req.userId) return true;
+    const member = await storage.getMemberById(req.userId!);
+    if (!member) return false;
+    const role = (member as any).role ?? (member.profileId ? (await storage.getProfile(member.profileId) as any)?.role : null);
+    return role === "admin" || role === "super_admin";
+}
+
+/** 주소로 들어온 id 가 uuid 꼴인가. 아니면 Postgres 가 던져 500 이 난다 — 없는 것으로 보고 404 를 준다. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * 신청자 목록 — 글쓴이(와 운영자)만.
+ * 신청이 쌓여도 볼 화면이 없으면 글쓴이는 여전히 누가 오는지 모른다. 노쇼 표시도 여기서 한다.
+ */
+router.get("/bookings/:id/applicants", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "조인 글을 찾을 수 없어요");
+    const booking: any = await storage.getGolfBooking(req.params.id);
+    if (!booking) return sendError(res, 404, "조인 글을 찾을 수 없어요");
+    if (!(await canManageBooking(req, booking))) return sendError(res, 403, "글쓴이만 볼 수 있어요");
+    const applicants = await storage.listJoinApplicants(req.params.id);
+    return sendSuccess(res, {
+        teeTime: booking.datetime,
+        applicants,
+    });
+}));
+
+/**
+ * 안 나타났다고 표시한다(되돌리기 포함). 글쓴이·운영자만, 그리고 **티타임이 지난 뒤에만**.
+ * 치기도 전에 노쇼를 찍을 수 있으면 그건 기록이 아니라 협박 수단이 된다.
+ */
+router.post("/bookings/:id/applicants/:memberId/noshow", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id) || !UUID.test(req.params.memberId)) return sendError(res, 404, "조인 글을 찾을 수 없어요");
+    const booking: any = await storage.getGolfBooking(req.params.id);
+    if (!booking) return sendError(res, 404, "조인 글을 찾을 수 없어요");
+    if (!(await canManageBooking(req, booking))) return sendError(res, 403, "글쓴이만 표시할 수 있어요");
+    if (new Date(booking.datetime).getTime() > Date.now()) {
+        return sendError(res, 400, "티타임이 지난 뒤에 표시할 수 있어요", "TEE_TIME_NOT_PASSED");
+    }
+    const noShow = req.body?.noShow !== false;
+    const ok = await storage.setJoinNoShow(req.params.id, req.params.memberId, noShow);
+    if (!ok) return sendError(res, 404, noShow ? "신청 중인 사람이 아니에요" : "노쇼로 표시된 사람이 아니에요");
+    return sendSuccess(res, { noShow });
+}));
+
+/**
+ * 크루 채팅방에 부킹 카드를 올린다.
+ *
+ * 왜 서버가 만드나: 화면에서 /crews/:id/chats 로 metadata 를 실어 보내고 있었는데, 그 라우트는
+ * metadata 를 **버린다**(클라이언트가 카드를 지정할 수 있으면 가짜 정산·예약 카드를 주입할 수 있어서).
+ * 그래서 크루방에는 카드가 아니라 눌리지 않는 글자 덩어리만 올라갔다(2026-09-09 검토).
+ * 이제 서버가 실제 매물을 읽어 카드를 만든다 — 없는 부킹으로 카드를 만들 수 없다.
+ */
+router.post("/bookings/:id/share/crew", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const crewId = String(req.body?.crewId ?? "");
+    if (!crewId || !UUID.test(crewId)) return sendError(res, 400, "크루를 골라 주세요");
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "티타임을 찾을 수 없어요");
+
+    const booking: any = await storage.getGolfBooking(req.params.id);
+    if (!booking || booking.isBlinded) return sendError(res, 404, "티타임을 찾을 수 없어요");
+
+    const membership = await storage.getCrewMembership(crewId, req.userId!);
+    if (!membership || membership.role === "pending") return sendError(res, 403, "크루 멤버만 공유할 수 있어요");
+
+    const crewData = await storage.getCrew(crewId);
+    // 당구 크루에 골프 부킹을 올리지 않는다 — 두 종목은 아예 다른 플랫폼으로 본다.
+    if (crewData?.crew?.sportCategory && crewData.crew.sportCategory !== "GOLF") {
+        return sendError(res, 400, "골프 크루에만 공유할 수 있어요", "NOT_GOLF_CREW");
+    }
+
+    const name = booking.isBlind ? (booking.blindName || "비공개 골프장") : booking.courseName;
+    const when = new Date(booking.datetime).toLocaleString("ko-KR", {
+        month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit",
+        hour12: false, timeZone: "Asia/Seoul",
+    });
+    const kstDay = new Date(booking.datetime).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+    const view = booking.listingType === "JOIN" ? "JOIN" : "BOOKING";
+    const label = view === "JOIN" ? "조인" : "부킹";
+
+    const chat = await storage.createCrewChat({
+        crewId,
+        senderId: req.userId,
+        // 카드가 못 그려지는 옛 앱에서도 읽히도록 본문에 요점을 남긴다.
+        message: `⛳️ [${label} 공유] ${name} / ${when} / 그린피 ${Number(booking.greenFee).toLocaleString()}원`,
+        type: "text",
+        metadata: {
+            type: "GOLF_BOOKING",
+            bookingId: booking.id,
+            courseName: name,
+            datetime: booking.datetime,
+            greenFee: booking.greenFee,
+            listingType: view,
+            // 날짜를 함께 싣는다 — 받는 사람이 눌렀을 때 목록이 그 날짜로 열려야 글이 보인다.
+            date: kstDay,
+        },
+    } as any);
+
+    await notifyCrewChat({
+        crewId,
+        senderId: req.userId!,
+        preview: `${label} 공유 · ${name}`,
+        tag: "[GolfShareNotif]",
+    });
+
+    return sendSuccess(res, chat);
 }));
 
 /** 목록에 '몇 명 찼는지'와 '내가 신청했는지'를 얹는다 — 화면이 그걸 알아야 신청/취소를 가른다. */

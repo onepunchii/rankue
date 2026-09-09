@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LucideChevronRight, LucideUsers, LucideCheckCircle2, LucideCircleDollarSign, LucideMessageSquare, LucideShare2, LucideFlag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { THEME_COLORS, SPECIAL_OPTIONS } from '../../constants/booking';
+import { JoinApplicants } from './JoinApplicants';
+import { kstHour, kstMinute } from '@/lib/kst';
 
 interface BookingCardProps {
     item: any;
@@ -14,9 +16,11 @@ interface BookingCardProps {
     onApply?: (item: any) => void;
     onShare: (item: any) => void;
     viewType: 'ALL' | 'BOOKING' | 'JOIN';
+    /** 로그인한 회원 id. 내가 올린 조인 글이면 신청자 목록을 연다. */
+    meId?: string;
 }
 
-export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType }: BookingCardProps) => {
+export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType, meId }: BookingCardProps) => {
     const [reportOpen, setReportOpen] = useState(false);
     const isExpanded = expandedBookingId === item.id;
     const theme = viewType === 'JOIN' ? THEME_COLORS.JOIN : THEME_COLORS.BOOKING;
@@ -24,6 +28,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
     const capacity = Number(item.joinHeadcount) > 0 ? Number(item.joinHeadcount) : 3;
     const applied = Number(item.joinApplied ?? 0);
     const joinFull = applied >= capacity;
+    const isMine = !!meId && item.ownerId === meId;
 
     return (
         <>
@@ -52,10 +57,10 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                 <div className="flex items-center gap-4">
                     <div className="flex flex-col items-center justify-center w-14 h-14 rounded-2xl bg-white/5 border border-white/5 group-hover:border-[#64DD17]/30 transition-colors">
                         <span className="text-xl font-black text-white leading-none">
-                            {new Date(item.datetime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }).split(':')[0]}
+                            {kstHour(item.datetime)}
                         </span>
                         <span className="text-[10px] font-bold text-white/40 leading-none mt-1">
-                            {new Date(item.datetime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }).split(':')[1]}
+                            {kstMinute(item.datetime)}
                         </span>
                     </div>
                     <div className="space-y-1">
@@ -150,6 +155,9 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 </div>
                             )}
 
+                            {/* 내가 올린 조인이면 누가 신청했는지 — 그리고 티타임이 지나면 안 온 사람 표시 */}
+                            {isJoin && isMine && <JoinApplicants bookingId={item.id} enabled={isExpanded} />}
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
                                     <div className="text-[10px] font-black text-white/20 uppercase tracking-widest flex items-center gap-1">
@@ -211,9 +219,10 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        if (isJoin && isMine) return;
                                         if (isJoin && onApply) onApply(item); else onReserve(item);
                                     }}
-                                    disabled={isJoin && joinFull && !item.joinedByMe}
+                                    disabled={isJoin && ((isMine) || (joinFull && !item.joinedByMe))}
                                     className={cn(
                                         "flex-1 py-4 rounded-2xl text-sm font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:hover:scale-100",
                                         isJoin
@@ -223,10 +232,11 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 >
                                     <span>
                                         {!isJoin ? "예약 문자 보내기"
-                                            : item.joinedByMe ? "신청 취소하기"
-                                                : joinFull ? "자리가 찼어요" : `조인 신청하기 ${applied}/${capacity}`}
+                                            : isMine ? `내가 올린 조인 · ${applied}/${capacity}`
+                                                : item.joinedByMe ? "신청 취소하기"
+                                                    : joinFull ? "자리가 찼어요" : `조인 신청하기 ${applied}/${capacity}`}
                                     </span>
-                                    {!item.joinedByMe && <LucideChevronRight className="w-4 h-4" />}
+                                    {!item.joinedByMe && !(isJoin && isMine) && <LucideChevronRight className="w-4 h-4" />}
                                 </button>
                                 <button
                                     onClick={(e) => {

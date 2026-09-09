@@ -645,6 +645,13 @@ export const golfBookings = pgTable("golf_bookings", {
   courseId: text("course_id").notNull(),
   courseName: text("course_name").notNull(),
   region: text("region").notNull(),
+  /**
+   * 지역 필터용 코드(shared/golfRegions.ts). region 은 골프장 마스터에서 온 자유 문자열이라
+   * '경기'·'경기도 용인시'·'용인' 이 뒤섞인다. 예전엔 그 문자열에 LIKE '%경기%' 를 걸었는데,
+   * 경기 남부·북부·동부가 전부 같은 '경기' 를 훑어서 세 필터가 완전히 같은 결과를 냈다(2026-09-09 검토).
+   * 이제 넣을 때 서버가 코드로 굳힌다. region 은 화면에 그대로 보여 주는 표시용으로 남는다.
+   */
+  regionCode: text("region_code"),
   datetime: timestamp("datetime").notNull(),
   managerPhone: text("manager_phone").notNull(),
   greenFee: integer("green_fee").notNull(),
@@ -678,8 +685,19 @@ export const golfJoinRequests = pgTable("golf_join_requests", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   bookingId: uuid("booking_id").references(() => golfBookings.id, { onDelete: "cascade" }).notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
-  /** applied = 신청 중, cancelled = 본인이 취소. 행을 지우지 않는다 — 반복 취소를 나중에 볼 수 있어야 한다. */
-  status: text("status", { enum: ["applied", "cancelled"] }).default("applied").notNull(),
+  /**
+   * applied = 신청 중, cancelled = 본인이 취소, noshow = 글쓴이가 안 왔다고 표시.
+   * 행을 지우지 않는다 — 반복 취소·노쇼를 나중에 볼 수 있어야 한다.
+   * 취소한 시각은 updated_at 이다(취소 때 함께 갱신된다). 티타임과 견주면 '몇 시간 전 취소'가 나온다.
+   */
+  status: text("status", { enum: ["applied", "cancelled", "noshow"] }).default("applied").notNull(),
+  /**
+   * 이 글에서 이 사람이 **여태까지** 취소한/안 나타난 횟수. status 한 칸만 두면 다시 신청하는 순간
+   * 지워진다 — 취소·재신청을 반복하는 사람이 늘 깨끗해 보이고, 노쇼로 찍힌 사람도 재신청 한 번으로
+   * 표시를 지울 수 있었다(2026-09-10 검토). 이 두 칸은 재신청해도 안 줄어든다.
+   */
+  cancelCount: integer("cancel_count").default(0).notNull(),
+  noShowCount: integer("no_show_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -693,6 +711,13 @@ export const golfJoins = pgTable("golf_joins", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   courseName: text("course_name").notNull(),
   region: text("region").notNull(),
+  /**
+   * 지역 필터용 코드(shared/golfRegions.ts). region 은 골프장 마스터에서 온 자유 문자열이라
+   * '경기'·'경기도 용인시'·'용인' 이 뒤섞인다. 예전엔 그 문자열에 LIKE '%경기%' 를 걸었는데,
+   * 경기 남부·북부·동부가 전부 같은 '경기' 를 훑어서 세 필터가 완전히 같은 결과를 냈다(2026-09-09 검토).
+   * 이제 넣을 때 서버가 코드로 굳힌다. region 은 화면에 그대로 보여 주는 표시용으로 남는다.
+   */
+  regionCode: text("region_code"),
   datetime: timestamp("datetime").notNull(),
   hostId: uuid("host_id"),
   managerPhone: text("manager_phone"),

@@ -1,5 +1,6 @@
 import { LucideX, LucideMessageCircle, LucideCopy, LucideMessageSquare, LucideSend } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
+import { buildGolfShareUrl } from '../../hooks/useShare';
 
 interface ShareSheetProps {
     open: boolean;
@@ -40,10 +41,9 @@ export const ShareSheet = ({ open, onOpenChange, shareItem, onExternalShare, onC
                             <span className="text-[11px] font-black text-[#3C1E1E] uppercase tracking-widest">카카오톡</span>
                         </button>
                         <button
-                            onClick={() => {
-                                const link = `${window.location.origin}/golf/booking-list/${shareItem?.id}`;
-                                onCopyLink(link);
-                            }}
+                            // 링크는 반드시 buildGolfShareUrl 로 만든다 — 여기서 손으로 만들면 날짜·보기가
+                            // 빠져서, 받는 사람 화면이 '오늘 부킹' 으로 열리고 그 티타임이 안 보인다(2026-09-10 검토).
+                            onClick={() => shareItem && onCopyLink(buildGolfShareUrl(shareItem))}
                             className="flex flex-col items-center justify-center gap-3 p-6 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                         >
                             <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center">

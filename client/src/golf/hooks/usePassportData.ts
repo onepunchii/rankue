@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { HiqGameHistory } from "../../../../shared/schema";
 import { COURSES } from "@/golf/data/golfCourses";
+import { kstDateLabel } from "@/lib/kst";
 
 export interface Course {
     id: number;
@@ -111,7 +112,7 @@ export function usePassportData() {
                 id: i + 1,
                 dbId: h.id,
                 name: h.locationName || "알 수 없는 구장",
-                date: new Date(h.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.'),
+                date: kstDateLabel(h.createdAt, { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.'),
                 score: h.score,
                 region: region,
                 color: ["#64DD17", "#00E5FF", "#FFD600", "#AA00FF", "#FF4081", "#FF6D00"][i % 6]

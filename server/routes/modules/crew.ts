@@ -6,6 +6,7 @@ import { notificationService } from "../../services/notificationService.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { deleteBlobs } from "../../utils/blob.js";
+import { notifyCrewChat } from "../../services/crewChatNotify.js";
 
 const router = Router();
 
@@ -478,33 +479,8 @@ router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res
         metadata: null,
     } as any);
 
-    // Send notification to all crew members except sender
-    try {
-        const crewData = await storage.getCrew(req.params.id);
-        if (crewData) {
-            const userId = req.userId!;
-            // pending 제외 — 알림 본문에 대화 원문이 그대로 실린다(아래 body 참고).
-            const membersToNotify = activeMembers(crewData.members).filter((m: any) => m.member.id !== userId);
-            const sender = crewData.members.find((m: any) => m.member.id === userId);
-            const senderName = sender?.member.name || "누군가";
-
-            // 설정 조회도 멤버별로 병렬 — 예전엔 멤버 수만큼 순차 await이라 큰 크루에서 응답이 느렸다.
-            await settleNotifications("[ChatNotif]", membersToNotify.map(async (m: any) => {
-                const chatSetting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
-                if (!chatSetting.chatEnabled) return;
-                await notificationService.sendAndSaveNotification({
-                    memberId: m.member.id,
-                    title: `💬 [${crewData.crew.name}] 새 메시지`,
-                    body: `${senderName}: ${chat.message}`,
-                    category: crewData.crew.sportCategory || "BILLIARDS",
-                    type: "CHAT",
-                    params: { url: `/crew/${req.params.id}/chat`, crewId: req.params.id, tab: "chat" }
-                });
-            }));
-        }
-    } catch (notifErr) {
-        console.error("[ChatNotif] Error getting crew members:", notifErr);
-    }
+    // 알림 — 서버가 만드는 카드(골프 부킹 공유)도 같은 함수를 쓴다.
+    await notifyCrewChat({ crewId: req.params.id, senderId: req.userId!, preview: chat.message });
 
     return sendSuccess(res, chat);
 }));

@@ -59,13 +59,15 @@ class Storage {
     async myJoinRequestIds(memberId: string, ids: string[]) { return this.golf.myJoinRequestIds(memberId, ids); }
     async applyToJoin(bookingId: string, memberId: string, capacity: number) { return this.golf.applyToJoin(bookingId, memberId, capacity); }
     async cancelJoinRequest(bookingId: string, memberId: string) { return this.golf.cancelJoinRequest(bookingId, memberId); }
+    async listJoinApplicants(bookingId: string) { return this.golf.listJoinApplicants(bookingId); }
+    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean) { return this.golf.setJoinNoShow(bookingId, memberId, noShow); }
     async deleteGolfBooking(id: string, managerPhone?: string, ownerId?: string) { return this.golf.deleteGolfBooking(id, managerPhone, ownerId); }
     async getGolfJoins(filters?: any) { return this.golf.getGolfJoins(filters); }
     async createGolfJoin(data: any) { return this.golf.createGolfJoin(data); }
     async deleteGolfJoin(id: string, hostId?: string) { return this.golf.deleteGolfJoin(id, hostId); }
     async updateGolfStats(id: string) { return this.golf.updateGolfStats(id); }
     async getGolfPassportStats(id: string) { return this.golf.getGolfPassportStats(id); }
-    async getGolfBookingCounts(start: string, end: string, viewType?: string) { return this.golf.getGolfBookingCounts(start, end, viewType); }
+    async getGolfBookingCounts(start: string, end: string, viewType?: string, filters?: any) { return this.golf.getGolfBookingCounts(start, end, viewType, filters); }
     async processScorecardOCR(data: any) { return this.golf.processScorecardOCR(data); }
     async updateCourseHoleInfo(data: any) { return this.golf.updateCourseHoleInfo(data); }
     async createGolfMatchSession(data: any) { return this.golf.createGolfMatchSession(data); }

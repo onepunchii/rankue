@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { kstDateKey, kstHour, kstMinute } from "@/lib/kst";
 import { GolfBooking } from "../../../../shared/schema";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { DATE_STRIP_DAYS } from "../constants/booking";
 
 interface GlobalSearchProps {
     isOpen: boolean;
@@ -47,8 +49,10 @@ export function GlobalSearch({ isOpen, onClose, onSelectBooking, viewType }: Glo
         saveSearch(query);
 
         try {
-            const startDate = new Date().toISOString().split('T')[0];
-            const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            // 검색 범위도 한국 날짜다 — UTC 날짜를 쓰면 한국 기준 오늘 오전 티타임이 범위 밖으로 밀린다.
+            // 띠와 **같은 날 수**만 찾는다 — 더 멀리 찾으면 결과를 눌러도 갈 칩이 없다.
+            const startDate = kstDateKey(Date.now());
+            const endDate = kstDateKey(Date.now() + (DATE_STRIP_DAYS - 1) * 24 * 60 * 60 * 1000);
 
             const params = new URLSearchParams({
                 courseName: query,
@@ -70,18 +74,21 @@ export function GlobalSearch({ isOpen, onClose, onSelectBooking, viewType }: Glo
     const groupedResults = useMemo(() => {
         const groups: Record<string, GolfBooking[]> = {};
         results.forEach(booking => {
-            const dt = typeof booking.datetime === 'string' ? new Date(booking.datetime) : booking.datetime;
-            const dateKey = dt.toISOString().split('T')[0];
+            const dateKey = kstDateKey(booking.datetime as any);
             if (!groups[dateKey]) groups[dateKey] = [];
             groups[dateKey].push(booking);
         });
         return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
     }, [results]);
 
+    // 'YYYY-MM-DD' 를 new Date() 에 넣으면 UTC 자정으로 읽혀서, 기기 시간대에 따라 하루 앞뒤로 흔들린다.
+    // 숫자를 그대로 쪼개 쓴다.
     const formatDate = (dateStr: string) => {
-        const date = new Date(dateStr);
+        const [y, m, d] = dateStr.split('-').map(Number);
+        if (!y || !m || !d) return dateStr;
         const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
-        return `${date.getMonth() + 1}.${date.getDate()} (${dayNames[date.getDay()]})`;
+        const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+        return `${m}.${d} (${dayNames[dow]})`;
     };
 
     return (
@@ -208,10 +215,10 @@ export function GlobalSearch({ isOpen, onClose, onSelectBooking, viewType }: Glo
                                                 <div className="flex items-center gap-4">
                                                     <div className="flex flex-col items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/5 group-hover:border-[#64DD17]/30 transition-colors">
                                                         <div className="text-sm font-black text-white leading-none">
-                                                            {new Date(item.datetime).getHours().toString().padStart(2, '0')}
+                                                            {kstHour(item.datetime)}
                                                         </div>
                                                         <div className="text-[9px] font-bold text-[#64DD17] tracking-tighter">
-                                                            {new Date(item.datetime).getMinutes().toString().padStart(2, '0')}
+                                                            {kstMinute(item.datetime)}
                                                         </div>
                                                     </div>
                                                     <div>

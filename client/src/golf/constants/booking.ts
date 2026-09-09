@@ -1,14 +1,17 @@
-export const REGION_OPTIONS = [
-    { id: 'kyunggi_south', label: '경기 남부 (한강 이남)' },
-    { id: 'kyunggi_north', label: '경기 북부 (한강 이북)' },
-    { id: 'kyunggi_east', label: '경기 동부 (남양주/가평)' },
-    { id: 'incheon_west', label: '인천 / 경기 서부' },
-    { id: 'gangwon', label: '강원권' },
-    { id: 'chungcheong', label: '충청권' },
-    { id: 'jeolla', label: '전라권' },
-    { id: 'gyeongsang', label: '경상권' },
-    { id: 'jeju', label: '제주' }
-];
+import { GOLF_REGION_OPTIONS } from '@shared/golfRegions';
+
+/**
+ * 지역 칩. 정의는 shared/golfRegions.ts 하나뿐이다 — 여기에 따로 적어 두면 칩 id 와 서버의
+ * 판정 규칙이 조용히 어긋난다(예전에 경기 남/북/동이 서버에서 전부 '경기' 하나로 뭉개져 있었다).
+ */
+export const REGION_OPTIONS = GOLF_REGION_OPTIONS;
+
+/**
+ * 날짜 띠에 그리는 칸 수 = 목록·검색·티커가 불러오는 날 수. 한 곳에서만 정한다.
+ * 예전엔 띠는 30칸(오늘~+29)인데 검색·티커는 +30일까지 불러와, 마지막 하루 결과를 눌러도
+ * 갈 칩이 없어 아무 일도 안 일어났다(2026-09-10 검토).
+ */
+export const DATE_STRIP_DAYS = 30;
 
 export const PRICE_OPTIONS = [
     { id: 'under_10', label: '10만원 이하' },

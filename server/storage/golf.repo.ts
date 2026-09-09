@@ -31,6 +31,8 @@ import type {
 } from "../../shared/schema.js";
 import { eq, ne, desc, asc, and, or, sql, gte, lte, isNull, like, inArray } from "drizzle-orm";
 import { notFound, conflict } from "../utils/errors.js";
+import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords } from "../../shared/golfRegions.js";
+import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
 
 export const GOLF_GRADES = [
     { id: 'ALBATROSS', label: 'Albatross', minHandi: -Infinity, maxHandi: 0, icon: '🏆', color: '#c0c0c0' },
@@ -41,10 +43,104 @@ export const GOLF_GRADES = [
     { id: 'ROOKIE', label: 'Rookie', minHandi: 37, maxHandi: Infinity, icon: '🐣', color: '#CD7F32' },
 ];
 
+/**
+ * 목록·날짜 배지가 **같은 조건**을 쓰게 만드는 한 곳.
+ *
+ * 왜 필요했나: 날짜 칩의 "12개" 는 /bookings/counts 가 세는데, 그 라우트는 지역·시간·가격·옵션
+ * 필터를 통째로 무시했다. 필터를 걸어 목록이 2개로 줄어도 칩은 계속 12개라고 말했다(2026-09-09 검토).
+ * 게다가 시간·가격·옵션은 서버가 아예 안 걸고 화면에서만 걸러서, 세는 쪽과 보여 주는 쪽이 다른 규칙이었다.
+ *
+ * 판정은 화면(BookingList.tsx 의 filteredTimes)과 글자 그대로 같게 맞춘다:
+ *  - 1부는 한국시각 12시 이전, 2부는 17시 이전, 3부는 그 뒤
+ *  - 가격 칩의 sort_* 는 정렬용이라 거르는 조건이 아니다
+ *  - 옵션은 고른 것 중 **하나라도** 있으면 통과
+ */
+function buildGolfFilterConditions(filters: any): any[] {
+    const out: any[] = [];
+    const list = (v: unknown): string[] =>
+        typeof v === "string" ? v.split(",").map((x) => x.trim()).filter(Boolean) : Array.isArray(v) ? v.map(String) : [];
+
+    // 지역 — 넣을 때 굳혀 둔 region_code 로 본다. 코드가 없는 옛 행만 예전처럼 문자열로 되짚는다.
+    const regions = list(filters?.region);
+    if (regions.length > 0) {
+        const codes = expandRegionCodes(regions);
+        const words = legacyRegionKeywords(regions);
+        const byCode = codes.length > 0 ? inArray(golfBookings.regionCode, codes) : undefined;
+        const byText = words.length > 0
+            ? and(isNull(golfBookings.regionCode), or(...words.map((w) => like(golfBookings.region, `%${w}%`))))
+            : undefined;
+        const both = [byCode, byText].filter(Boolean) as any[];
+        // 아는 칩이 하나도 없으면(장난 값) 조건을 안 건다 — 빈 inArray 로 전부 지우는 사고를 막는다.
+        if (both.length > 0) out.push(both.length === 1 ? both[0] : or(...both));
+    }
+
+    // 시간대 — 한국시각 기준. 'all' 은 거르지 않는다는 뜻이다.
+    const times = list(filters?.time).filter((t) => t !== "all");
+    if (times.length > 0) {
+        const kstHour = sql<number>`extract(hour from (${golfBookings.datetime} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul'))`;
+        const spans: any[] = [];
+        if (times.includes("morning")) spans.push(sql`${kstHour} < 12`);
+        if (times.includes("afternoon")) spans.push(sql`${kstHour} >= 12 AND ${kstHour} < 17`);
+        if (times.includes("night")) spans.push(sql`${kstHour} >= 17`);
+        if (spans.length > 0) out.push(or(...spans));
+    }
+
+    // 가격 — sort_* 는 정렬이라 뺀다.
+    const prices = list(filters?.price).filter((p) => !p.startsWith("sort_"));
+    if (prices.length > 0) {
+        const spans: any[] = [];
+        if (prices.includes("under_10")) spans.push(lte(golfBookings.greenFee, 100000));
+        if (prices.includes("range_10_15")) spans.push(and(gte(golfBookings.greenFee, 100001), lte(golfBookings.greenFee, 150000)));
+        if (prices.includes("range_15_20")) spans.push(and(gte(golfBookings.greenFee, 150001), lte(golfBookings.greenFee, 200000)));
+        if (prices.includes("over_20")) spans.push(gte(golfBookings.greenFee, 200001));
+        if (spans.length > 0) out.push(spans.length === 1 ? spans[0] : or(...spans));
+    }
+
+    // 옵션 — jsonb 배열에 고른 것 중 하나라도 있으면. '?|' 대신 함수형을 쓴다(물음표는 드라이버가 자리표시자로 볼 수 있다).
+    const specials = list(filters?.special);
+    if (specials.length > 0) {
+        out.push(sql`jsonb_exists_any(coalesce(${golfBookings.options}, '[]'::jsonb), ARRAY[${sql.join(specials.map((v) => sql`${v}`), sql`, `)}]::text[])`);
+    }
+
+    return out;
+}
+
 export class GolfRepository {
+    /**
+     * 지역 코드는 **여기서** 굳힌다 — 라우트가 아니라 저장소에서. 넣는 길이 하나만 있는 게 아니라
+     * (관리자 도구·스크립트가 늘어난다) 어느 길로 들어와도 코드가 비지 않아야 지역 필터가 믿을 만해진다.
+     * 클라이언트가 보낸 region_code 는 버린다.
+     *
+     * **주소까지 본다.** 등록 화면이 고르는 골프장은 정적 원장(client/src/golf/data/golfCourses.ts)에서
+     * 오는데, 그 파일의 region 은 '경기' 한 낱말뿐이고 시·군은 address 에만 있다. 지역 글자만 보면
+     * 경기 골프장 168곳이 전부 '시·군 모름' 으로 굳어 남/북/동/서 칩이 다시 같은 결과를 낸다 —
+     * 고치려던 그 증상이 그대로 돌아온다(2026-09-10 검토에서 실측).
+     * 그래서 그 원장의 주소까지 본 판정을 shared/golfCourseRegions.ts 에 접어 두고 course_id 로 꺼낸다.
+     * 클라이언트가 보낸 주소를 믿는 게 아니라 서버가 가진 표를 본다.
+     */
     async createGolfBooking(data: InsertGolfBooking): Promise<GolfBooking> {
-        const [booking] = await db.insert(golfBookings).values(data).returning();
+        const { regionCode: _ignored, ...rest } = data as any;
+        const club = await this.findClubForBooking((data as any).courseId);
+        const region = (data as any).region || club?.region || null;
+        const values = {
+            ...rest,
+            region,
+            // 1순위: 정적 원장의 course_id (등록 화면이 고르는 골프장은 여기서 온다)
+            // 2순위: DB 원부의 주소  3순위: 지역 글자만
+            regionCode: golfRegionCodeByCourseId((data as any).courseId)
+                ?? resolveGolfRegionCode(region, club?.address ?? null),
+        };
+        const [booking] = await db.insert(golfBookings).values(values).returning();
         return booking;
+    }
+
+    /** 매물의 course_id 로 골프장 원부를 찾는다. uuid 가 아니면(옛 값·수기 입력) 조용히 없는 것으로 본다. */
+    private async findClubForBooking(courseId: unknown): Promise<{ region: string | null; address: string | null } | null> {
+        const id = String(courseId ?? "");
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
+        const [club] = await db.select({ region: rankueGolfClubs.region, address: rankueGolfClubs.address })
+            .from(rankueGolfClubs).where(eq(rankueGolfClubs.id, id)).limit(1);
+        return club ?? null;
     }
 
     // --- Golf Club & Course Management (Updated to use Rankue Official DB) ---
@@ -120,34 +216,7 @@ export class GolfRepository {
         }
 
         if (filters) {
-            if (filters.region && filters.region !== "") {
-                const regionIds = filters.region.split(',');
-                const regionMap: Record<string, string | string[]> = {
-                    'kyunggi_south': ['경기', '서울', '남부'],
-                    'kyunggi_north': '경기',
-                    'kyunggi_east': '경기',
-                    'incheon_west': ['인천', '서부'],
-                    'gangwon': '강원',
-                    'chungcheong': ['충북', '충남', '대전', '세종', '충청'],
-                    'jeolla': ['전북', '전남', '광주', '전라'],
-                    'gyeongsang': ['경북', '경남', '대구', '부산', '울산', '경상'],
-                    'jeju': ['제주']
-                };
-
-                const flatMappedRegions: string[] = [];
-                regionIds.forEach((id: string) => {
-                    const mapped = (regionMap as any)[id];
-                    if (Array.isArray(mapped)) {
-                        flatMappedRegions.push(...mapped);
-                    } else if (typeof mapped === 'string') {
-                        flatMappedRegions.push(mapped);
-                    }
-                });
-
-                if (flatMappedRegions.length > 0) {
-                    conditions.push(or(...flatMappedRegions.map(r => like(golfBookings.region, `%${r}%`))));
-                }
-            }
+            conditions.push(...buildGolfFilterConditions(filters));
 
             if (filters.courseName && filters.courseName !== "") {
                 conditions.push(
@@ -174,36 +243,33 @@ export class GolfRepository {
             .orderBy(asc(golfBookings.datetime));
     }
 
-    async getGolfBookingCounts(startDate: string, endDate: string, viewType: string = 'ALL'): Promise<any> {
+    /**
+     * 날짜 칩에 붙는 개수. 목록과 **같은 필터**를 건다 — 예전엔 지역·시간·가격·옵션을 무시해서
+     * 칩은 12개라고 하는데 목록엔 2개만 있는 일이 생겼다(2026-09-09 검토).
+     * 가려진 매물도 뺀다 — 목록에선 빠지는데 개수에는 들어 있었다.
+     */
+    async getGolfBookingCounts(startDate: string, endDate: string, viewType: string = 'ALL', filters?: any): Promise<any> {
         const start = new Date(startDate);
         start.setUTCHours(start.getUTCHours() - 9);
 
         const end = new Date(endDate);
         end.setUTCHours(end.getUTCHours() + 14, 59, 59, 999);
 
-        let whereCondition;
+        const parts: any[] = [
+            eq(golfBookings.isBlinded, false),
+            gte(golfBookings.datetime, start),
+            lte(golfBookings.datetime, end),
+        ];
 
         if (viewType === 'JOIN') {
-            whereCondition = and(
-                gte(golfBookings.datetime, start),
-                lte(golfBookings.datetime, end),
-                eq(golfBookings.listingType, 'JOIN')
-            );
+            parts.push(eq(golfBookings.listingType, 'JOIN'));
         } else if (viewType === 'BOOKING') {
-            whereCondition = and(
-                gte(golfBookings.datetime, start),
-                lte(golfBookings.datetime, end),
-                or(
-                    eq(golfBookings.listingType, 'BOOKING'),
-                    isNull(golfBookings.listingType)
-                )
-            );
-        } else {
-            whereCondition = and(
-                gte(golfBookings.datetime, start),
-                lte(golfBookings.datetime, end)
-            );
+            parts.push(or(eq(golfBookings.listingType, 'BOOKING'), isNull(golfBookings.listingType)));
         }
+
+        if (filters) parts.push(...buildGolfFilterConditions(filters));
+
+        const whereCondition = and(...parts);
 
         return await db.select({
             date: sql<string>`to_char(${golfBookings.datetime} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
@@ -291,14 +357,91 @@ export class GolfRepository {
         return (inserted.rows?.length ?? 0) > 0 ? "ok" : "full";
     }
 
-    /** 신청을 물린다. 행은 남긴다 — 반복 취소를 나중에 볼 수 있어야 한다. */
+    /**
+     * 신청을 물린다. 행은 남기고 취소 횟수를 올린다 — 다시 신청해도 그 숫자는 안 줄어든다.
+     * 그러지 않으면 취소·재신청을 반복하는 사람이 늘 깨끗해 보인다(2026-09-10 검토).
+     */
     async cancelJoinRequest(bookingId: string, memberId: string): Promise<boolean> {
         const rows = await db.update(golfJoinRequests)
-            .set({ status: "cancelled", updatedAt: new Date() })
+            .set({ status: "cancelled", cancelCount: sql`${golfJoinRequests.cancelCount} + 1`, updatedAt: new Date() })
             .where(and(
                 eq(golfJoinRequests.bookingId, bookingId),
                 eq(golfJoinRequests.memberId, memberId),
                 eq(golfJoinRequests.status, "applied"),
+            ))
+            .returning({ id: golfJoinRequests.id });
+        return rows.length > 0;
+    }
+
+    /**
+     * 조인 글에 누가 신청했는지 — 글쓴이에게만 보여 준다.
+     *
+     * 왜 필요했나: 신청은 쌓이는데 그걸 볼 화면이 없으면 글쓴이는 여전히 누가 오는지 모른다.
+     * 그리고 노쇼를 표시하려면 먼저 사람 목록이 있어야 한다(2026-09-10).
+     *
+     * 함께 싣는 것: 그 사람의 **여태까지** 취소·노쇼 횟수. 한 번 늦게 취소한 사람과 매번 그러는 사람은
+     * 다르게 봐야 하는데, 이 글 하나만 보면 그게 안 보인다.
+     */
+    async listJoinApplicants(bookingId: string): Promise<any[]> {
+        const rows = await db.select({
+            memberId: golfJoinRequests.memberId,
+            status: golfJoinRequests.status,
+            appliedAt: golfJoinRequests.createdAt,
+            changedAt: golfJoinRequests.updatedAt,
+            name: hiqMembers.name,
+            golfGrade: hiqMembers.golfGrade,
+            profileImageUrl: profiles.profileImageUrl,
+        })
+            .from(golfJoinRequests)
+            .innerJoin(hiqMembers, eq(hiqMembers.id, golfJoinRequests.memberId))
+            .leftJoin(profiles, eq(profiles.id, hiqMembers.profileId))
+            .where(eq(golfJoinRequests.bookingId, bookingId))
+            .orderBy(asc(golfJoinRequests.createdAt));
+
+        if (rows.length === 0) return [];
+
+        const memberIds: string[] = Array.from(new Set<string>(rows.map((r) => String(r.memberId))));
+        // 지금 상태가 아니라 **쌓인 숫자**를 더한다 — 다시 신청해서 status 가 'applied' 로 돌아가도
+        // 취소·노쇼 이력은 남아 있어야 한다.
+        const history = await db.select({
+            memberId: golfJoinRequests.memberId,
+            cancelled: sql<number>`coalesce(sum(${golfJoinRequests.cancelCount}), 0)::int`,
+            noshow: sql<number>`coalesce(sum(${golfJoinRequests.noShowCount}), 0)::int`,
+        })
+            .from(golfJoinRequests)
+            .where(inArray(golfJoinRequests.memberId, memberIds as any))
+            .groupBy(golfJoinRequests.memberId);
+        const hist = new Map<string, { cancelled: number; noshow: number }>(
+            history.map((h: any) => [String(h.memberId), { cancelled: Number(h.cancelled), noshow: Number(h.noshow) }]),
+        );
+
+        return rows.map((r) => ({
+            ...r,
+            cancelCount: hist.get(String(r.memberId))?.cancelled ?? 0,
+            noShowCount: hist.get(String(r.memberId))?.noshow ?? 0,
+        }));
+    }
+
+    /**
+     * 안 나타났다고 표시하거나 되돌린다. 글쓴이 확인은 라우트가 한다.
+     * 되돌리면 'applied' 로 — 잘못 누른 걸 못 고치면 표시를 무서워서 못 쓴다.
+     * 본인이 취소한 행('cancelled')은 건드리지 않는다. 취소와 노쇼는 다른 일이다.
+     */
+    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean): Promise<boolean> {
+        const rows = await db.update(golfJoinRequests)
+            .set({
+                status: noShow ? "noshow" : "applied",
+                // 되돌리면 숫자도 되돌린다(0 아래로는 안 내려간다). 표시가 다시 신청으로 지워지지 않게
+                // 숫자는 status 와 따로 남는다.
+                noShowCount: noShow
+                    ? sql`${golfJoinRequests.noShowCount} + 1`
+                    : sql`greatest(${golfJoinRequests.noShowCount} - 1, 0)`,
+                updatedAt: new Date(),
+            })
+            .where(and(
+                eq(golfJoinRequests.bookingId, bookingId),
+                eq(golfJoinRequests.memberId, memberId),
+                eq(golfJoinRequests.status, noShow ? "applied" : "noshow"),
             ))
             .returning({ id: golfJoinRequests.id });
         return rows.length > 0;
@@ -325,34 +468,7 @@ export class GolfRepository {
             conditions.push(and(gte(golfBookings.datetime, start), lte(golfBookings.datetime, end)));
         }
 
-        if (filters?.region && filters.region !== "") {
-            const regionIds = filters.region.split(',');
-            const regionMap: Record<string, string | string[]> = {
-                'kyunggi_south': ['경기', '서울', '남부'],
-                'kyunggi_north': '경기',
-                'kyunggi_east': '경기',
-                'incheon_west': ['인천', '서부'],
-                'gangwon': '강원',
-                'chungcheong': ['충북', '충남', '대전', '세종', '충청'],
-                'jeolla': ['전북', '전남', '광주', '전라'],
-                'gyeongsang': ['경북', '경남', '대구', '부산', '울산', '경상'],
-                'jeju': ['제주']
-            };
-
-            const flatMappedRegions: string[] = [];
-            regionIds.forEach((id: string) => {
-                const mapped = (regionMap as any)[id];
-                if (Array.isArray(mapped)) {
-                    flatMappedRegions.push(...mapped);
-                } else if (typeof mapped === 'string') {
-                    flatMappedRegions.push(mapped);
-                }
-            });
-
-            if (flatMappedRegions.length > 0) {
-                conditions.push(or(...flatMappedRegions.map(r => like(golfBookings.region, `%${r}%`))));
-            }
-        }
+        conditions.push(...buildGolfFilterConditions(filters ?? {}));
 
         const filteredConditions = conditions.filter((c): c is NonNullable<typeof c> => c !== undefined);
 

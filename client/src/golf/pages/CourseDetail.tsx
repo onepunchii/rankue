@@ -13,6 +13,7 @@ import { CourseHero } from "../components/course/CourseHero";
 import { CourseStats } from "../components/course/CourseStats";
 import { ReviewCard } from "../components/course/ReviewCard";
 import { ReviewFormSheet } from "../components/course/ReviewFormSheet";
+import { kstDateLabel } from "@/lib/kst";
 
 // Mock data for demo
 const STAMPS = [
@@ -95,7 +96,7 @@ export default function GolfCourseDetail() {
             tier: "싱글골퍼 / 30대",
             rating: 5,
             content: "",
-            date: new Date().toLocaleDateString(),
+            date: kstDateLabel(Date.now(), { year: 'numeric', month: '2-digit', day: '2-digit' }),
             verified: true,
             likes: 0,
             ...formData

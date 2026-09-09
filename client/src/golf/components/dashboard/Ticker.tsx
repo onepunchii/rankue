@@ -1,19 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import { kstDateKey, kstDateLabel, kstTime } from "@/lib/kst";
+import { DATE_STRIP_DAYS } from "../../constants/booking";
 
 export function Ticker() {
     const [, setLocation] = useLocation();
     const { data: joins } = useQuery({
         queryKey: ["/api/hiq/golf/bookings", "ticker-joins"],
         queryFn: async () => {
-            // Fetch upcoming joins for next 30 days
-            const today = new Date();
-            const nextMonth = new Date(today);
-            nextMonth.setDate(today.getDate() + 30);
-
-            const startStr = today.toISOString().split('T')[0];
-            const endStr = nextMonth.toISOString().split('T')[0];
+            // 목록 화면의 날짜 띠와 같은 범위. 더 멀리 불러오면 눌렀을 때 갈 칩이 없다.
+            const startStr = kstDateKey(Date.now());
+            const endStr = kstDateKey(Date.now() + (DATE_STRIP_DAYS - 1) * 24 * 60 * 60 * 1000);
 
             return apiRequest(`/api/hiq/golf/bookings?listingType=JOIN&startDate=${startStr}&endDate=${endStr}`);
         },
@@ -32,7 +30,7 @@ export function Ticker() {
                     <span
                         key={item.id}
                         onClick={() => {
-                            const date = new Date(item.datetime).toISOString().split('T')[0];
+                            const date = kstDateKey(item.datetime);
                             setLocation(`/golf/booking-list?date=${date}&highlight=${item.id}&view=JOIN`);
                         }}
                         className="text-xs font-medium flex items-center gap-2 cursor-pointer hover:text-white transition-colors hover:bg-white/5 py-1 px-2 rounded-lg"
@@ -40,9 +38,9 @@ export function Ticker() {
                         <span className="w-1.5 h-1.5 rounded-full bg-[#64DD17] animate-pulse" />
                         <span className="text-[#64DD17] font-bold">[{item.courseName}]</span>
                         <span>
-                            {new Date(item.datetime).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+                            {kstDateLabel(item.datetime, { month: 'numeric', day: 'numeric' })}
                             {" "}
-                            {new Date(item.datetime).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}
+                            {kstTime(item.datetime)}
                         </span>
                         <span>{item.joinHeadcount ? `${item.joinHeadcount}명` : ''}</span>
                         <span className="opacity-80 ">{item.comment || "조인 모집"}</span>

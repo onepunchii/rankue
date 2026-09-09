@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     LucideChevronLeft,
@@ -14,9 +14,10 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookingCreateForm } from "../components/BookingCreateForm";
 import { GlobalSearch } from "../components/GlobalSearch";
+import { kstDateKey, kstDateLabel, kstHour, kstTime } from "@/lib/kst";
 
 // Constants & Hooks
-import { THEME_COLORS } from "../constants/booking";
+import { THEME_COLORS, DATE_STRIP_DAYS } from "../constants/booking";
 import { useBookingFilters } from "../hooks/useBookingFilters";
 import { useDeepLink } from "../hooks/useDeepLink";
 import { useBookingData } from "../hooks/useBookingData";
@@ -32,6 +33,10 @@ export default function BookingList() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
     const [selectedDate, setSelectedDate] = useState(0);
+    // 되짚기 응답이 늦게 왔을 때 "사용자가 그 사이 직접 날짜를 골랐는지" 를 본다.
+    // 골랐으면 덮어쓰지 않는다 — 응답이 몇 초 뒤 도착해 화면이 혼자 튀는 걸 막는다.
+    const userPickedDate = useRef(false);
+    const pickDate = useCallback((idx: number) => { userPickedDate.current = true; setSelectedDate(idx); }, []);
     const [viewType, setViewType] = useState<'ALL' | 'BOOKING' | 'JOIN'>('BOOKING');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -50,29 +55,44 @@ export default function BookingList() {
         copyToClipboard
     } = useShare();
 
-    // Generate next 30 days
-    // Generate next 30 days (KST based)
-    const weekDates = useMemo(() => Array.from({ length: 30 }, (_, i) => {
-        const now = new Date();
-        const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // Convert to KST
-        kstNow.setDate(kstNow.getDate() + i);
+    /**
+     * 오늘부터 30일(한국 날짜). 예전엔 `now + 9시간` 을 만든 뒤 **기기 시간대의** setDate/getDate 로
+     * 하루씩 밀고 UTC 게터로 읽었다 — 지역 시간대와 UTC 를 섞어 쓴 셈이라 서머타임이 있는 나라의
+     * 기기에서는 하루가 통째로 빠지거나 겹칠 수 있었고, kst.ts 의 날짜 열쇠와도 어긋났다(2026-09-10 검토).
+     * 이제 한국 날짜 하나를 얻은 뒤 Date.UTC 로 순수한 날짜 산술만 한다 — 시간대가 끼어들 자리가 없다.
+     */
+    // 한국 날짜가 바뀌면 다시 만든다 — 앱을 켜 둔 채 자정을 넘기면 '오늘' 칩이 어제를 가리켰다.
+    const [todayKey, setTodayKey] = useState(() => kstDateKey(Date.now()));
+    useEffect(() => {
+        const check = () => setTodayKey((prev) => {
+            const now = kstDateKey(Date.now());
+            return now && now !== prev ? now : prev;
+        });
+        const timer = window.setInterval(check, 60_000);
+        window.addEventListener('visibilitychange', check);
+        return () => { window.clearInterval(timer); window.removeEventListener('visibilitychange', check); };
+    }, []);
 
+    const weekDates = useMemo(() => {
+        const [y, m, d] = todayKey.split('-').map(Number);
         const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
-        const dayOfWeek = dayNames[kstNow.getUTCDay()];
-        const month = kstNow.getUTCMonth() + 1;
-        const dateNum = kstNow.getUTCDate();
-        const fullDate = `${kstNow.getUTCFullYear()}-${String(kstNow.getUTCMonth() + 1).padStart(2, '0')}-${String(kstNow.getUTCDate()).padStart(2, '0')}`;
-
-        return {
-            dayName: i === 0 ? "오늘" : dayOfWeek,
-            dateNum: dateNum,
-            displayDate: `${month}/${dateNum} ${dayOfWeek}요일`,
-            fullDate: fullDate
-        };
-    }), []);
+        return Array.from({ length: DATE_STRIP_DAYS }, (_, i) => {
+            const day = new Date(Date.UTC(y, m - 1, d + i));
+            const dayOfWeek = dayNames[day.getUTCDay()];
+            const month = day.getUTCMonth() + 1;
+            const dateNum = day.getUTCDate();
+            return {
+                dayName: i === 0 ? "오늘" : dayOfWeek,
+                dateNum,
+                displayDate: `${month}/${dateNum} ${dayOfWeek}요일`,
+                fullDate: `${day.getUTCFullYear()}-${String(month).padStart(2, '0')}-${String(dateNum).padStart(2, '0')}`,
+            };
+        });
+    }, [todayKey]);
 
     // Handle deep linking from URL
     useEffect(() => {
+        if (weekDates.length === 0) return;
         const params = new URLSearchParams(window.location.search);
         const dateParam = params.get('date');
         const viewParam = params.get('view');
@@ -81,13 +101,38 @@ export default function BookingList() {
             setViewType(viewParam);
         }
 
-        if (dateParam && weekDates.length > 0) {
+        if (dateParam) {
             const idx = weekDates.findIndex(d => d.fullDate === dateParam);
             if (idx !== -1) {
                 setSelectedDate(idx);
+                return;
             }
+            // 띠(30일) 밖의 날짜다. 여기서 멈추면 아무 말 없이 '오늘' 이 열리므로 아래 되짚기로 넘어간다.
         }
-    }, [weekDates]);
+
+        // 날짜가 안 실린 옛 링크(/golf/booking-list/<id>)이거나, 실린 날짜가 띠 밖인 경우.
+        // 목록은 고른 하루치만 불러오기 때문에 오늘로 열면 그 티타임이 아예 없다 — id 로 한 건 물어본다.
+        const id = window.location.pathname.split('/').filter(Boolean).pop();
+        if (!id || id.length < 20) return;
+        let cancelled = false;
+        apiRequest(`/api/hiq/golf/bookings/${id}`)
+            .then((b: any) => {
+                // 응답이 늦게 와도 사용자가 그 사이 고른 날짜를 덮지 않는다
+                // (아직 첫 칩(오늘)에 있을 때만 옮긴다).
+                if (cancelled || !b?.datetime) return;
+                if (userPickedDate.current) return;
+                if (b.listingType === 'JOIN') setViewType('JOIN');
+                const idx = weekDates.findIndex(d => d.fullDate === kstDateKey(b.datetime));
+                if (idx !== -1) { setSelectedDate(idx); return; }
+                // 30일 띠 밖이면 화면에 띄울 자리가 없다 — 조용히 오늘을 보여 주는 대신 그렇다고 말한다.
+                toast({
+                    title: "이 티타임은 목록에서 볼 수 있는 30일 밖이에요",
+                    description: `${kstDateLabel(b.datetime)} ${kstTime(b.datetime)} · ${b.courseName ?? ''}`.trim(),
+                });
+            })
+            .catch(() => { /* 지워졌거나 가려진 글 — 목록은 그대로 오늘을 보여 준다 */ });
+        return () => { cancelled = true; };
+    }, [weekDates, toast]);
 
     const { bookingCounts, bookings, isLoading, isError } = useBookingData(weekDates, selectedDate, viewType, selectedFilters);
     const { expandedBookingId, setExpandedBookingId } = useDeepLink(bookings);
@@ -130,11 +175,8 @@ export default function BookingList() {
         if (!bookings) return [];
 
         return (bookings as any[]).filter(item => {
-            // 1. Date matching (KST based)
-            const itemDate = new Date(item.datetime);
-            const kstDate = new Date(itemDate.getTime() + (9 * 60 * 60 * 1000));
-            const itemDateStr = `${kstDate.getUTCFullYear()}-${String(kstDate.getUTCMonth() + 1).padStart(2, '0')}-${String(kstDate.getUTCDate()).padStart(2, '0')}`;
-            if (itemDateStr !== weekDates[selectedDate].fullDate) return false;
+            // 1. Date matching — 날짜 열쇠는 kst.ts 하나만 쓴다(손으로 +9시간 더하던 계산과 갈라지지 않게)
+            if (kstDateKey(item.datetime) !== weekDates[selectedDate].fullDate) return false;
 
             // 2. Type filtering
             if (viewType === 'BOOKING' && item.listingType === 'JOIN') return false;
@@ -148,10 +190,10 @@ export default function BookingList() {
             // 4. Time filtering
             const timeFilters = selectedFilters.time;
             if (timeFilters.length > 0 && !timeFilters.includes('all')) {
-                const kstHour = (itemDate.getUTCHours() + 9) % 24;
+                const hour = Number(kstHour(item.datetime));
                 let category = 'night';
-                if (kstHour < 12) category = 'morning';
-                else if (kstHour < 17) category = 'afternoon';
+                if (hour < 12) category = 'morning';
+                else if (hour < 17) category = 'afternoon';
                 if (!timeFilters.includes(category)) return false;
             }
 
@@ -206,20 +248,16 @@ export default function BookingList() {
 
     const handleReserve = useCallback((item: any) => {
         const phoneNumber = item.managerPhone || "010-1234-5678";
-        const dateStr = weekDates[selectedDate].displayDate;
-        const timeStr = new Date(item.datetime).toLocaleTimeString('ko-KR', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-            timeZone: 'Asia/Seoul'
-        });
+        // 날짜는 고른 칩이 아니라 **그 매물의 시각**에서 뽑는다 — 골프장에 가는 문자라 어긋나면 안 된다.
+        const dateStr = kstDateLabel(item.datetime, { month: 'long', day: 'numeric', weekday: 'short' });
+        const timeStr = kstTime(item.datetime);
         const displayName = item.isBlind ? item.blindName : item.courseName;
         const actionText = item.listingType === 'JOIN' ? "조인 신청 가능한가요?" : "예약 가능한가요?";
         const messageBody = `안녕하세요! [랭큐] 보고 연락드립니다.\n${displayName} / ${dateStr} / ${timeStr} / ${item.greenFee.toLocaleString()}원\n${actionText}`;
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const delimiter = isIOS ? '&' : '?';
         window.open(`sms:${phoneNumber}${delimiter}body=${encodeURIComponent(messageBody)}`, '_self');
-    }, [selectedDate, weekDates]);
+    }, []);
 
     return (
         <div className="min-h-screen bg-[#0A0A0A] text-white pb-nav font-sans selection:bg-[#64DD17]/30">
@@ -264,7 +302,7 @@ export default function BookingList() {
                 <DateSelector
                     weekDates={weekDates}
                     selectedDate={selectedDate}
-                    setSelectedDate={setSelectedDate}
+                    setSelectedDate={pickDate}
                     bookingCounts={bookingCounts}
                     viewType={viewType}
                 />
@@ -316,6 +354,7 @@ export default function BookingList() {
                                     onApply={handleApply}
                                 onShare={handleShare}
                                 viewType={viewType}
+                                meId={(user as any)?.id}
                             />
                         ))}
                     </div>
@@ -369,10 +408,13 @@ export default function BookingList() {
                 onClose={() => setIsSearchOpen(false)}
                 viewType={viewType}
                 onSelectBooking={(booking) => {
-                    const dt = typeof booking.datetime === 'string' ? new Date(booking.datetime) : booking.datetime;
-                    const dateIdx = weekDates.findIndex(d => d.fullDate === dt.toISOString().split('T')[0]);
+                    // 날짜 칩은 한국 날짜다. toISOString() 은 UTC 라서 오전 9시 이전 티타임이
+                    // 하루 앞으로 밀렸고, 그러면 못 찾아서(-1) 눌러도 아무 일이 없었다(2026-09-09 검토).
+                    const dateIdx = weekDates.findIndex(d => d.fullDate === kstDateKey(booking.datetime));
                     if (dateIdx !== -1) {
-                        setSelectedDate(dateIdx);
+                        // 사용자가 고른 것이므로 되짚기 응답이 나중에 와도 이 선택을 못 덮게 한다.
+                        pickDate(dateIdx);
+                        if ((booking as any).listingType === 'JOIN' && viewType !== 'JOIN') setViewType('JOIN');
                         setExpandedBookingId(booking.id);
                         setIsSearchOpen(false);
                         requestAnimationFrame(() => {

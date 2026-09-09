@@ -43,7 +43,9 @@ export function HiqNavigation() {
         ? [
             { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
-            { id: "join", label: "hiqNavigation.join", icon: LucideCalendarDays, path: "/golf/booking-list" },
+            // to 는 이동할 주소, path 는 탭 켜짐 판정용 경로다. 질의를 안 붙이면 '조인' 탭인데
+            // 부킹 화면이 열렸다(목록의 기본 보기가 부킹이다).
+            { id: "join", label: "hiqNavigation.join", icon: LucideCalendarDays, path: "/golf/booking-list", to: "/golf/booking-list?view=JOIN" },
             { id: "round", label: "hiqNavigation.round", icon: LucideBarChart3, path: "/history" },
             { id: "menu", label: "hiqNavigation.menu", icon: LucideMenu, path: "/menu" },
         ]
@@ -75,7 +77,7 @@ export function HiqNavigation() {
                         <motion.button
                             key={tab.id}
                             whileTap={{ scale: 0.9 }}
-                            onClick={() => setLocation(tab.path)}
+                            onClick={() => setLocation((tab as any).to ?? tab.path)}
                             className="flex-1 flex flex-col items-center justify-center py-2 gap-2 relative group"
                         >
                             <div className={`relative transition-all duration-300 ${active ? 'scale-110' : 'opacity-55 group-hover:opacity-100'}`}>

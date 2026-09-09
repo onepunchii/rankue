@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { CourseSearchSection } from './booking/CourseSearchSection';
 import { TimeSelectionSection } from './booking/TimeSelectionSection';
 import { OptionSelectionSection } from './booking/OptionSelectionSection';
+import { kstDateLabel, kstTime } from "@/lib/kst";
 
 interface BookingCreateFormProps {
     onClose: () => void;
@@ -176,7 +177,7 @@ export function BookingCreateForm({ onClose, initialMode }: BookingCreateFormPro
                                         <span className="text-sm font-bold text-white">{booking.courseName}</span>
                                     </div>
                                     <div className="text-xs text-white/60 font-medium">
-                                        {new Date(booking.datetime).toLocaleDateString()} {new Date(booking.datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        {kstDateLabel(booking.datetime)} {kstTime(booking.datetime)}
                                     </div>
                                     <div className="text-sm font-black text-white mt-1">{booking.greenFee.toLocaleString()}원</div>
                                 </div>

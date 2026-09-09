@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LucideMessageSquare, LucideSend, LucideLoader2, LucideTrash2, LucideReceipt, LucideFlag } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { kstDateKey, kstDateLabel, kstTime } from "@/lib/kst";
 import { useT } from "@/lib/i18n";
 
 interface ChatMessage {
@@ -309,9 +310,10 @@ const ChatMessageItem = memo(({
                                             <h3 className="font-semibold text-[rgba(0,0,0,0.87)] text-base line-clamp-1 leading-tight">{chat.metadata?.courseName ?? t("crewChat.golfCourseFallback")}</h3>
                                             {hasValidBookingDate && (
                                                 <div className="flex items-center gap-2 mt-1.5 text-black/55 text-xs font-medium tabular-nums">
-                                                    <span>{bookingDate!.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</span>
+                                                    {/* 티타임은 골프장이 있는 한국 시각이다 — 기기 시계를 따르면 다른 시간이 찍힌다(2026-09-10) */}
+                                                    <span>{kstDateLabel(bookingDate!)}</span>
                                                     <span className="w-1 h-1 rounded-full bg-black/20" />
-                                                    <span>{bookingDate!.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    <span>{kstTime(bookingDate!)}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -322,7 +324,15 @@ const ChatMessageItem = memo(({
                                             <Button
                                                 size="sm" variant="ghost"
                                                 className="w-full bg-black/[0.04] hover:bg-black/[0.06] text-[rgba(0,0,0,0.87)] font-semibold h-10 rounded-xl text-xs transition-all active:scale-95"
-                                                onClick={() => setLocation(`/golf/booking-list/${chat.metadata.bookingId}`)}
+                                                // 날짜·보기를 함께 넘긴다 — 목록은 고른 하루치만 불러오므로,
+                                                // 날짜가 없으면 오늘로 열려 그 티타임이 안 보인다.
+                                                onClick={() => {
+                                                    const q = new URLSearchParams();
+                                                    const day = chat.metadata?.date || (hasValidBookingDate ? kstDateKey(bookingDate!) : '');
+                                                    if (day) q.set('date', day);
+                                                    q.set('view', chat.metadata?.listingType === 'JOIN' ? 'JOIN' : 'BOOKING');
+                                                    setLocation(`/golf/booking-list/${chat.metadata.bookingId}?${q.toString()}`);
+                                                }}
                                             >
                                                 {t("crewChat.viewDetail")}
                                             </Button>
