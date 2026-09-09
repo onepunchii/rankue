@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
-import { GOLF_ENABLED } from "@/lib/features";
+import { useGolfAccess } from "@/hooks/useGolfAccess";
 
 export type SportType = "BILLIARDS" | "GOLF";
 
@@ -11,18 +11,19 @@ interface SportContextType {
 const SportContext = createContext<SportContextType | undefined>(undefined);
 
 export function SportProvider({ children }: { children: React.ReactNode }) {
-    const [currentSport, setCurrentSport] = useState<SportType>(() => {
-        // While golf is disabled, always start in billiards — ignore any stale "GOLF"
-        // left in localStorage so first entry never falls into the golf dashboard.
-        if (!GOLF_ENABLED) return "BILLIARDS";
-        const saved = localStorage.getItem("rankue_current_sport");
-        return (saved as SportType) || "BILLIARDS";
+    // 골프는 허용된 사람만. 판단은 shared/golfAccess.ts 하나이고 서버도 같은 걸 쓴다.
+    const golfOk = useGolfAccess();
+    const [saved, setSaved] = useState<SportType>(() => {
+        const v = localStorage.getItem("rankue_current_sport");
+        return v === "GOLF" ? "GOLF" : "BILLIARDS";
     });
 
+    // 허용되지 않으면 저장값이 GOLF 여도 당구로 본다 — 로그인 확인이 끝나기 전에도 당구로 시작한다.
+    const currentSport: SportType = golfOk ? saved : "BILLIARDS";
+
     const setSport = (sport: SportType) => {
-        // Coerce to billiards while golf is disabled so no entry point can switch modes.
-        const next: SportType = GOLF_ENABLED ? sport : "BILLIARDS";
-        setCurrentSport(next);
+        const next: SportType = sport === "GOLF" && !golfOk ? "BILLIARDS" : sport;
+        setSaved(next);
         localStorage.setItem("rankue_current_sport", next);
     };
 

@@ -94,9 +94,9 @@ router.delete("/joins/:id", requireAuth, asyncHandler(async (req: AuthRequest, r
 }));
 
 router.get("/passport-stats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    // Self-healing: seed data if empty
-    await storage.seedGolfSampleData(req.userId!);
-
+    // 예전엔 여기서 "비어 있으면 표본을 심는" 코드를 돌렸다. 없는 경기 번호로 넣어서 프로덕션에서
+    // 열 때마다 500 이 났고, 성공했다면 남의 골프 평균·랭킹에 가짜 8라운드가 들어갔을 것이다.
+    // 2026-09-09 삭제 — 통계는 실제 기록만 센다.
     const stats = await storage.getGolfPassportStats(req.userId!);
     return sendSuccess(res, stats);
 }));

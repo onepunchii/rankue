@@ -364,48 +364,9 @@ export class GolfRepository {
         };
     }
 
-    async seedGolfSampleData(memberId: string) {
-        // Check if already has data
-        const [existing] = await db.select().from(hiqGameHistory)
-            .where(and(
-                eq(hiqGameHistory.memberId, memberId),
-                eq(hiqGameHistory.sportCategory, 'GOLF' as any)
-            ))
-            .limit(1);
-
-        if (existing) return; // Already has data
-
-        const samples = [
-            { locationName: "남서울 CC", region: "경기", score: 82, subType: "Membership" },
-            { locationName: "스카이72(하늘)", region: "인천", score: 85, subType: "Public" },
-            { locationName: "안양 CC", region: "경기", score: 79, subType: "Membership" },
-            { locationName: "설해원", region: "강원", score: 88, subType: "Public" },
-            { locationName: "나인브릿지", region: "제주", score: 81, subType: "Membership" },
-            { locationName: "해슬리 나인브릿지", region: "경기", score: 83, subType: "Membership" },
-            { locationName: "88CC", region: "경기", score: 85, subType: "Membership" },
-            { locationName: "세이지우드CC홍천", region: "강원", score: 87, subType: "Public" }
-        ];
-
-        for (const s of samples) {
-            await db.insert(hiqGameHistory).values({
-                memberId,
-                gameId: '00000000-0000-0000-0000-000000000000', // Dummy
-                gameMode: 'practice',
-                gameType: 'golf',
-                score: s.score,
-                innings: 18,
-                average: (s.score / 18).toFixed(2),
-                isWinner: true,
-                isRanked: false,
-                locationName: s.locationName,
-                sportCategory: 'GOLF' as any,
-                createdAt: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000)
-            });
-        }
-
-        // Update stats after seeding
-        await this.updateGolfStats(memberId);
-    }
+    // seedGolfSampleData 는 2026-09-09 삭제했다. "기록이 없으면 표본 8라운드를 심는" 코드였는데,
+    // 없는 경기 번호(00000000-…)로 넣어 프로덕션에서 여권 화면을 열 때마다 500 이 났다.
+    // 외래키가 없었다면 조용히 모든 사용자에게 가짜 라운드가 쌓였을 것이다. 다시 만들지 말 것.
 
     async processScorecardOCR(ocrData: any) {
         const items = ocrData.textAnnotations || [];

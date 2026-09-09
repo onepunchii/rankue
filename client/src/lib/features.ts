@@ -1,8 +1,7 @@
 /**
- * Feature flags.
+ * 기능 플래그.
  *
- * GOLF_ENABLED: golf mode is hidden for now (billiards-only launch). Flip to `true`
- * when golf is ready to operate — the sport selector, golf entry points, and the
- * golf dashboard redirect all key off this flag.
+ * 골프 접근은 여기가 아니라 shared/golfAccess.ts 가 정한다 — 화면과 서버가 같은 판단을 써야 해서다.
+ * 화면에선 useGolfAccess() 훅을 쓴다. 전면 공개는 shared/golfAccess.ts 의 GOLF_PUBLIC 하나만 바꾸면 된다.
  */
-export const GOLF_ENABLED = false;
+export {};

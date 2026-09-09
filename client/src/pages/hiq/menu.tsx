@@ -35,7 +35,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { AppInstallCard } from "@/components/hiq/AppInstallCard";
 import { apiRequest } from "@/lib/queryClient";
 import { uploadImage } from "@/lib/imageUtils";
-import { GOLF_ENABLED } from "@/lib/features";
+import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,7 @@ export default function HiqMenu() {
     const queryClient = useQueryClient();
     const [isUploading, setIsUploading] = useState(false);
     const { currentSport, setSport } = useSport();
+    const golfOk = useGolfAccess();
 
     const [infoModal, setInfoModal] = useState<{ open: boolean, type: InfoModalType | null }>({ open: false, type: null });
     const openInfoModal = (type: InfoModalType) => setInfoModal({ open: true, type });
@@ -372,7 +373,7 @@ export default function HiqMenu() {
                         )}>{t("menu.billiards")}</span>
                     </div>
 
-                    {GOLF_ENABLED && (
+                    {golfOk && (
                         <>
                             <div className="w-px h-8 bg-black/10 mx-1" />
 

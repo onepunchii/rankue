@@ -3,9 +3,11 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
+import { useAuth } from "@/hooks/useAuth";
+import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
 import NotFound from "@/pages/not-found";
-import { useEffect, lazy, Suspense, type ComponentType, type FunctionComponent } from "react";
+import { useEffect, lazy, Suspense, type ComponentType, type FunctionComponent, type ReactNode } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 // HiQ Pages
@@ -136,6 +138,21 @@ function SimulatorLazy() {
   );
 }
 
+/**
+ * 골프 화면 문지기. 허용되지 않으면 홈으로 돌린다.
+ * 로그인 확인 중에는 아무것도 그리지 않는다 — 잠깐 골프가 보였다 사라지는 것보다 낫다.
+ */
+function GolfOnly({ children }: { children: ReactNode }) {
+  const { isLoading } = useAuth();
+  const golfOk = useGolfAccess();
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    if (!isLoading && !golfOk) setLocation("/dashboard", { replace: true });
+  }, [isLoading, golfOk, setLocation]);
+  if (isLoading || !golfOk) return null;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -235,16 +252,19 @@ function AppRoutes() {
       <Route path="/join/:code" component={FramedJoin} />
       <Route path="/game/result" component={HiqGameResult} />
       <Route path="/game/:id" component={HiqScoreboard} />
-      <Route path="/golf/game/new" component={GolfNewGame} />
-      <Route path="/golf/game/:id" component={GolfScorecard} />
-      <Route path="/golf/game/:id/result" component={GameResult} />
-      <Route path="/golf/passport" component={GolfPassport} />
-      <Route path="/golf/membership" component={MembershipExchange} />
-      <Route path="/golf/membership/:id" component={MembershipDetail} />
-      <Route path="/golf/ranking" component={GolfCourseRanking} />
-      <Route path="/golf/elite60" component={GolfElite60} />
-      <Route path="/golf/course/:id" component={GolfCourseDetail} />
-      <Route path="/golf/booking-list/:id?" component={GolfBookingList} />
+      {/* 골프 주소는 허용된 사람에게만 연다. 예전엔 종목 스위치만 숨기고 이 라우트는 열어 둬서
+          로그인한 사람이 주소만 치면 골프 화면이 그대로 열렸다(2026-09-09 프로덕션 실측).
+          서버의 /api/hiq/golf/* 도 같은 목록으로 막는다 — 화면만 가리는 잠금은 잠금이 아니다. */}
+      <Route path="/golf/game/new"><GolfOnly><GolfNewGame /></GolfOnly></Route>
+      <Route path="/golf/game/:id/result"><GolfOnly><GameResult /></GolfOnly></Route>
+      <Route path="/golf/game/:id"><GolfOnly><GolfScorecard /></GolfOnly></Route>
+      <Route path="/golf/passport"><GolfOnly><GolfPassport /></GolfOnly></Route>
+      <Route path="/golf/membership/:id"><GolfOnly><MembershipDetail /></GolfOnly></Route>
+      <Route path="/golf/membership"><GolfOnly><MembershipExchange /></GolfOnly></Route>
+      <Route path="/golf/ranking"><GolfOnly><GolfCourseRanking /></GolfOnly></Route>
+      <Route path="/golf/elite60"><GolfOnly><GolfElite60 /></GolfOnly></Route>
+      <Route path="/golf/course/:id"><GolfOnly><GolfCourseDetail /></GolfOnly></Route>
+      <Route path="/golf/booking-list/:id?"><GolfOnly><GolfBookingList /></GolfOnly></Route>
       <Route path="/history" component={FramedHistory} />
       <Route path="/ranking" component={FramedRanking} />
       <Route path="/menu" component={FramedMenu} />

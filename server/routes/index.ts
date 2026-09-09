@@ -1,5 +1,6 @@
 import { Router } from "express";
 import golfRouter from "./modules/golf.js";
+import { requireGolfAccess } from "../middleware/golfAccess.js";
 import crewRouter from "./modules/crew.js";
 import authRouter from "./modules/auth.js";
 import adminRouter from "./modules/admin.js";
@@ -21,7 +22,8 @@ const router = Router();
 // --- Domain Modules ---
 
 // 1. Golf (/golf)
-router.use("/golf", golfRouter);
+// 골프는 시험 단계 — 허용 목록에 있는 사람만. 읽기까지 막는다(2026-09-09 오너: 두 플랫폼으로 완전히 가른다).
+router.use("/golf", ...requireGolfAccess, golfRouter);
 
 // 2. Crew (/crews)
 router.use("/crews", crewRouter);
