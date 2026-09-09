@@ -1158,7 +1158,10 @@ export function SimulatorPage() {
                         )}
                         {/* 채점 중엔 힌트를 곁에 둔다 — 예전엔 목록에만 있어서 정작 칠 때는 안 보였다(2026-09-09 오너) */}
                         {drill && drillLocked && sim.phase === "aim" && (
-                            <span className={chipNeutral}>{t(drill.drill.hintKey)}</span>
+                            // 다른 칩과 달리 자르지 않는다 — 잘린 힌트는 쓸모가 없다(한국어 밖에서 특히 길다).
+                            <span className={cn(chipNeutral.replace(" truncate", ""), "whitespace-normal text-left leading-snug")}>
+                                {t(drill.drill.hintKey)}
+                            </span>
                         )}
                         {!drill && sim.canPlace && sim.session && sim.session.shotCount === 0 && (
                             <span className={cn(chipNeutral, pathView && "hidden")}>{t("sim.hud.placeHint")}</span>

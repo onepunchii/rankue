@@ -64,7 +64,8 @@ const Row = memo(function Row({ d, onPlay }: { d: WeekDrill; onPlay: () => void 
             <Star state={state} size={22} />
             <span className="flex-1 min-w-0 flex flex-col gap-0.5">
                 <span className={cn("text-[14px] font-black truncate", state === "done" ? "text-[color:var(--arc-ink)]" : "text-white")}>{t(d.nameKey)}</span>
-                <span className={cn("text-[11px] font-bold truncate", state === "done" ? "text-[color:var(--arc-ink)] opacity-75" : "text-white/70")}>{sub}</span>
+                {/* 힌트는 자르지 않고 두 줄까지 — 한국어 밖에선 한 줄에 안 들어가고, 잘린 힌트는 쓸모가 없다(2026-09-09) */}
+                <span className={cn("text-[11px] font-bold leading-snug line-clamp-2", state === "done" ? "text-[color:var(--arc-ink)] opacity-75" : "text-white/70")}>{sub}</span>
             </span>
             <span className={cn("rk-num shrink-0 text-[11px] font-bold", state === "done" ? "text-[color:var(--arc-ink)]" : "text-white/75")}>{status}</span>
         </button>

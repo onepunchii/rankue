@@ -39,18 +39,17 @@ function routeOf(drill: Drill, events: readonly SimEvent[]): AttemptRoute {
 
 /**
  * 저장된 입력으로 다시 시뮬해 길을 읽는다.
- * 재시뮬이 그때의 판정과 어긋나면(배치나 엔진이 바뀐 경우) 아무것도 내지 않는다 —
- * 채점된 샷과 다른 샷의 길을 '성공' 옆에 붙이면 거짓말이 된다(2026-09-09 검토).
+ * 채점 때 저장해 둔 해시와 대조해, 같은 샷일 때만 길을 낸다. 배치나 엔진이 바뀌면 재시뮬은 다른 샷이 되는데
+ * 그 길을 '성공' 옆에 붙이면 거짓말이 된다(2026-09-09 검토). 해시는 그 샷의 지문이라 가장 확실하다.
  * 입력이 깨졌거나 미스큐 범위를 넘어 엔진이 던지는 경우도 조용히 생략한다.
  */
-function routeOfStored(drill: Drill, input: unknown, cushions: number): AttemptRoute | null {
+function routeOfStored(drill: Drill, input: unknown, hash: string): AttemptRoute | null {
     const p = attemptSchema.shape.input.safeParse(input);
     if (!p.success) return null;
     try {
         const balls = drillLayout(drill, TABLES[DRILL_TABLE]);
         const result = simulateShot(balls, p.data as ShotInput, DRILL_PARAMS);
-        const outcome = evaluateShot(result.events, "white", DEFAULT_3C_RULES, result.truncated);
-        if (!outcome.scored || outcome.cushionsBeforeSecond !== cushions) return null;
+        if (result.hash !== hash) return null;
         return routeOf(drill, result.events);
     } catch {
         return null;
@@ -83,7 +82,7 @@ router.get("/sim/drills/week", requireAuth, asyncHandler(async (req: AuthRequest
             balls: drillLayout(d, TABLES[DRILL_TABLE]),
             attempt: (() => {
                 const a = mine.find((x) => x.drillId === d.id);
-                return a ? { ...a, route: a.success ? routeOfStored(d, a.input, a.cushions) : null } : null;
+                return a ? { ...a, route: a.success ? routeOfStored(d, a.input, a.hash) : null } : null;
             })(),
         })),
     });
