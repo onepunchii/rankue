@@ -1934,6 +1934,8 @@ const vi: Dict = {
   "sim.drill.success": "Thành công · {n} băng",
   "sim.drill.fail": "Hụt",
   "sim.drill.ladder": "Xếp hạng tuần",
+  "sim.drill.stars": "{s}/{n} sao",
+  "sim.drill.boardTitle": "Bài tập tuần này",
   "sim.drill.ladderEmpty": "Chưa ai thử",
   "sim.drill.ladderScore": "{s} / {a}",
   "sim.drill.entry": "Bài tập tuần này",

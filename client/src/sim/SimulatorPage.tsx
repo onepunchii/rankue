@@ -1261,7 +1261,7 @@ export function SimulatorPage() {
 
             {/* 드릴·로비 전체 화면: 머리글(제목 + 닫기 알약)은 각 패널이 로비와 같은 꼴로 그린다. 폭·여백은 여기서 한 번만. */}
             {showDrills && (
-                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
                         <DrillPanel onPlay={onPlayDrill} myMemberId={member?.id} onClose={() => navigate(EXIT_PATH)} />
                     </div>
@@ -1283,7 +1283,7 @@ export function SimulatorPage() {
                 </div>
             )}
             {showRooms && (
-                <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <RoomList
                         onOpen={openMatch}
                         onCreate={() => navigate("/online-game?lobby=1&public=1")}

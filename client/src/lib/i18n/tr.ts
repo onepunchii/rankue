@@ -1934,6 +1934,8 @@ const tr: Dict = {
   "sim.drill.success": "Başarı · {n} banda",
   "sim.drill.fail": "Kaçtı",
   "sim.drill.ladder": "Haftalık sıralama",
+  "sim.drill.stars": "{s}/{n} yıldız",
+  "sim.drill.boardTitle": "Bu haftanın egzersizleri",
   "sim.drill.ladderEmpty": "Henüz kimse denemedi",
   "sim.drill.ladderScore": "{s} / {a}",
   "sim.drill.entry": "Haftanın çalışmaları",

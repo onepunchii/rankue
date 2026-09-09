@@ -1936,6 +1936,8 @@ export const ko: Dict = {
   "sim.drill.success": "성공 · 쿠션 {n}",
   "sim.drill.fail": "실패",
   "sim.drill.ladder": "주간 순위",
+  "sim.drill.stars": "별 {s}/{n}",
+  "sim.drill.boardTitle": "이번 주 드릴",
   "sim.drill.ladderEmpty": "아직 아무도 도전하지 않았어요",
   "sim.drill.ladderScore": "{s} / {a}",
   "sim.drill.entry": "이번 주 드릴",

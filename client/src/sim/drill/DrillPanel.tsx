@@ -27,24 +27,38 @@ export function weekLabel(weekId: string, t: (key: string) => string): string {
     return t("sim.drill.week").replace("{year}", m[1]).replace("{week}", String(Number(m[2])));
 }
 
+/** 드릴 별: 성공이면 금색 채움, 시도했는데 실패면 빈 별, 아직 안 했으면 흐리게. */
+function Star({ state, size = 18 }: { state: "done" | "fail" | "todo"; size?: number }) {
+    const fill = state === "done" ? "var(--arc-frame)" : "none";
+    const stroke = state === "todo" ? "rgba(255,255,255,0.35)" : "var(--arc-frame)";
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+            <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z" />
+        </svg>
+    );
+}
+
 const Row = memo(function Row({ d, onPlay }: { d: WeekDrill; onPlay: () => void }) {
     const { t } = useT();
     const a = d.attempt;
+    const state = !a ? "todo" : a.success ? "done" : "fail";
     const status = !a ? t("sim.drill.notTried") : a.success
         ? t("sim.drill.success").replace("{n}", String(a.cushions))
         : t("sim.drill.fail");
     return (
         <button
             type="button" onClick={onPlay}
-            className="w-full min-h-[64px] rounded-tile border border-surface-line bg-surface-1 px-4 py-3 flex items-center gap-3 text-left active:bg-surface-3"
+            className={cn(
+                "arc-row w-full min-h-[56px] rounded-pill px-3 py-2 flex items-center gap-3 text-left",
+                state === "done" && "arc-row-1",
+            )}
         >
+            <Star state={state} size={22} />
             <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                <span className="text-[14px] font-semibold text-ink-1 truncate">{t(d.nameKey)}</span>
-                <span className="text-[12px] font-medium text-ink-3 truncate">{t(d.hintKey)}</span>
+                <span className={cn("text-[14px] font-black truncate", state === "done" ? "text-[color:var(--arc-ink)]" : "text-white")}>{t(d.nameKey)}</span>
+                <span className={cn("text-[11px] font-bold truncate", state === "done" ? "text-[color:var(--arc-ink)] opacity-75" : "text-white/70")}>{t(d.hintKey)}</span>
             </span>
-            <span className={cn("rk-chip shrink-0", a?.success ? "bg-brand/[0.1] text-brand" : "bg-surface-3 text-ink-2")}>
-                {status}
-            </span>
+            <span className={cn("rk-num shrink-0 text-[11px] font-bold", state === "done" ? "text-[color:var(--arc-ink)]" : "text-white/75")}>{status}</span>
         </button>
     );
 });
@@ -57,56 +71,84 @@ export function DrillPanel({ onPlay, api = drillApi, myMemberId, onClose }: Prop
     const progress = w ? weekProgress(w) : null;
 
     return (
-        <section className="flex flex-col gap-4">
+        <section className="rank-arcade flex flex-col gap-4">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <h2 className="text-[18px] font-semibold text-ink-1 leading-tight">{t("sim.drill.title")}</h2>
-                    <p className="text-[13px] font-medium text-ink-3 mt-1 leading-relaxed">{t("sim.drill.desc")}</p>
+                    <h2 className="text-[18px] font-black text-white leading-tight">{t("sim.drill.title")}</h2>
+                    <p className="text-[13px] font-medium text-white/60 mt-1 leading-relaxed">{t("sim.drill.desc")}</p>
                 </div>
                 {onClose && (
                     <button
                         type="button" onClick={onClose}
-                        className="shrink-0 h-11 px-3 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2"
+                        className="shrink-0 h-11 px-3 rounded-pill border border-white/25 text-[13px] font-bold text-white/85"
                     >
                         {t("sim.common.close")}
                     </button>
                 )}
             </div>
 
+            {week.isLoading && <p className="text-[13px] font-medium text-white/60 min-h-11 flex items-center">{t("sim.match.listLoading")}</p>}
+            {week.isError && <p className="text-[13px] font-medium text-white/80 min-h-11 flex items-center">{t("sim.match.listFailed")}</p>}
+
             {w && progress && (
-                <div className="rounded-tile bg-surface-3 px-4 min-h-11 py-2.5 flex items-center justify-between gap-3">
-                    <span className="rk-num text-[13px] font-semibold text-ink-1">
-                        {t("sim.drill.progress").replace("{s}", String(progress.successes)).replace("{a}", String(progress.attempted)).replace("{n}", String(progress.total))}
-                    </span>
-                    <span className="rk-num text-[12px] font-medium text-ink-3 shrink-0">{weekLabel(w.weekId, t)}</span>
+                <div>
+                    {/* 리본 제목 + 별 진행 — 랭킹 리더보드와 같은 언어(2026-09-09 오너) */}
+                    <div className="relative flex justify-center">
+                        <span className="arc-ribbon relative z-[1] inline-flex items-center h-10 px-6 rounded-lg text-white text-[15px] font-black tracking-wide">
+                            {t("sim.drill.boardTitle")}
+                        </span>
+                    </div>
+                    <div className="arc-board rounded-[26px] -mt-4 pt-7 px-3 pb-3">
+                        <div className="flex items-center justify-between gap-2 px-1 pb-2.5">
+                            <span className="flex items-center gap-1" aria-label={t("sim.drill.stars").replace("{s}", String(progress.successes)).replace("{n}", String(progress.total))}>
+                                {Array.from({ length: progress.total }, (_, i) => (
+                                    <Star key={i} state={i < progress.successes ? "done" : "todo"} />
+                                ))}
+                            </span>
+                            <span className="rk-num text-[12px] font-bold text-white/75 shrink-0">{weekLabel(w.weekId, t)}</span>
+                        </div>
+                        <ul className="flex flex-col gap-2">
+                            {w.drills.map((d) => (
+                                <li key={d.id}><Row d={d} onPlay={() => onPlay(d, w)} /></li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
             )}
-            {week.isLoading && <p className="text-[13px] font-medium text-ink-3 min-h-11 flex items-center">{t("sim.match.listLoading")}</p>}
-            {week.isError && <p className="text-[13px] font-medium text-ink-2 min-h-11 flex items-center">{t("sim.match.listFailed")}</p>}
-            {w && (
-                <ul className="flex flex-col gap-2">
-                    {w.drills.map((d) => (
-                        <li key={d.id}><Row d={d} onPlay={() => onPlay(d, w)} /></li>
-                    ))}
-                </ul>
-            )}
 
-            <h3 className="text-[15px] font-semibold text-ink-1 mt-2">{t("sim.drill.ladder")}</h3>
-            {ladder.data && ladder.data.rows.length === 0 && (
-                <p className="text-[13px] font-medium text-ink-3">{t("sim.drill.ladderEmpty")}</p>
-            )}
             {ladder.data && ladder.data.rows.length > 0 && (
-                <ol className="rounded-tile border border-surface-line bg-surface-1 divide-y divide-surface-line">
-                    {ladder.data.rows.slice(0, 10).map((r, i) => (
-                        <li key={r.memberId} className={cn("flex items-center gap-3 px-4 min-h-11 py-2", r.memberId === myMemberId && "bg-brand/[0.06]")}>
-                            <span className="rk-num w-6 text-[13px] font-semibold text-ink-3">{i + 1}</span>
-                            <span className="flex-1 min-w-0 text-[14px] font-semibold text-ink-1 truncate">{r.name}</span>
-                            <span className="rk-num text-[13px] font-semibold text-ink-1">
-                                {t("sim.drill.ladderScore").replace("{s}", String(r.successes)).replace("{a}", String(r.attempts))}
-                            </span>
-                        </li>
-                    ))}
-                </ol>
+                <div>
+                    <div className="relative flex justify-center">
+                        <span className="arc-ribbon relative z-[1] inline-flex items-center h-9 px-5 rounded-lg text-white text-[14px] font-black">
+                            {t("sim.drill.ladder")}
+                        </span>
+                    </div>
+                    <ol className="arc-board rounded-[26px] -mt-4 pt-7 px-3 pb-3 space-y-2">
+                        {ladder.data.rows.slice(0, 10).map((r, i) => {
+                            const mine = r.memberId === myMemberId;
+                            const top3 = i < 3;
+                            return (
+                                <li
+                                    key={r.memberId}
+                                    className={cn(
+                                        "arc-row rounded-pill h-12 px-3 flex items-center gap-3",
+                                        i === 0 && "arc-row-1", i === 1 && "arc-row-2", i === 2 && "arc-row-3",
+                                        mine && "ring-2 ring-white",
+                                    )}
+                                >
+                                    <span className={cn("rk-num w-6 shrink-0 text-center text-[16px] font-black", top3 ? "text-[color:var(--arc-ink)]" : "text-white")}>{i + 1}</span>
+                                    <span className={cn("flex-1 min-w-0 text-[13px] font-black truncate", top3 ? "text-[color:var(--arc-ink)]" : "text-white")}>{r.name}</span>
+                                    <span className={cn("rk-num shrink-0 text-[13px] font-black", top3 ? "text-[color:var(--arc-ink)]" : "text-white")}>
+                                        {t("sim.drill.ladderScore").replace("{s}", String(r.successes)).replace("{a}", String(r.attempts))}
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                </div>
+            )}
+            {ladder.data && ladder.data.rows.length === 0 && (
+                <p className="text-[13px] font-medium text-white/60">{t("sim.drill.ladderEmpty")}</p>
             )}
         </section>
     );

@@ -1934,6 +1934,8 @@ const es: Dict = {
   "sim.drill.success": "Logrado · {n} bandas",
   "sim.drill.fail": "Fallado",
   "sim.drill.ladder": "Ranking semanal",
+  "sim.drill.stars": "{s}/{n} estrellas",
+  "sim.drill.boardTitle": "Ejercicios de la semana",
   "sim.drill.ladderEmpty": "Nadie lo ha intentado aún",
   "sim.drill.ladderScore": "{s} / {a}",
   "sim.drill.entry": "Ejercicios de la semana",

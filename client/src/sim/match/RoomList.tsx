@@ -65,7 +65,7 @@ const Row = memo(function Row({ m, age, onJoin }: { m: MatchPublic; age: string;
                     </span>
                 )}
             </span>
-            <button type="button" onClick={() => onJoin(m)} className={pill} aria-label={`${t("sim.rooms.join")} · ${m.hostName}`}>
+            <button type="button" onClick={() => onJoin(m)} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black" aria-label={`${t("sim.rooms.join")} · ${m.hostName}`}>
                 {t("sim.rooms.join")}
             </button>
         </li>
@@ -163,21 +163,21 @@ export function RoomList({ onOpen, onCreate, onClose, api = defaultApi, myHandi,
     const nowMs = now();
     const rows = useMemo(() => q.data ?? [], [q.data]);
     return (
-        <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
+        <div className="rank-arcade w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
             <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="min-w-0">
-                    <h1 className="text-[20px] font-bold text-ink-1 leading-tight">{t("sim.rooms.title")}</h1>
-                    <p className="text-[12.5px] font-medium text-ink-3 mt-0.5">{t("sim.rooms.sub")}</p>
+                    <h1 className="text-[20px] font-black text-white leading-tight">{t("sim.rooms.title")}</h1>
+                    <p className="text-[12.5px] font-medium text-white/60 mt-0.5">{t("sim.rooms.sub")}</p>
                 </div>
-                <button type="button" onClick={onClose} className="h-11 px-4 shrink-0 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2 active:bg-surface-3">
+                <button type="button" onClick={onClose} className="h-11 px-4 shrink-0 rounded-pill border border-white/25 text-[13px] font-bold text-white/85">
                     {t("sim.common.close")}
                 </button>
             </div>
             <div className="flex items-center justify-between gap-2 mb-3">
-                <span className="rk-num text-[13px] font-semibold text-ink-2">{t("sim.entry.roomsOpen")} {rows.length}</span>
-                <button type="button" onClick={onCreate} className={pill}>{t("sim.entry.roomCreate")}</button>
+                <span className="rk-num text-[13px] font-bold text-white/85">{t("sim.entry.roomsOpen")} {rows.length}</span>
+                <button type="button" onClick={onCreate} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black">{t("sim.entry.roomCreate")}</button>
             </div>
-            {q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.rooms.loading")}</p>}
+            {q.isPending && <p className="text-[13px] font-medium text-white/60 min-h-11 flex items-center">{t("sim.rooms.loading")}</p>}
             {q.isError && (
                 <div className="flex items-center justify-between gap-3 min-h-11">
                     <p className="text-[13px] font-medium text-ink-2">{t("sim.rooms.failed")}</p>
@@ -185,14 +185,27 @@ export function RoomList({ onOpen, onCreate, onClose, api = defaultApi, myHandi,
                 </div>
             )}
             {q.isSuccess && rows.length === 0 && (
-                <div className="rounded-card border border-surface-line bg-surface-1 rk-shadow p-5">
-                    <p className="text-[16px] font-bold text-ink-1">{t("sim.rooms.empty")}</p>
-                    <p className="text-[13px] font-medium text-ink-3 mt-1">{t("sim.rooms.emptyDesc")}</p>
+                <div className="arc-board rounded-[22px] p-5">
+                    <p className="text-[16px] font-black text-white">{t("sim.rooms.empty")}</p>
+                    <p className="text-[13px] font-medium text-white/70 mt-1">{t("sim.rooms.emptyDesc")}</p>
                 </div>
             )}
-            <ul className={cn("space-y-2", q.isFetching && !q.isPending && "opacity-80")} aria-label={t("sim.rooms.title")}>
-                {rows.map((m) => <Row key={m.id} m={m} age={roomAge(m.createdAt, nowMs, t)} onJoin={setTarget} />)}
-            </ul>
+            {rows.length > 0 && (
+                <div>
+                    {/* 판과 리본만 아케이드로 — 방 줄은 정보가 많아 담백하게 둔다(2026-09-09 오너: "멀티방은 절반만") */}
+                    <div className="relative flex justify-center">
+                        <span className="arc-ribbon relative z-[1] inline-flex items-center h-9 px-5 rounded-lg text-white text-[14px] font-black">
+                            {t("sim.rooms.title")}
+                        </span>
+                    </div>
+                    <ul
+                        className={cn("arc-board rounded-[26px] -mt-4 pt-7 px-3 pb-3 space-y-2", q.isFetching && !q.isPending && "opacity-80")}
+                        aria-label={t("sim.rooms.title")}
+                    >
+                        {rows.map((m) => <Row key={m.id} m={m} age={roomAge(m.createdAt, nowMs, t)} onJoin={setTarget} />)}
+                    </ul>
+                </div>
+            )}
             <JoinDialog room={target} api={api} myHandi={myHandi} onClose={() => setTarget(null)} onOpen={(m) => { setTarget(null); onOpen(m); }} />
         </div>
     );
