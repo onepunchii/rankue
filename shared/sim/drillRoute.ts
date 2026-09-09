@@ -5,8 +5,11 @@
  * 빈쿠션으로 때워도 똑같이 성공이다(2026-09-09 실측: 배치마다 득점 해법이 90~200개, 그 대부분이 빈쿠션).
  * 그래서 통과 조건은 그대로 두고, 지나온 길을 사실 그대로 보여 준다. 이름표대로 갔으면 표시를 하나 더 준다.
  *
- * 판별은 이벤트에서 확실히 읽히는 것만 쓴다 — 빈쿠션 여부, 쿠션 차례, 첫 적구 뒤 첫 쿠션이 어느 벽인가.
- * 회전(리버스)이나 각도(긴각)처럼 이벤트로 못 가르는 패턴은 null 을 돌려주고 표시하지 않는다. 지어내지 않는다.
+ * 이름표 판별은 **그 드릴의 힌트가 길을 못박은 것만** 인정한다(2026-09-09 검토에서 크게 좁혔다).
+ * 처음엔 큐볼 위치로 앞/뒤/옆을 갈랐는데, 앞돌리기 규칙이 앱이 띄우는 힌트("긴 쿠션을 먼저 맞히기")와
+ * 정반대였다 — 힌트대로 친 사람만 배지를 못 받았다. 실측으로 적구 먼저 득점의 76%가 그쪽이었다.
+ * 앞·뒤·옆·횡단은 부르는 사람마다 정의가 갈려 이벤트로 단정할 수 없다. 그래서 지어내지 않고 null 을 돌린다.
+ * 지금 인정하는 넷: 빈쿠션(쿠션 먼저) · 대회전(크게 한 바퀴) · 더블레일(같은 긴 쿠션 두 번) · 앞돌리기(긴 쿠션 먼저).
  *
  * 좌표계(types.ts): left x=0 · right x=width 는 긴 쿠션, bottom y=0 · top y=length 는 짧은 쿠션.
  * shared/sim 규칙을 따른다 — 초월함수·Date·Math.random 금지.
@@ -52,39 +55,26 @@ export function readRoute(events: readonly SimEvent[], cueBallId: string, object
     return { bankFirst, rails, firstRailAfterBall, contacts: seen.length };
 }
 
-/**
- * 이름표대로 갔는가. 판별 규칙이 없는 패턴은 null.
- * cueY·tableLength 로 "큐볼이 출발한 쪽 짧은 쿠션"(뒤)과 "건너편 짧은 쿠션"(앞)을 가른다.
- */
-export function matchesPattern(route: DrillRoute, pattern: DrillPattern, cueY: number, tableLength: number): boolean | null {
-    const near: CushionId = cueY * 2 < tableLength ? "bottom" : "top";
-    const far: CushionId = near === "bottom" ? "top" : "bottom";
+/** 이름표대로 갔는가. 힌트가 길을 못박지 않은 패턴은 null — 표시하지 않는다. */
+export function matchesPattern(route: DrillRoute, pattern: DrillPattern): boolean | null {
     const ballFirst = route.bankFirst === 0 && route.contacts >= 1;
-    const after = route.firstRailAfterBall;
+    const twice = (c: CushionId): boolean => route.rails.filter((x) => x === c).length >= 2;
     switch (pattern) {
         case "bank":
+            // 힌트: "쿠션을 먼저 맞히고 1적구로"
             return route.bankFirst >= 1;
         case "grand-tour":
+            // 힌트: "세게, 순회전으로 크게 한 바퀴"
             return ballFirst && route.rails.length >= 5;
         case "double-rail":
-            return ballFirst && route.rails.some((c, i) => i > 0 && route.rails[i - 1] === c);
-        case "side-around":
-            return ballFirst && after !== null && isLongRail(after);
-        case "back-around":
-            return ballFirst && after === near;
-        case "short-back":
-            return ballFirst && after === near && route.rails.length <= 3;
+            // 힌트: "같은 긴 쿠션을 두 번". 사이에 다른 쿠션이 끼어도 된다(left·right·left 가 전형).
+            // 짧은 쿠션을 연달아 튄 건 더블레일이 아니다 — 예전엔 '같은 쿠션 연속' 만 봐서 그걸 인정했다.
+            return ballFirst && (twice("left") || twice("right"));
         case "front-around":
-            return ballFirst && after === far;
-        case "cross":
-            // 횡단 = 긴 쿠션 사이를 가로지른다. 적구 뒤 첫 두 쿠션이 마주 보는 긴 쿠션이어야 한다.
-            {
-                const idx = route.rails.findIndex((c) => c === after);
-                const next = idx >= 0 ? route.rails[idx + 1] : undefined;
-                return ballFirst && after !== null && isLongRail(after) && next !== undefined && isLongRail(next) && next !== after;
-            }
+            // 힌트: "앞으로 돌려 긴 쿠션을 먼저 맞히기"
+            return ballFirst && route.firstRailAfterBall !== null && isLongRail(route.firstRailAfterBall);
         default:
-            // reverse(역회전)·long-angle(각도)은 이벤트만으로 못 가른다 — 표시하지 않는다.
+            // 뒤돌리기·옆돌리기·짧은 뒤돌리기·횡단샷·리버스·긴각 — 정의가 사람마다 갈려 샷 기록만으로 단정 못 한다.
             return null;
     }
 }

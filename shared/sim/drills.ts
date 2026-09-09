@@ -130,25 +130,34 @@ function shuffled(idx: number[], rnd: () => number): number[] {
 /**
  * 주차 id → 그 주의 드릴 5개. 같은 주엔 누구나 같은 문제, 같은 순서.
  *
- * BALANCED_FROM_WEEK 부터는 그냥 섞지 않는다 — 여유(easeMargin) 순으로 줄을 세워 count 칸으로 나누고
- * 칸마다 하나씩 뽑는다. 무작위로 뽑던 때는 어려운 문제만 걸린 주와 쉬운 문제만 걸린 주의 차이가 커서
- * 같은 래더로 견주기 어려웠다(실측 여유 14%~50%).
+ * BALANCED_FROM_WEEK 부터는 난이도가 한쪽으로 쏠리지 않게 고른다 — 무작위로만 뽑던 때는
+ * 어려운 것만 걸린 주와 쉬운 것만 걸린 주의 차이가 커서 같은 래더로 견주기 어려웠다(실측 여유 14%~50%).
+ *
+ * 다만 칸을 다섯으로 못박아 하나씩 뽑으면 나올 수 있는 조합이 2^5 = 32 가지로 줄어 주마다 같은 묶음이
+ * 반복된다(2026-09-09 검토에서 W52·W53 이 똑같이 나오는 걸 확인). 그래서 칸이 아니라 조건으로 건다 —
+ * 그냥 섞어 다섯을 집되 어려운 쪽 셋과 쉬운 쪽 셋에서 하나씩은 들어와야 한다. 안 맞으면 다시 섞는다.
+ * 조합 수는 옛 방식에 가깝게 두면서 난이도 폭은 보장된다.
  */
 export function drillsForWeek(weekId: string, pool: readonly Drill[] = DRILLS, count = DRILLS_PER_WEEK): readonly Drill[] {
     const n = Math.min(count, pool.length);
     const rnd = mulberry32(seedOf(weekId));
-    if (weekId < BALANCED_FROM_WEEK) {
-        return shuffled(pool.map((_, i) => i), rnd).slice(0, n).map((i) => pool[i]);
+    const all = pool.map((_, i) => i);
+    if (weekId < BALANCED_FROM_WEEK) return shuffled(all, rnd).slice(0, n).map((i) => pool[i]);
+
+    // 여유가 작을수록 어렵다. 양 끝 삼분의 일을 어려운 쪽·쉬운 쪽으로 본다.
+    const byEase = [...all].sort((a, b) => pool[a].easeMargin - pool[b].easeMargin || (pool[a].id < pool[b].id ? -1 : 1));
+    const tier = Math.max(1, Math.floor(byEase.length / 3));
+    const hard = new Set(byEase.slice(0, tier));
+    const easy = new Set(byEase.slice(byEase.length - tier));
+    const spans = (pick: readonly number[]) => pick.some((i) => hard.has(i)) && pick.some((i) => easy.has(i));
+
+    let pick = shuffled([...all], rnd).slice(0, n);
+    for (let tries = 0; tries < 24 && !spans(pick); tries++) pick = shuffled([...all], rnd).slice(0, n);
+    if (!spans(pick)) {
+        // 여기까지 왔으면 풀이 이상한 것(전부 같은 난이도 등) — 그래도 뭔가는 내야 하니 양 끝에서 하나씩 박는다.
+        pick = [byEase[0], byEase[byEase.length - 1], ...all.filter((i) => i !== byEase[0] && i !== byEase[byEase.length - 1])].slice(0, n);
     }
-    // 쉬운 것부터 줄 세운 뒤 n 칸으로 쪼개고, 칸마다 하나씩. 칸 경계는 나머지를 앞칸에 몰지 않게 비율로 자른다.
-    const order = pool.map((_, i) => i).sort((a, b) => pool[a].easeMargin - pool[b].easeMargin || (pool[a].id < pool[b].id ? -1 : 1));
-    const picked: number[] = [];
-    for (let k = 0; k < n; k++) {
-        const from = Math.floor((k * order.length) / n);
-        const to = Math.max(from + 1, Math.floor(((k + 1) * order.length) / n));
-        picked.push(order[from + Math.floor(rnd() * (to - from))]);
-    }
-    return shuffled(picked, rnd).map((i) => pool[i]);
+    return pick.map((i) => pool[i]);
 }
 
 export function findDrill(id: string): Drill | undefined {

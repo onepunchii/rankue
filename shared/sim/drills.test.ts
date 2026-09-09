@@ -43,15 +43,23 @@ describe("난이도 섞어 뽑기 (BALANCED_FROM_WEEK 이후)", () => {
         // 옛 방식이 이번 주(2026-W37)에 내놓던 그대로 — 이 배열이 바뀌면 진행 중인 래더가 깨진다
         expect(drillsForWeek("2026-W37").map((d) => d.id)).toEqual(LEGACY_W37);
     });
-    it("적용 주차부터는 5문제가 쉬움~어려움에 하나씩 걸린다", () => {
-        const easeOrder = [...DRILLS].sort((a, b) => a.easeMargin - b.easeMargin || (a.id < b.id ? -1 : 1));
-        const bucketOf = (id: string) => Math.floor((easeOrder.findIndex((d) => d.id === id) * DRILLS_PER_WEEK) / DRILLS.length);
-        for (const w of ["2026-W38", "2026-W39", "2026-W40", "2026-W52", "2027-W01", "2027-W26"]) {
+    it("적용 주차부터는 어려운 쪽·쉬운 쪽에서 하나씩은 들어온다", () => {
+        const byEase = [...DRILLS].sort((a, b) => a.easeMargin - b.easeMargin || (a.id < b.id ? -1 : 1));
+        const tier = Math.floor(DRILLS.length / 3);
+        const hard = new Set(byEase.slice(0, tier).map((d) => d.id));
+        const easy = new Set(byEase.slice(DRILLS.length - tier).map((d) => d.id));
+        const weeks = ["2026-W38", "2026-W39", "2026-W40", "2026-W52", "2027-W01", "2027-W26", "2028-W07"];
+        const seen = new Set<string>();
+        for (const w of weeks) {
             const got = drillsForWeek(w);
             expect(got.length, w).toBe(DRILLS_PER_WEEK);
             expect(new Set(got.map((d) => d.id)).size, w).toBe(DRILLS_PER_WEEK);
-            expect(new Set(got.map((d) => bucketOf(d.id))), w).toEqual(new Set([0, 1, 2, 3, 4]));
+            expect(got.some((d) => hard.has(d.id)), `${w} 어려운 문제`).toBe(true);
+            expect(got.some((d) => easy.has(d.id)), `${w} 쉬운 문제`).toBe(true);
+            seen.add(got.map((d) => d.id).sort().join(","));
         }
+        // 칸을 못박던 때는 조합이 32가지로 줄어 주마다 같은 묶음이 반복됐다 — 이제 그러면 안 된다
+        expect(seen.size).toBeGreaterThanOrEqual(6);
     });
     it("같은 주면 같은 결과", () => {
         expect(drillsForWeek("2026-W40").map((d) => d.id)).toEqual(drillsForWeek("2026-W40").map((d) => d.id));

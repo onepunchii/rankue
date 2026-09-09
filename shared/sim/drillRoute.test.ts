@@ -37,41 +37,39 @@ describe("길 읽기", () => {
     });
 });
 
-describe("이름표 일치", () => {
+describe("이름표 일치 — 힌트가 길을 못박은 패턴만 판별한다", () => {
     const route = (ev: SimEvent[]) => readRoute(ev, "white", OB);
     const ball = (rails: CushionId[]) => route([bb("white", "red"), ...rails.map((c) => cu("white", c)), bb("white", "yellow")]);
 
     it("빈쿠션 = 적구 전에 쿠션이 있으면 참", () => {
-        expect(matchesPattern(route([cu("white", "left"), bb("white", "red"), cu("white", "top"), cu("white", "right"), bb("white", "yellow")]), "bank", NEAR_Y, L)).toBe(true);
-        expect(matchesPattern(ball(["left", "top", "right"]), "bank", NEAR_Y, L)).toBe(false);
+        expect(matchesPattern(route([cu("white", "left"), bb("white", "red"), cu("white", "top"), cu("white", "right"), bb("white", "yellow")]), "bank")).toBe(true);
+        expect(matchesPattern(ball(["left", "top", "right"]), "bank")).toBe(false);
     });
-    it("옆돌리기 = 적구 먼저, 그 뒤 첫 쿠션이 긴 쿠션", () => {
-        expect(matchesPattern(ball(["left", "top", "right"]), "side-around", NEAR_Y, L)).toBe(true);
-        expect(matchesPattern(ball(["bottom", "left", "right"]), "side-around", NEAR_Y, L)).toBe(false);
+    it("대회전 = 적구 먼저 쿠션 5개 이상", () => {
+        expect(matchesPattern(ball(["left", "top", "right", "bottom", "left"]), "grand-tour")).toBe(true);
+        expect(matchesPattern(ball(["left", "top", "right"]), "grand-tour")).toBe(false);
     });
-    it("뒤돌리기 = 출발한 쪽 짧은 쿠션, 앞돌리기 = 건너편 짧은 쿠션", () => {
-        expect(matchesPattern(ball(["bottom", "left", "top"]), "back-around", NEAR_Y, L)).toBe(true);
-        expect(matchesPattern(ball(["top", "left", "bottom"]), "back-around", NEAR_Y, L)).toBe(false);
-        expect(matchesPattern(ball(["top", "left", "bottom"]), "front-around", NEAR_Y, L)).toBe(true);
-        // 큐볼이 반대쪽에서 출발하면 가까운 쿠션도 뒤집힌다
-        expect(matchesPattern(ball(["top", "left", "bottom"]), "back-around", L - NEAR_Y, L)).toBe(true);
+    it("더블레일 = 같은 '긴' 쿠션을 두 번, 사이에 다른 쿠션이 끼어도 된다", () => {
+        expect(matchesPattern(ball(["left", "right", "left"]), "double-rail")).toBe(true);
+        expect(matchesPattern(ball(["left", "right", "top", "left"]), "double-rail")).toBe(true);
+        expect(matchesPattern(ball(["left", "left", "top"]), "double-rail")).toBe(true);
+        // 짧은 쿠션 연속은 더블레일이 아니다 — 예전 규칙이 이걸 인정했다
+        expect(matchesPattern(ball(["top", "top", "left"]), "double-rail")).toBe(false);
+        expect(matchesPattern(ball(["left", "right", "top", "bottom"]), "double-rail")).toBe(false);
     });
-    it("짧은 뒤돌리기는 쿠션 3개 이하", () => {
-        expect(matchesPattern(ball(["bottom", "left", "top"]), "short-back", NEAR_Y, L)).toBe(true);
-        expect(matchesPattern(ball(["bottom", "left", "top", "right"]), "short-back", NEAR_Y, L)).toBe(false);
+    it("앞돌리기 = 적구 먼저, 그 뒤 첫 쿠션이 긴 쿠션 — 드릴 힌트와 같은 말", () => {
+        expect(matchesPattern(ball(["right", "top", "left"]), "front-around")).toBe(true);
+        expect(matchesPattern(ball(["top", "right", "bottom"]), "front-around")).toBe(false);
     });
-    it("대회전 = 적구 먼저 쿠션 5개 이상, 더블레일 = 같은 쿠션 연속", () => {
-        expect(matchesPattern(ball(["left", "top", "right", "bottom", "left"]), "grand-tour", NEAR_Y, L)).toBe(true);
-        expect(matchesPattern(ball(["left", "top", "right"]), "grand-tour", NEAR_Y, L)).toBe(false);
-        expect(matchesPattern(ball(["left", "left", "top"]), "double-rail", NEAR_Y, L)).toBe(true);
-        expect(matchesPattern(ball(["left", "top", "left"]), "double-rail", NEAR_Y, L)).toBe(false);
+    it("빈쿠션으로 시작하면 적구 먼저를 요구하는 패턴은 모두 거짓", () => {
+        const bankStart = route([cu("white", "left"), bb("white", "red"), cu("white", "right"), cu("white", "left"), cu("white", "top"), cu("white", "bottom"), bb("white", "yellow")]);
+        expect(matchesPattern(bankStart, "grand-tour")).toBe(false);
+        expect(matchesPattern(bankStart, "double-rail")).toBe(false);
+        expect(matchesPattern(bankStart, "front-around")).toBe(false);
     });
-    it("횡단 = 마주 보는 긴 쿠션을 잇달아", () => {
-        expect(matchesPattern(ball(["right", "left", "bottom"]), "cross", NEAR_Y, L)).toBe(true);
-        expect(matchesPattern(ball(["right", "top", "left"]), "cross", NEAR_Y, L)).toBe(false);
-    });
-    it("역회전·긴각은 샷 기록만으로 못 가른다 — 지어내지 않고 null", () => {
-        expect(matchesPattern(ball(["left", "top", "right"]), "reverse", NEAR_Y, L)).toBeNull();
-        expect(matchesPattern(ball(["left", "top", "right"]), "long-angle", NEAR_Y, L)).toBeNull();
+    it("정의가 갈리는 패턴은 지어내지 않고 null", () => {
+        for (const p of ["back-around", "side-around", "short-back", "cross", "reverse", "long-angle"] as const) {
+            expect(matchesPattern(ball(["left", "top", "right"]), p), p).toBeNull();
+        }
     });
 });

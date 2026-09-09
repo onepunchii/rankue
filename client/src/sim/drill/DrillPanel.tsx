@@ -47,10 +47,12 @@ const Row = memo(function Row({ d, onPlay }: { d: WeekDrill; onPlay: () => void 
         : t("sim.drill.fail");
     // 성공했으면 힌트 대신 '어떻게 넣었는지' 를 보여 준다 — 빈쿠션으로 때웠는지가 여기서 드러난다.
     const r = a?.success ? a.route : null;
-    const sub = r
-        ? [r.named === true ? t("sim.drill.routeNamed").replace("{name}", t(d.nameKey)) : null,
-           r.bankFirst > 0 ? t("sim.drill.routeBank") : t("sim.drill.routeBall")].filter(Boolean).join(" · ")
-        : t(d.hintKey);
+    // 이름표대로 갔으면 그 한 줄이면 된다 — 빈쿠션 드릴에선 "빈쿠션 성공 · 빈쿠션으로" 처럼 같은 말이 겹쳤다.
+    const sub = !r
+        ? t(d.hintKey)
+        : r.named === true
+            ? t("sim.drill.routeNamed").replace("{name}", t(d.nameKey))
+            : r.bankFirst > 0 ? t("sim.drill.routeBank") : t("sim.drill.routeBall");
     return (
         <button
             type="button" onClick={onPlay}

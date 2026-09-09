@@ -33,19 +33,28 @@ export interface AttemptRoute {
 }
 
 function routeOf(drill: Drill, events: readonly SimEvent[]): AttemptRoute {
-    const balls = drillLayout(drill, TABLES[DRILL_TABLE]);
-    const cueY = balls.find((b) => b.id === "white")!.r[1];
     const route = readRoute(events, "white", ["red", "yellow"]);
-    const named = matchesPattern(route, drill.pattern, cueY, TABLES[DRILL_TABLE].length);
-    return { bankFirst: route.bankFirst, cushions: route.rails.length, named };
+    return { bankFirst: route.bankFirst, cushions: route.rails.length, named: matchesPattern(route, drill.pattern) };
 }
 
-/** 저장된 입력으로 다시 시뮬해 길을 읽는다. 입력이 깨졌으면 조용히 생략한다. */
-function routeOfStored(drill: Drill, input: unknown): AttemptRoute | null {
+/**
+ * 저장된 입력으로 다시 시뮬해 길을 읽는다.
+ * 재시뮬이 그때의 판정과 어긋나면(배치나 엔진이 바뀐 경우) 아무것도 내지 않는다 —
+ * 채점된 샷과 다른 샷의 길을 '성공' 옆에 붙이면 거짓말이 된다(2026-09-09 검토).
+ * 입력이 깨졌거나 미스큐 범위를 넘어 엔진이 던지는 경우도 조용히 생략한다.
+ */
+function routeOfStored(drill: Drill, input: unknown, cushions: number): AttemptRoute | null {
     const p = attemptSchema.shape.input.safeParse(input);
     if (!p.success) return null;
-    const balls = drillLayout(drill, TABLES[DRILL_TABLE]);
-    return routeOf(drill, simulateShot(balls, p.data as ShotInput, DRILL_PARAMS).events);
+    try {
+        const balls = drillLayout(drill, TABLES[DRILL_TABLE]);
+        const result = simulateShot(balls, p.data as ShotInput, DRILL_PARAMS);
+        const outcome = evaluateShot(result.events, "white", DEFAULT_3C_RULES, result.truncated);
+        if (!outcome.scored || outcome.cushionsBeforeSecond !== cushions) return null;
+        return routeOf(drill, result.events);
+    } catch {
+        return null;
+    }
 }
 
 const attemptSchema = z.object({
@@ -74,7 +83,7 @@ router.get("/sim/drills/week", requireAuth, asyncHandler(async (req: AuthRequest
             balls: drillLayout(d, TABLES[DRILL_TABLE]),
             attempt: (() => {
                 const a = mine.find((x) => x.drillId === d.id);
-                return a ? { ...a, route: a.success ? routeOfStored(d, a.input) : null } : null;
+                return a ? { ...a, route: a.success ? routeOfStored(d, a.input, a.cushions) : null } : null;
             })(),
         })),
     });
