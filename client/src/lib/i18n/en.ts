@@ -2158,6 +2158,8 @@ const en: Dict = {
   "sim.rank.title": "Ranking",
   "sim.rank.podium": "Top 3 this season",
   "sim.rank.board": "Leaderboard",
+  "sim.rank.tableAria": "Choose table",
+  "sim.rank.rankedCount": "{n}",
   "sim.rank.meMark": "You",
   "sim.rank.toNext": "{n} to {tier}",
   "sim.rank.myRank": "My rank",

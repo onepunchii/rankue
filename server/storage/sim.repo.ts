@@ -236,6 +236,11 @@ export class SimRepository {
             select r.sim_rating, r.matches, r.wins, mem.country from hiq_sim_ratings r join hiq_members mem on mem.id = r.member_id
             where r.member_id = ${memberId} and r.game_type = ${gameType} and r.table_id = ${tableId}`)).rows as Record<string, unknown>[];
         const [meCountry] = (await db.execute(sql`select country from hiq_members where id = ${memberId}`)).rows as { country: string | null }[];
+        const combos = (await db.execute(sql`
+            select game_type, table_id,
+                   count(*) filter (where matches >= ${placement})::int as ranked,
+                   coalesce(max(matches) filter (where member_id = ${memberId}), 0)::int as my_matches
+            from hiq_sim_ratings group by game_type, table_id`)).rows as Record<string, unknown>[];
         const n = (v: unknown) => Number(v ?? 0);
         const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
         return {
@@ -249,6 +254,12 @@ export class SimRepository {
                 rating: n(meRow.sim_rating), matches: n(meRow.matches), wins: n(meRow.wins), country: str(meRow.country),
                 rank: meRanked ? n(meRanked.rank) : null, countryRank: meRanked && meRanked.country ? n(meRanked.country_rank) : null,
             } : { rating: 1000, matches: 0, wins: 0, country: meCountry?.country ?? null, rank: null, countryRank: null },
+            // 조합(종목×테이블)별 등재 인원과 내 대전 수 — 화면이 "사람이 있는 조합"을 기본으로 열고 칩에 인원을 적는다.
+            combos: combos.map((c) => ({
+                gameType: String(c.game_type) as "3c" | "4c",
+                tableId: String(c.table_id) as "DAEDAE" | "JUNGDAE_KR",
+                ranked: n(c.ranked), myMatches: n(c.my_matches),
+            })),
         };
     }
 

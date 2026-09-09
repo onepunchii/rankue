@@ -2158,6 +2158,8 @@ const vi: Dict = {
   "sim.rank.title": "Xếp hạng",
   "sim.rank.podium": "Top 3 mùa này",
   "sim.rank.board": "Bảng xếp hạng",
+  "sim.rank.tableAria": "Chọn bàn",
+  "sim.rank.rankedCount": "{n}",
   "sim.rank.meMark": "Bạn",
   "sim.rank.toNext": "Còn {n} tới {tier}",
   "sim.rank.myRank": "Hạng của tôi",

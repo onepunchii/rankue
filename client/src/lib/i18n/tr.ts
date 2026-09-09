@@ -2158,6 +2158,8 @@ const tr: Dict = {
   "sim.rank.title": "Sıralama",
   "sim.rank.podium": "Sezonun ilk 3'ü",
   "sim.rank.board": "Liderlik tablosu",
+  "sim.rank.tableAria": "Masa seç",
+  "sim.rank.rankedCount": "{n}",
   "sim.rank.meMark": "Sen",
   "sim.rank.toNext": "{tier} için {n}",
   "sim.rank.myRank": "Sıram",

@@ -27,6 +27,8 @@ export interface RankLadder {
     /** 배치를 마친 선수 수(전체) */
     readonly total: number;
     readonly countries: readonly { country: string | null; players: number }[];
+    /** 조합(종목×테이블)별 등재 인원과 내 대전 수 — 첫 화면을 사람이 있는 조합으로 열고 칩에 인원을 적는다. 예전 서버 응답엔 없다. */
+    readonly combos: readonly { readonly gameType: DashGameType; readonly tableId: DashTableId; readonly ranked: number; readonly myMatches: number }[];
     readonly me: RankMe;
 }
 export interface RankQuery {
@@ -60,6 +62,11 @@ export function parseRankLadder(raw: unknown): RankLadder {
         })),
         total: num(o.total),
         countries: countries.map((c) => ({ country: cc(c.country), players: num(c.players) })),
+        combos: (Array.isArray(o.combos) ? o.combos.map(rec) : []).map((c) => ({
+            gameType: (c.gameType === "4c" ? "4c" : "3c") as DashGameType,
+            tableId: (c.tableId === "JUNGDAE_KR" ? "JUNGDAE_KR" : "DAEDAE") as DashTableId,
+            ranked: num(c.ranked), myMatches: num(c.myMatches),
+        })),
         me: { rating: num(me.rating, 1000), matches: num(me.matches), wins: num(me.wins), country: cc(me.country), rank: numOrNull(me.rank), countryRank: numOrNull(me.countryRank) },
     };
 }

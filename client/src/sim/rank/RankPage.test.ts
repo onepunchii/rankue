@@ -48,6 +48,7 @@ const ladder = (over: Partial<RankLadder> = {}): RankLadder => ({
     ],
     total: 3, countries: [{ country: "KR", players: 2 }, { country: "MX", players: 1 }],
     me: { rating: 1160, matches: 6, wins: 4, country: "KR", rank: 2, countryRank: 2 }, ...over,
+    combos: [{ gameType: "3c" as const, tableId: "DAEDAE" as const, ranked: 3, myMatches: 6 }],
 });
 function mount(l: RankLadder) {
     const container = document.createElement("div");
@@ -100,7 +101,7 @@ describe("RankPage", () => {
         await settle(h, () => (h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls.length >= 2);
         expect((h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls[1][0]).toEqual({ gameType: "3c", tableId: "DAEDAE", country: "KR" });
         const combos = h.container.querySelector(`[role=group][aria-label="${ko["sim.dash.filterAria"]}"]`)!;
-        click(Array.from(combos.querySelectorAll("button")).find((b) => b.textContent?.includes("4구"))!);
+        click(Array.from(combos.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === ko["sim.setup.type4c"])!);
         await settle(h, () => (h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls.length >= 3);
         expect((h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls[2][0]).toMatchObject({ gameType: "4c", country: "KR" });
     });

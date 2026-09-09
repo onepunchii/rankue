@@ -3,13 +3,14 @@
  * 위: 종목·테이블 칩 → 범위(전체 / 내 나라 / 나라 고르기) → 내 카드(티어 배지·레이팅·전역 순위·국가 순위·전적, 배치 전엔 "배치 중 n/3") → 순위 목록.
  * 내 나라가 없으면 기기 언어의 지역으로 한 번 저장하고(PATCH /me), 카드의 "내 나라 바꾸기"로 고친다. 값은 온라인 대전 Elo 뿐 — 실전 RP 와 무관.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { rankStatus, tierFor, TIERS, PLACEMENT_MATCHES, type Tier } from "@shared/sim/rank";
 import { RankBoard } from "./RankBoard";
+import { GameBalls } from "./GameBalls";
 import type { DashGameType, DashTableId } from "../dash/dashApi";
 import { gameLabel } from "../match/matchView";
 import { COUNTRY_OPTIONS, countryName, guessCountry, isCountryCode } from "./country";
@@ -70,6 +71,9 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
     const { member } = useAuth();
     const qc = useQueryClient();
     const [combo, setCombo] = useState(initial ?? COMBOS[0]);
+    // 첫 화면은 사람이 있는 곳으로: 내가 가장 많이 친 조합 → 없으면 등재자가 가장 많은 조합(2026-09-09 오너).
+    // 링크로 조합을 지정해 들어왔거나(initial) 사용자가 한 번이라도 고른 뒤에는 건드리지 않는다.
+    const pickedRef = useRef(!!initial);
     const [scope, setScope] = useState<"all" | "mine" | "pick">("all");
     const [picked, setPicked] = useState<string>("");
     const myCountry = member?.country && isCountryCode(member.country) ? member.country : null;
@@ -100,6 +104,13 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
     };
 
     const data = q.data;
+    useEffect(() => {
+        if (pickedRef.current || !data || (data.combos ?? []).length === 0) return;
+        const best = [...(data.combos ?? [])].sort((a, b) => b.myMatches - a.myMatches || b.ranked - a.ranked)[0];
+        if (!best || (best.myMatches === 0 && best.ranked === 0)) return;
+        pickedRef.current = true;
+        if (best.gameType !== combo.gameType || best.tableId !== combo.tableId) setCombo({ gameType: best.gameType, tableId: best.tableId });
+    }, [data, combo.gameType, combo.tableId]);
     const status = data ? rankStatus(data.me.rating, data.me.matches) : null;
     const options = useMemo(() => {
         const set = new Set<string>(COUNTRY_OPTIONS);
@@ -121,14 +132,37 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
             </div>
 
             <div role="group" aria-label={t("sim.dash.filterAria")} className="flex gap-1.5 overflow-x-auto -mx-5 px-5 pb-1 mb-1.5">
-                {COMBOS.map((c) => {
-                    const sel = c.gameType === combo.gameType && c.tableId === combo.tableId;
+                {(["3c", "4c"] as const).map((g) => {
+                    const sel = combo.gameType === g;
+                    const ranked = (data?.combos ?? []).filter((c) => c.gameType === g).reduce((a, c) => a + c.ranked, 0);
                     return (
-                        <button key={`${c.gameType}-${c.tableId}`} type="button" aria-pressed={sel} onClick={() => setCombo(c)} className={cn(pill, sel ? chipOn : chipOff)}>
-                            {gameLabel(c, t)}
+                        <button
+                            key={g} type="button" aria-pressed={sel} onClick={() => { pickedRef.current = true; setCombo({ ...combo, gameType: g }); }}
+                            aria-label={t(g === "3c" ? "sim.setup.type3c" : "sim.setup.type4c")}
+                            className={cn(pill, "gap-2", sel ? chipOn : chipOff)}
+                        >
+                            <GameBalls gameType={g} />
+                            {ranked > 0 && <span className="rk-num text-[11px] font-bold opacity-70">{t("sim.rank.rankedCount").replace("{n}", String(ranked))}</span>}
                         </button>
                     );
                 })}
+                {/* 대대·중대는 작은 토글 하나로(칩 넷은 많다 — 2026-09-09 오너). 점수는 테이블별로 따로 쌓이므로 합치지 않는다. */}
+                <div role="group" aria-label={t("sim.rank.tableAria")} className="shrink-0 inline-flex rounded-pill border border-white/15 bg-white/[0.08] p-0.5">
+                    {(["DAEDAE", "JUNGDAE_KR"] as const).map((tb) => {
+                        const sel = combo.tableId === tb;
+                        return (
+                            <button
+                                key={tb} type="button" aria-pressed={sel} onClick={() => { pickedRef.current = true; setCombo({ ...combo, tableId: tb }); }}
+                                className={cn(
+                                    "h-9 px-3 rounded-pill text-[12px] font-bold",
+                                    sel ? "bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)]" : "text-white/70",
+                                )}
+                            >
+                                {tb === "DAEDAE" ? t("sim.setup.tableDaedae") : t("sim.setup.tableJungdae")}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
             <div role="group" aria-label={t("sim.rank.scopeAria")} className="flex items-center gap-1.5 flex-wrap mb-3">
                 <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className={cn(pill, scope === "all" ? chipOn : chipOff)}>{t("sim.rank.scopeAll")}</button>
