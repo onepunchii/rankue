@@ -944,8 +944,10 @@ export function SimulatorPage() {
 
     // 오른쪽 바의 "길 1·2·3": 성공 확률 순 상위 세 개. 누르면 그 길을 고르고 경로를 그린다(2026-09-08 오너).
     const ballsKey = useMemo(() => sim.balls.map((b) => `${b.id}:${b.r[0].toFixed(4)},${b.r[1].toFixed(4)}`).join("|"), [sim.balls]);
+    // 탐색을 건 그 배치를 openSolver 가 한 번 찍는다. 예전엔 "탐색 중이면 지금 배치로 다시 찍기" 였는데,
+    // 그러면 탐색 도중 공을 옮겼을 때 솔버가 본 적도 없는 배치가 '푼 배치' 로 기록돼(2026-09-09 검토),
+    // 결과가 도착하면 옛 배치의 길이 새 배치 위에 그대로 그려졌다 — 적구를 스치지도 않는 길을 카드가 설명한다.
     const solvedKeyRef = useRef("");
-    useEffect(() => { if (solver.status === "running") solvedKeyRef.current = ballsKey; }, [solver.status, ballsKey]);
     // 찾은 길은 그때의 배치에만 유효하다 — 공이 움직이면(샷·손으로 옮김) 목록을 비운다
     const pathStale = solvedKeyRef.current !== ballsKey;
     const paths = useMemo(
@@ -958,6 +960,7 @@ export function SimulatorPage() {
 
     const openSolver = useCallback(() => {
         if (!sim.config || !sim.params || sim.phase !== "aim") return;
+        solvedKeyRef.current = ballsKey;
         setSolverOpen(true);
         void solver.solve({
             balls: sim.balls, cueBallId: sim.cueBallId, gameType: sim.config.gameType, rules: sim.config.rules,
@@ -966,7 +969,7 @@ export function SimulatorPage() {
             // 길 찾기는 전용 화면이라 예산을 넉넉히 준다 — 전수 탐색이 더 돌고 오차 허용(여유) 추정이 안정된다
             ...(pathViewRef.current ? { budgetMs: PATH_BUDGET_MS } : {}),
         });
-    }, [sim.config, sim.params, sim.phase, sim.balls, sim.cueBallId, sim.session, solver]);
+    }, [sim.config, sim.params, sim.phase, sim.balls, sim.cueBallId, sim.session, solver, ballsKey]);
     const retrySolver = useCallback(() => { solverSeedRef.current += 1; openSolver(); }, [openSolver]);
     // 길 찾기에서 결과가 나오면 이 기기의 "찾아본 배치" 수를 올린다(서버에 남기지 않는다)
     const pathCountedRef = useRef("");
@@ -1013,6 +1016,10 @@ export function SimulatorPage() {
     };
     // 배치가 바뀌면(샷·되돌리기·공 옮기기) 후보는 낡은 것 — 경로를 끄고 시트를 닫는다
     useEffect(() => { setSolverPreview(null); setSolverOpen(false); }, [sim.balls]);
+    // 길 찾기: 결과가 오면 시트를 스스로 닫는다. 목록을 뺀 뒤로 시트가 할 일은 '찾는 중' 뿐인데,
+    // 열린 채로 두면 검은 막(Radix 모달)이 정작 안내가 가리키는 오른쪽 바와 아래 카드를 덮는다(2026-09-09 검토).
+    // 길을 못 찾은 경우도 아래 카드가 '이 배치에선 길이 없어요' 로 받아 준다.
+    useEffect(() => { if (pathView && solver.result) setSolverOpen(false); }, [pathView, solver.result]);
     // 연습·드릴(채점 뒤)에서만. 기록 세션·대전엔 넘기지 않는다.
     const solverAllowed = sim.mode === "solo" && !sim.record && !drillLocked;
 

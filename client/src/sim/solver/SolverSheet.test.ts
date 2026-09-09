@@ -108,6 +108,9 @@ describe("SolverSheet", () => {
         const text = h.container.textContent ?? "";
         expect(text).toContain(ko["sim.path.pickInRail"]);
         expect(text).toContain("400개 시도 · 해법 5개");   // 상태 줄은 그대로 남는다
+        // 찾는 중에도 안내가 보인다 — 결과가 오면 페이지가 시트를 닫으므로 여기가 실제로 보이는 구간이다
+        h.render({ status: "running", candidates: [], progress: { tried: 12, found: 0, phase: "seed" } });
+        expect(h.container.textContent).toContain(ko["sim.path.pickInRail"]);
         // 해법이 없으면 안내 대신 평소의 '없음' 문구
         h.render({ status: "done", candidates: [], progress: { tried: 900, found: 0, phase: "done" } });
         expect(h.container.textContent).toContain(ko["sim.solver.noneHint"]);

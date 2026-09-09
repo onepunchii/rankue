@@ -171,13 +171,12 @@ export const SolverSheet = memo(function SolverSheet(p: SolverSheetProps) {
                 </div>
 
                 <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 pb-6">
-                    {rows.length === 0 ? (
-                        status === "done" ? (
-                            <p className="py-6 text-center text-[13px] font-medium text-ink-4">{t("sim.solver.noneHint")}</p>
-                        ) : null
+                    {rows.length === 0 && status === "done" ? (
+                        <p className="py-6 text-center text-[13px] font-medium text-ink-4">{t("sim.solver.noneHint")}</p>
                     ) : pickInRail ? (
+                        // 찾는 동안 보여 준다 — 결과가 오면 페이지가 시트를 닫으므로 여기 머무는 시간은 탐색 중뿐이다
                         <p className="py-5 px-2 text-center text-[13px] font-medium text-ink-3 text-balance">{t("sim.path.pickInRail")}</p>
-                    ) : (
+                    ) : rows.length === 0 ? null : (
                         <ol className="flex flex-col">
                             {rows.map((c, i) => {
                                 const on = previewIdx === i;
