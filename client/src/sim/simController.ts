@@ -832,6 +832,27 @@ export class SimController {
      * 40초 룰 시간 초과 처리. 내 차례면 40초, 상대 차례면 50초(유예 10초) 뒤에 화면이 부른다 — 판정은 서버 시계.
      * 성공하면 응답의 대전 행으로 맞춘다(샷 없이 차례가 바뀌므로 세션 스냅). 아직 이르면(409 TOO_EARLY) 조용히 false.
      */
+    /** 이모지 인사 보내기. 서버가 거부하면(너무 자주·횟수 소진) 이유를 돌려준다. */
+    async sendEmoji(code: string): Promise<"ok" | "too-fast" | "limit" | "failed"> {
+        const s = this.store.get();
+        if (this.disposed || s.mode !== "match" || !s.match || s.match.status !== "playing" || !this.matchApi.sendEmoji) return "failed";
+        const gen = this.gen;
+        const id = s.match.matchId;
+        let out: "ok" | "too-fast" | "limit" | "failed" = "failed";
+        await this.serial(async () => {
+            try {
+                const m = await this.matchApi.sendEmoji!(id, code);
+                if (gen !== this.gen) return;
+                await this.applyMatchUpdate(gen, m);
+                out = "ok";
+            } catch (e) {
+                const code2 = (e as { data?: { code?: string } })?.data?.code;
+                out = code2 === "TOO_FAST" ? "too-fast" : code2 === "LIMIT" ? "limit" : "failed";
+            }
+        });
+        return out;
+    }
+
     async timeout(): Promise<boolean> {
         const s = this.store.get();
         if (this.disposed || s.mode !== "match" || !s.match || s.match.status !== "playing" || !this.matchApi.timeout) return false;

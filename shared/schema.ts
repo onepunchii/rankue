@@ -1643,6 +1643,13 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   /** 접속 표시: 각자가 대전 화면을 마지막으로 폴링·샷한 시각(5 s 단위 갱신). 차례가 넘어갈 때 상대 시계를 바로 돌릴지 정한다. */
   hostSeenAt: timestamp("host_seen_at"),
   guestSeenAt: timestamp("guest_seen_at"),
+  /** 이모지 인사(2026-09-09 오너): 마지막 하나만 둔다 — 대화 내역이 아니라 순간 반응이라 쌓을 이유가 없다. */
+  emojiCode: text("emoji_code"),
+  /** 보낸 사람 자리(0 = 호스트, 1 = 게스트) */
+  emojiFrom: integer("emoji_from"),
+  emojiAt: timestamp("emoji_at"),
+  /** 자리별 보낸 횟수 {"0":n,"1":m} — 한 대전 상한을 세는 용도. */
+  emojiCounts: jsonb("emoji_counts"),
   /** 쓰리아웃: 각자의 40초 시간 초과 횟수. SHOT_CLOCK_STRIKES(3) 가 되면 그 사람의 실격패. */
   hostTimeouts: integer("host_timeouts").default(0).notNull(),
   guestTimeouts: integer("guest_timeouts").default(0).notNull(),

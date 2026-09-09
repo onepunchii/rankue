@@ -32,7 +32,7 @@ import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
 import { randomLayout } from "@shared/sim/randomLayout";
 import { DEFAULT_CUE } from "@shared/sim/params";
-import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome, SHOT_CLOCK_STRIKES } from "@shared/sim/rules";
+import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome, SHOT_CLOCK_STRIKES, EMOJI_SHOW_MS, EMOJI_BADGE_MS } from "@shared/sim/rules";
 import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -717,6 +717,34 @@ export function SimulatorPage() {
         ? { seconds: Math.max(0, Math.ceil(clockRemaining)), mine: sim.match.isMyTurn }
         : null;
     // 쓰리아웃: 지금 차례인 사람이 이미 넘긴 횟수(대전·진행 중일 때만)
+    // 이모지 인사(2026-09-09 오너): 헤더의 상대 이름표 옆에서 보내고, 받은 건 그 자리에서 말풍선으로 뜬다.
+    const [emojiBusy, setEmojiBusy] = useState(false);
+    const [emojiNow, setEmojiNow] = useState(() => Date.now());
+    const emojiAt = isMatch && sim.match?.emoji ? Date.parse(sim.match.emoji.at) : NaN;
+    const emojiFresh = Number.isFinite(emojiAt) && emojiNow - emojiAt < EMOJI_BADGE_MS;
+    useEffect(() => {
+        if (!Number.isFinite(emojiAt)) return;
+        setEmojiNow(Date.now());
+        const id = setInterval(() => setEmojiNow(Date.now()), 500);
+        return () => clearInterval(id);
+    }, [emojiAt]);
+    const onSendEmoji = useCallback(async (code: string) => {
+        setEmojiBusy(true);
+        const r = await actions.sendEmoji(code);
+        setEmojiBusy(false);
+        if (r === "too-fast") toast({ title: t("sim.emoji.tooFast") });
+        else if (r === "limit") toast({ title: t("sim.emoji.limit") });
+    }, [actions, toast, t]);
+    const emojiUi = isMatch && sim.match && sim.match.status === "playing"
+        ? {
+            onSend: onSendEmoji,
+            busy: emojiBusy,
+            // 상대가 보낸 것만 띄운다(내가 보낸 건 이미 내가 안다)
+            received: emojiFresh && sim.match.emoji && sim.match.emoji.from !== sim.match.myIndex
+                ? { code: sim.match.emoji.code, bubble: emojiNow - emojiAt < EMOJI_SHOW_MS }
+                : null,
+        }
+        : null;
     const strikes = isMatch && sim.match && sim.match.status === "playing"
         ? { used: sim.match.timeouts[sim.match.turn] ?? 0, total: SHOT_CLOCK_STRIKES, mine: sim.match.isMyTurn }
         : null;
@@ -861,7 +889,8 @@ export function SimulatorPage() {
 
     const openMatch = useCallback((m: MatchPublic) => {
         if (m.status === "waiting") return;
-        if (actions.startMatch(m)) navigate(`/online-game?match=${m.id}`, { replace: true });
+        // 대전 열기도 히스토리를 남긴다 — 기기 뒤로가기가 로비·목록으로 돌아온다(2026-09-09 오너)
+        if (actions.startMatch(m)) navigate(`/online-game?match=${m.id}`);
     }, [actions, navigate]);
 
     const onResign = useCallback(async () => {
@@ -1072,6 +1101,7 @@ export function SimulatorPage() {
                     session={sim.session} config={sim.config} phase={sim.phase} names={names}
                     record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
                     drillName={drill ? t(drill.drill.nameKey) : null}
+                    emoji={emojiUi}
                     hideStatus={pathView}
                     hideSummary={pathView}
                     onClose={pathView ? onExitRequest : undefined}
@@ -1239,13 +1269,13 @@ export function SimulatorPage() {
                 <div className={cn("fixed inset-0 z-[5] overflow-y-auto", ENTRY_STYLE.page)} style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <SimEntry
                         onSingle={() => setSetupOpen(true)}
-                        onDrills={() => navigate("/online-game?drills=1", { replace: true })}
-                        onMulti={() => navigate("/online-game?lobby=1", { replace: true })}
-                        onJoin={() => navigate("/online-game?lobby=1&tab=join", { replace: true })}
-                        onRooms={() => navigate("/online-game?rooms=1", { replace: true })}
-                        onRank={() => navigate("/online-game?rank=1", { replace: true })}
-                        onPath={() => navigate("/online-game?path=1", { replace: true })}
-                        onDash={() => navigate("/online-game?dash=1", { replace: true })}
+                        onDrills={() => navigate("/online-game?drills=1")}
+                        onMulti={() => navigate("/online-game?lobby=1")}
+                        onJoin={() => navigate("/online-game?lobby=1&tab=join")}
+                        onRooms={() => navigate("/online-game?rooms=1")}
+                        onRank={() => navigate("/online-game?rank=1")}
+                        onPath={() => navigate("/online-game?path=1")}
+                        onDash={() => navigate("/online-game?dash=1")}
                         onClose={() => navigate(EXIT_PATH)}
                     />
                 </div>
@@ -1254,7 +1284,7 @@ export function SimulatorPage() {
                 <div className="fixed inset-0 z-[5] overflow-y-auto bg-surface-1" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <RoomList
                         onOpen={openMatch}
-                        onCreate={() => navigate("/online-game?lobby=1&public=1", { replace: true })}
+                        onCreate={() => navigate("/online-game?lobby=1&public=1")}
                         onClose={() => navigate("/online-game", { replace: true })}
                         myHandi={member ? { handi3c: member.handi3c, handi4c: member.handi4c } : undefined}
                     />
@@ -1277,9 +1307,9 @@ export function SimulatorPage() {
                         onClose={() => navigate("/online-game", { replace: true })}
                         onOpenMatch={openMatch}
                         onPractice={() => { navigate("/online-game", { replace: true }); setSetupOpen(true); }}
-                        onDrills={() => navigate("/online-game?drills=1", { replace: true })}
-                        onLobby={() => navigate("/online-game?lobby=1", { replace: true })}
-                        onRank={() => navigate("/online-game?rank=1", { replace: true })}
+                        onDrills={() => navigate("/online-game?drills=1")}
+                        onLobby={() => navigate("/online-game?lobby=1")}
+                        onRank={() => navigate("/online-game?rank=1")}
                     />
                 </div>
             )}

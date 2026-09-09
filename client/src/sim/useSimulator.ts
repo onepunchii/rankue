@@ -80,6 +80,8 @@ export interface SimulatorActions {
     sync(): void;
     /** 대전: 40초 룰 시간 초과 처리(화면의 시계가 0 이 되면 부른다 — 내 차례 40초 / 상대 차례 50초). 성공하면 true. */
     timeout(): Promise<boolean>;
+    /** 이모지 인사(대전). 거부 사유를 돌려준다. */
+    sendEmoji(code: string): Promise<"ok" | "too-fast" | "limit" | "failed">;
 }
 
 /** 네트워크 대전 뷰(mode="match" 에서만). 이름은 players 순서(0 호스트·흰 공, 1 게스트·노란 공). */
@@ -112,6 +114,8 @@ export interface MatchView {
     readonly serverOffsetMs: number;
     /** 쓰리아웃: [호스트, 게스트] 시간 초과 횟수(SHOT_CLOCK_STRIKES 가 되면 실격패). */
     readonly timeouts: readonly [number, number];
+    /** 마지막 이모지 인사(보낸 사람 자리 포함). 화면이 상대 것만 띄운다. */
+    readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
 }
 
 export interface Simulator {
@@ -203,6 +207,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         claim: () => ctrl.claim(),
         sync: () => ctrl.sync(),
         timeout: () => ctrl.timeout(),
+        sendEmoji: (code: string) => ctrl.sendEmoji(code),
     }), [ctrl]);
 
     return useMemo<Simulator>(() => {
@@ -226,6 +231,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             canResign: m.status === "playing",
             opponentShot: core.replayOf !== null && core.replayOf !== m.myIndex,
             turnSeenAt: m.turnSeenAt,
+            emoji: m.emoji ?? null,
             serverOffsetMs: aux.serverOffsetMs,
             timeouts: m.timeouts ?? [0, 0],
         } : null;

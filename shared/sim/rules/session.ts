@@ -152,3 +152,25 @@ function decideByInningCap(players: readonly PlayerState[]): number | null {
     if (r0 === r1) return null;
     return r0 > r1 ? 0 : 1;
 }
+
+/* ------------------------------------------------------------------ 이모지 인사 */
+
+/**
+ * 대전 중 상대에게 보내는 인사(2026-09-09 오너). 직접 입력은 없다 — 5개 언어를 쓰는 앱이라 번역·신고 대응 부담이 크고,
+ * 고정 여섯 개면 그 문제가 없다. 코드만 저장하고 그림은 화면이 고른다.
+ */
+export const MATCH_EMOJIS = ["hi", "nice", "wow", "hurry", "sorry", "fight"] as const;
+export type MatchEmoji = typeof MATCH_EMOJIS[number];
+
+export function isMatchEmoji(v: unknown): v is MatchEmoji {
+    return typeof v === "string" && (MATCH_EMOJIS as readonly string[]).includes(v);
+}
+
+/** 도배 방지: 한 사람이 이 간격 안에는 한 번만. */
+export const EMOJI_COOLDOWN_MS = 5_000;
+/** 한 대전에서 한 사람이 보낼 수 있는 총 횟수. */
+export const EMOJI_MAX_PER_MATCH = 10;
+/** 받은 이모지를 화면에 띄워 두는 시간(말풍선). */
+export const EMOJI_SHOW_MS = 3_000;
+/** 이름표 옆에 작게 남겨 두는 시간(잠깐 딴 데 봐도 놓치지 않게). */
+export const EMOJI_BADGE_MS = 10_000;

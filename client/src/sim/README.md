@@ -527,3 +527,16 @@ entry/entryStats.ts   EntryChoice = "solo" | "together". 예전 저장값(single
 수집 정체 알림      services/feedHealth.ts — umb-sync·pba-sync 크론이 동기화 직후 "새 데이터가 들어왔나"를 보고 밀려 있으면 운영자에게 하루 한 번.
                   점검 scripts/feed-health.ts · umb-state.ts · pba-state.ts.
 ```
+
+### 이모지 인사 (2026-09-09 오너)
+```
+무엇        대전 중 상대에게 보내는 고정 인사 여섯 개(hi 👋 · nice 👍 · wow 😮 · hurry ⏰ · sorry 🙏 · fight 🔥).
+           직접 입력은 없다 — 5개 언어 번역·신고 대응 부담을 지지 않는다. 서버·DB 는 코드만 알고 그림은 EmojiBar 가 고른다.
+어디        보내기: 헤더 요약(상대 이름표) 오른쪽의 작은 버튼 → 누르면 여섯 개가 펼쳐지고 고르면 접힌다.
+           받기: 상대 이름표 위에 말풍선 3 s(EMOJI_SHOW_MS) → 그 뒤 작은 배지 10 s(EMOJI_BADGE_MS). 테이블 위에는 절대 그리지 않는다.
+전달        새 실시간 연결 없이 기존 폴링(상대 차례 2 s · 조준 중 5 s)에 실린다. publicMatch.emoji = { code, from, at } (마지막 하나만).
+제한        같은 사람 5 s 간격(EMOJI_COOLDOWN_MS) · 한 대전 10회(EMOJI_MAX_PER_MATCH). 거부는 429 TOO_FAST / LIMIT → 화면은 토스트.
+저장        hiq_sim_matches.emoji_code·emoji_from·emoji_at·emoji_counts — 대화 내역이 아니라 순간 반응이라 마지막 하나만 둔다.
+푸시        보내지 않는다(앱 밖에서 진동은 성가시다). 앱 안에서만 보인다.
+e2e        scripts/sim-e2e/emoji.ts (전달·간격·상한·잘못된 코드)
+```

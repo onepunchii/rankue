@@ -160,6 +160,8 @@ export interface MatchState {
     readonly claimableAt: string | null;
     /** 40초 룰 시계 기준(ISO). 없으면 시계 없음. */
     readonly turnSeenAt: string | null;
+    /** 마지막 이모지 인사(내 것도 포함 — 화면이 보낸 사람으로 가른다). */
+    readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
     readonly endReason: MatchEndReason | null;
     readonly winnerIndex: PlayerIndex | null;
     /** 쓰리아웃: [호스트, 게스트] 시간 초과 횟수 */
@@ -181,6 +183,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         timeouts: m.timeouts ?? [0, 0],
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
+        emoji: m.emoji ?? null,
         endReason: m.endReason,
         winnerIndex: m.winnerIndex,
     };
@@ -190,7 +193,8 @@ export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
     return a.matchId === b.matchId && a.myIndex === b.myIndex && a.version === b.version && a.turn === b.turn
         && a.status === b.status && a.claimableAt === b.claimableAt && a.turnSeenAt === b.turnSeenAt && a.endReason === b.endReason
         && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName
-        && a.timeouts[0] === b.timeouts[0] && a.timeouts[1] === b.timeouts[1];
+        && a.timeouts[0] === b.timeouts[0] && a.timeouts[1] === b.timeouts[1]
+        && (a.emoji?.at ?? null) === (b.emoji?.at ?? null);
 }
 
 /** 서버가 끝냈는데(기권·무응답 승리) 세션은 아직 playing 이면 세션에도 종료를 표시한다. */

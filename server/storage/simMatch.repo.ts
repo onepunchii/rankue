@@ -210,6 +210,30 @@ export class SimMatchRepository {
                 or(isNull(col), sql`${col} < now() - make_interval(secs => ${SEEN_THROTTLE_MS / 1000})`)));
     }
 
+    /**
+     * 이모지 인사 보내기. 마지막 하나만 남기고, 도배는 여기서 막는다 —
+     * 같은 사람이 EMOJI_COOLDOWN_MS 안에 또 보내면 거부, 한 대전에서 EMOJI_MAX_PER_MATCH 를 넘어도 거부.
+     * 보낸 횟수는 대전 행에 세지 않고(컬럼을 더 늘리지 않으려고) 알림 없이 카운트만 메모리에 두지 않는다 —
+     * 대신 host/guest 각각의 누적을 emoji_counts jsonb 없이 간단히 처리하기 위해 shots 처럼 별도 컬럼 없이
+     * "마지막 시각 + 총 횟수"를 한 컬럼(emoji_from/emoji_at)으로는 못 세므로, 횟수 제한은 라우트에서
+     * 알림 테이블이 아닌 이 메서드의 반환값으로 판단한다(아래 sentCount 참고).
+     */
+    async sendEmoji(id: string, from: 0 | 1, code: string, cooldownMs: number, maxPerMatch: number): Promise<"ok" | "cooldown" | "limit" | "gone"> {
+        return db.transaction(async (tx) => {
+            const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, id)).for("update");
+            if (!m || m.status !== "playing") return "gone";
+            const counts = (m.emojiCounts as Record<string, number> | null) ?? {};
+            const key = String(from);
+            if ((counts[key] ?? 0) >= maxPerMatch) return "limit";
+            if (m.emojiAt && m.emojiFrom === from && Date.now() - m.emojiAt.getTime() < cooldownMs) return "cooldown";
+            await tx.update(hiqSimMatches).set({
+                emojiCode: code, emojiFrom: from, emojiAt: new Date(),
+                emojiCounts: { ...counts, [key]: (counts[key] ?? 0) + 1 },
+            }).where(eq(hiqSimMatches.id, id));
+            return "ok";
+        });
+    }
+
     /** 40초 룰: 차례인 사람이 조준 화면에 들어온 시각을 한 번만 적는다(이미 있으면 그대로 → undefined). */
     async markTurnSeen(id: string, turn: number): Promise<HiqSimMatch | undefined> {
         const [row] = await db.update(hiqSimMatches).set({ turnSeenAt: new Date() })

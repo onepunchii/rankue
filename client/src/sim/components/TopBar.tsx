@@ -1,6 +1,7 @@
 import { Fragment, memo } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { EmojiBar, EMOJI_GLYPH } from "../match/EmojiBar";
 import type { SessionState } from "@shared/sim/rules";
 import type { SimSetupConfig } from "../setupPresets";
 import type { Phase } from "../simReducer";
@@ -41,6 +42,15 @@ export interface TopBarProps {
     hideSummary?: boolean;
     /** 오른쪽 닫기 알약(길 찾기: 툴바의 X 대신 여기). */
     onClose?: () => void;
+    /**
+     * 이모지 인사(대전). 보내기 버튼은 상대 이름표 옆에 두고, 받은 인사는 그 자리에서 말풍선으로 띄운다
+     * — 테이블 위에는 절대 그리지 않는다(공 궤적을 가린다).
+     */
+    emoji?: {
+        readonly onSend: (code: string) => void;
+        readonly busy: boolean;
+        readonly received: { readonly code: string; readonly bubble: boolean } | null;
+    } | null;
     /** 쓰리아웃: 지금 차례인 사람의 시간 초과 횟수(used/total). 대전에서만. */
     strikes?: { readonly used: number; readonly total: number; readonly mine: boolean } | null;
 }
@@ -100,6 +110,7 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                     ))}
                 </span>
             )}
+            {p.emoji && <EmojiBar onSend={p.emoji.onSend} disabled={p.emoji.busy} className="shrink-0" />}
             <div className="flex-1 min-w-0" />
             {p.onClose && (
                 <button
@@ -120,7 +131,21 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                 </button>
             ))}
             {s && !p.drillName && !p.hideSummary && (
-                <div className="flex items-center gap-1.5 min-w-0 -mr-1">
+                <div className="relative flex items-center gap-1.5 min-w-0 -mr-1">
+                    {/* 받은 인사: 이름표 위에서 잠깐 떠오르고(말풍선) 그 뒤엔 작은 배지로 남는다 — 테이블은 가리지 않는다 */}
+                    {p.emoji?.received && (
+                        <span
+                            role="status"
+                            className={cn(
+                                "absolute right-0 z-[2] pointer-events-none select-none",
+                                p.emoji.received.bubble
+                                    ? "-top-1 text-[26px] leading-none animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                    : "top-0 text-[14px] leading-none opacity-80",
+                            )}
+                        >
+                            {EMOJI_GLYPH[p.emoji.received.code as keyof typeof EMOJI_GLYPH] ?? "🙂"}
+                        </span>
+                    )}
                     {twoPlayers
                         ? s.players.map((pl, i) => {
                             const isTurn = playing && s.turn === i;

@@ -44,6 +44,10 @@ export function matchResignUrl(id: string): string {
 export function matchClaimUrl(id: string): string {
     return `${matchUrl(id)}/claim`;
 }
+export function matchEmojiUrl(id: string): string {
+    return `${matchUrl(id)}/emoji`;
+}
+
 export function matchTimeoutUrl(id: string): string {
     return `${matchUrl(id)}/timeout`;
 }
@@ -122,6 +126,8 @@ export interface MatchPublic {
     readonly turnSeenAt: string | null;
     /** 응답을 만든 서버 시각(ISO) — 클라이언트 시계 보정용. 예전 서버 응답엔 없다. */
     readonly serverNow: string | null;
+    /** 마지막 이모지 인사(없거나 예전 서버면 null). */
+    readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
     /** 쓰리아웃: [호스트, 게스트] 의 40초 시간 초과 횟수. 예전 응답엔 없어 [0, 0]. */
     readonly timeouts: readonly [number, number];
 }
@@ -340,6 +346,10 @@ export function parseMatch(raw: unknown): MatchPublic {
         claimableAt: isoOrNull(raw.claimableAt),
         turnSeenAt: isoOrNull(raw.turnSeenAt),
         serverNow: isoOrNull(raw.serverNow),
+
+        emoji: isRecord(raw.emoji) && typeof raw.emoji.code === "string" && typeof raw.emoji.at === "string"
+            ? { code: raw.emoji.code, from: typeof raw.emoji.from === "number" ? raw.emoji.from : 0, at: raw.emoji.at }
+            : null,
         timeouts: Array.isArray(raw.timeouts) && raw.timeouts.length === 2
             ? [Number(raw.timeouts[0]) || 0, Number(raw.timeouts[1]) || 0] as const
             : [0, 0] as const,
@@ -533,6 +543,8 @@ export interface MatchApi {
     claim(id: string): Promise<ClaimResponse>;
     /** 40초 룰 시간 초과 처리(내 차례 40초 / 상대 차례 50초 뒤). 서버가 시각을 판정하고 갱신된 대전 행을 돌려준다. 없으면 시계 기능 없음. */
     timeout?(id: string): Promise<MatchPublic>;
+    /** 이모지 인사 보내기. 너무 자주 보내면 429. */
+    sendEmoji?(id: string, code: string): Promise<MatchPublic>;
 }
 
 /** request 를 주입해 만든다(테스트는 가짜 request). 응답은 {success,data} 가 이미 벗겨진 data 여야 한다. */
