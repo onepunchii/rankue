@@ -665,6 +665,29 @@ export const golfBookings = pgTable("golf_bookings", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/**
+ * 조인 신청 기록 (2026-09-09 신설).
+ *
+ * 그전엔 '조인 신청하기' 버튼이 문자 앱만 열고 끝이었다 — 누가 신청했는지도, 몇 명이 찼는지도,
+ * 안 나타났는지도 어디에도 남지 않았다. 크루 안에서 조인을 열려면 신청자가 회원으로 남아야 하고,
+ * 노쇼 장치도 "신청한 적이 있다"는 기록 위에서만 만들 수 있다.
+ *
+ * 조인 글 자체는 golf_bookings(listing_type='JOIN') 행이다. 여기는 그 글에 대한 신청만 담는다.
+ */
+export const golfJoinRequests = pgTable("golf_join_requests", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  bookingId: uuid("booking_id").references(() => golfBookings.id, { onDelete: "cascade" }).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  /** applied = 신청 중, cancelled = 본인이 취소. 행을 지우지 않는다 — 반복 취소를 나중에 볼 수 있어야 한다. */
+  status: text("status", { enum: ["applied", "cancelled"] }).default("applied").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.bookingId, table.memberId),
+]);
+
+export type GolfJoinRequest = typeof golfJoinRequests.$inferSelect;
+
 // 9.2 골프 조인 (Golf Join) - Separated from Booking
 export const golfJoins = pgTable("golf_joins", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),

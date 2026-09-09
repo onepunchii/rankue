@@ -10,14 +10,20 @@ interface BookingCardProps {
     expandedBookingId: string | null;
     onExpand: (id: string | null) => void;
     onReserve: (item: any) => void;
+    /** 조인 신청·취소. 조인 글에서만 쓴다. */
+    onApply?: (item: any) => void;
     onShare: (item: any) => void;
     viewType: 'ALL' | 'BOOKING' | 'JOIN';
 }
 
-export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onShare, viewType }: BookingCardProps) => {
+export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType }: BookingCardProps) => {
     const [reportOpen, setReportOpen] = useState(false);
     const isExpanded = expandedBookingId === item.id;
     const theme = viewType === 'JOIN' ? THEME_COLORS.JOIN : THEME_COLORS.BOOKING;
+    const isJoin = item.listingType === 'JOIN';
+    const capacity = Number(item.joinHeadcount) > 0 ? Number(item.joinHeadcount) : 3;
+    const applied = Number(item.joinApplied ?? 0);
+    const joinFull = applied >= capacity;
 
     return (
         <>
@@ -201,18 +207,26 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onSh
                             )}
 
                             <div className="flex gap-3">
+                                {/* 조인은 기록으로 남는 신청이다. 부킹은 예전처럼 문자로 문의한다. */}
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onReserve(item);
+                                        if (isJoin && onApply) onApply(item); else onReserve(item);
                                     }}
+                                    disabled={isJoin && joinFull && !item.joinedByMe}
                                     className={cn(
-                                        "flex-1 py-4 rounded-2xl text-sm font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2",
-                                        viewType === 'JOIN' ? 'bg-[#FF6B00] text-white shadow-[0_4px_20px_-4px_rgba(255,107,0,0.3)]' : 'bg-[#64DD17] text-[#051907] shadow-[0_4px_20px_-4px_rgba(100,221,23,0.3)]'
+                                        "flex-1 py-4 rounded-2xl text-sm font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:hover:scale-100",
+                                        isJoin
+                                            ? (item.joinedByMe ? 'bg-white/10 text-white border border-white/20' : 'bg-[#FF6B00] text-white shadow-[0_4px_20px_-4px_rgba(255,107,0,0.3)]')
+                                            : 'bg-[#64DD17] text-[#051907] shadow-[0_4px_20px_-4px_rgba(100,221,23,0.3)]'
                                     )}
                                 >
-                                    <span>{viewType === 'JOIN' ? "조인 신청하기" : "예약 문자 보내기"}</span>
-                                    <LucideChevronRight className="w-4 h-4" />
+                                    <span>
+                                        {!isJoin ? "예약 문자 보내기"
+                                            : item.joinedByMe ? "신청 취소하기"
+                                                : joinFull ? "자리가 찼어요" : `조인 신청하기 ${applied}/${capacity}`}
+                                    </span>
+                                    {!item.joinedByMe && <LucideChevronRight className="w-4 h-4" />}
                                 </button>
                                 <button
                                     onClick={(e) => {

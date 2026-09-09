@@ -8,11 +8,11 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 const router = Router();
 
 // --- Golf Booking Routes ---
-router.get("/bookings", asyncHandler(async (req: any, res: any) => {
+router.get("/bookings", asyncHandler(async (req: AuthRequest, res: any) => {
     const date = req.query.date as string | undefined;
     // Pass all query params as filters
     const bookings = await storage.getGolfBookings(date, req.query);
-    return sendSuccess(res, bookings);
+    return sendSuccess(res, await withJoinCounts(bookings as any[], req.userId));
 }));
 
 router.get("/bookings/counts", asyncHandler(async (req: any, res: any) => {
@@ -98,41 +98,57 @@ router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest
 
 
 // --- Golf Join Routes ---
-router.get("/joins", asyncHandler(async (req: any, res: any) => {
+// ── 조인 신청 ──────────────────────────────────────────────────────────────
+// 그전엔 '조인 신청하기' 가 문자 앱만 열고 아무 기록도 안 남겼다. 누가 신청했는지·몇 명 찼는지·
+// 안 나타났는지가 전부 없었다(2026-09-09 검토). 크루 안에서 조인을 열려면 이게 먼저다.
+const DEFAULT_JOIN_CAPACITY = 3;   // 4인 1팀에서 방장을 뺀 자리
+
+router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const booking: any = await storage.getGolfBooking(req.params.id);
+    if (!booking || booking.isBlinded) return sendError(res, 404, "조인 글을 찾을 수 없어요");
+    if (booking.listingType !== "JOIN") return sendError(res, 400, "조인 글이 아니에요");
+    if (booking.ownerId && booking.ownerId === req.userId) return sendError(res, 400, "내가 올린 조인이에요");
+    if (new Date(booking.datetime).getTime() <= Date.now()) return sendError(res, 400, "이미 지난 티타임이에요");
+
+    const capacity = Number(booking.joinHeadcount) > 0 ? Number(booking.joinHeadcount) : DEFAULT_JOIN_CAPACITY;
+    const r = await storage.applyToJoin(req.params.id, req.userId!, capacity);
+    if (r === "already") return sendError(res, 409, "이미 신청했어요", "ALREADY_APPLIED");
+    if (r === "full") return sendError(res, 409, "자리가 다 찼어요", "JOIN_FULL");
+    return sendSuccess(res, { applied: true });
+}));
+
+router.delete("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const ok = await storage.cancelJoinRequest(req.params.id, req.userId!);
+    if (!ok) return sendError(res, 404, "신청 내역이 없어요");
+    return sendSuccess(res, { applied: false });
+}));
+
+/** 목록에 '몇 명 찼는지'와 '내가 신청했는지'를 얹는다 — 화면이 그걸 알아야 신청/취소를 가른다. */
+async function withJoinCounts(rows: any[], userId?: string) {
+    const ids = rows.map((r) => r.id);
+    const [counts, mine] = await Promise.all([
+        storage.countJoinRequests(ids),
+        userId ? storage.myJoinRequestIds(userId, ids) : Promise.resolve(new Set<string>()),
+    ]);
+    return rows.map((r) => ({
+        ...r,
+        joinApplied: counts.get(r.id) ?? 0,
+        joinedByMe: mine.has(r.id),
+    }));
+}
+
+router.get("/joins", asyncHandler(async (req: AuthRequest, res: any) => {
     const date = req.query.date as string | undefined;
     const joins = await storage.getGolfJoins({ date, ...req.query });
-    return sendSuccess(res, joins);
+    return sendSuccess(res, await withJoinCounts(joins as any[], req.userId));
 }));
 
-router.post("/joins", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const items = Array.isArray(req.body) ? req.body : [req.body];
-    const results: GolfJoin[] = [];
-
-    for (const item of items) {
-        const data = {
-            ...item,
-            datetime: new Date(item.datetime),
-            hostId: req.userId,
-            status: 'recruiting'
-        };
-
-        const validation = insertGolfJoinSchema.safeParse(data);
-        if (!validation.success) {
-            return sendError(res, 400, validation.error.message);
-        }
-
-        const join = await storage.createGolfJoin(validation.data as any);
-        results.push(join);
-    }
-
-    return sendSuccess(res, results);
-}));
-
-router.delete("/joins/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const deleted = await storage.deleteGolfJoin(req.params.id, req.userId!);
-    if (!deleted) return sendError(res, 404, "삭제할 글이 없거나 권한이 없습니다");
-    return sendSuccess(res, { success: true });
-}));
+/*
+ * POST/DELETE /joins 는 2026-09-09 제거했다.
+ * golf_joins 표에 쓰는 라우트였는데 읽는 곳이 한 군데도 없었다 — GET /joins 는 golf_bookings 에서
+ * listing_type='JOIN' 을 꺼내 온다. 즉 이 라우트로 만든 조인은 어디에도 안 뜨는 유령이었다.
+ * 조인 글은 POST /bookings 로 listingType:'JOIN' 을 실어 만들고, 신청은 /bookings/:id/apply 가 받는다.
+ */
 
 router.get("/passport-stats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     // 예전엔 여기서 "비어 있으면 표본을 심는" 코드를 돌렸다. 없는 경기 번호로 넣어서 프로덕션에서

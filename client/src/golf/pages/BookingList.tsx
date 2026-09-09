@@ -7,7 +7,9 @@ import {
     LucideLoader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookingCreateForm } from "../components/BookingCreateForm";
@@ -27,6 +29,8 @@ import { FilterBar } from "../components/booking/FilterBar";
 import { ShareSheet } from "../components/booking/ShareSheet";
 
 export default function BookingList() {
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
     const [selectedDate, setSelectedDate] = useState(0);
     const [viewType, setViewType] = useState<'ALL' | 'BOOKING' | 'JOIN'>('BOOKING');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -183,6 +187,23 @@ export default function BookingList() {
         });
     }, [bookings, viewType, selectedFilters, selectedDate, weekDates]);
 
+    // 조인 신청은 기록으로 남긴다. 그전엔 문자 앱만 열고 아무것도 안 남아서 몇 명 찼는지도,
+    // 누가 신청했는지도, 안 나타났는지도 알 수 없었다(2026-09-09 검토).
+    const applyMutation = useMutation({
+        mutationFn: async ({ id, joined }: { id: string; joined: boolean }) =>
+            apiRequest(`/api/hiq/golf/bookings/${id}/apply`, { method: joined ? "DELETE" : "POST" }),
+        onSuccess: (_d, v) => {
+            toast({ title: v.joined ? "신청을 취소했어요" : "조인을 신청했어요" });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/joins"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
+        },
+        onError: (e: any) => toast({ title: e?.message || "신청하지 못했어요", variant: "destructive" }),
+    });
+
+    const handleApply = useCallback((item: any) => {
+        applyMutation.mutate({ id: item.id, joined: !!item.joinedByMe });
+    }, [applyMutation]);
+
     const handleReserve = useCallback((item: any) => {
         const phoneNumber = item.managerPhone || "010-1234-5678";
         const dateStr = weekDates[selectedDate].displayDate;
@@ -292,6 +313,7 @@ export default function BookingList() {
                                 expandedBookingId={expandedBookingId}
                                 onExpand={setExpandedBookingId}
                                 onReserve={handleReserve}
+                                    onApply={handleApply}
                                 onShare={handleShare}
                                 viewType={viewType}
                             />

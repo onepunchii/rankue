@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import {
     golfBookings,
+    golfJoinRequests,
     golfJoins,
     golfMatchSessions,
     hiqGameHistory,
@@ -28,7 +29,7 @@ import type {
     InsertGolfMembershipOrder,
     GolfMembershipOrder
 } from "../../shared/schema.js";
-import { eq, ne, desc, asc, and, or, sql, gte, lte, isNull, like } from "drizzle-orm";
+import { eq, ne, desc, asc, and, or, sql, gte, lte, isNull, like, inArray } from "drizzle-orm";
 import { notFound, conflict } from "../utils/errors.js";
 
 export const GOLF_GRADES = [
@@ -227,6 +228,80 @@ export class GolfRepository {
             .where(owns ? and(eq(golfBookings.id, id), owns) : eq(golfBookings.id, id))
             .returning({ id: golfBookings.id });
         return deleted.length > 0;
+    }
+
+    /** 한 건 조회 — 조인 신청 전 검사(마감·본인 글·가려진 글)에 쓴다. */
+    async getGolfBooking(id: string): Promise<GolfBooking | undefined> {
+        const [row] = await db.select().from(golfBookings).where(eq(golfBookings.id, id)).limit(1);
+        return row;
+    }
+
+    // ── 조인 신청 ────────────────────────────────────────────────────────
+    // 조인 글은 golf_bookings(listing_type='JOIN') 행이고, 신청은 여기 따로 쌓인다.
+    // 그전엔 '조인 신청하기' 가 문자만 열고 아무것도 안 남겼다(2026-09-09).
+
+    /** 조인 글별 현재 신청 인원. 목록에 뿌리려고 한 번에 센다. */
+    async countJoinRequests(bookingIds: string[]): Promise<Map<string, number>> {
+        if (bookingIds.length === 0) return new Map();
+        const rows = await db.select({
+            bookingId: golfJoinRequests.bookingId,
+            n: sql<number>`count(*)::int`,
+        })
+            .from(golfJoinRequests)
+            .where(and(inArray(golfJoinRequests.bookingId, bookingIds), eq(golfJoinRequests.status, "applied")))
+            .groupBy(golfJoinRequests.bookingId);
+        return new Map(rows.map((r) => [r.bookingId, Number(r.n)]));
+    }
+
+    /** 내가 신청해 둔 조인 글 id 들. */
+    async myJoinRequestIds(memberId: string, bookingIds: string[]): Promise<Set<string>> {
+        if (bookingIds.length === 0) return new Set();
+        const rows = await db.select({ bookingId: golfJoinRequests.bookingId })
+            .from(golfJoinRequests)
+            .where(and(
+                eq(golfJoinRequests.memberId, memberId),
+                eq(golfJoinRequests.status, "applied"),
+                inArray(golfJoinRequests.bookingId, bookingIds),
+            ));
+        return new Set(rows.map((r) => r.bookingId));
+    }
+
+    /**
+     * 신청한다. 정원이 차 있으면 거절한다 — 마지막 한 자리에 둘이 동시에 들어오는 경우까지 막으려면
+     * 세고 넣는 사이가 갈라지면 안 되므로, 한 문장 안에서 세고 넣는다.
+     */
+    async applyToJoin(bookingId: string, memberId: string, capacity: number): Promise<"ok" | "full" | "already"> {
+        const [existing] = await db.select({ status: golfJoinRequests.status })
+            .from(golfJoinRequests)
+            .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId)))
+            .limit(1);
+        if (existing?.status === "applied") return "already";
+
+        const inserted = await db.execute(sql`
+            INSERT INTO golf_join_requests (booking_id, member_id, status, updated_at)
+            SELECT ${bookingId}::uuid, ${memberId}::uuid, 'applied', now()
+            WHERE (
+              SELECT count(*) FROM golf_join_requests
+              WHERE booking_id = ${bookingId}::uuid AND status = 'applied'
+            ) < ${capacity}
+            ON CONFLICT (booking_id, member_id)
+            DO UPDATE SET status = 'applied', updated_at = now()
+            RETURNING id
+        `);
+        return (inserted.rows?.length ?? 0) > 0 ? "ok" : "full";
+    }
+
+    /** 신청을 물린다. 행은 남긴다 — 반복 취소를 나중에 볼 수 있어야 한다. */
+    async cancelJoinRequest(bookingId: string, memberId: string): Promise<boolean> {
+        const rows = await db.update(golfJoinRequests)
+            .set({ status: "cancelled", updatedAt: new Date() })
+            .where(and(
+                eq(golfJoinRequests.bookingId, bookingId),
+                eq(golfJoinRequests.memberId, memberId),
+                eq(golfJoinRequests.status, "applied"),
+            ))
+            .returning({ id: golfJoinRequests.id });
+        return rows.length > 0;
     }
 
     async createGolfJoin(data: InsertGolfJoin): Promise<GolfJoin> {
