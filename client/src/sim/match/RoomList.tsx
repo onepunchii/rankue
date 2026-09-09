@@ -53,7 +53,7 @@ const Row = memo(function Row({ m, age, onJoin }: { m: MatchPublic; age: string;
             <span className="flex-1 min-w-0 flex flex-col gap-1">
                 <span className="flex items-center gap-2 min-w-0">
                     <span className="text-[14px] font-semibold text-ink-1 truncate">{m.hostName}</span>
-                    <span className="text-[11px] font-medium text-ink-4 shrink-0">{age}</span>
+                    <span className="text-[11px] font-medium text-ink-3 shrink-0">{age}</span>
                 </span>
                 <span className="text-[12px] font-medium text-ink-3 truncate">
                     {gameLabel(m, t)} · {t("sim.rooms.target").replace("{n}", String(m.hostTarget))}

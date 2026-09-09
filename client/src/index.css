@@ -578,6 +578,9 @@ body {
    * brand(초록)·공 색·gold 은 그대로 둔다: 초록은 여기서도 "이걸 누르세요" 하나만 가리킨다.
    */
   .sim-dark {
+    /* 글자 색을 이 구역에서 다시 상속시킨다 — body 의 color 는 바깥(밝은) --ink-1 로 이미 계산돼 내려오므로,
+       색 클래스를 안 준 요소(예: shadcn Label, input)가 검은 글씨 그대로 남는다(실측 대비 1.12:1). */
+    color: var(--ink-1);
     --surface-0: #121412;
     --surface-1: #1b1e1b;
     --surface-2: #1b1e1b;
@@ -587,7 +590,7 @@ body {
     --ink-1: rgba(255, 255, 255, 0.94);
     --ink-2: rgba(255, 255, 255, 0.75);
     --ink-3: rgba(255, 255, 255, 0.58);
-    --ink-4: rgba(255, 255, 255, 0.42);
+    --ink-4: rgba(255, 255, 255, 0.52);   /* 12 px 캡션 대비 4.5:1 — 0.42 는 4.1:1 로 모자랐다(실측) */
     --shadow-card: none;
     color-scheme: dark;
     /* UI 키트(shadcn) 토큰도 같이 — 안 덮으면 Button variant="outline" 이 흰 알약에 흰 글씨가 된다(실측) */
