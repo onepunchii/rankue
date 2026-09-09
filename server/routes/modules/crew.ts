@@ -234,10 +234,13 @@ router.get("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res:
 router.post("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const role = await requireCrewMember(req, res);
     if (role === null) return;
+    // 글의 종목은 크루가 정한다 — 예전엔 안 넣어서 골프 크루 글까지 BILLIARDS 로 저장됐다(2026-09-09 검토).
+    const crewForPost = await storage.getCrew(req.params.id);
     const data = {
         ...req.body,
         crewId: req.params.id,
         authorId: req.userId,
+        sportCategory: crewForPost?.crew?.sportCategory ?? "BILLIARDS",
         // 공지 등록은 운영진 전용 — 일반 멤버가 isNotice:true를 실어 보내 상단 고정 공지로
         // 올리는 걸 막는다.
         isNotice: (role === 'leader' || role === 'manage') ? req.body.isNotice === true : false,
@@ -697,6 +700,10 @@ router.post("/:id/tournaments", requireAuth, asyncHandler(async (req: AuthReques
     if (!title) return sendError(res, 400, "대회 이름을 입력해주세요");
     const gameType = req.body?.gameType;
     if (gameType !== "3c" && gameType !== "4c") return sendError(res, 400, "종목을 선택해주세요");
+    // 대회는 3쿠션·4구뿐이고 대진에서 경기를 시작하면 당구 경기가 만들어진다 — 골프 크루엔 열지 않는다.
+    // (열어 두면 골프 크루에서 시작한 경기가 당구 RP·에버리지를 오염시킨다, 2026-09-09 검토)
+    const crewForTournament = await storage.getCrew(req.params.id);
+    if (crewForTournament?.crew?.sportCategory !== "BILLIARDS") return sendError(res, 400, "대회는 당구 크루에서만 열 수 있어요");
     const maxPlayers = Number(req.body?.maxPlayers ?? 8);
     // 2의 거듭제곱만 허용 — 대진표가 딱 떨어진다. 2인은 곧 단판(또는 N판) 승부다
     // (오너 결정 2026-09-04: 2명 대회 허용, 풀리그는 당분간 접는다).
@@ -944,7 +951,9 @@ router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =>
 
 // GET /crews/mine - Get my crews
 router.get("/mine", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const sport = req.query.sport as string;
+    // 종목을 안 주면 당구로 본다. 예전엔 undefined 가 "필터 없음"이라 두 종목 크루가 섞여 나갔고,
+    // 골프 부킹 공유 시트가 당구 크루까지 나열해 그 채팅방에 골프 글이 올라갔다(2026-09-09 검토).
+    const sport = req.query.sport === "GOLF" ? "GOLF" : "BILLIARDS";
     const crews = await storage.getUserCrews(req.userId!, sport);
     return sendSuccess(res, crews);
 }));

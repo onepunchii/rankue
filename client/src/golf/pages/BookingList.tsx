@@ -110,7 +110,9 @@ export default function BookingList() {
     }, [user]);
 
     // My Crews for sharing
-    const { data: myCrewsData } = useQuery<any[]>({ queryKey: ["/api/hiq/crews/mine"] });
+    // 종목을 반드시 실어 보낸다 — 예전엔 안 보내서 당구 크루까지 목록에 뜨고,
+    // 공유를 누르면 당구 크루 채팅방에 골프 부킹 글이 올라갔다(2026-09-09 검토).
+    const { data: myCrewsData } = useQuery<any[]>({ queryKey: ["/api/hiq/crews/mine", { sport: "GOLF" }] });
     const myCrews = useMemo(() => {
         if (!myCrewsData) return [];
         return myCrewsData.map(item => item?.crew).filter(Boolean);

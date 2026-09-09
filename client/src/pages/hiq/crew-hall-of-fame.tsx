@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,11 @@ export default function CrewHallOfFame() {
     });
 
     const crewName = crewData?.crew?.name ?? "";
+    // 3쿠션 왕·4구 왕은 당구 전용이다. 골프 크루는 대회 자체를 안 열므로 이 화면도 없다.
+    // (홈에서 진입로는 감췄지만 주소로 들어올 수 있어 여기서도 막는다, 2026-09-09)
+    const isGolfCrew = crewData?.crew?.sportCategory === "GOLF";
     const back = () => setLocation(`/crew/${id}/tournament`);
+    useEffect(() => { if (isGolfCrew) setLocation(`/crew/${id}`, { replace: true }); }, [isGolfCrew, id, setLocation]);
 
     // 종목별 왕 — 그 종목에서 우승이 가장 많은 사람. 3쿠션과 4구는 실력 스케일이 달라
     // 한 줄로 세우면 한 사람이 모든 왕관을 쓴다.

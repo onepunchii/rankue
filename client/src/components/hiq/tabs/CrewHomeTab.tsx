@@ -275,8 +275,9 @@ export const CrewHomeTab = memo(({
                 </div>
             </div>
 
-            {/* 대회 — 홈에는 요약만, 전체는 전용 탭에서 (투표와 같은 방식) */}
-            <div className="px-6 space-y-4">
+            {/* 대회 — 홈에는 요약만, 전체는 전용 탭에서 (투표와 같은 방식).
+                대회·명예의 전당은 3쿠션/4구 전용이라 골프 크루에는 그리지 않는다(2026-09-09 오너: 두 종목을 아예 가른다). */}
+            <div className={cn("px-6 space-y-4", crew.sportCategory === "GOLF" && "hidden")}>
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-brand" />

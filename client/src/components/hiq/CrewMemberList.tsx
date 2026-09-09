@@ -138,7 +138,8 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     // 크루에서 멤버를 열었을 때 가장 궁금한 숫자다("나랑 붙으면 누가 이겼더라").
     const { data: h2h } = useQuery<{ total: number; myWins: number; friendWins: number; winRate: number }>({
         queryKey: [`/api/hiq/stats/h2h/${selectedMember?.member?.id}`],
-        enabled: isSheetOpen && !!selectedMember && !isMe,
+        // 이 전적은 당구 경기만 센다 — 골프 크루에서 "나와 N승 M패" 로 보여주면 남의 종목 숫자다(2026-09-09 검토).
+        enabled: isSheetOpen && !!selectedMember && !isMe && sportCategory !== "GOLF",
         staleTime: 60 * 1000,
     });
 
