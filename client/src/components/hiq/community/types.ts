@@ -52,6 +52,10 @@ export interface CommunityComment {
     authorId: string;
     content: string;
     isBlinded: boolean;
+    /** 대댓글이면 부모(최상위) 댓글 id */
+    parentId?: string | null;
+    /** 답글이 달린 채 지운 댓글 — 자리만 남는다 */
+    isDeleted?: boolean;
     createdAt: string;
     author: CommunityAuthor;
 }

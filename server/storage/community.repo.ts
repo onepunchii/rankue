@@ -84,7 +84,7 @@ export class CommunityRepository {
             avg3c: hiqMembers.avg3c,
             avg4c: hiqMembers.avg4c,
             likeCount: sql<number>`(SELECT count(*)::int FROM ${hiqCommunityLikes} WHERE ${hiqCommunityLikes.postId} = ${hiqCommunityPosts.id})`,
-            commentCount: sql<number>`(SELECT count(*)::int FROM ${hiqCommunityComments} c WHERE c.post_id = ${hiqCommunityPosts.id} AND c.is_blinded = false${viewerId ? sql` AND NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE ${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = c.author_id)` : sql``})`,
+            commentCount: sql<number>`(SELECT count(*)::int FROM ${hiqCommunityComments} c WHERE c.post_id = ${hiqCommunityPosts.id} AND c.is_blinded = false AND c.deleted_at IS NULL${viewerId ? sql` AND NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE ${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = c.author_id)` : sql``})`,
             isLiked: viewerId
                 ? sql<boolean>`EXISTS(SELECT 1 FROM ${hiqCommunityLikes} WHERE ${hiqCommunityLikes.postId} = ${hiqCommunityPosts.id} AND ${hiqCommunityLikes.memberId} = ${viewerId})`
                 : sql<boolean>`false`,
@@ -142,6 +142,9 @@ export class CommunityRepository {
             avg3c: hiqMembers.avg3c,
             avg4c: hiqMembers.avg4c,
             likeCount: sql<number>`(SELECT count(*)::int FROM ${hiqCommunityLikes} WHERE ${hiqCommunityLikes.postId} = ${hiqCommunityPosts.id})`,
+            // 글 상세의 💬 숫자 — 목록 쿼리와 **같은 기준**(가려진 댓글·지운 자리·차단한 사람 제외).
+            // 예전엔 이 쿼리에만 이 칸이 없어서 상세 화면은 댓글이 몇 개든 늘 💬 0 이었다(2026-09-10 발견).
+            commentCount: sql<number>`(SELECT count(*)::int FROM ${hiqCommunityComments} c WHERE c.post_id = ${hiqCommunityPosts.id} AND c.is_blinded = false AND c.deleted_at IS NULL${viewerId ? sql` AND NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE ${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = c.author_id)` : sql``})`,
             isLiked: viewerId
                 ? sql<boolean>`EXISTS(SELECT 1 FROM ${hiqCommunityLikes} WHERE ${hiqCommunityLikes.postId} = ${hiqCommunityPosts.id} AND ${hiqCommunityLikes.memberId} = ${viewerId})`
                 : sql<boolean>`false`,
@@ -180,6 +183,8 @@ export class CommunityRepository {
             authorId: hiqCommunityComments.authorId,
             content: hiqCommunityComments.content,
             isBlinded: hiqCommunityComments.isBlinded,
+            parentId: hiqCommunityComments.parentId,
+            deletedAt: hiqCommunityComments.deletedAt,
             createdAt: hiqCommunityComments.createdAt,
             authorName: hiqMembers.name,
             authorProfileImage: profiles.profileImageUrl,
@@ -198,14 +203,22 @@ export class CommunityRepository {
             ))
             .orderBy(hiqCommunityComments.createdAt);
 
-        return rows.map(r => {
-            const { authorName, authorProfileImage, hideSkillBadge, handi3c, handi4c, avg3c, avg4c, ...c } = r;
-            const masked = c.isBlinded ? { ...c, content: "" } : c;
+        const mapped = rows.map(r => {
+            const { authorName, authorProfileImage, hideSkillBadge, handi3c, handi4c, avg3c, avg4c, deletedAt, ...c } = r;
+            const isDeleted = !!deletedAt;
+            // 지운 댓글 자리는 누가 썼는지도 내보내지 않는다.
+            const masked = isDeleted ? { ...c, content: "", authorId: "" } : c.isBlinded ? { ...c, content: "" } : c;
             return {
                 ...masked,
-                author: { id: c.authorId, name: authorName, profileImageUrl: authorProfileImage, badge: buildBadge(r) },
+                isDeleted,
+                author: isDeleted
+                    ? { id: "", name: "", profileImageUrl: null, badge: null }
+                    : { id: c.authorId, name: authorName, profileImageUrl: authorProfileImage, badge: buildBadge(r) },
             };
         });
+        // 지운 댓글 자리는 **보이는 답글이 있을 때만** 남긴다(차단 등으로 답글이 다 가려지면 빈 자리만 남는다).
+        const hasVisibleReply = new Set(mapped.filter(c => c.parentId).map(c => c.parentId));
+        return mapped.filter(c => !c.isDeleted || hasVisibleReply.has(c.id));
     }
 
     async createComment(data: InsertHiqCommunityComment) {
@@ -218,8 +231,29 @@ export class CommunityRepository {
         return row;
     }
 
+    /**
+     * 댓글 지우기(2026-09-10). 답글이 달린 댓글은 행을 남기고 '삭제된 댓글' 로 바꾼다 — 통째로 지우면
+     * 남이 단 답글까지 사라진다. 답글을 지운 뒤 그 부모가 이미 지운 댓글이고 남은 답글이 없으면 부모 자리도 치운다.
+     */
     async deleteComment(commentId: string) {
+        const [target] = await db.select().from(hiqCommunityComments).where(eq(hiqCommunityComments.id, commentId));
+        if (!target) return;
+        const replyCount = async (id: string) => Number((await db.select({ n: sql<number>`count(*)::int` })
+            .from(hiqCommunityComments).where(eq(hiqCommunityComments.parentId, id)))[0]?.n ?? 0);
+
+        if (!target.parentId) {
+            if (await replyCount(commentId) > 0) {
+                await db.update(hiqCommunityComments).set({ deletedAt: new Date(), content: "" }).where(eq(hiqCommunityComments.id, commentId));
+            } else {
+                await db.delete(hiqCommunityComments).where(eq(hiqCommunityComments.id, commentId));
+            }
+            return;
+        }
         await db.delete(hiqCommunityComments).where(eq(hiqCommunityComments.id, commentId));
+        const [parent] = await db.select().from(hiqCommunityComments).where(eq(hiqCommunityComments.id, target.parentId));
+        if (parent?.deletedAt && await replyCount(parent.id) === 0) {
+            await db.delete(hiqCommunityComments).where(eq(hiqCommunityComments.id, parent.id));
+        }
     }
 
     // upsert 기반 토글 — select-then-insert는 빠른 더블탭에서 unique 위반 500이 난다

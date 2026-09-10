@@ -12,8 +12,7 @@ import {
   varchar,
   index,
   primaryKey,
-  bigint
-} from "drizzle-orm/pg-core";
+  bigint, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1353,6 +1352,13 @@ export const hiqCommunityComments = pgTable("hiq_community_comments", {
   blindReason: text("blind_reason"),
   appealText: text("appeal_text"),
   appealAt: timestamp("appeal_at"),
+  /**
+   * 대댓글이면 부모 댓글 id. **한 단계만** 둔다 — 답글에 답하면 그 답글의 부모(최상위)에 붙인다(2026-09-10 오너).
+   * 부모가 사라지면 답글도 같이 사라진다(글 삭제 경로). 사용자가 부모를 지우는 경우는 deletedAt 으로 자리를 남긴다.
+   */
+  parentId: uuid("parent_id").references((): AnyPgColumn => hiqCommunityComments.id, { onDelete: "cascade" }),
+  /** 답글이 달린 댓글을 지우면 행을 남기고 이 시각을 적는다(내용은 비운다) — 통째로 지우면 남이 단 답글까지 사라진다. */
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -150,26 +150,48 @@ router.post("/posts/:id/comments", requireAuth, asyncHandler(async (req: AuthReq
     const filter = checkContent(content);
     if (filter.blocked) return sendError(res, 400, filter.reason!);
 
+    // 답글이면 부모 댓글. 같은 글이어야 하고 **한 단계만** 둔다 — 답글에 답하면 그 답글의 부모에 붙인다.
+    // 알림은 실제로 답한 사람(바로 위 댓글 작성자)에게 간다.
+    let parentId: string | null = null;
+    let replyToAuthorId: string | null = null;
+    const rawParent = req.body?.parentId;
+    if (rawParent !== undefined && rawParent !== null && rawParent !== "") {
+        if (typeof rawParent !== "string" || !UUID_RE.test(rawParent)) return sendError(res, 404, "답글을 달 댓글을 찾을 수 없습니다");
+        const parent = await storage.community.getCommentRaw(rawParent);
+        if (!parent || parent.postId !== req.params.id) return sendError(res, 404, "답글을 달 댓글을 찾을 수 없습니다");
+        const top = parent.parentId ? await storage.community.getCommentRaw(parent.parentId) : parent;
+        if (!top || top.isBlinded || top.deletedAt || parent.isBlinded || parent.deletedAt) {
+            return sendError(res, 400, "이 댓글에는 답글을 달 수 없습니다");
+        }
+        parentId = top.id;
+        replyToAuthorId = parent.authorId;
+    }
+
     const comment = await storage.community.createComment({
         postId: req.params.id,
         authorId: req.userId!,
         content: maskContacts(content),
-    });
+        parentId,
+    } as any);
 
     // 글 작성자에게 알림 (본인 댓글 제외). 서버리스라 await — fire-and-forget은 유실된다.
     // body는 반드시 마스킹된 저장본(comment.content)을 쓴다 — 원문을 쓰면 전화번호가
     // "연락받고 싶은 상대"의 푸시로 정확히 배달되는 마스킹 우회가 된다.
-    if (post.authorId !== req.userId) {
+    // 답글이면 답한 사람에게 '새 답글', 글 작성자에게 '새 댓글'. 같은 사람이면 한 번만(답글 알림으로).
+    const targets: { memberId: string; title: string }[] = [];
+    if (replyToAuthorId && replyToAuthorId !== req.userId) targets.push({ memberId: replyToAuthorId, title: "💬 새 답글" });
+    if (post.authorId !== req.userId && post.authorId !== replyToAuthorId) targets.push({ memberId: post.authorId, title: "💬 새 댓글" });
+    if (targets.length) {
         try {
             const commenter = await storage.getMemberById(req.userId!);
-            await notificationService.sendAndSaveNotification({
-                memberId: post.authorId,
-                title: "💬 새 댓글",
+            await Promise.allSettled(targets.map((tg) => notificationService.sendAndSaveNotification({
+                memberId: tg.memberId,
+                title: tg.title,
                 body: `${commenter?.name || "누군가"}님: ${comment.content.slice(0, 40)}`,
                 category: "BILLIARDS",
                 type: "COMMUNITY",
                 params: { url: `/community/${post.id}` },
-            });
+            })));
         } catch (e) { console.error("[Notify] 커뮤니티 댓글:", e); }
     }
     return sendSuccess(res, comment);
