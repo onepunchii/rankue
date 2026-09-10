@@ -14,6 +14,22 @@ import type { EvaluateOptions, Rules, ShotOutcome, ShotOutcomeCode } from "./typ
 
 export const CUE_BALL_IDS = ["white", "yellow"] as const;
 
+/**
+ * 뱅크샷(빈쿠션) = 수구가 **첫 적구보다 쿠션을 먼저** 맞힌 득점. 쿠션 개수 조건은 없다(원뱅크·투뱅크·스리뱅크 모두).
+ *
+ * 근거: PBA 공식 경기규칙 "뱅크샷 득점 (빈쿠션) 2포인트"(pbatour.org, 2026-09-10 확인). 정상 3쿠션 득점 요건
+ * (두 번째 적구 전 쿠션 합 3개 이상)은 따로 먼저 채워야 한다 — 이 함수는 득점인 샷에만 쓴다.
+ *
+ * 예전엔 '쿠션 3개 먼저' 로 되어 있었다. 규칙 엔진을 만들 때 근거 없이 들어간 가정이었고(2026-09-07),
+ * 원뱅크·투뱅크가 1점으로 처리돼 사용자 문의가 들어왔다. 점수 판정과 '마무리는 뱅크샷' 규칙이 이 한 함수를 함께 쓴다 —
+ * 두 곳에 숫자를 따로 적어 두면 또 어긋난다(드릴 경로 표시는 이미 1 을 쓰고 있었다).
+ */
+export const BANK_MIN_CUSHIONS_FIRST = 1;
+
+export function isBankShot(o: { readonly cushionsBeforeFirst: number }): boolean {
+    return o.cushionsBeforeFirst >= BANK_MIN_CUSHIONS_FIRST;
+}
+
 export function opponentCueBall(cueBallId: string): string {
     return cueBallId === "white" ? "yellow" : "white";
 }
@@ -124,7 +140,7 @@ export function evaluateShot(
         return outcome(walk.contacts.length === 1 ? "miss-one-ball" : "miss-no-contact", 0, false, true, walk);
     }
     if (walk.cushionsBeforeSecond < 3) return outcome("miss-cushions", 0, false, true, walk);
-    if (rules.ruleSet === "pba" && walk.cushionsBeforeFirst >= 3) {
+    if (rules.ruleSet === "pba" && isBankShot(walk)) {
         return outcome("point-bank", rules.bankShotPoint, true, false, walk);
     }
     return outcome("point", 1, true, false, walk);

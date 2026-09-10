@@ -8,6 +8,7 @@
 import type { Rules, ShotOutcome } from "./types.js";
 import type { BallState } from "../types.js";
 import { isOpeningLayout } from "../layouts.js";
+import { isBankShot } from "./evaluate.js";
 
 export type FinishType = "none" | "3c" | "bank";
 
@@ -64,7 +65,7 @@ export function currentPlayer(s: SessionState): PlayerState {
 function finishSatisfied(s: SessionState, o: ShotOutcome): boolean {
     if (s.finishType === "none") return true;
     if (s.finishType === "3c") return o.cushionsBeforeSecond >= 3;
-    return o.cushionsBeforeFirst >= 3; // bank
+    return isBankShot(o); // bank — 점수 판정과 같은 정의(evaluate.ts)
 }
 
 /**

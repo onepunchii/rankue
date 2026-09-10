@@ -45,6 +45,14 @@ describe("마무리 규칙", () => {
         const r2 = applyShot(r.session, three);
         expect(r2.session.status).toBe("finished");
     });
+    it("bank: 원뱅크(쿠션 1개 먼저)도 뱅크샷 마무리로 인정한다", () => {
+        const s = createSession({ rules: DEFAULT_3C_RULES, finishType: "bank", players: [{ id: "me", target: 1 }] });
+        expect(applyShot(s, { ...POINT, cushionsBeforeFirst: 1 }).session.status).toBe("finished");
+    });
+    it("bank: 공을 먼저 맞힌 득점으로는 마무리가 안 된다", () => {
+        const s = createSession({ rules: DEFAULT_3C_RULES, finishType: "bank", players: [{ id: "me", target: 1 }] });
+        expect(applyShot(s, { ...POINT, cushionsBeforeFirst: 0 }).session.status).not.toBe("finished");
+    });
     it("bank: 마지막 점수는 뱅크샷이어야 한다", () => {
         const s = createSession({ rules: DEFAULT_3C_RULES, finishType: "bank", players: [{ id: "me", target: 1 }] });
         expect(applyShot(s, POINT).outcome.code).toBe("miss-finish");

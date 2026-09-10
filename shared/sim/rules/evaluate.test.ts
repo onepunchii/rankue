@@ -45,14 +45,33 @@ describe("3쿠션 판정 (UMB 기본)", () => {
         const o = evaluateShot([bb("white", "red"), bb("red", "yellow"), cu("white"), cu("white"), cu("white"), bb("white", "yellow")], "white", DEFAULT_3C_RULES);
         expect(o.code).toBe("point"); expect(o.kisses).toBe(1);
     });
-    it("뱅크샷(쿠션 3 먼저)은 UMB 에서 1점, PBA 에서 2점", () => {
+    // PBA 뱅크샷 = 빈쿠션(첫 적구보다 쿠션 먼저). 쿠션 개수는 따지지 않는다 — pbatour.org "뱅크샷 득점 (빈쿠션) 2포인트".
+    it("원뱅크(벽 → 공1 → 벽 → 벽 → 공2): UMB 1점, PBA 2점", () => {
+        const ev = [cu("white"), bb("white", "red"), cu("white"), cu("white"), bb("white", "yellow")];
+        expect(evaluateShot(ev, "white", DEFAULT_3C_RULES)).toMatchObject({ code: "point", points: 1 });
+        expect(evaluateShot(ev, "white", PBA)).toMatchObject({ code: "point-bank", points: 2, cushionsBeforeFirst: 1 });
+    });
+    it("투뱅크(벽 → 벽 → 공1 → 벽 → 공2): PBA 2점 — 예전엔 1점이라 문의가 들어왔다", () => {
+        const ev = [cu("white"), cu("white"), bb("white", "red"), cu("white"), bb("white", "yellow")];
+        expect(evaluateShot(ev, "white", PBA)).toMatchObject({ code: "point-bank", points: 2, cushionsBeforeFirst: 2 });
+    });
+    it("스리뱅크(벽 ×3 → 공1 → 공2): UMB 1점, PBA 2점", () => {
         const ev = [cu("white"), cu("white"), cu("white"), bb("white", "red"), bb("white", "yellow")];
         expect(evaluateShot(ev, "white", DEFAULT_3C_RULES)).toMatchObject({ code: "point", points: 1 });
         expect(evaluateShot(ev, "white", PBA)).toMatchObject({ code: "point-bank", points: 2 });
     });
-    it("PBA 에서도 쿠션 2 → 적구 → 쿠션 1 은 1점(뱅크 아님)", () => {
-        const ev = [cu("white"), cu("white"), bb("white", "red"), cu("white"), bb("white", "yellow")];
-        expect(evaluateShot(ev, "white", PBA)).toMatchObject({ code: "point", points: 1 });
+    it("벽을 먼저 맞혀도 쿠션 합이 3 이 안 되면 득점이 아니다(벽 → 공1 → 벽 → 공2)", () => {
+        const ev = [cu("white"), bb("white", "red"), cu("white"), bb("white", "yellow")];
+        expect(evaluateShot(ev, "white", PBA)).toMatchObject({ code: "miss-cushions", points: 0, scored: false });
+    });
+    it("공을 먼저 맞힌 득점은 PBA 에서도 1점(공1 → 벽 ×3 → 공2)", () => {
+        const ev = [bb("white", "red"), cu("white"), cu("white"), cu("white"), bb("white", "yellow")];
+        expect(evaluateShot(ev, "white", PBA)).toMatchObject({ code: "point", points: 1, cushionsBeforeFirst: 0 });
+    });
+    it("적구가 먼저 쿠션을 맞는 건 빈쿠션이 아니다(수구 쿠션만 센다)", () => {
+        // 수구가 red 를 먼저 맞히고, red 가 쿠션을 맞는 이벤트가 섞여 있어도 cushionsBeforeFirst 는 0
+        const ev = [bb("white", "red"), cu("red"), cu("white"), cu("white"), cu("white"), bb("white", "yellow")];
+        expect(evaluateShot(ev, "white", PBA)).toMatchObject({ code: "point", points: 1, cushionsBeforeFirst: 0 });
     });
     it("한 공만 맞힘 / 아무것도 못 맞힘 / 쿠션만", () => {
         expect(evaluateShot([bb("white", "red"), cu("white")], "white", DEFAULT_3C_RULES).code).toBe("miss-one-ball");

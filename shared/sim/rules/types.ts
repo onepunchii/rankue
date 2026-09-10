@@ -34,7 +34,7 @@ export type Rules = ThreeCushionRules | FourBallRules;
 
 export type ShotOutcomeCode =
     | "point"            // 정상 득점
-    | "point-bank"       // PBA 뱅크샷(쿠션 3개 먼저) 득점
+    | "point-bank"       // PBA 뱅크샷(빈쿠션: 첫 적구보다 쿠션 먼저, 개수 무관) 득점
     | "point-3c"         // 4구: 3쿠션 이상 득점(2배 옵션)
     | "miss-no-contact"  // 아무 공도 못 맞힘
     | "miss-one-ball"    // 한 공만 맞힘
