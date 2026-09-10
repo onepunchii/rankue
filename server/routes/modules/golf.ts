@@ -295,27 +295,23 @@ router.get("/passport-stats", requireAuth, asyncHandler(async (req: AuthRequest,
     return sendSuccess(res, stats);
 }));
 
+/**
+ * 스코어카드 글자 인식 결과를 표로 정리해 돌려준다. **아무것도 저장하지 않는다.**
+ *
+ * 예전엔 여기서 공용 코스 자료(hiq_course_hole_info)에 홀별 파를 적었다. 두 가지가 겹쳐 있었다:
+ *  1. 화면(ScorecardScanner)이 올린 사진을 보지도 않고, 코드에 박아 둔 가짜 결과
+ *     (HOLE 1 / PAR 4 / HONG 5)를 3초 기다린 뒤 보내고 있었다. 여기 쌓이던 건 실제 스코어카드가
+ *     아니라 지어낸 숫자였고, 사용자에게는 "성공적으로 분석했습니다" 라고 말했다.
+ *  2. ocrData 는 클라이언트가 보내는 값이다. 아무나 아무 숫자나 실어 보내면 그게 모든 사람이 보는
+ *     골프장 코스 자료가 됐다 — 검증이 한 군데도 없었다.
+ * 2026-09-10 저장을 걷어냈다. 진짜 인식을 붙일 때는 **서버가** 이미지에서 직접 뽑은 결과만 적는다.
+ */
 router.post("/scorecard/ocr", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const { ocrData, courseId, courseName } = req.body;
+    const { ocrData } = req.body;
     if (!ocrData) return sendError(res, 400, "OCR 데이터가 필요합니다.");
 
     const parsed = await storage.processScorecardOCR(ocrData);
     if (!parsed) return sendError(res, 400, "분석 가능한 데이터가 없습니다.");
-
-    // Crowdsourcing Logic: Update Master DB with identified PARs
-    if (courseId && courseName) {
-        for (const course of parsed.courses) {
-            for (let i = 0; i < course.pars.length; i++) {
-                await storage.updateCourseHoleInfo({
-                    courseId,
-                    courseName,
-                    subPathName: course.course_name,
-                    holeNo: i + 1,
-                    par: course.pars[i]
-                });
-            }
-        }
-    }
 
     return sendSuccess(res, parsed);
 }));

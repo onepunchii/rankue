@@ -29,7 +29,7 @@ export const ScorecardScanner: React.FC<RawScannerProps> = ({
     onClose
 }) => {
     const { toast } = useToast();
-    const [step, setStep] = useState<'upload' | 'scanning' | 'result'>('upload');
+    const [step, setStep] = useState<'upload' | 'scanning' | 'result' | 'notReady'>('upload');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [scannedData, setScannedData] = useState<any>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -46,45 +46,19 @@ export const ScorecardScanner: React.FC<RawScannerProps> = ({
         }
     };
 
+    /**
+     * 스코어카드 자동 인식은 **아직 없다.**
+     *
+     * 예전 이 자리에는 올린 사진을 아예 보지 않고, 3초 기다린 뒤(“AI 느낌” 이라는 주석과 함께)
+     * 코드에 박아 둔 가짜 인식 결과(HOLE 1 / PAR 4 / HONG 5)를 서버로 보내는 코드가 있었다.
+     * 사용자에게는 "스캔 완료 · 스코어카드 정보를 성공적으로 분석했습니다" 라고 말했고,
+     * 서버는 그 가짜 파를 실제 골프장 id 에 묶어 공용 코스 자료(hiq_course_hole_info)에 적었다.
+     * 즉 한 번 쓸 때마다 없는 사실이 모두의 자료에 섞였다(2026-09-10 확인, 다행히 0행이었다).
+     *
+     * 없는 기능을 있는 척하지 않는다. 인식을 실제로 붙이기 전까지는 그렇다고 말한다.
+     */
     const startScanning = async () => {
-        setStep('scanning');
-
-        // Mock OCR Data for demonstration (In production, this comes from Google Vision API)
-        const mockOcrResponse = {
-            textAnnotations: [
-                { description: "Full Text" },
-                { description: "HOLE", boundingPoly: { vertices: [{ x: 10, y: 10 }, { x: 50, y: 10 }, { x: 50, y: 30 }, { x: 10, y: 30 }] } },
-                { description: "1", boundingPoly: { vertices: [{ x: 60, y: 10 }, { x: 80, y: 10 }, { x: 80, y: 30 }, { x: 60, y: 30 }] } },
-                { description: "PAR", boundingPoly: { vertices: [{ x: 10, y: 40 }, { x: 50, y: 40 }, { x: 50, y: 60 }, { x: 10, y: 60 }] } },
-                { description: "4", boundingPoly: { vertices: [{ x: 60, y: 40 }, { x: 80, y: 40 }, { x: 80, y: 60 }, { x: 60, y: 60 }] } },
-                { description: "HONG", boundingPoly: { vertices: [{ x: 10, y: 70 }, { x: 50, y: 70 }, { x: 50, y: 90 }, { x: 10, y: 90 }] } },
-                { description: "5", boundingPoly: { vertices: [{ x: 60, y: 70 }, { x: 80, y: 70 }, { x: 80, y: 90 }, { x: 60, y: 90 }] } },
-            ]
-        };
-
-        try {
-            // Simulated delay for AI feel
-            await new Promise(resolve => setTimeout(resolve, 3000));
-
-            const res = await apiRequest("/api/hiq/golf/scorecard/ocr", {
-                method: "POST",
-                body: { ocrData: mockOcrResponse, courseId, courseName }
-            });
-
-            setScannedData(res);
-            setStep('result');
-            toast({
-                title: "스캔 완료",
-                description: "스코어카드 정보를 성공적으로 분석했습니다.",
-            });
-        } catch (error) {
-            setStep('upload');
-            toast({
-                title: "스캔 실패",
-                description: "이미지 분석 중 오류가 발생했습니다.",
-                variant: "destructive"
-            });
-        }
+        setStep('notReady');
     };
 
     return (
@@ -101,8 +75,8 @@ export const ScorecardScanner: React.FC<RawScannerProps> = ({
                             <LucideCamera className="w-5 h-5 text-[#64DD17]" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white tracking-tight">Rankue AI 스캔</h3>
-                            <p className="text-[10px] text-[#64DD17] uppercase tracking-widest font-black">스코어카드 AI 분석 엔진</p>
+                            <h3 className="text-lg font-bold text-white tracking-tight">스코어카드 인식</h3>
+                            <p className="text-[10px] text-white/40 uppercase tracking-widest font-black">준비 중</p>
                         </div>
                     </div>
                     <button
@@ -116,6 +90,30 @@ export const ScorecardScanner: React.FC<RawScannerProps> = ({
 
                 <div className="flex-1 overflow-y-auto p-6">
                     <AnimatePresence mode="wait">
+                        {step === 'notReady' && (
+                            <motion.div
+                                key="notReady"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="flex flex-col items-center justify-center py-16 text-center gap-4"
+                            >
+                                {imagePreview && (
+                                    <img src={imagePreview} alt="" className="w-full max-h-48 object-contain rounded-2xl opacity-40" />
+                                )}
+                                <LucideAlertCircle className="w-10 h-10 text-white/20" />
+                                <div className="space-y-2">
+                                    <p className="text-white font-bold">스코어카드 자동 인식은 아직 준비 중이에요</p>
+                                    <p className="text-[12px] text-white/40 leading-relaxed">
+                                        올려 주신 사진은 아무 데도 저장하지 않았어요.<br />
+                                        지금은 라운드 화면에서 직접 입력해 주세요.
+                                    </p>
+                                </div>
+                                <Button onClick={onClose} className="mt-2 h-12 px-8 rounded-2xl bg-white/10 text-white font-bold hover:bg-white/20">
+                                    닫기
+                                </Button>
+                            </motion.div>
+                        )}
+
                         {step === 'upload' && (
                             <motion.div
                                 key="upload"
@@ -133,7 +131,7 @@ export const ScorecardScanner: React.FC<RawScannerProps> = ({
                                     </div>
                                     <div className="text-center">
                                         <p className="text-white/60 font-medium">스코어카드 사진 업로드</p>
-                                        <p className="text-[11px] text-white/30 mt-1">스마트스코어 화면을 찍어서 올려주세요</p>
+                                        <p className="text-[11px] text-white/30 mt-1">자동 인식은 준비 중이에요</p>
                                     </div>
                                     <input
                                         type="file"
