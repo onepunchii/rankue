@@ -22,7 +22,7 @@ export const DateSelector = ({ weekDates, selectedDate, setSelectedDate, booking
     }, [selectedDate]);
 
     return (
-        <div ref={stripRef} className="flex gap-3 overflow-x-auto px-6 pb-6 pt-2 scrollbar-hide">
+        <div ref={stripRef} className="flex gap-2 overflow-x-auto px-6 pb-3 pt-1 scrollbar-hide">
             {weekDates.map((date, idx) => {
                 const isSelected = selectedDate === idx;
                 const count = (Array.isArray(bookingCounts) ? bookingCounts : []).find((c: any) => c.date === date.fullDate)?.count;

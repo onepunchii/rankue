@@ -267,6 +267,11 @@ body {
 :root[data-sport="GOLF"] .text-black\/40,
 :root[data-sport="GOLF"] .text-black\/35 { color: var(--ink-3); }
 :root[data-sport="GOLF"] .text-\[rgba\(0\,0\,0\,0\.87\)\] { color: var(--ink-1); }
+:root[data-sport="GOLF"] .text-black\/30 { color: var(--ink-4); }
+/* 안내창(토스트) 닫기 X — text-black/30 이라 골프의 어두운 안내창 위에서 안 보였다(2026-09-10 오너 제보).
+   누르는 단추라 흐린 글자(ink-4)보다 한 단 밝게 둔다. [toast-close] 는 ui/toast.tsx 가 붙이는 속성이다. */
+:root[data-sport="GOLF"] [toast-close] { color: var(--ink-2); }
+:root[data-sport="GOLF"] [toast-close]:hover { color: var(--ink-1); background-color: var(--surface-3); }
 
 :root[data-sport="GOLF"] .bg-black\/\[0\.03\],
 :root[data-sport="GOLF"] .bg-black\/\[0\.04\],

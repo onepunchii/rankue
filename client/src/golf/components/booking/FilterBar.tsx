@@ -12,7 +12,7 @@ interface FilterBarProps {
 
 export const FilterBar = ({ selectedFilters, toggleFilter, clearFilter, viewType }: FilterBarProps) => {
     return (
-        <div className="flex gap-2 overflow-x-auto px-6 pb-6 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto px-6 pb-3 scrollbar-hide">
             <FilterChip
                 icon={LucideMapPin}
                 label="골프장"
