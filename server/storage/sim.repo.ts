@@ -263,6 +263,33 @@ export class SimRepository {
         };
     }
 
+    /**
+     * 온라인 대전 랭킹에서 내 순위 — 네 판(종목 × 테이블)을 한 번에. 진입 화면의 '랭킹' 줄이 가장 높은 순위를 보여 준다.
+     * 정렬·배치 조건은 rankLadder 와 **글자 그대로 같다**(회원 표와 inner join 까지) — 둘이 다르면 로비와 랭킹 화면의 숫자가 어긋난다.
+     * 배치 전(대전 < placement)인 판은 rank 가 null 이고 matches 로 '배치 중 n/m' 을 보여 준다.
+     */
+    async myMatchRanks(memberId: string, placement = 3): Promise<{ gameType: "3c" | "4c"; tableId: "DAEDAE" | "JUNGDAE_KR"; matches: number; rank: number | null; total: number }[]> {
+        const res = await db.execute(sql`
+            with ranked as (
+                select r.member_id, r.game_type, r.table_id,
+                       rank() over (partition by r.game_type, r.table_id order by r.sim_rating desc, r.wins desc, r.matches asc) as rank,
+                       count(*) over (partition by r.game_type, r.table_id) as total
+                from hiq_sim_ratings r join hiq_members mem on mem.id = r.member_id
+                where r.matches >= ${placement}
+            )
+            select m.game_type, m.table_id, m.matches, x.rank, x.total
+            from hiq_sim_ratings m
+            left join ranked x on x.member_id = m.member_id and x.game_type = m.game_type and x.table_id = m.table_id
+            where m.member_id = ${memberId}`);
+        return (res.rows as Record<string, unknown>[]).map((r) => ({
+            gameType: String(r.game_type) as "3c" | "4c",
+            tableId: String(r.table_id) as "DAEDAE" | "JUNGDAE_KR",
+            matches: Number(r.matches ?? 0),
+            rank: r.rank === null || r.rank === undefined ? null : Number(r.rank),
+            total: Number(r.total ?? 0),
+        }));
+    }
+
     async getShots(sessionId: string): Promise<HiqSimShot[]> {
         return db.select().from(hiqSimShots)
             .where(eq(hiqSimShots.sessionId, sessionId))

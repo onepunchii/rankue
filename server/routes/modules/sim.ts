@@ -155,6 +155,12 @@ router.get("/sim/rank", requireAuth, asyncHandler(async (req: AuthRequest, res: 
     return sendSuccess(res, await storage.sim.rankLadder(req.userId!, gameType, tableId, country, limit, PLACEMENT_MATCHES));
 }));
 
+// GET /sim/rank/me — 네 판의 내 대전 순위(진입 화면 '랭킹' 줄). 랭킹 화면을 네 번 부르지 않으려고 따로 둔다.
+router.get("/sim/rank/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const boards = await storage.sim.myMatchRanks(req.userId!, PLACEMENT_MATCHES);
+    return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards });
+}));
+
 // GET /sim/sessions/:id — 상세(샷 로그 포함, 리플레이용)
 router.get("/sim/sessions/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const s = await storage.sim.getSession(req.params.id);
