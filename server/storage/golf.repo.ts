@@ -96,6 +96,16 @@ function buildGolfFilterConditions(filters: any): any[] {
         if (spans.length > 0) out.push(spans.length === 1 ? spans[0] : or(...spans));
     }
 
+    // 특가 상품(핫딜)만 — 홈의 긴급티 티커가 쓴다. 값이 있을 때만 거른다(없으면 전부).
+    if (filters?.hotDeal === "1" || filters?.hotDeal === true || filters?.hotDeal === "true") {
+        out.push(eq(golfBookings.isHotDeal, true));
+    }
+
+    // 이미 지난 티타임 빼기 — '지금부터' 를 보여 주는 화면(티커)에 어제 것이 섞이면 안 된다.
+    if (filters?.upcoming === "1" || filters?.upcoming === true || filters?.upcoming === "true") {
+        out.push(gte(golfBookings.datetime, new Date()));
+    }
+
     // 옵션 — jsonb 배열에 고른 것 중 하나라도 있으면. '?|' 대신 함수형을 쓴다(물음표는 드라이버가 자리표시자로 볼 수 있다).
     const specials = list(filters?.special);
     if (specials.length > 0) {

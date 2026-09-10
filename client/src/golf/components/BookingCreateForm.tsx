@@ -12,9 +12,11 @@ import { kstDateLabel, kstTime } from "@/lib/kst";
 interface BookingCreateFormProps {
     onClose: () => void;
     initialMode: 'BOOKING' | 'JOIN';
+    /** 등록이 끝난 뒤 그 날짜(YYYY-MM-DD)와 보기를 알려 준다 — 목록이 그리로 옮겨 가야 방금 올린 게 보인다. */
+    onCreated?: (date: string, listingType: 'BOOKING' | 'JOIN') => void;
 }
 
-export function BookingCreateForm({ onClose, initialMode }: BookingCreateFormProps) {
+export function BookingCreateForm({ onClose, initialMode, onCreated }: BookingCreateFormProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
@@ -104,6 +106,8 @@ export function BookingCreateForm({ onClose, initialMode }: BookingCreateFormPro
             queryClient.invalidateQueries({ queryKey: ['/api/hiq/golf/joins'] });
             queryClient.invalidateQueries({ queryKey: ['/api/hiq/golf/bookings/counts'] });
             toast({ title: "등록 완료", description: `${timeList.length}건의 티타임이 등록되었습니다.` });
+            // 목록은 고른 하루치만 보여 준다 — 오늘에 그대로 두면 방금 올린 게 안 보인다.
+            onCreated?.(date, listingType);
             onClose();
         },
         onError: (err: any) => {

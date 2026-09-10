@@ -3,8 +3,6 @@ import { useLocation } from "wouter";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import {
     LucideHash,
-    LucideCalendarDays,
-    LucideChevronRight,
 } from "lucide-react";
 
 interface QuickActionsProps {
@@ -60,24 +58,8 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                 </motion.button>
             </div>
 
-            {/* Booking Banner (Horizontal) */}
-            <motion.button
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setLocation('/golf/booking-list')}
-                className="w-full mb-4 relative z-10 bg-white/[0.03] border border-white/5 rounded-2xl py-8 px-6 flex items-center justify-between shadow-lg backdrop-blur-sm group hover:border-[#64DD17]/30 transition-colors"
-                title="실시간 골프 부킹 및 조인 찾기"
-            >
-                <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-2xl bg-[#64DD17]/10 flex items-center justify-center group-hover:bg-[#64DD17] transition-colors">
-                        <LucideCalendarDays className="w-7 h-7 text-[#64DD17] group-hover:text-[#051907] transition-colors" />
-                    </div>
-                    <div className="text-left">
-                        <h3 className="text-xl font-extrabold text-white">GOLF BOOKING</h3>
-                        <p className="text-sm font-semibold text-white/40 group-hover:text-[#64DD17] transition-colors mt-0.5">실시간 부킹 & 조인 찾기</p>
-                    </div>
-                </div>
-                <LucideChevronRight className="w-6 h-6 text-white/20 group-hover:text-white transition-colors" />
-            </motion.button>
+            {/* GOLF BOOKING 배너는 2026-09-10 뺐다. 홈 맨 위 긴급티 티커가 그 자리를 맡고,
+                부킹 목록은 하단 네비 '조인' 탭으로 들어간다(오너). */}
 
             {/* Secondary Actions (Bottom Row) */}
             <div className="grid grid-cols-2 gap-4 mb-4 relative z-10">

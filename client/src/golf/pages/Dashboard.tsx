@@ -11,7 +11,7 @@ import { HandicapCard } from "../components/dashboard/HandicapCard";
 import { QuickActions } from "../components/dashboard/QuickActions";
 import { StatsChart } from "../components/dashboard/StatsChart";
 import { MyCrewCard } from "../components/dashboard/MyCrewCard";
-import { Ticker } from "../components/dashboard/Ticker";
+import { HotDealTicker } from "../components/dashboard/HotDealTicker";
 import { GameModeSheet } from "../components/dashboard/GameModeSheet";
 import { PinEntrySheet } from "../components/dashboard/PinEntrySheet";
 
@@ -64,7 +64,7 @@ export default function GolfDashboard() {
 
             {/* Header & Identity */}
             <GolfHeader member={me} />
-            <Ticker />
+            <HotDealTicker />
             <HandicapCard
                 member={me}
                 avgScore={effectiveAvg}

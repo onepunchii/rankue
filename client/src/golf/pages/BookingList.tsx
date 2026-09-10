@@ -389,7 +389,15 @@ export default function BookingList() {
 
             <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                 <DialogContent className="p-0 border-none bg-transparent max-w-md w-full h-[90vh] overflow-hidden flex flex-col" hideClose={true}>
-                    <BookingCreateForm onClose={() => setIsCreateModalOpen(false)} initialMode={viewType === 'ALL' ? 'BOOKING' : viewType as 'BOOKING' | 'JOIN'} />
+                    <BookingCreateForm
+                        onClose={() => setIsCreateModalOpen(false)}
+                        initialMode={viewType === 'ALL' ? 'BOOKING' : viewType as 'BOOKING' | 'JOIN'}
+                        onCreated={(day, type) => {
+                            setViewType(type);
+                            const idx = weekDates.findIndex(d => d.fullDate === day);
+                            if (idx !== -1) pickDate(idx);
+                        }}
+                    />
                 </DialogContent>
             </Dialog>
 
