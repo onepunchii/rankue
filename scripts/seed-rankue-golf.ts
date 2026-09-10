@@ -47,11 +47,17 @@ async function main() {
     type Row = { name: string; region: string | null; address: string | null };
     const wanted = new Map<string, Row>();
     for (const c of COURSES as any[]) {
-        wanted.set(normalizeName(c.name), { name: c.name, region: c.region ?? null, address: c.address ?? null });
+        // 이름이 빈 행이 하나 섞여 있다(정적 원장 id 359, 의성). 이름 없는 골프장을 목록에 세우면
+        // 고를 수는 있는데 이름이 안 보인다 — 넣지 않는다.
+        const name = String(c.name ?? "").trim();
+        if (!name) continue;
+        wanted.set(normalizeName(name), { name, region: c.region ?? null, address: c.address ?? null });
     }
     for (const c of courseData) {
-        const key = normalizeName(c.clubName);
-        if (!wanted.has(key)) wanted.set(key, { name: c.clubName, region: null, address: null });
+        const name = String(c.clubName ?? "").trim();
+        if (!name) continue;
+        const key = normalizeName(name);
+        if (!wanted.has(key)) wanted.set(key, { name, region: null, address: null });
     }
 
     // 3) 이미 있는 것 읽기

@@ -1,0 +1,3172 @@
+[
+ {
+  "golfclub_seq": 1,
+  "golfclub_name": "힐마루",
+  "area_name": "경상남부 &gt; 창녕",
+  "address1": "경남 창녕군 장마면 초곡리 산 228",
+  "latitude": "35.5005738",
+  "longitude": "128.4999053",
+  "hole_count": 18,
+  "course_name": "북/남"
+ },
+ {
+  "golfclub_seq": 3,
+  "golfclub_name": "킹즈락&#40;P&#41;",
+  "area_name": "충청북부 &gt; 제천",
+  "address1": "충북 제천시 내토로7길 136",
+  "latitude": "37.1385253",
+  "longitude": "128.1783063",
+  "hole_count": 27,
+  "course_name": "South/East/West/South&#40;18홀&#41;/East&#40;18홀&#41;/West&#40;18홀&#41;/South&#40;27홀&#41;/East&#40;27홀&#41;/West&#40;27홀&#41;"
+ },
+ {
+  "golfclub_seq": 4,
+  "golfclub_name": "히든밸리&#40;P&#41;",
+  "area_name": "충청북부 &gt; 진천",
+  "address1": "충청북도 진천군 백곡면 갈월리 산29-1번지",
+  "latitude": "36.9050751",
+  "longitude": "127.3050227",
+  "hole_count": 27,
+  "course_name": "HIDDEN/VALLEY/SKY"
+ },
+ {
+  "golfclub_seq": 5,
+  "golfclub_name": "휘닉스",
+  "area_name": "강원서부 &gt; 평창",
+  "address1": "강원도 평창군 봉평면 면온리 1095",
+  "latitude": "37.5819026",
+  "longitude": "128.3272381",
+  "hole_count": 18,
+  "course_name": "현장배정/현장배정"
+ },
+ {
+  "golfclub_seq": 6,
+  "golfclub_name": "태기산 나인CC&#40;P&#41;",
+  "area_name": "강원동부 &gt; 평창",
+  "address1": "강원특별자치도 평창군 봉평면 태기로 174",
+  "latitude": "37.5800555",
+  "longitude": "128.3196196",
+  "hole_count": 10,
+  "course_name": "1라운드/2라운드/3라운드"
+ },
+ {
+  "golfclub_seq": 7,
+  "golfclub_name": "사우스스프링스&#40;P&#41;",
+  "area_name": "경기남부 &gt; 이천",
+  "address1": "경기도 이천시 모가면 공원로 174-26",
+  "latitude": "37.1755782",
+  "longitude": "127.4513355",
+  "hole_count": 18,
+  "course_name": "레이크/마운틴/코스당일배정"
+ },
+ {
+  "golfclub_seq": 8,
+  "golfclub_name": "화성상록&#40;P&#41;",
+  "area_name": "경기남부 &gt; 화성",
+  "address1": "경기도 화성시 동탄면 중리 산 170",
+  "latitude": "37.1973024",
+  "longitude": "127.1334139",
+  "hole_count": 27,
+  "course_name": "미지정1&#40;9홀&#41;/미지정2&#40;9홀&#41;/미지정3&#40;9홀&#41;/남&#40;18홀&#41;/동&#40;18홀&#41;/서&#40;18홀&#41;"
+ },
+ {
+  "golfclub_seq": 10,
+  "golfclub_name": "비콘힐스&#40;P&#41;",
+  "area_name": "강원서부 &gt; 홍천",
+  "address1": "강원도 홍천군 홍천읍 장전평2리 722-2",
+  "latitude": "37.6235946",
+  "longitude": "127.8682553",
+  "hole_count": 18,
+  "course_name": "누리/하늘"
+ },
+ {
+  "golfclub_seq": 12,
+  "golfclub_name": "해운대",
+  "area_name": "경상남부 &gt; 부산",
+  "address1": "부산광역시 기장군 정관면 산 6번지",
+  "latitude": "35.3640906",
+  "longitude": "129.2042932",
+  "hole_count": 27,
+  "course_name": "골든/실크/로얄"
+ },
+ {
+  "golfclub_seq": 14,
+  "golfclub_name": "해비치제주",
+  "area_name": "제주 &gt; 서귀포",
+  "address1": "제주특별자치도 서귀포시 남원읍 원님로399번길 319",
+  "latitude": "33.3583919",
+  "longitude": "126.72118",
+  "hole_count": 36,
+  "course_name": "스카이&#40;회원제코스&#41;/팜&#40;회원제코스&#41;/레이크&#40;대중제코스&#41;/밸리&#40;대중제코스&#41;"
+ },
+ {
+  "golfclub_seq": 17,
+  "golfclub_name": "한탄강&#40;P&#41;",
+  "area_name": "강원서부 &gt; 철원",
+  "address1": "강원 철원군 갈말읍 순담길 59",
+  "latitude": "38.1712769",
+  "longitude": "127.2937959",
+  "hole_count": 18,
+  "course_name": "밸리/마운틴"
+ },
+ {
+  "golfclub_seq": 19,
+  "golfclub_name": "한원",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 남사면 북리 859-1",
+  "latitude": "37.1573221",
+  "longitude": "127.1305663",
+  "hole_count": 27,
+  "course_name": "고구려/백제/신라"
+ },
+ {
+  "golfclub_seq": 20,
+  "golfclub_name": "서울한양",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기도 고양시 덕양구 원당동 198-114호",
+  "latitude": "37.6569737",
+  "longitude": "126.8545625",
+  "hole_count": 36,
+  "course_name": "신OUT&#40;18홀&#41;/신IN&#40;18홀&#41;/구OUT&#40;18홀&#41;/구IN&#40;18홀&#41;"
+ },
+ {
+  "golfclub_seq": 21,
+  "golfclub_name": "한성",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기 용인시 기흥구 구교동로 151",
+  "latitude": "37.3117256",
+  "longitude": "127.1176081",
+  "hole_count": 27,
+  "course_name": "오렌지/블루/그린"
+ },
+ {
+  "golfclub_seq": 22,
+  "golfclub_name": "한맥&#40;P&#41;",
+  "area_name": "경상북부 &gt; 예천",
+  "address1": "경북 예천군 호명읍 한맥골프장길 72",
+  "latitude": "36.6599538",
+  "longitude": "128.5183916",
+  "hole_count": 18,
+  "course_name": "H/M"
+ },
+ {
+  "golfclub_seq": 24,
+  "golfclub_name": "하이원&#40;P&#41;",
+  "area_name": "강원동부 &gt; 정선",
+  "address1": "강원특별자치도 정선군 고한읍 고한7길 348",
+  "latitude": "37.1780291",
+  "longitude": "128.8442724",
+  "hole_count": 18,
+  "course_name": "마운틴코스/밸리코스"
+ },
+ {
+  "golfclub_seq": 25,
+  "golfclub_name": "필로스&#40;P&#41;",
+  "area_name": "경기북부 &gt; 포천",
+  "address1": "경기도 포천시 일동면 기산리 산142-1",
+  "latitude": "37.9345944",
+  "longitude": "127.3359552",
+  "hole_count": 27,
+  "course_name": "동&gt;서/서&gt;남/남&gt;동"
+ },
+ {
+  "golfclub_seq": 28,
+  "golfclub_name": "프린세스&#40;P&#41;",
+  "area_name": "충청남부 &gt; 공주",
+  "address1": "충청남도 공주시 정안면 인풍리 331",
+  "latitude": "36.6511993",
+  "longitude": "127.1166",
+  "hole_count": 18,
+  "course_name": "EAST/WEST"
+ },
+ {
+  "golfclub_seq": 29,
+  "golfclub_name": "프리스틴밸리",
+  "area_name": "경기북부 &gt; 가평",
+  "address1": "경기도 가평군 설악면 이천리 산2-12",
+  "latitude": "37.6562093",
+  "longitude": "127.4509328",
+  "hole_count": 18,
+  "course_name": "Pristin/Valley"
+ },
+ {
+  "golfclub_seq": 30,
+  "golfclub_name": "플라자CC용인",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 남사면 봉무리 257-1",
+  "latitude": "37.1329795",
+  "longitude": "127.1411047",
+  "hole_count": 36,
+  "course_name": "T-OUT/T-IN/L-OUT/L-IN"
+ },
+ {
+  "golfclub_seq": 31,
+  "golfclub_name": "푸른솔장성&#40;P&#41;",
+  "area_name": "전라남부 &gt; 장성",
+  "address1": "전남 장성군 동화면 임정로 155",
+  "latitude": "35.2503948",
+  "longitude": "126.7161086",
+  "hole_count": 27,
+  "course_name": "레이크&#40;18홀&#41;/레이크&#40;27홀&#41;/마운틴&#40;18홀&#41;/마운틴&#40;27홀&#41;/힐&#40;18홀&#41;/힐&#40;27홀&#41;"
+ },
+ {
+  "golfclub_seq": 32,
+  "golfclub_name": "포천아도니스",
+  "area_name": "경기북부 &gt; 포천",
+  "address1": "경기 포천시 신북면 고일리 산 59",
+  "latitude": "37.9661826",
+  "longitude": "127.1679190",
+  "hole_count": 27,
+  "course_name": "미정/미정1/미정2"
+ },
+ {
+  "golfclub_seq": 33,
+  "golfclub_name": "포천아도니스퍼블릭&#40;P&#41;",
+  "area_name": "경기북부 &gt; 포천",
+  "address1": "경기도 포천시 신북면 삼성당리 460-2",
+  "latitude": "37.9658106",
+  "longitude": "127.1954894",
+  "hole_count": 9,
+  "course_name": "9홀X2회"
+ },
+ {
+  "golfclub_seq": 34,
+  "golfclub_name": "팔공",
+  "area_name": "경상북부 &gt; 대구",
+  "address1": "대구광역시 동구 도학동 산 1",
+  "latitude": "35.9891743",
+  "longitude": "128.7233735",
+  "hole_count": 18,
+  "course_name": "동봉/서봉"
+ },
+ {
+  "golfclub_seq": 35,
+  "golfclub_name": "파크밸리&#40;P&#41;",
+  "area_name": "강원서부 &gt; 원주",
+  "address1": "강원 원주시 소초면 바우실길 281",
+  "latitude": "37.3888889",
+  "longitude": "128.0130556",
+  "hole_count": 18,
+  "course_name": "park/valley"
+ },
+ {
+  "golfclub_seq": 36,
+  "golfclub_name": "파주&#40;P&#41;",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기 파주시 법원읍 갈곡리 360",
+  "latitude": "37.8436917",
+  "longitude": "126.9039056",
+  "hole_count": 18,
+  "course_name": "동/서/EAST/WEST"
+ },
+ {
+  "golfclub_seq": 37,
+  "golfclub_name": "파인힐스&#40;P&#41;",
+  "area_name": "전라남부 &gt; 순천",
+  "address1": "전남 순천시 주암면 송광사길 99",
+  "latitude": "35.0350017",
+  "longitude": "127.2726025",
+  "hole_count": 27,
+  "course_name": "파인/레이크/힐스"
+ },
+ {
+  "golfclub_seq": 39,
+  "golfclub_name": "파인크리크&#40;P&#41;",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기 안성시 양성면 안성맞춤대로 2417-13",
+  "latitude": "37.0917875",
+  "longitude": "127.2359071",
+  "hole_count": 27,
+  "course_name": "현장랜덤배정&#40;18홀&#41;/현장랜덤배정&#40;9홀&#41;/현장랜덤배정&#40;18홀&#41;/현장랜덤배정&#40;9홀&#41;/현장랜덤배정&#40;18홀&#41;/현장랜덤배정&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 40,
+  "golfclub_name": "파인스톤&#40;P&#41;",
+  "area_name": "충청남부 &gt; 당진",
+  "address1": "충남 당진시 송산면 무수들길 90",
+  "latitude": "36.9648298",
+  "longitude": "126.6676533",
+  "hole_count": 18,
+  "course_name": "파인/스톤"
+ },
+ {
+  "golfclub_seq": 41,
+  "golfclub_name": "파인밸리&#40;P&#41;",
+  "area_name": "강원동부 &gt; 삼척",
+  "address1": "강원 삼척시 근덕면 미근로 1629",
+  "latitude": "37.3767497",
+  "longitude": "129.205456",
+  "hole_count": 18,
+  "course_name": "코스현장문의/코스현장문의"
+ },
+ {
+  "golfclub_seq": 42,
+  "golfclub_name": "파인리즈&#40;P&#41;",
+  "area_name": "강원동부 &gt; 고성",
+  "address1": "강원특별자치도 고성군 토성면 잼버리동로 267",
+  "latitude": "38.2479077",
+  "longitude": "128.5427460",
+  "hole_count": 27,
+  "course_name": "파인/리즈/레이크/파인&#40;9홀&#41;/리즈&#40;9홀&#41;/레이크&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 44,
+  "golfclub_name": "파미힐스",
+  "area_name": "경상북부 &gt; 대구권",
+  "address1": "경상북도 칠곡군 왜관읍 매원리 295-1번지",
+  "latitude": "36.0007467",
+  "longitude": "128.4439429",
+  "hole_count": 36,
+  "course_name": "남OUT/남IN/동OUT/동IN"
+ },
+ {
+  "golfclub_seq": 48,
+  "golfclub_name": "블루원용인",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기 용인시 처인구 원삼면 보개원삼로1534번길 40",
+  "latitude": "37.1288303",
+  "longitude": "127.3240018",
+  "hole_count": 18,
+  "course_name": "서코스/중코스"
+ },
+ {
+  "golfclub_seq": 49,
+  "golfclub_name": "블루원용인&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 원삼면 산38",
+  "latitude": "37.1341408",
+  "longitude": "127.3259239",
+  "hole_count": 9,
+  "course_name": "동코스&#40;9홀*2&#41;/동코스&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 50,
+  "golfclub_name": "스톤비치&#40;P&#41;",
+  "area_name": "충청남부 &gt; 태안",
+  "address1": "충남 태안군 근흥면 갈음이길 77",
+  "latitude": "36.6886736",
+  "longitude": "126.1543175",
+  "hole_count": 18,
+  "course_name": "스톤/비치"
+ },
+ {
+  "golfclub_seq": 51,
+  "golfclub_name": "태광",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 기흥구 영덕동 158-2",
+  "latitude": "37.2850034",
+  "longitude": "127.0851421",
+  "hole_count": 27,
+  "course_name": "북&#40;회원제&#41;/남&#40;회원제&#41;/서&#40;회원제&#41;"
+ },
+ {
+  "golfclub_seq": 52,
+  "golfclub_name": "태광&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기 용인시 기흥구 흥덕4로 77",
+  "latitude": "37.2846869",
+  "longitude": "127.0861739",
+  "hole_count": 9,
+  "course_name": "9홀X1회&#40;대중제동코스&#41;/9홀X2회&#40;대중제동코스&#41;"
+ },
+ {
+  "golfclub_seq": 54,
+  "golfclub_name": "타미우스",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 애월읍 화전길 201 ",
+  "latitude": "33.3689588",
+  "longitude": "126.3505941",
+  "hole_count": 27,
+  "course_name": "Mountain/Woods/Lake"
+ },
+ {
+  "golfclub_seq": 57,
+  "golfclub_name": "화순",
+  "area_name": "전라남부 &gt; 화순",
+  "address1": "전남 화순군 도곡면 천태로 1000-151",
+  "latitude": "34.9722229",
+  "longitude": "126.9093590",
+  "hole_count": 27,
+  "course_name": "Spring/Summer/Autumn"
+ },
+ {
+  "golfclub_seq": 58,
+  "golfclub_name": "코리아",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 이동면 서리 784-7",
+  "latitude": "37.2192388",
+  "longitude": "127.1513372",
+  "hole_count": 27,
+  "course_name": "레이크/첼린지/크리크"
+ },
+ {
+  "golfclub_seq": 59,
+  "golfclub_name": "캐슬파인&#40;P&#41;",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 강천면 부평리 산 47-1",
+  "latitude": "37.3033383",
+  "longitude": "127.7453227",
+  "hole_count": 18,
+  "course_name": "Lake/Valley"
+ },
+ {
+  "golfclub_seq": 60,
+  "golfclub_name": "캐슬렉스제주",
+  "area_name": "제주 &gt; 서귀포",
+  "address1": "제주특별자치도 서귀포시 안덕면 평화로 1241",
+  "latitude": "33.3400037",
+  "longitude": "126.3486894",
+  "hole_count": 18,
+  "course_name": "남/동/북"
+ },
+ {
+  "golfclub_seq": 63,
+  "golfclub_name": "스프링베일&#40;P&#41;",
+  "area_name": "강원서부 &gt; 춘천",
+  "address1": "강원 춘천시 동면 만천리 산 21",
+  "latitude": "37.875724",
+  "longitude": "127.7932263",
+  "hole_count": 9,
+  "course_name": "9홀x2/9홀"
+ },
+ {
+  "golfclub_seq": 64,
+  "golfclub_name": "알프스대영&#40;P&#41;",
+  "area_name": "강원서부 &gt; 횡성",
+  "address1": "강원 횡성군 우천면 한우로 1295",
+  "latitude": "37.4631923",
+  "longitude": "128.0723478",
+  "hole_count": 18,
+  "course_name": "IN/OUT"
+ },
+ {
+  "golfclub_seq": 65,
+  "golfclub_name": "천안상록&#40;P&#41;",
+  "area_name": "충청남부 &gt; 천안",
+  "address1": "충남 천안시 동남구 수신면 수신로 576",
+  "latitude": "36.7409454",
+  "longitude": "127.2834426",
+  "hole_count": 27,
+  "course_name": "남/중/동/남&#40;18홀&#41;/중&#40;18홀&#41;/동&#40;18홀&#41;"
+ },
+ {
+  "golfclub_seq": 66,
+  "golfclub_name": "천룡",
+  "area_name": "충청북부 &gt; 진천",
+  "address1": "충북 진천군 이월면 진안로 347-123",
+  "latitude": "36.9466254",
+  "longitude": "127.3896256",
+  "hole_count": 27,
+  "course_name": "미지정/미지정2"
+ },
+ {
+  "golfclub_seq": 67,
+  "golfclub_name": "천룡&#40;P&#41;",
+  "area_name": "충청북부 &gt; 진천",
+  "address1": "충북 진천군 이월면 진안로 425",
+  "latitude": "36.9565392",
+  "longitude": "127.3942424",
+  "hole_count": 9,
+  "course_name": "9홀X2"
+ },
+ {
+  "golfclub_seq": 71,
+  "golfclub_name": "진양밸리&#40;P&#41;",
+  "area_name": "충청북부 &gt; 음성",
+  "address1": "충북 음성군 삼성면 금일로 1195",
+  "latitude": "37.0337102",
+  "longitude": "127.4672369",
+  "hole_count": 27,
+  "course_name": "힐/크리크/밸리"
+ },
+ {
+  "golfclub_seq": 72,
+  "golfclub_name": "중원&#40;P&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충청북도 충주시 산척면 영덕리 산 2-14",
+  "latitude": "37.0684865",
+  "longitude": "127.9972975",
+  "hole_count": 27,
+  "course_name": "신라&#40;18홀&#41;/신라&#40;27홀&#41;/백제&#40;18홀&#41;/백제&#40;27홀&#41;/고구려&#40;18홀&#41;/고구려&#40;27홀&#41;"
+ },
+ {
+  "golfclub_seq": 73,
+  "golfclub_name": "아난티 중앙",
+  "area_name": "충청북부 &gt; 진천",
+  "address1": "충청북도 진천군 백곡면 성대리 산103-1",
+  "latitude": "36.9388756",
+  "longitude": "127.3375212",
+  "hole_count": 27,
+  "course_name": "마운틴/레이크/스카이"
+ },
+ {
+  "golfclub_seq": 74,
+  "golfclub_name": "더시에나서울&#40;구 중부&#41;",
+  "area_name": "경기남부 &gt; 광주",
+  "address1": "경기도 광주시 실촌읍 곤지암리 산28-1",
+  "latitude": "37.3379704",
+  "longitude": "127.3548838",
+  "hole_count": 18,
+  "course_name": "동코스/서코스"
+ },
+ {
+  "golfclub_seq": 77,
+  "golfclub_name": "그린필드",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 조천읍 번영로 1040-70",
+  "latitude": "33.4638765",
+  "longitude": "126.6454394",
+  "hole_count": 18,
+  "course_name": "Mountain/Sea"
+ },
+ {
+  "golfclub_seq": 79,
+  "golfclub_name": "더시에나&#40;P&#41;",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 516로 2695",
+  "latitude": "33.4303902",
+  "longitude": "126.5835648",
+  "hole_count": 18,
+  "course_name": "서/동"
+ },
+ {
+  "golfclub_seq": 81,
+  "golfclub_name": "골프존카운티감포&#40;P&#41;",
+  "area_name": "경상북부 &gt; 경주",
+  "address1": "경상북도 경주시 감포읍 나정리 산47",
+  "latitude": "35.773242",
+  "longitude": "129.4862531",
+  "hole_count": 18,
+  "course_name": "OUT/IN/OUT&#40;09홀&#41;/OUT&#40;27홀&#41;/IN&#40;09홀&#41;/IN&#40;09홀&#41;"
+ },
+ {
+  "golfclub_seq": 83,
+  "golfclub_name": "정산",
+  "area_name": "경상남부 &gt; 김해",
+  "address1": "경상남도 김해시 주촌면 덕암리 산180번지",
+  "latitude": "35.253462",
+  "longitude": "128.8078381",
+  "hole_count": 27,
+  "course_name": "해우/달우/별우"
+ },
+ {
+  "golfclub_seq": 86,
+  "golfclub_name": "자유",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 가남면 삼군리 산44",
+  "latitude": "37.2086286",
+  "longitude": "127.5713727",
+  "hole_count": 18,
+  "course_name": "18홀/OUT코스/18홀/IN코스/9홀/OUT코스/9홀/IN코스"
+ },
+ {
+  "golfclub_seq": 88,
+  "golfclub_name": "임페리얼레이크&#40;P&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충청북도 충주시 금가면 월상리 산95-1",
+  "latitude": "37.0286661",
+  "longitude": "127.8677246",
+  "hole_count": 18,
+  "course_name": "Pine/Lake/PINE/LAKE"
+ },
+ {
+  "golfclub_seq": 91,
+  "golfclub_name": "해내다CC",
+  "area_name": "경상북부 &gt; 경산",
+  "address1": "경상북도 경산시 평산동 542-16",
+  "latitude": "35.7951069",
+  "longitude": "128.7616438",
+  "hole_count": 27,
+  "course_name": "스카이/마운틴/밸리"
+ },
+ {
+  "golfclub_seq": 92,
+  "golfclub_name": "인천그랜드&#40;P&#41;",
+  "area_name": "경기남부 &gt; 인천",
+  "address1": "인천광역시 서구 원창동 380",
+  "latitude": "37.5137214",
+  "longitude": "126.6412277",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 95,
+  "golfclub_name": "이포",
+  "area_name": "경기남부 &gt; 여주권",
+  "address1": "경기도 여주시 금사면 장흥로 416",
+  "latitude": "37.393012",
+  "longitude": "127.4972815",
+  "hole_count": 18,
+  "course_name": "IN/OUT"
+ },
+ {
+  "golfclub_seq": 97,
+  "golfclub_name": "이븐데일&#40;P&#41;",
+  "area_name": "충청북부 &gt; 청주",
+  "address1": "충청북도 청원군 미원면 대신리 산70",
+  "latitude": "36.6827976",
+  "longitude": "127.6036907",
+  "hole_count": 18,
+  "course_name": "이븐/데일/이븐/데일"
+ },
+ {
+  "golfclub_seq": 99,
+  "golfclub_name": "은화삼",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 남동 산118-1",
+  "latitude": "37.2152538",
+  "longitude": "127.2198162",
+  "hole_count": 18,
+  "course_name": "당일랜덤지정/당일랜덤지정"
+ },
+ {
+  "golfclub_seq": 101,
+  "golfclub_name": "서산수&#40;P&#41;",
+  "area_name": "충청남부 &gt; 서산",
+  "address1": "충남 서산시 대산읍 삼길포7로 6",
+  "latitude": "36.9920681",
+  "longitude": "126.4433431",
+  "hole_count": 18,
+  "course_name": "서산/산수"
+ },
+ {
+  "golfclub_seq": 102,
+  "golfclub_name": "윈체스트안성&#40;P&#41;",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기도 안성시 서운면 오촌리 173-4",
+  "latitude": "36.9612861",
+  "longitude": "127.2895692",
+  "hole_count": 18,
+  "course_name": "로맨틱/클래식"
+ },
+ {
+  "golfclub_seq": 103,
+  "golfclub_name": "골프존카운티안성W&#40;P&#41;",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기도 안성시 양성면 교동길 19-70",
+  "latitude": "37.0752185",
+  "longitude": "127.1949612",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 104,
+  "golfclub_name": "울산",
+  "area_name": "경상남부 &gt; 울산",
+  "address1": "울산광역시 울주군 웅촌면 대대리 산105번지",
+  "latitude": "35.4416894",
+  "longitude": "129.1868078",
+  "hole_count": 27,
+  "course_name": "동/남/서"
+ },
+ {
+  "golfclub_seq": 106,
+  "golfclub_name": "서귀포팬텀&#40;P&#41;&#40;구 우리들&#41;",
+  "area_name": "제주 &gt; 서귀포",
+  "address1": "제주특별자치도 서귀포시 산록남로 2914",
+  "latitude": "33.310405",
+  "longitude": "126.5890084",
+  "hole_count": 18,
+  "course_name": "OUT/IN/NORTH/SOUTH"
+ },
+ {
+  "golfclub_seq": 107,
+  "golfclub_name": "버치힐",
+  "area_name": "용평",
+  "address1": "강원도 평창군 도암면 수하리 산69",
+  "latitude": "37.6450401",
+  "longitude": "128.6880021",
+  "hole_count": 18,
+  "course_name": "버치/힐"
+ },
+ {
+  "golfclub_seq": 108,
+  "golfclub_name": "용평",
+  "area_name": "용평",
+  "address1": "강원도 평창군 대관령면 용산리 130",
+  "latitude": "37.6457301",
+  "longitude": "128.6806078",
+  "hole_count": 18,
+  "course_name": "강나루/산마루"
+ },
+ {
+  "golfclub_seq": 110,
+  "golfclub_name": "용인&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 백암면 석천리 747-1번지",
+  "latitude": "37.1107358",
+  "longitude": "127.3440579",
+  "hole_count": 18,
+  "course_name": "용인/석천"
+ },
+ {
+  "golfclub_seq": 111,
+  "golfclub_name": "용원",
+  "area_name": "경상남부 &gt; 창원",
+  "address1": "경남 창원시 진해구 가주로 133",
+  "latitude": "35.1135162",
+  "longitude": "128.8232769",
+  "hole_count": 27,
+  "course_name": "백로/무학/백구"
+ },
+ {
+  "golfclub_seq": 113,
+  "golfclub_name": "옥스필드&#40;P&#41;",
+  "area_name": "강원서부 &gt; 횡성",
+  "address1": "강원도 횡성군 서원면 유현리 산61",
+  "latitude": "37.5232754",
+  "longitude": "127.8423144",
+  "hole_count": 18,
+  "course_name": "옥스/필드"
+ },
+ {
+  "golfclub_seq": 115,
+  "golfclub_name": "영천오펠골프클럽",
+  "area_name": "경상북부 &gt; 영천",
+  "address1": "경북 영천시 고경면 호국로 1221-24",
+  "latitude": "36.0104451",
+  "longitude": "129.0571046",
+  "hole_count": 27,
+  "course_name": "가람/누리/마루"
+ },
+ {
+  "golfclub_seq": 116,
+  "golfclub_name": "오투리조트&#40;P&#41;",
+  "area_name": "강원동부 &gt; 태백",
+  "address1": "강원도 태백시 황지동 산 176-28번지",
+  "latitude": "37.1600861",
+  "longitude": "128.9478604",
+  "hole_count": 27,
+  "course_name": "태백SKY/함백SKY/백두SKY"
+ },
+ {
+  "golfclub_seq": 117,
+  "golfclub_name": "오크힐스",
+  "area_name": "강원서부 &gt; 원주",
+  "address1": "강원도 원주시 지정면 판대리 산1-13",
+  "latitude": "37.4078262",
+  "longitude": "127.8150985",
+  "hole_count": 18,
+  "course_name": "브릿지/힐"
+ },
+ {
+  "golfclub_seq": 118,
+  "golfclub_name": "오크밸리",
+  "area_name": "강원서부 &gt; 원주",
+  "address1": "강원도 원주시 지정면 오크밸리 1길 66",
+  "latitude": "37.43819684",
+  "longitude": "127.8136961",
+  "hole_count": 36,
+  "course_name": "오크/메이플/파인"
+ },
+ {
+  "golfclub_seq": 120,
+  "golfclub_name": "오창에딘버러&#40;P&#41;",
+  "area_name": "충청북부 &gt; 오창",
+  "address1": "충청북도 청원군 오창읍 성산리 11",
+  "latitude": "36.7361265",
+  "longitude": "127.4280174",
+  "hole_count": 9,
+  "course_name": "9홀X2 &#40;18홀&#41;/B코스"
+ },
+ {
+  "golfclub_seq": 121,
+  "golfclub_name": "대호단양&#40;P&#41;",
+  "area_name": "충청북부 &gt; 단양",
+  "address1": "충청북도 단양군 매포읍 고양리 300-1번지",
+  "latitude": "37.0896957",
+  "longitude": "128.2726438",
+  "hole_count": 18,
+  "course_name": "마운틴&#40;9홀&#41;/레이크&#40;9홀&#41;/마운틴&#40;18홀&#41;/레이크&#40;18홀&#41;"
+ },
+ {
+  "golfclub_seq": 122,
+  "golfclub_name": "오션힐스포항",
+  "area_name": "경상북부 &gt; 포항",
+  "address1": "경상북도 포항시 북구 송라면 대전리 산208",
+  "latitude": "36.2556595",
+  "longitude": "129.3555013",
+  "hole_count": 27,
+  "course_name": "Hills/Pine/OCEAN&#40;OUT&#41;/OCEAN&#40;IN&#41;"
+ },
+ {
+  "golfclub_seq": 124,
+  "golfclub_name": "블루원상주&#40;P&#41;",
+  "area_name": "경상북부 &gt; 상주",
+  "address1": "경상북도 상주시 모서면 화현리 산46-1",
+  "latitude": "36.3338766",
+  "longitude": "127.9458754",
+  "hole_count": 18,
+  "course_name": "동코스/서코스"
+ },
+ {
+  "golfclub_seq": 125,
+  "golfclub_name": "골프존카운티오라",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 오라남로 130-16",
+  "latitude": "33.4479443",
+  "longitude": "126.5134221",
+  "hole_count": 36,
+  "course_name": "동&#40;East&#41;/서&#40;West&#41;/남A/남B"
+ },
+ {
+  "golfclub_seq": 126,
+  "golfclub_name": "영랑호&#40;P&#41;",
+  "area_name": "강원동부 &gt; 속초",
+  "address1": "강원특별자치도 속초시 영랑호반길 170",
+  "latitude": "38.2116774",
+  "longitude": "128.5767703",
+  "hole_count": 18,
+  "course_name": "영랑호&#40;9홀*2&#41;/영랑호&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 127,
+  "golfclub_name": "웨스트오션&#40;P&#41;",
+  "area_name": "전라남부 &gt; 영광",
+  "address1": "전남 영광군 백수읍 해안로 1362-70",
+  "latitude": "35.3557104",
+  "longitude": "126.4106721",
+  "hole_count": 18,
+  "course_name": "오션/밸리"
+ },
+ {
+  "golfclub_seq": 129,
+  "golfclub_name": "YJC골프클럽&#40;구 여주&#41;",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 여주읍 월송리 35-10",
+  "latitude": "37.2791221",
+  "longitude": "127.6022921",
+  "hole_count": 27,
+  "course_name": "ACE&#40;18홀&#41;/DREAM&#40;18홀&#41;/CHALLENGE&#40;18홀&#41;/ACE&#40;9홀&#41;/노캐디/DREAM&#40;9홀&#41;/노캐디/CHALLENGE&#40;9홀&#41;/노캐디"
+ },
+ {
+  "golfclub_seq": 132,
+  "golfclub_name": "엘리시안제주",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 애월읍 평화로 1738-116",
+  "latitude": "33.3730412",
+  "longitude": "126.3817708",
+  "hole_count": 36,
+  "course_name": "레이크&#40;회원제&#41;/파인&#40;회원제&#41;/캄포&#40;대중형&#41;/오션&#40;대중형&#41;"
+ },
+ {
+  "golfclub_seq": 133,
+  "golfclub_name": "에코랜드&#40;P&#41;",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 조천읍 대흘리 1221-1",
+  "latitude": "33.5492811",
+  "longitude": "126.6533031",
+  "hole_count": 27,
+  "course_name": "당일랜덤배정&#40;와일드,비치홀,에코&#41;"
+ },
+ {
+  "golfclub_seq": 134,
+  "golfclub_name": "에이원",
+  "area_name": "경상남부 &gt; 양산",
+  "address1": "경상남도 양산시 매곡동 산1",
+  "latitude": "35.3799864",
+  "longitude": "129.1886973",
+  "hole_count": 27,
+  "course_name": "West/South/East"
+ },
+ {
+  "golfclub_seq": 135,
+  "golfclub_name": "에버리스",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 애월읍 평화로 1693-75",
+  "latitude": "33.3693255",
+  "longitude": "126.3654287",
+  "hole_count": 27,
+  "course_name": "레이크/새별/파인"
+ },
+ {
+  "golfclub_seq": 137,
+  "golfclub_name": "에딘버러",
+  "area_name": "충청남부 &gt; 금산",
+  "address1": "충남 금산군 진산면 살구정길 167",
+  "latitude": "36.1545756",
+  "longitude": "127.3251129",
+  "hole_count": 18,
+  "course_name": "마운틴/밸리"
+ },
+ {
+  "golfclub_seq": 138,
+  "golfclub_name": "에덴블루&#40;P&#41;",
+  "area_name": "경기남부 &gt; 안성권",
+  "address1": "경기도 안성시 죽산면 장능리 산65",
+  "latitude": "37.056837",
+  "longitude": "127.385121",
+  "hole_count": 27,
+  "course_name": "마운틴/밸리/레이크"
+ },
+ {
+  "golfclub_seq": 139,
+  "golfclub_name": "골프존카운티이든&#40;P&#41;&#40;구 에덴밸리&#41;",
+  "area_name": "경상남부 &gt; 양산",
+  "address1": "경상남도 양산시 어곡동 산489-1",
+  "latitude": "35.4275364",
+  "longitude": "128.994212",
+  "hole_count": 18,
+  "course_name": "EDEN/VALLEY"
+ },
+ {
+  "golfclub_seq": 140,
+  "golfclub_name": "양평TPC&#40;P&#41;",
+  "area_name": "경기북부 &gt; 양평",
+  "address1": "경기도 양평군 지평면 대평리 산112",
+  "latitude": "37.4187073",
+  "longitude": "127.6503399",
+  "hole_count": 27,
+  "course_name": "루나/솔라/스텔라"
+ },
+ {
+  "golfclub_seq": 141,
+  "golfclub_name": "양지파인&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 양지면 남곡리 34-1",
+  "latitude": "37.217889",
+  "longitude": "127.295143",
+  "hole_count": 27,
+  "course_name": "서/동/남/서&#40;9홀라운드/노캐디&#41;/남&#40;9홀라운드/노캐디&#41;/동&#40;9홀라운드/노캐디&#41;"
+ },
+ {
+  "golfclub_seq": 142,
+  "golfclub_name": "양주",
+  "area_name": "경기북부 &gt; 남양주",
+  "address1": "경기도 남양주시 화도읍 금남리 300",
+  "latitude": "37.6452137",
+  "longitude": "127.3560634",
+  "hole_count": 18,
+  "course_name": "동/서"
+ },
+ {
+  "golfclub_seq": 143,
+  "golfclub_name": "양산&#40;P&#41;",
+  "area_name": "경상남부 &gt; 양산",
+  "address1": "경상남도 양산시 상북면 소토리 산9-18번지",
+  "latitude": "35.402688",
+  "longitude": "129.039991",
+  "hole_count": 27,
+  "course_name": "누리/가온/마루"
+ },
+ {
+  "golfclub_seq": 144,
+  "golfclub_name": "알펜시아700GC",
+  "area_name": "강원동부 &gt; 평창",
+  "address1": "강원도 평창군 대관령면 솔봉로325",
+  "latitude": "37.6621195",
+  "longitude": "128.6907983",
+  "hole_count": 18,
+  "course_name": "알프스/아시아"
+ },
+ {
+  "golfclub_seq": 145,
+  "golfclub_name": "알펜시아CC",
+  "area_name": "강원동부 &gt; 평창",
+  "address1": "강원도 평창군 대관령면 용산리 406-23번지",
+  "latitude": "37.6530834",
+  "longitude": "128.660498",
+  "hole_count": 27,
+  "course_name": "포레스트/레이크/매도우 "
+ },
+ {
+  "golfclub_seq": 147,
+  "golfclub_name": "안성베네스트",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기도 안성시 금광면 삼흥리 산1",
+  "latitude": "37.0206167",
+  "longitude": "127.3853452",
+  "hole_count": 36,
+  "course_name": "서/북/남/동"
+ },
+ {
+  "golfclub_seq": 149,
+  "golfclub_name": "안성",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기 안성시 죽산면 걸미로 487",
+  "latitude": "37.0376940",
+  "longitude": "127.4082673",
+  "hole_count": 18,
+  "course_name": "Out/In"
+ },
+ {
+  "golfclub_seq": 150,
+  "golfclub_name": "골프존카운티진천&#40;P&#41;",
+  "area_name": "충청북부 &gt; 진천",
+  "address1": "충청북도 진천군 진천읍 송강로783-51",
+  "latitude": "36.8184968",
+  "longitude": "127.405896",
+  "hole_count": 27,
+  "course_name": "레이크/마운틴/밸리"
+ },
+ {
+  "golfclub_seq": 152,
+  "golfclub_name": "아크로&#40;P&#41;",
+  "area_name": "전라남부 &gt; 영암",
+  "address1": "전남 영암군 금정면 안적동길 403",
+  "latitude": "34.8731462",
+  "longitude": "126.7843523",
+  "hole_count": 27,
+  "course_name": "챌린지/마스터/스카이"
+ },
+ {
+  "golfclub_seq": 154,
+  "golfclub_name": "아리지&#40;P&#41;",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 가남면 양귀리 217-1",
+  "latitude": "37.2141751",
+  "longitude": "127.5951699",
+  "hole_count": 27,
+  "course_name": "햇님/달님/별님"
+ },
+ {
+  "golfclub_seq": 155,
+  "golfclub_name": "SG아름다운&#40;P&#41;",
+  "area_name": "충청남부 &gt; 아산",
+  "address1": "충남 아산시 영인면 영인산로 440",
+  "latitude": "36.8462681",
+  "longitude": "126.9186446",
+  "hole_count": 27,
+  "course_name": "힐/레이크/락"
+ },
+ {
+  "golfclub_seq": 157,
+  "golfclub_name": "아델스코트&#40;P&#41;",
+  "area_name": "경상남부 &gt; 합천",
+  "address1": "경남 합천군 가야면 가조가야로 1916-10",
+  "latitude": "35.6966119",
+  "longitude": "128.0809387",
+  "hole_count": 27,
+  "course_name": "마운틴-힐/힐-레이크/레이크-마운틴"
+ },
+ {
+  "golfclub_seq": 161,
+  "golfclub_name": "썬힐&#40;P&#41;",
+  "area_name": "경기북부 &gt; 가평",
+  "address1": "경기 가평군 조종면 운악청계로 809",
+  "latitude": "37.8754002",
+  "longitude": "127.3490711",
+  "hole_count": 18,
+  "course_name": "썬18홀/썬27홀/밸리18홀/밸리27홀/힐18홀/힐27홀/파인18홀/파인27홀"
+ },
+ {
+  "golfclub_seq": 163,
+  "golfclub_name": "세레니티&#40;구 실크리버&#41;",
+  "area_name": "충청북부 &gt; 청주",
+  "address1": "충북 청주시 서원구 남이면 문곡구절골길 235",
+  "latitude": "36.5456238",
+  "longitude": "127.3905021",
+  "hole_count": 27,
+  "course_name": "Silk/River/Blue"
+ },
+ {
+  "golfclub_seq": 165,
+  "golfclub_name": "신안&#40;M&#41;",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기도 안성시 고삼면 가유리 787-15",
+  "latitude": "37.0974482",
+  "longitude": "127.2512919",
+  "hole_count": 18,
+  "course_name": "토마토&#40;회원&#41;&gt;애플&#40;회원&#41;/애플&#40;회원&#41;&gt;토마토&#40;회원&#41;"
+ },
+ {
+  "golfclub_seq": 166,
+  "golfclub_name": "신안&#40;P&#41;",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기도 안성시 고삼면 가유리 787번지",
+  "latitude": "37.0974482",
+  "longitude": "127.2512919",
+  "hole_count": 9,
+  "course_name": "오렌지&#40;대중&#41;X2회/애플&#40;회원&#41;&gt;오렌지&#40;대중&#41;/오렌지&#40;대중&#41;&gt;토마토&#40;회원&#41;"
+ },
+ {
+  "golfclub_seq": 167,
+  "golfclub_name": "여주신라&#40;P&#41;",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 북내면 덕산리 산3-1",
+  "latitude": "37.3673631",
+  "longitude": "127.6964169",
+  "hole_count": 27,
+  "course_name": "West/South/East"
+ },
+ {
+  "golfclub_seq": 168,
+  "golfclub_name": "여수시티파크&#40;P&#41;",
+  "area_name": "전라남부 &gt; 여수",
+  "address1": "전남 여수시 좌수영로 641",
+  "latitude": "34.7775729",
+  "longitude": "127.6900322",
+  "hole_count": 18,
+  "course_name": "파크/시티"
+ },
+ {
+  "golfclub_seq": 169,
+  "golfclub_name": "시그너스&#40;P&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충청북도 충주시 양성면 중전리 산11-1",
+  "latitude": "37.1755143",
+  "longitude": "127.7420815",
+  "hole_count": 27,
+  "course_name": "실크/라미/코튼/코스미정"
+ },
+ {
+  "golfclub_seq": 170,
+  "golfclub_name": "포라이즌&#40;구 승주&#41;",
+  "area_name": "전라남부 &gt; 순천",
+  "address1": "전남 순천시 별량면 오실길 333",
+  "latitude": "34.9013414",
+  "longitude": "127.4489908",
+  "hole_count": 27,
+  "course_name": "스카이/베이/가든"
+ },
+ {
+  "golfclub_seq": 171,
+  "golfclub_name": "일산스프링힐스&#40;P&#41;",
+  "area_name": "경기북부 &gt; 고양",
+  "address1": "경기도 고양시 덕양구 주교동 1500번지",
+  "latitude": "37.6577669",
+  "longitude": "126.8134854",
+  "hole_count": 9,
+  "course_name": "9홀*2/9홀"
+ },
+ {
+  "golfclub_seq": 172,
+  "golfclub_name": "김제스파힐스&#40;P&#41;",
+  "area_name": "전라북부 &gt; 김제",
+  "address1": "전라북도 김제시 온천길 37",
+  "latitude": "35.8278108",
+  "longitude": "126.9157821",
+  "hole_count": 18,
+  "course_name": "스파/힐스"
+ },
+ {
+  "golfclub_seq": 173,
+  "golfclub_name": "롯데스카이힐제주",
+  "area_name": "제주 &gt; 서귀포",
+  "address1": "제주특별자치도 서귀포시 상예로 530",
+  "latitude": "33.2872525",
+  "longitude": "126.4053086",
+  "hole_count": 36,
+  "course_name": "SKY&#40;회원제&#41;/OCEAN&#40;회원제&#41;/HILL&#40;대중제&#41;/FOREST&#40;대중제&#41;"
+ },
+ {
+  "golfclub_seq": 174,
+  "golfclub_name": "포웰CC김해&#40;구 스카이힐김해&#41;",
+  "area_name": "경상남부 &gt; 김해",
+  "address1": "경상남도 김해시 진례면 송현리 산100번지",
+  "latitude": "35.233071",
+  "longitude": "128.782778",
+  "hole_count": 18,
+  "course_name": "HILL/SKY"
+ },
+ {
+  "golfclub_seq": 175,
+  "golfclub_name": "스카이밸리",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 북내면 운촌리 산68",
+  "latitude": "37.3344367",
+  "longitude": "127.7273569",
+  "hole_count": 36,
+  "course_name": "밸리&#40;회원제&#41;/스카이&#40;회원제&#41;/레이크&#40;대중제&#41;/마운틴&#40;대중제&#41;"
+ },
+ {
+  "golfclub_seq": 176,
+  "golfclub_name": "수원",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 기흥구 구갈동 313",
+  "latitude": "37.2802744",
+  "longitude": "127.1209907",
+  "hole_count": 36,
+  "course_name": "구OUT/구IN/신OUT/신IN"
+ },
+ {
+  "golfclub_seq": 178,
+  "golfclub_name": "포항&#40;P&#41;",
+  "area_name": "경상북부 &gt; 포항",
+  "address1": "경상북도 포항시 북구 송라면 상송리 산48",
+  "latitude": "36.2100106",
+  "longitude": "129.3417279",
+  "hole_count": 18,
+  "course_name": "동해/태백"
+ },
+ {
+  "golfclub_seq": 181,
+  "golfclub_name": "소피아그린&#40;P&#41;",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 점동면 현수리 산13",
+  "latitude": "37.1777588",
+  "longitude": "127.7078039",
+  "hole_count": 27,
+  "course_name": "세종 18H/여강 18H/황학 18H/세종 27H/여강 27H/황학 27H"
+ },
+ {
+  "golfclub_seq": 182,
+  "golfclub_name": "센테리움&#40;P&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충청북도 충주시 노은면 신효리 산81번지",
+  "latitude": "37.0303974",
+  "longitude": "127.7861737",
+  "hole_count": 27,
+  "course_name": "잉글랜드/웨일즈/스코틀랜드"
+ },
+ {
+  "golfclub_seq": 183,
+  "golfclub_name": "센추리21",
+  "area_name": "강원서부 &gt; 원주",
+  "address1": "강원도 원주시 문막읍 궁말길193",
+  "latitude": "37.2814016",
+  "longitude": "127.8536407",
+  "hole_count": 18,
+  "course_name": "파인-레이크/레이크-파인"
+ },
+ {
+  "golfclub_seq": 184,
+  "golfclub_name": "센추리21&#40;P&#41;",
+  "area_name": "강원서부 &gt; 원주",
+  "address1": "강원 원주시 문막읍 궁말길 193",
+  "latitude": "37.2854872",
+  "longitude": "127.8445763",
+  "hole_count": 27,
+  "course_name": "마운틴-밸리/마운틴&#40;9홀*2&#41;/마운틴&#40;9홀&#41;/필드-마운틴/밸리-필드"
+ },
+ {
+  "golfclub_seq": 185,
+  "golfclub_name": "아난티클럽제주&#40;구 세인트포&#41;",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 구좌읍 김영리 5160-2",
+  "latitude": "33.5202105",
+  "longitude": "126.7391524",
+  "hole_count": 36,
+  "course_name": "CIELO/BOSCO/MARE/VITA"
+ },
+ {
+  "golfclub_seq": 186,
+  "golfclub_name": "구니&#40;P&#41;",
+  "area_name": "경상북부 &gt; 군위",
+  "address1": "경상북도 군위군 군위읍 외량리 산 13번지",
+  "latitude": "36.2539446",
+  "longitude": "128.5428283",
+  "hole_count": 18,
+  "course_name": "웨스트/이스트"
+ },
+ {
+  "golfclub_seq": 187,
+  "golfclub_name": "웰리힐리",
+  "area_name": "강원서부 &gt; 횡성",
+  "address1": "강원 횡성군 둔내면 고원로 451",
+  "latitude": "37.4736599",
+  "longitude": "128.2339239",
+  "hole_count": 36,
+  "course_name": "북/남IN/남OUT"
+ },
+ {
+  "golfclub_seq": 190,
+  "golfclub_name": "플라자CC설악",
+  "area_name": "강원동부 &gt; 속초",
+  "address1": "강원도 속초시 장사동 24-1",
+  "latitude": "38.2081162",
+  "longitude": "128.5308012",
+  "hole_count": 18,
+  "course_name": "S-Rise/M-View"
+ },
+ {
+  "golfclub_seq": 191,
+  "golfclub_name": "골프존카운티선운&#40;P&#41;",
+  "area_name": "전라북부 &gt; 고창",
+  "address1": "전북특별자치도 고창군 아산면 운곡로 418",
+  "latitude": "35.4917325",
+  "longitude": "126.6448228",
+  "hole_count": 18,
+  "course_name": "선운/화시"
+ },
+ {
+  "golfclub_seq": 192,
+  "golfclub_name": "골프존카운티선산",
+  "area_name": "경상북부 &gt; 구미",
+  "address1": "경북 구미시 산동읍 강동로 953-73",
+  "latitude": "36.161565",
+  "longitude": "128.4496731",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 193,
+  "golfclub_name": "서원밸리",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기도 파주시 광탄면 발랑리 48-1번지",
+  "latitude": "37.8213255",
+  "longitude": "126.8894285",
+  "hole_count": 18,
+  "course_name": "서원/밸리"
+ },
+ {
+  "golfclub_seq": 195,
+  "golfclub_name": "서서울",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기도 파주시 광탄면 용미리 산79-1",
+  "latitude": "37.7312868",
+  "longitude": "126.8964342",
+  "hole_count": 18,
+  "course_name": "Lake/Hill"
+ },
+ {
+  "golfclub_seq": 196,
+  "golfclub_name": "서라벌&#40;P&#41;",
+  "area_name": "경상북부 &gt; 경주권",
+  "address1": "경상북도 경주시 외동읍 석계리 산1",
+  "latitude": "35.6864975",
+  "longitude": "129.3106306",
+  "hole_count": 45,
+  "course_name": "Hill/Lake/Mountain/Valley/Pine"
+ },
+ {
+  "golfclub_seq": 197,
+  "golfclub_name": "샌드파인",
+  "area_name": "강원동부 &gt; 강릉",
+  "address1": "강원도 강릉시 저동등길 53",
+  "latitude": "37.7990379",
+  "longitude": "128.882288",
+  "hole_count": 18,
+  "course_name": "IN&#40;18홀&#41;/OUT&#40;18홀&#41;/IN&#40;9홀&#41;/OUT&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 198,
+  "golfclub_name": "익산&#40;P&#41;&#40;구 상떼힐익산&#41;",
+  "area_name": "전라북부 &gt; 익산",
+  "address1": "전북특별자치도 익산시 무왕로38길 111",
+  "latitude": "35.9632277",
+  "longitude": "127.0260205",
+  "hole_count": 18,
+  "course_name": "동/서"
+ },
+ {
+  "golfclub_seq": 202,
+  "golfclub_name": "빅토리아&#40;P&#41;",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 가남면 송림리 214번지",
+  "latitude": "37.1794633",
+  "longitude": "127.631206",
+  "hole_count": 9,
+  "course_name": "9홀&#40;노캐디&#41;/9홀*2&#40;노캐디&#41;"
+ },
+ {
+  "golfclub_seq": 204,
+  "golfclub_name": "비에이비스타&#40;대중제&#41;",
+  "area_name": "경기남부 &gt; 이천",
+  "address1": "경기 이천시 모가면 어농로 272",
+  "latitude": "37.1803652",
+  "longitude": "127.4166682",
+  "hole_count": 54,
+  "course_name": "Buona/Hopark"
+ },
+ {
+  "golfclub_seq": 207,
+  "golfclub_name": "블루헤런",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 대신면 상구리 11-1",
+  "latitude": "37.3844588",
+  "longitude": "127.6478834",
+  "hole_count": 18,
+  "course_name": "서/동"
+ },
+ {
+  "golfclub_seq": 208,
+  "golfclub_name": "로제비앙&#40;P&#41;",
+  "area_name": "경기남부 &gt; 광주",
+  "address1": "경기도 광주시 실촌읍 오향리 156-1",
+  "latitude": "37.3841455",
+  "longitude": "127.372566",
+  "hole_count": 27,
+  "course_name": "로제/비앙/네오"
+ },
+ {
+  "golfclub_seq": 209,
+  "golfclub_name": "블랙스톤 제주",
+  "area_name": "제주도 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 한림읍 금악리 산54",
+  "latitude": "33.3489132",
+  "longitude": "126.3319872",
+  "hole_count": 27,
+  "course_name": "North/South/East"
+ },
+ {
+  "golfclub_seq": 210,
+  "golfclub_name": "블랙밸리&#40;P&#41;",
+  "area_name": "강원동부 &gt; 삼척",
+  "address1": "강원도 삼척시 도계읍 도상로307-84",
+  "latitude": "37.2240957",
+  "longitude": "129.0685846",
+  "hole_count": 18,
+  "course_name": "BLACK/VALLEY"
+ },
+ {
+  "golfclub_seq": 211,
+  "golfclub_name": "제주부영&#40;P&#41;",
+  "area_name": "제주 &gt; 서귀포",
+  "address1": "제주특별자치도 서귀포시 남원읍 남조로 960",
+  "latitude": "33.3592183",
+  "longitude": "126.7124642",
+  "hole_count": 27,
+  "course_name": "원앙/사랑/우정"
+ },
+ {
+  "golfclub_seq": 213,
+  "golfclub_name": "부곡",
+  "area_name": "경상남부 &gt; 창녕",
+  "address1": "경상남도 창녕군 부곡면 거문리 산263",
+  "latitude": "35.4508744",
+  "longitude": "128.5777363",
+  "hole_count": 18,
+  "course_name": "서코스/동코스"
+ },
+ {
+  "golfclub_seq": 214,
+  "golfclub_name": "플라자CC제주&#40;P&#41;",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 명림로 575-107",
+  "latitude": "33.4488638",
+  "longitude": "126.6375149",
+  "hole_count": 9,
+  "course_name": "9홀"
+ },
+ {
+  "golfclub_seq": 215,
+  "golfclub_name": "보성&#40;P&#41;",
+  "area_name": "전라남부 &gt; 보성",
+  "address1": "전남 보성군 조성면 조성3길 338",
+  "latitude": "34.8170973",
+  "longitude": "127.2196608",
+  "hole_count": 18,
+  "course_name": "레이크/마운틴"
+ },
+ {
+  "golfclub_seq": 216,
+  "golfclub_name": "보문&#40;P&#41;",
+  "area_name": "경상북부 &gt; 경주",
+  "address1": "경상북도 경주시 북군동 5-4번지",
+  "latitude": "35.8610524",
+  "longitude": "129.2734335",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 217,
+  "golfclub_name": "보라",
+  "area_name": "경상남부 &gt; 울산",
+  "address1": "울산광역시 울주군 삼동면 금곡리 산183-6",
+  "latitude": "35.4931717",
+  "longitude": "129.1338043",
+  "hole_count": 27,
+  "course_name": "WIL/HEN/EDW"
+ },
+ {
+  "golfclub_seq": 222,
+  "golfclub_name": "골프존카운티천안",
+  "area_name": "충청남부 &gt; 천안",
+  "address1": "충남 천안시 동남구 병천면 매성2길 103",
+  "latitude": "36.803518",
+  "longitude": "127.3071301",
+  "hole_count": 18,
+  "course_name": "버드/우드/OUT/IN"
+ },
+ {
+  "golfclub_seq": 224,
+  "golfclub_name": "발리오스",
+  "area_name": "경기남부 &gt; 화성",
+  "address1": "경기도 화성시 팔탄면 해창리 256-5",
+  "latitude": "37.111338",
+  "longitude": "126.86616",
+  "hole_count": 27,
+  "course_name": "동서/서남/남동"
+ },
+ {
+  "golfclub_seq": 225,
+  "golfclub_name": "문경&#40;P&#41;",
+  "area_name": "경상북부 &gt; 문경",
+  "address1": "경상북도 문경시 문경읍 마성면 외어리 산 1-1번지",
+  "latitude": "36.715215",
+  "longitude": "128.161935",
+  "hole_count": 18,
+  "course_name": "문희/경서"
+ },
+ {
+  "golfclub_seq": 226,
+  "golfclub_name": "무주덕유산",
+  "area_name": "전라북부 &gt; 무주",
+  "address1": "전북특별자치도 무주군 설천면 만선로 185",
+  "latitude": "35.8909658",
+  "longitude": "127.7365409",
+  "hole_count": 18,
+  "course_name": "IN/OUT"
+ },
+ {
+  "golfclub_seq": 229,
+  "golfclub_name": "몽베르",
+  "area_name": "경기북부 &gt; 포천",
+  "address1": "경기도 포천시 영북면 산정리 558-1",
+  "latitude": "38.0842706",
+  "longitude": "127.3117523",
+  "hole_count": 36,
+  "course_name": "망무봉OUT&#40;대중제&#41;/망무봉IN&#40;대중제&#41;/명성산OUT&#40;회원제&#41;/명성산IN&#40;회원제&#41;"
+ },
+ {
+  "golfclub_seq": 231,
+  "golfclub_name": "마우나오션",
+  "area_name": "경상북부 &gt; 경주",
+  "address1": "경상북도 경주시 양남면 신대리 산140-1번지",
+  "latitude": "35.683729",
+  "longitude": "129.372494",
+  "hole_count": 27,
+  "course_name": "마우나&#40;18홀&#41;/블루&#40;18홀&#41;/오션&#40;18홀&#41;/블루&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 232,
+  "golfclub_name": "마에스트로&#40;P&#41;",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기도 안성시 양성면 노곡리 123",
+  "latitude": "37.1046908",
+  "longitude": "127.2606635",
+  "hole_count": 18,
+  "course_name": "LAKE/VALLEY"
+ },
+ {
+  "golfclub_seq": 233,
+  "golfclub_name": "링크나인&#40;P&#41;",
+  "area_name": "경기남부 &gt; 화성",
+  "address1": "경기도 화성시 마도면 고모리 625-2",
+  "latitude": "37.1717457",
+  "longitude": "126.7532524",
+  "hole_count": 9,
+  "course_name": "9홀X2"
+ },
+ {
+  "golfclub_seq": 234,
+  "golfclub_name": "리더스&#40;P&#41;",
+  "area_name": "경상남부 &gt; 밀양",
+  "address1": "경남 밀양시 활성로 455",
+  "latitude": "35.4746783",
+  "longitude": "128.8134441",
+  "hole_count": 27,
+  "course_name": "HILL/PINE/LAKE"
+ },
+ {
+  "golfclub_seq": 235,
+  "golfclub_name": "리베라",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 화성시 청계동 510-385",
+  "latitude": "37.190825",
+  "longitude": "127.1120302",
+  "hole_count": 36,
+  "course_name": "CHERRY HILL/PINE HILL/LAKES/VALLEY"
+ },
+ {
+  "golfclub_seq": 238,
+  "golfclub_name": "레인보우힐스&#40;P&#41;",
+  "area_name": "충청북부 &gt; 음성",
+  "address1": "충북 음성군 생극면 차생로 168",
+  "latitude": "37.026466",
+  "longitude": "127.6491964",
+  "hole_count": 27,
+  "course_name": "EAST/SOUTH/WEST"
+ },
+ {
+  "golfclub_seq": 240,
+  "golfclub_name": "한림용인&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 남사면 창리 산 103-3",
+  "latitude": "37.1298336",
+  "longitude": "127.1899123",
+  "hole_count": 27,
+  "course_name": "사파이어/루비/다이아/사파이어&#40;27홀&#41;/루비&#40;27홀&#41;/다이아몬드&#40;27홀&#41;"
+ },
+ {
+  "golfclub_seq": 242,
+  "golfclub_name": "골프존카운티경남&#40;P&#41;",
+  "area_name": "경상남부 &gt; 함안",
+  "address1": "경남 함안군 칠원읍 운무로 470",
+  "latitude": "35.3099616",
+  "longitude": "128.5733627",
+  "hole_count": 18,
+  "course_name": "제이드/페리돗 "
+ },
+ {
+  "golfclub_seq": 244,
+  "golfclub_name": "레이크사이드",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 모현면 능원리 산5-12",
+  "latitude": "37.3195517",
+  "longitude": "127.179116",
+  "hole_count": 36,
+  "course_name": "동 OUT/동 IN/남 OUT/남 IN/서OUT/서IN/9홀"
+ },
+ {
+  "golfclub_seq": 246,
+  "golfclub_name": "라헨느",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 명림로 374",
+  "latitude": "33.4532385",
+  "longitude": "126.6138256",
+  "hole_count": 18,
+  "course_name": "레이크/오션"
+ },
+ {
+  "golfclub_seq": 247,
+  "golfclub_name": "라온&#40;P&#41;",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 한경면 용금로 998",
+  "latitude": "33.3395484",
+  "longitude": "126.2781566",
+  "hole_count": 27,
+  "course_name": "스톤/레이크/파인"
+ },
+ {
+  "golfclub_seq": 248,
+  "golfclub_name": "라비돌&#40;P&#41;",
+  "area_name": "경기남부 &gt; 화성",
+  "address1": "경기도 화성시 정남면 보통일 1414-39번지",
+  "latitude": "37.19034",
+  "longitude": "126.9833709",
+  "hole_count": 9,
+  "course_name": "9홀/9홀X2"
+ },
+ {
+  "golfclub_seq": 249,
+  "golfclub_name": "라데나",
+  "area_name": "강원서부 &gt; 춘천",
+  "address1": "강원도 춘천시 신동면 정죽리 1007-1",
+  "latitude": "37.8411301",
+  "longitude": "127.7186555",
+  "hole_count": 27,
+  "course_name": "현장랜덤배정/현장랜덤배정/현장랜덤배정"
+ },
+ {
+  "golfclub_seq": 252,
+  "golfclub_name": "떼제베&#40;P&#41;",
+  "area_name": "충청북부 &gt; 청주",
+  "address1": "충북 청주시 흥덕구 옥산면 동림2길 149",
+  "latitude": "36.665459",
+  "longitude": "127.3190149",
+  "hole_count": 36,
+  "course_name": "가람&#40;서남&#41;&#40;9홀&#41;/누리&#40;남서&#41;&#40;9홀&#41;/한울&#40;동북&#41;&#40;9홀&#41;/마루&#40;북동&#41;&#40;9홀&#41;/가람&#40;서남&#41;&#40;18홀&#41;/누리&#40;남서&#41;&#40;18홀&#41;/한울&#40;동북&#41;&#40;18홀&#41;/마루&#40;북동&#41;&#40;18홀&#41;"
+ },
+ {
+  "golfclub_seq": 253,
+  "golfclub_name": "강동디아너스&#40;구 블루원디아너스&#41;",
+  "area_name": "경상북부 &gt; 경주",
+  "address1": "경상북도 경주시 천군동 산31",
+  "latitude": "35.8225557",
+  "longitude": "129.2958649",
+  "hole_count": 27,
+  "course_name": "레이크-&gt;힐스/레이크-&gt;밸리/밸리-&gt;레이크/힐스-&gt;밸리/밸리-&gt;힐스/힐스-&gt;레이크"
+ },
+ {
+  "golfclub_seq": 255,
+  "golfclub_name": "젠스필드&#40;P&#41;",
+  "area_name": "충청북부 &gt; 음성",
+  "address1": "충청북도 음성군 삼성면 용대리 540-1번지 ",
+  "latitude": "37.0407288",
+  "longitude": "127.5166428",
+  "hole_count": 18,
+  "course_name": "드래곤/힐"
+ },
+ {
+  "golfclub_seq": 258,
+  "golfclub_name": "동부산",
+  "area_name": "경상남부 &gt; 부산권",
+  "address1": "경상남도 양산시 매곡동 131",
+  "latitude": "35.3716807",
+  "longitude": "129.1792244",
+  "hole_count": 27,
+  "course_name": "Hill/Lake/Valley"
+ },
+ {
+  "golfclub_seq": 259,
+  "golfclub_name": "동래베네스트",
+  "area_name": "경상남부 &gt; 부산",
+  "address1": "부산광역시 금정구 선동 산128",
+  "latitude": "35.262381",
+  "longitude": "129.0991729",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 261,
+  "golfclub_name": "H1",
+  "area_name": "경기남부 &gt; 이천",
+  "address1": "경기도 이천시 호법면 매곡리 704-2",
+  "latitude": "37.1882147",
+  "longitude": "127.4033083",
+  "hole_count": 18,
+  "course_name": "마운틴/레이크"
+ },
+ {
+  "golfclub_seq": 262,
+  "golfclub_name": "더클래식&#40;P&#41;",
+  "area_name": "제주 &gt; 서귀포",
+  "address1": "제주특별자치도 서귀포시 남원읍 남조로 1105",
+  "latitude": "33.3724316",
+  "longitude": "126.6798119",
+  "hole_count": 18,
+  "course_name": "Forest/Valley"
+ },
+ {
+  "golfclub_seq": 264,
+  "golfclub_name": "대영베이스&#40;P&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충청북도 충주시 이류면 장성리 산 7번지",
+  "latitude": "36.9461186",
+  "longitude": "127.8347278",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 268,
+  "golfclub_name": "대구",
+  "area_name": "경상북부 &gt; 경산",
+  "address1": "경상북도 경산시 진량읍 선화리 67-2",
+  "latitude": "35.869925",
+  "longitude": "128.811151",
+  "hole_count": 27,
+  "course_name": "동&#40;9홀&#41;/동&#40;18홀&#41;/중&#40;9홀&#41;/중&#40;18홀&#41;/서&#40;9홀&#41;/서&#40;18홀&#41;"
+ },
+ {
+  "golfclub_seq": 269,
+  "golfclub_name": "담양레이나&#40;P&#41;",
+  "area_name": "전라남부 &gt; 담양",
+  "address1": "전남 담양군 담양읍 깊은실길 169",
+  "latitude": "35.3087798",
+  "longitude": "127.0190765",
+  "hole_count": 18,
+  "course_name": "임페리얼/마제스티"
+ },
+ {
+  "golfclub_seq": 271,
+  "golfclub_name": "뉴코리아",
+  "area_name": "경기북부 &gt; 파주권",
+  "address1": "경기도 고양시 덕양구 신원동 227-12",
+  "latitude": "37.6650773",
+  "longitude": "126.8777942",
+  "hole_count": 18,
+  "course_name": "OUT코스/IN코스"
+ },
+ {
+  "golfclub_seq": 272,
+  "golfclub_name": "뉴스프링빌2&#40;P&#41;",
+  "area_name": "경상북부 &gt; 상주",
+  "address1": "경북 상주시 모서면 백화로 40",
+  "latitude": "36.2805303",
+  "longitude": "127.8602659",
+  "hole_count": 18,
+  "course_name": "몬테로사&#40;18홀&#41;/빅혼&#40;18홀&#41;/로즈파크&#40;18홀&#41;/몬테로사&#40;9홀&#41;/빅혼&#40;9홀&#41;/로즈파크&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 273,
+  "golfclub_name": "뉴스프링빌",
+  "area_name": "경기남부 &gt; 이천",
+  "address1": "경기도 이천시 모가면 두미리 산 76",
+  "latitude": "37.1565163",
+  "longitude": "127.4151263",
+  "hole_count": 36,
+  "course_name": "록키/올림푸스/알프스/몽블랑"
+ },
+ {
+  "golfclub_seq": 274,
+  "golfclub_name": "뉴스프링빌퍼블릭&#40;P&#41;",
+  "area_name": "경기남부 &gt; 이천",
+  "address1": "경기도 이천시 모가면 두미리 산 76",
+  "latitude": "37.1565163",
+  "longitude": "127.4151263",
+  "hole_count": 9,
+  "course_name": "9홀&#40;노캐디&#41;"
+ },
+ {
+  "golfclub_seq": 275,
+  "golfclub_name": "뉴서울",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 광주시 삼동 1번지",
+  "latitude": "37.4175195",
+  "longitude": "127.2114256",
+  "hole_count": 36,
+  "course_name": "예술OUT_18홀라운드/예술IN_18홀라운드/문화OUT_18홀라운드/문화IN_18홀라운드/예술OUT_9홀라운드/예술IN_9홀라운드/문화OUT_9홀라운드/문화IN_9홀라운드"
+ },
+ {
+  "golfclub_seq": 279,
+  "golfclub_name": "남여주&#40;P&#41;",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 여주읍 하거리 산64-1",
+  "latitude": "37.2272627",
+  "longitude": "127.6276216",
+  "hole_count": 27,
+  "course_name": "가람&#40;9홀&#41;/누리&#40;9홀&#41;/마루&#40;9홀&#41;/가람&#40;27홀&#41;/누리&#40;27홀&#41;/마루&#40;27홀&#41;/가람&#40;27홀&#41;/누리&#40;27홀&#41;/마루&#40;27홀&#41;/가람&#40;18홀&#41;/누리&#40;18홀&#41;/마루&#40;18홀&#41;"
+ },
+ {
+  "golfclub_seq": 280,
+  "golfclub_name": "남양주&#40;P&#41;",
+  "area_name": "경기북부 &gt; 남양주",
+  "address1": "경기도 남양주시 오남읍 산 171-3번지",
+  "latitude": "37.6769035",
+  "longitude": "127.2160592",
+  "hole_count": 9,
+  "course_name": "파랑새*2/포시즌"
+ },
+ {
+  "golfclub_seq": 282,
+  "golfclub_name": "남서울",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 성남시 분당구 백현동 511-25",
+  "latitude": "37.380265",
+  "longitude": "127.082313",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 284,
+  "golfclub_name": "화순엘리체",
+  "area_name": "전라남부 &gt; 화순",
+  "address1": "전남 화순군 춘양면 장곡길 55",
+  "latitude": "34.9544389",
+  "longitude": "126.9207700",
+  "hole_count": 18,
+  "course_name": "남&#40;18홀&#41;/동&#40;18홀&#41;/남&#40;9홀&#41;/동&#40;9홀&#41;/남&#40;27홀&#41;/동&#40;27홀&#41;"
+ },
+ {
+  "golfclub_seq": 285,
+  "golfclub_name": "해피니스",
+  "area_name": "전라남부 &gt; 나주",
+  "address1": "전남 나주시 다도면 다도로 171-60",
+  "latitude": "34.9959291",
+  "longitude": "126.8326947",
+  "hole_count": 45,
+  "course_name": "휴먼&#40;18홀&#41;/해피&#40;18홀&#41;/하트&#40;18홀&#41;/힐링&#40;18홀&#41;/히든&#40;18홀&#41;/휴먼&#40;9홀&#41;/해피&#40;9홀&#41;/하트&#40;9홀&#41;/힐링&#40;9홀&#41;/히든&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 288,
+  "golfclub_name": "천지&#40;P&#41;",
+  "area_name": "전라남부 &gt; 함평",
+  "address1": "전남 함평군 함평읍 함장로 889-11",
+  "latitude": "35.0502122",
+  "longitude": "126.4991118",
+  "hole_count": 9,
+  "course_name": "천지&#40;9홀X2회&#41;"
+ },
+ {
+  "golfclub_seq": 289,
+  "golfclub_name": "김포씨사이드",
+  "area_name": "경기남부 &gt; 김포",
+  "address1": "경기도 김포시 월곶면 포내리 220-6",
+  "latitude": "37.706053",
+  "longitude": "126.5338708",
+  "hole_count": 18,
+  "course_name": "서코스/남코스"
+ },
+ {
+  "golfclub_seq": 291,
+  "golfclub_name": "한미르대덕&#40;P&#41;",
+  "area_name": "충청남부 &gt; 대전",
+  "address1": "대전광역시 유성구 용산동 676",
+  "latitude": "36.4188756",
+  "longitude": "127.4012806",
+  "hole_count": 9,
+  "course_name": "9홀X2회/9홀"
+ },
+ {
+  "golfclub_seq": 292,
+  "golfclub_name": "금강",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주시 가남읍 여주남로 541",
+  "latitude": "37.2432575",
+  "longitude": "127.6018862",
+  "hole_count": 27,
+  "course_name": "서/남/동"
+ },
+ {
+  "golfclub_seq": 293,
+  "golfclub_name": "글렌로스&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 포곡읍 전대리 310",
+  "latitude": "37.2944692",
+  "longitude": "127.1857046",
+  "hole_count": 9,
+  "course_name": "9홀&times;2/스페셜 9홀&times;2"
+ },
+ {
+  "golfclub_seq": 295,
+  "golfclub_name": "그레이스&#40;P&#41;",
+  "area_name": "경상북부 &gt; 대구권",
+  "address1": "경상북도 청도군 이서면 각계리 산6-2",
+  "latitude": "35.6587389",
+  "longitude": "128.6634449",
+  "hole_count": 27,
+  "course_name": "Valley/Lake/Mountain"
+ },
+ {
+  "golfclub_seq": 296,
+  "golfclub_name": "그랜드&#40;청주&#41;",
+  "area_name": "충청북부 &gt; 청주",
+  "address1": "충북 청주시 청원구 오창읍 꽃화산길 51-20",
+  "latitude": "36.7216534",
+  "longitude": "127.3783637",
+  "hole_count": 27,
+  "course_name": "동&#40;18홀&#41;/남&#40;18홀&#41;/서&#40;18홀&#41;/동&#40;9홀&#41;/남&#40;9홀&#41;/서&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 297,
+  "golfclub_name": "군산&#40;토너먼트&#41;",
+  "area_name": "전라북부 &gt; 군산",
+  "address1": "전북특별자치도 군산시 옥서면 남군산로 1685-53",
+  "latitude": "35.8944384",
+  "longitude": "126.6551443",
+  "hole_count": 18,
+  "course_name": "토너먼트-IN/토너먼트-OUT"
+ },
+ {
+  "golfclub_seq": 298,
+  "golfclub_name": "군산&#40;레귤러&#41;",
+  "area_name": "전라북부 &gt; 군산",
+  "address1": "전북특별자치도 군산시 옥서면 남군산로 1685-53",
+  "latitude": "35.8944384",
+  "longitude": "126.6551443",
+  "hole_count": 63,
+  "course_name": "전주/익산/김제/정읍/부안/남원"
+ },
+ {
+  "golfclub_seq": 301,
+  "golfclub_name": "한림광릉",
+  "area_name": "경기북부 &gt; 남양주",
+  "address1": "경기도 남양주군 진접읍 팔야리 산1",
+  "latitude": "37.7586433",
+  "longitude": "127.2386124",
+  "hole_count": 36,
+  "course_name": "글렌/파인"
+ },
+ {
+  "golfclub_seq": 302,
+  "golfclub_name": "골프클럽Q&#40;P&#41;",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기도 안성시 죽산면 장계리 711번지",
+  "latitude": "37.0469732",
+  "longitude": "127.389507",
+  "hole_count": 18,
+  "course_name": "Pampas/Valley"
+ },
+ {
+  "golfclub_seq": 304,
+  "golfclub_name": "골드레이크",
+  "area_name": "전라남부 &gt; 나주",
+  "address1": "전남 나주시 남평읍 나주호로 442-129",
+  "latitude": "34.9594233",
+  "longitude": "126.8734646",
+  "hole_count": 18,
+  "course_name": "골드/레이크"
+ },
+ {
+  "golfclub_seq": 305,
+  "golfclub_name": "골드레이크&#40;P&#41;",
+  "area_name": "전라남부 &gt; 나주",
+  "address1": "전남 나주시 남평읍 나주호로 442-129",
+  "latitude": "34.9579494",
+  "longitude": "126.8755342",
+  "hole_count": 18,
+  "course_name": "밸리/힐"
+ },
+ {
+  "golfclub_seq": 307,
+  "golfclub_name": "골드",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 기흥구 고매동 5-48",
+  "latitude": "37.2175847",
+  "longitude": "127.1369192",
+  "hole_count": 36,
+  "course_name": "참피온OUT/참피온IN/마스터OUT/마스터IN"
+ },
+ {
+  "golfclub_seq": 309,
+  "golfclub_name": "고창&#40;P&#41;",
+  "area_name": "전라북부 &gt; 고창",
+  "address1": "전북특별자치도 고창군 심원면 애향갯벌로 70",
+  "latitude": "35.5161338",
+  "longitude": "126.5018590",
+  "hole_count": 21,
+  "course_name": "바다/푸른"
+ },
+ {
+  "golfclub_seq": 312,
+  "golfclub_name": "경주신라",
+  "area_name": "경상북부 &gt; 경주",
+  "address1": "경상북도 경주시 신평동 산5번지",
+  "latitude": "35.85084",
+  "longitude": "129.2850197",
+  "hole_count": 36,
+  "course_name": "천마OUT/천마IN/화랑OUT/화랑IN"
+ },
+ {
+  "golfclub_seq": 313,
+  "golfclub_name": "경주&#40;P&#41;",
+  "area_name": "경상북부 &gt; 경주",
+  "address1": "경상북도 경주시 북군동 375-1",
+  "latitude": "35.863183",
+  "longitude": "129.2616282",
+  "hole_count": 27,
+  "course_name": "Sun/Sea/Moon"
+ },
+ {
+  "golfclub_seq": 314,
+  "golfclub_name": "강남300",
+  "area_name": "경기남부 &gt; 광주",
+  "address1": "경기도 광주시 목동497-6",
+  "latitude": "37.3861932",
+  "longitude": "127.1814885",
+  "hole_count": 18,
+  "course_name": "IN코스/OUT코스"
+ },
+ {
+  "golfclub_seq": 318,
+  "golfclub_name": "푸른솔포천&#40;P&#41;",
+  "area_name": "경기북부 &gt; 포천",
+  "address1": "경기 포천시 가산면 금우로 276",
+  "latitude": "37.8403697",
+  "longitude": "127.2352431",
+  "hole_count": 27,
+  "course_name": "마운틴/밸리/레이크"
+ },
+ {
+  "golfclub_seq": 319,
+  "golfclub_name": "코오롱가든&#40;P&#41;",
+  "area_name": "경상북부 &gt; 경주",
+  "address1": "경북 경주시 불국로 289-17",
+  "latitude": "35.7879333",
+  "longitude": "129.3219125",
+  "hole_count": 9,
+  "course_name": "가든&#40;9홀&#41;/가든&#40;18홀&#41;"
+ },
+ {
+  "golfclub_seq": 323,
+  "golfclub_name": "클럽72_바다&#40;P&#41;",
+  "area_name": "경기남부 &gt; 인천",
+  "address1": "인천 중구 공항동로 392",
+  "latitude": "37.4827530",
+  "longitude": "126.4665970",
+  "hole_count": 54,
+  "course_name": "레이크OUT/레이크IN/클래식OUT/클래식IN/오션OUT/오션IN"
+ },
+ {
+  "golfclub_seq": 324,
+  "golfclub_name": "크리스탈밸리",
+  "area_name": "경기북부 &gt; 가평권",
+  "address1": "경기도 가평군 상면 항사리 산 36-2",
+  "latitude": "37.7940699",
+  "longitude": "127.3873397",
+  "hole_count": 18,
+  "course_name": "크리스탈/밸리"
+ },
+ {
+  "golfclub_seq": 326,
+  "golfclub_name": "크라운&#40;P&#41;",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 조천읍 북선로 125",
+  "latitude": "33.5286071",
+  "longitude": "126.6954014",
+  "hole_count": 27,
+  "course_name": "당일랜덤배정&#40;동,서,남&#41;"
+ },
+ {
+  "golfclub_seq": 341,
+  "golfclub_name": "시엘골프클럽&#40;P&#41;",
+  "area_name": "경상북부 &gt; 영천",
+  "address1": "경상북도 영천시 청동면 보성리 32-1",
+  "latitude": "35.9927325",
+  "longitude": "128.8571242",
+  "hole_count": 9,
+  "course_name": "마운틴&#40;18홀&#41;/레이크&#40;18홀&#41;/마운틴&#40;9홀&#41;/레이크&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 359,
+  "golfclub_name": "오션힐스청도&#40;P&#41;",
+  "area_name": "경상북부 &gt; 청도",
+  "address1": "경북 청도군 매전면 곰티로 370-204",
+  "latitude": "35.6732562",
+  "longitude": "128.8218956",
+  "hole_count": 18,
+  "course_name": "Valley/Creek"
+ },
+ {
+  "golfclub_seq": 360,
+  "golfclub_name": "화성&#40;P&#41;",
+  "area_name": "경기남부 &gt; 화성",
+  "address1": "경기 화성시 남양읍 북양리 172-7",
+  "latitude": "37.2261033",
+  "longitude": "126.8365413",
+  "hole_count": 9,
+  "course_name": "18홀&#40;9홀*2&#41;/9홀"
+ },
+ {
+  "golfclub_seq": 361,
+  "golfclub_name": "우리골프클럽&#40;P&#41;",
+  "area_name": "경상북부 &gt; 경주",
+  "address1": "경북 경주시 양남면 동남로 972",
+  "latitude": "35.6776761",
+  "longitude": "129.3766309",
+  "hole_count": 9,
+  "course_name": "9홀/18홀&#40;9홀X2&#41;"
+ },
+ {
+  "golfclub_seq": 363,
+  "golfclub_name": "힐마루&#40;P&#41;",
+  "area_name": "경상남부 &gt; 창녕",
+  "address1": "경남 창녕군 장마면 초곡리 산 228",
+  "latitude": "35.5005738",
+  "longitude": "128.4999053",
+  "hole_count": 18,
+  "course_name": "동/서"
+ },
+ {
+  "golfclub_seq": 365,
+  "golfclub_name": "파인비치&#40;P&#41;",
+  "area_name": "전라남부 &gt; 해남",
+  "address1": "전남 해남군 화원면 시아로 224",
+  "latitude": "34.6967433",
+  "longitude": "126.2623244",
+  "hole_count": 27,
+  "course_name": "파인/비치/오시아노"
+ },
+ {
+  "golfclub_seq": 368,
+  "golfclub_name": "포레스트힐&#40;P&#41;",
+  "area_name": "경기북부 &gt; 포천",
+  "address1": "경기도 포천시 화현면 봉화로 253",
+  "latitude": "37.8737474",
+  "longitude": "127.2735798",
+  "hole_count": 24,
+  "course_name": "ROCK&#40;18홀/캐디&#41;/HILL&#40;18홀/캐디&#41;/FOREST&#40;6홀X2회/노캐디&#41;"
+ },
+ {
+  "golfclub_seq": 369,
+  "golfclub_name": "포천힐스&#40;P&#41;",
+  "area_name": "경기북부 &gt; 포천",
+  "address1": "경기도 포천시 군내면 상성북리 34-1 번지",
+  "latitude": "37.8848433",
+  "longitude": "127.2477085",
+  "hole_count": 27,
+  "course_name": "캐슬/팰리스/가든"
+ },
+ {
+  "golfclub_seq": 370,
+  "golfclub_name": "골든베이&#40;P&#41;",
+  "area_name": "충청남부 &gt; 태안",
+  "address1": "충남 태안군 근흥면 정산포로 217",
+  "latitude": "36.7108878",
+  "longitude": "126.1721069",
+  "hole_count": 27,
+  "course_name": "OCEAN/VALLEY/MOUNTAIN"
+ },
+ {
+  "golfclub_seq": 372,
+  "golfclub_name": "제주아덴힐&#40;P&#41;",
+  "area_name": "제주 &gt; 제주시",
+  "address1": "제주특별자치도 제주시 한림읍 화전길 82",
+  "latitude": "33.3455748",
+  "longitude": "126.364317",
+  "hole_count": 18,
+  "course_name": "왕이메/새별"
+ },
+ {
+  "golfclub_seq": 373,
+  "golfclub_name": "골프존카운티구미&#40;P&#41;",
+  "area_name": "경상북부 &gt; 구미",
+  "address1": "경북 구미시 산동면 강동로 953-74",
+  "latitude": "36.1570557",
+  "longitude": "128.4425686",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 385,
+  "golfclub_name": "골프존카운티화랑&#40;P&#41;",
+  "area_name": "충청북부 &gt; 진천",
+  "address1": "충북 진천군 문백면 농다리로 809",
+  "latitude": "36.8193572",
+  "longitude": "127.4708909",
+  "hole_count": 18,
+  "course_name": "원화랑/원낭자"
+ },
+ {
+  "golfclub_seq": 386,
+  "golfclub_name": "골프존카운티안성H&#40;P&#41;",
+  "area_name": "경기남부 &gt; 안성",
+  "address1": "경기도 안성시 보개면 북가현리 산 65-1번지",
+  "latitude": "37.0944877",
+  "longitude": "127.3360591",
+  "hole_count": 18,
+  "course_name": "HILL/LAKE"
+ },
+ {
+  "golfclub_seq": 387,
+  "golfclub_name": "더헤븐&#40;P&#41;",
+  "area_name": "경기남부 &gt; 안산",
+  "address1": "경기도 안산시 단원구 대부남동 1111번지",
+  "latitude": "37.2288428",
+  "longitude": "126.5656851",
+  "hole_count": 27,
+  "course_name": "SOUTH/WEST/EAST"
+ },
+ {
+  "golfclub_seq": 389,
+  "golfclub_name": "스마트KU&#40;P&#41;",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기도 파주시 법원읍 보광로 1616",
+  "latitude": "37.8208728",
+  "longitude": "126.8773214",
+  "hole_count": 27,
+  "course_name": "바른/미쁨/혼솔"
+ },
+ {
+  "golfclub_seq": 390,
+  "golfclub_name": "더시에나벨루토&#40;P&#41;&#40;구 세라지오&#41;",
+  "area_name": "경기남부 &gt; 여주권",
+  "address1": "경기도 여주군 여주읍 오금리 422-3번지",
+  "latitude": "37.3289813",
+  "longitude": "127.6560756",
+  "hole_count": 18,
+  "course_name": "벨라/루체"
+ },
+ {
+  "golfclub_seq": 391,
+  "golfclub_name": "벨라스톤&#40;P&#41;",
+  "area_name": "강원서부 &gt; 횡성",
+  "address1": "강원 횡성군 서원면 옥계9길 124",
+  "latitude": "37.4567115",
+  "longitude": "127.8328069",
+  "hole_count": 18,
+  "course_name": "벨라/스톤"
+ },
+ {
+  "golfclub_seq": 392,
+  "golfclub_name": "남춘천&#40;P&#41;",
+  "area_name": "강원서부 &gt; 춘천",
+  "address1": "강원 춘천시 신동면 오봉길 78",
+  "latitude": "37.7853521",
+  "longitude": "127.7079472",
+  "hole_count": 18,
+  "course_name": "Victory/Challenge"
+ },
+ {
+  "golfclub_seq": 393,
+  "golfclub_name": "힐드로사이&#40;P&#41;",
+  "area_name": "강원서부 &gt; 홍천",
+  "address1": "강원도 홍천군 남면 한서로 2840",
+  "latitude": "37.5951516",
+  "longitude": "127.7141622",
+  "hole_count": 18,
+  "course_name": "버치/파인/코스당일배정"
+ },
+ {
+  "golfclub_seq": 394,
+  "golfclub_name": "동강시스타&#40;P&#41;",
+  "area_name": "강원동부 &gt; 영월",
+  "address1": "강원도 영월군 영월읍 삼옥리 362",
+  "latitude": "37.2149115",
+  "longitude": "128.5118311",
+  "hole_count": 18,
+  "course_name": "영월&#40;18홀&#41;/동강&#40;18홀&#41;"
+ },
+ {
+  "golfclub_seq": 396,
+  "golfclub_name": "메이플비치&#40;P&#41;",
+  "area_name": "강원동부 &gt; 동해권",
+  "address1": "강원특별자치도 강릉시 강동면 하시동리 산 131-6",
+  "latitude": "37.74516",
+  "longitude": "128.9677",
+  "hole_count": 18,
+  "course_name": "비치/메이플"
+ },
+ {
+  "golfclub_seq": 399,
+  "golfclub_name": "마론&#40;P&#41;",
+  "area_name": "충청남부 &gt; 천안",
+  "address1": "충남 천안시 동남구 북면 납안5길 74",
+  "latitude": "36.865835",
+  "longitude": "127.257049",
+  "hole_count": 18,
+  "course_name": "dream/vision"
+ },
+ {
+  "golfclub_seq": 400,
+  "golfclub_name": "속리산&#40;P&#41;&#40;구 클럽디속리산&#41;",
+  "area_name": "충청북부 &gt; 보은",
+  "address1": "충청북도 보은군 탄부면 상장리 산 30번지",
+  "latitude": "36.447164",
+  "longitude": "127.7819396",
+  "hole_count": 18,
+  "course_name": "WEST/EAST"
+ },
+ {
+  "golfclub_seq": 401,
+  "golfclub_name": "대영힐스&#40;P&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충청북도 충주시 대소원면 성종 두담길 114번지",
+  "latitude": "36.9538542",
+  "longitude": "127.8545821",
+  "hole_count": 27,
+  "course_name": "청&#40;靑&#41;/미&#40;美&#41;/력&#40;力&#41;"
+ },
+ {
+  "golfclub_seq": 402,
+  "golfclub_name": "로얄포레&#40;P&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충북 충주시 신니면 화치3길 35",
+  "latitude": "36.9955645",
+  "longitude": "127.6797625",
+  "hole_count": 18,
+  "course_name": "로얄/포레"
+ },
+ {
+  "golfclub_seq": 405,
+  "golfclub_name": "세븐밸리&#40;P&#41;",
+  "area_name": "경상북부 &gt; 칠곡",
+  "address1": "경북 칠곡군 왜관읍 봉계3길 180",
+  "latitude": "36.0170548",
+  "longitude": "128.4645369",
+  "hole_count": 18,
+  "course_name": "세븐/밸리"
+ },
+ {
+  "golfclub_seq": 407,
+  "golfclub_name": "포도&#40;P&#41;",
+  "area_name": "경상북부 &gt; 김천",
+  "address1": "경상북도 김천시 구성면 송죽리 611-2번지",
+  "latitude": "36.0423995",
+  "longitude": "128.0582294",
+  "hole_count": 27,
+  "course_name": "샤인/포도/자두"
+ },
+ {
+  "golfclub_seq": 408,
+  "golfclub_name": "엠스클럽의성",
+  "area_name": "경상북부 &gt; 의성",
+  "address1": "경상북도 의성군 봉양면 신평리 산 107번지",
+  "latitude": "36.2817645",
+  "longitude": "128.5603387",
+  "hole_count": 27,
+  "course_name": "챔피온/마스터/챌린지"
+ },
+ {
+  "golfclub_seq": 412,
+  "golfclub_name": "드비치",
+  "area_name": "경상남부 &gt; 거제",
+  "address1": "경남 거제시 장목면 거제북로 1573",
+  "latitude": "35.0151218",
+  "longitude": "128.6738434",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 413,
+  "golfclub_name": "스프링데일&#40;P&#41;",
+  "area_name": "제주 &gt; 서귀포",
+  "address1": "제주특별자치도 서귀포시 남원읍 서성로 459",
+  "latitude": "33.3293612",
+  "longitude": "126.6380203",
+  "hole_count": 18,
+  "course_name": "데일/스프링"
+ },
+ {
+  "golfclub_seq": 414,
+  "golfclub_name": "오션힐스영천",
+  "area_name": "경상북부 &gt; 영천",
+  "address1": "경상북도 영천시 임고면 방목길 34-2",
+  "latitude": "34.801849",
+  "longitude": "126.9703927",
+  "hole_count": 27,
+  "course_name": "해&#40;OUT&#41;/별&#40;IN&#41;/달&#40;IN&#41;"
+ },
+ {
+  "golfclub_seq": 416,
+  "golfclub_name": "JNJ&#40;P&#41;",
+  "area_name": "전라남부 &gt; 장흥",
+  "address1": "전남 장흥군 장평면 제산기동로 326-1",
+  "latitude": "34.7995846",
+  "longitude": "126.9729772",
+  "hole_count": 27,
+  "course_name": "정/남/진"
+ },
+ {
+  "golfclub_seq": 417,
+  "golfclub_name": "세이지우드여수경도&#40;P&#41;",
+  "area_name": "전라남부 &gt; 여수",
+  "address1": "전남 여수시 대경도길 111",
+  "latitude": "34.7139584",
+  "longitude": "127.7255127",
+  "hole_count": 27,
+  "course_name": "오동도/돌산도/금오도"
+ },
+ {
+  "golfclub_seq": 418,
+  "golfclub_name": "디오션&#40;P&#41;",
+  "area_name": "전라남부 &gt; 여수",
+  "address1": "전남 여수시 화양면 장수안포로 142",
+  "latitude": "34.6498436",
+  "longitude": "127.6193537",
+  "hole_count": 18,
+  "course_name": "웨스트오션/이스트오션"
+ },
+ {
+  "golfclub_seq": 419,
+  "golfclub_name": "남원상록&#40;P&#41;",
+  "area_name": "전라북부 &gt; 남원",
+  "address1": "전북 남원시 대산면 월계길 11",
+  "latitude": "35.4171388",
+  "longitude": "127.2971904",
+  "hole_count": 18,
+  "course_name": "몽룡/춘향"
+ },
+ {
+  "golfclub_seq": 420,
+  "golfclub_name": "코스카&#40;P&#41;",
+  "area_name": "충청북부 &gt; 음성",
+  "address1": "충북 음성군 음성읍 동음로 318",
+  "latitude": "36.9307533",
+  "longitude": "127.6208239",
+  "hole_count": 27,
+  "course_name": "메이플/릴리/파인"
+ },
+ {
+  "golfclub_seq": 422,
+  "golfclub_name": "라비에벨듄스&#40;P&#41;",
+  "area_name": "강원서부 &gt; 춘천",
+  "address1": "강원 춘천시 동산면 종자리로 436",
+  "latitude": "37.7411447",
+  "longitude": "127.7581496",
+  "hole_count": 18,
+  "course_name": "듄스&#40;OUT&#41;/듄스&#40;IN&#41;"
+ },
+ {
+  "golfclub_seq": 423,
+  "golfclub_name": "세레니티강촌&#40;P&#41;",
+  "area_name": "강원서부 &gt; 춘천",
+  "address1": "강원 춘천시 남면 후동리 303-3",
+  "latitude": "37.7496091",
+  "longitude": "127.6197170",
+  "hole_count": 18,
+  "course_name": "파란/청춘"
+ },
+ {
+  "golfclub_seq": 424,
+  "golfclub_name": "클럽모우&#40;P&#41;",
+  "area_name": "강원서부 &gt; 홍천",
+  "address1": "강원도 홍천군 서면 모곡리 산 146",
+  "latitude": "37.6937438",
+  "longitude": "127.5643728",
+  "hole_count": 27,
+  "course_name": "Mountain/Oasis/Wild"
+ },
+ {
+  "golfclub_seq": 425,
+  "golfclub_name": "오너스&#40;P&#41;",
+  "area_name": "강원서부 &gt; 춘천",
+  "address1": "강원도 춘천시 남산면 수동리 산 30번지",
+  "latitude": "37.7702399",
+  "longitude": "127.6556612",
+  "hole_count": 18,
+  "course_name": "Hill/Lake"
+ },
+ {
+  "golfclub_seq": 426,
+  "golfclub_name": "지산퍼블릭&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인권",
+  "address1": "경기 용인시 처인구 원삼면 죽양대로2000번길 60",
+  "latitude": "37.2135891",
+  "longitude": "127.3285028",
+  "hole_count": 9,
+  "course_name": "9홀&#40;노캐디&#41;/9홀&times;2회&#40;노캐디&#41;"
+ },
+ {
+  "golfclub_seq": 430,
+  "golfclub_name": "360도&#40;P&#41;",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기도 여주군 강천면 부평리 산 59-3",
+  "latitude": "37.3026364",
+  "longitude": "127.7388476",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 432,
+  "golfclub_name": "노스팜&#40;P&#41;",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기도 파주시 광탄면 기산리 쇠장 이길 265",
+  "latitude": "37.7850976",
+  "longitude": "126.9092124",
+  "hole_count": 18,
+  "course_name": "동코스/서코스"
+ },
+ {
+  "golfclub_seq": 434,
+  "golfclub_name": "킹스데일&#40;P&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충북 충주시 주덕읍 기업도시3로 2",
+  "latitude": "37.0184022",
+  "longitude": "127.81539",
+  "hole_count": 18,
+  "course_name": "Lake/Hill"
+ },
+ {
+  "golfclub_seq": 435,
+  "golfclub_name": "골프존카운티무주&#40;P&#41;",
+  "area_name": "전라북부 &gt; 무주",
+  "address1": "전북 무주군 안성면 장무로 1537-21",
+  "latitude": "35.8300547",
+  "longitude": "127.6365456",
+  "hole_count": 18,
+  "course_name": "레이크/마운틴"
+ },
+ {
+  "golfclub_seq": 436,
+  "golfclub_name": "파나시아&#40;P&#41;",
+  "area_name": "충청남부 &gt; 당진",
+  "address1": "충남 당진시 신평면 계명길 33",
+  "latitude": "36.8865663",
+  "longitude": "126.7917195",
+  "hole_count": 9,
+  "course_name": "9홀X2회"
+ },
+ {
+  "golfclub_seq": 437,
+  "golfclub_name": "고령유니밸리&#40;P&#41;",
+  "area_name": "경상북부 &gt; 대구권",
+  "address1": "경북 고령군 대가야읍 일량로 588",
+  "latitude": "35.6815349",
+  "longitude": "128.2938986",
+  "hole_count": 9,
+  "course_name": "유니"
+ },
+ {
+  "golfclub_seq": 438,
+  "golfclub_name": "골프존카운티드래곤&#40;P&#41;",
+  "area_name": "전라북부 &gt; 남원",
+  "address1": "전북 남원시 대산면 대사로 500",
+  "latitude": "35.4344460",
+  "longitude": "127.3410970",
+  "hole_count": 27,
+  "course_name": "드래곤&#40;18홀&#41;/레이크&#40;18홀&#41;/스카이&#40;18홀&#41;/스카이&#40;27홀&#41;/드래곤&#40;27홀&#41;/레이크&#40;27홀&#41;"
+ },
+ {
+  "golfclub_seq": 441,
+  "golfclub_name": "써닝포인트&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기 용인시 처인구 백암면 고안로51번길 205",
+  "latitude": "37.1451636",
+  "longitude": "127.4208310",
+  "hole_count": 18,
+  "course_name": "썬/포인트"
+ },
+ {
+  "golfclub_seq": 442,
+  "golfclub_name": "해솔리아&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 처인구 이동면 서리 248-1번지",
+  "latitude": "37.2036973",
+  "longitude": "127.1841351",
+  "hole_count": 27,
+  "course_name": "해/솔/리아"
+ },
+ {
+  "golfclub_seq": 443,
+  "golfclub_name": "샤인데일&#40;P&#41;",
+  "area_name": "강원서부 &gt; 홍천",
+  "address1": "강원도 홍천군 서면 동막리 산77",
+  "latitude": "37.6739609",
+  "longitude": "127.5598409",
+  "hole_count": 27,
+  "course_name": "샤인/레이크/데일"
+ },
+ {
+  "golfclub_seq": 444,
+  "golfclub_name": "서원힐스&#40;P&#41;",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기 파주시 광탄면 서원길 333",
+  "latitude": "37.8157491",
+  "longitude": "126.8952472",
+  "hole_count": 27,
+  "course_name": "이스트&#40;Z&#41;&rarr;웨스트/웨스트&#40;Z&#41;&rarr;사우스/사우스&#40;Z&#41;&rarr;이스트/이스트&#40;V&#41;&rarr;웨스트/웨스트&#40;V&#41;&rarr;사우스/사우스&#40;V&#41;&rarr;이스트"
+ },
+ {
+  "golfclub_seq": 448,
+  "golfclub_name": "석정힐&#40;P&#41;",
+  "area_name": "전라북부 &gt; 고창",
+  "address1": "전북특별자치도 고창군 고창읍 석정2로 192",
+  "latitude": "35.4300645",
+  "longitude": "126.7416179",
+  "hole_count": 18,
+  "course_name": "마운틴/레이크"
+ },
+ {
+  "golfclub_seq": 449,
+  "golfclub_name": "리앤리&#40;P&#41;",
+  "area_name": "경기북부 &gt; 가평",
+  "address1": "경기도 가평군 하면 운악청계로 702-24",
+  "latitude": "37.8724258",
+  "longitude": "127.3619733",
+  "hole_count": 27,
+  "course_name": "레이크/하이랜드/스카이"
+ },
+ {
+  "golfclub_seq": 450,
+  "golfclub_name": "롯데스카이힐부여&#40;P&#41;",
+  "area_name": "충청남부 &gt; 부여",
+  "address1": "충남 부여군 규암면 백제문로 470",
+  "latitude": "36.303932",
+  "longitude": "126.909426",
+  "hole_count": 18,
+  "course_name": "계백장군/의자왕/18홀"
+ },
+ {
+  "golfclub_seq": 451,
+  "golfclub_name": "클럽디더플레이어스&#40;P&#41;",
+  "area_name": "강원서부 &gt; 춘천",
+  "address1": "강원 춘천시 동산면 새술막길 438",
+  "latitude": "37.7775430",
+  "longitude": "127.7507189",
+  "hole_count": 27,
+  "course_name": "VALLEY/LAKE/MOUNT"
+ },
+ {
+  "golfclub_seq": 454,
+  "golfclub_name": "안동레이크&#40;P&#41;&#40;구 휴그린&#41;",
+  "area_name": "경상북부 &gt; 안동",
+  "address1": "경상북도 안동시 관광단지로 316 &#40;성곡동 산132&#41;",
+  "latitude": "36.5661436",
+  "longitude": "128.7734986",
+  "hole_count": 18,
+  "course_name": "In/Out/In&#40;9홀&#41;/Out&#40;9홀&#41;/OUT/IN"
+ },
+ {
+  "golfclub_seq": 457,
+  "golfclub_name": "고성노벨",
+  "area_name": "경상남부 &gt; 고성",
+  "address1": "경상남도 고성군 고성읍 월평리 산48번지",
+  "latitude": "35.0698317",
+  "longitude": "128.4054959",
+  "hole_count": 27,
+  "course_name": "가야/충무/공룡/가야&#40;27홀&#41;/충무&#40;27홀&#41;/공룡&#40;27홀&#41;"
+ },
+ {
+  "golfclub_seq": 459,
+  "golfclub_name": "골프존카운티사천&#40;P&#41;",
+  "area_name": "경상남부 &gt; 사천",
+  "address1": "경남 사천시 서포면 다평리 1464",
+  "latitude": "35.0105896",
+  "longitude": "127.9527350",
+  "hole_count": 27,
+  "course_name": "18홀다솔코스/18홀비토코스/18홀비룡코스/18홀 다솔코스/27홀 다솔코스/18홀 비토코스/27홀 비토코스/18홀 비룡코스/27홀 비룡코스"
+ },
+ {
+  "golfclub_seq": 460,
+  "golfclub_name": "로드힐스&#40;P&#41;",
+  "area_name": "강원서부 &gt; 춘천",
+  "address1": "강원도 춘천시 군자리 산 245번지",
+  "latitude": "37.7406889",
+  "longitude": "127.7276222",
+  "hole_count": 27,
+  "course_name": "로드/힐스/레이크"
+ },
+ {
+  "golfclub_seq": 464,
+  "golfclub_name": "다이아몬드&#40;P&#41;",
+  "area_name": "경상남부 &gt; 양산",
+  "address1": "경상남도 양산시 상북면 상삼리 산18-5",
+  "latitude": "35.4200487",
+  "longitude": "129.0299512",
+  "hole_count": 18,
+  "course_name": "North/South/North&#40;27홀&#41;/South&#40;27홀&#41;/North&#40;09홀&#41;/South&#40;09홀&#41;"
+ },
+ {
+  "golfclub_seq": 466,
+  "golfclub_name": "베이사이드골프클럽",
+  "area_name": "경상남부 &gt; 부산",
+  "address1": "부산 기장군 일광읍 이천8길 100",
+  "latitude": "35.2753963",
+  "longitude": "129.2427769",
+  "hole_count": 27,
+  "course_name": "Park/Lake/Canyon"
+ },
+ {
+  "golfclub_seq": 473,
+  "golfclub_name": "거제뷰&#40;P&#41;",
+  "area_name": "경상남부 &gt; 거제",
+  "address1": "경남 거제시 거제면 두동로 259-80",
+  "latitude": "34.8807207",
+  "longitude": "128.5891772",
+  "hole_count": 18,
+  "course_name": "해돋이/해넘이"
+ },
+ {
+  "golfclub_seq": 474,
+  "golfclub_name": "코리아&#40;P&#41;",
+  "area_name": "경기남부 &gt; 용인",
+  "address1": "경기도 용인시 기흥구 고매동 279-13",
+  "latitude": "37.2235236",
+  "longitude": "127.1189654",
+  "hole_count": 9,
+  "course_name": "퍼블릭&#40;9홀&#41;/퍼블릭&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 478,
+  "golfclub_name": "솔트베이&#40;P&#41;",
+  "area_name": "경기남부 &gt; 시흥",
+  "address1": "경기도 시흥시 마유로 987",
+  "latitude": "37.3901956",
+  "longitude": "126.7703632",
+  "hole_count": 18,
+  "course_name": "OUT/IN"
+ },
+ {
+  "golfclub_seq": 479,
+  "golfclub_name": "골프존카운티송도&#40;P&#41;",
+  "area_name": "경기남부 &gt; 인천",
+  "address1": "인천광역시 연수구 인천신항대로 1120",
+  "latitude": "37.3510553",
+  "longitude": "126.5897074",
+  "hole_count": 18,
+  "course_name": "EAST&#40;18홀&#41;/WEST&#40;18홀&#41;/EAST&#40;9홀&#41;/WEST&#40;9홀&#41;"
+ },
+ {
+  "golfclub_seq": 482,
+  "golfclub_name": "마이다스레이크이천&#40;P&#41;",
+  "area_name": "경기남부 &gt; 이천",
+  "address1": "경기 이천시 설성면 설가로 602",
+  "latitude": "37.1770500",
+  "longitude": "127.5244619",
+  "hole_count": 27,
+  "course_name": "올림푸스/타이탄/마이다스"
+ },
+ {
+  "golfclub_seq": 483,
+  "golfclub_name": "베스트밸리&#40;P&#41;",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기도 파주시 광탄면 분수리 1-1",
+  "latitude": "37.7579264",
+  "longitude": "126.8864175",
+  "hole_count": 9,
+  "course_name": "베스트밸리&#40;9홀&#41;/베스트밸리&#40;9*2홀&#41;"
+ },
+ {
+  "golfclub_seq": 485,
+  "golfclub_name": "무안클린밸리&#40;P&#41;",
+  "area_name": "전라남부 &gt; 무안",
+  "address1": "전남 무안군 청계면 태봉리 757",
+  "latitude": "34.9417395",
+  "longitude": "126.4594296",
+  "hole_count": 18,
+  "course_name": "클린/밸리"
+ },
+ {
+  "golfclub_seq": 486,
+  "golfclub_name": "실크밸리&#40;P&#41;",
+  "area_name": "경기남부 &gt; 이천",
+  "address1": "경기 이천시 율면 임오산로 296",
+  "latitude": "37.0817299",
+  "longitude": "127.5734295",
+  "hole_count": 27,
+  "course_name": "VALLEY/LAKE/SILK"
+ },
+ {
+  "golfclub_seq": 487,
+  "golfclub_name": "동촌&#40;P&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충북 충주시 노은면 감노로 1327",
+  "latitude": "37.056697",
+  "longitude": "127.7445388",
+  "hole_count": 18,
+  "course_name": "EAST/WEST/east/west"
+ },
+ {
+  "golfclub_seq": 513,
+  "golfclub_name": "세이지우드홍천&#40;P&#41;",
+  "area_name": "강원서부 &gt; 홍천",
+  "address1": "강원 홍천군 두촌면 광석로 898-160",
+  "latitude": "37.886014",
+  "longitude": "128.1184971",
+  "hole_count": 27,
+  "course_name": "드림/비전/챌린지"
+ },
+ {
+  "golfclub_seq": 515,
+  "golfclub_name": "모카&#40;P&#41;&#40;구 세일&#41;",
+  "area_name": "충청북부 &gt; 충주",
+  "address1": "충북 충주시 신니면 동락길 207",
+  "latitude": "37.020169",
+  "longitude": "127.674087",
+  "hole_count": 18,
+  "course_name": "산길/들길"
+ },
+ {
+  "golfclub_seq": 517,
+  "golfclub_name": "장수&#40;P&#41;",
+  "area_name": "전라북부 &gt; 장수",
+  "address1": "전북특별자치도 장수군 계남면 장안산로 303",
+  "latitude": "35.6784542",
+  "longitude": "127.5956133",
+  "hole_count": 18,
+  "course_name": "사과/나무"
+ },
+ {
+  "golfclub_seq": 518,
+  "golfclub_name": "순천부영&#40;P&#41;",
+  "area_name": "전라남부 &gt; 순천",
+  "address1": "전남 순천시 해룡면 신대로 188",
+  "latitude": "34.9400542",
+  "longitude": "127.5555086",
+  "hole_count": 18,
+  "course_name": "우정/사랑"
+ },
+ {
+  "golfclub_seq": 520,
+  "golfclub_name": "군위오펠&#40;P&#41;",
+  "area_name": "경상북부 &gt; 군위",
+  "address1": "대구 군위군 산성면 부흥로 227",
+  "latitude": "36.1124975",
+  "longitude": "128.6793603",
+  "hole_count": 18,
+  "course_name": "산울/여울"
+ },
+ {
+  "golfclub_seq": 523,
+  "golfclub_name": "골드리버&#40;P&#41;",
+  "area_name": "충청남부 &gt; 공주",
+  "address1": "충남 공주시 의당면 신성말길 67-38",
+  "latitude": "36.5036143",
+  "longitude": "127.1633280",
+  "hole_count": 18,
+  "course_name": "A코스/B코스"
+ },
+ {
+  "golfclub_seq": 535,
+  "golfclub_name": "보령베이스&#40;P&#41;",
+  "area_name": "충청남부 &gt; 보령",
+  "address1": "충남 보령시 옥마벚길 64",
+  "latitude": "36.3291046",
+  "longitude": "126.6223329",
+  "hole_count": 9,
+  "course_name": "9홀X2회"
+ },
+ {
+  "golfclub_seq": 536,
+  "golfclub_name": "더힐&#40;P&#41;",
+  "area_name": "충청남부 &gt; 논산",
+  "address1": "충청남도 논산시 상월면 선비로 1079번지",
+  "latitude": "36.2759622",
+  "longitude": "127.1686305",
+  "hole_count": 9,
+  "course_name": "9홀/9홀X2회"
+ },
+ {
+  "golfclub_seq": 539,
+  "golfclub_name": "삼삼&#40;P&#41;",
+  "area_name": "경상남부 &gt; 사천",
+  "address1": "경남 사천시 축동면 반용리 산 110-1",
+  "latitude": "35.1111403",
+  "longitude": "128.0452280",
+  "hole_count": 9,
+  "course_name": "1번홀&#40;9홀X2&#41;/1번홀&#40;9홀X2&#41;"
+ },
+ {
+  "golfclub_seq": 540,
+  "golfclub_name": "샤인빌파크&#40;P&#41;",
+  "area_name": "제주 &gt; 서귀포",
+  "address1": "제주특별자치도 서귀포시 표선면 가시로 384",
+  "latitude": "33.3451906",
+  "longitude": "126.7883285",
+  "hole_count": 18,
+  "course_name": "PALM/RIVER"
+ },
+ {
+  "golfclub_seq": 543,
+  "golfclub_name": "경주레전드골프클럽",
+  "area_name": "경상북부 &gt; 경주",
+  "address1": "경상북도 경주시 안강읍 옥산리 949",
+  "latitude": "35.9964938",
+  "longitude": "129.1628177",
+  "hole_count": 9,
+  "course_name": "Legend/Queen"
+ },
+ {
+  "golfclub_seq": 545,
+  "golfclub_name": "인터불고원주&#40;P&#41;",
+  "area_name": "강원서부 &gt; 원주",
+  "address1": "강원도 원주시 반곡동 1401-10",
+  "latitude": "37.331984",
+  "longitude": "127.9736999",
+  "hole_count": 9,
+  "course_name": "9홀X2회&#40;노캐디&#41;/9홀&#40;노캐디&#41;"
+ },
+ {
+  "golfclub_seq": 546,
+  "golfclub_name": "제이퍼블릭&#40;P&#41;",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기도 파주시 조리읍 장곡리 47-1번지",
+  "latitude": "37.7506428",
+  "longitude": "126.844702",
+  "hole_count": 6,
+  "course_name": "6홀X2회"
+ },
+ {
+  "golfclub_seq": 550,
+  "golfclub_name": "페럼&#40;P&#41;",
+  "area_name": "경기남부 &gt; 여주",
+  "address1": "경기 여주시 점동면 사곡리 286-1",
+  "latitude": "37.2046351",
+  "longitude": "127.685438",
+  "hole_count": 18,
+  "course_name": "동코스/서코스"
+ },
+ {
+  "golfclub_seq": 560,
+  "golfclub_name": "비에이비스타&#40;M&#41;",
+  "area_name": "경기남부 &gt; 이천",
+  "address1": "경기도 이천시 모가면 어농리 산86",
+  "latitude": "37.1803652",
+  "longitude": "127.4166682",
+  "hole_count": 18,
+  "course_name": "Monti/Lago/Bella/Vista/미지정/미지정/미지정/미지정/신규/미지정"
+ },
+ {
+  "golfclub_seq": 561,
+  "golfclub_name": "사이프러스",
+  "area_name": "제주 &gt; 서귀포",
+  "address1": "제주특별자치도 서귀포시 표선면 번영로 2300",
+  "latitude": "33.413916",
+  "longitude": "126.7432085",
+  "hole_count": 36,
+  "course_name": "WEST&#40;회원제&#41;/NORTH&#40;회원제&#41;/EAST&#40;대중제&#41;/SOUTH&#40;대중제&#41;"
+ },
+ {
+  "golfclub_seq": 568,
+  "golfclub_name": "오션비치&#40;P&#41;",
+  "area_name": "경상북부 &gt; 영덕",
+  "address1": "경북 영덕군 남정면 남호리 산 15-1",
+  "latitude": "36.3396877",
+  "longitude": "129.373589",
+  "hole_count": 27,
+  "course_name": "Ocean/Valley/Beach"
+ },
+ {
+  "golfclub_seq": 572,
+  "golfclub_name": "어등산&#40;P&#41;",
+  "area_name": "전라남부 &gt; 광주",
+  "address1": "광주 광산구 무진대로 31",
+  "latitude": "35.1654187",
+  "longitude": "126.7718511",
+  "hole_count": 27,
+  "course_name": "어등/송정/하남"
+ },
+ {
+  "golfclub_seq": 574,
+  "golfclub_name": "골프존카운티순천&#40;P&#41;",
+  "area_name": "전라남부 &gt; 순천",
+  "address1": "전남 순천시 주암면 행정1길 77",
+  "latitude": "35.0458239",
+  "longitude": "127.3079089",
+  "hole_count": 36,
+  "course_name": "에메랄드/토파즈/다이아몬드/루비"
+ },
+ {
+  "golfclub_seq": 577,
+  "golfclub_name": "코브스윙&#40;P&#41;&#40;구 참밸리&#41;",
+  "area_name": "경기북부 &gt; 포천",
+  "address1": "경기 포천시 설운동 산38",
+  "latitude": "37.866798",
+  "longitude": "127.136237",
+  "hole_count": 18,
+  "course_name": "코브/스윙"
+ },
+ {
+  "golfclub_seq": 582,
+  "golfclub_name": "월송리&#40;P&#41;",
+  "area_name": "강원서부 &gt; 원주",
+  "address1": "강원도 원주시 지정면 오크밸리2길 250",
+  "latitude": "37.4138752",
+  "longitude": "127.8221338",
+  "hole_count": 18,
+  "course_name": "18홀/OUT코스/18홀/IN코스"
+ },
+ {
+  "golfclub_seq": 583,
+  "golfclub_name": "락가든&#40;P&#41;",
+  "area_name": "경기북부 &gt; 포천권",
+  "address1": "경기도 포천시 일동면 유동리 21-2",
+  "latitude": "37.9320832",
+  "longitude": "127.3188858",
+  "hole_count": 9,
+  "course_name": "18홀코스&#40;락-가든-락&#41;/12홀코스&#40;락-가든&#41;/6홀코스&#40;락&#41;/18홀코스&#40;가든-락-가든&#41;/12홀코스&#40;가든-락&#41;/6홀코스&#40;가든&#41;"
+ },
+ {
+  "golfclub_seq": 584,
+  "golfclub_name": "포세븐금강&#40;P&#41;_&#40;구 클럽디금강&#41;",
+  "area_name": "전라북부 &gt; 익산",
+  "address1": "전라북도 익산시 웅포면 강변로 130 ",
+  "latitude": "36.0738052",
+  "longitude": "126.8925554",
+  "hole_count": 18,
+  "course_name": "동/서"
+ },
+ {
+  "golfclub_seq": 589,
+  "golfclub_name": "애플밸리&#40;P&#41;",
+  "area_name": "경상북부 &gt; 김천",
+  "address1": "경상북도 김천시 어모면 능치리 산67",
+  "latitude": "36.220892",
+  "longitude": "128.0572878",
+  "hole_count": 9,
+  "course_name": "9홀X2"
+ },
+ {
+  "golfclub_seq": 592,
+  "golfclub_name": "골프존카운티청통&#40;P&#41;",
+  "area_name": "경상북부 &gt; 영천",
+  "address1": "경북 영천시 청통면 은해사로 49-77",
+  "latitude": "35.9881241",
+  "longitude": "128.8117358",
+  "hole_count": 18,
+  "course_name": "청통/팔공"
+ },
+ {
+  "golfclub_seq": 593,
+  "golfclub_name": "해운대비치&#40;M&#41;",
+  "area_name": "경상남부 &gt; 부산",
+  "address1": "부산 기장군 기장읍 대변로 74",
+  "latitude": "35.2249852",
+  "longitude": "129.22053",
+  "hole_count": 18,
+  "course_name": "Mountain/Ocean"
+ },
+ {
+  "golfclub_seq": 616,
+  "golfclub_name": "한양파인&#40;P&#41;",
+  "area_name": "경기북부 &gt; 고양",
+  "address1": "경기도 고양시 덕양구 고양대로 1591",
+  "latitude": "37.6518167",
+  "longitude": "126.8634024",
+  "hole_count": 9,
+  "course_name": "[1부]9홀/[1부]9홀X2/[2부]9홀/[2부]9홀X2/[3부]9홀/[3부]9홀X2"
+ },
+ {
+  "golfclub_seq": 617,
+  "golfclub_name": "아세코밸리&#40;P&#41;",
+  "area_name": "경기남부 &gt; 시흥",
+  "address1": "경기도 시흥시 월곶동 330-6",
+  "latitude": "37.3683087",
+  "longitude": "126.7696953",
+  "hole_count": 9,
+  "course_name": "9홀X2/9홀"
+ },
+ {
+  "golfclub_seq": 621,
+  "golfclub_name": "통영동원로얄&#40;P&#41;",
+  "area_name": "경상남부 &gt; 통영",
+  "address1": "경남 통영시 산양읍 담안길 240",
+  "latitude": "34.8126477",
+  "longitude": "128.4266789",
+  "hole_count": 18,
+  "course_name": "한려/미륵"
+ },
+ {
+  "golfclub_seq": 624,
+  "golfclub_name": "타이거&#40;P&#41;",
+  "area_name": "경기북부 &gt; 파주",
+  "address1": "경기도 파주시 법원읍 웅담리 105-3",
+  "latitude": "37.9238103",
+  "longitude": "126.8946936",
+  "hole_count": 18,
+  "course_name": "가온&#40;9홀&#41;/누리&#40;9홀&#41;/가온&#40;18홀&#41;/누리&#40;18홀&#41;/가온/누리"
+ },
+ {
+  "golfclub_seq": 626,
+  "golfclub_name": "마스터피스&#40;P&#41;",
+  "area_name": "경상북부 &gt; 고령",
+  "address1": "경상북도 고령군 쌍림면 월막리 산40-2",
+  "latitude": "35.706698",
+  "longitude": "128.2099588",
+  "hole_count": 18,
+  "course_name": "마스터/피스"
+ },
+ {
+  "golfclub_seq": 629,
+  "golfclub_name": "더나인&#40;P&#41;",
+  "area_name": "전라북부 &gt; 김제",
+  "address1": "전라북도 김제시 금구면 대화1길 8-75",
+  "latitude": "35.7954133",
+  "longitude": "127.0344751",
+  "hole_count": 9,
+  "course_name": "9홀X2회/9홀"
+ },
+ {
+  "golfclub_seq": 633,
+  "golfclub_name": "솔라고&#40;P&#41;",
+  "area_name": "충청남부 &gt; 태안",
+  "address1": "충남 태안군 태안읍 기업도시9길 176",
+  "latitude": "36.6973421",
+  "longitude": "126.3241286",
+  "hole_count": 36,
+  "course_name": "Sol-Out/Sol-In/Lago-Out/Lago-In"
+ },
+ {
+  "golfclub_seq": 635,
+  "golfclub_name": "에스앤골프클럽&#40;P9&#41;",
+  "area_name": "충청남부 &gt; 보령",
+  "address1": "충남 보령시 남포면 개목수리섬길 196",
+  "latitude": "36.2870243",
+  "longitude": "126.5525302",
+  "hole_count": 9,
+  "course_name": "9홀X2회"
+ },
+ {
+  "golfclub_seq": 640,
+  "golfclub_name": "펜타뷰&#40;P9&#41;",
+  "area_name": "경상북부 &gt; 청도",
+  "address1": "경상북도 청도군 금천면 금천로 709-4",
+  "latitude": "35.7423023",
+  "longitude": "128.8614627",
+  "hole_count": 9,
+  "course_name": "9홀*2"
+ },
+ {
+  "golfclub_seq": 647,
+  "golfclub_name": "함평엘리체&#40;P&#41;",
+  "area_name": "전라남부 &gt; 함평",
+  "address1": "전남 함평군 학교면 서당매길 242",
+  "latitude": "35.0041814",
+  "longitude": "126.5587901",
+  "hole_count": 27,
+  "course_name": "임페리얼/마제스티/팰리스"
+ },
+ {
+  "golfclub_seq": 654,
+  "golfclub_name": "자유로&#40;P&#41;",
+  "area_name": "경기북부 &gt; 연천",
+  "address1": "경기도 연천군 백학면 노아로297번길 179-55",
+  "latitude": "38.0024697",
+  "longitude": "126.9510133",
+  "hole_count": 27,
+  "course_name": "대한/민국/통일"
+ },
+ {
+  "golfclub_seq": 655,
+  "golfclub_name": "기장동원로얄&#40;P&#41;",
+  "area_name": "경상남부 &gt; 부산",
+  "address1": "부산광역시 기장군 기장읍 만화리 산 104-5",
+  "latitude": "35.2566847",
+  "longitude": "129.1848868",
+  "hole_count": 9,
+  "course_name": "9홀*2"
+ },
+ {
+  "golfclub_seq": 691,
+  "golfclub_name": "클럽디보은&#40;P&#41;",
+  "area_name": "충청북부 &gt; 보은",
+  "address1": "충북 보은군 보은읍 장속중초로 386",
+  "latitude": "36.5091018",
+  "longitude": "127.690822",
+  "hole_count": 18,
+  "course_name": "EAST/WEST"
+ }
+]
