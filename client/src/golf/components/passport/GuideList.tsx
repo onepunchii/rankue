@@ -137,21 +137,8 @@ export const GuideList = ({ savedImages, conqueredCourses, filterHook }: Props) 
                                             </div>
                                             <h3 className="text-lg font-black group-hover:text-amber-500 transition-colors tracking-tighter leading-none text-white">{course.name}</h3>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                            {/* Rating, Speed, Difficulty pills */}
-                                            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/5 shadow-inner">
-                                                <LucideStar className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
-                                                <span className="text-[10px] font-black text-white/90">{course.rating}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/5 shadow-inner">
-                                                <LucideZap className="w-2.5 h-2.5 text-[#64DD17]" />
-                                                <span className="text-[10px] font-black text-white/90">{course.speed}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/5 shadow-inner">
-                                                <LucideSkull className="w-2.5 h-2.5 text-red-500" />
-                                                <span className="text-[10px] font-black text-white/90">{course.difficulty}</span>
-                                            </div>
-                                        </div>
+                                        {/* 별점·그린 스피드·난이도 알약은 두 가지 틀로 찍어 낸 합성값이라 뺐다(2026-09-11). */}
+                                        <div className="text-[10px] font-bold text-white/40">{course.holes ? `${course.holes}홀` : ""}</div>
                                     </div>
                                 </div>
                             </Link>

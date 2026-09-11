@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { ScorecardScanner } from "../components/ScorecardScanner";
@@ -14,6 +15,7 @@ import { MyCrewCard } from "../components/dashboard/MyCrewCard";
 import { HotDealTicker } from "../components/dashboard/HotDealTicker";
 import { GameModeSheet } from "../components/dashboard/GameModeSheet";
 import { PinEntrySheet } from "../components/dashboard/PinEntrySheet";
+import { ActiveRoundCard } from "../components/dashboard/ActiveRoundCard";
 
 // Hooks
 import { useGolfMatch } from "../hooks/useGolfMatch";
@@ -28,6 +30,18 @@ export default function GolfDashboard() {
     const [isGameModeOpen, setIsGameModeOpen] = useState(false);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
     const matchLogic = useGolfMatch(me);
+    const [, setLocation] = useLocation();
+
+    // 로그인 전에 초대 링크를 눌렀던 사람 — 로그인 뒤 여기서 이어서 들어간다(App.tsx GolfOnly 가 핀을 남긴다).
+    useEffect(() => {
+        if (!me?.golfAccess) return;
+        try {
+            const pin = sessionStorage.getItem("rankue_golf_pending_pin");
+            if (!pin) return;
+            sessionStorage.removeItem("rankue_golf_pending_pin");
+            setLocation(`/golf/game/new?mode=join&pin=${encodeURIComponent(pin)}`);
+        } catch { /* 저장소를 못 쓰는 환경 */ }
+    }, [me?.golfAccess, setLocation]);
 
     // 3. Game History Data (Master Record)
     const { data: history = [] } = useQuery({
@@ -64,6 +78,7 @@ export default function GolfDashboard() {
 
             {/* Header & Identity */}
             <GolfHeader member={me} />
+            <ActiveRoundCard />
             <HotDealTicker />
             <HandicapCard
                 member={me}
@@ -100,6 +115,9 @@ export default function GolfDashboard() {
                 pinEntry={matchLogic.pinEntry}
                 onKeyPress={matchLogic.handleKeypadPress}
                 onDelete={matchLogic.handleDelete}
+                onSetDigits={matchLogic.handleSetDigits}
+                error={matchLogic.error}
+                isLoading={matchLogic.isLoading}
             />
 
             {isScannerOpen && (
@@ -113,32 +131,3 @@ export default function GolfDashboard() {
         </div>
     );
 }
-
-// Helper Mutation Logic (Added inside component for simplicity, in real production move to separate hook)
-// Need to add this inside GolfDashboard function before return
-/* 
-    // Join Match Mutation
-    const joinMatch = useMutation({
-        mutationFn: async (pin: string) => {
-            const res = await apiRequest("/api/hiq/golf/match/join", {
-                method: "POST",
-                body: {
-                    pin,
-                    memberId: me?.id,
-                    name: me?.name
-                }
-            });
-            return res.json();
-        },
-        onSuccess: (data) => {
-            toast({ title: "입장 성공!", description: "대기실로 이동합니다.. 🚀" });
-            setIsJoinOpen(false);
-            setLocation(`/golf/game/${data.id}`);
-        },
-        onError: (e: any) => {
-            toast({ variant: "destructive", title: "입장 실패", description: "핀 번호를 다시 확인해주세요." });
-            setPinEntry([]);
-        }
-    });
-*/
-

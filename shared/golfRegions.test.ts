@@ -109,3 +109,16 @@ describe("실제 골프장 자료(golf/golf.csv 525곳) 형태", () => {
         expect(resolveGolfRegionCode("경남", "고성군 회화면")).toBe("gyeongsang");
     });
 });
+
+import { passportRegionGroup } from "./golfRegions";
+describe("여권 지도 묶음", () => {
+    it("권역 코드를 여섯 묶음으로", () => {
+        expect(passportRegionGroup("kyunggi_south")).toBe("경기");
+        expect(passportRegionGroup("kyunggi")).toBe("경기");
+        expect(passportRegionGroup("incheon_west")).toBe("경기");
+        expect(passportRegionGroup("gyeongsang")).toBe("경상");
+        expect(passportRegionGroup("jeju")).toBe("제주");
+        expect(passportRegionGroup(null)).toBeNull();
+        expect(passportRegionGroup("mars")).toBeNull();
+    });
+});

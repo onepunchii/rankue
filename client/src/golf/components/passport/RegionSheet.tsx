@@ -23,10 +23,13 @@ interface Props {
     onClose: () => void;
     regionId: string | null;
     conqueredCourses: string[]; // List of names
+    /** 서버가 골프장 원장 기준으로 센 묶음별 총수·정복 수. 지도와 같은 숫자를 보여 주려고 받는다. */
+    regionTotals?: Record<string, number>;
+    regionConquered?: Record<string, number>;
     onGoToGuide: (regionName: string) => void;
 }
 
-export const RegionSheet = ({ isOpen, onClose, regionId, conqueredCourses, onGoToGuide }: Props) => {
+export const RegionSheet = ({ isOpen, onClose, regionId, conqueredCourses, onGoToGuide, regionTotals, regionConquered }: Props) => {
     const regionName = regionId ? REGION_GROUP_MAPPING[regionId] : "";
     const coursesInRegion = regionName ? COURSES.filter(c => c.region === regionName) : [];
     const conqueredCount = coursesInRegion.filter(c => conqueredCourses.includes(c.name)).length;
@@ -46,7 +49,7 @@ export const RegionSheet = ({ isOpen, onClose, regionId, conqueredCourses, onGoT
                             <div className="px-3 py-1 rounded-full bg-[#64DD17]/10 border border-[#64DD17]/20 flex items-center gap-2">
                                 <LucideBadgeCheck className="w-3 h-3 text-[#64DD17]" />
                                 <span className="text-[10px] font-black text-[#64DD17] uppercase tracking-widest">
-                                    {conqueredCount} / {coursesInRegion.length} 정복
+                                    {regionConquered?.[regionName] ?? conqueredCount} / {regionTotals?.[regionName] ?? coursesInRegion.length} 정복
                                 </span>
                             </div>
                         </div>

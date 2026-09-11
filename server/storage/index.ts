@@ -70,12 +70,14 @@ class Storage {
     async getGolfBookingCounts(start: string, end: string, viewType?: string, filters?: any) { return this.golf.getGolfBookingCounts(start, end, viewType, filters); }
     async processScorecardOCR(data: any) { return this.golf.processScorecardOCR(data); }
     async updateCourseHoleInfo(data: any) { return this.golf.updateCourseHoleInfo(data); }
-    async createGolfMatchSession(data: any) { return this.golf.createGolfMatchSession(data); }
-    async getGolfMatchSessionByPin(pin: string) { return this.golf.getGolfMatchSessionByPin(pin); }
-    async joinGolfMatchSession(pin: string, mid: string, name: string) { return this.golf.joinGolfMatchSession(pin, mid, name); }
+    async createGolfMatchSession(hostId: string, input: any) { return this.golf.createGolfMatchSession(hostId, input); }
+    async joinGolfMatchSession(pin: string, mid: string): Promise<{ session: any; added: boolean }> { return this.golf.joinGolfMatchSession(pin, mid); }
     async getGolfMatchSession(id: string) { return this.golf.getGolfMatchSession(id); }
-    async updateGolfMatchScore(id: string, hole: number, players: any, near?: any) { return this.golf.updateGolfMatchScore(id, hole, players, near); }
+    async startGolfMatchSession(id: string) { return this.golf.startGolfMatchSession(id); }
+    async updateGolfMatchScore(id: string, hole: number, players: unknown) { return this.golf.updateGolfMatchScore(id, hole, players); }
     async finishGolfMatchSession(id: string) { return this.golf.finishGolfMatchSession(id); }
+    async abandonGolfMatchSession(id: string) { return this.golf.abandonGolfMatchSession(id); }
+    async getActiveGolfMatch(memberId: string) { return this.golf.getActiveGolfMatch(memberId); }
     async findGolfSessionForHistory(h: any) { return this.golf.findGolfSessionForHistory(h); }
     async updateGolfMatchCourse(id: string, front?: string, back?: string) { return this.golf.updateGolfMatchCourse(id, front, back); }
     async getGolfClubs(search?: string, lat?: number, lng?: number) { return this.golf.getGolfClubs(search, lat, lng); }

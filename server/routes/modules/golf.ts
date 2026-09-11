@@ -5,6 +5,8 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { notifyCrewChat } from "../../services/crewChatNotify.js";
+import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
+import { z } from "zod";
 
 const router = Router();
 
@@ -316,61 +318,115 @@ router.post("/scorecard/ocr", requireAuth, asyncHandler(async (req: AuthRequest,
     return sendSuccess(res, parsed);
 }));
 
-// --- Golf Match Session (PIN based) ---
-// 경기 세션은 전부 로그인 뒤에만. 예전엔 requireAuth 도 없고 hostId·memberId 를 요청 본문에서 받아,
-// 남의 회원 번호로 가짜 라운드를 만들어 그 사람 평균·핸디캡·등급을 덮어쓸 수 있었다(2026-09-09 검토).
-router.post("/match/create", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const { hostId: _h, ...rest } = req.body ?? {};
-    const session = await storage.createGolfMatchSession({ ...rest, hostId: req.userId });
-    return sendSuccess(res, session);
-}));
+// --- 랭큐매치 (PIN 으로 모이는 골프 경기) ---
+//
+// 2026-09-11 다시 짰다. 예전엔 참가자면 누구나 점수·시작·종료·코스를 서버에 직접 바꿀 수 있었고(방장 전용은
+// 화면에서만), 점수 저장이 남의 회원번호까지 받아 그 사람 평균·등급을 덮을 수 있었다. 이제 쓰기는 **방장만**,
+// 읽기는 **그 경기에 든 사람만**이다. 로그인 없이 방 정보를 통째로 주던 GET /match/pin/:pin 은 없앴다
+// (화면이 쓰지도 않았고, 4자리라 전수 조회로 모든 대기방이 새었다).
 
-router.get("/match/pin/:pin", asyncHandler(async (req: any, res: any) => {
-    const session = await storage.getGolfMatchSessionByPin(req.params.pin);
-    if (!session) return sendError(res, 404, "게임을 찾을 수 없습니다.");
+const matchCreateSchema = z.object({
+    courseId: z.string().max(64).nullish(),
+    // 골프장 없이 끝낸 라운드가 '알 수 없는 구장' 도장이 됐다 — 이름은 꼭 받는다(화면도 이미 강제한다).
+    courseName: z.string().trim().min(1).max(80),
+    gameMode: z.enum(["stroke", "skins"]),
+    strokeMode: z.enum(["solo", "group"]).nullish(),
+    stake: z.coerce.number().optional(),
+    useDouble: z.boolean().optional(),
+    doublingMode: z.enum(["none", "current", "next"]).optional(),
+    birdieAmount: z.coerce.number().optional(),
+    eagleAmount: z.coerce.number().optional(),
+    frontCourseName: z.string().trim().max(40).nullish(),
+    backCourseName: z.string().trim().max(40).nullish(),
+    guests: z.array(z.string().trim().min(1).max(12)).max(3).optional(),
+});
+
+const matchScoreSchema = z.object({
+    holeNo: z.coerce.number().int().min(1).max(18),
+    players: z.array(z.object({ memberId: z.string().max(64) }).passthrough()).max(4),
+});
+
+router.post("/match/create", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const parsed = matchCreateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, "경기 설정이 올바르지 않아요");
+    const session = await storage.createGolfMatchSession(req.userId!, parsed.data as any);
     return sendSuccess(res, session);
 }));
 
 router.post("/match/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    // 참가자는 자기 자신뿐이다 — 본문의 memberId 는 무시한다.
-    const { pin, name } = req.body ?? {};
-    const session = await storage.joinGolfMatchSession(pin, req.userId!, name);
-    return sendSuccess(res, session);
+    const pin = String(req.body?.pin ?? "").replace(/\D/g, "");
+    if (pin.length !== 4) return sendError(res, 400, "핀번호 4자리를 입력해 주세요");
+    // 4자리는 만 개뿐이다 — 틀린 번호를 연달아 넣으면 잠깐 막는다(로그인 PIN 과 같은 방어).
+    const key = attemptKey("golf-pin", req.userId, req.ip);
+    const rl = checkRateLimit(key);
+    if (rl.limited) {
+        return sendError(res, 429, `번호를 여러 번 틀렸어요. ${Math.max(1, Math.ceil(rl.retryAfterSec / 60))}분 뒤에 다시 해 주세요`);
+    }
+    try {
+        const { session, added } = await storage.joinGolfMatchSession(pin, req.userId!);
+        // 이미 든 방(내 방 포함)에 다시 들어간 건 '맞힌 것' 으로 치지 않는다 — 치면 틀린 번호 4번 → 내 방 입장을
+        // 되풀이해 잠금을 영영 피할 수 있었다(2026-09-11 리뷰).
+        if (added) clearAttempts(key);
+        return sendSuccess(res, session);
+    } catch (e: any) {
+        if (e?.statusCode === 404 || e?.statusCode === 409) registerFailure(key);
+        throw e;
+    }
 }));
 
-router.get("/match/:id", asyncHandler(async (req: any, res: any) => {
-    const session = await storage.getGolfMatchSession(req.params.id);
-    if (!session) return sendError(res, 404, "게임을 찾을 수 없습니다.");
-    return sendSuccess(res, session);
+/** 홈의 '진행 중 라운드' 카드. 없으면 null. (/match/:id 보다 먼저 둔다) */
+router.get("/match/active", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    return sendSuccess(res, await storage.getActiveGolfMatch(req.userId!));
 }));
 
-/** 그 경기에 참여한 사람만 점수를 만질 수 있다(방장 또는 참가자). */
-async function requireMatchMember(req: AuthRequest, res: any): Promise<any | null> {
+/** 그 경기에 든 사람(방장 포함)만 통과. hostOnly 면 방장만. */
+async function loadMatch(req: AuthRequest, res: any, hostOnly: boolean): Promise<any | null> {
+    if (!UUID.test(req.params.id)) { sendError(res, 404, "게임을 찾을 수 없어요"); return null; }
     const session: any = await storage.getGolfMatchSession(req.params.id);
-    if (!session) { sendError(res, 404, "게임을 찾을 수 없습니다."); return null; }
+    if (!session) { sendError(res, 404, "게임을 찾을 수 없어요"); return null; }
     const players: any[] = Array.isArray(session.players) ? session.players : [];
-    const mine = session.hostId === req.userId || players.some((p) => p?.memberId === req.userId);
-    if (!mine) { sendError(res, 403, "이 경기의 참가자가 아니에요"); return null; }
+    const isHost = session.hostId === req.userId;
+    if (!isHost && !players.some((p) => p?.memberId === req.userId)) {
+        sendError(res, 403, "이 경기의 참가자가 아니에요");
+        return null;
+    }
+    if (hostOnly && !isHost) { sendError(res, 403, "방장만 할 수 있어요"); return null; }
     return session;
 }
 
+router.get("/match/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const session = await loadMatch(req, res, false);
+    if (!session) return;
+    return sendSuccess(res, session);
+}));
+
+router.post("/match/:id/start", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await loadMatch(req, res, true)) return;
+    return sendSuccess(res, await storage.startGolfMatchSession(req.params.id));
+}));
+
 router.post("/match/:id/score", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    if (!await requireMatchMember(req, res)) return;
-    const { holeNo, players, nearHistory } = req.body ?? {};
-    const session = await storage.updateGolfMatchScore(req.params.id, holeNo, players, nearHistory);
+    if (!await loadMatch(req, res, true)) return;
+    const parsed = matchScoreSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, "점수 형식이 올바르지 않아요");
+    const session = await storage.updateGolfMatchScore(req.params.id, parsed.data.holeNo, parsed.data.players);
     return sendSuccess(res, session);
 }));
 
 router.post("/match/:id/finish", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    if (!await requireMatchMember(req, res)) return;
-    const session = await storage.finishGolfMatchSession(req.params.id);
-    return sendSuccess(res, session);
+    if (!await loadMatch(req, res, true)) return;
+    return sendSuccess(res, await storage.finishGolfMatchSession(req.params.id));
+}));
+
+router.post("/match/:id/abandon", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await loadMatch(req, res, true)) return;
+    return sendSuccess(res, await storage.abandonGolfMatchSession(req.params.id));
 }));
 
 router.post("/match/:id/course", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    if (!await requireMatchMember(req, res)) return;
-    const { frontCourseName, backCourseName } = req.body ?? {};
-    const session = await storage.updateGolfMatchCourse(req.params.id, frontCourseName, backCourseName);
+    if (!await loadMatch(req, res, true)) return;
+    const name = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 40) : undefined);
+    const session = await storage.updateGolfMatchCourse(req.params.id, name(req.body?.frontCourseName), name(req.body?.backCourseName));
     return sendSuccess(res, session);
 }));
 

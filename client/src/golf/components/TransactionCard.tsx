@@ -1,15 +1,17 @@
 import { motion } from "framer-motion";
 import { MoveRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatMoney, type MoneyUnit } from "../lib/money";
 
 interface TransactionCardProps {
     fromName: string;
     toName: string;
     amount: number;
     details: string[];
+    unit?: MoneyUnit;
 }
 
-export function TransactionCard({ fromName, toName, amount, details }: TransactionCardProps) {
+export function TransactionCard({ fromName, toName, amount, details, unit = "P" }: TransactionCardProps) {
     return (
         <motion.div
             initial={{ opacity: 0, x: -10 }}
@@ -33,7 +35,7 @@ export function TransactionCard({ fromName, toName, amount, details }: Transacti
 
             <div className="text-right shrink-0">
                 <p className="text-md font-black text-white italic tracking-tight">
-                    {amount.toLocaleString()}<span className="text-[10px] ml-0.5 not-italic">P</span>
+                    {formatMoney(amount, unit)}
                 </p>
             </div>
         </motion.div>

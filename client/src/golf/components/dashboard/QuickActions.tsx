@@ -33,7 +33,7 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                     </div>
                     <div>
                         <h3 className="text-2xl font-extrabold text-[#051907] leading-none mb-1">RANKUE<br />MATCH</h3>
-                        <p className="text-xs font-semibold text-[#051907]/60">스코어 & 내기 자동 정산</p>
+                        <p className="text-xs font-semibold text-[#051907]/60">스코어 기록 · 동반자 게임</p>
                     </div>
                 </motion.button>
 

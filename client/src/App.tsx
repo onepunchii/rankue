@@ -148,7 +148,14 @@ function GolfOnly({ children }: { children: ReactNode }) {
   const golfOk = useGolfAccess();
   const [, setLocation] = useLocation();
   useEffect(() => {
-    if (!isLoading && !golfOk) setLocation("/dashboard", { replace: true });
+    if (!isLoading && !golfOk) {
+      // 초대 링크(?pin=)로 왔는데 아직 로그인 전이면, 로그인 뒤 골프 홈에서 이어서 들어가게 핀을 잠깐 남긴다.
+      try {
+        const pin = new URLSearchParams(window.location.search).get("pin");
+        if (pin) sessionStorage.setItem("rankue_golf_pending_pin", pin);
+      } catch { /* 저장소를 못 쓰는 환경 */ }
+      setLocation("/dashboard", { replace: true });
+    }
   }, [isLoading, golfOk, setLocation]);
   if (isLoading || !golfOk) return null;
   return <>{children}</>;

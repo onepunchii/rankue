@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { golfAllowed } from "../../lib/golfAccess.js";
 import { put } from "@vercel/blob";
 import { deleteBlobs } from "../../utils/blob.js";
 import { storage, getRecentOpponents, searchUsers } from "../../storage/index.js";
@@ -75,6 +76,8 @@ router.get("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =
         nickname: profile?.nickname || member.name,
         handle: profile?.handle ?? null,
         countryCode: profile?.countryCode ?? null,
+        // 골프를 쓸 수 있는가 — 서버만 허용 목록을 안다(번호가 화면 번들에 실리지 않게. 2026-09-11)
+        golfAccess: golfAllowed(member),
         // 설정 화면 '연결된 로그인' 표시용 — 값 자체는 절대 노출하지 않고 연결 여부만
         connections: {
             phone: !member.phone?.startsWith("social:"),

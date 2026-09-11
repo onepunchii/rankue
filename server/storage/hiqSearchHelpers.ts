@@ -173,6 +173,8 @@ export async function getRecentOpponents(currentUserId: string, sport: "BILLIARD
             const opponents = players.filter(p => p.memberId && p.memberId !== currentUserId);
 
             for (const opp of opponents) {
+                // 게스트('guest-…', 앱 없는 동반자)는 회원이 아니다 — uuid 칸에 넣으면 조회 전체가 500 이었다.
+                if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(opp.memberId))) continue;
                 if (friendIds.includes(opp.memberId)) continue;
                 if (opponentMap.has(opp.memberId)) continue;
 

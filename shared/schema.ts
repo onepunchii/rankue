@@ -902,6 +902,10 @@ export const hiqGameHistory = pgTable("hiq_game_history", {
   locationName: text("location_name"), // Added for Golf: Course name
   subType: text("sub_type"), // Added for Golf: Course sub-type (e.g. "Castle")
   scoreJson: jsonb("score_json"), // Added for Golf: Hole-by-hole scores
+  // 골프: 이 기록을 만든 경기와 골프장. 예전엔 '±10분 안에 끝난 세션' 이라는 시간 추측과 골프장 이름 글자로만
+  // 이어져 있어서, 여권 도장이 화면마다 다르게 세졌고 기록 상세가 404 가 났다(2026-09-11).
+  golfSessionId: uuid("golf_session_id"),
+  golfClubId: text("golf_club_id"),
   sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -1001,13 +1005,20 @@ export const golfMatchSessions = pgTable("golf_match_sessions", {
   useOecd: boolean("use_oecd").default(false).notNull(),
   useDouble: boolean("use_double").default(false).notNull(),
 
-  status: text("status", { enum: ["waiting", "playing", "finished"] }).default("waiting").notNull(),
+  // abandoned: 방장이 접은 방(기록 없음). 예전엔 버려진 방이 waiting/playing 으로 영원히 남아 핀을 붙잡았다.
+  status: text("status", { enum: ["waiting", "playing", "finished", "abandoned"] }).default("waiting").notNull(),
   currentHole: integer("current_hole").default(1).notNull(),
+  // solo(혼자 기록) | group(다함께 기록). 예전엔 화면이 보내도 칸이 없어 조용히 버려졌다.
+  strokeMode: text("stroke_mode"),
+  // 종료 순간 서버가 계산해 못박은 정산 { totals, transactions }. 결과 화면은 이걸 보여 준다 —
+  // 볼 때마다 다시 계산하면 끝난 뒤 코스를 바꿀 때 금액이 소급해서 바뀌었다.
+  settlement: jsonb("settlement"),
+  finishedAt: timestamp("finished_at"),
 
   // Player Data: Array of { memberId, name, scores: [18], penalties: [18] }
   players: jsonb("players").$type<any[]>().default([]).notNull(),
 
-  doublingMode: text("doubling_mode", { enum: ["none", "next"] }).default("next").notNull(),
+  doublingMode: text("doubling_mode", { enum: ["none", "current", "next"] }).default("next").notNull(),
   nearHistory: jsonb("near_history").default({}).notNull(),
   frontCourseName: text("front_course_name"),
   backCourseName: text("back_course_name"),

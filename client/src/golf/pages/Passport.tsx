@@ -68,12 +68,10 @@ export default function Passport() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                         >
-                            <PassportStatsCard
-                                stats={stats}
-                                onScanClick={() => setScannerOpen(true)}
-                            />
+                            <PassportStatsCard stats={stats} />
                             <RegionMap
-                                stamps={stamps}
+                                regionTotals={stats.regionTotals}
+                                regionConquered={stats.regionConquered}
                                 onRegionClick={(id) => {
                                     setRegionalSheetRegion(id);
                                     setIsRegionalPopupOpen(true);
@@ -111,6 +109,8 @@ export default function Passport() {
                 regionId={regionalSheetRegion}
                 conqueredCourses={conqueredCourses}
                 onGoToGuide={handleRegionSheetGoToGuide}
+                regionTotals={stats.regionTotals}
+                regionConquered={stats.regionConquered}
             />
 
             <HiqNavigation />

@@ -3,12 +3,10 @@ import { COURSES } from "@/golf/data/golfCourses";
 
 export type FilterCategory = 'Region' | 'Difficulty' | 'Speed' | 'Vibe' | 'Grass';
 
-export const FILTERS = {
+// 난이도·그린 스피드·분위기·잔디 칩은 눌러도 아무것도 걸러내지 않았고(값 자체가 합성값), 뺐다(2026-09-11).
+// 칩 목록은 이 객체에서 나오므로 지역만 남긴다. 타입은 저장된 선택 상태와 맞추려고 그대로 둔다.
+export const FILTERS: Partial<Record<FilterCategory, string[]>> = {
     Region: ['전체', '경기', '강원', '제주', '충청', '전라', '경상'],
-    Difficulty: ['상', '중', '하'],
-    Speed: ['빠름', '보통', '느림'],
-    Vibe: ['비즈니스', '풍경', '가성비', '데이트'],
-    Grass: ['벤트', '중지', '블루글라스']
 };
 
 export const CATEGORY_LABELS: Record<FilterCategory, string> = {

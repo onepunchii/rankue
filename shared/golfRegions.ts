@@ -229,3 +229,19 @@ export function legacyRegionKeywords(selected: readonly string[]): string[] {
     }
     return [...out];
 }
+
+/** 골프 여권(도장깨기) 지도의 여섯 묶음. 지도 그림이 이 단위로 칠해진다. */
+export const PASSPORT_REGION_GROUPS = ["경기", "강원", "충청", "전라", "경상", "제주"] as const;
+export type PassportRegionGroup = (typeof PASSPORT_REGION_GROUPS)[number];
+
+/**
+ * 필터용 권역 코드 → 여권 지도 묶음. 서울·인천은 경기로 묶는다(지도에서도 한 색으로 칠한다).
+ * 예전 여권은 이 표를 안 쓰고 자체 매핑을 두 파일에 복붙했고, 지도는 영문 키로 한글 합계를 찾아
+ * 17개 지역 중 하나도 칠해지지 않았다(2026-09-11).
+ */
+export function passportRegionGroup(code: string | null | undefined): PassportRegionGroup | null {
+    if (!code) return null;
+    if (code === KYUNGGI_ANY || code.startsWith("kyunggi_") || code === "incheon_west") return "경기";
+    const map: Record<string, PassportRegionGroup> = { gangwon: "강원", chungcheong: "충청", jeolla: "전라", gyeongsang: "경상", jeju: "제주" };
+    return map[code] ?? null;
+}

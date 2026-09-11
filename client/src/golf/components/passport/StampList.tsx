@@ -1,8 +1,27 @@
 import { motion } from "framer-motion";
 import { Stamp } from "@/golf/hooks/usePassportData";
 import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 
 export const StampList = ({ stamps }: { stamps: Stamp[] }) => {
+    const [, setLocation] = useLocation();
+    // 예전엔 비어 있으면 가짜 '88 CC' 도장을 보여 줬다. 비었으면 비었다고, 어떻게 받는지 말한다.
+    if (stamps.length === 0) {
+        return (
+            <div className="py-16 px-6 text-center rounded-3xl border border-dashed border-white/10 bg-white/[0.02] mb-8">
+                <p className="text-base font-black text-white/80">아직 찍힌 도장이 없어요</p>
+                <p className="mt-2 text-[12px] font-bold text-white/50 break-keep">
+                    랭큐매치로 18홀을 끝까지 적고 라운드를 끝내면, 그 골프장 도장이 여기 찍혀요. 같은 곳은 한 번만 찍혀요.
+                </p>
+                <button
+                    onClick={() => setLocation('/golf/game/new?mode=match')}
+                    className="mt-6 h-11 px-6 rounded-full bg-[#64DD17] text-[#051907] text-sm font-black"
+                >
+                    라운드 시작
+                </button>
+            </div>
+        );
+    }
     return (
         <motion.div
             key="stamp"
@@ -71,10 +90,13 @@ export const StampList = ({ stamps }: { stamps: Stamp[] }) => {
                                         className="text-[6px] font-bold uppercase tracking-wide opacity-70"
                                         style={{ color: stamp.color }}
                                     >
-                                        TASU
+                                        BEST
                                     </span>
                                 </div>
 
+                                {stamp.rounds > 1 && (
+                                    <span className="text-[7px] font-black mb-0.5" style={{ color: stamp.color }}>{stamp.rounds}회 라운드</span>
+                                )}
                                 {/* 지역 */}
                                 <span
                                     className="text-[6px] font-bold uppercase tracking-[0.15em] opacity-50"

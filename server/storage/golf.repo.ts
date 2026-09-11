@@ -30,9 +30,46 @@ import type {
     GolfMembershipOrder
 } from "../../shared/schema.js";
 import { eq, ne, desc, asc, and, or, sql, gte, lte, isNull, like, inArray } from "drizzle-orm";
-import { notFound, conflict } from "../utils/errors.js";
-import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords } from "../../shared/golfRegions.js";
+import { notFound, conflict, badRequest } from "../utils/errors.js";
+import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords, passportRegionGroup } from "../../shared/golfRegions.js";
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
+import {
+    resolvePars, sanitizeScores, isCompleteRound, roundTotals, settleMatch, rulesFor, isGuestId, GUEST_PREFIX, rankRound,
+    type CoursePars,
+} from "../../shared/golfMatch.js";
+
+/** 대기방 핀이 살아 있는 시간. 지나면 그 핀으로는 못 들어온다(방장은 홈의 '진행 중 라운드' 로 돌아온다). */
+const PIN_TTL_MS = 6 * 3600_000;
+/** 진행 중 경기를 이어하기·재입장 대상으로 보는 시간(마지막으로 손댄 때부터). */
+const ACTIVE_TTL_MS = 12 * 3600_000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const blankPenalties = () => Array.from({ length: 18 }, () => ({ ob: false, hz: false, bunk: false, putt3: false }));
+const PENALTY_KEYS = ["ob", "hz", "hazard", "bunk", "putt3"] as const;
+/** 벌타 칸은 알려진 이름의 참/거짓만 남긴다. 모양이 틀리면 null(기존 값을 둔다). */
+function sanitizePenalties(v: unknown): Record<string, boolean>[] | null {
+    if (!Array.isArray(v) || v.length !== 18) return null;
+    return v.map((h) => {
+        const o: Record<string, boolean> = {};
+        if (h && typeof h === "object") for (const k of PENALTY_KEYS) if (k in (h as any)) o[k] = !!(h as any)[k];
+        return o;
+    });
+}
+
+export interface GolfMatchCreateInput {
+    courseId?: string | null;
+    courseName?: string | null;
+    gameMode: "stroke" | "skins";
+    strokeMode?: "solo" | "group" | null;
+    stake?: number;
+    useDouble?: boolean;
+    doublingMode?: "none" | "current" | "next";
+    birdieAmount?: number;
+    eagleAmount?: number;
+    frontCourseName?: string | null;
+    backCourseName?: string | null;
+    /** 앱이 없는 동반자 이름(최대 3명). 기록·통계에는 들어가지 않고 이 경기 점수판에만 있다. */
+    guests?: string[];
+}
 
 export const GOLF_GRADES = [
     { id: 'ALBATROSS', label: 'Albatross', minHandi: -Infinity, maxHandi: 0, icon: '🏆', color: '#c0c0c0' },
@@ -575,29 +612,88 @@ export class GolfRepository {
         };
     }
 
+    /**
+     * 골프 여권(도장깨기).
+     *
+     * 2026-09-11 다시 짰다. 예전엔 (1) 도장을 골프장 **이름 글자**로만 이어서 서버·여권·Elite60 이 서로 다른
+     * 숫자를 냈고, (2) 같은 곳을 다시 치면 도장이 하나 더 찍혔고, (3) '상위 N%' 는 공식으로 지어낸 숫자,
+     * 분모 520 은 하드코딩이었다. 이제 도장은 **골프장당 하나**(기록의 golf_club_id, 옛 기록은 이름으로),
+     * 분모와 지역별 총수는 실제 골프장 원장에서 센다.
+     */
     async getGolfPassportStats(memberId: string) {
-        const history = await db.select().from(hiqGameHistory)
-            .where(and(
-                eq(hiqGameHistory.memberId, memberId),
-                eq(hiqGameHistory.sportCategory, 'GOLF' as any)
-            ));
+        const history = await db.select({
+            locationName: hiqGameHistory.locationName,
+            golfClubId: hiqGameHistory.golfClubId,
+            score: hiqGameHistory.score,
+            createdAt: hiqGameHistory.createdAt,
+        })
+            .from(hiqGameHistory)
+            .where(and(eq(hiqGameHistory.memberId, memberId), eq(hiqGameHistory.sportCategory, 'GOLF' as any)))
+            .orderBy(asc(hiqGameHistory.createdAt));
 
-        const uniqueCourses = new Set(history.map(h => h.locationName).filter(Boolean));
-        const starsCollected = history.filter(h => h.score !== null && h.score < 85).length;
+        const clubs = await db.select({
+            id: rankueGolfClubs.id, name: rankueGolfClubs.name,
+            region: rankueGolfClubs.region, address: rankueGolfClubs.address,
+        }).from(rankueGolfClubs);
 
+        const squash = (v: string) => v.replace(/\s+/g, "").toLowerCase();
+        const byId = new Map(clubs.map((c) => [c.id, c]));
+        const byName = new Map<string, (typeof clubs)[number]>();
+        for (const c of clubs) if (!byName.has(squash(c.name))) byName.set(squash(c.name), c);
+        const groupOf = (c: { region: string | null; address: string | null }) =>
+            passportRegionGroup(resolveGolfRegionCode(c.region, c.address));
+
+        const regionTotals: Record<string, number> = {};
+        for (const c of clubs) {
+            const g = groupOf(c);
+            if (g) regionTotals[g] = (regionTotals[g] ?? 0) + 1;
+        }
+
+        type Stamp = { clubId: string | null; name: string; region: string | null; firstDate: Date; lastDate: Date; bestScore: number; rounds: number };
+        const stamps = new Map<string, Stamp>();
+        for (const h of history) {
+            const club = (h.golfClubId && byId.get(h.golfClubId)) || (h.locationName ? byName.get(squash(h.locationName)) : undefined);
+            // 골프장을 모르는 기록(옛 '알 수 없는 구장' 포함)은 라운드 수에만 들어가고 도장은 없다.
+            if (!club && (!h.locationName || h.locationName === "알 수 없는 구장")) continue;
+            const key = club?.id ?? `name:${squash(h.locationName!)}`;
+            const cur = stamps.get(key);
+            if (!cur) {
+                stamps.set(key, {
+                    clubId: club?.id ?? null,
+                    name: club?.name ?? h.locationName!,
+                    region: club ? groupOf(club) : null,
+                    firstDate: h.createdAt, lastDate: h.createdAt,
+                    bestScore: h.score, rounds: 1,
+                });
+            } else {
+                cur.rounds++;
+                cur.lastDate = h.createdAt;
+                if (h.score > 0 && (cur.bestScore <= 0 || h.score < cur.bestScore)) cur.bestScore = h.score;
+            }
+        }
+        const list = [...stamps.values()];
+        const regionConquered: Record<string, number> = {};
+        for (const st of list) if (st.region) regionConquered[st.region] = (regionConquered[st.region] ?? 0) + 1;
+
+        const conquered = list.length;
         let level = "골프 입문자";
         let levelNum = 1;
-        if (uniqueCourses.size >= 30) { level = "골프 매니아"; levelNum = 4; }
-        else if (uniqueCourses.size >= 10) { level = "골프 탐험가"; levelNum = 3; }
-        else if (uniqueCourses.size >= 3) { level = "골프 비기너"; levelNum = 2; }
+        let nextLevelAt: number | null = 3;
+        if (conquered >= 30) { level = "골프 매니아"; levelNum = 4; nextLevelAt = null; }
+        else if (conquered >= 10) { level = "골프 탐험가"; levelNum = 3; nextLevelAt = 30; }
+        else if (conquered >= 3) { level = "골프 비기너"; levelNum = 2; nextLevelAt = 10; }
 
         return {
-            conquered: uniqueCourses.size,
-            starsCollected,
-            rankPercent: Math.max(1, 15 - Math.floor(uniqueCourses.size / 2)),
+            conquered,
+            totalCourses: clubs.length,
+            rounds: history.length,
+            starsCollected: history.filter((h) => h.score > 0 && h.score < 85).length,
             level,
             levelNum,
-            totalCourses: 520
+            nextLevelAt,
+            stamps: list,
+            regionTotals,
+            regionConquered,
         };
     }
 
@@ -688,138 +784,196 @@ export class GolfRepository {
     }
 
     // --- Golf Match Session (PIN based) ---
-    async createGolfMatchSession(data: any): Promise<any> {
-        const pinCode = Math.floor(1000 + Math.random() * 9000).toString();
+    //
+    // 2026-09-11 다시 짰다(골프 리뷰). 예전 구멍:
+    //  1. 점수 저장이 클라이언트가 보낸 players 배열을 그대로 병합해, 남의 회원번호를 끼워 넣거나 남의 점수·이름을
+    //     덮을 수 있었다 → 이미 방에 있는 사람의 점수·벌타 칸만, 모양을 검사해서 받는다.
+    //  2. 끝난 경기에 저장이 한 번 더 오면 'playing' 으로 되돌아가 종료가 두 번 기록됐다 → 상태를 먼저 본다.
+    //  3. 안 친 홀을 파로 채워 빈 경기도 '70타 공식 라운드' 가 됐다 → 18홀을 다 적은 회원만 기록한다.
+    //  4. 핀이 겹치는지·만료됐는지 보지 않았다 → 살아 있는 방과 안 겹치는 핀, 대기방 핀은 6시간.
+    //  5. 종료가 트랜잭션이 아니어서 중간 실패 시 일부 기록만 남았다 → 상태 변경과 기록을 한 트랜잭션으로.
+    // 누가 쓸 수 있는지(방장만)는 라우트(golf.ts)가 정한다.
 
-        const host = await db.select({
-            name: hiqMembers.name,
-            profileImageUrl: profiles.profileImageUrl
-        })
+    async createGolfMatchSession(hostId: string, input: GolfMatchCreateInput): Promise<any> {
+        const [host] = await db.select({ name: hiqMembers.name, profileImageUrl: profiles.profileImageUrl })
             .from(hiqMembers)
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
-            .where(eq(hiqMembers.id, data.hostId))
+            .where(eq(hiqMembers.id, hostId))
             .limit(1);
+        if (!host) throw notFound("회원 정보를 찾을 수 없어요");
 
+        const rules = rulesFor(input.gameMode, input);
+        const solo = input.gameMode === "stroke" && input.strokeMode === "solo";
+        const guests = solo ? [] : (input.guests ?? []).map((n) => n.trim()).filter(Boolean).slice(0, 3);
+        const players = [
+            { memberId: hostId, name: host.name || "방장", profileImageUrl: host.profileImageUrl ?? null, scores: new Array(18).fill(0), penalties: blankPenalties() },
+            ...guests.map((name) => ({
+                memberId: `${GUEST_PREFIX}${crypto.randomUUID().slice(0, 8)}`,
+                name, isGuest: true, profileImageUrl: null,
+                scores: new Array(18).fill(0), penalties: blankPenalties(),
+            })),
+        ];
+
+        const pinCode = await this.freshPin();
         const [session] = await db.insert(golfMatchSessions).values({
-            ...data,
-            doublingMode: data.doublingMode, // Explicitly set to avoid default override
             pinCode,
-            players: [{
-                memberId: data.hostId,
-                name: host[0]?.name || "Host",
-                profileImageUrl: host[0]?.profileImageUrl,
-                scores: new Array(18).fill(0),
-                penalties: Array.from({ length: 18 }, () => ({ ob: false, hz: false, bunk: false, putt3: false }))
-            }]
+            hostId,
+            courseId: input.courseId || null,
+            courseName: input.courseName || null,
+            gameMode: input.gameMode,
+            strokeMode: input.gameMode === "stroke" ? (input.strokeMode ?? "group") : null,
+            stake: rules.stake,
+            useOecd: false,
+            useDouble: rules.useDouble,
+            doublingMode: rules.doublingMode,
+            birdieAmount: rules.birdieAmount,
+            eagleAmount: rules.eagleAmount,
+            frontCourseName: input.frontCourseName || null,
+            backCourseName: input.backCourseName || null,
+            // 혼자 기록은 기다릴 사람이 없다 — 바로 진행 중으로 연다(예전엔 화면이 점수 저장을 한 번 불러 시작시켰다).
+            status: solo ? "playing" : "waiting",
+            currentHole: 1,
+            players,
         }).returning();
         return session;
+    }
+
+    /** 살아 있는 방(대기 6시간·진행 12시간)과 겹치지 않는 4자리 핀. */
+    private async freshPin(): Promise<string> {
+        const now = Date.now();
+        for (let i = 0; i < 40; i++) {
+            const pin = String(Math.floor(1000 + Math.random() * 9000));
+            const [clash] = await db.select({ id: golfMatchSessions.id }).from(golfMatchSessions)
+                .where(and(eq(golfMatchSessions.pinCode, pin), or(
+                    and(eq(golfMatchSessions.status, "waiting"), gte(golfMatchSessions.createdAt, new Date(now - PIN_TTL_MS))),
+                    and(eq(golfMatchSessions.status, "playing"), gte(golfMatchSessions.updatedAt, new Date(now - ACTIVE_TTL_MS))),
+                )))
+                .limit(1);
+            if (!clash) return pin;
+        }
+        throw conflict("지금 열린 방이 너무 많아요. 잠시 후 다시 만들어 주세요");
+    }
+
+    /** 전반·후반 코스의 실제 파. 모르는 홀은 known=false 로 표시된다(계산에서 버디·배판 판정에 안 쓴다). */
+    private async parsFor(session: { courseId: string | null; frontCourseName: string | null; backCourseName: string | null }): Promise<CoursePars> {
+        if (!session.courseId || !UUID_RE.test(session.courseId)) return resolvePars(null, null);
+        try {
+            const courses = await db.select({ name: rankueGolfCourses.name, pars: rankueGolfCourses.pars })
+                .from(rankueGolfCourses)
+                .where(eq(rankueGolfCourses.clubId, session.courseId));
+            return resolvePars(
+                courses.find((c) => c.name === session.frontCourseName)?.pars,
+                courses.find((c) => c.name === session.backCourseName)?.pars,
+            );
+        } catch (e) {
+            console.error("[golf] course pars", e);
+            return resolvePars(null, null);
+        }
     }
 
     async getGolfMatchSession(id: string): Promise<any> {
         const [session] = await db.select().from(golfMatchSessions).where(eq(golfMatchSessions.id, id));
         if (!session) return null;
-
-        let pars: number[] = new Array(18).fill(4);
-
-        if (session.courseId) {
-            try {
-                // Fetch course info to populate Hole Pars
-                const courses = await db.select().from(rankueGolfCourses)
-                    .where(eq(rankueGolfCourses.clubId, session.courseId));
-
-                const frontPars = courses.find(c => c.name === session.frontCourseName)?.pars as number[];
-                const backPars = courses.find(c => c.name === session.backCourseName)?.pars as number[];
-
-                if (frontPars && backPars) {
-                    pars = [...frontPars, ...backPars];
-                } else if (frontPars) {
-                    pars = [...frontPars, ...frontPars];
-                }
-            } catch (e) {
-                console.error("Error fetching course pars:", e);
-            }
-        }
-
-        return { ...session, pars };
+        const cp = await this.parsFor(session);
+        return { ...session, pars: cp.pars, parKnown: cp.known };
     }
 
-    async getGolfMatchSessionByPin(pin: string): Promise<any> {
-        const [session] = await db.select().from(golfMatchSessions).where(and(eq(golfMatchSessions.pinCode, pin), eq(golfMatchSessions.status, 'waiting')));
-        return session;
+    /** 핀으로 들어갈 수 있는 방: 6시간 안에 만든 대기방, 또는 12시간 안에 손댄 진행 중 방(늦게 온 사람·다시 들어오기). */
+    private async findJoinableByPin(pin: string): Promise<any> {
+        const now = Date.now();
+        const [row] = await db.select().from(golfMatchSessions)
+            .where(and(eq(golfMatchSessions.pinCode, pin), or(
+                and(eq(golfMatchSessions.status, "waiting"), gte(golfMatchSessions.createdAt, new Date(now - PIN_TTL_MS))),
+                and(eq(golfMatchSessions.status, "playing"), gte(golfMatchSessions.updatedAt, new Date(now - ACTIVE_TTL_MS))),
+            )))
+            .orderBy(desc(golfMatchSessions.createdAt))
+            .limit(1);
+        return row;
     }
 
-    async joinGolfMatchSession(pin: string, memberId: string, name: string): Promise<any> {
-        const found = await this.getGolfMatchSessionByPin(pin);
-        if (!found) throw notFound("게임을 찾을 수 없거나 이미 시작되었습니다.");
+    /** added: 새로 들어왔는가(다시 들어오기는 false — PIN 시도 카운터를 지우지 않는다). */
+    async joinGolfMatchSession(pin: string, memberId: string): Promise<{ session: any; added: boolean }> {
+        const found = await this.findJoinableByPin(pin);
+        if (!found) throw notFound("그 번호로 열린 방이 없어요. 번호를 다시 확인해 주세요");
 
-        const player = await db.select({
-            name: hiqMembers.name,
-            profileImageUrl: profiles.profileImageUrl
-        })
+        const [me] = await db.select({ name: hiqMembers.name, profileImageUrl: profiles.profileImageUrl })
             .from(hiqMembers)
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
             .where(eq(hiqMembers.id, memberId))
             .limit(1);
 
-        // Append the joining player under a row lock. Re-read inside the transaction so the
-        // capacity/dedup checks and the write see a consistent snapshot — two players joining
-        // at once (or a join racing a host score-save) can't both append onto stale state.
+        // 행을 잠그고 다시 읽는다 — 두 사람이 동시에 들어오거나 방장이 막 시작/종료해도 낡은 상태에 붙지 않는다.
         return await db.transaction(async (tx) => {
             const [session] = await tx.select().from(golfMatchSessions)
                 .where(eq(golfMatchSessions.id, found.id))
-                .for('update');
-            if (!session) throw notFound("게임을 찾을 수 없거나 이미 시작되었습니다.");
-
-            const players = session.players || [];
-            if (players.length >= 4) throw conflict("방이 꽉 찼습니다.");
-            if (players.some((p: any) => p.memberId === memberId)) return session;
-
-            const updatedPlayers = [...players, {
-                memberId,
-                name: player[0]?.name || name,
-                profileImageUrl: player[0]?.profileImageUrl,
-                scores: new Array(18).fill(0),
-                penalties: Array.from({ length: 18 }, () => ({ ob: false, hz: false, bunk: false, putt3: false }))
-            }];
+                .for("update");
+            if (!session || (session.status !== "waiting" && session.status !== "playing")) {
+                throw conflict("이미 끝난 경기예요");
+            }
+            const players = (session.players || []) as any[];
+            if (players.some((p) => p.memberId === memberId)) return { session, added: false }; // 다시 들어오기
+            // 시작한 경기엔 원래 있던 사람만 다시 들어온다. 새 참가를 받으면 4자리만 맞힌 낯선 사람이 라운드 도중
+            // 참가자가 돼 전원의 이름·점수를 읽고, 방장은 내보낼 방법이 없었다(2026-09-11 리뷰). 혼자 기록 방도 같다.
+            if (session.status !== "waiting" || session.strokeMode === "solo") {
+                throw conflict("이미 시작한 경기라 새로 들어올 수 없어요");
+            }
+            if (players.length >= 4) throw conflict("방이 꽉 찼어요 (최대 4명)");
 
             const [updated] = await tx.update(golfMatchSessions)
-                .set({ players: updatedPlayers })
+                .set({
+                    players: [...players, {
+                        memberId,
+                        name: me?.name || "동반자",
+                        profileImageUrl: me?.profileImageUrl ?? null,
+                        scores: new Array(18).fill(0),
+                        penalties: blankPenalties(),
+                    }],
+                    updatedAt: new Date(),
+                })
                 .where(eq(golfMatchSessions.id, session.id))
                 .returning();
-            return updated;
+            return { session: updated, added: true };
         });
     }
 
-    async updateGolfMatchScore(id: string, holeNo: number, players: any, nearHistory?: any): Promise<any> {
-        // Concurrent writers (host saving scores vs a guest joining via joinGolfMatchSession)
-        // both touch the same row's `players` JSON. A blind overwrite is last-write-wins and
-        // silently drops the other writer's change. Serialize with a row lock and merge by
-        // memberId so a concurrent join is preserved and we only apply the incoming scores.
+    async startGolfMatchSession(id: string): Promise<any> {
+        const [started] = await db.update(golfMatchSessions)
+            .set({ status: "playing", currentHole: 1, updatedAt: new Date() })
+            .where(and(eq(golfMatchSessions.id, id), eq(golfMatchSessions.status, "waiting")))
+            .returning();
+        if (started) return started;
+        const [cur] = await db.select().from(golfMatchSessions).where(eq(golfMatchSessions.id, id));
+        if (cur?.status === "playing") return cur; // 두 번 눌러도 같다
+        throw conflict("이미 끝난 방이에요");
+    }
+
+    /**
+     * 방장이 보낸 점수를 **이미 방에 있는 사람의 점수·벌타 칸에만** 적는다.
+     * 이름·사진·회원번호는 여기서 절대 바뀌지 않고, 모르는 회원번호는 버린다.
+     */
+    async updateGolfMatchScore(id: string, holeNo: number, incoming: unknown): Promise<any> {
         return await db.transaction(async (tx) => {
             const [current] = await tx.select().from(golfMatchSessions)
                 .where(eq(golfMatchSessions.id, id))
-                .for('update');
-            if (!current) return undefined;
+                .for("update");
+            if (!current) throw notFound("게임을 찾을 수 없어요");
+            if (current.status === "waiting") throw conflict("아직 시작하지 않은 경기예요");
+            if (current.status !== "playing") throw conflict("이미 끝난 경기예요. 점수를 바꿀 수 없어요");
 
-            const incomingById = new Map<string, any>((players || []).map((p: any) => [p.memberId, p]));
-            const merged = (current.players || []).map((dbP: any) => {
-                const inc = incomingById.get(dbP.memberId);
-                if (!inc) return dbP; // player not in this payload (e.g. concurrently joined) — keep as-is
-                incomingById.delete(dbP.memberId);
-                return { ...dbP, ...inc };
+            const byId = new Map<string, any>();
+            for (const p of Array.isArray(incoming) ? incoming : []) {
+                if (p && typeof p.memberId === "string") byId.set(p.memberId, p);
+            }
+            const merged = ((current.players || []) as any[]).map((dbP) => {
+                const inc = byId.get(dbP.memberId);
+                if (!inc) return dbP;
+                const scores = sanitizeScores(inc.scores);
+                if (!scores) throw badRequest("점수 형식이 올바르지 않아요 (홀당 1~15타)");
+                return { ...dbP, scores, penalties: sanitizePenalties(inc.penalties) ?? dbP.penalties };
             });
-            // Append any genuinely new players present only in the payload.
-            for (const inc of incomingById.values()) merged.push(inc);
 
             const [session] = await tx.update(golfMatchSessions)
-                .set({
-                    players: merged,
-                    currentHole: holeNo,
-                    // Preserve existing nearHistory when the caller doesn't send it (most saves don't).
-                    nearHistory: nearHistory !== undefined ? nearHistory : (current.nearHistory || {}),
-                    updatedAt: new Date(),
-                    status: 'playing'
-                })
+                .set({ players: merged, currentHole: holeNo, updatedAt: new Date() })
                 .where(eq(golfMatchSessions.id, id))
                 .returning();
             return session;
@@ -831,67 +985,140 @@ export class GolfRepository {
         if (frontName) updateData.frontCourseName = frontName;
         if (backName) updateData.backCourseName = backName;
 
+        // 끝난 경기의 코스를 바꾸면 파가 소급해서 바뀌었다 — 진행 중일 때만.
         const [session] = await db.update(golfMatchSessions)
             .set(updateData)
-            .where(eq(golfMatchSessions.id, id))
+            .where(and(eq(golfMatchSessions.id, id), inArray(golfMatchSessions.status, ["waiting", "playing"])))
             .returning();
+        if (!session) throw conflict("끝난 경기는 코스를 바꿀 수 없어요");
         return session;
     }
 
-    async finishGolfMatchSession(id: string): Promise<any> {
-        // Idempotency guard: only the FIRST caller transitions the row to 'finished'.
-        // The WHERE status != 'finished' makes this atomic, so concurrent/duplicate finish
-        // requests (double-tap, retry) cannot both insert history / double-count stats.
+    /** 방장이 방을 접는다. 기록은 남기지 않는다. */
+    async abandonGolfMatchSession(id: string): Promise<any> {
         const [session] = await db.update(golfMatchSessions)
-            .set({ status: 'finished', updatedAt: new Date() })
-            .where(and(eq(golfMatchSessions.id, id), ne(golfMatchSessions.status, 'finished')))
+            .set({ status: "abandoned", updatedAt: new Date() })
+            .where(and(eq(golfMatchSessions.id, id), inArray(golfMatchSessions.status, ["waiting", "playing"])))
             .returning();
-
-        // Already finished (or not found): return current state without re-inserting history.
-        if (!session) {
-            const [existing] = await db.select().from(golfMatchSessions).where(eq(golfMatchSessions.id, id));
-            return existing;
-        }
-
-        {
-            const DEFAULT_PAR = [4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 4, 3, 4, 5, 4, 3, 4, 4];
-            const pars = (session as any).pars || DEFAULT_PAR;
-
-            for (const player of session.players) {
-                if (!player.memberId) continue; // Skip malformed player entries
-                const scores = player.scores || new Array(18).fill(0);
-
-                // Batch Update Fix: Treat 0 as Par for total calculation
-                let totalScore = 0;
-                for (let i = 0; i < 18; i++) {
-                    const s = scores[i] || 0;
-                    totalScore += (s > 0) ? s : (pars[i] || 4);
-                }
-
-                await db.insert(hiqGameHistory).values({
-                    memberId: player.memberId,
-                    gameId: null,
-                    gameMode: 'match',
-                    gameType: 'golf',
-                    score: totalScore,
-                    innings: 18,
-                    average: (totalScore / 18).toFixed(2),
-                    isWinner: false,
-                    isRanked: true,
-                    locationName: session.courseName || "알 수 없는 구장",
-                    sportCategory: 'GOLF' as any,
-                    scoreJson: player.scores
-                });
-
-                // Update member's golf stats (Average based)
-                await this.updateGolfStats(player.memberId);
-            }
-        }
-
+        if (!session) throw conflict("이미 끝난 경기예요");
         return session;
+    }
+
+    /** 홈의 '진행 중 라운드' 카드. 12시간 안에 손댄, 내가 들어 있는 대기·진행 중 방 하나. */
+    async getActiveGolfMatch(memberId: string): Promise<any> {
+        const [s] = await db.select().from(golfMatchSessions)
+            .where(and(
+                inArray(golfMatchSessions.status, ["waiting", "playing"]),
+                gte(golfMatchSessions.updatedAt, new Date(Date.now() - ACTIVE_TTL_MS)),
+                sql`${golfMatchSessions.players} @> ${JSON.stringify([{ memberId }])}::jsonb`,
+            ))
+            .orderBy(desc(golfMatchSessions.updatedAt))
+            .limit(1);
+        if (!s) return null;
+        const isHost = s.hostId === memberId;
+        return {
+            id: s.id,
+            status: s.status,
+            courseName: s.courseName,
+            currentHole: s.currentHole,
+            isHost,
+            pinCode: isHost ? s.pinCode : undefined,
+            playerCount: ((s.players || []) as any[]).length,
+            updatedAt: s.updatedAt,
+        };
+    }
+
+    /**
+     * 경기를 끝낸다. 상태 변경·정산 저장·기록 추가를 **한 트랜잭션**으로 한다.
+     * 기록(평균·등급·여권 도장)은 18홀을 다 적은 회원만. 게스트·중도 종료한 사람은 점수판에만 남는다.
+     */
+    async finishGolfMatchSession(id: string): Promise<any> {
+        const [pre] = await db.select().from(golfMatchSessions).where(eq(golfMatchSessions.id, id));
+        if (!pre) throw notFound("게임을 찾을 수 없어요");
+        if (pre.status === "finished") return { ...pre, ...(await this.parsView(pre)), recordedMemberIds: [] };
+        if (pre.status !== "playing") throw conflict("진행 중인 경기만 끝낼 수 있어요");
+
+        const cp = await this.parsFor(pre);
+
+        // 기록 대상 후보: 실제 회원만(탈퇴 등으로 없는 번호면 외래키에 걸려 전체가 실패한다).
+        const memberIds = ((pre.players || []) as any[])
+            .map((p) => String(p?.memberId ?? ""))
+            .filter((mid) => !isGuestId(mid) && UUID_RE.test(mid));
+        const existing = memberIds.length
+            ? new Set((await db.select({ id: hiqMembers.id }).from(hiqMembers).where(inArray(hiqMembers.id, memberIds))).map((r) => r.id))
+            : new Set<string>();
+
+        const { session, recorded } = await db.transaction(async (tx) => {
+            const [cur] = await tx.select().from(golfMatchSessions)
+                .where(eq(golfMatchSessions.id, id))
+                .for("update");
+            if (!cur) throw notFound("게임을 찾을 수 없어요");
+            if (cur.status === "finished") return { session: cur, recorded: [] as string[] };
+            if (cur.status !== "playing") throw conflict("진행 중인 경기만 끝낼 수 있어요");
+
+            const players = (cur.players || []) as any[];
+            const settlement = settleMatch(players, cp, rulesFor(cur.gameMode, cur as any));
+            const [done] = await tx.update(golfMatchSessions)
+                .set({ status: "finished", settlement, finishedAt: new Date(), updatedAt: new Date() })
+                .where(eq(golfMatchSessions.id, id))
+                .returning();
+
+            const complete = players.filter((p) => existing.has(p.memberId) && isCompleteRound(p.scores));
+            const strokes = complete.map((p) => roundTotals(p.scores, cp.pars).strokes);
+            // 승자는 결과 화면과 같은 규칙(shared rankRound): 18홀을 다 친 사람 중 파 대비 가장 적게 친 사람.
+            // 게스트가 이겼으면 회원 누구도 승자가 아니다. 혼자 친 라운드엔 승자가 없다. 동타면 공동 승.
+            const winnerIds = new Set(
+                rankRound(players, cp.pars).filter((r) => r.winner && r.holesPlayed === 18).map((r) => r.player.memberId),
+            );
+            const recorded: string[] = [];
+            for (let i = 0; i < complete.length; i++) {
+                const p = complete[i];
+                const ins = await tx.insert(hiqGameHistory).values({
+                    memberId: p.memberId,
+                    gameId: null,
+                    gameMode: "match",
+                    gameType: "golf",
+                    score: strokes[i],
+                    innings: 18,
+                    average: (strokes[i] / 18).toFixed(2),
+                    isWinner: winnerIds.has(p.memberId),
+                    isRanked: true,
+                    // 골프장을 모르면 비워 둔다 — '알 수 없는 구장' 이름이 여권에 가짜 골프장 도장으로 찍혔다.
+                    locationName: cur.courseName || null,
+                    subType: [cur.frontCourseName, cur.backCourseName].filter(Boolean).join(" / ") || null,
+                    sportCategory: "GOLF" as any,
+                    scoreJson: p.scores,
+                    golfSessionId: cur.id,
+                    golfClubId: cur.courseId || null,
+                }).onConflictDoNothing().returning({ id: hiqGameHistory.id });
+                if (ins.length > 0) recorded.push(p.memberId);
+            }
+            return { session: done, recorded };
+        });
+
+        for (const mid of recorded) {
+            await this.updateGolfStats(mid).catch((e) => console.error("[golf] updateGolfStats", e));
+        }
+        return { ...session, pars: cp.pars, parKnown: cp.known, recordedMemberIds: recorded };
+    }
+
+    private async parsView(session: any): Promise<{ pars: number[]; parKnown: boolean[] }> {
+        const cp = await this.parsFor(session);
+        return { pars: cp.pars, parKnown: cp.known };
     }
 
     async findGolfSessionForHistory(history: HiqGameHistory): Promise<any> {
+        // 2026-09-11 부터 기록에 경기 번호가 붙는다. 있으면 그걸로 바로 찾는다.
+        const linkedId = (history as any).golfSessionId as string | null | undefined;
+        if (linkedId) {
+            const [linked] = await db.select().from(golfMatchSessions).where(eq(golfMatchSessions.id, linkedId));
+            if (linked) return this.golfSessionAsGame(linked);
+        }
+        return this.findGolfSessionByTime(history);
+    }
+
+    /** 경기 번호가 없는 옛 기록: 종료 시각 근처의 경기를 추측한다. */
+    private async findGolfSessionByTime(history: HiqGameHistory): Promise<any> {
         // Heuristic: Find session updated around the same time as history creation
         const timeWindowMinutes = 10;
         const historyTime = new Date(history.createdAt);
@@ -929,12 +1156,13 @@ export class GolfRepository {
         const match = candidates.reduce((best, s) => (score(s) > score(best) ? s : best), candidates[0]);
 
         if (!match) return null;
+        return this.golfSessionAsGame(match);
+    }
 
-        // Transform to HiqGame shape for the dialog
+    /** 기록 상세 대화상자가 쓰는 HiqGame 모양으로 바꾼다. 파는 그 경기 코스의 실제 파(모르면 기본 배치). */
+    private async golfSessionAsGame(match: any): Promise<any> {
         const players = match.players;
-        const DEFAULT_PAR = [4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 4, 3, 4, 5, 4, 3, 4, 4];
-        // Use session pars if available, otherwise default
-        const pars = (match as any).pars || DEFAULT_PAR;
+        const pars = (await this.parsFor(match)).pars;
 
         const calculateBirdiePlus = (scores: number[] | undefined) => {
             if (!scores) return 0;

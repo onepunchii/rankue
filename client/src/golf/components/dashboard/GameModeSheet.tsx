@@ -52,7 +52,7 @@ export function GameModeSheet({ open, onOpenChange, onOpenScanner }: GameModeShe
 
                         <div className="relative z-10 text-center">
                             <h3 className="text-base font-extrabold text-[#64DD17] mb-1">새 게임 시작</h3>
-                            <p className="text-xs font-semibold text-white/60 leading-tight text-center">실시간 스코어 입력 &<br />내기 관리</p>
+                            <p className="text-xs font-semibold text-white/60 leading-tight text-center">실시간 스코어 입력 &<br />동반자 게임</p>
                         </div>
                     </motion.button>
 

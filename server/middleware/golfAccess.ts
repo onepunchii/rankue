@@ -6,11 +6,11 @@ import type { Response, NextFunction } from "express";
 import { storage } from "../storage/index.js";
 import { requireAuth, AuthRequest } from "./auth.js";
 import { sendError } from "../utils/response.js";
-import { golfAllowed } from "../../shared/golfAccess.js";
+import { golfAllowed } from "../lib/golfAccess.js";
 
 async function checkGolf(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     const member = req.userId ? await storage.getMemberById(req.userId) : null;
-    if (!golfAllowed(member?.phone)) {
+    if (!golfAllowed(member)) {
         sendError(res, 403, "골프는 아직 준비 중이에요", "GOLF_NOT_AVAILABLE");
         return;
     }
