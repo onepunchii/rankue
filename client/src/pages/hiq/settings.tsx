@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { LucideChevronLeft, LucideChevronRight, LucideCheck, LucideLoader2, LucideGlobe, LucidePencil, LucideBadgeCheck, LucideShield, LucideLogOut, LucideBell } from "@/lib/icons";
+import { LucideChevronLeft, LucideChevronRight, LucideCheck, LucideLoader2, LucideGlobe, LucidePencil, LucideBadgeCheck, LucideShield, LucideLogOut, LucideBell, LucideFileText } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import { flagEmoji } from "@/lib/flag";
 import { cn } from "@/lib/utils";
+import { BlockedMembersSection } from "@/components/hiq/community/BlockedMembersSection";
 import {
     canOpenNotificationSettings, forgetPushToken, isNativeApp, openNotificationSettings, pushPermission, requestPushPermission,
     storedPushToken, type PushPermission,
@@ -248,6 +249,9 @@ export default function HiqSettings() {
                     </button>
                 </section>
 
+                {/* 차단한 사용자 — 커뮤니티·크루 어디서 차단했든 여기서 푼다 */}
+                <BlockedMembersSection />
+
                 {/* 연결된 로그인 */}
                 <section className="rk-card p-5">
                     <div className="flex items-center gap-2 mb-1">
@@ -271,6 +275,11 @@ export default function HiqSettings() {
 
                 {/* 법적 고지 · 계정 */}
                 <section className="rk-card overflow-hidden">
+                    <button onClick={() => setLocation("/terms")} className="w-full flex items-center justify-between px-5 h-14 active:bg-black/[0.03]">
+                        <span className="flex items-center gap-2 text-[14px] font-medium"><LucideFileText className="w-4 h-4 text-black/40" /> {t("settings.terms")}</span>
+                        <LucideChevronRight className="w-4 h-4 text-black/25" />
+                    </button>
+                    <div className="h-px bg-black/[0.05] mx-5" />
                     <button onClick={() => setLocation("/privacy")} className="w-full flex items-center justify-between px-5 h-14 active:bg-black/[0.03]">
                         <span className="flex items-center gap-2 text-[14px] font-medium"><LucideShield className="w-4 h-4 text-black/40" /> {t("settings.privacy")}</span>
                         <LucideChevronRight className="w-4 h-4 text-black/25" />

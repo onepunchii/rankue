@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { kstDateKey, kstDateLabel, kstTime } from "@/lib/kst";
 import { useT } from "@/lib/i18n";
+import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
+import { useTermsGate } from "@/components/hiq/TermsConsent";
 
 interface ChatMessage {
     id: string;
@@ -35,6 +37,7 @@ interface CrewChatTabProps {
 export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSettlementClick }: CrewChatTabProps) {
     const { toast } = useToast();
     const { t } = useT();
+    const { gate } = useTermsGate();
     const [_, setLocation] = useLocation();
     const [inputValue, setInputValue] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -71,15 +74,18 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
             }
             return { previousChats };
         },
-        onError: (err, _, context) => {
+        onError: (err: any, sentMessage, context) => {
             if (context?.previousChats) {
                 queryClient.setQueryData([`/api/hiq/crews/${crewId}/chats`], context.previousChats);
             }
+            // 400 은 서버 필터가 거절한 경우(내기·욕설·거래 표현) — 이유를 그대로 보여줘야 고쳐 보낼 수 있다.
+            // 보낸 문장은 입력창에 되돌려 둔다(보내는 순간 비웠기 때문에 그대로 두면 사라진다).
             toast({
                 title: t("crewChat.sendFailedTitle"),
-                description: t("crewChat.sendFailedDesc"),
+                description: err?.status === 400 && err?.message ? err.message : t("crewChat.sendFailedDesc"),
                 variant: "destructive"
             });
+            setInputValue((cur) => cur || sentMessage);
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/chats`] });
@@ -108,8 +114,12 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
 
     const handleSendMessage = () => {
         if (!inputValue.trim() || sendChatMutation.isPending) return;
-        sendChatMutation.mutate(inputValue);
-        setInputValue("");
+        // 첫 채팅이면 약관 동의부터(감사 S4) — 동의하면 쓴 문장을 그대로 보낸다
+        const text = inputValue;
+        gate(() => {
+            sendChatMutation.mutate(text);
+            setInputValue("");
+        });
     };
 
     // Improved conditional auto-scroll
@@ -171,6 +181,7 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
                                     chat={chat}
                                     isMe={isMe}
                                     isAdmin={isAdmin}
+                                    crewId={crewId}
                                     onDelete={(id) => deleteChatMutation.mutate(id)}
                                     onSettlementClick={onSettlementClick}
                                     setLocation={setLocation}
@@ -236,11 +247,12 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
 
 // Separate Memoized Message Item for Performance
 const ChatMessageItem = memo(({
-    chat, isMe, isAdmin, onDelete, onSettlementClick, setLocation
+    chat, isMe, isAdmin, crewId, onDelete, onSettlementClick, setLocation
 }: {
     chat: ChatMessage,
     isMe: boolean,
     isAdmin: boolean,
+    crewId: string,
     onDelete: (id: string) => void,
     onSettlementClick?: (id: string) => void,
     setLocation: (url: string) => void
@@ -252,6 +264,9 @@ const ChatMessageItem = memo(({
     const isGolfBooking = chat.metadata?.type === 'GOLF_BOOKING' && chat.metadata?.greenFee != null;
     const bookingDate = isGolfBooking ? new Date(chat.metadata?.datetime) : null;
     const hasValidBookingDate = !!bookingDate && !Number.isNaN(bookingDate.getTime());
+    // 남의 메시지 — ⋯ 버튼과 우클릭(데스크톱)으로 신고·차단 메뉴를 연다 (Apple 1.2)
+    const canReport = !isMe && !isTemp;
+    const [menuOpen, setMenuOpen] = useState(false);
 
     return (
         <div className={cn("flex w-full mb-1 group", isMe ? "justify-end" : "justify-start")}>
@@ -270,7 +285,9 @@ const ChatMessageItem = memo(({
                     )}
 
                     <div className="flex items-end gap-1.5 flex-row-reverse">
-                        <div className={cn(
+                        <div
+                            onContextMenu={canReport ? (e) => { e.preventDefault(); setMenuOpen(true); } : undefined}
+                            className={cn(
                             "px-4 py-2.5 rounded-2xl text-sm font-medium break-all leading-relaxed relative",
                             isMe ? "bg-brand text-brand-fg rounded-tr-none" : "bg-white text-[rgba(0,0,0,0.87)] rounded-tl-none shadow-[0_1px_2px_rgba(0,0,0,0.05)]",
                             (chat.type === 'settlement' || isGolfBooking) && "bg-transparent p-0 shadow-none border-none",
@@ -345,6 +362,20 @@ const ChatMessageItem = memo(({
                         </div>
 
                         <div className={cn("flex flex-col mb-1", isMe ? "items-end" : "items-start")}>
+                            {canReport && (
+                                <UgcActionMenu
+                                    targetType="crew_chat"
+                                    targetId={chat.id}
+                                    crewId={crewId}
+                                    authorId={chat.senderId}
+                                    authorName={chat.sender?.name}
+                                    open={menuOpen}
+                                    onOpenChange={setMenuOpen}
+                                    align="left"
+                                    side="top"
+                                    className="p-2.5 -m-1 mb-0.5"
+                                />
+                            )}
                             {(isMe || isAdmin) && !isTemp && (
                                 <button
                                     onClick={() => {

@@ -22,7 +22,8 @@ import {
     hiqSettlementParticipants,
     hiqPolls,
     hiqPollOptions,
-    hiqPollVotes
+    hiqPollVotes,
+    hiqBlocks
 } from "../../shared/schema.js";
 import { eq, and, desc, asc, sql, or, gte, like, inArray, ne } from "drizzle-orm";
 import { notFound, conflict } from "../utils/errors.js";
@@ -38,6 +39,14 @@ import type {
     InsertHiqPoll,
     InsertHiqPollVote
 } from "../../shared/schema.js";
+
+// 차단 필터 — viewer 가 차단한 사람의 크루 글·댓글·사진·채팅을 숨긴다 (Apple 1.2 / Play UGC).
+// community.repo 와 같은 규칙: 목록·댓글·카운트 모든 조회에 횡단 적용한다. 한쪽 방향(차단한 사람만
+// 안 보임)이라 크루 운영진의 관리 화면이나 상대방 화면은 그대로다.
+const notBlockedBy = (viewerId: string | undefined, authorCol: any) =>
+    viewerId
+        ? sql`NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE ${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = ${authorCol})`
+        : sql`true`;
 
 export class CrewRepository {
     async createCrew(data: InsertHiqCrew): Promise<HiqCrew> {
@@ -692,7 +701,7 @@ export class CrewRepository {
             authorProfileImage: profiles.profileImageUrl,
             authorRole: hiqCrewMembers.role,
             likeCount: sql<number>`(SELECT count(*) FROM ${hiqCrewLikes} WHERE ${hiqCrewLikes.postId} = ${hiqCrewPosts.id})`,
-            commentCount: sql<number>`(SELECT count(*) FROM ${hiqCrewComments} WHERE ${hiqCrewComments.postId} = ${hiqCrewPosts.id})`,
+            commentCount: sql<number>`(SELECT count(*) FROM ${hiqCrewComments} WHERE ${hiqCrewComments.postId} = ${hiqCrewPosts.id} AND ${notBlockedBy(currentMemberId, hiqCrewComments.authorId)})`,
             isLiked: currentMemberId ? sql<boolean>`EXISTS(SELECT 1 FROM ${hiqCrewLikes} WHERE ${hiqCrewLikes.postId} = ${hiqCrewPosts.id} AND ${hiqCrewLikes.memberId} = ${currentMemberId})` : sql<boolean>`false`
         })
             .from(hiqCrewPosts)
@@ -702,7 +711,7 @@ export class CrewRepository {
                 eq(hiqCrewPosts.crewId, hiqCrewMembers.crewId),
                 eq(hiqCrewPosts.authorId, hiqCrewMembers.memberId)
             ))
-            .where(eq(hiqCrewPosts.crewId, crewId))
+            .where(and(eq(hiqCrewPosts.crewId, crewId), notBlockedBy(currentMemberId, hiqCrewPosts.authorId)))
             .orderBy(desc(hiqCrewPosts.isNotice), desc(hiqCrewPosts.createdAt));
 
         return results.map(r => ({
@@ -762,7 +771,7 @@ export class CrewRepository {
         });
     }
 
-    async getCrewPostComments(postId: string) {
+    async getCrewPostComments(postId: string, viewerId?: string) {
         const rows = await db.select({
             comment: hiqCrewComments,
             authorName: hiqMembers.name,
@@ -771,7 +780,7 @@ export class CrewRepository {
             .from(hiqCrewComments)
             .innerJoin(hiqMembers, eq(hiqCrewComments.authorId, hiqMembers.id))
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
-            .where(eq(hiqCrewComments.postId, postId))
+            .where(and(eq(hiqCrewComments.postId, postId), notBlockedBy(viewerId, hiqCrewComments.authorId)))
             .orderBy(hiqCrewComments.createdAt);
 
         return rows.map(row => ({
@@ -808,13 +817,13 @@ export class CrewRepository {
             uploaderName: hiqMembers.name,
             uploaderProfileImage: profiles.profileImageUrl,
             likeCount: sql<number>`(SELECT count(*) FROM ${hiqCrewPhotoLikes} WHERE ${hiqCrewPhotoLikes.photoId} = ${hiqCrewPhotos.id})`,
-            commentCount: sql<number>`(SELECT count(*) FROM ${hiqCrewPhotoComments} WHERE ${hiqCrewPhotoComments.photoId} = ${hiqCrewPhotos.id})`,
+            commentCount: sql<number>`(SELECT count(*) FROM ${hiqCrewPhotoComments} WHERE ${hiqCrewPhotoComments.photoId} = ${hiqCrewPhotos.id} AND ${notBlockedBy(currentMemberId, hiqCrewPhotoComments.authorId)})`,
             isLiked: currentMemberId ? sql<boolean>`EXISTS(SELECT 1 FROM ${hiqCrewPhotoLikes} WHERE ${hiqCrewPhotoLikes.photoId} = ${hiqCrewPhotos.id} AND ${hiqCrewPhotoLikes.memberId} = ${currentMemberId})` : sql<boolean>`false`
         })
             .from(hiqCrewPhotos)
             .innerJoin(hiqMembers, eq(hiqCrewPhotos.uploaderId, hiqMembers.id))
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
-            .where(eq(hiqCrewPhotos.crewId, crewId))
+            .where(and(eq(hiqCrewPhotos.crewId, crewId), notBlockedBy(currentMemberId, hiqCrewPhotos.uploaderId)))
             .orderBy(desc(hiqCrewPhotos.createdAt));
 
         return results.map(r => ({
@@ -853,7 +862,7 @@ export class CrewRepository {
         }
     }
 
-    async getCrewPhotoComments(photoId: string) {
+    async getCrewPhotoComments(photoId: string, viewerId?: string) {
         const rows = await db.select({
             comment: hiqCrewPhotoComments,
             authorName: hiqMembers.name,
@@ -862,7 +871,7 @@ export class CrewRepository {
             .from(hiqCrewPhotoComments)
             .innerJoin(hiqMembers, eq(hiqCrewPhotoComments.authorId, hiqMembers.id))
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
-            .where(eq(hiqCrewPhotoComments.photoId, photoId))
+            .where(and(eq(hiqCrewPhotoComments.photoId, photoId), notBlockedBy(viewerId, hiqCrewPhotoComments.authorId)))
             .orderBy(hiqCrewPhotoComments.createdAt);
 
         return rows.map(row => ({
@@ -915,7 +924,8 @@ export class CrewRepository {
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
             .where(and(
                 eq(hiqCrewChats.crewId, crewId),
-                joinedAt ? gte(hiqCrewChats.createdAt, joinedAt) : undefined
+                joinedAt ? gte(hiqCrewChats.createdAt, joinedAt) : undefined,
+                notBlockedBy(memberId, hiqCrewChats.senderId)
             ))
             .orderBy(desc(hiqCrewChats.createdAt))
             .limit(100);
@@ -944,6 +954,23 @@ export class CrewRepository {
     async createCrewChat(data: InsertHiqCrewChat) {
         const [chat] = await db.insert(hiqCrewChats).values(data).returning();
         return chat;
+    }
+
+    // blocker 가 blocked 를 차단했는가 — 차단한 사람에게 차단당한 사람의 댓글 알림이 가지 않게 한다.
+    async hasBlocked(blockerId: string, blockedId: string): Promise<boolean> {
+        const [row] = await db.select({ id: hiqBlocks.id }).from(hiqBlocks)
+            .where(and(eq(hiqBlocks.blockerId, blockerId), eq(hiqBlocks.blockedId, blockedId)))
+            .limit(1);
+        return !!row;
+    }
+    /**
+     * memberId 를 차단한 사람들 — 크루 전체에 보내는 알림(채팅·정모·투표·대회·정산)에서 뺀다.
+     * 받는 사람마다 hasBlocked 를 부르지 않고 한 번에 읽는다(큰 크루에서 쿼리 N번 방지).
+     */
+    async getBlockerIds(memberId: string): Promise<Set<string>> {
+        const rows = await db.select({ blockerId: hiqBlocks.blockerId }).from(hiqBlocks)
+            .where(eq(hiqBlocks.blockedId, memberId));
+        return new Set(rows.map((r) => r.blockerId));
     }
     async createPoll(data: InsertHiqPoll, options: string[]) {
         return await db.transaction(async (tx) => {

@@ -6,6 +6,9 @@ import { storage } from "../../storage/index.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { verifyGoogleIdToken, verifyAppleIdToken } from "../../lib/socialAuth.js";
+import { recordTermsAcceptance, isMemberSuspended, SUSPENDED_MESSAGE } from "../../middleware/terms.js";
+import { isTermsAccepted, ACCOUNT_SUSPENDED_CODE } from "../../../shared/terms.js";
+import { screenMemberProfile } from "../../utils/crewModeration.js";
 
 const router = Router();
 
@@ -79,6 +82,11 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
 
     if (!result.isNew && !result.requiresPassword && result.member) {
         clearAttempts(key);
+        // 운영자가 정지한 계정은 들여보내지 않는다(약관 4조 무관용·이용 정지, 검토 policy:R1). 쿠키를 주기 전에 막는다.
+        if (await isMemberSuspended(result.member.id)) {
+            res.clearCookie('hiq_user_id', { path: '/' });
+            return sendError(res, 403, SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
+        }
         res.cookie('hiq_user_id', result.member.id, {
             maxAge: 30 * 24 * 60 * 60 * 1000,
             httpOnly: true,
@@ -122,6 +130,10 @@ router.post("/social", asyncHandler(async (req: any, res: any) => {
 
     const result = await hiqService.socialLogin(provider, identity, typeof name === "string" ? name.slice(0, 40) : undefined, countryCode);
     clearAttempts(key);
+    if (await isMemberSuspended(result.member.id)) {
+        res.clearCookie('hiq_user_id', { path: '/' });
+        return sendError(res, 403, SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
+    }
 
     res.cookie('hiq_user_id', result.member.id, {
         maxAge: 30 * 24 * 60 * 60 * 1000,
@@ -137,12 +149,28 @@ router.post("/social", asyncHandler(async (req: any, res: any) => {
 
 // POST /register
 router.post("/register", asyncHandler(async (req: any, res: any) => {
+    // 가입 화면의 약관 동의(감사 S4) — 화면이 필수 동의를 받은 뒤 본 약관 버전을 함께 보낸다.
+    // zod 가입 스키마 밖의 값이라(스키마가 terms* 를 뺀다) 검증 전에 따로 읽는다.
+    // 버전이 없다고 가입을 막지는 않는다: 옛 화면의 가입이 통째로 깨지고, 동의가 없으면 첫 글쓰기에서 서버가 다시 받는다.
+    const termsVersion = req.body?.termsVersion;
     const validation = insertHiqMemberSchema.safeParse(req.body);
     if (!validation.success) {
         return sendError(res, 400, validation.error.errors[0].message);
     }
+    // 가입 이름도 랭킹·크루·커뮤니티에 그대로 뜨는 공개 문구다 — 프로필 수정(PATCH /me)과 같은 필터(검토 policy:R5).
+    const screenedName = screenMemberProfile({ name: validation.data.name });
+    if (!screenedName.ok) return sendError(res, 400, screenedName.reason);
 
     const result = await hiqService.register(validation.data);
+    // 번호로 이미 정지된 프로필에 매장 회원 행만 새로 붙이는 우회를 막는다 — 가입 경로도 로그인과 같이 확인한다.
+    if (await isMemberSuspended(result.member.id)) {
+        return sendError(res, 403, SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
+    }
+    if (isTermsAccepted(termsVersion)) {
+        // 기록이 실패해도 가입은 살린다 — 첫 글쓰기 때 동의 시트가 다시 받는다
+        await recordTermsAcceptance(result.member.id, termsVersion)
+            .catch((e: unknown) => console.error("[Register] terms record failed:", (e as Error)?.message));
+    }
     res.cookie('hiq_user_id', result.member.id, {
         maxAge: 30 * 24 * 60 * 60 * 1000,
         httpOnly: true,

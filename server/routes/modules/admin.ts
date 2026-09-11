@@ -117,9 +117,35 @@ router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     return sendSuccess(res, { sent, total: memberIds.length });
 }));
 
+// --- 신고 큐 (2026-09-11, 스토어 심사 SX1 — Apple 1.2 / Play UGC) ---
+// 예전 GET /reports 는 늘 빈 배열이었다(admin.repo 자리표시) — 신고가 들어와도 운영자가 볼 곳이 없었다.
+const REPORT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// GET /admin/reports?status=open|handled|all&offset=&limit= — 신고를 대상별로 묶은 큐(미처리 먼저).
 router.get("/reports", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
-    const reports = await storage.getReportedUsers();
-    return sendSuccess(res, reports);
+    const raw = String(req.query.status || "all");
+    const filter = raw === "open" || raw === "handled" ? raw : "all";
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+    const offset = Math.max(0, Math.floor(Number(req.query.offset) || 0));
+    return sendSuccess(res, await storage.admin.getReportQueue({ filter, limit, offset }));
+}));
+
+// POST /admin/reports/action { targetType, targetId, action }
+// 블라인드·해제·삭제·작성자 정지/해제·기각·이의제기 승인/반려. 할 수 있는 조치인지는 서버가 최신 상태로 다시 판단한다
+// (services/moderation). 처리한 운영자는 서명된 파트너 쿠키에서만 읽어 기록에 남긴다.
+router.post("/reports/action", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { isReportTargetType, isModerationAction } = await import("../../lib/reportQueue.js");
+    const { applyModerationAction } = await import("../../services/moderation.js");
+    const { targetType, targetId, action } = req.body || {};
+    if (!isReportTargetType(targetType)) return sendError(res, 400, "잘못된 신고 대상입니다");
+    if (typeof targetId !== "string" || !REPORT_UUID_RE.test(targetId)) return sendError(res, 400, "잘못된 신고 대상입니다");
+    if (!isModerationAction(action)) return sendError(res, 400, "잘못된 조치입니다");
+    const result = await applyModerationAction({
+        targetType, targetId, action,
+        adminProfileId: req.signedCookies?.hiq_partner_auth ?? null,
+    });
+    if (!result.ok) return sendError(res, result.status, result.message);
+    return sendSuccess(res, result);
 }));
 
 router.post("/users/:id/ban", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {

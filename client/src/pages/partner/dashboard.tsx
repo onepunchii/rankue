@@ -16,6 +16,7 @@ import * as XLSX from 'xlsx';
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import html2canvas from "html2canvas";
 import { LucideLock as LockIcon } from "@/lib/icons";
+import { isNativeApp } from "@/lib/nativeBridge";
 
 type MemberWithStats = {
     id: string;
@@ -38,6 +39,9 @@ type AdminStats = {
 };
 
 export default function PartnerDashboard() {
+    // 앱(iOS·안드로이드) 안에서는 유료 구독 권유·가격·잠긴 프리미엄 기능을 보이지 않는다 — 스토어 결제 밖의
+    // 디지털 구독 판매·안내는 Apple 3.1.1 · Google Play 결제 정책 위반이다(감사 S9). 매장 관리 기능은 그대로.
+    const native = isNativeApp();
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const qrRef = useRef<HTMLDivElement>(null);
@@ -297,7 +301,8 @@ export default function PartnerDashboard() {
                     <span className="text-[12px] text-black/55 tabular-nums">전체 {stats?.totalMembers || 0}명</span>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons — 앱 안에서 BASIC 매장에는 숨긴다(잠금 표시·'프리미엄 전용' 안내가 곧 구독 권유가 된다) */}
+                {(!native || store.subscriptionTier !== "BASIC") && (
                 <div className="grid grid-cols-2 gap-3 mb-6">
                     <Button
                         onClick={handleDownloadExcel}
@@ -324,6 +329,7 @@ export default function PartnerDashboard() {
                         <span className={`text-sm font-bold ${store.subscriptionTier === "BASIC" ? 'text-black/40' : ''}`}>단체 문자</span>
                     </Button>
                 </div>
+                )}
 
                 {/* Member List */}
                 <div className="bg-white rounded-[1.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)] overflow-hidden">
@@ -469,7 +475,8 @@ export default function PartnerDashboard() {
                 </div>
             </div>
 
-            {/* Premium Gating Banner */}
+            {/* Premium Gating Banner — 웹에서만. 앱 안에서는 구독 권유·가격을 보이지 않는다(감사 S9) */}
+            {!native && (
             <div className="px-6 mb-8">
                 <div className="rounded-card bg-[var(--house-green)] p-8 relative overflow-hidden shadow-[0_8px_30px_rgba(30,57,50,0.25)]">
                     {/* Warm Glow Accents */}
@@ -522,6 +529,7 @@ export default function PartnerDashboard() {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Hidden Poster Element for Capturing */}
             {store && (

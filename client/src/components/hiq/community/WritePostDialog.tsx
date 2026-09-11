@@ -6,6 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { uploadImage } from "@/lib/imageUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
+import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { GameResultCard } from "./GameResultCard";
 import { BOARD_KEYS, type CommunityBoard, type CommunityGameCard } from "./types";
 
@@ -28,6 +29,7 @@ interface MyHistoryItem extends CommunityGameCard {
 // - 우리 매장(store)·레슨(lesson): 최근 30일 경기 기록 매장을 소속 근거로 선택
 export const WritePostDialog = ({ open, onOpenChange, board: initialBoard }: WritePostDialogProps) => {
     const { t, locale } = useT();
+    const { gate } = useTermsGate();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -296,7 +298,7 @@ export const WritePostDialog = ({ open, onOpenChange, board: initialBoard }: Wri
 
                     <button
                         disabled={!canSubmit}
-                        onClick={() => submitMutation.mutate()}
+                        onClick={() => gate(() => submitMutation.mutate())} // 첫 글이면 약관 동의부터(감사 S4)
                         className="w-full h-12 rounded-full bg-brand text-white text-[15px] font-bold disabled:opacity-40 active:scale-[0.98] transition-transform"
                     >
                         {submitMutation.isPending ? t("community.submitting") : t("community.submit")}

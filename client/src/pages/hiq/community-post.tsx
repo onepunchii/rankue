@@ -14,6 +14,7 @@ import { useT } from "@/lib/i18n";
 import { CommunityPostCard } from "@/components/hiq/community/CommunityPostCard";
 import { SkillBadge } from "@/components/hiq/community/SkillBadge";
 import { ReportDialog } from "@/components/hiq/community/ReportDialog";
+import { useTermsGate } from "@/components/hiq/TermsConsent";
 import type { CommunityComment, CommunityPost } from "@/components/hiq/community/types";
 import type { HiqMember } from "@shared/schema";
 import { ShareButton } from "@/components/hiq/ShareButton";
@@ -25,6 +26,8 @@ interface PostDetail extends CommunityPost {
 // 커뮤니티 글 상세 — 공개 댓글만. 댓글에도 신고·차단이 반드시 붙는다 (모든 UGC 표면).
 export default function HiqCommunityPost() {
     const { t } = useT();
+    // 첫 댓글이면 약관 동의부터(감사 S4) — 동의하면 쓴 댓글을 그대로 보낸다
+    const { gate } = useTermsGate();
     const [, setLocation] = useLocation();
     const [, params] = useRoute("/community/:id");
     const postId = params?.id;
@@ -283,7 +286,7 @@ export default function HiqCommunityPost() {
                                 onChange={(e) => setComment(e.target.value)}
                                 onKeyDown={(e) => {
                                     // 한글 IME 조합 중 Enter는 무시 — isComposing 체크 없이는 마지막 글자가 잘린 채 제출된다
-                                    if (e.key === "Enter" && !e.nativeEvent.isComposing && comment.trim() && !commentMutation.isPending) commentMutation.mutate();
+                                    if (e.key === "Enter" && !e.nativeEvent.isComposing && comment.trim() && !commentMutation.isPending) gate(() => commentMutation.mutate());
                                     if (e.key === "Escape" && replyTo) setReplyTo(null);
                                 }}
                                 maxLength={1000}
@@ -292,7 +295,7 @@ export default function HiqCommunityPost() {
                             />
                             <button
                                 disabled={!comment.trim() || commentMutation.isPending}
-                                onClick={() => commentMutation.mutate()}
+                                onClick={() => gate(() => commentMutation.mutate())}
                                 className="w-10 h-10 shrink-0 rounded-full bg-brand text-white flex items-center justify-center disabled:opacity-35 active:scale-95 transition-all"
                                 aria-label={t("community.commentSubmit")}
                             >

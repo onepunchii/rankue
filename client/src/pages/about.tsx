@@ -18,6 +18,11 @@ const ABOUT_LOCALES: { code: string; label: string }[] = [
   { code: "zh", label: "中文" },
 ];
 const ABOUT_CODES = new Set(ABOUT_LOCALES.map((l) => l.code));
+// 하단 '이용약관' 링크 글자 — 소개 문서(aboutContent)는 7개 언어지만 약관은 한국어·영어본뿐이라 글자만 여기 둔다
+const TERMS_LABEL: Record<string, string> = {
+  ko: "이용약관", en: "Terms of Use", vi: "Điều khoản sử dụng", tr: "Kullanım Koşulları",
+  es: "Términos de uso", ja: "利用規約", zh: "使用條款",
+};
 
 export default function About() {
   const { locale, setLocale } = useT();
@@ -149,6 +154,8 @@ export default function About() {
           <a href="/support" className="hover:text-black/70">{c.support}</a>
           <span aria-hidden>·</span>
           <a href="/privacy" className="hover:text-black/70">{c.privacy}</a>
+          <span aria-hidden>·</span>
+          <a href="/terms" className="hover:text-black/70">{TERMS_LABEL[view] ?? TERMS_LABEL.en}</a>
         </nav>
       </div>
     </div>

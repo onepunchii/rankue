@@ -55,6 +55,7 @@ import AdminDashboard from "@/pages/admin/dashboard";
 import Privacy from "@/pages/privacy";
 import AccountDelete from "@/pages/account-delete";
 import Support from "@/pages/support";
+import Terms from "@/pages/terms";
 import About from "@/pages/about";
 import Stores from "@/pages/stores";
 import StoreListing from "@/pages/store-listing";
@@ -66,6 +67,7 @@ import SharedResult from "@/pages/hiq/shared-result";
 import { StoreProvider } from "./contexts/StoreContext";
 import { I18nProvider } from "@/lib/i18n";
 import { SportProvider } from "./contexts/SportContext";
+import { TermsConsentProvider } from "@/components/hiq/TermsConsent";
 import { DesktopFrame } from "@/components/hiq/DesktopFrame";
 
 /**
@@ -218,6 +220,8 @@ function AppRoutes() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/account-delete" component={AccountDelete} />
       <Route path="/support" component={Support} />
+      {/* 이용약관(EULA) — 공개 문서. 가입·동의 시트·설정·고객지원에서 링크한다(감사 S4) */}
+      <Route path="/terms" component={Terms} />
       <Route path="/about" component={About} />
       <Route path="/stores" component={Stores} />
       {/* register 는 :code 와일드카드보다 먼저 — 아니면 "register"가 매장 코드로 해석돼 404 */}
@@ -311,7 +315,10 @@ function App() {
       <I18nProvider>
         <StoreProvider>
           <SportProvider>
-            <AppRoutes />
+            {/* 이용약관 동의 시트 — 첫 글쓰기·첫 소셜 로그인 때 뜬다(감사 S4). 화면 어디서나 useTermsGate 로 부른다 */}
+            <TermsConsentProvider>
+              <AppRoutes />
+            </TermsConsentProvider>
             <Toaster />
             {/* 네이티브 앱 전용 안내(업데이트·알림 권한 사전 설명). 웹에선 아무것도 그리지 않는다. */}
             <NativePrompts />

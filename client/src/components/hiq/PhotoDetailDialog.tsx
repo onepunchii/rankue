@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { LucideHeart, LucideMessageSquare, LucideUser, LucideSend } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { UgcActionMenu } from "./community/UgcActionMenu";
+import { useTermsGate } from "./TermsConsent";
 
 interface Comment {
     id: string;
@@ -37,6 +39,7 @@ interface PhotoDetailDialogProps {
 
 export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentMemberId }: PhotoDetailDialogProps) {
     const { t } = useT();
+    const { gate } = useTermsGate();
     const [commentContent, setCommentContent] = useState("");
     const { toast } = useToast();
 
@@ -131,7 +134,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
 
     const handleSubmitComment = () => {
         if (!commentContent.trim()) return;
-        commentMutation.mutate(commentContent);
+        gate(() => commentMutation.mutate(commentContent)); // 첫 댓글이면 약관 동의부터(감사 S4)
     };
 
     if (!photo) return null;
@@ -155,6 +158,19 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                             {formatDistanceToNow(new Date(photo.createdAt), { addSuffix: true, locale: ko })}
                         </p>
                     </div>
+                    {/* 남의 사진 — 신고·차단. 차단하면 사진이 목록에서 빠지므로 창도 닫는다 */}
+                    {currentMemberId && photo.uploaderId !== currentMemberId && (
+                        <UgcActionMenu
+                            targetType="crew_photo"
+                            targetId={photo.id}
+                            crewId={photo.crewId}
+                            authorId={photo.uploaderId}
+                            authorName={photo.author?.name}
+                            onBlocked={() => onOpenChange(false)}
+                            className="p-2"
+                            iconClassName="w-[18px] h-[18px]"
+                        />
+                    )}
                     {(isAdmin || photo.uploaderId === currentMemberId) && (
                         <button
                             onClick={() => {
@@ -233,6 +249,18 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                                             </div>
                                             <p className="text-xs text-black/70 leading-relaxed font-medium">{comment.content}</p>
                                         </div>
+                                        {currentMemberId && comment.authorId !== currentMemberId && (
+                                            <UgcActionMenu
+                                                targetType="crew_photo_comment"
+                                                targetId={comment.id}
+                                                crewId={photo.crewId}
+                                                authorId={comment.authorId}
+                                                authorName={comment.author?.name}
+                                                wrapperClassName="self-start"
+                                                className="p-1"
+                                                iconClassName="w-3.5 h-3.5"
+                                            />
+                                        )}
                                         {(isAdmin || comment.authorId === currentMemberId) && (
                                             <button
                                                 onClick={() => {

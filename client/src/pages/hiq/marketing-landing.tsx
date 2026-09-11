@@ -419,6 +419,8 @@ export default function MarketingLanding({ onStart }: { onStart: () => void }) {
                     <a href="/support" className="hover:text-ink-2">고객지원</a>
                     <span aria-hidden>·</span>
                     <a href="/privacy" className="hover:text-ink-2">개인정보처리방침</a>
+                    <span aria-hidden>·</span>
+                    <a href="/terms" className="hover:text-ink-2">이용약관</a>
                 </nav>
             </div>
         </div>

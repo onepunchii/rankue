@@ -56,6 +56,19 @@ export default function Support() {
             </p>
           </div>
           <div>
+            <p className="font-bold">Q. 불쾌한 글이나 사용자를 신고·차단하려면?</p>
+            <p className="mt-1">
+              글·댓글·사진·채팅이나 회원 프로필의 <b>⋯ 메뉴</b>에서 <b>신고</b> 또는{" "}
+              <b>차단하기</b>를 누르세요. 신고는 운영팀이 24시간 안에 확인해 조치합니다.
+              차단한 사용자는 <b>설정 → 차단한 사용자</b>에서 풀 수 있습니다. 금지되는
+              콘텐츠와 제재 기준은{" "}
+              <a className="font-bold underline" href="/terms">
+                이용약관
+              </a>
+              에 있습니다.
+            </p>
+          </div>
+          <div>
             <p className="font-bold">Q. 계정을 삭제하고 싶어요.</p>
             <p className="mt-1">
               앱의 <b>전체 메뉴 → 계정 삭제</b>에서 직접 삭제할 수 있습니다. 자세한
@@ -73,6 +86,11 @@ export default function Support() {
           <li>
             <a className="underline" href="/about">
               랭큐 소개 (About)
+            </a>
+          </li>
+          <li>
+            <a className="underline" href="/terms">
+              이용약관
             </a>
           </li>
           <li>

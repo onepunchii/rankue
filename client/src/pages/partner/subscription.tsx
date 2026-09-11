@@ -5,20 +5,37 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LucideShieldCheck, LucideCreditCard, LucideCheckCircle2, LucideLock, LucideArrowLeft } from "@/lib/icons";
 import * as PortOne from "@portone/browser-sdk/v2";
+import { isNativeApp } from "@/lib/nativeBridge";
+
+// PortOne 결제 키 — 예전엔 데모 값(문서 예시 storeId + 가짜 channelKey)이 하드코딩돼 있어 결제창이 떠도 실패했다
+// (심사 2.1 '미완성 기능' 지적 소지, 감사 S9). 배포 환경변수로만 받고, 없으면 결제 버튼을 잠근다.
+// 서버도 PORTONE_V2_SECRET 이 없으면 구독을 받지 않는다(server/routes/modules/partner.ts).
+const PORTONE_STORE_ID = import.meta.env.VITE_PORTONE_STORE_ID as string | undefined;
+const PORTONE_CHANNEL_KEY = import.meta.env.VITE_PORTONE_CHANNEL_KEY as string | undefined;
+const PAYMENT_READY = !!(PORTONE_STORE_ID && PORTONE_CHANNEL_KEY);
 
 export default function PartnerSubscription() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // 앱(iOS·안드로이드) 안에서는 이 화면을 열지 않는다 — 앱 기능을 여는 디지털 구독을 스토어 결제 밖에서 팔면
+    // Apple 3.1.1 · Google Play 결제 정책 위반이다(감사 S9). 웹 결제로 안내하는 문구도 두지 않는다(anti-steering).
+    // 매장 관리 화면(대시보드)은 그대로 쓴다.
+    const native = isNativeApp();
+    useEffect(() => {
+        if (native) setLocation("/partner/dashboard", { replace: true });
+    }, [native, setLocation]);
+
     // Payment Handler
     const handlePayment = async () => {
+        if (!PAYMENT_READY) return;
         setIsSubmitting(true);
         try {
             // 1. Issue Billing Key (Card Registration)
             const issueResponse = await PortOne.requestIssueBillingKey({
-                storeId: "store-4ff4af41-85e3-4559-8eb8-0d08a2c6ceec", // Demo Store ID (Replace with Env Var in prod)
-                channelKey: "channel-key-3b3e2b2b-0b2b-4b2b-8b2b-5b2b2b2b2b2b", // Demo Channel Key
+                storeId: PORTONE_STORE_ID!,
+                channelKey: PORTONE_CHANNEL_KEY!,
                 billingKeyMethod: "CARD",
             });
 
@@ -58,6 +75,8 @@ export default function PartnerSubscription() {
             setIsSubmitting(false);
         }
     };
+
+    if (native) return null;
 
     return (
         <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -117,7 +136,7 @@ export default function PartnerSubscription() {
 
                     <Button
                         onClick={handlePayment}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || !PAYMENT_READY}
                         className="w-full h-16 bg-brand hover:bg-brand-strong text-white text-lg font-bold rounded-full transition-all shadow-[0_1px_2px_rgba(0,0,0,0.06)] active:scale-[0.98] relative overflow-hidden"
                     >
                         {isSubmitting ? (
@@ -125,6 +144,8 @@ export default function PartnerSubscription() {
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 결제 처리 중...
                             </span>
+                        ) : !PAYMENT_READY ? (
+                            <span className="flex items-center gap-2">결제 준비 중이에요</span>
                         ) : (
                             <span className="flex items-center gap-2">
                                 <LucideLock className="w-5 h-5" />

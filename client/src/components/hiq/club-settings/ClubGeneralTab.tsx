@@ -11,6 +11,7 @@ import { CrewData } from '@/types/crew';
 import { useT } from '@/lib/i18n';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { withoutBettingTags } from '@shared/crewTags';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -47,7 +48,8 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
         meetingTime: crew?.meetingTime || '',
         joinType: crew?.joinType || 'auto', // 가입 방식 — 생성 후에도 변경 가능 (서버 PATCH 화이트리스트에 포함)
         gameType: crew?.gameType || 'any',
-        tags: crew?.tags || [],
+        // 이미 저장된 내기 권유 태그(#내기환영 등)는 폼에 싣지 않는다 — 실으면 선택된 채 다시 저장돼 서버 필터가 거부한다(감사 S5)
+        tags: withoutBettingTags(crew?.tags),
         baseListingCode: (crew as any)?.baseListingCode ?? null,
         baseStoreId: (crew as any)?.baseStoreId ?? null,
     });
@@ -79,7 +81,7 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
             meetingTime: crew?.meetingTime || '',
             joinType: crew?.joinType || 'auto',
             gameType: crew?.gameType || 'any',
-            tags: crew?.tags || [],
+            tags: withoutBettingTags(crew?.tags),
             baseListingCode: (crew as any)?.baseListingCode ?? null,
             baseStoreId: (crew as any)?.baseStoreId ?? null,
         });
@@ -337,7 +339,8 @@ export function ClubGeneralTab({ crew, isLeader, canEdit, onUpdate, onDelete, is
                     <div className="flex flex-wrap gap-1.5">
                         {(crew?.sportCategory === "GOLF"
                             ? ["#매너골프", "#싱글목표", "#명랑골프", "#라운딩", "#스크린", "#초보환영", "#고수환영", "#2030", "#4050", "#주말골퍼"]
-                            : ["#빡겜", "#즐겜", "#내기환영", "#매너필수", "#음주가무", "#금연", "#초보환영", "#고수환영", "#2030", "#4050"]
+                            // "#내기환영" 은 뺐다 — 앱이 금전 내기를 권하는 모양이 된다(감사 S5, shared/crewTags.ts)
+                            : ["#빡겜", "#즐겜", "#매너필수", "#금연", "#초보환영", "#고수환영", "#2030", "#4050"]
                         ).map(tag => {
                             const selected = (formData.tags as string[]).includes(tag);
                             return (

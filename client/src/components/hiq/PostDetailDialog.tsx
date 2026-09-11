@@ -13,6 +13,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucideSend, LucideTrash2 } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
+import { UgcActionMenu } from "./community/UgcActionMenu";
+import { useTermsGate } from "./TermsConsent";
 
 interface Comment {
     id: string;
@@ -35,6 +37,7 @@ interface PostDetailDialogProps {
 
 export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMemberId }: PostDetailDialogProps) {
     const [commentContent, setCommentContent] = useState("");
+    const { gate } = useTermsGate();
     const { toast } = useToast();
     const { t } = useT();
 
@@ -92,7 +95,7 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
 
     const handleSubmitComment = () => {
         if (!commentContent.trim()) return;
-        commentMutation.mutate(commentContent);
+        gate(() => commentMutation.mutate(commentContent)); // 첫 댓글이면 약관 동의부터(감사 S4)
     };
 
     return (
@@ -116,6 +119,18 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                 )}
                             </div>
                             <span className="text-[15px] font-bold text-ink-1">{post?.author?.name}</span>
+                            {post?.id && currentMemberId && post.authorId !== currentMemberId && (
+                                <UgcActionMenu
+                                    targetType="crew_post"
+                                    targetId={post.id}
+                                    crewId={post.crewId}
+                                    authorId={post.authorId}
+                                    authorName={post.author?.name}
+                                    onBlocked={() => onOpenChange(false)}
+                                    wrapperClassName="ml-auto -mr-2"
+                                    className="min-w-[44px] min-h-[44px]"
+                                />
+                            )}
                         </div>
                         <p className="text-[15px] text-black/70 leading-relaxed whitespace-pre-wrap font-medium">{post?.content}</p>
 
@@ -171,6 +186,17 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                             </div>
                                             <p className="text-[13px] text-black/70 leading-relaxed font-medium">{comment.content}</p>
                                         </div>
+                                        {currentMemberId && comment.authorId !== currentMemberId && (
+                                            <UgcActionMenu
+                                                targetType="crew_comment"
+                                                targetId={comment.id}
+                                                crewId={post?.crewId}
+                                                authorId={comment.authorId}
+                                                authorName={comment.author?.name}
+                                                wrapperClassName="self-start -mr-2"
+                                                className="min-w-[44px] min-h-[44px]"
+                                            />
+                                        )}
                                         {(isAdmin || comment.authorId === currentMemberId) && (
                                             <button
                                                 onClick={() => {

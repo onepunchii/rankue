@@ -10,6 +10,9 @@ import { db } from "../../db.js";
 import { hiqMembers, hiqFriendships } from "../../../shared/schema.js";
 import { eq, and, or } from "drizzle-orm";
 import { notificationService } from "../../services/notificationService.js";
+import { recordTermsAcceptance, requireTermsAccepted } from "../../middleware/terms.js";
+import { screenMemberProfile } from "../../utils/crewModeration.js";
+import { isTermsAccepted } from "../../../shared/terms.js";
 
 const router = Router();
 
@@ -120,11 +123,24 @@ router.get("/handle-check", asyncHandler(async (req: any, res: any) => {
 // (POST /me/recalculate-avg, storage._updateUserAverage). 등록 경로도 같은 이유로 막아 뒀다
 // — hiqService.register() 의 skill/rating 필드 삭제 참고.
 // 클라이언트가 이 필드를 보내더라도 조용히 버려지는 게 정상이다.
-router.patch("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+// 이름·소개·프로필 사진은 랭킹·크루·커뮤니티에서 누구에게나 보이는 UGC 다(검토 policy:R5). 이 셋을 바꿀 때만
+// 약관 동의·계정 정지 문지기를 건다 — 성별·출생연도·국가·뱃지 토글까지 막으면 약관 시트가 없는 옛 화면이 설정에서 멈춘다.
+const PROFILE_UGC_KEYS = ["name", "introduction", "profileImageUrl"] as const;
+const gateProfileUgc = (req: AuthRequest, res: any, next: any) =>
+    PROFILE_UGC_KEYS.some((k) => req.body?.[k] !== undefined && req.body?.[k] !== null)
+        ? requireTermsAccepted(req, res, next)
+        : next();
+
+router.patch("/me", requireAuth, gateProfileUgc, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
     if (!member) return sendError(res, 404, "회원 정보 없음");
 
-    const { profileImageUrl, name, introduction } = req.body;
+    const { profileImageUrl, name: rawName, introduction: rawIntro } = req.body;
+    // 이름·소개 필터 — 욕설·금전 내기·거래는 거부, 이름의 연락처는 거부, 소개의 연락처는 가린다(crewModeration).
+    const screenedProfile = screenMemberProfile({ name: rawName, introduction: rawIntro });
+    if (!screenedProfile.ok) return sendError(res, 400, screenedProfile.reason);
+    const name = typeof rawName === "string" ? screenedProfile.value.name : rawName;
+    const introduction = typeof rawIntro === "string" ? screenedProfile.value.introduction : rawIntro;
 
     if (member.profileId) {
         await storage.updateProfile(member.profileId, {
@@ -164,6 +180,19 @@ router.patch("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any)
     }
 
     return sendSuccess(res, { success: true });
+}));
+
+// POST /me/terms — 이용약관 동의 기록(2026-09-11, App Store 1.2 · Play UGC, 감사 S4).
+// 화면이 자기가 보여 준 약관 버전을 보낸다. 서버가 아는 유효 범위(shared/terms.ts) 밖이면
+// 옛 화면이 옛 약관을 보여 준 것이라 기록하지 않고 새로고침을 안내한다.
+// 기존 회원은 첫 글쓰기 직전, 소셜 신규 가입자는 로그인 직후 동의 시트에서 이 API 를 부른다.
+router.post("/me/terms", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const version = req.body?.version;
+    if (!isTermsAccepted(version)) {
+        return sendError(res, 400, "약관이 새로 바뀌었어요. 화면을 새로고침한 뒤 다시 동의해 주세요", "TERMS_OUTDATED");
+    }
+    await recordTermsAcceptance(req.userId!, version);
+    return sendSuccess(res, { termsVersion: version });
 }));
 
 // POST /me/recalculate-avg - Manually recalculate averages

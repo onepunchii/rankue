@@ -8,6 +8,8 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { deleteBlobs } from "../../utils/blob.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
+// 약관 미동의 회원의 UGC 작성 거절(TERMS_REQUIRED) — 작성 라우트에만 건다(middleware/terms.ts)
+import { requireTermsAccepted } from "../../middleware/terms.js";
 
 const router = Router();
 
@@ -54,7 +56,7 @@ router.get("/posts/:id", optionalAuth, asyncHandler(async (req: AuthRequest, res
 }));
 
 // POST /posts — 글 작성. 서버측 금칙어 필터 + 연락처 마스킹 + 결과카드 서버 스냅샷.
-router.post("/posts", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
+router.post("/posts", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: Response) => {
     const { board, title, content, images, historyId, tags, regionName, storeId, language } = req.body || {};
 
     if (!BOARDS.includes(board)) return sendError(res, 400, "잘못된 게시판입니다");
@@ -137,7 +139,7 @@ router.delete("/posts/:id", requireAuth, asyncHandler(async (req: AuthRequest, r
 
 // --- 댓글 ---
 
-router.post("/posts/:id/comments", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
+router.post("/posts/:id/comments", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: Response) => {
     if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "게시글을 찾을 수 없습니다");
     const content = (req.body?.content || "").trim();
     if (!content) return sendError(res, 400, "내용을 입력해주세요");
@@ -183,8 +185,12 @@ router.post("/posts/:id/comments", requireAuth, asyncHandler(async (req: AuthReq
     if (post.authorId !== req.userId && post.authorId !== replyToAuthorId) targets.push({ memberId: post.authorId, title: "💬 새 댓글" });
     if (targets.length) {
         try {
+            // 받는 사람이 댓글 쓴 사람을 차단했으면 알리지 않는다 — 크루 댓글 알림과 같은 규칙(검토 code:R5).
+            // 목록에서 가려도 푸시로 이름과 원문이 오면 차단이 반쪽이 된다.
+            const blockers = await storage.crews.getBlockerIds(req.userId!);
+            const liveTargets = targets.filter((tg) => !blockers.has(tg.memberId));
             const commenter = await storage.getMemberById(req.userId!);
-            await Promise.allSettled(targets.map((tg) => notificationService.sendAndSaveNotification({
+            await Promise.allSettled(liveTargets.map((tg) => notificationService.sendAndSaveNotification({
                 memberId: tg.memberId,
                 title: tg.title,
                 body: `${commenter?.name || "누군가"}님: ${comment.content.slice(0, 40)}`,
@@ -216,16 +222,43 @@ router.post("/posts/:id/like", requireAuth, asyncHandler(async (req: AuthRequest
     return sendSuccess(res, result);
 }));
 
-// --- 신고 (커뮤니티 + 크루 콘텐츠 소급) ---
+// --- 신고 (커뮤니티·회원·골프 매물) ---
 
-const REPORT_TARGETS = ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_chat", "member", "golf_booking"];
+// 크루 콘텐츠(crew_*)는 크루 신고 주소(POST /crews/:id/reports)로만 받는다 — 거기서 대상이 그 크루 것인지,
+// 신고자가 크루원인지 확인한다. 여기서도 받으면 그 확인을 우회한다(검토 code:R6). 화면(ReportDialog)은 이미 crew_* 를 크루 주소로 보낸다.
+const REPORT_TARGETS = ["community_post", "community_comment", "member", "golf_booking"];
 const REPORT_REASONS = ["abuse", "gambling", "trade", "privacy", "spam", "other"];
+
+// 신고 대상이 실제로 있는지 확인하고 작성자를 돌려준다. null = 없는 대상.
+// 없는 UUID 를 받아 두면 큐가 빈 카드로 차고, 운영자 알림 상한(시간당 대상 수)을 가짜 신고로 먼저 채워
+// 진짜 신고의 알림을 막을 수 있었다(검토 code:R6). 작성자 id 가 없는 골프 매물은 "" 로 존재만 알린다.
+async function reportTargetAuthor(targetType: string, id: string): Promise<string | null> {
+    switch (targetType) {
+        case "community_post":
+            return (await storage.community.getPostRaw(id))?.authorId ?? null;
+        case "community_comment": {
+            const c = await storage.community.getCommentRaw(id);
+            return c && !c.deletedAt ? c.authorId : null;
+        }
+        case "member":
+            return (await storage.getMemberById(id))?.id ?? null;
+        case "golf_booking": {
+            const b = await storage.getGolfBooking(id);
+            return b ? (b.ownerId ?? "") : null;
+        }
+        default:
+            return null;
+    }
+}
 
 router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
     const { targetType, targetId, reason, detail } = req.body || {};
     if (!REPORT_TARGETS.includes(targetType)) return sendError(res, 400, "잘못된 신고 대상입니다");
     if (typeof targetId !== "string" || !UUID_RE.test(targetId)) return sendError(res, 400, "신고 대상이 없습니다");
     if (!REPORT_REASONS.includes(reason)) return sendError(res, 400, "신고 사유를 선택해주세요");
+    const authorId = await reportTargetAuthor(targetType, targetId);
+    if (authorId === null) return sendError(res, 404, "신고할 대상을 찾을 수 없습니다");
+    if (authorId === req.userId) return sendError(res, 400, "본인 콘텐츠는 신고할 수 없습니다");
 
     const result = await storage.community.report({
         targetType, targetId,
@@ -233,6 +266,14 @@ router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: 
         reason,
         detail: detail ? String(detail).slice(0, 500) : undefined,
     });
+
+    // 운영자에게 알림 — 사람이 24시간 안에 보도록(Apple 1.2 "timely", 스토어 심사 SX1).
+    // 같은 대상은 1시간에 한 번, 전체는 시간당 상한까지만(도배 신고에 운영자 폰이 울려 대지 않게, server/lib/reportQueue).
+    // 알림 실패가 신고 접수를 실패시키면 안 된다. 서버리스라 await(fire-and-forget 은 유실된다).
+    try {
+        const { notifyAdminsOfReport } = await import("../../services/moderation.js");
+        await notifyAdminsOfReport({ targetType, targetId, reason, reporterId: req.userId! });
+    } catch (e) { console.error("[Notify] 신고 운영자 알림:", e); }
 
     // 자동 블라인드 시 작성자에게 즉시 알림 + 이의제기 안내 — 담합·보복 신고 방어 세트
     if (result.autoBlinded && result.authorId) {

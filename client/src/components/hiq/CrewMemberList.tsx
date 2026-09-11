@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { getTier } from "@/lib/hiqUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { MemberActivityStats } from "@/components/hiq/member/MemberActivityStats";
+import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
 import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 
@@ -222,6 +223,21 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                         <div className="flex-1 min-h-0 overflow-y-auto">
                             <div className="relative pt-12 pb-8 px-6 flex flex-col items-center bg-white">
                                 <div className="absolute top-3 w-12 h-1 bg-black/10 rounded-full left-1/2 -translate-x-1/2" />
+                                {/* 회원 신고·차단 — 소개글·프로필 사진도 UGC 다 (Apple 1.2). 오른쪽 위는 시트 닫기 자리라 왼쪽에 둔다 */}
+                                {!isMe && currentMemberId && (
+                                    <div className="absolute top-3 left-3">
+                                        <UgcActionMenu
+                                            targetType="member"
+                                            targetId={selectedMember.member.id}
+                                            authorId={selectedMember.member.id}
+                                            authorName={selectedMember.member.nickname || selectedMember.member.name}
+                                            onBlocked={() => setIsSheetOpen(false)}
+                                            align="left"
+                                            className="w-11 h-11"
+                                            iconClassName="w-5 h-5"
+                                        />
+                                    </div>
+                                )}
                                 <Avatar className={cn(
                                     "w-24 h-24 mb-4 border-4",
                                     selectedMember.member.gender === 'female' ? "border-pink-500/30" : "border-black/10"

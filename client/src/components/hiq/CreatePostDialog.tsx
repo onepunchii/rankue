@@ -13,6 +13,7 @@ import { LucideImage, LucideX, LucideCamera } from "@/lib/icons";
 import { uploadImage } from "@/lib/imageUtils";
 import { useRef } from "react";
 import { useT } from "@/lib/i18n";
+import { useTermsGate } from "@/components/hiq/TermsConsent";
 
 import { CrewData } from "@/types/crew";
 
@@ -34,6 +35,7 @@ interface CreatePostDialogProps {
 
 export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: CreatePostDialogProps) {
     const { t } = useT();
+    const { gate } = useTermsGate();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [category, setCategory] = useState("자유글");
@@ -131,13 +133,14 @@ export function CreatePostDialog({ open, onOpenChange, crewId, isAdmin, crew }: 
             return;
         }
 
-        createPostMutation.mutate({
+        // 첫 글이면 약관 동의부터(감사 S4) — 동의하면 그대로 올린다
+        gate(() => createPostMutation.mutate({
             title,
             content: finalContent,
             category,
             isNotice: category === "공지사항" ? true : isNotice,
             images: images.length > 0 ? images : null
-        });
+        }));
     };
 
     return (

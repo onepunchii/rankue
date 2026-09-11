@@ -1,6 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import OnlineGameView from "./OnlineGameView";
+import ModerationView from "./ModerationView";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -54,13 +55,6 @@ type Notice = {
     content: string;
     target: "all" | "owners";
     createdAt: string;
-};
-
-type ReportedUser = {
-    id: string;
-    nickname: string;
-    reportCount: number;
-    reason: string;
 };
 
 type AdminCrew = {
@@ -155,7 +149,9 @@ export default function AdminDashboard() {
     const queryClient = useQueryClient();
     // 모바일 메뉴 서랍(열림 상태를 들고 있어야 메뉴를 고를 때 닫을 수 있다)
     const [menuOpen, setMenuOpen] = useState(false);
-    const [tab, setTab] = useState<"dashboard" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game">("dashboard");
+    const [tab, setTab] = useState<"dashboard" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game">(() =>
+        // 신고 알림(푸시)을 누르면 ?tab=moderation 으로 온다 — 바로 신고/제재 센터를 연다(2026-09-11).
+        new URLSearchParams(window.location.search).get("tab") === "moderation" ? "moderation" : "dashboard");
     const [memberSearch, setMemberSearch] = useState("");
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
@@ -165,7 +161,6 @@ export default function AdminDashboard() {
     const { data: stores = [] } = useQuery<AdminStore[]>({ queryKey: ["/api/hiq/admin/stores"] });
     const { data: crews = [] } = useQuery<AdminCrew[]>({ queryKey: ["/api/hiq/admin/crews"] });
     const { data: notices = [] } = useQuery<Notice[]>({ queryKey: ["/api/hiq/admin/notices"] });
-    const { data: reports = [] } = useQuery<ReportedUser[]>({ queryKey: ["/api/hiq/admin/reports"] });
     const { data: suggestions = [] } = useQuery<Suggestion[]>({ queryKey: ["/api/hiq/admin/suggestions"] });
     // 건의 모두 읽음 — 하나씩 누르는 게 일이다(오너 요청 2026-09-04).
     const readAllSuggestionsMutation = useMutation({
@@ -289,16 +284,6 @@ export default function AdminDashboard() {
         },
         onSuccess: () => {
             window.location.href = "/partner/dashboard";
-        }
-    });
-
-    const banUserMutation = useMutation({
-        mutationFn: async (userId: string) => {
-            return apiRequest(`/api/hiq/admin/users/${userId}/ban`, { method: "POST" });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/reports"] });
-            toast({ title: "사용자 제재 완료", variant: "destructive" });
         }
     });
 
@@ -997,30 +982,7 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {tab === "moderation" && (
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {reports.map((user) => (
-                                <div key={user.id} className="bg-red-500/[0.05] p-6 rounded-2xl border border-red-500/20 shadow-[0_1px_2px_rgba(0,0,0,0.06)] text-center">
-                                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <LucideShieldAlert className="w-8 h-8 text-red-500" />
-                                    </div>
-                                    <h3 className="text-lg font-bold text-[rgba(0,0,0,0.87)] mb-1">{user.nickname}</h3>
-                                    <div className="text-red-600 font-bold mb-4">누적 신고: {user.reportCount}건</div>
-                                    <div className="text-black/60 text-sm mb-6 bg-black/[0.04] py-2 rounded-lg">
-                                        사유: {user.reason}
-                                    </div>
-                                    <Button
-                                        variant="destructive"
-                                        className="w-full font-bold"
-                                        onClick={() => banUserMutation.mutate(user.id)}
-                                    >
-                                        계정 정지 (Ban)
-                                    </Button>
-                                </div>
-                            ))}
-                            {reports.length === 0 && <div className="col-span-3 text-center text-black/55 py-10">신고된 유저가 없습니다. 클린합니다! ✨</div>}
-                        </div>
-                    )}
+                    {tab === "moderation" && <ModerationView />}
 
                     {tab === "members" && (
                         <div>

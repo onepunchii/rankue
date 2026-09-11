@@ -9,6 +9,7 @@ import { PhotoDetailDialog } from "@/components/hiq/PhotoDetailDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { useTermsGate } from "@/components/hiq/TermsConsent";
 
 interface PhotoAuthor {
     name: string;
@@ -37,6 +38,7 @@ interface CrewGalleryTabProps {
 export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: CrewGalleryTabProps) {
     const { toast } = useToast();
     const { t } = useT();
+    const { needsConsent, ask } = useTermsGate();
     // Track only the id, then re-derive the photo from the live list cache so the detail
     // dialog reflects fresh like/comment counts after invalidation (a snapshot would go stale).
     const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -172,7 +174,15 @@ export function CrewGalleryTab({ crewId, isMember, isAdmin, currentMemberId }: C
                             size="sm"
                             variant="outline"
                             className="border-black/10 text-[rgba(0,0,0,0.87)] font-semibold text-xs rounded-xl h-9 px-4 flex items-center gap-2 bg-transparent hover:bg-black/[0.04]"
-                            onClick={() => document.getElementById('gallery-upload')?.click()}
+                            onClick={() => {
+                                // 첫 사진이면 약관 동의부터(감사 S4). 파일 선택 창은 사용자가 누른 그 순간에만 열려서
+                                // 동의 뒤 자동으로 열 수 없다 — 동의했다고 알리고 한 번 더 누르게 한다.
+                                if (needsConsent) {
+                                    void ask().then((ok) => { if (ok) toast({ title: t("terms.accepted"), description: t("terms.retryDesc") }); });
+                                    return;
+                                }
+                                document.getElementById('gallery-upload')?.click();
+                            }}
                             disabled={isProcessing || uploadPhotoMutation.isPending}
                         >
                             {(isProcessing || uploadPhotoMutation.isPending) ? (

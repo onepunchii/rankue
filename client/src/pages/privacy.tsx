@@ -16,6 +16,13 @@ export default function Privacy() {
             petudy@kakao.com
           </a>
         </p>
+        <p className="mt-1 text-sm text-gray-500">
+          서비스 이용 조건은{" "}
+          <a className="underline" href="/terms">
+            이용약관
+          </a>
+          을 확인해 주세요.
+        </p>
 
         <h2 className="mt-8 text-lg font-bold">1. 수집하는 개인정보 항목</h2>
         <ul className="mt-2 list-disc pl-5 text-sm text-gray-700 space-y-1">

@@ -6,7 +6,7 @@ import { notificationService } from "./notificationService.js";
  * 카드도 채팅방에 뜨는 메시지라 알림이 안 가면 아무도 못 본다.
  *
  * 승인 대기(pending)는 대상에서 뺀다 — 채팅 조회가 403 으로 막힌 사람에게 알림 본문으로
- * 대화 원문이 새어 나갔던 적이 있다.
+ * 대화 원문이 새어 나갔던 적이 있다. 보낸 사람을 차단한 크루원도 뺀다.
  *
  * 발송을 await 한다 — 서버리스(Vercel)는 응답을 보내면 실행이 얼어붙어서 fire-and-forget 으로 띄운
  * 푸시가 그대로 유실된다. 개별 실패는 로그만 남기고 요청 자체는 성공시킨다.
@@ -23,9 +23,13 @@ export async function notifyCrewChat(opts: {
         const crewData = await storage.getCrew(opts.crewId);
         if (!crewData) return;
 
+        // 보낸 사람을 차단한 크루원에게는 보내지 않는다 — 목록에서 가려도 푸시로 이름과 원문이 잠금 화면에 뜨면
+        // 차단이 반쪽이 된다(Apple 1.2 차단, 2026-09-11 검토 policy:R7).
+        const blockers = await storage.crews.getBlockerIds(opts.senderId);
         const targets = (crewData.members || [])
             .filter((m: any) => m?.role !== "pending")
-            .filter((m: any) => m.member.id !== opts.senderId);
+            .filter((m: any) => m.member.id !== opts.senderId)
+            .filter((m: any) => !blockers.has(m.member.id));
         const sender = (crewData.members || []).find((m: any) => m.member.id === opts.senderId);
         const senderName = sender?.member.name || "누군가";
 

@@ -7,8 +7,13 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { deleteBlobs } from "../../utils/blob.js";
 import { notifyCrewChat } from "../../services/crewChatNotify.js";
+// 약관 미동의 회원의 UGC 작성 거절(TERMS_REQUIRED) — 작성 라우트에만 건다(middleware/terms.ts)
+import { requireTermsAccepted } from "../../middleware/terms.js";
+import { screenCrewFields, screenCrewText, screenCrewProfile, screenCrewBody, changedCrewProfileFields, isCrewReportTarget, isReportReason, type CrewReportTarget } from "../../utils/crewModeration.js";
 
 const router = Router();
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Membership gate: returns the member's role, or sends a 403/404 and returns null.
 // Non-members and pending (승인 대기) members are rejected from writing crew content.
@@ -49,11 +54,18 @@ router.get("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest,
     return sendSuccess(res, activities);
 }));
 
+// 정모의 사람이 쓰는 칸 — 제목은 크루원 전원의 푸시 본문으로도 나가므로 채팅과 같은 필터를 건다(검토 policy:R3).
+// cost("게임비 1만원 엔빵")는 크루 맥락이라 모임비 표현이 통과한다.
+const ACTIVITY_TEXT_KEYS = ["title", "description", "locationName", "cost"] as const;
+
 // POST /activities - Create activity
-router.post("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/:id/activities", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
+    const screenedActivity = screenCrewBody(req.body, ACTIVITY_TEXT_KEYS);
+    if (!screenedActivity.ok) return sendError(res, 400, screenedActivity.reason);
     const data = {
         ...req.body,
+        ...screenedActivity.value.fields,
         crewId: req.params.id,
         creatorId: req.userId,
         // Ensure activityDate is Date object if string
@@ -72,8 +84,9 @@ router.post("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest
         if (crewData) {
             const creator = await storage.getMemberById(req.userId!);
             const activityTime = activity.activityDate ? new Date(activity.activityDate).toLocaleString("ko-KR", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "곧";
+            const blockers = await storage.crews.getBlockerIds(req.userId!); // 만든 사람을 차단한 크루원에게는 알리지 않는다
             await settleNotifications("[ActivityCreateNotif]", activeMembers(crewData.members)
-                .filter((m: any) => m.member.id !== req.userId)
+                .filter((m: any) => m.member.id !== req.userId && !blockers.has(m.member.id))
                 .map(async (m: any) => {
                     const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
                     if (!setting.activityEnabled) return;
@@ -125,7 +138,7 @@ router.delete("/:id/activities/:activityId/join", requireAuth, asyncHandler(asyn
 }));
 
 // PATCH /activities/:activityId - Update activity (Leader/Manager only)
-router.patch("/:id/activities/:activityId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.patch("/:id/activities/:activityId", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     const crewData = await storage.getCrew(req.params.id);
     if (!crewData) return sendError(res, 404, "크루를 찾을 수 없습니다");
 
@@ -145,6 +158,9 @@ router.patch("/:id/activities/:activityId", requireAuth, asyncHandler(async (req
     if (req.body.cost !== undefined) updateData.cost = req.body.cost;
     if (req.body.maxParticipants !== undefined) updateData.maxParticipants = req.body.maxParticipants;
     if (req.body.category !== undefined) updateData.category = req.body.category;
+    const screenedEdit = screenCrewBody(updateData, ACTIVITY_TEXT_KEYS);
+    if (!screenedEdit.ok) return sendError(res, 400, screenedEdit.reason);
+    Object.assign(updateData, screenedEdit.value.fields);
 
     const updated = await storage.updateCrewActivity(req.params.activityId, updateData);
     // P1: 정모 수정 → 참여자 전원에게 알림
@@ -232,13 +248,21 @@ router.get("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res:
 }));
 
 // POST /posts
-router.post("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/:id/posts", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     const role = await requireCrewMember(req, res);
     if (role === null) return;
+    // 게시 전 필터 — 커뮤니티와 같은 차단(내기·욕설·거래) + 연락처 마스킹 (Apple 1.2 / Play UGC).
+    // 크루 게시판도 크루원끼리 보는 UGC 라 심사 요건이 똑같이 걸린다.
+    const str = (v: unknown) => (typeof v === "string" ? v : null);
+    if ((str(req.body?.content) || "").length > 4000) return sendError(res, 400, "내용이 너무 깁니다 (4000자 이내)");
+    const screened = screenCrewFields({ title: str(req.body?.title), content: str(req.body?.content), category: str(req.body?.category) });
+    if (!screened.ok) return sendError(res, 400, screened.reason);
     // 글의 종목은 크루가 정한다 — 예전엔 안 넣어서 골프 크루 글까지 BILLIARDS 로 저장됐다(2026-09-09 검토).
     const crewForPost = await storage.getCrew(req.params.id);
     const data = {
         ...req.body,
+        ...(screened.value.title != null ? { title: screened.value.title } : {}),
+        ...(screened.value.content != null ? { content: screened.value.content } : {}),
         crewId: req.params.id,
         authorId: req.userId,
         sportCategory: crewForPost?.crew?.sportCategory ?? "BILLIARDS",
@@ -287,29 +311,36 @@ router.post("/:id/posts/:postId/like", requireAuth, asyncHandler(async (req: Aut
 // --- Comments ---
 
 // GET /crews/:id/posts/:postId/comments - list comments
-router.get("/:id/posts/:postId/comments", asyncHandler(async (req: any, res: any) => {
+// 크루원 전용 — 글 목록이 크루원 전용인데 댓글만 로그인 없이 열려 있었다. 조회자를 알아야
+// 차단한 사람의 댓글을 뺄 수 있기도 하다(Apple 1.2 차단).
+router.get("/:id/posts/:postId/comments", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
     const post = await storage.getCrewPost(req.params.postId);
     if (!post || post.crewId !== req.params.id) return sendError(res, 404, "게시글을 찾을 수 없습니다");
-    const comments = await storage.getCrewPostComments(req.params.postId);
+    const comments = await storage.crews.getCrewPostComments(req.params.postId, req.userId);
     return sendSuccess(res, comments);
 }));
 
 // POST /crews/:id/posts/:postId/comments - add comment (members only)
-router.post("/:id/posts/:postId/comments", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/:id/posts/:postId/comments", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
     const post = await storage.getCrewPost(req.params.postId);
     if (!post || post.crewId !== req.params.id) return sendError(res, 404, "게시글을 찾을 수 없습니다");
     const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
     if (!content) return sendError(res, 400, "댓글 내용을 입력해주세요");
+    if (content.length > 1000) return sendError(res, 400, "댓글이 너무 깁니다 (1000자 이내)");
+    const screened = screenCrewText(content);
+    if (!screened.ok) return sendError(res, 400, screened.reason);
     const comment = await storage.createCrewPostComment({
         postId: req.params.postId,
         authorId: req.userId!,
-        content,
+        content: screened.value,
     } as any);
-    // P2: 댓글 → 게시글 작성자에게 알림
+    // P2: 댓글 → 게시글 작성자에게 알림. 작성자가 댓글 쓴 사람을 차단했으면 보내지 않는다 —
+    // 목록에서 가려도 푸시로 이름·알림이 계속 오면 차단이 무력해진다.
     try {
         const post = await storage.getCrewPost(req.params.postId);
-        if (post?.authorId && post.authorId !== req.userId) {
+        if (post?.authorId && post.authorId !== req.userId && !(await storage.crews.hasBlocked(post.authorId, req.userId!))) {
             const commenter = await storage.getMemberById(req.userId!);
             const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, post.authorId);
             if (setting.postCommentEnabled) {
@@ -369,24 +400,29 @@ router.post("/:id/photos/:photoId/like", requireAuth, asyncHandler(async (req: A
 }));
 
 // GET /crews/:id/photos/:photoId/comments - list photo comments
-router.get("/:id/photos/:photoId/comments", asyncHandler(async (req: any, res: any) => {
+// 크루원 전용 + 차단 필터 — 게시글 댓글과 같은 이유.
+router.get("/:id/photos/:photoId/comments", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
     const photo = await storage.getCrewPhoto(req.params.photoId);
     if (!photo || photo.crewId !== req.params.id) return sendError(res, 404, "사진을 찾을 수 없습니다");
-    const comments = await storage.getCrewPhotoComments(req.params.photoId);
+    const comments = await storage.crews.getCrewPhotoComments(req.params.photoId, req.userId);
     return sendSuccess(res, comments);
 }));
 
 // POST /crews/:id/photos/:photoId/comments - add photo comment (members only)
-router.post("/:id/photos/:photoId/comments", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/:id/photos/:photoId/comments", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
     const photo = await storage.getCrewPhoto(req.params.photoId);
     if (!photo || photo.crewId !== req.params.id) return sendError(res, 404, "사진을 찾을 수 없습니다");
     const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
     if (!content) return sendError(res, 400, "댓글 내용을 입력해주세요");
+    if (content.length > 1000) return sendError(res, 400, "댓글이 너무 깁니다 (1000자 이내)");
+    const screened = screenCrewText(content);
+    if (!screened.ok) return sendError(res, 400, screened.reason);
     const comment = await storage.createCrewPhotoComment({
         photoId: req.params.photoId,
         authorId: req.userId!,
-        content,
+        content: screened.value,
     } as any);
     return sendSuccess(res, comment);
 }));
@@ -414,17 +450,21 @@ router.delete("/:id/photo-comments/:commentId", requireAuth, asyncHandler(async 
 }));
 
 // POST /crews/:id/photos
-router.post("/:id/photos", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/:id/photos", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
     const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
     if (!url) return sendError(res, 400, "사진 URL이 필요합니다");
+    // 캡션도 사진첩에 그대로 보이는 글이라 같은 필터를 건다
+    const rawCaption = typeof req.body?.caption === 'string' ? req.body.caption.slice(0, 500) : null;
+    const caption = rawCaption ? screenCrewText(rawCaption) : null;
+    if (caption && !caption.ok) return sendError(res, 400, caption.reason);
     // 화이트리스트 — req.body를 그대로 펼치면 id/createdAt까지 통과해 PK 충돌이나
     // 목록 최상단 강제 점유가 가능하다.
     const photo = await storage.createCrewPhoto({
         crewId: req.params.id,
         uploaderId: req.userId,
         url,
-        caption: typeof req.body?.caption === 'string' ? req.body.caption : null,
+        caption: caption ? caption.value : null,
     } as any);
     return sendSuccess(res, photo);
 }));
@@ -460,12 +500,17 @@ router.get("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res:
 }));
 
 // POST /crews/:id/chats
-router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/:id/chats", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
 
     if (!req.body?.message || typeof req.body.message !== 'string' || !req.body.message.trim()) {
         return sendError(res, 400, "메시지를 입력해주세요");
     }
+    if (req.body.message.length > 1000) return sendError(res, 400, "메시지가 너무 깁니다 (1000자 이내)");
+    // 채팅도 필터 대상 — 내기·욕설·거래는 거부하고 전화번호·오픈채팅 링크는 가린다.
+    // 가린 저장본이 알림 본문(chat.message)으로도 나가므로 푸시로 연락처가 새지 않는다.
+    const screenedChat = screenCrewText(req.body.message);
+    if (!screenedChat.ok) return sendError(res, 400, screenedChat.reason);
 
     // 화이트리스트 — req.body를 그대로 펼치면 id/createdAt까지 통과해 PK 충돌이나
     // 목록 최상단 강제 점유가 가능하다.
@@ -474,7 +519,7 @@ router.post("/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res
     const chat = await storage.createCrewChat({
         crewId: req.params.id,
         senderId: req.userId,
-        message: req.body.message,
+        message: screenedChat.value,
         type: "text",
         metadata: null,
     } as any);
@@ -504,6 +549,71 @@ router.delete("/:id/chats/:chatId", requireAuth, asyncHandler(async (req: AuthRe
 }));
 
 
+// --- 신고 ---
+
+// 신고 대상이 정말 이 크루의 것인지 확인하고 작성자를 돌려준다. 댓글·사진 댓글에는 crewId 가
+// 없어서 부모 글·사진을 거쳐 확인한다(삭제 라우트와 같은 방식).
+async function crewTargetAuthor(crewId: string, type: CrewReportTarget, id: string): Promise<string | null> {
+    switch (type) {
+        case "crew_post": {
+            const p = await storage.getCrewPost(id);
+            return p && p.crewId === crewId ? p.authorId : null;
+        }
+        case "crew_comment": {
+            const c = await storage.getCrewComment(id);
+            const p = c ? await storage.getCrewPost(c.postId) : null;
+            return c && p && p.crewId === crewId ? c.authorId : null;
+        }
+        case "crew_photo": {
+            const ph = await storage.getCrewPhoto(id);
+            return ph && ph.crewId === crewId ? ph.uploaderId : null;
+        }
+        case "crew_photo_comment": {
+            const c = await storage.getCrewPhotoComment(id);
+            const ph = c ? await storage.getCrewPhoto(c.photoId) : null;
+            return c && ph && ph.crewId === crewId ? c.authorId : null;
+        }
+        case "crew_chat": {
+            const ch = await storage.getCrewChat(id);
+            return ch && ch.crewId === crewId ? ch.senderId : null;
+        }
+    }
+}
+
+// POST /crews/:id/reports — 크루 콘텐츠 신고 (Apple 1.2 / Play UGC).
+// 커뮤니티 신고와 같은 hiqReports 에 쌓아 관리자 신고 큐가 한곳에서 읽게 한다. 커뮤니티 /reports 를
+// 쓰지 않는 이유: 대상이 이 크루 것인지 확인해야 하고(남의 크루 콘텐츠 id 로 허위 신고 방지),
+// 거기서는 crew_photo_comment 를 받지 않는다. 크루 콘텐츠는 자동 블라인드 없이 운영자 검토 큐로만
+// 간다(community.repo.report) — 그동안 신고자는 차단으로 즉시 가릴 수 있다.
+router.post("/:id/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (await requireCrewMember(req, res) === null) return;
+    const { targetType, targetId, reason, detail } = req.body || {};
+    if (!isCrewReportTarget(targetType)) return sendError(res, 400, "잘못된 신고 대상입니다");
+    if (typeof targetId !== "string" || !UUID_RE.test(targetId)) return sendError(res, 400, "신고 대상이 없습니다");
+    if (!isReportReason(reason)) return sendError(res, 400, "신고 사유를 선택해주세요");
+
+    const authorId = await crewTargetAuthor(req.params.id, targetType, targetId);
+    if (!authorId) return sendError(res, 404, "신고할 콘텐츠를 찾을 수 없습니다");
+    if (authorId === req.userId) return sendError(res, 400, "본인 콘텐츠는 신고할 수 없습니다");
+
+    await storage.community.report({
+        targetType, targetId,
+        reporterId: req.userId!,
+        reason,
+        detail: detail ? String(detail).slice(0, 500) : undefined,
+    });
+
+    // 운영자 알림 — 크루 콘텐츠는 자동 블라인드가 없어서 사람이 보기 전까지 아무 조치도 없다. 24시간 안 검토
+    // (약관 5조, Apple 1.2)를 지키려면 커뮤니티 신고처럼 바로 알려야 한다(검토 policy:R2). 도배 방지는 같은 규칙.
+    // 알림 실패가 신고 접수를 실패시키면 안 된다. 서버리스라 await(fire-and-forget 은 유실된다).
+    try {
+        const { notifyAdminsOfReport } = await import("../../services/moderation.js");
+        await notifyAdminsOfReport({ targetType, targetId, reason, reporterId: req.userId! });
+    } catch (e) { console.error("[Notify] 크루 신고 운영자 알림:", e); }
+    return sendSuccess(res, { reported: true });
+}));
+
+
 // --- Polls ---
 
 // GET /polls - List crew polls — 크루원 전용
@@ -514,9 +624,14 @@ router.get("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res:
 }));
 
 // POST /polls - Create poll
-router.post("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/:id/polls", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
-    const { options, ...rest } = req.body;
+    const { options: rawOptions, ...rest } = req.body;
+    // 투표 제목·설명·선택지도 필터 — 제목은 크루원 전원의 푸시 본문으로 나간다(검토 policy:R3).
+    const screenedPoll = screenCrewBody(rest, ["title", "description"] as const, Array.isArray(rawOptions) ? rawOptions : []);
+    if (!screenedPoll.ok) return sendError(res, 400, screenedPoll.reason);
+    Object.assign(rest, screenedPoll.value.fields);
+    const options = Array.isArray(rawOptions) ? screenedPoll.value.extra : rawOptions;
     const data = {
         ...rest,
         endTime: rest.endTime ? new Date(rest.endTime) : undefined,
@@ -539,8 +654,9 @@ router.post("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res
         const crewData = await storage.getCrew(req.params.id);
         if (crewData) {
             const author = await storage.getMemberById(req.userId!);
+            const blockers = await storage.crews.getBlockerIds(req.userId!);
             await settleNotifications("[PollCreateNotif]", activeMembers(crewData.members)
-                .filter((m: any) => m.member.id !== req.userId)
+                .filter((m: any) => m.member.id !== req.userId && !blockers.has(m.member.id))
                 .map(async (m: any) => {
                     const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
                     if (!setting.pollEnabled) return;
@@ -669,11 +785,20 @@ router.get("/:id/tournaments/:tournamentId", requireAuth, asyncHandler(async (re
 }));
 
 // POST /tournaments — 대회 개설 (크루장/부크루장)
-router.post("/:id/tournaments", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/:id/tournaments", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!await requireCrewAdmin(req, res)) return;
 
-    const title = String(req.body?.title || "").trim().slice(0, 60);
-    if (!title) return sendError(res, 400, "대회 이름을 입력해주세요");
+    const rawTitle = String(req.body?.title || "").trim().slice(0, 60);
+    if (!rawTitle) return sendError(res, 400, "대회 이름을 입력해주세요");
+    // 대회 이름·설명·상금도 필터 — 이름은 크루원 전원의 푸시로 나가고, 자유 입력인 상금 칸은
+    // 금전 내기 모집 통로가 될 수 있다(검토 policy:R3). "트로피", "게임비 면제" 같은 문구는 통과한다.
+    const screenedTournament = screenCrewBody({
+        title: rawTitle,
+        description: req.body?.description ? String(req.body.description).slice(0, 500) : undefined,
+        prize: req.body?.prize ? String(req.body.prize).slice(0, 100) : undefined,
+    }, ["title", "description", "prize"] as const);
+    if (!screenedTournament.ok) return sendError(res, 400, screenedTournament.reason);
+    const { title = rawTitle, description, prize } = screenedTournament.value.fields;
     const gameType = req.body?.gameType;
     if (gameType !== "3c" && gameType !== "4c") return sendError(res, 400, "종목을 선택해주세요");
     // 대회는 3쿠션·4구뿐이고 대진에서 경기를 시작하면 당구 경기가 만들어진다 — 골프 크루엔 열지 않는다.
@@ -693,22 +818,23 @@ router.post("/:id/tournaments", requireAuth, asyncHandler(async (req: AuthReques
         crewId: req.params.id,
         creatorId: req.userId,
         title,
-        description: req.body?.description ? String(req.body.description).slice(0, 500) : null,
+        description: description ?? null,
         gameType,
         format,
         bestOf,
         maxPlayers,
         recruitEnd: req.body?.recruitEnd ? new Date(req.body.recruitEnd) : null,
         startAt: req.body?.startAt ? new Date(req.body.startAt) : null,
-        prize: req.body?.prize ? String(req.body.prize).slice(0, 100) : null,
+        prize: prize ?? null,
     });
 
     try {
         const crewData = await storage.getCrew(req.params.id);
         if (crewData) {
             const creator = await storage.getMemberById(req.userId!);
+            const blockers = await storage.crews.getBlockerIds(req.userId!);
             await settleNotifications("[TournamentCreateNotif]", activeMembers(crewData.members)
-                .filter((m: any) => m.member.id !== req.userId)
+                .filter((m: any) => m.member.id !== req.userId && !blockers.has(m.member.id))
                 .map(async (m: any) => {
                     const setting = await storage.notifs.getCrewNotificationSetting(req.params.id, m.member.id);
                     if (!setting.activityEnabled) return;
@@ -880,7 +1006,7 @@ router.get("/store-search", requireAuth, asyncHandler(async (req: AuthRequest, r
 }));
 
 // POST /crews - Create a new crew
-router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     const validation = insertHiqCrewSchema.safeParse(req.body);
     if (!validation.success) {
         return sendError(res, 400, validation.error.errors[0].message);
@@ -890,6 +1016,11 @@ router.post("/", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =>
     if (!validation.data.name || validation.data.name.length > 30) {
         return sendError(res, 400, "크루 이름은 1~30자여야 합니다");
     }
+    // 크루 이름·소개·태그·가입 질문도 공개 탐색에 뜨는 글이라 게시글과 같은 필터를 건다
+    // ("#내기환영" 같은 내기 권유 태그 차단, 소개의 연락처 마스킹).
+    const profile = screenCrewProfile(validation.data as any);
+    if (!profile.ok) return sendError(res, 400, profile.reason);
+    Object.assign(validation.data, profile.value);
     if (await storage.crews.findCrewByName(validation.data.name)) {
         return sendError(res, 409, "이미 사용 중인 크루 이름입니다");
     }
@@ -1013,7 +1144,9 @@ router.post("/:id/join", requireAuth, asyncHandler(async (req: AuthRequest, res:
 }));
 
 // PATCH /crews/:id - Update crew (Leader only)
-router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+// 크루 이름·소개·표지는 로그인 없이 보이는 공개 문구라 약관 동의·정지 문지기를 건다(검토 policy:R8) — 약관 도입 전에
+// 크루를 만든 모임장도 첫 수정 때 동의 시트가 뜬다(TermsConsent 의 TERMS_REQUIRED 안전망).
+router.patch("/:id", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     const crewId = req.params.id;
     const data = await storage.getCrew(crewId);
     const me = data?.members.find((m: any) => m.member.id === req.userId);
@@ -1065,6 +1198,12 @@ router.patch("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any
     if (updateData.tags !== undefined && (!Array.isArray(updateData.tags) || updateData.tags.length > 3 || updateData.tags.some((t: any) => typeof t !== "string" || t.length > 20))) {
         return sendError(res, 400, "태그가 올바르지 않습니다");
     }
+    // 이름·소개·태그·가입 질문 필터 — 생성과 같은 규칙(연락처는 가려서 저장, 내기 권유 태그는 거부).
+    // 저장된 값과 달라진 칸만 검사한다(검토 code:R7): 화면이 폼 전체를 다시 보내서, 예전 문구가 나중에 새로 막히는
+    // 규칙에 걸리면 가입 방식처럼 전혀 다른 설정까지 저장이 막히고 어느 칸 탓인지도 알 수 없었다.
+    const profile = screenCrewProfile(changedCrewProfileFields(updateData, data?.crew as Record<string, unknown> | undefined));
+    if (!profile.ok) return sendError(res, 400, profile.reason);
+    Object.assign(updateData, profile.value);
     if (Object.keys(updateData).length === 0) {
         return sendError(res, 400, "수정할 내용이 없습니다"); // 빈 UPDATE는 드리즐이 500을 던진다
     }
@@ -1266,15 +1405,25 @@ router.patch("/:id/members/:memberId/role", requireAuth, asyncHandler(async (req
 }));
 
 // POST /crews/:id/settlements
-router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/:id/settlements", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
+    const { items: rawItems, participants } = req.body; // Complex structure
+
+    // 정산 제목·항목 이름도 필터 — 제목은 "정산 요청: {제목}" 채팅 카드와 푸시로 나가서, 거르지 않으면 채팅 필터를
+    // 건너뛰는 통로가 된다("5만원 내기 정산", 검토 policy:R4). 크루 맥락이라 "정모 정산", "게임비 1만원씩"은 통과한다.
+    // 계좌 칸(accountNumber 등)은 넣지 않는다 — 가리면 입금할 계좌가 망가진다.
+    const screenedSettlement = screenCrewBody(req.body, ["title"] as const,
+        Array.isArray(rawItems) ? rawItems.map((it: any) => it?.title) : []);
+    if (!screenedSettlement.ok) return sendError(res, 400, screenedSettlement.reason);
+    const items = Array.isArray(rawItems)
+        ? rawItems.map((it: any, i: number) => (it && typeof it === "object" ? { ...it, title: screenedSettlement.value.extra[i] } : it))
+        : rawItems;
     const data = {
         ...req.body, // title, date, totalAmount, etc.
+        ...screenedSettlement.value.fields,
         crewId: req.params.id,
         creatorId: req.userId
     };
-
-    const { items, participants } = req.body; // Complex structure
 
     const validation = insertHiqSettlementSchema.safeParse(data);
     if (!validation.success) {
@@ -1319,10 +1468,11 @@ router.post("/:id/settlements", requireAuth, asyncHandler(async (req: AuthReques
             // 같은 사람이 여러 차수에 들어 있어도 알림은 1번이면 되므로 Set으로 중복 제거.
             // 승인 대기자는 정산 대상이 될 수 없다 — 교집합을 정식 멤버로 한정한다.
             const crewMemberIds = new Set(activeMembers(crewData.members).map((m: any) => m.member.id));
+            const blockers = await storage.crews.getBlockerIds(req.userId!); // 요청한 사람을 차단한 사람에게는 푸시를 보내지 않는다
             const targetIds = new Set<string>();
             for (const p of participants) {
                 const pid = typeof p === "string" ? p : p?.memberId;
-                if (pid && pid !== req.userId && crewMemberIds.has(pid)) targetIds.add(pid);
+                if (pid && pid !== req.userId && crewMemberIds.has(pid) && !blockers.has(pid)) targetIds.add(pid);
             }
 
             await settleNotifications("[SettlementNotif]", [...targetIds].map(async (pid) => {
@@ -1411,8 +1561,11 @@ router.post("/:id/challenge", requireAuth, asyncHandler(async (req: AuthRequest,
     ]);
     const myName = (meMember as any)?.name || "크루 멤버";
     const crewName = (crew as any)?.crew?.name || "크루";
+    // 상대가 나를 차단했으면 푸시를 보내지 않는다 — 차단한 사람의 이름이 잠금 화면에 뜨지 않게(검토 policy:R7).
+    // 신청 자체를 거절하면 차단당한 사실이 드러나므로 응답은 그대로 둔다.
+    const blockedByTarget = await storage.crews.hasBlocked(toMemberId, req.userId!);
 
-    await settleNotifications("[Challenge]", [
+    await settleNotifications("[Challenge]", blockedByTarget ? [] : [
         notificationService.sendAndSaveNotification({
             memberId: toMemberId,
             title: `⚔️ ${myName}님의 대결 신청`,

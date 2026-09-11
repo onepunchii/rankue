@@ -4,6 +4,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { isNativeApp, nativePlatform, openStorePage } from "@/lib/nativeBridge";
 import { nativeSocialAvailable, nativeSocialIdToken } from "@/lib/nativeSignIn";
+import { useTermsGate } from "@/components/hiq/TermsConsent";
+import { queryClient } from "@/lib/queryClient";
+import { isTermsAccepted } from "@shared/terms";
 
 // 소셜 로그인(구글·애플) — 글로벌(비한국어) 유저의 기본 진입.
 // 웹:          구글 GIS + 애플 SIWA JS(Services ID) → id_token → 서버(/api/hiq/social) JWKS 재검증.
@@ -74,6 +77,7 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
   const [appleReady, setAppleReady] = useState(false);
   const inApp = isNativeApp();
   const nativeSocial = inApp && nativeSocialAvailable();
+  const { ask: askTerms } = useTermsGate();
 
   const submitToken = useCallback(async (provider: "google" | "apple", idToken: string, name?: string) => {
     setBusy(true);
@@ -86,6 +90,18 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
       });
       const j = await res.json();
       if (!res.ok || !j?.success) throw new Error(j?.message || "social login failed");
+      // 약관 동의(감사 S4 — Apple 1.2·Play UGC). 소셜 첫 로그인은 동의 화면 없이 계정이 만들어진다.
+      // 그래서 앱에 들어가기 전에 바로 받는다. 거절하면 로그아웃해 동의 없이 쓰는 상태를 남기지 않는다
+      // (계정은 남고, 다음 로그인 때 다시 묻는다). 이미 동의한 계정은 시트 없이 지나간다.
+      if (!isTermsAccepted(j.data?.member?.termsVersion)) {
+        const agreed = await askTerms("signup");
+        if (!agreed) {
+          await fetch("/api/hiq/logout", { method: "POST", credentials: "include" }).catch(() => undefined);
+          queryClient.removeQueries({ queryKey: ["/api/hiq/me"] });
+          toast({ title: t("terms.declinedTitle"), description: t("terms.declinedDesc") });
+          return;
+        }
+      }
       // LoginGate 가 붙여 보낸 ?redirect= 로 돌아간다 — 라이벌을 보려다 로그인한 사람은
       // 라이벌로 되돌아와야 한다. startsWith("/") 로 오픈 리다이렉트를 막는다(전화 로그인과 동일).
       const back = new URLSearchParams(window.location.search).get("redirect");
@@ -98,7 +114,7 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
     } finally {
       setBusy(false);
     }
-  }, [setLocation, toast, t]);
+  }, [setLocation, toast, t, askTerms]);
 
   // 앱(Capacitor): 네이티브 플러그인 → id_token → 서버. 취소 시 조용히 종료.
   const nativeSignIn = useCallback(async (provider: "google" | "apple") => {

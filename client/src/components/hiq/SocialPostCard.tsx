@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { PostDetailDialog } from "./PostDetailDialog";
+import { UgcActionMenu } from "./community/UgcActionMenu";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -174,6 +175,17 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     <time className="text-[12px] font-medium text-black/55">
                         {post.createdAt ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ko }) : '--'}
                     </time>
+                    {/* 남의 글 — 신고·차단 (Apple 1.2). 운영진은 휴지통과 함께 보인다 */}
+                    {isMember && currentMemberId && post.authorId !== currentMemberId && (
+                        <UgcActionMenu
+                            targetType="crew_post"
+                            targetId={post.id}
+                            crewId={post.crewId}
+                            authorId={post.authorId}
+                            authorName={post.author?.name}
+                            className="p-1.5 -mr-1.5"
+                        />
+                    )}
                     {canDelete && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>

@@ -156,6 +156,9 @@ export const hiqMembers = pgTable("hiq_members", {
   hideSkillBadge: boolean("hide_skill_badge").default(false).notNull(), // 커뮤니티 실력 뱃지 숨김
   /** 국가(ISO 3166-1 alpha-2, 예 "KR"). 시뮬레이터 랭킹의 국가별 보기용 — 기기 언어에서 추정하거나 본인이 고른다. */
   country: text("country"),
+  // 이용약관 동의(2026-09-11, App Store 1.2·Play UGC) — 본 약관 버전(shared/terms.ts)과 동의 시각. 둘 다 비어 있으면 미동의.
+  termsVersion: text("terms_version"),
+  termsAcceptedAt: timestamp("terms_accepted_at"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1090,7 +1093,10 @@ export const insertHiqMemberSchema = createInsertSchema(hiqMembers, {
   createdAt: true,
   updatedAt: true,
   visitCount: true,
-  totalSimPoints: true
+  totalSimPoints: true,
+  // 약관 동의는 가입 본문에서 받지 않는다 — 서버가 버전을 검증한 뒤 직접 적는다(auth.ts /register)
+  termsVersion: true,
+  termsAcceptedAt: true
 });
 
 export const insertHiqClubMemberSchema = createInsertSchema(hiqClubMembers).omit({ id: true, joinedAt: true });
@@ -1387,7 +1393,8 @@ export const hiqReports = pgTable("hiq_reports", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   targetType: text("target_type", {
     // golf_booking 추가(2026-09-09): 골프 매물에 신고·삭제가 하나도 없어 먹튀 글을 내릴 방법이 없었다
-    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_chat", "member", "golf_booking"],
+    // crew_photo_comment 추가(2026-09-11): 크루 사진 댓글도 신고 대상. DB CHECK 가 없는 text 라 타입만 넓힌다.
+    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "member", "golf_booking"],
   }).notNull(),
   targetId: uuid("target_id").notNull(),
   reporterId: uuid("reporter_id").references(() => hiqMembers.id).notNull(),
@@ -1408,6 +1415,21 @@ export const hiqBlocks = pgTable("hiq_blocks", {
 }, (table) => [
   unique().on(table.blockerId, table.blockedId),
 ]);
+
+// 15-1. 신고 처리 기록(2026-09-11, 관리자 신고 큐 SX1) — 운영자가 신고 대상에 한 조치를 한 줄씩 쌓는다(고치거나 지우지 않는다).
+// hiq_reports.status 는 "이 신고가 닫혔나"만 말한다. 누가·언제·무엇으로 닫았는지, 지운 원문이 무엇이었는지는 여기 남는다
+// — 24시간 안에 대응했다는 근거이자, 작성자가 항의할 때 되짚을 기록이다. 조치 이름은 server/lib/reportQueue.ts.
+export const hiqModerationActions = pgTable("hiq_moderation_actions", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: uuid("target_id").notNull(),
+  action: text("action").notNull(),
+  adminProfileId: uuid("admin_profile_id"), // 처리한 운영자(profiles.id). 계정이 지워져도 기록은 남게 FK 는 걸지 않는다
+  authorMemberId: uuid("author_member_id"), // 조치 당시 작성자 — 원문을 지운 뒤에도 작성자 정지를 할 수 있게
+  note: text("note"), // 삭제 때 원문 일부 스냅샷
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type HiqModerationAction = typeof hiqModerationActions.$inferSelect;
 
 // 16. UMB 세계랭킹 — 주간 스냅샷 (umb-carom.org 공식 랭킹 PDF에서 수집, 출처 표기)
 export const umbRankings = pgTable("umb_rankings", {

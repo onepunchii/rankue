@@ -35,6 +35,7 @@ import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
+import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { useEffect } from "react";
 
 // 라벨은 i18n 키 — 렌더 시 t()로 감싼다.
@@ -47,6 +48,7 @@ const STEPS = [
 export default function CreateClub() {
     const [_, setLocation] = useLocation();
     const { t, locale } = useT();
+    const { gate } = useTermsGate();
     const { data: member } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
     const { toast } = useToast();
     const [uploadingField, setUploadingField] = useState<null | 'emblem' | 'coverImage'>(null);
@@ -144,7 +146,8 @@ export default function CreateClub() {
     const handleSubmit = () => {
         if (!member) return;
 
-        createCrewMutation.mutate({
+        // 크루 이름·소개·태그도 공개 UGC 라 첫 생성 전에 약관 동의부터(감사 S4)
+        gate(() => createCrewMutation.mutate({
             ...formData as InsertHiqCrew,
             leaderId: member.id,
             // 파트너 매장이면 baseStoreId, 디렉토리(1,195곳)면 baseListingCode — 서버가 실존 검증
@@ -152,7 +155,7 @@ export default function CreateClub() {
             baseListingCode: selectedStore?.type === "listing" ? selectedStore.code : null,
             tags: formData.tags || [],
             sportCategory: currentSport,
-        } as any);
+        } as any));
     };
 
     // Store Search Query — 당구는 파트너+디렉토리 통합 검색, 골프는 기존 파트너 검색 유지
@@ -590,7 +593,8 @@ export default function CreateClub() {
                                     <div className="flex flex-wrap gap-2">
                                         {(currentSport === "GOLF"
                                             ? ["#매너골프", "#싱글목표", "#명랑골프", "#라운딩", "#스크린", "#초보환영", "#고수환영", "#2030", "#4050", "#주말골퍼"]
-                                            : ["#빡겜", "#즐겜", "#내기환영", "#매너필수", "#음주가무", "#금연", "#초보환영", "#고수환영", "#2030", "#4050"]
+                                            // "#내기환영" 은 뺐다 — 앱이 금전 내기를 권하는 모양이 된다(감사 S5, shared/crewTags.ts)
+                                            : ["#빡겜", "#즐겜", "#매너필수", "#금연", "#초보환영", "#고수환영", "#2030", "#4050"]
                                         ).map(tag => (
                                             <button
                                                 key={tag}
