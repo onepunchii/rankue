@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { APP_UPDATE_POLICY, compareVersions, decideUpdate, isPolicyActive, parseBuildNumber, shownToday, type UpdatePolicy } from "./appVersion";
+import { APP_UPDATE_POLICY, compareVersions, decideUpdate, isPolicyActive, isUpToDate, parseBuildNumber, shownToday, type UpdatePolicy } from "./appVersion";
 
-const on = (latestBuild: number, minBuild = 0): UpdatePolicy => ({ enabled: true, latestBuild, minBuild });
+const on = (latestBuild: number, minBuild = 0): UpdatePolicy => ({ enabled: true, latestVersion: "9.9", latestBuild, minBuild });
 
 describe("decideUpdate", () => {
-    it("출고 상태는 두 플랫폼 모두 꺼져 있다(오너가 출시 확인 후 켠다)", () => {
+    it("enabled 는 둘 다 false 로 출고(iOS 는 스토어 확인으로 자동, 안드로이드는 출시 후 수동)", () => {
         expect(APP_UPDATE_POLICY.ios.enabled).toBe(false);
         expect(APP_UPDATE_POLICY.android.enabled).toBe(false);
         expect(decideUpdate(APP_UPDATE_POLICY.ios, 1)).toBe("none");
         expect(decideUpdate(APP_UPDATE_POLICY.android, null)).toBe("none");
     });
     it("꺼져 있거나 정책이 없으면 아무것도 안 띄운다", () => {
-        expect(decideUpdate({ enabled: false, latestBuild: 99, minBuild: 99 }, 1)).toBe("none");
+        expect(decideUpdate({ enabled: false, latestVersion: "9.9", latestBuild: 99, minBuild: 99 }, 1)).toBe("none");
         expect(decideUpdate(undefined, 1)).toBe("none");
     });
     it("최신보다 낮으면 권유, 같거나 높으면 없음", () => {
@@ -36,8 +36,15 @@ describe("decideUpdate", () => {
 describe("iOS 자동 켜기(App Store 에 새 버전이 올라오면)", () => {
     const ios = APP_UPDATE_POLICY.ios;
     it("출고 정책: iOS 는 1.2 가 스토어에 뜨면 자동, 안드로이드는 수동", () => {
-        expect(ios.autoWhenStoreVersion).toBe("1.2");
-        expect(APP_UPDATE_POLICY.android.autoWhenStoreVersion).toBeUndefined();
+        expect(ios.autoFromStore).toBe(true);
+        expect(ios.latestVersion).toBe("1.2");
+        expect(APP_UPDATE_POLICY.android.autoFromStore).toBeUndefined();
+    });
+    it("latestBuild 와 latestVersion 은 같은 출시의 두 이름이다 — 하나만 올리면 여기서 걸린다", () => {
+        // 새 버전을 낼 때 이 표에 (빌드 → 마케팅 버전)을 추가하고 정책의 두 값을 같이 올린다.
+        const RELEASES = { ios: { 7: "1.2" } as Record<number, string>, android: { 5: "1.2.0" } as Record<number, string> };
+        expect(RELEASES.ios[APP_UPDATE_POLICY.ios.latestBuild]).toBe(APP_UPDATE_POLICY.ios.latestVersion);
+        expect(RELEASES.android[APP_UPDATE_POLICY.android.latestBuild]).toBe(APP_UPDATE_POLICY.android.latestVersion);
     });
     it("스토어가 아직 1.1 이면 안 띄운다", () => {
         expect(decideUpdate(ios, 6, "1.1")).toBe("none");
@@ -55,8 +62,20 @@ describe("iOS 자동 켜기(App Store 에 새 버전이 올라오면)", () => {
         expect(decideUpdate(ios, 6, "beta")).toBe("none");
     });
     it("enabled 가 true 면 스토어 버전과 상관없이 켠다", () => {
-        expect(isPolicyActive({ enabled: true, latestBuild: 7, minBuild: 0 }, null)).toBe(true);
+        expect(isPolicyActive({ enabled: true, latestVersion: "1.2", latestBuild: 7, minBuild: 0 }, null)).toBe(true);
         expect(isPolicyActive(undefined, "9.9")).toBe(false);
+    });
+});
+
+describe("isUpToDate", () => {
+    it("최신 빌드면 스토어를 물을 필요 없다", () => {
+        expect(isUpToDate(APP_UPDATE_POLICY.ios, 7)).toBe(true);
+        expect(isUpToDate(APP_UPDATE_POLICY.ios, 8)).toBe(true);
+    });
+    it("옛 빌드·모르는 빌드는 물어봐야 한다", () => {
+        expect(isUpToDate(APP_UPDATE_POLICY.ios, 6)).toBe(false);
+        expect(isUpToDate(APP_UPDATE_POLICY.ios, null)).toBe(false);
+        expect(isUpToDate(undefined, 7)).toBe(false);
     });
 });
 

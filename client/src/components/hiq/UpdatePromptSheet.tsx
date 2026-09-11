@@ -4,7 +4,7 @@ import { LucideDownload } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 import { openStorePage } from "@/lib/nativeBridge";
 import { apiRequest } from "@/lib/queryClient";
-import { APP_UPDATE_POLICY, decideUpdate, isPolicyActive, parseBuildNumber, shownToday, type UpdateDecision } from "@shared/appVersion";
+import { APP_UPDATE_POLICY, decideUpdate, isPolicyActive, isUpToDate, parseBuildNumber, shownToday, type UpdateDecision } from "@shared/appVersion";
 import { hasPlugin, platform } from "@shared/nativeCaps";
 
 // 앱 업데이트 안내(감사 N7·C-O5). 정책은 shared/appVersion.ts —
@@ -40,10 +40,14 @@ async function installedBuild(): Promise<number | null> {
     }
 }
 
-/** iOS 자동 켜기용 — App Store 에 지금 올라가 있는 버전(서버가 애플 공개 조회로 확인). 못 읽으면 null(→ 안내 안 함). */
+/** iOS 자동 켜기용 — App Store 에 지금 올라가 있는 버전(서버가 애플 공개 조회로 확인).
+ *  못 읽거나 3초 안에 답이 없으면 null(→ 안내 안 함). 앱 첫 화면의 다른 안내를 오래 붙잡지 않으려고 상한을 둔다. */
 async function iosStoreVersion(): Promise<string | null> {
     try {
-        const r = (await apiRequest("/api/hiq/app/store-version")) as { ios?: unknown } | null;
+        const r = (await Promise.race([
+            apiRequest("/api/hiq/app/store-version"),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+        ])) as { ios?: unknown } | null;
         return typeof r?.ios === "string" ? r.ios : null;
     } catch {
         return null;
@@ -75,28 +79,34 @@ async function startUpdate(): Promise<void> {
     openStorePage();
 }
 
-export function UpdatePromptSheet({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
+/**
+ * onSettled: 띄울지 말지 결정이 끝나면 한 번 부른다. 알림 권한 시트가 이걸 기다린다 —
+ * 결정 전에 알림 시트가 먼저 올라왔다가 업데이트 시트로 바뀌면 읽던 사람이 놀란다.
+ */
+export function UpdatePromptSheet({ onOpenChange, onSettled }: { onOpenChange?: (open: boolean) => void; onSettled?: () => void }) {
     const { t } = useT();
     const [decision, setDecision] = useState<UpdateDecision>("none");
 
     useEffect(() => {
-        const p = platform();
-        if (p === "web") return;
-        const policy = APP_UPDATE_POLICY[p];
-        const auto = !policy.enabled && !!policy.autoWhenStoreVersion && p === "ios";
-        if (!policy.enabled && !auto) return; // 꺼져 있으면 스토어도, 빌드 번호도 묻지 않는다
         let alive = true;
+        const settle = () => { if (alive) onSettled?.(); };
+        const p = platform();
+        const policy = p === "web" ? undefined : APP_UPDATE_POLICY[p];
+        const auto = !!policy && !policy.enabled && !!policy.autoFromStore && p === "ios";
+        if (!policy || (!policy.enabled && !auto)) { settle(); return () => { alive = false; }; } // 꺼져 있으면 아무것도 묻지 않는다
         void (async () => {
-            const storeVersion = auto ? await iosStoreVersion() : null;
-            if (!alive || !isPolicyActive(policy, storeVersion)) return;
+            // 설치 빌드(즉시)를 먼저 본다 — 이미 최신이면 스토어에 물을 이유가 없다(새 앱 사용자 대부분)
             const build = await installedBuild();
             if (!alive) return;
+            if (isUpToDate(policy, build)) { settle(); return; }
+            const storeVersion = auto ? await iosStoreVersion() : null;
+            if (!alive) return;
+            if (!isPolicyActive(policy, storeVersion)) { settle(); return; }
             const d = decideUpdate(policy, build, storeVersion);
-            if (d === "suggest") {
-                if (shownToday(readShownAt(), Date.now())) return;
-                writeShownAt(Date.now());
-            }
+            if (d === "suggest" && shownToday(readShownAt(), Date.now())) { settle(); return; }
+            if (d === "suggest") writeShownAt(Date.now());
             setDecision(d);
+            settle();
         })();
         return () => { alive = false; };
     }, []);
