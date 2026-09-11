@@ -789,6 +789,23 @@ export const suggestions = pgTable("suggestions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// 건의 답장 기록 — 운영자가 건의함에서 '앱으로 답장'한 내용을 건의에 붙여 남긴다
+// (오너 요청 2026-09-11 "내가 답장한 내역도 볼 수 있게"). 그전 답장은 회원 알림(type suggestion_reply)으로만
+// 남아 어느 건의에 답했는지 알 수 없었다 — 옛 답장은 scripts/backfill-suggestion-replies.ts 가 옮겼다.
+// DDL: migrations/suggestion_replies.sql (추가만 하는 테이블).
+export const suggestionReplies = pgTable("suggestion_replies", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  suggestionId: uuid("suggestion_id").references(() => suggestions.id, { onDelete: "cascade" }).notNull(),
+  message: text("message").notNull(),
+  // 보낸 운영자(프로필). FK 를 걸지 않는다 — 운영자 계정이 정리돼도 답장 기록은 남아야 한다. 옛 답장 이관분은 비어 있다.
+  adminProfileId: uuid("admin_profile_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("suggestion_replies_suggestion_idx").on(table.suggestionId, table.createdAt),
+]);
+
+export type SuggestionReply = typeof suggestionReplies.$inferSelect;
+
 // 신규 매장 등록 신청 — 디렉토리(1,195곳)에 없는 매장의 사장님이 직접 등록을 요청한다.
 //
 // 왜 별도 테이블인가: store_listings 를 읽는 공개 표면이 11곳(목록·상세·사이트맵·프리렌더·

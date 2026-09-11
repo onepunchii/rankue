@@ -12,6 +12,7 @@ import {
     hiqSettlementItems,
     hiqSettlementParticipants,
     suggestions,
+    suggestionReplies,
     storeListings,
     hiqReports,
     hiqModerationActions,
@@ -36,6 +37,7 @@ import type {
     InsertHiqTournament,
     Suggestion,
     InsertSuggestion,
+    SuggestionReply,
     HiqModerationAction
 } from "../../shared/schema.js";
 import { eq, desc, asc, and, or, sql, gt, gte, like, isNull, inArray } from "drizzle-orm";
@@ -45,6 +47,7 @@ import {
     summarizeReports, isAppealOpen, queueState, isOverdue, availableActions,
     type ReportTargetType, type ModerationAction, type QueueState, type ReportSummary,
 } from "../lib/reportQueue.js";
+import { SUGGESTION_ALERT_TYPE, SUGGESTION_ALERT_WINDOW_MIN, attachReplies, type SuggestionReplyView } from "../lib/suggestionBox.js";
 
 // --- 신고 큐 타입(2026-09-11, SX1) ---
 // 원문을 대상 종류마다 다른 테이블에서 읽어 한 모양으로 맞춘 것.
@@ -943,8 +946,43 @@ export class AdminRepository {
         return suggestion;
     }
 
-    async getSuggestions(): Promise<Suggestion[]> {
-        return await db.select().from(suggestions).orderBy(desc(suggestions.createdAt));
+    /**
+     * 건의 목록(최신부터) + 건의마다 보낸 답장(오래된 것부터). 답장은 한 번에 다 읽어 붙인다 — 건의마다 읽으면 N+1.
+     * 답장은 건의가 지워지면 함께 지워지므로(FK cascade) 전부 읽어도 목록 밖 건의의 몫은 없다.
+     */
+    async getSuggestions(): Promise<(Suggestion & { replies: SuggestionReplyView[] })[]> {
+        const rows = await db.select().from(suggestions).orderBy(desc(suggestions.createdAt));
+        if (!rows.length) return [];
+        const replies = await db.select({
+            id: suggestionReplies.id,
+            suggestionId: suggestionReplies.suggestionId,
+            message: suggestionReplies.message,
+            createdAt: suggestionReplies.createdAt,
+        }).from(suggestionReplies).orderBy(asc(suggestionReplies.createdAt));
+        return attachReplies(rows, replies);
+    }
+
+    /** 운영자가 앱으로 보낸 답장을 건의에 남긴다(POST /admin/suggestions/:id/reply). */
+    async createSuggestionReply(data: { suggestionId: string; message: string; adminProfileId: string | null }): Promise<SuggestionReply> {
+        const [row] = await db.insert(suggestionReplies).values(data).returning();
+        return row;
+    }
+
+    /**
+     * 새 건의 운영자 알림 도배 방지 재료(lib/suggestionBox shouldAlertSuggestion) — 이 회원의 건의로 최근에 알렸나.
+     * 시각 비교는 DB 의 now() 로 한다(getReportAlertState 와 같은 이유 — 저장할 때와 같은 시계).
+     */
+    async getSuggestionAlertState(submitterMemberId: string): Promise<{ alertedRecently: boolean; submittersAlerted: number }> {
+        const [row]: any[] = await db.execute(sql`
+            SELECT
+                EXISTS (SELECT 1 FROM ${hiqNotifications}
+                         WHERE type = ${SUGGESTION_ALERT_TYPE} AND params->>'submitterMemberId' = ${submitterMemberId}
+                           AND created_at > now() - make_interval(mins => ${SUGGESTION_ALERT_WINDOW_MIN}::int)) AS "alertedRecently",
+                (SELECT count(DISTINCT params->>'submitterMemberId')::int FROM ${hiqNotifications}
+                  WHERE type = ${SUGGESTION_ALERT_TYPE}
+                    AND created_at > now() - make_interval(mins => ${SUGGESTION_ALERT_WINDOW_MIN}::int)) AS "submittersAlerted"
+        `).then((r: any) => r.rows ?? r);
+        return { alertedRecently: !!row?.alertedRecently, submittersAlerted: Number(row?.submittersAlerted ?? 0) };
     }
 
     /** 안 읽은 건의 전부 읽음 처리. 어드민이 하나씩 누르던 걸 한 번에. */

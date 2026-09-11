@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../../storage/index.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { SUGGESTION_REPLY_TYPE } from "../../lib/suggestionBox.js";
 
 const router = Router();
 
@@ -215,12 +216,34 @@ router.post("/suggestions/:id/reply", checkSuperAdmin, asyncHandler(async (req: 
         title: "건의하신 내용에 답변이 도착했어요",
         body: message,
         category: "admin",
-        type: "suggestion_reply",
+        type: SUGGESTION_REPLY_TYPE,
+        // 어느 건의에 대한 답인지 알림에도 남긴다 — 옛 답장 이관(scripts/backfill-suggestion-replies)은
+        // 이 값이 있는 알림을 이미 기록된 것으로 보고 건너뛴다.
+        // url 은 싣지 않는다: 회원이 자기 건의를 다시 보는 화면이 없어서, 링크를 달면 알림함에서 누를 때
+        // 답장을 읽던 알림함이 닫히고 다른 화면으로 넘어갈 뿐이다(NotificationInbox handleItemClick).
+        params: { suggestionId: s.id },
     });
+
+    // 보낸 답장을 건의에 남긴다(오너 요청 2026-09-11 "내가 답장한 내역도 볼 수 있게").
+    // 알림이 나간 뒤에 적는다 — 전송이 실패했는데 '보낸 답장'에 뜨면 안 된다.
+    // 보낸 사람은 checkSuperAdmin 이 확인한 서명 쿠키의 프로필이다.
+    // 기록이 실패해도 답장은 이미 회원에게 갔다 — 여기서 500 을 돌려주면 운영자는 '전송 실패'로 알고 다시 보내
+    // 회원이 같은 답장을 두 번 받는다. 로그만 남기고 성공으로 돌려주되, 기록 여부(recorded)를 함께 알린다.
+    let recorded = true;
+    try {
+        await storage.admin.createSuggestionReply({
+            suggestionId: s.id,
+            message,
+            adminProfileId: req.signedCookies?.hiq_partner_auth || null,
+        });
+    } catch (e) {
+        recorded = false;
+        console.error("[Suggestion] 답장 기록 실패:", s.id, e);
+    }
 
     // 답장했으면 처리한 건이다 — 읽음 표시를 따로 누르게 하지 않는다.
     await db.update(suggestions).set({ isRead: true }).where(eq(suggestions.id, s.id));
-    return sendSuccess(res, { sent: true, memberName: member.name });
+    return sendSuccess(res, { sent: true, recorded, memberName: member.name });
 }));
 
 // 모두 읽음 — /suggestions/:id 보다 위에 둬야 "read-all" 이 id 로 안 먹힌다.

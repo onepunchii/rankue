@@ -10,6 +10,7 @@ import { db } from "../../db.js";
 import { hiqMembers, hiqFriendships } from "../../../shared/schema.js";
 import { eq, and, or } from "drizzle-orm";
 import { notificationService } from "../../services/notificationService.js";
+import { notifyAdminsOfSuggestion } from "../../services/suggestionBox.js";
 import { recordTermsAcceptance, requireTermsAccepted } from "../../middleware/terms.js";
 import { screenMemberProfile } from "../../utils/crewModeration.js";
 import { isTermsAccepted } from "../../../shared/terms.js";
@@ -354,6 +355,16 @@ router.post("/suggestions", requireAuth, asyncHandler(async (req: AuthRequest, r
         content,
         contact
     });
+
+    // 운영자에게 푸시(오너 요청 2026-09-11). 알림이 실패해도 건의 접수는 성공이다 — 건의는 이미 저장됐다.
+    // 응답 전에 기다린다: Vercel 함수는 응답을 보낸 뒤 남은 작업을 끊을 수 있다.
+    await notifyAdminsOfSuggestion({
+        suggestionId: suggestion.id,
+        type,
+        content,
+        submitterMemberId: member?.id ?? req.userId!,
+    }).catch((e) => console.error("[Notify] 새 건의:", e));
+
     return sendSuccess(res, suggestion);
 }));
 

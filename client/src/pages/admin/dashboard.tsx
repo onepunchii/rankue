@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import {
     LucideGlobe, LucideArrowRight, LucideCheckCircle, LucideLogOut,
     LucideSearch, LucideTrendingUp, LucideBell, LucideCreditCard, LucideSettings, LucideShieldAlert, LucideMenu, LucideX, LucideUsersRound, LucideMail, LucideFlag, GameController
 } from "@/lib/icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // Assuming Sheet is available or using conditional rendering
@@ -68,6 +68,12 @@ type AdminCrew = {
     createdAt: string;
 };
 
+type SuggestionReply = {
+    id: string;
+    message: string;
+    createdAt: string;
+};
+
 type Suggestion = {
     id: string;
     type: string;
@@ -75,7 +81,12 @@ type Suggestion = {
     contact: string | null;
     createdAt: string;
     isRead: boolean;
+    /** 보낸 답장 — 오래된 것부터(서버 admin.repo getSuggestions) */
+    replies: SuggestionReply[];
 };
+
+// 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
+const DEEP_LINK_TABS = ["moderation", "suggestions"] as const;
 
 // --- Left Sidebar Component ---
 // --- Sidebar Component (Unified) ---
@@ -150,8 +161,21 @@ export default function AdminDashboard() {
     // 모바일 메뉴 서랍(열림 상태를 들고 있어야 메뉴를 고를 때 닫을 수 있다)
     const [menuOpen, setMenuOpen] = useState(false);
     const [tab, setTab] = useState<"dashboard" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game">(() =>
-        // 신고 알림(푸시)을 누르면 ?tab=moderation 으로 온다 — 바로 신고/제재 센터를 연다(2026-09-11).
-        new URLSearchParams(window.location.search).get("tab") === "moderation" ? "moderation" : "dashboard");
+        // 신고 알림은 ?tab=moderation(신고/제재 센터), 새 건의 알림은 ?tab=suggestions(건의함)로 온다(2026-09-11).
+        // 목록에 없는 값은 무시하고 대시보드를 연다.
+        DEEP_LINK_TABS.find((t) => t === new URLSearchParams(window.location.search).get("tab")) ?? "dashboard");
+    // 대시보드가 이미 떠 있을 때 알림을 누르면 주소만 바뀌고 이 화면은 다시 만들어지지 않는다(navigateInApp 은 라우터 이동).
+    // 그래서 처음 한 번이 아니라 주소가 바뀔 때마다 ?tab= 을 읽는다. 읽은 뒤에는 주소에서 지운다 — 남겨 두면 다른 탭으로
+    // 옮긴 뒤 같은 알림을 또 눌렀을 때 주소가 같아 이동이 일어나지 않는다(navigateInApp 은 같은 주소면 아무것도 안 한다).
+    const search = useSearch();
+    useEffect(() => {
+        const t = DEEP_LINK_TABS.find((x) => x === new URLSearchParams(search).get("tab"));
+        if (!t) return;
+        setTab(t);
+        // 새 건의 알림으로 왔다 — 5분 캐시를 기다리지 않고 건의함을 다시 읽어 방금 온 건의가 보이게 한다.
+        if (t === "suggestions") queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/suggestions"] });
+        setLocation(window.location.pathname, { replace: true });
+    }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
     const [memberSearch, setMemberSearch] = useState("");
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
@@ -294,7 +318,11 @@ export default function AdminDashboard() {
         mutationFn: async ({ id, message }: { id: string; message: string }) =>
             apiRequest(`/api/hiq/admin/suggestions/${id}/reply`, { method: "POST", body: { message } }),
         onSuccess: (r: any) => {
-            toast({ title: `${r?.memberName ?? "회원"}님에게 답장을 보냈습니다` });
+            toast({
+                title: `${r?.memberName ?? "회원"}님에게 답장을 보냈습니다`,
+                // 답장은 갔는데 기록만 실패한 경우(서버 recorded:false) — 다시 보내면 회원이 두 번 받는다.
+                description: r?.recorded === false ? "'보낸 답장' 기록에는 실패했습니다. 다시 보내지 마세요." : undefined,
+            });
             setReplyingId(null);
             setReplyText("");
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/suggestions"] });
@@ -756,8 +784,10 @@ export default function AdminDashboard() {
                                 </div>
                             )}
                             {suggestions.map((suggestion) => (
-                                <div key={suggestion.id} className={`bg-white p-5 rounded-2xl border shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex flex-col gap-3 transition-opacity ${suggestion.isRead ? 'border-black/[0.07] opacity-50' : 'border-black/[0.07]'}`}>
-                                    <div className="flex justify-between items-start">
+                                // 읽은 건은 흐리게 — 단 카드 전체가 아니라 머리·본문·버튼만. 답장하면 읽음이 되므로 카드째 흐리면
+                                // '보낸 답장'이 늘 흐린 채로 보인다(시각은 거의 안 읽힌다).
+                                <div key={suggestion.id} className="bg-white p-5 rounded-2xl border border-black/[0.07] shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex flex-col gap-3">
+                                    <div className={`flex justify-between items-start transition-opacity ${suggestion.isRead ? "opacity-50" : ""}`}>
                                         <div className="flex items-center gap-2">
                                             <Badge variant={suggestion.type === 'BUG' ? 'destructive' : suggestion.type === 'PARTNERSHIP' ? 'default' : 'secondary'}>
                                                 {suggestion.type}
@@ -775,10 +805,24 @@ export default function AdminDashboard() {
                                             </div>
                                         )}
                                     </div>
-                                    <p className="text-black/70 whitespace-pre-wrap text-sm leading-relaxed p-3 bg-black/[0.03] rounded-xl ">
+                                    <p className={`text-black/70 whitespace-pre-wrap text-sm leading-relaxed p-3 bg-black/[0.03] rounded-xl transition-opacity ${suggestion.isRead ? "opacity-50" : ""}`}>
                                         {suggestion.content}
                                     </p>
-                                    <div className="flex justify-end gap-2">
+                                    {/* 보낸 답장 — 무엇을 답했는지 다시 보려고(오너 요청 2026-09-11). 오래된 것부터, 최신이 맨 아래. */}
+                                    {(suggestion.replies?.length ?? 0) > 0 && (
+                                        <div className="space-y-2">
+                                            <p className="text-[12px] font-semibold text-black/55">
+                                                보낸 답장 <span className="tabular-nums">{suggestion.replies.length}</span>
+                                            </p>
+                                            {suggestion.replies.map((reply) => (
+                                                <div key={reply.id} className="rounded-xl bg-brand/5 px-3 py-2.5">
+                                                    <p className="text-[13px] text-black/70 whitespace-pre-wrap leading-relaxed">{reply.message}</p>
+                                                    <p className="mt-1 text-[12px] text-black/50 tabular-nums">{new Date(reply.createdAt).toLocaleString()}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div className={`flex justify-end gap-2 transition-opacity ${suggestion.isRead ? "opacity-50" : ""}`}>
                                         <Button
                                             size="sm"
                                             variant={suggestion.isRead ? "ghost" : "outline"}
