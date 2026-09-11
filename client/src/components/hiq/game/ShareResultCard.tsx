@@ -543,7 +543,8 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 // 동작하지 않아서(둘 다 조용히 아무 일도 안 일어난다) 파일을 캐시에 쓴 뒤
 // 네이티브 공유 시트를 띄우는 경로가 유일하게 확실하다.
 async function shareNative(blob: Blob, filename: string, text: string): Promise<boolean> {
-    if (!Capacitor.isNativePlatform()) return false;
+    // 옛 안드로이드 앱(1.0.2)에는 Share·Filesystem 플러그인이 없다 — 부르면 실패 뒤에야 폴백하니 미리 거른다.
+    if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable("Share") || !Capacitor.isPluginAvailable("Filesystem")) return false;
     try {
         const dataUrl = await blobToDataUrl(blob);
         const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);

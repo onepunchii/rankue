@@ -2,7 +2,45 @@
 <html lang="ko"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <title>랭큐</title>
-<style>body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#0b1220;color:#333;font-family:system-ui;-apple-system,sans-serif;text-align:center}p{opacity:.7;font-size:14px}</style>
-</head><body><div><div style="font-size:52px">🎱</div><h1 style="font-size:20px;margin:10px 0 4px">랭큐</h1><p>네트워크 연결을 확인해 주세요</p></div>
-<script>setInterval(()=>{fetch("https://www.rankue.co.kr",{mode:"no-cors"}).then(()=>location.href="https://www.rankue.co.kr").catch(()=>{})},4000)</script>
+<!-- 앱 바이너리에 그대로 들어가는 오프라인 안내 페이지(capacitor.config errorPath). 웹 배포로는 못 고치니 신중히.
+     - 바탕·글자색은 웹 캔버스(#f2f0eb, ink)와 같다. 예전 남색 바탕에 #333 글자는 문구가 거의 안 보였다.
+     - 안드로이드는 오프라인뿐 아니라 첫 화면이 4xx·5xx 를 줄 때도 이 페이지를 띄운다 — 그래서 원인을 '네트워크'로 단정하지 않는다.
+     - 돌아갈 땐 반드시 /?resume=1 — 웹(nativeBridge applyOfflineResume)이 이 표식을 보고 보던 화면(경기 중이면 점수판)으로 되돌린다. -->
+<style>
+body{margin:0;min-height:100vh;min-height:100dvh;display:grid;place-items:center;box-sizing:border-box;padding:24px;background:#f2f0eb;color:rgba(0,0,0,.87);font-family:-apple-system,system-ui,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;text-align:center;-webkit-text-size-adjust:100%}
+h1{margin:0 0 10px;font-size:20px;font-weight:800;letter-spacing:-.01em}
+p{margin:0;font-size:14px;line-height:1.5;color:rgba(0,0,0,.68)}
+button{margin-top:24px;min-width:160px;height:48px;padding:0 20px;border:0;border-radius:12px;background:#006241;color:#fff;font:inherit;font-size:15px;font-weight:600}
+button:disabled{opacity:.6}
+</style>
+</head><body><div><h1 id="t">랭큐에 연결할 수 없어요</h1><p id="d">연결되면 자동으로 이어집니다.</p><button id="r" type="button">다시 시도</button></div>
+<script>
+(function(){
+  var HOME="https://www.rankue.co.kr/?resume=1";
+  var L={
+    ko:["랭큐에 연결할 수 없어요","연결되면 자동으로 이어집니다.","다시 시도"],
+    en:["Can't reach Rankue","We'll reconnect automatically.","Try again"],
+    es:["No se puede conectar con Rankue","Nos reconectaremos automáticamente.","Reintentar"],
+    vi:["Không thể kết nối với Rankue","Ứng dụng sẽ tự động kết nối lại.","Thử lại"],
+    tr:["Rankue'ya bağlanılamıyor","Bağlantı kurulunca otomatik olarak devam edeceğiz.","Tekrar dene"]
+  };
+  var lang=String(navigator.language||"").slice(0,2).toLowerCase();
+  if(!L[lang])lang="en";
+  var s=L[lang],btn=document.getElementById("r");
+  document.documentElement.lang=lang;
+  document.getElementById("t").textContent=s[0];
+  document.getElementById("d").textContent=s[1];
+  btn.textContent=s[2];
+  var busy=false;
+  function check(){
+    if(busy)return;
+    busy=true;btn.disabled=true;
+    fetch("https://www.rankue.co.kr/",{mode:"no-cors",cache:"no-store"})
+      .then(function(){location.replace(HOME)},function(){busy=false;btn.disabled=false});
+  }
+  btn.onclick=check;
+  window.addEventListener("online",check);
+  setInterval(check,6000);
+})();
+</script>
 </body></html>

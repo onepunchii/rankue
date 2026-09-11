@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
-import { isNativeApp, nativePlatform } from "@/lib/nativeBridge";
-import { nativeSocialIdToken } from "@/lib/nativeSignIn";
+import { isNativeApp, nativePlatform, openStorePage } from "@/lib/nativeBridge";
+import { nativeSocialAvailable, nativeSocialIdToken } from "@/lib/nativeSignIn";
 
 // 소셜 로그인(구글·애플) — 글로벌(비한국어) 유저의 기본 진입.
 // 웹:          구글 GIS + 애플 SIWA JS(Services ID) → id_token → 서버(/api/hiq/social) JWKS 재검증.
@@ -73,6 +73,7 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
   const [gisReady, setGisReady] = useState(false);
   const [appleReady, setAppleReady] = useState(false);
   const inApp = isNativeApp();
+  const nativeSocial = inApp && nativeSocialAvailable();
 
   const submitToken = useCallback(async (provider: "google" | "apple", idToken: string, name?: string) => {
     setBusy(true);
@@ -186,6 +187,23 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
       await submitToken("apple", idToken, name);
     } catch { /* 유저 취소 등 무시 */ }
   }, [submitToken]);
+
+  // ── 옛 앱(네이티브 소셜 로그인 플러그인 없음 — iOS 1.0.x): 누르면 Unimplemented 로 깨지는 버튼 대신 업데이트 안내.
+  //    웹 구글·애플 로그인도 대신 쓸 수 없다(구글은 앱 웹뷰 안의 OAuth 를 정책상 막는다). 웹뷰에서도 되는
+  //    전화번호 로그인은 랜딩에 그대로 남는다. (감사 C1)
+  if (inApp && !nativeSocial) {
+    return (
+      <div className="w-full flex flex-col items-center gap-3">
+        <p className="text-[12.5px] font-medium text-black/60 text-center">{t("login.updateForSocial")}</p>
+        <button
+          onClick={openStorePage}
+          className="w-full max-w-[320px] h-[44px] rounded-full bg-white border border-black/15 flex items-center justify-center text-[15px] font-medium text-black/80 active:scale-[0.98] transition-transform"
+        >
+          {t("login.updateApp")}
+        </button>
+      </div>
+    );
+  }
 
   // ── 앱(Capacitor): 네이티브 플러그인 버튼 ──
   if (inApp) {

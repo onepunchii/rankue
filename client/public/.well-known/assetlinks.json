@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.rankue.app",
+      "sha256_cert_fingerprints": [
+        "EF:B3:08:1B:F2:EC:6C:01:F1:85:52:A6:A0:3B:C8:C1:A2:67:91:66:32:11:94:ED:E1:C2:0F:08:F3:09:70:B7",
+        "C4:BF:37:B4:84:CF:E5:F6:CA:90:A1:D3:68:99:B1:15:52:36:D7:29:4A:C3:26:A4:25:4B:38:C4:A2:D7:EF:FC"
+      ]
+    }
+  }
+]

@@ -155,12 +155,25 @@ router.post("/register", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, result);
 }));
 
-// POST /logout 
-router.post("/logout", (req, res) => {
+// POST /logout
+// 앱에서 로그아웃하면 이 기기의 푸시 토큰도 계정에서 뗀다 — 안 그러면 로그아웃한 폰에 이전 계정의
+// 크루 채팅 원문이 계속 뜬다(감사 P4). 앱이 body.pushToken 으로 지금 기기 토큰을 보내면, 그 회원 프로필에
+// 저장된 토큰이 바로 그 기기일 때만 비운다(다른 기기의 토큰은 그대로). 토큰이 없거나 형식이 틀리거나
+// DB 가 실패해도 로그아웃 자체(쿠키 삭제)는 늘 성공한다.
+router.post("/logout", asyncHandler(async (req: any, res: any) => {
+    const userId = req.signedCookies?.hiq_user_id;
+    const pushToken = req.body?.pushToken;
+    if (typeof userId === "string" && userId && isValidPushToken(pushToken)) {
+        try {
+            await storage.users.clearPushToken(userId, pushToken);
+        } catch (e) {
+            console.error("[Logout] push token clear failed:", (e as Error)?.message);
+        }
+    }
     res.clearCookie('hiq_user_id', { path: '/' });
     res.clearCookie('hiq_partner_auth', { path: '/' });
     return sendSuccess(res, { success: true });
-});
+}));
 
 // 푸시 토큰 형식 검증.
 // APNs 발송(pushNative.ts)은 토큰을 HTTP/2 :path(`/3/device/${token}`)에 그대로 보간하므로,
@@ -179,10 +192,13 @@ function isValidPushToken(raw: unknown): raw is string {
 
 // POST /push-token - Save/Update Push Token (FCM / APNs)
 router.post("/push-token", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const { token } = req.body || {};
+    // 새 웹은 { pushToken }, 이미 떠 있는 옛 웹 번들(nativeBridge·App.tsx)은 { token } 으로 보낸다 — 둘 다 받는다.
+    const { pushToken, token: legacyToken } = req.body || {};
+    const token = pushToken ?? legacyToken;
     if (!token) return sendError(res, 400, "토큰이 필요합니다");
     if (!isValidPushToken(token)) return sendError(res, 400, "푸시 토큰 형식이 올바르지 않습니다");
 
+    // 같은 기기 토큰을 쥐고 있던 다른 계정은 여기서 떼어진다(user.repo updatePushToken).
     await storage.updatePushToken(req.userId!, token);
     return sendSuccess(res, { success: true });
 }));

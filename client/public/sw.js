@@ -1,5 +1,10 @@
-
-const CACHE_NAME = 'polli-pwa-v3';
+// 랭큐 서비스 워커 — main.tsx 가 '/' 범위로 등록한다.
+// 하는 일: 앱 껍데기('/', '/index.html', '/manifest.json')를 미리 받아 두고, 화면 이동이 아닌 요청은
+// 캐시에 있으면 캐시로, 없으면 네트워크로 보낸다. 오프라인이면 콘솔 오류 대신 404 를 돌려준다.
+// 웹 푸시는 2026-09-11 오너 결정으로 없앴다. 예전 Polli 시절 Firebase 메시징(gstatic importScripts,
+// polli-a71b7 설정, 'Polli' 제목·아이콘, 알림 탭 처리)이 이 파일 끝에 붙어 있었다. 앱 푸시는 네이티브(FCM/APNs)가 따로 한다.
+// 캐시 이름을 바꿨으니 activate 가 옛 'polli-pwa-v3' 캐시를 지운다 — 거기 묵어 있던 manifest.json 도 새로 받는다.
+const CACHE_NAME = 'rankue-pwa-v1';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -65,41 +70,3 @@ self.addEventListener('activate', (event) => {
         ])
     );
 });
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
-
-// These config values will be injected or used if available
-firebase.initializeApp({
-    apiKey: "AIzaSyDcyFj0c6aWbkCk0nH4sJ3_PS1CxLjLeOw",
-    authDomain: "polli-a71b7.firebaseapp.com",
-    projectId: "polli-a71b7",
-    storageBucket: "polli-a71b7.firebasestorage.app",
-    messagingSenderId: "737747715451",
-    appId: "1:737747715451:web:143bfcb0396cc68acf69de",
-    measurementId: "G-JER9YDSNWY"
-});
-
-const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage((payload) => {
-    console.log('[sw.js] Received background message ', payload);
-    const notificationTitle = payload.notification?.title || 'Polli';
-    const notificationOptions = {
-        body: payload.notification?.body || '',
-        icon: 'https://www.polli.co.kr/polli_og_marketing_v1.png',
-        badge: 'https://www.polli.co.kr/polli_og_marketing_v1.png',
-        data: payload.data,
-        tag: 'polli-notification',
-        renotify: true
-    };
-
-    self.registration.showNotification(notificationTitle, notificationOptions);
-});
-
-self.addEventListener('notificationclick', (event) => {
-    event.notification.close();
-    event.waitUntil(
-        clients.openWindow(event.notification.data?.url || '/')
-    );
-});
-

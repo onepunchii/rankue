@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { usePreventZoom } from "@/hooks/usePreventZoom";
+import { useKeepAwake } from "@/hooks/useKeepAwake";
 import { useGameScore } from "@/hooks/useGameScore";
 import { LandscapeGuard } from "@/components/hiq/LandscapeGuard";
 import { PlayerCard } from "@/components/hiq/game/PlayerCard";
@@ -29,6 +30,9 @@ export default function HiqScoreboard() {
         playerOrder, handleDragEnd, handleCardTap, handleTurnChange,
         finishMutation, discardMutation, speak
     } = useGameScore(id || "");
+
+    // 경기 중엔 화면이 꺼지지 않게 — 폰을 테이블에 두고 쓰는 점수판이다.
+    useKeepAwake(!!id && game?.status !== "finished");
 
     const [inningModalPlayer, setInningModalPlayer] = useState<number | null>(null);
 

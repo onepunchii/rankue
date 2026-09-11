@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useAuth } from "@/hooks/useAuth";
+import { useKeepAwake } from "../hooks/useKeepAwake"; // 상대 경로 — vitest 에 "@/" 별칭이 없고 SimulatorPage.test 는 "@/" 를 전부 목으로 바꾼다
 import { useSimulator, type OfflineReason } from "./useSimulator";
 import type { Renderer, RendererView, SafeInsets } from "./render/Renderer";
 import { ZOOM_MIN } from "./render/Renderer";
@@ -698,6 +699,8 @@ export function SimulatorPage() {
         return Array.from({ length: n }, (_, i) => playerLabel(i, n, member?.nickname, t));
     }, [matchNames, sim.session?.players.length, member?.nickname, t]);
     const isMatch = sim.mode === "match";
+    // 대전이 진행 중인 동안은 화면이 꺼지지 않게 — 상대 차례를 기다리는 중에도 40초 시계가 돈다.
+    useKeepAwake(isMatch && sim.match?.status === "playing");
     // ── 40초 룰 시계(대전): 서버가 적은 turnSeenAt 부터 센다(서버 시각 보정). 0 이 되면 내 차례는 스스로, 상대 차례는 10초 유예 뒤 서버에 알린다.
     // 0 = 시계 없음(NaN 을 쓰면 NaN !== NaN 이라 아래 useEffect 가 매 렌더 다시 걸린다)
     const clockSeenAt = isMatch && sim.match?.status === "playing" && sim.match.turnSeenAt ? Date.parse(sim.match.turnSeenAt) : 0;

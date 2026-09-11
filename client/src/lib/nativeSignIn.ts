@@ -1,9 +1,15 @@
 import { isNativeApp, nativePlatform } from "@/lib/nativeBridge";
+import { hasPlugin } from "@shared/nativeCaps";
 
 // 네이티브 앱(Capacitor) 소셜 로그인 — 웹뷰 OAuth 리다이렉트 차단 우회.
 // 플러그인이 구글/애플에서 직접 id_token을 받아오면, 그걸 /api/hiq/social 로 넘겨 세션 발급.
 // 웹/PWA에선 isNativeApp()=false라 절대 안 탐 → 기존 GIS/SIWA JS 그대로. (mapix/onp 표준 이식)
 let inited = false;
+
+/** 이 바이너리에 네이티브 소셜 로그인 플러그인이 있는가 — iOS 1.0(2)~1.0(5) 에는 없다(감사 C1). */
+export function nativeSocialAvailable(): boolean {
+  return hasPlugin("SocialLogin");
+}
 
 async function ensureInit() {
   if (inited) return;
@@ -24,7 +30,8 @@ async function ensureInit() {
 
 // 네이티브에서 소셜 로그인 → id_token 반환. 실패/취소 시 null.
 export async function nativeSocialIdToken(provider: "google" | "apple"): Promise<string | null> {
-  if (!isNativeApp()) return null;
+  // 플러그인 없는 옛 앱 — 화면(SocialLogin.tsx)이 버튼을 안 보여 주지만 여기서도 한 번 더 막는다
+  if (!isNativeApp() || !nativeSocialAvailable()) return null;
   const { SocialLogin } = await import("@capgo/capacitor-social-login");
   await ensureInit();
   // 안드로이드: scopes를 넘기면 플러그인이 MainActivity 수정을 요구하며 throw — 기본 로그인으로도 email 포함 idToken이 옴

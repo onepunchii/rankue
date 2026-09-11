@@ -1,0 +1,30 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["29U5FPY2FG.com.rankue.app"],
+        "components": [
+          { "/": "/api/*", "exclude": true, "comment": "API is never opened in the app" },
+          { "/": "/club/*" },
+          { "/": "/crew*" },
+          { "/": "/join*" },
+          { "/": "/r/*" },
+          { "/": "/community*" },
+          { "/": "/store/*" },
+          { "/": "/stores*" },
+          { "/": "/pba-player/*" },
+          { "/": "/player/*" },
+          { "/": "/pba*" },
+          { "/": "/online-game*" },
+          { "/": "/world-ranking*" },
+          { "/": "/ranking*" },
+          { "/": "/briefing/*" },
+          { "/": "/game/*" },
+          { "/": "/dashboard*" },
+          { "/": "/history*" },
+          { "/": "/friends*" }
+        ]
+      }
+    ]
+  }
+}

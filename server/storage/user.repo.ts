@@ -19,6 +19,7 @@ import type {
     HiqMember
 } from "../../shared/schema.js";
 import { eq, desc, asc, and, or, ne, sql, gt, gte, inArray } from "drizzle-orm";
+import { pushTokenVariants } from "../services/pushNative.js";
 
 // SECURITY: 남에게 보이는 응답(랭킹·상대목록·검색·타인 프로필)은 반드시 이 화이트리스트로만 셀렉트한다.
 // hiqMembers를 통째로 select하면 phone과 정산 계좌(defaultAccount*)까지 API로 새어 나간다.
@@ -372,13 +373,42 @@ export class UserRepository {
         return this.createFriendship(requesterId, receiverId, sportCategory);
     }
 
+    /**
+     * 기기 푸시 토큰 저장. 한 기기(토큰)는 한 번에 한 계정에만 묶는다 — 공용 태블릿·가족 폰에서 B 로
+     * 로그인했는데 A 의 크루 채팅 원문까지 계속 뜨던 문제(감사 P4). 그래서 같은 토큰을 쥔 다른 프로필을
+     * 먼저 비운다(NULL). 옛 래퍼가 접두사 없이 저장한 표기도 같은 기기로 본다.
+     */
     async updatePushToken(memberId: string, token: string): Promise<void> {
-        const [member] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, memberId));
-        if (member && member.profileId) {
-            await db.update(profiles)
-                .set({ pushToken: token, updatedAt: new Date() })
-                .where(eq(profiles.id, member.profileId));
+        const [member] = await db.select({ profileId: hiqMembers.profileId }).from(hiqMembers).where(eq(hiqMembers.id, memberId));
+        if (!member?.profileId) return;
+        if (!token) {
+            await this.clearPushToken(memberId);
+            return;
         }
+        await db.update(profiles)
+            .set({ pushToken: null })
+            .where(and(inArray(profiles.pushToken, pushTokenVariants(token)), ne(profiles.id, member.profileId)));
+        await db.update(profiles)
+            .set({ pushToken: token, updatedAt: new Date() })
+            .where(eq(profiles.id, member.profileId));
+    }
+
+    /**
+     * 이 회원 프로필의 푸시 토큰을 비운다. expected 가 있으면 저장된 토큰이 바로 그 기기일 때만 —
+     * 로그아웃한 기기가 아닌 다른 기기의 토큰이거나, 죽은 토큰을 지우는 사이 새 토큰이 들어왔으면 건드리지 않는다.
+     * '' 가 아니라 NULL 로 쓴다: 푸시 가능 회원 조회(notification.repo listPushableMembers)는 NULL 만 걸러서
+     * '' 는 방송 대상 300명 상한에 섞였다(감사 P14). 지웠으면 true.
+     */
+    async clearPushToken(memberId: string, expected?: string): Promise<boolean> {
+        const [member] = await db.select({ profileId: hiqMembers.profileId }).from(hiqMembers).where(eq(hiqMembers.id, memberId));
+        if (!member?.profileId) return false;
+        const rows = await db.update(profiles)
+            .set({ pushToken: null })
+            .where(expected
+                ? and(eq(profiles.id, member.profileId), inArray(profiles.pushToken, pushTokenVariants(expected)))
+                : eq(profiles.id, member.profileId))
+            .returning({ id: profiles.id });
+        return rows.length > 0;
     }
 
     // --- Private / Shared Helpers ---

@@ -1,11 +1,13 @@
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "./lib/queryClient";
+import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
 import { useAuth } from "@/hooks/useAuth";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
+import { NativePrompts } from "@/components/hiq/NativePrompts";
+import { syncPushToken } from "@/lib/nativeBridge";
 import NotFound from "@/pages/not-found";
 import { useEffect, lazy, Suspense, type ComponentType, type FunctionComponent, type ReactNode } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -114,20 +116,7 @@ const FramedWorldPlayer = framed(HiqWorldPlayer, { wide: true });
 const FramedPba = framed(HiqPba, { wide: true });
 const FramedPbaPlayer = framed(HiqPbaPlayer, { wide: true });
 
-/**
- * localStorage에 저장된 FCM 토큰을 서버에 등록한다.
- * 미인증(401) 등 오류는 조용히 무시한다 — 로그인/부팅 시 재호출되어 재동기화된다.
- * storage.updatePushToken 이 upsert 이므로 반복 호출은 멱등하다.
- */
-export async function syncPushToken() {
-  try {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('fcm_token') : null;
-    if (!token) return;
-    await apiRequest('/api/hiq/push-token', { method: 'POST', body: { token } });
-  } catch {
-    // 미인증/네트워크 오류 등은 무시 (다음 인증 시점에 재시도)
-  }
-}
+// 푸시 토큰 서버 등록(syncPushToken)은 lib/nativeBridge.ts 로 옮겼다 — 네이티브 registration 이벤트도 같은 함수를 쓴다.
 
 // 시뮬레이터 페이지는 물리 엔진·캔버스 렌더러를 포함해 메인 청크에서 분리한다.
 const SimulatorPage = lazy(() => import("@/sim/SimulatorPage"));
@@ -324,6 +313,8 @@ function App() {
           <SportProvider>
             <AppRoutes />
             <Toaster />
+            {/* 네이티브 앱 전용 안내(업데이트·알림 권한 사전 설명). 웹에선 아무것도 그리지 않는다. */}
+            <NativePrompts />
             {/* 앱 설치 유도 — iOS/안드로이드 스토어 우선, 미출시 플랫폼은 PWA 폴백.
                 컴포넌트는 예전부터 있었지만 **어디에도 마운트돼 있지 않아 죽어 있었다**(번들에서도 빠졌다).
                 여기 붙여야 실제로 뜬다. 네이티브 앱 안에서는 컴포넌트가 스스로 숨는다. */}

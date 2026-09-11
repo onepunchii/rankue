@@ -50,6 +50,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useShare } from "@/hooks/useShare";
 import { appDownloadUrl } from "@shared/appLinks";
 import { goLogin } from "@/components/hiq/LoginGate";
+import { forgetPushToken, storedPushToken } from "@/lib/nativeBridge";
 
 export default function HiqMenu() {
     const { t } = useT();
@@ -144,7 +145,10 @@ export default function HiqMenu() {
 
     const handleLogout = async () => {
         // The auth cookie is httpOnly+signed, so client JS cannot clear it — the server must.
-        try { await apiRequest("/api/hiq/logout", { method: "POST" }); } catch { /* ignore */ }
+        // 이 기기 푸시 토큰도 함께 보내 서버가 지우게 한다 — 안 지우면 로그아웃한 폰에 이전 계정 알림(채팅 미리보기 등)이 계속 온다.
+        const pushToken = storedPushToken();
+        try { await apiRequest("/api/hiq/logout", { method: "POST", body: pushToken ? { pushToken } : undefined }); } catch { /* ignore */ }
+        forgetPushToken();
         // Clear all cached data so the next user on this device sees nothing from this account.
         queryClient.clear();
         setLocation("/");

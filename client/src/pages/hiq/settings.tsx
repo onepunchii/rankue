@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { LucideChevronLeft, LucideChevronRight, LucideCheck, LucideLoader2, LucideGlobe, LucidePencil, LucideBadgeCheck, LucideShield, LucideLogOut } from "@/lib/icons";
+import { LucideChevronLeft, LucideChevronRight, LucideCheck, LucideLoader2, LucideGlobe, LucidePencil, LucideBadgeCheck, LucideShield, LucideLogOut, LucideBell } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import { flagEmoji } from "@/lib/flag";
 import { cn } from "@/lib/utils";
+import {
+    canOpenNotificationSettings, forgetPushToken, isNativeApp, openNotificationSettings, pushPermission, requestPushPermission,
+    storedPushToken, type PushPermission,
+} from "@/lib/nativeBridge";
 
 // 설정 — 전체메뉴 톱니바퀴 진입. 1순위: 계정 연결 상태 + 언어. (형 결정: 2026-07)
 export default function HiqSettings() {
@@ -17,6 +21,20 @@ export default function HiqSettings() {
     const { t, locale, setLocale } = useT();
 
     const { data: member } = useQuery<any>({ queryKey: ["/api/hiq/me"] });
+
+    // 알림 권한 — 앱에서만 보인다. OS 설정에서 바꾸고 돌아오면(화면이 다시 보이면) 다시 읽는다.
+    const [pushPerm, setPushPerm] = useState<PushPermission>("unsupported");
+    useEffect(() => {
+        if (!isNativeApp()) return;
+        let alive = true;
+        const check = () => { void pushPermission().then((p) => { if (alive) setPushPerm(p); }); };
+        const onVisible = () => { if (document.visibilityState === "visible") check(); };
+        check();
+        document.addEventListener("visibilitychange", onVisible);
+        return () => { alive = false; document.removeEventListener("visibilitychange", onVisible); };
+    }, []);
+    const enablePush = async () => setPushPerm(await requestPushPermission());
+    const pushLabel = pushPerm === "granted" ? t("settings.notifOn") : pushPerm === "denied" ? t("settings.notifOff") : t("settings.notifNotSet");
 
     // @핸들 변경
     const [handleInput, setHandleInput] = useState<string | null>(null);
@@ -40,7 +58,10 @@ export default function HiqSettings() {
     };
 
     const handleLogout = async () => {
-        try { await apiRequest("/api/hiq/logout", { method: "POST" }); } catch { /* ignore */ }
+        // 이 기기 푸시 토큰도 함께 보내 서버가 지우게 한다 — 안 지우면 로그아웃한 폰에 이전 계정 알림(채팅 미리보기 등)이 계속 온다.
+        const pushToken = storedPushToken();
+        try { await apiRequest("/api/hiq/logout", { method: "POST", body: pushToken ? { pushToken } : undefined }); } catch { /* ignore */ }
+        forgetPushToken();
         queryClient.clear();
         setLocation("/");
     };
@@ -172,6 +193,36 @@ export default function HiqSettings() {
                         ))}
                     </div>
                 </section>
+
+                {/* 알림 — 앱에서만. 상태와 복구 경로(거부했으면 설정 열기 — iOS 는 앱이 다시 물을 수 없다) */}
+                {pushPerm !== "unsupported" && (
+                    <section className="rk-card p-5">
+                        <div className="flex items-center gap-2 mb-1">
+                            <LucideBell className="w-4 h-4 text-brand" />
+                            <h2 className="text-[15px] font-bold">{t("settings.notifications")}</h2>
+                        </div>
+                        <p className="text-[12px] text-black/45 mb-4">{t("settings.notificationsDesc")}</p>
+                        <div className="flex items-center justify-between h-12 px-4 bg-black/[0.03] rounded-tile">
+                            <span className="text-[14px] font-medium">{t("settings.notifStatus")}</span>
+                            <span className={cn("text-[12px] font-bold", pushPerm === "granted" ? "text-brand" : "text-black/55")}>{pushLabel}</span>
+                        </div>
+                        {pushPerm === "prompt" && (
+                            <button onClick={enablePush} className="mt-2 w-full h-12 rounded-tile bg-brand text-brand-fg text-[14px] font-semibold active:scale-[0.98] transition-transform">
+                                {t("settings.notifEnable")}
+                            </button>
+                        )}
+                        {pushPerm === "denied" && (
+                            <>
+                                <p className="text-[12px] text-black/55 mt-3">{t("settings.notifDeniedHint")}</p>
+                                {canOpenNotificationSettings() && (
+                                    <button onClick={() => void openNotificationSettings()} className="mt-2 w-full h-12 rounded-tile bg-black/[0.06] text-[14px] font-semibold active:scale-[0.98] transition-transform">
+                                        {t("settings.notifOpenSettings")}
+                                    </button>
+                                )}
+                            </>
+                        )}
+                    </section>
+                )}
 
                 {/* 커뮤니티 */}
                 <section className="rk-card p-5">

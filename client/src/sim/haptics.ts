@@ -2,11 +2,11 @@
  * 시뮬레이터 햅틱. @capacitor/haptics 의 impact 를 얇게 감싼다.
  *  - 접근 속도(impulse, m/s) → light / medium / heavy.
  *  - 50 ms 미만 간격의 진동은 버린다(연속 충돌이 한 덩어리 진동으로 뭉개지는 것을 막는다).
- *  - 웹에서 navigator.vibrate 가 없으면 완전한 no-op. 어떤 경우에도 throw 하지 않는다.
+ *  - Haptics 플러그인이 없으면(웹·옛 바이너리) navigator.vibrate, 그것도 없으면 완전한 no-op. 어떤 경우에도 throw 하지 않는다.
  *  - 예약은 setTimeout + performance.now() — UI 타이밍이므로 물리의 결정론 규칙과 무관하다.
  *  - 시뮬 루프(재생 프레임) 안에서 호출하지 않는다. 샷 시작 시 이벤트 목록을 통째로 예약한다.
  */
-import { Capacitor } from "@capacitor/core";
+import { hasPlugin } from "@shared/nativeCaps";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import type { SoundEvent } from "./audioMapping";
 
@@ -72,10 +72,10 @@ export class SimHaptics {
     private native: boolean;
 
     constructor() {
-        let native = false;
-        try { native = Capacitor.isNativePlatform(); } catch { native = false; }
-        this.native = native;
-        this.enabled = native || hasVibrate();
+        // 네이티브라도 Haptics 플러그인이 없는 옛 바이너리(안드로이드 1.0.2 등)는 navigator.vibrate 로 내려간다 —
+        // isNativePlatform 만 보면 없는 플러그인을 불러 아무 진동도 없다.
+        this.native = hasPlugin("Haptics");
+        this.enabled = this.native || hasVibrate();
     }
 
     isAvailable(): boolean {
