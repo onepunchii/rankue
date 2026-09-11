@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import { TABLES } from "@shared/sim/params";
 import { openingLayout } from "@shared/sim/layouts";
 import { normalizeAngle } from "./aim";
-import { beginGesture, hitBall, moveGesture, type GestureEnv } from "./tableGestures";
+import {
+    beginGesture, gestureActive, hitBall, idleGestureState, isAbnormalReset, moveGesture, planGestureReset, shouldDropStale,
+    staleResetReason, type GestureEnv, type TableGestureState,
+} from "./tableGestures";
 
 const table = TABLES.DAEDAE;
 const R = table.ball.R;
@@ -78,5 +81,115 @@ describe("tableGestures", () => {
 
     it("큐볼이 없으면 null", () => {
         expect(beginGesture(env({ cueBallId: "ghost" }), [cx, cy + 0.3])).toBeNull();
+    });
+});
+
+/** 페이지가 pointerdown 에서 만드는 조준 기록(주인 손가락 id, dragging 켜짐) */
+const aimingState = (pointerId: number, patch: Partial<TableGestureState> = {}): TableGestureState => ({
+    ...idleGestureState(),
+    gesture: beginGesture(env(), [cx, cy + 0.3]),
+    pointerId,
+    lastScreen: [100, 200],
+    pointers: new Map([[pointerId, [100, 200]]]),
+    dragging: true,
+    ...patch,
+});
+
+describe("조준 기록 정리(2026-09-11 먹통 수정)", () => {
+    it("회귀: 뗌 신호가 빠진 뒤(top 뷰) 다음 터치는 옛 기록을 버리고 새 조준을 시작해 각이 다시 돈다", () => {
+        // 손가락 6 으로 조준 중 — pointerup/cancel 이 오지 않았다(OS 메뉴가 가로챔). 새 터치 7 은 첫 손가락(isPrimary)이고 캡처도 이미 없다.
+        const stuck = aimingState(6);
+        const reason = staleResetReason({ view: "top", isPrimary: true, hasCapture: false });
+        expect(reason).toBe("stale-pointerdown");
+        const plan = planGestureReset(stuck, reason!);
+        expect(plan.next).toEqual(idleGestureState());
+        expect(plan.releasePointerId).toBe(6);
+        expect(plan.clearDisplay).toBe(true); // dragging 이 굳어 직선 안내만 보이던 것을 푼다
+        expect(plan.abnormal).toBe(true);
+        // 새 손가락으로 시작한 조준이 실제로 각을 바꾼다(예전엔 여기서 return 해 0°)
+        const g = beginGesture(env(), [cx, cy + 0.3])!;
+        const m = moveGesture(g, [cx - 0.3, cy], Math.PI / 2);
+        expect(m.phi).toBeCloseTo(Math.PI, 9);
+    });
+
+    it("회귀: 뗌 신호가 빠진 채 캡처만 풀리면(lostpointercapture) 그 자리에서 비우고 계측한다", () => {
+        const plan = planGestureReset(aimingState(3), "lostcapture");
+        expect(plan.next.pointerId).toBeNull();
+        expect(plan.next.gesture).toBeNull();
+        expect(plan.next.pointers.size).toBe(0);
+        expect(plan.abnormal).toBe(true);
+    });
+
+    it("회귀: 선수 시점에서 뗌 신호가 빠지면 새 첫 손가락(isPrimary)이나 캡처가 풀린 옛 손가락 모두 새로 시작", () => {
+        expect(staleResetReason({ view: "player", isPrimary: true, hasCapture: true })).toBe("stale-pointerdown");
+        expect(staleResetReason({ view: "player", isPrimary: false, hasCapture: false })).toBe("stale-pointerdown");
+        expect(shouldDropStale({ view: "player", isPrimary: true, hasCapture: false })).toBe(true);
+    });
+
+    it("선수 시점의 진짜 두 번째 손가락(첫 손가락이 캡처를 쥐고 있음)은 그대로 둔다 — 핀치 축소", () => {
+        expect(staleResetReason({ view: "player", isPrimary: false, hasCapture: true })).toBeNull();
+        expect(shouldDropStale({ view: "player", isPrimary: false, hasCapture: true })).toBe(false);
+    });
+
+    it("top 뷰의 진짜 두 번째 손가락은 새 조준으로 넘기되 비정상으로 세지 않는다", () => {
+        const reason = staleResetReason({ view: "top", isPrimary: false, hasCapture: true });
+        expect(reason).toBe("second-finger");
+        expect(planGestureReset(aimingState(1), reason!).abnormal).toBe(false);
+    });
+
+    it("top 뷰 재생 중 길게 누르기(hold)에 살아 있는 두 번째 손가락이 닿으면 예전처럼 무시한다 — 4× 가 끊기지 않게", () => {
+        expect(staleResetReason({ view: "top", isPrimary: false, hasCapture: true, gesture: "hold" })).toBeNull();
+        // 뗌 신호를 놓친 증거가 있으면 hold 여도 버린다
+        expect(staleResetReason({ view: "top", isPrimary: true, hasCapture: true, gesture: "hold" })).toBe("stale-pointerdown");
+        expect(staleResetReason({ view: "top", isPrimary: false, hasCapture: false, gesture: "hold" })).toBe("stale-pointerdown");
+        // 조준·공 옮기기는 조준 단계라 샷 전엔 단계 전환이 없다 — 늘 새 손가락으로 넘긴다
+        expect(staleResetReason({ view: "top", isPrimary: false, hasCapture: true, gesture: "aim" })).toBe("second-finger");
+        expect(staleResetReason({ view: "top", isPrimary: false, hasCapture: true, gesture: "place" })).toBe("second-finger");
+        expect(staleResetReason({ view: "player", isPrimary: false, hasCapture: true, gesture: "hold" })).toBeNull();
+    });
+
+    it("길게 눌러 4× 가 켜진 채 풀리면 1× 로, 타이머만 걸린 상태면 타이머만 끈다", () => {
+        const fast = planGestureReset({ ...idleGestureState(), gesture: { kind: "hold" }, pointerId: 2, holdFast: true }, "hidden");
+        expect(fast.restoreSpeed).toBe(true);
+        expect(fast.clearHoldTimer).toBe(false);
+        expect(fast.abnormal).toBe(true);
+        const pending = planGestureReset({ ...idleGestureState(), gesture: { kind: "hold" }, pointerId: 2, holdPending: true }, "end");
+        expect(pending.clearHoldTimer).toBe(true);
+        expect(pending.restoreSpeed).toBe(false);
+        expect(pending.abnormal).toBe(false);
+    });
+
+    it("핀치 끝: 원래 크기로 돌아가고 남은 손가락 항목까지 지운다(다음 핀치 판정 size===2 가 틀어지지 않게)", () => {
+        const pinching = aimingState(1, {
+            pointers: new Map([[1, [0, 0]], [2, [50, 50]]]), pinch: { d0: 70 }, dragging: false,
+        });
+        const plan = planGestureReset(pinching, "pinch-end");
+        expect(plan.restoreZoom).toBe(true);
+        expect(plan.next.pointers.size).toBe(0);
+        expect(plan.next.pinch).toBeNull();
+        expect(plan.abnormal).toBe(false);
+    });
+
+    it("blur·visibility 는 제스처가 걸려 있을 때만 비정상, 단계 전환·언마운트는 늘 정상", () => {
+        expect(isAbnormalReset("blur", false)).toBe(false);
+        expect(isAbnormalReset("blur", true)).toBe(true);
+        expect(isAbnormalReset("hidden", true)).toBe(true);
+        expect(isAbnormalReset("pagehide", true)).toBe(true);
+        expect(isAbnormalReset("phase", true)).toBe(false);
+        expect(isAbnormalReset("unmount", true)).toBe(false);
+        expect(isAbnormalReset("end", true)).toBe(false);
+        expect(planGestureReset(idleGestureState(), "blur")).toMatchObject({ wasActive: false, abnormal: false, releasePointerId: null });
+        // 표시만 남은 상태(dragging)도 진행 중으로 본다 — 굳은 직선 안내가 바로 그 증상이다
+        expect(gestureActive({ ...idleGestureState(), dragging: true })).toBe(true);
+    });
+
+    it("언마운트는 기록·타이머·캡처만 비우고 컨트롤러·렌더러·React 상태는 건드리지 않는다", () => {
+        const plan = planGestureReset(aimingState(4, { holdFast: true, holdPending: true, pinch: { d0: 10 } }), "unmount");
+        expect(plan.releasePointerId).toBe(4);
+        expect(plan.clearHoldTimer).toBe(true);
+        expect(plan.restoreSpeed).toBe(false);
+        expect(plan.restoreZoom).toBe(false);
+        expect(plan.clearDisplay).toBe(false);
+        expect(plan.next).toEqual(idleGestureState());
     });
 });

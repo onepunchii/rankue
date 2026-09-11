@@ -1543,3 +1543,24 @@ html[data-bottom-nav] .rk-install-banner {
     /* 네비게이션 바 색상과 동일하게 */
   }
 }
+/* 시뮬레이터(당구 게임·연습)가 떠 있는 동안만 글자 선택과 길게 누르기 메뉴를 끈다 — SimulatorPage 가 마운트될 때
+   <html> 에 붙이고 언마운트될 때 뗀다(2026-09-11 먹통 수정 2단계). 조준 화면 본문은 select-none 이지만, body 로 포털되는
+   시트(당점·이닝·해법)·대화상자·토스트는 그 밖이라 따닥·길게 누르기에 '복사하기' 메뉴가 뜰 수 있었고, 그 메뉴가 테이블의
+   뗌 신호를 삼키면 조준이 굳었다. 공용 부품(sheet.tsx·toast.tsx)을 고치면 다른 페이지까지 바뀌므로 여기서 문서 단위로 건다.
+   입력칸은 예외 — 설정 창 숫자 입력 붙여넣기가 살아야 하고, iOS 사파리는 입력칸에 user-select:none 이 걸리면 입력이 막힌다.
+   예외 규칙은 :is() 없이 풀어 쓴다(구형 웹뷰가 :is 를 모르면 규칙째 버려 입력칸까지 잠긴다). 특이도: 아래 (0,1,2)+ > 위 (0,1,1). */
+html.sim-no-select,
+html.sim-no-select * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+html.sim-no-select input,
+html.sim-no-select textarea,
+html.sim-no-select [contenteditable],
+html.sim-no-select [contenteditable] * {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}

@@ -17,6 +17,7 @@ import { buildConfig } from "./setupPresets";
 import { encodePageConfig } from "./pageConfig";
 import { paramsFromConfig } from "./simReducer";
 import { encodeReplay, replaySource } from "./share/replayLink";
+import { resetTelemetrySession } from "./gestureTelemetry";
 
 const nav = vi.hoisted(() => ({ search: "", navigate: vi.fn(), apiRequest: vi.fn(), toast: vi.fn() }));
 
@@ -358,5 +359,57 @@ describe("SimulatorPage", () => {
         const broken = mount();
         expect(broken.container.querySelector("[role=dialog]")).not.toBeNull();
         expect(broken.container.textContent).toContain(ko["sim.setup.title"]);
+    });
+    describe("테이블 조준 기록 자가 복구(2026-09-11 먹통 회귀)", () => {
+        const sent = vi.fn((_url: string, _init?: RequestInit) => Promise.resolve(new Response(null, { status: 204 })));
+        /** jsdom 엔 PointerEvent 가 없다 — MouseEvent 에 포인터 필드를 붙여 React 의 onPointer* 로 흘린다. */
+        const pointer = (el: Element, type: string, id: number, primary = true) => React.act(() => {
+            const ev = new window.MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: 40, clientY: 60 });
+            Object.defineProperties(ev, { pointerId: { value: id }, isPrimary: { value: primary }, pointerType: { value: "touch" } });
+            el.dispatchEvent(ev);
+        });
+        const reasons = () => sent.mock.calls.map((c) => (JSON.parse(String(c[1]?.body)) as { reason: string }).reason);
+        const openPractice = () => {
+            nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
+            const h = mount();
+            return { h, table: h.container.querySelector("[data-sim-table]")! };
+        };
+        afterEach(() => { vi.unstubAllGlobals(); sent.mockClear(); });
+
+        it("뗌 신호가 빠진 뒤의 새 터치는 옛 기록을 버리고 새 조준이 된다 — 그 손가락을 떼면 깨끗해진다", () => {
+            resetTelemetrySession();
+            vi.stubGlobal("fetch", sent);
+            const { table } = openPractice();
+            expect(document.documentElement.classList.contains("sim-no-select")).toBe(true);
+            pointer(table, "pointerdown", 1); // pointerup 이 오지 않는다(OS 메뉴가 가로챔)
+            pointer(table, "pointerdown", 2); // 예전엔 '두 번째 손가락'으로 무시돼 영구히 굳었다
+            expect(reasons()).toEqual(["stale-pointerdown"]);
+            const body = JSON.parse(String(sent.mock.calls[0][1]?.body));
+            expect(body).toMatchObject({ kind: "sim-gesture-recover", view: "top", mode: "practice", native: false });
+            // 새 손가락(2)이 조준 기록의 주인이 됐다 — 그 뗌 신호로 정상 정리되고 다음 터치는 복구 없이 시작된다
+            pointer(table, "pointerup", 2);
+            pointer(table, "pointerdown", 3);
+            pointer(table, "pointerup", 3);
+            expect(reasons()).toEqual(["stale-pointerdown"]);
+        });
+
+        it("캡처가 뗌 신호 없이 풀리면(lostpointercapture) 그 자리에서 풀린다 · 정상 뗌은 계측하지 않는다", () => {
+            resetTelemetrySession();
+            vi.stubGlobal("fetch", sent);
+            const { h, table } = openPractice();
+            pointer(table, "pointerdown", 7);
+            pointer(table, "pointerup", 7);
+            expect(sent).not.toHaveBeenCalled();
+            pointer(table, "pointerdown", 5);
+            pointer(table, "lostpointercapture", 5);
+            expect(reasons()).toEqual(["lostcapture"]);
+            pointer(table, "pointerdown", 6); // 이미 비었으므로 옛 기록 복구가 일어나지 않는다
+            pointer(table, "pointerup", 6);
+            expect(reasons()).toEqual(["lostcapture"]);
+            // 화면이 내려가면 문서의 선택 금지도 풀린다
+            h.unmount();
+            live.splice(live.indexOf(h), 1);
+            expect(document.documentElement.classList.contains("sim-no-select")).toBe(false);
+        });
     });
 });

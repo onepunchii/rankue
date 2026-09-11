@@ -4,6 +4,8 @@
  *    렌더러는 기기 저장값(rendererChoice: "rankue.sim.renderer")과 WebGL2 탐색으로 ThreeRenderer 를 고르고, 생성 실패나
  *    컨텍스트 손실 2회면 Canvas2DRenderer 로 내려간다(같은 Renderer 계약이라 루프·오버레이·제스처는 모른다),
  *  - 테이블 포인터 제스처(조준 드래그 · 연습 모드 공 배치 · 재생 중 길게 눌러 4×)를 tableGestures 로 해석하고,
+ *    조준 기록은 resetTableGesture 한 곳에서 비운다 — 뗌 신호 말고도 캡처 상실·옛 손가락 위 새 터치·단계 전환·앱 가려짐·언마운트에서
+ *    스스로 풀린다(2026-09-11 먹통 수정). 떠 있는 동안 <html> 에 sim-no-select 를 붙여 복사하기 메뉴를 막는다(index.css),
  *  - 레이아웃 B("오른쪽 툴바형", 2026-09-07 오너 선택): 상단 띠(TopBar 44 px) 아래가 전부 테이블 영역이고, 조작은 그 위에 얹힌다 —
  *    오른쪽 열(툴바 ToolRail → 세로 큐 슬라이더 PowerRail(흰 알약) → ± → 샷 ShotButton), 왼쪽 아래 두께 독(ThicknessDock, 둘째 줄에
  *    되돌리기), 당점·큐 각은 시트(SpinSheet), 공유는 왼쪽 위 칩 열의 알약 버튼(샷 뒤). 렌더러는 TABLE_INSETS 만큼 비워 탑다운 테이블을
@@ -79,7 +81,8 @@ import { fileNameFor, gameBadge, replayShortText, sessionStatsLine, shotSubtitle
 import { useShare } from "./share/useShare";
 import { activeThickness, elevationDeg, FINE_STEP_RAD, pullbackFor, stepPower, type ThicknessStep } from "./controlsMath";
 import { appendShot, EMPTY_LOG, popShot, type InningLog } from "./inningLog";
-import { beginGesture, moveGesture, type Gesture } from "./tableGestures";
+import { beginGesture, moveGesture, planGestureReset, staleResetReason, type Gesture, type GestureResetReason } from "./tableGestures";
+import { reportGestureRecover, type TelemetryMode } from "./gestureTelemetry";
 import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
 import type { CueInput, Phase } from "./simReducer";
@@ -101,6 +104,22 @@ import { OutcomeBanner } from "./components/OutcomeBanner";
 import { InningSheet } from "./components/InningSheet";
 import { EndDialog } from "./components/EndDialog";
 import { ExitConfirm } from "./components/ExitConfirm";
+
+/**
+ * 시뮬레이터가 떠 있는 동안 <html> 에 붙이는 클래스 — index.css 가 문서 전체의 글자 선택·길게 누르기 메뉴를 끈다(입력칸 제외).
+ * 몸체로 포털되는 시트·대화상자·토스트까지 덮으려고 이 화면 루트가 아니라 문서에 건다. 화면이 겹쳐 떠도(전환 중) 마지막이
+ * 내려갈 때만 떼도록 센다.
+ */
+const NO_SELECT_CLASS = "sim-no-select";
+let noSelectHolders = 0;
+
+/** 남아 있는 글자 선택을 지운다 — 선택이 살아 있으면 다음 길게 누르기에 OS 복사하기 메뉴가 뜨고, 그 메뉴가 뗌 신호를 삼킨다. */
+function clearDocumentSelection(): void {
+    try {
+        const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
+        if (sel && sel.rangeCount > 0) sel.removeAllRanges();
+    } catch { /* 선택 API 없음 */ }
+}
 
 const OFFLINE_KEYS: Record<OfflineReason, string> = {
     "session-create": "sim.sync.offlineCreate",
@@ -569,6 +588,45 @@ export function SimulatorPage() {
     const phiAtDownRef = useRef(0);
     /** 직전 포인터의 화면 px(마운트 기준). 조준 드래그의 각 변화를 현재 카메라로 다시 재기 위해 둔다. */
     const lastScreenRef = useRef<[number, number] | null>(null);
+    /** 길게 누르기로 4× 를 켰다 — 정리할 때 1× 로 되돌릴지 여기서 안다(뗌 신호가 빠져도 빨리감기가 남지 않게). */
+    const holdFastRef = useRef(false);
+    // 정리 함수는 리스너(blur·visibilitychange)와 언마운트에서도 불리므로 참조가 안정해야 한다 — 바뀌는 값은 ref 로 읽는다
+    const actionsRef = useRef(actions);
+    actionsRef.current = actions;
+    /** 계측에 싣는 모드 */
+    const telemetryModeRef = useRef<TelemetryMode>("practice");
+    telemetryModeRef.current = drill ? "drill" : sim.mode === "match" ? "online" : "practice";
+
+    /**
+     * 조준 기록을 한 번에 비운다: 제스처·주인 손가락·직전 화면점·손가락 목록·핀치·빨리감기 타이머(와 켜진 4×)·dragging·placing.
+     * 예전엔 onPointerEnd(같은 손가락의 up/cancel)만 이 일을 해서, 그 신호 하나가 빠지면 새 터치가 전부 '두 번째 손가락'으로
+     * 무시되고 dragging 이 굳어 직선 안내만 보였다(± 버튼만 먹는 먹통). 판단은 tableGestures.planGestureReset, 여기선 실행만.
+     * 비정상 사유(캡처 상실·옛 손가락 위 새 터치·제스처 중 앱 가려짐)면 계측 한 건.
+     */
+    const resetTableGesture = useCallback((reason: GestureResetReason) => {
+        const v = viewRef.current;
+        const plan = planGestureReset({
+            gesture: gestureRef.current, pointerId: pointerIdRef.current, lastScreen: lastScreenRef.current,
+            pointers: pointersRef.current, pinch: pinchRef.current,
+            holdPending: holdTimerRef.current !== null, holdFast: holdFastRef.current,
+            dragging: v.dragging, placing: v.placing,
+        }, reason);
+        const next = plan.next;
+        gestureRef.current = next.gesture;
+        pointerIdRef.current = next.pointerId;
+        lastScreenRef.current = next.lastScreen;
+        pointersRef.current = next.pointers;
+        pinchRef.current = next.pinch;
+        holdFastRef.current = next.holdFast;
+        if (plan.clearHoldTimer && holdTimerRef.current) clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+        // 이미 풀린 캡처(뗌 신호를 놓친 손가락)는 브라우저가 예외를 낸다
+        if (plan.releasePointerId !== null) { try { tableRef.current?.releasePointerCapture(plan.releasePointerId); } catch { /* 이미 풀림 */ } }
+        if (plan.restoreZoom) rendererRef.current?.setZoom?.(1);
+        if (plan.restoreSpeed) actionsRef.current.setSpeed(1);
+        if (plan.clearDisplay) { setDragging(false); setPlacing(null); }
+        if (plan.abnormal) reportGestureRecover({ reason, view: v.cameraView, mode: telemetryModeRef.current });
+    }, []);
 
     const screenPoint = (e: React.PointerEvent<HTMLDivElement>): [number, number] => {
         const r = e.currentTarget.getBoundingClientRect();
@@ -591,20 +649,34 @@ export function SimulatorPage() {
 
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
-        pointersRef.current.set(e.pointerId, screenPoint(e));
+        clearDocumentSelection();
         if (pointerIdRef.current !== null) {
-            // 두 번째 손가락: 선수 시점(3D)에서 조준 중이면 핀치 축소 — 조준 드래그는 취소하고 시작 각으로 되돌린다(2026-09-07 오너 요청:
-            // 30 % 까지만 작아지고 떼면 원래대로). 그 밖(공 옮기기·재생·top 뷰)에선 무시.
-            const g = gestureRef.current;
-            const renderer = rendererRef.current;
-            if (g?.kind === "aim" && !pinchRef.current && pointersRef.current.size === 2 && viewRef.current.cameraView === "player" && renderer?.setZoom) {
-                actions.setPhi(phiAtDownRef.current);
-                pinchRef.current = { d0: Math.max(1, pinchDistance()) };
-                try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
-                setDragging(false);
+            // 옛 손가락 기록이 남아 있다. 그 손가락이 살아 있다는 증거(이 터치가 두 번째 손가락 + 캡처 유지)가 없으면 뗌 신호를 놓친 것 —
+            // 버리고 이 손가락으로 조준을 새로 시작한다. top 뷰엔 두 손가락 기능이 없어 새로 시작한다 — 재생 중 길게 누르기만 예외로
+            // 두 번째 손가락을 무시해 4× 가 이어진다(staleResetReason).
+            let hasCapture = false;
+            try { hasCapture = e.currentTarget.hasPointerCapture(pointerIdRef.current); } catch { /* 조회 불가 = 캡처 없음으로 본다 */ }
+            const stale = staleResetReason({
+                view: viewRef.current.cameraView, isPrimary: e.isPrimary, hasCapture, gesture: gestureRef.current?.kind ?? null,
+            });
+            if (stale) {
+                resetTableGesture(stale);
+            } else {
+                // 두 번째 손가락: 선수 시점(3D)에서 조준 중이면 핀치 축소 — 조준 드래그는 취소하고 시작 각으로 되돌린다(2026-09-07 오너 요청:
+                // 30 % 까지만 작아지고 떼면 원래대로). 그 밖(공 옮기기·재생)에선 무시.
+                pointersRef.current.set(e.pointerId, screenPoint(e));
+                const g = gestureRef.current;
+                const renderer = rendererRef.current;
+                if (g?.kind === "aim" && !pinchRef.current && pointersRef.current.size === 2 && viewRef.current.cameraView === "player" && renderer?.setZoom) {
+                    actions.setPhi(phiAtDownRef.current);
+                    pinchRef.current = { d0: Math.max(1, pinchDistance()) };
+                    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
+                    setDragging(false);
+                }
+                return;
             }
-            return;
         }
+        pointersRef.current.set(e.pointerId, screenPoint(e));
         const p = unprojectEvent(e);
         if (!p) return;
         const v = viewRef.current;
@@ -614,7 +686,7 @@ export function SimulatorPage() {
         pointerIdRef.current = e.pointerId;
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
         if (g.kind === "hold") {
-            holdTimerRef.current = setTimeout(() => { holdTimerRef.current = null; actions.setSpeed(4); }, HOLD_FF_MS);
+            holdTimerRef.current = setTimeout(() => { holdTimerRef.current = null; holdFastRef.current = true; actions.setSpeed(4); }, HOLD_FF_MS);
         } else if (g.kind === "aim") {
             phiAtDownRef.current = v.input.phi;
             setDragging(true);
@@ -651,32 +723,63 @@ export function SimulatorPage() {
     const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
         pointersRef.current.delete(e.pointerId);
         if (pinchRef.current) {
-            // 어느 손가락이든 떼면 핀치 끝: 원래 크기로 돌아가고 남은 손가락은 제스처를 잇지 않는다
-            pinchRef.current = null;
-            rendererRef.current?.setZoom?.(1);
-            gestureRef.current = null;
-            pointerIdRef.current = null;
-            lastScreenRef.current = null;
+            // 어느 손가락이든 떼면 핀치 끝: 원래 크기로 돌아가고 남은 손가락은 제스처를 잇지 않는다.
+            // 남은 손가락 항목까지 목록에서 비운다 — 남겨 두면 다음 핀치 판정(size===2)이 틀어졌다(2026-09-11 검토).
             try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-            setDragging(false);
-            setPlacing(null);
+            resetTableGesture("pinch-end");
             return;
         }
         if (e.pointerId !== pointerIdRef.current) return;
-        const g = gestureRef.current;
-        gestureRef.current = null;
-        pointerIdRef.current = null;
-        lastScreenRef.current = null;
-        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-        if (g?.kind === "hold") {
-            if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-            actions.setSpeed(1);
-        }
-        setDragging(false);
-        setPlacing(null);
+        resetTableGesture("end");
     };
 
-    useEffect(() => () => { if (holdTimerRef.current) clearTimeout(holdTimerRef.current); }, []);
+    // 추적 중인 손가락의 캡처가 뗌 신호 없이 풀렸다(± 버튼·당점 패드와 같은 안전망). 정상 흐름에선 up/cancel 이 먼저 와서
+    // onPointerEnd 가 기록을 비우므로 여기선 id 가 맞지 않는다.
+    const onLostPointerCapture = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (pointerIdRef.current === null || e.pointerId !== pointerIdRef.current) return;
+        resetTableGesture("lostcapture");
+    };
+
+    // 단계가 바뀌면(샷 발사·차례 넘김·나가기) 진행 중이던 테이블 제스처는 이어질 수 없다 — 굳은 기록이 다음 단계로 새지 않게 비운다.
+    // 대전 '나가기 → 목록 → 다시 입장'은 같은 /online-game 이라 이 화면이 그대로 재사용되므로 여기서 풀려야 한다.
+    const gesturePhaseRef = useRef(sim.phase);
+    useEffect(() => {
+        if (gesturePhaseRef.current === sim.phase) return;
+        gesturePhaseRef.current = sim.phase;
+        resetTableGesture("phase");
+    }, [sim.phase, resetTableGesture]);
+
+    // 앱이 가려지거나 포커스를 잃으면(홈으로 나감·알림 창·OS 메뉴) 뗌 신호가 오지 않을 수 있다 — 돌아왔을 때 굳어 있지 않게 비운다.
+    // 언마운트에서도 비운다(타이머·캡처만 — 컨트롤러는 함께 사라진다).
+    useEffect(() => {
+        const onBlur = () => resetTableGesture("blur");
+        const onVisibility = () => { if (document.visibilityState === "hidden") resetTableGesture("hidden"); };
+        const onPageHide = () => resetTableGesture("pagehide");
+        window.addEventListener("blur", onBlur);
+        document.addEventListener("visibilitychange", onVisibility);
+        window.addEventListener("pagehide", onPageHide);
+        return () => {
+            window.removeEventListener("blur", onBlur);
+            document.removeEventListener("visibilitychange", onVisibility);
+            window.removeEventListener("pagehide", onPageHide);
+            resetTableGesture("unmount");
+        };
+    }, [resetTableGesture]);
+
+    // 복사하기 메뉴 막기: 떠 있는 동안 <html> 에 sim-no-select(index.css), 테이블에선 선택 시작 자체를 막는다.
+    useEffect(() => {
+        const root = document.documentElement;
+        noSelectHolders += 1;
+        root.classList.add(NO_SELECT_CLASS);
+        const el = tableRef.current;
+        const stopSelect = (ev: Event) => ev.preventDefault();
+        el?.addEventListener("selectstart", stopSelect);
+        return () => {
+            el?.removeEventListener("selectstart", stopSelect);
+            noSelectHolders = Math.max(0, noSelectHolders - 1);
+            if (noSelectHolders === 0) root.classList.remove(NO_SELECT_CLASS);
+        };
+    }, []);
 
     // ── 결과 배너 ─────────────────────────────────────────────────────────
     useEffect(() => {
@@ -1127,11 +1230,13 @@ export function SimulatorPage() {
                 <div className="relative flex-1 min-h-0 overflow-hidden bg-surface-3">
                     <div
                         ref={tableRef}
+                        data-sim-table=""
                         className="absolute inset-0 touch-none bg-surface-3"
                         onPointerDown={onPointerDown}
                         onPointerMove={onPointerMove}
                         onPointerUp={onPointerEnd}
                         onPointerCancel={onPointerEnd}
+                        onLostPointerCapture={onLostPointerCapture}
                         onContextMenu={(e) => e.preventDefault()}
                     />
 

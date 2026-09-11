@@ -6,10 +6,14 @@
  *  - place: 연습 모드에서 공을 눌러 끌어 옮긴다. 잡은 지점의 오프셋을 유지해 공이 손가락 아래로 튀지 않게 한다.
  *  - hold:  재생 중 길게 누르기(4× 빨리감기). 타이머는 페이지가 돈다.
  * 화면 좌표는 y 가 뒤집혀 있으므로 반드시 테이블 좌표로 unproject 한 뒤 넘긴다(각 부호가 맞는다).
+ *
+ * 아래쪽 "조준 기록 정리"는 제스처 기록이 굳지 않게 하는 판단(2026-09-11 먹통 수정). 페이지는 ref 를 스냅샷으로 넘기고
+ * planGestureReset 이 돌려준 계획대로 부수효과(캡처 해제·타이머·속도·줌·표시 상태)만 실행한다.
  */
 import type { BallState } from "@shared/sim/types";
 import { phiFromDrag, type XY } from "./aim";
 import type { Phase } from "./simReducer";
+import type { RendererView } from "./render/Renderer";
 
 export type Gesture =
     | { readonly kind: "aim"; readonly cue: XY; readonly prev: XY; readonly moved: boolean }
@@ -74,4 +78,124 @@ export function moveGesture(g: Gesture, p: XY, phi: number): GestureMove {
     const next: Gesture = { ...g, prev: p, moved: true };
     if (dPrev < 1e-6 || dNext < 1e-6) return { gesture: next };
     return { gesture: next, phi: phiFromDrag(g.cue, g.prev, p, phi) };
+}
+
+// ── 조준 기록 정리(2026-09-11 먹통 수정) ─────────────────────────────────────
+// 예전엔 조준 기록이 "같은 손가락의 pointerup/cancel 이 테이블에 닿을 때"에만 풀렸다. 그 신호 하나가 빠지면(OS 의 복사하기 메뉴가
+// 터치를 가로채는 등) 기록이 그 판 내내 남아, 새 터치는 전부 '두 번째 손가락'으로 무시되고 dragging 이 굳어 예측 경로 대신 직선만
+// 보였다 — ± 버튼만 먹는 증상. 그래서 정리를 한 곳으로 모으고, 뗌 신호 말고도 여러 길에서 부른다.
+
+/**
+ * 조준 기록을 비우는 사유.
+ *  - 정상: end(같은 손가락 뗌) · pinch-end · second-finger(top 뷰의 진짜 두 번째 손가락) · phase(샷·차례·나가기) · unmount
+ *  - 비정상(현장 계측 대상): lostcapture(추적 중인 손가락의 캡처가 뗌 없이 풀림) · stale-pointerdown(옛 손가락 기록 위에 새 터치) ·
+ *    blur/hidden/pagehide 가 제스처 도중에 옴
+ * 서버(server/routes/modules/errors.ts 의 SIM_REASONS)는 비정상 사유만 받는다 — 비정상 사유를 늘리면 거기도 늘린다.
+ */
+export type GestureResetReason =
+    | "end" | "pinch-end" | "second-finger" | "phase" | "unmount"
+    | "lostcapture" | "stale-pointerdown" | "blur" | "hidden" | "pagehide";
+
+export interface StalePointerInput {
+    readonly view: RendererView;
+    /** 새 pointerdown 의 isPrimary — 다른 손가락이 눌려 있지 않으면 true(= 브라우저는 옛 손가락이 이미 떨어진 줄 안다). */
+    readonly isPrimary: boolean;
+    /** 테이블이 아직 옛 포인터를 붙잡고 있나(element.hasPointerCapture(oldId)). 조회가 안 되면 false 로 넘긴다. */
+    readonly hasCapture: boolean;
+    /** 옛 기록의 제스처 종류. 모르면 생략(= hold 가 아닌 것으로 본다). */
+    readonly gesture?: Gesture["kind"] | null;
+}
+
+/**
+ * 옛 추적 포인터가 남은 채 새 pointerdown 이 왔을 때 무엇으로 정리할지. null 이면 그대로 둔다(선수 시점의 진짜 두 번째 손가락 → 핀치).
+ *  - 옛 손가락이 살아 있다는 증거(isPrimary false + 캡처 유지)가 없으면 뗌 신호를 놓친 것 → stale-pointerdown(어느 뷰든).
+ *  - top 뷰엔 두 손가락 기능이 없다 — 살아 있는 두 번째 손가락이어도 옛 기록을 버리고 새 손가락으로 조준을 새로 시작한다.
+ *    단 재생 중 길게 누르기(hold)는 예전처럼 두 번째 손가락을 무시한다 — 버리면 켜진 4× 가 1× 로 떨어지고, 새 손가락을 떼는 순간
+ *    첫 손가락이 아직 누르고 있어도 1× 가 됐다(2026-09-11 검토). hold 는 재생 단계에만 있고 샷이 끝나면 단계 전환이 기록을 비우므로
+ *    여기서 두어도 판 내내 굳는 일은 없다. 공 옮기기(place)는 조준 단계라 그런 끝이 없어 버린다.
+ */
+export function staleResetReason(s: StalePointerInput): "stale-pointerdown" | "second-finger" | null {
+    if (s.isPrimary || !s.hasCapture) return "stale-pointerdown";
+    if (s.view !== "top" || s.gesture === "hold") return null;
+    return "second-finger";
+}
+
+/** 옛 기록을 버리고 새 손가락으로 시작해야 하나. */
+export function shouldDropStale(s: StalePointerInput): boolean {
+    return staleResetReason(s) !== null;
+}
+
+/** 페이지가 ref·상태로 들고 있는 테이블 제스처 전부 — 정리할 때 이 모양 그대로 비운다. */
+export interface TableGestureState {
+    gesture: Gesture | null;
+    /** 조준 기록의 주인 손가락 */
+    pointerId: number | null;
+    /** 직전 포인터의 화면 px(선수 시점 조준 드래그용) */
+    lastScreen: [number, number] | null;
+    /** 눌린 포인터 전부의 화면 px(핀치 판정 size===2) */
+    pointers: Map<number, [number, number]>;
+    pinch: { d0: number } | null;
+    /** 길게 누르기 타이머가 걸려 있다(아직 4× 전) */
+    holdPending: boolean;
+    /** 길게 누르기로 4× 가 켜졌다 — 정리할 때 1× 로 되돌린다 */
+    holdFast: boolean;
+    /** 조준 드래그 표시(true 면 오버레이가 예측 경로 대신 직선) */
+    dragging: boolean;
+    /** 연습 모드에서 옮기는 중인 공 */
+    placing: string | null;
+}
+
+export function idleGestureState(): TableGestureState {
+    return {
+        gesture: null, pointerId: null, lastScreen: null, pointers: new Map(), pinch: null,
+        holdPending: false, holdFast: false, dragging: false, placing: null,
+    };
+}
+
+/** 정리 직전 무엇이든 진행 중(또는 표시가 남아 있음)이었나. */
+export function gestureActive(s: TableGestureState): boolean {
+    return s.gesture !== null || s.pointerId !== null || s.pinch !== null || s.holdPending || s.holdFast || s.dragging || s.placing !== null;
+}
+
+/** 계측할 비정상 복구인가. 캡처 상실·앱 가려짐은 제스처가 걸려 있었을 때만 비정상이다(평소 blur 는 셀 이유가 없다). */
+export function isAbnormalReset(reason: GestureResetReason, wasActive: boolean): boolean {
+    switch (reason) {
+        case "stale-pointerdown": return true;
+        case "lostcapture": case "blur": case "hidden": case "pagehide": return wasActive;
+        default: return false;
+    }
+}
+
+export interface GestureResetPlan {
+    /** 정리 뒤 상태(늘 빈 상태 — 핀치의 남은 손가락 항목까지 지운다) */
+    readonly next: TableGestureState;
+    /** 캡처를 놓을 옛 추적 포인터. 없으면 null. 이미 풀렸으면 브라우저가 예외를 내므로 페이지가 삼킨다. */
+    readonly releasePointerId: number | null;
+    readonly clearHoldTimer: boolean;
+    /** 길게 누르기가 켠 4× 를 1× 로 */
+    readonly restoreSpeed: boolean;
+    /** 핀치 축소를 원래 크기로 */
+    readonly restoreZoom: boolean;
+    /** dragging·placing 표시를 끈다 */
+    readonly clearDisplay: boolean;
+    readonly wasActive: boolean;
+    readonly abnormal: boolean;
+}
+
+/**
+ * 조준 기록 정리 계획(순수). 언마운트면 기록·타이머·캡처만 비우고 컨트롤러·렌더러·React 상태는 건드리지 않는다(곧 함께 사라진다).
+ */
+export function planGestureReset(s: TableGestureState, reason: GestureResetReason): GestureResetPlan {
+    const live = reason !== "unmount";
+    const wasActive = gestureActive(s);
+    return {
+        next: idleGestureState(),
+        releasePointerId: s.pointerId,
+        clearHoldTimer: s.holdPending,
+        restoreSpeed: live && s.holdFast,
+        restoreZoom: live && s.pinch !== null,
+        clearDisplay: live,
+        wasActive,
+        abnormal: isAbnormalReset(reason, wasActive),
+    };
 }
