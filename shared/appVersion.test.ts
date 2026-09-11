@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { APP_UPDATE_POLICY, decideUpdate, parseBuildNumber, shownToday, type UpdatePolicy } from "./appVersion";
+import { APP_UPDATE_POLICY, compareVersions, decideUpdate, isPolicyActive, parseBuildNumber, shownToday, type UpdatePolicy } from "./appVersion";
 
 const on = (latestBuild: number, minBuild = 0): UpdatePolicy => ({ enabled: true, latestBuild, minBuild });
 
@@ -30,6 +30,46 @@ describe("decideUpdate", () => {
         expect(decideUpdate(on(7), null)).toBe("suggest");
         expect(decideUpdate(on(7, 6), null)).toBe("force");
         expect(decideUpdate(on(7, 6), NaN)).toBe("force");
+    });
+});
+
+describe("iOS 자동 켜기(App Store 에 새 버전이 올라오면)", () => {
+    const ios = APP_UPDATE_POLICY.ios;
+    it("출고 정책: iOS 는 1.2 가 스토어에 뜨면 자동, 안드로이드는 수동", () => {
+        expect(ios.autoWhenStoreVersion).toBe("1.2");
+        expect(APP_UPDATE_POLICY.android.autoWhenStoreVersion).toBeUndefined();
+    });
+    it("스토어가 아직 1.1 이면 안 띄운다", () => {
+        expect(decideUpdate(ios, 6, "1.1")).toBe("none");
+        expect(decideUpdate(ios, null, "1.1")).toBe("none");
+    });
+    it("스토어에 1.2 이상이 뜨면 옛 빌드에 권유, 새 빌드엔 없음", () => {
+        expect(decideUpdate(ios, 6, "1.2")).toBe("suggest");
+        expect(decideUpdate(ios, 2, "1.2.1")).toBe("suggest");
+        expect(decideUpdate(ios, 7, "1.2")).toBe("none");
+        expect(decideUpdate(ios, 8, "1.3")).toBe("none");
+    });
+    it("스토어 버전을 모르면(조회 실패) 안 띄운다", () => {
+        expect(decideUpdate(ios, 6, null)).toBe("none");
+        expect(decideUpdate(ios, 6, undefined)).toBe("none");
+        expect(decideUpdate(ios, 6, "beta")).toBe("none");
+    });
+    it("enabled 가 true 면 스토어 버전과 상관없이 켠다", () => {
+        expect(isPolicyActive({ enabled: true, latestBuild: 7, minBuild: 0 }, null)).toBe(true);
+        expect(isPolicyActive(undefined, "9.9")).toBe(false);
+    });
+});
+
+describe("compareVersions", () => {
+    it("자리별 숫자 비교, 모자란 자리는 0", () => {
+        expect(compareVersions("1.2", "1.1")).toBe(1);
+        expect(compareVersions("1.2", "1.2.0")).toBe(0);
+        expect(compareVersions("1.10", "1.9")).toBe(1);
+        expect(compareVersions("1.1.9", "1.2")).toBe(-1);
+    });
+    it("형식이 아니면 null", () => {
+        expect(compareVersions("abc", "1.2")).toBeNull();
+        expect(compareVersions("1.2", "")).toBeNull();
     });
 });
 

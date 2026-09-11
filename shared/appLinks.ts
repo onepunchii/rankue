@@ -7,7 +7,7 @@
 // ct / referrer 는 유입 출처 추적용이다. 이게 없으면 "어느 자리가 설치를 만들었나"를
 // App Store Connect·Play Console 에서 영영 알 수 없다.
 
-const IOS_APP_ID = "6760333313";
+export const IOS_APP_ID = "6760333313";
 const ANDROID_PACKAGE = "com.rankue.app";
 export const WEB_URL = "https://www.rankue.co.kr";
 

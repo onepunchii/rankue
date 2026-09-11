@@ -3,10 +3,12 @@ import { App } from "@capacitor/app";
 import { LucideDownload } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 import { openStorePage } from "@/lib/nativeBridge";
-import { APP_UPDATE_POLICY, decideUpdate, parseBuildNumber, shownToday, type UpdateDecision } from "@shared/appVersion";
+import { apiRequest } from "@/lib/queryClient";
+import { APP_UPDATE_POLICY, decideUpdate, isPolicyActive, parseBuildNumber, shownToday, type UpdateDecision } from "@shared/appVersion";
 import { hasPlugin, platform } from "@shared/nativeCaps";
 
-// 앱 업데이트 안내(감사 N7·C-O5). 정책은 shared/appVersion.ts — 출고 상태는 두 플랫폼 모두 꺼져 있어 지금은 아무것도 안 뜬다.
+// 앱 업데이트 안내(감사 N7·C-O5). 정책은 shared/appVersion.ts —
+// iOS 는 App Store 에 새 버전이 실제로 올라오면 자동으로 켜지고(서버가 확인), 안드로이드는 enabled 로 수동으로 켠다.
 //  - 권유(최신 빌드보다 낮음): 닫을 수 있고 하루 한 번.
 //  - 강제(최소 빌드보다 낮음): 닫을 수 없다.
 // 버튼: 새 안드로이드 앱은 Play 인앱 업데이트(앱을 떠나지 않고 받는다), 그 밖에는 스토어 페이지.
@@ -33,6 +35,16 @@ async function installedBuild(): Promise<number | null> {
     if (!hasPlugin("App")) return null;
     try {
         return parseBuildNumber((await App.getInfo()).build);
+    } catch {
+        return null;
+    }
+}
+
+/** iOS 자동 켜기용 — App Store 에 지금 올라가 있는 버전(서버가 애플 공개 조회로 확인). 못 읽으면 null(→ 안내 안 함). */
+async function iosStoreVersion(): Promise<string | null> {
+    try {
+        const r = (await apiRequest("/api/hiq/app/store-version")) as { ios?: unknown } | null;
+        return typeof r?.ios === "string" ? r.ios : null;
     } catch {
         return null;
     }
@@ -71,17 +83,21 @@ export function UpdatePromptSheet({ onOpenChange }: { onOpenChange?: (open: bool
         const p = platform();
         if (p === "web") return;
         const policy = APP_UPDATE_POLICY[p];
-        if (!policy.enabled) return; // 꺼져 있으면 빌드 번호도 읽지 않는다
+        const auto = !policy.enabled && !!policy.autoWhenStoreVersion && p === "ios";
+        if (!policy.enabled && !auto) return; // 꺼져 있으면 스토어도, 빌드 번호도 묻지 않는다
         let alive = true;
-        void installedBuild().then((build) => {
+        void (async () => {
+            const storeVersion = auto ? await iosStoreVersion() : null;
+            if (!alive || !isPolicyActive(policy, storeVersion)) return;
+            const build = await installedBuild();
             if (!alive) return;
-            const d = decideUpdate(policy, build);
+            const d = decideUpdate(policy, build, storeVersion);
             if (d === "suggest") {
                 if (shownToday(readShownAt(), Date.now())) return;
                 writeShownAt(Date.now());
             }
             setDecision(d);
-        });
+        })();
         return () => { alive = false; };
     }, []);
 

@@ -16,6 +16,7 @@ import communityRouter from "./modules/community.js";
 import umbRouter from "./modules/umb.js";
 import pbaRouter from "./modules/pba.js";
 import listingsRouter from "./modules/listings.js";
+import appMetaRouter from "./modules/appMeta.js";
 
 const router = Router();
 
@@ -75,5 +76,8 @@ router.use("/listings", listingsRouter);
 
 // 13. PBA 투어 (/pba) — 공개 읽기 전용
 router.use("/pba", pbaRouter);
+
+// 14. 앱 메타 (/app) — 스토어에 올라가 있는 버전(옛 앱 업데이트 안내 자동 켜기용), 공개
+router.use("/app", appMetaRouter);
 
 export default router;
