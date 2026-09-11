@@ -77,7 +77,7 @@ async function sendFcm(token: string, payload: PushPayload): Promise<'ok' | 'dea
         token,
         notification: { title: payload.title, body: payload.body },
         data: { url: payload.url ?? '/' },
-        android: { notification: { tag: payload.tag ?? undefined, icon: 'ic_stat_notify', color: '#10B981' } },
+        android: { notification: { tag: payload.tag ?? undefined, icon: 'ic_stat_notify', color: '#64DD17' } },
       },
     }),
   });
