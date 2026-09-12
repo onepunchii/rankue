@@ -33,6 +33,15 @@ export interface SessionState {
     readonly shotCount: number;
     readonly status: "playing" | "finished";
     readonly winnerIndex: number | null;
+    /**
+     * 후구(마지막 동점 이닝) 진행 중이면 먼저 목표에 닿은 사람의 자리. 없으면 null(2026-09-12 테스터 제보 → 오너 결정).
+     *
+     * 왜 있나: 자리 0 이 매 이닝을 먼저 친다. 그 사람이 목표에 닿는 순간 끝내 버리면 상대는 그 이닝을 못 쳐 본다.
+     * 그래서 3쿠션 공식전은 후공에게 한 이닝을 더 줘 이닝 수를 맞춘다 — 그게 후구다. 따라붙으면 무승부.
+     * 자리 1 이 목표에 닿았을 때는 이미 이닝이 같으므로 바로 끝난다. 혼자 치는 연습(1인)도 바로 끝난다.
+     * 옛 대전 행에는 이 칸이 없다(undefined) — null 과 같게 다룬다.
+     */
+    readonly pendingWinner?: number | null;
 }
 
 export interface CreateSessionOptions {
@@ -53,7 +62,7 @@ export function createSession(o: CreateSessionOptions): SessionState {
     if (players.length === 2 && players[0].cueBallId === players[1].cueBallId) throw new RangeError("cue balls must differ");
     return {
         rules: o.rules, finishType: o.finishType ?? "none", inningCap: o.inningCap ?? 0,
-        players, turn: 0, shotCount: 0, status: "playing", winnerIndex: null,
+        players, turn: 0, shotCount: 0, status: "playing", winnerIndex: null, pendingWinner: null,
     };
 }
 
@@ -128,19 +137,39 @@ export function applyShot(s: SessionState, raw: ShotOutcome): ApplyResult {
     let status: SessionState["status"] = "playing";
     let winnerIndex: number | null = null;
     let turn = s.turn;
+    const pending = s.pendingWinner ?? null;
+    let pendingWinner: number | null = pending;
 
     if (o.scored && newScore >= me.target) {
-        status = "finished";
-        winnerIndex = s.turn;
-    } else if (o.consumesInning) {
-        turn = (s.turn + 1) % players.length;
-        if (s.inningCap > 0 && players.every((p) => p.innings >= s.inningCap)) {
+        if (pending !== null) {
+            // 후구에서 후공도 자기 목표에 닿았다 — 이닝 수가 같고 둘 다 다 쳤으니 무승부
             status = "finished";
-            winnerIndex = decideByInningCap(players);
+            winnerIndex = null;
+            pendingWinner = null;
+        } else if (players.length === 2 && s.turn === 0) {
+            // 선공이 먼저 닿았다 — 후공에게 마지막 한 이닝(후구)을 준다. 아직 끝나지 않았다.
+            pendingWinner = 0;
+            turn = 1;
+        } else {
+            status = "finished";
+            winnerIndex = s.turn;
+        }
+    } else if (o.consumesInning) {
+        if (pending !== null) {
+            // 후구를 못 채우고 이닝을 넘겼다 — 먼저 닿은 사람의 승리
+            status = "finished";
+            winnerIndex = pending;
+            pendingWinner = null;
+        } else {
+            turn = (s.turn + 1) % players.length;
+            if (s.inningCap > 0 && players.every((p) => p.innings >= s.inningCap)) {
+                status = "finished";
+                winnerIndex = decideByInningCap(players);
+            }
         }
     }
     return {
-        session: { ...s, players, turn, shotCount: s.shotCount + 1, status, winnerIndex },
+        session: { ...s, players, turn, shotCount: s.shotCount + 1, status, winnerIndex, pendingWinner },
         outcome: o,
     };
 }

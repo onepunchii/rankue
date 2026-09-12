@@ -103,7 +103,7 @@ export interface SimCallbacks {
     /** 서버 기록을 포기한 순간 1회(솔로 세션). 이후 샷은 로컬에만 남는다. */
     readonly onOffline?: (reason: OfflineReason) => void;
     /** 재생이 끝나 공이 멈춘 뒤(스냅 반영 후). 토스트·이닝 시트 갱신용. 따라잡기 재생도 온다. */
-    readonly onOutcome?: (outcome: ShotOutcome, session: SessionState) => void;
+    readonly onOutcome?: (outcome: ShotOutcome, session: SessionState, shooter: number) => void;
     /** 당점이 미스큐 범위라 샷이 거부됐다(setSpin 이 클램프하므로 정상 경로에선 나오지 않는다). */
     readonly onMiscue?: () => void;
     /** 네트워크 대전 이벤트. */
@@ -616,7 +616,7 @@ export class SimController {
         if (this.aux.speed !== 1) this.setSpeed(1);
         const after = this.store.get();
         if (snapped) this.callbacks.onMismatch?.(after.mismatches);
-        if (after.outcomeLast && after.session) this.callbacks.onOutcome?.(after.outcomeLast, after.session);
+        if (after.outcomeLast && after.session) this.callbacks.onOutcome?.(after.outcomeLast, after.session, after.shooterLast);
         this.afterMeta(before, after);
         this.resolvePlaybackWaiters();
     }

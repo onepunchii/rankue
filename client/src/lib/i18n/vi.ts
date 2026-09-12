@@ -1888,6 +1888,8 @@ const vi: Dict = {
   "sim.match.hostLabel": "Người tạo",
   "sim.match.hostTarget": "Mục tiêu của đối thủ",
   "sim.match.myTarget": "Mục tiêu của tôi",
+  "sim.match.finalInning": "Lượt gỡ hòa",
+  "sim.match.finalInningHint": "Khi người đi trước đạt mục tiêu, người sau được một lượt cuối. Gỡ kịp thì hòa",
   "sim.match.handicapOn": "Trận chấp",
   "sim.match.handicapOnDesc": "Mỗi người có mục tiêu riêng, tính từ thành tích gần đây",
   "sim.match.myHandicap": "Mục tiêu của tôi",

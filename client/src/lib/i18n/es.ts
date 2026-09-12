@@ -1888,6 +1888,8 @@ const es: Dict = {
   "sim.match.hostLabel": "Anfitrión",
   "sim.match.hostTarget": "Meta del rival",
   "sim.match.myTarget": "Mi meta",
+  "sim.match.finalInning": "Entrada de empate",
+  "sim.match.finalInningHint": "Cuando el primero llega a la meta, el segundo tiene una última entrada. Si empata, hay tablas",
   "sim.match.handicapOn": "Partida con hándicap",
   "sim.match.handicapOnDesc": "Cada jugador recibe su propia meta, según su registro reciente",
   "sim.match.myHandicap": "Mi meta",

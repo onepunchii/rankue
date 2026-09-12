@@ -49,9 +49,11 @@ describe("matchView", () => {
         expect(opponentLabel(m({ myIndex: -1 }), t)).toBe("호스트");
         expect(gameLabel(m(), t)).toBe(`${ko["sim.setup.type3c"]} · ${ko["sim.setup.tableDaedae"]}`);
         expect(gameLabel(m({ gameType: "4c", tableId: "JUNGDAE_KR" }), t)).toBe(`${ko["sim.setup.type4c"]} · ${ko["sim.setup.tableJungdae"]}`);
-        expect(rulesLabel(m(), t)).toBe(ko["sim.hud.ruleUmb"]);
-        expect(rulesLabel(m({ rules: { ...DEFAULT_3C_RULES, ruleSet: "pba" } }), t)).toBe(ko["sim.hud.rulePba"]);
-        expect(rulesLabel(m({ rules: { ...DEFAULT_4C_RULES, threeCushionDouble: true } }), t)).toBe(`${ko["sim.hud.rule4c"]} · ${ko["sim.hud.rule4cDouble"]}`);
+        // 2026-09-12: 규칙 줄 끝에 '후구' 를 붙인다 — 대전은 언제나 후구가 있다(테스터 제보 → 오너 결정)
+        const fin = ko["sim.match.finalInning"];
+        expect(rulesLabel(m(), t)).toBe(`${ko["sim.hud.ruleUmb"]} · ${fin}`);
+        expect(rulesLabel(m({ rules: { ...DEFAULT_3C_RULES, ruleSet: "pba" } }), t)).toBe(`${ko["sim.hud.rulePba"]} · ${fin}`);
+        expect(rulesLabel(m({ rules: { ...DEFAULT_4C_RULES, threeCushionDouble: true } }), t)).toBe(`${ko["sim.hud.rule4c"]} · ${ko["sim.hud.rule4cDouble"]} · ${fin}`);
         expect(inningCapLabel(0, t)).toBe(ko["sim.setup.inningNone"]);
         expect(inningCapLabel(15, t)).toBe(ko["sim.setup.inningN"].replace("{n}", "15"));
     });

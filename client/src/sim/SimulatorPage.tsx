@@ -260,8 +260,8 @@ export function SimulatorPage() {
         onMismatch: () => toast({ title: t("sim.sync.mismatch") }),
         onOffline: (reason) => toast({ title: t(OFFLINE_KEYS[reason]) }),
         onMiscue: () => toast({ title: t("sim.shot.miscue") }),
-        onOutcome: (outcome, session) => {
-            setLog((l) => appendShot(l, outcome, session));
+        onOutcome: (outcome, session, shooter) => {
+            setLog((l) => appendShot(l, outcome, session, shooter));
             setBanner({ outcome, id: session.shotCount });
             void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
         },
@@ -1241,6 +1241,7 @@ export function SimulatorPage() {
                     clock={clock}
                     strikes={strikes}
                     watchers={sim.match?.watchers ?? 0}
+                    finalInning={(sim.session?.pendingWinner ?? null) !== null}
                 />
 
                 {/* 테이블 영역: 남은 높이 전부. 렌더러·오버레이는 absolute 마운트(tableRef)에, 조작·칩은 그 형제로 얹힌다. */}

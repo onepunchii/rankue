@@ -1890,6 +1890,8 @@ export const ko: Dict = {
   "sim.match.hostLabel": "만든 사람",
   "sim.match.hostTarget": "상대 다마수",
   "sim.match.myTarget": "내 다마수",
+  "sim.match.finalInning": "후구",
+  "sim.match.finalInningHint": "선공이 목표에 닿아도 후공에게 마지막 한 이닝을 줍니다. 따라붙으면 무승부예요",
   "sim.match.handicapOn": "핸디전",
   "sim.match.handicapOnDesc": "각자 다마수가 다르게 잡혀요. 서로의 최근 온라인 기록으로 자동입니다",
   "sim.match.myHandicap": "내 다마수",

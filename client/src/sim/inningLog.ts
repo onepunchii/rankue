@@ -33,8 +33,12 @@ export function shooterIndex(outcome: Pick<ShotOutcome, "consumesInning">, after
     return (after.turn + n - 1) % n;
 }
 
-export function appendShot(log: InningLog, outcome: ShotOutcome, after: SessionState): InningLog {
-    const player = shooterIndex(outcome, after);
+/**
+ * shooter 를 넘기면 그대로 쓴다 — 후구(2026-09-12)에서는 득점 샷도 턴을 넘기므로 끝난 상태만으로는 친 사람을 알 수 없다.
+ * 안 넘기면 예전처럼 끝난 상태에서 되짚는다(shooterIndex).
+ */
+export function appendShot(log: InningLog, outcome: ShotOutcome, after: SessionState, shooter?: number): InningLog {
+    const player = shooter ?? shooterIndex(outcome, after);
     const p = after.players[player];
     // 이닝을 소모했으면 innings 가 이미 올라가 있으니 그 값이 이번 이닝 번호. 아니면 진행 중 이닝 = innings + 1.
     const inning = outcome.consumesInning ? p.innings : p.innings + 1;

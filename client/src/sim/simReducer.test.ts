@@ -533,11 +533,12 @@ describe("대전: 따라잡기 재생", () => {
         expect(u.phase).toBe("waiting");
         expect(u.session!.players[0].score).toBe(1);
     });
-    it("상대의 결승 샷 → 재생 뒤 finished(승자 상대)", () => {
+    it("방장의 결승 샷 → 후구로 내 차례가 온다(2026-09-12)", () => {
         const g = startMatch(1, publicMatch({ state: matchSession(1) }));
         const u = simReducer(replay(g, POINT, 0), { type: "playbackEnd" });
-        expect(u.phase).toBe("finished");
-        expect(u.session!.winnerIndex).toBe(0);
+        expect(u.phase).toBe("aim");                    // 아직 안 끝났다 — 내 마지막 이닝
+        expect(u.session!.status).toBe("playing");
+        expect(u.session!.pendingWinner).toBe(0);
     });
     it("해시 불일치는 누적 카운트에 들어가고, 재생 중·setup·솔로에선 무시", () => {
         const g = startMatch(1);

@@ -71,8 +71,11 @@ describe("hudMath 문구", () => {
         expect(capped.status).toBe("finished");
         expect(endTitle(capped, ["나"], t)).toBe(ko["sim.end.inningCap"]);
 
+        // 2026-09-12 후구: 선공이 먼저 닿으면 후공에게 한 이닝 — 그 이닝을 못 채워야 선공 승리다
         let duo = createSession({ rules: DEFAULT_3C_RULES, players: [{ id: "a", target: 1 }, { id: "b", target: 1 }] });
-        duo = applyShot(duo, outcome(1, true)).session;
+        duo = applyShot(duo, outcome(1, true)).session;      // 선공 1점 = 목표 → 후구
+        expect(duo.status).toBe("playing");
+        duo = applyShot(duo, outcome(0, false)).session;     // 후공 실패
         expect(endTitle(duo, ["선수 1", "선수 2"], t)).toBe("선수 1 승리");
         let draw = createSession({ rules: DEFAULT_3C_RULES, inningCap: 1, players: [{ id: "a", target: 5 }, { id: "b", target: 5 }] });
         draw = applyShot(draw, outcome(0, false)).session;

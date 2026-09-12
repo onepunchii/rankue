@@ -411,22 +411,28 @@ describe("따라잡기 재생", () => {
         expect(m.cb.onMismatch).toHaveBeenCalledWith(1);
         expect(m.s().balls).toEqual(m.srv.row.balls);
     });
-    it("상대의 결승 샷 → 재생 뒤 finished(승자 상대, endReason target) + onMatch('finished')", async () => {
+    it("방장의 결승 샷 → 후구: 내 마지막 이닝이 온다(아직 안 끝난다). 내가 못 채우면 방장 승", async () => {
+        // 2026-09-12 후구: 자리 0(방장)이 매 이닝을 먼저 치므로, 목표에 닿아도 자리 1 에게 한 이닝을 더 준다.
         const m = (make(GUEST, { hostTarget: 1 }));
         m.ctrl.startMatch(m.srv.public(GUEST));
         m.srv.shootAs(HOST, POINT_SHOT);
-        expect(m.srv.row.status).toBe("finished");
+        expect(m.srv.row.status).toBe("playing");                 // 서버도 아직 안 끝낸다
         m.env.advance(POLL_FAST_MS);
         await settle();
         expect(m.s().phase).toBe("shooting");
         m.playOut();
         await settle();
-        expect(m.s().phase).toBe("finished");
+        expect(m.s().phase).toBe("aim");                          // 내 후구 차례
+        expect(m.s().session!.pendingWinner).toBe(0);
+        expect(m.s().match!.status).toBe("playing");
+        expect(m.cb.onMatch).not.toHaveBeenCalledWith("finished");
+
+        // 후구에서 못 채우고 이닝을 넘기면 방장 승리
+        m.srv.shootAs(GUEST);                                     // 기본 입력은 미스다
+        expect(m.srv.row.status).toBe("finished");
+        m.env.advance(POLL_FAST_MS);
+        await settle();
         expect(m.s().session!.winnerIndex).toBe(0);
-        expect(m.s().match!.status).toBe("finished");
-        expect(m.s().match!.endReason).toBe("target");
-        expect(m.cb.onMatch).toHaveBeenCalledWith("finished");
-        expect(m.env.timerDues()).toEqual([]);
     });
     it("서버가 기권·무응답 승리로 끝냈으면 샷 없이 finished + 세션에 승자", async () => {
         const m = (make(GUEST));

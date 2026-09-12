@@ -1888,6 +1888,8 @@ const en: Dict = {
   "sim.match.hostLabel": "Host",
   "sim.match.hostTarget": "Opponent's target",
   "sim.match.myTarget": "My target",
+  "sim.match.finalInning": "Equalizing inning",
+  "sim.match.finalInningHint": "When the first player reaches the target, the second gets one last inning. Catching up means a draw",
   "sim.match.handicapOn": "Handicap match",
   "sim.match.handicapOnDesc": "Each player gets their own target, set from recent online records",
   "sim.match.myHandicap": "My target",

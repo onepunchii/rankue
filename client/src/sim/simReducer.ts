@@ -235,6 +235,8 @@ export interface UndoEntry {
     readonly session: SessionState;
     readonly shotIdx: number;
     readonly outcomeLast: ShotOutcome | null;
+    /** 그 샷을 친 사람의 자리. 후구(2026-09-12)에서는 득점 샷도 턴을 넘기므로 끝난 상태만으로는 알 수 없다. */
+    readonly shooterLast: number;
     readonly input: CueInput;
 }
 
@@ -244,6 +246,8 @@ export interface ServerSnap {
     readonly session: SessionState;
     /** 서버 판정. 없으면 로컬 판정을 유지한다. */
     readonly outcome?: ShotOutcome;
+    /** 그 샷을 친 사람의 자리(있으면). 후구에서 턴만으로는 알 수 없다. */
+    readonly shooter?: number;
 }
 
 export interface SimCoreState {
@@ -264,6 +268,8 @@ export interface SimCoreState {
     readonly shotIdx: number;
     readonly serverSessionId: string | null;
     readonly outcomeLast: ShotOutcome | null;
+    /** 그 샷을 친 사람의 자리. 후구(2026-09-12)에서는 득점 샷도 턴을 넘기므로 끝난 상태만으로는 알 수 없다. */
+    readonly shooterLast: number;
     /** 서버 해시와 어긋난 샷 수(이 세션) */
     readonly mismatches: number;
     /** 서버 기록을 포기했다(재전송 상한·거부·세션 개설 실패). 로컬 플레이는 계속된다. 대전에선 "지금 연결이 끊김"(폴링 성공 시 풀린다). */
@@ -289,6 +295,7 @@ export const INITIAL_STATE: SimCoreState = {
     shotIdx: 0,
     serverSessionId: null,
     outcomeLast: null,
+    shooterLast: 0,
     mismatches: 0,
     offline: false,
     queue: [],
@@ -394,6 +401,7 @@ function snapNow(s: SimCoreState, snap: ServerSnap): SimCoreState {
         phase: phaseFor(s, session),
         input: reAim(s, snap.balls, session),
         outcomeLast: snap.outcome ?? s.outcomeLast,
+        shooterLast: snap.shooter ?? s.shooterLast,
         pendingSnap: null,
     };
 }
@@ -490,7 +498,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             if (s.phase !== "aim" || !s.session) return s;
             const undo = s.record
                 ? s.undo
-                : [...s.undo, { balls: s.balls, session: s.session, shotIdx: s.shotIdx, outcomeLast: s.outcomeLast, input: s.input }];
+                : [...s.undo, { balls: s.balls, session: s.session, shotIdx: s.shotIdx, outcomeLast: s.outcomeLast, shooterLast: s.shooterLast, input: s.input }];
             return {
                 ...s,
                 phase: "shooting",
@@ -498,6 +506,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
                 balls: a.final,
                 session: a.session,
                 outcomeLast: a.outcome,
+                shooterLast: s.session.turn,
                 shotIdx: s.shotIdx + 1,
                 undo,
                 pendingSnap: null,
@@ -558,6 +567,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
                 session: e.session,
                 shotIdx: e.shotIdx,
                 outcomeLast: e.outcomeLast,
+                shooterLast: e.shooterLast,
                 input: e.input,
                 undo: s.undo.slice(0, -1),
                 pendingSnap: null,

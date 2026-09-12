@@ -1888,6 +1888,8 @@ const tr: Dict = {
   "sim.match.hostLabel": "Oluşturan",
   "sim.match.hostTarget": "Rakibin hedefi",
   "sim.match.myTarget": "Hedefim",
+  "sim.match.finalInning": "Eşitleme devresi",
+  "sim.match.finalInningHint": "İlk oyuncu hedefe ulaşınca ikinciye son bir devre verilir. Yakalarsa beraberedir",
   "sim.match.handicapOn": "Handikaplı maç",
   "sim.match.handicapOnDesc": "Her oyuncuya son çevrimiçi kayıtlarına göre kendi hedefi verilir",
   "sim.match.myHandicap": "Hedefim",

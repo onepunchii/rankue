@@ -55,6 +55,8 @@ export interface TopBarProps {
     strikes?: { readonly used: number; readonly total: number; readonly mine: boolean } | null;
     /** 관전자 수(대전, 2026-09-12). 0 이면 안 그린다 — 보는 사람이 있을 때만 알린다. */
     watchers?: number;
+    /** 후구(마지막 동점 이닝) 진행 중(2026-09-12). 지금 치는 사람이 따라붙으면 무승부다. */
+    finalInning?: boolean;
 }
 
 const SCORE = "rk-num text-[14px] font-bold text-ink-1 leading-none mt-1";
@@ -94,6 +96,12 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
             )}
             {status && <span className="rk-chip border border-surface-line text-ink-3 shrink-0 whitespace-nowrap">{status}</span>}
             {p.clock && <ShotClock seconds={p.clock.seconds} mine={p.clock.mine} size={34} />}
+            {/* 후구: 선공이 목표에 닿아 후공에게 마지막 이닝이 간 상태. 지금 치는 사람이 따라붙으면 무승부. */}
+            {p.finalInning && (
+                <span className="rk-chip bg-ball-yellow text-ink-1 font-bold shrink-0 whitespace-nowrap" title={t("sim.match.finalInningHint")}>
+                    {t("sim.match.finalInning")}
+                </span>
+            )}
             {/* 관전자(2026-09-12 오너: "관전자가 몇 명인지 표기"): 보고 있는 사람이 있을 때만 뜬다. 누가 보는지는 안 보인다. */}
             {(p.watchers ?? 0) > 0 && (
                 <span className="rk-chip bg-surface-3 text-brand font-bold shrink-0 whitespace-nowrap" title={t("sim.watch.viewers").replace("{n}", String(p.watchers))}>

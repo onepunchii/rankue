@@ -12,9 +12,10 @@ const NOSHOT = o("no-shot", 0, false, false);
 /** 세션에 샷을 적용하면서 로그를 같이 쌓는다(페이지의 onOutcome 흐름). */
 function play(s: SessionState, log: InningLog, outcomes: readonly ShotOutcome[]): { s: SessionState; log: InningLog } {
     for (const oc of outcomes) {
+        const shooter = s.turn;                 // 친 사람은 샷 '전' 의 차례다(후구에서는 득점 샷도 턴을 넘긴다)
         const r = applyShot(s, oc);
         s = r.session;
-        log = appendShot(log, r.outcome, s);
+        log = appendShot(log, r.outcome, s, shooter);
     }
     return { s, log };
 }
@@ -44,9 +45,11 @@ describe("inningLog", () => {
     });
 
     it("목표 도달로 끝난 샷·no-shot 은 턴이 안 넘어가므로 그대로 turn", () => {
+        // 2026-09-12 후구: 자리 0 이 목표에 닿으면 자리 1 에게 한 이닝이 더 간다(끝나지 않는다).
+        // 이 테스트가 보는 것은 이닝 표 — 목표에 닿은 샷과 no-shot 이 턴을 안 넘긴다는 점은 그대로다.
         const s0 = createSession({ rules: DEFAULT_3C_RULES, players: [{ id: "a", target: 1 }, { id: "b", target: 1 }] });
         const { s, log } = play(s0, EMPTY_LOG, [NOSHOT, POINT]);
-        expect(s.status).toBe("finished");
+        expect(s.pendingWinner).toBe(0);
         expect(log.entries.map((e) => `${e.player}:${e.inning}:${e.code}`)).toEqual(["0:1:no-shot", "0:1:point"]);
         expect(inningRows(log, 2)).toEqual([{ inning: 1, cells: [1, null] }]);
     });

@@ -54,12 +54,17 @@ export function gameLabel(m: Pick<MatchPublic, "gameType" | "tableId">, t: T): s
 }
 
 /** 규칙 한 줄(참가 화면): UMB/PBA 또는 4구 옵션. */
+/**
+ * 규칙 한 줄. 끝에 '후구 있음' 을 붙인다(2026-09-12 테스터 제보 → 오너 결정):
+ * 자리 0 이 매 이닝을 먼저 치므로, 목표에 닿아도 상대에게 마지막 한 이닝을 준다. 따라붙으면 무승부다.
+ * 대전은 언제나 적용하므로 방마다 다르지 않다 — 그래도 적어 둔다. 몰라서 손해 보는 규칙이 없어야 한다.
+ */
 export function rulesLabel(m: Pick<MatchPublic, "rules">, t: T): string {
     const r = m.rules;
-    if (r.gameType === "3c") return r.ruleSet === "pba" ? t("sim.hud.rulePba") : t("sim.hud.ruleUmb");
-    const parts = [t("sim.hud.rule4c")];
-    if (r.threeCushionDouble) parts.push(t("sim.hud.rule4cDouble"));
-    return parts.join(" · ");
+    const base = r.gameType === "3c"
+        ? (r.ruleSet === "pba" ? t("sim.hud.rulePba") : t("sim.hud.ruleUmb"))
+        : [t("sim.hud.rule4c"), ...(r.threeCushionDouble ? [t("sim.hud.rule4cDouble")] : [])].join(" · ");
+    return `${base} · ${t("sim.match.finalInning")}`;
 }
 
 export function inningCapLabel(inningCap: number, t: T): string {
