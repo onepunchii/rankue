@@ -166,6 +166,8 @@ export interface MatchState {
     readonly winnerIndex: PlayerIndex | null;
     /** 쓰리아웃: [호스트, 게스트] 시간 초과 횟수 */
     readonly timeouts: readonly [number, number];
+    /** 지금 이 대전을 보고 있는 관전자 수(2026-09-12). 폴링마다 바뀌는 표시용 값이라 판정에는 쓰지 않는다. */
+    readonly watchers: number;
 }
 
 /** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
@@ -181,6 +183,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         turn: m.turn,
         status: m.status,
         timeouts: m.timeouts ?? [0, 0],
+        watchers: m.watchers ?? 0,
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
         emoji: m.emoji ?? null,

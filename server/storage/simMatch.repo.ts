@@ -9,6 +9,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot } from "../../shared/schema.js";
 import { PRESENCE_MS, REPLAY_GRACE_MS } from "../../shared/sim/rules/session.js";
+import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
 
 const ELO_K = 24;
 const LIVE = ["waiting", "playing"] as const;
@@ -111,6 +112,24 @@ export class SimMatchRepository {
             sql`${hiqSimMatches.hostId} <> ${viewerId}`, gte(hiqSimMatches.createdAt, new Date(sinceMs)),
         )).orderBy(desc(hiqSimMatches.createdAt)).limit(limit);
         return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
+    }
+
+    /**
+     * 관전자 표시: 내 시각을 적고 오래된 사람은 같은 문장에서 걷어낸다(2026-09-12).
+     * 한 문장이라 관전자 여럿이 동시에 들어와도 서로의 항목을 덮지 않는다(읽고-고쳐-쓰기가 아니다).
+     * 선수는 적지 않는다 — 관전자 수는 "구경하는 사람"이라 대전 당사자는 빼고 센다.
+     */
+    async touchWatcher(id: string, memberId: string, nowMs: number): Promise<void> {
+        const fresh = nowMs - WATCHER_WINDOW_MS;
+        await db.execute(sql`
+            update ${hiqSimMatches}
+            set watchers = (
+                select coalesce(jsonb_object_agg(k, v), '{}'::jsonb)
+                from jsonb_each(coalesce(${hiqSimMatches.watchers}, '{}'::jsonb)) as t(k, v)
+                where k <> ${memberId} and (v #>> '{}')::bigint > ${fresh}
+            ) || jsonb_build_object(${memberId}::text, ${nowMs}::bigint)
+            where id = ${id}::uuid and status = 'playing'
+        `);
     }
 
     /**

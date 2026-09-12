@@ -134,6 +134,8 @@ export interface MatchPublic {
     /** 마지막 이모지 인사(없거나 예전 서버면 null). */
     readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
     /** 쓰리아웃: [호스트, 게스트] 의 40초 시간 초과 횟수. 예전 응답엔 없어 [0, 0]. */
+    /** 지금 보고 있는 관전자 수(선수 제외, 2026-09-12) */
+    readonly watchers?: number;
     readonly timeouts: readonly [number, number];
 }
 
@@ -152,6 +154,8 @@ export interface WatchCard {
     readonly turn: number;
     readonly shots: number;
     readonly winnerIndex: 0 | 1 | null;
+    /** 지금 보고 있는 관전자 수(선수 제외) */
+    readonly watchers?: number;
     readonly startedAt: string | null;
     readonly finishedAt: string | null;
     readonly lastShotAt: string | null;

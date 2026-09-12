@@ -1765,6 +1765,13 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   emojiAt: timestamp("emoji_at"),
   /** 자리별 보낸 횟수 {"0":n,"1":m} — 한 대전 상한을 세는 용도. */
   emojiCounts: jsonb("emoji_counts"),
+  /**
+   * 관전자 표시(2026-09-12): {"<회원 id>": epoch ms} — 관전 화면이 폴링할 때마다 자기 시각을 적는다.
+   * 시각이 WATCHER_WINDOW_MS 안인 사람만 "보고 있는 중"으로 센다. 이름은 담지 않는다(숫자만 보인다).
+   * 새 테이블을 만들지 않은 이유: 오래 남길 기록이 아니라 몇 초짜리 현재 상태이고, 대전 행 하나만 읽으면 끝이라서.
+   * 갱신은 SQL 한 문장에서 오래된 항목을 걷어내며 하므로(pruneAndTouchWatcher) 관전자가 동시에 들어와도 서로 덮지 않는다.
+   */
+  watchers: jsonb("watchers"),
   /** 쓰리아웃: 각자의 40초 시간 초과 횟수. SHOT_CLOCK_STRIKES(3) 가 되면 그 사람의 실격패. */
   hostTimeouts: integer("host_timeouts").default(0).notNull(),
   guestTimeouts: integer("guest_timeouts").default(0).notNull(),

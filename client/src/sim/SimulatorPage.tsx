@@ -1228,6 +1228,7 @@ export function SimulatorPage() {
                     onBack={isMatch ? onExitRequest : undefined}
                     clock={clock}
                     strikes={strikes}
+                    watchers={sim.match?.watchers ?? 0}
                 />
 
                 {/* 테이블 영역: 남은 높이 전부. 렌더러·오버레이는 absolute 마운트(tableRef)에, 조작·칩은 그 형제로 얹힌다. */}

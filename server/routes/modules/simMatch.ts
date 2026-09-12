@@ -21,6 +21,7 @@ import {
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
+import { countWatchers } from "../../../shared/sim/watchers.js";
 import type { MatchWithNames } from "../../storage/simMatch.repo.js";
 
 const router = Router();
@@ -103,6 +104,7 @@ function watchCard(m: MatchWithNames) {
         hostName: m.hostName, guestName: m.guestName,
         targets: [m.hostTarget, m.guestTarget ?? m.hostTarget] as const,
         scores, innings, turn: m.turn, shots: m.shots,
+        watchers: countWatchers(m.watchers, Date.now()),
         winnerIndex: m.winnerId === null ? null : m.winnerId === m.hostId ? 0 : 1,
         startedAt: m.startedAt, finishedAt: m.finishedAt, lastShotAt: m.lastShotAt,
     };
@@ -123,6 +125,8 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         createdAt: m.createdAt, startedAt: m.startedAt, lastShotAt: m.lastShotAt, finishedAt: m.finishedAt,
         // 40초 룰: 시계 기준 시각과 서버 시각(클라이언트 시계 보정용)
         turnSeenAt: m.turnSeenAt, serverNow: new Date(),
+        // 지금 보고 있는 관전자 수(선수 제외). 폴링마다 갱신되는 값이라 숫자만 싣는다 — 누가 보는지는 담지 않는다.
+        watchers: countWatchers(m.watchers, Date.now()),
         // 쓰리아웃 표시용 [호스트, 게스트] 시간 초과 횟수
         timeouts: [m.hostTimeouts, m.guestTimeouts] as const,
         // 이모지 인사(마지막 하나) — 폴링에 실려 간다. 보낸 지 오래된 건 화면이 알아서 안 띄운다.
@@ -314,6 +318,13 @@ router.get("/sim/matches/:id", requireAuth, asyncHandler(async (req: AuthRequest
     if (!m || (!isPlayer && !isWatchable(m))) return sendError(res, 404, "대전이 없습니다");
     // 접속 표시: 대전 화면을 보고 있다(폴링). 차례가 넘어올 때 시계를 바로 돌릴지 여기서 판단한다(PRESENCE_MS).
     if (isPlayer && m.status === "playing") await storage.simMatch.touchSeen(m.id, m.hostId === req.userId ? 0 : 1);
+    // 관전자 표시(2026-09-12): 보고 있는 사람 수를 선수와 다른 관전자에게 보여 주려고 폴링마다 시각을 적는다.
+    else if (!isPlayer && m.status === "playing") {
+        const now = Date.now();
+        await storage.simMatch.touchWatcher(m.id, req.userId!, now);
+        // 방금 적은 내 표시를 응답에도 반영한다 — 대전 행을 한 번 더 읽지 않으려고 여기서 합친다(4초마다 오는 요청이다).
+        m = { ...m, watchers: { ...(m.watchers as Record<string, number> | null ?? {}), [req.userId!]: now } };
+    }
     // ?ack=1: 차례인 사람이 조준 화면에 들어왔다 → 40초 시계 시작(한 번만, 서버가 이미 적었으면 그대로). 상대·재생 중 폴링은 ack 없이 온다.
     if (isPlayer && req.query.ack === "1" && m.status === "playing" && !m.turnSeenAt) {
         const myIndex = m.hostId === req.userId ? 0 : 1;

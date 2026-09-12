@@ -27,6 +27,7 @@ function Row({ card, label, onOpen }: { card: WatchCard; label: string; onOpen: 
                 <span className="text-[12px] font-medium text-ink-3 truncate">
                     {gameLabel(card, t)} · <span className="tabular-nums">{scores[0]} : {scores[1]}</span>
                     {card.winnerIndex !== null && <> · {names[card.winnerIndex]} {t("sim.watch.win")}</>}
+                    {(card.watchers ?? 0) > 0 && <span className="text-brand font-bold"> · {t("sim.watch.viewers").replace("{n}", String(card.watchers))}</span>}
                 </span>
             </span>
             <button

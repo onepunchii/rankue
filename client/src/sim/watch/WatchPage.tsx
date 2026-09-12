@@ -250,7 +250,14 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                 <button onClick={() => navigate("/online-game?rooms=1")} className="h-9 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2">{t("sim.watch.toRooms")}</button>
                 <span className="text-[15px] font-bold text-ink-1">{finished ? t("sim.watch.replayTitle") : t("sim.watch.title")}</span>
                 <span className="text-[12px] text-ink-3">{match.gameType === "3c" ? t("sim.setup.type3c") : t("sim.setup.type4c")}</span>
-                {!finished && <span className="ml-auto text-[11px] text-ink-3">{t("sim.watch.refresh")}</span>}
+                {!finished && (
+                    <span className="ml-auto flex items-center gap-2">
+                        {(match.watchers ?? 0) > 0 && (
+                            <span className="text-[11px] font-bold text-brand">{t("sim.watch.viewers").replace("{n}", String(match.watchers))}</span>
+                        )}
+                        <span className="text-[11px] text-ink-3">{t("sim.watch.refresh")}</span>
+                    </span>
+                )}
             </header>
 
             <div className="px-4 pb-3 shrink-0">

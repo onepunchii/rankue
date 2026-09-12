@@ -2154,6 +2154,7 @@ const es: Dict = {
   "sim.rooms.agoMin": "hace {n} min",
   "sim.rooms.agoHour": "hace {n} h",
   "sim.watch.title": "Ver",
+  "sim.watch.viewers": "{n} viendo",
   "sim.watch.replayTitle": "Repetición",
   "sim.watch.live": "Jugando ahora",
   "sim.watch.replays": "Repeticiones recientes",
