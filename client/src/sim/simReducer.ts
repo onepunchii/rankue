@@ -41,7 +41,17 @@ export interface CueInput {
 
 export const V0_DEFAULT = 2.5;
 export const V0_MIN = 0.2;
-export const V0_MAX = 9;
+/**
+ * 화면에서 낼 수 있는 큐 최대 속도(m/s) = 세기 100 %. 2026-09-12 에 9 → 6.5 로 낮췄다.
+ * 타격 모델(resolve/stickBall)은 큐 속도를 공 속도로 약 1.25배 한다(캐롬 공 210 g, 큐 520 g, 팁 효율 0.88):
+ *   9 m/s → 공 11.3 m/s — 포켓볼 브레이크 수준이라 3쿠션에서는 쓰지 않는 세기였다.
+ *   6.5 m/s → 공 8.1 m/s — 가장 센 대회전(공 5~7 m/s)도 여유 있게 들어간다.
+ * 옛 기록·공유 링크에는 이보다 큰 값이 남아 있을 수 있어 clampPower 는 V0_LEGACY_MAX 까지 받아 준다
+ * (그대로 재생돼야 해시가 맞는다). 화면 눈금은 controlsMath 의 퍼센트 변환이 V0_MAX 로 묶는다.
+ */
+export const V0_MAX = 6.5;
+/** 엔진이 받아 주는 상한 — 상한을 낮추기 전(2026-09-12 이전)에 저장된 샷과 공유 링크를 위해 남긴다. */
+export const V0_LEGACY_MAX = 9;
 /** 큐 들림각 상한 (rad). README: v2.0 은 고급 패널에서 0~20°. */
 // 큐 각 상한. 엔진 v2.2 가 공중·착지를 풀어 마세이(30°+)·점프(35°+)가 실제로 나온다. 서버는 1.2 rad 까지 받는다.
 export const THETA_MAX = (60 * Math.PI) / 180;
@@ -63,7 +73,8 @@ export function paramsFromConfig(config: SimSetupConfig): SimParams {
 
 export function clampPower(V0: number): number {
     if (!Number.isFinite(V0)) return V0_DEFAULT;
-    return Math.min(V0_MAX, Math.max(V0_MIN, V0));
+    // 상한은 옛 값 기준이다 — 옛 기록·공유 링크를 그대로 재생해야 해시가 맞는다. 새로 만드는 값은 퍼센트 변환이 V0_MAX 로 묶는다.
+    return Math.min(V0_LEGACY_MAX, Math.max(V0_MIN, V0));
 }
 
 export function clampElevation(theta: number): number {

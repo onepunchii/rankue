@@ -2,8 +2,7 @@ import { memo } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { formatSpeed, POWER_FINE_STEP, powerPercent } from "../controlsMath";
-import { V0_MAX, V0_MIN } from "../simReducer";
+import { formatSpeed, powerFromPercent, POWER_PERCENT_STEP, powerPercent } from "../controlsMath";
 
 /**
  * 세로 큐 슬라이더(세기 V0). 오른쪽 툴바 아래에 놓이고 남은 높이를 채운다.
@@ -15,6 +14,8 @@ import { V0_MAX, V0_MIN } from "../simReducer";
  *    아래로 끌수록 세지고, 큐대가 아래로(공에서 멀리) 당겨진다 — 참조 게임의 큐 슬라이더와 같은 손맛.
  *    radix 는 엄지를 트랙 안에 가두므로 큐대 길이만큼 이동 범위가 줄어든다(트랙 − CUE_PX). 그래서 큐대는 100 px 로 짧게.
  *  - 터치 폭 44 px(w-11), touch-none. 미세 조절 ± 는 페이지가 샷 버튼 옆에 따로 둔다.
+ *  - 슬라이더 값은 m/s 가 아니라 **%(0~100)** 다. 속도 눈금이 2026-09-12 부터 휘어 있어서(controlsMath.POWER_GAMMA)
+ *    m/s 로 밀면 아래쪽(실제로 자주 쓰는 세기)이 뭉개진다.
  *  - compact(짧은 화면): 큐대를 80 px 로, 트랙 최소 높이를 낮춘다. 트랙 최소 높이는 flex 에서 툴바보다 우선한다.
  */
 interface Props {
@@ -69,10 +70,10 @@ export const PowerRail = memo(function PowerRail({ V0, disabled, onChange, compa
                 aria-label={t("sim.controls.power")}
                 orientation="vertical"
                 inverted
-                min={V0_MIN} max={V0_MAX} step={POWER_FINE_STEP}
-                value={[V0]}
+                min={0} max={100} step={POWER_PERCENT_STEP}
+                value={[powerPercent(V0)]}
                 disabled={disabled}
-                onValueChange={([v]) => onChange(v)}
+                onValueChange={([pct]) => onChange(powerFromPercent(pct))}
                 className="relative flex-1 w-full flex justify-center touch-none select-none data-[disabled]:opacity-50"
                 style={{ minHeight: compact ? TRACK_MIN_SM : TRACK_MIN }}
             >

@@ -17,7 +17,7 @@ import { TABLES, type CushionModelId, type TableSpec } from "@shared/sim/params"
 import { isValidLayout } from "@shared/sim/layouts";
 import type { GameType } from "@shared/sim/rules/types";
 import { buildConfig, clampCondition, CONDITION_MAX, CONDITION_MIN, type SimSetupConfig, type TableId } from "../setupPresets";
-import { clampSpin, THETA_MAX, V0_MAX, V0_MIN } from "../simReducer";
+import { clampSpin, THETA_MAX, V0_LEGACY_MAX, V0_MIN } from "../simReducer";
 import { TWO_PI } from "../aim";
 
 export const REPLAY_PARAM = "replay";
@@ -186,7 +186,8 @@ function parseInput(raw: unknown, balls: readonly BallState[]): ShotInput | null
     const b = raw.b === undefined ? 0 : raw.b;
     const theta = raw.theta === undefined ? 0 : raw.theta;
     if (!isNum(phi) || phi < 0 || phi > TWO_PI) return null;
-    if (!isNum(V0) || V0 < V0_MIN || V0 > V0_MAX) return null;
+    // 상한을 낮추기 전(2026-09-12 이전)에 만든 링크도 열려야 한다 — 화면 상한이 아니라 엔진 상한으로 본다.
+    if (!isNum(V0) || V0 < V0_MIN || V0 > V0_LEGACY_MAX) return null;
     if (!isNum(theta) || theta < 0 || theta > THETA_MAX) return null;
     if (!isNum(a) || !isNum(b)) return null;
     // 미스큐 링 밖이면 setInput 이 값을 바꾼다 → 원본과 다른 재생이 되므로 거부

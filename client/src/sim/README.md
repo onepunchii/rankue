@@ -169,7 +169,7 @@ interface SimulatorActions {
 ### 하위 모듈 API
 - `playback.ts`: `makePlayback(result, ball)` → `{ duration, at(t), keyframes }`(at 은 [0, duration] 클램프, t ≥ duration 이면 `result.final` 참조 그대로; keyframes 는 1/120 s 격자 지연 캐시). `effectiveBall(params)` = `applyCondition(table.ball, condition)` — 재생·미리보기에 반드시 이것을 넘긴다. `eventsForFeedback(result)` → `SoundEvent[]`(audioMapping). `startClock/clockTime/withSpeed` 배속 연속 시계.
 - `simApi.ts`: `simApi.createSession(config, balls?, players?)` → `{ session: SimSessionRow, state: SessionState, balls }`, `postShot(sessionId, { idx, input, clientHash })` → `ShotResponse`, `closeSession(sessionId, "finished" | "abandoned")` → `SimSessionRow`. 순수: `toCreateSessionBody`, `toShotBody`, `parse*Response`, `classifyApiError` → `"network" | "idx-mismatch" | "session-closed" | "unauthorized" | "rejected"`, `serverShotsFromError`. `createSimApi(request)` 로 주입.
-- `simReducer.ts`: `simReducer(state, action)`, `createSimStore()`, `INITIAL_STATE`, `paramsFromConfig`, `clampPower/clampElevation/clampSpin`, `defaultPhi/thicknessPhi/objectTargetFor`, 상수 `V0_DEFAULT=2.5, V0_MIN=0.2, V0_MAX=9, THETA_MAX=20°, MAX_RETRIES=3`.
+- `simReducer.ts`: `simReducer(state, action)`, `createSimStore()`, `INITIAL_STATE`, `paramsFromConfig`, `clampPower/clampElevation/clampSpin`, `defaultPhi/thicknessPhi/objectTargetFor`, 상수 `V0_DEFAULT=2.5, V0_MIN=0.2, V0_MAX=6.5(화면 상한) · V0_LEGACY_MAX=9(엔진·옛 기록), THETA_MAX=20°, MAX_RETRIES=3`. 세기 눈금은 `controlsMath.POWER_GAMMA=1.6` 으로 휘어 있다(퍼센트 → 속도 = min + range·x^1.6).
 
 ## SimulatorPage (화면 계층)
 

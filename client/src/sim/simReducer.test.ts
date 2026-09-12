@@ -9,7 +9,7 @@ import { buildConfig } from "./setupPresets";
 import {
     simReducer, createSimStore, INITIAL_STATE,
     clampPower, clampElevation, clampSpin, defaultPhi, thicknessPhi, initialInput, paramsFromConfig, objectTargetFor,
-    V0_MIN, V0_MAX, V0_DEFAULT, THETA_MAX, MAX_RETRIES,
+    V0_MIN, V0_MAX, V0_LEGACY_MAX, V0_DEFAULT, THETA_MAX, MAX_RETRIES,
     type SimCoreState,
 } from "./simReducer";
 
@@ -51,7 +51,10 @@ describe("헬퍼", () => {
         expect(p.condition).toBe(0.9);
     });
     it("세기·각 클램프", () => {
-        expect(clampPower(12)).toBe(V0_MAX);
+        // 엔진 상한은 옛 값 기준(V0_LEGACY_MAX) — 화면에서 낼 수 있는 최대치(V0_MAX)는 퍼센트 변환이 묶는다.
+        // 2026-09-12 에 화면 상한을 9 → 6.5 로 낮추면서, 그 전에 저장된 샷이 그대로 재생되도록 남긴 구분이다.
+        expect(clampPower(12)).toBe(V0_LEGACY_MAX);
+        expect(clampPower(V0_MAX + 1)).toBe(V0_MAX + 1);
         expect(clampPower(0)).toBe(V0_MIN);
         expect(clampPower(Number.NaN)).toBe(V0_DEFAULT);
         expect(clampElevation(2)).toBe(THETA_MAX);
@@ -119,11 +122,11 @@ describe("start / setInput", () => {
     it("setInput 은 aim 에서만, 클램프·정규화, 변화 없으면 같은 참조", () => {
         const s = started();
         const a = simReducer(s, { type: "setInput", patch: { V0: 20, theta: 3, a: 0.6, b: 0.6, phi: -1 } });
-        expect(a.input.V0).toBe(V0_MAX);
+        expect(a.input.V0).toBe(V0_LEGACY_MAX);
         expect(a.input.theta).toBe(THETA_MAX);
         expect(a.input.a * a.input.a + a.input.b * a.input.b).toBeLessThanOrEqual(0.25);
         expect(a.input.phi).toBeCloseTo(2 * Math.PI - 1, 12);
-        expect(simReducer(a, { type: "setInput", patch: { V0: V0_MAX } })).toBe(a);
+        expect(simReducer(a, { type: "setInput", patch: { V0: V0_LEGACY_MAX } })).toBe(a);
         const shooting = shoot(s, MISS);
         expect(simReducer(shooting, { type: "setInput", patch: { V0: 3 } })).toBe(shooting);
     });

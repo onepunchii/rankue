@@ -5,7 +5,7 @@ import { phiForThickness } from "./aim";
 import { V0_MAX, V0_MIN, clampSpin } from "./simReducer";
 import {
     activeThickness, ELEVATION_MAX_DEG, ELEVATION_STEPS_DEG, elevationFromArc, FINE_STEP_RAD, formatPower, formatSpeed, formatSpin, nearestStep,
-    padOffsetFor, powerFromSlider, powerPercent, pullbackFor, snapElevationDeg, spinFromPad, spinReadout, stepPower, THICKNESS_UI_STEPS,
+    padOffsetFor, powerFromPercent, powerFromSlider, powerPercent, pullbackFor, snapElevationDeg, spinFromPad, spinReadout, stepPower, THICKNESS_UI_STEPS,
     thicknessStepLabel, nextElevationRad, elevationDeg } from "./controlsMath";
 
 const table = TABLES.DAEDAE;
@@ -46,33 +46,58 @@ describe("controlsMath 두께", () => {
 });
 
 describe("controlsMath 세기", () => {
-    it("2.5 m/s → '2.5 m/s · 28%'", () => {
-        expect(formatPower(2.5)).toBe("2.5 m/s · 28%");
+    // 2026-09-12: 상한 9 → 6.5 m/s, 눈금은 x^1.6 으로 휘었다. 실제로 쓰는 세기(공 1.5~4 m/s)가
+    // 퍼센트의 30~60 % 에 오도록 한 것이다 — 예전 선형 눈금에서는 15~48 % 에 몰려 한 칸이 굵었다.
+    it("표시: 퍼센트는 휜 눈금을 따른다", () => {
         expect(formatSpeed(2.55)).toBe("2.55");
-        expect(formatSpeed(9)).toBe("9");
         expect(powerPercent(V0_MAX)).toBe(100);
+        expect(powerPercent(V0_MIN)).toBe(0);
         expect(powerPercent(0)).toBe(powerPercent(V0_MIN));
+        expect(formatPower(2.5)).toBe(`2.5 m/s · ${powerPercent(2.5)}%`);
+        // 옛 기록에 남은 상한 밖 값(최대 9 m/s)도 100 % 로 읽고 버리지 않는다
+        expect(powerPercent(9)).toBe(100);
+        expect(formatSpeed(9)).toBe("9");
     });
 
-    it("±1 % 눈금(0.09 m/s)에 맞고 범위에서 멈춘다", () => {
-        expect(stepPower(2.5, 1)).toBe(2.61);      // 28 % → 29 %
-        expect(stepPower(2.61, -1)).toBe(2.52);    // 29 % → 28 %
-        expect(stepPower(2.5 + 1e-12, 1)).toBe(2.61);
+    it("퍼센트 ↔ 속도가 서로의 역함수다", () => {
+        expect(powerFromPercent(0)).toBe(V0_MIN);
+        expect(powerFromPercent(100)).toBe(V0_MAX);
+        for (const pct of [1, 7, 23, 50, 72, 99]) {
+            expect(powerPercent(powerFromPercent(pct))).toBe(pct);
+        }
+    });
+
+    it("낮은 쪽이 촘촘하다 — 같은 1 % 가 위쪽에서 더 크게 움직인다", () => {
+        const low = powerFromPercent(21) - powerFromPercent(20);
+        const high = powerFromPercent(91) - powerFromPercent(90);
+        expect(low).toBeGreaterThan(0);
+        expect(high).toBeGreaterThan(low * 2);
+    });
+
+    it("±1 % 눈금에 맞고 범위에서 멈춘다", () => {
+        expect(powerPercent(stepPower(2.5, 1))).toBe(powerPercent(2.5) + 1);
+        expect(powerPercent(stepPower(4, 1))).toBe(powerPercent(4) + 1);
+        expect(stepPower(stepPower(2.5, 1), -1)).toBeCloseTo(powerFromPercent(powerPercent(2.5)), 10);
         expect(stepPower(V0_MAX, 1)).toBe(V0_MAX);
         expect(stepPower(V0_MIN, -1)).toBe(V0_MIN);
-        let v = 0.3;
+        let v = V0_MIN;
         for (let i = 0; i < 10; i++) v = stepPower(v, 1);
-        expect(v).toBe(1.17);                       // 3 % + 10 = 13 %
-        expect(powerPercent(stepPower(4, 1))).toBe(powerPercent(4) + 1);
+        expect(powerPercent(v)).toBe(10);
     });
 
     it("슬라이더·당김 매핑", () => {
         expect(powerFromSlider(0)).toBe(V0_MIN);
         expect(powerFromSlider(1)).toBe(V0_MAX);
         expect(powerFromSlider(2)).toBe(V0_MAX);
+        expect(powerFromSlider(0.5)).toBe(powerFromPercent(50));
         expect(pullbackFor(V0_MIN)).toBe(0);
         expect(pullbackFor(V0_MAX)).toBe(1);
         expect(pullbackFor(100)).toBe(1);
+    });
+
+    it("가장 센 샷도 대회전 범위를 넘지 않는다(공 속도 ≈ 큐 × 1.25)", () => {
+        expect(V0_MAX * 1.25).toBeGreaterThan(7);   // 대회전(공 5~7 m/s)은 낼 수 있고
+        expect(V0_MAX * 1.25).toBeLessThan(9);      // 포켓볼 브레이크(11~13 m/s)는 안 나온다
     });
 });
 

@@ -53,12 +53,32 @@ export const FINE_STEP_RAD = (0.1 * Math.PI) / 180;
 
 /* ------------------------------------------------------------------ 세기 */
 
-/** 미세 조절·슬라이더 눈금: 상한의 1 % (9 m/s → 0.09). 화면은 % 로만 읽어 주므로 눈금도 % 단위(2026-09-07 오너 요청). */
-export const POWER_FINE_STEP = 0.09;
+/** 슬라이더·± 눈금 단위(%) — 화면은 세기를 % 로만 읽어 준다(2026-09-07 오너). */
+export const POWER_PERCENT_STEP = 1;
+/** @deprecated 옛 이름(슬라이더가 m/s 로 움직이던 시절). 퍼센트 눈금은 POWER_PERCENT_STEP. */
+export const POWER_FINE_STEP = POWER_PERCENT_STEP;
 
-/** 세기 % — 상한 9 m/s 기준. 2.5 m/s → 28 %. 슬라이더·± 눈금과 같은 단위. */
+/**
+ * 세기 눈금의 휨 정도(2026-09-12). 퍼센트 → 속도가 x^GAMMA 라 낮은 쪽이 촘촘해진다.
+ *
+ * 왜: 3쿠션에서 실제로 쓰는 세기는 공 1.5~4 m/s(큐 1.2~3.2 m/s)에 몰려 있다. 선형 눈금에서는 그 구간이
+ * 전체의 15~48 % 밖에 안 돼 한 칸(1 %)이 너무 굵었고, 위쪽 절반은 거의 쓰지 않는 세기였다.
+ * 1.6 이면 같은 구간이 32~63 % 로 퍼져 평소 세기를 미세하게 맞출 수 있다.
+ */
+export const POWER_GAMMA = 1.6;
+
+/** 세기 %(0~100) → 큐 속도(m/s). 0 % = V0_MIN, 100 % = V0_MAX. */
+export function powerFromPercent(pct: number): number {
+    const x = Math.max(0, Math.min(1, (Number.isFinite(pct) ? pct : 0) / 100));
+    return clampPower(V0_MIN + (V0_MAX - V0_MIN) * Math.pow(x, POWER_GAMMA));
+}
+
+/** 큐 속도 → 세기 %(반올림). powerFromPercent 의 역함수 — V0_MAX 를 넘는 옛 값은 100 %. */
 export function powerPercent(V0: number): number {
-    return Math.round((clampPower(V0) / V0_MAX) * 100);
+    const r = (clampPower(V0) - V0_MIN) / (V0_MAX - V0_MIN);
+    if (r <= 0) return 0;
+    if (r >= 1) return 100;
+    return Math.round(100 * Math.pow(r, 1 / POWER_GAMMA));
 }
 
 /** m/s 표시: 소수 둘째 자리까지, 뒤 0 은 뗀다(2.5, 2.55). */
@@ -72,20 +92,19 @@ export function formatPower(V0: number): string {
     return `${formatSpeed(V0)} m/s · ${powerPercent(V0)}%`;
 }
 
-/** ±1 % 눈금으로 옮기고 격자에 맞춘다(부동소수 찌꺼기 없이): 2.5 m/s(28 %) → 29 % = 2.61 m/s. */
+/** ±1 % 눈금으로 옮긴다 — 퍼센트 격자 위에서 세므로 눌렀다 되돌리면 제자리다. */
 export function stepPower(V0: number, dir: -1 | 1): number {
-    const pct = powerPercent(V0) + dir;
-    return clampPower(Math.round(pct * V0_MAX) / 100);
+    return powerFromPercent(powerPercent(V0) + dir);
 }
 
-/** 슬라이더 값(0..1) ↔ m/s. */
+/** 슬라이더 값(0..1) → m/s. 퍼센트와 같은 휜 눈금을 쓴다. */
 export function powerFromSlider(x: number): number {
-    return clampPower(V0_MIN + Math.max(0, Math.min(1, x)) * (V0_MAX - V0_MIN));
+    return powerFromPercent(Math.max(0, Math.min(1, x)) * 100);
 }
 
-/** 렌더러 cue.pullback(0..1): 세기에 비례해 큐를 뒤로 당긴 모습. */
+/** 렌더러 cue.pullback(0..1): 화면에 보이는 세기(%)에 맞춰 큐를 당긴다 — 눈금이 휘어도 손맛이 따라간다. */
 export function pullbackFor(V0: number): number {
-    return (clampPower(V0) - V0_MIN) / (V0_MAX - V0_MIN);
+    return powerPercent(V0) / 100;
 }
 
 /* ------------------------------------------------------------------ 당점 */
