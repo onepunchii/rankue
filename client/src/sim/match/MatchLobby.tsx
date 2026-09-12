@@ -5,6 +5,7 @@
  * 문구는 전부 sim.match.* / sim.setup.* 키.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,6 +153,11 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
     const [gameType, setGameType] = useState<GameType>("3c");
     const [tableId, setTableId] = useState<TableId>(defaultTableFor("3c"));
     const [targetText, setTargetText] = useState<string>(String(defaultTarget("3c")));
+    // 핸디전(2026-09-12 오너: "다마수에 따른 경기"). 켜면 참가하는 순간 서버가 두 사람의 온라인 에버리지로
+    // 각자 목표를 정한다 — 방장이 숫자를 적지 않는다. 끄면 예전처럼 방장 다마수로 둘 다 친다(맞대결).
+    const [handicap, setHandicap] = useState(true);
+    const myHandi = useQuery({ queryKey: ["/api/hiq/sim/handicap"], queryFn: () => api.getMyHandicap(), staleTime: 60_000 });
+    const myBoard = myHandi.data?.boards.find((b) => b.gameType === gameType);
     const [ruleSet, setRuleSet] = useState<ThreeCushionRuleSet>("umb");
     const [threeCushionDouble, setThreeCushionDouble] = useState(false);
     // 플레이 모드: 방장이 고르면 게스트도 같은 모드(서버 aimAssist). 물리 기본값은 buildConfig 의 모드 프리셋이 채운다.
@@ -178,7 +184,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
     onStartedRef.current = onStarted;
 
     const targetNum = targetText.trim() === "" ? NaN : Number(targetText);
-    const targetOk = isValidTarget(targetNum);
+    const targetOk = handicap || isValidTarget(targetNum);
     const passwordOk = !isPublic || isValidRoomPassword(password);
 
     const pickGameType = (g: GameType) => {
@@ -196,7 +202,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
             const m = await api.createMatch(buildConfig({
                 gameType, tableId, target: targetNum, inningCap, mode, matchPreview: "short",
                 rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: false },
-            }), { isPublic, password: isPublic && password !== "" ? password : undefined });
+            }), { isPublic, handicap, password: isPublic && password !== "" ? password : undefined });
             setCreated(m);
             onCreated?.(m);
         } catch {
@@ -365,7 +371,26 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
                 </div>
             </div>
 
-            <TargetPicker id="sim-match-target" gameType={gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+            <div className="space-y-2">
+                <ToggleRow
+                    id="sim-match-handicap" checked={handicap} onCheckedChange={setHandicap}
+                    title={t("sim.match.handicapOn")} desc={t("sim.match.handicapOnDesc")}
+                />
+                {handicap ? (
+                    <div className="rounded-tile border border-surface-line bg-surface-2 px-4 py-3">
+                        <p className="text-[13px] font-semibold text-ink-1">
+                            {t("sim.match.myHandicap")} <span className="rk-num text-brand">{myBoard ? myBoard.target : "—"}</span>
+                        </p>
+                        <p className="text-[12px] font-medium text-ink-3 mt-0.5">
+                            {myBoard && myBoard.fromRecord
+                                ? t("sim.match.myHandicapFrom").replace("{avg}", myBoard.avg.toFixed(3)).replace("{n}", String(myBoard.matches))
+                                : t("sim.match.myHandicapNew")}
+                        </p>
+                    </div>
+                ) : (
+                    <TargetPicker id="sim-match-target" gameType={gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                )}
+            </div>
 
             <div className="space-y-1.5">
                 <Label>{t("sim.setup.mode")}</Label>

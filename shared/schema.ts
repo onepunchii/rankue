@@ -1744,6 +1744,12 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   fullPreview: boolean("full_preview").default(false).notNull(),
   /** 멀티방(공개 방): 방 목록에 떠서 누구나 참가. 기본 false = 코드·푸시 초대로만. */
   isPublic: boolean("is_public").default(false).notNull(),
+  /**
+   * 핸디전(2026-09-12 오너: "다마수에 따른 경기를 해야 합리적"). 참가하는 순간 서버가 두 사람의 온라인
+   * 에버리지로 각자 목표를 정한다(shared/sim/handicap — 비율 유지, 길이 고정). 끄면 방장이 적은 다마수로
+   * 둘 다 친다(맞대결). 이 칸이 생기기 전 방들은 전부 false 로 넣었다.
+   */
+  handicap: boolean("handicap").default(true).notNull(),
   /** 방 비밀번호(선택) "salt:sha256(salt+pw)". 있으면 참가(코드·목록 모두)에 password 가 맞아야 한다. */
   passwordHash: text("password_hash"),
   /** 호스트가 마지막으로 푸시 초대한 회원(친구에게 보내기). */

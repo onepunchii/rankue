@@ -114,6 +114,11 @@ function fakeApi(over: Partial<MatchApi> = {}): MatchApi {
         joinRoom: vi.fn(async () => match({ status: "playing", myIndex: 1 })),
         invite: vi.fn(async () => ({ name: "홍길동" })),
         listOpponents: vi.fn(async () => [{ id: "op-1", name: "홍길동", handi3c: 20, handi4c: 80 }, { id: "op-2", name: "김철수", handi3c: null, handi4c: null }]),
+        // 2026-09-12 핸디전: 방 만들기 화면이 "내 다마수" 를 물어본다
+        getMyHandicap: vi.fn(async () => ({ minInnings: 20, innings: 18, boards: [
+            { gameType: "3c" as const, avg: 0.4, target: 7, matches: 8, innings: 40, fromRecord: true },
+            { gameType: "4c" as const, avg: 0.35, target: 60, matches: 8, innings: 40, fromRecord: true },
+        ] })),
         ...over,
     };
 }
@@ -122,8 +127,10 @@ function mountEl(el: React.ReactElement): Harness {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
-    React.act(() => { root.render(el); });
-    const h: Harness = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); } };
+    // 화면이 react-query 로 내 다마수를 읽는다(2026-09-12) — 테스트에도 클라이언트가 있어야 한다.
+    const qc = new rq.QueryClient({ defaultOptions: { queries: { retry: false } } });
+    React.act(() => { root.render(React.createElement(rq.QueryClientProvider, { client: qc }, el)); });
+    const h: Harness = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); } };
     live.push(h);
     return h;
 }
@@ -169,11 +176,14 @@ describe("MatchLobby · 만들기", () => {
         const api = fakeApi();
         const h = mountEl(React.createElement(MatchLobby, { onStarted: vi.fn(), onClose: () => undefined, api, pollMs: 1000 }));
         click(byText(h, ko["sim.setup.type4c"])!);
+        // 2026-09-12: 기본이 핸디전이라 다마수 입력이 없다 — 맞대결로 바꿔야 나온다
+        expect(h.container.querySelector("#sim-match-target")).toBeNull();
+        click(h.container.querySelector("#sim-match-handicap")!);
         // 3쿠션 2배 스위치는 세부 설정 안(접힘) — 펼쳐야 보인다
-        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(1);   // 멀티방으로 열기
+        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(2);   // 핸디전 + 멀티방으로 열기
         click(Array.from(h.container.querySelectorAll("button")).find((b) => b.textContent?.startsWith(ko["sim.setup.advanced"]))!);
-        // 2026-09-12: '미리보기 전체' 를 대전에서 뺐다(랭킹이 섞인다) — 남은 스위치는 멀티방 + 3쿠션 2배
-        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(2);
+        // 2026-09-12: '미리보기 전체' 를 대전에서 뺐다(랭킹이 섞인다) — 남은 스위치는 핸디전 + 멀티방 + 3쿠션 2배
+        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(3);
         expect((h.container.querySelector("#sim-match-target") as HTMLInputElement).value).toBe("80");
         click(byText(h, ko["sim.match.create"])!);
         await flush();
@@ -186,8 +196,21 @@ describe("MatchLobby · 만들기", () => {
         expect(h.container.querySelector("[data-testid=lobby-waiting]")).toBeNull();
         expect(byText(h, ko["sim.match.create"])).not.toBeNull();
     });
-    it("다마수를 비우면 만들기가 잠긴다", () => {
+    it("기본은 핸디전 — 다마수를 안 적고, 내 다마수를 보여 주고, 만들 때 handicap 이 켜져 나간다", async () => {
+        const api = fakeApi();
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: vi.fn(), onClose: () => undefined, api, pollMs: 1000 }));
+        await flush();
+        expect(h.container.querySelector("#sim-match-target")).toBeNull();
+        expect(h.container.textContent).toContain(ko["sim.match.myHandicap"]);
+        expect(h.container.textContent).toContain("7");                       // 3쿠션 내 다마수(fakeApi)
+        click(byText(h, ko["sim.match.create"])!);
+        await flush();
+        expect((api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][1]).toMatchObject({ handicap: true });
+    });
+
+    it("맞대결에서 다마수를 비우면 만들기가 잠긴다", () => {
         const h = mountEl(React.createElement(MatchLobby, { onStarted: vi.fn(), onClose: () => undefined, api: fakeApi() }));
+        click(h.container.querySelector("#sim-match-handicap")!);   // 핸디전 끄기 → 다마수 입력이 나온다
         type(h.container.querySelector("#sim-match-target") as HTMLInputElement, "");
         expect(byText(h, ko["sim.match.create"])!.disabled).toBe(true);
         expect(h.container.textContent).toContain(ko["sim.setup.targetRange"]);
@@ -316,7 +339,7 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
         click(byText(h, ko["sim.match.create"])!);
         await flush();
         expect(api.createMatch).toHaveBeenCalledTimes(1);
-        expect((api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual({ isPublic: true, password: "1234" });
+        expect((api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual({ isPublic: true, handicap: true, password: "1234" });
         expect(h.container.textContent).toContain(ko["sim.match.publicWaiting"]);
         expect(h.container.textContent).toContain(ko["sim.match.publicLocked"]);
         // 친구에게 보내기
@@ -338,7 +361,7 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
         const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000 }));
         click(byText(h, ko["sim.match.create"])!);
         await flush();
-        expect((api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual({ isPublic: false, password: undefined });
+        expect((api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual({ isPublic: false, handicap: true, password: undefined });
         const h2 = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api: fakeApi(), pollMs: 1000, initialPublic: true }));
         expect(h2.container.querySelector("#sim-match-password")).not.toBeNull();
     });

@@ -21,6 +21,7 @@ import {
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
+import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCHES, TARGET_INNINGS, targetFor } from "../../../shared/sim/handicap.js";
 import { countWatchers } from "../../../shared/sim/watchers.js";
 import type { MatchWithNames } from "../../storage/simMatch.repo.js";
 
@@ -47,6 +48,8 @@ const createSchema = z.object({
     aimAssist: z.boolean().default(true),
     /** 미리보기 전체(연습처럼). 기본 false = 첫 접촉 + 꼬리까지만 — 대전은 쿠션 뒤 진로를 스스로 읽는다. */
     fullPreview: z.boolean().default(false),
+    /** 핸디전(기본): 참가 시 서버가 두 사람의 온라인 에버리지로 각자 목표를 정한다. */
+    handicap: z.boolean().default(true),
     /** 멀티방(공개 방): 목록에 떠서 누구나 참가. */
     isPublic: z.boolean().default(false),
     /** 방 비밀번호(선택, 4~20자). 있으면 참가할 때 맞아야 한다. */
@@ -115,7 +118,7 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
     return {
         id: m.id, code: m.code, status: m.status,
         gameType: m.gameType, tableId: m.tableId, cushionModel: m.cushionModel, condition: m.condition, aimAssist: m.aimAssist, fullPreview: m.fullPreview,
-        isPublic: m.isPublic, hasPassword: !!m.passwordHash,
+        isPublic: m.isPublic, hasPassword: !!m.passwordHash, handicap: m.handicap,
         rules: m.rules, finishType: m.finishType, inningCap: m.inningCap,
         hostName: m.hostName, guestName: m.guestName, hostTarget: m.hostTarget, guestTarget: m.guestTarget,
         myIndex, turn: m.turn, shots: m.shots, version: m.version,
@@ -188,7 +191,7 @@ router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, r
     const params = paramsFor({ tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition });
     const row = await storage.simMatch.create({
         hostId: req.userId!, gameType: b.gameType, tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition,
-        aimAssist: b.aimAssist, fullPreview: b.fullPreview, rules, finishType: b.finishType, hostTarget: b.target, inningCap: b.inningCap,
+        aimAssist: b.aimAssist, fullPreview: b.fullPreview, handicap: b.handicap, rules, finishType: b.finishType, hostTarget: b.target, inningCap: b.inningCap,
         isPublic: b.isPublic, passwordHash: b.password ? hashRoomPassword(b.password) : null,
         engineVersion: ENGINE_VERSION, paramsHash: paramsHash(params),
     });
@@ -232,23 +235,68 @@ async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body:
     }
     if (m.status !== "waiting") return sendError(res, 409, "참가할 수 없는 대전입니다");
     if (!checkRoomPassword(m.passwordHash, body.password)) return sendError(res, 403, "비밀번호가 맞지 않습니다", "BAD_PASSWORD");
-    const guestTarget = body.target ?? m.hostTarget;
     const rules = m.rules as Rules;
+    // 핸디전(2026-09-12 오너): 참가하는 순간 두 사람의 온라인 에버리지로 각자 목표를 정한다.
+    // 비율(실력 차)은 그대로, 길이는 기준 이닝으로 고정된다 — 다마수를 그대로 옮기면 고수 판이 300이닝씩 간다.
+    // 게스트가 보낸 target 은 핸디전에서 무시한다(짠다마 방지 — 자기신고를 안 받는 건 실전 핸디와 같은 설계).
+    const targets = m.handicap
+        ? await handicapTargets(m, req.userId!, pointUnitOf(rules))
+        : [m.hostTarget, body.target ?? m.hostTarget] as [number, number];
+    const [hostTarget, guestTarget] = targets;
     const state = createSession({
         rules, finishType: m.finishType, inningCap: m.inningCap,
         players: [
-            { id: m.hostId, target: m.hostTarget, cueBallId: "white" },
+            { id: m.hostId, target: hostTarget, cueBallId: "white" },
             { id: req.userId!, target: guestTarget, cueBallId: "yellow" },
         ],
     });
     const balls = openingLayout(m.gameType, TABLES[m.tableId], "white");
-    const started = await storage.simMatch.start(m.id, req.userId!, guestTarget, state, balls);
+    const started = await storage.simMatch.start(m.id, req.userId!, guestTarget, state, balls, hostTarget);
     if (!started) return sendError(res, 409, "이미 시작됐거나 참가할 수 없는 대전입니다");
     const guest = await storage.getMemberById(req.userId!);
     notify(m.hostId, "온라인게임 대전 시작", `${guest?.name ?? "상대"}님이 들어왔어요. 첫 샷은 당신 차례입니다.`, m.id);
     const full = await storage.simMatch.get(m.id);
     return sendSuccess(res, publicMatch(full!, req.userId!));
 }
+
+/** 4구는 1캐롬 = pointUnit 점(관행 10), 3쿠션은 1점. 에버리지는 언제나 캐롬/이닝으로 센다. */
+function pointUnitOf(rules: Rules): number {
+    return rules.gameType === "4c" ? rules.pointUnit : 1;
+}
+
+/**
+ * 한 사람의 온라인 에버리지. **온라인 대전 기록만** 본다 — 시뮬레이터는 실전 성적(RP·에버리지·핸디)을
+ * 읽지도 쓰지도 않는다(sim.guard.test 가 막는다, 2026-08-30 오염 사고). 기록이 모자라면 종목 기본값이다.
+ */
+async function simAverage(memberId: string, gameType: "3c" | "4c", pointUnit: number): Promise<{ avg: number; record: { score: number; innings: number; matches: number } }> {
+    const record = await storage.simMatch.recentMatchRecord(memberId, gameType, RECENT_MATCHES);
+    return { avg: playerAverage({ gameType, pointUnit, record }), record };
+}
+
+/** 핸디전 목표 두 개. [방장, 게스트]. */
+async function handicapTargets(m: MatchWithNames, guestId: string, pointUnit: number): Promise<[number, number]> {
+    const [host, guest] = await Promise.all([
+        simAverage(m.hostId, m.gameType, pointUnit),
+        simAverage(guestId, m.gameType, pointUnit),
+    ]);
+    return handicapPair(host.avg, guest.avg, m.gameType, pointUnit);
+}
+
+// GET /sim/handicap — 내 온라인 다마수(종목별). 방 만들기·참가 화면이 "내 다마 80" 을 보여줄 때 쓴다.
+router.get("/sim/handicap", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const out = await Promise.all((["3c", "4c"] as const).map(async (gameType) => {
+        const pointUnit = pointUnitOf(gameType === "4c" ? DEFAULT_4C_RULES : DEFAULT_3C_RULES);
+        const { avg, record } = await simAverage(req.userId!, gameType, pointUnit);
+        return {
+            gameType, avg: Math.round(avg * 1000) / 1000,
+            target: targetFor(avg, gameType, pointUnit),
+            matches: record.matches, innings: record.innings,
+            /** 온라인 기록으로 매긴 값인가(아니면 아직 기본값에서 시작 중인가) */
+            fromRecord: hasEnoughRecord(record),
+        };
+    }));
+    return sendSuccess(res, { minInnings: MIN_INNINGS, innings: TARGET_INNINGS, boards: out });
+}));
 
 // POST /sim/matches/code/:code/join — 게스트 참가 → 시작
 router.post("/sim/matches/code/:code/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {

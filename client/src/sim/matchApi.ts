@@ -53,6 +53,11 @@ export function matchTimeoutUrl(id: string): string {
 }
 /** ack=1: 차례인 내가 조준 화면에 들어왔다고 알려 40초 시계를 시작한다(서버가 한 번만 적는다). */
 /** 관전 목록: live(지금 치는 중) · replays(최근에 끝난 공개 대전). 비밀번호 방은 서버가 빼고 준다. */
+/** 내 온라인 다마수(종목별). 방 만들기·참가 화면이 "내 다마 60" 을 보여줄 때 쓴다. */
+export function handicapUrl(): string {
+    return `${SIM_API_BASE}/handicap`;
+}
+
 export function watchUrl(): string {
     return `${SIM_API_BASE}/watch`;
 }
@@ -100,6 +105,8 @@ export interface MatchPublic {
     readonly isPublic?: boolean;
     /** 비밀번호 방 — 참가할 때 password 가 필요하다. */
     readonly hasPassword?: boolean;
+    /** 핸디전 방(2026-09-12): 참가하는 순간 서버가 두 사람의 온라인 에버리지로 각자 목표를 정한다. 옛 응답엔 없다. */
+    readonly handicap?: boolean;
     readonly rules: Rules;
     readonly finishType: FinishType;
     readonly inningCap: number;
@@ -159,6 +166,23 @@ export interface WatchCard {
     readonly startedAt: string | null;
     readonly finishedAt: string | null;
     readonly lastShotAt: string | null;
+}
+
+/** 내 다마 한 줄. target 은 지금 이 실력으로 치면 잡히는 목표 점수(4구는 10점 단위). */
+export interface MyHandicap {
+    readonly gameType: "3c" | "4c";
+    readonly avg: number;
+    readonly target: number;
+    readonly matches: number;
+    readonly innings: number;
+    /** 온라인 기록으로 매긴 값인가(아니면 아직 기본값) */
+    readonly fromRecord: boolean;
+}
+
+export interface MyHandicaps {
+    readonly minInnings: number;
+    readonly innings: number;
+    readonly boards: readonly MyHandicap[];
 }
 
 export interface WatchLists {
@@ -227,6 +251,8 @@ export interface CreateMatchBody {
     readonly fullPreview: boolean;
     /** 멀티방(공개 방)으로 열기. */
     readonly isPublic: boolean;
+    /** 핸디전(기본 true): 참가하는 순간 서버가 두 사람의 온라인 에버리지로 각자 목표를 정한다. */
+    readonly handicap: boolean;
     /** 방 비밀번호(4~20자). 없으면 보내지 않는다. */
     readonly password?: string;
 }
@@ -235,6 +261,8 @@ export interface CreateMatchBody {
 export interface RoomOptions {
     readonly isPublic?: boolean;
     readonly password?: string;
+    /** 핸디전(기본 true). 끄면 방장이 적은 다마수로 둘 다 친다(맞대결). */
+    readonly handicap?: boolean;
 }
 
 export const ROOM_PASSWORD_MIN = 4;
@@ -274,6 +302,7 @@ export function toCreateMatchBody(config: SimSetupConfig, room?: RoomOptions): C
         aimAssist: aimAssistFor(config.mode),
         fullPreview: config.matchPreview === "full",
         isPublic: room?.isPublic === true,
+        handicap: room?.handicap !== false,
         ...(password ? { password } : {}),
     };
 }
@@ -355,6 +384,7 @@ export function parseMatch(raw: unknown): MatchPublic {
         fullPreview: typeof raw.fullPreview === "boolean" ? raw.fullPreview : undefined,
         isPublic: typeof raw.isPublic === "boolean" ? raw.isPublic : undefined,
         hasPassword: typeof raw.hasPassword === "boolean" ? raw.hasPassword : undefined,
+        handicap: typeof raw.handicap === "boolean" ? raw.handicap : undefined,
         rules: raw.rules as unknown as Rules,
         finishType: raw.finishType === "3c" || raw.finishType === "bank" ? raw.finishType : "none",
         inningCap: typeof raw.inningCap === "number" ? raw.inningCap : 0,
@@ -571,6 +601,8 @@ export interface MatchApi {
     getShots(id: string, from?: number): Promise<readonly MatchShot[]>;
     /** 관전·다시보기 목록 */
     getWatchable(): Promise<WatchLists>;
+    /** 내 온라인 다마수(종목별) */
+    getMyHandicap(): Promise<MyHandicaps>;
     postShot(id: string, req: ShotRequest): Promise<PostShotResponse>;
     /** waiting 인 내 대전이면 취소(canceled), playing 이면 기권(finished, 상대 승) */
     resign(id: string): Promise<ResignResponse>;
@@ -621,6 +653,15 @@ export function createMatchApi(request: RequestFn): MatchApi {
         },
         async getShots(id, from) {
             return parseMatchShots(await request(matchShotsUrl(id, from), { method: "GET" }));
+        },
+        async getMyHandicap() {
+            const r = await request(handicapUrl()) as { minInnings?: unknown; innings?: unknown; boards?: unknown };
+            const num = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
+            return {
+                minInnings: num(r?.minInnings, 20),
+                innings: num(r?.innings, 18),
+                boards: Array.isArray(r?.boards) ? r.boards as MyHandicap[] : [],
+            };
         },
         async getWatchable() {
             const r = await request(watchUrl()) as { live?: unknown; replays?: unknown };

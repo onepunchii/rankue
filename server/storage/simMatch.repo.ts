@@ -115,6 +115,35 @@ export class SimMatchRepository {
     }
 
     /**
+     * 온라인 다마용 최근 기록(2026-09-12). 끝난 대전에서 **내 몫의 점수·이닝**만 모은다.
+     * 방장은 players[0], 게스트는 players[1] 이다(세션을 만들 때 그 순서로 넣는다 — joinAndStart).
+     * 기권·무응답으로 끝난 판도 친 만큼은 기록이라 그대로 센다.
+     */
+    async recentMatchRecord(memberId: string, gameType: "3c" | "4c", limit: number): Promise<{ score: number; innings: number; matches: number }> {
+        const rows = await db.select({ hostId: hiqSimMatches.hostId, state: hiqSimMatches.state })
+            .from(hiqSimMatches)
+            .where(and(
+                eq(hiqSimMatches.status, "finished"),
+                eq(hiqSimMatches.gameType, gameType),
+                or(eq(hiqSimMatches.hostId, memberId), eq(hiqSimMatches.guestId, memberId)),
+                sql`${hiqSimMatches.state} is not null`,
+            ))
+            .orderBy(desc(hiqSimMatches.finishedAt))
+            .limit(Math.max(1, limit));
+
+        let score = 0, innings = 0, matches = 0;
+        for (const r of rows) {
+            const players = (r.state as { players?: { score?: number; innings?: number }[] } | null)?.players;
+            const me = players?.[r.hostId === memberId ? 0 : 1];
+            if (!me) continue;
+            score += me.score ?? 0;
+            innings += me.innings ?? 0;
+            matches += 1;
+        }
+        return { score, innings, matches };
+    }
+
+    /**
      * 관전자 표시: 내 시각을 적고 오래된 사람은 같은 문장에서 걷어낸다(2026-09-12).
      * 한 문장이라 관전자 여럿이 동시에 들어와도 서로의 항목을 덮지 않는다(읽고-고쳐-쓰기가 아니다).
      * 선수는 적지 않는다 — 관전자 수는 "구경하는 사람"이라 대전 당사자는 빼고 센다.
@@ -158,12 +187,14 @@ export class SimMatchRepository {
     }
 
     /** 게스트 참가 → playing. waiting 상태의 행을 잠그고 한 번만 성공한다. */
-    async start(id: string, guestId: string, guestTarget: number, state: unknown, balls: unknown): Promise<HiqSimMatch | null> {
+    /** hostTarget 은 핸디전에서만 넘어온다 — 참가하는 순간 두 사람의 에버리지로 방장 목표까지 다시 정하기 때문이다. */
+    async start(id: string, guestId: string, guestTarget: number, state: unknown, balls: unknown, hostTarget?: number): Promise<HiqSimMatch | null> {
         return db.transaction(async (tx) => {
             const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, id)).for("update");
             if (!m || m.status !== "waiting" || m.hostId === guestId) return null;
             const [row] = await tx.update(hiqSimMatches).set({
                 guestId, guestTarget, state, balls, status: "playing", turn: 0,
+                ...(typeof hostTarget === "number" ? { hostTarget } : {}),
                 startedAt: new Date(), version: m.version + 1,
             }).where(eq(hiqSimMatches.id, id)).returning();
             return row;

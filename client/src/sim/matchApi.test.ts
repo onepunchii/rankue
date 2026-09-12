@@ -63,9 +63,9 @@ describe("요청 매핑", () => {
         expect(body).toEqual({
             gameType: "4c", tableId: "JUNGDAE_KR", cushionModel: "mathavan2010", condition: 0.9,
             rules: { ...DEFAULT_4C_RULES, threeCushionDouble: true }, finishType: "none", target: 80, inningCap: 15,
-            aimAssist: true, fullPreview: false, isPublic: false,
+            aimAssist: true, fullPreview: false, isPublic: false, handicap: true,
         });
-        expect(Object.keys(body)).toHaveLength(11);
+        expect(Object.keys(body)).toHaveLength(12);
     });
     it("toJoinBody: 유효한 정수 다마수만 싣고 아니면 빈 본문(서버가 호스트 다마수를 쓴다)", () => {
         expect(toJoinBody(15)).toEqual({ target: 15 });

@@ -59,7 +59,8 @@ const Row = memo(function Row({ m, age, onJoin }: { m: MatchPublic; age: string;
                     <span className="text-[11px] font-medium text-ink-3 shrink-0">{age}</span>
                 </span>
                 <span className="text-[12px] font-medium text-ink-3 truncate">
-                    {gameLabel(m, t)} · {t("sim.rooms.target").replace("{n}", String(m.hostTarget))}
+                    {gameLabel(m, t)}
+                    {m.handicap === true ? <> · <span className="text-brand font-bold">{t("sim.match.handicapRoom")}</span></> : <> · {t("sim.rooms.target").replace("{n}", String(m.hostTarget))}</>}
                 </span>
                 {(m.aimAssist === false || m.hasPassword) && (
                     <span className="flex flex-wrap gap-1">
@@ -122,13 +123,15 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
         if (room) { setTargetText(String(defaultJoinTarget(room, myHandi))); setPassword(""); setError(null); }
     }, [room, myHandi]);
     const targetNum = targetText.trim() === "" ? NaN : Number(targetText);
-    const ok = !!room && isValidTarget(targetNum) && (!room.hasPassword || password !== "");
+    // 핸디전 방(2026-09-12): 다마수를 게스트가 정하지 않는다 — 참가하는 순간 서버가 두 사람 기록으로 정한다(짠다마 방지).
+    const isHandicap = room?.handicap === true;
+    const ok = !!room && (isHandicap || isValidTarget(targetNum)) && (!room.hasPassword || password !== "");
     const join = async () => {
         if (!room || !ok || joining) return;
         setJoining(true);
         setError(null);
         try {
-            const m = await api.joinRoom(room.id, targetNum, room.hasPassword ? password : undefined);
+            const m = await api.joinRoom(room.id, isHandicap ? undefined : targetNum, room.hasPassword ? password : undefined);
             void qc.invalidateQueries({ queryKey: ROOMS_QUERY_KEY });
             onOpen(m);
         } catch (e) {
@@ -153,16 +156,25 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
                                 <span className="text-[12px] font-medium text-ink-4">{t("sim.setup.rules")}</span>
                                 <span className="text-[13px] font-semibold text-ink-2">{rulesLabel(room, t)} · {inningCapLabel(room.inningCap, t)}</span>
                             </div>
-                            <div className="flex items-baseline justify-between gap-2">
-                                <span className="text-[12px] font-medium text-ink-4">{t("sim.match.hostTarget")}</span>
-                                <span className="rk-num text-[14px] font-semibold text-ink-1">{room.hostTarget}</span>
-                            </div>
+                            {!isHandicap && (
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <span className="text-[12px] font-medium text-ink-4">{t("sim.match.hostTarget")}</span>
+                                    <span className="rk-num text-[14px] font-semibold text-ink-1">{room.hostTarget}</span>
+                                </div>
+                            )}
                             <div className="flex items-baseline justify-between gap-2">
                                 <span className="text-[12px] font-medium text-ink-4">{t("sim.setup.mode")}</span>
                                 <span className="text-[13px] font-semibold text-ink-2">{room.aimAssist === false ? t("sim.setup.modeReality") : t("sim.setup.modeNormal")}</span>
                             </div>
                         </div>
-                        <TargetPicker id="sim-room-target" gameType={room.gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                        {isHandicap ? (
+                            <div className="rounded-tile border border-brand/30 bg-brand/[0.06] px-4 py-3">
+                                <p className="text-[13px] font-bold text-ink-1">{t("sim.match.handicapRoom")}</p>
+                                <p className="text-[12px] font-medium text-ink-3 mt-0.5">{t("sim.match.handicapJoin")}</p>
+                            </div>
+                        ) : (
+                            <TargetPicker id="sim-room-target" gameType={room.gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                        )}
                         {room.hasPassword && (
                             <div className="space-y-1.5">
                                 <Label htmlFor="sim-room-password">{t("sim.rooms.password")}</Label>
