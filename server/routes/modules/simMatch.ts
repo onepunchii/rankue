@@ -88,6 +88,26 @@ function paramsFor(m: { tableId: "DAEDAE" | "JUNGDAE_KR"; cushionModel: string; 
 }
 
 /** 클라이언트에 주는 모양. 상대 회원 id 는 필요 없으니 이름만. */
+/** 관전 가능: 공개 방이고 비밀번호가 없으며, 진행 중이거나 끝난 대전. 비밀번호 방은 그들끼리 치겠다는 뜻이라 막는다. */
+export function isWatchable(m: { isPublic: boolean; passwordHash: string | null; status: string }): boolean {
+    return m.isPublic && !m.passwordHash && (m.status === "playing" || m.status === "finished");
+}
+
+/** 관전 목록에 들어갈 한 줄. 관전은 목록에서 고르는 화면이라 점수·차례까지만 담고 공 배치는 싣지 않는다. */
+function watchCard(m: MatchWithNames) {
+    const st = m.state as SessionState | null;
+    const scores = st ? st.players.map((p) => p.score) : [0, 0];
+    const innings = st ? Math.max(...st.players.map((p) => p.innings)) : 0;
+    return {
+        id: m.id, status: m.status, gameType: m.gameType, tableId: m.tableId,
+        hostName: m.hostName, guestName: m.guestName,
+        targets: [m.hostTarget, m.guestTarget ?? m.hostTarget] as const,
+        scores, innings, turn: m.turn, shots: m.shots,
+        winnerIndex: m.winnerId === null ? null : m.winnerId === m.hostId ? 0 : 1,
+        startedAt: m.startedAt, finishedAt: m.finishedAt, lastShotAt: m.lastShotAt,
+    };
+}
+
 function publicMatch(m: MatchWithNames, viewerId: string) {
     const myIndex = m.hostId === viewerId ? 0 : m.guestId === viewerId ? 1 : -1;
     return {
@@ -116,6 +136,10 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
  * 도배 방지: 같은 제목이 최근 ROOM_BROADCAST_QUIET_MIN 분 안에 있으면 건너뛴다(방을 연속으로 열어도 한 번만).
  * 토큰이 없는 회원은 제외한다 — 알림함에만 쌓여 방이 닫힌 뒤에 읽히면 안내가 아니라 소음이다.
  */
+/** 관전 목록에 띄우는 범위: 진행 중은 하루 안에 시작한 대전, 다시보기는 최근 7일. */
+const WATCH_LIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const WATCH_REPLAY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 const ROOM_BROADCAST_QUIET_MIN = 30;
 const ROOM_BROADCAST_LIMIT = 300;
 /** 방송을 기다려 주는 상한(ms) — 넘으면 남은 건 다음 요청 없이 그대로 끝난다. */
@@ -237,6 +261,19 @@ router.get("/sim/rooms", requireAuth, asyncHandler(async (req: AuthRequest, res:
     return sendSuccess(res, rows.map((m) => ({ ...publicMatch(m, req.userId!), code: "" })));
 }));
 
+// GET /sim/watch — 관전 목록. live = 지금 치고 있는 공개 대전, replays = 최근에 끝난 공개 대전(다시보기).
+// 오너(2026-09-12): "게임 시작하면 방이 사라지는데, 관전으로 들어가면 그 경기를 볼 수 있게".
+router.get("/sim/watch", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const [live, replays] = await Promise.all([
+        storage.simMatch.listWatchable(req.userId!, "playing", Date.now() - WATCH_LIVE_WINDOW_MS, 20),
+        storage.simMatch.listWatchable(req.userId!, "finished", Date.now() - WATCH_REPLAY_WINDOW_MS, 20),
+    ]);
+    return sendSuccess(res, {
+        live: live.map((m) => watchCard(m)),
+        replays: replays.map((m) => watchCard(m)),
+    });
+}));
+
 // POST /sim/matches/:id/join — 멀티방 참가(목록에서). 비밀번호 방이면 body.password.
 router.post("/sim/matches/:id/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const parsed = joinSchema.safeParse(req.body ?? {});
@@ -270,11 +307,15 @@ router.post("/sim/matches/:id/invite", requireAuth, asyncHandler(async (req: Aut
 // GET /sim/matches/:id — 상태(폴링용)
 router.get("/sim/matches/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     let m = await storage.simMatch.get(req.params.id);
-    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
+    // 참가자가 아니어도 관전할 수 있다(공개 방·비밀번호 없음, 진행 중이거나 끝난 대전) — 2026-09-12.
+    // 관전자는 읽기만 한다: 접속 표시(touchSeen)도, 40초 시계 시작(ack)도 건드리지 않는다.
+    // 당구는 숨은 정보가 없어 관전이 판을 유리하게 만들지 않는다.
+    const isPlayer = !!m && (m.hostId === req.userId || m.guestId === req.userId);
+    if (!m || (!isPlayer && !isWatchable(m))) return sendError(res, 404, "대전이 없습니다");
     // 접속 표시: 대전 화면을 보고 있다(폴링). 차례가 넘어올 때 시계를 바로 돌릴지 여기서 판단한다(PRESENCE_MS).
-    if (m.status === "playing") await storage.simMatch.touchSeen(m.id, m.hostId === req.userId ? 0 : 1);
+    if (isPlayer && m.status === "playing") await storage.simMatch.touchSeen(m.id, m.hostId === req.userId ? 0 : 1);
     // ?ack=1: 차례인 사람이 조준 화면에 들어왔다 → 40초 시계 시작(한 번만, 서버가 이미 적었으면 그대로). 상대·재생 중 폴링은 ack 없이 온다.
-    if (req.query.ack === "1" && m.status === "playing" && !m.turnSeenAt) {
+    if (isPlayer && req.query.ack === "1" && m.status === "playing" && !m.turnSeenAt) {
         const myIndex = m.hostId === req.userId ? 0 : 1;
         if (m.turn === myIndex) {
             const row = await storage.simMatch.markTurnSeen(m.id, myIndex);
@@ -327,7 +368,8 @@ router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: Au
 // GET /sim/matches/:id/shots?from=N — 놓친 샷 따라잡기(preState+input 으로 로컬 재시뮬)
 router.get("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const m = await storage.simMatch.get(req.params.id);
-    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
+    // 관전·다시보기도 같은 경로로 샷을 받아 로컬에서 재시뮬한다(관전 규칙은 isWatchable).
+    if (!m || !(m.hostId === req.userId || m.guestId === req.userId || isWatchable(m))) return sendError(res, 404, "대전이 없습니다");
     const from = Math.max(0, parseInt(String(req.query.from ?? "0"), 10) || 0);
     const shots = await storage.simMatch.getShots(m.id, from);
     return sendSuccess(res, shots.map((s) => ({

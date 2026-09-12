@@ -57,6 +57,8 @@ import { ENTRY_STYLE } from "./entry/entryTheme";
 import { bumpPathCount } from "./entry/entryStats";
 import { SimDash } from "./dash/SimDash";
 import { RoomList } from "./match/RoomList";
+import { WatchList } from "./watch/WatchList";
+import WatchPage from "./watch/WatchPage";
 import { RankPage } from "./rank/RankPage";
 import { isCompleteCode, sanitizeCode } from "./matchApi";
 import { matchApi, type MatchPublic } from "./matchApi";
@@ -197,6 +199,8 @@ export function SimulatorPage() {
     // ?rooms=1 멀티방 목록(2026-09-08 오너: 별도 카드) · ?rank=1 온라인 대전 랭킹
     const roomsView = params.get("rooms") === "1";
     const rankView = params.get("rank") === "1";
+    // ?watch=<대전 id> 관전·다시보기(2026-09-12 오너). 읽기 전용 화면이라 시뮬레이터 세션을 열지 않는다.
+    const watchId = params.get("watch");
     // ?join=<code>[&auto=1]: 푸시 초대 딥링크. auto 면 비밀번호 없는 대기 방에 바로 참가, 아니면 코드가 채워진 참가 화면
     const joinCodeRaw = sanitizeCode(params.get("join") ?? "");
     const joinCode = isCompleteCode(joinCodeRaw) ? joinCodeRaw : "";
@@ -205,7 +209,7 @@ export function SimulatorPage() {
     // 길 찾기(?path=1, 2026-09-08 오너): 공을 놓고 3쿠션 해법을 찾는 연습 세션. 오버레이가 아니라 세션이라 overlayParam 에는 넣지 않는다.
     const pathView = params.get("path") === "1";
     // 리플레이 링크(?replay=): 대전·로비·드릴·대시보드가 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
-    const overlayParam = !!matchId || lobby || drillsView || dashView || roomsView || rankView || joinCode !== "" || pathView;
+    const overlayParam = !!matchId || !!watchId || lobby || drillsView || dashView || roomsView || rankView || joinCode !== "" || pathView;
     const [replay] = useState<ReplayPayload | null>(() => (overlayParam ? null : decodeReplay(params.get(REPLAY_PARAM))));
     const [initial] = useState(() => (overlayParam || replay ? null : decodePageConfig(readCfgParam(search))));
     // 파라미터가 하나도 없으면 진입 화면(싱글 / 친구와 대전 / 멀티방)부터. cfg 가 있는데 깨졌으면 예전처럼 설정 창을 바로 연다.
@@ -1412,11 +1416,21 @@ export function SimulatorPage() {
                         onClose={() => navigate("/online-game", { replace: true })}
                         myHandi={member ? { handi3c: member.handi3c, handi4c: member.handi4c } : undefined}
                     />
+                    {/* 시작한 방은 참가 목록에서 빠진다 — 그 판들을 관전으로 되살린다(2026-09-12 오너). */}
+                    <div className="px-4 pb-8">
+                        <WatchList onOpen={(id) => navigate(`/online-game?watch=${id}`)} />
+                    </div>
                 </div>
             )}
             {showRank && (
                 <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <RankPage onClose={() => navigate("/online-game", { replace: true })} />
+                </div>
+            )}
+            {/* 관전·다시보기: 읽기 전용 화면을 위에 덮는다(대전 화면·시뮬 세션과 완전히 분리) */}
+            {watchId && (
+                <div className="sim-dark fixed inset-0 z-[6] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                    <WatchPage matchId={watchId} />
                 </div>
             )}
             {joinCode !== "" && sim.phase === "setup" && (

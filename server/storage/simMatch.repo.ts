@@ -113,6 +113,27 @@ export class SimMatchRepository {
         return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
     }
 
+    /**
+     * 관전 목록(2026-09-12 오너: "게임 시작하면 방이 사라지는데 관전으로 들어가 볼 수 있게").
+     * 공개 방이고 비밀번호가 없는 대전만 — 비밀번호를 건 방은 그들끼리 치겠다는 뜻이라 관전도 막는다.
+     * live = 진행 중, replays = 최근에 끝난 대전(다시보기). 내가 뛰고 있는 대전은 빼고 보여준다(그건 '내 대전'이다).
+     */
+    async listWatchable(viewerId: string, status: "playing" | "finished", sinceMs: number, limit = 20): Promise<MatchWithNames[]> {
+        const { q } = this.withNames();
+        const timeCol = status === "playing" ? hiqSimMatches.startedAt : hiqSimMatches.finishedAt;
+        const rows = await q.where(and(
+            eq(hiqSimMatches.isPublic, true),
+            eq(hiqSimMatches.status, status),
+            isNull(hiqSimMatches.passwordHash),
+            sql`${hiqSimMatches.hostId} <> ${viewerId}`,
+            sql`(${hiqSimMatches.guestId} is null or ${hiqSimMatches.guestId} <> ${viewerId})`,
+            gte(timeCol, new Date(sinceMs)),
+            // 한 샷도 안 친 대전은 뺀다 — 시작하자마자 기권·취소된 판이라 볼 것이 없다.
+            sql`${hiqSimMatches.shots} > 0`,
+        )).orderBy(desc(timeCol)).limit(limit);
+        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
+    }
+
     async setInvited(id: string, memberId: string): Promise<void> {
         await db.update(hiqSimMatches).set({ invitedId: memberId }).where(eq(hiqSimMatches.id, id));
     }

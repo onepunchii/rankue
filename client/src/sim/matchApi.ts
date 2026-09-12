@@ -52,6 +52,11 @@ export function matchTimeoutUrl(id: string): string {
     return `${matchUrl(id)}/timeout`;
 }
 /** ack=1: 차례인 내가 조준 화면에 들어왔다고 알려 40초 시계를 시작한다(서버가 한 번만 적는다). */
+/** 관전 목록: live(지금 치는 중) · replays(최근에 끝난 공개 대전). 비밀번호 방은 서버가 빼고 준다. */
+export function watchUrl(): string {
+    return `${SIM_API_BASE}/watch`;
+}
+
 export function roomsUrl(): string {
     return `${SIM_API_BASE}/rooms`;
 }
@@ -133,6 +138,30 @@ export interface MatchPublic {
 }
 
 /** GET /sim/matches/:id/shots 의 한 줄. preState + input 으로 로컬에서 같은 샷을 재시뮬한다. */
+/** 관전 목록 한 줄. 공 배치는 담지 않는다 — 고르는 화면이라 점수·차례까지면 된다. */
+export interface WatchCard {
+    readonly id: string;
+    readonly status: MatchStatus;
+    readonly gameType: "3c" | "4c";
+    readonly tableId: "DAEDAE" | "JUNGDAE_KR";
+    readonly hostName: string;
+    readonly guestName: string | null;
+    readonly targets: readonly [number, number];
+    readonly scores: readonly number[];
+    readonly innings: number;
+    readonly turn: number;
+    readonly shots: number;
+    readonly winnerIndex: 0 | 1 | null;
+    readonly startedAt: string | null;
+    readonly finishedAt: string | null;
+    readonly lastShotAt: string | null;
+}
+
+export interface WatchLists {
+    readonly live: readonly WatchCard[];
+    readonly replays: readonly WatchCard[];
+}
+
 export interface MatchShot {
     readonly idx: number;
     readonly playerIndex: number;
@@ -536,6 +565,8 @@ export interface MatchApi {
     getMatch(id: string, opts?: { ack?: boolean }): Promise<MatchPublic>;
     /** from = 로컬 샷 수 → 놓친 샷(idx ≥ from) */
     getShots(id: string, from?: number): Promise<readonly MatchShot[]>;
+    /** 관전·다시보기 목록 */
+    getWatchable(): Promise<WatchLists>;
     postShot(id: string, req: ShotRequest): Promise<PostShotResponse>;
     /** waiting 인 내 대전이면 취소(canceled), playing 이면 기권(finished, 상대 승) */
     resign(id: string): Promise<ResignResponse>;
@@ -586,6 +617,13 @@ export function createMatchApi(request: RequestFn): MatchApi {
         },
         async getShots(id, from) {
             return parseMatchShots(await request(matchShotsUrl(id, from), { method: "GET" }));
+        },
+        async getWatchable() {
+            const r = await request(watchUrl()) as { live?: unknown; replays?: unknown };
+            return {
+                live: Array.isArray(r?.live) ? r.live as WatchCard[] : [],
+                replays: Array.isArray(r?.replays) ? r.replays as WatchCard[] : [],
+            };
         },
         async postShot(id, req) {
             return parsePostShotResponse(await request(matchShotsUrl(id), { method: "POST", body: toShotBody(req) }));
