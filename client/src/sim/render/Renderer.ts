@@ -24,8 +24,14 @@ export interface CueFrame {
  */
 export type RendererView = "top" | "player";
 
-/** 핀치 축소 하한: 0.7 = 30 % 축소(화면의 모든 것이 70 % 크기). 그 이상 작아지지 않는다. */
-export const ZOOM_MIN = 0.7;
+/**
+ * 핀치 확대·축소 범위(player 뷰). 1 = 기본 시야각(45°).
+ * 0.45 = 많이 축소(시야각 85° — 테이블이 거의 다 들어온다), 2 = 확대(시야각 23°).
+ * 2026-09-12 오너: "축소율과 확대 가능하게, 손가락 놓더라도 내가 맞춘 크기가 고정으로" — 그 전에는 0.7~1 이었고
+ * 손을 떼면 1 로 되돌아갔다.
+ */
+export const ZOOM_MIN = 0.45;
+export const ZOOM_MAX = 2;
 
 /** 선수 시점 카메라의 목표. 없으면 카메라는 마지막 자리에 머문다(공 옮기기·상대 차례 대기). */
 export interface ViewFrame {
@@ -96,8 +102,8 @@ export interface Renderer {
     /** 카메라가 아직 움직이는 중이면 true — 페이지 rAF 루프가 dirty 가 아니어도 draw 를 한 번 더 부른다(선택). */
     needsFrame?(): boolean;
     /**
-     * 임시 축소(선택, player 뷰만). 1 = 기본, ZOOM_MIN(0.7) = 30 % 축소 — 시야각을 넓혀 더 멀리까지 보인다. 감쇠로 따라가며
-     * project/unproject 도 같은 시야각을 쓴다. 두 손가락 핀치가 잡고 있는 동안만 < 1 이고, 손을 떼면 페이지가 1 로 되돌린다.
+     * 확대·축소(선택, player 뷰만). 1 = 기본, ZOOM_MIN = 넓게(멀리까지 보인다), ZOOM_MAX = 좁게(확대). 감쇠로 따라가며
+     * project/unproject 도 같은 시야각을 쓴다. 두 손가락 핀치가 정하고, **손을 떼도 그 값이 남는다**(2026-09-12 오너).
      * 구현하지 않는 렌더러(Canvas2D)는 없음 — 페이지는 이 메서드가 있을 때만 핀치를 시작한다.
      */
     setZoom?(zoom: number): void;

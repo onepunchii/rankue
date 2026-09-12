@@ -1,11 +1,11 @@
+import { ZOOM_MAX, ZOOM_MIN } from "./render/Renderer";
 import { describe, it, expect } from "vitest";
 import { TABLES } from "@shared/sim/params";
 import { openingLayout } from "@shared/sim/layouts";
 import { normalizeAngle } from "./aim";
 import {
     beginGesture, gestureActive, hitBall, idleGestureState, isAbnormalReset, moveGesture, planGestureReset, shouldDropStale,
-    staleResetReason, type GestureEnv, type TableGestureState,
-} from "./tableGestures";
+    staleResetReason, type GestureEnv, type TableGestureState, pinchZoom} from "./tableGestures";
 
 const table = TABLES.DAEDAE;
 const R = table.ball.R;
@@ -191,5 +191,31 @@ describe("조준 기록 정리(2026-09-11 먹통 수정)", () => {
         expect(plan.restoreZoom).toBe(false);
         expect(plan.clearDisplay).toBe(false);
         expect(plan.next).toEqual(idleGestureState());
+    });
+});
+
+/**
+ * 3D 확대·축소(2026-09-12 오너: "손가락 놓으면 풀리지 말고, 축소율과 확대 가능하게").
+ * 핀치는 배율을 '바꾸는' 조작이다 — 잡고 있는 동안의 임시 상태가 아니라서, 다음 핀치는 지난 값에서 이어진다.
+ */
+describe("pinchZoom", () => {
+    it("오므리면 작아지고 벌리면 커진다", () => {
+        expect(pinchZoom(1, 200, 100)).toBeCloseTo(0.5, 10);
+        expect(pinchZoom(1, 100, 150)).toBeCloseTo(1.5, 10);
+        expect(pinchZoom(1, 100, 100)).toBe(1);
+    });
+    it("지난 배율에서 이어진다 — 나눠서 오므려도 계속 작아진다", () => {
+        const once = pinchZoom(1, 100, 70);
+        expect(pinchZoom(once, 100, 70)).toBeLessThan(once);
+    });
+    it("범위 밖은 자른다", () => {
+        expect(pinchZoom(1, 100, 1)).toBe(ZOOM_MIN);
+        expect(pinchZoom(1, 100, 10_000)).toBe(ZOOM_MAX);
+        expect(pinchZoom(ZOOM_MIN, 100, 50)).toBe(ZOOM_MIN);
+        expect(pinchZoom(ZOOM_MAX, 100, 200)).toBe(ZOOM_MAX);
+    });
+    it("이상한 입력이면 배율을 바꾸지 않는다", () => {
+        expect(pinchZoom(1.2, 0, 80)).toBeCloseTo(1.2, 10);
+        expect(pinchZoom(Number.NaN, 100, 80)).toBe(1);
     });
 });

@@ -18,7 +18,7 @@ import {
     unprojectPerspective, overviewPose, OVERVIEW_EDGE, OVERVIEW_MARGIN_M, OVERVIEW_SMOOTH_S, rigSmoothTime, zoomedFovDeg, dampScalar,
     type CameraPose,
 } from "./threeMath";
-import { ZOOM_MIN } from "./Renderer";
+import { ZOOM_MAX, ZOOM_MIN } from "./Renderer";
 import { ThreeRenderer, type ThreeRendererOptions } from "./ThreeRenderer";
 
 const VIEWPORTS = [
@@ -997,12 +997,14 @@ describe("ThreeRenderer 재생 중 부감(view.mode = 'overview')", () => {
 });
 
 describe("핀치 축소 — zoomedFovDeg / dampScalar / ThreeRenderer.setZoom", () => {
-    it("zoomedFovDeg: 1 이면 그대로, 0.7 이면 tan(f/2) 가 1/0.7 배, ZOOM_MIN 아래·1 위는 클램프", () => {
+    it("zoomedFovDeg: 1 이면 그대로, 0.7 이면 tan(f/2) 가 1/0.7 배, ZOOM_MIN 아래·ZOOM_MAX 위는 클램프", () => {
         expect(zoomedFovDeg(45, 1)).toBeCloseTo(45, 12);
         const f = zoomedFovDeg(45, 0.7);
         expect(Math.tan((f * Math.PI) / 360)).toBeCloseTo(Math.tan((45 * Math.PI) / 360) / 0.7, 12);
         expect(zoomedFovDeg(45, 0.2)).toBeCloseTo(zoomedFovDeg(45, ZOOM_MIN), 12);
-        expect(zoomedFovDeg(45, 3)).toBeCloseTo(45, 12);
+        // 2026-09-12: 확대(zoom > 1)를 열었다 — 위 클램프는 1 이 아니라 ZOOM_MAX 다.
+        expect(zoomedFovDeg(45, 3)).toBeCloseTo(zoomedFovDeg(45, ZOOM_MAX), 12);
+        expect(zoomedFovDeg(45, ZOOM_MAX)).toBeLessThan(45);   // 확대하면 시야각이 좁아진다
     });
     it("dampScalar: dt 0 이면 그대로, 목표로 단조 접근, 1e-3 안이면 스냅", () => {
         expect(dampScalar(1, 0.7, 0.08, 0)).toBe(1);

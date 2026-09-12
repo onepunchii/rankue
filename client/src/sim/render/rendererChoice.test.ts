@@ -1,8 +1,8 @@
+import { ZOOM_MAX, ZOOM_MIN } from "./Renderer";
 import { describe, it, expect, vi } from "vitest";
 import {
     chooseRendererKind, CONTEXT_LOSS_LIMIT, probeWebGL2, readRendererPref, readViewPref, RENDERER_PREF_KEY, selectRendererKind,
-    VIEW_PREF_KEY, writeRendererPref, writeViewPref, type StorageLike,
-} from "./rendererChoice";
+    VIEW_PREF_KEY, writeRendererPref, writeViewPref, type StorageLike, readZoomPref, writeZoomPref} from "./rendererChoice";
 
 function memStorage(initial: Record<string, string> = {}): StorageLike & { data: Record<string, string> } {
     const data = { ...initial };
@@ -102,5 +102,33 @@ describe("chooseRendererKind", () => {
 describe("selectRendererKind (브라우저 전역 없음)", () => {
     it("node 환경에서는 canvas", () => {
         expect(selectRendererKind()).toBe("canvas");
+    });
+});
+
+/** 3D 확대·축소 저장(2026-09-12 오너: 손을 떼도 남고, 다음에 들어와도 그 크기). */
+describe("readZoomPref / writeZoomPref", () => {
+    const mem = (v?: string) => {
+        const store: Record<string, string> = v === undefined ? {} : { "rankue.sim.zoom": v };
+        return { getItem: (k: string) => store[k] ?? null, setItem: (k: string, val: string) => { store[k] = val; }, store };
+    };
+    it("저장된 값을 읽고, 없으면 1", () => {
+        expect(readZoomPref(mem("0.6"))).toBeCloseTo(0.6, 10);
+        expect(readZoomPref(mem())).toBe(1);
+        expect(readZoomPref(null)).toBe(1);
+    });
+    it("망가진 값·범위 밖은 안전하게 본다", () => {
+        expect(readZoomPref(mem("어쩌구"))).toBe(1);
+        expect(readZoomPref(mem("0"))).toBe(1);
+        expect(readZoomPref(mem("9"))).toBe(ZOOM_MAX);
+        expect(readZoomPref(mem("0.01"))).toBe(ZOOM_MIN);
+    });
+    it("쓸 때도 범위로 자른다. 저장할 수 없으면 false", () => {
+        const s = mem();
+        expect(writeZoomPref(s, 0.8)).toBe(true);
+        expect(s.store["rankue.sim.zoom"]).toBe("0.8");
+        writeZoomPref(s, 99);
+        expect(Number(s.store["rankue.sim.zoom"])).toBe(ZOOM_MAX);
+        expect(writeZoomPref(null, 1)).toBe(false);
+        expect(writeZoomPref(mem(), Number.NaN)).toBe(false);
     });
 });

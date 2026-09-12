@@ -17,6 +17,8 @@ export const VIEW_PREF_KEY = "rankue.sim.view";
 /** 이 횟수만큼 WebGL 컨텍스트를 잃으면 Canvas2D 로 내려간다. */
 export const CONTEXT_LOSS_LIMIT = 2;
 
+import { ZOOM_MAX, ZOOM_MIN } from "./Renderer";
+
 export interface StorageLike {
     getItem(key: string): string | null;
     setItem(key: string, value: string): void;
@@ -99,6 +101,33 @@ export function probeWebGL2(
 export function chooseRendererKind(pref: RendererKind | null, webgl2: boolean): RendererKind {
     if (!webgl2) return "canvas";
     return pref ?? "three";
+}
+
+/**
+ * 3D 확대·축소 저장(2026-09-12 오너: "손가락 놓더라도 내가 축소한 사이즈와 확대한 사이즈가 고정으로").
+ * 기기에 남겨 다음에 들어와도 그 크기로 시작한다. 범위 밖·망가진 값은 1(기본)로 본다.
+ */
+export const ZOOM_PREF_KEY = "rankue.sim.zoom";
+
+export function readZoomPref(storage: StorageLike | null | undefined): number {
+    if (!storage) return 1;
+    try {
+        const v = Number(storage.getItem(ZOOM_PREF_KEY));
+        if (!Number.isFinite(v) || v <= 0) return 1;
+        return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v));
+    } catch {
+        return 1;
+    }
+}
+
+export function writeZoomPref(storage: StorageLike | null | undefined, zoom: number): boolean {
+    if (!storage || !Number.isFinite(zoom)) return false;
+    try {
+        storage.setItem(ZOOM_PREF_KEY, String(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom))));
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 /** window.localStorage — 접근 자체가 던지는 환경(프라이빗 모드·about:blank)에서는 null. */

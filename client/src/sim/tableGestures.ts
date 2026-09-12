@@ -13,7 +13,7 @@
 import type { BallState } from "@shared/sim/types";
 import { phiFromDrag, type XY } from "./aim";
 import type { Phase } from "./simReducer";
-import type { RendererView } from "./render/Renderer";
+import { ZOOM_MAX, ZOOM_MIN, type RendererView } from "./render/Renderer";
 
 export type Gesture =
     | { readonly kind: "aim"; readonly cue: XY; readonly prev: XY; readonly moved: boolean }
@@ -134,7 +134,8 @@ export interface TableGestureState {
     lastScreen: [number, number] | null;
     /** 눌린 포인터 전부의 화면 px(핀치 판정 size===2) */
     pointers: Map<number, [number, number]>;
-    pinch: { d0: number } | null;
+    /** 핀치 중이면 시작 거리(d0)와 시작 배율(z0). 배율은 페이지가 들고 있고 여기선 "핀치 중인가"만 본다. */
+    pinch: { d0: number; z0: number } | null;
     /** 길게 누르기 타이머가 걸려 있다(아직 4× 전) */
     holdPending: boolean;
     /** 길게 누르기로 4× 가 켜졌다 — 정리할 때 1× 로 되돌린다 */
@@ -166,6 +167,16 @@ export function isAbnormalReset(reason: GestureResetReason, wasActive: boolean):
     }
 }
 
+/**
+ * 핀치 배율(2026-09-12 오너: "축소율과 확대 가능하게, 손가락 놓더라도 고정"). 시작 배율 × (지금 거리 / 시작 거리).
+ * 손을 뗀 값에서 이어지므로 여러 번 나눠 오므리면 계속 작아진다 — 한 번에 얼마나 벌렸는지가 아니라 누적이 기준이다.
+ * 시작 거리가 0 이하(손가락이 겹친 이상한 입력)면 배율을 바꾸지 않는다.
+ */
+export function pinchZoom(z0: number, d0: number, d: number): number {
+    if (!(d0 > 0) || !(d >= 0) || !Number.isFinite(z0)) return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number.isFinite(z0) ? z0 : 1));
+    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z0 * (d / d0)));
+}
+
 export interface GestureResetPlan {
     /** 정리 뒤 상태(늘 빈 상태 — 핀치의 남은 손가락 항목까지 지운다) */
     readonly next: TableGestureState;
@@ -175,6 +186,7 @@ export interface GestureResetPlan {
     /** 길게 누르기가 켠 4× 를 1× 로 */
     readonly restoreSpeed: boolean;
     /** 핀치 축소를 원래 크기로 */
+    /** @deprecated 2026-09-12 부터 배율은 되돌리지 않는다(오너: 맞춘 크기가 남는다). 옛 이름은 계획 모양을 지키려고 남겨 둔다. */
     readonly restoreZoom: boolean;
     /** dragging·placing 표시를 끈다 */
     readonly clearDisplay: boolean;

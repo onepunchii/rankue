@@ -44,10 +44,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useKeepAwake } from "../hooks/useKeepAwake"; // 상대 경로 — vitest 에 "@/" 별칭이 없고 SimulatorPage.test 는 "@/" 를 전부 목으로 바꾼다
 import { useSimulator, type OfflineReason } from "./useSimulator";
 import type { Renderer, RendererView, SafeInsets } from "./render/Renderer";
-import { ZOOM_MIN } from "./render/Renderer";
+import { ZOOM_MAX, ZOOM_MIN } from "./render/Renderer";
 import { Canvas2DRenderer } from "./render/Canvas2DRenderer";
 import {
     CONTEXT_LOSS_LIMIT, readViewPref, safeLocalStorage, selectRendererKind, writeRendererPref, writeViewPref, type RendererKind,
+    readZoomPref, writeZoomPref,
 } from "./render/rendererChoice";
 import { Overlay, type Project } from "./overlay/Overlay";
 import { createNumbersCache, overlayDiamond, readDiamondPref, shotReadout, writeDiamondPref } from "./overlay/diamondSystem";
@@ -83,7 +84,7 @@ import { fileNameFor, gameBadge, replayShortText, sessionStatsLine, shotSubtitle
 import { useShare } from "./share/useShare";
 import { activeThickness, elevationDeg, FINE_STEP_RAD, pullbackFor, stepPower, type ThicknessStep } from "./controlsMath";
 import { appendShot, EMPTY_LOG, popShot, type InningLog } from "./inningLog";
-import { beginGesture, moveGesture, planGestureReset, staleResetReason, type Gesture, type GestureResetReason } from "./tableGestures";
+import { beginGesture, moveGesture, planGestureReset, staleResetReason, type Gesture, type GestureResetReason, pinchZoom} from "./tableGestures";
 import { reportGestureRecover, type TelemetryMode } from "./gestureTelemetry";
 import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
@@ -461,8 +462,9 @@ export function SimulatorPage() {
                 }
                 rendererRef.current?.dispose();
                 rendererRef.current = three;
-                // 저장된 카메라 뷰를 적용하고 툴바에 "3D 보기" 토글을 연다
+                // 저장된 카메라 뷰·배율을 적용하고 툴바에 "3D 보기" 토글을 연다(배율은 기기에 남는다 — 2026-09-12 오너)
                 three.setView(cameraViewRef.current);
+                three.setZoom?.(zoomRef.current);
                 setViewSupported(true);
                 dirtyRef.current = true;
             }).catch(() => {
@@ -586,8 +588,13 @@ export function SimulatorPage() {
     const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     /** 눌린 포인터 전부의 화면 px — 두 번째 손가락이 오면 핀치 축소(선수 시점 조준 중에만). */
     const pointersRef = useRef(new Map<number, [number, number]>());
-    /** 핀치 중이면 시작 거리. 축소 배율 = 현재 거리 / 시작 거리(ZOOM_MIN..1, 벌리면 1). */
-    const pinchRef = useRef<{ d0: number } | null>(null);
+    /** 핀치 중이면 시작 거리와 그때의 배율. 새 배율 = 시작 배율 × (현재 거리 / 시작 거리). */
+    const pinchRef = useRef<{ d0: number; z0: number } | null>(null);
+    /**
+     * 지금 3D 확대·축소 배율(2026-09-12 오너: "손가락 놓더라도 내가 맞춘 크기가 고정으로").
+     * 손을 떼도 남고 기기에도 저장한다 — 핀치는 이 값을 바꾸는 조작이지, 잡고 있는 동안의 임시 상태가 아니다.
+     */
+    const zoomRef = useRef<number>(readZoomPref(safeLocalStorage()));
     /** 조준 드래그 시작 때의 phi — 핀치로 바뀌면 손가락 둘이 닿기 전 드래그된 몇 px 을 되돌린다. */
     const phiAtDownRef = useRef(0);
     /** 직전 포인터의 화면 px(마운트 기준). 조준 드래그의 각 변화를 현재 카메라로 다시 재기 위해 둔다. */
@@ -626,7 +633,7 @@ export function SimulatorPage() {
         holdTimerRef.current = null;
         // 이미 풀린 캡처(뗌 신호를 놓친 손가락)는 브라우저가 예외를 낸다
         if (plan.releasePointerId !== null) { try { tableRef.current?.releasePointerCapture(plan.releasePointerId); } catch { /* 이미 풀림 */ } }
-        if (plan.restoreZoom) rendererRef.current?.setZoom?.(1);
+        // 배율은 되돌리지 않는다(2026-09-12 오너) — 제스처가 어떻게 끝나든 사용자가 맞춘 크기는 남는다.
         if (plan.restoreSpeed) actionsRef.current.setSpeed(1);
         if (plan.clearDisplay) { setDragging(false); setPlacing(null); }
         if (plan.abnormal) reportGestureRecover({ reason, view: v.cameraView, mode: telemetryModeRef.current });
@@ -673,7 +680,7 @@ export function SimulatorPage() {
                 const renderer = rendererRef.current;
                 if (g?.kind === "aim" && !pinchRef.current && pointersRef.current.size === 2 && viewRef.current.cameraView === "player" && renderer?.setZoom) {
                     actions.setPhi(phiAtDownRef.current);
-                    pinchRef.current = { d0: Math.max(1, pinchDistance()) };
+                    pinchRef.current = { d0: Math.max(1, pinchDistance()), z0: zoomRef.current };
                     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
                     setDragging(false);
                 }
@@ -704,8 +711,12 @@ export function SimulatorPage() {
         if (pts.has(e.pointerId)) pts.set(e.pointerId, screenPoint(e));
         const pinch = pinchRef.current;
         if (pinch) {
-            // 핀치 중: 두 손가락 거리 비율로 축소(오므리면 작아지고, 벌려도 1 을 넘지 않는다)
-            if (pts.size >= 2) rendererRef.current?.setZoom?.(Math.max(ZOOM_MIN, Math.min(1, pinchDistance() / pinch.d0)));
+            // 핀치 중: 시작 배율에서 두 손가락 거리 비율만큼 — 오므리면 넓게, 벌리면 확대. 범위는 ZOOM_MIN..ZOOM_MAX.
+            if (pts.size >= 2) {
+                const z = pinchZoom(pinch.z0, pinch.d0, pinchDistance());
+                zoomRef.current = z;
+                rendererRef.current?.setZoom?.(z);
+            }
             return;
         }
         if (e.pointerId !== pointerIdRef.current) return;
@@ -727,7 +738,8 @@ export function SimulatorPage() {
     const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
         pointersRef.current.delete(e.pointerId);
         if (pinchRef.current) {
-            // 어느 손가락이든 떼면 핀치 끝: 원래 크기로 돌아가고 남은 손가락은 제스처를 잇지 않는다.
+            // 어느 손가락이든 떼면 핀치 끝. 배율은 **그대로 남긴다**(2026-09-12 오너) — 기기에 저장해 다음에도 같은 크기로 연다.
+            writeZoomPref(safeLocalStorage(), zoomRef.current);
             // 남은 손가락 항목까지 목록에서 비운다 — 남겨 두면 다음 핀치 판정(size===2)이 틀어졌다(2026-09-11 검토).
             try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
             resetTableGesture("pinch-end");

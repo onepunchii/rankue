@@ -21,7 +21,7 @@ import type { Vec3 } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
 import { diamondMarks } from "../aim";
 import { RAIL_WIDTH_M, type Size, type TableLayout } from "./tableGeometry";
-import { ZOOM_MIN } from "./Renderer";
+import { ZOOM_MIN, ZOOM_MAX } from "./Renderer";
 
 const DEG2RAD = Math.PI / 180;
 
@@ -393,7 +393,7 @@ export const ZOOM_SMOOTH_S = 0.08;
 
 /** 축소 배율 → 세로 시야각(°): tan(f/2) = tan(F/2) / zoom. zoom 0.7 이면 화면의 모든 것이 70 % 크기로 보인다(NDC 가 정확히 0.7 배). */
 export function zoomedFovDeg(baseDeg: number, zoom: number): number {
-    const z = zoom < ZOOM_MIN ? ZOOM_MIN : zoom > 1 ? 1 : zoom;
+    const z = zoom < ZOOM_MIN ? ZOOM_MIN : zoom > ZOOM_MAX ? ZOOM_MAX : zoom;
     return (2 * Math.atan(Math.tan(baseDeg * DEG2RAD * 0.5) / z)) / DEG2RAD;
 }
 

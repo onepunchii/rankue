@@ -38,7 +38,7 @@ import {
     Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, BoxGeometry } from "three";
 import type { BallState } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
-import { ZOOM_MIN, type RenderFrame, type Renderer, type RendererView, type SafeInsets, type Viewport } from "./Renderer";
+import { ZOOM_MIN, type RenderFrame, type Renderer, type RendererView, type SafeInsets, type Viewport, ZOOM_MAX } from "./Renderer";
 import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, parseColor, readPalette, rgba, scaleColor, type Palette, type RGBA } from "./tokens";
 import {
@@ -584,7 +584,7 @@ export class ThreeRenderer implements Renderer {
 
     /** 핀치 축소 목표(ZOOM_MIN..1). 다음 draw 부터 감쇠로 따라간다 — needsFrame 이 페이지 루프를 돌린다. */
     setZoom(zoom: number): void {
-        const z = Number.isFinite(zoom) ? Math.max(ZOOM_MIN, Math.min(1, zoom)) : 1;
+        const z = Number.isFinite(zoom) ? Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom)) : 1;
         this.zoomTarget = z;
     }
 
