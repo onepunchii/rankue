@@ -37,6 +37,25 @@ router.get("/members", checkSuperAdmin, asyncHandler(async (req: any, res: any) 
     return sendSuccess(res, members);
 }));
 
+// GET /admin/members/:id/games — 그 회원의 최근 경기(기록 정리용 목록)
+router.get("/members/:id/games", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+    return sendSuccess(res, await storage.games.adminMemberGames(req.params.id, limit));
+}));
+
+// DELETE /admin/games/:id — 끝난 경기까지 지운다(어드민만). 전적 행·RP·에버리지를 함께 되돌린다.
+// 회원용 DELETE /game/:id 는 진행 중인 경기만 지운다 — 끝난 경기는 랭킹에 반영돼 참가자가 지우면 안 되기 때문이다.
+// 잘못 만든 판을 억지로 끝낸 기록(1이닝 16점 같은)이 에버리지·하이런을 오염시킬 때 쓴다(2026-09-12 테스터 제보).
+router.delete("/games/:id", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const r = await storage.games.adminDeleteFinishedGame(req.params.id);
+    if (!r.ok) {
+        if (r.reason === "not-found") return sendError(res, 404, "경기를 찾을 수 없습니다");
+        return sendError(res, 409, "대진표에 연결된 경기입니다 — 크루 대진을 먼저 정리해야 합니다");
+    }
+    console.info("[admin] 경기 삭제", JSON.stringify({ gameId: req.params.id, members: r.members.map((m) => ({ name: m.name, rp: m.rpRolledBack })) }));
+    return sendSuccess(res, r);
+}));
+
 router.get("/leads", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const leads = await storage.getPartnerLeads();
     return sendSuccess(res, leads);

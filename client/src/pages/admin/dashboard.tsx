@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
+import MemberGamesDialog from "./MemberGamesDialog";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -177,6 +178,8 @@ export default function AdminDashboard() {
         setLocation(window.location.pathname, { replace: true });
     }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
     const [memberSearch, setMemberSearch] = useState("");
+    // 기록 정리 대화상자(잘못 만든 경기 삭제) — 회원 표의 '기록' 버튼이 연다
+    const [gamesFor, setGamesFor] = useState<{ id: string; name: string } | null>(null);
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
     // Queries
@@ -1053,6 +1056,7 @@ export default function AdminDashboard() {
                                             <th className="p-4 font-black text-black/55 text-center">온라인게임</th>
                                             <th className="p-4 font-black text-black/55 text-right">방문</th>
                                             <th className="p-4 font-black text-black/55">가입일</th>
+                                            <th className="p-4 font-black text-black/55 text-right">기록</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1082,16 +1086,24 @@ export default function AdminDashboard() {
                                                     </td>
                                                     <td className="p-4 text-right text-black/60 font-mono">{m.visitCount ?? 0}</td>
                                                     <td className="p-4 text-black/50 font-mono">{m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "-"}</td>
+                                                    <td className="p-4 text-right">
+                                                        <button
+                                                            onClick={() => setGamesFor({ id: m.id, name: m.name })}
+                                                            className="h-8 px-3 rounded-lg border border-black/15 text-xs font-bold text-black/60 hover:border-brand/40 hover:text-brand"
+                                                        >기록</button>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         {members.length === 0 && (
-                                            <tr><td colSpan={10} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
+                                            <tr><td colSpan={11} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     )}
+
+                    <MemberGamesDialog member={gamesFor} onClose={() => setGamesFor(null)} />
 
                     {tab === "golf-orders" && <GolfOrdersView />}
                     {tab === "online-game" && <OnlineGameView />}

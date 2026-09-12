@@ -5,6 +5,7 @@ import {
     hiqGameHistory,
     hiqInvites,
     hiqFriendships,
+    hiqCrewTournamentMatches,
     profiles
 } from "../../shared/schema.js";
 import type {
@@ -40,6 +41,39 @@ const HANDICAP_MAP_3C = [
     { avg: 0.3, handi: 15 },
     { avg: 0.0, handi: 12 },
 ];
+
+/** 어드민 기록 삭제 결과 — 지운 것과, 되돌린 값의 전후 대조. 실패 사유도 같은 타입으로 돌려준다. */
+export type AdminGameDeleteResult =
+    | { ok: false; reason: "not-found" | "tournament" }
+    | {
+        ok: true;
+        game: { id: string; gameType: "3c" | "4c"; gameMode: string; isRanked: boolean; playedAt: string | null; players: string[] };
+        members: Array<{
+            id: string; name: string;
+            /** RP 에 되돌려 넣은 값(승리 되돌리기면 -30). 0 이면 건드리지 않았다. */
+            rpRolledBack: number;
+            before: { rating: number; avg: number; games: number; wins: number; highRun: number };
+            after: { rating: number; avg: number; games: number; wins: number; highRun: number };
+        }>;
+    };
+
+/**
+ * 랭킹 포인트 증감. 경기 종료(finishHiqGame)와 어드민의 기록 삭제(되돌리기)가 **같은 식**을 써야
+ * 넣은 만큼 정확히 빼진다. 임계값은 HANDICAP_MAP_3C / HANDICAP_MAP_4C 의 스케일과 한 몸이다
+ * (자세한 근거는 finishHiqGame 안 주석).
+ */
+export function rpDeltaFor(gameType: string, isWinner: boolean, handi: number): number {
+    if (isWinner) return 30;
+    const h = handi || 0;
+    if (gameType === "3c") {
+        if (h < 16) return 0;
+        if (h < 22) return -5;
+        return -15;
+    }
+    if (h < 12) return 0;
+    if (h < 25) return -5;
+    return -15;
+}
 
 export class GameRepository {
 
@@ -176,19 +210,7 @@ export class GameRepository {
             // 4구 임계값이 예전엔 80·150이었는데 4구 맵의 최댓값이 50이라 항상 h<80,
             // 즉 패배 감점이 언제나 0이었다(4구 랭킹이 사실상 '승 횟수 랭킹'이 됐다).
             // 새 값은 두 맵의 avg 축에서도 대응된다: 면제 구간 상한이 3구·4구 모두 avg 0.3이다.
-            const calculateRpDelta = (isWinner: boolean, handi: number) => {
-                if (isWinner) return 30;
-                const h = handi || 0;
-                if (game.gameType === "3c") {
-                    if (h < 16) return 0;
-                    if (h < 22) return -5;
-                    return -15;
-                } else {
-                    if (h < 12) return 0;
-                    if (h < 25) return -5;
-                    return -15;
-                }
-            };
+            const calculateRpDelta = (isWinner: boolean, handi: number) => rpDeltaFor(game.gameType, isWinner, handi);
 
             if (game.isRanked) {
                 // Apply RP to EVERY bound member slot, not just 1 and 2 — a consented member in
@@ -613,6 +635,157 @@ export class GameRepository {
             await tx.delete(hiqGames).where(eq(hiqGames.id, gameId));
             return true;
         });
+    }
+
+    /**
+     * 어드민 전용: **끝난 경기**를 지운다(2026-09-12). 회원용 DELETE /game/:id 는 진행 중인 경기만 지운다 —
+     * 끝난 경기는 RP·전적에 이미 반영돼서 참가자가 마음대로 지우면 안 되기 때문이다. 그런데 잘못 눌러
+     * 만든 판을 억지로 끝낸 기록(예: 1이닝 16점)이 에버리지·하이런·랭킹을 오염시키는 일이 실제로 있었고,
+     * 그때마다 DB 를 직접 건드려야 했다. 그 작업을 순서·되돌리기까지 포함해 한 곳에 둔다.
+     *
+     * 지우는 순서는 자식 → 부모다: hiq_game_history → hiq_games (반대로 하면 FK 위반).
+     * 되돌릴 것이 세 가지 있고, 셋 다 자동으로는 복구되지 않는다:
+     *   1) RP — 증감식이라 넣은 값을 그대로 빼야 한다(rpDeltaFor 를 종료 훅과 공유). 단, 종료 당시의
+     *      핸디가 지금과 다르거나 그때 0 에서 잘렸다면 정확히 원상복구되지 않는다 — 결과에 그대로 적어 돌려준다.
+     *   2) 에버리지 — _updateUserAverage 는 그 종목 기록이 0건이면 조기 반환이라 값이 남는다. 여기서는
+     *      0건이면 0 으로 되돌리는 _recomputeUserAverage 를 쓴다.
+     *   3) 하이런·승수 — 전적 행에서 다시 계산되는 값이라 행만 지우면 따라온다.
+     *
+     * 대진표(hiq_crew_tournament_matches)에 연결된 경기는 지우지 않는다(409). 대진 승패까지 건드리는
+     * 일이라 자동으로 판단할 수 없다 — 크루장이 대진을 먼저 정리해야 한다.
+     */
+    async adminDeleteFinishedGame(gameId: string): Promise<AdminGameDeleteResult> {
+        const game = await this.getHiqGameById(gameId);
+        if (!game) return { ok: false, reason: "not-found" };
+
+        const [linked] = await db.select({ n: sql<number>`count(*)::int` })
+            .from(hiqCrewTournamentMatches).where(eq(hiqCrewTournamentMatches.gameId, gameId));
+        if ((linked?.n ?? 0) > 0) return { ok: false, reason: "tournament" };
+
+        const gameType = game.gameType as "3c" | "4c";
+        const memberIds = [game.player1Id, game.player2Id, game.player3Id, game.player4Id]
+            .filter((id): id is string => !!id);
+        const before = await this._memberStatsFor(memberIds, gameType);
+
+        const rolledBack: Record<string, number> = {};
+        await db.transaction(async (tx) => {
+            await tx.delete(hiqGameHistory).where(eq(hiqGameHistory.gameId, gameId));
+            await tx.delete(hiqGames).where(eq(hiqGames.id, gameId));
+
+            if (game.isRanked) {
+                const ratingField = gameType === "3c" ? "rating3c" : "rating4c";
+                const handiField = gameType === "3c" ? "handi3c" : "handi4c";
+                for (const pid of memberIds) {
+                    const [p] = await tx.select().from(hiqMembers).where(eq(hiqMembers.id, pid));
+                    if (!p) continue;
+                    const delta = rpDeltaFor(gameType, game.winnerId === pid, (p as any)[handiField] || 0);
+                    rolledBack[pid] = -delta;
+                    if (delta === 0) continue;
+                    await tx.update(hiqMembers)
+                        .set({ [ratingField]: sql`GREATEST(0, ${hiqMembers[ratingField]} - ${delta})` })
+                        .where(eq(hiqMembers.id, pid));
+                }
+            }
+        });
+
+        // 커밋 뒤에 돌려야 방금 지운 행이 집계에서 빠진다.
+        for (const pid of memberIds) await this._recomputeUserAverage(pid, gameType);
+        const after = await this._memberStatsFor(memberIds, gameType);
+
+        return {
+            ok: true,
+            game: {
+                id: game.id, gameType, gameMode: game.gameMode, isRanked: game.isRanked,
+                playedAt: game.playedAt ? new Date(game.playedAt).toISOString() : null,
+                players: memberIds.map((id) => before.find((b) => b.id === id)?.name ?? id),
+            },
+            members: before.map((b) => ({
+                id: b.id, name: b.name,
+                rpRolledBack: rolledBack[b.id] ?? 0,
+                before: b, after: after.find((a) => a.id === b.id) ?? b,
+            })),
+        };
+    }
+
+    /** 어드민 화면용: 한 회원의 최근 경기(끝난 것·진행 중 모두). 지울 판을 눈으로 고르는 용도다. */
+    async adminMemberGames(memberId: string, limit = 30) {
+        const rows = await db.select().from(hiqGames)
+            .where(or(
+                eq(hiqGames.player1Id, memberId), eq(hiqGames.player2Id, memberId),
+                eq(hiqGames.player3Id, memberId), eq(hiqGames.player4Id, memberId),
+            ))
+            .orderBy(desc(hiqGames.playedAt))
+            .limit(Math.min(100, Math.max(1, limit)));
+
+        return rows.map((g: any) => {
+            const slot = [1, 2, 3, 4].find((n) => g[`player${n}Id`] === memberId) ?? 1;
+            const others = [1, 2, 3, 4].filter((n) => n !== slot && g[`player${n}Id`]).map((n) => g[`player${n}Name`] || "상대");
+            return {
+                id: g.id,
+                playedAt: g.playedAt,
+                gameType: g.gameType,
+                gameMode: g.gameMode,
+                status: g.status,
+                isRanked: g.isRanked,
+                opponents: others.length ? others : [g[`player${slot === 1 ? 2 : 1}Name`] || "-"],
+                score: g[`player${slot}Score`] ?? 0,
+                target: g[`player${slot}Target`] ?? 0,
+                highRun: g[`player${slot}HighRun`] ?? 0,
+                innings: g.totalInnings ?? 0,
+                isWinner: g.winnerId === memberId,
+            };
+        });
+    }
+
+    /** 삭제 전후 대조용 한 줄: 캐시된 RP·에버리지와, 전적 행에서 다시 센 값. */
+    private async _memberStatsFor(memberIds: string[], type: "3c" | "4c") {
+        if (memberIds.length === 0) return [];
+        const members = await db.select().from(hiqMembers).where(inArray(hiqMembers.id, memberIds));
+        const agg = await db.select({
+            memberId: hiqGameHistory.memberId,
+            games: sql<number>`count(*)::int`,
+            score: sql<number>`coalesce(sum(${hiqGameHistory.score}),0)::int`,
+            innings: sql<number>`coalesce(sum(${hiqGameHistory.innings}),0)::int`,
+            wins: sql<number>`coalesce(sum(case when ${hiqGameHistory.isWinner} then 1 else 0 end),0)::int`,
+            highRun: sql<number>`coalesce(max(${hiqGameHistory.highRun}),0)::int`,
+        })
+            .from(hiqGameHistory)
+            .where(and(
+                inArray(hiqGameHistory.memberId, memberIds),
+                eq(hiqGameHistory.gameType, type),
+                eq(hiqGameHistory.gameMode, "match"),
+                eq(hiqGameHistory.isRanked, true),
+            ))
+            .groupBy(hiqGameHistory.memberId);
+
+        return members.map((m: any) => {
+            const a = agg.find((x) => x.memberId === m.id);
+            return {
+                id: m.id as string,
+                name: (m.name as string) ?? "",
+                rating: (type === "3c" ? m.rating3c : m.rating4c) ?? 0,
+                avg: Number((type === "3c" ? m.avg3c : m.avg4c) ?? 0),
+                games: a?.games ?? 0,
+                wins: a?.wins ?? 0,
+                highRun: a?.highRun ?? 0,
+            };
+        });
+    }
+
+    /**
+     * _updateUserAverage 와 같은 산식이되, 그 종목 기록이 0건이면 **0 으로 되돌린다**.
+     * _updateUserAverage 는 0건이면 조기 반환이라, 기록을 지워도 캐시된 에버리지가 그대로 남는다.
+     */
+    async _recomputeUserAverage(memberId: string, type: "3c" | "4c") {
+        const history = await this.getMemberGameHistory(memberId);
+        const filtered = history.filter(h => h.gameType === type && h.gameMode === "match" && h.isRanked);
+        const totalScore = filtered.reduce((acc, h) => acc + (h.score || 0), 0);
+        const totalInnings = filtered.reduce((acc, h) => acc + (h.innings || 0), 0);
+        const totalAvg = totalInnings > 0 ? totalScore / totalInnings : 0;
+        const avgField = type === "3c" ? "avg3c" : "avg4c";
+        await db.update(hiqMembers)
+            .set({ [avgField]: totalAvg, average: totalAvg.toFixed(3), updatedAt: new Date() })
+            .where(eq(hiqMembers.id, memberId));
     }
 
     // --- Private Helper ---
