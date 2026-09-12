@@ -19,8 +19,7 @@ import { formatAvg } from "../entry/entryStats";
 import { fetchSimStats, SIM_STATS_QUERY_KEY, type StatsFetcher } from "./dashApi";
 import {
     availableCombos, bestAvgOf, bestHighRunOf, comboKey, drillSeries, drillTotals, matchSummary, overallAvg, ratingFor, recentForm, sameCombo,
-    sessionSeries, shortDate, signedAvg, type Combo,
-} from "./dashStats";
+    sessionSeries, shortDate, signedAvg, type Combo, matchSeries} from "./dashStats";
 import { Columns, FormStrip, TrendLine } from "./charts";
 
 export interface SimDashProps {
@@ -83,10 +82,14 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
     const combos = useMemo(() => (data ? availableCombos(data.ratings, data.sessions, rows) : []), [data, rows]);
     const [pick, setPick] = useState<string | null>(null);
     const combo: Combo | null = combos.find((c) => comboKey(c) === pick) ?? combos[0] ?? null;
-    const series = useMemo(() => (data && combo ? sessionSeries(data.sessions, combo) : []), [data, combo]);
+    // 2026-09-12 오너: "연습은 다 빼자, 공식 멀티경기만" — 숫자(에버리지·하이런·추이)는 끝난 대전에서만 뽑는다.
+    const series = useMemo(() => (combo ? matchSeries(rows, combo) : []), [rows, combo]);
+    /** 연습 세션은 목록으로만 남긴다(집계에 안 들어간다). */
+    const practice = useMemo(() => (data && combo ? sessionSeries(data.sessions, combo, 10) : []), [data, combo]);
     const recent = series.slice(-TREND_N);
     const form = recentForm(series, FORM_N);
     const rating = data && combo ? ratingFor(data.ratings, combo) : undefined;
+    const mr = data && combo ? (data.matchRatings ?? []).find((r) => r.gameType === combo.gameType) : undefined;
     const rank = data && combo ? data.ranks.find((r) => sameCombo(r, combo)) : undefined;
     const ms = matchSummary(rows, combo, FORM_N);
     const nowMs = now ?? Date.now();
@@ -143,7 +146,7 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                     {series.length > 0 ? (
                         <>
                             <section className={card} aria-label={t("sim.dash.heroAria")}>
-                                <p className="text-[12px] font-semibold text-ink-3">{t("sim.dash.heroLabel").replace("{n}", n(form.sessions))}</p>
+                                <p className="text-[12px] font-semibold text-ink-3">{t("sim.dash.heroLabelMatch").replace("{n}", n(form.sessions))}</p>
                                 <div className="flex items-baseline gap-3 mt-1 flex-wrap">
                                     <span data-hero className="text-[48px] font-black text-ink-1 leading-none tracking-tight">{formatAvg(form.avg)}</span>
                                     {form.delta !== null ? (
@@ -155,19 +158,19 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                                     )}
                                 </div>
                                 <p className="rk-num text-[12.5px] font-medium text-ink-3 mt-2">
-                                    {t("sim.dash.heroSub").replace("{avg}", formatAvg(overallAvg(rating))).replace("{n}", n(rating?.sessions ?? series.length))}
+                                    {t("sim.dash.heroSubMatch").replace("{n}", n(mr?.matches ?? series.length))}
                                 </p>
                             </section>
 
                             <div className="grid grid-cols-3 gap-2">
-                                <Tile label={t("sim.dash.kSessions")} value={n(rating?.sessions ?? series.length)} />
-                                <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(rating ? bestAvgOf(rating) : Math.max(...series.map((p) => p.avg)))} tone="best" />
-                                <Tile label={t("sim.dash.kHighRun")} value={n(rating ? bestHighRunOf(rating) : Math.max(...series.map((p) => p.highRun)))} tone="best" />
+                                <Tile label={t("sim.dash.kMatches")} value={n(mr?.matches ?? series.length)} />
+                                <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(Math.max(0, ...series.map((p) => p.avg)))} tone="best" />
+                                <Tile label={t("sim.dash.kHighRun")} value={n(Math.max(0, ...series.map((p) => p.highRun)))} tone="best" />
                                 <Tile label={t("sim.dash.kRank")} value={rank ? t("sim.dash.rankValue").replace("{r}", n(rank.rank)) : "–"} sub={rank ? t("sim.dash.rankOf").replace("{n}", n(rank.total)) : undefined} />
                                 <button type="button" onClick={onRank} aria-label={t("sim.rank.title")} className="text-left rounded-tile active:opacity-80" disabled={!onRank}>
                                     <Tile
-                                        label={t("sim.dash.kRating")} value={n(rating?.simRating ?? 1000)}
-                                        sub={(() => { const st = rankStatus(rating?.simRating ?? 1000, rating?.matches ?? 0); return st.tier ? t(st.tier.nameKey) : t("sim.rank.unranked").replace("{n}", n(rating?.matches ?? 0)).replace("{m}", n(PLACEMENT_MATCHES)); })()}
+                                        label={t("sim.dash.kRating")} value={n(mr?.rating ?? 1000)}
+                                        sub={(() => { const st = rankStatus(mr?.rating ?? 1000, mr?.matches ?? 0); return st.tier ? t(st.tier.nameKey) : t("sim.rank.unranked").replace("{n}", n(mr?.matches ?? 0)).replace("{m}", n(PLACEMENT_MATCHES)); })()}
                                     />
                                 </button>
                                 <Tile label={t("sim.dash.kRecord")} value={t("sim.entry.record").replace("{w}", n(ms.wins)).replace("{l}", n(ms.losses))} />
@@ -195,9 +198,10 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                         </>
                     ) : (
                         <section className={card}>
-                            <p className="text-[16px] font-bold text-ink-1">{t(combo ? "sim.dash.noPractice" : "sim.dash.empty")}</p>
-                            <p className="text-[13px] font-medium text-ink-3 mt-1">{t("sim.dash.emptyDesc")}</p>
-                            <button type="button" onClick={onPractice} className={cn(primary, "mt-4")}>{t("sim.dash.startPractice")}</button>
+                            {/* 2026-09-12: 숫자는 공식 대전만 본다 — 빈 상태도 "대전을 한 판 하라"로 이끈다 */}
+                            <p className="text-[16px] font-bold text-ink-1">{t(combo ? "sim.dash.noMatchYet" : "sim.dash.empty")}</p>
+                            <p className="text-[13px] font-medium text-ink-3 mt-1">{t("sim.dash.emptyDescMatch")}</p>
+                            <button type="button" onClick={onLobby} className={cn(primary, "mt-4")}>{t("sim.dash.startMatch")}</button>
                         </section>
                     )}
 

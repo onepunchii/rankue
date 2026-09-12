@@ -2,10 +2,10 @@
  * 시뮬레이터 v2 기록 저장소.
  *
  * 불변: 이 파일은 실전 경기 테이블·경기 마감 함수·회원 성적 컬럼(레이팅·에버리지·핸디)을 절대 건드리지 않는다.
- * sim.guard.test.ts 가 식별자 grep 으로 지킨다. 시뮬 성적은 hiqSimRatings 에만 쓴다.
+ * sim.guard.test.ts 가 식별자 grep 으로 지킨다. 대전 성적은 hiqSimMatchRatings, 연습은 집계하지 않는다(2026-09-12).
  */
 import { db } from "../db.js";
-import { hiqSimSessions, hiqSimShots, hiqSimRatings, hiqMembers } from "../../shared/schema.js";
+import { hiqSimSessions, hiqSimShots, hiqSimRatings, hiqMembers, hiqSimMatchRatings} from "../../shared/schema.js";
 import { eq, and, desc, sql } from "drizzle-orm";
 import type { HiqSimSession, HiqSimShot } from "../../shared/schema.js";
 
@@ -329,7 +329,8 @@ export class SimRepository {
                 ...(a.finished ? { status: "finished" as const, finishedAt: new Date() } : {}),
             }).where(eq(hiqSimSessions.id, a.sessionId));
 
-            if (a.finished) await this.upsertSoloRating(tx, { ...s, score: a.score, innings: a.innings, highRun: a.highRun });
+            // 2026-09-12 오너: "연습은 다 빼자, 공식 멀티경기만 적용" — 연습은 되돌리기로 이닝을 지울 수 있어
+            // 에버리지·하이런이 실력이 아니라 되돌리기 사용량을 잰다. 세션 행(hiq_sim_sessions)은 그대로 남아 목록에는 보인다.
             return { shot, duplicate: false };
         });
     }
@@ -344,35 +345,8 @@ export class SimRepository {
             const [row] = await tx.update(hiqSimSessions)
                 .set({ status, finishedAt: new Date() })
                 .where(eq(hiqSimSessions.id, id)).returning();
-            if (status === "finished") await this.upsertSoloRating(tx, s);   // 이닝 0(한 이닝에 끝낸 판)도 기록한다
+            // 연습은 성적 집계에 넣지 않는다(2026-09-12 오너) — 세션 행만 남는다
             return row;
-        });
-    }
-
-    /**
-     * 솔로 세션 마감 → 시뮬 성적 집계.
-     * **완료 이닝이 0이어도 1이닝으로 세어 반영한다**(2026-09-12 오너 제보). 예전에는 innings <= 0 이면 통째로 건너뛰어,
-     * 한 이닝에 목표를 다 채운 판(4구 999점 목표 → 1000점)이 기록에 남지 않았다. 이닝은 '완료한 이닝'이라
-     * 마지막 진행 중 이닝이 빠지는데, 그 판도 분명히 친 판이다(에버리지 표시도 score / max(1, innings) 규약).
-     */
-    private async upsertSoloRating(tx: any, s: Pick<HiqSimSession, "memberId" | "gameType" | "tableId" | "score" | "innings" | "highRun" | "kind">) {
-        if (s.kind !== "solo") return;
-        const innings = Math.max(1, s.innings);
-        const avg = s.score / innings;
-        await tx.insert(hiqSimRatings).values({
-            memberId: s.memberId, gameType: s.gameType, tableId: s.tableId,
-            sessions: 1, totalScore: s.score, totalInnings: innings,
-            bestAvg: avg, bestHighRun: s.highRun, updatedAt: new Date(),
-        }).onConflictDoUpdate({
-            target: [hiqSimRatings.memberId, hiqSimRatings.gameType, hiqSimRatings.tableId],
-            set: {
-                sessions: sql`${hiqSimRatings.sessions} + 1`,
-                totalScore: sql`${hiqSimRatings.totalScore} + ${s.score}`,
-                totalInnings: sql`${hiqSimRatings.totalInnings} + ${innings}`,
-                bestAvg: sql`GREATEST(${hiqSimRatings.bestAvg}, ${avg})`,
-                bestHighRun: sql`GREATEST(${hiqSimRatings.bestHighRun}, ${s.highRun})`,
-                updatedAt: new Date(),
-            },
         });
     }
 
@@ -388,27 +362,22 @@ export class SimRepository {
         return rows.length;
     }
 
-    /** 연습 에버리지 랭킹. 최소 세션 수·이닝 수 조건은 호출자가 정한다. */
-    async ladder(gameType: "3c" | "4c", tableId: "DAEDAE" | "JUNGDAE_KR", limit = 50) {
-        return db.select({
-            memberId: hiqSimRatings.memberId,
-            name: hiqMembers.name,
-            sessions: hiqSimRatings.sessions,
-            bestAvg: hiqSimRatings.bestAvg,
-            bestHighRun: hiqSimRatings.bestHighRun,
-            avg: sql<number>`CASE WHEN ${hiqSimRatings.totalInnings} > 0 THEN ${hiqSimRatings.totalScore}::float / ${hiqSimRatings.totalInnings} ELSE 0 END`,
-            updatedAt: hiqSimRatings.updatedAt,
-        })
-            .from(hiqSimRatings)
-            .innerJoin(hiqMembers, eq(hiqMembers.id, hiqSimRatings.memberId))
-            .where(and(eq(hiqSimRatings.gameType, gameType), eq(hiqSimRatings.tableId, tableId)))
-            .orderBy(desc(hiqSimRatings.bestAvg), desc(hiqSimRatings.bestHighRun))
-            .limit(limit);
-    }
-
 
     async myRatings(memberId: string) {
         return db.select().from(hiqSimRatings).where(eq(hiqSimRatings.memberId, memberId));
+    }
+
+    /**
+     * 대전 레이팅(종목별, 대대·중대 통합 — 2026-09-12). 대시보드가 '공식 기록'을 여기서 읽는다.
+     * hiq_sim_ratings 의 sim_rating 은 통합 전 값이라 더 이상 보지 않는다.
+     */
+    async myMatchRatings(memberId: string) {
+        return db.select({
+            gameType: hiqSimMatchRatings.gameType,
+            rating: hiqSimMatchRatings.rating,
+            matches: hiqSimMatchRatings.matches,
+            wins: hiqSimMatchRatings.wins,
+        }).from(hiqSimMatchRatings).where(eq(hiqSimMatchRatings.memberId, memberId));
     }
 
     async myRating(memberId: string, gameType: "3c" | "4c", tableId: "DAEDAE" | "JUNGDAE_KR") {

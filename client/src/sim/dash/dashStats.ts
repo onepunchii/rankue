@@ -21,6 +21,34 @@ export interface DashMatchRow extends Combo {
     readonly winnerIndex: number | null;
     readonly createdAt: string;
     readonly finishedAt: string | null;
+    /** 세션 상태(선수별 점수·이닝·하이런). 공식 기록은 여기서 뽑는다(2026-09-12). 옛 응답엔 없을 수 있다. */
+    readonly state?: { readonly players?: readonly { readonly score?: number; readonly innings?: number; readonly highRun?: number }[] } | null;
+}
+
+/**
+ * 공식 기록(대전) 시리즈 — 끝난 대전에서 **내 몫**의 점수·이닝·하이런을 뽑아 세션 시리즈와 같은 모양으로 돌려준다.
+ * 2026-09-12 오너: "연습은 다 빼자, 공식 멀티경기만 적용하는 걸로". 연습은 되돌리기로 이닝을 지울 수 있어
+ * 에버리지·하이런이 실력이 아니라 되돌리기 사용량을 재게 된다.
+ */
+export function matchSeries(matches: readonly DashMatchRow[], combo: Combo, limit?: number): SessionPoint[] {
+    const rows = matches
+        .filter((m) => m.status === "finished" && sameCombo(m, combo) && (m.myIndex === 0 || m.myIndex === 1))
+        .map((m) => {
+            const me = m.state?.players?.[m.myIndex];
+            const score = me?.score ?? 0;
+            const innings = me?.innings ?? 0;
+            return {
+                id: `${m.createdAt}-${m.myIndex}`,
+                at: m.finishedAt ?? m.createdAt,
+                avg: sessionAverage(score, innings, combo.gameType),
+                score, innings,
+                highRun: caromsOf(me?.highRun ?? 0, combo.gameType),
+                target: 0,
+            };
+        })
+        .filter((p) => p.innings > 0 || p.score > 0)     // 한 샷도 못 친 대전(기권 등)은 기록이 아니다
+        .sort((a, b) => ms(a.at) - ms(b.at));
+    return limit && limit > 0 ? rows.slice(-limit) : rows;
 }
 
 const ms = (iso: string | null | undefined): number => {

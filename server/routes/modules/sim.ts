@@ -118,13 +118,8 @@ router.get("/sim/sessions", requireAuth, asyncHandler(async (req: AuthRequest, r
     return sendSuccess(res, rows);
 }));
 
-// GET /sim/ladder — 연습 에버리지 랭킹 (세션 목록보다 위: /:id 에 먹히지 않게)
-router.get("/sim/ladder", asyncHandler(async (req: any, res: any) => {
-    const gameType = req.query.gameType === "4c" ? "4c" : "3c";
-    const tableId = req.query.tableId === "JUNGDAE_KR" ? "JUNGDAE_KR" : "DAEDAE";
-    const rows = await storage.sim.ladder(gameType, tableId);
-    return sendSuccess(res, rows);
-}));
+// 연습 에버리지 랭킹(GET /sim/ladder)은 2026-09-12 에 없앴다 — 오너: "연습은 다 빼자, 공식 멀티경기만 적용".
+// 연습은 되돌리기로 이닝을 지울 수 있어 순위를 매길 수 없다. 화면에서 쓰던 곳은 없었다.
 
 // GET /sim/ratings/me — 내 시뮬 성적 요약(종목·테이블별). 실전 성적과 무관한 별도 집계.
 router.get("/sim/ratings/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -136,13 +131,14 @@ router.get("/sim/ratings/me", requireAuth, asyncHandler(async (req: AuthRequest,
 // 대전 목록은 /sim/matches 를 그대로 쓴다(목록 화면과 캐시 공유). 실전 성적(RP·에버리지)은 절대 섞지 않는다.
 router.get("/sim/stats/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const memberId = req.userId!;
-    const [ratings, sessions, ranks, drillWeeks] = await Promise.all([
+    const [ratings, matchRatings, sessions, ranks, drillWeeks] = await Promise.all([
         storage.sim.myRatings(memberId),
+        storage.sim.myMatchRatings(memberId),      // 공식 기록(대전) — 2026-09-12 부터 대시보드는 이쪽을 본다
         storage.sim.listSessionSummaries(memberId, 100),
         storage.sim.myRanks(memberId),
         storage.simDrill.myWeeks(memberId, 12),
     ]);
-    return sendSuccess(res, { ratings, sessions, ranks, drillWeeks, currentWeekId: weekIdFor(Date.now()) });
+    return sendSuccess(res, { ratings, matchRatings, sessions, ranks, drillWeeks, currentWeekId: weekIdFor(Date.now()) });
 }));
 
 // GET /sim/rank?gameType&tableId&country=KR|all — 온라인 대전 랭킹(배치 3판 뒤). country 없음/all = 전체, 있으면 그 나라(순위 번호는 전역).

@@ -84,6 +84,8 @@ function stats(): SimStats {
         S(21, { status: "playing" }),
     ];
     return {
+        // 공식 기록(대전) — 2026-09-12 부터 대시보드의 레이팅·판수는 여기서 온다
+        matchRatings: [{ gameType: "3c" as const, rating: 1024, matches: 3, wins: 2 }],
         ratings: [
             { gameType: "3c", tableId: "DAEDAE", sessions: 12, totalScore: 104, totalInnings: 240, bestAvg: 0.5, bestHighRun: 4, simRating: 1024, matches: 3, wins: 2, updatedAt: day(12) },
             { gameType: "4c", tableId: "DAEDAE", sessions: 1, totalScore: 60, totalInnings: 20, bestAvg: 3, bestHighRun: 9, simRating: 1000, matches: 0, wins: 0, updatedAt: day(0) },
@@ -100,11 +102,15 @@ const M = (id: string, o: Partial<MatchPublic>): MatchPublic => ({
     myIndex: 0, turn: 0, shots: 0, version: 0, state: null, balls: null, winnerIndex: 0, endReason: "target", engineVersion: "v", paramsHash: "h",
     createdAt: day(1), startedAt: day(1), lastShotAt: null, finishedAt: day(1), claimableAt: null, turnSeenAt: null, serverNow: null, ...o,
 });
+/** 대전의 내 몫 기록(공식) — 세션 상태에서 뽑는다. 2026-09-12 부터 대시보드 숫자는 이것만 본다. */
+const st = (mine: { score: number; innings: number; highRun: number }, theirs = { score: 3, innings: 6, highRun: 2 }, myIndex = 0) =>
+    ({ players: myIndex === 0 ? [mine, theirs] : [theirs, mine] }) as MatchPublic["state"];
+
 function matches(): MatchPublic[] {
     return [
-        M("m1", { winnerIndex: 0, finishedAt: day(2) }),                                  // W
-        M("m2", { myIndex: 1, winnerIndex: 0, finishedAt: day(3), hostName: "상대", guestName: "나" }), // L
-        M("m3", { winnerIndex: 0, finishedAt: day(4) }),                                  // W
+        M("m1", { winnerIndex: 0, finishedAt: day(2), state: st({ score: 5, innings: 10, highRun: 2 }) }),        // W · 에버 0.50
+        M("m2", { myIndex: 1, winnerIndex: 0, finishedAt: day(3), hostName: "상대", guestName: "나", state: st({ score: 2, innings: 10, highRun: 1 }, { score: 15, innings: 10, highRun: 4 }, 1) }), // L · 0.20
+        M("m3", { winnerIndex: 0, finishedAt: day(4), state: st({ score: 6, innings: 10, highRun: 3 }) }),        // W · 0.60
         M("m4", { status: "playing", turn: 0, winnerIndex: null, endReason: null, finishedAt: null, createdAt: day(5) }), // 내 차례
     ];
 }
@@ -122,15 +128,16 @@ function mount(props: Partial<React.ComponentProps<DashMod["SimDash"]>> & { stat
     const root = createRoot(container);
     const qc = new rq.QueryClient({ defaultOptions: { queries: { retry: false } } });
     const onPractice = vi.fn();
+    const onLobby = vi.fn();
     const { stats: st = stats(), rows = matches(), ...rest } = props;
     React.act(() => {
         root.render(React.createElement(rq.QueryClientProvider, { client: qc },
             React.createElement(SimDash, {
-                onClose: () => undefined, onOpenMatch: () => undefined, onPractice, onDrills: () => undefined, onLobby: () => undefined,
+                onClose: () => undefined, onOpenMatch: () => undefined, onPractice, onDrills: () => undefined, onLobby,
                 statsApi: async () => st, matchApi: fakeMatchApi(rows), now: NOW, ...rest,
             })));
     });
-    const h = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); }, onPractice };
+    const h = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); }, onPractice, onLobby };
     live.push(h);
     return h;
 }
@@ -151,10 +158,9 @@ describe("SimDash", () => {
     it("큰 숫자·지표·차트·표·대전·드릴이 한 화면에", async () => {
         const h = mount({});
         await settle(h, () => hero(h) !== "");
-        // 최근 10세션 = 0.50, 이전 2세션 0.10 → +0.40
-        expect(hero(h)).toBe("0.50");
-        expect(text(h)).toContain("+0.40");
-        expect(text(h)).toContain("전체 에버리지 0.43 · 세션 12");
+        // 2026-09-12: 숫자는 공식 대전만 본다(연습 제외). 내 세 대전 = (5+2+6)점 / 30이닝 = 0.43
+        expect(hero(h)).toBe("0.43");
+        expect(text(h)).toContain("공식 대전 3판 기준");
         // 지표 여섯 칸
         expect(text(h)).toContain("3위");
         expect(text(h)).toContain("12명 중");
@@ -168,7 +174,7 @@ describe("SimDash", () => {
         // 마지막 점 마커 + 값 라벨, 눈금선은 hairline
         expect(trend!.querySelectorAll("circle")).toHaveLength(1);
         expect(trend!.querySelectorAll("line").length).toBeGreaterThanOrEqual(2);
-        expect(trend!.textContent).toContain("0.50");
+        expect(trend!.textContent).toContain("0.60");   // 마지막 대전(6점/10이닝)
         // 대전 섹션: 전적·연속·내 차례·흐름·내 대전 목록
         expect(text(h)).toContain(ko["sim.dash.matchesTitle"]);
         expect(text(h)).toContain("1연승");
@@ -181,41 +187,37 @@ describe("SimDash", () => {
         expect(text(h)).toContain("이번 주 2/5");
         expect(text(h)).toContain("누적 성공 7/9");
         expect(h.container.querySelectorAll("table.sr-only tbody tr")).toHaveLength(8);
-        // 표: 12세션 중 10행, 모두 보기
-        expect(h.container.querySelectorAll("table:not(.sr-only) tbody tr")).toHaveLength(10);
-        click(buttons(h).find((b) => b.textContent === ko["sim.dash.showAll"].replace("{n}", "12"))!);
-        expect(h.container.querySelectorAll("table:not(.sr-only) tbody tr")).toHaveLength(12);
-        // 화면의 초록 버튼은 없다(연습 시작은 기록 없을 때만)
+        // 표: 공식 대전 3판(2026-09-12 부터 연습은 숫자에 안 들어간다)
+        expect(h.container.querySelectorAll("table:not(.sr-only) tbody tr")).toHaveLength(3);
+        // 화면의 초록 버튼은 없다(대전 만들기는 기록 없을 때만)
         expect(buttons(h).some((b) => b.className.includes("bg-brand "))).toBe(false);
     });
 
-    it("방향키로 읽기 줄이 이전 점으로, 종목 칩을 고르면 숫자가 그 종목으로", async () => {
-        const h = mount({ rows: [] });
+    it("방향키로 읽기 줄이 이전 대전으로, 대전이 없는 종목을 고르면 빈 안내", async () => {
+        const h = mount({});
         await settle(h, () => hero(h) !== "");
         const trend = h.container.querySelector(`svg[aria-label="${ko["sim.dash.chartTrendAria"]}"]`) as SVGSVGElement;
         const readout = () => trend.parentElement!.querySelector("[aria-live]")!.textContent ?? "";
-        expect(readout()).toContain("0.50");
-        // 세 번 왼쪽: 0.50(12) → 11 → 10 → 9 … 모두 0.50, 열 번 더 가면 0.10 인 2번 세션
-        React.act(() => { for (let i = 0; i < 11; i++) trend.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })); });
-        expect(readout()).toContain("0.10");
-        // 칩: 3쿠션·대대(최근 활동) / 4구·대대
+        expect(readout()).toContain("0.60");                       // 마지막 대전
+        React.act(() => { trend.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })); });
+        expect(readout()).toContain("0.20");                       // 그 앞 대전
+        // 칩: 3쿠션·대대(대전 있음) / 4구·대대(연습만 있음 → 숫자는 없다)
         const group = h.container.querySelector(`[role="group"][aria-label="${ko["sim.dash.filterAria"]}"]`)!;
         const chips = Array.from(group.querySelectorAll("button"));
         expect(chips).toHaveLength(2);
         expect(chips[0].getAttribute("aria-pressed")).toBe("true");
         click(chips.find((c) => c.textContent?.includes("4구"))!);
-        expect(hero(h)).toBe("0.30");
-        expect(text(h)).toContain(ko["sim.dash.deltaNone"]);
-        expect(text(h)).toContain("0승 0패");
+        expect(text(h)).toContain(ko["sim.dash.noMatchYet"]);
+        expect(h.container.querySelector("[data-hero]")).toBeNull();
     });
 
-    it("기록이 없으면 안내와 연습 시작(초록 하나), 대전 섹션은 남는다 · sec=matches 도 안전", async () => {
-        const h = mount({ stats: { ratings: [], sessions: [], ranks: [], drillWeeks: [], currentWeekId: "2026-W37" }, rows: [], initialSection: "matches" });
+    it("기록이 없으면 안내와 대전 만들기(초록 하나), 대전 섹션은 남는다 · sec=matches 도 안전", async () => {
+        const h = mount({ stats: { matchRatings: [], ratings: [], sessions: [], ranks: [], drillWeeks: [], currentWeekId: "2026-W37" }, rows: [], initialSection: "matches" });
         await settle(h, () => text(h).includes(ko["sim.dash.empty"]));
-        const start = buttons(h).find((b) => b.textContent === ko["sim.dash.startPractice"])!;
+        const start = buttons(h).find((b) => b.textContent === ko["sim.dash.startMatch"])!;
         expect(start.className).toContain("bg-brand");
         click(start);
-        expect(h.onPractice).toHaveBeenCalledTimes(1);
+        expect(h.onLobby).toHaveBeenCalledTimes(1);
         expect(h.container.querySelector("[data-hero]")).toBeNull();
         expect(text(h)).toContain(ko["sim.match.listEmpty"]);
         expect(text(h)).toContain(ko["sim.dash.drillEmpty"]);

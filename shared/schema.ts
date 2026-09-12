@@ -1708,6 +1708,12 @@ export const hiqSimRatings = pgTable("hiq_sim_ratings", {
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
   gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
   tableId: text("table_id", { enum: ["DAEDAE", "JUNGDAE_KR"] }).notNull(),
+  /**
+   * @deprecated 연습 집계 — 2026-09-12 부터 **쓰지 않는다**(오너: "연습은 다 빼자, 공식 멀티경기만 적용").
+   * 연습은 되돌리기로 이닝을 지울 수 있어 에버리지·하이런이 실력이 아니라 되돌리기 사용량을 잰다.
+   * 새로 쓰지 않고 화면도 읽지 않는다. 남은 값은 그때까지의 흔적이고, 필요하면 hiq_sim_sessions 에서 다시 셀 수 있다
+   * (scripts/backfill-sim-solo-stats.ts).
+   */
   sessions: integer("sessions").default(0).notNull(),
   totalScore: integer("total_score").default(0).notNull(),
   totalInnings: integer("total_innings").default(0).notNull(),

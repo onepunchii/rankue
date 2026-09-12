@@ -55,8 +55,17 @@ export interface SimDrillWeek {
     readonly cushions: number;
 }
 
+/** 공식 기록(대전) — 종목별, 대대·중대 통합(2026-09-12). 대시보드의 에버리지·레이팅은 여기서 온다. */
+export interface SimMatchRatingRow {
+    readonly gameType: DashGameType;
+    readonly rating: number;
+    readonly matches: number;
+    readonly wins: number;
+}
+
 export interface SimStats {
     readonly ratings: readonly SimRatingRow[];
+    readonly matchRatings: readonly SimMatchRatingRow[];
     readonly sessions: readonly SimSessionSummary[];
     readonly ranks: readonly SimRank[];
     readonly drillWeeks: readonly SimDrillWeek[];
@@ -75,6 +84,10 @@ const arr = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.fil
 export function parseSimStats(raw: unknown): SimStats {
     const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     return {
+        matchRatings: arr(o.matchRatings).map((r) => ({
+            gameType: r.gameType === "4c" ? "4c" as const : "3c" as const,
+            rating: num(r.rating, 1000), matches: num(r.matches), wins: num(r.wins),
+        })),
         ratings: arr(o.ratings).map((r) => ({
             gameType: r.gameType === "4c" ? "4c" : "3c",
             tableId: r.tableId === "JUNGDAE_KR" ? "JUNGDAE_KR" : "DAEDAE",

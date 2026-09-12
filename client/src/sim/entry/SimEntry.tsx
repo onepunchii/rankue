@@ -14,7 +14,7 @@ import { EntryShowcase } from "./EntryShowcase";
 import { HandicapCard } from "./HandicapCard";
 import { BallMotif } from "./BallMotif";
 import { CodeIcon, DrillIcon, InviteIcon, PathIcon, PracticeIcon, RankIcon, RoomsIcon } from "./entryIcons";
-import { ENTRY_LAST_KEY, entryOrder, formatAvg, matchRecord, practiceSummary, type EntryChoice, type EntryMatchRow, type EntryRating } from "./entryStats";
+import { ENTRY_LAST_KEY, entryOrder, matchRecord, type EntryChoice, type EntryMatchRow } from "./entryStats";
 import { ENTRY_STYLE as st } from "./entryTheme";
 
 /**
@@ -57,12 +57,6 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
     const pill = cn(PILL, st.pill);
     const primary = cn(PRIMARY, st.primary);
     const { member } = useAuth();
-    const ratings = useQuery<EntryRating[]>({
-        queryKey: ["/api/hiq/sim/ratings/me"],
-        queryFn: async () => (await apiRequest("/api/hiq/sim/ratings/me")) ?? [],
-        enabled: !!member,
-        staleTime: 30_000,
-    });
     const matches = useQuery<EntryMatchRow[]>({
         queryKey: MATCH_LIST_QUERY_KEY,
         queryFn: async () => (await apiRequest("/api/hiq/sim/matches")) ?? [],
@@ -73,7 +67,6 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
     const week = useQuery({ queryKey: DRILL_WEEK_QUERY_KEY, queryFn: () => drillApi.getWeek(), enabled: !!member, staleTime: 30_000 });
     const rooms = useQuery({ queryKey: ROOMS_QUERY_KEY, queryFn: () => matchApi.listRooms(), enabled: !!member, staleTime: 10_000 });
 
-    const practice = practiceSummary(ratings.data ?? []);
     const record = matchRecord(matches.data ?? []);
     const drill = week.data ? weekProgress(week.data) : null;
     const order = entryOrder(readLast());
@@ -164,10 +157,12 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
                         <span className={cn("transition-transform duration-200", st.chevron, open === "solo" && "rotate-90")}><ChevronRightIcon /></span>
                     </span>
                     <span className={cn("block text-[12.5px] font-medium mt-0.5", st.cardSub)}>{t("sim.entry.groupSoloDesc")}</span>
-                    {practice ? (
+                    {/* 2026-09-12 오너: "연습은 다 빼자, 공식 멀티경기만" — 연습 에버리지는 되돌리기로 부풀어 실력을 못 잰다.
+                        대신 이번 주 드릴 성공률을 큰 숫자로 둔다. 드릴은 문제당 한 번만 채점해서 되돌리기가 안 통한다. */}
+                    {drill ? (
                         <span className="flex items-baseline gap-2 mt-3">
-                            <span className={cn("rk-num text-[30px] font-bold leading-none", st.cardBig)}>{formatAvg(practice.bestAvg)}</span>
-                            <span className={cn("text-[12px] font-medium", st.cardSub)}>{t("sim.entry.avgLabel").replace("{n}", String(practice.sessions))}</span>
+                            <span className={cn("rk-num text-[30px] font-bold leading-none", st.cardBig)}>{drill.successes}/{drill.total}</span>
+                            <span className={cn("text-[12px] font-medium", st.cardSub)}>{t("sim.entry.drillWeekLabel")}</span>
                         </span>
                     ) : (
                         <span className={cn("block text-[13px] font-medium mt-3", st.cardNote)}>{t("sim.entry.singleEmpty")}</span>
