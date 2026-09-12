@@ -11,6 +11,7 @@ import { drillApi, weekProgress } from "../drill/drillApi";
 import { DRILL_WEEK_QUERY_KEY } from "../drill/DrillPanel";
 import { ChartIcon, ChevronRightIcon } from "../components/railIcons";
 import { EntryShowcase } from "./EntryShowcase";
+import { HandicapCard } from "./HandicapCard";
 import { BallMotif } from "./BallMotif";
 import { CodeIcon, DrillIcon, InviteIcon, PathIcon, PracticeIcon, RankIcon, RoomsIcon } from "./entryIcons";
 import { ENTRY_LAST_KEY, entryOrder, formatAvg, matchRecord, practiceSummary, type EntryChoice, type EntryMatchRow, type EntryRating } from "./entryStats";
@@ -263,6 +264,8 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
             </div>
             <EntryShowcase className={st.showcase} />
             <div className={cn("flex flex-col", st.gap)}>
+                {/* 내 다마수(2026-09-12 오너) — 정보 카드라 늘 맨 위, 접히지 않는다 */}
+                <HandicapCard enabled={!!member} />
                 {order.map((k) => (k === "solo" ? solo : together))}
             </div>
         </div>

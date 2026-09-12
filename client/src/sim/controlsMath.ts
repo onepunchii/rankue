@@ -63,9 +63,10 @@ export const POWER_FINE_STEP = POWER_PERCENT_STEP;
  *
  * 왜: 3쿠션에서 실제로 쓰는 세기는 공 1.5~4 m/s(큐 1.2~3.2 m/s)에 몰려 있다. 선형 눈금에서는 그 구간이
  * 전체의 15~48 % 밖에 안 돼 한 칸(1 %)이 너무 굵었고, 위쪽 절반은 거의 쓰지 않는 세기였다.
- * 1.6 이면 같은 구간이 32~63 % 로 퍼져 평소 세기를 미세하게 맞출 수 있다.
+ * 1.6 으로 시작했다가 오너가 쳐 보고 "살짝 약하다" 해서 1.45 로 폈다 — 아래쪽 촘촘함은 남기고 중간이 덜 눌린다
+ * (50 % 에서 공 2.9 → 3.6 m/s).
  */
-export const POWER_GAMMA = 1.6;
+export const POWER_GAMMA = 1.45;
 
 /** 세기 %(0~100) → 큐 속도(m/s). 0 % = V0_MIN, 100 % = V0_MAX. */
 export function powerFromPercent(pct: number): number {

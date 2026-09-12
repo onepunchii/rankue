@@ -265,7 +265,8 @@ describe("SimulatorPage", () => {
         expect(h.container.querySelector("[role=dialog]")).toBeNull();
         expect(h.container.textContent).toContain("0/15");
         // 진입 화면의 기록 읽기(레이팅·대전·드릴·멀티방·내 대전 순위)만 서버를 부르고, 세션은 만들지 않는다
-        expect(nav.apiRequest.mock.calls.filter((c) => !/rank\/me|ratings|matches|drills|rooms/.test(String(c[0])))).toHaveLength(0);
+        // 진입 화면이 읽는 것: 순위·성적·대전·드릴·방 목록 + 내 다마수(2026-09-12 핸디 카드)
+        expect(nav.apiRequest.mock.calls.filter((c) => !/rank\/me|ratings|matches|drills|rooms|handicap/.test(String(c[0])))).toHaveLength(0);
 
         click(byLabel(h, ko["sim.controls.exit"])!);
         expect(h.container.textContent).toContain(ko["sim.exit.title"]);

@@ -71,7 +71,7 @@ describe("controlsMath 세기", () => {
         const low = powerFromPercent(21) - powerFromPercent(20);
         const high = powerFromPercent(91) - powerFromPercent(90);
         expect(low).toBeGreaterThan(0);
-        expect(high).toBeGreaterThan(low * 2);
+        expect(high).toBeGreaterThan(low * 1.5);
     });
 
     it("±1 % 눈금에 맞고 범위에서 멈춘다", () => {
@@ -95,9 +95,10 @@ describe("controlsMath 세기", () => {
         expect(pullbackFor(100)).toBe(1);
     });
 
-    it("가장 센 샷도 대회전 범위를 넘지 않는다(공 속도 ≈ 큐 × 1.25)", () => {
-        expect(V0_MAX * 1.25).toBeGreaterThan(7);   // 대회전(공 5~7 m/s)은 낼 수 있고
-        expect(V0_MAX * 1.25).toBeLessThan(9);      // 포켓볼 브레이크(11~13 m/s)는 안 나온다
+    it("대회전은 낼 수 있고 브레이크 세기는 안 나온다(공 속도 ≈ 큐 × 1.25)", () => {
+        // 2026-09-12: 6.5 로 낮췄다가 오너가 "살짝 약하다" 해서 7.5 로 올렸다.
+        expect(powerFromPercent(80) * 1.25).toBeGreaterThan(5);   // 80 % 면 대회전(공 5~7 m/s)
+        expect(V0_MAX * 1.25).toBeLessThan(11);                   // 포켓볼 브레이크(11~13 m/s)는 안 나온다
     });
 });
 
