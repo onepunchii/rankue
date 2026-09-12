@@ -3,6 +3,7 @@
  * 규칙: 에버리지는 점수 합 / 이닝 합(세션 평균의 평균이 아니다) — billiards-domain-rules 의 정본 공식.
  */
 import { weekIdFor } from "@shared/sim/drills";
+import { caromsOf, sessionAverage } from "@shared/sim/handicap";
 import type { DashGameType, DashTableId, SimDrillWeek, SimRatingRow, SimSessionSummary } from "./dashApi";
 
 export interface Combo {
@@ -29,7 +30,9 @@ const ms = (iso: string | null | undefined): number => {
 
 /** 마친 솔로 연습 세션(이닝 1 이상)만 기록으로 친다 — 성적 행(upsertSoloRating)과 같은 기준. */
 export function isRecordedSession(s: SimSessionSummary): boolean {
-    return s.status === "finished" && s.kind === "solo" && s.innings > 0;
+    // 이닝 0(완료 이닝 없이 한 번에 끝낸 판)도 기록이다 — 2026-09-12 오너 제보로 고쳤다.
+    // 에버리지는 sessionAverage 가 max(1, innings) 로 센다.
+    return s.status === "finished" && s.kind === "solo";
 }
 
 /** 기록이 있는 종목·테이블 조합, 최근 활동순. 성적 행(세션 또는 대전이 있는 것)·세션·대전을 모두 본다. */
@@ -61,16 +64,29 @@ export interface SessionPoint {
 export function sessionSeries(sessions: readonly SimSessionSummary[], combo: Combo, limit?: number): SessionPoint[] {
     const rows = sessions
         .filter((s) => isRecordedSession(s) && sameCombo(s, combo))
-        .map((s) => ({ id: s.id, at: s.finishedAt ?? s.startedAt, avg: s.score / s.innings, score: s.score, innings: s.innings, highRun: s.highRun, target: s.targetScore }))
+        .map((s) => ({
+            id: s.id, at: s.finishedAt ?? s.startedAt,
+            avg: sessionAverage(s.score, s.innings, combo.gameType),
+            score: s.score, innings: s.innings,
+            highRun: caromsOf(s.highRun, combo.gameType),
+            target: s.targetScore,
+        }))
         .sort((a, b) => ms(a.at) - ms(b.at));
     return limit && limit > 0 ? rows.slice(-limit) : rows;
 }
 
-/** 점수 합 / 이닝 합. 이닝이 없으면 0. */
-export function pooledAvg(points: readonly Pick<SessionPoint, "score" | "innings">[]): number {
-    let score = 0, innings = 0;
-    for (const p of points) { score += p.score; innings += p.innings; }
-    return innings > 0 ? score / innings : 0;
+/**
+ * 여러 세션의 에버리지 = 점수 합 / 이닝 합. 세션마다 avg 를 다시 평균하면 2이닝 판과 40이닝 판이 같은 무게가 된다.
+ * avg 가 이미 캐롬 기준이라 여기서는 avg × 이닝으로 캐롬을 되돌려 더한다(이닝 0인 판은 1이닝으로).
+ */
+export function pooledAvg(points: readonly Pick<SessionPoint, "avg" | "innings">[]): number {
+    let caroms = 0, innings = 0;
+    for (const p of points) {
+        const n = Math.max(1, p.innings);
+        caroms += p.avg * n;
+        innings += n;
+    }
+    return innings > 0 ? caroms / innings : 0;
 }
 
 export interface RecentForm {
@@ -92,8 +108,17 @@ export function ratingFor(ratings: readonly SimRatingRow[], combo: Combo): SimRa
     return ratings.find((r) => sameCombo(r, combo));
 }
 
-export function overallAvg(r: Pick<SimRatingRow, "totalScore" | "totalInnings"> | undefined): number {
-    return r && r.totalInnings > 0 ? r.totalScore / r.totalInnings : 0;
+/** 성적 행의 에버리지(캐롬/이닝). 저장은 점수 합이라 종목 단위로 나눠 읽는다(4구 1캐롬 = 10점). */
+export function overallAvg(r: Pick<SimRatingRow, "totalScore" | "totalInnings" | "gameType"> | undefined): number {
+    return r && r.totalInnings > 0 ? caromsOf(r.totalScore, r.gameType) / r.totalInnings : 0;
+}
+
+/** 성적 행의 최고 에버리지·하이런도 저장은 점수 기준이다 — 읽을 때 캐롬으로 바꾼다. */
+export function bestAvgOf(r: Pick<SimRatingRow, "bestAvg" | "gameType"> | undefined): number {
+    return r ? caromsOf(r.bestAvg, r.gameType) : 0;
+}
+export function bestHighRunOf(r: Pick<SimRatingRow, "bestHighRun" | "gameType"> | undefined): number {
+    return r ? caromsOf(r.bestHighRun, r.gameType) : 0;
 }
 
 export type MatchResult = "W" | "L";

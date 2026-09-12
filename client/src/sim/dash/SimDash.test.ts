@@ -72,7 +72,10 @@ const S = (i: number, o: Partial<SimSessionSummary> = {}): SimSessionSummary => 
     id: `s${i}`, kind: "solo", gameType: "3c", tableId: "DAEDAE", cushionModel: "han2005", condition: 1, targetScore: 15, inningCap: 0,
     score: 10, innings: 20, highRun: (i % 4) + 1, shots: 30, status: "finished", startedAt: day(i), finishedAt: day(i), ...o,
 });
-/** 3쿠션 대대 12세션(첫 둘은 0.10, 나머지 열은 0.50) + 4구 대대 1세션(3.00, 가장 오래돼 기본 칩은 3쿠션) + 진행 중 1 */
+/**
+ * 3쿠션 대대 12세션(첫 둘은 0.10, 나머지 열은 0.50) + 4구 대대 1세션 + 진행 중 1.
+ * 4구는 60점 / 20이닝 = 6캐롬 / 20이닝 → 에버 0.30(2026-09-12: 4구 에버리지를 캐롬 기준으로 읽는다).
+ */
 function stats(): SimStats {
     const sessions: SimSessionSummary[] = [
         S(1, { score: 2 }), S(2, { score: 2 }),
@@ -201,7 +204,7 @@ describe("SimDash", () => {
         expect(chips).toHaveLength(2);
         expect(chips[0].getAttribute("aria-pressed")).toBe("true");
         click(chips.find((c) => c.textContent?.includes("4구"))!);
-        expect(hero(h)).toBe("3.00");
+        expect(hero(h)).toBe("0.30");
         expect(text(h)).toContain(ko["sim.dash.deltaNone"]);
         expect(text(h)).toContain("0승 0패");
     });

@@ -33,6 +33,28 @@ export const CAROM_MAX: Record<GameType, number> = { "3c": 30, "4c": 40 };
 /** 기록이 아예 없을 때 쓰는 에버리지(캐롬/이닝). 초보 기준. */
 export const DEFAULT_AVG: Record<GameType, number> = { "3c": 0.2, "4c": 0.35 };
 
+/**
+ * 종목별 1캐롬의 점수. 4구는 당구장 관행대로 10점(DEFAULT_4C_RULES.pointUnit), 3쿠션은 1점.
+ * **에버리지·하이런은 언제나 캐롬 단위로 읽어 준다** — 점수로 세면 4구만 10배가 되어(에버 200 같은 숫자) 뜻이 없어진다.
+ */
+export function pointUnitFor(gameType: GameType): number {
+    return gameType === "4c" ? FOUR_BALL_POINT_UNIT : 1;
+}
+export const FOUR_BALL_POINT_UNIT = 10;
+
+/** 점수 → 캐롬 수. */
+export function caromsOf(score: number, gameType: GameType): number {
+    return (Number.isFinite(score) ? score : 0) / pointUnitFor(gameType);
+}
+
+/**
+ * 세션 하나의 에버리지(캐롬/이닝). **완료 이닝이 0이어도 1이닝으로 센다** — 한 이닝에 다 쳐서 끝낸 판도
+ * 친 판이다(2026-09-12 오너 제보: 4구 999점 목표로 1000점에 끝냈는데 기록이 안 남았다. 이닝 0이라 버려졌다).
+ */
+export function sessionAverage(score: number, innings: number, gameType: GameType): number {
+    return caromsOf(score, gameType) / Math.max(1, Number.isFinite(innings) ? innings : 0);
+}
+
 /** 온라인 대전 기록 한 사람 몫. score 는 점수(4구는 10점 단위), innings 는 그 사람이 마친 이닝. */
 export interface MatchRecord {
     readonly score: number;

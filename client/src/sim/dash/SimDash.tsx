@@ -18,7 +18,7 @@ import { gameLabel } from "../match/matchView";
 import { formatAvg } from "../entry/entryStats";
 import { fetchSimStats, SIM_STATS_QUERY_KEY, type StatsFetcher } from "./dashApi";
 import {
-    availableCombos, comboKey, drillSeries, drillTotals, matchSummary, overallAvg, ratingFor, recentForm, sameCombo,
+    availableCombos, bestAvgOf, bestHighRunOf, comboKey, drillSeries, drillTotals, matchSummary, overallAvg, ratingFor, recentForm, sameCombo,
     sessionSeries, shortDate, signedAvg, type Combo,
 } from "./dashStats";
 import { Columns, FormStrip, TrendLine } from "./charts";
@@ -161,8 +161,8 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
 
                             <div className="grid grid-cols-3 gap-2">
                                 <Tile label={t("sim.dash.kSessions")} value={n(rating?.sessions ?? series.length)} />
-                                <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(rating?.bestAvg ?? Math.max(...series.map((p) => p.avg)))} tone="best" />
-                                <Tile label={t("sim.dash.kHighRun")} value={n(rating?.bestHighRun ?? Math.max(...series.map((p) => p.highRun)))} tone="best" />
+                                <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(rating ? bestAvgOf(rating) : Math.max(...series.map((p) => p.avg)))} tone="best" />
+                                <Tile label={t("sim.dash.kHighRun")} value={n(rating ? bestHighRunOf(rating) : Math.max(...series.map((p) => p.highRun)))} tone="best" />
                                 <Tile label={t("sim.dash.kRank")} value={rank ? t("sim.dash.rankValue").replace("{r}", n(rank.rank)) : "–"} sub={rank ? t("sim.dash.rankOf").replace("{n}", n(rank.total)) : undefined} />
                                 <button type="button" onClick={onRank} aria-label={t("sim.rank.title")} className="text-left rounded-tile active:opacity-80" disabled={!onRank}>
                                     <Tile

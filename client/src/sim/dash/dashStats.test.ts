@@ -21,21 +21,24 @@ const R = (o: Partial<SimRatingRow>): SimRatingRow => ({
 const COMBO = { gameType: "3c", tableId: "DAEDAE" } as const;
 
 describe("dashStats", () => {
-    it("세션 시리즈: 마친 솔로(이닝 1+)만, 같은 종목·테이블만, 오래된 순, limit 은 최근 것", () => {
+    // 2026-09-12: 이닝 0(완료 이닝 없이 한 번에 끝낸 판)도 기록이다 — 오너 제보로 고쳤다. 그 판은 1이닝으로 센다.
+    it("세션 시리즈: 마친 솔로만(이닝 0 포함), 같은 종목·테이블만, 오래된 순, limit 은 최근 것", () => {
         const rows = [
             S({ id: "new", score: 10, innings: 10, finishedAt: "2026-09-05T00:00:00Z" }),
             S({ id: "old", score: 5, innings: 10, finishedAt: "2026-09-02T00:00:00Z" }),
             S({ id: "playing", status: "playing", score: 3, innings: 3 }),
             S({ id: "abandoned", status: "abandoned", score: 3, innings: 3 }),
             S({ id: "drill", kind: "drill", score: 3, innings: 3 }),
-            S({ id: "zero", innings: 0 }),
+            S({ id: "zero", innings: 0, finishedAt: "2026-09-01T00:00:00Z" }),
             S({ id: "4c", gameType: "4c", score: 30, innings: 10 }),
             S({ id: "mid", score: 8, innings: 10, finishedAt: "2026-09-03T00:00:00Z" }),
         ];
-        expect(sessionSeries(rows, COMBO).map((p) => p.id)).toEqual(["old", "mid", "new"]);
+        expect(sessionSeries(rows, COMBO).map((p) => p.id)).toEqual(["zero", "old", "mid", "new"]);
         expect(sessionSeries(rows, COMBO, 2).map((p) => p.id)).toEqual(["mid", "new"]);
-        expect(sessionSeries(rows, COMBO)[0].avg).toBeCloseTo(0.5);
+        expect(sessionSeries(rows, COMBO)[1].avg).toBeCloseTo(0.5);
         expect(sessionSeries(rows, { gameType: "4c", tableId: "DAEDAE" }).map((p) => p.id)).toEqual(["4c"]);
+        // 4구는 1캐롬 = 10점이라 에버리지를 캐롬으로 읽는다: 30점 / 10이닝 = 3캐롬 / 10이닝 = 0.3
+        expect(sessionSeries(rows, { gameType: "4c", tableId: "DAEDAE" })[0].avg).toBeCloseTo(0.3, 10);
     });
 
     it("최근 흐름: 점수 합 / 이닝 합(세션 평균의 평균이 아니다), 이전 블록이 없으면 delta null", () => {

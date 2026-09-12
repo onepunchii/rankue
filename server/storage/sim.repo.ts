@@ -344,25 +344,31 @@ export class SimRepository {
             const [row] = await tx.update(hiqSimSessions)
                 .set({ status, finishedAt: new Date() })
                 .where(eq(hiqSimSessions.id, id)).returning();
-            if (status === "finished" && s.innings > 0) await this.upsertSoloRating(tx, s);
+            if (status === "finished") await this.upsertSoloRating(tx, s);   // 이닝 0(한 이닝에 끝낸 판)도 기록한다
             return row;
         });
     }
 
-    /** 솔로 세션 마감 → 시뮬 성적 집계. 이닝 0 이면 반영하지 않는다(에버리지 분모). */
+    /**
+     * 솔로 세션 마감 → 시뮬 성적 집계.
+     * **완료 이닝이 0이어도 1이닝으로 세어 반영한다**(2026-09-12 오너 제보). 예전에는 innings <= 0 이면 통째로 건너뛰어,
+     * 한 이닝에 목표를 다 채운 판(4구 999점 목표 → 1000점)이 기록에 남지 않았다. 이닝은 '완료한 이닝'이라
+     * 마지막 진행 중 이닝이 빠지는데, 그 판도 분명히 친 판이다(에버리지 표시도 score / max(1, innings) 규약).
+     */
     private async upsertSoloRating(tx: any, s: Pick<HiqSimSession, "memberId" | "gameType" | "tableId" | "score" | "innings" | "highRun" | "kind">) {
-        if (s.kind !== "solo" || s.innings <= 0) return;
-        const avg = s.score / s.innings;
+        if (s.kind !== "solo") return;
+        const innings = Math.max(1, s.innings);
+        const avg = s.score / innings;
         await tx.insert(hiqSimRatings).values({
             memberId: s.memberId, gameType: s.gameType, tableId: s.tableId,
-            sessions: 1, totalScore: s.score, totalInnings: s.innings,
+            sessions: 1, totalScore: s.score, totalInnings: innings,
             bestAvg: avg, bestHighRun: s.highRun, updatedAt: new Date(),
         }).onConflictDoUpdate({
             target: [hiqSimRatings.memberId, hiqSimRatings.gameType, hiqSimRatings.tableId],
             set: {
                 sessions: sql`${hiqSimRatings.sessions} + 1`,
                 totalScore: sql`${hiqSimRatings.totalScore} + ${s.score}`,
-                totalInnings: sql`${hiqSimRatings.totalInnings} + ${s.innings}`,
+                totalInnings: sql`${hiqSimRatings.totalInnings} + ${innings}`,
                 bestAvg: sql`GREATEST(${hiqSimRatings.bestAvg}, ${avg})`,
                 bestHighRun: sql`GREATEST(${hiqSimRatings.bestHighRun}, ${s.highRun})`,
                 updatedAt: new Date(),

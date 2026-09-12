@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-    averageOf, CAROM_MAX, CAROM_MIN, DEFAULT_AVG, handicapPair,
-    MIN_INNINGS, playerAverage, TARGET_INNINGS, targetFor,
+    averageOf, caromsOf, CAROM_MAX, CAROM_MIN, DEFAULT_AVG, handicapPair,
+    MIN_INNINGS, playerAverage, pointUnitFor, sessionAverage, TARGET_INNINGS, targetFor,
 } from "./handicap.js";
 
 describe("averageOf", () => {
@@ -62,5 +62,27 @@ describe("handicapPair", () => {
             const inningsNeeded = t / Math.max(0.01, avg);
             expect(inningsNeeded).toBeLessThanOrEqual(TARGET_INNINGS * 1.7);   // 아래 한계에 걸린 초보는 조금 길다
         }
+    });
+});
+
+/**
+ * 4구는 1캐롬 = 10점이라 에버리지를 점수로 세면 10배가 된다(에버 200 같은 숫자).
+ * 그리고 완료 이닝이 0인 판(한 이닝에 다 친 판)도 1이닝으로 세어 기록에 남긴다 — 2026-09-12 오너 제보.
+ */
+describe("caromsOf / sessionAverage", () => {
+    it("4구 점수는 10으로 나눠 캐롬으로 읽는다", () => {
+        expect(caromsOf(1000, "4c")).toBe(100);
+        expect(caromsOf(15, "3c")).toBe(15);
+        expect(pointUnitFor("4c")).toBe(10);
+        expect(pointUnitFor("3c")).toBe(1);
+    });
+    it("완료 이닝이 0이면 1이닝으로 센다", () => {
+        expect(sessionAverage(1000, 0, "4c")).toBe(100);   // 100캐롬 / 1이닝
+        expect(sessionAverage(200, 4, "4c")).toBe(5);      // 20캐롬 / 4이닝
+        expect(sessionAverage(15, 30, "3c")).toBe(0.5);
+    });
+    it("이상한 값이어도 나눗셈이 깨지지 않는다", () => {
+        expect(sessionAverage(Number.NaN, 5, "3c")).toBe(0);
+        expect(sessionAverage(10, Number.NaN, "3c")).toBe(10);
     });
 });

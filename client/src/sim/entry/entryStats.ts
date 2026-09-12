@@ -2,6 +2,8 @@
  * 진입 화면(싱글 / 친구와 대전) 카드에 붙는 기록 한 줄 — 순수 함수, 테스트 동반.
  * 실전 전적(RP·에버리지)이 아니라 시뮬레이터 테이블(hiq_sim_*)의 값만 다룬다.
  */
+import { caromsOf } from "@shared/sim/handicap";
+import type { GameType } from "@shared/sim/rules/types";
 export interface EntryMatchRow {
     readonly status: "waiting" | "playing" | "finished" | "canceled";
     readonly myIndex: number;
@@ -35,7 +37,9 @@ export function matchRecord(rows: readonly EntryMatchRow[]): MatchRecord {
 
 export interface EntryRating {
     readonly sessions: number;
+    /** 저장은 점수 기준(4구 1캐롬 = 10점) — 읽을 때 종목 단위로 나눈다. */
     readonly bestAvg: number;
+    readonly gameType: GameType;
 }
 
 /** 연습 요약: 세션 합과 최고 에버리지. 세션이 없으면 null(카드는 "아직 기록이 없어요"). */
@@ -43,7 +47,9 @@ export function practiceSummary(ratings: readonly EntryRating[]): { readonly ses
     let sessions = 0, bestAvg = 0;
     for (const r of ratings) {
         sessions += r.sessions;
-        if (r.bestAvg > bestAvg) bestAvg = r.bestAvg;
+        // 캐롬 기준으로 맞춰 비교한다 — 점수로 비교하면 4구가 언제나 이긴다(1캐롬 = 10점)
+        const avg = caromsOf(r.bestAvg, r.gameType);
+        if (avg > bestAvg) bestAvg = avg;
     }
     return sessions > 0 ? { sessions, bestAvg } : null;
 }
