@@ -11,6 +11,11 @@
  */
 import type { MatchShot } from "../matchApi";
 
+/** 관전 목록 쿼리 키 — 멀티방 화면(게임 중인 방 줄)과 다시보기 목록이 같은 캐시를 쓴다. */
+export const WATCH_QUERY_KEY = ["sim-watch"] as const;
+/** 목록 갱신 주기(ms). 대전 화면(4 s)보다 느리다 — 점수만 보이는 목록이라 급하지 않다. */
+export const WATCH_LIST_REFETCH_MS = 15_000;
+
 /** 관전 폴링 주기(ms). 선수(2 s·5 s)보다 느리게 — 관전자는 여럿이 붙을 수 있다. */
 export const WATCH_POLL_MS = 4000;
 /** 이만큼 이상 밀렸으면 앞의 샷은 재생하지 않고 상태만 따라간다(뒤늦게 들어온 관전자). */

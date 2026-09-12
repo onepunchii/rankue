@@ -8,11 +8,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { matchApi, type MatchApi, type WatchCard } from "../matchApi";
+import { WATCH_LIST_REFETCH_MS, WATCH_QUERY_KEY } from "./watchPlan";
 import { gameLabel } from "../match/matchView";
-
-export const WATCH_QUERY_KEY = ["sim-watch"] as const;
-/** 목록 갱신 — 대전 화면(4초)보다 느리다. 여기는 점수만 보이는 목록이라 급하지 않다. */
-export const WATCH_LIST_REFETCH_MS = 15_000;
 
 function Row({ card, label, onOpen }: { card: WatchCard; label: string; onOpen: (id: string) => void }) {
     const { t } = useT();
@@ -39,6 +36,10 @@ function Row({ card, label, onOpen }: { card: WatchCard; label: string; onOpen: 
     );
 }
 
+/**
+ * 다시보기 목록. '게임 중'인 방은 멀티방 목록 안에 '게임중 · 관전'으로 같이 뜬다(2026-09-12 오너:
+ * "게임중이라도 방이 보이고 게임중이라고 표시되고, 선택되면 관전으로") — 그래서 여기는 끝난 경기만 다룬다.
+ */
 export function WatchList({ onOpen, api = matchApi }: { onOpen: (id: string) => void; api?: MatchApi }) {
     const { t } = useT();
     const { data } = useQuery({
@@ -46,23 +47,11 @@ export function WatchList({ onOpen, api = matchApi }: { onOpen: (id: string) => 
         queryFn: () => api.getWatchable(),
         refetchInterval: WATCH_LIST_REFETCH_MS,
     });
-    const live = data?.live ?? [];
     const replays = data?.replays ?? [];
-    if (live.length === 0 && replays.length === 0) return null;
+    if (replays.length === 0) return null;
 
     return (
         <div className="space-y-5">
-            {live.length > 0 && (
-                <section className="space-y-2">
-                    <h3 className="text-[13px] font-bold text-ink-2 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" aria-hidden />
-                        {t("sim.watch.live")}
-                    </h3>
-                    <ul className="space-y-2">
-                        {live.map((c) => <Row key={c.id} card={c} label={t("sim.watch.watch")} onOpen={onOpen} />)}
-                    </ul>
-                </section>
-            )}
             {replays.length > 0 && (
                 <section className="space-y-2">
                     <h3 className="text-[13px] font-bold text-ink-2">{t("sim.watch.replays")}</h3>

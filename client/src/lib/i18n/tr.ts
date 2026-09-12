@@ -2155,6 +2155,7 @@ const tr: Dict = {
   "sim.rooms.agoHour": "{n} sa önce",
   "sim.watch.title": "İzle",
   "sim.watch.viewers": "{n} izliyor",
+  "sim.watch.badge": "Oyunda",
   "sim.watch.replayTitle": "Tekrar",
   "sim.watch.live": "Şimdi oynuyor",
   "sim.watch.replays": "Son tekrarlar",

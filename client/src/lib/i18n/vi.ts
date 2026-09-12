@@ -2155,6 +2155,7 @@ const vi: Dict = {
   "sim.rooms.agoHour": "{n} giờ trước",
   "sim.watch.title": "Xem",
   "sim.watch.viewers": "{n} đang xem",
+  "sim.watch.badge": "Đang chơi",
   "sim.watch.replayTitle": "Xem lại",
   "sim.watch.live": "Đang thi đấu",
   "sim.watch.replays": "Xem lại gần đây",

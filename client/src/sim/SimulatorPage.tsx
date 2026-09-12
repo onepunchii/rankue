@@ -1413,11 +1413,12 @@ export function SimulatorPage() {
                 <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <RoomList
                         onOpen={openMatch}
+                        onWatch={(id) => navigate(`/online-game?watch=${id}`)}
                         onCreate={() => navigate("/online-game?lobby=1&public=1")}
                         onClose={() => navigate("/online-game", { replace: true })}
                         myHandi={member ? { handi3c: member.handi3c, handi4c: member.handi4c } : undefined}
                     />
-                    {/* 시작한 방은 참가 목록에서 빠진다 — 그 판들을 관전으로 되살린다(2026-09-12 오너). */}
+                    {/* 끝난 공개 대전 다시보기. 게임 중인 방은 위 목록에 '게임 중 · 관전'으로 함께 뜬다. */}
                     <div className="px-4 pb-8">
                         <WatchList onOpen={(id) => navigate(`/online-game?watch=${id}`)} />
                     </div>

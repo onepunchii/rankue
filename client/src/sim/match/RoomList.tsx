@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { matchApi as defaultApi, matchErrorCode, type MatchApi, type MatchPublic } from "../matchApi";
+import { matchApi as defaultApi, matchErrorCode, type MatchApi, type MatchPublic, type WatchCard } from "../matchApi";
 import { gameLabel, rulesLabel, inningCapLabel } from "./matchView";
+import { WATCH_LIST_REFETCH_MS, WATCH_QUERY_KEY } from "../watch/watchPlan";
 import { isValidTarget } from "../setupPresets";
 import { TargetPicker } from "./MatchLobby";
 
@@ -19,6 +20,8 @@ export const ROOMS_QUERY_KEY = ["sim-rooms"] as const;
 export const ROOMS_REFETCH_MS = 10_000;
 
 export interface RoomListProps {
+    /** 게임 중인 방을 골랐을 때(관전으로 간다). 없으면 게임 중인 방 줄을 그리지 않는다. */
+    onWatch?: (id: string) => void;
     /** 참가가 끝나 playing 이 된 대전 — 페이지가 actions.startMatch 로 연다 */
     onOpen: (m: MatchPublic) => void;
     onCreate: () => void;
@@ -68,6 +71,34 @@ const Row = memo(function Row({ m, age, onJoin }: { m: MatchPublic; age: string;
             <button type="button" onClick={() => onJoin(m)} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black" aria-label={`${t("sim.rooms.join")} · ${m.hostName}`}>
                 {t("sim.rooms.join")}
             </button>
+        </li>
+    );
+});
+
+/**
+ * 게임 중인 방 줄(2026-09-12 오너: "게임중이라도 방이 보이고 게임중이라고 표시되고, 선택되면 관전으로").
+ * 시작한 방은 참가할 수 없으니 버튼이 '관전'이다. 대기 중인 방과 같은 목록에 둔다 — 방이 사라진 것처럼 보이지 않게.
+ */
+const LiveRow = memo(function LiveRow({ c, onWatch }: { c: WatchCard; onWatch: (id: string) => void }) {
+    const { t } = useT();
+    const guest = c.guestName ?? "-";
+    return (
+        <li className="rounded-tile border border-surface-line bg-surface-1 px-4 py-3 flex items-center gap-3">
+            <span className="flex-1 min-w-0 flex flex-col gap-1">
+                <span className="flex items-center gap-2 min-w-0">
+                    <span className="text-[14px] font-semibold text-ink-1 truncate">{c.hostName} <span className="text-ink-3">vs</span> {guest}</span>
+                    <span className="rk-chip bg-brand/15 text-brand font-bold shrink-0">{t("sim.watch.badge")}</span>
+                </span>
+                <span className="text-[12px] font-medium text-ink-3 truncate">
+                    {gameLabel(c, t)} · <span className="tabular-nums">{c.scores[0] ?? 0} : {c.scores[1] ?? 0}</span>
+                    {(c.watchers ?? 0) > 0 && <span className="text-brand font-bold"> · {t("sim.watch.viewers").replace("{n}", String(c.watchers))}</span>}
+                </span>
+            </span>
+            <button
+                type="button" onClick={() => onWatch(c.id)}
+                className="h-10 px-4 shrink-0 rounded-pill border border-surface-line-strong text-[13px] font-black text-ink-1"
+                aria-label={`${t("sim.watch.watch")} · ${c.hostName}`}
+            >{t("sim.watch.watch")}</button>
         </li>
     );
 });
@@ -156,12 +187,15 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
     );
 }
 
-export function RoomList({ onOpen, onCreate, onClose, api = defaultApi, myHandi, now = Date.now }: RoomListProps) {
+export function RoomList({ onOpen, onWatch, onCreate, onClose, api = defaultApi, myHandi, now = Date.now }: RoomListProps) {
     const { t } = useT();
     const q = useQuery({ queryKey: ROOMS_QUERY_KEY, queryFn: () => api.listRooms(), staleTime: 0, refetchInterval: ROOMS_REFETCH_MS });
+    // 게임 중인 공개 방 — 참가 목록에서는 빠지지만 관전으로 들어갈 수 있어 같은 목록에 이어 붙인다.
+    const watch = useQuery({ queryKey: WATCH_QUERY_KEY, queryFn: () => api.getWatchable(), refetchInterval: WATCH_LIST_REFETCH_MS, enabled: !!onWatch });
     const [target, setTarget] = useState<MatchPublic | null>(null);
     const nowMs = now();
     const rows = useMemo(() => q.data ?? [], [q.data]);
+    const live = useMemo(() => (onWatch ? watch.data?.live ?? [] : []), [watch.data, onWatch]);
     return (
         <div className="rank-arcade w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
             <div className="flex items-start justify-between gap-3 mb-3">
@@ -174,7 +208,10 @@ export function RoomList({ onOpen, onCreate, onClose, api = defaultApi, myHandi,
                 </button>
             </div>
             <div className="flex items-center justify-between gap-2 mb-3">
-                <span className="rk-num text-[13px] font-bold text-white/85">{t("sim.entry.roomsOpen")} {rows.length}</span>
+                <span className="rk-num text-[13px] font-bold text-white/85">
+                    {t("sim.entry.roomsOpen")} {rows.length}
+                    {live.length > 0 && <span className="text-brand"> · {t("sim.watch.badge")} {live.length}</span>}
+                </span>
                 <button type="button" onClick={onCreate} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black">{t("sim.entry.roomCreate")}</button>
             </div>
             {q.isPending && <p className="text-[13px] font-medium text-white/60 min-h-11 flex items-center">{t("sim.rooms.loading")}</p>}
@@ -184,13 +221,13 @@ export function RoomList({ onOpen, onCreate, onClose, api = defaultApi, myHandi,
                     <button type="button" onClick={() => { void q.refetch(); }} className={pill}>{t("sim.match.retry")}</button>
                 </div>
             )}
-            {q.isSuccess && rows.length === 0 && (
+            {q.isSuccess && rows.length === 0 && live.length === 0 && (
                 <div className="arc-board rounded-[22px] p-5">
                     <p className="text-[16px] font-black text-white">{t("sim.rooms.empty")}</p>
                     <p className="text-[13px] font-medium text-white/70 mt-1">{t("sim.rooms.emptyDesc")}</p>
                 </div>
             )}
-            {rows.length > 0 && (
+            {(rows.length > 0 || live.length > 0) && (
                 <div>
                     {/* 판과 리본만 아케이드로 — 방 줄은 정보가 많아 담백하게 둔다(2026-09-09 오너: "멀티방은 절반만") */}
                     <div className="relative flex justify-center">
@@ -203,6 +240,7 @@ export function RoomList({ onOpen, onCreate, onClose, api = defaultApi, myHandi,
                         aria-label={t("sim.rooms.title")}
                     >
                         {rows.map((m) => <Row key={m.id} m={m} age={roomAge(m.createdAt, nowMs, t)} onJoin={setTarget} />)}
+                        {onWatch && live.map((c) => <LiveRow key={c.id} c={c} onWatch={onWatch} />)}
                     </ul>
                 </div>
             )}

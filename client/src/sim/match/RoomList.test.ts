@@ -70,19 +70,30 @@ const room = (over: Partial<MatchPublic> = {}): MatchPublic => ({
     myIndex: -1, turn: 0, shots: 0, version: 1, state: null, balls: null, winnerIndex: null, endReason: null, engineVersion: "v", paramsHash: "h",
     createdAt: new Date(NOW - 5 * 60_000).toISOString(), startedAt: null, lastShotAt: null, finishedAt: null, claimableAt: null, turnSeenAt: null, serverNow: null, ...over,
 });
-function api(rows: MatchPublic[], joinRoom?: MatchApi["joinRoom"]): MatchApi {
-    return { listRooms: vi.fn(async () => rows), joinRoom: joinRoom ?? vi.fn(async (id) => room({ id, status: "playing", myIndex: 1 })) } as unknown as MatchApi;
+function api(rows: MatchPublic[], joinRoom?: MatchApi["joinRoom"], live: unknown[] = []): MatchApi {
+    return {
+        listRooms: vi.fn(async () => rows),
+        joinRoom: joinRoom ?? vi.fn(async (id) => room({ id, status: "playing", myIndex: 1 })),
+        getWatchable: vi.fn(async () => ({ live, replays: [] })),
+    } as unknown as MatchApi;
 }
-function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; myHandi?: { handi3c: number | null; handi4c: number | null } }) {
+
+/** 게임 중인 공개 대전 한 줄(관전 목록 카드). */
+const liveCard = (over: Record<string, unknown> = {}) => ({
+    id: "m1", status: "playing", gameType: "3c", tableId: "DAEDAE", hostName: "다대맨", guestName: "정현경",
+    targets: [20, 20], scores: [7, 5], innings: 9, turn: 0, shots: 18, winnerIndex: null, watchers: 2,
+    startedAt: new Date(NOW - 60_000).toISOString(), finishedAt: null, lastShotAt: null, ...over,
+});
+function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; myHandi?: { handi3c: number | null; handi4c: number | null }; live?: unknown[]; onWatch?: (id: string) => void }) {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
     const qc = new rq.QueryClient({ defaultOptions: { queries: { retry: false } } });
     const onOpen = vi.fn(); const onCreate = vi.fn();
-    const a = api(props.rows, props.joinRoom);
+    const a = api(props.rows, props.joinRoom, props.live ?? []);
     React.act(() => {
         root.render(React.createElement(rq.QueryClientProvider, { client: qc },
-            React.createElement(RoomList, { onOpen, onCreate, onClose: () => undefined, api: a, myHandi: props.myHandi, now: () => NOW })));
+            React.createElement(RoomList, { onOpen, onWatch: props.onWatch, onCreate, onClose: () => undefined, api: a, myHandi: props.myHandi, now: () => NOW })));
     });
     const h = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); }, onOpen, onCreate, api: a };
     live.push(h);
@@ -149,5 +160,38 @@ describe("RoomList", () => {
         expect(roomAge("junk", NOW, t)).toBe("방금");
         expect(defaultJoinTarget({ gameType: "4c", hostTarget: 100 }, { handi3c: 18, handi4c: 80 })).toBe(80);
         expect(defaultJoinTarget({ gameType: "4c", hostTarget: 100 }, { handi3c: 18, handi4c: null })).toBe(100);
+    });
+});
+
+/**
+ * 게임 중인 방(2026-09-12 오너: "게임중이라도 방이 보이고 게임중이라고 표시되고, 선택되면 관전으로").
+ * 시작한 방은 참가 목록(listRooms)에서 빠지지만 관전 목록으로 같은 자리에 이어 붙는다.
+ */
+describe("RoomList: 게임 중인 방 줄", () => {
+    it("대기 방이 없어도 게임 중인 방이 있으면 '열린 방이 없어요' 대신 그 방을 보여 준다", async () => {
+        const onWatch = vi.fn();
+        const h = mount({ rows: [], live: [liveCard()], onWatch });
+        await settle(h, () => (h.container.textContent ?? "").includes("다대맨"));
+        const text = h.container.textContent ?? "";
+        expect(text).toContain(ko["sim.watch.badge"]);          // 게임 중
+        expect(text).toContain("7 : 5");
+        expect(text).toContain(ko["sim.watch.viewers"].replace("{n}", "2"));
+        expect(text).not.toContain(ko["sim.rooms.empty"]);
+    });
+
+    it("관전 버튼을 누르면 그 대전 id 로 관전을 연다", async () => {
+        const onWatch = vi.fn();
+        const h = mount({ rows: [], live: [liveCard({ id: "m-42" })], onWatch });
+        await settle(h, () => (h.container.textContent ?? "").includes("다대맨"));
+        const btn = [...h.container.querySelectorAll("button")].find((b) => b.textContent === ko["sim.watch.watch"]);
+        expect(btn, h.container.textContent ?? "").toBeTruthy();
+        click(btn!);
+        expect(onWatch).toHaveBeenCalledWith("m-42");
+    });
+
+    it("onWatch 를 안 넘기면 게임 중인 방을 그리지 않는다(관전을 쓰지 않는 화면)", async () => {
+        const h = mount({ rows: [], live: [liveCard()] });
+        await settle(h, () => (h.container.textContent ?? "").includes(ko["sim.rooms.empty"]));
+        expect(h.container.textContent ?? "").not.toContain("다대맨");
     });
 });

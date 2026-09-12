@@ -2157,6 +2157,7 @@ export const ko: Dict = {
   "sim.rooms.agoHour": "{n}시간 전",
   "sim.watch.title": "관전",
   "sim.watch.viewers": "관전 {n}명",
+  "sim.watch.badge": "게임 중",
   "sim.watch.replayTitle": "다시보기",
   "sim.watch.live": "지금 치는 중",
   "sim.watch.replays": "최근 경기 다시보기",
