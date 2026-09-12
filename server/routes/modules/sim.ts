@@ -148,11 +148,11 @@ router.get("/sim/stats/me", requireAuth, asyncHandler(async (req: AuthRequest, r
 // GET /sim/rank?gameType&tableId&country=KR|all — 온라인 대전 랭킹(배치 3판 뒤). country 없음/all = 전체, 있으면 그 나라(순위 번호는 전역).
 router.get("/sim/rank", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const gameType = req.query.gameType === "4c" ? "4c" : "3c";
-    const tableId = req.query.tableId === "JUNGDAE_KR" ? "JUNGDAE_KR" : "DAEDAE";
+    // 2026-09-12: 대대·중대를 합쳤다(오너). 옛 앱이 보내는 tableId 는 그냥 무시한다 — 400 을 내면 옛 화면이 깨진다.
     const raw = typeof req.query.country === "string" ? req.query.country.toUpperCase() : "";
     const country = /^[A-Z]{2}$/.test(raw) ? raw : null;
     const limit = Math.min(200, Math.max(10, Number(req.query.limit) || 100));
-    return sendSuccess(res, await storage.sim.rankLadder(req.userId!, gameType, tableId, country, limit, PLACEMENT_MATCHES));
+    return sendSuccess(res, await storage.sim.rankLadder(req.userId!, gameType, country, limit, PLACEMENT_MATCHES));
 }));
 
 // GET /sim/rank/me — 네 판의 내 대전 순위(진입 화면 '랭킹' 줄). 랭킹 화면을 네 번 부르지 않으려고 따로 둔다.

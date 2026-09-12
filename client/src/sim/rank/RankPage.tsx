@@ -20,13 +20,12 @@ import { rankApi as defaultApi, RANK_QUERY_KEY, type RankApi, type RankRow } fro
 export interface RankPageProps {
     onClose: () => void;
     api?: RankApi;
-    /** 처음 보여줄 종목·테이블 */
-    initial?: { gameType: DashGameType; tableId: DashTableId };
+    /** 처음 보여줄 종목 */
+    initial?: { gameType: DashGameType };
 }
 
-const COMBOS: readonly { gameType: DashGameType; tableId: DashTableId }[] = [
-    { gameType: "3c", tableId: "DAEDAE" }, { gameType: "3c", tableId: "JUNGDAE_KR" }, { gameType: "4c", tableId: "DAEDAE" }, { gameType: "4c", tableId: "JUNGDAE_KR" },
-];
+/** 2026-09-12 오너: "대대 중대 통합해줘" — 사다리는 종목 둘뿐이다(인원이 적어 넷으로 쪼개면 한 판에 서너 명이었다). */
+const COMBOS: readonly { gameType: DashGameType }[] = [{ gameType: "3c" }, { gameType: "4c" }];
 const pill = "h-10 px-3.5 shrink-0 inline-flex items-center rounded-pill border text-[13px] font-bold";
 const chipOn = "border-transparent bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)]";
 const chipOff = "border-white/15 bg-white/[0.08] text-white/85 active:bg-white/15";
@@ -79,8 +78,8 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
     const myCountry = member?.country && isCountryCode(member.country) ? member.country : null;
     const country = scope === "all" ? null : scope === "mine" ? myCountry : picked || null;
     const q = useQuery({
-        queryKey: [...RANK_QUERY_KEY, combo.gameType, combo.tableId, country ?? "all"],
-        queryFn: () => api.getLadder({ gameType: combo.gameType, tableId: combo.tableId, country }),
+        queryKey: [...RANK_QUERY_KEY, combo.gameType, country ?? "all"],
+        queryFn: () => api.getLadder({ gameType: combo.gameType, country }),
         staleTime: 15_000,
     });
 
@@ -109,8 +108,8 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
         const best = [...(data.combos ?? [])].sort((a, b) => b.myMatches - a.myMatches || b.ranked - a.ranked)[0];
         if (!best || (best.myMatches === 0 && best.ranked === 0)) return;
         pickedRef.current = true;
-        if (best.gameType !== combo.gameType || best.tableId !== combo.tableId) setCombo({ gameType: best.gameType, tableId: best.tableId });
-    }, [data, combo.gameType, combo.tableId]);
+        if (best.gameType !== combo.gameType) setCombo({ gameType: best.gameType });
+    }, [data, combo.gameType]);
     const status = data ? rankStatus(data.me.rating, data.me.matches) : null;
     const options = useMemo(() => {
         const set = new Set<string>(COUNTRY_OPTIONS);
@@ -146,23 +145,6 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
                         </button>
                     );
                 })}
-                {/* 대대·중대는 작은 토글 하나로(칩 넷은 많다 — 2026-09-09 오너). 점수는 테이블별로 따로 쌓이므로 합치지 않는다. */}
-                <div role="group" aria-label={t("sim.rank.tableAria")} className="shrink-0 inline-flex rounded-pill border border-white/15 bg-white/[0.08] p-0.5">
-                    {(["DAEDAE", "JUNGDAE_KR"] as const).map((tb) => {
-                        const sel = combo.tableId === tb;
-                        return (
-                            <button
-                                key={tb} type="button" aria-pressed={sel} onClick={() => { pickedRef.current = true; setCombo({ ...combo, tableId: tb }); }}
-                                className={cn(
-                                    "h-9 px-3 rounded-pill text-[12px] font-bold",
-                                    sel ? "bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)]" : "text-white/70",
-                                )}
-                            >
-                                {tb === "DAEDAE" ? t("sim.setup.tableDaedae") : t("sim.setup.tableJungdae")}
-                            </button>
-                        );
-                    })}
-                </div>
             </div>
             <div role="group" aria-label={t("sim.rank.scopeAria")} className="flex items-center gap-1.5 flex-wrap mb-3">
                 <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className={cn(pill, scope === "all" ? chipOn : chipOff)}>{t("sim.rank.scopeAll")}</button>

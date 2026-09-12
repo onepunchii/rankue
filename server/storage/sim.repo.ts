@@ -219,13 +219,14 @@ export class SimRepository {
      * 온라인 대전 랭킹(종목·테이블별). 배치(대전 3판) 를 마친 선수만 순위에 오르고, 전체 순위는 국가 필터와 무관하게 전역이다.
      * country 가 있으면 그 나라 행만 돌려준다(순위 번호는 전역 그대로 + 국가 순위). me 는 배치 전이어도 레이팅·판 수를 준다.
      */
-    async rankLadder(memberId: string, gameType: "3c" | "4c", tableId: "DAEDAE" | "JUNGDAE_KR", country: string | null, limit = 100, placement = 3) {
+    async rankLadder(memberId: string, gameType: "3c" | "4c", country: string | null, limit = 100, placement = 3) {
+        // 2026-09-12: 대대·중대를 합친 hiq_sim_match_ratings 를 본다(오너 지시). 테이블 구분은 사다리에서 사라졌다.
         const ranked = sql`
-            select r.member_id, mem.name, mem.country, r.sim_rating, r.matches, r.wins,
-                   rank() over (order by r.sim_rating desc, r.wins desc, r.matches asc) as rank,
-                   rank() over (partition by mem.country order by r.sim_rating desc, r.wins desc, r.matches asc) as country_rank
-            from hiq_sim_ratings r join hiq_members mem on mem.id = r.member_id
-            where r.game_type = ${gameType} and r.table_id = ${tableId} and r.matches >= ${placement}`;
+            select r.member_id, mem.name, mem.country, r.rating as sim_rating, r.matches, r.wins,
+                   rank() over (order by r.rating desc, r.wins desc, r.matches asc) as rank,
+                   rank() over (partition by mem.country order by r.rating desc, r.wins desc, r.matches asc) as country_rank
+            from hiq_sim_match_ratings r join hiq_members mem on mem.id = r.member_id
+            where r.game_type = ${gameType} and r.matches >= ${placement}`;
         const rows = (await db.execute(sql`
             select * from (${ranked}) x where ${country}::text is null or x.country = ${country}::text order by x.rank asc limit ${limit}`)).rows as Record<string, unknown>[];
         const countries = (await db.execute(sql`
@@ -233,14 +234,14 @@ export class SimRepository {
         const [total] = (await db.execute(sql`select count(*)::int as n from (${ranked}) x`)).rows as { n: number }[];
         const [meRanked] = (await db.execute(sql`select * from (${ranked}) x where x.member_id = ${memberId}`)).rows as Record<string, unknown>[];
         const [meRow] = (await db.execute(sql`
-            select r.sim_rating, r.matches, r.wins, mem.country from hiq_sim_ratings r join hiq_members mem on mem.id = r.member_id
-            where r.member_id = ${memberId} and r.game_type = ${gameType} and r.table_id = ${tableId}`)).rows as Record<string, unknown>[];
+            select r.rating as sim_rating, r.matches, r.wins, mem.country from hiq_sim_match_ratings r join hiq_members mem on mem.id = r.member_id
+            where r.member_id = ${memberId} and r.game_type = ${gameType}`)).rows as Record<string, unknown>[];
         const [meCountry] = (await db.execute(sql`select country from hiq_members where id = ${memberId}`)).rows as { country: string | null }[];
         const combos = (await db.execute(sql`
-            select game_type, table_id,
+            select game_type,
                    count(*) filter (where matches >= ${placement})::int as ranked,
                    coalesce(max(matches) filter (where member_id = ${memberId}), 0)::int as my_matches
-            from hiq_sim_ratings group by game_type, table_id`)).rows as Record<string, unknown>[];
+            from hiq_sim_match_ratings group by game_type`)).rows as Record<string, unknown>[];
         const n = (v: unknown) => Number(v ?? 0);
         const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
         return {
@@ -254,36 +255,36 @@ export class SimRepository {
                 rating: n(meRow.sim_rating), matches: n(meRow.matches), wins: n(meRow.wins), country: str(meRow.country),
                 rank: meRanked ? n(meRanked.rank) : null, countryRank: meRanked && meRanked.country ? n(meRanked.country_rank) : null,
             } : { rating: 1000, matches: 0, wins: 0, country: meCountry?.country ?? null, rank: null, countryRank: null },
-            // 조합(종목×테이블)별 등재 인원과 내 대전 수 — 화면이 "사람이 있는 조합"을 기본으로 열고 칩에 인원을 적는다.
+            // 종목별 등재 인원과 내 대전 수 — 화면이 "사람이 있는 종목"을 기본으로 열고 칩에 인원을 적는다.
+            // 2026-09-12 부터 테이블(대대·중대) 구분은 없다.
             combos: combos.map((c) => ({
                 gameType: String(c.game_type) as "3c" | "4c",
-                tableId: String(c.table_id) as "DAEDAE" | "JUNGDAE_KR",
                 ranked: n(c.ranked), myMatches: n(c.my_matches),
             })),
         };
     }
 
     /**
-     * 온라인 대전 랭킹에서 내 순위 — 네 판(종목 × 테이블)을 한 번에. 진입 화면의 '랭킹' 줄이 가장 높은 순위를 보여 준다.
+     * 온라인 대전 랭킹에서 내 순위 — 종목별로(3쿠션·4구). 진입 화면의 '랭킹' 줄이 가장 높은 순위를 보여 준다.
      * 정렬·배치 조건은 rankLadder 와 **글자 그대로 같다**(회원 표와 inner join 까지) — 둘이 다르면 로비와 랭킹 화면의 숫자가 어긋난다.
-     * 배치 전(대전 < placement)인 판은 rank 가 null 이고 matches 로 '배치 중 n/m' 을 보여 준다.
+     * 배치 전(대전 < placement)이면 rank 가 null 이고 matches 로 '배치 중 n/m' 을 보여 준다.
+     * 2026-09-12: 대대·중대를 합쳐 판이 넷에서 둘로 줄었다(오너 지시).
      */
-    async myMatchRanks(memberId: string, placement = 3): Promise<{ gameType: "3c" | "4c"; tableId: "DAEDAE" | "JUNGDAE_KR"; matches: number; rank: number | null; total: number }[]> {
+    async myMatchRanks(memberId: string, placement = 3): Promise<{ gameType: "3c" | "4c"; matches: number; rank: number | null; total: number }[]> {
         const res = await db.execute(sql`
             with ranked as (
-                select r.member_id, r.game_type, r.table_id,
-                       rank() over (partition by r.game_type, r.table_id order by r.sim_rating desc, r.wins desc, r.matches asc) as rank,
-                       count(*) over (partition by r.game_type, r.table_id) as total
-                from hiq_sim_ratings r join hiq_members mem on mem.id = r.member_id
+                select r.member_id, r.game_type,
+                       rank() over (partition by r.game_type order by r.rating desc, r.wins desc, r.matches asc) as rank,
+                       count(*) over (partition by r.game_type) as total
+                from hiq_sim_match_ratings r join hiq_members mem on mem.id = r.member_id
                 where r.matches >= ${placement}
             )
-            select m.game_type, m.table_id, m.matches, x.rank, x.total
-            from hiq_sim_ratings m
-            left join ranked x on x.member_id = m.member_id and x.game_type = m.game_type and x.table_id = m.table_id
+            select m.game_type, m.matches, x.rank, x.total
+            from hiq_sim_match_ratings m
+            left join ranked x on x.member_id = m.member_id and x.game_type = m.game_type
             where m.member_id = ${memberId}`);
         return (res.rows as Record<string, unknown>[]).map((r) => ({
             gameType: String(r.game_type) as "3c" | "4c",
-            tableId: String(r.table_id) as "DAEDAE" | "JUNGDAE_KR",
             matches: Number(r.matches ?? 0),
             rank: r.rank === null || r.rank === undefined ? null : Number(r.rank),
             total: Number(r.total ?? 0),

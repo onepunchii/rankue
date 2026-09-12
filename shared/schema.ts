@@ -1686,6 +1686,24 @@ export const hiqSimShots = pgTable("hiq_sim_shots", {
 }));
 
 /** 시뮬 전용 성적. hiqMembers 의 rating·avg 컬럼과 완전히 분리. */
+/**
+ * 온라인 대전 레이팅(2026-09-12). **테이블(대대·중대)을 합친다** — 오너: "대대 중대 통합해줘".
+ * 예전에는 hiq_sim_ratings 안에 종목·테이블별로 있었는데, 인원이 적어 사다리가 넷으로 쪼개지면
+ * 한 판에 서너 명씩 남았고(전체 4명), 같은 사람이 판마다 다른 등급을 달았다.
+ * 솔로 기록(세션·에버·하이런)은 테이블 특성이 실제로 다르므로 hiq_sim_ratings 에 그대로 둔다 — 여긴 대전 전용이다.
+ */
+export const hiqSimMatchRatings = pgTable("hiq_sim_match_ratings", {
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  /** Elo. 1000 시작, K=24. 실전 RP 와 무관하다. */
+  rating: integer("rating").default(1000).notNull(),
+  matches: integer("matches").default(0).notNull(),
+  wins: integer("wins").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.memberId, t.gameType] }),
+}));
+
 export const hiqSimRatings = pgTable("hiq_sim_ratings", {
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
   gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
@@ -1695,7 +1713,7 @@ export const hiqSimRatings = pgTable("hiq_sim_ratings", {
   totalInnings: integer("total_innings").default(0).notNull(),
   bestAvg: doublePrecision("best_avg").default(0).notNull(),
   bestHighRun: integer("best_high_run").default(0).notNull(),
-  /** 네트워크 대전용 Elo(Phase 6+). 솔로는 건드리지 않는다. */
+  /** @deprecated 2026-09-12 부터 대전 레이팅은 hiq_sim_match_ratings(테이블 통합) 에 쌓인다. 이 세 칸은 그때까지의 기록이다. */
   simRating: integer("sim_rating").default(1000).notNull(),
   matches: integer("matches").default(0).notNull(),
   wins: integer("wins").default(0).notNull(),

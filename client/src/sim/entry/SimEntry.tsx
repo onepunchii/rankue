@@ -78,19 +78,20 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
     const order = entryOrder(readLast());
     const top = order[0];
     const openRooms = rooms.data?.length ?? 0;
-    const myRank = useQuery<{ placement: number; boards: { gameType: "3c" | "4c"; tableId: "DAEDAE" | "JUNGDAE_KR"; matches: number; rank: number | null; total: number }[] }>({
+    const myRank = useQuery<{ placement: number; boards: { gameType: "3c" | "4c"; matches: number; rank: number | null; total: number }[] }>({
         queryKey: ["/api/hiq/sim/rank/me"],
         queryFn: async () => (await apiRequest("/api/hiq/sim/rank/me")) ?? { placement: 3, boards: [] },
         enabled: !!member,
         staleTime: 30_000,
     });
-    // 네 판 중 **가장 높은 순위**(숫자가 작은 쪽). 같으면 사람이 많은 판을 보여 준다.
+    // 두 판(3쿠션·4구) 중 **가장 높은 순위**(숫자가 작은 쪽). 같으면 사람이 많은 판을 보여 준다.
+    // 2026-09-12 부터 대대·중대는 합쳐져 판이 넷에서 둘로 줄었다.
     const bestBoard = (myRank.data?.boards ?? [])
         .filter((b) => b.rank !== null)
         .sort((a, b) => (a.rank! - b.rank!) || (b.total - a.total))[0];
     const placingMatches = Math.max(0, ...(myRank.data?.boards ?? []).map((b) => b.matches));
-    const boardLabel = (b: { gameType: "3c" | "4c"; tableId: "DAEDAE" | "JUNGDAE_KR" }) =>
-        `${t(b.gameType === "4c" ? "sim.setup.type4c" : "sim.setup.type3c")} ${t(b.tableId === "JUNGDAE_KR" ? "sim.setup.tableJungdae" : "sim.setup.tableDaedae")}`;
+    const boardLabel = (b: { gameType: "3c" | "4c" }) =>
+        t(b.gameType === "4c" ? "sim.setup.type4c" : "sim.setup.type3c");
     const rankValue: { text: string; muted: boolean } | null = bestBoard
         ? { text: `#${bestBoard.rank} · ${boardLabel(bestBoard)}`, muted: false }
         : placingMatches > 0

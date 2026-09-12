@@ -1,10 +1,10 @@
 /**
  * 시뮬레이터 네트워크 대전 A(비동기·폴링) 저장소.
  * 불변: 실전 경기 테이블·마감 함수·회원 성적 컬럼은 절대 건드리지 않는다(sim.guard.test.ts).
- * 시뮬 대전 성적(Elo)은 hiqSimRatings.simRating 에만 쓴다.
+ * 시뮬 대전 성적(Elo)은 hiqSimMatchRatings.rating 에만 쓴다(2026-09-12 부터 대대·중대 통합).
  */
 import { db } from "../db.js";
-import { hiqSimMatches, hiqSimMatchShots, hiqSimRatings, hiqMembers } from "../../shared/schema.js";
+import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchRatings, hiqMembers } from "../../shared/schema.js";
 import { alias } from "drizzle-orm/pg-core";
 import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot } from "../../shared/schema.js";
@@ -313,12 +313,16 @@ export class SimMatchRepository {
         });
     }
 
-    /** 시뮬 대전 Elo. 실전 RP 와 완전히 별개의 hiqSimRatings.simRating. 무승부(null)는 0.5. */
+    /**
+     * 시뮬 대전 Elo. 실전 RP 와 완전히 별개다. 무승부(null)는 0.5.
+     * 2026-09-12 부터 **테이블(대대·중대)을 합쳐** hiq_sim_match_ratings 에 (회원, 종목) 한 줄로 쌓는다 — 오너 지시.
+     * 인원이 적어 사다리를 넷으로 쪼개면 한 판에 서너 명밖에 안 남았다.
+     */
     private async applyElo(tx: any, m: HiqSimMatch, winnerId: string | null) {
         const ids = [m.hostId, m.guestId!];
-        const rows = await tx.select().from(hiqSimRatings)
-            .where(and(inArray(hiqSimRatings.memberId, ids), eq(hiqSimRatings.gameType, m.gameType), eq(hiqSimRatings.tableId, m.tableId)));
-        const rating = (id: string) => rows.find((r: any) => r.memberId === id)?.simRating ?? 1000;
+        const rows = await tx.select().from(hiqSimMatchRatings)
+            .where(and(inArray(hiqSimMatchRatings.memberId, ids), eq(hiqSimMatchRatings.gameType, m.gameType)));
+        const rating = (id: string) => rows.find((r: any) => r.memberId === id)?.rating ?? 1000;
         const [ra, rb] = [rating(ids[0]), rating(ids[1])];
         const ea = 1 / (1 + Math.pow(10, (rb - ra) / 400));
         const sa = winnerId === null ? 0.5 : winnerId === ids[0] ? 1 : 0;
@@ -326,15 +330,15 @@ export class SimMatchRepository {
         for (const [i, id] of ids.entries()) {
             const delta = i === 0 ? da : -da;
             const won = winnerId === id ? 1 : 0;
-            await tx.insert(hiqSimRatings).values({
-                memberId: id, gameType: m.gameType, tableId: m.tableId,
-                simRating: 1000 + delta, matches: 1, wins: won, updatedAt: new Date(),
+            await tx.insert(hiqSimMatchRatings).values({
+                memberId: id, gameType: m.gameType,
+                rating: 1000 + delta, matches: 1, wins: won, updatedAt: new Date(),
             }).onConflictDoUpdate({
-                target: [hiqSimRatings.memberId, hiqSimRatings.gameType, hiqSimRatings.tableId],
+                target: [hiqSimMatchRatings.memberId, hiqSimMatchRatings.gameType],
                 set: {
-                    simRating: sql`${hiqSimRatings.simRating} + ${delta}`,
-                    matches: sql`${hiqSimRatings.matches} + 1`,
-                    wins: sql`${hiqSimRatings.wins} + ${won}`,
+                    rating: sql`${hiqSimMatchRatings.rating} + ${delta}`,
+                    matches: sql`${hiqSimMatchRatings.matches} + 1`,
+                    wins: sql`${hiqSimMatchRatings.wins} + ${won}`,
                     updatedAt: new Date(),
                 },
             });

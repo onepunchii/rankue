@@ -5,8 +5,9 @@ import { guessCountry, isCountryCode, countryName } from "./country";
 
 describe("rankApi", () => {
     it("URL: 종목·테이블, 나라가 있을 때만 country", () => {
-        expect(rankUrl({ gameType: "3c", tableId: "DAEDAE", country: null })).toBe("/api/hiq/sim/rank?gameType=3c&tableId=DAEDAE");
-        expect(rankUrl({ gameType: "4c", tableId: "JUNGDAE_KR", country: "MX" })).toBe("/api/hiq/sim/rank?gameType=4c&tableId=JUNGDAE_KR&country=MX");
+        // 2026-09-12: 대대·중대를 합쳐 tableId 를 안 보낸다(오너 지시).
+        expect(rankUrl({ gameType: "3c", country: null })).toBe("/api/hiq/sim/rank?gameType=3c");
+        expect(rankUrl({ gameType: "4c", country: "MX" })).toBe("/api/hiq/sim/rank?gameType=4c&country=MX");
     });
     it("파서: 숫자 문자열·잘못된 국가 코드·배치 전 me", () => {
         const l = parseRankLadder({
@@ -23,9 +24,9 @@ describe("rankApi", () => {
     it("요청: getLadder · setCountry(PATCH /me)", async () => {
         const calls: unknown[] = [];
         const api = createRankApi(async (url, options) => { calls.push([url, options?.method, options?.body]); return { rows: [], total: 0, countries: [], me: {} }; });
-        await api.getLadder({ gameType: "3c", tableId: "DAEDAE", country: "KR" });
+        await api.getLadder({ gameType: "3c", country: "KR" });
         await api.setCountry("VN");
-        expect(calls).toEqual([["/api/hiq/sim/rank?gameType=3c&tableId=DAEDAE&country=KR", undefined, undefined], ["/api/hiq/me", "PATCH", { country: "VN" }]]);
+        expect(calls).toEqual([["/api/hiq/sim/rank?gameType=3c&country=KR", undefined, undefined], ["/api/hiq/me", "PATCH", { country: "VN" }]]);
     });
     it("국가: 언어 태그에서 지역, 코드 검사, 이름", () => {
         expect(guessCountry("es-MX")).toBe("MX");
