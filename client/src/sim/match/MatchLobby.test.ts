@@ -172,12 +172,14 @@ describe("MatchLobby · 만들기", () => {
         // 3쿠션 2배 스위치는 세부 설정 안(접힘) — 펼쳐야 보인다
         expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(1);   // 멀티방으로 열기
         click(Array.from(h.container.querySelectorAll("button")).find((b) => b.textContent?.startsWith(ko["sim.setup.advanced"]))!);
-        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(3);   // 멀티방 + 3쿠션 2배 + 미리보기 전체
+        // 2026-09-12: '미리보기 전체' 를 대전에서 뺐다(랭킹이 섞인다) — 남은 스위치는 멀티방 + 3쿠션 2배
+        expect(h.container.querySelectorAll("[role=switch]")).toHaveLength(2);
         expect((h.container.querySelector("#sim-match-target") as HTMLInputElement).value).toBe("80");
         click(byText(h, ko["sim.match.create"])!);
         await flush();
         const cfg = (api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][0];
         expect(cfg).toMatchObject({ gameType: "4c", tableId: "JUNGDAE_KR", target: 80 });
+        expect(cfg.matchPreview ?? "short").toBe("short");   // 대전 미리보기는 언제나 짧다
         click(byText(h, ko["sim.match.cancelWait"])!);
         await flush();
         expect(api.resign).toHaveBeenCalledWith("m-1");

@@ -160,8 +160,10 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
     // 세부 설정(규칙 · 이닝 제한)은 접어 둔다 — 대전 만들기는 종목·테이블·다마수·모드면 충분하다(2026-09-07 오너)
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const [inningCap, setInningCap] = useState<number>(0);
-    // 대전 미리보기: 기본 짧게(첫 접촉 + 꺾임 꼬리). 켜면 연습처럼 전체 경로(친구끼리 편하게 칠 때).
-    const [fullPreview, setFullPreview] = useState(false);
+    // 대전 미리보기는 언제나 짧다(첫 접촉 + 꺾임 꼬리). 2026-09-12 오너: "대전인데 미리보기 전체 있으면 안 되는 거 아닌가".
+    // 방장이 켜고 끌 수 있던 '미리보기 전체' 를 뺐다 — 양쪽에 똑같이 적용되긴 했지만, 쿠션 뒤까지 선이 보이는 방과
+    // 안 보이는 방이 **같은 레이팅(hiqSimRatings)** 에 쌓여 사다리가 섞였다. 연습·드릴·길 찾기는 그대로 전체 경로다.
+    // 서버 필드(full_preview)는 남겨 둔다 — 그 전에 만들어진 방은 켜진 채로 끝까지 간다.
     // 멀티방(공개 방, 2026-09-08 오너): 목록에 떠서 누구나 참가. 비밀번호(선택 4~20자)는 공개 방에서만 받는다.
     const [isPublic, setIsPublic] = useState(initialPublic);
     const [password, setPassword] = useState("");
@@ -192,7 +194,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
         setError(null);
         try {
             const m = await api.createMatch(buildConfig({
-                gameType, tableId, target: targetNum, inningCap, mode, matchPreview: fullPreview ? "full" : "short",
+                gameType, tableId, target: targetNum, inningCap, mode, matchPreview: "short",
                 rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: false },
             }), { isPublic, password: isPublic && password !== "" ? password : undefined });
             setCreated(m);
@@ -448,10 +450,6 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
                             </div>
                         </div>
 
-                        <ToggleRow
-                            id="sim-match-full-preview" checked={fullPreview} onCheckedChange={setFullPreview}
-                            title={t("sim.setup.previewFull")} desc={t("sim.setup.previewFullDesc")}
-                        />
                     </div>
                 )}
             </div>
