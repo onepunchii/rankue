@@ -279,6 +279,11 @@ export class AdminRepository {
             // 온라인게임(시뮬레이터) 이용: 연습 세션 수 · 대전 수(호스트/게스트) — 2026-09-08 오너
             simSessions: sql<number>`(select count(*)::int from hiq_sim_sessions s where s.member_id = ${hiqMembers.id})`,
             simMatches: sql<number>`(select count(*)::int from hiq_sim_matches x where x.host_id = ${hiqMembers.id} or x.guest_id = ${hiqMembers.id})`,
+            // 앱 접속(2026-09-13 오너: 잔류 측정) — 마지막 접속 · 최근 7일 접속일수 · 최근 30일 평균 세션(분, 4시간 상한)
+            lastSeenAt: sql<string | null>`(select max(coalesce(closed_at, last_seen_at)) from hiq_app_sessions a where a.member_id = ${hiqMembers.id})`,
+            activeDays7: sql<number>`(select count(distinct date(opened_at))::int from hiq_app_sessions a where a.member_id = ${hiqMembers.id} and opened_at >= now() - interval '7 days')`,
+            avgSessionMin30: sql<number | null>`(select round(avg(least(extract(epoch from (coalesce(closed_at, last_seen_at) - opened_at)), 14400)) / 60)::int
+                from hiq_app_sessions a where a.member_id = ${hiqMembers.id} and opened_at >= now() - interval '30 days')`,
         }).from(hiqMembers)
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
             .orderBy(sql`${hiqMembers.createdAt} DESC`);

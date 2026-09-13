@@ -1555,6 +1555,25 @@ export type InsertStoreListing = typeof storeListings.$inferInsert;
  * 관심 선수(팔로우, 2026-09-13 오너). 랭큐 회원이 UMB 선수를 따라간다 — 랭큐 회원끼리의 '라이벌'(함께 친 상대)과는
  * 다른 개념이라 따로 둔다. 순위 변동 알림(7번)이 이 표를 보고 보낸다.
  */
+/**
+ * 앱 접속 세션(2026-09-13 오너: "회원들이 우리 앱에 얼마나 잔류하는지 잴 수 있나").
+ * 앱이 앞으로 오면 한 줄 열고(opened_at), 뒤로 가면 닫는다(closed_at). 열려 있는 동안 5분마다 last_seen_at 을 찍어서
+ * 강제 종료로 닫힘 신호가 안 와도 "마지막 신호 뒤 30분" 을 끝으로 본다. 외부 분석 SDK 대신 우리 DB 에만 남긴다 —
+ * 회원 규모에 맞고, 남의 서버로 가는 데이터가 없다. 로그인한 회원만 기록한다(누군지 모르면 잔류를 셀 수 없다).
+ * 어드민이 여기서 DAU/WAU/MAU · 회원별 마지막 접속·주간 접속일 · 가입 코호트 리텐션(D1/D7/D30)을 낸다.
+ */
+export const hiqAppSessions = pgTable("hiq_app_sessions", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  /** ios · android · web */
+  platform: text("platform").notNull(),
+  openedAt: timestamp("opened_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  closedAt: timestamp("closed_at"),
+}, (t) => ({
+  memberIdx: index("hiq_app_sessions_member_idx").on(t.memberId, t.openedAt),
+}));
+
 export const hiqPlayerFollows = pgTable("hiq_player_follows", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),

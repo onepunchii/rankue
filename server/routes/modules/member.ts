@@ -133,6 +133,35 @@ const gateProfileUgc = (req: AuthRequest, res: any, next: any) =>
         ? requireTermsAccepted(req, res, next)
         : next();
 
+// ── 앱 접속 세션(2026-09-13 오너: 잔류 측정) ──
+// 앱이 앞으로 오면 open, 뒤로 가면 close, 열려 있는 동안 5분마다 touch. close 는 페이지가 닫히는 순간 sendBeacon 으로 오므로
+// 본문이 text/plain 일 수 있다 — JSON 이 아니면 그대로 파싱해 본다. 실패해도 200 — 추적이 앱을 방해하면 안 된다.
+const SESSION_PLATFORMS = new Set(["ios", "android", "web"]);
+const readSessionBody = (req: AuthRequest): { id?: string; platform?: string } => {
+    const b = req.body;
+    if (b && typeof b === "object") return b as { id?: string; platform?: string };
+    if (typeof b === "string") { try { return JSON.parse(b); } catch { return {}; } }
+    return {};
+};
+
+router.post("/me/app-session/open", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const raw = String(readSessionBody(req).platform ?? "web");
+    const platform = (SESSION_PLATFORMS.has(raw) ? raw : "web") as "ios" | "android" | "web";
+    return sendSuccess(res, await storage.appSessions.open(req.userId!, platform));
+}));
+
+router.post("/me/app-session/touch", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { id } = readSessionBody(req);
+    if (typeof id === "string" && /^[0-9a-f-]{36}$/.test(id)) await storage.appSessions.touch(id, req.userId!);
+    return sendSuccess(res, { ok: true });
+}));
+
+router.post("/me/app-session/close", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { id } = readSessionBody(req);
+    if (typeof id === "string" && /^[0-9a-f-]{36}$/.test(id)) await storage.appSessions.close(id, req.userId!);
+    return sendSuccess(res, { ok: true });
+}));
+
 /**
  * GET /me/notification-prefs — 알림 카테고리별 켬/끔(2026-09-13 오너).
  * 저장은 "끈 것만" 담지만 화면에는 다섯 칸을 다 내려 준다(없는 키 = 켜짐).

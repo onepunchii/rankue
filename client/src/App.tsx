@@ -4,6 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
 import { useAuth } from "@/hooks/useAuth";
+import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
 import { NativePrompts } from "@/components/hiq/NativePrompts";
@@ -213,7 +214,10 @@ function AppRoutes() {
   }, [toast, setLocation]);
 
   return (
-    <Switch>
+    <>
+      {/* 로그인한 회원의 앱 접속을 기록한다(잔류 측정, 2026-09-13) — 화면 없음 */}
+      <AppSessionTracker />
+      <Switch>
       {/* 메인 랜딩 페이지 */}
       <Route path="/" component={HiqLanding} />
       {/* 공개 정책 문서 — 스토어 심사용, 로그인 불필요 */}
@@ -295,6 +299,7 @@ function AppRoutes() {
       {/* 404 페이지 */}
       <Route component={NotFound} />
     </Switch>
+    </>
   );
 }
 

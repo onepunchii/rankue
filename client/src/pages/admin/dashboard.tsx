@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideArrowRight, LucideCheckCircle, LucideLogOut,
@@ -155,6 +156,33 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
 
 
 // --- Main Page Component ---
+
+/** 마지막 접속을 "3분 전 · 2일 전" 으로. 기록이 없으면 '-'. */
+function lastSeenLabel(iso: string | null | undefined): string {
+    if (!iso) return "-";
+    const ms = Date.now() - Date.parse(iso);
+    if (!Number.isFinite(ms)) return "-";
+    const min = Math.floor(ms / 60_000);
+    if (min < 1) return "방금";
+    if (min < 60) return `${min}분 전`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return `${h}시간 전`;
+    const d = Math.floor(h / 24);
+    return d < 30 ? `${d}일 전` : `${Math.floor(d / 30)}달 전`;
+}
+/** 30일 넘게 안 들어온 회원은 이탈로 본다 — 붉게. 7일 안이면 진하게. */
+function lastSeenTone(iso: string | null | undefined): string {
+    if (!iso) return "text-black/25";
+    const d = (Date.now() - Date.parse(iso)) / 86_400_000;
+    return d > 30 ? "text-red-600" : d <= 7 ? "text-[rgba(0,0,0,0.87)] font-bold" : "text-black/55";
+}
+/** 리텐션 칸: 아직 그 기간이 안 지난 코호트는 '-' (숫자를 내면 낮게 보여 오해한다). */
+function retentionCell(n: number, signed: number, ready: boolean) {
+    if (!ready || signed === 0) return <span className="text-black/25">-</span>;
+    const pct = Math.round((n / signed) * 100);
+    return <span className={pct >= 40 ? "font-bold text-brand" : pct > 0 ? "text-[rgba(0,0,0,0.87)]" : "text-black/35"}>{pct}%<span className="text-black/35 text-[11px]"> ({n})</span></span>;
+}
+
 export default function AdminDashboard() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
@@ -199,6 +227,10 @@ export default function AdminDashboard() {
         onError: (e: any) => toast({ title: e?.message || "처리 실패", variant: "destructive" }),
     });
     const { data: members = [] } = useQuery<any[]>({ queryKey: ["/api/hiq/admin/members"] });
+    const { data: activity } = useQuery<{
+        dau: number; wau: number; mau: number; sessions7: number; avgMinutes7: number;
+        cohorts: { week: string; signed: number; d1: number; d7: number; d30: number; d7Ready: boolean; d30Ready: boolean }[];
+    }>({ queryKey: ["/api/hiq/admin/activity"], enabled: tab === "members" });
 
     // Filter crews
     const filteredCrews = crews.filter(crew => {
@@ -1033,6 +1065,50 @@ export default function AdminDashboard() {
 
                     {tab === "members" && (
                         <div>
+                            {/* 앱 접속 요약(2026-09-13 오너: 잔류 측정). 앱을 연 회원 수와 가입 코호트별 재방문 */}
+                            {activity && (
+                                <div className="mb-5 space-y-3">
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                        {[
+                                            ["오늘 접속", activity.dau, "명"], ["7일 접속", activity.wau, "명"], ["30일 접속", activity.mau, "명"],
+                                            ["7일 세션", activity.sessions7, "회"], ["평균 세션", activity.avgMinutes7, "분"],
+                                        ].map(([label, v, unit]) => (
+                                            <div key={String(label)} className="rounded-2xl bg-white border border-black/10 p-4">
+                                                <p className="text-[11px] font-bold text-black/45">{label}</p>
+                                                <p className="text-[22px] font-black text-[rgba(0,0,0,0.87)] tabular-nums">{v}<span className="text-[12px] text-black/40 ml-0.5">{unit}</span></p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="rounded-2xl overflow-hidden border border-black/10 overflow-x-auto">
+                                        <table className="w-full text-left bg-white text-sm whitespace-nowrap">
+                                            <thead>
+                                                <tr className="border-b border-black/10 bg-black/[0.02]">
+                                                    <th className="p-3 font-black text-black/55">가입 주</th>
+                                                    <th className="p-3 font-black text-black/55 text-right">가입</th>
+                                                    <th className="p-3 font-black text-black/55 text-right" title="가입 다음 날 다시 왔나">D1</th>
+                                                    <th className="p-3 font-black text-black/55 text-right" title="가입 후 7일 안에 다시 왔나">D7</th>
+                                                    <th className="p-3 font-black text-black/55 text-right" title="가입 후 30일 안에 다시 왔나">D30</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {activity.cohorts.map((c) => (
+                                                    <tr key={c.week} className="border-b border-black/[0.06]">
+                                                        <td className="p-3 font-mono text-black/60">{c.week}~</td>
+                                                        <td className="p-3 text-right font-mono">{c.signed}</td>
+                                                        <td className="p-3 text-right font-mono">{retentionCell(c.d1, c.signed, true)}</td>
+                                                        <td className="p-3 text-right font-mono">{retentionCell(c.d7, c.signed, c.d7Ready)}</td>
+                                                        <td className="p-3 text-right font-mono">{retentionCell(c.d30, c.signed, c.d30Ready)}</td>
+                                                    </tr>
+                                                ))}
+                                                {activity.cohorts.length === 0 && (
+                                                    <tr><td colSpan={5} className="p-6 text-center text-black/45">최근 8주 가입자가 없습니다.</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p className="text-[11px] text-black/40">접속 기록은 이 기능을 켠 날부터 쌓입니다. 그 전 가입자의 D1·D7은 기록이 없어 낮게 나옵니다.</p>
+                                </div>
+                            )}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                                 <p className="text-sm font-bold text-black/55">총 <span className="text-brand">{members.length}</span>명</p>
                                 <input
@@ -1055,6 +1131,9 @@ export default function AdminDashboard() {
                                             <th className="p-4 font-black text-black/55 text-right">4구 RP</th>
                                             <th className="p-4 font-black text-black/55 text-center">온라인게임</th>
                                             <th className="p-4 font-black text-black/55 text-right">방문</th>
+                                            <th className="p-4 font-black text-black/55" title="앱을 마지막으로 연 시각">접속</th>
+                                            <th className="p-4 font-black text-black/55 text-right" title="최근 7일 중 앱을 연 날 수">주간</th>
+                                            <th className="p-4 font-black text-black/55 text-right" title="최근 30일 평균 세션(분, 4시간 상한)">세션</th>
                                             <th className="p-4 font-black text-black/55">가입일</th>
                                             <th className="p-4 font-black text-black/55 text-right">기록</th>
                                         </tr>
@@ -1085,6 +1164,9 @@ export default function AdminDashboard() {
                                                             : <span className="text-black/25">-</span>}
                                                     </td>
                                                     <td className="p-4 text-right text-black/60 font-mono">{m.visitCount ?? 0}</td>
+                                                    <td className={cn("p-4 font-mono text-[12px]", lastSeenTone(m.lastSeenAt))}>{lastSeenLabel(m.lastSeenAt)}</td>
+                                                    <td className="p-4 text-right font-mono">{(m.activeDays7 ?? 0) > 0 ? <span className="font-bold text-[rgba(0,0,0,0.87)]">{m.activeDays7}일</span> : <span className="text-black/25">-</span>}</td>
+                                                    <td className="p-4 text-right font-mono text-black/60">{m.avgSessionMin30 ? `${m.avgSessionMin30}분` : <span className="text-black/25">-</span>}</td>
                                                     <td className="p-4 text-black/50 font-mono">{m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "-"}</td>
                                                     <td className="p-4 text-right">
                                                         <button
@@ -1095,7 +1177,7 @@ export default function AdminDashboard() {
                                                 </tr>
                                             ))}
                                         {members.length === 0 && (
-                                            <tr><td colSpan={11} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
+                                            <tr><td colSpan={14} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
                                         )}
                                     </tbody>
                                 </table>

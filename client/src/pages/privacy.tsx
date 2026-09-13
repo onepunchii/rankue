@@ -31,6 +31,7 @@ export default function Privacy() {
           <li>당구 경기 기록(점수, 이용 매장) — 경기 기록·RP 레이팅·랭킹 기능 제공</li>
           <li>사진(선택) — 사용자가 프로필 등에 직접 업로드하는 경우에만</li>
           <li>푸시 토큰(FCM) — 알림 수신에 동의한 경우에만</li>
+          <li>서비스 이용 기록(접속 일시·이용 시간·기기 종류) — 서비스 품질 개선 및 이용 통계</li>
         </ul>
 
         <h2 className="mt-8 text-lg font-bold">2. 이용 목적</h2>
@@ -38,6 +39,7 @@ export default function Privacy() {
           <li>계정 생성·관리 및 본인 식별</li>
           <li>경기 기록, RP 레이팅, 랭킹, 크루 매칭 등 핵심 기능 제공</li>
           <li>서비스 관련 푸시 알림 발송(동의 시)</li>
+          <li>이용 통계 분석을 통한 서비스 개선</li>
         </ul>
 
         <h2 className="mt-8 text-lg font-bold">3. 보관 및 파기</h2>

@@ -2,6 +2,7 @@ import { UserRepository } from "./user.repo.js";
 import { CrewRepository } from "./crew.repo.js";
 import { GolfRepository } from "./golf.repo.js";
 import { GameRepository } from "./game.repo.js";
+import { AppSessionRepository } from "./appSession.repo.js";
 import { AdminRepository } from "./admin.repo.js";
 import { NotificationRepository } from "./notification.repo.js";
 import { CommunityRepository } from "./community.repo.js";
@@ -17,6 +18,7 @@ class Storage {
     public crews = new CrewRepository();
     public golf = new GolfRepository();
     public games = new GameRepository();
+    public appSessions = new AppSessionRepository();
     public admin = new AdminRepository();
     public notifs = new NotificationRepository();
     public community = new CommunityRepository();

@@ -32,6 +32,11 @@ router.get("/online-game", checkSuperAdmin, asyncHandler(async (req: any, res: a
     return sendSuccess(res, await storage.sim.adminOverview(days));
 }));
 
+// GET /admin/activity — 앱 접속 요약(DAU/WAU/MAU · 최근 7일 세션 · 가입 코호트 리텐션 D1/D7/D30), 2026-09-13 오너
+router.get("/activity", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    return sendSuccess(res, await storage.appSessions.summary(8));
+}));
+
 router.get("/members", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const members = await storage.getAllMembersForAdmin();
     return sendSuccess(res, members);
