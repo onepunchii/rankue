@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
+import { List, Section } from "./ui";
 import type { UmbCategory } from "./types";
 
 interface Cheer { id: string; content: string; createdAt: string; authorId: string; authorName: string; mine: boolean }
@@ -53,56 +54,60 @@ export function PlayerCheers({ category, playerUmbId }: { category: UmbCategory;
     const canSend = text.trim().length > 0 && text.length <= CHEER_MAX && !post.isPending;
 
     return (
-        <div>
-            <div className="flex items-baseline justify-between gap-2 mb-2">
-                <h3 className="text-[13.5px] font-bold text-ink-1">{t("umb.cheersTitle")}</h3>
-                {(data?.total ?? 0) > 0 && <span className="text-[12px] font-semibold text-black/45">{t("umb.cheersCount").replace("{n}", String(data!.total))}</span>}
-            </div>
-
+        <Section emoji="💬" title={t("umb.cheersTitle")} meta={(data?.total ?? 0) > 0 ? t("umb.cheersCount").replace("{n}", String(data!.total)) : undefined}>
             {member ? (
-                <div className="rounded-2xl bg-black/[0.03] p-2.5 mb-2.5">
+                <div className="rounded-2xl bg-black/[0.03] p-3 mb-3">
                     <textarea
                         value={text}
                         onChange={(e) => setText(e.target.value.slice(0, CHEER_MAX))}
                         placeholder={t("umb.cheerPlaceholder")}
                         rows={2}
-                        className="w-full bg-transparent text-[13.5px] text-ink-1 placeholder:text-black/35 outline-none resize-none px-1.5 py-1"
+                        className="w-full bg-transparent text-[13.5px] text-ink-1 placeholder:text-black/35 outline-none resize-none px-1 py-0.5"
                     />
-                    <div className="flex items-center justify-between gap-2 mt-1">
-                        <span className="text-[11px] font-medium text-black/35 tabular-nums px-1.5">{text.length}/{CHEER_MAX}</span>
+                    <div className="flex items-center justify-between gap-2 mt-1.5">
+                        <span className="text-[11px] font-medium text-black/35 tabular-nums px-1">{text.length}/{CHEER_MAX}</span>
                         <button
                             type="button" disabled={!canSend}
                             onClick={() => gate(() => post.mutate())}   // 첫 글이면 약관 동의부터 — 커뮤니티 글쓰기와 같은 규칙
-                            className="h-9 px-4 rounded-full bg-brand text-brand-fg text-[12.5px] font-bold disabled:opacity-40"
+                            className="h-9 px-4 rounded-full bg-brand text-brand-fg text-[12.5px] font-bold disabled:opacity-40 transition-opacity"
                         >{post.isPending ? t("umb.cheerSending") : t("umb.cheerSend")}</button>
                     </div>
                 </div>
             ) : (
-                <p className="text-[12px] font-medium text-black/45 mb-2.5 px-0.5">{t("umb.cheerLogin")}</p>
+                <p className="text-[12px] font-medium text-black/45 mb-3 px-0.5">🔒 {t("umb.cheerLogin")}</p>
             )}
 
             {rows.length === 0 ? (
-                <p className="text-[12.5px] font-medium text-black/40 px-0.5">{t("umb.cheersEmpty")}</p>
+                <div className="rounded-2xl bg-black/[0.03] py-6 px-4 text-center">
+                    <div className="text-[24px] leading-none">📣</div>
+                    <p className="text-[12.5px] font-medium text-black/45 mt-2">{t("umb.cheersEmpty")}</p>
+                </div>
             ) : (
-                <ul className="flex flex-col gap-1.5">
+                <List>
                     {rows.map((c) => (
-                        <li key={c.id} className="rounded-xl bg-black/[0.03] px-3 py-2.5">
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="min-w-0 flex items-baseline gap-1.5">
-                                    <span className="text-[12.5px] font-bold text-ink-1 truncate">{c.authorName}</span>
-                                    <span className="text-[11px] font-medium text-black/40 shrink-0">{timeAgo(c.createdAt, t)}</span>
-                                </span>
-                                {c.mine ? (
-                                    <button type="button" onClick={() => remove.mutate(c.id)} className="text-[11.5px] font-semibold text-black/40 hover:text-red-500 shrink-0">{t("umb.cheerDelete")}</button>
-                                ) : member ? (
-                                    <UgcActionMenu targetType="player_cheer" targetId={c.id} authorId={c.authorId} authorName={c.authorName} onBlocked={() => void qc.invalidateQueries({ queryKey: key })} />
-                                ) : null}
+                        <div key={c.id} className="flex gap-3 px-3 py-3">
+                            {/* 이름 첫 글자 아바타 — 글마다 얼굴이 하나씩 생겨 목록이 덜 밋밋하다 */}
+                            <span className="w-8 h-8 rounded-full bg-brand/12 text-brand text-[13px] font-bold flex items-center justify-center shrink-0 select-none">
+                                {(c.authorName || "?").trim().charAt(0).toUpperCase()}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="min-w-0 flex items-baseline gap-1.5">
+                                        <span className="text-[12.5px] font-bold text-ink-1 truncate">{c.authorName}</span>
+                                        <span className="text-[11px] font-medium text-black/40 shrink-0">{timeAgo(c.createdAt, t)}</span>
+                                    </span>
+                                    {c.mine ? (
+                                        <button type="button" onClick={() => remove.mutate(c.id)} className="text-[11.5px] font-semibold text-black/40 hover:text-red-500 shrink-0">{t("umb.cheerDelete")}</button>
+                                    ) : member ? (
+                                        <UgcActionMenu targetType="player_cheer" targetId={c.id} authorId={c.authorId} authorName={c.authorName} onBlocked={() => void qc.invalidateQueries({ queryKey: key })} />
+                                    ) : null}
+                                </div>
+                                <p className="text-[13.5px] text-ink-1 mt-1 whitespace-pre-wrap break-words leading-snug">{c.content}</p>
                             </div>
-                            <p className="text-[13.5px] text-ink-1 mt-1 whitespace-pre-wrap break-words">{c.content}</p>
-                        </li>
+                        </div>
                     ))}
-                </ul>
+                </List>
             )}
-        </div>
+        </Section>
     );
 }

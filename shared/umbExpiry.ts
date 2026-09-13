@@ -20,7 +20,7 @@ const MONTHS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4,
 export function eventDateOf(label: string): Date | null {
     const iso = label.match(/(\d{4})-(\d{2})-(\d{2})/);
     if (iso) return new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3]));
-    const en = label.match(/(\d{1,2})(?:\/(\d{1,2}))?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{4})/i);
+    const en = label.match(/(\d{1,2})(?:\/(\d{1,2}))?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*(\d{4})/i);  // 주니어는 "Sep.2025" 처럼 붙여 쓴다(2026-09 실측)
     if (en) {
         const day = en[2] ? +en[2] : +en[1];   // "14/18 Oct." 은 마지막 날을 대회일로
         return new Date(Date.UTC(+en[4], MONTHS[en[3].toLowerCase().slice(0, 3)], day));
