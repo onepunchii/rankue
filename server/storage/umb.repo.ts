@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { umbRankings, umbEvents, umbPlayerNames, hiqPlayerFollows, pbaPlayers, pbaSeasonRanks, type InsertUmbRanking } from "../../shared/schema.js";
+import { umbRankings, umbEvents, umbPlayerNames, hiqPlayerFollows, hiqPlayerCheers, hiqBlocks, hiqMembers, pbaPlayers, pbaSeasonRanks, type InsertUmbRanking } from "../../shared/schema.js";
 import { and, eq, desc, asc, sql, inArray, ilike, or } from "drizzle-orm";
 import type { UmbCategory, ParsedRanking, ArchiveEntry } from "../services/umbService.js";
 import { expiringEvents, projectedRank } from "../../shared/umbExpiry.js";
@@ -294,6 +294,58 @@ export class UmbRepository {
             await db.delete(hiqPlayerFollows)
                 .where(and(eq(hiqPlayerFollows.memberId, memberId), eq(hiqPlayerFollows.category, category), eq(hiqPlayerFollows.playerUmbId, playerUmbId)));
         }
+    }
+
+    /* ── 응원글(2026-09-13 오너 제안 11번) ── */
+
+    /** 최신 응원글. 블라인드·삭제된 것은 빼고, 보는 사람이 차단한 회원의 글도 뺀다(커뮤니티와 같은 규칙). */
+    async listCheers(category: UmbCategory, playerUmbId: string, viewerId: string | null, limit = 30) {
+        const blocked = viewerId
+            ? (await db.select({ id: hiqBlocks.blockedId }).from(hiqBlocks).where(eq(hiqBlocks.blockerId, viewerId))).map(r => r.id)
+            : [];
+        const rows = await db.select({
+            id: hiqPlayerCheers.id, content: hiqPlayerCheers.content, createdAt: hiqPlayerCheers.createdAt,
+            authorId: hiqPlayerCheers.authorId, authorName: hiqMembers.name,
+        })
+            .from(hiqPlayerCheers)
+            .innerJoin(hiqMembers, eq(hiqMembers.id, hiqPlayerCheers.authorId))
+            .where(and(
+                eq(hiqPlayerCheers.category, category), eq(hiqPlayerCheers.playerUmbId, playerUmbId),
+                eq(hiqPlayerCheers.isBlinded, false), sql`${hiqPlayerCheers.deletedAt} is null`,
+                blocked.length ? sql`${hiqPlayerCheers.authorId} not in ${blocked}` : sql`true`,
+            ))
+            .orderBy(desc(hiqPlayerCheers.createdAt))
+            .limit(limit);
+        const [countRow] = await db.select({ n: sql<number>`count(*)::int` }).from(hiqPlayerCheers)
+            .where(and(eq(hiqPlayerCheers.category, category), eq(hiqPlayerCheers.playerUmbId, playerUmbId),
+                eq(hiqPlayerCheers.isBlinded, false), sql`${hiqPlayerCheers.deletedAt} is null`));
+        return { rows: rows.map(r => ({ ...r, mine: viewerId !== null && r.authorId === viewerId })), total: countRow?.n ?? 0 };
+    }
+
+    /** 이 회원이 이 선수에게 마지막으로 남긴 시각 — 도배 방지(60초). */
+    async lastCheerAt(authorId: string, category: UmbCategory, playerUmbId: string): Promise<Date | null> {
+        const [row] = await db.select({ at: hiqPlayerCheers.createdAt }).from(hiqPlayerCheers)
+            .where(and(eq(hiqPlayerCheers.authorId, authorId), eq(hiqPlayerCheers.category, category), eq(hiqPlayerCheers.playerUmbId, playerUmbId)))
+            .orderBy(desc(hiqPlayerCheers.createdAt)).limit(1);
+        return row?.at ?? null;
+    }
+
+    async createCheer(v: { category: UmbCategory; playerUmbId: string; authorId: string; content: string }) {
+        const [row] = await db.insert(hiqPlayerCheers).values(v).returning();
+        return row;
+    }
+
+    async getCheerRaw(id: string) {
+        const [row] = await db.select().from(hiqPlayerCheers).where(eq(hiqPlayerCheers.id, id)).limit(1);
+        return row ?? null;
+    }
+
+    /** 소프트 삭제 — 신고 기록이 가리키는 행은 남겨야 정지 판단이 된다. */
+    async deleteCheer(id: string, authorId?: string): Promise<boolean> {
+        const rows = await db.update(hiqPlayerCheers).set({ deletedAt: new Date() })
+            .where(and(eq(hiqPlayerCheers.id, id), sql`${hiqPlayerCheers.deletedAt} is null`, authorId ? eq(hiqPlayerCheers.authorId, authorId) : sql`true`))
+            .returning({ id: hiqPlayerCheers.id });
+        return rows.length > 0;
     }
 
     // 이번 주 무버 — 최신 vs 직전 회차의 순위 상승 톱 N (상위 200위 안에서)

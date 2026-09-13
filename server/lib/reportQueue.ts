@@ -10,6 +10,7 @@
 // 사진 댓글을 함께 가리켰으므로, 옛 crew_comment 는 두 테이블을 다 본다(admin.repo·services/moderation).
 export const REPORT_TARGET_TYPES = [
     "community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "member", "golf_booking",
+    "player_cheer",   // 선수 응원글(2026-09-13)
 ] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 
@@ -22,13 +23,13 @@ export type ReportStatus = "pending" | "actioned" | "dismissed";
 export type QueueState = "open" | "actioned" | "dismissed";
 
 /** 가릴 수 있는 대상 — is_blinded 칸이 있고 읽는 쪽 쿼리가 그 칸을 지킨다. 크루 콘텐츠엔 그 칸이 없어 지우기만 된다. */
-export const BLINDABLE_TARGETS: readonly ReportTargetType[] = ["community_post", "community_comment", "golf_booking"];
+export const BLINDABLE_TARGETS: readonly ReportTargetType[] = ["community_post", "community_comment", "golf_booking", "player_cheer"];
 /**
  * 지울 수 있는 대상. 골프 매물은 빠진다 — 지우면 누가 무엇을 올렸는지 추적이 사라져서 가리기만 한다
  * (community.repo 자동 블라인드와 같은 원칙). 회원은 콘텐츠가 아니라 제재 대상이다.
  */
 export const DELETABLE_TARGETS: readonly ReportTargetType[] = [
-    "community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat",
+    "community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "player_cheer",
 ];
 /** 작성자가 이의제기할 수 있는 대상(POST /community/appeals 가 받는 것과 같다). */
 export const APPEALABLE_TARGETS: readonly ReportTargetType[] = ["community_post", "community_comment"];
@@ -59,6 +60,7 @@ export const TARGET_LABEL: Record<ReportTargetType, string> = {
     crew_chat: "크루 채팅",
     member: "회원",
     golf_booking: "골프 매물",
+    player_cheer: "선수 응원글",
 };
 
 // 신고 화면(ReportDialog)의 사유와 같은 목록·같은 말(ko.ts community.reportReason.*).

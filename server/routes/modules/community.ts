@@ -226,7 +226,7 @@ router.post("/posts/:id/like", requireAuth, asyncHandler(async (req: AuthRequest
 
 // 크루 콘텐츠(crew_*)는 크루 신고 주소(POST /crews/:id/reports)로만 받는다 — 거기서 대상이 그 크루 것인지,
 // 신고자가 크루원인지 확인한다. 여기서도 받으면 그 확인을 우회한다(검토 code:R6). 화면(ReportDialog)은 이미 crew_* 를 크루 주소로 보낸다.
-const REPORT_TARGETS = ["community_post", "community_comment", "member", "golf_booking"];
+const REPORT_TARGETS = ["community_post", "community_comment", "member", "golf_booking", "player_cheer"];
 const REPORT_REASONS = ["abuse", "gambling", "trade", "privacy", "spam", "other"];
 
 // 신고 대상이 실제로 있는지 확인하고 작성자를 돌려준다. null = 없는 대상.
@@ -245,6 +245,10 @@ async function reportTargetAuthor(targetType: string, id: string): Promise<strin
         case "golf_booking": {
             const b = await storage.getGolfBooking(id);
             return b ? (b.ownerId ?? "") : null;
+        }
+        case "player_cheer": {
+            const c = await storage.umb.getCheerRaw(id);
+            return c && !c.deletedAt ? c.authorId : null;
         }
         default:
             return null;

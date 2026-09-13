@@ -11,6 +11,7 @@ import { flagEmoji } from "@/lib/flag";
 import { useT } from "@/lib/i18n";
 import { LucideX } from "@/lib/icons";
 import { ageFrom, regionName as regionNameOf, UMB_SOURCE_URL, type UmbCategory, type UmbPlayerDetail } from "./types";
+import { PlayerCheers } from "./PlayerCheers";
 
 /** 대회 수가 많으면 상위 몇 개만 펴 둔다 — 8개 넘게 늘어져 페이지가 길었다(2026-09-13 오너). */
 const POINTS_FOLD = 5;
@@ -420,6 +421,9 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                     </div>
                 </div>
             )}
+
+            {/* 응원글(2026-09-13 오너 제안 11번) — 맨 아래. 커뮤니티 댓글과 같은 안전장치 */}
+            <PlayerCheers category={category} playerUmbId={playerUmbId} />
 
             <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-center text-[11px] font-medium text-black/35 hover:text-black/55 transition-colors">
                 {t("umb.source")}

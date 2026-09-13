@@ -1417,7 +1417,8 @@ export const hiqReports = pgTable("hiq_reports", {
   targetType: text("target_type", {
     // golf_booking 추가(2026-09-09): 골프 매물에 신고·삭제가 하나도 없어 먹튀 글을 내릴 방법이 없었다
     // crew_photo_comment 추가(2026-09-11): 크루 사진 댓글도 신고 대상. DB CHECK 가 없는 text 라 타입만 넓힌다.
-    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "member", "golf_booking"],
+    // player_cheer 추가(2026-09-13): 선수 응원글도 신고 대상.
+    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "member", "golf_booking", "player_cheer"],
   }).notNull(),
   targetId: uuid("target_id").notNull(),
   reporterId: uuid("reporter_id").references(() => hiqMembers.id).notNull(),
@@ -1551,6 +1552,24 @@ export type InsertStoreListing = typeof storeListings.$inferInsert;
 // 선수 네이티브 이름 — 로마자 표기(UMB 원본)의 현지 문자 표기.
 // 한국 선수는 로마자→한글 결정적 변환기(umbKoreanName.ts)가 채운다.
 // 자국 문자로 검색·표시하는 사용자를 위함 ("조명우" ↔ "CHO Myung Woo").
+/**
+ * 응원글(2026-09-13 오너 제안 11번): 랭큐 회원이 UMB 선수 페이지에 남기는 짧은 공개 글.
+ * **실존 인물에 대한 공개 글**이라 커뮤니티 댓글과 같은 안전장치를 그대로 탄다 — 욕설·내기 필터(checkContent),
+ * 연락처 마스킹, 약관 동의·정지 문지기, 신고(targetType player_cheer)·자동 블라인드·차단 필터.
+ */
+export const hiqPlayerCheers = pgTable("hiq_player_cheers", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  category: text("category", { enum: ["players", "ladies", "juniors"] }).notNull(),
+  playerUmbId: text("player_umb_id").notNull(),
+  authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
+  content: text("content").notNull(),
+  isBlinded: boolean("is_blinded").default(false).notNull(),
+  blindReason: text("blind_reason"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type HiqPlayerCheer = typeof hiqPlayerCheers.$inferSelect;
+
 /**
  * 관심 선수(팔로우, 2026-09-13 오너). 랭큐 회원이 UMB 선수를 따라간다 — 랭큐 회원끼리의 '라이벌'(함께 친 상대)과는
  * 다른 개념이라 따로 둔다. 순위 변동 알림(7번)이 이 표를 보고 보낸다.

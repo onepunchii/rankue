@@ -25,7 +25,7 @@ import {
     hiqCrewChats,
     hiqNotifications,
     golfBookings,
-} from "../../shared/schema.js";
+    hiqPlayerCheers} from "../../shared/schema.js";
 import type {
     HiqStore,
     InsertHiqStore,
@@ -623,6 +623,18 @@ export class AdminRepository {
             }
         });
 
+        job("player_cheer", async (ids) => {
+            const rows = await db.select().from(hiqPlayerCheers).where(inArray(hiqPlayerCheers.id, ids));
+            for (const r of rows) {
+                if (r.deletedAt) { put("player_cheer", r.id, { exists: false, authorId: r.authorId }); continue; }
+                put("player_cheer", r.id, {
+                    text: previewText(r.content), isBlinded: r.isBlinded, blindReason: r.blindReason,
+                    appealText: null, appealAt: null, authorId: r.authorId,
+                    meta: "응원글", link: `/player/${r.category}/${r.playerUmbId}`, createdAt: r.createdAt,
+                });
+            }
+        });
+
         job("crew_post", async (ids) => {
             const rows = await db.select({
                 id: hiqCrewPosts.id,
@@ -783,6 +795,11 @@ export class AdminRepository {
                     .set({ isBlinded: blinded, blindReason })
                     .where(eq(hiqCommunityComments.id, targetId))
                     .returning({ id: hiqCommunityComments.id })).length > 0;
+            case "player_cheer":
+                return (await db.update(hiqPlayerCheers)
+                    .set({ isBlinded: blinded, blindReason })
+                    .where(eq(hiqPlayerCheers.id, targetId))
+                    .returning({ id: hiqPlayerCheers.id })).length > 0;
             case "golf_booking":
                 return (await db.update(golfBookings)
                     .set({ isBlinded: blinded, blindReason })

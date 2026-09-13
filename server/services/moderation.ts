@@ -103,6 +103,9 @@ async function deleteReportedContent(targetType: ReportTargetType, id: string): 
         case "community_comment":
             // 답글이 달린 댓글은 '삭제된 댓글' 자리로 남는다 — 남이 단 답글까지 지우지 않게(community.repo deleteComment).
             await storage.community.deleteComment(id);
+            break;
+        case "player_cheer":
+            await storage.umb.deleteCheer(id);
             return;
         case "crew_post": {
             const post = await storage.crews.getCrewPost(id);

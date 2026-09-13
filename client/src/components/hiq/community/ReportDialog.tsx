@@ -10,7 +10,8 @@ import { invalidateCommunityPosts } from "./types";
 // 차단 버튼도 함께 제공: 신고와 차단이 한 동선에 있어야 심사 요건을 채운다.
 export type ReportTargetType =
     | "community_post" | "community_comment" | "member" | "golf_booking"
-    | "crew_post" | "crew_comment" | "crew_photo" | "crew_photo_comment" | "crew_chat";
+    | "crew_post" | "crew_comment" | "crew_photo" | "crew_photo_comment" | "crew_chat"
+    | "player_cheer";   // 선수 응원글(2026-09-13)
 
 interface ReportDialogProps {
     open: boolean;
