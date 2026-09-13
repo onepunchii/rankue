@@ -67,6 +67,26 @@ async function handlePbaSync(req: any, res: any) {
 router.get("/pba-sync", asyncHandler(handlePbaSync));
 router.post("/pba-sync", asyncHandler(handlePbaSync));
 
+// 골프 랭킹 동기화(2026-09-13) — 투어별로 따로 부른다(?tour=owgr|rolex|kpga|klpga). 한 번에 넷을 돌리면
+// KPGA 40여 개·KLPGA 20여 개 요청이 서버리스 시간 제한에 걸린다. tour 가 없으면 넷 다(수동용).
+async function handleGolfSync(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { GOLF_TOURS, isGolfTour } = await import("../../../shared/golfTours.js");
+    const t = typeof req.query.tour === "string" ? req.query.tour : "";
+    const tours = t ? (isGolfTour(t) ? [t] : null) : [...GOLF_TOURS];
+    if (!tours) return sendError(res, 400, "잘못된 투어");
+    const { syncGolfTours } = await import("../../services/golf/golfSync.js");
+    const results = await syncGolfTours(tours);
+    // 새 회차가 생긴 투어만 관심 선수 알림
+    const { notifyGolfFollowers } = await import("../../services/playerFollowAlerts.js");
+    const followAlerts = await notifyGolfFollowers(results.filter((r) => r.newEdition).map((r) => r.tour));
+    return sendSuccess(res, { results, followAlerts });
+}
+router.get("/golf-sync", asyncHandler(handleGolfSync));
+router.post("/golf-sync", asyncHandler(handleGolfSync));
+
 // 시뮬레이터 정리: 방치된 playing 세션(6시간) → abandoned, 상대가 안 들어온 waiting 대전(24시간) → canceled.
 // 실전 경기·성적과 무관한 시뮬 테이블만 건드린다.
 async function handleSimCleanup(req: any, res: any) {

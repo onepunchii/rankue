@@ -13,6 +13,7 @@ import { storage } from "../storage/index.js";
 import { notificationService } from "./notificationService.js";
 import { rankChangeMessage } from "../../shared/playerAlerts.js";
 import type { UmbCategory } from "./umbService.js";
+import { isGolfTour, type GolfTour } from "../../shared/golfTours.js";
 
 export type FollowAlertResult = Record<string, { candidates: number; sent: number }>;
 
@@ -52,6 +53,41 @@ export async function notifyFollowersForCategory(category: UmbCategory): Promise
             pref: "players",
             params: { url: `/player/${category}/${r.playerUmbId}`, edition: latest, playerUmbId: r.playerUmbId },
         }).catch((e) => console.error(`[FollowAlerts] ${r.memberId} ← ${r.playerUmbId} 발송 실패:`, (e as Error)?.message));
+        sent++;
+    }
+    return { candidates: rows.length, sent };
+}
+
+/* ── 골프(2026-09-13): 같은 규칙, 표만 golf_rankings. 팔로우 표는 category 에 투어 id 가 들어간다 ── */
+export async function notifyGolfFollowers(newEditionTours: readonly string[]): Promise<FollowAlertResult> {
+    const out: FollowAlertResult = {};
+    for (const tour of new Set(newEditionTours)) {
+        if (!isGolfTour(tour)) continue;
+        try {
+            out[tour] = await notifyGolfFollowersForTour(tour);
+        } catch (e) {
+            console.error(`[FollowAlerts] golf ${tour} 실패:`, (e as Error)?.message);
+            out[tour] = { candidates: 0, sent: 0 };
+        }
+    }
+    return out;
+}
+
+export async function notifyGolfFollowersForTour(tour: GolfTour): Promise<{ candidates: number; sent: number }> {
+    const editions = await storage.golfRank.getLatestEditions(tour, 2);
+    if (editions.length === 0) return { candidates: 0, sent: 0 };
+    const latest = editions[0].edition;
+    const prev = editions[1]?.edition ?? null;
+    const rows = await storage.golfRank.followedRows(tour, latest, prev);
+    let sent = 0;
+    for (const r of rows) {
+        const msg = rankChangeMessage({ name: r.nativeName || r.playerName, rank: r.rank, prevRank: r.prevRank, points: r.points });
+        if (!msg) continue;
+        await notificationService.sendAndSaveNotification({
+            memberId: r.memberId, title: msg.title, body: msg.body,
+            category: "GOLF", type: "PLAYER_RANK", pref: "golf",   // 종목이 먼저다 — 골프 알림은 골프 칸 하나로(shared/notificationPrefs)
+            params: { url: `/golfer/${tour}/${r.playerUmbId}`, edition: latest, playerUmbId: r.playerUmbId },
+        }).catch((e) => console.error(`[FollowAlerts] golf ${r.memberId} ← ${r.playerUmbId} 발송 실패:`, (e as Error)?.message));
         sent++;
     }
     return { candidates: rows.length, sent };

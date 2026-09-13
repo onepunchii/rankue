@@ -1,91 +1,107 @@
 {
-    "version": 2,
-    "builds": [
-        {
-            "src": "api/index.ts",
-            "use": "@vercel/node"
-        },
-        {
-            "src": "package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "dist/public"
-            }
-        }
-    ],
-    "routes": [
-        {
-            "src": "/\\.well-known/(apple-app-site-association|assetlinks\\.json)",
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            "continue": true
-        },
-        {
-            "src": "/api/(.*)",
-            "dest": "/api/index.ts"
-        },
-        {
-            "src": "/sitemap.xml",
-            "dest": "/api/index.ts"
-        },
-        {
-            "src": "/(rss|feed)\\.xml",
-            "dest": "/api/index.ts"
-        },
-        {
-            "src": "^/$",
-            "has": [
-                {
-                    "type": "header",
-                    "key": "user-agent",
-                    "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
-                }
-            ],
-            "dest": "/api/index.ts"
-        },
-        {
-            "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking|pba|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|(?:store|club|r)/[^/]+)/?",
-            "has": [
-                {
-                    "type": "header",
-                    "key": "user-agent",
-                    "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
-                }
-            ],
-            "dest": "/api/index.ts"
-        },
-        {
-            "handle": "filesystem"
-        },
-        {
-            "src": "/\\.well-known/.*",
-            "status": 404
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/index.html"
-        }
-    ],
-    "crons": [
-        {
-            "path": "/api/cron/reminders",
-            "schedule": "0 * * * *"
-        },
-        {
-            "path": "/api/cron/umb-sync",
-            "schedule": "0 21 * * *"
-        },
-        {
-            "path": "/api/cron/pba-sync",
-            "schedule": "30 21 * * *"
-        },
-        {
-            "path": "/api/cron/sim-cleanup",
-            "schedule": "15 18 * * *"
-        }
-    ],
-    "env": {
-        "VERCEL": "true"
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist/public"
+      }
     }
+  ],
+  "routes": [
+    {
+      "src": "/\\.well-known/(apple-app-site-association|assetlinks\\.json)",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "continue": true
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/(rss|feed)\\.xml",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "^/$",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
+        }
+      ],
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking|pba|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|(?:store|club|r)/[^/]+)/?",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
+        }
+      ],
+      "dest": "/api/index.ts"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/\\.well-known/.*",
+      "status": 404
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/umb-sync",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/pba-sync",
+      "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/cron/sim-cleanup",
+      "schedule": "15 18 * * *"
+    },
+    {
+      "path": "/api/cron/golf-sync?tour=owgr",
+      "schedule": "40 21 * * *"
+    },
+    {
+      "path": "/api/cron/golf-sync?tour=rolex",
+      "schedule": "50 21 * * *"
+    },
+    {
+      "path": "/api/cron/golf-sync?tour=kpga",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron/golf-sync?tour=klpga",
+      "schedule": "10 22 * * *"
+    }
+  ],
+  "env": {
+    "VERCEL": "true"
+  }
 }

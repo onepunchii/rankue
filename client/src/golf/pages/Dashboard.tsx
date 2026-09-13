@@ -12,6 +12,7 @@ import { HandicapCard } from "../components/dashboard/HandicapCard";
 import { QuickActions } from "../components/dashboard/QuickActions";
 import { StatsChart } from "../components/dashboard/StatsChart";
 import { MyCrewCard } from "../components/dashboard/MyCrewCard";
+import { GolfRankingCard } from "../components/dashboard/GolfRankingCard";
 import { HotDealTicker } from "../components/dashboard/HotDealTicker";
 import { GameModeSheet } from "../components/dashboard/GameModeSheet";
 import { PinEntrySheet } from "../components/dashboard/PinEntrySheet";
@@ -100,6 +101,7 @@ export default function GolfDashboard() {
                     avgScore: effectiveAvg
                 }}
             />
+            <GolfRankingCard />
             <MyCrewCard />
 
             {/* Modals & Sheets */}

@@ -35,6 +35,8 @@ import HiqCommunityPost from "@/pages/hiq/community-post";
 import HiqWorldRanking from "@/pages/hiq/world-ranking";
 import HiqPba from "@/pages/hiq/pba";
 import HiqPbaPlayer from "@/pages/hiq/pba-player";
+import HiqGolfRanking from "@/pages/hiq/golf-ranking";
+import HiqGolfer from "@/pages/hiq/golfer";
 import HiqWorldPlayer from "@/pages/hiq/world-player";
 import GolfNewGame from "@/golf/pages/NewGame";
 import GolfScorecard from "@/golf/pages/GamePage";
@@ -103,6 +105,8 @@ function framed<P extends object>(Page: ComponentType<P>, opts?: { wide?: boolea
 
 const FramedRegister = framed(HiqRegister);
 const FramedDashboard = framed(HiqDashboard);
+const FramedGolfRanking = framed(HiqGolfRanking);
+const FramedGolfer = framed(HiqGolfer);
 const FramedSettings = framed(HiqSettings);
 const FramedFriends = framed(HiqFriends);
 const FramedClub = framed(HiqClub);
@@ -280,6 +284,9 @@ function AppRoutes() {
       <Route path="/player/:category/:umbId" component={FramedWorldPlayer} />
       <Route path="/pba" component={FramedPba} />
       <Route path="/pba-player/:memCode" component={FramedPbaPlayer} />
+      {/* 골프 랭킹(2026-09-13 오너: 공개 전체) — GolfOnly 를 타지 않는다. 검색 유입용 공개 페이지 */}
+      <Route path="/golf-ranking" component={FramedGolfRanking} />
+      <Route path="/golfer/:tour/:id" component={FramedGolfer} />
       <Route path="/admin" component={HiqAdmin} />
 
       {/* Partner (SaaS) Pages */}

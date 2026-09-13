@@ -10,4 +10,4 @@
  */
 
 /** 전면 공개 스위치. true 면 허용 목록과 무관하게 모두 골프를 쓸 수 있다. */
-export const GOLF_PUBLIC = false;
+export const GOLF_PUBLIC = true;   // 2026-09-13 오너: "골프는 공개 전체"

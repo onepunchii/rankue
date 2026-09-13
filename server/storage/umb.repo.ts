@@ -3,6 +3,10 @@ import { umbRankings, umbEvents, umbPlayerNames, hiqPlayerFollows, hiqPlayerChee
 import { and, eq, desc, asc, sql, inArray, ilike, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { UmbCategory, ParsedRanking, ArchiveEntry } from "../services/umbService.js";
+import type { GolfTour } from "../../shared/golfTours.js";
+
+/** 팔로우·응원글은 당구 부문과 골프 투어가 같은 표를 쓴다(2026-09-13). */
+export type PlayerCategory = UmbCategory | GolfTour;
 import { expiringEvents, projectedRank } from "../../shared/umbExpiry.js";
 import { toKoreanName } from "../services/umbKoreanName.js";
 
@@ -280,7 +284,7 @@ export class UmbRepository {
     }
 
     /** 이 회원이 그 선수를 팔로우 중인가. */
-    async isFollowing(memberId: string, category: UmbCategory, playerUmbId: string): Promise<boolean> {
+    async isFollowing(memberId: string, category: PlayerCategory, playerUmbId: string): Promise<boolean> {
         const [row] = await db.select({ id: hiqPlayerFollows.id }).from(hiqPlayerFollows)
             .where(and(eq(hiqPlayerFollows.memberId, memberId), eq(hiqPlayerFollows.category, category), eq(hiqPlayerFollows.playerUmbId, playerUmbId)))
             .limit(1);
@@ -288,7 +292,7 @@ export class UmbRepository {
     }
 
     /** 팔로우 켜기/끄기. 켤 때 이미 있으면 그대로(유니크 충돌을 무시). */
-    async setFollowing(memberId: string, category: UmbCategory, playerUmbId: string, on: boolean): Promise<void> {
+    async setFollowing(memberId: string, category: PlayerCategory, playerUmbId: string, on: boolean): Promise<void> {
         if (on) {
             await db.insert(hiqPlayerFollows).values({ memberId, category, playerUmbId }).onConflictDoNothing();
         } else {
@@ -327,7 +331,7 @@ export class UmbRepository {
     /* ── 응원글(2026-09-13 오너 제안 11번) ── */
 
     /** 최신 응원글. 블라인드·삭제된 것은 빼고, 보는 사람이 차단한 회원의 글도 뺀다(커뮤니티와 같은 규칙). */
-    async listCheers(category: UmbCategory, playerUmbId: string, viewerId: string | null, limit = 30) {
+    async listCheers(category: PlayerCategory, playerUmbId: string, viewerId: string | null, limit = 30) {
         const blocked = viewerId
             ? (await db.select({ id: hiqBlocks.blockedId }).from(hiqBlocks).where(eq(hiqBlocks.blockerId, viewerId))).map(r => r.id)
             : [];
@@ -351,14 +355,14 @@ export class UmbRepository {
     }
 
     /** 이 회원이 이 선수에게 마지막으로 남긴 시각 — 도배 방지(60초). */
-    async lastCheerAt(authorId: string, category: UmbCategory, playerUmbId: string): Promise<Date | null> {
+    async lastCheerAt(authorId: string, category: PlayerCategory, playerUmbId: string): Promise<Date | null> {
         const [row] = await db.select({ at: hiqPlayerCheers.createdAt }).from(hiqPlayerCheers)
             .where(and(eq(hiqPlayerCheers.authorId, authorId), eq(hiqPlayerCheers.category, category), eq(hiqPlayerCheers.playerUmbId, playerUmbId)))
             .orderBy(desc(hiqPlayerCheers.createdAt)).limit(1);
         return row?.at ?? null;
     }
 
-    async createCheer(v: { category: UmbCategory; playerUmbId: string; authorId: string; content: string }) {
+    async createCheer(v: { category: PlayerCategory; playerUmbId: string; authorId: string; content: string }) {
         const [row] = await db.insert(hiqPlayerCheers).values(v).returning();
         return row;
     }

@@ -734,6 +734,119 @@ export function registerPrerender(app: Express) {
     }
   });
 
+  // ── /golf-ranking, /golfer/:tour/:id ──────────────────────────────
+  // 골프 랭킹(2026-09-13 오너: 공개 전체·검색 유입). 출처 표기는 작게 한 줄. 언어판은 ko·en 만 — 나머지는 ko 로 떨어진다.
+  const GOLF_L10N = {
+    ko: {
+      listTitle: "골프 랭킹 — 세계·KPGA·KLPGA 공식 순위 | 랭큐 RANKUE",
+      listDesc: "남자·여자 세계 골프 랭킹(OWGR·롤렉스)과 KPGA·KLPGA 투어 순위, 드라이브 거리·페어웨이·그린 적중률 등 시즌 기록을 매주 업데이트.",
+      tour: { owgr: "남자 세계 골프랭킹", rolex: "여자 세계 골프랭킹", kpga: "KPGA 코리안투어", klpga: "KLPGA 투어" } as Record<string, string>,
+      rankWord: (r: number) => `${r}위`,
+      playerTitle: (n: string, tour: string, r: number | null) => `${n} — ${tour} ${r === null ? "" : `${r}위`} | 랭큐 RANKUE`,
+      playerDesc: (n: string, c: string, tour: string, r: number | null, best: number | null) => `${n} (${c}) ${tour} ${r === null ? "순위" : `${r}위`}${best !== null ? `, 역대 최고 ${best}위` : ""}. 순위 추이와 시즌 기록(드라이브 거리·페어웨이·그린 적중률)을 랭큐에서 확인하세요.`,
+      statsH: "시즌 기록", histH: "최근 순위", source: (n: string) => `출처: ${n}`, navAll: "골프 랭킹 전체", navHome: "랭큐 홈",
+    },
+    en: {
+      listTitle: "Golf Rankings — World, KPGA & KLPGA | RANKUE",
+      listDesc: "Men's and women's world golf rankings (OWGR, Rolex) plus KPGA & KLPGA tour standings with season stats — driving distance, fairways, GIR — updated weekly.",
+      tour: { owgr: "Men's World Golf Ranking", rolex: "Women's World Golf Ranking", kpga: "KPGA Korean Tour", klpga: "KLPGA Tour" } as Record<string, string>,
+      rankWord: (r: number) => `No.${r}`,
+      playerTitle: (n: string, tour: string, r: number | null) => `${n} — ${tour} ${r === null ? "" : `No.${r}`} | RANKUE`,
+      playerDesc: (n: string, c: string, tour: string, r: number | null, best: number | null) => `${n} (${c}) is ${r === null ? "ranked" : `No.${r}`} in the ${tour}${best !== null ? `, career best No.${best}` : ""}. Rank history and season stats (driving distance, fairways, GIR) on RANKUE.`,
+      statsH: "Season stats", histH: "Recent ranks", source: (n: string) => `Source: ${n}`, navAll: "All golf rankings", navHome: "RANKUE home",
+    },
+  };
+  const GOLF_TOURS_ALL = ["owgr", "rolex", "kpga", "klpga"] as const;
+  const golfLang = (req: Request): "ko" | "en" => (String(req.query.lang ?? "") === "en" ? "en" : "ko");
+
+  app.get("/golf-ranking", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    const lang = golfLang(req);
+    const G = GOLF_L10N[lang];
+    const tq = String(req.query.tour ?? "owgr");
+    const tour = (GOLF_TOURS_ALL as readonly string[]).includes(tq) ? tq as (typeof GOLF_TOURS_ALL)[number] : "owgr";
+    try {
+      const { GOLF_TOUR_META } = await import("../shared/golfTours.js");
+      const data = await storage.golfRank.getRankings(tour, { limit: 50 });
+      if (!data.rows.length) return sendUnavailable(res);
+      const langSuffix = lang === "ko" ? "" : `?lang=${lang}`;
+      const disp = (r: { playerName: string; nameKo: string | null }) => lang === "ko" && r.nameKo ? `${r.nameKo} (${r.playerName})` : r.playerName;
+      const list = data.rows.map((r) => `  <li><a href="/golfer/${tour}/${esc(r.playerId)}${langSuffix}">${esc(disp(r))}</a> (${esc(r.country)}) — ${r.points}</li>`).join("\n");
+      const tabs = GOLF_TOURS_ALL.map((tid) => `<a href="/golf-ranking?tour=${tid}">${esc(G.tour[tid])}</a>`).join(" · ");
+      res.setHeader("X-Prerender", `golf-ranking:${tour}:${lang}`);
+      noStore(res);
+      res.send(page({
+        title: `${esc(G.tour[tour])} — ${G.listTitle}`,
+        desc: G.listDesc,
+        canonical: `${ORIGIN}/golf-ranking?tour=${tour}${lang === "ko" ? "" : `&lang=${lang}`}`,
+        lang,
+        jsonLd: [{
+          "@context": "https://schema.org", "@type": "ItemList", name: G.tour[tour],
+          itemListElement: data.rows.slice(0, 20).map((r, i) => ({ "@type": "ListItem", position: i + 1, name: lang === "ko" ? (r.nameKo || r.playerName) : r.playerName, url: `${ORIGIN}/golfer/${tour}/${r.playerId}${langSuffix}` })),
+        }],
+        body: `<main>
+  <h1>${esc(G.tour[tour])} — ${esc(G.listTitle.split(" | ")[0])}</h1>
+  <p>${esc(G.listDesc)} (${esc(data.edition ?? "")})</p>
+  <nav>${tabs}</nav>
+  <ol>
+${list}
+  </ol>
+  <p>${esc(G.source(GOLF_TOUR_META[tour].sourceName))} — <a href="${esc(GOLF_TOUR_META[tour].sourceUrl)}" rel="noopener">${esc(GOLF_TOUR_META[tour].sourceUrl.replace("https://", ""))}</a></p>
+  <nav><a href="/golf-ranking${langSuffix}">${esc(G.navAll)}</a> <a href="/">${esc(G.navHome)}</a></nav>
+</main>`,
+      }));
+    } catch (e) {
+      console.warn("[prerender] golf-ranking failed:", (e as Error)?.message);
+      return next();
+    }
+  });
+
+  app.get("/golfer/:tour/:id", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    const tour = (GOLF_TOURS_ALL as readonly string[]).includes(req.params.tour) ? req.params.tour as (typeof GOLF_TOURS_ALL)[number] : null;
+    if (!tour || !/^\d{1,10}$/.test(req.params.id)) return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
+    const lang = golfLang(req);
+    const G = GOLF_L10N[lang];
+    try {
+      const { GOLF_TOUR_META } = await import("../shared/golfTours.js");
+      const data = await storage.golfRank.getPlayer(tour, req.params.id);
+      if (!data?.player) return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
+      const p = data.player;
+      const nameMain = lang === "ko" ? (p.nameKo || p.playerName) : p.playerName;
+      const nameFull = lang === "ko" && p.nameKo && p.nameKo !== p.playerName ? `${p.nameKo} (${p.playerName})` : p.playerName;
+      const base = `${ORIGIN}/golfer/${tour}/${req.params.id}`;
+      const canonical = lang === "ko" ? base : `${base}?lang=${lang}`;
+      const langSuffix = lang === "ko" ? "" : `?lang=${lang}`;
+      const hist = data.history.slice(-10).map((h) => `<li>${esc(h.edition)}: ${esc(G.rankWord(h.rank))} (${h.points})</li>`).join("\n  ");
+      const stats = data.stats.slice(0, 12).map((s) => `<li>${esc(s.label)}: ${s.value}${s.unit ? ` ${esc(s.unit)}` : ""} — ${esc(G.rankWord(s.rank))}${s.of ? `/${s.of}` : ""}</li>`).join("\n  ");
+      res.setHeader("X-Prerender", `golfer:${lang}`);
+      res.send(page({
+        title: G.playerTitle(nameFull, G.tour[tour], p.rank),
+        desc: G.playerDesc(nameFull, p.country, G.tour[tour], p.rank, data.bestRank),
+        canonical, lang, altLangs: ["en"], altBase: base,
+        jsonLd: [
+          { "@context": "https://schema.org", "@type": "Person", name: nameMain, alternateName: p.nameKo && p.nameKo !== p.playerName ? p.playerName : undefined,
+            nationality: { "@type": "Country", name: p.country }, description: G.playerDesc(nameMain, p.country, G.tour[tour], p.rank, data.bestRank), url: canonical, knowsAbout: "Golf" },
+          { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
+            { "@type": "ListItem", position: 1, name: G.tour[tour], item: `${ORIGIN}/golf-ranking?tour=${tour}${lang === "ko" ? "" : `&lang=${lang}`}` },
+            { "@type": "ListItem", position: 2, name: nameMain, item: canonical },
+          ] },
+        ],
+        body: `<main>
+  <h1>${esc(nameFull)} — ${esc(G.tour[tour])} ${p.rank === null ? "" : esc(G.rankWord(p.rank))}</h1>
+  <p>${esc(G.playerDesc(nameMain, p.country, G.tour[tour], p.rank, data.bestRank))}</p>
+  ${stats ? `<h2>${esc(G.statsH)}</h2>\n  <ul>\n  ${stats}\n  </ul>` : ""}
+  ${hist ? `<h2>${esc(G.histH)}</h2>\n  <ul>\n  ${hist}\n  </ul>` : ""}
+  <p>${esc(G.source(GOLF_TOUR_META[tour].sourceName))} — <a href="${esc(GOLF_TOUR_META[tour].sourceUrl)}" rel="noopener">${esc(GOLF_TOUR_META[tour].sourceUrl.replace("https://", ""))}</a></p>
+  <nav><a href="/golf-ranking?tour=${tour}${lang === "ko" ? "" : `&lang=${lang}`}">${esc(G.navAll)}</a> <a href="/">${esc(G.navHome)}</a></nav>
+</main>`,
+      }));
+    } catch (e) {
+      console.warn("[prerender] golfer failed:", (e as Error)?.message);
+      return next();
+    }
+  });
+
   // ── /pba, /pba-player/:memCode ────────────────────────────────────
   // PBA 투어 — pbatour.org 공개 데이터 재가공(사실 정보). "스롱 피아비 상금" 같은
   // 국내 롱테일 검색 타깃이라 ko 단일 언어로 서빙한다.

@@ -1559,7 +1559,7 @@ export type InsertStoreListing = typeof storeListings.$inferInsert;
  */
 export const hiqPlayerCheers = pgTable("hiq_player_cheers", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
-  category: text("category", { enum: ["players", "ladies", "juniors"] }).notNull(),
+  category: text("category", { enum: ["players", "ladies", "juniors", "owgr", "rolex", "kpga", "klpga"] }).notNull(),
   playerUmbId: text("player_umb_id").notNull(),
   authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
   content: text("content").notNull(),
@@ -1596,7 +1596,7 @@ export const hiqAppSessions = pgTable("hiq_app_sessions", {
 export const hiqPlayerFollows = pgTable("hiq_player_follows", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
-  category: text("category", { enum: ["players", "ladies", "juniors"] }).notNull(),
+  category: text("category", { enum: ["players", "ladies", "juniors", "owgr", "rolex", "kpga", "klpga"] }).notNull(),
   playerUmbId: text("player_umb_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({
@@ -1914,3 +1914,66 @@ export const hiqSimDrillAttempts = pgTable("hiq_sim_drill_attempts", {
 }));
 
 export type HiqSimDrillAttempt = typeof hiqSimDrillAttempts.$inferSelect;
+
+/* ── 골프 랭킹(2026-09-13 오너: PGA·LPGA·KPGA·KLPGA 를 당구 세계랭킹처럼) — shared/golfTours.ts 가 투어 목록의 정본 ── */
+
+// 회차별 순위 스냅샷. 세계 랭킹(owgr·rolex)은 주 1회 회차, 투어 랭킹(kpga·klpga)은 바뀐 날에만 새 회차(서명이 같으면 건너뛴다).
+export const golfRankings = pgTable("golf_rankings", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  tour: text("tour", { enum: ["owgr", "rolex", "kpga", "klpga"] }).notNull(),
+  edition: text("edition").notNull(),              // "2026-09-06" (회차 기준일)
+  editionDate: timestamp("edition_date").notNull(),
+  rank: integer("rank").notNull(),
+  playerId: text("player_id").notNull(),           // 출처의 선수 id(OWGR id · Rolex id · KPGA playerCode · KLPGA playerCode)
+  playerName: text("player_name").notNull(),       // 출처 표기(세계 랭킹은 로마자, 국내 투어는 한글)
+  nameKo: text("name_ko"),
+  country: text("country").notNull(),              // IOC 3자(KOR)
+  points: doublePrecision("points").notNull(),     // 순위 기준 값(평균 포인트 · 시즌 포인트)
+  pointsTotal: doublePrecision("points_total"),    // 세계 랭킹의 총점
+  events: integer("events"),
+  prevRank: integer("prev_rank"),                  // 출처가 주는 지난 회차 순위(OWGR lastWeekRank · Rolex change)
+  extra: jsonb("extra").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  unique().on(t.tour, t.edition, t.playerId),
+  index("golf_rankings_player_idx").on(t.tour, t.playerId),
+  index("golf_rankings_edition_idx").on(t.tour, t.edition, t.rank),
+]);
+
+// 선수 기본 정보(생일·영문 이름 등). 순위 행에도 이름이 있어 화면은 이 표 없이도 그려진다.
+export const golfPlayers = pgTable("golf_players", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  tour: text("tour", { enum: ["owgr", "rolex", "kpga", "klpga"] }).notNull(),
+  playerId: text("player_id").notNull(),
+  name: text("name").notNull(),
+  nameKo: text("name_ko"),
+  nameEn: text("name_en"),
+  country: text("country").notNull(),
+  birthDate: text("birth_date"),                   // "1996-06-21" (OWGR 가 준다)
+  extra: jsonb("extra").$type<Record<string, unknown>>(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [unique().on(t.tour, t.playerId)]);
+
+// 시즌 기록(비거리·페어웨이·그린 적중·퍼팅·상금 …). 출처의 지표 키를 그대로 쓴다(KPGA menuId · KLPGA menu2).
+export const golfStats = pgTable("golf_stats", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  tour: text("tour", { enum: ["owgr", "rolex", "kpga", "klpga"] }).notNull(),
+  season: text("season").notNull(),                // "2026"
+  statKey: text("stat_key").notNull(),
+  label: text("label").notNull(),
+  unit: text("unit").notNull().default(""),
+  rank: integer("rank").notNull(),
+  playerId: text("player_id").notNull(),
+  playerName: text("player_name").notNull(),
+  value: doublePrecision("value").notNull(),
+  extra: jsonb("extra").$type<Record<string, unknown>>(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  unique().on(t.tour, t.season, t.statKey, t.playerId),
+  index("golf_stats_player_idx").on(t.tour, t.playerId),
+  index("golf_stats_key_idx").on(t.tour, t.season, t.statKey, t.rank),
+]);
+
+export type InsertGolfRanking = typeof golfRankings.$inferInsert;
+export type InsertGolfPlayer = typeof golfPlayers.$inferInsert;
+export type InsertGolfStat = typeof golfStats.$inferInsert;

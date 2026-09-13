@@ -118,6 +118,16 @@ export async function generateSitemap(): Promise<string> {
     console.warn("[sitemap] pba players failed:", (e as Error)?.message);
   }
 
+  // 골프 랭킹(2026-09-13) — 랭킹 + 선수(세계 톱300·한국 선수 전원, KPGA·KLPGA 전원). ko 우선, 언어판은 프리렌더가 준다.
+  try {
+    const players = await storage.golfRank.getPlayersForSitemap();
+    parts.push(entry(`${ORIGIN}/golf-ranking`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }));
+    for (const tour of ["owgr", "rolex", "kpga", "klpga"]) parts.push(entry(`${ORIGIN}/golf-ranking?tour=${tour}`, { changefreq: "weekly", priority: "0.6" }));
+    for (const p of players) parts.push(entry(`${ORIGIN}/golfer/${p.tour}/${p.playerId}`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.5" }));
+  } catch (e) {
+    console.warn("[sitemap] golf players failed:", (e as Error)?.message);
+  }
+
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${parts.join("\n")}\n</urlset>\n`;
 }
 

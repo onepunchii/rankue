@@ -15,6 +15,7 @@ import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
 import { List, Section } from "./ui";
 import type { UmbCategory } from "./types";
+import type { GolfTour } from "@shared/golfTours";
 
 interface Cheer { id: string; content: string; createdAt: string; authorId: string; authorName: string; mine: boolean }
 
@@ -30,23 +31,24 @@ function timeAgo(iso: string, t: (k: string) => string): string {
     return t("umb.cheerDayAgo").replace("{n}", String(Math.floor(h / 24)));
 }
 
-export function PlayerCheers({ category, playerUmbId }: { category: UmbCategory; playerUmbId: string }) {
+/** basePath: 골프 선수(2026-09-13)는 같은 부품을 다른 API 로 — 표는 같다(hiq_player_cheers, category=투어) */
+export function PlayerCheers({ category, playerUmbId, basePath = "/api/hiq/umb/players" }: { category: UmbCategory | GolfTour; playerUmbId: string; basePath?: string }) {
     const { t } = useT();
     const { member } = useAuth();
     const { toast } = useToast();
     const { gate } = useTermsGate();
     const qc = useQueryClient();
-    const key = [`/api/hiq/umb/players/${category}/${playerUmbId}/cheers`];
+    const key = [`${basePath}/${category}/${playerUmbId}/cheers`];
     const { data } = useQuery<{ rows: Cheer[]; total: number }>({ queryKey: key, staleTime: 30_000 });
     const [text, setText] = useState("");
 
     const post = useMutation({
-        mutationFn: async () => apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}/cheers`, { method: "POST", body: { content: text.trim() } }),
+        mutationFn: async () => apiRequest(`${basePath}/${category}/${playerUmbId}/cheers`, { method: "POST", body: { content: text.trim() } }),
         onSuccess: () => { setText(""); void qc.invalidateQueries({ queryKey: key }); },
         onError: (e: any) => toast({ title: e?.message || t("umb.cheerFailed"), variant: "destructive" }),
     });
     const remove = useMutation({
-        mutationFn: async (id: string) => apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}/cheers/${id}`, { method: "DELETE" }),
+        mutationFn: async (id: string) => apiRequest(`${basePath}/${category}/${playerUmbId}/cheers/${id}`, { method: "DELETE" }),
         onSuccess: () => void qc.invalidateQueries({ queryKey: key }),
     });
 
@@ -56,16 +58,16 @@ export function PlayerCheers({ category, playerUmbId }: { category: UmbCategory;
     return (
         <Section emoji="💬" title={t("umb.cheersTitle")} meta={(data?.total ?? 0) > 0 ? t("umb.cheersCount").replace("{n}", String(data!.total)) : undefined}>
             {member ? (
-                <div className="rounded-2xl bg-black/[0.03] p-3 mb-3">
+                <div className="rounded-2xl bg-surface-3 p-3 mb-3">
                     <textarea
                         value={text}
                         onChange={(e) => setText(e.target.value.slice(0, CHEER_MAX))}
                         placeholder={t("umb.cheerPlaceholder")}
                         rows={2}
-                        className="w-full bg-transparent text-[13.5px] text-ink-1 placeholder:text-black/35 outline-none resize-none px-1 py-0.5"
+                        className="w-full bg-transparent text-[13.5px] text-ink-1 placeholder:text-ink-4 outline-none resize-none px-1 py-0.5"
                     />
                     <div className="flex items-center justify-between gap-2 mt-1.5">
-                        <span className="text-[11px] font-medium text-black/35 tabular-nums px-1">{text.length}/{CHEER_MAX}</span>
+                        <span className="text-[11px] font-medium text-ink-4 tabular-nums px-1">{text.length}/{CHEER_MAX}</span>
                         <button
                             type="button" disabled={!canSend}
                             onClick={() => gate(() => post.mutate())}   // 첫 글이면 약관 동의부터 — 커뮤니티 글쓰기와 같은 규칙
@@ -74,13 +76,13 @@ export function PlayerCheers({ category, playerUmbId }: { category: UmbCategory;
                     </div>
                 </div>
             ) : (
-                <p className="text-[12px] font-medium text-black/45 mb-3 px-0.5">🔒 {t("umb.cheerLogin")}</p>
+                <p className="text-[12px] font-medium text-ink-3 mb-3 px-0.5">🔒 {t("umb.cheerLogin")}</p>
             )}
 
             {rows.length === 0 ? (
-                <div className="rounded-2xl bg-black/[0.03] py-6 px-4 text-center">
+                <div className="rounded-2xl bg-surface-3 py-6 px-4 text-center">
                     <div className="text-[24px] leading-none">📣</div>
-                    <p className="text-[12.5px] font-medium text-black/45 mt-2">{t("umb.cheersEmpty")}</p>
+                    <p className="text-[12.5px] font-medium text-ink-3 mt-2">{t("umb.cheersEmpty")}</p>
                 </div>
             ) : (
                 <List>
@@ -94,10 +96,10 @@ export function PlayerCheers({ category, playerUmbId }: { category: UmbCategory;
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="min-w-0 flex items-baseline gap-1.5">
                                         <span className="text-[12.5px] font-bold text-ink-1 truncate">{c.authorName}</span>
-                                        <span className="text-[11px] font-medium text-black/40 shrink-0">{timeAgo(c.createdAt, t)}</span>
+                                        <span className="text-[11px] font-medium text-ink-3 shrink-0">{timeAgo(c.createdAt, t)}</span>
                                     </span>
                                     {c.mine ? (
-                                        <button type="button" onClick={() => remove.mutate(c.id)} className="text-[11.5px] font-semibold text-black/40 hover:text-red-500 shrink-0">{t("umb.cheerDelete")}</button>
+                                        <button type="button" onClick={() => remove.mutate(c.id)} className="text-[11.5px] font-semibold text-ink-3 hover:text-red-500 shrink-0">{t("umb.cheerDelete")}</button>
                                     ) : member ? (
                                         <UgcActionMenu targetType="player_cheer" targetId={c.id} authorId={c.authorId} authorName={c.authorName} onBlocked={() => void qc.invalidateQueries({ queryKey: key })} />
                                     ) : null}

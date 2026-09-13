@@ -630,7 +630,7 @@ export class AdminRepository {
                 put("player_cheer", r.id, {
                     text: previewText(r.content), isBlinded: r.isBlinded, blindReason: r.blindReason,
                     appealText: null, appealAt: null, authorId: r.authorId,
-                    meta: "응원글", link: `/player/${r.category}/${r.playerUmbId}`, createdAt: r.createdAt,
+                    meta: "응원글", link: ["owgr", "rolex", "kpga", "klpga"].includes(r.category) ? `/golfer/${r.category}/${r.playerUmbId}` : `/player/${r.category}/${r.playerUmbId}`, createdAt: r.createdAt,
                 });
             }
         });
