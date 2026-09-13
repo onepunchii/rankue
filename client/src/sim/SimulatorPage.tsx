@@ -989,7 +989,7 @@ export function SimulatorPage() {
             badge: gameBadge(t, gt),
             title: d ? t(d.drill.nameKey) : outcomeTitle,
             subtitle: d ? `${outcomeTitle} · ${tableLabel(config, t)}` : shotSubtitle(t, config, result.input),
-            stats: withStats && statsFor ? sessionStatsLine(t, statsFor, sim.phase) : null,
+            stats: withStats && statsFor ? sessionStatsLine(t, statsFor, sim.phase, sim.session?.rules.gameType) : null,
             footer: t("sim.share.footer"),
             replayText: replayShortText(url),
             replayUrl: url,

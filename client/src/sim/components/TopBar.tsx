@@ -201,7 +201,7 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                                     </button>
                                     <button type="button" onClick={p.onSummary} aria-label={t("sim.top.avg")} title={t("sim.top.avg")} className={cn(CHIP, "border-surface-line")}>
                                         <span className={LABEL}>{t("sim.top.avg")}</span>
-                                        <span className={VALUE}>{formatAverage(displayAverage(pl, p.phase))}</span>
+                                        <span className={VALUE}>{formatAverage(displayAverage(pl, p.phase, s?.rules.gameType))}</span>
                                     </button>
                                 </Fragment>
                             );

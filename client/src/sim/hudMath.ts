@@ -10,6 +10,8 @@
  *     정확히 그 이닝을 세는 것이고(shared/averageRule "목표 도달 이닝까지"), 상대는 점수판과 같은 값이 된다.
  */
 import type { PlayerState, SessionState } from "@shared/sim/rules";
+import type { GameType } from "@shared/sim/rules/types";
+import { caromsOf } from "@shared/sim/handicap";
 import type { Phase } from "./simReducer";
 import type { SimSetupConfig } from "./setupPresets";
 
@@ -21,8 +23,18 @@ export function inningsForAverage(p: Pick<PlayerState, "innings" | "currentRun">
     return Math.max(1, p.innings + inProgress);
 }
 
-export function displayAverage(p: Pick<PlayerState, "score" | "innings" | "currentRun">, phase: Phase): number {
-    return p.score / inningsForAverage(p, phase);
+/**
+ * 화면에 보여 줄 에버리지 = **캐롬 / 이닝**. 4구는 1캐롬 = 10점이라 점수 그대로 나누면 10배가 된다
+ * (80점 4이닝이 "에버 20.00" 으로 나왔다 — 2026-09-13 관전 화면 작업 중 발견, 선수 화면도 같았다).
+ * gameType 을 안 주면 3쿠션처럼 1점 = 1캐롬으로 본다(옛 호출부 보호).
+ */
+export function displayAverage(p: Pick<PlayerState, "score" | "innings" | "currentRun">, phase: Phase, gameType?: GameType): number {
+    return caromsOf(p.score, gameType ?? "3c") / inningsForAverage(p, phase);
+}
+
+/** 하이런도 같은 단위다 — 4구는 캐롬 수로 읽는다. */
+export function displayHighRun(p: Pick<PlayerState, "highRun">, gameType?: GameType): number {
+    return caromsOf(p.highRun, gameType ?? "3c");
 }
 
 /** 점수판·전적 화면과 같은 소수 둘째 자리. 음수 정상(4구 파울 감점). */

@@ -16,8 +16,12 @@ export const WATCH_QUERY_KEY = ["sim-watch"] as const;
 /** 목록 갱신 주기(ms). 대전 화면(4 s)보다 느리다 — 점수만 보이는 목록이라 급하지 않다. */
 export const WATCH_LIST_REFETCH_MS = 15_000;
 
-/** 관전 폴링 주기(ms). 선수(2 s·5 s)보다 느리게 — 관전자는 여럿이 붙을 수 있다. */
-export const WATCH_POLL_MS = 4000;
+/**
+ * 관전 폴링 주기(ms). 2026-09-13 오너: "관전이 리플레이처럼 보인다" — 4초에서 2초로 당겼다.
+ * 당구는 샷이 끝나야 서버로 가므로 그보다 빨라질 수는 없다. 관전자 수만큼 요청이 곱해지지만
+ * 지금 규모(푸시 대상 18명)에서는 무의미한 양이고, 화면이 가려지면 아예 쉰다.
+ */
+export const WATCH_POLL_MS = 2000;
 /** 이만큼 이상 밀렸으면 앞의 샷은 재생하지 않고 상태만 따라간다(뒤늦게 들어온 관전자). */
 export const WATCH_CATCHUP_LIMIT = 3;
 

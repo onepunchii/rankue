@@ -134,12 +134,12 @@ export function shotSubtitle(t: T, config: Pick<SimSetupConfig, "tableId" | "rul
 }
 
 /** 세션 통계: "{score}/{target} · {innings}이닝 · 에버리지 {avg}" — 에버리지 규약은 hudMath(진행 중 이닝 포함). */
-export function sessionStatsLine(t: T, p: Pick<PlayerState, "score" | "target" | "innings" | "currentRun">, phase: Phase): string {
+export function sessionStatsLine(t: T, p: Pick<PlayerState, "score" | "target" | "innings" | "currentRun">, phase: Phase, gameType?: GameType): string {
     return t("sim.share.stats")
         .replace("{score}", String(p.score))
         .replace("{target}", String(p.target))
         .replace("{innings}", String(inningsForAverage(p, phase)))
-        .replace("{avg}", formatAverage(displayAverage(p, phase)));
+        .replace("{avg}", formatAverage(displayAverage(p, phase, gameType)));   // 4구는 캐롬 기준(1캐롬 = 10점)
 }
 
 /** 종목 알약 문구(설정 창과 같은 키). */

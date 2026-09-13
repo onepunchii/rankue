@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import type { SessionState } from "@shared/sim/rules";
 import type { Phase } from "../simReducer";
 import { inningRows, totals, type InningLog } from "../inningLog";
-import { displayAverage, formatAverage } from "../hudMath";
+import { displayAverage, formatAverage, displayHighRun} from "../hudMath";
 
 // 이닝 시트(아래에서 올라오는 시트). 이닝 번호 × 선수 표 + 합계, 위에 선수별 에버리지·하이런.
 // 데이터는 페이지가 onOutcome 마다 쌓는 inningLog — 진행 중 이닝(득점만 있고 아직 안 닫힌)도 한 줄로 보인다.
@@ -41,7 +41,7 @@ export const InningSheet = memo(function InningSheet({ open, onOpenChange, log, 
                     <SheetDescription className="text-[13px] font-medium text-ink-3">
                         {session
                             ? session.players.map((pl, i) => (
-                                `${names[i] ?? pl.id} · ${t("sim.hud.average")} ${formatAverage(displayAverage(pl, phase))} · ${t("sim.hud.highRun")} ${pl.highRun}`
+                                `${names[i] ?? pl.id} · ${t("sim.hud.average")} ${formatAverage(displayAverage(pl, phase, session?.rules.gameType))} · ${t("sim.hud.highRun")} ${displayHighRun(pl, session?.rules.gameType)}`
                             )).join("  /  ")
                             : ""}
                     </SheetDescription>

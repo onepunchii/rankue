@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { applyShot, createSession, DEFAULT_3C_RULES, type ShotOutcome } from "@shared/sim/rules";
 import { ko } from "../lib/i18n/ko";
 import { buildConfig } from "./setupPresets";
-import { displayAverage, endTitle, formatAverage, inningsForAverage, playerLabel, ruleBadge, tableLabel } from "./hudMath";
+import { displayAverage, endTitle, formatAverage, inningsForAverage, playerLabel, ruleBadge, tableLabel, displayHighRun} from "./hudMath";
 
 const t = (k: string) => ko[k] ?? k;
 
@@ -82,5 +82,24 @@ describe("hudMath 문구", () => {
         draw = applyShot(draw, outcome(0, false)).session;
         expect(draw.winnerIndex).toBeNull();
         expect(endTitle(draw, ["선수 1", "선수 2"], t)).toBe(ko["sim.end.draw"]);
+    });
+});
+
+/**
+ * 4구는 1캐롬 = 10점이라 점수를 그대로 이닝으로 나누면 10배가 된다 — 화면에는 캐롬 기준으로 보여 준다
+ * (2026-09-13 관전 화면 작업 중 발견: 80점 4이닝이 "에버 20.00" 이었다. 선수 화면·이닝 시트도 같았다).
+ */
+describe("에버리지 단위", () => {
+    const p = { score: 80, innings: 3, currentRun: 0, highRun: 50 };
+    it("4구는 캐롬으로 나눈다", () => {
+        expect(displayAverage(p, "aim", "4c")).toBeCloseTo(8 / 4, 10);   // 8캐롬 / (3+1)이닝
+        expect(displayHighRun(p, "4c")).toBe(5);
+    });
+    it("3쿠션은 점수가 곧 캐롬이다", () => {
+        expect(displayAverage({ score: 8, innings: 3, currentRun: 0 }, "aim", "3c")).toBeCloseTo(8 / 4, 10);
+        expect(displayHighRun({ highRun: 5 }, "3c")).toBe(5);
+    });
+    it("종목을 안 주면 3쿠션처럼 본다(옛 호출부)", () => {
+        expect(displayAverage(p, "aim")).toBeCloseTo(80 / 4, 10);
     });
 });

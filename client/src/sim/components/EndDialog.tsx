@@ -56,7 +56,7 @@ export const EndDialog = memo(function EndDialog(p: Props) {
                                 </div>
                                 <div className="mt-1.5 flex gap-4 text-[12px] font-medium text-ink-3 rk-num">
                                     <span>{t("sim.hud.inning")} {inningsForAverage(pl, p.phase)}</span>
-                                    <span>{t("sim.hud.average")} {formatAverage(displayAverage(pl, p.phase))}</span>
+                                    <span>{t("sim.hud.average")} {formatAverage(displayAverage(pl, p.phase, p.session?.rules.gameType))}</span>
                                     <span>{t("sim.hud.highRun")} {pl.highRun}</span>
                                 </div>
                             </div>

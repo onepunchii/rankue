@@ -1,46 +1,56 @@
 /**
- * 관전 · 다시보기 화면(2026-09-12 오너 요청: "게임 시작하면 방이 사라지는데, 관전으로 들어가면 그 경기를 볼 수 있게").
+ * 관전 · 다시보기 화면(2026-09-12 오너 요청 → 2026-09-13 "호스트나 참여자처럼 보이는데 보기만 가능한 권한").
  *
- * 읽기 전용이다 — 조준·샷·40초 시계·이모지가 없다. 그래서 대전 화면(SimulatorPage + simController)을 건드리지 않고
- * 따로 만든다. 선수용 코드에 '관전 모드'를 끼워 넣었다가는 실제 대전이 위험해진다.
+ * **선수 화면과 같은 부품**으로 짓는다 — 머리줄(TopBar: 규칙 칩·점수·차례·40초 시계·관전자 수), 이닝 시트,
+ * 같은 렌더러(Canvas2D → 가능하면 3D). 다른 점은 조작이 없다는 것뿐이다: 조준선·큐대·세기 레일·샷 버튼·기권이 없고
+ * 나가기만 있다.
+ *
+ * 선수용 코드(SimulatorPage·simController)는 건드리지 않는다. 그쪽은 "나는 선수다" 를 전제로 돌아가서
+ * 관전 모드를 끼워 넣으면 실제 대전이 위험하다 — 부품을 같이 쓰되 화면은 따로 둔다(2026-09-13 오너와 합의).
  *
  * 어떻게 그리나: 서버가 샷마다 '샷 직전 배치(preState) + 입력(input)' 을 남긴다. 그걸 받아 **로컬에서 다시 시뮬레이션**해
- * 궤적을 얻고 재생한다(선수 화면이 상대 샷을 받아 보는 방식과 같다). 그래서 관전은 서버에 영상이나 좌표를 더 얹지 않는다.
+ * 궤적을 얻고 재생한다(선수 화면이 상대 샷을 받아 보는 방식과 같다). 서버에 영상이나 좌표를 더 얹지 않는다.
  *
- * 진행 중(live): 4초마다 상태를 받아 새 샷이 있으면 이어서 재생한다. 화면이 가려지면 폴링을 쉰다.
+ * 진행 중(live): WATCH_POLL_MS 마다 상태를 받아 새 샷이 있으면 이어서 재생한다. 상대가 조준하는 동안에는
+ * 화면이 멈춰 있는 게 아니라 "○○님 차례 · 40초" 가 돈다 — 그게 없으면 끝난 판을 보는 것처럼 느껴진다(오너 제보).
  * 끝난 대전(다시보기): 샷을 한 번에 받아 두고 재생·다음 샷·처음부터·배속으로 본다.
- *
- * 렌더러는 Canvas2D 고정(위에서 보기)이다. 관전은 판을 읽는 화면이고, three.js 청크(~540 kB)를 관전자에게까지
- * 받게 할 이유가 없다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { simulateShot } from "@shared/sim/simulate";
 import type { BallState, SimResult } from "@shared/sim/types";
-import type { SessionState } from "@shared/sim/rules";
+import { SHOT_CLOCK_S, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import { Canvas2DRenderer } from "../render/Canvas2DRenderer";
-import type { Renderer, SafeInsets } from "../render/Renderer";
+import type { Renderer, RendererView, SafeInsets } from "../render/Renderer";
+import { readZoomPref, safeLocalStorage, selectRendererKind, type RendererKind } from "../render/rendererChoice";
 import { matchApi, matchConfig, type MatchPublic, type MatchShot } from "../matchApi";
 import { paramsFromConfig } from "../simReducer";
 import { effectiveBall, makePlayback, startClock, clockTime, type Playback, type PlaybackClock } from "../playback";
+import { TopBar } from "../components/TopBar";
+import { ShotClock } from "../components/ShotClock";
+import { InningSheet } from "../components/InningSheet";
+import { appendShot, EMPTY_LOG, type InningLog } from "../inningLog";
 import { nextPollMs, normalizeShots, planWatch, shouldSkipAnimation } from "./watchPlan";
 
 const INSETS: SafeInsets = { top: 8, right: 8, bottom: 8, left: 8 };
 const SPEEDS = [1, 2, 4] as const;
-
 type Speed = typeof SPEEDS[number];
 
-function playerLine(m: MatchPublic, i: 0 | 1, fallback: string): { name: string; score: number; target: number; innings: number; highRun: number } {
-    const st = m.state as SessionState | null;
-    const p = st?.players[i];
+/** 저장된 샷 한 줄 → 이닝 표가 아는 모양. 이닝을 소모했는지는 다음 샷이 누구 차례였는지로 안다(서버가 따로 안 적는다). */
+function outcomeOf(s: MatchShot, next: MatchShot | undefined, sessionTurn: number): ShotOutcome {
+    const consumesInning = next ? next.playerIndex !== s.playerIndex : sessionTurn !== s.playerIndex;
     return {
-        name: (i === 0 ? m.hostName : m.guestName) || fallback,
-        score: p?.score ?? 0,
-        target: (i === 0 ? m.hostTarget : m.guestTarget ?? m.hostTarget) ?? 0,
-        innings: p?.innings ?? 0,
-        highRun: p?.highRun ?? 0,
-    };
+        code: s.outcomeCode as ShotOutcome["code"],
+        points: s.points,
+        scored: s.points > 0,
+        consumesInning,
+        cushionsBeforeSecond: s.cushions ?? 0,
+        cushionsBeforeFirst: 0,
+        contacts: [],
+        kisses: 0,
+    } as ShotOutcome;
 }
 
 export default function WatchPage({ matchId }: { matchId: string }) {
@@ -51,45 +61,85 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     const [playedShots, setPlayedShots] = useState(0);
     const [animating, setAnimating] = useState(false);
     const [speed, setSpeed] = useState<Speed>(1);
-    const [lastShot, setLastShot] = useState<{ playerIndex: number; points: number; code: string } | null>(null);
     const [replayShots, setReplayShots] = useState<readonly MatchShot[]>([]);
     const [autoPlay, setAutoPlay] = useState(false);
+    const [log, setLog] = useState<InningLog>(EMPTY_LOG);
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const [view, setView] = useState<RendererView>("top");
+    const [viewSupported, setViewSupported] = useState(false);
 
     const tableRef = useRef<HTMLDivElement | null>(null);
     const rendererRef = useRef<Renderer | null>(null);
     const ballsRef = useRef<readonly BallState[]>([]);
     const dirtyRef = useRef(true);
-    const animRef = useRef<{ pb: Playback; clock: PlaybackClock; cueBallId: string; done: () => void } | null>(null);
+    const animRef = useRef<{ pb: Playback; clock: PlaybackClock; cueBallId: string; phi: number; done: () => void } | null>(null);
     const aliveRef = useRef(true);
     const speedRef = useRef<Speed>(1);
     speedRef.current = speed;
+    const viewRef = useRef<RendererView>("top");
+    viewRef.current = view;
+    const aimRef = useRef<{ cueBallId: string; phi: number }>({ cueBallId: "white", phi: Math.PI / 2 });
+    const rendererKindRef = useRef<RendererKind | null>(null);
+    if (rendererKindRef.current === null) rendererKindRef.current = selectRendererKind();
 
     const finished = match?.status === "finished";
     const params = useMemo(() => (match ? paramsFromConfig(matchConfig(match)) : null), [match]);
+    const config = useMemo(() => (match ? matchConfig(match) : null), [match]);
+    const session = (match?.state as SessionState | null) ?? null;
+    const names = useMemo(() => [match?.hostName || t("sim.watch.host"), match?.guestName || t("sim.watch.guest")], [match, t]);
 
-    /* ── 렌더러: 마운트 한 번, rAF 는 필요할 때만 그린다 ── */
+    /* ── 렌더러: 선수 화면과 같은 것을 쓴다. Canvas2D 를 먼저 올리고, 3D 가 되는 기기면 바꿔 끼운다. ── */
     useEffect(() => {
         const el = tableRef.current;
         if (!el || !params) return;
-        const r = new Canvas2DRenderer({ insets: INSETS });
-        r.mount(el, params.table);
-        rendererRef.current = r;
+        let alive = true;
+        const mount2d = (): Renderer => {
+            const r = new Canvas2DRenderer({ insets: INSETS });
+            r.mount(el, params.table);
+            return r;
+        };
+        let renderer: Renderer = mount2d();
+        rendererRef.current = renderer;
         dirtyRef.current = true;
-        let raf = 0;
-        const loop = () => {
+        if (rendererKindRef.current === "three") {
+            void import("../render/ThreeRenderer").then(({ ThreeRenderer }) => {
+                if (!alive) return;
+                let three: InstanceType<typeof ThreeRenderer> | null = null;
+                try {
+                    three = new ThreeRenderer({ insets: INSETS });
+                    three.mount(el, params.table);
+                } catch {
+                    try { three?.dispose(); } catch { /* 이미 망가진 상태 */ }
+                    return;   // WebGL2 를 못 열었다 — canvas 로 계속한다
+                }
+                rendererRef.current?.dispose();
+                rendererRef.current = three;
+                three.setView(viewRef.current);
+                three.setZoom?.(readZoomPref(safeLocalStorage()));
+                setViewSupported(true);
+                dirtyRef.current = true;
+            }).catch(() => { /* 청크 로드 실패 — canvas 유지 */ });
+        }
+        let raf = requestAnimationFrame(function loop() {
             raf = requestAnimationFrame(loop);
+            const r = rendererRef.current;
+            if (!r) return;
             const anim = animRef.current;
             if (anim) {
-                const t = clockTime(anim.clock, performance.now());
-                ballsRef.current = anim.pb.at(t);
+                const tt = clockTime(anim.clock, performance.now());
+                ballsRef.current = anim.pb.at(tt);
                 dirtyRef.current = true;
-                if (t >= anim.pb.duration) { animRef.current = null; anim.done(); }
+                if (tt >= anim.pb.duration) { animRef.current = null; anim.done(); }
             }
-            if (!dirtyRef.current) return;
+            if (!dirtyRef.current && !(r.needsFrame?.() ?? false)) return;
             dirtyRef.current = false;
-            r.draw({ balls: ballsRef.current, highlightBallId: anim?.cueBallId });
-        };
-        raf = requestAnimationFrame(loop);
+            const aim = animRef.current ?? aimRef.current;
+            r.draw({
+                balls: ballsRef.current,
+                highlightBallId: aim.cueBallId,
+                view: { cueBallId: aim.cueBallId, phi: aim.phi, mode: animRef.current ? "overview" : "follow" },
+            });
+        });
         // 재생 중에 화면이 가려지면 프레임이 멈춰 영영 안 끝난다 — 마지막 상태로 붙이고 끝낸 것으로 친다.
         const onVisibility = () => {
             const a = animRef.current;
@@ -101,34 +151,39 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         };
         document.addEventListener("visibilitychange", onVisibility);
         return () => {
+            alive = false;
             document.removeEventListener("visibilitychange", onVisibility);
             cancelAnimationFrame(raf);
-            animRef.current?.done?.();   // 재생 중에 화면을 떠나면 기다리던 쪽을 풀어 준다(개발 중 HMR 로 모양이 바뀐 옛 값도 안전하게)
+            animRef.current?.done?.();
             animRef.current = null;
-            r.dispose();
+            rendererRef.current?.dispose();
             rendererRef.current = null;
         };
     }, [params]);
 
-    // StrictMode(개발)는 마운트 → 정리 → 다시 마운트를 한다. 정리에서 false 로만 두면 두 번째 마운트에서 영영 false 라
-    // 재생 루프가 첫 샷 뒤에 멈춘다(2026-09-12 실측: 샷 번호가 0 에서 안 올라갔다). 마운트마다 다시 true 로 둔다.
     useEffect(() => {
         aliveRef.current = true;
         return () => { aliveRef.current = false; };
     }, []);
 
-    /* ── 샷 하나를 재생한다(재시뮬 → 궤적). skip 이면 결과 배치로 바로 붙인다. ── */
-    const playShot = useCallback(async (s: MatchShot, skip: boolean): Promise<void> => {
+    const toggleView = () => {
+        const next: RendererView = view === "top" ? "player" : "top";
+        setView(next);
+        rendererRef.current?.setView?.(next);
+        dirtyRef.current = true;
+    };
+
+    /* ── 샷 하나를 재생한다(재시뮬 → 궤적). 가려져 있거나 밀렸으면 결과 배치로 바로 붙인다. ── */
+    const playShot = useCallback(async (s: MatchShot, next: MatchShot | undefined, sessionTurn: number, skip: boolean): Promise<void> => {
         if (!params) return;
         let result: SimResult;
         try {
             result = simulateShot(s.preState as BallState[], s.input, params);
         } catch {
-            return; // 엔진 버전이 달라 재시뮬이 안 되는 옛 대전 — 그 샷은 건너뛴다
+            return;   // 엔진 버전이 달라 재시뮬이 안 되는 옛 대전 — 그 샷은 건너뛴다
         }
-        setLastShot({ playerIndex: s.playerIndex, points: s.points, code: s.outcomeCode });
-        // 화면이 가려져 있으면(다른 앱·다른 탭) 브라우저가 requestAnimationFrame 을 멈춘다 — 궤적을 그려도 아무도 못 보고,
-        // 재생이 끝나지 않아 다음 샷으로 넘어가지도 못한다. 그럴 땐 결과 배치로 바로 붙인다.
+        aimRef.current = { cueBallId: s.input.cueBallId, phi: s.input.phi };
+        setLog((l) => appendShot(l, outcomeOf(s, next, sessionTurn), { ...(session ?? {} as SessionState), turn: sessionTurn } as SessionState, s.playerIndex));
         const hidden = typeof document !== "undefined" && document.hidden;
         if (skip || hidden) {
             ballsRef.current = result.final;
@@ -139,25 +194,26 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         await new Promise<void>((resolve) => {
             let settled = false;
             const done = () => { if (!settled) { settled = true; resolve(); } };
-            animRef.current = { pb, clock: startClock(performance.now(), speedRef.current), cueBallId: s.input.cueBallId, done };
+            animRef.current = { pb, clock: startClock(performance.now(), speedRef.current), cueBallId: s.input.cueBallId, phi: s.input.phi, done };
         });
         ballsRef.current = result.final;
         dirtyRef.current = true;
-    }, [params]);
+    }, [params, session]);
 
-    const playList = useCallback(async (list: readonly MatchShot[]) => {
+    const playList = useCallback(async (list: readonly MatchShot[], all: readonly MatchShot[], sessionTurn: number) => {
         if (list.length === 0) return;
         setAnimating(true);
         const skipUntil = shouldSkipAnimation(list.length) ? list.length - 1 : 0;
         for (let i = 0; i < list.length; i++) {
             if (!aliveRef.current) break;
-            await playShot(list[i], i < skipUntil);
-            setPlayedShots(list[i].idx + 1);
+            const s = list[i];
+            await playShot(s, all[s.idx + 1] ?? list[i + 1], sessionTurn, i < skipUntil);
+            setPlayedShots(s.idx + 1);
         }
         setAnimating(false);
     }, [playShot]);
 
-    /* ── 처음 열 때: 대전 상태를 받아 현재 배치부터 보여준다(진행 중이면 지금까지 친 결과가 이미 반영된 배치다). ── */
+    /* ── 처음 열 때: 지금 배치부터 보여 준다(진행 중이면 여태 친 결과가 이미 반영된 배치다). ── */
     useEffect(() => {
         let alive = true;
         matchApi.getMatch(matchId).then((m) => {
@@ -167,9 +223,9 @@ export default function WatchPage({ matchId }: { matchId: string }) {
             setPlayedShots(m.shots);
         }).catch(() => { if (alive) setError(t("sim.watch.gone")); });
         return () => { alive = false; };
-    }, [matchId]);
+    }, [matchId, t]);
 
-    /* ── 진행 중: 4초 폴링 → 새 샷이 있으면 이어 재생 ── */
+    /* ── 진행 중: 폴링 → 새 샷이 있으면 이어 재생 ── */
     useEffect(() => {
         if (!match || match.status !== "playing") return;
         let alive = true;
@@ -186,14 +242,15 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                 if (plan.kind === "fetch") {
                     const shots = await matchApi.getShots(matchId, plan.from);
                     if (!alive) return;
-                    await playList(normalizeShots(shots, plan.from));
+                    const list = normalizeShots(shots, plan.from);
+                    await playList(list, list, (m.state as SessionState | null)?.turn ?? 0);
                 } else if (!animating && m.balls && m.shots === playedShots) {
-                    ballsRef.current = m.balls; dirtyRef.current = true;       // 시간 초과 등 샷 없는 변화
+                    ballsRef.current = m.balls; dirtyRef.current = true;      // 시간 초과 등 샷 없는 변화
                 }
             } catch { /* 일시적 오류 — 다음 주기에 다시 */ }
             if (alive) timer = setTimeout(tick, delay);
         };
-        timer = setTimeout(tick, nextPollMs(match.status, true) ?? 4000);
+        timer = setTimeout(tick, nextPollMs(match.status, true) ?? 2000);
         return () => { alive = false; if (timer) clearTimeout(timer); };
     }, [match, matchId, playedShots, animating, playList]);
 
@@ -205,7 +262,13 @@ export default function WatchPage({ matchId }: { matchId: string }) {
             if (!alive) return;
             const list = normalizeShots(shots, 0);
             setReplayShots(list);
-            if (list.length > 0) { ballsRef.current = list[0].preState as BallState[]; dirtyRef.current = true; setPlayedShots(0); }
+            if (list.length > 0) {
+                ballsRef.current = list[0].preState as BallState[];
+                aimRef.current = { cueBallId: list[0].input.cueBallId, phi: list[0].input.phi };
+                dirtyRef.current = true;
+                setPlayedShots(0);
+                setLog(EMPTY_LOG);
+            }
         }).catch(() => { /* 목록 없이도 결과 화면은 보인다 */ });
         return () => { alive = false; };
     }, [finished, matchId, replayShots.length]);
@@ -216,9 +279,9 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         const next = replayShots[playedShots];
         if (!next) { setAutoPlay(false); return; }
         let alive = true;
-        (async () => { if (alive) await playList([next]); })();
+        void (async () => { if (alive) await playList([next], replayShots, session?.turn ?? 0); })();
         return () => { alive = false; };
-    }, [autoPlay, animating, finished, replayShots, playedShots, playList]);
+    }, [autoPlay, animating, finished, replayShots, playedShots, playList, session]);
 
     const restart = () => {
         if (replayShots.length === 0) return;
@@ -227,8 +290,22 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         ballsRef.current = replayShots[0].preState as BallState[];
         dirtyRef.current = true;
         setPlayedShots(0);
-        setLastShot(null);
+        setLog(EMPTY_LOG);
     };
+
+    /* ── 40초 시계: 선수 화면과 같은 계산(서버가 적은 turnSeenAt 부터, 서버 시각 보정) ── */
+    const seenAt = match?.status === "playing" && match.turnSeenAt ? Date.parse(match.turnSeenAt) : 0;
+    const clockOn = seenAt > 0 && Number.isFinite(seenAt) && !animating;
+    const [clockNow, setClockNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!clockOn) return;
+        setClockNow(Date.now());
+        const id = setInterval(() => setClockNow(Date.now()), 250);
+        return () => clearInterval(id);
+    }, [clockOn, seenAt]);
+    const serverOffset = match?.serverNow ? Date.parse(match.serverNow) - clockNow : 0;
+    const remaining = clockOn ? SHOT_CLOCK_S - (clockNow + (Number.isFinite(serverOffset) ? 0 : 0) - seenAt) / 1000 : null;
+    const clockSeconds = remaining !== null && remaining <= SHOT_CLOCK_S ? Math.max(0, Math.ceil(remaining)) : null;
 
     if (error) {
         return (
@@ -240,67 +317,52 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     }
     if (!match) return <div className="min-h-dvh bg-surface-0 flex items-center justify-center text-ink-3 text-[14px]">{t("sim.watch.loading")}</div>;
 
-    const p0 = playerLine(match, 0, t("sim.watch.host"));
-    const p1 = playerLine(match, 1, t("sim.watch.guest"));
-    const turn = match.turn;
+    const turnName = names[match.turn] ?? "";
 
     return (
-        <div className="min-h-dvh bg-surface-0 flex flex-col">
-            <header className="flex items-center gap-3 px-4 h-14 shrink-0">
-                <button onClick={() => navigate("/online-game?rooms=1")} className="h-9 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2">{t("sim.watch.toRooms")}</button>
-                <span className="text-[15px] font-bold text-ink-1">{finished ? t("sim.watch.replayTitle") : t("sim.watch.title")}</span>
-                <span className="text-[12px] text-ink-3">{match.gameType === "3c" ? t("sim.setup.type3c") : t("sim.setup.type4c")}</span>
-                {!finished && (
-                    <span className="ml-auto flex items-center gap-2">
-                        {(match.watchers ?? 0) > 0 && (
-                            <span className="text-[11px] font-bold text-brand">{t("sim.watch.viewers").replace("{n}", String(match.watchers))}</span>
-                        )}
-                        <span className="text-[11px] text-ink-3">{t("sim.watch.refresh")}</span>
-                    </span>
-                )}
-            </header>
+        <div className="h-dvh flex flex-col bg-surface-0">
+            {/* 선수 화면과 같은 머리줄 — 규칙 칩·점수·차례·관전자 수. 조작 버튼만 없다. */}
+            <TopBar
+                session={session} config={config} phase={finished ? "finished" : "waiting"} names={names}
+                record={false} offline={false} syncing={false} queued={0}
+                onSummary={() => setSheetOpen(true)}
+                onBack={() => navigate("/online-game?rooms=1")}
+                clock={clockSeconds !== null ? { seconds: clockSeconds, mine: false } : null}
+                watchers={match.watchers ?? 0}
+                finalInning={(session?.pendingWinner ?? null) !== null}
+                hideStatus
+            />
 
-            <div className="px-4 pb-3 shrink-0">
-                <div className="grid grid-cols-2 gap-2">
-                    {[p0, p1].map((p, i) => {
-                        const isTurn = !finished && turn === i;
-                        const isWinner = finished && match.winnerIndex === i;
-                        return (
-                            <div key={i} className={`rounded-tile border p-3 ${isTurn ? "border-brand bg-brand/10" : isWinner ? "border-brand/60 bg-brand/5" : "border-surface-line bg-surface-1"}`}>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-[13px] font-bold text-ink-1 truncate">{p.name}</span>
-                                    {isTurn && <span className="text-[10px] font-bold text-brand shrink-0">● {t("sim.watch.turn")}</span>}
-                                    {isWinner && <span className="text-[10px] font-bold text-brand shrink-0">{t("sim.watch.win")}</span>}
-                                </div>
-                                <div className="mt-1 flex items-baseline gap-1">
-                                    <span className="text-[26px] font-black text-ink-1 tabular-nums leading-none">{p.score}</span>
-                                    <span className="text-[13px] text-ink-3">/ {p.target}</span>
-                                </div>
-                                <p className="mt-1 text-[11px] text-ink-3">{t("sim.watch.inningsHigh").replace("{i}", String(p.innings)).replace("{h}", String(p.highRun))}</p>
-                            </div>
-                        );
-                    })}
-                </div>
+            <div ref={tableRef} className="flex-1 min-h-[45vh] relative">
+                {/* 3D 보기 토글 — 선수 화면과 같은 시점으로 볼 수 있다(되는 기기에서만) */}
+                {viewSupported && (
+                    <button
+                        type="button" onClick={toggleView}
+                        className="absolute top-2 right-2 z-[3] h-9 px-3 rounded-pill bg-surface-1/90 border border-surface-line text-[12px] font-bold text-ink-2"
+                    >{view === "top" ? t("sim.watch.view3d") : t("sim.watch.viewTop")}</button>
+                )}
+                {/* 상대가 조준하는 동안 화면이 멈춘 게 아니라는 표시(2026-09-13 오너: "리플레이처럼 보인다") */}
+                {!finished && !animating && (
+                    <div className="absolute inset-x-0 bottom-3 z-[3] flex flex-col items-center gap-1.5 px-4 pointer-events-none">
+                        <div className="rounded-card bg-surface-1/95 border border-surface-line px-4 py-2.5 text-center">
+                            <p className="text-[13px] font-semibold text-ink-1">{t("sim.watch.turnOf").replace("{name}", turnName)}</p>
+                            {clockSeconds !== null && <ShotClock seconds={clockSeconds} mine={false} size={44} className="mt-1" />}
+                        </div>
+                    </div>
+                )}
             </div>
 
-            <div ref={tableRef} className="flex-1 min-h-[55vh] relative" />
-
             <footer className="shrink-0 px-4 py-3 space-y-2">
-                {lastShot && (
-                    <p className="text-[12px] text-ink-2 text-center">
-                        {(lastShot.playerIndex === 0 ? p0.name : p1.name)} · {lastShot.points > 0 ? t("sim.watch.point").replace("{n}", String(lastShot.points)) : t("sim.watch.miss")}
-                    </p>
-                )}
                 {finished ? (
                     <div className="flex items-center gap-2">
                         <button onClick={restart} className="h-11 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2">{t("sim.watch.restart")}</button>
                         <button
                             onClick={() => setAutoPlay((v) => !v)}
                             disabled={replayShots.length === 0 || playedShots >= replayShots.length}
-                            className="h-11 flex-1 rounded-tile bg-brand text-black text-[14px] font-bold disabled:opacity-40"
+                            className="h-11 flex-1 rounded-tile bg-brand text-brand-fg text-[14px] font-bold disabled:opacity-40"
                         >{autoPlay ? t("sim.watch.pause") : t("sim.watch.play")}</button>
                         <button
-                            onClick={() => { setAutoPlay(false); const n = replayShots[playedShots]; if (n) void playList([n]); }}
+                            onClick={() => { setAutoPlay(false); const nx = replayShots[playedShots]; if (nx) void playList([nx], replayShots, session?.turn ?? 0); }}
                             disabled={animating || playedShots >= replayShots.length}
                             className="h-11 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2 disabled:opacity-40"
                         >{t("sim.watch.nextShot")}</button>
@@ -310,7 +372,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                         >{t("sim.watch.speed").replace("{n}", String(speed))}</button>
                     </div>
                 ) : (
-                    <p className="text-[11px] text-ink-3 text-center">
+                    <p className={cn("text-[11px] text-ink-3 text-center")}>
                         {animating ? t("sim.watch.playing") : t("sim.watch.seen").replace("{n}", String(match.shots))}
                     </p>
                 )}
@@ -318,6 +380,8 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                     <p className="text-[11px] text-ink-3 text-center">{t("sim.watch.shotProgress").replace("{a}", String(playedShots)).replace("{b}", String(replayShots.length))}</p>
                 )}
             </footer>
+
+            <InningSheet open={sheetOpen} onOpenChange={setSheetOpen} log={log} session={session} names={names} phase={finished ? "finished" : "waiting"} />
         </div>
     );
 }
