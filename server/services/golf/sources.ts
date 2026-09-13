@@ -95,8 +95,18 @@ export async function fetchOwgr(): Promise<TourSnapshot> {
 
 /* ── Rolex ── */
 export async function fetchRolex(): Promise<TourSnapshot> {
+    // 프로덕션(Vercel/AWS IP)에서 403 이 났다(2026-09-14 실측, 로컬은 200). Akamai 봇 판정에 브라우저 힌트 헤더를 최대한 맞춰 본다.
     const j = await getJson<{ week?: Record<string, unknown>; list?: { items?: RolexItemJson[] } }>(
-        "https://www.rolexrankings.com/core/rankings/list?count=5000", { Referer: "https://www.rolexrankings.com/rankings" });
+        "https://www.rolexrankings.com/core/rankings/list?count=5000", {
+            Referer: "https://www.rolexrankings.com/rankings",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "sec-ch-ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+            "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors", "Sec-Fetch-Site": "same-origin",
+            "X-Requested-With": "XMLHttpRequest",
+        });
     const items = j.list?.items ?? [];
     const rows = items.map(mapRolexItem).filter((r): r is RankRow => !!r);
     if (rows.length < 100) throw new Error(`Rolex 행 수 비정상: ${rows.length}`);
