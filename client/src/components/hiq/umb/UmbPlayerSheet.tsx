@@ -30,12 +30,13 @@ const BRAND = "#006241";
 const GRID = "rgba(0,0,0,0.06)";
 const AXIS = "rgba(0,0,0,0.35)";
 
-// ?v=2 — 응답 형태가 바뀔 때 올린다. 초기 배포가 브라우저에도 하루짜리
+// ?v=3 — 응답 형태가 바뀔 때 올린다(v3: 2026-09-13 국내 순위판·PBA·만료 예고·팔로우 추가. 쿼리 캐시가 localStorage 에
+// 남아 있어 키를 올리지 않으면 옛 응답이 10분 동안 그대로 보인다 — 실측). 초기 배포가 브라우저에도 하루짜리
 // stale-while-revalidate를 심어놔서(이후 CDN 전용으로 분리) URL로 캐시를 우회해야 한다.
 export function usePlayerDetail(category: UmbCategory, playerUmbId: string | null) {
     return useQuery<UmbPlayerDetail>({
-        queryKey: [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v2"],
-        queryFn: async () => apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}?v=2`),
+        queryKey: [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v3"],
+        queryFn: async () => apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}?v=3`),
         enabled: !!playerUmbId,
         staleTime: 10 * 60 * 1000,
     });
@@ -60,7 +61,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
     const [showAllPoints, setShowAllPoints] = useState(false);
     const [followBusy, setFollowBusy] = useState(false);
     const { data, isLoading } = usePlayerDetail(category, playerUmbId);
-    const detailKey = [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v2"];
+    const detailKey = [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v3"];
 
     /** 관심 선수 켜기/끄기 — 낙관적으로 먼저 바꾸고 실패하면 되돌린다. 비로그인은 안내만. */
     const toggleFollow = async () => {
