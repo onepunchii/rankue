@@ -87,6 +87,22 @@ async function handleGolfSync(req: any, res: any) {
 router.get("/golf-sync", asyncHandler(handleGolfSync));
 router.post("/golf-sync", asyncHandler(handleGolfSync));
 
+// 골프 외부 적재(2026-09-14): rolexrankings.com 이 Vercel IP 를 403 으로 막아, GitHub 러너(.github/workflows/golf-rolex-sync.yml)가
+// 받은 JSON 을 그대로 보내면 여기서 같은 규칙으로 적재한다. 인증은 크론과 같은 CRON_SECRET.
+router.post("/golf-ingest", asyncHandler(async (req: any, res: any) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    if (req.query.tour !== "rolex") return sendError(res, 400, "지원하지 않는 투어");
+    if (!req.body || typeof req.body !== "object") return sendError(res, 400, "본문이 JSON 이 아닙니다");
+    const { rolexSnapshotFromJson } = await import("../../services/golf/sources.js");
+    const { ingestSnapshot } = await import("../../services/golf/golfSync.js");
+    const result = await ingestSnapshot(await rolexSnapshotFromJson(req.body));
+    const { notifyGolfFollowers } = await import("../../services/playerFollowAlerts.js");
+    const followAlerts = await notifyGolfFollowers(result.newEdition ? [result.tour] : []);
+    return sendSuccess(res, { result, followAlerts });
+}));
+
 // 시뮬레이터 정리: 방치된 playing 세션(6시간) → abandoned, 상대가 안 들어온 waiting 대전(24시간) → canceled.
 // 실전 경기·성적과 무관한 시뮬 테이블만 건드린다.
 async function handleSimCleanup(req: any, res: any) {

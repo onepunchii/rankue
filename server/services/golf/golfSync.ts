@@ -33,7 +33,12 @@ async function koreanNameMap(): Promise<Map<string, string>> {
 }
 
 export async function syncGolfTour(tour: GolfTour, opts: { force?: boolean } = {}): Promise<GolfSyncResult> {
-    const snap: TourSnapshot = await FETCHERS[tour]();
+    return ingestSnapshot(await FETCHERS[tour](), opts);
+}
+
+/** 이미 받아 둔 스냅샷을 적재(수집만 밖에서 한 경우 — 롤렉스는 GitHub 러너가 받아 넘긴다). 규칙은 syncGolfTour 와 같다. */
+export async function ingestSnapshot(snap: TourSnapshot, opts: { force?: boolean } = {}): Promise<GolfSyncResult> {
+    const tour = snap.tour;
     const meta = GOLF_TOUR_META[tour];
 
     // 한글 이름 채우기(세계 랭킹의 한국 선수)

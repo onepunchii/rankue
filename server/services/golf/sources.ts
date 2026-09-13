@@ -107,6 +107,11 @@ export async function fetchRolex(): Promise<TourSnapshot> {
             "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors", "Sec-Fetch-Site": "same-origin",
             "X-Requested-With": "XMLHttpRequest",
         });
+    return rolexSnapshotFromJson(j);
+}
+
+/** 롤렉스 JSON(직접 받았든, GitHub 러너가 넘겼든) → 스냅샷. 회차는 week.publish_date. */
+export async function rolexSnapshotFromJson(j: { week?: Record<string, unknown>; list?: { items?: RolexItemJson[] } }): Promise<TourSnapshot> {
     const items = j.list?.items ?? [];
     const rows = items.map(mapRolexItem).filter((r): r is RankRow => !!r);
     if (rows.length < 100) throw new Error(`Rolex 행 수 비정상: ${rows.length}`);
