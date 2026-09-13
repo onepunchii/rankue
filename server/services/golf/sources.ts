@@ -20,6 +20,19 @@ const DELAY_MS = 150;
 const TIMEOUT_MS = 20_000;
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const CONCURRENCY = 4;   // 직렬이면 KPGA 45초(로컬 실측) — 서버리스 60초 제한에 아슬아슬해 4개씩 나눠 보낸다
+
+/** 배열을 CONCURRENCY 개씩 병렬로. 각 묶음 사이에 DELAY_MS. 실패한 항목은 null */
+async function mapLimited<T, R>(items: readonly T[], fn: (item: T) => Promise<R>): Promise<Array<R | null>> {
+    const out: Array<R | null> = [];
+    for (let i = 0; i < items.length; i += CONCURRENCY) {
+        const chunk = items.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(chunk.map(async (it) => { try { return await fn(it); } catch (e) { console.warn("[golf] 항목 실패:", (e as Error)?.message); return null; } }));
+        out.push(...results);
+        if (i + CONCURRENCY < items.length) await sleep(DELAY_MS);
+    }
+    return out;
+}
 
 async function request(url: string, init: RequestInit = {}): Promise<Response> {
     const ctl = new AbortController();
@@ -114,19 +127,14 @@ export async function fetchKpga(year = seasonNow()): Promise<TourSnapshot> {
     const sub = await getJson<KpgaSubmenu>(`${KPGA}/record/submenu?year=${year}&tourId=${KPGA_TOUR_ID}`, KPGA_HEADERS);
     const menus = (sub.tabs ?? []).flatMap((t) => t.subMenus ?? []);
     if (!menus.length) throw new Error("KPGA 지표 메뉴가 비었다");
-    const stats: StatList[] = [];
-    for (const m of menus) {
-        await sleep(DELAY_MS);
-        try {
-            const d = await getJson<{ records?: KpgaRecordJson[] }>(`${KPGA}/record/detail?tourId=${KPGA_TOUR_ID}&year=${year}&menuId=${m.menuId}`, KPGA_HEADERS);
-            const rows = (d.records ?? []).map(mapKpgaStatRow).filter((r): r is StatRow => !!r);
-            if (!rows.length) continue;
-            // 라벨은 상세 응답의 title 이 맞다(submenu 의 label 은 metricKey 와 어긋나 있었다, 2026-09 실측)
-            stats.push({ key: String(m.menuId), label: (d.records?.[0]?.title || m.label || `#${m.menuId}`).trim(), unit: (m.unit ?? "").trim(), rows });
-        } catch (e) {
-            console.warn(`[golf] KPGA menu ${m.menuId} 실패:`, (e as Error)?.message);
-        }
-    }
+    const fetched = await mapLimited(menus, async (m) => {
+        const d = await getJson<{ records?: KpgaRecordJson[] }>(`${KPGA}/record/detail?tourId=${KPGA_TOUR_ID}&year=${year}&menuId=${m.menuId}`, KPGA_HEADERS);
+        const rows = (d.records ?? []).map(mapKpgaStatRow).filter((r): r is StatRow => !!r);
+        if (!rows.length) return null;
+        // 라벨은 상세 응답의 title 이 맞다(submenu 의 label 은 metricKey 와 어긋나 있었다, 2026-09 실측)
+        return { key: String(m.menuId), label: (d.records?.[0]?.title || m.label || `#${m.menuId}`).trim(), unit: (m.unit ?? "").trim(), rows } as StatList;
+    });
+    const stats: StatList[] = fetched.filter((x): x is StatList => !!x);
     const main = stats.find((s) => s.key === "1");
     if (!main || main.rows.length < 30) throw new Error("KPGA 제네시스 포인트 목록이 비정상");
     const rows = kpgaRankingFromStats(main.rows);
@@ -142,21 +150,16 @@ export async function fetchKpga(year = seasonNow()): Promise<TourSnapshot> {
 
 /* ── KLPGA ── */
 export async function fetchKlpga(season = seasonNow()): Promise<TourSnapshot> {
-    const stats: StatList[] = [];
-    for (const m of KLPGA_MENUS) {
-        await sleep(DELAY_MS);
-        try {
-            const res = await request("https://klpga.co.kr/load/record/loadPublicRecord", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-Requested-With": "XMLHttpRequest", Referer: "https://klpga.co.kr/web/record/publicRecordDetail", Accept: "text/html, */*" },
-                body: `season=${encodeURIComponent(season)}&menu1=${m.menu1}&menu2=${m.menu2}`,
-            });
-            const rows = parseKlpgaRows(await res.text());
-            if (rows.length) stats.push({ key: m.menu2, label: m.label, unit: m.unit, rows });
-        } catch (e) {
-            console.warn(`[golf] KLPGA ${m.menu1}/${m.menu2} 실패:`, (e as Error)?.message);
-        }
-    }
+    const fetched = await mapLimited(KLPGA_MENUS, async (m) => {
+        const res = await request("https://klpga.co.kr/load/record/loadPublicRecord", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-Requested-With": "XMLHttpRequest", Referer: "https://klpga.co.kr/web/record/publicRecordDetail", Accept: "text/html, */*" },
+            body: `season=${encodeURIComponent(season)}&menu1=${m.menu1}&menu2=${m.menu2}`,
+        });
+        const rows = parseKlpgaRows(await res.text());
+        return rows.length ? ({ key: m.menu2, label: m.label, unit: m.unit, rows } as StatList) : null;
+    });
+    const stats: StatList[] = fetched.filter((x): x is StatList => !!x);
     const main = stats.find((s) => s.key === "Klpga");
     if (!main || main.rows.length < 30) throw new Error("KLPGA 대상포인트 목록이 비정상");
     const rows = klpgaRankingFromStats(main.rows);

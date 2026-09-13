@@ -45,7 +45,7 @@
       "dest": "/api/index.ts"
     },
     {
-      "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking|pba|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|(?:store|club|r)/[^/]+)/?",
+      "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking|pba|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|golf-ranking|golfer/[^/]+/[^/]+|(?:store|club|r)/[^/]+)/?",
       "has": [
         {
           "type": "header",
