@@ -5,33 +5,51 @@
  *  1. 끄면 **푸시만** 멈춘다. 인앱 알림함에는 그대로 쌓인다 — 나중에 들어와서 볼 수 있어야 한다.
  *  2. 저장은 "끈 것만" 담는다({"rooms": false}). 없는 키는 켜짐이라, 카테고리를 새로 만들어도 마이그레이션이 필요 없다.
  *
- * 카테고리는 '무엇에 대한 알림인가'로 가른다 — 보내는 코드의 위치가 아니라 받는 사람이 느끼는 묶음이다.
+ * 축이 둘이다 — **종목(sport)** 과 **성격(무엇에 대한 알림인가)**. 종목이 먼저다:
+ * 알림의 category 가 GOLF 면 성격을 보지 않고 골프 칸으로 간다. 골프를 나중에 당구처럼 성격별로 쪼갤 때는
+ * PREFS 에 golf_* 키를 더하고 prefKeyFor 의 골프 가지만 늘리면 된다 — 그 자리를 미리 내 둔 것이다(2026-09-13 오너).
  */
 
-export type PrefKey = "sim" | "rooms" | "crew" | "game" | "notice";
+export type SportScope = "BILLIARDS" | "GOLF";
+export type PrefKey = "sim" | "rooms" | "crew" | "game" | "notice" | "golf";
 
-export const PREF_KEYS: readonly PrefKey[] = ["sim", "rooms", "crew", "game", "notice"];
+export interface PrefMeta {
+    readonly key: PrefKey;
+    /** 이 칸이 어느 종목 것인가. 화면은 종목별로 묶어 보여 주고, 안 쓰는 종목은 감춘다. */
+    readonly sport: SportScope;
+    readonly title: string;
+    readonly desc: string;
+}
 
-/** 화면 문구 키(i18n). 순서가 곧 설정 화면의 순서다. */
-export const PREF_LABELS: Readonly<Record<PrefKey, { title: string; desc: string }>> = {
-    sim: { title: "settings.notifSim", desc: "settings.notifSimDesc" },
-    rooms: { title: "settings.notifRooms", desc: "settings.notifRoomsDesc" },
-    crew: { title: "settings.notifCrew", desc: "settings.notifCrewDesc" },
-    game: { title: "settings.notifGame", desc: "settings.notifGameDesc" },
-    notice: { title: "settings.notifNotice", desc: "settings.notifNoticeDesc" },
-};
+/** 순서가 곧 설정 화면의 순서다. */
+export const PREFS: readonly PrefMeta[] = [
+    { key: "sim", sport: "BILLIARDS", title: "settings.notifSim", desc: "settings.notifSimDesc" },
+    { key: "rooms", sport: "BILLIARDS", title: "settings.notifRooms", desc: "settings.notifRoomsDesc" },
+    { key: "crew", sport: "BILLIARDS", title: "settings.notifCrew", desc: "settings.notifCrewDesc" },
+    { key: "game", sport: "BILLIARDS", title: "settings.notifGame", desc: "settings.notifGameDesc" },
+    { key: "notice", sport: "BILLIARDS", title: "settings.notifNotice", desc: "settings.notifNoticeDesc" },
+    { key: "golf", sport: "GOLF", title: "settings.notifGolf", desc: "settings.notifGolfDesc" },
+];
+
+export const PREF_KEYS: readonly PrefKey[] = PREFS.map((p) => p.key);
+
+/** 그 종목의 칸들. 설정 화면이 '당구' / '골프' 로 묶을 때 쓴다. */
+export function prefsForSport(sport: SportScope): readonly PrefMeta[] {
+    return PREFS.filter((p) => p.sport === sport);
+}
 
 /**
  * 보내는 쪽이 pref 를 안 정했을 때 (category, type) 으로 고른다. 옛 호출부를 한 번에 고치지 않아도 되게 둔다.
- * 모르는 조합은 'notice' 로 본다 — 끌 수 있는 쪽이 기본이다(알림함에는 어차피 남는다).
+ * **종목이 먼저다** — GOLF 면 성격을 보지 않는다. 모르는 조합은 'notice'(끌 수 있는 쪽이 기본이다 — 알림함에는 어차피 남는다).
  */
 export function prefKeyFor(category?: string | null, type?: string | null): PrefKey {
+    if ((category ?? "").toUpperCase() === "GOLF") return "golf";
     const t = (type ?? "").toUpperCase();
-    if (t === "SIM_MATCH" || t === "SIM_ROOM") return t === "SIM_ROOM" ? "rooms" : "sim";
+    if (t === "SIM_ROOM") return "rooms";
+    if (t === "SIM_MATCH") return "sim";
     if (t === "TOURNAMENT" || t === "ACTIVITY" || t === "ACTIVITY_REMINDER" || t === "POLL" || t === "POLL_REMINDER"
-        || t === "SETTLEMENT" || t === "CHAT" || t === "POST_COMMENT" || t === "CREW") return "crew";
+        || t === "SETTLEMENT" || t === "CHAT" || t === "POST_COMMENT" || t === "CREW" || t === "COMMUNITY") return "crew";
     if (t === "MATCH" || t === "FRIEND" || t === "CHALLENGE") return "game";
-    if (t === "COMMUNITY") return "crew";
     return "notice";
 }
 

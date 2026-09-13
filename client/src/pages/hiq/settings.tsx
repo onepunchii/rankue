@@ -9,7 +9,7 @@ import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import { flagEmoji } from "@/lib/flag";
 import { cn } from "@/lib/utils";
 import { BlockedMembersSection } from "@/components/hiq/community/BlockedMembersSection";
-import { PREF_KEYS, PREF_LABELS, type PrefKey } from "@shared/notificationPrefs";
+import { prefsForSport, type PrefKey, type PrefMeta } from "@shared/notificationPrefs";
 import {
     canOpenNotificationSettings, forgetPushToken, isNativeApp, openNotificationSettings, pushPermission, requestPushPermission,
     storedPushToken, type PushPermission,
@@ -250,7 +250,8 @@ export default function HiqSettings() {
                 )}
 
                 {/* 알림 종류 — 카테고리별로 끈다(2026-09-13 오너). 끄면 푸시만 멈추고 알림함에는 남는다.
-                    OS 알림을 아예 꺼 둔 기기에서도 보여 준다 — 나중에 켰을 때의 설정이기도 하다. */}
+                    OS 알림을 아예 꺼 둔 기기에서도 보여 준다 — 나중에 켰을 때의 설정이기도 하다.
+                    종목으로 묶는다: 골프 칸은 골프를 쓰는 회원에게만(안 쓰는 사람에게 빈 스위치를 주지 않는다). */}
                 {prefs && (
                     <section className="rk-card p-5">
                         <div className="flex items-center gap-2 mb-1">
@@ -258,25 +259,34 @@ export default function HiqSettings() {
                             <h2 className="text-[15px] font-bold">{t("settings.notifKinds")}</h2>
                         </div>
                         <p className="text-[12px] text-black/45 mb-4">{t("settings.notifKindsDesc")}</p>
-                        <div className="space-y-2">
-                            {PREF_KEYS.map((k) => (
-                                <button
-                                    key={k}
-                                    onClick={() => { void togglePref(k); }}
-                                    disabled={prefBusy !== null}
-                                    aria-pressed={prefs[k]}
-                                    className="w-full flex items-center justify-between gap-3 min-h-[52px] px-4 py-2.5 bg-black/[0.03] rounded-tile text-left disabled:opacity-60"
-                                >
-                                    <span className="min-w-0">
-                                        <span className="block text-[14px] font-medium">{t(PREF_LABELS[k].title)}</span>
-                                        <span className="block text-[11.5px] text-black/45 mt-0.5">{t(PREF_LABELS[k].desc)}</span>
-                                    </span>
-                                    <span className={cn("relative w-11 h-6 rounded-full shrink-0 transition-colors", prefs[k] ? "bg-brand" : "bg-black/[0.12]")}>
-                                        <span className={cn("absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all", prefs[k] ? "left-[22px]" : "left-0.5")} />
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
+                        {([["BILLIARDS", "settings.notifSportBilliards"], ["GOLF", "settings.notifSportGolf"]] as const).map(([sport, label]) => {
+                            const rows = prefsForSport(sport);
+                            if (rows.length === 0 || (sport === "GOLF" && !member?.golfAccess)) return null;
+                            return (
+                                <div key={sport} className="mb-4 last:mb-0">
+                                    {member?.golfAccess && <p className="text-[11.5px] font-bold text-black/40 mb-1.5">{t(label)}</p>}
+                                    <div className="space-y-2">
+                                        {rows.map((p: PrefMeta) => (
+                                            <button
+                                                key={p.key}
+                                                onClick={() => { void togglePref(p.key); }}
+                                                disabled={prefBusy !== null}
+                                                aria-pressed={prefs[p.key]}
+                                                className="w-full flex items-center justify-between gap-3 min-h-[52px] px-4 py-2.5 bg-black/[0.03] rounded-tile text-left disabled:opacity-60"
+                                            >
+                                                <span className="min-w-0">
+                                                    <span className="block text-[14px] font-medium">{t(p.title)}</span>
+                                                    <span className="block text-[11.5px] text-black/45 mt-0.5">{t(p.desc)}</span>
+                                                </span>
+                                                <span className={cn("relative w-11 h-6 rounded-full shrink-0 transition-colors", prefs[p.key] ? "bg-brand" : "bg-black/[0.12]")}>
+                                                    <span className={cn("absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all", prefs[p.key] ? "left-[22px]" : "left-0.5")} />
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </section>
                 )}
 
