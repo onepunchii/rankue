@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { umbRankings, umbEvents, umbPlayerNames, hiqPlayerFollows, hiqPlayerCheers, hiqBlocks, hiqMembers, pbaPlayers, pbaSeasonRanks, type InsertUmbRanking } from "../../shared/schema.js";
 import { and, eq, desc, asc, sql, inArray, ilike, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { UmbCategory, ParsedRanking, ArchiveEntry } from "../services/umbService.js";
 import { expiringEvents, projectedRank } from "../../shared/umbExpiry.js";
 import { toKoreanName } from "../services/umbKoreanName.js";
@@ -294,6 +295,33 @@ export class UmbRepository {
             await db.delete(hiqPlayerFollows)
                 .where(and(eq(hiqPlayerFollows.memberId, memberId), eq(hiqPlayerFollows.category, category), eq(hiqPlayerFollows.playerUmbId, playerUmbId)));
         }
+    }
+
+    /**
+     * 팔로우된 선수들의 최신 회차 순위 + 직전 회차 순위(2026-09-13 오너 제안 7번, 순위 변동 알림용).
+     * 팔로우 한 건 = 한 줄(같은 선수를 여러 회원이 팔로우하면 회원 수만큼). 최신 회차에 없는 선수는 빠진다(랭킹 이탈은 알리지 않는다).
+     * prevEdition 이 null 이면(회차가 하나뿐) prevRank 는 전부 null — 전원 '처음 등재'로 보인다.
+     */
+    async followedRows(category: UmbCategory, latestEdition: string, prevEdition: string | null): Promise<Array<{
+        memberId: string; playerUmbId: string; playerName: string; nativeName: string | null; rank: number; points: number; prevRank: number | null;
+    }>> {
+        const cur = alias(umbRankings, "cur");
+        const prev = alias(umbRankings, "prev");
+        const rows = await db.select({
+            memberId: hiqPlayerFollows.memberId,
+            playerUmbId: hiqPlayerFollows.playerUmbId,
+            playerName: cur.playerName,
+            nativeName: umbPlayerNames.nativeName,
+            rank: cur.rank,
+            points: cur.points,
+            prevRank: prev.rank,
+        })
+            .from(hiqPlayerFollows)
+            .innerJoin(cur, and(eq(cur.category, hiqPlayerFollows.category), eq(cur.edition, latestEdition), eq(cur.playerUmbId, hiqPlayerFollows.playerUmbId)))
+            .leftJoin(prev, and(eq(prev.category, hiqPlayerFollows.category), eq(prev.edition, prevEdition ?? "__none__"), eq(prev.playerUmbId, hiqPlayerFollows.playerUmbId)))
+            .leftJoin(umbPlayerNames, eq(umbPlayerNames.playerUmbId, hiqPlayerFollows.playerUmbId))
+            .where(eq(hiqPlayerFollows.category, category));
+        return rows.map((r) => ({ ...r, nativeName: r.nativeName ?? null, prevRank: r.prevRank ?? null }));
     }
 
     /* ── 응원글(2026-09-13 오너 제안 11번) ── */

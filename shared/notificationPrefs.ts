@@ -11,7 +11,7 @@
  */
 
 export type SportScope = "BILLIARDS" | "GOLF";
-export type PrefKey = "sim" | "rooms" | "crew" | "game" | "notice" | "golf";
+export type PrefKey = "sim" | "rooms" | "crew" | "game" | "players" | "notice" | "golf";
 
 export interface PrefMeta {
     readonly key: PrefKey;
@@ -27,6 +27,8 @@ export const PREFS: readonly PrefMeta[] = [
     { key: "rooms", sport: "BILLIARDS", title: "settings.notifRooms", desc: "settings.notifRoomsDesc" },
     { key: "crew", sport: "BILLIARDS", title: "settings.notifCrew", desc: "settings.notifCrewDesc" },
     { key: "game", sport: "BILLIARDS", title: "settings.notifGame", desc: "settings.notifGameDesc" },
+    // 관심 선수(2026-09-13 오너 제안 7번): 세계랭킹 새 회차에서 팔로우한 선수의 순위가 바뀌면
+    { key: "players", sport: "BILLIARDS", title: "settings.notifPlayers", desc: "settings.notifPlayersDesc" },
     { key: "notice", sport: "BILLIARDS", title: "settings.notifNotice", desc: "settings.notifNoticeDesc" },
     { key: "golf", sport: "GOLF", title: "settings.notifGolf", desc: "settings.notifGolfDesc" },
 ];
@@ -50,6 +52,7 @@ export function prefKeyFor(category?: string | null, type?: string | null): Pref
     if (t === "TOURNAMENT" || t === "ACTIVITY" || t === "ACTIVITY_REMINDER" || t === "POLL" || t === "POLL_REMINDER"
         || t === "SETTLEMENT" || t === "CHAT" || t === "POST_COMMENT" || t === "CREW" || t === "COMMUNITY") return "crew";
     if (t === "MATCH" || t === "FRIEND" || t === "CHALLENGE") return "game";
+    if (t === "PLAYER_RANK") return "players";
     return "notice";
 }
 

@@ -40,11 +40,14 @@ async function handleUmbSync(req: any, res: any) {
     if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
     const { syncUmbRankings } = await import("../../services/umbSync.js");
     const result = await syncUmbRankings();
+    // 새 회차가 들어온 부문만 — 관심 선수 순위 변동 알림(2026-09-13 오너 제안 7번). 적재가 없는 날은 조용하다.
+    const { notifyFollowersOfNewEditions } = await import("../../services/playerFollowAlerts.js");
+    const followAlerts = await notifyFollowersOfNewEditions(result.ingested.map((i) => i.category));
     // 동기화 직후에 "새 데이터가 들어왔나"를 확인하고, 밀려 있으면 운영자에게 알린다(하루 한 번).
     const { checkUmbHealth, alertIfUnhealthy } = await import("../../services/feedHealth.js");
     const issues = await checkUmbHealth();
     const alerted = await alertIfUnhealthy(issues);
-    return sendSuccess(res, { ...result, health: issues, alerted });
+    return sendSuccess(res, { ...result, followAlerts, health: issues, alerted });
 }
 router.get("/umb-sync", asyncHandler(handleUmbSync));
 router.post("/umb-sync", asyncHandler(handleUmbSync));

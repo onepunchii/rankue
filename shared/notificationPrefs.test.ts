@@ -21,6 +21,9 @@ describe("prefKeyFor", () => {
         expect(prefKeyFor("GOLF", "MATCH")).toBe("golf");               // 당구였다면 game
         expect(prefKeyFor("BILLIARDS", "ACTIVITY_REMINDER")).toBe("crew");
     });
+    it("관심 선수 순위 변동은 players 로(2026-09-13 오너 제안 7번)", () => {
+        expect(prefKeyFor("BILLIARDS", "PLAYER_RANK")).toBe("players");
+    });
     it("모르는 것은 공지로 본다 — 끌 수 있는 쪽이 기본", () => {
         expect(prefKeyFor("admin", "broadcast")).toBe("notice");
         expect(prefKeyFor(null, null)).toBe("notice");
@@ -48,10 +51,10 @@ describe("normalizePrefs / fullPrefs", () => {
         expect(normalizePrefs({ rooms: false, 해킹: true })).toEqual({ rooms: false });
     });
     it("화면에는 모든 칸이 온다", () => {
-        expect(fullPrefs({ rooms: false })).toEqual({ sim: true, rooms: false, crew: true, game: true, notice: true, golf: true });
+        expect(fullPrefs({ rooms: false })).toEqual({ sim: true, rooms: false, crew: true, game: true, players: true, notice: true, golf: true });
     });
     it("종목으로 묶어 준다 — 골프를 성격별로 쪼갤 자리다", () => {
-        expect(prefsForSport("BILLIARDS").map((p) => p.key)).toEqual(["sim", "rooms", "crew", "game", "notice"]);
+        expect(prefsForSport("BILLIARDS").map((p) => p.key)).toEqual(["sim", "rooms", "crew", "game", "players", "notice"]);
         expect(prefsForSport("GOLF").map((p) => p.key)).toEqual(["golf"]);
     });
 });

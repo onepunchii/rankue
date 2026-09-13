@@ -125,6 +125,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
         qc.setQueryData<UmbPlayerDetail>(detailKey, { ...data, following: next, followers: Math.max(0, (data.followers ?? 0) + (next ? 1 : -1)) });
         try {
             await apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}/follow`, { method: "PUT", body: { on: next } });
+            if (next) toast({ title: t("umb.followOn") });   // 알림이 붙는다는 걸 여기서 한 번 알려 준다(설정의 '관심 선수' 칸으로 끌 수 있다)
         } catch {
             qc.setQueryData<UmbPlayerDetail>(detailKey, data);
         } finally {
