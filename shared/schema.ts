@@ -1551,6 +1551,20 @@ export type InsertStoreListing = typeof storeListings.$inferInsert;
 // 선수 네이티브 이름 — 로마자 표기(UMB 원본)의 현지 문자 표기.
 // 한국 선수는 로마자→한글 결정적 변환기(umbKoreanName.ts)가 채운다.
 // 자국 문자로 검색·표시하는 사용자를 위함 ("조명우" ↔ "CHO Myung Woo").
+/**
+ * 관심 선수(팔로우, 2026-09-13 오너). 랭큐 회원이 UMB 선수를 따라간다 — 랭큐 회원끼리의 '라이벌'(함께 친 상대)과는
+ * 다른 개념이라 따로 둔다. 순위 변동 알림(7번)이 이 표를 보고 보낸다.
+ */
+export const hiqPlayerFollows = pgTable("hiq_player_follows", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  category: text("category", { enum: ["players", "ladies", "juniors"] }).notNull(),
+  playerUmbId: text("player_umb_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.memberId, t.category, t.playerUmbId),
+}));
+
 export const umbPlayerNames = pgTable("umb_player_names", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   playerUmbId: text("player_umb_id").notNull(),

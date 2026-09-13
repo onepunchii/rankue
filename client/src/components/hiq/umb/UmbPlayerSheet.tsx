@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { pointsByContinent } from "@shared/umbContinent";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
@@ -7,7 +10,20 @@ import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { useT } from "@/lib/i18n";
 import { LucideX } from "@/lib/icons";
-import { UMB_SOURCE_URL, type UmbCategory, type UmbPlayerDetail } from "./types";
+import { ageFrom, regionName as regionNameOf, UMB_SOURCE_URL, type UmbCategory, type UmbPlayerDetail } from "./types";
+
+/** 대회 수가 많으면 상위 몇 개만 펴 둔다 — 8개 넘게 늘어져 페이지가 길었다(2026-09-13 오너). */
+const POINTS_FOLD = 5;
+
+/** 원 단위 상금 → "9.9억" / "5,015만" 처럼 짧게. 한국어 화면에서만 단위를 붙인다. */
+function formatPrize(won: number, locale: string): string {
+    if (locale === "ko") {
+        if (won >= 100_000_000) return `${(won / 100_000_000).toFixed(won >= 1_000_000_000 ? 0 : 1)}억`;
+        if (won >= 10_000) return `${Math.round(won / 10_000).toLocaleString("ko-KR")}만`;
+        return won.toLocaleString("ko-KR");
+    }
+    return `₩${Math.round(won / 1_000_000).toLocaleString()}M`;
+}
 
 // 디자인 토큰 리터럴 — recharts는 CSS 변수를 못 받는다 (GrowthChart와 동일 팔레트)
 const BRAND = "#006241";
@@ -37,8 +53,30 @@ interface UmbPlayerBodyProps {
 // 순위 히스토리 + 대회별 포인트 분해 + 성취 뱃지 + 1년 전 대비 + 국내 라이벌.
 export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }: UmbPlayerBodyProps) => {
     const { t, locale } = useT();
+    const { member } = useAuth();
+    const { toast } = useToast();
+    const qc = useQueryClient();
     const [metric, setMetric] = useState<"rank" | "points">("rank");
+    const [showAllPoints, setShowAllPoints] = useState(false);
+    const [followBusy, setFollowBusy] = useState(false);
     const { data, isLoading } = usePlayerDetail(category, playerUmbId);
+    const detailKey = [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v2"];
+
+    /** 관심 선수 켜기/끄기 — 낙관적으로 먼저 바꾸고 실패하면 되돌린다. 비로그인은 안내만. */
+    const toggleFollow = async () => {
+        if (!data || followBusy) return;
+        if (!member) { toast({ title: t("umb.followLogin") }); return; }
+        const next = !data.following;
+        setFollowBusy(true);
+        qc.setQueryData<UmbPlayerDetail>(detailKey, { ...data, following: next, followers: Math.max(0, (data.followers ?? 0) + (next ? 1 : -1)) });
+        try {
+            await apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}/follow`, { method: "PUT", body: { on: next } });
+        } catch {
+            qc.setQueryData<UmbPlayerDetail>(detailKey, data);
+        } finally {
+            setFollowBusy(false);
+        }
+    };
 
     const player = data?.player;
     const history = data?.history || [];
@@ -54,6 +92,14 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
             .filter(([, v]) => v !== 0)
             .sort((a, b) => b[1] - a[1])
         : [];
+
+    // 대륙별 강세 · 나이(PBA 생일) · 국내 리더보드(2026-09-13 오너 제안)
+    const continents = pointsByContinent(player?.eventPoints, eventLabels);
+    const age = ageFrom(data?.pba?.birthday);
+    const national = data?.national;
+    const nationalTopIds = new Set((national?.top ?? []).map(r => r.playerUmbId));
+    const nearby = (data?.rivals ?? []).filter(r => !nationalTopIds.has(r.playerUmbId));
+    const pba = data?.pba ?? null;
 
     // --- 히스토리 파생 지표 (전부 이미 받은 데이터로 계산) ---
     const last = history[history.length - 1];
@@ -114,8 +160,24 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                 </TitleTag>
                 <DescTag className="text-[12.5px] font-medium text-black/50 mt-1">
                     {locale === "ko" && player.nativeName ? `${player.playerName} · ` : player.nativeName ? `${player.nativeName} · ` : ""}
+                    {age !== null ? `${t("umb.age").replace("{n}", String(age))} · ` : ""}
                     {t(`umb.cat${category === "players" ? "Players" : category === "ladies" ? "Ladies" : "Juniors"}`)} · {t("umb.subtitle")}
                 </DescTag>
+                {/* 관심 선수(팔로우, 2026-09-13 오너). 순위 변동 알림이 여기 붙는다. 비로그인은 눌러도 안내만. */}
+                <div className="flex items-center gap-2 mt-2.5">
+                    <button
+                        type="button" onClick={() => { void toggleFollow(); }} disabled={followBusy} aria-pressed={!!data?.following}
+                        className={cn(
+                            "h-9 px-3.5 rounded-full text-[12.5px] font-bold transition-colors disabled:opacity-60",
+                            data?.following ? "bg-brand text-brand-fg" : "bg-black/[0.05] text-ink-1 hover:bg-black/[0.08]",
+                        )}
+                    >
+                        {data?.following ? t("umb.following") : `♡ ${t("umb.follow")}`}
+                    </button>
+                    {(data?.followers ?? 0) > 0 && (
+                        <span className="text-[12px] font-medium text-black/45">{t("umb.followers").replace("{n}", String(data!.followers))}</span>
+                    )}
+                </div>
                 {badges.length > 0 && (
                     <div className="flex gap-1.5 flex-wrap mt-2.5">
                         {badges.map(b => (
@@ -193,24 +255,84 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                 </div>
             )}
 
-            {/* 국내 라이벌 — 같은 국가에서 순위가 가장 가까운 선수. 탭하면 이동 */}
-            {(data?.rivals?.length ?? 0) > 0 && (
+            {/* 국내 순위(2026-09-13 오너): "한국 12명 중 3위" 맥락 + 상위 5명 + 가까운 순위. 탭하면 그 선수로 이동 */}
+            {national && national.top.length > 0 && (
                 <div>
-                    <h3 className="text-[13.5px] font-bold text-ink-1 mb-2">{flagEmoji(player.fed)} {t("umb.rivals")}</h3>
+                    <div className="flex items-baseline justify-between gap-2 mb-2">
+                        <h3 className="text-[13.5px] font-bold text-ink-1">{flagEmoji(player.fed)} {t("umb.national")}</h3>
+                        {player.nationalRank && (
+                            <span className="text-[12px] font-semibold text-black/50">
+                                {t("umb.nationalOf").replace("{fed}", regionNameOf(player.fed, locale)).replace("{n}", String(national.fedCount)).replace("{r}", String(player.nationalRank))}
+                            </span>
+                        )}
+                    </div>
                     <div className="flex flex-col gap-1.5">
-                        {data!.rivals.map(r => (
-                            <button
-                                key={r.playerUmbId}
-                                onClick={() => onNavigate?.(r.playerUmbId)}
-                                disabled={!onNavigate}
-                                className="flex items-center gap-3 rounded-xl bg-black/[0.03] px-3 py-2.5 text-left hover:bg-black/[0.06] transition-colors"
-                            >
-                                <span className="w-9 shrink-0 text-center font-bold text-[13.5px] tabular-nums text-black/45">{r.rank}</span>
-                                <span className="flex-1 min-w-0 truncate text-[13.5px] font-semibold text-ink-1">{locale === "ko" && r.nativeName ? r.nativeName : r.playerName}</span>
-                                <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-black/45">{r.points}{t("umb.pointsUnit")}</span>
-                            </button>
+                        {national.top.map(r => {
+                            const me = r.playerUmbId === player.playerUmbId;
+                            return (
+                                <button
+                                    key={r.playerUmbId}
+                                    onClick={() => onNavigate?.(r.playerUmbId)}
+                                    disabled={!onNavigate || me}
+                                    className={cn(
+                                        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+                                        me ? "bg-brand/10 ring-1 ring-brand/30" : "bg-black/[0.03] hover:bg-black/[0.06]",
+                                    )}
+                                >
+                                    <span className="w-9 shrink-0 text-center font-bold text-[13.5px] tabular-nums text-black/45">{r.rank}</span>
+                                    <span className={cn("flex-1 min-w-0 truncate text-[13.5px] font-semibold", me ? "text-brand" : "text-ink-1")}>{locale === "ko" && r.nativeName ? r.nativeName : r.playerName}</span>
+                                    <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-black/45">{r.points}{t("umb.pointsUnit")}</span>
+                                </button>
+                            );
+                        })}
+                        {nearby.length > 0 && (
+                            <>
+                                <p className="text-[11px] font-semibold text-black/40 mt-1 px-0.5">{t("umb.nearby")}</p>
+                                {nearby.map(r => (
+                                    <button
+                                        key={r.playerUmbId}
+                                        onClick={() => onNavigate?.(r.playerUmbId)}
+                                        disabled={!onNavigate}
+                                        className="flex items-center gap-3 rounded-xl bg-black/[0.03] px-3 py-2.5 text-left hover:bg-black/[0.06] transition-colors"
+                                    >
+                                        <span className="w-9 shrink-0 text-center font-bold text-[13.5px] tabular-nums text-black/45">{r.rank}</span>
+                                        <span className="flex-1 min-w-0 truncate text-[13.5px] font-semibold text-ink-1">{locale === "ko" && r.nativeName ? r.nativeName : r.playerName}</span>
+                                        <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-black/45">{r.points}{t("umb.pointsUnit")}</span>
+                                    </button>
+                                ))}
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* PBA 통산 기록(2026-09-13 오너): UMB 랭킹에는 없는 진짜 경기 수치 — 교차 매칭된 선수(167명)에게만 */}
+            {pba && (
+                <div>
+                    <h3 className="text-[13.5px] font-bold text-ink-1 mb-2">{t("umb.pbaTitle").replace("{league}", pba.league)}</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                        {[
+                            { label: t("umb.pbaAverage"), value: pba.average !== null ? pba.average.toFixed(3) : "—", accent: true },
+                            { label: t("umb.pbaHighRun"), value: pba.highRun !== null ? String(pba.highRun) : "—" },
+                            { label: t("umb.pbaBank"), value: pba.bankShotRate !== null ? `${pba.bankShotRate.toFixed(1)}%` : "—" },
+                            { label: t("umb.pbaRecord"), value: pba.win !== null && pba.lose !== null ? `${pba.win}-${pba.lose}${pba.draw ? `-${pba.draw}` : ""}` : "—" },
+                            { label: t("umb.pbaPrize"), value: pba.careerPrize ? formatPrize(pba.careerPrize, locale) : "—" },
+                        ].map((c) => (
+                            <div key={c.label} className="rounded-2xl bg-black/[0.03] p-3 text-center">
+                                <div className={cn("text-[17px] font-bold tabular-nums", c.accent ? "text-brand" : "text-ink-1")}>{c.value}</div>
+                                <div className="text-[10.5px] font-semibold text-black/45 mt-0.5">{c.label}</div>
+                            </div>
                         ))}
                     </div>
+                    {pba.season && (
+                        <p className="text-[12px] font-medium text-black/50 mt-2 px-0.5">
+                            {t("umb.pbaSeason")
+                                .replace("{season}", String(pba.season.season)).replace("{next}", String((pba.season.season + 1) % 100).padStart(2, "0"))
+                                .replace("{r}", pba.season.prizeRank ? String(pba.season.prizeRank) : "—")
+                                .replace("{p}", pba.season.pointRank ? String(pba.season.pointRank) : "—")}
+                        </p>
+                    )}
+                    <p className="text-[11px] font-medium text-black/35 mt-1 px-0.5">{t("umb.pbaSource")}</p>
                 </div>
             )}
 
@@ -218,8 +340,20 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
             {breakdown.length > 0 && (
                 <div>
                     <h3 className="text-[13.5px] font-bold text-ink-1 mb-2">{t("umb.pointsBreakdown")}</h3>
+                    {/* 어디서 점수를 버나 — 대회 이름의 연맹 약자로 대륙을 가른다(2026-09-13 오너 제안) */}
+                    {continents.length > 1 && (
+                        <div className="flex gap-1.5 flex-wrap mb-2.5">
+                            {continents.map((c) => (
+                                <span key={c.continent} className="inline-flex items-baseline gap-1 px-2.5 py-1 rounded-full bg-black/[0.04] text-[11.5px] font-semibold text-ink-2">
+                                    {t(`umb.cont.${c.continent}`)}
+                                    <span className="font-bold text-brand tabular-nums">{c.points}</span>
+                                    <span className="text-black/40">· {t("umb.contEvents").replace("{n}", String(c.events))}</span>
+                                </span>
+                            ))}
+                        </div>
+                    )}
                     <div className="flex flex-col gap-1.5">
-                        {breakdown.map(([colKey, pts], idx) => {
+                        {(showAllPoints ? breakdown : breakdown.slice(0, POINTS_FOLD)).map(([colKey, pts], idx) => {
                             const max = breakdown[0][1] || 1;
                             return (
                                 <div key={colKey} className="rounded-xl bg-black/[0.03] px-3 py-2">
@@ -240,6 +374,14 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                 </div>
                             );
                         })}
+                        {breakdown.length > POINTS_FOLD && (
+                            <button
+                                type="button" onClick={() => setShowAllPoints((v) => !v)}
+                                className="h-10 rounded-xl bg-black/[0.03] text-[12.5px] font-semibold text-ink-2 hover:bg-black/[0.06] transition-colors"
+                            >
+                                {showAllPoints ? t("umb.showLess") : t("umb.showMore").replace("{n}", String(breakdown.length - POINTS_FOLD))}
+                            </button>
+                        )}
                         {player.penaltyPoints > 0 && (
                             <div className="flex items-center justify-between rounded-xl bg-black/[0.03] px-3 py-2">
                                 <span className="text-[12px] font-medium text-ink-2">{t("umb.penalty")}</span>

@@ -44,6 +44,41 @@ export interface UmbPlayerDetail {
     history: Array<{ edition: string; editionDate: string; rank: number; points: number }>;
     events: Array<{ colKey: string; label: string }>;
     rivals: Array<{ rank: number; playerName: string; nativeName?: string | null; playerUmbId: string; points: number }>;
+    /** 국내 미니 리더보드(2026-09-13): 같은 국가 상위 5 + 등재 인원 */
+    national?: {
+        fedCount: number;
+        top: Array<{ rank: number; playerName: string; nativeName?: string | null; playerUmbId: string; points: number }>;
+    };
+    /** PBA 교차 매칭 수치(매칭된 선수만). UMB 랭킹에는 없는 진짜 경기 수치다. */
+    pba?: {
+        league: "PBA" | "LPBA";
+        memCode: string;
+        nameKo: string;
+        birthday: string | null;
+        average: number | null;
+        highRun: number | null;
+        bankShotRate: number | null;
+        win: number | null;
+        lose: number | null;
+        draw: number | null;
+        careerPrize: number | null;
+        season: { season: number; prizeRank: number | null; pointRank: number | null; prize: number; rankingPoint: number } | null;
+    } | null;
+    /** 이 선수를 관심 선수로 둔 랭큐 회원 수 */
+    followers?: number;
+    /** 로그인한 나의 팔로우 여부 */
+    following?: boolean;
+}
+
+/** 생일 → 만 나이. 형식이 이상하면 null. */
+export function ageFrom(birthday: string | null | undefined, now = new Date()): number | null {
+    if (!birthday || !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return null;
+    const b = new Date(birthday + "T00:00:00Z");
+    if (Number.isNaN(b.getTime())) return null;
+    let age = now.getUTCFullYear() - b.getUTCFullYear();
+    const m = now.getUTCMonth() - b.getUTCMonth();
+    if (m < 0 || (m === 0 && now.getUTCDate() < b.getUTCDate())) age -= 1;
+    return age >= 0 && age < 120 ? age : null;
 }
 
 export const UMB_CATEGORIES: Array<{ id: UmbCategory; labelKey: string }> = [

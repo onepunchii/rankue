@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
+import type { NextFunction } from "express";
 import { Response } from "express";
 import { storage } from "../../storage/index.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
@@ -41,13 +43,31 @@ router.get("/rankings", asyncHandler(async (req: any, res: Response) => {
 }));
 
 // GET /umb/players/:category/:umbId — 선수 상세 + 히스토리 + 대회 레전드
-router.get("/players/:category/:umbId", asyncHandler(async (req: any, res: Response) => {
+// 로그인은 선택 — 공개 페이지지만 로그인한 회원에겐 '팔로우 중' 을 같이 알려 준다(서명 쿠키만 믿는다)
+const optionalAuth = (req: AuthRequest, _res: Response, next: NextFunction) => {
+    const userId = (req as any).signedCookies?.hiq_user_id;
+    if (typeof userId === "string" && userId) req.userId = userId;
+    next();
+};
+
+router.get("/players/:category/:umbId", optionalAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
     const category = parseCategory(req.params.category);
     if (!category) return sendError(res, 400, "잘못된 부문입니다");
     if (!/^\d{1,6}$/.test(req.params.umbId)) return sendError(res, 404, "선수를 찾을 수 없습니다");
     const data = await storage.umb.getPlayerHistory(category, req.params.umbId);
     if (!data) return sendError(res, 404, "선수를 찾을 수 없습니다");
-    return sendSuccess(res, data);
+    const following = req.userId ? await storage.umb.isFollowing(req.userId, category, req.params.umbId) : false;
+    return sendSuccess(res, { ...data, following });
+}));
+
+// PUT /umb/players/:category/:umbId/follow { on: boolean } — 관심 선수 켜기/끄기(2026-09-13 오너)
+router.put("/players/:category/:umbId/follow", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
+    const category = parseCategory(req.params.category);
+    if (!category) return sendError(res, 400, "잘못된 부문입니다");
+    if (!/^\d{1,6}$/.test(req.params.umbId)) return sendError(res, 404, "선수를 찾을 수 없습니다");
+    const on = req.body?.on === true;
+    await storage.umb.setFollowing(req.userId!, category, req.params.umbId, on);
+    return sendSuccess(res, { following: on });
 }));
 
 // GET /umb/movers?category= — 이번 주 순위 상승 톱

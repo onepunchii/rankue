@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { umbRankings, umbEvents, umbPlayerNames, type InsertUmbRanking } from "../../shared/schema.js";
+import { umbRankings, umbEvents, umbPlayerNames, hiqPlayerFollows, pbaPlayers, pbaSeasonRanks, type InsertUmbRanking } from "../../shared/schema.js";
 import { and, eq, desc, asc, sql, inArray, ilike, or } from "drizzle-orm";
 import type { UmbCategory, ParsedRanking, ArchiveEntry } from "../services/umbService.js";
 import { toKoreanName } from "../services/umbKoreanName.js";
@@ -198,14 +198,56 @@ export class UmbRepository {
             .limit(2) : [];
         const rivals = rivalsRaw.sort((a, b) => a.rank - b.rank);
 
-        // 네이티브 이름(한글 등) 일괄 조회 — 본인 + 라이벌
+        // 국내 미니 리더보드(2026-09-13 오너): 같은 국가 상위 5 + 그 나라 등재 인원. "한국 12명 중 3위" 의 맥락이 된다.
+        const nationalTopRaw = latestRow ? await db.select({
+            rank: umbRankings.rank, playerName: umbRankings.playerName, playerUmbId: umbRankings.playerUmbId, points: umbRankings.points,
+        })
+            .from(umbRankings)
+            .where(and(eq(umbRankings.category, category), eq(umbRankings.edition, latestEdition), eq(umbRankings.fed, latestRow.fed)))
+            .orderBy(asc(umbRankings.rank))
+            .limit(5) : [];
+        const [fedCountRow] = latestRow ? await db.select({ n: sql<number>`count(*)::int` })
+            .from(umbRankings)
+            .where(and(eq(umbRankings.category, category), eq(umbRankings.edition, latestEdition), eq(umbRankings.fed, latestRow.fed))) : [{ n: 0 }];
+
+        // PBA 교차 매칭(2026-09-13 오너): 우리가 모아 둔 PBA 통산 수치 — 에버리지·하이런·뱅크샷·승패·상금·생일.
+        // UMB 랭킹에는 없는 '진짜 경기 수치' 라 매칭된 선수(167명)에게만 보여 준다.
+        const [pbaRow] = await db.select().from(pbaPlayers).where(eq(pbaPlayers.umbPlayerId, playerUmbId)).limit(1);
+        const [pbaSeason] = pbaRow ? await db.select({
+            season: pbaSeasonRanks.season, prizeRank: pbaSeasonRanks.prizeRank, pointRank: pbaSeasonRanks.pointRank,
+            prize: pbaSeasonRanks.prize, rankingPoint: pbaSeasonRanks.rankingPoint,
+        })
+            .from(pbaSeasonRanks)
+            .where(and(eq(pbaSeasonRanks.memCode, pbaRow.memCode), eq(pbaSeasonRanks.league, pbaRow.league)))
+            .orderBy(desc(pbaSeasonRanks.season))
+            .limit(1) : [];
+        const pba = pbaRow ? {
+            league: pbaRow.league, memCode: pbaRow.memCode, nameKo: pbaRow.nameKo, birthday: pbaRow.birthday,
+            average: pbaRow.average, highRun: pbaRow.highRun, bankShotRate: pbaRow.bankShotRate,
+            win: pbaRow.win, lose: pbaRow.lose, draw: pbaRow.draw, careerPrize: pbaRow.careerPrize,
+            season: pbaSeason ? { season: pbaSeason.season, prizeRank: pbaSeason.prizeRank, pointRank: pbaSeason.pointRank, prize: pbaSeason.prize, rankingPoint: pbaSeason.rankingPoint } : null,
+        } : null;
+
+        // 팔로워 수 — 이 선수를 관심 선수로 둔 랭큐 회원
+        const [followRow] = await db.select({ n: sql<number>`count(*)::int` })
+            .from(hiqPlayerFollows)
+            .where(and(eq(hiqPlayerFollows.category, category), eq(hiqPlayerFollows.playerUmbId, playerUmbId)));
+
+        // 네이티브 이름(한글 등) 일괄 조회 — 본인 + 라이벌 + 국내 상위
+        const nameIds = [...new Set([playerUmbId, ...rivals.map(r => r.playerUmbId), ...nationalTopRaw.map(r => r.playerUmbId)])];
         const nameRows = await db.select({ playerUmbId: umbPlayerNames.playerUmbId, nativeName: umbPlayerNames.nativeName })
             .from(umbPlayerNames)
-            .where(inArray(umbPlayerNames.playerUmbId, [playerUmbId, ...rivals.map(r => r.playerUmbId)]));
+            .where(inArray(umbPlayerNames.playerUmbId, nameIds));
         const nativeNames = new Map(nameRows.map(n => [n.playerUmbId, n.nativeName]));
 
         return {
             rivals: rivals.map(r => ({ ...r, nativeName: nativeNames.get(r.playerUmbId) ?? null })),
+            national: {
+                fedCount: fedCountRow?.n ?? 0,
+                top: nationalTopRaw.map(r => ({ ...r, nativeName: nativeNames.get(r.playerUmbId) ?? null })),
+            },
+            pba,
+            followers: followRow?.n ?? 0,
             player: latestRow ? {
                 playerName: latestRow.playerName,
                 nativeName: nativeNames.get(playerUmbId) ?? null,
@@ -221,6 +263,24 @@ export class UmbRepository {
             history,
             events,
         };
+    }
+
+    /** 이 회원이 그 선수를 팔로우 중인가. */
+    async isFollowing(memberId: string, category: UmbCategory, playerUmbId: string): Promise<boolean> {
+        const [row] = await db.select({ id: hiqPlayerFollows.id }).from(hiqPlayerFollows)
+            .where(and(eq(hiqPlayerFollows.memberId, memberId), eq(hiqPlayerFollows.category, category), eq(hiqPlayerFollows.playerUmbId, playerUmbId)))
+            .limit(1);
+        return !!row;
+    }
+
+    /** 팔로우 켜기/끄기. 켤 때 이미 있으면 그대로(유니크 충돌을 무시). */
+    async setFollowing(memberId: string, category: UmbCategory, playerUmbId: string, on: boolean): Promise<void> {
+        if (on) {
+            await db.insert(hiqPlayerFollows).values({ memberId, category, playerUmbId }).onConflictDoNothing();
+        } else {
+            await db.delete(hiqPlayerFollows)
+                .where(and(eq(hiqPlayerFollows.memberId, memberId), eq(hiqPlayerFollows.category, category), eq(hiqPlayerFollows.playerUmbId, playerUmbId)));
+        }
     }
 
     // 이번 주 무버 — 최신 vs 직전 회차의 순위 상승 톱 N (상위 200위 안에서)
