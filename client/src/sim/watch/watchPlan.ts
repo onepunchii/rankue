@@ -21,6 +21,20 @@ export const WATCH_POLL_MS = 4000;
 /** 이만큼 이상 밀렸으면 앞의 샷은 재생하지 않고 상태만 따라간다(뒤늦게 들어온 관전자). */
 export const WATCH_CATCHUP_LIMIT = 3;
 
+/**
+ * 대기 방 목록이 바뀌었나 — 바뀌었으면 관전 목록을 곧바로 다시 받아야 한다(2026-09-13 오너 제보).
+ * 두 목록은 주기가 달라(방 10초 · 관전 15초), 누가 참가하면 그 방이 대기 목록에서 빠진 뒤에도
+ * 관전 목록에는 최대 15초 동안 안 나타나 화면이 "열린 방이 없어요" 로 비었다.
+ * 첫 응답(prev === null)은 바뀐 것이 아니다 — 처음 받아 본 것뿐이라 다시 받을 이유가 없다.
+ */
+export function roomSetKey(ids: readonly string[]): string {
+    return [...ids].sort().join(",");
+}
+
+export function shouldRefreshWatch(prev: string | null, next: string): boolean {
+    return prev !== null && prev !== next;
+}
+
 export type WatchPlan =
     | { kind: "idle" }
     | { kind: "fetch"; from: number };

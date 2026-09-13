@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planWatch, shouldSkipAnimation, nextPollMs, normalizeShots, WATCH_POLL_MS } from "./watchPlan";
+import { planWatch, roomSetKey, shouldRefreshWatch, shouldSkipAnimation, nextPollMs, normalizeShots, WATCH_POLL_MS } from "./watchPlan";
 import type { MatchShot } from "../matchApi";
 
 const shot = (idx: number): MatchShot => ({
@@ -44,5 +44,25 @@ describe("normalizeShots", () => {
     it("중복은 버리고, 번호가 비면 거기서 끊는다", () => {
         expect(normalizeShots([shot(1), shot(3), shot(4)], 3).map((s) => s.idx)).toEqual([3, 4]);
         expect(normalizeShots([shot(3), shot(5)], 3).map((s) => s.idx)).toEqual([3]);
+    });
+});
+
+/**
+ * 방 목록이 바뀌면 관전 목록을 바로 다시 받는다(2026-09-13 오너 제보:
+ * "누가 방을 만들고 누가 참여하면 '열린 방이 없어요' 라고 뜨고 얼마 뒤에 관전이 된다고 뜬다").
+ */
+describe("shouldRefreshWatch", () => {
+    it("방이 빠지면(누가 참가했다) 다시 받는다", () => {
+        expect(shouldRefreshWatch(roomSetKey(["a", "b"]), roomSetKey(["a"]))).toBe(true);
+    });
+    it("방이 새로 열려도 다시 받는다 — 목록 두 개가 어긋나지 않게", () => {
+        expect(shouldRefreshWatch(roomSetKey(["a"]), roomSetKey(["a", "b"]))).toBe(true);
+    });
+    it("그대로면 받지 않는다. 순서만 다른 것도 그대로다", () => {
+        expect(shouldRefreshWatch(roomSetKey(["a", "b"]), roomSetKey(["b", "a"]))).toBe(false);
+    });
+    it("첫 응답은 '바뀐 것' 이 아니다", () => {
+        expect(shouldRefreshWatch(null, roomSetKey(["a"]))).toBe(false);
+        expect(shouldRefreshWatch(null, roomSetKey([]))).toBe(false);
     });
 });

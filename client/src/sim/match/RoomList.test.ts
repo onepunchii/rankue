@@ -39,6 +39,7 @@ type ReactMod = typeof import("react");
 type ClientMod = typeof import("react-dom/client");
 type Mod = typeof import("./RoomList");
 type RQ = typeof import("@tanstack/react-query");
+let ROOMS_QUERY_KEY: Mod["ROOMS_QUERY_KEY"];
 let React: ReactMod; let createRoot: ClientMod["createRoot"]; let RoomList: Mod["RoomList"]; let roomAge: Mod["roomAge"]; let defaultJoinTarget: Mod["defaultJoinTarget"]; let rq: RQ; let dom: JSDOM;
 const globalsSet: string[] = [];
 
@@ -54,7 +55,7 @@ beforeAll(async () => {
     React = await import("react");
     if (!("React" in g)) { g.React = React; globalsSet.push("React"); }
     ({ createRoot } = await import("react-dom/client"));
-    ({ RoomList, roomAge, defaultJoinTarget } = await import("./RoomList"));
+    ({ RoomList, roomAge, defaultJoinTarget, ROOMS_QUERY_KEY } = await import("./RoomList"));
     rq = await import("@tanstack/react-query");
 });
 afterAll(() => { const g = globalThis as unknown as Record<string, unknown>; for (const k of globalsSet) delete g[k]; dom.window.close(); });

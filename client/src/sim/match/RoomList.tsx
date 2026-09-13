@@ -3,7 +3,7 @@
  * 행: 방장 · 종목/테이블 · 다마수 · 리얼리티 칩 · 비밀번호 칩 · 만든 지 n분 · "참가". 참가 → 다이얼로그(내 다마수 · 비밀번호) → POST /sim/matches/:id/join → onOpen(playing).
  * 화면의 초록은 다이얼로그의 "참가" 하나. 목록의 참가 버튼은 테두리 알약.
  */
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState, useRef} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { matchApi as defaultApi, matchErrorCode, type MatchApi, type MatchPublic, type WatchCard } from "../matchApi";
 import { gameLabel, rulesLabel, inningCapLabel } from "./matchView";
-import { WATCH_LIST_REFETCH_MS, WATCH_QUERY_KEY } from "../watch/watchPlan";
+import { roomSetKey, shouldRefreshWatch, WATCH_LIST_REFETCH_MS, WATCH_QUERY_KEY } from "../watch/watchPlan";
 import { isValidTarget } from "../setupPresets";
 import { TargetPicker } from "./MatchLobby";
 
@@ -205,9 +205,25 @@ export function RoomList({ onOpen, onWatch, onCreate, onClose, api = defaultApi,
     // 게임 중인 공개 방 — 참가 목록에서는 빠지지만 관전으로 들어갈 수 있어 같은 목록에 이어 붙인다.
     const watch = useQuery({ queryKey: WATCH_QUERY_KEY, queryFn: () => api.getWatchable(), refetchInterval: WATCH_LIST_REFETCH_MS, enabled: !!onWatch });
     const [target, setTarget] = useState<MatchPublic | null>(null);
+    const qc = useQueryClient();
     const nowMs = now();
     const rows = useMemo(() => q.data ?? [], [q.data]);
     const live = useMemo(() => (onWatch ? watch.data?.live ?? [] : []), [watch.data, onWatch]);
+
+    /**
+     * 대기 방 목록이 바뀌면 관전 목록도 바로 다시 받는다(2026-09-13 오너 제보).
+     * 두 목록은 주기가 달라서(방 10초 · 관전 15초), 누가 참가하면 그 방은 대기 목록에서 곧바로 빠지지만
+     * 관전 목록에는 최대 15초 뒤에야 나타났다 — 그 사이 화면이 "열린 방이 없어요" 로 비었다.
+     * 방 하나가 사라지는 사건 = 누가 참가했거나 방을 닫은 것이라, 그때만 한 번 더 받으면 된다(주기를 당기지 않는다).
+     */
+    const roomIdsRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!onWatch || !q.isSuccess) return;
+        const ids = roomSetKey(rows.map((m) => m.id));
+        const prev = roomIdsRef.current;
+        roomIdsRef.current = ids;
+        if (shouldRefreshWatch(prev, ids)) void qc.invalidateQueries({ queryKey: WATCH_QUERY_KEY });
+    }, [rows, q.isSuccess, onWatch, qc]);
     return (
         <div className="rank-arcade w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
             <div className="flex items-start justify-between gap-3 mb-3">
