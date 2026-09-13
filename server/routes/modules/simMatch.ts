@@ -161,6 +161,8 @@ async function broadcastRoomOpened(hostId: string, hostName: string, m: { gameTy
     // 그래서 여기서 기다린다. 다만 상대 푸시 서버가 늘어져도 방 만들기가 인질이 되지 않게 상한을 둔다.
     const sends = targets.map((memberId) => notificationService.sendAndSaveNotification({
         memberId, title, body, category: "BILLIARDS", type: "MATCH",
+        // 전체 방송이라 '멀티방 열림' 묶음이다 — 내 대전 알림(sim)과 따로 끌 수 있어야 한다(2026-09-13 오너)
+        pref: "rooms",
         params: { url: "/online-game?rooms=1" },
     }).catch((e) => { console.error("[RoomBroadcast]", e); }));
     await Promise.race([
@@ -177,6 +179,7 @@ function notifyUrl(memberId: string | null | undefined, title: string, body: str
     if (!memberId) return;
     notificationService.sendAndSaveNotification({
         memberId, title, body, category: "BILLIARDS", type: "MATCH",
+        pref: "sim",        // 내가 뛰는 대전 — 방 방송(rooms)과 따로 끈다
         params: { url },
     }).catch((e) => console.error("[SimMatchNotify]", e));
 }

@@ -128,6 +128,12 @@ export const hiqMembers = pgTable("hiq_members", {
   handi3c: integer("handi_3c"),
   handi4c: integer("handi_4c"),
   average: text("average"),
+  /**
+   * 알림 카테고리별 켬/끔(2026-09-13 오너: "크루 알림·온라인게임 알림 등 카테고리로 나눠서").
+   * {"rooms": false} 처럼 **끈 것만** 담는다 — 없는 키는 켜짐이라 카테고리를 새로 만들어도 옛 값을 손볼 필요가 없다.
+   * 규칙은 shared/notificationPrefs.ts. 끄면 푸시만 멈추고 인앱 알림함에는 그대로 쌓인다.
+   */
+  pushPrefs: jsonb("push_prefs"),
   rating3c: integer("rating_3c").default(0).notNull(),
   rating4c: integer("rating_4c").default(0).notNull(),
   avg3c: doublePrecision("avg_3c").default(0),

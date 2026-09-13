@@ -1,4 +1,5 @@
 import { storage } from '../storage/index.js';
+import { isPushAllowed, prefKeyFor, type PrefKey } from "../../shared/notificationPrefs.js";
 import { InsertHiqNotification } from '../../shared/schema.js';
 import { sendPushNative, type PushPayload } from './pushNative.js';
 
@@ -65,6 +66,8 @@ export class NotificationService {
         category?: string;
         type?: string;
         params?: any;
+        /** 알림 카테고리(설정에서 끌 수 있는 묶음). 생략하면 type 으로 고른다 — shared/notificationPrefs. */
+        pref?: PrefKey;
     }) {
         const { memberId, title, body, category, type, params: deepLinkParams } = params;
 
@@ -89,6 +92,13 @@ export class NotificationService {
             console.log(`[Push] No profile for member ${memberId}, saved to DB only.`);
             return;
         }
+        // 2-1. 카테고리별 켬/끔(2026-09-13 오너). **푸시만** 막는다 — 위에서 이미 알림함에 저장했다.
+        const prefKey = params.pref ?? prefKeyFor(category, type);
+        if (!isPushAllowed((member as { pushPrefs?: unknown }).pushPrefs, prefKey)) {
+            console.log(`[Push] Muted by member ${memberId} (${prefKey}), saved to DB only.`);
+            return;
+        }
+
         const profile = await storage.getProfile(member.profileId);
         const pushToken = profile?.pushToken;
 

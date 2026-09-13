@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { fullPrefs, normalizePrefs } from "../../../shared/notificationPrefs.js";
 import { golfAllowed } from "../../lib/golfAccess.js";
 import { put } from "@vercel/blob";
 import { deleteBlobs } from "../../utils/blob.js";
@@ -131,6 +132,27 @@ const gateProfileUgc = (req: AuthRequest, res: any, next: any) =>
     PROFILE_UGC_KEYS.some((k) => req.body?.[k] !== undefined && req.body?.[k] !== null)
         ? requireTermsAccepted(req, res, next)
         : next();
+
+/**
+ * GET /me/notification-prefs — 알림 카테고리별 켬/끔(2026-09-13 오너).
+ * 저장은 "끈 것만" 담지만 화면에는 다섯 칸을 다 내려 준다(없는 키 = 켜짐).
+ */
+router.get("/me/notification-prefs", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const member = await storage.getMemberById(req.userId!);
+    if (!member) return sendError(res, 404, "회원 정보 없음");
+    return sendSuccess(res, { prefs: fullPrefs((member as { pushPrefs?: unknown }).pushPrefs) });
+}));
+
+/** PATCH /me/notification-prefs — 보낸 카테고리만 바꾼다. 모르는 키는 버린다(normalizePrefs). */
+router.patch("/me/notification-prefs", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const member = await storage.getMemberById(req.userId!);
+    if (!member) return sendError(res, 404, "회원 정보 없음");
+    const patch = normalizePrefs(req.body?.prefs);
+    if (Object.keys(patch).length === 0) return sendError(res, 400, "바꿀 알림 설정이 없습니다");
+    const next = { ...normalizePrefs((member as { pushPrefs?: unknown }).pushPrefs), ...patch };
+    await storage.users.updateMember(req.userId!, { pushPrefs: next });
+    return sendSuccess(res, { prefs: fullPrefs(next) });
+}));
 
 router.patch("/me", requireAuth, gateProfileUgc, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);

@@ -9,6 +9,7 @@ import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import { flagEmoji } from "@/lib/flag";
 import { cn } from "@/lib/utils";
 import { BlockedMembersSection } from "@/components/hiq/community/BlockedMembersSection";
+import { PREF_KEYS, PREF_LABELS, type PrefKey } from "@shared/notificationPrefs";
 import {
     canOpenNotificationSettings, forgetPushToken, isNativeApp, openNotificationSettings, pushPermission, requestPushPermission,
     storedPushToken, type PushPermission,
@@ -22,6 +23,29 @@ export default function HiqSettings() {
     const { t, locale, setLocale } = useT();
 
     const { data: member } = useQuery<any>({ queryKey: ["/api/hiq/me"] });
+
+    /**
+     * 알림 카테고리별 켬/끔(2026-09-13 오너). 끄면 그 묶음의 **푸시만** 멈추고 알림함에는 그대로 쌓인다.
+     * 낙관적으로 먼저 뒤집고(스위치가 손가락을 따라와야 한다) 실패하면 되돌린다.
+     */
+    const { data: prefsData } = useQuery<{ prefs: Record<PrefKey, boolean> }>({ queryKey: ["/api/hiq/me/notification-prefs"] });
+    const [prefBusy, setPrefBusy] = useState<PrefKey | null>(null);
+    const prefs = prefsData?.prefs;
+    const togglePref = async (key: PrefKey) => {
+        if (!prefs || prefBusy) return;
+        const next = !prefs[key];
+        setPrefBusy(key);
+        queryClient.setQueryData(["/api/hiq/me/notification-prefs"], { prefs: { ...prefs, [key]: next } });
+        try {
+            await apiRequest("/api/hiq/me/notification-prefs", { method: "PATCH", body: { prefs: { [key]: next } } });
+        } catch {
+            queryClient.setQueryData(["/api/hiq/me/notification-prefs"], { prefs });
+            toast({ title: t("settings.notifPrefFailed"), variant: "destructive" });
+        } finally {
+            setPrefBusy(null);
+            void queryClient.invalidateQueries({ queryKey: ["/api/hiq/me/notification-prefs"] });
+        }
+    };
 
     // 알림 권한 — 앱에서만 보인다. OS 설정에서 바꾸고 돌아오면(화면이 다시 보이면) 다시 읽는다.
     const [pushPerm, setPushPerm] = useState<PushPermission>("unsupported");
@@ -222,6 +246,37 @@ export default function HiqSettings() {
                                 )}
                             </>
                         )}
+                    </section>
+                )}
+
+                {/* 알림 종류 — 카테고리별로 끈다(2026-09-13 오너). 끄면 푸시만 멈추고 알림함에는 남는다.
+                    OS 알림을 아예 꺼 둔 기기에서도 보여 준다 — 나중에 켰을 때의 설정이기도 하다. */}
+                {prefs && (
+                    <section className="rk-card p-5">
+                        <div className="flex items-center gap-2 mb-1">
+                            <LucideBell className="w-4 h-4 text-brand" />
+                            <h2 className="text-[15px] font-bold">{t("settings.notifKinds")}</h2>
+                        </div>
+                        <p className="text-[12px] text-black/45 mb-4">{t("settings.notifKindsDesc")}</p>
+                        <div className="space-y-2">
+                            {PREF_KEYS.map((k) => (
+                                <button
+                                    key={k}
+                                    onClick={() => { void togglePref(k); }}
+                                    disabled={prefBusy !== null}
+                                    aria-pressed={prefs[k]}
+                                    className="w-full flex items-center justify-between gap-3 min-h-[52px] px-4 py-2.5 bg-black/[0.03] rounded-tile text-left disabled:opacity-60"
+                                >
+                                    <span className="min-w-0">
+                                        <span className="block text-[14px] font-medium">{t(PREF_LABELS[k].title)}</span>
+                                        <span className="block text-[11.5px] text-black/45 mt-0.5">{t(PREF_LABELS[k].desc)}</span>
+                                    </span>
+                                    <span className={cn("relative w-11 h-6 rounded-full shrink-0 transition-colors", prefs[k] ? "bg-brand" : "bg-black/[0.12]")}>
+                                        <span className={cn("absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all", prefs[k] ? "left-[22px]" : "left-0.5")} />
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
                     </section>
                 )}
 
