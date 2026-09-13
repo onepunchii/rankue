@@ -157,6 +157,8 @@ export interface WatchCard {
     readonly guestName: string | null;
     readonly targets: readonly [number, number];
     readonly scores: readonly number[];
+    /** 선수별 하이런(점수 단위 — 4구는 10점 = 1캐롬). 다시보기 정렬·표시에 쓴다. */
+    readonly highRuns?: readonly number[];
     readonly innings: number;
     readonly turn: number;
     readonly shots: number;

@@ -107,6 +107,8 @@ function watchCard(m: MatchWithNames) {
         hostName: m.hostName, guestName: m.guestName,
         targets: [m.hostTarget, m.guestTarget ?? m.hostTarget] as const,
         scores, innings, turn: m.turn, shots: m.shots,
+        // 다시보기 목록의 정렬·표시에 쓴다(하이런·에버, 2026-09-13 오너). 단위는 점수 그대로 — 화면이 캐롬으로 읽는다.
+        highRuns: st ? st.players.map((p) => p.highRun) : [0, 0],
         watchers: countWatchers(m.watchers, Date.now()),
         winnerIndex: m.winnerId === null ? null : m.winnerId === m.hostId ? 0 : 1,
         startedAt: m.startedAt, finishedAt: m.finishedAt, lastShotAt: m.lastShotAt,
@@ -321,7 +323,8 @@ router.get("/sim/rooms", requireAuth, asyncHandler(async (req: AuthRequest, res:
 router.get("/sim/watch", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const [live, replays] = await Promise.all([
         storage.simMatch.listWatchable(req.userId!, "playing", Date.now() - WATCH_LIVE_WINDOW_MS, 20),
-        storage.simMatch.listWatchable(req.userId!, "finished", Date.now() - WATCH_REPLAY_WINDOW_MS, 20),
+        // 다시보기는 정렬(하이런·명경기)을 화면에서 하므로 후보를 넉넉히 내려 준다(2026-09-13 오너)
+        storage.simMatch.listWatchable(req.userId!, "finished", Date.now() - WATCH_REPLAY_WINDOW_MS, 60),
     ]);
     return sendSuccess(res, {
         live: live.map((m) => watchCard(m)),
