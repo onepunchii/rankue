@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { umbRankings, umbEvents, umbPlayerNames, hiqPlayerFollows, pbaPlayers, pbaSeasonRanks, type InsertUmbRanking } from "../../shared/schema.js";
 import { and, eq, desc, asc, sql, inArray, ilike, or } from "drizzle-orm";
 import type { UmbCategory, ParsedRanking, ArchiveEntry } from "../services/umbService.js";
+import { expiringEvents, projectedRank } from "../../shared/umbExpiry.js";
 import { toKoreanName } from "../services/umbKoreanName.js";
 
 // UMB 세계랭킹 저장소. 공개 데이터라 뷰어 개인화·차단 로직이 없고,
@@ -228,6 +229,17 @@ export class UmbRepository {
             season: pbaSeason ? { season: pbaSeason.season, prizeRank: pbaSeason.prizeRank, pointRank: pbaSeason.pointRank, prize: pbaSeason.prize, rankingPoint: pbaSeason.rankingPoint } : null,
         } : null;
 
+        // 포인트 만료 예고(2026-09-13 오너 제안 1번): 앞으로 6개월 안에 빠질 대회와, 그때의 예상 순위.
+        // 예상 순위는 "다른 선수 점수가 그대로라면" 이다 — 최신 편집본의 다른 선수 점수와 비교한다(서버에서만 들고 있는다).
+        const expiring = latestRow
+            ? expiringEvents(latestRow.eventPoints as Record<string, number> | null, new Map(events.map(e => [e.colKey, e.label])), latestRow.points)
+            : [];
+        const others = expiring.length > 0 ? (await db.select({ points: umbRankings.points })
+            .from(umbRankings)
+            .where(and(eq(umbRankings.category, category), eq(umbRankings.edition, latestEdition), sql`${umbRankings.playerUmbId} != ${playerUmbId}`)))
+            .map(r => r.points) : [];
+        const expiry = expiring.map(e => ({ ...e, projectedRank: projectedRank(e.pointsAfter, others) }));
+
         // 팔로워 수 — 이 선수를 관심 선수로 둔 랭큐 회원
         const [followRow] = await db.select({ n: sql<number>`count(*)::int` })
             .from(hiqPlayerFollows)
@@ -247,6 +259,7 @@ export class UmbRepository {
                 top: nationalTopRaw.map(r => ({ ...r, nativeName: nativeNames.get(r.playerUmbId) ?? null })),
             },
             pba,
+            expiry,
             followers: followRow?.n ?? 0,
             player: latestRow ? {
                 playerName: latestRow.playerName,

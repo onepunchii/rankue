@@ -64,6 +64,8 @@ export interface UmbPlayerDetail {
         careerPrize: number | null;
         season: { season: number; prizeRank: number | null; pointRank: number | null; prize: number; rankingPoint: number } | null;
     } | null;
+    /** 포인트 만료 예고(2026-09-13): 6개월 안에 빠질 대회, 빠지는 순서. 예상 순위는 다른 선수 점수가 그대로일 때 */
+    expiry?: Array<{ colKey: string; label: string; points: number; eventDate: string; expiresAround: string; pointsAfter: number; projectedRank: number }>;
     /** 이 선수를 관심 선수로 둔 랭큐 회원 수 */
     followers?: number;
     /** 로그인한 나의 팔로우 여부 */

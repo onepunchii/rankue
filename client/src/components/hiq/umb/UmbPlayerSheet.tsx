@@ -255,6 +255,34 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                 </div>
             )}
 
+            {/* 포인트 만료 예고(2026-09-13 오너 제안 1번) — UMB 공식 사이트도 안 보여 주는 정보. 문구는 언제나 '예상·무렵' */}
+            {(data?.expiry?.length ?? 0) > 0 && (
+                <div>
+                    <h3 className="text-[13.5px] font-bold text-ink-1 mb-0.5">{t("umb.expiryTitle")}</h3>
+                    <p className="text-[11px] font-medium text-black/40 mb-2">{t("umb.expiryDesc")}</p>
+                    <div className="flex flex-col gap-1.5">
+                        {data!.expiry!.map((e) => {
+                            const ym = new Date(e.expiresAround).toLocaleDateString(locale === "ko" ? "ko-KR" : locale, { year: "numeric", month: "long" });
+                            const delta = e.projectedRank - player.rank;
+                            return (
+                                <div key={e.colKey} className="rounded-xl bg-black/[0.03] px-3 py-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="min-w-0 text-[12px] font-medium text-ink-2 truncate">{e.label}</span>
+                                        <span className="shrink-0 text-[13px] font-bold tabular-nums text-red-500">−{e.points}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                                        <span className="text-[11px] font-medium text-black/45">{t("umb.expiryAround").replace("{ym}", ym)} · {e.pointsAfter}{t("umb.pointsUnit")}</span>
+                                        <span className={cn("text-[11.5px] font-bold tabular-nums", delta > 0 ? "text-red-500" : "text-black/55")}>
+                                            {t("umb.expiryProjected").replace("{r}", String(e.projectedRank))}{delta > 0 ? ` (▼${delta})` : ""}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* 국내 순위(2026-09-13 오너): "한국 12명 중 3위" 맥락 + 상위 5명 + 가까운 순위. 탭하면 그 선수로 이동 */}
             {national && national.top.length > 0 && (
                 <div>
