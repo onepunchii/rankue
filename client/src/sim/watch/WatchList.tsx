@@ -85,7 +85,9 @@ export function WatchList({ onOpen, api = matchApi }: { onOpen: (id: string) => 
     if (all.length === 0) return null;
 
     return (
-        <section className="space-y-2">
+        // 아케이드 배색은 .rank-arcade 안에서만 산다(--arc-frame 등). 멀티방 화면의 연장이라 같은 배색을 쓰되,
+        // 변수가 이 안에서 정의되도록 클래스를 여기 직접 붙인다 — 안 붙이면 고른 칩이 안 칠해진다(2026-09-13 오너 지적).
+        <section className="rank-arcade space-y-2">
             <h3 className="text-[13px] font-bold text-ink-2">{t("sim.watch.replays")}</h3>
             <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-0.5">
                 {games.length > 1 && (
