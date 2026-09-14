@@ -9,6 +9,7 @@ import { CommunityRepository } from "./community.repo.js";
 import { UmbRepository } from "./umb.repo.js";
 import { PbaRepository } from "./pba.repo.js";
 import { GolfRankRepository } from "./golfRank.repo.js";
+import { GolfArcadeRepository } from "./golfArcade.repo.js";
 import { TournamentRepository } from "./tournament.repo.js";
 import { SimRepository } from "./sim.repo.js";
 import { SimMatchRepository } from "./simMatch.repo.js";
@@ -26,6 +27,7 @@ class Storage {
     public umb = new UmbRepository();
     public pba = new PbaRepository();
     public golfRank = new GolfRankRepository();   // 골프 랭킹(2026-09-13) — 공개 읽기
+    public golfArcade = new GolfArcadeRepository();   // 골프 온라인게임 방(2026-09-14)
     public tournaments = new TournamentRepository();
     public sim = new SimRepository();
     public simMatch = new SimMatchRepository();

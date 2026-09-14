@@ -49,6 +49,7 @@ import GolfBookingList from "@/golf/pages/BookingList";
 import GolfProAm from "@/golf/pages/ProAm";
 import MembershipExchange from "@/golf/pages/MembershipExchange";
 import MembershipDetail from "@/golf/pages/MembershipDetail";
+import GolfArcadePage from "@/golf/arcade/GolfArcadePage";
 import PartnerLogin from "@/pages/partner/login";
 import PartnerDashboard from "@/pages/partner/dashboard";
 import PartnerSettings from "@/pages/partner/settings";
@@ -275,6 +276,8 @@ function AppRoutes() {
       <Route path="/golf/course/:id"><GolfOnly><GolfCourseDetail /></GolfOnly></Route>
       <Route path="/golf/booking-list/:id?"><GolfOnly><GolfBookingList /></GolfOnly></Route>
       <Route path="/golf/proam"><GolfOnly><GolfProAm /></GolfOnly></Route>
+      {/* 골프 온라인게임(미니골프 대전, 2026-09-14) */}
+      <Route path="/golf/arcade"><GolfOnly><GolfArcadePage /></GolfOnly></Route>
       <Route path="/history" component={FramedHistory} />
       <Route path="/ranking" component={FramedRanking} />
       <Route path="/menu" component={FramedMenu} />

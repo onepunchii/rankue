@@ -58,6 +58,21 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                 </motion.button>
             </div>
 
+            {/* 온라인게임(미니골프 대전, 2026-09-14 오너: "골프 홈에 온라인게임") — 당구 온라인게임과 같은 자리 */}
+            <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setLocation('/golf/arcade')}
+                className="w-full mb-4 rounded-[2rem] bg-[#1a1a1a] border border-[#64DD17]/30 p-5 flex items-center gap-4 text-left relative overflow-hidden shadow-xl shadow-[#64DD17]/10 group z-10"
+            >
+                <div className="absolute inset-0 bg-gradient-to-r from-[#64DD17]/15 to-transparent" />
+                <div className="relative z-10 w-16 h-16 rounded-2xl bg-[#64DD17] flex items-center justify-center text-[34px] shrink-0">⛳</div>
+                <div className="relative z-10 flex-1 min-w-0">
+                    <h3 className="text-[20px] font-extrabold text-white leading-none">ONLINE GOLF</h3>
+                    <p className="text-[12px] font-semibold text-[#64DD17]/80 mt-1.5">미니골프 9홀 · 친구와 동시 대전 · 혼자 연습</p>
+                </div>
+                <span className="relative z-10 text-[#64DD17] font-extrabold text-[18px] group-hover:translate-x-1 transition-transform">›</span>
+            </motion.button>
+
             {/* GOLF BOOKING 배너는 2026-09-10 뺐다. 홈 맨 위 긴급티 티커가 그 자리를 맡고,
                 부킹 목록은 하단 네비 '조인' 탭으로 들어간다(오너). */}
 

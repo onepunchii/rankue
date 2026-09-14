@@ -1977,3 +1977,31 @@ export const golfStats = pgTable("golf_stats", {
 export type InsertGolfRanking = typeof golfRankings.$inferInsert;
 export type InsertGolfPlayer = typeof golfPlayers.$inferInsert;
 export type InsertGolfStat = typeof golfStats.$inferInsert;
+
+/* ── 골프 온라인게임(미니골프 대전, 2026-09-14 오너: "골프도 온라인게임") — 규칙·코스는 shared/golf ── */
+
+// 방: 6자리 코드로 모여 같은 코스를 각자 친다. 공이 서로 안 부딪히므로 서버는 타수만 모은다.
+export const golfArcadeRooms = pgTable("golf_arcade_rooms", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  code: text("code").notNull(),
+  hostId: uuid("host_id").references(() => hiqMembers.id).notNull(),
+  courseId: text("course_id").default("rankue-park").notNull(),
+  status: text("status", { enum: ["waiting", "playing", "finished"] }).default("waiting").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+}, (t) => [index("golf_arcade_rooms_code_idx").on(t.code, t.status)]);
+
+export const golfArcadePlayers = pgTable("golf_arcade_players", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  roomId: uuid("room_id").references(() => golfArcadeRooms.id).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  name: text("name").notNull(),
+  /** 홀별 타수(끝낸 홀까지). 길이가 곧 진행 홀 수 */
+  strokes: jsonb("strokes").$type<number[]>().default([]).notNull(),
+  finishedAt: timestamp("finished_at"),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+}, (t) => [unique().on(t.roomId, t.memberId)]);
+
+export type GolfArcadeRoom = typeof golfArcadeRooms.$inferSelect;
+export type GolfArcadePlayer = typeof golfArcadePlayers.$inferSelect;

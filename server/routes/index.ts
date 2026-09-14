@@ -1,5 +1,6 @@
 import { Router } from "express";
 import golfRouter from "./modules/golf.js";
+import golfArcadeRouter from "./modules/golfArcade.js";
 import { requireGolfAccess } from "../middleware/golfAccess.js";
 import crewRouter from "./modules/crew.js";
 import authRouter from "./modules/auth.js";
@@ -25,6 +26,8 @@ const router = Router();
 
 // 1. Golf (/golf)
 // 골프는 시험 단계 — 허용 목록에 있는 사람만. 읽기까지 막는다(2026-09-09 오너: 두 플랫폼으로 완전히 가른다).
+// 골프 온라인게임(미니골프 대전, 2026-09-14) — 골프 라우터보다 먼저(경로가 /golf/arcade 로 겹친다)
+router.use("/golf/arcade", ...requireGolfAccess, golfArcadeRouter);
 router.use("/golf", ...requireGolfAccess, golfRouter);
 
 // 2. Crew (/crews)
