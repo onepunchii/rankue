@@ -645,6 +645,8 @@ export function registerPrerender(app: Express) {
     faq2q: (name: string) => string;
     faq2a: (best: number, natl: number | null) => string;
     histH: string;
+    evHistH: string; // 대회 이력 표 절 제목
+    evKind: Record<string, string>; // worldcup·worldchamp·confederal·national
     rankWord: (rank: number) => string; // 히스토리 목록의 "12위" / "No.12"
     source: string;
     navAll: string;
@@ -664,6 +666,8 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `${n}의 역대 최고 순위는?`,
       faq2a: (b, natl) => `역대 최고 세계랭킹은 ${b}위입니다.${natl ? ` 현재 국내 순위는 ${natl}위입니다.` : ""}`,
       histH: "최근 순위 히스토리",
+      evHistH: "대회 이력 — 같은 대회의 연도별 포인트",
+      evKind: { worldcup: "월드컵", worldchamp: "세계선수권", confederal: "대륙선수권", national: "국가선수권" },
       rankWord: (r) => `${r}위`,
       source: "출처: UMB 공식 랭킹 — 매주 갱신",
       navAll: "당구 세계랭킹 전체", navHome: "랭큐 홈",
@@ -682,6 +686,8 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `What is ${n}'s career-best ranking?`,
       faq2a: (b, natl) => `The career-best world ranking is No.${b}.${natl ? ` Current national ranking is No.${natl}.` : ""}`,
       histH: "Recent ranking history",
+      evHistH: "Tournament history — points by year at the same event",
+      evKind: { worldcup: "World Cup", worldchamp: "World Championship", confederal: "Confederal Championship", national: "National Championship" },
       rankWord: (r) => `No.${r}`,
       source: "Source: official UMB rankings — updated weekly",
       navAll: "Full billiards world ranking", navHome: "RANKUE home",
@@ -700,6 +706,8 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `${n}'in kariyer rekoru kaçıncı sıra?`,
       faq2a: (b, natl) => `Kariyer rekoru dünya ${b}. sıralık.${natl ? ` Güncel ulusal sıralaması ${natl}.` : ""}`,
       histH: "Son sıralama geçmişi",
+      evHistH: "Turnuva geçmişi — aynı turnuvada yıllara göre puan",
+      evKind: { worldcup: "Dünya Kupası", worldchamp: "Dünya Şampiyonası", confederal: "Kıta Şampiyonası", national: "Ulusal Şampiyona" },
       rankWord: (r) => `${r}.`,
       source: "Kaynak: resmî UMB sıralaması — haftalık güncellenir",
       navAll: "Tüm bilardo dünya sıralaması", navHome: "RANKUE ana sayfa",
@@ -718,6 +726,8 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `Thứ hạng cao nhất sự nghiệp của ${n}?`,
       faq2a: (b, natl) => `Thứ hạng thế giới cao nhất là hạng ${b}.${natl ? ` Hiện xếp hạng ${natl} trong nước.` : ""}`,
       histH: "Diễn biến thứ hạng gần đây",
+      evHistH: "Lịch sử giải đấu — điểm theo năm tại cùng giải",
+      evKind: { worldcup: "World Cup", worldchamp: "Giải vô địch thế giới", confederal: "Giải châu lục", national: "Giải quốc gia" },
       rankWord: (r) => `hạng ${r}`,
       source: "Nguồn: BXH chính thức UMB — cập nhật hằng tuần",
       navAll: "BXH bida thế giới đầy đủ", navHome: "Trang chủ RANKUE",
@@ -736,6 +746,8 @@ export function registerPrerender(app: Express) {
       faq2q: (n) => `¿Cuál es el mejor puesto histórico de ${n}?`,
       faq2a: (b, natl) => `Su mejor puesto histórico es el N.º ${b}.${natl ? ` Actualmente es N.º ${natl} en su país.` : ""}`,
       histH: "Historial reciente",
+      evHistH: "Historial de torneos — puntos por año en el mismo torneo",
+      evKind: { worldcup: "Copa del Mundo", worldchamp: "Campeonato Mundial", confederal: "Campeonato Confederal", national: "Campeonato Nacional" },
       rankWord: (r) => `N.º ${r}`,
       source: "Fuente: ranking oficial UMB — actualización semanal",
       navAll: "Ranking mundial completo", navHome: "Inicio RANKUE",
@@ -771,6 +783,16 @@ export function registerPrerender(app: Express) {
         `<li>Edition ${esc(h.edition)}: ${esc(L.rankWord(h.rank))} (${h.points}pts)</li>`).join("\n  ");
       const updatedAt = data.history.length
         ? new Date(data.history[data.history.length - 1].editionDate).toLocaleDateString(DATE_LOCALE[lang], { year: "numeric", month: "long" })
+        : "";
+      // 대회 이력 표 — "월드컵 · Antwerp: 2024 40 · 2025 64 (▲24)" 줄. 절 제목이 있어 검색결과 칩 후보가 된다.
+      const eh = data.eventHistory;
+      const evHistHtml = eh && eh.rows.length
+        ? `\n  <h2>${esc(L.evHistH)}</h2>\n  <ul>\n  ${eh.rows.slice(0, 12).map((r) => {
+            const title = [L.evKind[r.kind] ?? r.label, r.city].filter(Boolean).join(" · ");
+            const cells = r.cells.map((c) => `${c.year} ${c.points}`).join(" · ");
+            const d = r.delta == null || r.delta === 0 ? "" : r.delta > 0 ? ` (▲${r.delta})` : ` (▼${-r.delta})`;
+            return `<li>${esc(title)}: ${esc(cells)}${esc(d)}</li>`;
+          }).join("\n  ")}\n  </ul>`
         : "";
       // 인접 순위 ±5 — 선수 페이지끼리 사슬로 이어져 사이트맵에 없는 하위 순위도 크롤러가 따라간다.
       let nearHtml = "";
@@ -836,7 +858,7 @@ export function registerPrerender(app: Express) {
   <h2>${esc(L.histH)}</h2>
   <ul>
   ${historySummary}
-  </ul>${nearHtml}
+  </ul>${evHistHtml}${nearHtml}
   <p>${esc(L.source)} — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
   <nav><a href="/world-ranking${lang === "ko" ? "" : `?lang=${lang}`}">${esc(L.navAll)}</a></nav>
   ${hubNav(lang)}

@@ -66,6 +66,13 @@ export interface UmbPlayerDetail {
     } | null;
     /** 포인트 만료 예고(2026-09-13): 6개월 안에 빠질 대회, 빠지는 순서. 예상 순위는 다른 선수 점수가 그대로일 때 */
     expiry?: Array<{ colKey: string; label: string; points: number; eventDate: string; expiresAround: string; pointsAfter: number; projectedRank: number }>;
+    /** 대회 이력 표(2026-09-14): 같은 대회의 연도별 포인트. shared/umbEventHistory.ts 의 EventHistory */
+    eventHistory?: {
+        years: string[];
+        rows: Array<{ key: string; kind: string; org: string | null; city: string | null; country: string | null; label: string; cells: Array<{ year: string; points: number; date: string | null; label: string }>; latest: number; delta: number | null }>;
+        strongest: string | null;
+        mostImproved: string | null;
+    };
     /** 이 선수를 관심 선수로 둔 랭큐 회원 수 */
     followers?: number;
     /** 로그인한 나의 팔로우 여부 */

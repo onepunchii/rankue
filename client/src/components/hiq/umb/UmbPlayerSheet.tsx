@@ -21,6 +21,7 @@ import { Chip, List, Section, Tile } from "./ui";
 
 /** 대회 수가 많으면 상위 몇 개만 펴 둔다 — 8개 넘게 늘어져 페이지가 길었다(2026-09-13 오너). */
 const POINTS_FOLD = 5;
+const EVHIST_FOLD = 6;
 /** 국내 순위판 1~3위 메달. 그 아래는 숫자 */
 const MEDALS = ["🥇", "🥈", "🥉"];
 /** 대륙 비중 막대의 단색 램프 — 브랜드 녹색 한 가지의 농도 차이라 알록달록하지 않다 */
@@ -65,13 +66,13 @@ const BRAND = "#006241";
 const GRID = "rgba(0,0,0,0.06)";
 const AXIS = "rgba(0,0,0,0.35)";
 
-// ?v=3 — 응답 형태가 바뀔 때 올린다(v3: 2026-09-13 국내 순위판·PBA·만료 예고·팔로우 추가. 쿼리 캐시가 localStorage 에
+// ?v=4 — 응답 형태가 바뀔 때 올린다(v4: 2026-09-14 대회 이력 표 eventHistory. v3: 2026-09-13 국내 순위판·PBA·만료 예고·팔로우 추가. 쿼리 캐시가 localStorage 에
 // 남아 있어 키를 올리지 않으면 옛 응답이 10분 동안 그대로 보인다 — 실측). 초기 배포가 브라우저에도 하루짜리
 // stale-while-revalidate를 심어놔서(이후 CDN 전용으로 분리) URL로 캐시를 우회해야 한다.
 export function usePlayerDetail(category: UmbCategory, playerUmbId: string | null) {
     return useQuery<UmbPlayerDetail>({
-        queryKey: [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v3"],
-        queryFn: async () => apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}?v=3`),
+        queryKey: [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v4"],
+        queryFn: async () => apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}?v=4`),
         enabled: !!playerUmbId,
         staleTime: 10 * 60 * 1000,
     });
@@ -115,6 +116,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
     const qc = useQueryClient();
     const [metric, setMetric] = useState<"rank" | "points">("rank");
     const [showAllPoints, setShowAllPoints] = useState(false);
+    const [showAllEvHist, setShowAllEvHist] = useState(false);
     const [followBusy, setFollowBusy] = useState(false);
     const { data, isLoading } = usePlayerDetail(category, playerUmbId);
     const detailKey = [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v3"];
@@ -492,6 +494,82 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                     </List>
                 </Section>
             )}
+
+            {/* 대회 이력 표(2026-09-13 오너 제안 4번, 9/14 구현) — 같은 대회의 연도별 포인트. 열 = 연도, 줄 = 대회.
+                "포인트 구성"이 최신 회차 스냅샷이라면 이건 그걸 시간축으로 이어 붙인 것: 방어할 점수와 성장이 한눈에 */}
+            {(data?.eventHistory?.rows.length ?? 0) > 0 && (() => {
+                const eh = data!.eventHistory!;
+                const strongest = eh.rows.find((r) => r.key === eh.strongest);
+                const improved = eh.rows.find((r) => r.key === eh.mostImproved);
+                const visible = showAllEvHist ? eh.rows : eh.rows.slice(0, EVHIST_FOLD);
+                const gridCols = `minmax(0,1fr) repeat(${eh.years.length}, 58px)`;
+                return (
+                    <Section emoji="📅" title={t("umb.evHist.title")} desc={t("umb.evHist.desc")}
+                        meta={<span className="tabular-nums">{t("umb.contEvents").replace("{n}", String(eh.rows.length))}</span>}>
+                        {(strongest || improved) && (
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                                {strongest && <Chip tone="gold">🏆 {t("umb.evHist.strongest")} · {eventView(strongest.label, t, { short: true }).title} {strongest.latest}</Chip>}
+                                {improved && improved.key !== strongest?.key && <Chip tone="brand">📈 {t("umb.evHist.improved")} · {eventView(improved.label, t, { short: true }).title} ▲{improved.delta}</Chip>}
+                                {improved && improved.key === strongest?.key && <Chip tone="brand">📈 ▲{improved.delta}</Chip>}
+                            </div>
+                        )}
+                        <div className="rounded-2xl bg-surface-3 overflow-x-auto">
+                            <div className="min-w-[280px]">
+                                {/* 머리글 — 대회 · 연도 열 */}
+                                <div className="grid items-center px-3 h-9 text-[11px] font-bold text-black/40 border-b border-surface-line" style={{ gridTemplateColumns: gridCols }}>
+                                    <span>{t("umb.evHist.eventCol")}</span>
+                                    {eh.years.map((y) => <span key={y} className="text-right tabular-nums">{y.length > 5 ? y.slice(2) : y}</span>)}
+                                </div>
+                                <div className="divide-y divide-surface-line">
+                                    {visible.map((r) => {
+                                        const ev = eventView(r.label, t, { short: true });
+                                        const byYear = new Map(r.cells.map((c) => [c.year, c]));
+                                        return (
+                                            <div key={r.key} className="grid items-center px-3 py-2.5" style={{ gridTemplateColumns: gridCols }} title={r.label}>
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="w-5 shrink-0 text-center text-[16px] leading-none">{ev.emoji}</span>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <span className="text-[12.5px] font-semibold text-ink-1 truncate">{ev.title}</span>
+                                                            {r.key === eh.strongest && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[#F5B721]/15 text-[9.5px] font-bold text-[#8a6a0a] leading-none">{t("umb.mainEvent")}</span>}
+                                                        </div>
+                                                        {r.org && <div className="text-[10.5px] font-medium text-black/40 truncate mt-0.5">{r.org}</div>}
+                                                    </div>
+                                                </div>
+                                                {eh.years.map((y, i) => {
+                                                    const c = byYear.get(y);
+                                                    const prevC = i > 0 ? byYear.get(eh.years[i - 1]) : undefined;
+                                                    const d = c && prevC ? c.points - prevC.points : null;
+                                                    return (
+                                                        <div key={y} className="text-right tabular-nums leading-none">
+                                                            {c ? (
+                                                                <>
+                                                                    <div className={cn("text-[13.5px] font-bold", i === eh.years.length - 1 ? "text-ink-1" : "text-ink-2")}>{c.points}</div>
+                                                                    {d !== null && d !== 0 && (
+                                                                        <div className={cn("text-[10px] font-bold mt-1", d > 0 ? "text-brand" : "text-[#c0392b]")}>{d > 0 ? `▲${d}` : `▼${-d}`}</div>
+                                                                    )}
+                                                                </>
+                                                            ) : <div className="text-[13px] font-medium text-black/20">·</div>}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                {eh.rows.length > EVHIST_FOLD && (
+                                    <button
+                                        type="button" onClick={() => setShowAllEvHist((v) => !v)}
+                                        className="w-full h-11 text-[12.5px] font-semibold text-brand hover:bg-black/[0.03] transition-colors border-t border-surface-line"
+                                    >
+                                        {showAllEvHist ? `${t("umb.showLess")} ▲` : `${t("umb.evHist.rowsMore").replace("{n}", String(eh.rows.length - EVHIST_FOLD))} ▼`}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </Section>
+                );
+            })()}
 
             {/* 응원글(2026-09-13 오너 제안 11번) — 맨 아래. 커뮤니티 댓글과 같은 안전장치 */}
             <PlayerCheers category={category} playerUmbId={playerUmbId} />

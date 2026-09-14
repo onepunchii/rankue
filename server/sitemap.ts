@@ -4,6 +4,7 @@ import { db } from "./db.js";
 import { storeListings } from "../shared/schema.js";
 import { hreflangOf } from "../shared/aboutContent.js";
 import { asc, sql } from "drizzle-orm";
+import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.js";
 
 // 동적 사이트맵 — /sitemap.xml 은 **사이트맵 인덱스**, 실제 URL 은 주제별 5개 파일에 나눠 싣는다.
 //
@@ -36,7 +37,8 @@ function esc(s: string): string {
 
 const day = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
 
-function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; priority?: string; lastmod?: Date | string | null }): string {
+// image: 선수 카드 PNG(/og/…) — 이미지 사이트맵 확장. 구글 이미지·썸네일 발견 경로(2026-09-14).
+function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; priority?: string; lastmod?: Date | string | null; image?: string }): string {
   let alts = "";
   if (opts?.langs && opts.langs.length) {
     const sep = loc.includes("?") ? "&" : "?";
@@ -48,6 +50,7 @@ function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; prio
   return (
     `  <url>\n    <loc>${esc(loc)}</loc>${alts}` +
     (opts?.lastmod ? `\n    <lastmod>${day(opts.lastmod)}</lastmod>` : "") +
+    (opts?.image ? `\n    <image:image><image:loc>${esc(opts.image)}</image:loc></image:image>` : "") +
     (opts?.changefreq ? `\n    <changefreq>${opts.changefreq}</changefreq>` : "") +
     (opts?.priority ? `\n    <priority>${opts.priority}</priority>` : "") +
     `\n  </url>`
@@ -55,7 +58,7 @@ function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; prio
 }
 
 function urlset(parts: string[]): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${parts.join("\n")}\n</urlset>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${parts.join("\n")}\n</urlset>\n`;
 }
 
 /** 인덱스 — 자식 사이트맵 5개. lastmod 는 오늘(매일 갱신되는 브리핑·커뮤니티가 있어 사실에 가깝다). */
@@ -138,6 +141,7 @@ async function playerParts(): Promise<string[]> {
     for (const p of players) {
       parts.push(entry(`${ORIGIN}/player/${p.category}/${p.playerUmbId}`, {
         changefreq: "weekly", priority: p.rank <= 50 ? "0.6" : "0.4", lastmod: p.lastmod,
+        image: playerCardUrl(ORIGIN, p.category, p.playerUmbId),
       }));
     }
   } catch (e) {
@@ -154,7 +158,7 @@ async function pbaParts(): Promise<string[]> {
     const players = await storage.pba.getPlayersForSitemap();
     if (players.length) {
       parts.push(entry(`${ORIGIN}/pba`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }));
-      for (const p of players) parts.push(entry(`${ORIGIN}/pba-player/${p.memCode}`, { changefreq: "weekly", priority: "0.5" }));
+      for (const p of players) parts.push(entry(`${ORIGIN}/pba-player/${p.memCode}`, { changefreq: "weekly", priority: "0.5", image: pbaCardUrl(ORIGIN, p.memCode) }));
     }
   } catch (e) {
     console.warn("[sitemap] pba players failed:", (e as Error)?.message);
@@ -169,7 +173,7 @@ async function golfParts(): Promise<string[]> {
     const players = await storage.golfRank.getPlayersForSitemap();
     parts.push(entry(`${ORIGIN}/golf-ranking`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }));
     for (const tour of ["owgr", "rolex", "kpga", "klpga"]) parts.push(entry(`${ORIGIN}/golf-ranking?tour=${tour}`, { changefreq: "weekly", priority: "0.6" }));
-    for (const p of players) parts.push(entry(`${ORIGIN}/golfer/${p.tour}/${p.playerId}`, { changefreq: "weekly", priority: "0.4", lastmod: p.lastmod }));
+    for (const p of players) parts.push(entry(`${ORIGIN}/golfer/${p.tour}/${p.playerId}`, { changefreq: "weekly", priority: "0.4", lastmod: p.lastmod, image: golferCardUrl(ORIGIN, p.tour, p.playerId) }));
   } catch (e) {
     console.warn("[sitemap] golf players failed:", (e as Error)?.message);
   }

@@ -8,6 +8,7 @@ import type { GolfTour } from "../../shared/golfTours.js";
 /** 팔로우·응원글은 당구 부문과 골프 투어가 같은 표를 쓴다(2026-09-13). */
 export type PlayerCategory = UmbCategory | GolfTour;
 import { expiringEvents, projectedRank } from "../../shared/umbExpiry.js";
+import { buildEventHistory } from "../../shared/umbEventHistory.js";
 import { toKoreanName } from "../services/umbKoreanName.js";
 
 // UMB 세계랭킹 저장소. 공개 데이터라 뷰어 개인화·차단 로직이 없고,
@@ -151,16 +152,34 @@ export class UmbRepository {
 
     // 선수 상세 — 전 회차 히스토리 + 최신 회차의 대회별 점수·레전드
     async getPlayerHistory(category: UmbCategory, playerUmbId: string) {
-        const history = await db.select({
+        const historyRows = await db.select({
             edition: umbRankings.edition,
             editionDate: umbRankings.editionDate,
             rank: umbRankings.rank,
             points: umbRankings.points,
+            eventPoints: umbRankings.eventPoints,
         })
             .from(umbRankings)
             .where(and(eq(umbRankings.category, category), eq(umbRankings.playerUmbId, playerUmbId)))
             .orderBy(asc(umbRankings.editionDate));
-        if (!history.length) return null;
+        if (!historyRows.length) return null;
+        // 공개 응답의 history 는 회차·순위·점수만(eventPoints 는 회차마다 커서 뺀다) — 대회 이력 표는 아래에서 따로 만든다
+        const history = historyRows.map(({ eventPoints: _ep, ...h }) => h);
+
+        // 대회 이력 표(2026-09-14) — 점수가 있는 회차들의 레전드를 한 번에 받아 같은 대회끼리 연도별로 묶는다
+        const editionsWithPoints = historyRows.filter((h) => h.eventPoints && Object.keys(h.eventPoints).length).map((h) => h.edition);
+        const labelRows = editionsWithPoints.length
+            ? await db.select({ edition: umbEvents.edition, colKey: umbEvents.colKey, label: umbEvents.label })
+                .from(umbEvents)
+                .where(and(eq(umbEvents.category, category), inArray(umbEvents.edition, editionsWithPoints)))
+            : [];
+        const labelsByEdition = new Map<string, Map<string, string>>();
+        for (const r of labelRows) {
+            const m = labelsByEdition.get(r.edition) ?? new Map<string, string>();
+            m.set(r.colKey, r.label);
+            labelsByEdition.set(r.edition, m);
+        }
+        const eventHistory = buildEventHistory(historyRows, labelsByEdition);
 
         const latestEdition = history[history.length - 1].edition;
         const [latestRow] = await db.select()
@@ -280,6 +299,7 @@ export class UmbRepository {
             bestRank,
             history,
             events,
+            eventHistory,
         };
     }
 
