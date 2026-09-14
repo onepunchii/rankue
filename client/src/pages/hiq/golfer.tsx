@@ -8,6 +8,7 @@ import { GOLF_TOUR_META, isGolfTour } from "@shared/golfTours";
 import { GolferBody, useGolferDetail } from "@/components/hiq/golf/GolferSheet";
 import { useGolfTheme } from "@/components/hiq/golf/ui";
 import { golferName, type GolfTour } from "@/components/hiq/golf/types";
+import { golferCardUrl } from "@/lib/playerCard";
 
 // 골프 선수 전용 페이지(/golfer/:tour/:id) — 시트와 같은 본문을 공유 가능한 URL 로. 검색 색인·링크 공유가 목적.
 export default function HiqGolfer() {
@@ -22,6 +23,8 @@ export default function HiqGolfer() {
     const p = data?.player;
     const name = p ? golferName(p, locale) : null;
     useSeo({
+        // 선수 카드 PNG — 프리렌더와 같은 주소(ko·en). 공유 미리보기·검색 썸네일.
+        image: p && id ? golferCardUrl(tour, id, locale) : undefined,
         title: p
             ? `${name}${p.nameKo && p.nameKo !== p.playerName ? ` (${p.playerName})` : ""} — ${t(GOLF_TOUR_META[tour].labelKey)} ${p.rank ?? "-"}${t("umb.rankSuffix")} | RANKUE`
             : `${t("golf.pageTitle")} | RANKUE`,

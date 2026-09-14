@@ -7,7 +7,7 @@ import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../sh
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo } from "../shared/storeMeta.js";
-import { playerCardUrl, CARD_SIZE } from "./services/playerCard.js";
+import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW, LANDING_LANGS, landingContent } from "../shared/landingContent.js";
 import {
   formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared,
@@ -935,14 +935,18 @@ ${list}
       const langSuffix = lang === "ko" ? "" : `?lang=${lang}`;
       const hist = data.history.slice(-10).map((h) => `<li>${esc(h.edition)}: ${esc(G.rankWord(h.rank))} (${h.points})</li>`).join("\n  ");
       const stats = data.stats.slice(0, 12).map((s) => `<li>${esc(s.label)}: ${s.value}${s.unit ? ` ${esc(s.unit)}` : ""} — ${esc(G.rankWord(s.rank))}${s.of ? `/${s.of}` : ""}</li>`).join("\n  ");
+      // 선수 카드(정사각형 PNG) — 클라이언트 golfer.tsx useSeo 와 같은 주소(golferCardUrl)
+      const card = golferCardUrl(ORIGIN, tour, req.params.id, lang);
+      const cardAlt = `${nameFull} — ${G.tour[tour]}${p.rank === null ? "" : ` ${G.rankWord(p.rank)}`}`;
       res.setHeader("X-Prerender", `golfer:${lang}`);
       res.send(page({
         title: G.playerTitle(nameFull, G.tour[tour], p.rank),
         desc: G.playerDesc(nameFull, p.country, G.tour[tour], p.rank, data.bestRank),
         canonical, lang, altLangs: ["en"], altBase: base,
+        image: { url: card, width: CARD_SIZE, height: CARD_SIZE, alt: cardAlt },
         jsonLd: [
           { "@context": "https://schema.org", "@type": "Person", name: nameMain, alternateName: p.nameKo && p.nameKo !== p.playerName ? p.playerName : undefined,
-            nationality: { "@type": "Country", name: p.country }, description: G.playerDesc(nameMain, p.country, G.tour[tour], p.rank, data.bestRank), url: canonical, knowsAbout: "Golf" },
+            nationality: { "@type": "Country", name: p.country }, description: G.playerDesc(nameMain, p.country, G.tour[tour], p.rank, data.bestRank), url: canonical, image: card, knowsAbout: "Golf" },
           { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
             { "@type": "ListItem", position: 1, name: G.tour[tour], item: `${ORIGIN}/golf-ranking?tour=${tour}${lang === "ko" ? "" : `&lang=${lang}`}` },
             { "@type": "ListItem", position: 2, name: nameMain, item: canonical },
@@ -950,6 +954,7 @@ ${list}
         ],
         body: `<main>
   <h1>${esc(nameFull)} — ${esc(G.tour[tour])} ${p.rank === null ? "" : esc(G.rankWord(p.rank))}</h1>
+  <img src="${esc(card)}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(cardAlt)}" />
   <p>${esc(G.playerDesc(nameMain, p.country, G.tour[tour], p.rank, data.bestRank))}</p>
   ${stats ? `<h2>${esc(G.statsH)}</h2>\n  <ul>\n  ${stats}\n  </ul>` : ""}
   ${hist ? `<h2>${esc(G.histH)}</h2>\n  <ul>\n  ${hist}\n  </ul>` : ""}
@@ -1041,12 +1046,16 @@ ${list}
     const pplang = (PBA_LANGS as readonly string[]).includes(ppq) ? ppq : "ko";
     const PP = pbaL10n(pplang);
     const prizeStr = p.careerPrize != null ? `${formatPrizeKo(p.careerPrize)}${pplang === "ko" ? "원" : " KRW"}` : "-";
+    // 선수 카드(정사각형 PNG) — 클라이언트 pba-player.tsx useSeo 와 같은 주소(pbaCardUrl)
+    const pbaCard = pbaCardUrl(ORIGIN, p.memCode, pplang);
+    const pbaCardAlt = `${p.nameKo}${p.nameEn ? ` (${p.nameEn})` : ""} — ${p.league}`;
     res.setHeader("X-Prerender", "pba-player");
     noStore(res);
     res.send(
       page({
         // client/src/pages/hiq/pba-player.tsx 의 useSeo(ko) 와 문자 단위로 같아야 한다
         lang: pplang,
+        image: { url: pbaCard, width: CARD_SIZE, height: CARD_SIZE, alt: pbaCardAlt },
         // ko 는 한글 이름, 그 외 언어는 로마자 원표기(현지 팬이 검색하는 형태)
         title: PP.playerTitle(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), p.league),
         desc: PP.playerDesc(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), pplang === "ko" ? p.nameEn : null, p.league, prizeStr, p.average, p.highRun),
@@ -1065,6 +1074,7 @@ ${list}
             jobTitle: "Professional billiards player",
             memberOf: { "@type": "SportsOrganization", name: `${p.league} Tour` },
             url: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
+            image: pbaCard,
           },
           {
             "@context": "https://schema.org",
@@ -1091,6 +1101,7 @@ ${list}
         body: `<main>
   <nav><a href="/pba">← PBA 투어 랭킹</a></nav>
   <h1>${esc(p.nameKo)}</h1>
+  <img src="${esc(pbaCard)}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(pbaCardAlt)}" />
   <p>${esc(p.nameEn ?? "")} · ${esc(p.league)}${p.nationCode ? ` · ${esc(p.nationCode)}` : ""}</p>
   <dl>
     <dt>${esc(PP.careerPrize)}</dt><dd>${esc(prizeStr)}</dd>

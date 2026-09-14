@@ -11,6 +11,8 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { seasonLabel, formatPrize } from "./pba";
 import { PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo } from "@shared/pbaMeta";
 import { ShareButton } from "@/components/hiq/ShareButton";
+import { PlayerCardShareButton } from "@/components/hiq/PlayerCardShareButton";
+import { pbaCardUrl } from "@/lib/playerCard";
 
 // PBA 선수 상세 — 통산 스탯 + 시즌별 궤적. 사진 없이 국기·이름·숫자만(초상권).
 
@@ -97,6 +99,8 @@ export default function HiqPbaPlayer() {
     }));
 
     useSeo({
+        // 선수 카드 PNG — 프리렌더(server/prerender.ts)와 같은 주소. 공유 미리보기·검색 썸네일.
+        image: p ? pbaCardUrl(memCode, locale) : undefined,
         // ko 는 "OOO 연봉" 검색 대응 문안(shared/pbaMeta)을 쓴다 — 프리렌더와 문자 단위로 같아야 한다.
         title: p
             ? (locale === "ko"
@@ -151,6 +155,14 @@ export default function HiqPbaPlayer() {
                         <p className="text-[13px] font-medium text-black/50 mt-1.5">
                             {p.nameEn}{age != null ? ` · ${age}` : ""}
                         </p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                            <PlayerCardShareButton
+                                cardUrl={pbaCardUrl(memCode, locale)}
+                                filename={`rankue-pba-${memCode}.png`}
+                                title={p.nameKo}
+                                text={`${p.nameKo} — ${p.league} · https://www.rankue.co.kr/pba-player/${memCode}`}
+                            />
+                        </div>
                     </header>
 
                     {/* 통산 스탯 */}

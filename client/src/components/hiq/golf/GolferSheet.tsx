@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { goLogin } from "@/components/hiq/LoginGate";
+import { PlayerCardShareButton } from "@/components/hiq/PlayerCardShareButton";
+import { golferCardUrl } from "@/lib/playerCard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -152,6 +154,12 @@ export const GolferBody = ({ tour, playerId, onNavigate, standalone }: GolferBod
                         {t("umb.follow")}
                         {(data.followers ?? 0) > 0 && <span className="tabular-nums opacity-70">· {data.followers}</span>}
                     </button>
+                    <PlayerCardShareButton
+                        cardUrl={golferCardUrl(tour, playerId, locale)}
+                        filename={`rankue-golf-${playerId}.png`}
+                        title={golferName(p, locale)}
+                        text={`${golferName(p, locale)} — ${t(meta.labelKey)} ${p.rank ?? "-"}${rankSuffix} · https://www.rankue.co.kr/golfer/${tour}/${playerId}`}
+                    />
                     {badges.map(b => <GChip key={b} tone="gold">{b}</GChip>)}
                 </div>
             </div>

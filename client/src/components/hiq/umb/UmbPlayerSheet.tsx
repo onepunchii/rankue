@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { goLogin } from "@/components/hiq/LoginGate";
+import { PlayerCardShareButton } from "@/components/hiq/PlayerCardShareButton";
+import { umbCardUrl } from "@/lib/playerCard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -238,6 +240,13 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                         {t("umb.follow")}
                         {(data?.followers ?? 0) > 0 && <span className="tabular-nums opacity-70">· {data!.followers}</span>}
                     </button>
+                    {/* 카드 공유 — 서버가 그린 정사각형 카드 PNG(/og/player/…)를 OS 공유 시트·다운로드로 */}
+                    <PlayerCardShareButton
+                        cardUrl={umbCardUrl(category, playerUmbId, locale)}
+                        filename={`rankue-${playerUmbId}.png`}
+                        title={locale === "ko" && player.nativeName ? player.nativeName : player.playerName}
+                        text={`${locale === "ko" && player.nativeName ? player.nativeName : player.playerName} — ${t("umb.subtitle")} ${player.rank}${rankSuffix} · https://www.rankue.co.kr/player/${category}/${playerUmbId}`}
+                    />
                     {badges.map(b => <Chip key={b} tone="gold">{b}</Chip>)}
                 </div>
             </div>
