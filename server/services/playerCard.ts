@@ -12,8 +12,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import satori from "satori";
-import { Resvg } from "@resvg/resvg-js";
+
+// ⚠️ satori·resvg 는 **지연 로드**한다. satori 가 끌어오는 harfbuzzjs 는 require 시점에 hb.wasm 을 읽고,
+// 그게 실패하면 프로세스가 죽는다. 2026-09-14 첫 배포에서 정적 import 로 두었다가 서버리스 번들에
+// hb.wasm 이 빠져 **/api 전체가 FUNCTION_INVOCATION_FAILED** 로 내려갔다(롤백). 지연 로드면 최악의 경우
+// /og 만 500 이다. wasm·네이티브 바이너리는 vercel.json includeFiles 로 함께 싣는다.
+type SatoriFn = (typeof import("satori"))["default"];
+type ResvgCtor = (typeof import("@resvg/resvg-js"))["Resvg"];
+let enginesCache: Promise<{ satori: SatoriFn; Resvg: ResvgCtor }> | null = null;
+function engines() {
+  enginesCache ??= Promise.all([import("satori"), import("@resvg/resvg-js")])
+    .then(([s, r]) => ({ satori: s.default, Resvg: r.Resvg }))
+    .catch((e) => { enginesCache = null; throw e; });
+  return enginesCache;
+}
 
 export const CARD_SIZE = 1200;
 
@@ -184,6 +196,7 @@ export function playerCardTree(p: PlayerCardInput): El {
 }
 
 export async function renderPlayerCardPng(p: PlayerCardInput): Promise<Buffer> {
+  const { satori, Resvg } = await engines();
   const svg = await satori(playerCardTree(p) as any, { width: CARD_SIZE, height: CARD_SIZE, fonts: fonts() });
   return new Resvg(svg, { fitTo: { mode: "width", value: CARD_SIZE } }).render().asPng();
 }

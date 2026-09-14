@@ -4,7 +4,7 @@
     {
       "src": "api/index.ts",
       "use": "@vercel/node",
-      "config": { "includeFiles": ["server/assets/**"] }
+      "config": { "includeFiles": ["server/assets/**", "node_modules/harfbuzzjs/hb.wasm", "node_modules/@resvg/resvg-js-linux-x64-gnu/**"] }
     },
     {
       "src": "package.json",
