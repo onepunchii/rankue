@@ -126,6 +126,28 @@ interface PageParts {
   jsonLd?: unknown[];
 }
 
+// 본문 목차(점프 링크) — 구글이 검색결과에 "섹션 칩"(오행 분포 · 2026년 운세 …처럼 페이지 안 절로
+// 바로 가는 버튼)을 붙이려면 페이지 안에 id 가 있는 제목과 그 id 를 가리키는 앵커 링크가 함께 있어야
+// 한다(2026-09-14 오너 요청). 모든 프리렌더 문서에 공통으로: 최상위 <h2> 에 id 를 달고 <h1> 바로 뒤에
+// <nav> 목차를 끼운다. 목록 항목(매장 카드 등)은 h3 이라 목차에 안 들어간다. h2 가 2개 미만이면 생략.
+const TOC_LABEL: Record<string, string> = { ko: "목차", en: "Contents", vi: "Mục lục", tr: "İçindekiler", es: "Contenido", ja: "目次", zh: "目录" };
+function withToc(body: string, lang: string): string {
+  const items: Array<{ id: string; label: string }> = [];
+  let n = 0;
+  const out = body.replace(/<h2(\s[^>]*)?>([\s\S]*?)<\/h2>/g, (m, attrs: string | undefined, inner: string) => {
+    if (attrs && /\bid=/.test(attrs)) return m;
+    const label = inner.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    if (!label) return m;
+    const id = `sec-${++n}`;
+    items.push({ id, label });
+    return `<h2${attrs ?? ""} id="${id}">${inner}</h2>`;
+  });
+  if (items.length < 2) return body;
+  const nav = `\n  <nav aria-label="${esc(TOC_LABEL[lang] ?? TOC_LABEL.en)}"><ul>${items.slice(0, 8).map((i) => `<li><a href="#${i.id}">${i.label}</a></li>`).join("")}</ul></nav>`;
+  const at = out.indexOf("</h1>");
+  return at >= 0 ? out.slice(0, at + 5) + nav + out.slice(at + 5) : out;
+}
+
 function page(p: PageParts): string {
   // 상호(reciprocal) hreflang: 어느 언어판을 내보내든 **같은 전체 클러스터**를 선언해야
   // 구글이 묶음으로 인식한다. 한쪽만 선언하면 선언 전체가 무시된다.
@@ -178,7 +200,7 @@ function page(p: PageParts): string {
   <meta name="twitter:image" content="${esc(OG_IMAGE)}" />${ld}
 </head>
 <body>
-${p.body}
+${withToc(p.body, p.lang ?? "ko")}
 </body>
 </html>
 `;
@@ -1283,7 +1305,8 @@ ${list}
   <nav><a href="/stores">← 매장 찾기</a></nav>
   <h1>${esc(regionQ)} 당구장 ${hit.n.toLocaleString("ko-KR")}곳</h1>
   <p>${esc(regionQ)} 지역 당구장의 주소·영업시간·테이블 구성·요금을 확인하세요.</p>
-  ${dirRows.map((s) => `<section><h2><a href="/stores/${esc(s.code)}">${esc(s.name)}</a></h2><p>${esc(s.address)}</p></section>`).join("\n  ")}
+  <h2>${esc(regionQ)} 당구장 목록</h2>
+  ${dirRows.map((s) => `<section><h3><a href="/stores/${esc(s.code)}">${esc(s.name)}</a></h3><p>${esc(s.address)}</p></section>`).join("\n  ")}
   <h2>다른 지역 당구장</h2>
   ${regionLinks(regions, regionQ)}
   ${hubNav("ko")}
@@ -1317,14 +1340,15 @@ ${list}
   <h1>매장 찾기</h1>
   <p>전국 당구장을 지역·이름으로 찾아보세요</p>
   <p>총 ${(dirTotal + items.length).toLocaleString("ko-KR")}개 매장</p>
+  <h2>랭큐 파트너 매장</h2>
   ${
     items.length
       ? items
           .map(
             (s) =>
-              `<section><h2>${
+              `<section><h3>${
                 s.slug ? `<a href="/store/${esc(encodeURIComponent(s.slug))}">${esc(s.name)}</a>` : esc(s.name)
-              }</h2>${s.region ? `<p>${esc(s.region)}</p>` : ""}${s.address ? `<p>${esc(s.address)}</p>` : ""}</section>`,
+              }</h3>${s.region ? `<p>${esc(s.region)}</p>` : ""}${s.address ? `<p>${esc(s.address)}</p>` : ""}</section>`,
           )
           .join("\n  ")
       : "<p>표시할 매장이 없습니다.</p>"
@@ -1421,6 +1445,7 @@ ${list}
   <h1>${esc(s.name)}</h1>
   <p>${esc(s.region)}</p>
   <p><a href="${esc(mapLink(s as any))}" rel="noopener">길찾기 · 지도에서 보기</a>${s.phone ? ` · <a href="tel:${esc(s.phone)}">전화 걸기</a>` : ""}</p>
+  <h2>매장 정보 · 영업시간 · 요금</h2>
   <dl>
     <dt>주소</dt><dd>${esc(s.address)}</dd>
     ${s.phone ? `<dt>전화</dt><dd>${esc(s.phone)}</dd>` : ""}
