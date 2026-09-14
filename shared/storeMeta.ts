@@ -19,6 +19,11 @@ export function rateSummaryKo(s: StoreRates): string {
 
 export const storeTitleKo = (name: string, region: string) => `${name} — ${region} 당구장 요금·영업시간 | 랭큐`;
 
+/** 지역 허브(/stores?region=서울) — "서울 당구장" 로컬 검색 타깃. 클라이언트 useSeo 와 프리렌더가 함께 쓴다. */
+export const regionTitleKo = (region: string) => `${region} 당구장 목록 · 주소·영업시간·요금 | 랭큐`;
+export const regionDescKo = (region: string, count: number) =>
+    `${region} 당구장 ${count.toLocaleString("ko-KR")}곳의 주소·영업시간·테이블 구성·요금을 한 곳에서. 전국 당구장 디렉토리 랭큐.`;
+
 /** "지역 당구장 요금"이 실제 검색어라, 값이 있으면 설명 앞쪽에 배치한다. */
 export function storeDescKo(name: string, address: string, s: StoreRates, openHours?: string | null): string {
     const rate = rateSummaryKo(s);

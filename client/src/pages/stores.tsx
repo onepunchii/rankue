@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { regionTitleKo, regionDescKo } from "@shared/storeMeta";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
@@ -134,7 +135,18 @@ export default function Stores() {
   const { locale } = useT();
   const [, setLocation] = useLocation();
   const [q, setQ] = useState("");
-  const [region, setRegion] = useState("");
+  // 지역은 URL(?region=서울)과 동기화 — 지역 허브가 공유·색인 가능한 고정 URL 이 된다
+  // (프리렌더 /stores?region= 와 같은 주소). 칩을 누르면 URL 도 함께 바뀐다.
+  const [region, setRegionState] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get("region")?.slice(0, 10) ?? ""; } catch { return ""; }
+  });
+  const setRegion = (r: string) => {
+    setRegionState(r);
+    try {
+      const url = r ? `/stores?region=${encodeURIComponent(r)}` : "/stores";
+      window.history.replaceState(null, "", url);
+    } catch { /* 히스토리 갱신 실패는 무시 — 필터는 그대로 동작 */ }
+  };
   const [older, setOlder] = useState<Listing[]>([]);
   const [nearbyOn, setNearbyOn] = useState(false);
   const { location: gps, requestLocation } = useNativeBridge();
@@ -186,10 +198,12 @@ export default function Stores() {
       && (!region || (s.region ?? "").includes(region)),
   );
 
+  // 지역 허브(?region=)는 서버 프리렌더(server/prerender.ts /stores)와 문자 단위로 같은 제목·설명 — shared/storeMeta.ts 공유.
+  const regionSeo = region && locale === "ko" && regions.some((r) => r.region === region);
   useSeo({
-    title: t.metaTitle,
-    description: t.metaDesc,
-    path: "/stores",
+    title: regionSeo ? regionTitleKo(region) : t.metaTitle,
+    description: regionSeo ? regionDescKo(region, total) : t.metaDesc,
+    path: regionSeo ? `/stores?region=${encodeURIComponent(region)}` : "/stores",
     locale,
     image: "https://www.rankue.co.kr/og.png",
     jsonLd: total

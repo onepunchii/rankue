@@ -26,7 +26,7 @@
       "dest": "/api/index.ts"
     },
     {
-      "src": "/sitemap.xml",
+      "src": "/sitemap(-[a-z]+)?\\.xml",
       "dest": "/api/index.ts"
     },
     {

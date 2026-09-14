@@ -2,11 +2,11 @@ import type { Express, Request } from "express";
 import { storage } from "./storage/index.js";
 import { db } from "./db.js";
 import { storeListings } from "../shared/schema.js";
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../shared/aboutContent.js";
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
-import { storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "../shared/storeMeta.js";
+import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo } from "../shared/storeMeta.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW, LANDING_LANGS, landingContent } from "../shared/landingContent.js";
 import {
   formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared,
@@ -76,6 +76,27 @@ function noStore(res: { setHeader: (k: string, v: string) => unknown }) {
 function esc(s: unknown): string {
   return String(s ?? "").replace(/[<>&"']/g, (c) =>
     ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
+
+// 허브 내비 — 모든 프리렌더 문서 하단에 같은 링크 묶음을 깐다. 2026-09-14 색인 진단: 홈 HTML 에
+// 내부 링크가 1개뿐이라 크롤러가 세계랭킹·PBA·골프·매장 허브로 갈 서버 렌더 경로가 없었다
+// (사이트맵만으로 5,173 URL 을 던져 4개 색인). 언어판이 있는 허브만 ?lang= 을 붙인다.
+const HUB_L10N: Record<string, { home: string; wr: string; pba: string; golf: string; stores: string; briefing: string; community: string; about: string; support: string }> = {
+  ko: { home: "랭큐 홈", wr: "당구 세계랭킹", pba: "PBA 투어 랭킹", golf: "골프 랭킹", stores: "전국 당구장 찾기", briefing: "오늘의 당구 브리핑", community: "당구 커뮤니티", about: "랭큐 소개", support: "고객지원" },
+  en: { home: "RANKUE home", wr: "Billiards world ranking", pba: "PBA Tour ranking", golf: "Golf rankings", stores: "Billiard halls in Korea", briefing: "Daily billiards briefing", community: "Community", about: "About RANKUE", support: "Support" },
+  vi: { home: "Trang chủ RANKUE", wr: "BXH bida thế giới", pba: "BXH PBA Tour", golf: "BXH golf", stores: "Quán bida ở Hàn Quốc", briefing: "Bản tin bida hằng ngày", community: "Cộng đồng", about: "Giới thiệu RANKUE", support: "Hỗ trợ" },
+  tr: { home: "RANKUE ana sayfa", wr: "Bilardo dünya sıralaması", pba: "PBA Tour sıralaması", golf: "Golf sıralamaları", stores: "Kore'deki bilardo salonları", briefing: "Günlük bilardo bülteni", community: "Topluluk", about: "RANKUE Hakkında", support: "Destek" },
+  es: { home: "Inicio RANKUE", wr: "Ranking mundial de billar", pba: "Ranking PBA Tour", golf: "Rankings de golf", stores: "Salas de billar en Corea", briefing: "Boletín diario de billar", community: "Comunidad", about: "Acerca de RANKUE", support: "Soporte" },
+};
+function hubNav(lang = "ko"): string {
+  const H = HUB_L10N[lang] ?? HUB_L10N.en;
+  const q = lang === "ko" ? "" : `?lang=${lang}`;
+  const golfQ = lang === "en" ? "?lang=en" : "";
+  const links: Array<[string, string]> = [
+    [`/${q}`, H.home], [`/world-ranking${q}`, H.wr], [`/pba${q}`, H.pba], [`/golf-ranking${golfQ}`, H.golf],
+    ["/stores", H.stores], ["/briefing", H.briefing], ["/community", H.community], [`/about${q}`, H.about], ["/support", H.support],
+  ];
+  return `<nav aria-label="RANKUE">${links.map(([href, label]) => `<a href="${href}">${esc(label)}</a>`).join(" · ")}</nav>`;
 }
 
 // 링크 미리보기용 기본 이미지. client/index.html:34 과 각 페이지 useSeo 의 image 인자가
@@ -284,7 +305,7 @@ export function registerPrerender(app: Express) {
     es: { canH: "Qué puedes hacer", canP: "Marcador, partidas emparejadas, historial y comunidad del billar: todo lo que necesitas en la sala, en una app.", faqH: "Preguntas frecuentes", about: "Acerca de RANKUE", stores: "Buscar sala", support: "Soporte" },
   };
 
-  app.get("/", (req, res, next) => {
+  app.get("/", async (req, res, next) => {
     if (!isBot(req)) return next();
     // 언어판 — 사이트맵이 홈에 en·vi·tr·es 를 선언하므로 실제로 그 언어를 서빙해야 한다.
     // 화이트리스트 밖 값(?lang=zz)은 ko 로 접고 canonical 도 ko 판을 가리켜 soft-404 를 막는다.
@@ -292,6 +313,21 @@ export function registerPrerender(app: Express) {
     const lang = (LANDING_LANGS as readonly string[]).includes(q) ? q : "ko";
     const c = landingContent(lang);
     const h = HOME_H[lang] ?? HOME_H.ko;
+    // 세계랭킹 톱 10 — 홈에서 선수 페이지로 가는 서버 렌더 링크(크롤 경로). 실패해도 홈은 나간다.
+    let top10Html = "";
+    try {
+      const data = await storage.umb.getRankings("players", { limit: 10 });
+      const ls = lang === "ko" ? "" : `?lang=${lang}`;
+      if (data.rows.length) {
+        const disp = (r: any) => lang === "ko" && r.nativeName ? `${r.nativeName} (${r.playerName})` : r.playerName;
+        top10Html = `<h2><a href="/world-ranking${ls}">${esc((WR_L10N[lang] ?? WR_L10N.ko).topH)}</a></h2>
+  <ol>
+  ${data.rows.map((r: any) => `<li><a href="/player/players/${esc(r.playerUmbId)}${ls}">${esc(disp(r))}</a> (${esc(r.fed)})</li>`).join("\n  ")}
+  </ol>`;
+      }
+    } catch (e) {
+      console.warn("[prerender] home top10 failed:", (e as Error)?.message);
+    }
     res.setHeader("X-Prerender", "home");
     noStore(res);
     res.send(
@@ -332,7 +368,8 @@ export function registerPrerender(app: Express) {
   <h2>${esc(h.faqH)}</h2>
   ${c.faqs.map((f) => `<section><h3>${esc(f.q)}</h3><p>${esc(f.a)}</p></section>`).join("\n  ")}
 
-  <nav><a href="${lang === "ko" ? "/about" : `/about?lang=${lang}`}">${esc(h.about)}</a> <a href="/stores">${esc(h.stores)}</a> <a href="/support">${esc(h.support)}</a></nav>
+  ${top10Html}
+  ${hubNav(lang)}
 </main>`,
       }),
     );
@@ -350,6 +387,7 @@ export function registerPrerender(app: Express) {
     gapQ: string; gapA: (n1: string, n2: string, diff: number) => string;
     no1H: string; weeksWord: (n: number) => string; nowWord: string;
     watchNote: string;
+    ladiesH: string; juniorsH: string; fedH: string | null; moreH: string;
   }> = {
     ko: {
       title: "당구 세계랭킹 — UMB 공식 3쿠션 랭킹 | 랭큐 RANKUE",
@@ -366,6 +404,7 @@ export function registerPrerender(app: Express) {
       gapA: (n1, n2, d) => `현재 1위 ${n1}와(과) 2위 ${n2}의 격차는 ${d}점입니다.`,
       no1H: "역대 세계 1위", weeksWord: (n) => `${n}주`, nowWord: "현재",
       watchNote: "공식 중계: SOOP Live · 대회 공식 채널 (TRT Spor·HTV 등 지역별 상이)",
+      ladiesH: "여자 세계랭킹 톱 20", juniorsH: "주니어 세계랭킹 톱 10", fedH: "한국 선수 세계랭킹 톱 20", moreH: "남자 세계랭킹 11~50위",
     },
     en: {
       title: "Billiards World Ranking — Official UMB 3-Cushion Rankings | RANKUE",
@@ -382,6 +421,7 @@ export function registerPrerender(app: Express) {
       gapA: (n1, n2, d) => `No.1 ${n1} currently leads No.2 ${n2} by ${d} points.`,
       no1H: "All-time world No.1s", weeksWord: (n) => `${n} wks`, nowWord: "current",
       watchNote: "Official broadcasts: SOOP Live and official event channels (TRT Spor, HTV by region)",
+      ladiesH: "Women's world ranking top 20", juniorsH: "Junior world ranking top 10", fedH: null, moreH: "Men's world ranking No.11–50",
     },
     tr: {
       title: "Bilardo Dünya Sıralaması — Resmî UMB 3 Bant Sıralaması | RANKUE",
@@ -398,6 +438,7 @@ export function registerPrerender(app: Express) {
       gapA: (n1, n2, d) => `Şu anda 1 numara ${n1}, 2 numara ${n2}'nin ${d} puan önünde.`,
       no1H: "Tüm zamanların dünya 1 numaraları", weeksWord: (n) => `${n} hafta`, nowWord: "güncel",
       watchNote: "Resmî yayınlar: TRT Spor, SOOP Live ve turnuva resmî kanalları",
+      ladiesH: "Kadınlar dünya sıralaması ilk 20", juniorsH: "Gençler dünya sıralaması ilk 10", fedH: "Türk oyuncular — dünya sıralaması ilk 20", moreH: "Erkekler dünya sıralaması 11–50",
     },
     vi: {
       title: "BXH Bida Thế giới — BXH 3 băng chính thức của UMB | RANKUE",
@@ -414,6 +455,7 @@ export function registerPrerender(app: Express) {
       gapA: (n1, n2, d) => `Hiện tại hạng 1 ${n1} hơn hạng 2 ${n2} ${d} điểm.`,
       no1H: "Các số 1 thế giới qua các thời kỳ", weeksWord: (n) => `${n} tuần`, nowWord: "hiện tại",
       watchNote: "Phát sóng chính thức: SOOP Live, HTV và kênh chính thức của giải",
+      ladiesH: "Top 20 BXH nữ thế giới", juniorsH: "Top 10 BXH trẻ thế giới", fedH: "Top 20 cơ thủ Việt Nam trên BXH thế giới", moreH: "BXH nam thế giới hạng 11–50",
     },
     es: {
       title: "Ranking Mundial de Billar — Ranking oficial UMB de tres bandas | RANKUE",
@@ -430,6 +472,7 @@ export function registerPrerender(app: Express) {
       gapA: (n1, n2, d) => `Actualmente el N.º 1 ${n1} supera al N.º 2 ${n2} por ${d} puntos.`,
       no1H: "N.º 1 mundiales de todos los tiempos", weeksWord: (n) => `${n} sem`, nowWord: "actual",
       watchNote: "Emisiones oficiales: SOOP Live y canales oficiales del torneo",
+      ladiesH: "Top 20 del ranking mundial femenino", juniorsH: "Top 10 del ranking mundial juvenil", fedH: "Top 20 de jugadores españoles en el ranking mundial", moreH: "Ranking mundial masculino N.º 11–50",
     },
   };
 
@@ -439,18 +482,24 @@ export function registerPrerender(app: Express) {
     const lang = ["en", "tr", "vi", "es"].includes(qLang) ? qLang : "ko";
     const W = WR_L10N[lang];
     let listHtml = "";
+    let moreHtml = "";
     let editionLabel = "";
     let faqHtml = "";
     const jsonLd: unknown[] = [];
     const langSuffix = lang === "ko" ? "" : `?lang=${lang}`;
+    // ko만 한글 이름 병기, 그 외 언어는 로마자
+    const disp = (r: any) => lang === "ko" && r.nativeName ? `${r.nativeName} (${r.playerName})` : r.playerName;
+    const playerLi = (cat: string) => (r: any) =>
+      `  <li><a href="/player/${cat}/${esc(r.playerUmbId)}${langSuffix}">${esc(disp(r))}</a> (${esc(r.fed)}) — ${r.points}pts</li>`;
     try {
-      const data = await storage.umb.getRankings("players", { limit: 10 });
+      // 톱 50 을 받아 1~10 은 본문, 11~50 은 이어지는 목록으로 — 선수 페이지로 가는 서버 렌더 링크를 늘린다(크롤 경로).
+      const data = await storage.umb.getRankings("players", { limit: 50 });
       if (data.rows.length) {
         editionLabel = data.edition ? ` (Edition ${data.edition})` : "";
-        // ko만 한글 이름 병기, 그 외 언어는 로마자
-        const disp = (r: any) => lang === "ko" && r.nativeName ? `${r.nativeName} (${r.playerName})` : r.playerName;
-        listHtml = `<ol>\n${data.rows.map((r: any) =>
-          `  <li><a href="/player/players/${esc(r.playerUmbId)}${langSuffix}">${esc(disp(r))}</a> (${esc(r.fed)}) — ${r.points}pts</li>`).join("\n")}\n</ol>`;
+        listHtml = `<ol>\n${data.rows.slice(0, 10).map(playerLi("players")).join("\n")}\n</ol>`;
+        if (data.rows.length > 10) {
+          moreHtml = `<h2>${esc(W.moreH)}</h2>\n  <ol start="11">\n${data.rows.slice(10).map(playerLi("players")).join("\n")}\n</ol>`;
+        }
 
         // AEO 문답 — 언어별 "관련 질문" 직격. 데이터 기반이라 매주 자동 갱신.
         const top = data.rows[0] as any;
@@ -504,7 +553,7 @@ export function registerPrerender(app: Express) {
           "@context": "https://schema.org",
           "@type": "ItemList",
           name: "UMB 3-Cushion World Ranking Top 10",
-          itemListElement: data.rows.map((r: any, i: number) => ({
+          itemListElement: data.rows.slice(0, 10).map((r: any, i: number) => ({
             "@type": "ListItem",
             position: i + 1,
             name: lang === "ko" ? (r.nativeName || r.playerName) : r.playerName,
@@ -515,6 +564,20 @@ export function registerPrerender(app: Express) {
     } catch (e) {
       console.warn("[prerender] world-ranking rows failed:", (e as Error)?.message);
     }
+    // 여자·주니어·자국 선수 — 부문별 선수 페이지로 가는 링크 층. 각각 실패해도 나머지는 나간다.
+    let sectionsHtml = "";
+    const section = async (title: string, cat: "ladies" | "juniors" | "players", opts: { limit: number; fed?: string }) => {
+      try {
+        const d = await storage.umb.getRankings(cat, opts);
+        if (!d.rows.length) return;
+        sectionsHtml += `\n  <h2>${esc(title)}</h2>\n  <ol>\n${d.rows.map(playerLi(cat)).join("\n")}\n  </ol>`;
+      } catch (e) {
+        console.warn(`[prerender] world-ranking ${cat} failed:`, (e as Error)?.message);
+      }
+    };
+    await section(W.ladiesH, "ladies", { limit: 20 });
+    await section(W.juniorsH, "juniors", { limit: 10 });
+    if (W.fedH && W.fedFaq) await section(W.fedH, "players", { limit: 20, fed: W.fedFaq.fed });
     res.setHeader("X-Prerender", `world-ranking:${lang}`);
     res.send(
       page({
@@ -531,8 +594,9 @@ export function registerPrerender(app: Express) {
   <h2>${esc(W.topH)}</h2>
   ${listHtml || `<p>${esc(W.loading)}</p>`}
   ${faqHtml}
+  ${moreHtml}${sectionsHtml}
   <p>${esc(W.source)} — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
-  <nav><a href="/">RANKUE</a> <a href="/about">About</a> <a href="/stores">Stores</a></nav>
+  ${hubNav(lang)}
 </main>`,
       }),
     );
@@ -561,6 +625,7 @@ export function registerPrerender(app: Express) {
     navAll: string;
     navHome: string;
     reignNote: (n: number) => string; // "세계 1위 통산 N주"
+    nearH: string; // "비슷한 순위의 선수" — 인접 순위 링크 제목
   }> = {
     ko: {
       cat: { players: "남자", ladies: "여자", juniors: "주니어" },
@@ -578,6 +643,7 @@ export function registerPrerender(app: Express) {
       source: "출처: UMB 공식 랭킹 — 매주 갱신",
       navAll: "당구 세계랭킹 전체", navHome: "랭큐 홈",
       reignNote: (n) => `세계 1위 통산 ${n}주.`,
+      nearH: "비슷한 순위의 선수",
     },
     en: {
       cat: { players: "Men's", ladies: "Women's", juniors: "Junior" },
@@ -595,6 +661,7 @@ export function registerPrerender(app: Express) {
       source: "Source: official UMB rankings — updated weekly",
       navAll: "Full billiards world ranking", navHome: "RANKUE home",
       reignNote: (n) => `${n} total weeks at world No.1.`,
+      nearH: "Players ranked nearby",
     },
     tr: {
       cat: { players: "Erkekler", ladies: "Kadınlar", juniors: "Gençler" },
@@ -612,6 +679,7 @@ export function registerPrerender(app: Express) {
       source: "Kaynak: resmî UMB sıralaması — haftalık güncellenir",
       navAll: "Tüm bilardo dünya sıralaması", navHome: "RANKUE ana sayfa",
       reignNote: (n) => `Toplam ${n} hafta dünya 1 numarası.`,
+      nearH: "Yakın sıradaki oyuncular",
     },
     vi: {
       cat: { players: "Nam", ladies: "Nữ", juniors: "Trẻ" },
@@ -629,6 +697,7 @@ export function registerPrerender(app: Express) {
       source: "Nguồn: BXH chính thức UMB — cập nhật hằng tuần",
       navAll: "BXH bida thế giới đầy đủ", navHome: "Trang chủ RANKUE",
       reignNote: (n) => `Tổng cộng ${n} tuần giữ vị trí số 1 thế giới.`,
+      nearH: "Cơ thủ có thứ hạng gần",
     },
     es: {
       cat: { players: "Masculino", ladies: "Femenino", juniors: "Juvenil" },
@@ -646,6 +715,7 @@ export function registerPrerender(app: Express) {
       source: "Fuente: ranking oficial UMB — actualización semanal",
       navAll: "Ranking mundial completo", navHome: "Inicio RANKUE",
       reignNote: (n) => `${n} semanas en total como N.º 1 mundial.`,
+      nearH: "Jugadores con ranking cercano",
     },
   };
   const DATE_LOCALE: Record<UmbLang, string> = { ko: "ko-KR", en: "en-US", tr: "tr-TR", vi: "vi-VN", es: "es-ES" };
@@ -677,6 +747,19 @@ export function registerPrerender(app: Express) {
       const updatedAt = data.history.length
         ? new Date(data.history[data.history.length - 1].editionDate).toLocaleDateString(DATE_LOCALE[lang], { year: "numeric", month: "long" })
         : "";
+      // 인접 순위 ±5 — 선수 페이지끼리 사슬로 이어져 사이트맵에 없는 하위 순위도 크롤러가 따라간다.
+      let nearHtml = "";
+      try {
+        const near = await storage.umb.getRankNeighbors(category as any, p.rank, 5);
+        if (near.length) {
+          nearHtml = `\n  <h2>${esc(L.nearH)}</h2>\n  <ul>\n  ${near.map((n) => {
+            const nm = lang === "ko" && n.nativeName ? `${n.nativeName} (${n.playerName})` : n.playerName;
+            return `<li>${esc(L.rankWord(n.rank))} <a href="/player/${category}/${esc(n.playerUmbId)}${lang === "ko" ? "" : `?lang=${lang}`}">${esc(nm)}</a> (${esc(n.fed)})</li>`;
+          }).join("\n  ")}\n  </ul>`;
+        }
+      } catch (e) {
+        console.warn("[prerender] player neighbors failed:", (e as Error)?.message);
+      }
       res.setHeader("X-Prerender", `umb-player:${lang}`);
       res.send(
         page({
@@ -722,9 +805,10 @@ export function registerPrerender(app: Express) {
   <h2>${esc(L.histH)}</h2>
   <ul>
   ${historySummary}
-  </ul>
+  </ul>${nearHtml}
   <p>${esc(L.source)} — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
-  <nav><a href="/world-ranking${lang === "ko" ? "" : `?lang=${lang}`}">${esc(L.navAll)}</a> <a href="/">${esc(L.navHome)}</a></nav>
+  <nav><a href="/world-ranking${lang === "ko" ? "" : `?lang=${lang}`}">${esc(L.navAll)}</a></nav>
+  ${hubNav(lang)}
 </main>`,
         }),
       );
@@ -792,7 +876,8 @@ export function registerPrerender(app: Express) {
 ${list}
   </ol>
   <p>${esc(G.source(GOLF_TOUR_META[tour].sourceName))} — <a href="${esc(GOLF_TOUR_META[tour].sourceUrl)}" rel="noopener">${esc(GOLF_TOUR_META[tour].sourceUrl.replace("https://", ""))}</a></p>
-  <nav><a href="/golf-ranking${langSuffix}">${esc(G.navAll)}</a> <a href="/">${esc(G.navHome)}</a></nav>
+  <nav><a href="/golf-ranking${langSuffix}">${esc(G.navAll)}</a></nav>
+  ${hubNav(lang)}
 </main>`,
       }));
     } catch (e) {
@@ -896,7 +981,7 @@ ${list}
   </ol>
   <p>${esc(PL.incomeNote)}</p>
   <p>${esc(PL.source)} — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
-  <nav><a href="/world-ranking${plang === "ko" ? "" : `?lang=${plang}`}">UMB</a> <a href="/${plang === "ko" ? "" : `?lang=${plang}`}">RANKUE</a></nav>
+  ${hubNav(plang)}
 </main>`,
         }),
       );
@@ -1131,25 +1216,80 @@ ${list}
   });
 
   // ── /stores ────────────────────────────────────────────────────────
+  // 지역 허브 링크 목록 — /stores 본문과 /stores?region= 페이지 하단, 매장 상세가 공유.
+  const regionLinks = (regions: { region: string; n: number }[], current?: string) =>
+    `<ul>${regions.map((r) => `<li>${r.region === current
+      ? `<strong>${esc(r.region)}</strong>`
+      : `<a href="/stores?region=${esc(encodeURIComponent(r.region))}">${esc(r.region)} 당구장</a>`} (${r.n.toLocaleString("ko-KR")})</li>`).join("")}</ul>`;
+  const listRegions = () => db.select({ region: storeListings.region, n: sql<number>`count(*)::int` })
+    .from(storeListings).groupBy(storeListings.region).orderBy(sql`count(*) DESC`);
+
   app.get("/stores", async (req, res, next) => {
     if (!isBot(req)) return next();
+    const regionQ = typeof req.query.region === "string" ? req.query.region.slice(0, 10) : "";
     let items: { slug: string | null; name: string; region: string | null; address: string | null }[] = [];
     let dirRows: { code: string; name: string; region: string; address: string }[] = [];
     let dirTotal = 0;
+    let regions: { region: string; n: number }[] = [];
     try {
-      // 디렉터리는 SPA 초기 화면과 같은 30곳(이름순)만 싣는다 — 전체 1,195곳의 발견 경로는 사이트맵.
-      [items, dirRows, [{ total: dirTotal }]] = await Promise.all([
+      // 디렉터리는 SPA 초기 화면과 같은 30곳(이름순)만 싣는다 — 전체 1,195곳은 지역 허브(/stores?region=)와 사이트맵으로.
+      [items, dirRows, [{ total: dirTotal }], regions] = await Promise.all([
         storage.getPublicStores() as Promise<typeof items>,
         db.select({
           code: storeListings.code, name: storeListings.name,
           region: storeListings.region, address: storeListings.address,
-        }).from(storeListings).orderBy(asc(storeListings.name)).limit(30),
+        }).from(storeListings).where(regionQ ? eq(storeListings.region, regionQ) : undefined)
+          .orderBy(asc(storeListings.name)).limit(regionQ ? 400 : 30),
         db.select({ total: sql<number>`count(*)::int` }).from(storeListings),
+        listRegions(),
       ]);
     } catch (e) {
       // 빈 목록("총 0개 매장")을 200 으로 내보내면 크롤러가 "매장이 없는 사이트"로 학습한다.
       console.warn("[prerender] stores failed:", (e as Error)?.message);
       return sendUnavailable(res);
+    }
+    // ── 지역 허브 /stores?region=서울 — "서울 당구장" 로컬 검색 타깃. 그 지역 매장 전부를 링크로 싣는다.
+    // 없는 지역(?region=zz)은 404 — 검색 파라미터 조합이 무한히 색인되는 것을 막는다.
+    if (regionQ) {
+      const hit = regions.find((r) => r.region === regionQ);
+      if (!hit) return sendGone(res, "지역을 찾을 수 없습니다.", "요청한 지역의 당구장 정보가 없습니다.");
+      const canonical = `${ORIGIN}/stores?region=${encodeURIComponent(regionQ)}`;
+      res.setHeader("X-Prerender", `stores-region:${encodeURIComponent(regionQ)}`);
+      noStore(res);
+      return res.send(
+        page({
+          // client/src/pages/stores.tsx 의 지역 useSeo 와 문자 단위로 같아야 한다(shared/storeMeta.ts 공유).
+          title: regionTitleKo(regionQ),
+          desc: regionDescKo(regionQ, hit.n),
+          canonical,
+          jsonLd: [
+            {
+              "@context": "https://schema.org",
+              "@type": "ItemList",
+              name: `${regionQ} 당구장`,
+              numberOfItems: hit.n,
+              itemListElement: dirRows.map((s, i) => ({ "@type": "ListItem", position: i + 1, name: s.name, url: `${ORIGIN}/stores/${s.code}` })),
+            },
+            {
+              "@context": "https://schema.org",
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "매장 찾기", item: `${ORIGIN}/stores` },
+                { "@type": "ListItem", position: 2, name: `${regionQ} 당구장`, item: canonical },
+              ],
+            },
+          ],
+          body: `<main>
+  <nav><a href="/stores">← 매장 찾기</a></nav>
+  <h1>${esc(regionQ)} 당구장 ${hit.n.toLocaleString("ko-KR")}곳</h1>
+  <p>${esc(regionQ)} 지역 당구장의 주소·영업시간·테이블 구성·요금을 확인하세요.</p>
+  ${dirRows.map((s) => `<section><h2><a href="/stores/${esc(s.code)}">${esc(s.name)}</a></h2><p>${esc(s.address)}</p></section>`).join("\n  ")}
+  <h2>다른 지역 당구장</h2>
+  ${regionLinks(regions, regionQ)}
+  ${hubNav("ko")}
+</main>`,
+        }),
+      );
     }
     res.setHeader("X-Prerender", "stores");
     noStore(res);
@@ -1189,6 +1329,8 @@ ${list}
           .join("\n  ")
       : "<p>표시할 매장이 없습니다.</p>"
   }
+  <h2>지역별 당구장</h2>
+  ${regionLinks(regions)}
   <h2>전국 당구장 디렉토리</h2>
   ${dirRows
     .map(
@@ -1196,6 +1338,7 @@ ${list}
         `<section><h3><a href="/stores/${esc(s.code)}">${esc(s.name)}</a></h3><p>${esc(s.region)}</p><p>${esc(s.address)}</p></section>`,
     )
     .join("\n  ")}
+  ${hubNav("ko")}
 </main>`,
       }),
     );
@@ -1228,6 +1371,21 @@ ${list}
       crews = await db.select({ id: hiqCrews.id, name: hiqCrews.name })
         .from(hiqCrews).where(eq(hiqCrews.baseListingCode, s.code)).limit(10);
     } catch { /* 크루 조회 실패는 본문 축소로만 — 페이지는 나간다 */ }
+    // 같은 지역 당구장 6곳 — 좌표가 있으면 가까운 순, 없으면 이름순. 상세끼리 이어지는 내부 링크(크롤 경로).
+    let nearby: { code: string; name: string; address: string }[] = [];
+    try {
+      const dist = s.latitude != null && s.longitude != null
+        ? sql`CASE WHEN ${storeListings.latitude} IS NULL THEN 1e9 ELSE
+            (6371 * acos(least(1.0, cos(radians(${s.latitude})) * cos(radians(${storeListings.latitude})) *
+            cos(radians(${storeListings.longitude}) - radians(${s.longitude})) +
+            sin(radians(${s.latitude})) * sin(radians(${storeListings.latitude}))))) END`
+        : sql`0`;
+      nearby = await db.select({ code: storeListings.code, name: storeListings.name, address: storeListings.address })
+        .from(storeListings)
+        .where(and(eq(storeListings.region, s.region), ne(storeListings.code, s.code)))
+        .orderBy(dist, asc(storeListings.name)).limit(6);
+    } catch { /* 이웃 조회 실패는 본문 축소로만 */ }
+    const regionHref = `/stores?region=${encodeURIComponent(s.region)}`;
     const tables = [
       s.tableLarge ? `대대 ${s.tableLarge}` : "",
       s.tableMedium ? `중대 ${s.tableMedium}` : "",
@@ -1253,12 +1411,13 @@ ${list}
             "@type": "BreadcrumbList",
             itemListElement: [
               { "@type": "ListItem", position: 1, name: "매장 찾기", item: `${ORIGIN}/stores` },
-              { "@type": "ListItem", position: 2, name: s.name, item: `${ORIGIN}/stores/${encodeURIComponent(s.code)}` },
+              { "@type": "ListItem", position: 2, name: `${s.region} 당구장`, item: `${ORIGIN}${regionHref}` },
+              { "@type": "ListItem", position: 3, name: s.name, item: `${ORIGIN}/stores/${encodeURIComponent(s.code)}` },
             ],
           },
         ],
         body: `<main>
-  <nav><a href="/stores">← 매장 찾기</a></nav>
+  <nav><a href="/stores">← 매장 찾기</a> › <a href="${esc(regionHref)}">${esc(s.region)} 당구장</a></nav>
   <h1>${esc(s.name)}</h1>
   <p>${esc(s.region)}</p>
   <p><a href="${esc(mapLink(s as any))}" rel="noopener">길찾기 · 지도에서 보기</a>${s.phone ? ` · <a href="tel:${esc(s.phone)}">전화 걸기</a>` : ""}</p>
@@ -1270,6 +1429,8 @@ ${list}
     ${rates.length ? `<dt>요금</dt><dd>${esc(rates.join(", "))}</dd>` : ""}
   </dl>
   ${crews.length ? `<h2>이 매장에서 활동하는 크루</h2><ul>${crews.map((c) => `<li><a href="/club/${esc(c.id)}">${esc(c.name)}</a></li>`).join("")}</ul>` : ""}
+  ${nearby.length ? `<h2>${esc(s.region)}의 다른 당구장</h2><ul>${nearby.map((n) => `<li><a href="/stores/${esc(n.code)}">${esc(n.name)}</a> — ${esc(n.address)}</li>`).join("")}</ul><p><a href="${esc(regionHref)}">${esc(s.region)} 당구장 전체 보기</a></p>` : ""}
+  ${hubNav("ko")}
 </main>`,
       }),
     );

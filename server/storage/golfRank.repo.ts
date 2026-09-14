@@ -230,18 +230,19 @@ export class GolfRankRepository {
 
     /* ── 사이트맵·요약 ── */
 
-    /** 세계 랭킹은 톱 300 + 한국 선수 전원, 투어 랭킹은 전원 */
-    async getPlayersForSitemap(): Promise<Array<{ tour: GolfTour; playerId: string }>> {
-        const out: Array<{ tour: GolfTour; playerId: string }> = [];
+    /** 세계 랭킹은 톱 150 + 한국 선수(500위 이내), 투어 랭킹은 전원. lastmod 는 회차 날짜.
+     *  2026-09-14 톱 300+한국 전원에서 축소 — 사이트맵 5,173 URL 중 4개 색인 사태의 다이어트(umb.repo 참고). */
+    async getPlayersForSitemap(): Promise<Array<{ tour: GolfTour; playerId: string; lastmod: Date }>> {
+        const out: Array<{ tour: GolfTour; playerId: string; lastmod: Date }> = [];
         for (const tour of Object.keys(GOLF_TOUR_META) as GolfTour[]) {
             const [latest] = await this.getLatestEditions(tour, 1);
             if (!latest) continue;
             const cond = GOLF_TOUR_META[tour].world
-                ? or(sql`${golfRankings.rank} <= 300`, eq(golfRankings.country, "KOR"))!
+                ? or(sql`${golfRankings.rank} <= 150`, and(eq(golfRankings.country, "KOR"), sql`${golfRankings.rank} <= 500`))!
                 : sql`true`;
             const rows = await db.select({ playerId: golfRankings.playerId }).from(golfRankings)
                 .where(and(eq(golfRankings.tour, tour), eq(golfRankings.edition, latest.edition), cond)).orderBy(asc(golfRankings.rank));
-            for (const r of rows) out.push({ tour, playerId: r.playerId });
+            for (const r of rows) out.push({ tour, playerId: r.playerId, lastmod: latest.editionDate });
         }
         return out;
     }

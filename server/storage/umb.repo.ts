@@ -405,8 +405,12 @@ export class UmbRepository {
 
     // 사이트맵용 선수 목록 — 부문별 톱 1000 + 한국 선수 전원 (오너 결정: 세계 톱1000).
     // 전 선수(4,300+)까지는 하위권 페이지가 얇은 콘텐츠로 저품질 판정 위험이 있어 제한한다.
-    async getPlayersForSitemap(): Promise<Array<{ category: string; playerUmbId: string }>> {
-        const out: Array<{ category: string; playerUmbId: string }> = [];
+    // 사이트맵 — 부문별 톱 300 + 한국 선수 전원. 2026-09-14 톱 1000 에서 축소:
+    // 5,173 URL 을 한 번에 제출한 뒤 4개만 색인됐다(발견됨-색인 안 됨 3,660). 하위 순위는
+    // 선수 페이지의 인접 순위 링크(getRankNeighbors)로 크롤러가 스스로 찾게 두고, 사이트맵은
+    // 검색 수요가 있는 상위·국내 선수에 집중한다. lastmod 는 회차 날짜.
+    async getPlayersForSitemap(): Promise<Array<{ category: string; playerUmbId: string; rank: number; lastmod: Date }>> {
+        const out: Array<{ category: string; playerUmbId: string; rank: number; lastmod: Date }> = [];
         for (const category of ["players", "ladies", "juniors"] as UmbCategory[]) {
             const editions = await this.getLatestEditions(category, 1);
             if (!editions.length) continue;
@@ -415,10 +419,10 @@ export class UmbRepository {
                 .where(and(
                     eq(umbRankings.category, category),
                     eq(umbRankings.edition, editions[0].edition),
-                    sql`(${umbRankings.rank} <= 1000 OR ${umbRankings.fed} = 'KR')`,
+                    sql`(${umbRankings.rank} <= 300 OR ${umbRankings.fed} = 'KR')`,
                 ))
                 .orderBy(asc(umbRankings.rank));
-            for (const r of rows) out.push({ category, playerUmbId: r.playerUmbId });
+            for (const r of rows) out.push({ category, playerUmbId: r.playerUmbId, rank: r.rank, lastmod: editions[0].editionDate });
         }
         return out;
     }
@@ -532,6 +536,22 @@ export class UmbRepository {
         }
         if (reigns.length) reigns[reigns.length - 1].current = true;
         return reigns.reverse(); // 현재 1위부터
+    }
+
+    // 인접 순위 선수 — 선수 페이지의 "비슷한 순위" 링크. 프리렌더 내부 링크 그래프용:
+    // 각 선수 페이지가 위·아래 span 명을 잇으면 크롤러가 순위표 전체를 링크로 따라갈 수 있다.
+    async getRankNeighbors(category: UmbCategory, rank: number, span = 5) {
+        const editions = await this.getLatestEditions(category, 1);
+        if (!editions.length) return [];
+        return db.select({ rank: umbRankings.rank, playerUmbId: umbRankings.playerUmbId, playerName: umbRankings.playerName, nativeName: umbPlayerNames.nativeName, fed: umbRankings.fed })
+            .from(umbRankings)
+            .leftJoin(umbPlayerNames, eq(umbPlayerNames.playerUmbId, umbRankings.playerUmbId))
+            .where(and(
+                eq(umbRankings.category, category), eq(umbRankings.edition, editions[0].edition),
+                sql`${umbRankings.rank} BETWEEN ${Math.max(1, rank - span)} AND ${rank + span}`,
+                sql`${umbRankings.rank} <> ${rank}`,
+            ))
+            .orderBy(asc(umbRankings.rank));
     }
 
     async getSummary(category: UmbCategory, fed = "KR") {

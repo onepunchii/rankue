@@ -3,22 +3,40 @@ import { storage } from "./storage/index.js";
 import { db } from "./db.js";
 import { storeListings } from "../shared/schema.js";
 import { hreflangOf } from "../shared/aboutContent.js";
-import { asc } from "drizzle-orm";
+import { asc, sql } from "drizzle-orm";
 
-// 동적 사이트맵 — 정적 페이지 + 모든 크루(/club/:id) + 모든 매장(/store/:slug)을
-// DB에서 조립. 새 크루/매장이 생기면 자동 반영된다. 루트(/sitemap.xml)에서 서빙.
+// 동적 사이트맵 — /sitemap.xml 은 **사이트맵 인덱스**, 실제 URL 은 주제별 5개 파일에 나눠 싣는다.
+//
+//   /sitemap.xml            인덱스 (아래 5개를 가리킴)
+//   /sitemap-core.xml       정적 페이지·허브(세계랭킹·PBA·골프·매장·브리핑·커뮤니티)·크루·파트너 매장·지역 허브
+//   /sitemap-players.xml    UMB 선수 — 부문별 톱 300 + 한국 전원
+//   /sitemap-pba.xml        PBA 투어 랭킹 + 선수
+//   /sitemap-golf.xml       골프 랭킹 + 선수 — 세계 톱 150·한국 500위 이내, KPGA·KLPGA 전원
+//   /sitemap-stores.xml     매장 디렉토리(수집 1,195곳)
+//
+// 2026-09-14 분할 이유: 단일 사이트맵에 5,173 URL 을 제출했더니 색인 4개, "발견됨 - 색인 안 됨" 3,660.
+// 서버 렌더 내부 링크가 거의 없는(홈에 링크 1개) 저권위 도메인에 한 번에 쏟은 게 원인이라
+// (1) 프리렌더에 허브→목록→상세 링크를 깔고 (2) 사이트맵은 주제별로 쪼개 Search Console 에서
+// 어느 묶음이 색인되는지 따로 보이게 하고 (3) 하위 순위 선수 등 검색 수요가 없는 URL 은 뺐다.
+// 언어판 hreflang 은 허브 URL 에만 선언한다 — 선수 페이지는 HTML <link rel=alternate> 가 이미 있어
+// 사이트맵까지 5배로 늘릴 이유가 없다(크롤 예산).
 
 const ORIGIN = "https://www.rankue.co.kr";
 // 앱 UI 지원 언어(홈): 5개. About 마케팅 페이지는 ja·zh 번역까지 있어 7개.
 const APP_LANGS = ["en", "vi", "tr", "es"];
 const ABOUT_LANGS = ["en", "vi", "tr", "es", "ja", "zh"];
 
+export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores"] as const;
+export type SitemapSection = (typeof SITEMAP_SECTIONS)[number];
+
 function esc(s: string): string {
   return s.replace(/[<>&'"]/g, (c) =>
     ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[c] as string));
 }
 
-function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; priority?: string }): string {
+const day = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
+
+function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; priority?: string; lastmod?: Date | string | null }): string {
   let alts = "";
   if (opts?.langs && opts.langs.length) {
     const sep = loc.includes("?") ? "&" : "?";
@@ -29,33 +47,55 @@ function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; prio
   }
   return (
     `  <url>\n    <loc>${esc(loc)}</loc>${alts}` +
+    (opts?.lastmod ? `\n    <lastmod>${day(opts.lastmod)}</lastmod>` : "") +
     (opts?.changefreq ? `\n    <changefreq>${opts.changefreq}</changefreq>` : "") +
     (opts?.priority ? `\n    <priority>${opts.priority}</priority>` : "") +
     `\n  </url>`
   );
 }
 
-export async function generateSitemap(): Promise<string> {
+function urlset(parts: string[]): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${parts.join("\n")}\n</urlset>\n`;
+}
+
+/** 인덱스 — 자식 사이트맵 5개. lastmod 는 오늘(매일 갱신되는 브리핑·커뮤니티가 있어 사실에 가깝다). */
+export function generateSitemapIndex(): string {
+  const today = day(new Date());
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${
+    SITEMAP_SECTIONS.map((s) => `  <sitemap>\n    <loc>${ORIGIN}/sitemap-${s}.xml</loc>\n    <lastmod>${today}</lastmod>\n  </sitemap>`).join("\n")
+  }\n</sitemapindex>\n`;
+}
+
+async function coreParts(): Promise<string[]> {
   const parts: string[] = [
     entry(`${ORIGIN}/`, { langs: APP_LANGS, changefreq: "weekly", priority: "1.0" }),
     entry(`${ORIGIN}/about`, { langs: ABOUT_LANGS, changefreq: "monthly", priority: "0.9" }),
-    entry(`${ORIGIN}/stores`, { changefreq: "weekly", priority: "0.7" }),
     // UMB 세계랭킹 — 주간 갱신 공개 페이지 ("당구 세계랭킹" 검색 유입 타깃)
     entry(`${ORIGIN}/world-ranking`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }),
+    entry(`${ORIGIN}/stores`, { changefreq: "weekly", priority: "0.7" }),
     entry(`${ORIGIN}/support`, { changefreq: "monthly", priority: "0.5" }),
     entry(`${ORIGIN}/privacy`, { changefreq: "yearly", priority: "0.3" }),
     entry(`${ORIGIN}/account-delete`, { changefreq: "yearly", priority: "0.3" }),
   ];
 
+  // 매장 지역 허브 — "서울 당구장"류 로컬 검색 타깃이자 디렉토리 1,195곳으로 가는 내부 링크 층.
+  try {
+    const regions = await db.select({ region: storeListings.region, n: sql<number>`count(*)::int` })
+      .from(storeListings).groupBy(storeListings.region).orderBy(sql`count(*) DESC`);
+    for (const r of regions) if (r.region) parts.push(entry(`${ORIGIN}/stores?region=${encodeURIComponent(r.region)}`, { changefreq: "weekly", priority: "0.6" }));
+  } catch (e) {
+    console.warn("[sitemap] regions failed:", (e as Error)?.message);
+  }
+
   // 크루
   try {
     const crews = await storage.getCrewsForSitemap();
-    for (const c of crews) parts.push(entry(`${ORIGIN}/club/${c.id}`, { changefreq: "weekly", priority: "0.6" }));
+    for (const c of crews) parts.push(entry(`${ORIGIN}/club/${c.id}`, { changefreq: "weekly", priority: "0.5" }));
   } catch (e) {
     console.warn("[sitemap] crews failed:", (e as Error)?.message);
   }
 
-  // 매장 — 시스템 매장(hiq·global)은 제외한다. 유저가 소속되는 그릇일 뿐이라
+  // 파트너 매장 — 시스템 매장(hiq·global)은 제외한다. 유저가 소속되는 그릇일 뿐이라
   // 검색에 노출할 콘텐츠가 없고, 색인되면 '랭큐'로 검색한 사람이 빈 매장 페이지를 만난다.
   try {
     const { isSystemStore } = await import("../shared/systemStores.js");
@@ -63,14 +103,6 @@ export async function generateSitemap(): Promise<string> {
     for (const s of stores) if (s.slug && !isSystemStore(s.slug)) parts.push(entry(`${ORIGIN}/store/${encodeURIComponent(s.slug)}`, { changefreq: "weekly", priority: "0.6" }));
   } catch (e) {
     console.warn("[sitemap] stores failed:", (e as Error)?.message);
-  }
-
-  // 매장 디렉토리 — 수집 1,195곳. "지역명 + 당구장" 로컬 검색 타깃, 한국어 전용 페이지.
-  try {
-    const listings = await db.select({ code: storeListings.code }).from(storeListings).orderBy(asc(storeListings.code));
-    for (const l of listings) parts.push(entry(`${ORIGIN}/stores/${l.code}`, { changefreq: "monthly", priority: "0.4" }));
-  } catch (e) {
-    console.warn("[sitemap] listings failed:", (e as Error)?.message);
   }
 
   // 커뮤니티 — 목록 + 글(블라인드 제외). 크루 내부 콘텐츠는 색인 제외가 원칙이지만
@@ -85,15 +117,6 @@ export async function generateSitemap(): Promise<string> {
     console.warn("[sitemap] community failed:", (e as Error)?.message);
   }
 
-  // UMB 선수 페이지 — 부문별 톱 1000 + 한국 선수 전원. 주간 갱신 콘텐츠.
-  // hreflang: 프리렌더가 ?lang=en·tr·vi·es 4개 언어 버전을 실제로 서빙한다.
-  try {
-    const players = await storage.umb.getPlayersForSitemap();
-    for (const p of players) parts.push(entry(`${ORIGIN}/player/${p.category}/${p.playerUmbId}`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.5" }));
-  } catch (e) {
-    console.warn("[sitemap] umb players failed:", (e as Error)?.message);
-  }
-
   // 브리핑 아카이브 — 오늘(KST) + 최근 30일 고정 URL (AEO). 과거분은 결정적 재계산이라 저장 불필요.
   {
     const { todayKst } = await import("../shared/briefingMeta.js");
@@ -101,45 +124,104 @@ export async function generateSitemap(): Promise<string> {
     parts.push(entry(`${ORIGIN}/briefing`, { changefreq: "daily", priority: "0.6" }));
     for (let i = 0; i < 30; i++) {
       const d = new Date(base - i * 86400000).toISOString().slice(0, 10);
-      parts.push(entry(`${ORIGIN}/briefing/${d}`, { changefreq: "monthly", priority: "0.3" }));
+      parts.push(entry(`${ORIGIN}/briefing/${d}`, { changefreq: "monthly", priority: "0.3", lastmod: d }));
     }
   }
+  return parts;
+}
 
-  // PBA 투어 — 랭킹 + 선수 전원. "스롱 피아비 상금"류 국내 검색 타깃, ko 단일 언어.
+// UMB 선수 페이지 — 부문별 톱 300 + 한국 선수 전원(umb.repo.getPlayersForSitemap). 상위 50 은 우선순위를 높인다.
+async function playerParts(): Promise<string[]> {
+  const parts: string[] = [];
+  try {
+    const players = await storage.umb.getPlayersForSitemap();
+    for (const p of players) {
+      parts.push(entry(`${ORIGIN}/player/${p.category}/${p.playerUmbId}`, {
+        changefreq: "weekly", priority: p.rank <= 50 ? "0.6" : "0.4", lastmod: p.lastmod,
+      }));
+    }
+  } catch (e) {
+    console.warn("[sitemap] umb players failed:", (e as Error)?.message);
+  }
+  return parts;
+}
+
+// PBA 투어 — 랭킹 + 선수 전원. "스롱 피아비 상금"류 국내 검색 타깃.
+// hreflang 은 허브(/pba)에만 — 프리렌더가 ?lang=en·vi·tr·es 언어판을 실제로 서빙한다(2026-08-18).
+async function pbaParts(): Promise<string[]> {
+  const parts: string[] = [];
   try {
     const players = await storage.pba.getPlayersForSitemap();
     if (players.length) {
-      // hreflang: 프리렌더가 ?lang=en·vi·tr·es 언어판을 실제로 서빙한다(2026-08-18).
-      // 선언만 하고 같은 문서를 주면 클러스터 전체가 무시되므로, 서빙과 선언을 함께 바꾼다.
       parts.push(entry(`${ORIGIN}/pba`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }));
-      for (const p of players) parts.push(entry(`${ORIGIN}/pba-player/${p.memCode}`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.5" }));
+      for (const p of players) parts.push(entry(`${ORIGIN}/pba-player/${p.memCode}`, { changefreq: "weekly", priority: "0.5" }));
     }
   } catch (e) {
     console.warn("[sitemap] pba players failed:", (e as Error)?.message);
   }
+  return parts;
+}
 
-  // 골프 랭킹(2026-09-13) — 랭킹 + 선수(세계 톱300·한국 선수 전원, KPGA·KLPGA 전원). ko 우선, 언어판은 프리렌더가 준다.
+// 골프 랭킹(2026-09-13) — 랭킹 + 선수(golfRank.repo.getPlayersForSitemap 의 컷). 언어판은 프리렌더가 준다.
+async function golfParts(): Promise<string[]> {
+  const parts: string[] = [];
   try {
     const players = await storage.golfRank.getPlayersForSitemap();
     parts.push(entry(`${ORIGIN}/golf-ranking`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }));
     for (const tour of ["owgr", "rolex", "kpga", "klpga"]) parts.push(entry(`${ORIGIN}/golf-ranking?tour=${tour}`, { changefreq: "weekly", priority: "0.6" }));
-    for (const p of players) parts.push(entry(`${ORIGIN}/golfer/${p.tour}/${p.playerId}`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.5" }));
+    for (const p of players) parts.push(entry(`${ORIGIN}/golfer/${p.tour}/${p.playerId}`, { changefreq: "weekly", priority: "0.4", lastmod: p.lastmod }));
   } catch (e) {
     console.warn("[sitemap] golf players failed:", (e as Error)?.message);
   }
+  return parts;
+}
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${parts.join("\n")}\n</urlset>\n`;
+// 매장 디렉토리 — 수집 1,195곳. "지역명 + 당구장" 로컬 검색 타깃, 한국어 전용 페이지.
+async function storeParts(): Promise<string[]> {
+  const parts: string[] = [];
+  try {
+    const listings = await db.select({ code: storeListings.code, updatedAt: storeListings.updatedAt })
+      .from(storeListings).orderBy(asc(storeListings.code));
+    for (const l of listings) parts.push(entry(`${ORIGIN}/stores/${l.code}`, { changefreq: "monthly", priority: "0.4", lastmod: l.updatedAt }));
+  } catch (e) {
+    console.warn("[sitemap] listings failed:", (e as Error)?.message);
+  }
+  return parts;
+}
+
+export async function generateSitemapSection(section: SitemapSection): Promise<string> {
+  const parts = await ({ core: coreParts, players: playerParts, pba: pbaParts, golf: golfParts, stores: storeParts })[section]();
+  return urlset(parts);
+}
+
+/** 예전 단일 사이트맵과 같은 내용 — 테스트·점검용(전체 URL 수 세기). 서빙은 인덱스+섹션으로 한다. */
+export async function generateSitemap(): Promise<string> {
+  const all: string[] = [];
+  for (const s of SITEMAP_SECTIONS) all.push(...(await ({ core: coreParts, players: playerParts, pba: pbaParts, golf: golfParts, stores: storeParts })[s]()));
+  return urlset(all);
 }
 
 export function registerSitemap(app: Express) {
-  app.get("/sitemap.xml", async (_req, res) => {
+  const send = (res: any, xml: string) => {
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
+    res.send(xml);
+  };
+  app.get("/sitemap.xml", (_req, res) => {
     try {
-      const xml = await generateSitemap();
-      res.setHeader("Content-Type", "application/xml; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
-      res.send(xml);
+      send(res, generateSitemapIndex());
     } catch (e) {
-      console.error("[sitemap] error:", e);
+      console.error("[sitemap] index error:", e);
+      res.status(500).send("sitemap error");
+    }
+  });
+  app.get("/sitemap-:section.xml", async (req, res) => {
+    const section = req.params.section as SitemapSection;
+    if (!(SITEMAP_SECTIONS as readonly string[]).includes(section)) return res.status(404).type("text/plain").send("not found");
+    try {
+      send(res, await generateSitemapSection(section));
+    } catch (e) {
+      console.error(`[sitemap] ${section} error:`, e);
       res.status(500).send("sitemap error");
     }
   });
