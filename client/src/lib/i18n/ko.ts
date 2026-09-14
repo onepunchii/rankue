@@ -1438,6 +1438,7 @@ export const ko: Dict = {
   "umb.cheerSend": "남기기",
   "umb.cheerSending": "남기는 중…",
   "umb.cheerLogin": "로그인하면 응원글을 남길 수 있어요",
+  "umb.cheerLoginCta": "로그인",
   "umb.cheersEmpty": "아직 응원글이 없어요. 첫 응원을 남겨 보세요",
   "umb.cheerDelete": "삭제",
   "umb.cheerFailed": "응원글을 남기지 못했어요",

@@ -1436,6 +1436,7 @@ const en: Dict = {
   "umb.cheerSend": "Post",
   "umb.cheerSending": "Posting…",
   "umb.cheerLogin": "Log in to leave a message",
+  "umb.cheerLoginCta": "Log in",
   "umb.cheersEmpty": "No messages yet — be the first",
   "umb.cheerDelete": "Delete",
   "umb.cheerFailed": "Couldn't post",

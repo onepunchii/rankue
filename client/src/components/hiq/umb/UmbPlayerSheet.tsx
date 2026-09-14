@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
+import { goLogin } from "@/components/hiq/LoginGate";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -117,9 +119,10 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
     const dateLocale = locale === "ko" ? "ko-KR" : locale;
 
     /** 관심 선수 켜기/끄기 — 낙관적으로 먼저 바꾸고 실패하면 되돌린다. 비로그인은 안내만. */
+    const [, setLocation] = useLocation();
     const toggleFollow = async () => {
         if (!data || followBusy) return;
-        if (!member) { toast({ title: t("umb.followLogin") }); return; }
+        if (!member) { toast({ title: t("umb.followLogin") }); goLogin(setLocation); return; }
         const next = !data.following;
         setFollowBusy(true);
         qc.setQueryData<UmbPlayerDetail>(detailKey, { ...data, following: next, followers: Math.max(0, (data.followers ?? 0) + (next ? 1 : -1)) });

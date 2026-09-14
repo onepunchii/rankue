@@ -6,6 +6,7 @@
  * 내 글은 삭제. 차단한 사람의 글은 서버가 목록에서 뺀다.
  */
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
+import { goLogin } from "@/components/hiq/LoginGate";
 import { List, Section } from "./ui";
 import type { UmbCategory } from "./types";
 import type { GolfTour } from "@shared/golfTours";
@@ -34,6 +36,7 @@ function timeAgo(iso: string, t: (k: string) => string): string {
 /** basePath: 골프 선수(2026-09-13)는 같은 부품을 다른 API 로 — 표는 같다(hiq_player_cheers, category=투어) */
 export function PlayerCheers({ category, playerUmbId, basePath = "/api/hiq/umb/players" }: { category: UmbCategory | GolfTour; playerUmbId: string; basePath?: string }) {
     const { t } = useT();
+    const [, setLocation] = useLocation();
     const { member } = useAuth();
     const { toast } = useToast();
     const { gate } = useTermsGate();
@@ -76,7 +79,16 @@ export function PlayerCheers({ category, playerUmbId, basePath = "/api/hiq/umb/p
                     </div>
                 </div>
             ) : (
-                <p className="text-[12px] font-medium text-ink-3 mb-3 px-0.5">🔒 {t("umb.cheerLogin")}</p>
+                // 비로그인: 안내만 두지 않고 로그인 버튼을 준다(2026-09-14 오너). goLogin 은 ?redirect= 로
+                // 지금 보던 선수 페이지에 그대로 되돌아오게 한다(전화·소셜 로그인 모두 지원).
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface-3 px-3 py-2.5 mb-3">
+                    <p className="text-[12px] font-medium text-ink-3 min-w-0">🔒 {t("umb.cheerLogin")}</p>
+                    <button
+                        type="button"
+                        onClick={() => goLogin(setLocation)}
+                        className="h-8 px-3.5 rounded-full bg-brand text-brand-fg text-[12px] font-bold shrink-0 active:scale-[0.97] transition-transform"
+                    >{t("umb.cheerLoginCta")}</button>
+                </div>
             )}
 
             {rows.length === 0 ? (

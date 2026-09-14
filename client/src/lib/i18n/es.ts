@@ -1436,6 +1436,7 @@ const es: Dict = {
   "umb.cheerSend": "Publicar",
   "umb.cheerSending": "Publicando…",
   "umb.cheerLogin": "Inicia sesión para dejar un mensaje",
+  "umb.cheerLoginCta": "Iniciar sesión",
   "umb.cheersEmpty": "Aún no hay mensajes. Sé el primero",
   "umb.cheerDelete": "Eliminar",
   "umb.cheerFailed": "No se pudo publicar",

@@ -1436,6 +1436,7 @@ const tr: Dict = {
   "umb.cheerSend": "Gönder",
   "umb.cheerSending": "Gönderiliyor…",
   "umb.cheerLogin": "Mesaj bırakmak için giriş yap",
+  "umb.cheerLoginCta": "Giriş yap",
   "umb.cheersEmpty": "Henüz mesaj yok — ilk sen ol",
   "umb.cheerDelete": "Sil",
   "umb.cheerFailed": "Gönderilemedi",

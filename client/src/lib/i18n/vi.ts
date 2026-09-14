@@ -1436,6 +1436,7 @@ const vi: Dict = {
   "umb.cheerSend": "Đăng",
   "umb.cheerSending": "Đang đăng…",
   "umb.cheerLogin": "Đăng nhập để gửi lời cổ vũ",
+  "umb.cheerLoginCta": "Đăng nhập",
   "umb.cheersEmpty": "Chưa có lời cổ vũ — hãy là người đầu tiên",
   "umb.cheerDelete": "Xóa",
   "umb.cheerFailed": "Không đăng được",

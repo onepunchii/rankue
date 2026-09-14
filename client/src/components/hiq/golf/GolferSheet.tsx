@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
+import { goLogin } from "@/components/hiq/LoginGate";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -73,9 +75,10 @@ export const GolferBody = ({ tour, playerId, onNavigate, standalone }: GolferBod
     const detailKey = [`${GOLF_API}/${tour}/${playerId}`];
     const meta = GOLF_TOUR_META[tour];
 
+    const [, setLocation] = useLocation();
     const toggleFollow = async () => {
         if (!data || followBusy) return;
-        if (!member) { toast({ title: t("umb.followLogin") }); return; }
+        if (!member) { toast({ title: t("umb.followLogin") }); goLogin(setLocation); return; }
         const next = !data.following;
         setFollowBusy(true);
         qc.setQueryData<GolferDetail>(detailKey, { ...data, following: next, followers: Math.max(0, (data.followers ?? 0) + (next ? 1 : -1)) });
