@@ -2,7 +2,7 @@
  * 기본 코스 "랭큐 파크" 9홀(2026-09-14). 좌표는 W36×H60. 티는 아래, 컵은 위쪽이 기본.
  * 홀마다 한 가지 재미(직선 → 꺾임 → 범퍼 → 지그재그 → 좁은 문 → 뱅크 → 섬 → 광장 → 종합)를 준다.
  */
-import { COURSE_H, COURSE_W, v, type Course, type Hole } from "./course";
+import { COURSE_H, COURSE_W, v, type Course, type Hole } from "./course.js";
 
 const cx = COURSE_W / 2;
 

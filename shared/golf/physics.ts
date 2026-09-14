@@ -3,7 +3,7 @@
  * 사람끼리 공이 부딪히지 않으므로 각자 자기 공만 돌리고 서버는 타수만 모은다 — 당구 대전보다 훨씬 가볍다.
  * 난수·시각을 쓰지 않는다(같은 입력이면 같은 결과 — 나중에 리플레이·고스트 공에 쓴다).
  */
-import { BALL_R, CUP_R, COURSE_H, COURSE_W, wallsOf, type Circle, type Hole, type Segment, type Vec } from "./course";
+import { BALL_R, CUP_R, COURSE_H, COURSE_W, wallsOf, type Circle, type Hole, type Segment, type Vec } from "./course.js";
 
 export const DT = 1 / 120;
 /** 구름 감속(단위/s²). 잔디 위 공이 40 단위/s 로 출발하면 약 2.2초 뒤에 선다 */

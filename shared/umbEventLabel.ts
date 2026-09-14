@@ -12,7 +12,7 @@
  *  - "National Championships 2025 / 2026"
  * 모르는 형식은 kind 'other' 로 원문을 그대로 돌려준다 — 못 알아본다고 정보를 잃지는 않는다.
  */
-import { eventDateOf } from "./umbExpiry";
+import { eventDateOf } from "./umbExpiry.js";
 
 export type EventKind = "worldcup" | "worldchamp" | "confederal" | "national" | "other";
 
