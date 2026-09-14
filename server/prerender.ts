@@ -7,6 +7,7 @@ import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../sh
 import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo } from "../shared/storeMeta.js";
+import { playerCardUrl, CARD_SIZE } from "./services/playerCard.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW, LANDING_LANGS, landingContent } from "../shared/landingContent.js";
 import {
   formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared,
@@ -122,6 +123,8 @@ interface PageParts {
    * 거기에 또 ?lang= 을 이어붙이는 실수가 난다.
    */
   altBase?: string;
+  /** 페이지 고유 이미지(선수 카드 등). 없으면 브랜드 og.png. 정사각형이면 width=height 로 준다. */
+  image?: { url: string; width: number; height: number; alt: string };
   body: string;
   jsonLd?: unknown[];
 }
@@ -190,14 +193,14 @@ function page(p: PageParts): string {
   <meta property="og:description" content="${esc(p.desc)}" />
   <meta property="og:url" content="${esc(p.canonical)}" />
   <meta property="og:locale" content="${esc(OG_LOCALE[lang] ?? "ko_KR")}" />
-  <meta property="og:image" content="${esc(OG_IMAGE)}" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="랭큐 RANKUE — 당구 실력 랭킹·매칭 앱" />
+  <meta property="og:image" content="${esc(p.image?.url ?? OG_IMAGE)}" />
+  <meta property="og:image:width" content="${p.image?.width ?? 1200}" />
+  <meta property="og:image:height" content="${p.image?.height ?? 630}" />
+  <meta property="og:image:alt" content="${esc(p.image?.alt ?? "랭큐 RANKUE — 당구 실력 랭킹·매칭 앱")}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${esc(p.title)}" />
   <meta name="twitter:description" content="${esc(p.desc)}" />
-  <meta name="twitter:image" content="${esc(OG_IMAGE)}" />${ld}
+  <meta name="twitter:image" content="${esc(p.image?.url ?? OG_IMAGE)}" />${ld}
 </head>
 <body>
 ${withToc(p.body, p.lang ?? "ko")}
@@ -782,6 +785,9 @@ export function registerPrerender(app: Express) {
       } catch (e) {
         console.warn("[prerender] player neighbors failed:", (e as Error)?.message);
       }
+      // 선수 카드(정사각형 PNG) — 검색 썸네일·미리보기의 재료. 클라이언트 useSeo 와 같은 주소(playerCardUrl).
+      const card = playerCardUrl(ORIGIN, category, req.params.umbId, lang);
+      const cardAlt = `${nameFull} — ${L.rankingName} ${L.rankWord(p.rank)}`;
       res.setHeader("X-Prerender", `umb-player:${lang}`);
       res.send(
         page({
@@ -791,6 +797,7 @@ export function registerPrerender(app: Express) {
           lang,
           altLangs: [...UMB_LANGS],
           altBase: base, // 상호 hreflang 클러스터 — ko가 기준, ?lang=xx가 변형
+          image: { url: card, width: CARD_SIZE, height: CARD_SIZE, alt: cardAlt },
           jsonLd: [
             {
               "@context": "https://schema.org",
@@ -800,6 +807,7 @@ export function registerPrerender(app: Express) {
               nationality: { "@type": "Country", name: p.fed },
               description: L.playerDesc(nameMain, p.fed, catName, p.rank, p.points, data.bestRank),
               url: canonical,
+              image: card,
               knowsAbout: "Three-cushion billiards",
             },
             {
@@ -813,6 +821,7 @@ export function registerPrerender(app: Express) {
           ],
           body: `<main>
   <h1>${esc(nameFull)} — ${esc(L.rankingName)} ${esc(L.rankWord(p.rank))}</h1>
+  <img src="${esc(card)}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(cardAlt)}" />
   <p>${esc(L.statsLine(p.fed, p.rank, p.points, data.bestRank, String(p.nationalRank ?? "-"), updatedAt))}${(() => {
       const w = data.history.filter((h: any) => h.rank === 1).length;
       return w > 0 ? " " + esc(L.reignNote(w)) : "";

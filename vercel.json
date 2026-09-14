@@ -3,7 +3,8 @@
   "builds": [
     {
       "src": "api/index.ts",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["server/assets/**"] }
     },
     {
       "src": "package.json",
@@ -27,6 +28,10 @@
     },
     {
       "src": "/sitemap(-[a-z]+)?\\.xml",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/og/(.*)",
       "dest": "/api/index.ts"
     },
     {

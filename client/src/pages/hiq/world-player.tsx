@@ -12,7 +12,7 @@ const CATEGORIES = ["players", "ladies", "juniors"];
 // 선수 전용 페이지 — 시트와 같은 본문을 공유 가능한 URL로. 검색 색인(사이트맵 톱200+한국 선수)
 // 과 링크 공유가 목적이다.
 export default function HiqWorldPlayer() {
-    const { t } = useT();
+    const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const [, params] = useRoute("/player/:category/:umbId");
     const category = (CATEGORIES.includes(params?.category || "") ? params!.category : "players") as UmbCategory;
@@ -30,6 +30,8 @@ export default function HiqWorldPlayer() {
             ? `${nameMain} (${p.fed}) — ${t("umb.subtitle")} ${p.rank}${t("umb.rankSuffix")}, ${p.points}${t("umb.pointsUnit")}. ${t("umb.rankHistory")}·${t("umb.pointsBreakdown")}`
             : t("umb.subtitle"),
         path: `/player/${category}/${umbId}`,
+        // 선수 카드 PNG — 프리렌더(server/prerender.ts)와 같은 주소. 공유 미리보기·검색 썸네일.
+        image: p ? `https://www.rankue.co.kr/og/player/${category}/${umbId}.png${locale === "ko" ? "" : `?lang=${locale}`}` : undefined,
         // 개체 연결(조명우 = CHO Myung Woo)용 Person 스키마 — 프리렌더와 동일 구조
         jsonLd: p ? {
             "@context": "https://schema.org",
