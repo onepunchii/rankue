@@ -88,8 +88,8 @@ describe("KLPGA HTML 조각", () => {
 
 describe("editionSignature", () => {
     it("상위 300명 순위·값이 같으면 같다 — 대회 없는 날 스냅샷을 안 쌓는 근거", () => {
-        const a = [{ rank: 1, playerId: "a", points: 1.2345 }, { rank: 2, playerId: "b", points: 1.1 }];
-        expect(editionSignature(a)).toBe(editionSignature([...a]));
-        expect(editionSignature(a)).not.toBe(editionSignature([{ ...a[0], points: 1.2355 }, a[1]]));
+        const a = [{ rank: 1, playerId: "a", points: 13.5098 }, { rank: 2, playerId: "b", points: 10.731 }];
+        expect(editionSignature(a)).toBe(editionSignature([{ ...a[0], points: 13.51 }, { ...a[1], points: 10.73 }]));   // 출처별 정밀도 차이는 같은 회차
+        expect(editionSignature(a)).not.toBe(editionSignature([{ ...a[0], points: 13.52 }, a[1]]));
     });
 });

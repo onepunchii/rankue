@@ -235,5 +235,6 @@ export function klpgaRankingFromStats(rows: readonly StatRow[]): RankRow[] {
  * 서명이 같으면 새 회차를 만들지 않는다(매일 같은 스냅샷이 쌓여 순위 추이가 계단이 되는 걸 막는다).
  */
 export function editionSignature(rows: readonly { rank: number; playerId: string; points: number }[]): string {
-    return rows.slice(0, 300).map((r) => `${r.rank}:${r.playerId}:${Math.round(r.points * 1000)}`).join("|");
+    // 소수 둘째 자리까지만 — 롤렉스 JSON(13.51)과 wwgr(13.5098)처럼 출처마다 정밀도가 달라 같은 자료가 다른 서명이 되면 중복 회차가 생긴다(2026-09-14 실측)
+    return rows.slice(0, 300).map((r) => `${r.rank}:${r.playerId}:${Math.round(r.points * 100)}`).join("|");
 }
