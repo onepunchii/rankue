@@ -11,7 +11,7 @@
 import { KLPGA_MENUS, type GolfTour } from "../../../shared/golfTours.js";
 import type { InsertGolfPlayer } from "../../../shared/schema.js";
 import {
-    kpgaRankingFromStats, klpgaRankingFromStats, mapKpgaStatRow, mapOwgrRow, mapRolexItem, parseKlpgaRows,
+    kpgaRankingFromStats, klpgaRankingFromStats, mapKpgaStatRow, mapOwgrRow, mapRolexItem, parseKlpgaRows, parseWwgrPage, publishDateOf,
     type KpgaRecordJson, type OwgrRankingJson, type RankRow, type RolexItemJson, type StatRow,
 } from "./parse.js";
 
@@ -93,9 +93,40 @@ export async function fetchOwgr(): Promise<TourSnapshot> {
     return { tour: "owgr", edition, editionDate: new Date(edition + "T00:00:00Z"), rows, players, season: seasonNow(), stats: [] };
 }
 
-/* ── Rolex ── */
+/* ── Rolex ──
+ * 1순위 rolexrankings.com JSON(국가·회차 정확). 데이터센터 IP(Vercel·GitHub 러너)는 Akamai 가 403 으로 막으므로(2026-09-14 실측)
+ * 실패하면 2순위 wwgr.net(여자 세계랭킹 관리 사이트, 같은 선수 id, 100명씩 HTML) 로 간다. */
 export async function fetchRolex(): Promise<TourSnapshot> {
-    // 프로덕션(Vercel/AWS IP)에서 403 이 났다(2026-09-14 실측, 로컬은 200). Akamai 봇 판정에 브라우저 힌트 헤더를 최대한 맞춰 본다.
+    try {
+        return await fetchRolexJson();
+    } catch (e) {
+        console.warn("[golf] rolexrankings 실패 → wwgr.net 으로:", (e as Error)?.message);
+        return fetchWwgr();
+    }
+}
+
+const WWGR_PAGE_SIZE = 100;
+const WWGR_MAX_PAGES = 40;
+
+export async function fetchWwgr(): Promise<TourSnapshot> {
+    const rows: RankRow[] = [];
+    let weekEnd: string | null = null;
+    for (let page = 1; page <= WWGR_MAX_PAGES; page++) {
+        const html = await (await request(`https://wwgr.net/rankings?page=${page}`, { headers: { Accept: "text/html" } })).text();
+        const p = parseWwgrPage(html);
+        if (page === 1) weekEnd = p.weekEnd;
+        rows.push(...p.rows);
+        if (p.rows.length < WWGR_PAGE_SIZE) break;
+        await sleep(DELAY_MS);
+    }
+    if (!weekEnd) throw new Error("wwgr 주차를 못 읽었다");
+    if (rows.length < 100) throw new Error(`wwgr 행 수 비정상: ${rows.length}`);
+    const edition = publishDateOf(weekEnd);
+    const players: InsertGolfPlayer[] = rows.map((r) => ({ tour: "rolex", playerId: r.playerId, name: r.playerName, nameEn: r.playerName, country: r.country }));
+    return { tour: "rolex", edition, editionDate: new Date(edition + "T00:00:00Z"), rows, players, season: seasonNow(), stats: [] };
+}
+
+async function fetchRolexJson(): Promise<TourSnapshot> {
     const j = await getJson<{ week?: Record<string, unknown>; list?: { items?: RolexItemJson[] } }>(
         "https://www.rolexrankings.com/core/rankings/list?count=5000", {
             Referer: "https://www.rolexrankings.com/rankings",

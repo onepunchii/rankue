@@ -50,11 +50,13 @@ export async function ingestSnapshot(snap: TourSnapshot, opts: { force?: boolean
 
     let newEdition = false;
     let skipped: string | undefined;
-    if (meta.world) {
-        if (!opts.force && await storage.golfRank.hasEdition(tour, snap.edition)) skipped = `회차 ${snap.edition} 이미 있음`;
-    } else if (!opts.force) {
-        const sig = await storage.golfRank.latestSignature(tour);
-        if (sig !== null && sig === editionSignature(rows)) skipped = "순위 변동 없음(서명 동일)";
+    if (!opts.force) {
+        if (meta.world && await storage.golfRank.hasEdition(tour, snap.edition)) skipped = `회차 ${snap.edition} 이미 있음`;
+        else {
+            // 세계 랭킹도 서명 비교 — 출처가 같은 자료를 다른 회차 이름으로 줄 때(롤렉스 JSON 발표일 vs wwgr 주차 라벨) 같은 스냅샷이 두 번 쌓이지 않게
+            const sig = await storage.golfRank.latestSignature(tour);
+            if (sig !== null && sig === editionSignature(rows)) skipped = "순위 변동 없음(서명 동일)";
+        }
     }
     if (!skipped) {
         await storage.golfRank.upsertEdition(tour, snap.edition, snap.editionDate, rows.map((r) => ({

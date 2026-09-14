@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { editionSignature, klpgaRankingFromStats, mapKpgaStatRow, mapOwgrRow, mapRolexItem, parseKlpgaRows, parseRankText, parseRolexHtml } from "./parse";
+import { editionSignature, flipName, klpgaRankingFromStats, mapKpgaStatRow, mapOwgrRow, mapRolexItem, parseKlpgaRows, parseRankText, parseRolexHtml, parseWwgrPage, publishDateOf } from "./parse";
 
 describe("OWGR", () => {
     it("JSON 한 행 → 공통 행(평균 포인트가 순위 기준, 지난주 순위 보존)", () => {
@@ -36,6 +36,27 @@ describe("Rolex JSON", () => {
     it("항목 → 공통 행. rank_delta 로 지난주 순위", () => {
         const r = mapRolexItem({ id: 7331, name_first: "Jeeno", name_last: "Thitikul", country_code: "THA", rank: 2, rank_delta: 1, points_average: 10.73, points_total: 450.7, tournament_count: 42 })!;
         expect(r).toMatchObject({ rank: 2, playerId: "7331", playerName: "Jeeno Thitikul", country: "THA", points: 10.73, pointsTotal: 450.7, events: 42, prevRank: 3 });
+    });
+});
+
+describe("wwgr.net HTML(롤렉스 대체)", () => {
+    const html = `<a href="/rankings/2026-09-06">x</a><a href="/rankings/2026-09-13">y</a><a href="/rankings/2026-08-30">z</a>
+<table><tr><th>Rank</th></tr>
+<tr class="" style="" onclick=""> <td class="text-center semi-bold col-md-1"> <a name="6925"></a>3 </td> <td class="text-center hidden-xs col-md-1"> <span>--</span> </td> <td class="text-center hidden-xs col-md-1"> <i class="fa fa-arrow-up text-success"></i> <span>10</span> </td> <td class="text-left col-md-4"> <img src="/Content/images/flags/KOR.png" alt="KOR" class="imgCountry" /> <span class="semi-bold">Ryu, Haeran</span> <small>- 6925</small> <td class="text-center hidden-xs col-md-1">44</td> <td class="text-right hidden-xs col-md-2">369.9825</td> <td class="text-right semi-bold col-md-2">8.4087</td> </tr>
+<tr> <td class="text-center semi-bold col-md-1"> <a name="4598"></a>25 </td> <td class="text-center hidden-xs col-md-1"> <i class="fa fa-arrow-down text-danger"></i> <span>2</span> </td> <td class="text-center hidden-xs col-md-1"> <span>13</span> </td> <td class="text-left col-md-4"> <img src="/Content/images/flags/USA.png" alt="USA" class="imgCountry" /> <span class="semi-bold">Yin, Angel</span> <small>- 4598</small> <td class="text-center hidden-xs col-md-1">38</td> <td class="text-right hidden-xs col-md-2">110.2705</td> <td class="text-right semi-bold col-md-2">2.9019</td> </tr>
+</table>`;
+    it("주차·행·국기·변동(위=상승, 아래=하락, -- = 없음)", () => {
+        const p = parseWwgrPage(html);
+        expect(p.weekEnd).toBe("2026-09-13");
+        expect(publishDateOf(p.weekEnd!)).toBe("2026-09-14");
+        expect(p.rows).toHaveLength(2);
+        expect(p.rows[0]).toMatchObject({ rank: 3, playerId: "6925", playerName: "Haeran Ryu", country: "KOR", points: 8.4087, pointsTotal: 369.9825, events: 44, prevRank: 3 });
+        expect(p.rows[1]).toMatchObject({ rank: 25, playerId: "4598", playerName: "Angel Yin", country: "USA", prevRank: 23 });
+    });
+    it("이름 뒤집기", () => {
+        expect(flipName("Korda, Nelly")).toBe("Nelly Korda");
+        expect(flipName("Henderson, Brooke M.")).toBe("Brooke M. Henderson");
+        expect(flipName("Somchai")).toBe("Somchai");
     });
 });
 

@@ -122,6 +122,54 @@ export function mapRolexItem(it: RolexItemJson): RankRow | null {
     };
 }
 
+/* ── wwgr.net (여자 세계랭킹 관리 사이트, 롤렉스 대체 경로) ──
+ * rolexrankings.com 은 데이터센터 IP(Vercel·GitHub) 를 403 으로 막는다(2026-09-14 실측). wwgr.net/rankings?page=N 은
+ * 같은 선수 id 로 100명씩 HTML 표를 주고 봇 차단이 없다. 행:
+ *   <td><a name="6925"></a>3</td> <td><span>--</span></td> <td><i class="fa fa-arrow-up"></i><span>10</span></td>
+ *   <td><img alt="KOR"> <span class="semi-bold">Ryu, Haeran</span> <small>- 6925</small> <td>44</td> <td>369.9825</td> <td>8.4087</td>
+ * 주차는 /rankings/YYYY-MM-DD(주 마감 일요일) 링크 중 가장 늦은 것. 발표일(월요일)=마감+1 이 회차다(롤렉스 JSON 의 publish_date 와 같은 규칙).
+ */
+export interface WwgrPage { readonly weekEnd: string | null; readonly rows: RankRow[] }
+
+/** "Korda, Nelly" → "Nelly Korda" (롤렉스 JSON 의 이름 표기와 맞춘다) */
+export function flipName(s: string): string {
+    const m = s.match(/^\s*([^,]+),\s*(.+?)\s*$/);
+    return m ? `${m[2]} ${m[1]}`.replace(/\s+/g, " ").trim() : s.replace(/\s+/g, " ").trim();
+}
+
+export function parseWwgrPage(html: string): WwgrPage {
+    const dates = [...html.matchAll(/\/rankings\/(\d{4}-\d{2}-\d{2})/g)].map((m) => m[1]).sort();
+    const weekEnd = dates.length ? dates[dates.length - 1] : null;
+    const rows: RankRow[] = [];
+    for (const tr of html.match(/<tr[\s\S]*?<\/tr>/g) ?? []) {
+        const id = tr.match(/<a name="(\d+)"><\/a>\s*(\d+)/);
+        if (!id) continue;
+        const rank = Number(id[2]);
+        const cells = [...tr.matchAll(/<td[^>]*>([\s\S]*?)(?=<td|<\/tr>)/g)].map((m) => m[1]);
+        if (cells.length < 7) continue;
+        const change = (() => {
+            const n = num(text(cells[1]));
+            if (n === null) return 0;                       // "--" = 변동 없음
+            return /arrow-down/.test(cells[1]) ? -n : n;   // 화살표 위 = 상승
+        })();
+        const country = (cells[3].match(/alt="([A-Z]{3})"/)?.[1] ?? "UNK").toUpperCase();
+        const name = flipName(text(cells[3].match(/<span[^>]*>([\s\S]*?)<\/span>/)?.[1] ?? ""));
+        if (!name) continue;
+        rows.push({
+            rank, playerId: id[1], playerName: name, nameKo: null, country,
+            points: num(text(cells[6])) ?? 0, pointsTotal: num(text(cells[5])), events: num(text(cells[4])),
+            prevRank: rank + change,
+        });
+    }
+    return { weekEnd, rows };
+}
+
+/** 주 마감(일요일) → 발표일(월요일) */
+export function publishDateOf(weekEnd: string): string {
+    const d = new Date(weekEnd + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+}
+
 /* ── KPGA ── */
 export interface KpgaRecordJson {
     playerCode: string; playerName: string; enPlayerName?: string | null; ranking: string | number; record: string | number;
