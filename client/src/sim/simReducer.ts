@@ -182,6 +182,8 @@ export interface MatchState {
     readonly watchers: number;
     /** 상대가 자리를 비웠나(2026-09-15). 시계가 늦게 시작하는 동안 이유를 보여 주는 표시용 값. */
     readonly opponentAway: boolean;
+    /** 핸디전인가 — 시작 인사 화면이 "다마수는 두 사람 에버리지로 정해졌다"를 설명할 때 쓴다. */
+    readonly handicap: boolean;
 }
 
 /** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
@@ -199,6 +201,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         timeouts: m.timeouts ?? [0, 0],
         watchers: m.watchers ?? 0,
         opponentAway: m.opponentAway === true,
+        handicap: m.handicap === true,
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
         emoji: m.emoji ?? null,

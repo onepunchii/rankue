@@ -71,6 +71,8 @@ import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
 import { ShotClock } from "./components/ShotClock";
 import { MatchEndRapport } from "./match/MatchEndRapport";
+import { PraisePrompt, PRAISE_MS } from "./match/PraisePrompt";
+import { MatchIntro, INTRO_MS } from "./match/MatchIntro";
 import { aimPhi } from "./aimAssist";
 import { useSolver } from "./solver/useSolver";
 import { SolverSheet } from "./solver/SolverSheet";
@@ -244,6 +246,13 @@ export function SimulatorPage() {
     const [log, setLog] = useState<InningLog>(EMPTY_LOG);
     const [banner, setBanner] = useState<{ outcome: ShotOutcome; id: number } | null>(null);
     const [bannerVisible, setBannerVisible] = useState(false);
+    // 굿샷 권유(2026-09-15 라포 4번): 상대가 득점한 직후에만 잠깐 뜨는 큰 버튼. run 은 상대의 지금 연속 득점.
+    const [praise, setPraise] = useState<{ id: number; run: number } | null>(null);
+    // onOutcome 은 useSimulator 보다 먼저 만들어져 sim 을 못 본다 — 내 자리만 ref 로 넘긴다.
+    const myIndexRef = useRef<number | null>(null);
+    // 시작 인사(2026-09-15 라포 3번): 첫 샷 전에 한 번만. 대전 id 를 적어 두어 같은 판에서 다시 뜨지 않게 한다.
+    const [introFor, setIntroFor] = useState<string | null>(null);
+    const introShownRef = useRef<string | null>(null);
     const [sheetOpen, setSheetOpen] = useState(false);
     // 당점·큐 각 시트. 툴바의 두 버튼이 각자 탭으로 연다
     const [spinSheet, setSpinSheet] = useState<{ open: boolean; tab: SpinSheetTab }>({ open: false, tab: "spin" });
@@ -264,6 +273,11 @@ export function SimulatorPage() {
         onOutcome: (outcome, session, shooter) => {
             setLog((l) => appendShot(l, outcome, session, shooter));
             setBanner({ outcome, id: session.shotCount });
+            // 상대가 득점했다 → 칭찬 버튼을 잠깐 띄운다. 내 샷·연습은 해당 없다.
+            const mine = myIndexRef.current;
+            if (mine !== null && shooter !== mine && outcome.scored) {
+                setPraise({ id: session.shotCount, run: session.players[shooter]?.currentRun ?? 0 });
+            }
             void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
         },
         matchApi,
@@ -851,6 +865,25 @@ export function SimulatorPage() {
         const id = setInterval(() => setEmojiNow(Date.now()), 500);
         return () => clearInterval(id);
     }, [emojiAt]);
+    // 내 자리를 ref 에 실어 onOutcome 이 볼 수 있게 한다(옵션 객체는 sim 보다 먼저 만들어진다).
+    myIndexRef.current = isMatch && sim.match ? sim.match.myIndex : null;
+    // 대전이 막 시작됐으면(아직 아무도 안 쳤다) 인사 화면을 한 번 띄운다.
+    const introKey = isMatch && sim.match?.status === "playing" && (sim.session?.shotCount ?? 1) === 0 ? sim.match.id : null;
+    useEffect(() => {
+        if (!introKey || introShownRef.current === introKey) return;
+        introShownRef.current = introKey;
+        setIntroFor(introKey);
+        const id = setTimeout(() => setIntroFor(null), INTRO_MS);
+        return () => clearTimeout(id);
+    }, [introKey]);
+
+    // 굿샷 버튼은 몇 초 뒤 스스로 사라진다 — 계속 떠 있으면 조준을 가린다.
+    useEffect(() => {
+        if (!praise) return;
+        const id = setTimeout(() => setPraise(null), PRAISE_MS);
+        return () => clearTimeout(id);
+    }, [praise]);
+
     const onSendEmoji = useCallback(async (code: string) => {
         setEmojiBusy(true);
         const r = await actions.sendEmoji(code);
@@ -1401,6 +1434,26 @@ export function SimulatorPage() {
                         {/* 길 찾기는 점수를 세는 화면이 아니라 결과 배너(득점 +1)를 띄우지 않는다(2026-09-08 오너) */}
                         <OutcomeBanner outcome={banner?.outcome ?? null} visible={bannerVisible && !pathView} sub={readoutText} />
                     </div>
+                    {/* 시작 인사(2026-09-15 라포): 누가 누구와, 다마수 몇으로, 몇 번째 만남인지. 누르면 바로 닫힌다. */}
+                    {isMatch && sim.match && sim.session && (
+                        <MatchIntro
+                            matchId={sim.match.id} names={names} myIndex={sim.match.myIndex}
+                            targets={[sim.session.players[0]?.target ?? 0, sim.session.players[1]?.target ?? 0]}
+                            handicap={sim.match.handicap}
+                            visible={introFor === sim.match.id}
+                            onDismiss={() => setIntroFor(null)}
+                        />
+                    )}
+                    {/* 굿샷 권유(2026-09-15 라포): 상대가 득점한 직후에만. 조준을 가리지 않게 테이블 아래쪽에 잠깐. */}
+                    {emojiUi && (
+                        <PraisePrompt
+                            visible={praise !== null}
+                            run={praise?.run ?? 0}
+                            name={sim.match?.opponentName ?? ""}
+                            disabled={emojiBusy}
+                            onPraise={() => { setPraise(null); void onSendEmoji("nice"); }}
+                        />
+                    )}
                 </div>
             </div>
 

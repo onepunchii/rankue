@@ -118,6 +118,8 @@ export interface MatchView {
     readonly watchers: number;
     /** 상대가 자리를 비웠다(2026-09-15). 시계 시작이 늦어지는 이유를 화면이 알려 줄 때 쓴다. */
     readonly opponentAway: boolean;
+    /** 핸디전(참가할 때 서버가 두 사람 에버리지로 다마수를 정한 방) */
+    readonly handicap: boolean;
     /** 마지막 이모지 인사(보낸 사람 자리 포함). 화면이 상대 것만 띄운다. */
     readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
 }
@@ -240,6 +242,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             timeouts: m.timeouts ?? [0, 0],
             watchers: m.watchers ?? 0,
             opponentAway: m.opponentAway === true,
+            handicap: m.handicap === true,
         } : null;
         return {
             phase: core.phase,
