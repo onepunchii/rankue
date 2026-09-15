@@ -7,6 +7,7 @@ import { CLUBS, PRESETS } from "./clubs.js";
 import { gridFrom, heightAt, gradAt, RANGE, validateHole, type FieldHole } from "./course.js";
 import { airDensityRatio } from "./params.js";
 import { simulateStroke, type StrokeContext } from "./stroke.js";
+import { noTapInput } from "./impact.js";
 
 const base = (club: ClubId, over: Partial<StrokeInput> = {}): StrokeInput => ({ club, aimDeg10: 0, stanceDeg10: 0, powerPct: 100, ballPos: 0, impactMs: 0, padX: 0, tapX: 0, tapY: 0, mode: 0, ...over });
 const range: StrokeContext = { hole: RANGE, preset: "pro" };
@@ -141,6 +142,31 @@ describe("전 입력 격자 강건성(결정론·유한·범위)", () => {
         expect(simulateStroke(tee, base("7I", { impactMs: 30 }), range).hash).not.toBe(a);
         expect(simulateStroke(tee, base("7I", { tapY: 30 }), range).hash).not.toBe(a);
         expect(simulateStroke(tee, base("7I", { stanceDeg10: 10 }), range).hash).not.toBe(a);
+    });
+});
+
+describe("스윙을 놓쳤을 때(noTapInput) — 화면에서 탭이 없었던 샷", () => {
+    it("어떤 클럽이든 얇게 + 크게 오른쪽: 캐리 −15~−40 %, 옆 10 m 이상. '정타 슬라이스' 가 아니다", () => {
+        for (const c of FULL) {
+            const teeShot = c === "D" || c === "3W" || c === "5W" || c === "HY";
+            const pre = teeShot ? tee : { x: 0, y: 60, z: 0 };
+            const nt = noTapInput(c);
+            const miss = simulateStroke(pre, base(c, nt), range);
+            const pure = simulateStroke(pre, base(c), range);
+            expect(miss.diag.contact, `${c} contact`).not.toBe("pure");
+            const loss = 1 - miss.carryM / pure.carryM;
+            expect(loss, `${c} 캐리 손실 ${(loss * 100).toFixed(0)} %`).toBeGreaterThan(0.15);
+            expect(loss, `${c} 캐리 손실 ${(loss * 100).toFixed(0)} %`).toBeLessThan(0.40);
+            expect(miss.final.p.x, `${c} 옆 ${miss.final.p.x.toFixed(0)} m`).toBeGreaterThan(10);
+            expect(miss.diag.shape).toMatch(/slice|push/);
+        }
+    });
+    it("입력은 정수·범위 안(서버 재시뮬이 같은 값을 받는다)", () => {
+        for (const c of CLUB_IDS) {
+            const nt = noTapInput(c);
+            expect(Number.isInteger(nt.impactMs) && Math.abs(nt.impactMs) <= 400).toBe(true);
+            expect(Number.isInteger(nt.tapY) && Math.abs(nt.tapY) <= 100).toBe(true);
+        }
     });
 });
 

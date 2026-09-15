@@ -39,6 +39,18 @@ export function zoneMsFor(club: ClubId, surface: Surface, powerPct: number, stan
     return Math.max(15, ZONE_BASE_MS * CLUBS[club].zoneCoef * LIE[surface].zone * powerCoef * shapeCoef);
 }
 
+/**
+ * 스윙을 통째로 놓쳤을 때(화면에서 탭이 없었을 때) 넣을 입력 — 늦은 정도가 아니라 '클럽이 이미 올라오는 중' 이라
+ * 페이스가 활짝 열리고 리딩엣지 쪽에 얇게 맞는다. 클럽 페이스 기하에 비례하므로 어떤 클럽이든 같은 세기의 미스가 된다.
+ * 서버 재시뮬도 같은 정수를 받으므로 결정론은 그대로.
+ */
+export function noTapInput(club: ClubId): { impactMs: number; tapY: number } {
+    const c = CLUBS[club];
+    // 스위트스팟 아래 0.88·faceDown(얇게 구간 깊은 쪽) → tapY
+    const tapY = Math.round(((0.88 * c.faceDownCm) / (TAPY_RANGE_R * BALL_R_CM)) * 100);
+    return { impactMs: 400, tapY: Math.max(-100, Math.min(100, tapY)) };
+}
+
 export function validateInput(i: StrokeInput): void {
     const int = (v: number) => Number.isInteger(v);
     if (!CLUBS[i.club]) throw new RangeError("club");

@@ -3,14 +3,17 @@
  * 패드를 아래로 당겨 파워(20~115 %) → 놓으면 바늘이 공을 가로질러 **왕복**한다(한 번 지나는 데 sweepMs) → 바늘이 공에 올 때 패드
  * 아무 데나 탭. 탭 시각 = impactMs(가까운 통과 시각 기준, 통과 전 −/후 +: 이르면 손이 먼저(닫힘), 늦으면 몸이 먼저(열림)).
  * 컨택(힐/토·높이)은 당점 선택기(ContactPicker)에서 미리 고른 값. 놓을 때 가로 흘림 = padX(패스 오차).
- * 4번 왕복해도 탭이 없으면 +2.5·zone(아주 늦음). 시계는 performance.now(), 탭은 PointerEvent.timeStamp.
+ * 4번 통과하도록 탭이 없으면 스윙을 놓친 것으로 본다(noTapInput: 페이스 활짝 열림 + 얇게). 시계는 performance.now(), 탭은 PointerEvent.timeStamp.
  */
 import { useEffect, useRef, useState, type PointerEvent as RPE } from "react";
 import { cn } from "@/lib/utils";
+import { noTapInput } from "@shared/golf/field/impact";
+import type { ClubId } from "@shared/golf/field/types";
 import type { ContactPoint } from "./ContactPicker";
 
-export interface SwingResult { powerPct: number; impactMs: number; padX: number; tapX: number; tapY: number }
+export interface SwingResult { powerPct: number; impactMs: number; padX: number; tapX: number; tapY: number; noTap: boolean }
 interface Props {
+    club: ClubId;
     zoneMs: number;          // 창 폭(±)
     sweepMs: number;         // 바늘이 한 번 지나가는 시간
     contact: ContactPoint;   // 당점(엔진 단위)
@@ -24,7 +27,7 @@ const MAX_PULL_PX = 170;   // 이만큼 당기면 100 %
 const MAX_PASSES = 4;      // 왕복 2번(4회 통과) 안에 탭이 없으면 자동
 const BALL_PX = 26;
 
-export function SwingPad({ zoneMs, sweepMs, contact, teed, disabled, onShot, onPower }: Props) {
+export function SwingPad({ club, zoneMs, sweepMs, contact, teed, disabled, onShot, onPower }: Props) {
     const [phase, setPhase] = useState<"idle" | "pull" | "impact">("idle");
     const [power, setPower] = useState(0);
     const [needle, setNeedle] = useState(0);          // 0..1 (0.5 = 공)
@@ -35,14 +38,20 @@ export function SwingPad({ zoneMs, sweepMs, contact, teed, disabled, onShot, onP
 
     useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
-    const finish = (impactMs: number) => {
+    const finish = (impactMs: number, noTap = false) => {
         if (!release.current || done.current) return;
         done.current = true;
         cancelAnimationFrame(raf.current);
         const r = release.current;
         release.current = null;
         setPhase("idle"); setNeedle(0); setPower(0);
-        onShot({ powerPct: r.power, impactMs: Math.max(-400, Math.min(400, Math.round(impactMs))), padX: r.padX, tapX: contact.x, tapY: contact.y });
+        // 탭이 없으면 스윙을 통째로 놓친 것 — 엔진의 noTapInput 이 페이스를 활짝 열고 얇게 맞춘다(당점 선택은 무시)
+        const nt = noTap ? noTapInput(club) : null;
+        onShot({
+            powerPct: r.power,
+            impactMs: nt ? nt.impactMs : Math.max(-400, Math.min(400, Math.round(impactMs))),
+            padX: r.padX, tapX: nt ? 0 : contact.x, tapY: nt ? nt.tapY : contact.y, noTap,
+        });
     };
 
     /** 경과 시간 → 바늘 위치(왕복 삼각파)와, 가장 가까운 통과 시각 기준 오차 */
@@ -87,7 +96,7 @@ export function SwingPad({ zoneMs, sweepMs, contact, teed, disabled, onShot, onP
             const el = performance.now() - t0;
             const n = needleAt(el);
             setNeedle(n.pos);
-            if (n.pass >= MAX_PASSES) { finish(zoneMs * 2.5); return; }
+            if (n.pass >= MAX_PASSES) { finish(0, true); return; }
             raf.current = requestAnimationFrame(loop);
         };
         raf.current = requestAnimationFrame(loop);
