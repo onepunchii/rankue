@@ -6,7 +6,7 @@ vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 
 import type { MatchPublic } from "../matchApi";
 import {
-    matchBadge, listRank, sortForList, opponentLabel, gameLabel, rulesLabel, inningCapLabel, endReasonText, joinErrorKey, shareText, inviteLink, shareLinkText } from "./matchView";
+    matchBadge, listRank, sortForList, opponentLabel, gameLabel, rulesLabel, inningCapLabel, endReasonText, joinErrorKey, shareText, inviteLink, shareLinkText, shouldOpenMatch } from "./matchView";
 
 const t = (k: string) => ko[k] ?? k;
 
@@ -82,5 +82,21 @@ describe("초대 링크", () => {
     it("링크 공유 문구에는 링크가 들어간다(코드만 주는 문구와 다르다)", () => {
         const t = (k: string) => (k === "sim.match.shareTextLink" ? "초대 {url}" : k);
         expect(shareLinkText("123456", "https://x.io", t)).toBe("초대 https://x.io/online-game?join=123456&auto=1");
+    });
+});
+
+describe("shouldOpenMatch", () => {
+    it("URL 에 대전이 없으면 열지 않는다", () => {
+        expect(shouldOpenMatch(null, null)).toBe(false);
+        expect(shouldOpenMatch("m-1", null)).toBe(false);
+    });
+    it("아직 아무것도 안 열었으면 연다", () => {
+        expect(shouldOpenMatch(null, "m-1")).toBe(true);
+    });
+    it("같은 대전은 두 번 열지 않는다 — 효과가 다시 돌아도 판이 리셋되면 안 된다", () => {
+        expect(shouldOpenMatch("m-1", "m-1")).toBe(false);
+    });
+    it("재경기: 다른 대전 id 로 바뀌면 갈아탄다(2026-09-15 회귀)", () => {
+        expect(shouldOpenMatch("m-1", "m-2")).toBe(true);
     });
 });

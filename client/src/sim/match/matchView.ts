@@ -113,6 +113,18 @@ export function inviteLink(code: string, origin: string): string {
 }
 
 /** 링크 공유 문구(링크 포함). 코드만 주는 shareText 와 달리 눌러서 바로 들어오게 한다. */
+/**
+ * ?match=<id> 로 대전을 열어야 하는가 — 화면(SimulatorPage)의 걸쇠 판단을 순수 함수로 뽑은 것.
+ *
+ * 왜 함수로 뽑았나: 예전에는 "한 번이라도 뭔가 시작했나"(불리언 하나)만 봤다. 그래서 **재경기로 새 대전 id 가
+ * 들어와도 옛 판이 그대로 남았다**(2026-09-15 오너 제보: "새 당구대가 안 열리고 기존 마지막 대결이 열려 있음").
+ * 무엇을 열어 뒀는지(id)를 들고 비교해야 같은 대전은 두 번 안 열면서 다른 대전으로는 갈아탈 수 있다.
+ */
+export function shouldOpenMatch(openedId: string | null, urlId: string | null): boolean {
+    if (!urlId) return false;
+    return openedId !== urlId;
+}
+
 export function shareLinkText(code: string, origin: string, t: T): string {
     return t("sim.match.shareTextLink").replace("{url}", inviteLink(code, origin));
 }

@@ -65,7 +65,7 @@ import { isCompleteCode, sanitizeCode } from "./matchApi";
 import { matchApi, type MatchPublic } from "./matchApi";
 import { MatchLobby } from "./match/MatchLobby";
 import { MATCH_LIST_QUERY_KEY } from "./match/queryKeys";
-import { endReasonText } from "./match/matchView";
+import { endReasonText, shouldOpenMatch } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
 import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
@@ -333,6 +333,12 @@ export function SimulatorPage() {
 
     // 처음 한 번: URL 설정이 있으면 바로 시작
     const startedRef = useRef(false);
+    /**
+     * 이미 연 대전 id. startedRef 하나로 "한 번이라도 시작했나"만 보면 **재경기로 새 대전에 들어와도 옛 판이 그대로 남는다**
+     * (2026-09-15 오너 제보: "재경기시 새 당구대가 안 열리고 기존 마지막 대결이 열려 있음").
+     * id 를 기억해 두면 같은 대전은 두 번 열지 않으면서 다른 대전으로는 갈아탈 수 있다.
+     */
+    const startedMatchRef = useRef<string | null>(null);
     useEffect(() => {
         if (startedRef.current || !initial) return;
         startedRef.current = true;
@@ -393,8 +399,9 @@ export function SimulatorPage() {
 
     // ?match=<id> (푸시 딥링크·목록에서 열기): 서버에서 받아 대전 모드로 연다
     useEffect(() => {
-        if (!matchId || startedRef.current) return;
-        startedRef.current = true;
+        if (!matchId || !shouldOpenMatch(startedMatchRef.current, matchId)) return;
+        startedMatchRef.current = matchId;
+        startedRef.current = true;   // 솔로 자동 시작은 계속 막는다
         setMatchLoad("loading");
         matchApi.getMatch(matchId).then((m) => {
             if (m.myIndex < 0) { setMatchLoad("notMine"); return; }
