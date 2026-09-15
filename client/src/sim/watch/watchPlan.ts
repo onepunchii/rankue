@@ -9,7 +9,7 @@
  * 관전자의 폴링은 선수보다 느리다(4초). 선수는 자기 차례를 기다리느라 2초까지 당기지만, 관전자는 몇 초 늦게 봐도
  * 아무 손해가 없고 관전자 수만큼 서버 호출이 곱해진다(서버리스 과금). 화면이 가려져 있으면 아예 쉰다.
  */
-import type { MatchShot } from "../matchApi";
+import type { MatchPublic, MatchShot } from "../matchApi";
 
 /** 관전 목록 쿼리 키 — 멀티방 화면(게임 중인 방 줄)과 다시보기 목록이 같은 캐시를 쓴다. */
 export const WATCH_QUERY_KEY = ["sim-watch"] as const;
@@ -56,6 +56,18 @@ export function planWatch(o: { serverShots: number; playedShots: number; animati
 /** 한 번에 여러 샷이 밀려 왔으면 마지막 하나만 재생한다. */
 export function shouldSkipAnimation(pending: number): boolean {
     return pending > WATCH_CATCHUP_LIMIT;
+}
+
+/**
+ * 렌더러·시뮬 파라미터가 바뀌었는지 판단하는 키. 폴링은 2초마다 **새 match 객체**를 주는데, 그걸 그대로 useMemo 의존성에
+ * 넣으면 params 가 매번 새 객체가 되고 → 렌더러 effect 가 2초마다 언마운트·재마운트되며 → 재생 중인 샷을 강제로 끝내
+ * 공이 결과 위치로 순간이동했다(2026-09-15 오너: "관전에서 샷이 멈춰 있다"). 대전 중에 바뀔 수 없는 설정값만 키로 쓴다.
+ */
+export function matchParamsKey(m: MatchPublic | null): string | null {
+    if (!m) return null;
+    // matchConfig(matchApi) 가 읽는 필드와 같다 — 여기서 matchApi 를 실행 import 하면 테스트가 queryClient 별칭까지 끌고 온다
+    const keys: Array<keyof MatchPublic> = ["gameType", "tableId", "cushionModel", "condition", "rules", "finishType", "inningCap", "hostTarget", "guestTarget", "myIndex", "aimAssist", "fullPreview"];
+    return keys.map((k) => { const v = (m as any)[k]; return typeof v === "object" && v !== null ? JSON.stringify(v) : String(v); }).join("|");
 }
 
 /** 진행 중인 대전만 폴링한다. 끝난 대전(다시보기)은 더 받아올 것이 없고, 가려진 화면은 쉰다. */

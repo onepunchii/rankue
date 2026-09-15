@@ -32,7 +32,7 @@ import { TopBar } from "../components/TopBar";
 import { ShotClock } from "../components/ShotClock";
 import { InningSheet } from "../components/InningSheet";
 import { appendShot, EMPTY_LOG, type InningLog } from "../inningLog";
-import { nextPollMs, normalizeShots, planWatch, shouldSkipAnimation } from "./watchPlan";
+import { matchParamsKey, nextPollMs, normalizeShots, planWatch, shouldSkipAnimation } from "./watchPlan";
 
 const INSETS: SafeInsets = { top: 8, right: 8, bottom: 8, left: 8 };
 const SPEEDS = [1, 2, 4] as const;
@@ -83,8 +83,14 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     if (rendererKindRef.current === null) rendererKindRef.current = selectRendererKind();
 
     const finished = match?.status === "finished";
-    const params = useMemo(() => (match ? paramsFromConfig(matchConfig(match)) : null), [match]);
-    const config = useMemo(() => (match ? matchConfig(match) : null), [match]);
+    // ⚠️ [match] 를 의존성으로 두면 안 된다 — 폴링이 2초마다 새 객체를 주어 params 가 바뀌고, 렌더러 effect([params])가
+    // 재마운트되며 재생 중인 샷을 끊었다(공 순간이동). 설정값 키가 같으면 같은 객체를 유지한다.
+    const paramsKey = matchParamsKey(match);
+    const matchRef = useRef(match);
+    matchRef.current = match;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const config = useMemo(() => (matchRef.current ? matchConfig(matchRef.current) : null), [paramsKey]);
+    const params = useMemo(() => (config ? paramsFromConfig(config) : null), [config]);
     const session = (match?.state as SessionState | null) ?? null;
     const names = useMemo(() => [match?.hostName || t("sim.watch.host"), match?.guestName || t("sim.watch.guest")], [match, t]);
 

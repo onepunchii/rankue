@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planWatch, roomSetKey, shouldRefreshWatch, shouldSkipAnimation, nextPollMs, normalizeShots, WATCH_POLL_MS } from "./watchPlan";
+import { matchParamsKey, planWatch, roomSetKey, shouldRefreshWatch, shouldSkipAnimation, nextPollMs, normalizeShots, WATCH_POLL_MS } from "./watchPlan";
 import type { MatchShot } from "../matchApi";
 
 const shot = (idx: number): MatchShot => ({
@@ -65,4 +65,19 @@ describe("shouldRefreshWatch", () => {
         expect(shouldRefreshWatch(null, roomSetKey(["a"]))).toBe(false);
         expect(shouldRefreshWatch(null, roomSetKey([]))).toBe(false);
     });
+});
+
+describe("matchParamsKey", () => {
+    const base: any = {
+        id: "m1", status: "playing", gameType: "3c", tableId: "large", rules: { target: 20 }, finishType: "target", inningCap: 30,
+        cushionModel: "standard", condition: "normal", aimAssist: true, fullPreview: false, shots: 3, turn: 1, version: 3, balls: null, state: null,
+    };
+    it("폴링으로 받은 새 객체라도 설정이 같으면 같은 키 — 렌더러가 재마운트되지 않는다", () => {
+        expect(matchParamsKey({ ...base, shots: 4, version: 4, turn: 0 })).toBe(matchParamsKey({ ...base }));
+    });
+    it("테이블·쿠션 모델이 다르면 다른 키", () => {
+        expect(matchParamsKey({ ...base, tableId: "medium" })).not.toBe(matchParamsKey(base));
+        expect(matchParamsKey({ ...base, cushionModel: "lively" })).not.toBe(matchParamsKey(base));
+    });
+    it("없는 대전은 null", () => { expect(matchParamsKey(null)).toBeNull(); });
 });
