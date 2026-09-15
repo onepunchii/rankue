@@ -40,32 +40,43 @@ export function MatchIntro({ matchId, names, targets, myIndex, handicap, visible
         <button
             type="button" onClick={onDismiss}
             aria-label={t("sim.intro.dismiss")}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-black/72 backdrop-blur-[2px] animate-in fade-in duration-200"
+            // 다크 블러(2026-09-15 오너: "투명도 때문에 흐릿하다, 다크블러로 세련되게").
+            // 반투명 검정만 깔면 그 아래 당구대 초록이 비쳐 글자가 뜬다 — 진한 바탕 + 강한 블러로 배경을 지운다.
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 bg-[#07100C]/88 backdrop-blur-2xl animate-in fade-in duration-200"
         >
-            <span className="text-[12px] font-bold tracking-[0.2em] text-white/55">{t("sim.intro.title")}</span>
-            <div className="flex items-center gap-3">
-                {[0, 1].map((i) => (
-                    <div key={i} className="contents">
-                        {i === 1 && <span className="text-[15px] font-bold text-white/45">VS</span>}
-                        <div className={cn(
-                            "min-w-[112px] max-w-[150px] rounded-2xl px-4 py-3 text-center",
-                            i === myIndex ? "bg-brand text-brand-fg" : "bg-white/12 text-white",
-                        )}>
-                            <div className="text-[15px] font-bold truncate">{names[i] || "-"}</div>
-                            <div className="mt-1 rk-num text-[22px] font-bold leading-none">{targets[i]}</div>
-                            <div className="mt-1 text-[10.5px] font-semibold opacity-70">{t("sim.intro.target")}</div>
+            <span className="text-[11px] font-bold tracking-[0.34em] text-white/35">{t("sim.intro.title")}</span>
+            <div className="flex items-center gap-4">
+                {[0, 1].map((i) => {
+                    const me = i === myIndex;
+                    return (
+                        <div key={i} className="contents">
+                            {i === 1 && <span className="text-[13px] font-bold tracking-wider text-white/30">VS</span>}
+                            {/* 내 쪽은 통째로 칠하지 않는다 — 초록 덩어리가 화면을 먹는다. 얇은 테두리·숫자 색·"나" 칩으로만 구분한다. */}
+                            <div className={cn(
+                                "min-w-[128px] max-w-[160px] rounded-[20px] px-5 pt-3 pb-4 text-center bg-white/[0.06] ring-1",
+                                me ? "ring-brand/55" : "ring-white/10",
+                            )}>
+                                <div className="h-4 flex items-center justify-center">
+                                    {me && <span className="rounded-pill bg-brand px-1.5 py-[2px] text-[9.5px] font-bold leading-none tracking-wide text-brand-fg">{t("sim.intro.me")}</span>}
+                                </div>
+                                <div className={cn("mt-1 text-[14px] font-bold truncate", me ? "text-white" : "text-white/85")}>{names[i] || "-"}</div>
+                                <div className={cn("mt-1.5 rk-num text-[30px] font-bold leading-none", me ? "text-brand" : "text-white")}>{targets[i]}</div>
+                                <div className="mt-1.5 text-[10px] font-semibold tracking-wide text-white/40">{t("sim.intro.target")}</div>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
-            {h && h.total > 0 && (
-                <span className="rk-num text-[12.5px] font-semibold text-white/75">
-                    {t("sim.rematch.nth").replace("{n}", String(h.total + 1))}
-                    {" · "}
-                    {t("sim.rematch.record").replace("{w}", String(h.wins)).replace("{l}", String(h.losses))}
-                </span>
-            )}
-            {handicap && <span className="text-[11.5px] font-medium text-white/55 px-8 text-center">{t("sim.intro.handicap")}</span>}
+            <div className="flex flex-col items-center gap-1">
+                {h && h.total > 0 && (
+                    <span className="rk-num text-[13px] font-semibold text-white/90">
+                        {t("sim.rematch.nth").replace("{n}", String(h.total + 1))}
+                        {" · "}
+                        {t("sim.rematch.record").replace("{w}", String(h.wins)).replace("{l}", String(h.losses))}
+                    </span>
+                )}
+                {handicap && <span className="text-[11px] font-medium text-white/40 px-10 text-center leading-relaxed">{t("sim.intro.handicap")}</span>}
+            </div>
         </button>
     );
 }

@@ -2024,6 +2024,7 @@ const es: Dict = {
   "sim.praise.send": "¡Buen tiro!",
   "sim.intro.title": "I N I C I O",
   "sim.intro.target": "Objetivo",
+  "sim.intro.me": "Tú",
   "sim.intro.handicap": "Partida con hándicap: los objetivos salen de los promedios online de ambos",
   "sim.intro.dismiss": "Cerrar",
   "sim.praise.streak": "¡{name} {n} seguidas!",

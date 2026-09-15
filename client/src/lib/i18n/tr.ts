@@ -2024,6 +2024,7 @@ const tr: Dict = {
   "sim.praise.send": "Güzel vuruş!",
   "sim.intro.title": "M A Ç   B A Ş L I Y O R",
   "sim.intro.target": "Hedef",
+  "sim.intro.me": "Sen",
   "sim.intro.handicap": "Handikaplı maç: hedefler iki oyuncunun online ortalamasından belirlendi",
   "sim.intro.dismiss": "Kapat",
   "sim.praise.streak": "{name} üst üste {n}!",

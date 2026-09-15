@@ -2024,6 +2024,7 @@ const en: Dict = {
   "sim.praise.send": "Nice shot!",
   "sim.intro.title": "M A T C H   S T A R T",
   "sim.intro.target": "Target",
+  "sim.intro.me": "You",
   "sim.intro.handicap": "Handicap match: targets were set from both players' online averages",
   "sim.intro.dismiss": "Dismiss",
   "sim.praise.streak": "{name} {n} in a row!",

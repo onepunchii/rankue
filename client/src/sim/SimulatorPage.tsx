@@ -1451,6 +1451,7 @@ export function SimulatorPage() {
                             run={praise?.run ?? 0}
                             name={sim.match?.opponentName ?? ""}
                             disabled={emojiBusy}
+                            bottom={DOCK_HEIGHT + 12}
                             onPraise={() => { setPraise(null); void onSendEmoji("nice"); }}
                         />
                     )}

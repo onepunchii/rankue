@@ -2026,6 +2026,7 @@ export const ko: Dict = {
   "sim.praise.send": "굿샷!",
   "sim.intro.title": "대 전 시 작",
   "sim.intro.target": "다마수",
+  "sim.intro.me": "나",
   "sim.intro.handicap": "핸디전이라 다마수는 두 사람의 온라인 에버리지로 정해졌어요",
   "sim.intro.dismiss": "닫기",
   "sim.praise.streak": "{name} {n}연속!",

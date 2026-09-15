@@ -2024,6 +2024,7 @@ const vi: Dict = {
   "sim.praise.send": "Cú đánh đẹp!",
   "sim.intro.title": "B Ắ T   Đ Ầ U",
   "sim.intro.target": "Mục tiêu",
+  "sim.intro.me": "Bạn",
   "sim.intro.handicap": "Trận chấp: mục tiêu được tính từ điểm trung bình online của cả hai",
   "sim.intro.dismiss": "Đóng",
   "sim.praise.streak": "{name} {n} lần liên tiếp!",

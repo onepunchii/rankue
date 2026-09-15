@@ -16,24 +16,26 @@ export const PRAISE_MS = 6000;
 /** 이 이상 연속 득점이면 "n연속" 을 같이 띄운다. 1~2 는 흔해서 소음이다. */
 export const PRAISE_RUN_MIN = 3;
 
-export const PraisePrompt = memo(function PraisePrompt({ visible, run, name, disabled, onPraise }: {
+export const PraisePrompt = memo(function PraisePrompt({ visible, run, name, disabled, bottom, onPraise }: {
     visible: boolean;
     /** 상대의 지금 연속 득점 */
     run: number;
     name: string;
     /** 쿨다운·횟수 소진·전송 중 */
     disabled?: boolean;
+    /** 조작 독 위로 띄울 높이(px). 독을 덮으면 미세 방향조절 키가 안 눌린다 — 2026-09-15 실측. */
+    bottom: number;
     onPraise: () => void;
 }) {
     const { t } = useT();
     const streak = run >= PRAISE_RUN_MIN;
+    // 안 보일 때는 **아예 그리지 않는다**. opacity-0 으로만 숨기면 투명한 버튼이 그대로 남아
+    // 아래의 조작 독(당점·두께·미세 방향조절)이 안 눌렸다. 사라질 때 서서히 없어지는 맛보다 조작이 먼저다.
+    if (!visible) return null;
     return (
         <div
-            aria-hidden={!visible}
-            className={cn(
-                "pointer-events-none absolute inset-x-0 bottom-3 z-20 flex flex-col items-center gap-1.5 transition-opacity duration-200",
-                visible ? "opacity-100" : "opacity-0",
-            )}
+            className="pointer-events-none absolute inset-x-0 z-20 flex flex-col items-center gap-1.5 animate-in fade-in duration-200"
+            style={{ bottom }}
         >
             {streak && (
                 <span className="rounded-pill bg-ink-1/85 px-3 py-1 text-[12px] font-bold text-white">
@@ -41,7 +43,7 @@ export const PraisePrompt = memo(function PraisePrompt({ visible, run, name, dis
                 </span>
             )}
             <button
-                type="button" disabled={!visible || disabled} onClick={onPraise}
+                type="button" disabled={disabled} onClick={onPraise}
                 className={cn(
                     "pointer-events-auto inline-flex items-center gap-1.5 h-11 px-5 rounded-pill",
                     "bg-brand text-brand-fg text-[14px] font-bold shadow-[0_4px_16px_rgba(0,0,0,0.18)]",
