@@ -11,7 +11,7 @@ import { noTapInput } from "@shared/golf/field/impact";
 import type { ClubId } from "@shared/golf/field/types";
 import type { ContactPoint } from "./ContactPicker";
 
-export interface SwingResult { powerPct: number; impactMs: number; padX: number; tapX: number; tapY: number; noTap: boolean; /** 쓸기 스윙: 이상 템포 대비 다운스윙 오차(+ 빠름) */ tempoDevMs?: number }
+export interface SwingResult { powerPct: number; impactMs: number; padX: number; tapX: number; tapY: number; noTap: boolean; /** 쓸기 스윙: 이상 템포 대비 다운스윙 오차(+ 빠름) */ tempoDevMs?: number; /** 아크 스윙: 끌어서 정한 스탠스(드로우 +) */ stanceDeg10?: number }
 interface Props {
     club: ClubId;
     zoneMs: number;          // 창 폭(±)

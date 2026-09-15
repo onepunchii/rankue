@@ -19,6 +19,7 @@ import { SwingPad, type SwingResult } from "./SwingPad";
 import { ContactPicker, type ContactPoint } from "./ContactPicker";
 import { ImpactVerdict, verdictOf, type Verdict } from "./ImpactVerdict";
 import { SwipeSwing, downswingMsFor } from "./SwipeSwing";
+import { ArcSwing } from "./ArcSwing";
 
 const CLUB_LIST: ClubId[] = ["D", "3W", "5I", "7I", "9I", "PW", "SW"];
 // 스탠스 = 스윙 패스. 드라이버 3° 면 축 14°·옆 30 m(큰 페이드), 1.5° 가 투어 페이드 급. 엔진은 ±15° 까지 받는다
@@ -51,28 +52,30 @@ export default function RangePage() {
     const [card, setCard] = useState<{ result: StrokeResult; input: StrokeInput; ghost: Float32Array; verdict: Verdict; noTap: boolean; tempoDevMs?: number } | null>(null);
     const [showOpts, setShowOpts] = useState(false);
     // 입력 방식 A/B — 쓸기(한 제스처가 세 축을 결과로) vs 바늘(당점 선택 + 왕복 바늘 탭)
-    const [mode, setMode] = useState<"swipe" | "needle">(() => (localStorage.getItem("rankue_golf_swing_mode") as "swipe" | "needle") ?? "swipe");
+    const [mode, setMode] = useState<"arc" | "swipe" | "needle">(() => (localStorage.getItem("rankue_golf_swing_mode") as "arc" | "swipe" | "needle") ?? "arc");
     useEffect(() => { localStorage.setItem("rankue_golf_swing_mode", mode); }, [mode]);
     const [showGhost, setShowGhost] = useState(true);
     const rafRef = useRef(0);
     const [pullPower, setPullPower] = useState(0);   // 당기는 중 파워(0 = 안 당김)
+    const [pullShape, setPullShape] = useState(0);  // 당기는 중 스탠스(아크 스윙)
     const aimDrag = useRef<{ x: number; a: number } | null>(null);
 
     const wind = WINDS.find((w) => w.key === windKey)!.w;
     const ctx: StrokeContext = useMemo(() => ({ hole: RANGE, preset, env: wind.x || wind.y ? steadyWind(wind) : NO_WIND, stimp: 10 }), [preset, wind]);
-    const zoneMs = zoneMsFor(club, "tee", 100, stance, ballPos);
+    const aimStance = mode === "arc" ? pullShape : stance;
+    const zoneMs = zoneMsFor(club, "tee", 100, aimStance, ballPos);
     const teed = !CLUBS[club].iron;
     // 파워별 예상 착지(퍼펙트 임팩트·현재 바람·조준) — 20..115 % 를 5 % 간격으로 미리 돌려 두고, 당기는 동안 링이 따라간다
     const carryByPower = useMemo(() => {
         const m = new Map<number, { x: number; y: number; carry: number }>();
         for (let p = 20; p <= 115; p += 5) {
-            const inp: StrokeInput = { club, aimDeg10: Math.round(aimDeg * 10), stanceDeg10: stance, powerPct: p, ballPos, impactMs: 0, padX: 0, tapX: 0, tapY: 0, mode: 0 };
+            const inp: StrokeInput = { club, aimDeg10: Math.round(aimDeg * 10), stanceDeg10: aimStance, powerPct: p, ballPos, impactMs: 0, padX: 0, tapX: 0, tapY: 0, mode: 0 };
             const res = simulateStroke({ x: RANGE.tee.x, y: RANGE.tee.y, z: 0 }, inp, ctx);
             const land = res.events.find((e) => e.kind === "land");
             m.set(p, { x: land ? land.p.x : res.final.p.x, y: land ? land.p.y : res.final.p.y, carry: res.carryM });
         }
         return m;
-    }, [club, aimDeg, stance, ballPos, ctx]);
+    }, [club, aimDeg, aimStance, ballPos, ctx]);
     const ringPower = pullPower >= 20 ? Math.min(115, Math.round(pullPower / 5) * 5) : 100;
     const ring = carryByPower.get(ringPower) ?? { x: 0, y: nominalCarryM(club, preset), carry: nominalCarryM(club, preset) };
 
@@ -83,14 +86,14 @@ export default function RangePage() {
     const onFieldWheel = (e: RWE) => { const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; if (d) setAimDeg((a) => clampAim(a + Math.sign(d) * AIM_STEP)); };
 
     const shoot = (r: SwingResult) => {
-        const input: StrokeInput = { club, aimDeg10: Math.round(aimDeg * 10), stanceDeg10: stance, powerPct: r.powerPct, ballPos, impactMs: r.impactMs, padX: r.padX, tapX: r.tapX, tapY: r.tapY, mode: 0 };
+        const input: StrokeInput = { club, aimDeg10: Math.round(aimDeg * 10), stanceDeg10: r.stanceDeg10 ?? stance, powerPct: r.powerPct, ballPos, impactMs: r.impactMs, padX: r.padX, tapX: r.tapX, tapY: r.tapY, mode: 0 };
         let result: StrokeResult;
         try { result = simulateStroke({ x: RANGE.tee.x, y: RANGE.tee.y, z: 0 }, input, ctx); } catch (e) { console.warn("[range] 입력 거부", e); return; }
         const ghost = simulateStroke({ x: RANGE.tee.x, y: RANGE.tee.y, z: 0 }, perfectInput(input), ctx).frames;
         const land = result.events.find((e) => e.kind === "land");
         const shot: Shot = { frames: result.frames, landing: land ? { x: land.p.x, y: land.p.y } : null, rest: { x: result.final.p.x, y: result.final.p.y }, color: COLORS[shots.length % COLORS.length] };
         const verdict = verdictOf(result.diag, r.noTap, r.tempoDevMs);
-        setCard(null); setLive({ shot, result, input, verdict }); setFrame(0); setPullPower(0);
+        setCard(null); setLive({ shot, result, input, verdict }); setFrame(0); setPullPower(0); setPullShape(0);
         // 실시간 재생(120 Hz 프레임 → 경과 시간으로 인덱스)
         const t0 = performance.now(); const n = result.frames.length / 3;
         cancelAnimationFrame(rafRef.current);
@@ -123,15 +126,21 @@ export default function RangePage() {
                     <button onClick={() => setLocation("/golf/arcade")} className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0" aria-label="뒤로"><LucideChevronLeft className="w-5 h-5" /></button>
                     <div className="flex-1 min-w-0">
                         <div className="text-[13px] font-extrabold leading-tight">필드 골프 연습장 <span className="text-[10px] font-bold text-[#64DD17] align-middle">ENGINE 0.3</span></div>
-                        <div className="text-[10.5px] text-white/40 leading-tight truncate">{CLUBS[club].id} · {PRESET_KO[preset]} · {mode === "swipe" ? `템포 ${downswingMsFor(club)} ms` : `창 ±${Math.round(zoneMs)} ms`} · {WINDS.find((w) => w.key === windKey)!.label}</div>
+                        <div className="text-[10.5px] text-white/40 leading-tight truncate">{CLUBS[club].id} · {PRESET_KO[preset]} · {mode === "swipe" ? `템포 ${downswingMsFor(club)} ms` : `창 ±${Math.round(zoneMs)} ms`}{aimStance ? ` · ${aimStance > 0 ? "드로우" : "페이드"} ${Math.abs(aimStance / 10).toFixed(1)}°` : ""} · {WINDS.find((w) => w.key === windKey)!.label}</div>
                     </div>
                     {shots.length > 0 && <button onClick={() => { setShots([]); setCard(null); }} className="shrink-0 h-8 px-2.5 rounded-full bg-white/[0.06] text-[11px] font-bold text-white/50">지우기 {shots.length}</button>}
 
                 </div>
                 {/* 매 샷 만지는 것만 밖에: 스탠스(구질). 바람·볼포지션·프리셋은 연습장 설정이라 시트 안으로 */}
                 <div className="flex items-center gap-1 px-3 pb-1 text-[11.5px] font-bold">
-                    <span className="shrink-0 text-[10px] font-bold text-white/30 mr-0.5">스탠스</span>
-                    {STANCES.map((s) => <button key={s.key} onClick={() => setStance(s.key)} className={cn(chip(stance === s.key), "flex-1 px-0")}>{s.short}</button>)}
+                    {mode === "arc" ? (
+                        <div className="flex-1 text-[10.5px] font-bold text-white/30">공을 뒤로 끌어 파워 · 좌우로 드로우/페이드 · 초록 창에 탭</div>
+                    ) : (
+                        <>
+                            <span className="shrink-0 text-[10px] font-bold text-white/30 mr-0.5">스탠스</span>
+                            {STANCES.map((s) => <button key={s.key} onClick={() => setStance(s.key)} className={cn(chip(stance === s.key), "flex-1 px-0")}>{s.short}</button>)}
+                        </>
+                    )}
                     <button onClick={() => setShowOpts(true)} className="shrink-0 w-8 h-7 rounded-full bg-white/[0.06] text-white/60 flex items-center justify-center" aria-label="연습장 설정"><LucideSettings2 className="w-3.5 h-3.5" /></button>
                 </div>
 
@@ -161,12 +170,14 @@ export default function RangePage() {
                 </div>
 
                 {/* 하단: 당점 + 스윙 패드. 샷 카드가 이 자리를 덮는다(필드의 착지점·점선을 가리지 않게), 탭하면 다음 샷 */}
-                <div className="h-[32%] min-h-[176px] px-3 pb-3 pt-2 relative flex gap-2 items-stretch">
+                <div className="h-[38%] min-h-[230px] px-3 pb-3 pt-2 relative flex gap-2 items-stretch">
                     {mode === "needle" && <ContactPicker value={contact} onChange={setContact} teed={teed} disabled={!!live} />}
                     <div className="flex-1 min-w-0">
-                        {mode === "swipe"
-                            ? <SwipeSwing club={club} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />
-                            : <SwingPad club={club} zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} contact={contact} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />}
+                        {mode === "arc"
+                            ? <ArcSwing club={club} zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} teed={teed} disabled={!!live} onShot={shoot} onAim={(p, sh) => { setPullPower(p); setPullShape(sh); }} />
+                            : mode === "swipe"
+                                ? <SwipeSwing club={club} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />
+                                : <SwingPad club={club} zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} contact={contact} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />}
                     </div>
                     <div className={cn("absolute inset-x-3 top-2 bottom-3", card ? "" : "pointer-events-none")}>
                         {/* 탭한 순간부터 공이 멈출 때까지 — 내가 친 자리·등급·날아가는 거리 */}
@@ -212,6 +223,7 @@ export default function RangePage() {
                             <button onClick={() => setShowOpts(false)} className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center" aria-label="닫기"><LucideX className="w-4 h-4" /></button>
                         </div>
                         <Opt label="입력 방식">
+                            <button onClick={() => setMode("arc")} className={chip(mode === "arc")}>아크(끌기 → 탭)</button>
                             <button onClick={() => setMode("swipe")} className={chip(mode === "swipe")}>쓸기(한 제스처)</button>
                             <button onClick={() => setMode("needle")} className={chip(mode === "needle")}>바늘 + 당점 선택</button>
                         </Opt>
