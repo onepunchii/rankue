@@ -40,28 +40,29 @@ export function MatchIntro({ matchId, names, targets, myIndex, handicap, visible
         <button
             type="button" onClick={onDismiss}
             aria-label={t("sim.intro.dismiss")}
-            // 다크 블러(2026-09-15 오너: "투명도 때문에 흐릿하다, 다크블러로 세련되게").
-            // 반투명 검정만 깔면 그 아래 당구대 초록이 비쳐 글자가 뜬다 — 진한 바탕 + 강한 블러로 배경을 지운다.
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 bg-[#07100C]/88 backdrop-blur-2xl animate-in fade-in duration-200"
+            // 다크 블러(2026-09-15 오너). 배경을 **8자리 hex(알파 포함)** 로 쓴다 —
+            // `bg-[#07100C]/88` 처럼 5의 배수가 아닌 투명도를 붙이면 Tailwind 가 그 클래스를 통째로 버려서
+            // 배경이 아예 안 깔린다(실측: 빌드된 CSS 에 색이 한 번도 안 나온다). 그래서 블러만 남아 당구대 초록이 비쳤다.
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 bg-[#070F0BF2] backdrop-blur-2xl animate-in fade-in duration-200"
         >
-            <span className="text-[11px] font-bold tracking-[0.34em] text-white/35">{t("sim.intro.title")}</span>
+            <span className="text-[11px] font-bold tracking-[0.34em] text-white/50">{t("sim.intro.title")}</span>
             <div className="flex items-center gap-4">
                 {[0, 1].map((i) => {
                     const me = i === myIndex;
                     return (
                         <div key={i} className="contents">
-                            {i === 1 && <span className="text-[13px] font-bold tracking-wider text-white/30">VS</span>}
+                            {i === 1 && <span className="text-[13px] font-bold tracking-wider text-white/40">VS</span>}
                             {/* 내 쪽은 통째로 칠하지 않는다 — 초록 덩어리가 화면을 먹는다. 얇은 테두리·숫자 색·"나" 칩으로만 구분한다. */}
                             <div className={cn(
-                                "min-w-[128px] max-w-[160px] rounded-[20px] px-5 pt-3 pb-4 text-center bg-white/[0.06] ring-1",
-                                me ? "ring-brand/55" : "ring-white/10",
+                                "min-w-[128px] max-w-[160px] rounded-[20px] px-5 pt-3 pb-4 text-center bg-white/[0.07] ring-1",
+                                me ? "ring-brand/60" : "ring-white/15",
                             )}>
                                 <div className="h-4 flex items-center justify-center">
                                     {me && <span className="rounded-pill bg-brand px-1.5 py-[2px] text-[9.5px] font-bold leading-none tracking-wide text-brand-fg">{t("sim.intro.me")}</span>}
                                 </div>
-                                <div className={cn("mt-1 text-[14px] font-bold truncate", me ? "text-white" : "text-white/85")}>{names[i] || "-"}</div>
+                                <div className="mt-1 text-[14px] font-bold truncate text-white">{names[i] || "-"}</div>
                                 <div className={cn("mt-1.5 rk-num text-[30px] font-bold leading-none", me ? "text-brand" : "text-white")}>{targets[i]}</div>
-                                <div className="mt-1.5 text-[10px] font-semibold tracking-wide text-white/40">{t("sim.intro.target")}</div>
+                                <div className="mt-1.5 text-[10px] font-semibold tracking-wide text-white/55">{t("sim.intro.target")}</div>
                             </div>
                         </div>
                     );
@@ -69,13 +70,13 @@ export function MatchIntro({ matchId, names, targets, myIndex, handicap, visible
             </div>
             <div className="flex flex-col items-center gap-1">
                 {h && h.total > 0 && (
-                    <span className="rk-num text-[13px] font-semibold text-white/90">
+                    <span className="rk-num text-[13.5px] font-semibold text-white">
                         {t("sim.rematch.nth").replace("{n}", String(h.total + 1))}
                         {" · "}
                         {t("sim.rematch.record").replace("{w}", String(h.wins)).replace("{l}", String(h.losses))}
                     </span>
                 )}
-                {handicap && <span className="text-[11px] font-medium text-white/40 px-10 text-center leading-relaxed">{t("sim.intro.handicap")}</span>}
+                {handicap && <span className="text-[11px] font-medium text-white/55 px-10 text-center leading-relaxed">{t("sim.intro.handicap")}</span>}
             </div>
         </button>
     );
