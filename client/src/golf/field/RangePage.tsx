@@ -106,7 +106,8 @@ export default function RangePage() {
     }, [live, frame]);
     const chip = (active: boolean) => cn("shrink-0 h-7 px-2.5 rounded-full", active ? "bg-[#ffffff] text-[#000000]" : "bg-white/[0.06] text-white/60");
 
-    const SWING_H = 232, AIM_BOTTOM = SWING_H + 8, TEE_BOTTOM = 330;
+    // 링(공의 집) 은 화면 아래 215 px, 티 위의 공은 340 px. 조준 띠는 티 바로 위 — 끌기 영역과 안 겹친다
+    const HOME_BOTTOM = 215, TEE_BOTTOM = 340, SWING_H = 236, AIM_BOTTOM = TEE_BOTTOM + 40;   // 조준 띠는 티 위(POWER 글자와 안 겹치게)
 
     return (
         <div className="h-[100dvh] bg-[#0A0A0A] text-white font-sans overflow-hidden flex justify-center" style={{ overscrollBehavior: "none" }}>
@@ -134,7 +135,7 @@ export default function RangePage() {
 
 
                 {/* 클럽 바 */}
-                <div className="absolute right-3 flex flex-col gap-[3px] p-[3px] rounded-xl bg-black/50 backdrop-blur-sm" style={{ top: "50%", transform: "translateY(-58%)" }}>
+                <div className="absolute right-3 flex flex-col gap-[3px] p-[3px] rounded-xl bg-black/50 backdrop-blur-sm" style={{ top: 92 }}>
                     {CLUB_LIST.map((c) => (
                         <button key={c} onClick={() => setClub(c)} className={cn("w-[46px] h-[32px] rounded-lg flex flex-col items-center justify-center leading-none", club === c ? "bg-[#64DD17] text-[#051907]" : "text-white/80")}>
                             <span className="text-[12px] font-extrabold">{c}</span>
@@ -145,7 +146,7 @@ export default function RangePage() {
 
                 {/* 스윙 조작 — 화면 전체 오버레이(아크는 위, 큰 공은 아래) */}
                 {!live && !card && (
-                    <ArcSwing zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} teeBottomPx={TEE_BOTTOM} ctrlH={SWING_H} onShot={shoot} onAim={(p, sh) => { setPullPower(p); setPullShape(sh); }} />
+                    <ArcSwing club={club} ballPos={ballPos} teeBottomPx={TEE_BOTTOM} homeBottomPx={HOME_BOTTOM} onShot={shoot} onAim={(p, sh) => { setPullPower(p); setPullShape(sh); }} />
                 )}
 
                 {/* 조준 띠 */}
