@@ -3,11 +3,13 @@
 export interface Vec3 { readonly x: number; readonly y: number; readonly z: number }
 export interface Vec2 { readonly x: number; readonly y: number }
 
-export type ClubId = "D" | "3W" | "5I" | "7I" | "9I" | "PW" | "SW" | "PT";
-export const CLUB_IDS: readonly ClubId[] = ["D", "3W", "5I", "7I", "9I", "PW", "SW", "PT"];
+/** 풀 백 14: 트랙맨 투어 평균 표에 있는 클럽 + SW·PT. 1차 화면은 8개(D·3W·5I·7I·9I·PW·SW·PT)만 보여준다 */
+export type ClubId = "D" | "3W" | "5W" | "HY" | "3I" | "4I" | "5I" | "6I" | "7I" | "8I" | "9I" | "PW" | "SW" | "PT";
+export const CLUB_IDS: readonly ClubId[] = ["D", "3W", "5W", "HY", "3I", "4I", "5I", "6I", "7I", "8I", "9I", "PW", "SW", "PT"];
 
 export type Surface = "tee" | "fairway" | "fringe" | "green" | "rough" | "deeprough" | "bunker" | "water" | "ob";
-export type Preset = "pro" | "amateur";
+/** pro = PGA 투어 평균 · lpga = LPGA 투어 평균(표) · amateur = 오너 확정 0.88×(≈5 핸디) · ama15 = 트랙맨 평균 남성 아마(14~15 핸디) */
+export type Preset = "pro" | "amateur" | "lpga" | "ama15";
 export type StrokeMode = 0 | 1 | 2 | 3;   // 0 풀 · 1 칩 · 2 익스플로전 · 3 퍼트
 
 /**

@@ -3,13 +3,13 @@
  * 결과의 events + final 이 해시 대상. frames 는 120 Hz 위치(렌더용).
  */
 import { atan } from "../../sim/dmath.js";
-import { gradAt, heightAt, surfaceAt, type FieldHole } from "./course.js";
+import { gradAt, heightAt, surfaceAt, type FieldHole, type Tree } from "./course.js";
 import { stepAir, type MState } from "./flight.js";
 import { bounce, cupCheck, stepRoll } from "./ground.js";
 import { strokeHash } from "./hash.js";
 import { launchFrom, type LieInfo } from "./impact.js";
 import { EXPLOSION_IDEAL_TAPY } from "./clubs.js";
-import { BALL_R, BOUNCE_TO_ROLL_VN, CUP_RH, DEG, greenRollDecel, MAX_AIR_STEPS, MAX_ROLL_STEPS, SURFACE } from "./params.js";
+import { airDensityRatio, BALL_R, BOUNCE_TO_ROLL_VN, CUP_RH, DEG, greenRollDecel, K_AERO, MAX_AIR_STEPS, MAX_ROLL_STEPS, NO_CONDITIONS, stimpFor, SURFACE, surfaceParamsFor, type Conditions } from "./params.js";
 import { gustSeedFor, NO_WIND } from "./wind.js";
 import type { BallState3, Phase, Preset, StrokeEvent, StrokeInput, StrokeResult, Vec3, WindEnv } from "./types.js";
 
@@ -20,6 +20,50 @@ export interface StrokeContext {
     readonly stimp?: number;
     readonly strokeIdx?: number;
     readonly roomSeed?: number;
+    /** 고도·기온·단단함·젖음(방 옵션). 없으면 해면 15 °C·보통 */
+    readonly conditions?: Conditions;
+}
+
+const TRUNK_R_DEFAULT = 0.25;
+const TREE_CANOPY_E = 0.2, TREE_CANOPY_KEEP = 0.35, TREE_TRUNK_E = 0.5, TREE_TRUNK_KEEP = 0.5;
+
+/**
+ * 나무 충돌(결정론). 캐노피 구 안에 들어오면 표면 법선으로 되튀고 속도 35 %·스핀 30 % 만 남는다(잎이 먹는다),
+ * 둥치는 수평 반사 50 %. 부딪혔으면 true. 굴러가는 공은 둥치만 본다
+ */
+function treeHit(s: MState, trees: readonly Tree[], rolling: boolean): boolean {
+    for (const t of trees) {
+        const dx = s.px - t.c.x, dy = s.py - t.c.y;
+        const d2 = dx * dx + dy * dy;
+        const reach = t.r + 1;
+        if (d2 > reach * reach) continue;
+        const zc = t.h - t.r;
+        const trunkR = t.trunkR ?? TRUNK_R_DEFAULT;
+        if (!rolling) {
+            const dz = s.pz - zc;
+            const r2 = d2 + dz * dz;
+            if (r2 < t.r * t.r) {
+                const rl = Math.sqrt(Math.max(1e-9, r2));
+                const nx = dx / rl, ny = dy / rl, nz = dz / rl;
+                const vn = s.vx * nx + s.vy * ny + s.vz * nz;
+                if (vn < 0) { s.vx -= (1 + TREE_CANOPY_E) * vn * nx; s.vy -= (1 + TREE_CANOPY_E) * vn * ny; s.vz -= (1 + TREE_CANOPY_E) * vn * nz; }
+                s.vx *= TREE_CANOPY_KEEP; s.vy *= TREE_CANOPY_KEEP; s.vz *= TREE_CANOPY_KEEP;
+                s.wx *= 0.3; s.wy *= 0.3; s.wz *= 0.3;
+                s.px = t.c.x + nx * (t.r + 0.01); s.py = t.c.y + ny * (t.r + 0.01); s.pz = zc + nz * (t.r + 0.01);
+                return true;
+            }
+        }
+        if (d2 < trunkR * trunkR && s.pz < zc) {
+            const dl = Math.sqrt(Math.max(1e-9, d2));
+            const nx = dx / dl, ny = dy / dl;
+            const vn = s.vx * nx + s.vy * ny;
+            if (vn < 0) { s.vx -= (1 + TREE_TRUNK_E) * vn * nx; s.vy -= (1 + TREE_TRUNK_E) * vn * ny; }
+            s.vx *= TREE_TRUNK_KEEP; s.vy *= TREE_TRUNK_KEEP; if (!rolling) s.vz *= TREE_TRUNK_KEEP;
+            s.px = t.c.x + nx * (trunkR + 0.01); s.py = t.c.y + ny * (trunkR + 0.01);
+            return true;
+        }
+    }
+    return false;
 }
 
 function snapshot(s: MState, phase: Phase): BallState3 {
@@ -53,7 +97,10 @@ export function simulateStroke(pre: Vec3, input: StrokeInput, ctx: StrokeContext
     const aimDeg = input.aimDeg10 / 10;
     const lie = lieAt(hole, pre.x, pre.y, aimDeg, seed);
     const launch = launchFrom(input, { preset: ctx.preset, lie, aimDeg });
-    const stimp = ctx.stimp ?? 10;
+    const cond = ctx.conditions ?? NO_CONDITIONS;
+    const stimp = stimpFor(ctx.stimp ?? 10, cond);
+    const kAero = K_AERO * airDensityRatio(cond);
+    const trees = hole.trees ?? [];
 
     const s: MState = {
         px: pre.x, py: pre.y, pz: heightAt(hole, pre.x, pre.y) + BALL_R,
@@ -70,7 +117,8 @@ export function simulateStroke(pre: Vec3, input: StrokeInput, ctx: StrokeContext
     let landed = false;
     while (phase === "air") {
         const prevZ = s.pz, prevX = s.px, prevY = s.py, prevVz = s.vz;
-        stepAir(s, env, hasWind);
+        stepAir(s, env, hasWind, kAero);
+        if (trees.length && treeHit(s, trees, false)) events.push(ev("tree", s));
         frames.push(s.px, s.py, s.pz);
         if (prevVz > 0 && s.vz <= 0 && !landed) { apexM = Math.max(apexM, s.pz - heightAt(hole, s.px, s.py)); events.push(ev("apex", s)); }
         const ground = heightAt(hole, s.px, s.py) + BALL_R;
@@ -85,7 +133,7 @@ export function simulateStroke(pre: Vec3, input: StrokeInput, ctx: StrokeContext
             else events.push(ev("bounce", s));
             if (surf === "water") { phase = "water"; events.push(ev("water", s)); break; }
             if (surf === "ob") { phase = "ob"; events.push(ev("ob", s)); break; }
-            const sp = SURFACE[surf];
+            const sp = surfaceParamsFor(SURFACE[surf], cond);
             const { bounceUp } = bounce(s, sp, gradAt(hole, s.px, s.py));
             if (bounceUp < BOUNCE_TO_ROLL_VN) { s.vz = 0; phase = "roll"; events.push(ev("roll", s)); }
         }
@@ -99,9 +147,10 @@ export function simulateStroke(pre: Vec3, input: StrokeInput, ctx: StrokeContext
         const surf = surfaceAt(hole, s.px, s.py);
         if (surf === "water") { phase = "water"; events.push(ev("water", s)); break; }
         if (surf === "ob") { phase = "ob"; events.push(ev("ob", s)); break; }
-        const aRoll = surf === "green" ? greenRollDecel(stimp) : SURFACE[surf].aRoll;
+        const aRoll = surf === "green" ? greenRollDecel(stimp) : surfaceParamsFor(SURFACE[surf], cond).aRoll;
         const grad = gradAt(hole, s.px, s.py);
         const stopped = stepRoll(s, aRoll, grad, heightAt(hole, s.px, s.py));
+        if (trees.length && treeHit(s, trees, true)) events.push(ev("tree", s));
         frames.push(s.px, s.py, s.pz);
         if (surf === "green" || surf === "fringe") {
             const dx = s.px - hole.cup.x, dy = s.py - hole.cup.y;

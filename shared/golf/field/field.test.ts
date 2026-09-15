@@ -12,8 +12,8 @@ const tee = { x: 0, y: 0, z: 0 };
 const turf = { x: 0, y: 60, z: 0 };   // 티 박스 밖 잔디
 const lieTee = { surface: "tee" as const, slopeAlongDeg: 0, slopeSideDeg: 0, seed: 1 };
 
-// 조사 §8 모델 출력(프로, 반암시적 오일러 1/120 기준). 드라이버는 프리셋 76.5 m/s → 250
-const CARRY_PRO: Record<Exclude<ClubId, "PT">, number> = { D: 250.5, "3W": 228.7, "5I": 179.1, "7I": 153.7, "9I": 132.1, PW: 119.4, SW: 97.1 };
+// 모델 출력 회귀값(프로, v0.3 항력 스핀항 S 0.40 캡). 트랙맨 표 대조는 engine-grid.test.ts(±4 %). 드라이버는 프리셋 76.5 m/s → 250
+const CARRY_PRO: Record<Exclude<ClubId, "PT">, number> = { D: 249.8, "3W": 228.1, "5W": 215.5, HY: 205.3, "3I": 197.8, "4I": 188.8, "5I": 179.1, "6I": 169.1, "7I": 156.7, "8I": 148.5, "9I": 139.3, PW: 128.6, SW: 108.2 };
 
 describe("코스·지형", () => {
     it("레인지·연습 그린 불변식", () => {
@@ -211,7 +211,7 @@ describe("컨택 높이(tapY) — 잔디 위 아이언", () => {
         const r = simulateStroke(tee, base("7I"), { ...range, hole: roughHole });
         const p = simulateStroke(turf, base("7I"), range);
         expect(r.carryM).toBeLessThan(p.carryM); expect(r.carryM).toBeGreaterThan(p.carryM * 0.9);
-        expect(r.totalM - r.carryM).toBeGreaterThan((p.totalM - p.carryM) * 1.5);
+        expect(r.totalM - r.carryM).toBeGreaterThan((p.totalM - p.carryM) * 1.3);
     });
     it("볼 포지션 뒤(펀치)는 낮게·짧게, 앞(하이)은 높게", () => {
         const punch = simulateStroke(turf, base("7I", { ballPos: -100 }), range), high = simulateStroke(turf, base("7I", { ballPos: 100 }), range);

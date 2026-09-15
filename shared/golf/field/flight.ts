@@ -9,7 +9,7 @@ import type { WindEnv } from "./types.js";
 /** 가변 상태(엔진 내부 전용 — 바깥엔 불변 BallState3 로 내보낸다) */
 export interface MState { px: number; py: number; pz: number; vx: number; vy: number; vz: number; wx: number; wy: number; wz: number; t: number }
 
-export function stepAir(s: MState, env: WindEnv, hasWind: boolean): void {
+export function stepAir(s: MState, env: WindEnv, hasWind: boolean, kAero: number = K_AERO): void {
     let rx = s.vx, ry = s.vy, rz = s.vz;
     if (hasWind) { const w = windAt(env, s.pz, s.t); rx -= w.x; ry -= w.y; rz -= w.z; }
     const V = Math.sqrt(rx * rx + ry * ry + rz * rz);
@@ -18,7 +18,7 @@ export function stepAir(s: MState, env: WindEnv, hasWind: boolean): void {
         const om = Math.sqrt(s.wx * s.wx + s.wy * s.wy + s.wz * s.wz);
         const S = (BALL_R * om) / V;
         const cd = cdOf(S, V), cl = clOf(S);
-        const kV = K_AERO * V;
+        const kV = kAero * V;
         ax -= kV * cd * rx; ay -= kV * cd * ry; az -= kV * cd * rz;
         if (om > 1e-6) {
             const sx = s.wx / om, sy = s.wy / om, sz = s.wz / om;

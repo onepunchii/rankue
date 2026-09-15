@@ -12,7 +12,7 @@
  *  · 벙커 익스플로전: 이상적인 것은 공 1.5 cm 아래 모래(tapY −47). 얕게 들어갈수록 세지고(홈런), 깊으면 모래에 파묻힌다.
  */
 import { atan, cos, sin } from "../../sim/dmath.js";
-import { BALL_R_CM, CLUBS, EXPLOSION_IDEAL_TAPY, LIE, PERFECT_BAND, PRESET_SPEED, TAPY_RANGE_R, TURF_FREE_CM, ZONE_BASE_MS, type Club } from "./clubs.js";
+import { BALL_R_CM, CLUBS, EXPLOSION_IDEAL_TAPY, LIE, PERFECT_BAND, presetLaunch, TAPY_RANGE_R, TURF_FREE_CM, ZONE_BASE_MS, type Club } from "./clubs.js";
 import { DEG, RPM_TO_RAD } from "./params.js";
 import type { ClubId, Contact, ImpactDiag, LaunchState, Preset, StrokeInput, Surface } from "./types.js";
 
@@ -137,7 +137,7 @@ export function launchFrom(input: StrokeInput, ctx: LaunchCtx): LaunchState {
     validateInput(input);
     const club = CLUBS[input.club];
     const lie = LIE[ctx.lie.surface];
-    const presetF = PRESET_SPEED[ctx.preset];
+    const pl = presetLaunch(club, ctx.preset);   // 프리셋의 100 % 발사 조건(볼스피드·발사각·스핀)
     const P = clamp(input.powerPct / 100, 0.2, 1.15);
     const bp = input.ballPos / 100;
     const stanceDeg = input.stanceDeg10 / 10;
@@ -179,10 +179,10 @@ export function launchFrom(input: StrokeInput, ctx: LaunchCtx): LaunchState {
 
     // ── 발사 조건(스핀 로프트 식) + 페이스가 만드는 다이내믹 로프트(열리면 로프트 ↑·스핀 ↑, 닫히면 반대) ──
     let L = Math.max(4, club.spinLoftDeg + 2 * bp + 0.35 * faceH);
-    let launchV = club.launchDeg + 3.7 * bp + 0.25 * faceH;
-    let spin = club.spinRpm * (sin(L * DEG) / sin(club.spinLoftDeg * DEG));
+    let launchV = pl.launchDeg + 3.7 * bp + 0.25 * faceH;
+    let spin = pl.spinRpm * (sin(L * DEG) / sin(club.spinLoftDeg * DEG));
     const powerSpeed = P <= 1 ? P : 1 + 0.27 * (P - 1);
-    let speed = club.ballSpeed * presetF * powerSpeed * lie.speed * (1 - club.gearSpeedK * dx * dx);
+    let speed = pl.ballSpeed * powerSpeed * lie.speed * (1 - club.gearSpeedK * dx * dx);
     launchV += lie.launchAdd + ctx.lie.slopeAlongDeg;
     speed *= 1 - 0.01 * Math.max(0, ctx.lie.slopeAlongDeg);
     spin *= lie.spin;
@@ -193,7 +193,7 @@ export function launchFrom(input: StrokeInput, ctx: LaunchCtx): LaunchState {
         spin = 3000 + 2000 * P;
         L = 50;
     } else if (isChip) {
-        speed = club.ballSpeed * presetF * P * 0.85 * lie.speed;
+        speed = pl.ballSpeed * P * 0.85 * lie.speed;
         launchV = 8 + lie.launchAdd;
         spin *= 0.5;
     }

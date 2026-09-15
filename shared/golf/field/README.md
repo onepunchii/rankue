@@ -1,4 +1,4 @@
-# shared/golf/field — 필드 골프 물리 엔진 v0.2 (계약서)
+# shared/golf/field — 필드 골프 물리 엔진 v0.3 (계약서)
 
 2026-09-15 오너 확정안("전부 추천대로", 세션 제안서 `golf-field-sim-proposal.md`)의 물리 층. 미니골프(`shared/golf/{course,courses,physics}.ts`)는
 손대지 않고 이 폴더를 옆에 새로 판다. 화면·서버는 **`simulateStroke()` 하나**만 부른다.
@@ -26,7 +26,7 @@
 
 | 필드 | 범위 | 뜻 |
 |---|---|---|
-| club | "D" "3W" "5I" "7I" "9I" "PW" "SW" "PT" | 1차 8클럽 |
+| club | 풀 백 14: D 3W 5W HY 3I 4I 5I 6I 7I 8I 9I PW SW PT | 1차 화면은 8개(D·3W·5I·7I·9I·PW·SW·PT)만 노출 |
 | aimDeg10 | −1800..1800 | 타깃 라인 0.1°(카메라·조준선) |
 | stanceDeg10 | −150..150 | 스탠스 = 스윙 패스 오프셋 0.1°. − 왼쪽(아웃투인) / + 오른쪽(인투아웃). 크게 열수록 창이 좁다 |
 | powerPct | 20..115 | 당김 파워 %. 100 초과 = 오버스윙(창 좁아짐, 거리 +) |
@@ -48,10 +48,23 @@
   - **생크**: 아이언·웨지 tapX ≤ −85(호젤): 우 30°, 속도 0.6.
 - 퍼펙트(`perfectInput`) = 같은 스탠스·파워·볼포지션에 impactMs·padX·tapX 0, tapY 0(익스플로전은 −47).
 
+## 클럽 표·프리셋(clubs.ts)
+- 클럽 발사 조건은 **트랙맨 PGA 투어 평균**(볼스피드·발사각·스핀·캐리). 모델 캐리는 표 대비 ±4 %(`engine-grid.test.ts`), 드라이버는 프로 프리셋 76.5 m/s 로 250 m(오너 확정).
+- 프리셋 `pro` · `amateur`(볼스피드 0.88×, 오너 확정 ≈ 5 핸디) · `lpga`(LPGA 투어 평균 표 — 볼스피드·캐리는 표, 발사각·스핀은 통상값) · `ama15`(트랙맨 평균 남성 아마 드라이버 실측 132.6 mph·12.6°·3275 rpm·204 yd, 나머지 클럽은 배율).
+  표에 있는 클럽은 표 값을, 없는 클럽은 프로 표에 배율(`presetLaunch`).
+
+## 코스·공기 컨디션(StrokeContext.conditions)
+`{ altitudeM, tempC, firmness, wet }` 전부 선택. 공기 밀도비 `airDensityRatio` = exp(−h/8435)(3차 근사)×288.15/(273.15+T) 가 K_AERO 에 곱해진다(1500 m ≈ 캐리 +7 %).
+단단함 0.6..1.4 는 되튐 ×firm·구름 감속 ÷firm, 젖음 0..1 은 되튐 ×(1−0.4w)·구름 감속 ×(1+0.8w)·스팀프 ×(1−0.15w). 비행에는 안 닿는다.
+
+## 지형·나무(course.ts)
+- 고도 = 전체 기울기 + 범프 + **격자**(`height.grid`: origin·cell·nx·ny·z 행우선, 쌍선형 보간, 밖은 가장자리 값으로 편평). `gridFrom(origin, cell, nx, ny, f)` 로 만든다.
+- 나무 `{ c, r, h, trunkR? }`: 캐노피 구(중심 z = h − r) 안에 들어오면 법선 반사(e 0.2) 뒤 속도 35 %·스핀 30 % 만 남고 `tree` 이벤트, 둥치(기본 0.25 m)는 수평 반사 50 %. 굴러가는 공은 둥치만 본다. 결정론.
+
 ## 공개 API
 ```
 simulateStroke(pre: Vec3, input: StrokeInput, ctx: StrokeContext): StrokeResult
-  ctx = { hole: FieldHole, env: WindEnv, preset: "pro"|"amateur", stimp: number(ft), strokeIdx: number }
+  ctx = { hole: FieldHole, env: WindEnv, preset: "pro"|"amateur"|"lpga"|"ama15", stimp: number(ft), strokeIdx: number, roomSeed: number, conditions?: Conditions }
   result = { events, final(BallState3), frames(Float32Array xyz @120Hz), hash, diag(ImpactDiag), carryM, totalM, apexM, airTime }
 launchFrom(input, ctx): LaunchState + ImpactDiag              (impact.ts — 클럽 표·D-plane·기어·수직 컨택·라이)
 verticalContact(club, tapY, teedWood, explosion, putt)       (impact.ts — 컨택 높이 → 속도·스핀·발사각 배율, 표로 검증)
@@ -59,7 +72,7 @@ windAt(env, z, t): Vec3                                        (wind.ts — 높�
 heightAt / gradAt / surfaceAt(hole, x, y)                      (course.ts)
 strokeHash(events, final): string                              (hash.ts — fnv1a64, events+final 만)
 ```
-- 비행: 반암시적 오일러 DT=1/120, `a = g + K·V·(−Cd·v_rel + Cl·(ŝ×v_rel))`, Cd·Cl 은 스핀비 S 의 함수(params.ts), 스핀 감쇠 스텝당 상수.
+- 비행: 반암시적 오일러 DT=1/120, `a = g + K·V·(−Cd·v_rel + Cl·(ŝ×v_rel))`, Cd·Cl 은 스핀비 S 의 함수(params.ts; Cd 의 스핀 항은 S 0.40 에서 평탄 — 웨지 과항력 방지), 스핀 감쇠 스텝당 상수. K 는 컨디션의 공기 밀도비를 곱한다.
 - 착지: Penner 유효경사 + 속도 의존 COR + 그립/슬립 임펄스. 되튐 < 0.8 m/s 면 구름.
 - 구름: `a = −g∇h − a_roll·v̂ − 0.0046|v|v`. 그린 a_roll = 5.49/스팀프ft. 컵 포획 `v_cap(d) = (2√(Rh²−d²) − R)·15.16`, 립아웃 e 0.3 + 20 % 감속.
 - 해시 = fnv1a64(stableStringify(events + final)). 서브스텝·프레임 저장 방식을 바꿔도 해시가 산다.

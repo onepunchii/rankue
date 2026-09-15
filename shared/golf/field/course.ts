@@ -6,7 +6,10 @@ import { pointInPolygon } from "../course.js";
 import type { Surface, Vec2 } from "./types.js";
 
 export interface Bump { readonly c: Vec2; readonly r: number; readonly a: number }   // a<0 이면 구덩이
-export interface Tree { readonly c: Vec2; readonly r: number; readonly h: number }
+/** 나무: 캐노피 구(반지름 r, 꼭대기 높이 h → 중심 z = h − r) + 둥치(반지름 trunkR, 기본 0.25 m) */
+export interface Tree { readonly c: Vec2; readonly r: number; readonly h: number; readonly trunkR?: number }
+/** 높이 격자(실감 코스용): 행우선 z[j·nx + i], 셀 cell m, 원점 origin. 격자 밖은 가장자리 값으로 편평하게 잇는다 */
+export interface HeightGrid { readonly origin: Vec2; readonly cell: number; readonly nx: number; readonly ny: number; readonly z: readonly number[] }
 export interface FieldHole {
     readonly id: string;
     readonly name: string;
@@ -25,11 +28,26 @@ export interface FieldHole {
     readonly water?: readonly (readonly Vec2[])[];
     readonly deepRough?: readonly (readonly Vec2[])[];
     readonly trees?: readonly Tree[];
-    readonly height: { readonly slope: Vec2; readonly bumps: readonly Bump[] };
+    /** 고도 = 전체 기울기 + 범프 + (있으면) 격자의 쌍선형 보간 */
+    readonly height: { readonly slope: Vec2; readonly bumps: readonly Bump[]; readonly grid?: HeightGrid };
     /** 홀별 기본 바람(w10, m/s) — 방 옵션이 덮어쓸 수 있다 */
     readonly wind?: Vec2;
 }
 export interface FieldCourse { readonly id: string; readonly name: string; readonly kind: "field"; readonly holes: readonly FieldHole[]; readonly stimp: number }
+
+/** 격자 셀 안의 쌍선형 보간값과 기울기. 격자 밖은 가장자리 셀로 클램프(편평하게 이어짐) */
+function gridSample(g: HeightGrid, x: number, y: number): { z: number; gx: number; gy: number } {
+    const u = Math.max(0, Math.min(g.nx - 1.000001, (x - g.origin.x) / g.cell));
+    const v = Math.max(0, Math.min(g.ny - 1.000001, (y - g.origin.y) / g.cell));
+    const i = Math.floor(u), j = Math.floor(v);
+    const fx = u - i, fy = v - j;
+    const z00 = g.z[j * g.nx + i], z10 = g.z[j * g.nx + i + 1], z01 = g.z[(j + 1) * g.nx + i], z11 = g.z[(j + 1) * g.nx + i + 1];
+    const z = (1 - fx) * (1 - fy) * z00 + fx * (1 - fy) * z10 + (1 - fx) * fy * z01 + fx * fy * z11;
+    const inside = x >= g.origin.x && x <= g.origin.x + (g.nx - 1) * g.cell && y >= g.origin.y && y <= g.origin.y + (g.ny - 1) * g.cell;
+    const gx = inside ? ((1 - fy) * (z10 - z00) + fy * (z11 - z01)) / g.cell : 0;
+    const gy = inside ? ((1 - fx) * (z01 - z00) + fx * (z11 - z10)) / g.cell : 0;
+    return { z, gx, gy };
+}
 
 export function heightAt(h: FieldHole, x: number, y: number): number {
     let z = h.height.slope.x * x + h.height.slope.y * y;
@@ -38,10 +56,11 @@ export function heightAt(h: FieldHole, x: number, y: number): number {
         const q = (dx * dx + dy * dy) / (b.r * b.r);
         if (q < 1) { const s = 1 - q; z += b.a * s * s; }
     }
+    if (h.height.grid) z += gridSample(h.height.grid, x, y).z;
     return z;
 }
 
-/** ∂h/∂x, ∂h/∂y (해석적) */
+/** ∂h/∂x, ∂h/∂y (해석적 + 격자 쌍선형) */
 export function gradAt(h: FieldHole, x: number, y: number): Vec2 {
     let gx = h.height.slope.x, gy = h.height.slope.y;
     for (const b of h.height.bumps) {
@@ -50,7 +69,15 @@ export function gradAt(h: FieldHole, x: number, y: number): Vec2 {
         const q = (dx * dx + dy * dy) / r2;
         if (q < 1) { const k = -4 * b.a * (1 - q) / r2; gx += k * dx; gy += k * dy; }
     }
+    if (h.height.grid) { const g = gridSample(h.height.grid, x, y); gx += g.gx; gy += g.gy; }
     return { x: gx, y: gy };
+}
+
+/** 격자 유틸: 함수로 격자를 만든다(코스 에디터·테스트) */
+export function gridFrom(origin: Vec2, cell: number, nx: number, ny: number, f: (x: number, y: number) => number): HeightGrid {
+    const z: number[] = new Array(nx * ny);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) z[j * nx + i] = f(origin.x + i * cell, origin.y + j * cell);
+    return { origin, cell, nx, ny, z };
 }
 
 export function surfaceAt(h: FieldHole, x: number, y: number): Surface {
@@ -83,6 +110,9 @@ export function validateHole(h: FieldHole): string[] {
     if (h.lengthM < straight * 0.98) errs.push(`lengthM ${h.lengthM} shorter than straight ${straight.toFixed(0)}`);
     if (h.par === 3 && h.lengthM > 240) errs.push("par3 too long");
     if (h.par === 5 && h.lengthM < 400) errs.push("par5 too short");
+    const g = h.height.grid;
+    if (g && (g.nx < 2 || g.ny < 2 || g.z.length !== g.nx * g.ny || !(g.cell > 0))) errs.push("height grid malformed");
+    for (const t of h.trees ?? []) if (!(t.r > 0) || !(t.h > t.r)) errs.push("tree malformed");
     return errs;
 }
 
