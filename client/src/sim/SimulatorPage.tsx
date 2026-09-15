@@ -1381,6 +1381,10 @@ export function SimulatorPage() {
                                 {/* 깔끔하게: "상대 차례예요" + 상대 시계(접속 중이면 바로 돈다). 안내 문구는 없앴다(2026-09-08 오너). */}
                                 <p className="text-[14px] font-semibold text-ink-1">{t("sim.match.waitingTurn")}</p>
                                 {clock && !clock.mine && <ShotClock seconds={clock.seconds} mine={false} size={56} className="mt-1.5" />}
+                                {/* 시계가 아직 안 도는 동안(상대 자리 비움 유예) 화면이 멈춘 것처럼 보이지 않게 이유를 적는다(2026-09-15 오너 제보). */}
+                                {!clock && sim.match.opponentAway && (
+                                    <p className="mt-1.5 text-[12px] font-medium text-ink-3">{t("sim.match.opponentAway")}</p>
+                                )}
                                 {sim.match.canClaim && (
                                     <button type="button" onClick={() => { void onClaim(); }} className="mt-2 h-11 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
                                         {t("sim.match.claim")}

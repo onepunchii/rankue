@@ -2021,6 +2021,7 @@ export const ko: Dict = {
   "sim.match.opponentPending": "상대 미정",
   "sim.match.codeShort": "코드 {code}",
   "sim.match.waitingTurn": "상대 차례예요",
+  "sim.match.opponentAway": "상대가 자리를 비웠어요. 잠시 뒤 40초 시계가 시작됩니다",
   "sim.match.yourTurn": "내 차례예요",
   "sim.match.opponentShot": "상대 샷",
   "sim.match.resign": "기권",

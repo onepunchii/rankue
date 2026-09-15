@@ -17,7 +17,7 @@ import {
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
-    SHOT_CLOCK_STRIKES, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH, isMatchEmoji,
+    SHOT_CLOCK_STRIKES, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH, isMatchEmoji, PRESENCE_MS,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
@@ -130,6 +130,12 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         createdAt: m.createdAt, startedAt: m.startedAt, lastShotAt: m.lastShotAt, finishedAt: m.finishedAt,
         // 40초 룰: 시계 기준 시각과 서버 시각(클라이언트 시계 보정용)
         turnSeenAt: m.turnSeenAt, serverNow: new Date(),
+        // 상대가 지금 화면을 보고 있나 — 자리를 비우면 시계가 늦게(ABSENT_GRACE_MS) 시작하므로,
+        // 그 사이 남은 사람 화면이 멈춘 것처럼 보이지 않게 이유를 알려 준다(2026-09-15).
+        opponentAway: m.status === "playing" && (() => {
+            const seen = myIndex === 0 ? m.guestSeenAt : m.hostSeenAt;
+            return !seen || Date.now() - seen.getTime() > PRESENCE_MS;
+        })(),
         // 지금 보고 있는 관전자 수(선수 제외). 폴링마다 갱신되는 값이라 숫자만 싣는다 — 누가 보는지는 담지 않는다.
         watchers: countWatchers(m.watchers, Date.now()),
         // 쓰리아웃 표시용 [호스트, 게스트] 시간 초과 횟수

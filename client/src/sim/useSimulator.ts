@@ -116,6 +116,8 @@ export interface MatchView {
     readonly timeouts: readonly [number, number];
     /** 지금 이 대전을 보고 있는 관전자 수(2026-09-12). 표시용 — 판정에는 쓰지 않는다. */
     readonly watchers: number;
+    /** 상대가 자리를 비웠다(2026-09-15). 시계 시작이 늦어지는 이유를 화면이 알려 줄 때 쓴다. */
+    readonly opponentAway: boolean;
     /** 마지막 이모지 인사(보낸 사람 자리 포함). 화면이 상대 것만 띄운다. */
     readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
 }
@@ -237,6 +239,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             serverOffsetMs: aux.serverOffsetMs,
             timeouts: m.timeouts ?? [0, 0],
             watchers: m.watchers ?? 0,
+            opponentAway: m.opponentAway === true,
         } : null;
         return {
             phase: core.phase,

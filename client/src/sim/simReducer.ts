@@ -180,6 +180,8 @@ export interface MatchState {
     readonly timeouts: readonly [number, number];
     /** 지금 이 대전을 보고 있는 관전자 수(2026-09-12). 폴링마다 바뀌는 표시용 값이라 판정에는 쓰지 않는다. */
     readonly watchers: number;
+    /** 상대가 자리를 비웠나(2026-09-15). 시계가 늦게 시작하는 동안 이유를 보여 주는 표시용 값. */
+    readonly opponentAway: boolean;
 }
 
 /** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
@@ -196,6 +198,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         status: m.status,
         timeouts: m.timeouts ?? [0, 0],
         watchers: m.watchers ?? 0,
+        opponentAway: m.opponentAway === true,
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
         emoji: m.emoji ?? null,
@@ -209,6 +212,7 @@ export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
         && a.status === b.status && a.claimableAt === b.claimableAt && a.turnSeenAt === b.turnSeenAt && a.endReason === b.endReason
         && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName
         && a.timeouts[0] === b.timeouts[0] && a.timeouts[1] === b.timeouts[1]
+        && a.opponentAway === b.opponentAway
         && (a.emoji?.at ?? null) === (b.emoji?.at ?? null);
 }
 

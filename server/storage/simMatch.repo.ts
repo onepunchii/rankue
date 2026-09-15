@@ -8,7 +8,7 @@ import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchRatings, hiqMembers } from 
 import { alias } from "drizzle-orm/pg-core";
 import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot } from "../../shared/schema.js";
-import { PRESENCE_MS, REPLAY_GRACE_MS } from "../../shared/sim/rules/session.js";
+import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS } from "../../shared/sim/rules/session.js";
 import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
 
 const ELO_K = 24;
@@ -16,12 +16,20 @@ const LIVE = ["waiting", "playing"] as const;
 /** 접속 표시 갱신 간격(폴링마다 쓰지 않고 이 간격이 지났을 때만) */
 const SEEN_THROTTLE_MS = 5_000;
 
-/** 다음 차례의 시계 시작 시각: 그 사람이 접속 중이면 now + grace, 아니면 null(조준 화면을 열 때 ack). */
+/**
+ * 다음 차례의 시계 시작 시각.
+ *   접속 중       → now + graceMs (샷 재생을 보는 동안은 안 센다)
+ *   자리 비움     → now + ABSENT_GRACE_MS (푸시를 보고 돌아올 시간만큼 봐주고 시작)
+ *   대전 종료     → null (셀 시계가 없다)
+ *
+ * 2026-09-15 이전에는 자리 비움이 null 이어서 시계가 **영영 시작되지 않았다** — 남은 사람이 무한정 기다렸다.
+ * 늦게 시작해도 시계는 한 번 돌기 시작하면 멈추지 않는다(자리를 비우는 것 자체가 패널티, 2026-09-08 오너 결정).
+ */
 export function nextTurnSeenAt(m: { hostSeenAt: Date | null; guestSeenAt: Date | null }, nextTurn: number, finished: boolean, graceMs: number, now = Date.now()): Date | null {
     if (finished) return null;
     const seen = nextTurn === 0 ? m.hostSeenAt : m.guestSeenAt;
-    if (!seen || now - seen.getTime() > PRESENCE_MS) return null;
-    return new Date(now + graceMs);
+    const away = !seen || now - seen.getTime() > PRESENCE_MS;
+    return new Date(now + (away ? ABSENT_GRACE_MS : graceMs));
 }
 
 export interface MatchShotArgs {
@@ -194,6 +202,9 @@ export class SimMatchRepository {
             if (!m || m.status !== "waiting" || m.hostId === guestId) return null;
             const [row] = await tx.update(hiqSimMatches).set({
                 guestId, guestTarget, state, balls, status: "playing", turn: 0,
+                // 첫 샷(방장)도 시계를 건다 — 방을 열어 두고 앱을 끈 방장 때문에 게스트가 무한정 기다리던 자리다(2026-09-15).
+                // 방장은 "게스트가 들어왔어요" 푸시를 받으므로 돌아올 시간(ABSENT_GRACE_MS)만큼 봐주고 40초 룰이 돈다.
+                turnSeenAt: new Date(Date.now() + ABSENT_GRACE_MS),
                 ...(typeof hostTarget === "number" ? { hostTarget } : {}),
                 startedAt: new Date(), version: m.version + 1,
             }).where(eq(hiqSimMatches.id, id)).returning();

@@ -2019,6 +2019,7 @@ const tr: Dict = {
   "sim.match.opponentPending": "Henüz rakip yok",
   "sim.match.codeShort": "Kod {code}",
   "sim.match.waitingTurn": "Sıra rakipte",
+  "sim.match.opponentAway": "Rakibiniz ayrıldı. 40 saniyelik saat birazdan başlayacak",
   "sim.match.yourTurn": "Sıra sende",
   "sim.match.opponentShot": "Rakibin vuruşu",
   "sim.match.resign": "Çekil",

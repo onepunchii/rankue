@@ -2019,6 +2019,7 @@ const en: Dict = {
   "sim.match.opponentPending": "No opponent yet",
   "sim.match.codeShort": "Code {code}",
   "sim.match.waitingTurn": "Opponent's turn",
+  "sim.match.opponentAway": "Your opponent stepped away. The 40-second clock starts shortly",
   "sim.match.yourTurn": "Your turn",
   "sim.match.opponentShot": "Opponent's shot",
   "sim.match.resign": "Resign",

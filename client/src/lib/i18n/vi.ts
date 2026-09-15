@@ -2019,6 +2019,7 @@ const vi: Dict = {
   "sim.match.opponentPending": "Chưa có đối thủ",
   "sim.match.codeShort": "Mã {code}",
   "sim.match.waitingTurn": "Đến lượt đối thủ",
+  "sim.match.opponentAway": "Đối thủ đã rời đi. Đồng hồ 40 giây sẽ bắt đầu ngay sau đây",
   "sim.match.yourTurn": "Đến lượt bạn",
   "sim.match.opponentShot": "Cú đánh của đối thủ",
   "sim.match.resign": "Bỏ cuộc",

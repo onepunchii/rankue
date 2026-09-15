@@ -425,7 +425,7 @@ function publicMatch(over: Partial<MatchPublic> = {}): MatchPublic {
         state: matchSession(), balls: balls3,
         winnerIndex: null, endReason: null, engineVersion: "2.1.0", paramsHash: "0".repeat(16),
         createdAt: "2026-09-07T00:00:00.000Z", startedAt: "2026-09-07T00:01:00.000Z", lastShotAt: null, finishedAt: null,
-        claimableAt: "2026-09-09T00:01:00.000Z",
+        claimableAt: "2026-09-09T00:01:00.000Z", opponentAway: false,
         ...over,
     };
 }
@@ -445,11 +445,13 @@ describe("대전: 메타 헬퍼", () => {
     it("matchStateFrom: 내 자리에 따라 내 이름·상대 이름, sameMatchMeta 는 필드 비교", () => {
         const m = publicMatch();
         const host = matchStateFrom(m, 0);
-        expect(host).toEqual({ matchId: "m-1", myIndex: 0, version: 1, myName: "호스트", opponentName: "게스트", turn: 0, status: "playing", claimableAt: m.claimableAt, turnSeenAt: null, endReason: null, winnerIndex: null, timeouts: [0, 0], watchers: 0, emoji: null });
+        expect(host).toEqual({ matchId: "m-1", myIndex: 0, version: 1, myName: "호스트", opponentName: "게스트", turn: 0, status: "playing", claimableAt: m.claimableAt, turnSeenAt: null, endReason: null, winnerIndex: null, timeouts: [0, 0], watchers: 0, opponentAway: false, emoji: null });
         // 쓰리아웃 횟수도 메타 — 바뀌면 스냅한다
         expect(sameMatchMeta(host, matchStateFrom({ ...m, timeouts: [1, 0] }, 0))).toBe(false);
         expect(sameMatchMeta(host, matchStateFrom({ ...m, turnSeenAt: "2026-09-07T00:00:00.000Z" }, 0))).toBe(false);
         expect(sameMatchMeta(host, matchStateFrom({ ...m, emoji: { code: "hi", from: 1, at: "2026-09-09T00:00:00.000Z" } }, 0))).toBe(false);
+        // 상대 자리 비움도 메타 — 바뀌면 화면이 "잠시 뒤 시계가 시작됩니다" 안내를 켜고 끈다(2026-09-15)
+        expect(sameMatchMeta(host, matchStateFrom({ ...m, opponentAway: true }, 0))).toBe(false);
         const guest = matchStateFrom(m, 1);
         expect(guest.myName).toBe("게스트");
         expect(guest.opponentName).toBe("호스트");

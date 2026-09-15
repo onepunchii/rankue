@@ -121,6 +121,8 @@ export interface MatchPublic {
     /** 기록된 샷 수 = 다음 샷의 idx */
     readonly shots: number;
     readonly version: number;
+    /** 상대가 지금 화면을 안 보고 있다(자리 비움). 진행 중일 때만 의미가 있다. */
+    readonly opponentAway: boolean;
     /** 정본 세션 상태. waiting 이면 null. players[0]=호스트(white), players[1]=게스트(yellow) */
     readonly state: SessionState | null;
     readonly balls: readonly BallState[] | null;
@@ -398,6 +400,8 @@ export function parseMatch(raw: unknown): MatchPublic {
         turn: raw.turn,
         shots: raw.shots,
         version: raw.version,
+        // 옛 서버 응답에는 없다 — 없으면 "자리에 있다"로 본다(없던 안내가 새로 생기는 쪽이 안전).
+        opponentAway: raw.opponentAway === true,
         state,
         balls,
         winnerIndex: playerIndexOrNull(raw.winnerIndex),
