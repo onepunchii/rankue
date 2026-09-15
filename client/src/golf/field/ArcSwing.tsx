@@ -5,7 +5,7 @@
  *   2) 끌면서 **좌우로** → 드로우(왼쪽) · 페이드(오른쪽). 엔진의 스탠스(스윙 패스)로 들어간다
  *   3) 놓으면 위쪽 아크를 바늘이 **왕복** → 가운데 초록 창에 올 때 **탭**
  *        · 창 안이면 정타, 탭 위치가 페이스를 정한다(이르면 닫힘=드로우, 늦으면 열림=페이드)
- *        · 창을 벗어나면 컨택까지 무너진다 — 이르면 클럽이 먼저 바닥을 쳐 **뒷땅**, 늦으면 올라오며 **얇게·탑**
+ *        · 창을 벗어나면 컨택까지 무너진다 — **빨리 치면(왼쪽) 대가리**(클럽이 아직 안 내려옴), **늦게 치면(오른쪽) 뒷땅**(이미 땅에 박힘)
  *        · 4번 지나도록 안 치면 헛스윙
  * 당점을 고르는 메뉴는 없다. 미스는 전부 실행의 결과다.
  */
@@ -31,7 +31,10 @@ const SHAPE_MAX = 30;          // stanceDeg10 최대(±3°)
 const BALL_R = 44;
 const MAX_PASSES = 4;
 const ARC_H = 56;
-/** 창을 벗어난 정도 → 당점 붕괴(이르면 뒷땅 −, 늦으면 얇게 +) */
+/**
+ * 창을 벗어난 정도 → 당점 붕괴. 오너 지정(2026-09-15): **아크 왼쪽(빨리) = 대가리, 오른쪽(늦게) = 뒷땅.**
+ * 클럽이 아직 내려오지 않았는데 치면 공 윗부분을 때리고(대가리), 이미 지나 땅에 박힌 뒤면 잔디를 먼저 친다(뒷땅).
+ */
 const MISS_TAPY = 45;
 
 /** 2차 베지어 위의 점과 접선 각도 */
@@ -75,10 +78,10 @@ export function ArcSwing({ club, zoneMs, sweepMs, teed, disabled, onShot, onAim 
         const r = release.current;
         release.current = null;
         reset();
-        // 창 밖이면 당점까지 무너진다: 이르면 클럽이 먼저 바닥(뒷땅), 늦으면 올라오며(얇게)
+        // 창 밖이면 당점까지 무너진다(오너 지정): 빨리 = 대가리(tapY +, 공 윗부분) / 늦게 = 뒷땅(tapY −, 잔디)
         const t = impactMs / zoneMs;
         const over = Math.min(1.5, Math.max(0, Math.abs(t) - 1));
-        const tapY = Math.max(-100, Math.min(100, Math.round((t < 0 ? -1 : 1) * over * MISS_TAPY)));
+        const tapY = Math.max(-100, Math.min(100, Math.round((t < 0 ? 1 : -1) * over * MISS_TAPY)));
         onShot({
             powerPct: r.power, impactMs: Math.max(-400, Math.min(400, Math.round(impactMs))),
             padX: 0, tapX: 0, tapY, noTap, stanceDeg10: r.shape,
@@ -149,6 +152,8 @@ export function ArcSwing({ club, zoneMs, sweepMs, teed, disabled, onShot, onAim 
                 <path d={arcD} pathLength={100} fill="none" stroke="rgba(100,221,23,0.30)" strokeWidth={18} strokeDasharray={`${zoneFrac * 100} 100`} strokeDashoffset={-(50 - zoneFrac * 50)} />
                 <path d={arcD} pathLength={100} fill="none" stroke="rgba(100,221,23,0.9)" strokeWidth={18} strokeDasharray={`${perfectFrac * 100} 100`} strokeDashoffset={-(50 - perfectFrac * 50)} />
                 {phase === "swing" && <g transform={`translate(${np.x} ${np.y}) rotate(${np.deg})`}><rect x={-2.5} y={-14} width={5} height={28} rx={2.5} fill="#fff" /></g>}
+                <text x={16} y={ARC_H - 2} fontSize={9.5} fontWeight={700} fill="rgba(255,255,255,0.35)">대가리</text>
+                <text x={w - 16} y={ARC_H - 2} fontSize={9.5} fontWeight={700} fill="rgba(255,255,255,0.35)" textAnchor="end">뒷땅</text>
             </svg>
 
             {/* 드로우 · 페이드 */}

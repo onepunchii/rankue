@@ -37,9 +37,11 @@ interface Props {
     /** 날아가는 중 현재 거리(m) — 멈추면 총거리 */
     liveDistM: number;
     flying: boolean;
+    /** 창 양 끝 라벨 — 아크 스윙은 대가리/뒷땅 */
+    endLabels?: readonly [string, string];
 }
 
-export function ImpactVerdict({ verdict, diag, sweepMs, liveDistM, flying }: Props) {
+export function ImpactVerdict({ verdict, diag, sweepMs, liveDistM, flying, endLabels = ["이르게", "늦게"] }: Props) {
     const zoneFrac = Math.min(0.5, diag.zoneMs / sweepMs);
     const perfectFrac = zoneFrac * 0.33;
     const tapFrac = Math.max(0, Math.min(1, 0.5 + (diag.tNorm * diag.zoneMs) / sweepMs));
@@ -51,8 +53,8 @@ export function ImpactVerdict({ verdict, diag, sweepMs, liveDistM, flying }: Pro
                 <div className="absolute top-0 bottom-0 bg-[#64DD17]/55" style={{ left: `${(0.5 - perfectFrac) * 100}%`, width: `${perfectFrac * 200}%` }} />
                 <div className="absolute top-0 bottom-0 w-[2px] bg-white/40 left-1/2 -translate-x-1/2" />
                 <div className="absolute top-0 bottom-0 w-[4px] rounded-full" style={{ left: `calc(${tapFrac * 100}% - 2px)`, background: verdict.color, boxShadow: `0 0 10px ${verdict.color}` }} />
-                <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/35">이르게</div>
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/35">늦게</div>
+                <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/35">{endLabels[0]}</div>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white/35">{endLabels[1]}</div>
             </div>
             <div className="text-[26px] font-extrabold leading-none tracking-tight" style={{ color: verdict.color }}>{verdict.label}</div>
             <div className="text-[12px] font-bold text-white/60 text-center">{verdict.reason}</div>

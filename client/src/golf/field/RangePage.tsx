@@ -181,7 +181,7 @@ export default function RangePage() {
                     </div>
                     <div className={cn("absolute inset-x-3 top-2 bottom-3", card ? "" : "pointer-events-none")}>
                         {/* 탭한 순간부터 공이 멈출 때까지 — 내가 친 자리·등급·날아가는 거리 */}
-                        {live && <ImpactVerdict verdict={live.verdict} diag={live.result.diag} sweepMs={mode === "swipe" ? live.result.diag.zoneMs * 6 : CLUBS[club].sweepMs} liveDistM={liveDist} flying />}
+                        {live && <ImpactVerdict verdict={live.verdict} diag={live.result.diag} sweepMs={mode === "swipe" ? live.result.diag.zoneMs * 6 : CLUBS[club].sweepMs} liveDistM={liveDist} flying endLabels={mode === "arc" ? ["대가리(빨리)", "뒷땅(늦게)"] : ["이르게", "늦게"]} />}
                         {card && d && r && (
                             <div className="absolute inset-0 rounded-[1.5rem] bg-[#121212] border border-white/10 p-3 text-[12px] overflow-hidden" onPointerDown={() => setCard(null)}>
                                 <div className="flex items-center justify-between mb-1.5">
@@ -206,7 +206,7 @@ export default function RangePage() {
                                     <Stat k="스핀축" v={`${d.tiltDeg >= 0 ? "+" : ""}${d.tiltDeg.toFixed(0)}°`} />
                                 </div>
                                 <div className="text-[10.5px] text-white/40 mt-1 tabular-nums">정점 {r.apexM.toFixed(0)} m · 체공 {r.airTime.toFixed(1)} s · 파워 {card.input.powerPct} % · {mode === "swipe" ? `템포 ${downswingMsFor(club)} ms` : `창 ±${Math.round(d.zoneMs)} ms`}</div>
-                                <div className="text-[11px] text-white/60 mt-0.5 pr-24">{card.noTap ? (mode === "swipe" ? "공을 지나지 못했어요 — 공 중심선을 왼쪽으로 통과하도록 쓸어 주세요." : "스윙 타이밍을 놓쳤어요 — 바늘이 공에 올 때 패드를 탭하세요.") : coaching(d, r, card.tempoDevMs)}</div>
+                                <div className="text-[11px] text-white/60 mt-0.5 pr-24">{card.noTap ? (mode === "swipe" ? "공을 지나지 못했어요 — 공 중심선을 왼쪽으로 통과하도록 쓸어 주세요." : "스윙 타이밍을 놓쳤어요 — 바늘이 공에 올 때 패드를 탭하세요.") : coaching(d, r, card.tempoDevMs, mode === "arc")}</div>
                                 <div className="absolute right-3 bottom-2 text-[10px] font-bold text-white/30">탭하면 다음 샷 ▶</div>
                             </div>
                         )}
@@ -256,14 +256,14 @@ function Stat({ k, v, hi }: { k: string; v: string; hi?: boolean }) {
     );
 }
 
-function coaching(d: StrokeResult["diag"], r: StrokeResult, tempoDevMs?: number): string {
+function coaching(d: StrokeResult["diag"], r: StrokeResult, tempoDevMs?: number, arc?: boolean): string {
     // 쓸기 스윙이면 원인을 템포로 말한다(오너 모델: 몸이 먼저 돌면 열려서 페이드)
     const tempo = tempoDevMs !== undefined && Math.abs(tempoDevMs) > 20
         ? `다운스윙이 ${Math.abs(tempoDevMs)} ms ${tempoDevMs > 0 ? "빨라 몸이 먼저 돌았어요 — 페이스가 열립니다" : "느려 손이 먼저 릴리즈됐어요 — 페이스가 닫힙니다"}. `
         : "";
-    if (d.contact === "fat") return tempo + "뒷땅 — 공 아래 잔디를 먼저 쳤어요. 조금 위를 지나게.";
-    if (d.contact === "thin") return tempo + "얇게 — 공 윗부분(리딩엣지)에 맞았어요. 조금 아래를 지나게.";
-    if (d.contact === "top") return tempo + "탑 — 공 꼭대기를 쳤어요. 공 가운데를 지나게.";
+    if (d.contact === "fat") return arc ? "뒷땅 — 너무 늦게 쳤어요. 바늘이 초록 창에 오면 바로." : tempo + "뒷땅 — 공 아래 잔디를 먼저 쳤어요. 조금 위를 지나게.";
+    if (d.contact === "thin") return arc ? "얇게 — 조금 빨랐어요. 바늘이 가운데 올 때까지 기다리세요." : tempo + "얇게 — 공 윗부분(리딩엣지)에 맞았어요. 조금 아래를 지나게.";
+    if (d.contact === "top") return arc ? "대가리 — 너무 빨리 쳤어요. 클럽이 아직 안 내려왔어요." : tempo + "탑 — 공 꼭대기를 쳤어요. 공 가운데를 지나게.";
     if (d.contact === "sky") return tempo + "스카이 — 공 아래(티)를 쳐서 크라운에 맞았어요.";
     if (d.contact === "shank") return "생크 — 호젤에 맞았어요.";
     if (tempo && Math.abs(r.final.p.x) > 8) return tempo + "구질은 페이스 − 패스(스탠스) 차이에서 나요.";
