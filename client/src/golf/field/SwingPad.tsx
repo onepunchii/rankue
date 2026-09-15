@@ -125,7 +125,7 @@ export function SwingPad({ zoneMs, sweepMs, teed, disabled, onShot, onPower }: P
                             <div className="absolute inset-x-0 bg-[#2f7a34]" style={{ top: `calc(50% + ${BALL_PX - 3}px)`, bottom: 0 }} />
                         )}
                         {/* 공 */}
-                        <div className="absolute left-1/2 top-1/2 rounded-full bg-white shadow-[inset_-6px_-6px_10px_rgba(0,0,0,0.25)]" style={{ width: BALL_PX * 2, height: BALL_PX * 2, transform: "translate(-50%, -50%)" }} />
+                        <div className="absolute left-1/2 top-1/2 rounded-full bg-[#ffffff] shadow-[inset_-6px_-6px_10px_rgba(0,0,0,0.25)]" style={{ width: BALL_PX * 2, height: BALL_PX * 2, transform: "translate(-50%, -50%)" }} />
                         <div className="absolute left-1/2 top-1/2 w-[9px] h-[9px] rounded-full border-2 border-[#051907]/40 -translate-x-1/2 -translate-y-1/2" />
                         <div className="absolute left-2 top-1 text-[9px] font-bold text-white/40">위 = 얇게</div>
                         <div className="absolute left-2 bottom-1 text-[9px] font-bold text-white/60">{teed ? "아래 = 스카이" : "아래 = 뒷땅"}</div>
