@@ -21,6 +21,8 @@ interface Props {
     teed?: boolean;
     disabled?: boolean;
     onShot: (r: SwingResult) => void;
+    /** 전체화면 오버레이 — 배경·테두리 없이 필드 위에 뜬다 */
+    bare?: boolean;
     /** 끄는 동안 파워·스탠스 미리보기(필드의 예상 착지 링) */
     onAim?: (powerPct: number, stanceDeg10: number) => void;
 }
@@ -48,7 +50,7 @@ function arcPoint(w: number, t: number) {
     };
 }
 
-export function ArcSwing({ club, zoneMs, sweepMs, teed, disabled, onShot, onAim }: Props) {
+export function ArcSwing({ club, zoneMs, sweepMs, teed, disabled, bare, onShot, onAim }: Props) {
     const [phase, setPhase] = useState<"idle" | "pull" | "swing">("idle");
     const [power, setPower] = useState(0);
     const [shape, setShape] = useState(0);            // stanceDeg10 (+ 드로우)
@@ -137,17 +139,19 @@ export function ArcSwing({ club, zoneMs, sweepMs, teed, disabled, onShot, onAim 
     const np = arcPoint(w, needle);
     const arcD = `M 14 ${ARC_H - 8} Q ${w / 2} 8 ${w - 14} ${ARC_H - 8}`;
     const shapeF = shape / SHAPE_MAX;
-    const ballBottom = teed ? 76 : 70;   // 공이 잘리지 않게 지면 위로 넉넉히
+    // 공 중심이 화면 아래에서 104 px — 필드 캔버스의 티(teeBottomPx) 와 같은 자리라 큰 공이 곧 티 위의 공이다
+    const ballBottom = 98;
 
     return (
         <div
             ref={boxRef}
-            className={cn("relative select-none touch-none h-full w-full rounded-[1.5rem] overflow-hidden", disabled ? "opacity-40" : "")}
-            style={{ background: "radial-gradient(130% 100% at 50% 100%, rgba(100,221,23,0.12), rgba(255,255,255,0.03) 62%)", overscrollBehavior: "none" }}
+            className={cn("relative select-none touch-none h-full w-full overflow-hidden", bare ? "" : "rounded-[1.5rem]", disabled ? "opacity-40" : "")}
+            style={{ background: bare ? "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0.62) 100%)" : "radial-gradient(130% 100% at 50% 100%, rgba(100,221,23,0.12), rgba(255,255,255,0.03) 62%)", overscrollBehavior: "none" }}
             onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         >
             {/* 아크 미터 */}
-            <svg width={w} height={ARC_H} className="absolute left-0 top-1.5 pointer-events-none" style={{ opacity: phase === "swing" ? 1 : 0.3 }}>
+            {bare && <div className="absolute left-2 right-2 top-0 rounded-b-[2rem] pointer-events-none" style={{ height: ARC_H + 10, background: "linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0))" }} />}
+            <svg width={w} height={ARC_H} className="absolute left-0 top-1.5 pointer-events-none" style={{ opacity: phase === "swing" ? 1 : 0.5 }}>
                 <path d={arcD} pathLength={100} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={18} strokeLinecap="round" />
                 <path d={arcD} pathLength={100} fill="none" stroke="rgba(100,221,23,0.30)" strokeWidth={18} strokeDasharray={`${zoneFrac * 100} 100`} strokeDashoffset={-(50 - zoneFrac * 50)} />
                 <path d={arcD} pathLength={100} fill="none" stroke="rgba(100,221,23,0.9)" strokeWidth={18} strokeDasharray={`${perfectFrac * 100} 100`} strokeDashoffset={-(50 - perfectFrac * 50)} />
@@ -163,8 +167,8 @@ export function ArcSwing({ club, zoneMs, sweepMs, teed, disabled, onShot, onAim 
             </div>
 
             {/* 지면 · 공 */}
-            <div className="absolute inset-x-0 bg-[#2f7a34]" style={{ top: `calc(100% - ${teed ? 34 : 42}px)`, bottom: 0 }} />
-            {teed && <div className="absolute left-1/2 -translate-x-1/2 w-[6px] rounded-b bg-white/60" style={{ bottom: 18, height: 26 }} />}
+            {!bare && <div className="absolute inset-x-0 bg-[#2f7a34]" style={{ top: `calc(100% - ${teed ? 34 : 42}px)`, bottom: 0 }} />}
+            {teed && <div className="absolute left-1/2 -translate-x-1/2 w-[6px] rounded-b bg-white/60" style={{ bottom: ballBottom - BALL_R - 2, height: 24 }} />}
             {phase === "pull" && pull.y > 4 && (
                 <div className="absolute left-1/2 rounded-full" style={{ bottom: ballBottom, width: 12, height: pull.y, transform: `translateX(calc(-50% + ${pull.x * 0.5}px))`, background: "linear-gradient(180deg, rgba(255,72,56,0.9), rgba(255,72,56,0))" }} />
             )}

@@ -17,13 +17,17 @@ interface Props {
     frameIndex: number;             // live 의 현재 프레임
     ghost?: Float32Array | null;    // '퍼펙트였다면' 점선
     aimDeg: number;
+    /** 티를 화면 아래에서 이만큼 띄운다(px) — 전체화면에서 큰 공 위치와 맞춘다. 없으면 높이의 12 % */
+    teeBottomPx?: number;
+    /** 모서리 둥글기(전체화면은 0) */
+    radius?: number;
     carryRing: { x: number; y: number; label: string } | null;   // 예상 착지점 링(퍼펙트 임팩트·현재 바람·파워)
     windArrow?: { x: number; y: number } | null;
 }
 
 const ROUGH = "#1f4a27", FAIRWAY_A = "#4fae44", FAIRWAY_B = "#489f3f", GREEN = "#7ed47a", BUNKER = "#e6d29a", WATER = "#3d7fd6";
 
-export function FieldCanvas({ hole, viewLenM, shots, live, frameIndex, ghost, aimDeg, carryRing, windArrow }: Props) {
+export function FieldCanvas({ hole, viewLenM, shots, live, frameIndex, ghost, aimDeg, carryRing, windArrow, teeBottomPx, radius = 18 }: Props) {
     const wrapRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [size, setSize] = useState({ w: 0, h: 0 });
@@ -37,7 +41,7 @@ export function FieldCanvas({ hole, viewLenM, shots, live, frameIndex, ghost, ai
 
     // m → px (원점: 티가 아래에서 12 %, 가운데)
     const scale = size.h ? size.h / viewLenM : 1;
-    const ox = size.w / 2 - hole.tee.x * scale, oy = size.h * 0.88 + hole.tee.y * scale;
+    const ox = size.w / 2 - hole.tee.x * scale, oy = (size.h - (teeBottomPx ?? size.h * 0.12)) + hole.tee.y * scale;
     const px = (x: number) => ox + x * scale;
     const py = (y: number) => oy - y * scale;
 
@@ -135,7 +139,7 @@ export function FieldCanvas({ hole, viewLenM, shots, live, frameIndex, ghost, ai
 
     return (
         <div ref={wrapRef} className="relative w-full h-full">
-            <canvas ref={canvasRef} style={{ width: size.w, height: size.h, borderRadius: 18 }} />
+            <canvas ref={canvasRef} style={{ width: size.w, height: size.h, borderRadius: radius }} />
         </div>
     );
 }

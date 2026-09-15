@@ -118,99 +118,108 @@ export default function RangePage() {
     }, [live, frame]);
     const chip = (active: boolean) => cn("shrink-0 h-7 px-2.5 rounded-full", active ? "bg-[#ffffff] text-[#000000]" : "bg-white/[0.06] text-white/60");
 
+    const SWING_H = 246, AIM_BOTTOM = SWING_H - 6;
+
     return (
-        <div className="h-[100dvh] bg-[#0A0A0A] text-white flex justify-center font-sans overflow-hidden" style={{ overscrollBehavior: "none" }}>
-            <div className="w-full max-w-[520px] flex flex-col min-h-0">
-                {/* 상단 */}
-                <div className="flex items-center gap-2 px-3 pt-3 pb-1">
-                    <button onClick={() => setLocation("/golf/arcade")} className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0" aria-label="뒤로"><LucideChevronLeft className="w-5 h-5" /></button>
+        <div className="h-[100dvh] bg-[#0A0A0A] text-white font-sans overflow-hidden flex justify-center" style={{ overscrollBehavior: "none" }}>
+            <div className="relative w-full max-w-[520px] h-full overflow-hidden">
+                {/* 필드 — 전체 화면. 휠/트랙패드 스크롤 = 조준 */}
+                <div className="absolute inset-0" onWheel={onFieldWheel}>
+                    <FieldCanvas
+                        hole={RANGE} viewLenM={330} shots={shots} live={live?.shot ?? null} frameIndex={frame}
+                        ghost={card && showGhost ? card.ghost : null} aimDeg={aimDeg}
+                        carryRing={live ? null : { x: ring.x, y: ring.y, label: `${Math.round(ring.carry)} m${pullPower >= 20 ? ` · ${ringPower} %` : ""}` }}
+                        windArrow={wind} teeBottomPx={104} radius={0}
+                    />
+                </div>
+
+                {/* 상단 바 */}
+                <div className="absolute inset-x-0 top-0 flex items-center gap-2 px-3 pt-3 pb-4 pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0) 100%)", paddingBottom: 26 }}>
+                    <button onClick={() => setLocation("/golf/arcade")} className="pointer-events-auto w-9 h-9 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center shrink-0" aria-label="뒤로"><LucideChevronLeft className="w-5 h-5" /></button>
                     <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-extrabold leading-tight">필드 골프 연습장 <span className="text-[10px] font-bold text-[#64DD17] align-middle">ENGINE 0.3</span></div>
-                        <div className="text-[10.5px] text-white/40 leading-tight truncate">{CLUBS[club].id} · {PRESET_KO[preset]} · {mode === "swipe" ? `템포 ${downswingMsFor(club)} ms` : `창 ±${Math.round(zoneMs)} ms`}{aimStance ? ` · ${aimStance > 0 ? "드로우" : "페이드"} ${Math.abs(aimStance / 10).toFixed(1)}°` : ""} · {WINDS.find((w) => w.key === windKey)!.label}</div>
+                        <div className="text-[13px] font-extrabold leading-tight drop-shadow">필드 골프 연습장 <span className="text-[10px] font-bold text-[#64DD17] align-middle">ENGINE 0.3</span></div>
+                        <div className="text-[10.5px] text-white/60 leading-tight truncate drop-shadow">{CLUBS[club].id} · {PRESET_KO[preset]} · {mode === "swipe" ? `템포 ${downswingMsFor(club)} ms` : `창 ±${Math.round(zoneMs)} ms`}{aimStance ? ` · ${aimStance > 0 ? "드로우" : "페이드"} ${Math.abs(aimStance / 10).toFixed(1)}°` : ""} · {WINDS.find((w) => w.key === windKey)!.label}</div>
                     </div>
-                    {shots.length > 0 && <button onClick={() => { setShots([]); setCard(null); }} className="shrink-0 h-8 px-2.5 rounded-full bg-white/[0.06] text-[11px] font-bold text-white/50">지우기 {shots.length}</button>}
-
-                </div>
-                {/* 매 샷 만지는 것만 밖에: 스탠스(구질). 바람·볼포지션·프리셋은 연습장 설정이라 시트 안으로 */}
-                <div className="flex items-center gap-1 px-3 pb-1 text-[11.5px] font-bold">
-                    {mode === "arc" ? (
-                        <div className="flex-1 text-[10.5px] font-bold text-white/30">공을 뒤로 끌어 파워 · 좌우로 드로우/페이드 · 초록 창에 탭</div>
-                    ) : (
-                        <>
-                            <span className="shrink-0 text-[10px] font-bold text-white/30 mr-0.5">스탠스</span>
-                            {STANCES.map((s) => <button key={s.key} onClick={() => setStance(s.key)} className={cn(chip(stance === s.key), "flex-1 px-0")}>{s.short}</button>)}
-                        </>
-                    )}
-                    <button onClick={() => setShowOpts(true)} className="shrink-0 w-8 h-7 rounded-full bg-white/[0.06] text-white/60 flex items-center justify-center" aria-label="연습장 설정"><LucideSettings2 className="w-3.5 h-3.5" /></button>
+                    {shots.length > 0 && <button onClick={() => { setShots([]); setCard(null); }} className="pointer-events-auto shrink-0 h-8 px-2.5 rounded-full bg-black/45 backdrop-blur-sm text-[11px] font-bold text-white/70">지우기 {shots.length}</button>}
+                    <button onClick={() => setShowOpts(true)} className="pointer-events-auto shrink-0 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-white/70 flex items-center justify-center" aria-label="연습장 설정"><LucideSettings2 className="w-4 h-4" /></button>
                 </div>
 
-                {/* 필드 + 오른쪽 클럽 바. 휠/트랙패드 스크롤 = 조준 */}
-                <div className="flex-1 min-h-0 px-3 relative" onWheel={onFieldWheel}>
-                    <FieldCanvas hole={RANGE} viewLenM={330} shots={shots} live={live?.shot ?? null} frameIndex={frame} ghost={card && showGhost ? card.ghost : null} aimDeg={aimDeg} carryRing={live ? null : { x: ring.x, y: ring.y, label: `${Math.round(ring.carry)} m${pullPower >= 20 ? ` · ${ringPower} %` : ""}` }} windArrow={wind} />
-                    <div className="absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-[3px] p-[3px] rounded-xl bg-black/45 backdrop-blur-sm">
-                        {CLUB_LIST.map((c) => (
-                            <button key={c} onClick={() => setClub(c)} className={cn("w-[46px] h-[32px] rounded-lg flex flex-col items-center justify-center leading-none", club === c ? "bg-[#64DD17] text-[#051907]" : "text-white/75")}>
-                                <span className="text-[12px] font-extrabold">{c}</span>
-                                <span className={cn("text-[9px] font-bold tabular-nums", club === c ? "text-[#051907]/70" : "text-white/40")}>{nominalCarryM(c, preset)}</span>
-                            </button>
-                        ))}
+                {/* 스탠스(아크가 아닐 때만 — 아크는 끌기로 정한다) */}
+                {mode !== "arc" && (
+                    <div className="absolute inset-x-3 top-[68px] flex items-center gap-1 text-[11.5px] font-bold">
+                        <span className="shrink-0 text-[10px] font-bold text-white/50 mr-0.5 drop-shadow">스탠스</span>
+                        {STANCES.map((st) => <button key={st.key} onClick={() => setStance(st.key)} className={cn("flex-1 h-7 px-0 rounded-full backdrop-blur-sm", stance === st.key ? "bg-[#ffffff] text-[#000000]" : "bg-black/40 text-white/70")}>{st.short}</button>)}
                     </div>
+                )}
+
+                {/* 클럽 바 */}
+                <div className="absolute right-3 flex flex-col gap-[3px] p-[3px] rounded-xl bg-black/50 backdrop-blur-sm" style={{ top: "50%", transform: "translateY(-58%)" }}>
+                    {CLUB_LIST.map((c) => (
+                        <button key={c} onClick={() => setClub(c)} className={cn("w-[46px] h-[32px] rounded-lg flex flex-col items-center justify-center leading-none", club === c ? "bg-[#64DD17] text-[#051907]" : "text-white/80")}>
+                            <span className="text-[12px] font-extrabold">{c}</span>
+                            <span className={cn("text-[9px] font-bold tabular-nums", club === c ? "text-[#051907]/70" : "text-white/45")}>{nominalCarryM(c, preset)}</span>
+                        </button>
+                    ))}
                 </div>
 
-                {/* 조준 스크롤 띠 */}
-                <div className="px-3 pt-1.5">
-                    <div className="relative h-8 rounded-full bg-white/[0.05] touch-none select-none overflow-hidden" onPointerDown={onAimDown} onPointerMove={onAimMove} onPointerUp={onAimUp} onPointerCancel={onAimUp}>
+                {/* 조준 띠 */}
+                <div className="absolute inset-x-3" style={{ bottom: AIM_BOTTOM }}>
+                    <div className="relative h-8 rounded-full bg-black/45 backdrop-blur-sm touch-none select-none overflow-hidden" onPointerDown={onAimDown} onPointerMove={onAimMove} onPointerUp={onAimUp} onPointerCancel={onAimUp}>
                         {Array.from({ length: 13 }, (_, i) => -30 + i * 5).map((deg) => (
-                            <div key={deg} className={cn("absolute top-1/2 -translate-y-1/2 w-px", deg === 0 ? "h-4 bg-white/60" : "h-2 bg-white/20")} style={{ left: `${((deg + AIM_MAX) / (AIM_MAX * 2)) * 100}%` }} />
+                            <div key={deg} className={cn("absolute top-1/2 -translate-y-1/2 w-px", deg === 0 ? "h-4 bg-white/60" : "h-2 bg-white/25")} style={{ left: `${((deg + AIM_MAX) / (AIM_MAX * 2)) * 100}%` }} />
                         ))}
                         <div className="absolute top-0 bottom-0 w-[3px] rounded-full bg-[#64DD17] shadow-[0_0_8px_rgba(100,221,23,0.8)]" style={{ left: `calc(${((aimDeg + AIM_MAX) / (AIM_MAX * 2)) * 100}% - 1px)` }} />
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-white/40">◀ 끌어서 조준</div>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-extrabold tabular-nums text-white/80">{aimDeg > 0 ? "+" : ""}{aimDeg}°</div>
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-white/45">◀ 끌어서 조준</div>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-extrabold tabular-nums text-white/85">{aimDeg > 0 ? "+" : ""}{aimDeg}°</div>
                     </div>
                 </div>
 
-                {/* 하단: 당점 + 스윙 패드. 샷 카드가 이 자리를 덮는다(필드의 착지점·점선을 가리지 않게), 탭하면 다음 샷 */}
-                <div className="h-[38%] min-h-[230px] px-3 pb-3 pt-2 relative flex gap-2 items-stretch">
-                    {mode === "needle" && <ContactPicker value={contact} onChange={setContact} teed={teed} disabled={!!live} />}
-                    <div className="flex-1 min-w-0">
-                        {mode === "arc"
-                            ? <ArcSwing club={club} zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} teed={teed} disabled={!!live} onShot={shoot} onAim={(p, sh) => { setPullPower(p); setPullShape(sh); }} />
+                {/* 스윙 — 필드 위에 그대로 올라간다 */}
+                <div className="absolute inset-x-0 bottom-0" style={{ height: SWING_H }}>
+                    {!live && !card && (
+                        mode === "arc"
+                            ? <ArcSwing bare club={club} zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} teed={teed} onShot={shoot} onAim={(p, sh) => { setPullPower(p); setPullShape(sh); }} />
                             : mode === "swipe"
-                                ? <SwipeSwing club={club} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />
-                                : <SwingPad club={club} zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} contact={contact} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />}
-                    </div>
-                    <div className={cn("absolute inset-x-3 top-2 bottom-3", card ? "" : "pointer-events-none")}>
-                        {/* 탭한 순간부터 공이 멈출 때까지 — 내가 친 자리·등급·날아가는 거리 */}
-                        {live && <ImpactVerdict verdict={live.verdict} diag={live.result.diag} sweepMs={mode === "swipe" ? live.result.diag.zoneMs * 6 : CLUBS[club].sweepMs} liveDistM={liveDist} flying endLabels={mode === "arc" ? ["대가리(빨리)", "뒷땅(늦게)"] : ["이르게", "늦게"]} />}
-                        {card && d && r && (
-                            <div className="absolute inset-0 rounded-[1.5rem] bg-[#121212] border border-white/10 p-3 text-[12px] overflow-hidden" onPointerDown={() => setCard(null)}>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <div className="text-[15px] font-extrabold flex items-baseline gap-1.5 min-w-0">
-                                        <span style={{ color: card.verdict.color }}>{card.verdict.label}</span>
-                                        <span className="text-white/70 text-[13px] truncate">{CONTACT_KO[d.contact]} · {SHAPE_KO[d.shape]}</span>
-                                    </div>
-                                    <button onPointerDown={(e) => e.stopPropagation()} onClick={() => setShowGhost((v) => !v)} className={cn("h-6 px-2 rounded-full text-[10px] font-bold", showGhost ? "bg-white/20 text-white" : "bg-white/[0.06] text-white/40")}>퍼펙트였다면</button>
+                                ? <SwipeSwing club={club} teed={teed} onShot={shoot} onPower={setPullPower} />
+                                : <div className="h-full flex gap-2 px-3 pb-3">
+                                    <ContactPicker value={contact} onChange={setContact} teed={teed} />
+                                    <div className="flex-1 min-w-0"><SwingPad club={club} zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} contact={contact} teed={teed} onShot={shoot} onPower={setPullPower} /></div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-x-2 gap-y-1 tabular-nums">
-                                    <Stat k="캐리" v={`${r.carryM.toFixed(0)} m`} hi />
-                                    <Stat k="런" v={`${(r.totalM - r.carryM).toFixed(0)} m`} />
-                                    <Stat k="총" v={`${r.totalM.toFixed(0)} m`} hi />
-                                    <Stat k="옆" v={`${r.final.p.x >= 0 ? "우" : "좌"} ${Math.abs(r.final.p.x).toFixed(0)} m`} />
-                                    <Stat k="임팩트" v={`${card.input.impactMs >= 0 ? "+" : ""}${card.input.impactMs} ms`} />
-                                    <Stat k="페이스" v={`${d.faceDeg >= 0 ? "+" : ""}${d.faceDeg.toFixed(1)}°`} />
-                                    <Stat k="패스" v={`${d.pathDeg >= 0 ? "+" : ""}${d.pathDeg.toFixed(1)}°`} />
-                                    <Stat k="컨택" v={Math.abs(d.strikeHighCm) < 0.05 && d.toeHeelCm === 0 ? "중앙" : `${d.strikeHighCm > 0 ? (teed ? "위" : "잔디") : "공 위"} ${Math.abs(d.strikeHighCm).toFixed(1)}${d.toeHeelCm ? ` ${d.toeHeelCm > 0 ? "토" : "힐"}` : ""}`} />
-                                    <Stat k="볼스피드" v={`${d.ballSpeed.toFixed(1)} m/s`} />
-                                    <Stat k="발사각" v={`${d.launchVDeg.toFixed(1)}°`} />
-                                    <Stat k="스핀" v={`${Math.round(d.spinRpm)} rpm`} />
-                                    <Stat k="스핀축" v={`${d.tiltDeg >= 0 ? "+" : ""}${d.tiltDeg.toFixed(0)}°`} />
+                    )}
+                    {/* 탭한 순간부터 공이 멈출 때까지 — 내가 친 자리·등급·날아가는 거리 */}
+                    {live && (
+                        <div className="absolute inset-x-3 bottom-3 top-2">
+                            <ImpactVerdict verdict={live.verdict} diag={live.result.diag} sweepMs={mode === "swipe" ? live.result.diag.zoneMs * 6 : CLUBS[club].sweepMs} liveDistM={liveDist} flying endLabels={mode === "arc" ? ["대가리(빨리)", "뒷땅(늦게)"] : ["이르게", "늦게"]} />
+                        </div>
+                    )}
+                    {card && d && r && (
+                        <div className="absolute inset-x-3 bottom-3 top-2 rounded-[1.5rem] bg-black/80 backdrop-blur border border-white/10 p-3 text-[12px] overflow-hidden" onPointerDown={() => setCard(null)}>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <div className="text-[15px] font-extrabold flex items-baseline gap-1.5 min-w-0">
+                                    <span style={{ color: card.verdict.color }}>{card.verdict.label}</span>
+                                    <span className="text-white/70 text-[13px] truncate">{CONTACT_KO[d.contact]} · {SHAPE_KO[d.shape]}</span>
                                 </div>
-                                <div className="text-[10.5px] text-white/40 mt-1 tabular-nums">정점 {r.apexM.toFixed(0)} m · 체공 {r.airTime.toFixed(1)} s · 파워 {card.input.powerPct} % · {mode === "swipe" ? `템포 ${downswingMsFor(club)} ms` : `창 ±${Math.round(d.zoneMs)} ms`}</div>
-                                <div className="text-[11px] text-white/60 mt-0.5 pr-24">{card.noTap ? (mode === "swipe" ? "공을 지나지 못했어요 — 공 중심선을 왼쪽으로 통과하도록 쓸어 주세요." : "스윙 타이밍을 놓쳤어요 — 바늘이 공에 올 때 패드를 탭하세요.") : coaching(d, r, card.tempoDevMs, mode === "arc")}</div>
-                                <div className="absolute right-3 bottom-2 text-[10px] font-bold text-white/30">탭하면 다음 샷 ▶</div>
+                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => setShowGhost((v) => !v)} className={cn("h-6 px-2 rounded-full text-[10px] font-bold", showGhost ? "bg-white/20 text-white" : "bg-white/[0.06] text-white/40")}>퍼펙트였다면</button>
                             </div>
-                        )}
-                    </div>
+                            <div className="grid grid-cols-4 gap-x-2 gap-y-1 tabular-nums">
+                                <Stat k="캐리" v={`${r.carryM.toFixed(0)} m`} hi />
+                                <Stat k="런" v={`${(r.totalM - r.carryM).toFixed(0)} m`} />
+                                <Stat k="총" v={`${r.totalM.toFixed(0)} m`} hi />
+                                <Stat k="옆" v={`${r.final.p.x >= 0 ? "우" : "좌"} ${Math.abs(r.final.p.x).toFixed(0)} m`} />
+                                <Stat k="임팩트" v={`${card.input.impactMs >= 0 ? "+" : ""}${card.input.impactMs} ms`} />
+                                <Stat k="페이스" v={`${d.faceDeg >= 0 ? "+" : ""}${d.faceDeg.toFixed(1)}°`} />
+                                <Stat k="패스" v={`${d.pathDeg >= 0 ? "+" : ""}${d.pathDeg.toFixed(1)}°`} />
+                                <Stat k="컨택" v={Math.abs(d.strikeHighCm) < 0.05 && d.toeHeelCm === 0 ? "중앙" : `${d.strikeHighCm > 0 ? (teed ? "위" : "잔디") : "공 위"} ${Math.abs(d.strikeHighCm).toFixed(1)}${d.toeHeelCm ? ` ${d.toeHeelCm > 0 ? "토" : "힐"}` : ""}`} />
+                                <Stat k="볼스피드" v={`${d.ballSpeed.toFixed(1)} m/s`} />
+                                <Stat k="발사각" v={`${d.launchVDeg.toFixed(1)}°`} />
+                                <Stat k="스핀" v={`${Math.round(d.spinRpm)} rpm`} />
+                                <Stat k="스핀축" v={`${d.tiltDeg >= 0 ? "+" : ""}${d.tiltDeg.toFixed(0)}°`} />
+                            </div>
+                            <div className="text-[10.5px] text-white/40 mt-1 tabular-nums">정점 {r.apexM.toFixed(0)} m · 체공 {r.airTime.toFixed(1)} s · 파워 {card.input.powerPct} % · {mode === "swipe" ? `템포 ${downswingMsFor(club)} ms` : `창 ±${Math.round(d.zoneMs)} ms`}</div>
+                            <div className="text-[11px] text-white/60 mt-0.5 pr-24">{card.noTap ? (mode === "swipe" ? "공을 지나지 못했어요 — 공 중심선을 왼쪽으로 통과하도록 쓸어 주세요." : "스윙 타이밍을 놓쳤어요 — 바늘이 공에 올 때 패드를 탭하세요.") : coaching(d, r, card.tempoDevMs, mode === "arc")}</div>
+                            <div className="absolute right-3 bottom-2 text-[10px] font-bold text-white/30">탭하면 다음 샷 ▶</div>
+                        </div>
+                    )}
                 </div>
             </div>
 
