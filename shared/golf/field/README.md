@@ -61,6 +61,13 @@
 - 고도 = 전체 기울기 + 범프 + **격자**(`height.grid`: origin·cell·nx·ny·z 행우선, 쌍선형 보간, 밖은 가장자리 값으로 편평). `gridFrom(origin, cell, nx, ny, f)` 로 만든다.
 - 나무 `{ c, r, h, trunkR? }`: 캐노피 구(중심 z = h − r) 안에 들어오면 법선 반사(e 0.2) 뒤 속도 35 %·스핀 30 % 만 남고 `tree` 이벤트, 둥치(기본 0.25 m)는 수평 반사 50 %. 굴러가는 공은 둥치만 본다. 결정론.
 
+## 화면 입력 방식(client/src/golf/field) — 엔진은 정수만 받는다
+- **쓸기 스윙(기본, `SwipeSwing.tsx`)**: 한 제스처가 세 축을 전부 *결과* 로 만든다. 오른쪽으로 당김(파워) → 왼쪽으로 쓸어 공 중심선 통과.
+  통과 높이 → `tapY`(뒷땅·얇게), 다운스윙 소요 시간 vs 클럽 템포(`sweepMs/4`) → `impactMs`(**빠르면 몸이 먼저 = 열림 = 페이드**,
+  느리면 손이 먼저 = 닫힘 = 드로우), 통과 순간 경로 기울기 → `padX`, 공을 못 지나고 떼면 헛스윙(`noTapInput`).
+- **바늘 + 당점 선택(`SwingPad.tsx` + `ContactPicker.tsx`)**: 왕복 바늘을 탭해 `impactMs`, 당점은 샷 전에 공 위에서 골라 `tapX`·`tapY`.
+  당점을 *선택* 하는 건 골프가 아니라 당구의 개념이라 A/B 비교용으로만 남긴다(설정 시트에서 전환).
+
 ## 공개 API
 ```
 simulateStroke(pre: Vec3, input: StrokeInput, ctx: StrokeContext): StrokeResult

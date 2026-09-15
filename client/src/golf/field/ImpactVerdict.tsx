@@ -11,16 +11,22 @@ export interface Verdict { grade: Grade; label: string; reason: string; color: s
 const CONTACT_KO: Record<string, string> = { pure: "정타", fat: "뒷땅", thin: "얇게", top: "탑", shank: "생크", sky: "스카이" };
 
 /** 타이밍(창 대비)과 컨택을 합쳐 한 등급으로. 화면 어디서나 같은 규칙을 쓴다 */
-export function verdictOf(d: ImpactDiag, noTap: boolean): Verdict {
+export function verdictOf(d: ImpactDiag, noTap: boolean, tempoDevMs?: number): Verdict {
     const at = Math.abs(d.tNorm);
     const early = d.tNorm < 0;
     const ms = Math.round(d.tNorm * d.zoneMs);
-    const timing = at <= 0.33 ? "완벽한 타이밍" : `${Math.abs(ms)} ms ${early ? "이르게" : "늦게"}`;
-    if (noTap) return { grade: "miss", label: "미스", reason: "타이밍을 놓쳤어요 · 얇게", color: "#ff7043" };
+    // 쓸기 스윙이면 '이르게/늦게' 가 아니라 다운스윙 템포로 말한다(+ 는 이상보다 빠름 = 몸이 먼저)
+    const timing = at <= 0.33
+        ? (tempoDevMs === undefined ? "완벽한 타이밍" : "완벽한 템포")
+        : tempoDevMs !== undefined
+            ? `${Math.abs(tempoDevMs)} ms ${tempoDevMs > 0 ? "빠르게(몸이 먼저)" : "느리게(손이 먼저)"}`
+            : `${Math.abs(ms)} ms ${early ? "이르게" : "늦게"}`;
+    if (noTap) return { grade: "miss", label: "헛스윙", reason: tempoDevMs === undefined ? "타이밍을 놓쳤어요 · 얇게" : "공을 지나지 못했어요 · 얇게", color: "#ff7043" };
     if (d.contact !== "pure") return { grade: "miss", label: "미스", reason: `${CONTACT_KO[d.contact]} · ${timing}`, color: "#ff7043" };
     if (at <= 0.33) return { grade: "perfect", label: "퍼펙트", reason: `${timing} · 정타`, color: "#64DD17" };
     if (at <= 1) return { grade: "great", label: "굿샷", reason: `${timing} · 정타`, color: "#9ccc65" };
     if (at <= 1.6) return { grade: "good", label: "무난", reason: `${timing} · 페이스가 ${early ? "닫혔어요" : "열렸어요"}`, color: "#e0e0e0" };
+
     return { grade: "miss", label: "미스", reason: `${timing} · 페이스가 크게 ${early ? "닫힘" : "열림"}`, color: "#ff7043" };
 }
 

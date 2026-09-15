@@ -18,6 +18,7 @@ import { FieldCanvas, type Shot } from "./FieldCanvas";
 import { SwingPad, type SwingResult } from "./SwingPad";
 import { ContactPicker, type ContactPoint } from "./ContactPicker";
 import { ImpactVerdict, verdictOf, type Verdict } from "./ImpactVerdict";
+import { SwipeSwing, downswingMsFor } from "./SwipeSwing";
 
 const CLUB_LIST: ClubId[] = ["D", "3W", "5I", "7I", "9I", "PW", "SW"];
 // 스탠스 = 스윙 패스. 드라이버 3° 면 축 14°·옆 30 m(큰 페이드), 1.5° 가 투어 페이드 급. 엔진은 ±15° 까지 받는다
@@ -47,8 +48,11 @@ export default function RangePage() {
     const [shots, setShots] = useState<Shot[]>([]);
     const [live, setLive] = useState<{ shot: Shot; result: StrokeResult; input: StrokeInput; verdict: Verdict } | null>(null);
     const [frame, setFrame] = useState(0);
-    const [card, setCard] = useState<{ result: StrokeResult; input: StrokeInput; ghost: Float32Array; verdict: Verdict; noTap: boolean } | null>(null);
+    const [card, setCard] = useState<{ result: StrokeResult; input: StrokeInput; ghost: Float32Array; verdict: Verdict; noTap: boolean; tempoDevMs?: number } | null>(null);
     const [showOpts, setShowOpts] = useState(false);
+    // 입력 방식 A/B — 쓸기(한 제스처가 세 축을 결과로) vs 바늘(당점 선택 + 왕복 바늘 탭)
+    const [mode, setMode] = useState<"swipe" | "needle">(() => (localStorage.getItem("rankue_golf_swing_mode") as "swipe" | "needle") ?? "swipe");
+    useEffect(() => { localStorage.setItem("rankue_golf_swing_mode", mode); }, [mode]);
     const [showGhost, setShowGhost] = useState(true);
     const rafRef = useRef(0);
     const [pullPower, setPullPower] = useState(0);   // 당기는 중 파워(0 = 안 당김)
@@ -85,14 +89,14 @@ export default function RangePage() {
         const ghost = simulateStroke({ x: RANGE.tee.x, y: RANGE.tee.y, z: 0 }, perfectInput(input), ctx).frames;
         const land = result.events.find((e) => e.kind === "land");
         const shot: Shot = { frames: result.frames, landing: land ? { x: land.p.x, y: land.p.y } : null, rest: { x: result.final.p.x, y: result.final.p.y }, color: COLORS[shots.length % COLORS.length] };
-        const verdict = verdictOf(result.diag, r.noTap);
+        const verdict = verdictOf(result.diag, r.noTap, r.tempoDevMs);
         setCard(null); setLive({ shot, result, input, verdict }); setFrame(0); setPullPower(0);
         // 실시간 재생(120 Hz 프레임 → 경과 시간으로 인덱스)
         const t0 = performance.now(); const n = result.frames.length / 3;
         cancelAnimationFrame(rafRef.current);
         const loop = () => {
             const i = Math.floor(((performance.now() - t0) / 1000) * 120);
-            if (i >= n - 1) { setFrame(n - 1); setShots((s) => [...s, shot]); setLive(null); setCard({ result, input, ghost, verdict, noTap: r.noTap }); if (navigator.vibrate) navigator.vibrate(20); return; }
+            if (i >= n - 1) { setFrame(n - 1); setShots((s) => [...s, shot]); setLive(null); setCard({ result, input, ghost, verdict, noTap: r.noTap, tempoDevMs: r.tempoDevMs }); if (navigator.vibrate) navigator.vibrate(20); return; }
             setFrame(i); rafRef.current = requestAnimationFrame(loop);
         };
         rafRef.current = requestAnimationFrame(loop);
@@ -119,7 +123,7 @@ export default function RangePage() {
                     <button onClick={() => setLocation("/golf/arcade")} className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0" aria-label="뒤로"><LucideChevronLeft className="w-5 h-5" /></button>
                     <div className="flex-1 min-w-0">
                         <div className="text-[13px] font-extrabold leading-tight">필드 골프 연습장 <span className="text-[10px] font-bold text-[#64DD17] align-middle">ENGINE 0.3</span></div>
-                        <div className="text-[10.5px] text-white/40 leading-tight truncate">{CLUBS[club].id} · {PRESET_KO[preset]} · 창 ±{Math.round(zoneMs)} ms · {WINDS.find((w) => w.key === windKey)!.label}</div>
+                        <div className="text-[10.5px] text-white/40 leading-tight truncate">{CLUBS[club].id} · {PRESET_KO[preset]} · {mode === "swipe" ? `템포 ${downswingMsFor(club)} ms` : `창 ±${Math.round(zoneMs)} ms`} · {WINDS.find((w) => w.key === windKey)!.label}</div>
                     </div>
                     {shots.length > 0 && <button onClick={() => { setShots([]); setCard(null); }} className="shrink-0 h-8 px-2.5 rounded-full bg-white/[0.06] text-[11px] font-bold text-white/50">지우기 {shots.length}</button>}
 
@@ -158,13 +162,15 @@ export default function RangePage() {
 
                 {/* 하단: 당점 + 스윙 패드. 샷 카드가 이 자리를 덮는다(필드의 착지점·점선을 가리지 않게), 탭하면 다음 샷 */}
                 <div className="h-[32%] min-h-[176px] px-3 pb-3 pt-2 relative flex gap-2 items-stretch">
-                    <ContactPicker value={contact} onChange={setContact} teed={teed} disabled={!!live} />
+                    {mode === "needle" && <ContactPicker value={contact} onChange={setContact} teed={teed} disabled={!!live} />}
                     <div className="flex-1 min-w-0">
-                        <SwingPad club={club} zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} contact={contact} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />
+                        {mode === "swipe"
+                            ? <SwipeSwing club={club} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />
+                            : <SwingPad club={club} zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} contact={contact} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />}
                     </div>
                     <div className={cn("absolute inset-x-3 top-2 bottom-3", card ? "" : "pointer-events-none")}>
                         {/* 탭한 순간부터 공이 멈출 때까지 — 내가 친 자리·등급·날아가는 거리 */}
-                        {live && <ImpactVerdict verdict={live.verdict} diag={live.result.diag} sweepMs={CLUBS[club].sweepMs} liveDistM={liveDist} flying />}
+                        {live && <ImpactVerdict verdict={live.verdict} diag={live.result.diag} sweepMs={mode === "swipe" ? live.result.diag.zoneMs * 6 : CLUBS[club].sweepMs} liveDistM={liveDist} flying />}
                         {card && d && r && (
                             <div className="absolute inset-0 rounded-[1.5rem] bg-[#121212] border border-white/10 p-3 text-[12px] overflow-hidden" onPointerDown={() => setCard(null)}>
                                 <div className="flex items-center justify-between mb-1.5">
@@ -188,8 +194,8 @@ export default function RangePage() {
                                     <Stat k="스핀" v={`${Math.round(d.spinRpm)} rpm`} />
                                     <Stat k="스핀축" v={`${d.tiltDeg >= 0 ? "+" : ""}${d.tiltDeg.toFixed(0)}°`} />
                                 </div>
-                                <div className="text-[10.5px] text-white/40 mt-1 tabular-nums">정점 {r.apexM.toFixed(0)} m · 체공 {r.airTime.toFixed(1)} s · 파워 {card.input.powerPct} % · 창 ±{Math.round(d.zoneMs)} ms</div>
-                                <div className="text-[11px] text-white/60 mt-0.5 pr-24">{card.noTap ? "스윙 타이밍을 놓쳤어요 — 바늘이 공에 올 때 패드를 탭하세요." : coaching(d, r)}</div>
+                                <div className="text-[10.5px] text-white/40 mt-1 tabular-nums">정점 {r.apexM.toFixed(0)} m · 체공 {r.airTime.toFixed(1)} s · 파워 {card.input.powerPct} % · {mode === "swipe" ? `템포 ${downswingMsFor(club)} ms` : `창 ±${Math.round(d.zoneMs)} ms`}</div>
+                                <div className="text-[11px] text-white/60 mt-0.5 pr-24">{card.noTap ? (mode === "swipe" ? "공을 지나지 못했어요 — 공 중심선을 왼쪽으로 통과하도록 쓸어 주세요." : "스윙 타이밍을 놓쳤어요 — 바늘이 공에 올 때 패드를 탭하세요.") : coaching(d, r, card.tempoDevMs)}</div>
                                 <div className="absolute right-3 bottom-2 text-[10px] font-bold text-white/30">탭하면 다음 샷 ▶</div>
                             </div>
                         )}
@@ -205,6 +211,10 @@ export default function RangePage() {
                             <div className="text-[14px] font-extrabold">연습장 설정</div>
                             <button onClick={() => setShowOpts(false)} className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center" aria-label="닫기"><LucideX className="w-4 h-4" /></button>
                         </div>
+                        <Opt label="입력 방식">
+                            <button onClick={() => setMode("swipe")} className={chip(mode === "swipe")}>쓸기(한 제스처)</button>
+                            <button onClick={() => setMode("needle")} className={chip(mode === "needle")}>바늘 + 당점 선택</button>
+                        </Opt>
                         <Opt label="바람">{WINDS.map((w) => <button key={w.key} onClick={() => setWindKey(w.key)} className={chip(windKey === w.key)}>{w.label}</button>)}</Opt>
                         <Opt label="볼 포지션">{TRAJ.map((s) => <button key={s.key} onClick={() => setBallPos(s.key)} className={chip(ballPos === s.key)}>{s.label}</button>)}</Opt>
                         <Opt label="실력">{(["pro", "amateur", "lpga", "ama15"] as Preset[]).map((p) => <button key={p} onClick={() => setPreset(p)} className={chip(preset === p)}>{PRESET_KO[p]}</button>)}</Opt>
@@ -234,15 +244,20 @@ function Stat({ k, v, hi }: { k: string; v: string; hi?: boolean }) {
     );
 }
 
-function coaching(d: StrokeResult["diag"], r: StrokeResult): string {
-    if (d.contact === "fat") return "뒷땅 — 당점이 공 아래 잔디였어요. 당점을 가운데로.";
-    if (d.contact === "thin") return "얇게 — 당점이 공 윗부분(리딩엣지)이었어요. 조금만 아래를.";
-    if (d.contact === "top") return "탑 — 당점이 공 꼭대기였어요. 가운데를 노리세요.";
-    if (d.contact === "sky") return "스카이 — 당점이 티 쪽이라 크라운에 맞았어요.";
-    if (d.contact === "shank") return "생크 — 당점이 힐 끝(호젤)이었어요.";
-    const openClosed = d.faceDeg > 1.5 ? "몸이 먼저 돌아 페이스가 열렸어요(늦은 탭)" : d.faceDeg < -1.5 ? "손이 먼저 돌아 페이스가 닫혔어요(이른 탭)" : "";
+function coaching(d: StrokeResult["diag"], r: StrokeResult, tempoDevMs?: number): string {
+    // 쓸기 스윙이면 원인을 템포로 말한다(오너 모델: 몸이 먼저 돌면 열려서 페이드)
+    const tempo = tempoDevMs !== undefined && Math.abs(tempoDevMs) > 20
+        ? `다운스윙이 ${Math.abs(tempoDevMs)} ms ${tempoDevMs > 0 ? "빨라 몸이 먼저 돌았어요 — 페이스가 열립니다" : "느려 손이 먼저 릴리즈됐어요 — 페이스가 닫힙니다"}. `
+        : "";
+    if (d.contact === "fat") return tempo + "뒷땅 — 공 아래 잔디를 먼저 쳤어요. 조금 위를 지나게.";
+    if (d.contact === "thin") return tempo + "얇게 — 공 윗부분(리딩엣지)에 맞았어요. 조금 아래를 지나게.";
+    if (d.contact === "top") return tempo + "탑 — 공 꼭대기를 쳤어요. 공 가운데를 지나게.";
+    if (d.contact === "sky") return tempo + "스카이 — 공 아래(티)를 쳐서 크라운에 맞았어요.";
+    if (d.contact === "shank") return "생크 — 호젤에 맞았어요.";
+    if (tempo && Math.abs(r.final.p.x) > 8) return tempo + "구질은 페이스 − 패스(스탠스) 차이에서 나요.";
+    const openClosed = d.faceDeg > 1.5 ? "몸이 먼저 돌아 페이스가 열렸어요" : d.faceDeg < -1.5 ? "손이 먼저 돌아 페이스가 닫혔어요" : "";
     if (openClosed && Math.abs(r.final.p.x) > 10) return `${openClosed}. 구질은 페이스 − 패스(스탠스) 차이에서 나요.`;
     if (Math.abs(d.pathDeg - d.stanceDeg) > 1.5 && Math.abs(d.faceDeg) < 1) return "방향은 패드를 놓을 때 흘린 손 때문 — 곧게 위아래로.";
     if (Math.abs(d.tNorm) <= 0.33 && Math.abs(d.strikeHighCm) < 0.5) return d.stanceDeg !== 0 ? "퍼펙트. 스탠스대로 만든 구질이에요." : "퍼펙트. 스퀘어 페이스에 정타.";
-    return "살짝 어긋난 타이밍·당점이 구질과 거리를 만들었어요 — 카드의 페이스·컨택을 보세요.";
+    return tempo + "살짝 어긋난 템포·컨택이 구질과 거리를 만들었어요.";
 }
