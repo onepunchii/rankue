@@ -8,6 +8,7 @@ import { stepAir, type MState } from "./flight.js";
 import { bounce, cupCheck, stepRoll } from "./ground.js";
 import { strokeHash } from "./hash.js";
 import { launchFrom, type LieInfo } from "./impact.js";
+import { EXPLOSION_IDEAL_TAPY } from "./clubs.js";
 import { BALL_R, BOUNCE_TO_ROLL_VN, CUP_RH, DEG, greenRollDecel, MAX_AIR_STEPS, MAX_ROLL_STEPS, SURFACE } from "./params.js";
 import { gustSeedFor, NO_WIND } from "./wind.js";
 import type { BallState3, Phase, Preset, StrokeEvent, StrokeInput, StrokeResult, Vec3, WindEnv } from "./types.js";
@@ -124,7 +125,7 @@ export function simulateStroke(pre: Vec3, input: StrokeInput, ctx: StrokeContext
     };
 }
 
-/** '퍼펙트였다면' — 같은 입력에 타이밍·흘림·타점 0 */
+/** '퍼펙트였다면' — 같은 스탠스·파워·볼포지션에 타이밍·흘림·타점 0, 컨택은 모드의 이상값(익스플로전은 모래 진입) */
 export function perfectInput(input: StrokeInput): StrokeInput {
-    return { ...input, impactMs: 0, padX: 0, tapX: 0 };
+    return { ...input, impactMs: 0, padX: 0, tapX: 0, tapY: input.mode === 2 ? EXPLOSION_IDEAL_TAPY : 0 };
 }

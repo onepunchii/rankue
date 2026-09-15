@@ -91,6 +91,8 @@ export const RANGE: FieldHole = {
     id: "range", name: "드라이빙 레인지", par: 4, lengthM: 400, tee: { x: 0, y: 0 }, cup: { x: 0, y: 400 },
     bounds: [-150, -20, 150, 450],
     green: [{ x: -15, y: 385 }, { x: 15, y: 385 }, { x: 15, y: 415 }, { x: -15, y: 415 }],
+    // 타석은 티 박스: 우드는 티 위(잔디 없음), 아이언은 잔디 위 모델. 매트 위 연습장과 같다
+    teeBox: [{ x: -6, y: -6 }, { x: 6, y: -6 }, { x: 6, y: 6 }, { x: -6, y: 6 }],
     fairway: [[{ x: -150, y: -20 }, { x: 150, y: -20 }, { x: 150, y: 450 }, { x: -150, y: 450 }]],
     height: { slope: { x: 0, y: 0 }, bumps: [] },
 };

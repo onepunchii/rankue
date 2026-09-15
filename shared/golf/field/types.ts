@@ -10,15 +10,20 @@ export type Surface = "tee" | "fairway" | "fringe" | "green" | "rough" | "deepro
 export type Preset = "pro" | "amateur";
 export type StrokeMode = 0 | 1 | 2 | 3;   // 0 풀 · 1 칩 · 2 익스플로전 · 3 퍼트
 
+/**
+ * v0.2(A안, 2026-09-15): 구질은 고르는 게 아니라 만든다 — 스탠스(패스) · 회전 타이밍(페이스) · 컨택 높이(저점) 세 축.
+ * 정수 10개. 네트워크로 가는 것은 이것뿐.
+ */
 export interface StrokeInput {
     readonly club: ClubId;
-    readonly aimDeg10: number;   // 0.1° 정수, + 오른쪽
-    readonly powerPct: number;   // 20..115
-    readonly spinX: number;      // −100 드로우 … +100 페이드
-    readonly spinY: number;      // −100 펀치 … +100 하이
-    readonly impactMs: number;   // 탭 시각 오차(ms)
-    readonly padX: number;       // 패드 놓음 가로 흘림(−100..100), − = 아웃투인
-    readonly tapX: number;       // 탭 가로 위치(−100..100), + = 토
+    readonly aimDeg10: number;    // 타깃 라인 0.1° 정수, + 오른쪽
+    readonly stanceDeg10: number; // 스탠스(스윙 패스) 오프셋 0.1°, −150..150. − 왼쪽 = 아웃투인
+    readonly powerPct: number;    // 20..115
+    readonly ballPos: number;     // 볼 포지션/탄도: −100 뒤(핸드퍼스트·펀치) … +100 앞(하이)
+    readonly impactMs: number;    // 회전 타이밍 ms: − 이르게(손이 먼저, 페이스 닫힘) / + 늦게(몸이 먼저, 열림). 컨택과 무관
+    readonly padX: number;        // 패드 놓음 가로 흘림(−100..100) = 의도치 않은 패스 오차, − = 아웃투인
+    readonly tapX: number;        // 탭 가로 위치(−100..100), + = 토 (1차 화면은 0)
+    readonly tapY: number;        // 컨택 높이(−100..100): 스위트스팟이 공의 어디를 지났나. 0 = 이상적, + 위(얇게·탑), − 아래(잔디·모래·티)
     readonly mode: StrokeMode;
 }
 
@@ -36,7 +41,7 @@ export interface BallState3 {
 export type EventKind = "launch" | "apex" | "land" | "bounce" | "roll" | "tree" | "water" | "ob" | "lip" | "holed" | "rest";
 export interface StrokeEvent { readonly kind: EventKind; readonly t: number; readonly p: Vec3; readonly speed: number }
 
-export type Contact = "pure" | "fat" | "thin" | "top" | "shank";
+export type Contact = "pure" | "fat" | "thin" | "top" | "shank" | "sky";
 
 /** 임팩트 진단 — 샷 카드에 그대로 찍는다 */
 export interface ImpactDiag {
@@ -53,6 +58,8 @@ export interface ImpactDiag {
     readonly ballSpeed: number;    // m/s
     readonly spinRpm: number;
     readonly toeHeelCm: number;    // + 토
+    readonly strikeHighCm: number; // 페이스 위 타점 높이(스위트스팟 기준, + 위). 잔디 위에서 + 는 솔이 그만큼 파고든 것
+    readonly stanceDeg: number;    // 스탠스(의도 패스)
     readonly shape: "straight" | "draw" | "fade" | "hook" | "slice" | "pull" | "push" | "pullhook" | "pushslice";
 }
 

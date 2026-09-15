@@ -1,6 +1,7 @@
 /**
  * 필드 골프 연습장(/golf/range) — 3주차 게이트 화면(오너가 "진짜 같은가" 판정).
- * 클럽·구질·탄도·프리셋·바람을 고르고 스윙 패드로 친다 → 2.5D 톱다운 비행 → 샷 카드(임팩트·페이스·패스·타점·구질·캐리/런) + "퍼펙트였다면" 점선.
+ * v0.2 A안: 구질은 고르지 않고 만든다 — 스탠스(패스)·회전 타이밍(페이스)·컨택 높이(저점). 클럽·볼포지션·프리셋·바람을 고르고 스윙 패드로 친다
+ * → 2.5D 톱다운 비행 → 샷 카드(컨택·페이스·패스·타점 높이·구질·캐리/런) + "퍼펙트였다면" 점선.
  * 물리는 shared/golf/field(결정론). 화면은 프레임(120 Hz)을 실시간으로 재생만 한다.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -17,20 +18,21 @@ import { FieldCanvas, type Shot } from "./FieldCanvas";
 import { SwingPad, type SwingResult } from "./SwingPad";
 
 const CLUB_LIST: ClubId[] = ["D", "3W", "5I", "7I", "9I", "PW", "SW"];
-const SHAPES: Array<{ key: number; label: string }> = [{ key: -70, label: "드로우" }, { key: 0, label: "직진" }, { key: 70, label: "페이드" }];
-const TRAJ: Array<{ key: number; label: string }> = [{ key: -100, label: "펀치" }, { key: 0, label: "보통" }, { key: 100, label: "하이" }];
+// 스탠스 = 스윙 패스. 드라이버 3° 면 축 14°·옆 30 m(큰 페이드), 1.5° 가 투어 페이드 급. 엔진은 ±15° 까지 받는다
+const STANCES: Array<{ key: number; label: string }> = [{ key: -30, label: "스탠스 ◀ 3°" }, { key: -15, label: "◀ 1.5°" }, { key: 0, label: "정면" }, { key: 15, label: "1.5° ▶" }, { key: 30, label: "3° ▶" }];
+const TRAJ: Array<{ key: number; label: string }> = [{ key: -100, label: "공 뒤(펀치)" }, { key: 0, label: "보통" }, { key: 100, label: "공 앞(하이)" }];
 const WINDS: Array<{ key: string; label: string; w: { x: number; y: number } }> = [
     { key: "calm", label: "무풍", w: { x: 0, y: 0 } }, { key: "side5", label: "옆바람 5", w: { x: 5, y: 0 } }, { key: "head5", label: "맞바람 5", w: { x: 0, y: -5 } }, { key: "tail5", label: "뒷바람 5", w: { x: 0, y: 5 } },
 ];
-const CONTACT_KO: Record<string, string> = { pure: "정타", fat: "뒷땅", thin: "얇게", top: "탑", shank: "생크" };
+const CONTACT_KO: Record<string, string> = { pure: "정타", fat: "뒷땅", thin: "얇게", top: "탑", shank: "생크", sky: "스카이" };
 const SHAPE_KO: Record<string, string> = { straight: "스트레이트", draw: "드로우", fade: "페이드", hook: "훅", slice: "슬라이스", pull: "풀", push: "푸시", pullhook: "풀훅", pushslice: "푸시슬라이스" };
 const COLORS = ["#64DD17", "#7cc7ff", "#ffb84d", "#ff7ab6", "#c8a2ff", "#fff27a"];
 
 export default function RangePage() {
     const [, setLocation] = useLocation();
     const [club, setClub] = useState<ClubId>("7I");
-    const [spinX, setSpinX] = useState(0);
-    const [spinY, setSpinY] = useState(0);
+    const [stance, setStance] = useState(0);     // stanceDeg10
+    const [ballPos, setBallPos] = useState(0);
     const [preset, setPreset] = useState<Preset>("amateur");
     const [windKey, setWindKey] = useState("calm");
     const [aimDeg, setAimDeg] = useState(0);
@@ -44,23 +46,24 @@ export default function RangePage() {
 
     const wind = WINDS.find((w) => w.key === windKey)!.w;
     const ctx: StrokeContext = useMemo(() => ({ hole: RANGE, preset, env: wind.x || wind.y ? steadyWind(wind) : NO_WIND, stimp: 10 }), [preset, wind]);
-    const zoneMs = zoneMsFor(club, "tee", 100, spinX, spinY);
+    const zoneMs = zoneMsFor(club, "tee", 100, stance, ballPos);
+    const teed = !CLUBS[club].iron;
     // 파워별 예상 캐리(퍼펙트 임팩트·현재 바람) — 20..115 % 를 5 % 간격으로 미리 돌려 두고, 당기는 동안 링이 따라간다
     const carryByPower = useMemo(() => {
         const m = new Map<number, { x: number; y: number; carry: number }>();
         for (let p = 20; p <= 115; p += 5) {
-            const inp: StrokeInput = { club, aimDeg10: Math.round(aimDeg * 10), powerPct: p, spinX, spinY, impactMs: 0, padX: 0, tapX: 0, mode: 0 };
+            const inp: StrokeInput = { club, aimDeg10: Math.round(aimDeg * 10), stanceDeg10: stance, powerPct: p, ballPos, impactMs: 0, padX: 0, tapX: 0, tapY: 0, mode: 0 };
             const res = simulateStroke({ x: RANGE.tee.x, y: RANGE.tee.y, z: 0 }, inp, ctx);
             const land = res.events.find((e) => e.kind === "land");
             m.set(p, { x: land ? land.p.x : res.final.p.x, y: land ? land.p.y : res.final.p.y, carry: res.carryM });
         }
         return m;
-    }, [club, aimDeg, spinX, spinY, ctx]);
+    }, [club, aimDeg, stance, ballPos, ctx]);
     const ringPower = pullPower >= 20 ? Math.min(115, Math.round(pullPower / 5) * 5) : 100;
     const ring = carryByPower.get(ringPower) ?? { x: 0, y: nominalCarryM(club, preset), carry: nominalCarryM(club, preset) };
 
     const shoot = (r: SwingResult) => {
-        const input: StrokeInput = { club, aimDeg10: Math.round(aimDeg * 10), powerPct: r.powerPct, spinX, spinY, impactMs: r.impactMs, padX: r.padX, tapX: r.tapX, mode: 0 };
+        const input: StrokeInput = { club, aimDeg10: Math.round(aimDeg * 10), stanceDeg10: stance, powerPct: r.powerPct, ballPos, impactMs: r.impactMs, padX: r.padX, tapX: r.tapX, tapY: r.tapY, mode: 0 };
         let result: StrokeResult;
         try { result = simulateStroke({ x: RANGE.tee.x, y: RANGE.tee.y, z: 0 }, input, ctx); } catch (e) { console.warn("[range] 입력 거부", e); return; }
         const ghost = simulateStroke({ x: RANGE.tee.x, y: RANGE.tee.y, z: 0 }, perfectInput(input), ctx).frames;
@@ -99,9 +102,9 @@ export default function RangePage() {
             </div>
             {/* 옵션 줄: 구질·탄도·바람·조준 */}
             <div className="flex items-center gap-1 px-3 pb-1 overflow-x-auto scrollbar-hide text-[11.5px] font-bold">
-                {SHAPES.map((s) => <button key={s.key} onClick={() => setSpinX(s.key)} className={cn("shrink-0 h-7 px-2.5 rounded-full", spinX === s.key ? "bg-white text-black" : "bg-white/[0.06] text-white/60")}>{s.label}</button>)}
+                {STANCES.map((s) => <button key={s.key} onClick={() => setStance(s.key)} className={cn("shrink-0 h-7 px-2.5 rounded-full", stance === s.key ? "bg-white text-black" : "bg-white/[0.06] text-white/60")}>{s.label}</button>)}
                 <span className="w-px h-4 bg-white/10 mx-0.5" />
-                {TRAJ.map((s) => <button key={s.key} onClick={() => setSpinY(s.key)} className={cn("shrink-0 h-7 px-2.5 rounded-full", spinY === s.key ? "bg-white text-black" : "bg-white/[0.06] text-white/60")}>{s.label}</button>)}
+                {TRAJ.map((s) => <button key={s.key} onClick={() => setBallPos(s.key)} className={cn("shrink-0 h-7 px-2.5 rounded-full", ballPos === s.key ? "bg-white text-black" : "bg-white/[0.06] text-white/60")}>{s.label}</button>)}
                 <span className="w-px h-4 bg-white/10 mx-0.5" />
                 {WINDS.map((w) => <button key={w.key} onClick={() => setWindKey(w.key)} className={cn("shrink-0 h-7 px-2.5 rounded-full", windKey === w.key ? "bg-white text-black" : "bg-white/[0.06] text-white/60")}>{w.label}</button>)}
                 <span className="w-px h-4 bg-white/10 mx-0.5" />
@@ -118,7 +121,7 @@ export default function RangePage() {
 
             {/* 스윙 패드 */}
             <div className="h-[30%] min-h-[150px] px-3 pb-3 pt-2 relative">
-                <SwingPad zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} disabled={!!live} onShot={shoot} onPower={setPullPower} />
+                <SwingPad zoneMs={zoneMs} sweepMs={CLUBS[club].sweepMs} teed={teed} disabled={!!live} onShot={shoot} onPower={setPullPower} />
                 {/* 샷 카드 — 패드 자리에 덮인다(필드의 착지점·점선을 가리지 않게). 탭하면 걷히고 다음 샷 */}
                 <div className={cn("absolute inset-x-3 top-2 bottom-3", card ? "" : "pointer-events-none")}>
                 {card && d && r && (
@@ -139,7 +142,7 @@ export default function RangePage() {
                             <Stat k="임팩트" v={`${card.input.impactMs >= 0 ? "+" : ""}${card.input.impactMs} ms`} />
                             <Stat k="페이스" v={`${d.faceDeg >= 0 ? "+" : ""}${d.faceDeg.toFixed(1)}°`} />
                             <Stat k="패스" v={`${d.pathDeg >= 0 ? "+" : ""}${d.pathDeg.toFixed(1)}°`} />
-                            <Stat k="타점" v={d.toeHeelCm === 0 ? "중앙" : `${d.toeHeelCm > 0 ? "토" : "힐"} ${Math.abs(d.toeHeelCm).toFixed(1)}cm`} />
+                            <Stat k="컨택" v={Math.abs(d.strikeHighCm) < 0.05 ? "중앙" : `${d.strikeHighCm > 0 ? (teed ? "페이스 위" : "잔디") : "공 위"} ${Math.abs(d.strikeHighCm).toFixed(1)}cm`} />
                             <Stat k="볼스피드" v={`${d.ballSpeed.toFixed(1)} m/s`} />
                             <Stat k="발사각" v={`${d.launchVDeg.toFixed(1)}°`} />
                             <Stat k="스핀" v={`${Math.round(d.spinRpm)} rpm`} />
@@ -166,11 +169,14 @@ function Stat({ k, v, hi }: { k: string; v: string; hi?: boolean }) {
 }
 
 function coaching(d: StrokeResult["diag"], r: StrokeResult): string {
-    if (d.contact === "fat") return "뒷땅 — 바늘이 가운데 오기 전에 탭했어요. 조금만 늦게.";
-    if (d.contact === "thin" || d.contact === "top") return "얇게/탑 — 바늘이 지나간 뒤 탭했어요. 조금만 빨리.";
-    if (d.contact === "shank") return "생크 — 아이언에서 너무 늦었어요. 바늘 가운데를 노리세요.";
-    if (Math.abs(d.pathDeg) > 1.5 && Math.abs(d.faceDeg) < 1) return "방향은 패드를 놓을 때 흘린 손 때문 — 곧게 위아래로.";
-    if (Math.abs(r.final.p.x) > 10) return "방향이 틀렸으면 임팩트(탭 시각)를, 거리가 틀렸으면 파워·라이를 보세요.";
-    if (Math.abs(d.tNorm) <= 0.33) return "퍼펙트. 의도한 구질 그대로 나갔어요.";
-    return "살짝 어긋난 타이밍이 구질을 만들었어요 — 카드의 페이스·스핀축을 보세요.";
+    if (d.contact === "fat") return "뒷땅 — 공 아래 잔디를 쳤어요. 바늘이 올 때 공 가운데를 탭하세요.";
+    if (d.contact === "thin") return "얇게 — 공 윗부분(리딩엣지)에 맞았어요. 조금만 아래를.";
+    if (d.contact === "top") return "탑 — 공 꼭대기를 쳤어요. 공 가운데를 노리세요.";
+    if (d.contact === "sky") return "스카이 — 공 아래(티)를 쳐서 크라운에 맞았어요.";
+    if (d.contact === "shank") return "생크 — 호젤에 맞았어요.";
+    const openClosed = d.faceDeg > 1.5 ? "몸이 먼저 돌아 페이스가 열렸어요(늦은 탭)" : d.faceDeg < -1.5 ? "손이 먼저 돌아 페이스가 닫혔어요(이른 탭)" : "";
+    if (openClosed && Math.abs(r.final.p.x) > 10) return `${openClosed}. 구질은 페이스 − 패스(스탠스) 차이에서 나요.`;
+    if (Math.abs(d.pathDeg - d.stanceDeg) > 1.5 && Math.abs(d.faceDeg) < 1) return "방향은 패드를 놓을 때 흘린 손 때문 — 곧게 위아래로.";
+    if (Math.abs(d.tNorm) <= 0.33 && Math.abs(d.strikeHighCm) < 0.5) return d.stanceDeg !== 0 ? "퍼펙트. 스탠스대로 만든 구질이에요." : "퍼펙트. 스퀘어 페이스에 정타.";
+    return "살짝 어긋난 타이밍·컨택이 구질과 거리를 만들었어요 — 카드의 페이스·컨택을 보세요.";
 }
