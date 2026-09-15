@@ -50,6 +50,7 @@ import GolfProAm from "@/golf/pages/ProAm";
 import MembershipExchange from "@/golf/pages/MembershipExchange";
 import MembershipDetail from "@/golf/pages/MembershipDetail";
 import GolfArcadePage from "@/golf/arcade/GolfArcadePage";
+import GolfRangePage from "@/golf/field/RangePage";
 import PartnerLogin from "@/pages/partner/login";
 import PartnerDashboard from "@/pages/partner/dashboard";
 import PartnerSettings from "@/pages/partner/settings";
@@ -278,6 +279,8 @@ function AppRoutes() {
       <Route path="/golf/proam"><GolfOnly><GolfProAm /></GolfOnly></Route>
       {/* 골프 온라인게임(미니골프 대전, 2026-09-14) */}
       <Route path="/golf/arcade"><GolfOnly><GolfArcadePage /></GolfOnly></Route>
+      {/* 필드 골프 연습장(2026-09-15 확정안 3주차 게이트) */}
+      <Route path="/golf/range"><GolfOnly><GolfRangePage /></GolfOnly></Route>
       <Route path="/history" component={FramedHistory} />
       <Route path="/ranking" component={FramedRanking} />
       <Route path="/menu" component={FramedMenu} />
@@ -320,6 +323,8 @@ const PAGE_BANNER_ROUTES = ["/dashboard", "/club", "/friends", "/history", "/men
 function InstallBannerGate() {
   const [location] = useLocation();
   if (location.startsWith("/online-game")) return null;
+  // 골프 온라인게임(미니골프·필드 연습장)도 하단이 조작부다(실측 2026-09-15: 스윙 패드를 덮음).
+  if (location.startsWith("/golf/arcade") || location.startsWith("/golf/range")) return null;
   if (PAGE_BANNER_ROUTES.includes(location)) return null;
   return <HiqInstallBanner />;
 }

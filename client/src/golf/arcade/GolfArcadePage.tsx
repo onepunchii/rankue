@@ -56,7 +56,11 @@ export default function GolfArcadePage() {
                 <h2 className="text-[28px] font-extrabold leading-tight mt-1">랭큐 파크</h2>
                 <p className="text-[13px] font-semibold opacity-75 mt-1">파 {coursePar(RANKUE_PARK)} · 당기고 놓으면 샷 · 벽·범퍼 반사</p>
             </div>
-            <button onClick={() => setScreen({ kind: "solo" })} className="w-full h-14 rounded-2xl bg-white/[0.06] border border-white/10 text-[15px] font-bold mb-3 active:scale-[0.99]">🏌️ 혼자 연습</button>
+            {/* 필드 골프 연습장(베타) — 공이 뜨고 바람·구질·타이밍이 있는 새 시뮬레이터. 코스는 만드는 중 */}
+            <button onClick={() => setLocation("/golf/range")} className="w-full h-14 rounded-2xl bg-white/[0.06] border border-[#64DD17]/30 text-[15px] font-bold mb-3 active:scale-[0.99] flex items-center justify-center gap-2">
+                🎯 필드 골프 연습장 <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-[#64DD17]/20 text-[#64DD17]">BETA</span>
+            </button>
+            <button onClick={() => setScreen({ kind: "solo" })} className="w-full h-14 rounded-2xl bg-white/[0.06] border border-white/10 text-[15px] font-bold mb-3 active:scale-[0.99]">🏌️ 미니골프 혼자 연습</button>
             <button onClick={() => create.mutate()} disabled={!member || create.isPending} className="w-full h-14 rounded-2xl bg-[#64DD17] text-[#051907] text-[15px] font-extrabold mb-3 disabled:opacity-50 active:scale-[0.99]">
                 {create.isPending ? "만드는 중…" : "⛳ 방 만들기 (최대 6명)"}
             </button>
