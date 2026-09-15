@@ -17,7 +17,7 @@ import {
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
-    SHOT_CLOCK_STRIKES, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH, isMatchEmoji, PRESENCE_MS,
+    SHOT_CLOCK_STRIKES, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH, isMatchEmoji, PRESENCE_MS, ABSENT_GRACE_MS,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
@@ -143,6 +143,13 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         // 이모지 인사(마지막 하나) — 폴링에 실려 간다. 보낸 지 오래된 건 화면이 알아서 안 띄운다.
         emoji: m.emojiCode && m.emojiAt ? { code: m.emojiCode, from: m.emojiFrom ?? 0, at: m.emojiAt } : null,
         claimableAt: m.status === "playing" ? new Date((m.lastShotAt ?? m.startedAt ?? m.createdAt).getTime() + CLAIM_AFTER_MS) : null,
+        // "한 판 더"(2026-09-15): 끝난 대전에서만 뜻이 있다. matchId 가 채워지면 양쪽이 그 방으로 옮겨 간다.
+        rematch: m.status === "finished" ? (() => {
+            const by = (m.rematchBy as Record<string, string> | null) ?? {};
+            const meId = myIndex === 0 ? m.hostId : m.guestId;
+            const otherId = myIndex === 0 ? m.guestId : m.hostId;
+            return { mine: !!(meId && by[meId]), theirs: !!(otherId && by[otherId]), matchId: m.rematchId ?? null };
+        })() : null,
     };
 }
 
@@ -568,6 +575,80 @@ router.post("/sim/matches/:id/claim", requireAuth, asyncHandler(async (req: Auth
     if (!row) return sendError(res, 409, "이미 끝난 대전입니다");
     notify(myIndex === 0 ? m.guestId : m.hostId, "온라인게임 대전 종료", "48시간 동안 응답이 없어 상대의 승리로 끝났어요.", m.id);
     return sendSuccess(res, { status: "finished", winnerIndex: myIndex });
+}));
+
+/**
+ * GET /sim/matches/:id/rapport — 끝난 대전 화면에 붙는 "상대가 누구였나" 한 묶음(2026-09-15 오너: 라포).
+ * 상대전적(이 둘의 온라인 대전만) · 이미 라이벌인지 · 상대 회원 id(라이벌 추가 버튼이 쓴다).
+ * 폴링이 아니라 한 번만 부르는 값이라 대전 폴링에 얹지 않고 따로 둔다.
+ */
+router.get("/sim/matches/:id/rapport", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const m = await storage.simMatch.get(req.params.id);
+    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
+    const myIndex = m.hostId === req.userId ? 0 : 1;
+    const otherId = myIndex === 0 ? m.guestId : m.hostId;
+    const otherName = (myIndex === 0 ? m.guestName : m.hostName) ?? null;
+    if (!otherId) return sendSuccess(res, { opponentId: null, opponentName: null, headToHead: null, isRival: false });
+    // 라이벌 여부는 실전과 같은 관계(친구)를 쓴다 — 새 개념을 만들지 않는다.
+    const [isRival, headToHead] = await Promise.all([
+        storage.isFriend(req.userId!, otherId, "BILLIARDS").catch(() => false),
+        storage.simMatch.headToHead(req.userId!, otherId),
+    ]);
+    return sendSuccess(res, { opponentId: otherId, opponentName: otherName, headToHead, isRival });
+}));
+
+/**
+ * POST /sim/matches/:id/rematch — "한 판 더". 한 번 누르면 의사 표시만 하고, 둘 다 누르면 새 대전이 열린다.
+ *
+ * 새 방은 같은 설정에 **자리를 바꿔서** 만든다 — 먼저 치는 이점이 한쪽에 몰리지 않게(당구장에서 번갈아 깨는 것과 같다).
+ * 다마수는 사람을 따라간다: 새 방장(= 옛 게스트)의 목표는 옛 게스트 목표 그대로다.
+ * 공개 방이었으면 공개로 둔다 — 보던 관전자가 이어서 볼 수 있다.
+ */
+router.post("/sim/matches/:id/rematch", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const m = await storage.simMatch.get(req.params.id);
+    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
+    if (m.status !== "finished") return sendError(res, 409, "끝난 대전이 아닙니다");
+    if (!m.guestId) return sendError(res, 409, "상대가 없는 대전입니다");
+
+    const asked = await storage.simMatch.requestRematch(m.id, req.userId!);
+    if (!asked) return sendError(res, 409, "재경기를 요청할 수 없습니다");
+    if (asked.rematchId) return sendSuccess(res, { matchId: asked.rematchId, waiting: false });
+
+    const otherId = m.hostId === req.userId ? m.guestId : m.hostId;
+    if (!asked.by[otherId]) {
+        notify(otherId, "한 판 더?", `${(m.hostId === req.userId ? m.hostName : m.guestName) ?? "상대"}님이 재경기를 원해요.`, m.id);
+        return sendSuccess(res, { matchId: null, waiting: true });
+    }
+
+    // 둘 다 눌렀다 → 새 방을 연다. 자리를 바꾼다: 옛 게스트가 방장이 되어 먼저 친다.
+    const newHostId = m.guestId, newGuestId = m.hostId;
+    const newHostTarget = m.guestTarget ?? m.hostTarget;
+    const newGuestTarget = m.hostTarget;
+    const rules = m.rules as Rules;
+    const state = createSession({
+        rules, finishType: m.finishType, inningCap: m.inningCap,
+        players: [
+            { id: newHostId, target: newHostTarget, cueBallId: "white" },
+            { id: newGuestId, target: newGuestTarget, cueBallId: "yellow" },
+        ],
+    });
+    const created = await storage.simMatch.create({
+        hostId: newHostId, guestId: newGuestId,
+        gameType: m.gameType, tableId: m.tableId, cushionModel: m.cushionModel, condition: m.condition,
+        aimAssist: m.aimAssist, fullPreview: m.fullPreview, isPublic: m.isPublic, handicap: m.handicap,
+        rules: m.rules, finishType: m.finishType, inningCap: m.inningCap,
+        hostTarget: newHostTarget, guestTarget: newGuestTarget,
+        state, balls: openingLayout(m.gameType, TABLES[m.tableId], "white"),
+        status: "playing", turn: 0, startedAt: new Date(),
+        // 상대가 알림을 보고 돌아올 시간만큼 봐주고 40초 룰이 돈다(자리 비움 유예와 같은 규칙).
+        turnSeenAt: new Date(Date.now() + ABSENT_GRACE_MS),
+        engineVersion: ENGINE_VERSION, paramsHash: paramsHash(paramsFor(m)),
+    });
+    // 둘이 동시에 눌렀으면 먼저 적은 쪽이 정본 — 진 쪽이 만든 빈 방은 버린다.
+    const winnerId = await storage.simMatch.linkRematch(m.id, created.id);
+    if (winnerId !== created.id) await storage.simMatch.discardMatch(created.id);
+    notify(otherId, "한 판 더!", "재경기가 시작됐어요. 들어와서 이어 쳐요.", winnerId);
+    return sendSuccess(res, { matchId: winnerId, waiting: false });
 }));
 
 export default router;

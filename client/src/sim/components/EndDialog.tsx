@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -28,6 +28,8 @@ interface Props {
     hideRestart?: boolean;
     /** 마지막 샷 공유(카드 PNG + 리플레이 링크). 없으면 버튼을 그리지 않는다(대전·샷 없음) */
     onShare?: () => void;
+    /** 대전 전용 묶음(상대전적·한 판 더·라이벌). 점수 카드 아래에 그대로 끼운다 — 연습에는 없다. */
+    rapport?: ReactNode;
 }
 
 export const EndDialog = memo(function EndDialog(p: Props) {
@@ -62,6 +64,7 @@ export const EndDialog = memo(function EndDialog(p: Props) {
                             </div>
                         );
                     })}
+                    {p.rapport}
                     {(!p.record || p.offline) && (
                         <p className="text-[12px] font-medium text-ink-4">{t("sim.end.notRecorded")}</p>
                     )}

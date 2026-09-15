@@ -1846,6 +1846,14 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   /** 접속 표시: 각자가 대전 화면을 마지막으로 폴링·샷한 시각(5 s 단위 갱신). 차례가 넘어갈 때 상대 시계를 바로 돌릴지 정한다. */
   hostSeenAt: timestamp("host_seen_at"),
   guestSeenAt: timestamp("guest_seen_at"),
+  /**
+   * "한 판 더"(2026-09-15 오너: 라포). {"<회원 id>": "<ISO>"} — 끝난 대전에서 재경기를 원한다고 누른 사람.
+   * 둘 다 누르면 서버가 같은 설정으로 새 대전을 만들고 rematchId 에 적는다. 양쪽 화면은 그 id 로 옮겨 간다.
+   * 대화가 아니라 한 번의 의사 표시라 쌓지 않는다 — 대전 행 하나만 읽으면 끝이고, 대전이 지워지면 같이 사라진다.
+   */
+  rematchBy: jsonb("rematch_by"),
+  /** 재경기로 만들어진 새 대전. 한 번 정해지면 안 바뀐다(양쪽이 같은 방으로 들어가는 기준점). */
+  rematchId: uuid("rematch_id"),
   /** 이모지 인사(2026-09-09 오너): 마지막 하나만 둔다 — 대화 내역이 아니라 순간 반응이라 쌓을 이유가 없다. */
   emojiCode: text("emoji_code"),
   /** 보낸 사람 자리(0 = 호스트, 1 = 게스트) */

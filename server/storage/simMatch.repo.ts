@@ -190,6 +190,59 @@ export class SimMatchRepository {
         return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
     }
 
+    /* ────────── "한 판 더"(2026-09-15 오너: 라포) ────────── */
+
+    /**
+     * 재경기 의사 표시. 끝난 대전에서만, 참가자만. 이미 새 대전이 만들어졌으면 그 id 를 그대로 돌려준다(멱등).
+     * 행을 잠그고 읽어-고쳐-쓰기 때문에 둘이 동시에 눌러도 한쪽 표시가 지워지지 않는다.
+     */
+    async requestRematch(id: string, memberId: string): Promise<{ by: Record<string, string>; rematchId: string | null } | null> {
+        return db.transaction(async (tx) => {
+            const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, id)).for("update");
+            if (!m || m.status !== "finished") return null;
+            if (m.hostId !== memberId && m.guestId !== memberId) return null;
+            if (m.rematchId) return { by: (m.rematchBy as Record<string, string>) ?? {}, rematchId: m.rematchId };
+            const by = { ...((m.rematchBy as Record<string, string>) ?? {}), [memberId]: new Date().toISOString() };
+            await tx.update(hiqSimMatches).set({ rematchBy: by }).where(eq(hiqSimMatches.id, id));
+            return { by, rematchId: null };
+        });
+    }
+
+    /**
+     * 새 대전을 만들고 옛 대전에 이어 붙인다. rematchId 는 한 번만 정해진다 —
+     * 둘이 거의 동시에 눌러 양쪽에서 이 함수가 불려도, 조건부 UPDATE 에서 진 쪽은 만든 행을 버리고 이긴 id 를 쓴다.
+     */
+    async linkRematch(oldId: string, newId: string): Promise<string> {
+        const [row] = await db.update(hiqSimMatches).set({ rematchId: newId })
+            .where(and(eq(hiqSimMatches.id, oldId), isNull(hiqSimMatches.rematchId)))
+            .returning({ rematchId: hiqSimMatches.rematchId });
+        if (row?.rematchId) return row.rematchId;
+        const [cur] = await db.select({ rematchId: hiqSimMatches.rematchId }).from(hiqSimMatches).where(eq(hiqSimMatches.id, oldId));
+        return cur?.rematchId ?? newId;
+    }
+
+    /** 만들어 놓고 못 쓰게 된 재경기 방을 지운다(위 경쟁에서 진 쪽). 한 샷도 안 친 방만. */
+    async discardMatch(id: string): Promise<void> {
+        await db.delete(hiqSimMatches).where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.shots, 0)));
+    }
+
+    /**
+     * 두 사람의 온라인 대전 상대전적(끝난 대전만). "오늘까지 3승 2패" 한 줄을 위한 것.
+     * 기권·무응답 승리도 결과는 결과라 그대로 센다. 승자가 없는 행(중단)은 total 에서 빠진다.
+     */
+    async headToHead(meId: string, otherId: string): Promise<{ wins: number; losses: number; total: number }> {
+        const pair = or(
+            and(eq(hiqSimMatches.hostId, meId), eq(hiqSimMatches.guestId, otherId)),
+            and(eq(hiqSimMatches.hostId, otherId), eq(hiqSimMatches.guestId, meId)),
+        );
+        const [row] = await db.select({
+            wins: sql<number>`count(*) filter (where ${hiqSimMatches.winnerId} = ${meId})::int`,
+            losses: sql<number>`count(*) filter (where ${hiqSimMatches.winnerId} = ${otherId})::int`,
+            total: sql<number>`count(*) filter (where ${hiqSimMatches.winnerId} is not null)::int`,
+        }).from(hiqSimMatches).where(and(eq(hiqSimMatches.status, "finished"), pair));
+        return { wins: row?.wins ?? 0, losses: row?.losses ?? 0, total: row?.total ?? 0 };
+    }
+
     async setInvited(id: string, memberId: string): Promise<void> {
         await db.update(hiqSimMatches).set({ invitedId: memberId }).where(eq(hiqSimMatches.id, id));
     }

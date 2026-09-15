@@ -359,6 +359,21 @@ export class UserRepository {
         return result;
     }
 
+    /**
+     * 이미 라이벌(친구)인가 — 한 줄 확인용. getFriends 는 친구마다 상대전적을 한 번씩 더 읽으므로(N+1)
+     * "버튼을 켤까 말까"만 알고 싶을 때는 쓰지 않는다. 방향은 둘 다 본다(누가 먼저 추가했든 관계는 하나다).
+     */
+    async isFriend(memberId: string, otherId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<boolean> {
+        const [row] = await db.select({ id: hiqFriendships.id }).from(hiqFriendships).where(and(
+            eq(hiqFriendships.sportCategory, sport),
+            or(
+                and(eq(hiqFriendships.requesterId, memberId), eq(hiqFriendships.receiverId, otherId)),
+                and(eq(hiqFriendships.requesterId, otherId), eq(hiqFriendships.receiverId, memberId)),
+            ),
+        )).limit(1);
+        return !!row;
+    }
+
     async createFriendship(requesterId: string, receiverId: string, sportCategory: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<any> {
         const [friendship] = await db.insert(hiqFriendships).values({
             requesterId,

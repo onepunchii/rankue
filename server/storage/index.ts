@@ -49,6 +49,7 @@ class Storage {
     async deleteAccount(memberId: string) { return this.users.deleteAccount(memberId); }
     async updateProfile(id: string, data: any) { return this.users.updateProfile(id, data); }
     async getFriends(id: string, sport?: string) { return this.users.getFriends(id, sport); }
+    async isFriend(id: string, otherId: string, sport?: "BILLIARDS" | "GOLF") { return this.users.isFriend(id, otherId, sport); }
     async requestFriend(reqId: string, recId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS") { return this.users.requestFriend(reqId, recId, sport); }
     async getStoreMembersWithStats(id: string) { return this.users.getStoreMembersWithStats(id); }
     async getTopRankings(storeId?: string, limit?: number, type?: '3c' | '4c', countryCode?: string, sport?: 'BILLIARDS' | 'GOLF') { return this.users.getTopRankings(storeId, limit, type, countryCode, sport); }

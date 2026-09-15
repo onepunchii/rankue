@@ -70,6 +70,7 @@ import { ResignConfirm } from "./components/ResignConfirm";
 import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
 import { ShotClock } from "./components/ShotClock";
+import { MatchEndRapport } from "./match/MatchEndRapport";
 import { aimPhi } from "./aimAssist";
 import { useSolver } from "./solver/useSolver";
 import { SolverSheet } from "./solver/SolverSheet";
@@ -1513,6 +1514,12 @@ export function SimulatorPage() {
                 onRestart={onRestart} onExit={() => { void exitNow(); }}
                 onShare={canShare ? onShareEnd : undefined}
                 subtitle={endSubtitle} hideRestart={isMatch}
+                rapport={isMatch && sim.match ? (
+                    <MatchEndRapport
+                        matchId={sim.match.id}
+                        onRematch={(id) => { setEndDismissed(true); navigate(`/online-game?match=${id}`, { replace: true }); }}
+                    />
+                ) : undefined}
             />
             <ExitConfirm
                 open={exitOpen} onOpenChange={setExitOpen}
