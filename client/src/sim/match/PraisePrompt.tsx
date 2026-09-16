@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { EMOJI_GLYPH } from "./EmojiBar";
+import { CHAT_GLYPH } from "./MatchChat";
 
 /**
  * 상대가 잘 쳤을 때만 잠깐 튀어나오는 "굿샷" 버튼(2026-09-15 오너: 라포 4번).
@@ -50,7 +50,7 @@ export const PraisePrompt = memo(function PraisePrompt({ visible, run, name, dis
                     "active:scale-[0.97] transition-transform disabled:opacity-60",
                 )}
             >
-                <span className="text-[17px] leading-none">{EMOJI_GLYPH.nice}</span>
+                <span className="text-[17px] leading-none">{CHAT_GLYPH.nice}</span>
                 {t("sim.praise.send")}
             </button>
         </div>

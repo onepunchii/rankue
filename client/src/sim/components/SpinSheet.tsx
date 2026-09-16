@@ -242,7 +242,7 @@ export const SpinSheet = memo(function SpinSheet(p: SpinSheetProps) {
         <Sheet open={p.open} onOpenChange={p.onOpenChange}>
             <SheetContent
                 side="bottom" hideClose overlayClassName="bg-transparent"
-                className="rounded-t-card p-0 max-h-[40dvh] flex flex-col gap-0 pb-safe"
+                className="sim-dark sim-table bg-[var(--surface-1)] rounded-t-card p-0 max-h-[40dvh] flex flex-col gap-0 pb-safe"
             >
                 <SheetTitle className="sr-only">{t("sim.spin.title")}</SheetTitle>
                 <SheetDescription className="sr-only">{desc}</SheetDescription>

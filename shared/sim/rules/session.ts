@@ -205,24 +205,15 @@ function decideByInningCap(players: readonly PlayerState[]): number | null {
     return r0 > r1 ? 0 : 1;
 }
 
-/* ------------------------------------------------------------------ 이모지 인사 */
+/* ------------------------------------------------------------------ 고정 인사 */
 
 /**
- * 대전 중 상대에게 보내는 인사(2026-09-09 오너). 직접 입력은 없다 — 5개 언어를 쓰는 앱이라 번역·신고 대응 부담이 크고,
- * 고정 여섯 개면 그 문제가 없다. 코드만 저장하고 그림은 화면이 고른다.
+ * 2026-09-09~2026-09-16 상단 띠의 이모지 인사로 쓰던 여섯 개.
+ *
+ * **그 기능은 없어졌다**(2026-09-17 헤더 재설계 — 헤더는 "누가 치고 시간이 얼마 남았나"만 말한다).
+ * 같은 일은 하단 한마디의 1탭 문구판이 하고, 그쪽은 덮어쓰기 없는 자식 테이블에 줄로 남는다.
+ *
+ * 이 목록을 남겨 두는 이유는 하나다: `CHAT_CODES` 가 이 여섯을 **하나도 빠짐없이** 담는지 검사하기 위해서다
+ * (shared/sim/chat.test.ts). 갈라지면 그때 오간 옛 채팅 줄의 코드가 화면에서 조용히 사라진다.
  */
 export const MATCH_EMOJIS = ["hi", "nice", "wow", "hurry", "sorry", "fight"] as const;
-export type MatchEmoji = typeof MATCH_EMOJIS[number];
-
-export function isMatchEmoji(v: unknown): v is MatchEmoji {
-    return typeof v === "string" && (MATCH_EMOJIS as readonly string[]).includes(v);
-}
-
-/** 도배 방지: 한 사람이 이 간격 안에는 한 번만. */
-export const EMOJI_COOLDOWN_MS = 5_000;
-/** 한 대전에서 한 사람이 보낼 수 있는 총 횟수. */
-export const EMOJI_MAX_PER_MATCH = 10;
-/** 받은 이모지를 화면에 띄워 두는 시간(말풍선). */
-export const EMOJI_SHOW_MS = 3_000;
-/** 이름표 옆에 작게 남겨 두는 시간(잠깐 딴 데 봐도 놓치지 않게). */
-export const EMOJI_BADGE_MS = 10_000;

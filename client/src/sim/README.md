@@ -196,7 +196,7 @@ interface SimulatorActions {
   큐 각 탭 = 원호 드래그(≤260) + 0·10·20·30·45° 칩). 툴바 당점/큐 각 버튼이 각 탭으로 연다. 시트(당점·이닝·해법)는 기본 X 대신 44 px 닫기 알약(`SheetContent hideClose`).
 - CoachHint(첫 세션 안내)는 오른쪽 열을 비운 영역(right 64) 세로 가운데 — 독·툴바·슬라이더가 읽는 동안 보인다.
 - 재생(`shooting`)·상대 차례(`waiting`)·`setup` 엔 오른쪽 열과 독이 `opacity-0 pointer-events-none`(150 ms) — 상단 띠·칩·결과 배너·대기 배너는 남는다.
-- 대전: 툴바 맨 아래 X 가 깃발(기권)이 되고 나가기는 상단 띠 왼쪽 뒤로 화살표.
+- 대전: 툴바 맨 아래 X 가 깃발(기권)이 되고 나가기는 상단 띠 오른쪽 끝 멈춤 아이콘.
 모든 탭 대상 ≥ 40 px(툴바·샷·시트는 44 이상), 탭 대상 사이 ≥ 6 px(md 8), 텍스트 ≥ 12 px, 토큰만 사용(독 배경은 불투명 surface-1 — var() 토큰엔 Tailwind 투명도 수식어가 안 먹는다;
 그림자는 `.rk-shadow` = `--shadow-card`).
 
@@ -316,7 +316,7 @@ useEffect(() => {
 - `phase="waiting"` 이면 오른쪽 열·두께 독이 통째로 흐려진다(controlsHidden). 되돌리기는 `canUndo=false` 라 툴바에 없다.
 - 테이블 위 배너(포인터 이벤트 없음): `t("sim.match.waitingTurn")` + `t("sim.match.waitingHint")`, 상대 이름은 `sim.match.opponentName`. 재생 중 `sim.match.opponentShot` 이면 칩 `t("sim.match.opponentShot")`.
 - 내 차례가 되면(`phase === "aim"`) 짧은 칩 `t("sim.match.yourTurn")`(2.4 s, OutcomeBanner 와 같은 리듬).
-- 기권: `phase !== "finished" && sim.match?.canResign` 이면 툴바 맨 아래 X 대신 깃발 → 확인 다이얼로그(`sim.match.resignTitle` / `resignDesc` / `resignConfirm`) → `await actions.resign()`. 나가기는 상단 띠 뒤로 화살표.
+- 기권: `phase !== "finished" && sim.match?.canResign` 이면 툴바 맨 아래 X 대신 깃발 → 확인 다이얼로그(`sim.match.resignTitle` / `resignDesc` / `resignConfirm`) → `await actions.resign()`. 나가기는 상단 띠 **오른쪽 끝 멈춤**(2026-09-17 전에는 왼쪽 뒤로 화살표).
 - 승리 주장 버튼: `sim.match?.canClaim` 일 때만 배너 아래에 `t("sim.match.claim")` + `t("sim.match.claimDesc")`; `const ok = await actions.claim(); if (!ok) toast(t("sim.match.claimTooEarly"))`. claim 불가일 땐 `t("sim.match.claimWait")` 한 줄.
 - 나가기(ExitConfirm): 대전이면 설명을 `t("sim.match.leaveDesc")` 로, 확인 시 `await actions.exit()` 뒤 `/online-game?lobby=1`(목록으로) 또는 `/dashboard`.
 - 폴링은 훅이 맡는다(가시성·포커스 wake 포함). 페이지는 당겨서 새로고침 같은 명시적 갱신에만 `actions.sync()`.
@@ -432,10 +432,13 @@ QuickActions 의 온라인게임 타일 배경 = EntryShowcase(진입 화면과 
 
 ### 40초 시계 시각화 · 쓰리아웃 (2026-09-08 오너)
 ```
-components/ShotClock.tsx  남은 시간만큼 줄어드는 고리 + 가운데 숫자(헤더 34 px, 대기 패널 56 px). 10초 이하 ink-1 · 내 차례 brand · 상대 ink-3. role="timer".
+components/ShotClock.tsx  남은 시간만큼 줄어드는 **네모 테두리** + 가운데 숫자(헤더 34 px, 대기 카드 56 px). 12시에서 시계방향.
+                         색 단계(shotClockColor): 21초↑ 내 차례 brand·상대 ink-3 / 11~20초 gold-fill / 10초↓ ball-red, 5초부터 깜빡임.
+                         숫자를 읽기 전에 색으로 먼저 알아채라고 단계로 둔다(40초를 세 번 넘기면 실격패). role="timer".
 쓰리아웃                   hiq_sim_matches.host/guest_timeouts. 시간 초과 때 그 사람 것을 +1 하고 SHOT_CLOCK_STRIKES(3) 가 되면 그 자리에서 실격패
                           (status finished · endReason "timeout" · 승자는 상대, 양쪽에 알림). 사람마다 3번이라 번갈아 넘기면 안 끝난다.
-헤더 표시                  시계 옆 점 3개 — 채워진 만큼이 아웃(지금 차례인 사람 기준). MatchPublic.timeouts[호스트, 게스트] → MatchView·MatchState 로 흐른다.
+헤더 표시                  **선수마다** 점 3개 — 채워진 만큼이 아웃(2026-09-17 전에는 지금 차례인 사람 것만 보였다).
+                         MatchPublic.timeouts[호스트, 게스트] → MatchView·MatchState 로 흐른다.
 대기 방(멀티방)            도는 점 + 경과 시간(0:12) + "앱을 닫아도 상대가 들어오면 알림을 보내드릴게요". 참가 시 호스트에게 푸시(기존)와 자동 입장(폴링)은 그대로.
 e2e                       scripts/sim-e2e/strikeout.ts (호스트 2회를 미리 적고 3번째만 실제로 넘겨 실격패·알림까지 확인, 정리 포함).
 ```
@@ -528,17 +531,34 @@ entry/entryStats.ts   EntryChoice = "solo" | "together". 예전 저장값(single
                   점검 scripts/feed-health.ts · umb-state.ts · pba-state.ts.
 ```
 
-### 이모지 인사 (2026-09-09 오너)
+### 대전 헤더 (2026-09-17 오너가 준 참고 화면)
 ```
-무엇        대전 중 상대에게 보내는 고정 인사 여섯 개(hi 👋 · nice 👍 · wow 😮 · hurry ⏰ · sorry 🙏 · fight 🔥).
-           직접 입력은 없다 — 5개 언어 번역·신고 대응 부담을 지지 않는다. 서버·DB 는 코드만 알고 그림은 EmojiBar 가 고른다.
-어디        보내기: 헤더 요약(상대 이름표) 오른쪽의 작은 버튼 → 누르면 여섯 개가 펼쳐지고 고르면 접힌다.
-           받기: 상대 이름표 위에 말풍선 3 s(EMOJI_SHOW_MS) → 그 뒤 작은 배지 10 s(EMOJI_BADGE_MS). 테이블 위에는 절대 그리지 않는다.
-전달        새 실시간 연결 없이 기존 폴링(상대 차례 2 s · 조준 중 5 s)에 실린다. publicMatch.emoji = { code, from, at } (마지막 하나만).
-제한        같은 사람 5 s 간격(EMOJI_COOLDOWN_MS) · 한 대전 10회(EMOJI_MAX_PER_MATCH). 거부는 429 TOO_FAST / LIMIT → 화면은 토스트.
-저장        hiq_sim_matches.emoji_code·emoji_from·emoji_at·emoji_counts — 대화 내역이 아니라 순간 반응이라 마지막 하나만 둔다.
-푸시        보내지 않는다(앱 밖에서 진동은 성가시다). 앱 안에서만 보인다.
-e2e        scripts/sim-e2e/emoji.ts (전달·간격·상한·잘못된 코드)
+무엇        대전·관전 전용 상단 띠. [나: 국기·이름 / 공색·점수·게이지·쓰리아웃점] [40초 시계] [상대: 같은 것] [멈춤].
+           TopBar 의 matchHeader prop 이 있으면 이 레이아웃만 그린다 — 연습·드릴·길 찾기는 예전 레이아웃 그대로다.
+왜          헤더가 "누가 치고 있고 시간이 얼마 남았나" 하나만 말하게. 규칙 배지·관전자·후구는 왼쪽 칩 열로 내렸다.
+점수        참고 화면의 점 다섯 개는 5판 선취라 그렇다. 우리는 다마수가 15·20·25 라 점으로 못 그린다 —
+           숫자(7/20) + 얇은 게이지. 점 세 개는 쓰리아웃이 가져갔다(마침 정확히 셋, 세 번째면 실격패).
+국기        profiles.country_code(가입 때 IP 로 자동) → withNames 가 조인 → publicMatch.hostCountry/guestCountry.
+           **없는 사람이 훨씬 많다**(실측: 대전 참여자 13명 중 1명). 없으면 국기 없이 이름만 — 자리가 흔들리지 않게.
+나가기      왼쪽 뒤로 화살표를 없애고 오른쪽 끝 멈춤(PauseIcon)이 그 일을 한다. 왼쪽이 비어야 이름이 들어간다.
+배색        플레이 화면 루트에 `sim-dark sim-table`. 로비·랭킹은 2026-09-08 부터 검은 배색인데 이 화면만
+           앱 테마를 따라가 밝은 테마에서 펠트 위아래만 하얬다. sim-table 은 그 위의 강조색(#64DD17) —
+           검은 바탕에서 브랜드 초록(#006241)은 대비가 2:1 도 안 나와 시계 테두리·게이지가 묻힌다.
+           **포털로 나가는 다이얼로그 5개(EndDialog·ExitConfirm·ResignConfirm·InningSheet·SpinSheet)는
+           클래스를 상속하지 않는다** — 각자 붙여 뒀다. 새 시트를 만들면 같이 붙일 것.
+테스트      components/TopBar.test.ts(대전 헤더 절) · components/ShotClock.test.ts
+```
+
+### 없어진 것 — 이모지 인사 (2026-09-09 ~ 2026-09-16)
+```
+상단 띠의 고정 인사 여섯 개. 2026-09-17 헤더 재설계로 **통째로 걷어냈다**(오너: "헤더에 이모티콘도 빼도 될듯").
+같은 일은 하단 한마디의 1탭 문구판(CHAT_QUICK_CODES)이 하고, 그쪽이 더 낫다:
+  · 대전 행의 단일 슬롯이 아니라 자식 테이블에 줄로 남는다 — 둘이 같은 폴링 창에 보내도 앞말이 안 덮인다
+  · 쿨다운을 보낸 사람별로 센다 — 옛 이모지는 마지막 발신자 하나만 기억해 상대가 끼면 내 간격이 풀렸다
+지운 것: EmojiBar.tsx · POST /sim/matches/:id/emoji · repo.sendEmoji · publicMatch.emoji · 클라이언트 배선 전부
+       · EMOJI_COOLDOWN_MS/MAX_PER_MATCH/SHOW_MS/BADGE_MS · isMatchEmoji.
+남긴 것: hiq_sim_matches.emoji_* 컬럼(읽는 곳이 없다. 지우는 마이그레이션은 이득이 없어 안 했다)
+       · MATCH_EMOJIS(그 여섯을 CHAT_CODES 가 계속 담는지 검사하는 용도 — 갈라지면 옛 채팅 줄이 안 그려진다).
 ```
 
 ### 랭킹 화면 — 게임 리더보드 (2026-09-09 오너: **이 페이지만 디자인 규칙 해제**)

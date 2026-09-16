@@ -34,7 +34,7 @@ import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
 import { randomLayout } from "@shared/sim/randomLayout";
 import { DEFAULT_CUE } from "@shared/sim/params";
-import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome, SHOT_CLOCK_STRIKES, EMOJI_SHOW_MS, EMOJI_BADGE_MS } from "@shared/sim/rules";
+import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome } from "@shared/sim/rules";
 import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -93,11 +93,11 @@ import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
 import { sameCueInput } from "./simReducer";
 import { easeOppAim, OPP_AIM_PULLBACK } from "./match/oppAim";
-import { MatchChatBar, MatchChatLog } from "./match/MatchChat";
+import { MatchChatBar, MatchChatLog, MatchQuickAim } from "./match/MatchChat";
 import type { ChatLine } from "./matchApi";
 import type { CueInput, Phase } from "./simReducer";
 import type { SimPreview } from "./simController";
-import { TopBar } from "./components/TopBar";
+import { TopBar, type MatchHeaderPlayer } from "./components/TopBar";
 import { ToolRail, type RailItem } from "./components/ToolRail";
 import {
     CloseIcon, CubeIcon, DiamondIcon, ElevationIcon, FlagIcon, ListIcon, MinusIcon, PlusIcon, ResetIcon, ShareIcon, SolverIcon, SoundIcon, WarnIcon,
@@ -884,18 +884,6 @@ export function SimulatorPage() {
     const clock = clockRemaining !== null && clockRemaining <= SHOT_CLOCK_S && sim.match
         ? { seconds: Math.max(0, Math.ceil(clockRemaining)), mine: sim.match.isMyTurn }
         : null;
-    // 쓰리아웃: 지금 차례인 사람이 이미 넘긴 횟수(대전·진행 중일 때만)
-    // 이모지 인사(2026-09-09 오너): 헤더의 상대 이름표 옆에서 보내고, 받은 건 그 자리에서 말풍선으로 뜬다.
-    const [emojiBusy, setEmojiBusy] = useState(false);
-    const [emojiNow, setEmojiNow] = useState(() => Date.now());
-    const emojiAt = isMatch && sim.match?.emoji ? Date.parse(sim.match.emoji.at) : NaN;
-    const emojiFresh = Number.isFinite(emojiAt) && emojiNow - emojiAt < EMOJI_BADGE_MS;
-    useEffect(() => {
-        if (!Number.isFinite(emojiAt)) return;
-        setEmojiNow(Date.now());
-        const id = setInterval(() => setEmojiNow(Date.now()), 500);
-        return () => clearInterval(id);
-    }, [emojiAt]);
     /**
      * 채팅 초안(2026-09-16). **입력칸 밖**에 둔다 — 상대가 연속 득점하면 재생·결과 배너 때문에 하단 블록이
      * 몇 번씩 마운트를 오가는데, 안에 두면 그때마다 쓰던 글이 날아간다.
@@ -917,6 +905,13 @@ export function SimulatorPage() {
     const chatKey = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const onSendChat = useCallback(async (text: string) => actionsRef.current.sendChat({ text, clientKey: chatKey() }), []);
     const onSendChatCode = useCallback(async (code: string) => actionsRef.current.sendChat({ code, clientKey: chatKey() }), []);
+    /** 조준 중 1탭 전송 — 조용히 실패하면 "눌렀는데 아무 일도 안 난다"가 되므로 반드시 알린다(예전 이모지 사고). */
+    const onQuickCode = useCallback(async (code: string) => {
+        const r = await actionsRef.current.sendChat({ code, clientKey: chatKey() });
+        if (r === "too-fast") toast({ title: t("sim.emoji.tooFast") });
+        else if (r === "limit") toast({ title: t("sim.emoji.limit") });
+        else if (r !== "ok") toast({ title: t("sim.chat.failed") });
+    }, [toast, t]);
 
     // 내 자리를 ref 에 실어 onOutcome 이 볼 수 있게 한다(옵션 객체는 sim 보다 먼저 만들어진다).
     myIndexRef.current = isMatch && sim.match ? sim.match.myIndex : null;
@@ -937,28 +932,29 @@ export function SimulatorPage() {
         return () => clearTimeout(id);
     }, [praise]);
 
-    const onSendEmoji = useCallback(async (code: string) => {
-        setEmojiBusy(true);
-        const r = await actions.sendEmoji(code);
-        setEmojiBusy(false);
-        if (r === "too-fast") toast({ title: t("sim.emoji.tooFast") });
-        else if (r === "limit") toast({ title: t("sim.emoji.limit") });
-        // 조용히 실패하면 "눌렀는데 아무 일도 안 난다" — 실제로 API 등록이 빠져 그런 적이 있어 반드시 알린다
-        else if (r === "failed") toast({ title: t("sim.emoji.failed") });
-    }, [actions, toast, t]);
-    const emojiUi = isMatch && sim.match && sim.match.status === "playing"
-        ? {
-            onSend: onSendEmoji,
-            busy: emojiBusy,
-            // 상대가 보낸 것만 띄운다(내가 보낸 건 이미 내가 안다)
-            received: emojiFresh && sim.match.emoji && sim.match.emoji.from !== sim.match.myIndex
-                ? { code: sim.match.emoji.code, bubble: emojiNow - emojiAt < EMOJI_SHOW_MS }
-                : null,
-        }
-        : null;
-    const strikes = isMatch && sim.match && sim.match.status === "playing"
-        ? { used: sim.match.timeouts[sim.match.turn] ?? 0, total: SHOT_CLOCK_STRIKES, mine: sim.match.isMyTurn }
-        : null;
+    /**
+     * 대전 헤더의 두 선수(2026-09-16). **왼쪽이 나, 오른쪽이 상대** — 참고 화면과 같은 배치라
+     * 내 점수를 늘 같은 자리에서 찾는다. 자리(myIndex)와 화면 순서가 다를 수 있어 여기서 뒤집는다.
+     */
+    const headerPlayers = useMemo((): readonly [MatchHeaderPlayer, MatchHeaderPlayer] | null => {
+        const m = sim.match;
+        const sess = sim.session;
+        if (!isMatch || !m || !sess || sess.players.length !== 2) return null;
+        const mk = (i: 0 | 1): MatchHeaderPlayer => ({
+            name: names[i] ?? "",
+            country: m.countries[i] ?? null,
+            cueBallId: sess.players[i]?.cueBallId ?? (i === 0 ? "white" : "yellow"),
+            score: sess.players[i]?.score ?? 0,
+            target: sess.players[i]?.target ?? 0,
+            timeouts: m.timeouts[i] ?? 0,
+            turn: m.status === "playing" && sess.turn === i,
+            winner: sess.status === "finished" && sess.winnerIndex === i,
+        });
+        const me = m.myIndex === 1 ? 1 : 0;
+        const opp = me === 0 ? 1 : 0;
+        return [mk(me as 0 | 1), mk(opp as 0 | 1)] as const;
+    }, [isMatch, sim.match, sim.session, names]);
+
     // 0 이 되면 서버에 시간 초과를 알린다. 서버가 아직 이르다고 하면(시계 오차) 3 초마다 다시 — 차례가 바뀌어 key 가 달라질 때까지.
     const timeoutFiredRef = useRef<{ key: string; at: number }>({ key: "", at: 0 });
     useEffect(() => {
@@ -1364,7 +1360,9 @@ export function SimulatorPage() {
 
     return (
         <div
-            className="fixed inset-0 flex flex-col bg-surface-1 text-ink-1 select-none overflow-hidden"
+            /* 테이블 화면은 검은 배색(2026-09-17). 로비·랭킹은 2026-09-08 부터 sim-dark 인데 이 화면만 안 따라와
+               앱 테마를 그대로 썼다 — 밝은 테마에서 초록 펠트 위아래만 하얬다. sim-table 은 그 위의 강조색. */
+            className="sim-dark sim-table fixed inset-0 flex flex-col bg-surface-1 text-ink-1 select-none overflow-hidden"
             style={{
                 paddingTop: "env(safe-area-inset-top)",
                 paddingBottom: "env(safe-area-inset-bottom)",
@@ -1378,16 +1376,12 @@ export function SimulatorPage() {
                     session={sim.session} config={sim.config} phase={sim.phase} names={names}
                     record={sim.record} offline={isMatch ? false : sim.offline} syncing={sim.syncing} queued={sim.queued}
                     drillName={drill ? t(drill.drill.nameKey) : null}
-                    emoji={emojiUi}
                     hideStatus={pathView}
                     hideSummary={pathView}
                     onClose={pathView ? onExitRequest : undefined}
                     onSummary={pathView ? openSolver : onInnings}
-                    onBack={isMatch ? onExitRequest : undefined}
                     clock={clock}
-                    strikes={strikes}
-                    watchers={sim.match?.watchers ?? 0}
-                    finalInning={(sim.session?.pendingWinner ?? null) !== null}
+                    matchHeader={headerPlayers ? { players: headerPlayers, onExit: onExitRequest } : null}
                 />
 
                 {/* 테이블 영역: 남은 높이 전부. 렌더러·오버레이는 absolute 마운트(tableRef)에, 조작·칩은 그 형제로 얹힌다. */}
@@ -1416,13 +1410,29 @@ export function SimulatorPage() {
                                 {t("sim.share.button")}
                             </button>
                         )}
-                        {sim.phase === "shooting" && (
-                            <span className={chipNeutral}>{sim.playback.speed === 4 ? t("sim.hud.fastForward") : t("sim.hud.holdToFastForward")}</span>
+                        {/* 대전 알림은 헤더에서 여기로 내려왔다(2026-09-16 헤더 재설계) — 헤더는 "누가 치고 시간이 얼마 남았나"만 말한다. */}
+                        {isMatch && (sim.match?.watchers ?? 0) > 0 && (
+                            <span className={cn(chipNeutral, "text-brand font-bold")}>
+                                {t("sim.watch.viewers").replace("{n}", String(sim.match?.watchers ?? 0))}
+                            </span>
+                        )}
+                        {isMatch && (sim.session?.pendingWinner ?? null) !== null && (
+                            <span className="rk-chip bg-ball-yellow text-ink-1 font-bold max-w-full truncate" title={t("sim.match.finalInningHint")}>
+                                {t("sim.match.finalInning")}
+                            </span>
                         )}
                         {/* 오간 한마디(2026-09-16). 이 열은 이미 pointer-events-none 이라 글자 위 터치도 조준으로 지나간다 —
                             **auto 를 붙이지 마라.** 조준 중에도 보인다: 상대 말이 안 보이면 대화가 아니라 편지가 된다. */}
                         {isMatch && sim.match && (
                             <MatchChatLog lines={chatLines} myIndex={sim.match.myIndex} now={chatNow} />
+                        )}
+                        {/* 조준 중 1탭 문구(2026-09-16). 하단 입력줄은 상대 차례에만 있는데, 상대가 빗나간 직후
+                            "아깝다"를 보내고 싶은 순간이 바로 내 차례다. 읽은 자리 바로 아래에서 답한다. */}
+                        {isMatch && sim.match?.status === "playing" && sim.phase === "aim" && (
+                            <MatchQuickAim
+                                open={chatQuickOpen} onOpen={setChatQuickOpen}
+                                onSendCode={(code) => { void onQuickCode(code); }}
+                            />
                         )}
                         {drill && (
                             <span className={drillLocked ? chipBrand : chipNeutral}>
@@ -1590,14 +1600,14 @@ export function SimulatorPage() {
                         />
                     )}
                     {/* 굿샷 권유(2026-09-15 라포): 상대가 득점한 직후에만. 조준을 가리지 않게 테이블 아래쪽에 잠깐. */}
-                    {emojiUi && (
+                    {isMatch && sim.match?.status === "playing" && (
                         <PraisePrompt
                             visible={praise !== null}
                             run={praise?.run ?? 0}
                             name={sim.match?.opponentName ?? ""}
-                            disabled={emojiBusy}
                             bottom={DOCK_HEIGHT + 12}
-                            onPraise={() => { setPraise(null); void onSendEmoji("nice"); }}
+                            /* 한마디로 보낸다(이모지 경로가 아니라) — 그래야 대화 로그에 같이 남는다. */
+                            onPraise={() => { setPraise(null); void onSendChatCode("nice"); }}
                         />
                     )}
                 </div>

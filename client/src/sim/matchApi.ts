@@ -44,9 +44,6 @@ export function matchResignUrl(id: string): string {
 export function matchClaimUrl(id: string): string {
     return `${matchUrl(id)}/claim`;
 }
-export function matchEmojiUrl(id: string): string {
-    return `${matchUrl(id)}/emoji`;
-}
 export function matchChatUrl(id: string): string {
     return `${matchUrl(id)}/chat`;
 }
@@ -138,6 +135,12 @@ export interface MatchPublic {
      * 값이 늘 0 이 되어 /chats 가 한 번도 안 불리고 상대 말이 화면에 아예 안 닿는다(무증상 실패).
      */
     readonly chatSeq: number;
+    /**
+     * 두 선수의 국가(ISO 3166-1 alpha-2). 헤더에 국기를 그린다.
+     * 가입할 때 IP 로 자동으로 잡히므로 **없는 사람이 많다** — 없으면 국기 없이 이름만 그린다.
+     */
+    readonly hostCountry: string | null;
+    readonly guestCountry: string | null;
     /** 정본 세션 상태. waiting 이면 null. players[0]=호스트(white), players[1]=게스트(yellow) */
     readonly state: SessionState | null;
     readonly balls: readonly BallState[] | null;
@@ -155,8 +158,6 @@ export interface MatchPublic {
     readonly turnSeenAt: string | null;
     /** 응답을 만든 서버 시각(ISO) — 클라이언트 시계 보정용. 예전 서버 응답엔 없다. */
     readonly serverNow: string | null;
-    /** 마지막 이모지 인사(없거나 예전 서버면 null). */
-    readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
     /** 쓰리아웃: [호스트, 게스트] 의 40초 시간 초과 횟수. 예전 응답엔 없어 [0, 0]. */
     /** 지금 보고 있는 관전자 수(선수 제외, 2026-09-12) */
     readonly watchers?: number;
@@ -222,6 +223,11 @@ export interface ChatLine {
     readonly kind: "text" | "code";
     readonly text: string;
     readonly at: string;
+}
+
+/** ISO 3166-1 alpha-2 만 통과시킨다 — 화면이 이 두 글자로 국기 이모지를 만든다. */
+function countryOrNull(v: unknown): string | null {
+    return typeof v === "string" && /^[A-Za-z]{2}$/.test(v) ? v.toUpperCase() : null;
 }
 
 export function parseChatLine(raw: unknown): ChatLine | null {
@@ -450,6 +456,8 @@ export function parseMatch(raw: unknown): MatchPublic {
             ? { phi: raw.opponentAim.phi, at: isoOrNull(raw.opponentAim.at) ?? "" }
             : null,
         chatSeq: typeof raw.chatSeq === "number" && Number.isFinite(raw.chatSeq) ? raw.chatSeq : 0,
+        hostCountry: countryOrNull(raw.hostCountry),
+        guestCountry: countryOrNull(raw.guestCountry),
         state,
         balls,
         winnerIndex: playerIndexOrNull(raw.winnerIndex),
@@ -464,9 +472,6 @@ export function parseMatch(raw: unknown): MatchPublic {
         turnSeenAt: isoOrNull(raw.turnSeenAt),
         serverNow: isoOrNull(raw.serverNow),
 
-        emoji: isRecord(raw.emoji) && typeof raw.emoji.code === "string" && typeof raw.emoji.at === "string"
-            ? { code: raw.emoji.code, from: typeof raw.emoji.from === "number" ? raw.emoji.from : 0, at: raw.emoji.at }
-            : null,
         timeouts: Array.isArray(raw.timeouts) && raw.timeouts.length === 2
             ? [Number(raw.timeouts[0]) || 0, Number(raw.timeouts[1]) || 0] as const
             : [0, 0] as const,
@@ -664,8 +669,6 @@ export interface MatchApi {
     claim(id: string): Promise<ClaimResponse>;
     /** 40초 룰 시간 초과 처리(내 차례 40초 / 상대 차례 50초 뒤). 서버가 시각을 판정하고 갱신된 대전 행을 돌려준다. 없으면 시계 기능 없음. */
     timeout?(id: string): Promise<MatchPublic>;
-    /** 이모지 인사 보내기. 너무 자주 보내면 429. */
-    sendEmoji?(id: string, code: string): Promise<MatchPublic>;
     /** 내가 겨누는 방향 알리기(2026-09-16). 응답은 읽지 않는다 — 실패해도 조용히 넘어간다. */
     sendAim?(id: string, phi: number): Promise<void>;
     /**
@@ -711,9 +714,6 @@ export function createMatchApi(request: RequestFn): MatchApi {
         },
         async timeout(id) {
             return parseMatch(await request(matchTimeoutUrl(id), { method: "POST" }));
-        },
-        async sendEmoji(id, code) {
-            return parseMatch(await request(matchEmojiUrl(id), { method: "POST", body: { code } }));
         },
         async sendAim(id, phi) {
             await request(`${matchUrl(id)}/aim`, { method: "POST", body: { phi } });

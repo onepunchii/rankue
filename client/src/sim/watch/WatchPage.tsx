@@ -29,7 +29,7 @@ import { matchApi, matchConfig, type MatchPublic, type MatchShot } from "../matc
 import { cueBallIdOf, paramsFromConfig } from "../simReducer";
 import { easeOppAim, OPP_AIM_PULLBACK } from "../match/oppAim";
 import { effectiveBall, makePlayback, startClock, clockTime, type Playback, type PlaybackClock } from "../playback";
-import { TopBar } from "../components/TopBar";
+import { TopBar, type MatchHeaderPlayer } from "../components/TopBar";
 import { ShotClock } from "../components/ShotClock";
 import { InningSheet } from "../components/InningSheet";
 import { appendShot, EMPTY_LOG, type InningLog } from "../inningLog";
@@ -102,6 +102,22 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     liveAimRef.current = live && match?.opponentAim ? match.opponentAim.phi : null;
     liveCueRef.current = cueBallIdOf(session);
     const names = useMemo(() => [match?.hostName || t("sim.watch.host"), match?.guestName || t("sim.watch.guest")], [match, t]);
+    /** 관전 헤더도 선수와 같은 모양으로 — 왼쪽이 호스트, 오른쪽이 게스트(관전자에겐 "나"가 없다). */
+    const headerPlayers = useMemo((): readonly [MatchHeaderPlayer, MatchHeaderPlayer] | null => {
+        if (!match || !session) return null;
+        const timeouts = match.timeouts ?? [0, 0];
+        const mk = (i: 0 | 1): MatchHeaderPlayer => ({
+            name: names[i],
+            country: (i === 0 ? match.hostCountry : match.guestCountry) ?? null,
+            cueBallId: session.players[i]?.cueBallId ?? (i === 0 ? "white" : "yellow"),
+            score: session.players[i]?.score ?? 0,
+            target: session.players[i]?.target ?? 0,
+            timeouts: timeouts[i] ?? 0,
+            turn: session.status === "playing" && session.turn === i,
+            winner: session.status === "finished" && session.winnerIndex === i,
+        });
+        return [mk(0), mk(1)] as const;
+    }, [match, session, names]);
 
     /* ── 렌더러: 선수 화면과 같은 것을 쓴다. Canvas2D 를 먼저 올리고, 3D 가 되는 기기면 바꿔 끼운다. ── */
     useEffect(() => {
@@ -358,15 +374,13 @@ export default function WatchPage({ matchId }: { matchId: string }) {
 
     return (
         <div className="h-dvh flex flex-col bg-surface-0">
-            {/* 선수 화면과 같은 머리줄 — 규칙 칩·점수·차례·관전자 수. 조작 버튼만 없다. */}
+            {/* 선수 화면과 **같은** 머리줄(2026-09-16 오너: "관전자는 보는 게 플레이어랑 동일해야지"). 조작만 없다. */}
             <TopBar
                 session={session} config={config} phase={finished ? "finished" : "waiting"} names={names}
                 record={false} offline={false} syncing={false} queued={0}
                 onSummary={() => setSheetOpen(true)}
-                onBack={() => navigate("/online-game?rooms=1")}
                 clock={clockSeconds !== null ? { seconds: clockSeconds, mine: false } : null}
-                watchers={match.watchers ?? 0}
-                finalInning={(session?.pendingWinner ?? null) !== null}
+                matchHeader={headerPlayers ? { players: headerPlayers, onExit: () => navigate("/online-game?rooms=1") } : null}
                 hideStatus
             />
 

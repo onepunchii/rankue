@@ -4,7 +4,7 @@
  * 시뮬 대전 성적(Elo)은 hiqSimMatchRatings.rating 에만 쓴다(2026-09-12 부터 대대·중대 통합).
  */
 import { db } from "../db.js";
-import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchChats, hiqSimMatchRatings, hiqMembers } from "../../shared/schema.js";
+import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchChats, hiqSimMatchRatings, hiqMembers, profiles } from "../../shared/schema.js";
 import { alias } from "drizzle-orm/pg-core";
 import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot, HiqSimMatchChat } from "../../shared/schema.js";
@@ -54,7 +54,11 @@ export interface MatchShotArgs {
     endReason: string | null;
 }
 
-export type MatchWithNames = HiqSimMatch & { hostName: string; guestName: string | null };
+export type MatchWithNames = HiqSimMatch & {
+    hostName: string; guestName: string | null;
+    /** ISO 3166-1 alpha-2. 가입할 때 IP 로 자동으로 잡히므로 없는 사람도 있다 — 화면은 없으면 국기를 안 그린다. */
+    hostCountry: string | null; guestCountry: string | null;
+};
 
 function randomCode(): string {
     // 6자리, 앞자리 0 허용 안 함(입력 혼동 방지)
@@ -75,31 +79,42 @@ export class SimMatchRepository {
         throw new Error("코드 생성 실패");
     }
 
+    /**
+     * 대전 행 + 두 선수의 이름·국가. 국가는 profiles.country_code 에 있어 회원 → 프로필을 한 번 더 탄다
+     * (헤더의 국기, 2026-09-16 오너). 둘 다 기본키 조회라 비용은 인덱스 조회 두 번이고,
+     * 가입할 때 IP 로 자동으로 잡히므로 **없는 사람이 더 많다** — 화면은 없으면 국기를 그리지 않는다.
+     */
     private withNames() {
         const guest = alias(hiqMembers, "guest_member");
+        const hostProfile = alias(profiles, "host_profile");
+        const guestProfile = alias(profiles, "guest_profile");
         return {
             guest,
             q: db.select({
                 m: hiqSimMatches,
                 hostName: hiqMembers.name,
                 guestName: guest.name,
+                hostCountry: hostProfile.countryCode,
+                guestCountry: guestProfile.countryCode,
             }).from(hiqSimMatches)
                 .innerJoin(hiqMembers, eq(hiqMembers.id, hiqSimMatches.hostId))
-                .leftJoin(guest, eq(guest.id, hiqSimMatches.guestId)),
+                .leftJoin(guest, eq(guest.id, hiqSimMatches.guestId))
+                .leftJoin(hostProfile, eq(hostProfile.id, hiqMembers.profileId))
+                .leftJoin(guestProfile, eq(guestProfile.id, guest.profileId)),
         };
     }
 
     async get(id: string): Promise<MatchWithNames | undefined> {
         const { q } = this.withNames();
         const [row] = await q.where(eq(hiqSimMatches.id, id)).limit(1);
-        return row ? { ...row.m, hostName: row.hostName, guestName: row.guestName ?? null } : undefined;
+        return row ? { ...row.m, hostName: row.hostName, guestName: row.guestName ?? null, hostCountry: row.hostCountry ?? null, guestCountry: row.guestCountry ?? null } : undefined;
     }
 
     async findLiveByCode(code: string): Promise<MatchWithNames | undefined> {
         const { q } = this.withNames();
         const [row] = await q.where(and(eq(hiqSimMatches.code, code), inArray(hiqSimMatches.status, [...LIVE])))
             .orderBy(desc(hiqSimMatches.createdAt)).limit(1);
-        return row ? { ...row.m, hostName: row.hostName, guestName: row.guestName ?? null } : undefined;
+        return row ? { ...row.m, hostName: row.hostName, guestName: row.guestName ?? null, hostCountry: row.hostCountry ?? null, guestCountry: row.guestCountry ?? null } : undefined;
     }
 
     /** 내 대전 목록. 취소된 방(상대가 들어온 적 없다)은 빼고 준다 — 새 방을 열 때 접힌 방까지 줄로 남으면 목록이 지저분하다. */
@@ -110,7 +125,7 @@ export class SimMatchRepository {
             sql`not (${hiqSimMatches.status} = 'canceled' and ${hiqSimMatches.guestId} is null)`,
         ))
             .orderBy(desc(hiqSimMatches.createdAt)).limit(limit);
-        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
+        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null }));
     }
 
     /** 멀티방 목록: 공개·대기 중·내 방 아님·sinceMs 이후 만든 방, 최신순. */
@@ -120,7 +135,7 @@ export class SimMatchRepository {
             eq(hiqSimMatches.isPublic, true), eq(hiqSimMatches.status, "waiting"),
             sql`${hiqSimMatches.hostId} <> ${viewerId}`, gte(hiqSimMatches.createdAt, new Date(sinceMs)),
         )).orderBy(desc(hiqSimMatches.createdAt)).limit(limit);
-        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
+        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null }));
     }
 
     /**
@@ -188,7 +203,7 @@ export class SimMatchRepository {
             // 한 샷도 안 친 대전은 뺀다 — 시작하자마자 기권·취소된 판이라 볼 것이 없다.
             sql`${hiqSimMatches.shots} > 0`,
         )).orderBy(desc(timeCol)).limit(limit);
-        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
+        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null }));
     }
 
     /**
@@ -454,30 +469,6 @@ export class SimMatchRepository {
         await db.update(hiqSimMatches).set(playerIndex === 0 ? { hostSeenAt: new Date() } : { guestSeenAt: new Date() })
             .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.status, "playing"),
                 or(isNull(col), sql`${col} < now() - make_interval(secs => ${SEEN_THROTTLE_MS / 1000})`)));
-    }
-
-    /**
-     * 이모지 인사 보내기. 마지막 하나만 남기고, 도배는 여기서 막는다 —
-     * 같은 사람이 EMOJI_COOLDOWN_MS 안에 또 보내면 거부, 한 대전에서 EMOJI_MAX_PER_MATCH 를 넘어도 거부.
-     * 보낸 횟수는 대전 행에 세지 않고(컬럼을 더 늘리지 않으려고) 알림 없이 카운트만 메모리에 두지 않는다 —
-     * 대신 host/guest 각각의 누적을 emoji_counts jsonb 없이 간단히 처리하기 위해 shots 처럼 별도 컬럼 없이
-     * "마지막 시각 + 총 횟수"를 한 컬럼(emoji_from/emoji_at)으로는 못 세므로, 횟수 제한은 라우트에서
-     * 알림 테이블이 아닌 이 메서드의 반환값으로 판단한다(아래 sentCount 참고).
-     */
-    async sendEmoji(id: string, from: 0 | 1, code: string, cooldownMs: number, maxPerMatch: number): Promise<"ok" | "cooldown" | "limit" | "gone"> {
-        return db.transaction(async (tx) => {
-            const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, id)).for("update");
-            if (!m || m.status !== "playing") return "gone";
-            const counts = (m.emojiCounts as Record<string, number> | null) ?? {};
-            const key = String(from);
-            if ((counts[key] ?? 0) >= maxPerMatch) return "limit";
-            if (m.emojiAt && m.emojiFrom === from && Date.now() - m.emojiAt.getTime() < cooldownMs) return "cooldown";
-            await tx.update(hiqSimMatches).set({
-                emojiCode: code, emojiFrom: from, emojiAt: new Date(),
-                emojiCounts: { ...counts, [key]: (counts[key] ?? 0) + 1 },
-            }).where(eq(hiqSimMatches.id, id));
-            return "ok";
-        });
     }
 
     /** 40초 룰: 차례인 사람이 조준 화면에 들어온 시각을 한 번만 적는다(이미 있으면 그대로 → undefined). */

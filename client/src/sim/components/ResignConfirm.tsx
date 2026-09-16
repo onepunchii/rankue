@@ -15,7 +15,7 @@ export const ResignConfirm = memo(function ResignConfirm(p: Props) {
     const { t } = useT();
     return (
         <Dialog open={p.open} onOpenChange={(o) => { if (!p.busy) p.onOpenChange(o); }}>
-            <DialogContent hideClose className="max-w-[360px] rounded-card p-0 gap-0 flex flex-col">
+            <DialogContent hideClose className="sim-dark sim-table bg-[var(--surface-1)] max-w-[360px] rounded-card p-0 gap-0 flex flex-col">
                 <DialogHeader className="px-6 pt-6 pb-2 text-left">
                     <DialogTitle>{t("sim.match.resignTitle")}</DialogTitle>
                     <DialogDescription className="text-[13px] font-medium text-ink-3">{t("sim.match.resignDesc")}</DialogDescription>

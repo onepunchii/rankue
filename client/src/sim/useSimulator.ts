@@ -81,7 +81,6 @@ export interface SimulatorActions {
     /** 대전: 40초 룰 시간 초과 처리(화면의 시계가 0 이 되면 부른다 — 내 차례 40초 / 상대 차례 50초). 성공하면 true. */
     timeout(): Promise<boolean>;
     /** 이모지 인사(대전). 거부 사유를 돌려준다. */
-    sendEmoji(code: string): Promise<"ok" | "too-fast" | "limit" | "failed">;
     /** 한마디 보내기. 자유 입력은 { text }, 고정 인사는 { code }. */
     sendChat(body: { text?: string; code?: string; clientKey?: string }): Promise<ChatSendResult>;
 }
@@ -124,6 +123,8 @@ export interface MatchView {
     readonly handicap: boolean;
     /** 상대가 지금 겨누는 방향(rad). 상대 차례에만 온다 — 큐대를 그려 "지켜보는" 느낌을 만든다. */
     readonly opponentAim: { readonly phi: number; readonly at: string } | null;
+    /** 두 선수의 국가(ISO alpha-2, [호스트, 게스트]). 헤더 국기용 — 없는 사람은 null. */
+    readonly countries: readonly [string | null, string | null];
     /** 이 대전에서 오간 한마디(오래된 것부터). 내가 보낸 것도 들어 있다. */
     readonly chat: readonly ChatLine[];
     /**
@@ -132,8 +133,6 @@ export interface MatchView {
      * 그 창에서 쓴 글은 409 로 거부되므로, 애초에 입력칸을 내주지 않는다.
      */
     readonly canChat: boolean;
-    /** 마지막 이모지 인사(보낸 사람 자리 포함). 화면이 상대 것만 띄운다. */
-    readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
 }
 
 export interface Simulator {
@@ -225,7 +224,6 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         claim: () => ctrl.claim(),
         sync: () => ctrl.sync(),
         timeout: () => ctrl.timeout(),
-        sendEmoji: (code: string) => ctrl.sendEmoji(code),
         sendChat: (body) => ctrl.sendChat(body),
     }), [ctrl]);
 
@@ -250,13 +248,13 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             canResign: m.status === "playing",
             opponentShot: core.replayOf !== null && core.replayOf !== m.myIndex,
             turnSeenAt: m.turnSeenAt,
-            emoji: m.emoji ?? null,
             serverOffsetMs: aux.serverOffsetMs,
             timeouts: m.timeouts ?? [0, 0],
             watchers: m.watchers ?? 0,
             opponentAway: m.opponentAway === true,
             handicap: m.handicap === true,
             opponentAim: m.opponentAim ?? null,
+            countries: m.countries ?? [null, null],
             chat: aux.chat,
             canChat: m.status === "playing" && m.turn !== m.myIndex && core.queue.length === 0,
         } : null;

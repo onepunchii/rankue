@@ -141,6 +141,16 @@ export function BackIcon() {
     );
 }
 
+/** 대전 헤더 오른쪽 끝 — 나가기를 "멈춤"으로 읽히게(2026-09-16 오너가 준 참고 화면). */
+export function PauseIcon() {
+    return (
+        <Icon>
+            <path d="M9 5v14" />
+            <path d="M15 5v14" />
+        </Icon>
+    );
+}
+
 export function MinusIcon() {
     return (
         <svg {...SVG} width={16} height={16}><path d="M5 12h14" /></svg>

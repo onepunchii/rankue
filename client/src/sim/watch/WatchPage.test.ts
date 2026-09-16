@@ -72,7 +72,7 @@ function publicMatch(o: { shots: number; balls: readonly BallState[]; turn: numb
         createdAt: "2026-09-16T00:00:00.000Z", startedAt: "2026-09-16T00:00:00.000Z",
         lastShotAt: null, finishedAt: null, claimableAt: null,
         turnSeenAt: null, serverNow: "2026-09-16T00:00:00.000Z",
-        opponentAim: null, opponentAway: false, watchers: 1, timeouts: [0, 0], emoji: null, rematch: null,
+        opponentAim: null, opponentAway: false, watchers: 1, timeouts: [0, 0], rematch: null,
         serverOffsetMs: 0,
     } as unknown as MatchPublic;
 }

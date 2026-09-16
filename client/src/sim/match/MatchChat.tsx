@@ -4,7 +4,6 @@ import { useT } from "@/lib/i18n";
 import { CHAT_FRESH_MS, CHAT_LOG_LINES, CHAT_MAX_CHARS, CHAT_QUICK_CODES, chatLength, clampChatText } from "@shared/sim/chat";
 import type { ChatLine } from "../matchApi";
 import type { ChatSendResult } from "../simController";
-import { EMOJI_GLYPH } from "./EmojiBar";
 
 /**
  * 대전 중 한마디(2026-09-16 오너: "멀티가 너무 정적이다 … 하단에 내가 글을 쓸 수 있고, 상대 턴일 때 상대 글을 볼 수 있게").
@@ -30,11 +29,12 @@ function isFresh(line: ChatLine, now: number): boolean {
 }
 
 /**
- * 고정 문구의 그림. 상단 띠의 여섯 개(EMOJI_GLYPH)에 채팅 전용 셋을 얹는다.
- * 기존 여섯과 헷갈리지 않게 골랐다 — 손 모양(👋)과 시계(⏰)는 이미 쓰이고 있다.
+ * 고정 문구의 그림. 코드 하나에 그림 하나 — 서버·DB 는 코드만 알고 그림은 여기서만 고른다
+ * (5개 언어라 문장을 저장하면 상대 화면에 남의 언어가 뜬다).
+ * 2026-09-17 헤더 재설계로 상단 띠의 이모지 인사를 없애면서, 그때 쓰던 여섯 개의 그림도 이리로 왔다.
  */
-const CHAT_GLYPH: Readonly<Record<string, string>> = {
-    ...EMOJI_GLYPH,
+export const CHAT_GLYPH: Readonly<Record<string, string>> = {
+    hi: "👋", nice: "👍", wow: "😮", hurry: "⏰", sorry: "🙏", fight: "🔥",
     oops: "😖", wait: "⏸️", thanks: "🙌",
 };
 
@@ -77,6 +77,67 @@ export const MatchChatLog = memo(function MatchChatLog({ lines, myIndex, now }: 
         </>
     );
 });
+
+/** 1탭 문구 칩 묶음. 320 px 에서 두 줄로 앉는다(실측). 누를 것이라 pointer-events-auto 를 스스로 켠다. */
+export function QuickChips({ onPick, disabled }: { onPick: (code: string) => void; disabled?: boolean }) {
+    const { t } = useT();
+    return (
+        <div className="pointer-events-auto flex flex-wrap justify-center gap-1">
+            {CHAT_QUICK_CODES.map((code) => (
+                <button
+                    key={code} type="button" disabled={disabled}
+                    onClick={() => onPick(code)}
+                    className={cn(
+                        "h-8 px-2.5 rounded-pill inline-flex items-center gap-1",
+                        "bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-1",
+                        "active:bg-surface-3 disabled:opacity-40",
+                    )}
+                >
+                    <span className="text-[13px] leading-none">{CHAT_GLYPH[code]}</span>
+                    {t(`sim.emoji.${code}`)}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+/** ☺ 토글. 열고 닫는 일만 한다 — 열렸을 때 무엇이 비켜야 하는지는 부르는 쪽이 안다. */
+export function QuickToggle({ open, onToggle, className }: { open: boolean; onToggle: () => void; className?: string }) {
+    const { t } = useT();
+    return (
+        <button
+            type="button" onClick={onToggle}
+            aria-label={t("sim.chat.quick")} aria-expanded={open}
+            className={cn(
+                "pointer-events-auto shrink-0 h-11 w-11 rounded-pill text-[17px] leading-none",
+                "border border-surface-line active:bg-surface-3",
+                open ? "bg-brand text-brand-fg" : "bg-surface-1 text-ink-2",
+                className,
+            )}
+        >
+            ☺
+        </button>
+    );
+}
+
+/**
+ * 조준 중(내 차례)에 쓰는 1탭 문구. 왼쪽 위 칩 열 안에 들어간다.
+ *
+ * 왜 여기가 필요한가: 하단 입력줄은 상대 차례에만 있는데(키보드가 조작을 덮으면 안 되니까), 상대가 빗나간
+ * 직후 "아깝다"를 보내고 싶은 그 순간이 바로 내 차례다. 서버도 고정 문구는 차례를 안 따진다(키보드가 없다).
+ */
+export function MatchQuickAim({ open, onOpen, onSendCode }: {
+    open: boolean;
+    onOpen: (v: boolean) => void;
+    onSendCode: (code: string) => void;
+}) {
+    return (
+        <>
+            {open && <QuickChips onPick={(code) => { onOpen(false); onSendCode(code); }} />}
+            <QuickToggle open={open} onToggle={() => onOpen(!open)} className="h-9 w-9 text-[15px]" />
+        </>
+    );
+}
 
 /**
  * 입력 한 줄. 상대 차례에만 나타난다.
@@ -137,38 +198,9 @@ export function MatchChatBar({ draft, onDraft, onSend, onSendCode, quickOpen, on
         <div className="pointer-events-auto w-full max-w-[320px] flex flex-col items-stretch gap-1">
             {note && <span className="self-center rk-chip bg-surface-1 border border-surface-line text-ink-2">{note}</span>}
             {/* 1탭 문구판. 펼친 동안만 자리를 쓰고, 하나 고르면 접힌다. 키보드가 필요 없는 길이다. */}
-            {quickOpen && (
-                <div className="flex flex-wrap justify-center gap-1">
-                    {CHAT_QUICK_CODES.map((code) => (
-                        <button
-                            key={code} type="button" disabled={disabled || busy}
-                            onClick={() => { void sendCode(code); }}
-                            className={cn(
-                                "h-8 px-2.5 rounded-pill inline-flex items-center gap-1",
-                                "bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-1",
-                                "active:bg-surface-3 disabled:opacity-40",
-                            )}
-                        >
-                            <span className="text-[13px] leading-none">{CHAT_GLYPH[code]}</span>
-                            {t(`sim.emoji.${code}`)}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {quickOpen && <QuickChips onPick={(code) => { void sendCode(code); }} disabled={disabled || busy} />}
             <div className="flex items-center gap-1.5">
-                <button
-                    type="button"
-                    onClick={() => { onQuickOpen(!quickOpen); inputRef.current?.blur(); }}
-                    aria-label={t("sim.chat.quick")}
-                    aria-expanded={quickOpen}
-                    className={cn(
-                        "shrink-0 h-11 w-11 rounded-pill text-[17px] leading-none",
-                        "border border-surface-line active:bg-surface-3",
-                        quickOpen ? "bg-brand text-brand-fg" : "bg-surface-1 text-ink-2",
-                    )}
-                >
-                    ☺
-                </button>
+                <QuickToggle open={quickOpen} onToggle={() => { onQuickOpen(!quickOpen); inputRef.current?.blur(); }} />
                 <input
                     ref={inputRef}
                     value={draft}

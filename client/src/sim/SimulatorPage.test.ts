@@ -213,11 +213,12 @@ describe("SimulatorPage", () => {
         expect(controls().className).not.toContain("opacity-0");
         expect(dock().className).not.toContain("opacity-0");
         await shoot(h);
-        // 재생 중: 샷 잠금(빈 원, 비활성) + 빨리감기 안내 + 툴바·큐 슬라이더·두께 독이 흐려지고 포인터를 막는다(상단 띠·칩은 남는다)
+        // 재생 중: 샷 잠금(빈 원, 비활성) + 툴바·큐 슬라이더·두께 독이 흐려지고 포인터를 막는다(상단 띠·칩은 남는다).
+        // 빨리감기 안내 칩은 2026-09-16 에 뺐다(오너: 화면 정리) — 길게 누르는 동작 자체는 그대로다.
         const shot = byLabel(h, ko["sim.controls.shoot"]);
         expect(shot).not.toBeNull();
         expect(shot!.disabled).toBe(true);
-        expect(h.container.textContent).toContain(ko["sim.hud.holdToFastForward"]);
+        expect(h.container.textContent).not.toContain(ko["sim.hud.holdToFastForward"]);
         expect(byText(h, ko["sim.controls.shoot"])).toBeNull();
         expect(controls().className).toContain("opacity-0");
         expect(controls().className).toContain("pointer-events-none");
@@ -304,9 +305,8 @@ describe("SimulatorPage", () => {
         expect(h.container.textContent).toContain(ko["sim.top.practice"]);
         expect(h.container.textContent).toContain(ko["sim.share.replayChip"]);
         expect(h.container.textContent).not.toContain(ko["sim.share.replayMismatch"]);
-        // 자동 샷이 재생 중이고(샷 버튼 잠금 · 빨리감기 안내) 서버는 부르지 않는다
+        // 자동 샷이 재생 중이고(샷 버튼 잠금) 서버는 부르지 않는다
         expect(byLabel(h, ko["sim.controls.shoot"])!.disabled).toBe(true);
-        expect(h.container.textContent).toContain(ko["sim.hud.holdToFastForward"]);
         expect(nav.apiRequest).not.toHaveBeenCalled();
         performance.now = () => realNow() + 1_000_000;
         await frames(4);

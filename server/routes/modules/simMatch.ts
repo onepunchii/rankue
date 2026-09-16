@@ -17,7 +17,7 @@ import {
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
-    SHOT_CLOCK_STRIKES, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH, isMatchEmoji, PRESENCE_MS, ABSENT_GRACE_MS, AIM_FRESH_MS,
+    SHOT_CLOCK_STRIKES, PRESENCE_MS, ABSENT_GRACE_MS, AIM_FRESH_MS,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
@@ -146,6 +146,8 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         isPublic: m.isPublic, hasPassword: !!m.passwordHash, handicap: m.handicap,
         rules: m.rules, finishType: m.finishType, inningCap: m.inningCap,
         hostName: m.hostName, guestName: m.guestName, hostTarget: m.hostTarget, guestTarget: m.guestTarget,
+        /** 헤더 국기용(2026-09-16). ISO 3166-1 alpha-2, 가입할 때 IP 로 자동 — 없는 사람이 더 많다. */
+        hostCountry: m.hostCountry ?? null, guestCountry: m.guestCountry ?? null,
         myIndex, turn: m.turn, shots: m.shots, version: m.version,
         state: m.state as SessionState | null, balls: m.balls as BallState[] | null,
         winnerIndex: m.winnerId === null ? null : m.winnerId === m.hostId ? 0 : 1,
@@ -180,7 +182,6 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         // 쓰리아웃 표시용 [호스트, 게스트] 시간 초과 횟수
         timeouts: [m.hostTimeouts, m.guestTimeouts] as const,
         // 이모지 인사(마지막 하나) — 폴링에 실려 간다. 보낸 지 오래된 건 화면이 알아서 안 띄운다.
-        emoji: m.emojiCode && m.emojiAt ? { code: m.emojiCode, from: m.emojiFrom ?? 0, at: m.emojiAt } : null,
         claimableAt: m.status === "playing" ? new Date((m.lastShotAt ?? m.startedAt ?? m.createdAt).getTime() + CLAIM_AFTER_MS) : null,
         // "한 판 더"(2026-09-15): 끝난 대전에서만 뜻이 있다. matchId 가 채워지면 양쪽이 그 방으로 옮겨 간다.
         rematch: m.status === "finished" ? (() => {
@@ -577,21 +578,6 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
         turn: rec.match.turn, version: rec.match.version, status: rec.match.status,
         winnerIndex: rec.match.winnerId === null ? null : rec.match.winnerId === m.hostId ? 0 : 1,
     });
-}));
-
-// POST /sim/matches/:id/emoji — 상대에게 이모지 인사. 고정 여섯 개만, 5초 간격·한 대전 10회 제한.
-router.post("/sim/matches/:id/emoji", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const code = String(req.body?.code ?? "");
-    if (!isMatchEmoji(code)) return sendError(res, 400, "보낼 수 없는 인사입니다");
-    const m = await storage.simMatch.get(req.params.id);
-    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
-    const myIndex = m.hostId === req.userId ? 0 : 1;
-    const r = await storage.simMatch.sendEmoji(m.id, myIndex, code, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH);
-    if (r === "gone") return sendError(res, 409, "진행 중인 대전이 아닙니다");
-    if (r === "cooldown") return sendError(res, 429, "잠시 뒤에 보낼 수 있어요", "TOO_FAST");
-    if (r === "limit") return sendError(res, 429, "이 대전에서 보낼 수 있는 횟수를 다 썼어요", "LIMIT");
-    const full = await storage.simMatch.get(m.id);
-    return sendSuccess(res, publicMatch(full!, req.userId!));
 }));
 
 /**

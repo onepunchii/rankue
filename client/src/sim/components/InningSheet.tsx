@@ -26,7 +26,7 @@ export const InningSheet = memo(function InningSheet({ open, onOpenChange, log, 
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="bottom" hideClose className="rounded-t-card p-0 max-h-[72dvh] flex flex-col gap-0 pb-safe">
+            <SheetContent side="bottom" hideClose className="sim-dark sim-table bg-[var(--surface-1)] rounded-t-card p-0 max-h-[72dvh] flex flex-col gap-0 pb-safe">
                 <SheetHeader className="shrink-0 px-6 pt-5 pb-3 text-left">
                     <div className="flex items-center gap-3">
                         <SheetTitle className="flex-1 min-w-0 text-[17px] font-bold text-ink-1">{t("sim.hud.sheetTitle")}</SheetTitle>

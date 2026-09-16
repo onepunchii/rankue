@@ -37,7 +37,7 @@ export const EndDialog = memo(function EndDialog(p: Props) {
     const s = p.session;
     return (
         <Dialog open={p.open} onOpenChange={p.onOpenChange}>
-            <DialogContent className="max-w-[420px] rounded-card p-0 gap-0 flex flex-col">
+            <DialogContent className="sim-dark sim-table bg-[var(--surface-1)] max-w-[420px] rounded-card p-0 gap-0 flex flex-col">
                 <DialogHeader className="shrink-0 px-6 pt-6 pb-3 text-left">
                     <DialogTitle>{t("sim.end.title")}</DialogTitle>
                     <DialogDescription className="text-[13px] font-medium text-ink-3">

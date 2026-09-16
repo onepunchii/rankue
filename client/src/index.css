@@ -1346,6 +1346,18 @@ body.keyboard-open .hide-on-keyboard {
   display: none;
 }
 
+/*
+ * 테이블 화면의 강조색(2026-09-17 오너: "색상도 이렇게 가자 시인성 좋네").
+ * .sim-dark 위에 얹는다 — 검은 바탕에서 브랜드 초록(#006241)은 대비가 2:1 도 안 나와
+ * 시계 테두리·점수 게이지처럼 얇은 것이 통째로 묻힌다. 이 구역만 밝은 초록으로 바꾼다.
+ * 새 색이 아니다: .sim-dark 가 이미 shadcn --primary 로 쓰는 #64DD17 과 같은 값이고,
+ * 앱이 OS 다크 모드일 때 전역으로 쓰는 값과도 같다. 밝은 초록 위에는 글씨가 검어야 읽힌다.
+ */
+.sim-table {
+  --brand: 100 221 23;
+  --brand-fg: 10 10 10;
+}
+
 /* Safe Area Insets for iOS PWA */
 @supports (padding: env(safe-area-inset-bottom)) {
   .pb-safe {

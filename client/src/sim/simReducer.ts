@@ -180,8 +180,6 @@ export interface MatchState {
     readonly claimableAt: string | null;
     /** 40초 룰 시계 기준(ISO). 없으면 시계 없음. */
     readonly turnSeenAt: string | null;
-    /** 마지막 이모지 인사(내 것도 포함 — 화면이 보낸 사람으로 가른다). */
-    readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
     readonly endReason: MatchEndReason | null;
     readonly winnerIndex: PlayerIndex | null;
     /** 쓰리아웃: [호스트, 게스트] 시간 초과 횟수 */
@@ -199,6 +197,8 @@ export interface MatchState {
      * 이 값이 **sameMatchMeta 에 들어가야** 상대가 말만 한 폴링(다른 건 하나도 안 바뀐 순간)이 버려지지 않는다.
      */
     readonly chatSeq: number;
+    /** 두 자리의 국가(ISO alpha-2, 없으면 null). 대전 중에 바뀌지 않아 메타 비교에는 넣지 않는다. */
+    readonly countries: readonly [string | null, string | null];
 }
 
 /** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
@@ -219,9 +219,9 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         handicap: m.handicap === true,
         opponentAim: m.opponentAim ?? null,
         chatSeq: m.chatSeq ?? 0,
+        countries: [m.hostCountry ?? null, m.guestCountry ?? null] as const,
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
-        emoji: m.emoji ?? null,
         endReason: m.endReason,
         winnerIndex: m.winnerIndex,
     };
@@ -235,9 +235,9 @@ export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
         && a.opponentAway === b.opponentAway
         // 상대가 말만 한 순간은 다른 필드가 하나도 안 바뀐다 — 이게 빠지면 matchSync 의 조기 반환이
         // 그 응답을 통째로 버려 채팅이 화면에 영영 안 닿는다(2026-09-16 상대 조준과 똑같은 함정).
-        && a.chatSeq === b.chatSeq
+        && a.chatSeq === b.chatSeq;
         // 상대 조준은 여기 없다 — 자주 바뀌는 표시용 값이라 따로 본다(sameOpponentAim).
-        && (a.emoji?.at ?? null) === (b.emoji?.at ?? null);
+        // 국가(countries)도 없다 — 대전 중에 바뀌지 않는다.
 }
 
 /**
