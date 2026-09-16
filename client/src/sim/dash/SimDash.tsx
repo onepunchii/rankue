@@ -90,8 +90,9 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
     const form = recentForm(series, FORM_N);
     const rating = data && combo ? ratingFor(data.ratings, combo) : undefined;
     const mr = data && combo ? (data.matchRatings ?? []).find((r) => r.gameType === combo.gameType) : undefined;
-    // 사다리는 2026-09-12 부터 테이블을 합쳤다 — 순위는 종목으로만 찾는다(테이블까지 맞추면 영영 못 찾아 "–" 만 나왔다).
-    const rank = data && combo ? data.ranks.find((r) => r.gameType === combo.gameType) : undefined;
+    // 이 순위는 **연습** 사다리(sim.myRanks, hiq_sim_ratings)라 테이블까지 맞춰 찾는 것이 맞다.
+    // 테이블을 합친 것은 온라인 대전 사다리(myMatchRanks)다 — 둘을 헷갈리면 중대 칩에 대대 순위가 뜬다.
+    const rank = data && combo ? data.ranks.find((r) => sameCombo(r, combo)) : undefined;
     const ms = matchSummary(rows, combo, FORM_N);
     // 승패는 서버의 조합별 전체 집계로 본다. 대전 목록은 최근 20개뿐이라 새 대전이 생길 때마다 승수가 흔들렸다.
     const record = recordFor(data?.matchRecords, combo, ms);
