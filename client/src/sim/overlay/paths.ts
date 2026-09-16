@@ -30,10 +30,27 @@ export type PathCutoff =
      * 대전용 짧은 미리보기(2026-09-08 오너): 첫 적구 접촉 뒤 큐볼이 tailM 만큼 간 곳까지. 적구 첫 구간도 tailM 까지, 쿠션 번호 없음.
      * 아무 공도 못 맞히면 첫 쿠션까지(어디서 맞는지만). 쿠션 뒤 진로는 선수가 읽어야 한다.
      */
-    | { readonly kind: "first-contact"; readonly tailM: number };
+    | {
+        readonly kind: "first-contact";
+        readonly tailM: number;
+        /**
+         * 컷오프 전에 보여 줄 **큐볼 쿠션 수**. 없으면 제한 없음(적구에 맞을 때까지 다 그린다 — 2026-09-16 이전 동작).
+         *
+         * 왜 생겼나(오너 제보): 컷오프가 "첫 적구 접촉" 뿐이면 **쿠션을 많이 돌수록 공짜로 보이는 선이 길어진다**.
+         * 직접 치는 샷은 선이 짧고, 세 쿠션 돌리는 가락은 전 구간이 다 보여서 화면만 보고 각을 맞추게 된다.
+         * 어려운 샷일수록 더 많이 알려주는 셈이라 거꾸로였다. 쿠션 수로 한 번 더 자르면 그 역전이 사라진다.
+         * 적구에 바로 맞는 샷은 쿠션이 없어 이 값과 무관하다 — 쉬운 샷의 난이도는 그대로다.
+         */
+        readonly maxCushions?: number;
+    };
 
 /** 대전 짧은 미리보기의 꼬리 길이(m). */
 export const SHORT_PREVIEW_TAIL_M = 0.3;
+/**
+ * 대전 미리보기에서 보여 줄 큐볼 쿠션 수(2026-09-16 오너 결정: 1).
+ * 1 = 첫 쿠션에 맞고 튕기는 것까지 보이고 두 번째 쿠션에서 끊긴다. 0 이면 첫 쿠션에서 바로 끊긴다(더 어렵다).
+ */
+export const MATCH_PREVIEW_CUSHIONS = 1;
 
 export interface PathPoint {
     readonly x: number;
@@ -154,9 +171,18 @@ export function cutoffTime(src: PathSource, timeline: CueTimeline, cutoff: PathC
     const end = src.history.length ? src.history[src.history.length - 1].t : 0;
     switch (cutoff.kind) {
         case "first-contact": {
+            // 적구 접촉과 쿠션 제한 중 **먼저 오는 쪽**에서 자른다. 둘 다 없으면(맞지도 튕기지도 않음) 끝까지.
+            const withTail = (t: number) => timeAfterDistance(src.history, cueBallId, t, cutoff.tailM);
+            const stops: number[] = [];
             const first = timeline.contacts[0];
-            if (!first) { const c = timeline.cushions[0]; return c ? Math.min(c.t, end) : end; }
-            return Math.min(end, timeAfterDistance(src.history, cueBallId, first.t, cutoff.tailM));
+            if (first) stops.push(withTail(first.t));
+            if (cutoff.maxCushions !== undefined) {
+                // maxCushions 개를 보여 주고 그다음 쿠션에서 끊는다 — 1 이면 cushions[1](두 번째 쿠션)이 경계다.
+                const c = timeline.cushions[cutoff.maxCushions];
+                if (c) stops.push(withTail(c.t));
+            }
+            if (!stops.length) { const c = timeline.cushions[0]; return c ? Math.min(c.t, end) : end; }
+            return Math.min(end, ...stops);
         }
         case "second-contact":
             return timeline.secondContactT ?? end;

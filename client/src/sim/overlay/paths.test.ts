@@ -3,7 +3,7 @@ import { TABLES } from "@shared/sim/params";
 import type { BallState, SimEvent, Snapshot } from "@shared/sim/types";
 import { walkEvents, objectBallIds } from "@shared/sim/rules/evaluate";
 import {
-    buildPreviewPaths, cueTimeline, countCushionsBeforeSecond, cutoffTime, snapshotIndexAt, positionAt, ballPolyline, firstLegWindow, straightGuide, thicknessLabel, SHORT_PREVIEW_TAIL_M,
+    buildPreviewPaths, cueTimeline, countCushionsBeforeSecond, cutoffTime, snapshotIndexAt, positionAt, ballPolyline, firstLegWindow, straightGuide, thicknessLabel, SHORT_PREVIEW_TAIL_M, MATCH_PREVIEW_CUSHIONS,
 } from "./paths";
 
 const T = TABLES.DAEDAE;
@@ -268,5 +268,52 @@ describe("대전 짧은 미리보기(first-contact)", () => {
         const firstCushion = miss.events.find((e) => e.type === "ball-cushion")!.t;
         expect(m.cutoffT).toBeCloseTo(firstCushion, 9);
         expect(m.cushions).toEqual([]);
+    });
+});
+
+/**
+ * 가락(쿠션 먼저) 미리보기 제한 — 2026-09-16 오너 제보.
+ * 컷오프가 "첫 적구 접촉" 뿐이면 쿠션을 많이 돌수록 공짜로 보이는 선이 길어져, 화면만 보고 각을 맞추게 된다.
+ * maxCushions 로 한 번 더 자르되, **적구에 바로 맞는 샷은 그대로** 여야 한다(쉬운 샷의 난이도는 안 건드린다).
+ */
+describe("대전 미리보기 쿠션 제한(maxCushions)", () => {
+    const RT = T.width - R;
+    // 큐볼: 오른쪽(0.4) → 왼쪽(0.8) → 오른쪽(1.2) 쿠션을 돌고 나서야 red(1.6) 를 맞힌다
+    const bankHistory: Snapshot[] = [
+        snap(0.0, ball("white", 0.3, 0.3, 2, 0), ball("red", 0.8, 1.9), ball("yellow", 0.2, 2.4)),
+        snap(0.4, ball("white", RT, 0.3, -2, 1), ball("red", 0.8, 1.9), ball("yellow", 0.2, 2.4)),
+        snap(0.8, ball("white", R, 0.9, 2, 1), ball("red", 0.8, 1.9), ball("yellow", 0.2, 2.4)),
+        snap(1.2, ball("white", RT, 1.5, -2, 1), ball("red", 0.8, 1.9), ball("yellow", 0.2, 2.4)),
+        snap(1.6, ball("white", 0.8, 1.9, -1, 0), ball("red", 0.8, 1.9, 0, 1), ball("yellow", 0.2, 2.4)),
+        snap(2.0, ball("white", 0.4, 1.9), ball("red", 0.8, 2.3), ball("yellow", 0.2, 2.4)),
+    ];
+    const bankEvents: SimEvent[] = [
+        { type: "ball-cushion", t: 0.4, ids: ["white"], cushion: "right" },
+        { type: "ball-cushion", t: 0.8, ids: ["white"], cushion: "left" },
+        { type: "ball-cushion", t: 1.2, ids: ["white"], cushion: "right" },
+        { type: "ball-ball", t: 1.6, ids: ["white", "red"] },
+    ];
+    const bank = { history: bankHistory, events: bankEvents };
+
+    it("가락은 두 번째 쿠션에서 끊긴다 — 적구까지 가는 전 구간이 안 보인다", () => {
+        const open = buildPreviewPaths(bank, { cueBallId: "white", gameType: "3c", cutoff: { kind: "first-contact", tailM: SHORT_PREVIEW_TAIL_M } });
+        const capped = buildPreviewPaths(bank, { cueBallId: "white", gameType: "3c", cutoff: { kind: "first-contact", tailM: SHORT_PREVIEW_TAIL_M, maxCushions: 1 } });
+        expect(open.cutoffT).toBeGreaterThan(1.6);          // 예전: 적구에 맞을 때까지 다 보였다
+        expect(capped.cutoffT).toBeLessThan(1.6);           // 이제: 적구에 닿기 전에 끊긴다
+        expect(capped.cutoffT).toBeGreaterThan(0.8);        // 첫 반사는 보인다(두 번째 쿠션 + 꼬리)
+        expect(capped.paths.find((p) => p.id === "red")).toBeUndefined();   // 적구 선도 안 나온다
+    });
+
+    it("쿠션 0 이면 첫 쿠션에서 끊긴다 — 더 어렵게 조일 때의 값", () => {
+        const c0 = buildPreviewPaths(bank, { cueBallId: "white", gameType: "3c", cutoff: { kind: "first-contact", tailM: SHORT_PREVIEW_TAIL_M, maxCushions: 0 } });
+        expect(c0.cutoffT).toBeGreaterThan(0.4);
+        expect(c0.cutoffT).toBeLessThan(0.8);
+    });
+
+    it("적구에 바로 맞는 샷은 쿠션 제한과 무관하다 — 쉬운 샷은 그대로", () => {
+        const src = { history, events };   // white 가 0.5 에 red 를 먼저 맞히는 기본 픽스처
+        const a = buildPreviewPaths(src, { cueBallId: "white", gameType: "3c", cutoff: { kind: "first-contact", tailM: SHORT_PREVIEW_TAIL_M } });
+        const b = buildPreviewPaths(src, { cueBallId: "white", gameType: "3c", cutoff: { kind: "first-contact", tailM: SHORT_PREVIEW_TAIL_M, maxCushions: MATCH_PREVIEW_CUSHIONS } });
+        expect(b.cutoffT).toBe(a.cutoffT);
     });
 });

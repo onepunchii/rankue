@@ -35,7 +35,7 @@ import { cuePhiForAim } from "./aimAssist";
 import { aimAssistFor } from "./setupPresets";
 import { applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
-import { SHORT_PREVIEW_TAIL_M, buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
+import { SHORT_PREVIEW_TAIL_M, MATCH_PREVIEW_CUSHIONS, buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
 import { SimAudio } from "./audio";
 import { SimHaptics } from "./haptics";
 import {
@@ -698,7 +698,8 @@ export class SimController {
             const short = s.mode === "match" && setup.config.matchPreview !== "full";
             const paths = buildPreviewPaths(result, {
                 cueBallId, gameType: s.session.rules.gameType,
-                ...(short ? { cutoff: { kind: "first-contact" as const, tailM: SHORT_PREVIEW_TAIL_M } } : {}),
+                // 쿠션 제한(2026-09-16): 가락이 전 구간 보여 화면만 보고 각을 맞추던 것을 막는다.
+                ...(short ? { cutoff: { kind: "first-contact" as const, tailM: SHORT_PREVIEW_TAIL_M, maxCushions: MATCH_PREVIEW_CUSHIONS } } : {}),
             });
             this.setAux({ preview: { result, paths, input: shot } });
         } catch {
