@@ -61,9 +61,10 @@ export function FieldCanvas({ hole, viewLenM, shots, live, frameIndex, ghost, ai
             g.fillStyle = s === "green" ? GREEN : s === "bunker" ? BUNKER : s === "water" ? WATER : (s === "fairway" || s === "tee") ? (band ? FAIRWAY_A : FAIRWAY_B) : s === "ob" ? "#142a17" : ROUGH;
             g.fillRect(xx, yy, cell + 0.5, cell + 0.5);
         }
-        // 거리 링(티 기준 50 m 마다)
+        // 거리 링 — 화면이 넓으면 간격을 벌린다(드라이버에서 링이 빽빽해지지 않게)
+        const ringStep = viewLenM > 330 ? 100 : viewLenM > 180 ? 50 : 25;
         g.strokeStyle = "rgba(255,255,255,0.18)"; g.lineWidth = 1; g.font = "600 11px system-ui"; g.fillStyle = "rgba(255,255,255,0.55)"; g.textAlign = "left";
-        for (let d = 50; d <= viewLenM; d += 50) {
+        for (let d = ringStep; d <= viewLenM; d += ringStep) {
             g.beginPath(); g.arc(px(hole.tee.x), py(hole.tee.y), d * scale, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
             g.fillText(`${d} m`, px(hole.tee.x) + 6, py(hole.tee.y + d) - 4);
         }

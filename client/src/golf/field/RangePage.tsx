@@ -52,6 +52,7 @@ export default function RangePage() {
     const aimStance = pullShape;   // 끌면서 정한 드로우/페이드가 곧 스탠스다
     const zoneMs = zoneMsFor(club, "tee", 100, aimStance, ballPos);
     const teed = !CLUBS[club].iron;
+
     // 파워별 예상 착지(퍼펙트 임팩트·현재 바람·조준) — 20..115 % 를 5 % 간격으로 미리 돌려 두고, 당기는 동안 링이 따라간다
     const carryByPower = useMemo(() => {
         const m = new Map<number, { x: number; y: number; carry: number }>();
@@ -63,6 +64,16 @@ export default function RangePage() {
         }
         return m;
     }, [club, aimDeg, aimStance, ballPos, ctx]);
+    /**
+     * 화면 배율 — 그 클럽·바람에서 풀파워로 칠 때의 착지점이 화면 위쪽(상단 HUD 아래)에 들어오도록 맞춘다.
+     * 티가 화면 아래 290 px, 위쪽 150 px 는 헤더·알약이 쓰므로 실제 쓸 수 있는 세로는 화면의 약 46 % — 그 역수가 2.2 다.
+     * (오너 2026-09-16: 드라이버가 150 m 넘어가면 공이 안 보인다)
+     */
+    const viewLenM = useMemo(() => {
+        let far = 0;
+        for (const v of carryByPower.values()) far = Math.max(far, Math.sqrt(v.x * v.x + v.y * v.y));
+        return Math.round(Math.min(600, Math.max(160, far * 1.15 * 2.2)) / 10) * 10;
+    }, [carryByPower]);
     const ringPower = pullPower >= 20 ? Math.min(115, Math.round(pullPower / 5) * 5) : 100;
     const ring = carryByPower.get(ringPower) ?? { x: 0, y: nominalCarryM(club, preset), carry: nominalCarryM(club, preset) };
 
@@ -107,7 +118,8 @@ export default function RangePage() {
     const chip = (active: boolean) => cn("shrink-0 h-7 px-2.5 rounded-full", active ? "bg-[#ffffff] text-[#000000]" : "bg-white/[0.06] text-white/60");
 
     // 링(공의 집) 은 화면 아래 215 px, 티 위의 공은 340 px. 조준 띠는 티 바로 위 — 끌기 영역과 안 겹친다
-    const HOME_BOTTOM = 215, TEE_BOTTOM = 340, SWING_H = 236, AIM_BOTTOM = TEE_BOTTOM + 40;   // 조준 띠는 티 위(POWER 글자와 안 겹치게)
+    // 조작은 반투명이라 필드 위에 겹쳐도 된다 — 티를 아래로 내려 앞쪽 시야를 넓힌다(오너 2026-09-16: 드라이버가 화면 밖으로 나간다)
+    const HOME_BOTTOM = 190, TEE_BOTTOM = 290, AIM_BOTTOM = TEE_BOTTOM + 44;   // 조준 띠는 티 위(POWER 글자와 안 겹치게)
 
     return (
         <div className="h-[100dvh] bg-[#0A0A0A] text-white font-sans overflow-hidden flex justify-center" style={{ overscrollBehavior: "none" }}>
@@ -115,7 +127,7 @@ export default function RangePage() {
                 {/* 필드 — 전체 화면. 휠/트랙패드 스크롤 = 조준 */}
                 <div className="absolute inset-0" onWheel={onFieldWheel}>
                     <FieldCanvas
-                        hole={RANGE} viewLenM={330} shots={shots} live={live?.shot ?? null} frameIndex={frame}
+                        hole={RANGE} viewLenM={viewLenM} shots={shots} live={live?.shot ?? null} frameIndex={frame}
                         ghost={card ? card.ghost : null} aimDeg={aimDeg}
                         carryRing={live ? null : { x: ring.x, y: ring.y, label: `${Math.round(ring.carry)} m${pullPower >= 20 ? ` · ${ringPower} %` : ""}` }}
                         windArrow={wind} teeBottomPx={TEE_BOTTOM} radius={0}
@@ -127,7 +139,7 @@ export default function RangePage() {
                     <button onClick={() => setLocation("/golf/arcade")} className="pointer-events-auto w-9 h-9 rounded-full backdrop-blur-sm flex items-center justify-center shrink-0" style={{ background: "rgba(8,10,8,0.55)" }} aria-label="뒤로"><LucideChevronLeft className="w-5 h-5" /></button>
                     <div className="flex-1 min-w-0">
                         <div className="text-[13px] font-extrabold leading-tight drop-shadow">필드 골프 연습장 <span className="text-[10px] font-bold text-[#64DD17] align-middle">ENGINE 0.3</span></div>
-                        <div className="text-[10.5px] text-white/60 leading-tight truncate drop-shadow">{CLUBS[club].id} · {PRESET_KO[preset]} · {`창 ±${Math.round(zoneMs)} ms`}{aimStance ? ` · ${aimStance > 0 ? "드로우" : "페이드"} ${Math.abs(aimStance / 10).toFixed(1)}°` : ""} · {WINDS.find((w) => w.key === windKey)!.label}</div>
+                        <div className="text-[10.5px] text-white/60 leading-tight truncate drop-shadow">{CLUBS[club].id} · {PRESET_KO[preset]} · {`창 ±${Math.round(zoneMs)} ms · ${viewLenM} m`}{aimStance ? ` · ${aimStance > 0 ? "드로우" : "페이드"} ${Math.abs(aimStance / 10).toFixed(1)}°` : ""} · {WINDS.find((w) => w.key === windKey)!.label}</div>
                     </div>
                     {shots.length > 0 && <button onClick={() => { setShots([]); setCard(null); }} className="pointer-events-auto shrink-0 h-8 px-2.5 rounded-full backdrop-blur-sm text-[11px] font-bold text-white/70" style={{ background: "rgba(8,10,8,0.55)" }}>지우기 {shots.length}</button>}
                     <button onClick={() => setShowOpts(true)} className="pointer-events-auto shrink-0 w-8 h-8 rounded-full backdrop-blur-sm text-white/70 flex items-center justify-center" style={{ background: "rgba(8,10,8,0.55)" }} aria-label="연습장 설정"><LucideSettings2 className="w-4 h-4" /></button>

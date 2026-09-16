@@ -36,11 +36,11 @@ interface Props {
 }
 
 const MAX_PULL_PX = 145;        // 이만큼 끌면 100 % (115 % 까지 167 px — 화면 안에 들어온다)
-const BALL_TRAVEL_MAX = 150;    // 공 그림이 따라 내려가는 한계
+const BALL_TRAVEL_MAX = 118;    // 공 그림이 따라 내려가는 한계(화면 밖으로 안 나가게)
 const SHAPE_PX = 120;           // 이만큼 좌우로 끌면 드로우·페이드 최대
 const SHAPE_MAX = 50;           // stanceDeg10 최대(±5°) — 많이 끌수록 심해진다
-const BALL_R_IDLE = 26, BALL_R_FULL = 48;
-const RING_R = 88;
+const BALL_R_IDLE = 24, BALL_R_FULL = 44;
+const RING_R = 74;
 const MAX_PASSES = 4;
 const ARC_W_FRAC = 0.74, ARC_H = 56;
 /** 창을 벗어난 정도 → 당점 붕괴(오너 지정: 빨리 = 대가리 +, 늦게 = 뒷땅 −) */
@@ -189,7 +189,7 @@ export function ArcSwing({ club, ballPos, teeBottomPx, homeBottomPx, onShot, onA
             </div>
 
             {/* POWER — 티 위의 공 옆 */}
-            <div className="absolute pointer-events-none leading-none" style={{ left: size.w / 2 + 38, top: teeY - 24, opacity: phase === "idle" ? 0.5 : 1 }}>
+            <div className="absolute pointer-events-none leading-none" style={{ left: size.w / 2 + 36, top: teeY - 44, opacity: phase === "idle" ? 0.5 : 1 }}>
                 <div className="text-[12px] font-extrabold tracking-[0.14em] text-white drop-shadow">POWER</div>
                 <div className={cn("text-[30px] font-extrabold tabular-nums drop-shadow", over ? "text-[#ff5a3c]" : "text-white")}>{power}<span className="text-[15px]">%</span></div>
                 {shape !== 0 && <div className="text-[11.5px] font-extrabold text-[#64DD17] drop-shadow mt-0.5">{shape > 0 ? "드로우" : "페이드"} {Math.abs(shape / 10).toFixed(1)}°</div>}
