@@ -97,9 +97,15 @@ export function ArcSwing({ club, ballPos, teeBottomPx, homeBottomPx, onShot, onA
         onShot({ powerPct: r.power, impactMs: Math.max(-400, Math.min(400, Math.round(impactMs))), padX: 0, tapX: 0, tapY, noTap, stanceDeg10: r.shape });
     };
 
+    /**
+     * 경과 시간 → 바늘 위치(왕복)와 오차.
+     * 오차는 **화면에 보이는 위치** 로 잰다 — 되돌아오는 패스(오른쪽→왼쪽)에서는 frac 이 뒤집히므로
+     * frac 으로 재면 왼쪽(대가리)을 쳐도 늦음(뒷땅)으로 나온다. 2026-09-16 오너 제보 버그.
+     */
     const needleAt = (el: number, sweepMs: number) => {
         const u = el / sweepMs, pass = Math.floor(u), frac = u - pass;
-        return { pos: pass % 2 === 0 ? frac : 1 - frac, pass, errMs: (frac - 0.5) * sweepMs };
+        const pos = pass % 2 === 0 ? frac : 1 - frac;
+        return { pos, pass, errMs: (pos - 0.5) * sweepMs };
     };
 
     const onDown = (e: RPE) => {
