@@ -8,17 +8,16 @@ import { ChevronLeftIcon, ChevronRightIcon, UndoIcon } from "./railIcons";
 /**
  * 두께 독(테이블 왼쪽 아래). 흰 알약 묶음 두 줄, 칩 44 px · 간격 8 px:
  *  1. 정면 · ½ · ⅓ · ¼ · ⅛ — 현재 조준이 가장 가까운 적구에 대해 어느 단계인지 brand 틴트(activeThickness)
- *  2. 좌 | 우 (어느 쪽으로 맞힐지) · [되돌리기(onUndo 가 있을 때)] · ±0.1° 미세 조절(길게 누르면 가속)
+ *  2. [되돌리기(onUndo 가 있을 때)] · ±0.1° 미세 조절(길게 누르면 가속)
+ *     좌/우 버튼은 2026-09-17 에 뺐다(오너: "크게 안 쓰는 것 같다") — 두께 칩이 지금 겨누는 쪽으로 맞춘다.
  * 375 px 폰에서 한 줄(정면 52 + 40×4 + 좌우·±0.1° 40×4 = 368 px)은 샷 버튼과 겹쳐 두 줄로 나눴다. 둘째 줄은 첫 줄보다 짧아
  * 되돌리기 하나가 들어간다 — 툴바에 두면 샷 뒤 버튼 수가 늘어 열을 넘쳤다(2026-09-07 리뷰). 높이 = 4 + 44 + 8 + 44 + 4 (+테두리 2) = 106.
  * 배경은 불투명 surface-1 — 토큰이 var() 라 Tailwind 투명도 수식어(surface-1/90)를 못 쓴다.
  */
 interface Props {
     active: ActiveThickness | null;
-    side: "left" | "right";
     disabled?: boolean;
     onThickness: (step: ThicknessStep) => void;
-    onSide: (side: "left" | "right") => void;
     onNudge: (dir: -1 | 1) => void;
     /** 되돌리기(연습·드릴에서 샷 뒤). 없으면 자리를 비운다. */
     onUndo?: (() => void) | null;
@@ -55,18 +54,6 @@ export const ThicknessDock = memo(function ThicknessDock(p: Props) {
                 })}
             </div>
             <div className="flex gap-2">
-                {(["left", "right"] as const).map((s) => {
-                    const on = p.side === s;
-                    return (
-                        <button
-                            key={s} type="button" aria-pressed={on} disabled={p.disabled}
-                            onClick={() => p.onSide(s)}
-                            className={cn(CHIP, "w-10", on ? CHIP_ON : CHIP_OFF)}
-                        >
-                            {s === "left" ? t("sim.controls.sideLeft") : t("sim.controls.sideRight")}
-                        </button>
-                    );
-                })}
                 <div className="flex-1" />
                 {p.onUndo && (
                     <button

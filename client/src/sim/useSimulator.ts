@@ -53,7 +53,8 @@ export interface SimulatorActions {
     setPhi(phi: number): void;
     nudgePhi(deltaRad: number): void;
     /** 두께 단계(aim.THICKNESS_STEPS)와 방향으로 가장 가까운 적구를 겨눈다(4구는 상대 큐볼 제외). */
-    setThickness(step: number, side: "left" | "right"): void;
+    /** 두께 맞추기. side 를 안 주면 지금 겨누는 쪽으로 맞춘다. */
+    setThickness(step: number, side?: "left" | "right"): void;
     /** 당점 (a, b) R 비율. 0.5R 밖은 미스큐 링으로 클램프. */
     setSpin(a: number, b: number): void;
     /** m/s, [0.2, 9] */

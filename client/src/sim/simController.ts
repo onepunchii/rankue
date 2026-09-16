@@ -31,7 +31,8 @@ import type { BallState, ShotInput, SimResult } from "@shared/sim/types";
 import type { SimParams } from "@shared/sim/params";
 import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout, isValidLayout } from "@shared/sim/layouts";
-import { cuePhiForAim } from "./aimAssist";
+import { aimPhi as aimPhiFromCue, cuePhiForAim } from "./aimAssist";
+import { nearerThicknessPhi } from "./aim";
 import { aimAssistFor } from "./setupPresets";
 import { AIM_EPS_RAD, AIM_REPORT_MS, applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
@@ -520,11 +521,27 @@ export class SimController {
         this.setInput({ phi: this.store.get().input.phi + deltaRad });
     }
     /** 두께 단계(1·¾·½·⅓·¼·⅛)와 방향으로 가장 가까운 적구(4구는 상대 큐볼 제외)를 겨눈다. */
-    setThickness(step: number, side: "left" | "right"): void {
+    /**
+     * 두께 맞추기. side 를 주지 않으면 **지금 겨누고 있는 쪽**을 고른다(2026-09-17 오너: "좌우는 크게 안 쓰는 것 같다").
+     *
+     * 좌/우 버튼을 없앨 수 있는 이유가 여기 있다: 사람은 이미 한쪽으로 겨누고 있고, 두께 칩은 "그 쪽으로 몇 두께"를
+     * 뜻한다. 양쪽 각을 다 구해 지금 조준선에 가까운 쪽을 쓰면 버튼이 하던 일이 그대로 없어진다.
+     * 반대쪽을 원하면 그쪽으로 조금 돌린 뒤 칩을 누르면 된다 — 결정을 숨긴 게 아니라 한 단계를 없앤 것이다.
+     */
+    setThickness(step: number, side?: "left" | "right"): void {
         const s = this.store.get();
         const setup = this.aux.setup;
         if (s.phase !== "aim" || !s.session || !setup) return;
-        const aim = thicknessPhi(s.balls, cueBallIdOf(s.session), s.session.rules.gameType, step, side, setup.params.table.ball.R, isOpeningShot(s.session, s.balls));
+        const args = [s.balls, cueBallIdOf(s.session), s.session.rules.gameType, step] as const;
+        const R = setup.params.table.ball.R;
+        const opening = isOpeningShot(s.session, s.balls);
+        const aim = side
+            ? thicknessPhi(...args, side, R, opening)
+            : nearerThicknessPhi(
+                thicknessPhi(...args, "left", R, opening),
+                thicknessPhi(...args, "right", R, opening),
+                aimPhiFromCue(s.input.phi, s.input.a, s.aimAssist),
+            );
         // 두께는 공이 가는 방향으로 정해지므로, 보정 켜짐이면 큐 방향으로 바꿔 저장한다(옆당점이 있으면 스쿼트만큼 반대로)
         if (aim !== null) this.setInput({ phi: cuePhiForAim(aim, s.input.a, s.aimAssist) });
     }

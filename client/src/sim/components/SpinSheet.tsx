@@ -93,17 +93,23 @@ function SpinBall({ a, b, cueBallId, disabled, onChange }: { a: number; b: numbe
             onLostPointerCapture={() => { pointerRef.current = null; }}
             onContextMenu={(e) => e.preventDefault()}
         >
-            {/* 십자선 */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-surface-line" />
-            <div className="absolute top-1/2 left-0 right-0 h-px bg-surface-line" />
-            {/* 미스큐 링(0.5 R) */}
+            {/*
+              * 십자선·미스큐 링은 **공 위에 그리는 것**이라 테마 토큰을 쓰면 안 된다(2026-09-17 오너: "당점 부분 색상 확인해줘").
+              * 이 시트는 늘 sim-dark 안에서 열리는데 거기서 --surface-line 은 흰색 12% 다 — 크림색 백구(#F7F4ED) 위에
+              * 흰 12% 선은 **완전히 안 보였다**(채널당 1~2 차이). 공은 앱 테마와 무관하게 늘 밝으므로 검정 계열로 고정한다.
+              */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[rgba(0,0,0,0.20)]" />
+            <div className="absolute top-1/2 left-0 right-0 h-px bg-[rgba(0,0,0,0.20)]" />
+            {/* 미스큐 링(0.5 R) — 넘으면 미스큐라 십자선보다 진해야 한다. */}
             <div
-                className="absolute rounded-pill border border-dashed border-surface-line"
+                className="absolute rounded-pill border border-dashed border-[rgba(0,0,0,0.38)]"
                 style={{ width: `${ringPct}%`, height: `${ringPct}%`, left: `${50 - ringPct / 2}%`, top: `${50 - ringPct / 2}%` }}
             />
             {/* 당점 */}
             <div
-                className="absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-pill bg-brand border-2 border-surface-1 rk-shadow"
+                /* 당점: 밝은 공 위라 테두리도 검정 계열로 둔다 — sim-dark 의 --surface-1 은 어두워 우연히 보였을 뿐이고,
+                   노란 공(#E8B325) 위에서는 brand 만으로 경계가 약하다. */
+                className="absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-pill bg-brand border-2 border-[rgba(0,0,0,0.45)] rk-shadow"
                 style={{ left: `${50 + a * 50}%`, top: `${50 - b * 50}%` }}
             />
         </div>

@@ -3,7 +3,7 @@ import { TABLES } from "@shared/sim/params";
 import type { BallState } from "@shared/sim/types";
 import {
     phiFromPointer, phiFromDrag, rayBallDistance, rayCushionDistance, firstContact,
-    thicknessFor, phiForThickness, nearestObjectBall, diamondMarks, normalizeAngle,
+    thicknessFor, phiForThickness, nearestObjectBall, diamondMarks, normalizeAngle, nearerThicknessPhi, TWO_PI,
 } from "./aim";
 
 const T = TABLES.DAEDAE;
@@ -85,5 +85,27 @@ describe("기타", () => {
         const d = diamondMarks(T);
         expect(d.length).toBe(20);
         expect(d.filter((m) => m.rail === "left").length).toBe(7);
+    });
+});
+
+describe("nearerThicknessPhi — 좌/우 버튼 없이 두께를 맞춘다", () => {
+    it("지금 겨누는 쪽에 가까운 각을 고른다", () => {
+        expect(nearerThicknessPhi(0.2, 1.4, 0.3)).toBe(0.2);
+        expect(nearerThicknessPhi(0.2, 1.4, 1.3)).toBe(1.4);
+    });
+
+    it("각 차이는 짧은 쪽으로 잰다 — 0 과 2π 는 이웃이다", () => {
+        // 조준이 0.05 면 6.25(≈ -0.03)가 3.0 보다 가깝다. 그냥 빼면 한 바퀴를 돌아 3.0 을 고른다.
+        expect(nearerThicknessPhi(TWO_PI - 0.03, 3.0, 0.05)).toBeCloseTo(TWO_PI - 0.03, 12);
+    });
+
+    it("한쪽만 구해지면 그쪽, 둘 다 없으면 null", () => {
+        expect(nearerThicknessPhi(null, 1.4, 0)).toBe(1.4);
+        expect(nearerThicknessPhi(0.2, null, 3)).toBe(0.2);
+        expect(nearerThicknessPhi(null, null, 0)).toBeNull();
+    });
+
+    it("정확히 같은 거리면 왼쪽 — 뒤집히지 않고 늘 같은 답이 나온다", () => {
+        expect(nearerThicknessPhi(0.9, 1.1, 1.0)).toBe(0.9);
     });
 });

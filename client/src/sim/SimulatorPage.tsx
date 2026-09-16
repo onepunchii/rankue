@@ -71,7 +71,6 @@ import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
 import { ShotClock } from "./components/ShotClock";
 import { MatchEndRapport } from "./match/MatchEndRapport";
-import { PraisePrompt, PRAISE_MS } from "./match/PraisePrompt";
 import { MatchIntro, INTRO_MS } from "./match/MatchIntro";
 import { aimPhi } from "./aimAssist";
 import { useSolver } from "./solver/useSolver";
@@ -250,12 +249,10 @@ export function SimulatorPage() {
     const [cameraView, setCameraView] = useState<RendererView>(() => readViewPref(safeLocalStorage()));
     const cameraViewRef = useRef(cameraView);
     const [viewSupported, setViewSupported] = useState(false);
-    const [side, setSide] = useState<"left" | "right">("right");
     const [log, setLog] = useState<InningLog>(EMPTY_LOG);
     const [banner, setBanner] = useState<{ outcome: ShotOutcome; id: number } | null>(null);
     const [bannerVisible, setBannerVisible] = useState(false);
     // 굿샷 권유(2026-09-15 라포 4번): 상대가 득점한 직후에만 잠깐 뜨는 큰 버튼. run 은 상대의 지금 연속 득점.
-    const [praise, setPraise] = useState<{ id: number; run: number } | null>(null);
     // onOutcome 은 useSimulator 보다 먼저 만들어져 sim 을 못 본다 — 내 자리만 ref 로 넘긴다.
     const myIndexRef = useRef<number | null>(null);
     // 시작 인사(2026-09-15 라포 3번): 첫 샷 전에 한 번만. 대전 id 를 적어 두어 같은 판에서 다시 뜨지 않게 한다.
@@ -281,11 +278,6 @@ export function SimulatorPage() {
         onOutcome: (outcome, session, shooter) => {
             setLog((l) => appendShot(l, outcome, session, shooter));
             setBanner({ outcome, id: session.shotCount });
-            // 상대가 득점했다 → 칭찬 버튼을 잠깐 띄운다. 내 샷·연습은 해당 없다.
-            const mine = myIndexRef.current;
-            if (mine !== null && shooter !== mine && outcome.scored) {
-                setPraise({ id: session.shotCount, run: session.players[shooter]?.currentRun ?? 0 });
-            }
             void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
         },
         matchApi,
@@ -925,13 +917,6 @@ export function SimulatorPage() {
         return () => clearTimeout(id);
     }, [introKey]);
 
-    // 굿샷 버튼은 몇 초 뒤 스스로 사라진다 — 계속 떠 있으면 조준을 가린다.
-    useEffect(() => {
-        if (!praise) return;
-        const id = setTimeout(() => setPraise(null), PRAISE_MS);
-        return () => clearTimeout(id);
-    }, [praise]);
-
     /**
      * 대전 헤더의 두 선수(2026-09-16). **왼쪽이 나, 오른쪽이 상대** — 참고 화면과 같은 배치라
      * 내 점수를 늘 같은 자리에서 찾는다. 자리(myIndex)와 화면 순서가 다를 수 있어 여기서 뒤집는다.
@@ -985,12 +970,8 @@ export function SimulatorPage() {
     }, [diamondOn, banner, lastResult, table, t]);
 
     // ── 조작 콜백(참조 안정 — Controls 는 memo) ──────────────────────────
-    const onThickness = useCallback((step: ThicknessStep) => actions.setThickness(step, side), [actions, side]);
-    const onSide = useCallback((s: "left" | "right") => {
-        setSide(s);
-        const step = active?.step;
-        if (step && step !== 1) actions.setThickness(step, s);
-    }, [actions, active?.step]);
+    /* 좌/우 버튼을 없앴다(2026-09-17 오너) — 컨트롤러가 지금 겨누는 쪽을 골라 준다. */
+    const onThickness = useCallback((step: ThicknessStep) => actions.setThickness(step), [actions]);
     const onNudge = useCallback((dir: -1 | 1) => actions.nudgePhi(dir * FINE_STEP_RAD), [actions]);
     const onSpin = useCallback((a: number, b: number) => actions.setSpin(a, b), [actions]);
     const onElevation = useCallback((theta: number) => actions.setElevation(theta), [actions]);
@@ -1514,8 +1495,8 @@ export function SimulatorPage() {
                         />
                     ) : (
                         <ThicknessDock
-                            active={active} side={side} disabled={!aiming}
-                            onThickness={onThickness} onSide={onSide} onNudge={onNudge}
+                            active={active} disabled={!aiming}
+                            onThickness={onThickness} onNudge={onNudge}
                             onUndo={undoInDock ? onUndo : null}
                             className={cn(
                                 "absolute left-2 bottom-2 z-[3] transition-opacity duration-150",
@@ -1600,16 +1581,6 @@ export function SimulatorPage() {
                         />
                     )}
                     {/* 굿샷 권유(2026-09-15 라포): 상대가 득점한 직후에만. 조준을 가리지 않게 테이블 아래쪽에 잠깐. */}
-                    {isMatch && sim.match?.status === "playing" && (
-                        <PraisePrompt
-                            visible={praise !== null}
-                            run={praise?.run ?? 0}
-                            name={sim.match?.opponentName ?? ""}
-                            bottom={DOCK_HEIGHT + 12}
-                            /* 한마디로 보낸다(이모지 경로가 아니라) — 그래야 대화 로그에 같이 남는다. */
-                            onPraise={() => { setPraise(null); void onSendChatCode("nice"); }}
-                        />
-                    )}
                 </div>
             </div>
 

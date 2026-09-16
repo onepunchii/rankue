@@ -160,3 +160,20 @@ export function diamondMarks(table: TableSpec): readonly { x: number; y: number;
     }
     return out;
 }
+
+/**
+ * 두 두께 각(좌/우) 중 **지금 조준선에 가까운 쪽**. 두께 칩이 좌우 버튼 없이 동작하는 근거다
+ * (2026-09-17 오너: "좌 우 버튼은 크게 안 쓰는 것 같다").
+ *
+ * 각 차이는 짧은 쪽으로 잰다 — 0 과 2π 는 이웃이라 그냥 빼면 한 바퀴를 돈다.
+ * 한쪽만 구해졌으면 그쪽, 둘 다 없으면 null.
+ */
+export function nearerThicknessPhi(left: number | null, right: number | null, aim: number): number | null {
+    if (left === null) return right;
+    if (right === null) return left;
+    const gap = (x: number) => {
+        const d = Math.abs(normalizeAngle(x) - normalizeAngle(aim)) % TWO_PI;
+        return d > Math.PI ? TWO_PI - d : d;
+    };
+    return gap(left) <= gap(right) ? left : right;
+}
