@@ -91,6 +91,7 @@ import { beginGesture, moveGesture, planGestureReset, staleResetReason, type Ges
 import { reportGestureRecover, type TelemetryMode } from "./gestureTelemetry";
 import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
+import { sameCueInput } from "./simReducer";
 import type { CueInput, Phase } from "./simReducer";
 import type { SimPreview } from "./simController";
 import { TopBar } from "./components/TopBar";
@@ -297,6 +298,8 @@ export function SimulatorPage() {
     const solver = useSolver();
     const [solverOpen, setSolverOpen] = useState(false);
     const [solverPreview, setSolverPreview] = useState<{ candidate: SolveCandidate; paths: PreviewPaths } | null>(null);
+    /** 길을 눌러 넣은 입력. 이 값에서 벗어나면(내가 조준을 바꾸면) 그린 경로를 지운다. */
+    const appliedInputRef = useRef<CueInput | null>(null);
     const solverSeedRef = useRef(1);
     const lastResultRef = useRef(sim.lastResult);
     lastResultRef.current = sim.lastResult;
@@ -1161,7 +1164,9 @@ export function SimulatorPage() {
     // 길 찾기 화면과 대전의 길 버튼이 같은 적용부를 쓴다.
     const applyPath = useCallback((c: SolveCandidate | null) => {
         if (!c || !sim.config) return;
-        actions.setInput({ phi: c.input.phi, V0: c.input.V0, a: c.input.a, b: c.input.b, theta: 0 });
+        const next = { phi: c.input.phi, V0: c.input.V0, a: c.input.a, b: c.input.b, theta: 0 };
+        appliedInputRef.current = next;   // 내가 조준을 바꾸면 풀린다(아래 효과)
+        actions.setInput(next);
         setSolverPreview({ candidate: c, paths: buildPreviewPaths(c.result, { cueBallId: sim.cueBallId, gameType: sim.config.gameType }) });
     }, [sim.config, sim.cueBallId, actions]);
     const onPickPath = useCallback((i: number) => {
@@ -1184,7 +1189,20 @@ export function SimulatorPage() {
         } else openSolver();
     };
     // 배치가 바뀌면(샷·되돌리기·공 옮기기) 후보는 낡은 것 — 경로를 끄고 시트를 닫는다
-    useEffect(() => { setSolverPreview(null); setSolverOpen(false); }, [sim.balls]);
+    useEffect(() => { appliedInputRef.current = null; setSolverPreview(null); setSolverOpen(false); }, [sim.balls]);
+
+    /**
+     * 길을 고른 뒤 **내가 조준을 바꾸면 그 길은 풀린다**(2026-09-16 오너: "방향을 바꾸면 해제되어야 하는데 계속 그 길을 보여준다").
+     * 그린 경로는 '이 입력으로 치면 이렇게 간다' 는 그림이라, 입력이 달라지면 더는 맞는 그림이 아니다.
+     * applyPath 는 후보 값을 반올림 없이 그대로 넣으므로 정확히 같은지만 보면 된다.
+     * 시트에서 손가락만 올려 본 미리보기(onSolverPreview)는 적용한 적이 없어 ref 가 비어 있고, 여기서 건드리지 않는다.
+     */
+    useEffect(() => {
+        const ap = appliedInputRef.current;
+        if (!ap || sameCueInput(sim.input, ap)) return;
+        appliedInputRef.current = null;
+        setSolverPreview(null);
+    }, [sim.input]);
     // 길 찾기: 결과가 오면 시트를 스스로 닫는다. 목록을 뺀 뒤로 시트가 할 일은 '찾는 중' 뿐인데,
     // 열린 채로 두면 검은 막(Radix 모달)이 정작 안내가 가리키는 오른쪽 바와 아래 카드를 덮는다(2026-09-09 검토).
     // 길을 못 찾은 경우도 아래 카드가 '이 배치에선 길이 없어요' 로 받아 준다.

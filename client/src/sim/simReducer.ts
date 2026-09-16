@@ -39,6 +39,14 @@ export interface CueInput {
     readonly theta: number;
 }
 
+/**
+ * 두 조준 입력이 같은가 — 길 찾기로 넣은 입력에서 벗어났는지 볼 때 쓴다(2026-09-16 오너:
+ * "길을 눌렀는데 방향을 바꾸면 해제되어야 한다"). 후보 값을 반올림 없이 그대로 넣으므로 정확히 비교한다.
+ */
+export function sameCueInput(a: CueInput, b: CueInput): boolean {
+    return a.phi === b.phi && a.V0 === b.V0 && a.a === b.a && a.b === b.b && a.theta === b.theta;
+}
+
 export const V0_DEFAULT = 2.5;
 export const V0_MIN = 0.2;
 /**

@@ -10,8 +10,7 @@ import {
     simReducer, createSimStore, INITIAL_STATE,
     clampPower, clampElevation, clampSpin, defaultPhi, thicknessPhi, initialInput, paramsFromConfig, objectTargetFor,
     V0_MIN, V0_MAX, V0_LEGACY_MAX, V0_DEFAULT, THETA_MAX, MAX_RETRIES,
-    type SimCoreState,
-} from "./simReducer";
+    sameCueInput, type SimCoreState } from "./simReducer";
 
 const table = TABLES.DAEDAE;
 const R = table.ball.R;
@@ -690,5 +689,22 @@ describe("조준 보정(스쿼트) — 일반 모드는 당점을 바꿔도 화�
         const s1 = simReducer(s0, { type: "setInput", patch: { a: 0.5 } });
         expect(s1.input.phi).toBe(s0.input.phi);
         expect(simReducer(INITIAL_STATE, { type: "start", session: session3(), balls: balls3, record: false }).aimAssist).toBe(true);
+    });
+});
+
+describe("sameCueInput — 길을 고른 뒤 조준이 바뀌었나(2026-09-16)", () => {
+    const base = { phi: 1.2345, V0: 2.5, a: 0.1, b: -0.2, theta: 0 };
+    it("같은 값이면 같다", () => {
+        expect(sameCueInput(base, { ...base })).toBe(true);
+    });
+    it("방향·세기·당점·큐 각 중 하나라도 달라지면 다르다 — 그린 길을 지울 신호", () => {
+        expect(sameCueInput(base, { ...base, phi: 1.2346 })).toBe(false);
+        expect(sameCueInput(base, { ...base, V0: 2.6 })).toBe(false);
+        expect(sameCueInput(base, { ...base, a: 0 })).toBe(false);
+        expect(sameCueInput(base, { ...base, b: 0 })).toBe(false);
+        expect(sameCueInput(base, { ...base, theta: 5 })).toBe(false);
+    });
+    it("미세 방향조절 한 번(0.1°)도 잡아낸다", () => {
+        expect(sameCueInput(base, { ...base, phi: base.phi + (Math.PI / 180) * 0.1 })).toBe(false);
     });
 });
