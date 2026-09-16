@@ -192,6 +192,8 @@ export interface MatchState {
     readonly opponentAway: boolean;
     /** 핸디전인가 — 시작 인사 화면이 "다마수는 두 사람 에버리지로 정해졌다"를 설명할 때 쓴다. */
     readonly handicap: boolean;
+    /** 상대가 지금 겨누는 방향(2026-09-16). 기다리는 동안 큐대를 그린다. */
+    readonly opponentAim: { readonly phi: number; readonly at: string } | null;
 }
 
 /** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
@@ -210,6 +212,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         watchers: m.watchers ?? 0,
         opponentAway: m.opponentAway === true,
         handicap: m.handicap === true,
+        opponentAim: m.opponentAim ?? null,
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
         emoji: m.emoji ?? null,
@@ -224,6 +227,7 @@ export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
         && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName
         && a.timeouts[0] === b.timeouts[0] && a.timeouts[1] === b.timeouts[1]
         && a.opponentAway === b.opponentAway
+        // 조준은 자주 바뀌는 표시용 값이라 **메타 비교에서 뺀다** — 넣으면 폴링마다 메타가 달라져 스냅이 돈다.
         && (a.emoji?.at ?? null) === (b.emoji?.at ?? null);
 }
 

@@ -11,7 +11,7 @@ vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout } from "@shared/sim/layouts";
 import { DEFAULT_CUE, TABLES } from "@shared/sim/params";
-import { applyShot, createSession, evaluateShot, isOpeningShot, DEFAULT_3C_RULES, type SessionState } from "@shared/sim/rules";
+import { applyShot, createSession, evaluateShot, isOpeningShot, DEFAULT_3C_RULES, AIM_EPS_RAD, AIM_REPORT_MS, type SessionState } from "@shared/sim/rules";
 import type { BallState, ShotInput } from "@shared/sim/types";
 import { MAX_RETRIES } from "./simReducer";
 import type { ShotRequest, SimApi } from "./simApi";
@@ -101,6 +101,8 @@ class FakeMatchServer {
     /** getShots 가 돌려주는 해시를 망가뜨린다(결정론 깨짐 흉내). */
     tamperHash = false;
     calls = { get: 0, shots: 0, post: 0, resign: 0, claim: 0 };
+    /** 상대에게 보여 줄 조준 보고(phi) — 순서대로 쌓인다. */
+    aims: number[] = [];
     private gate: Promise<void> | null = null;
     private release_: (() => void) | null = null;
     /** 라우트 paramsFor 와 같다(컨트롤러의 paramsFromConfig 와 같은 값이어야 해시가 맞는다). */
@@ -212,6 +214,7 @@ class FakeMatchServer {
             lookupCode: vi.fn(async () => this.public(viewer)),
             joinMatch: vi.fn(async () => this.public(viewer)),
             getMatch: vi.fn(async () => { this.calls.get++; await guard(); return this.public(viewer); }),
+            sendAim: vi.fn(async (_id: string, phi: number) => { this.aims.push(phi); }),
             getShots: vi.fn(async (_id: string, from = 0) => {
                 this.calls.shots++;
                 await guard();
@@ -664,5 +667,98 @@ describe("기권·승리 주장·종료", () => {
         expect(endReasonFor({ winnerIndex: 0, state: won })).toBe("target");
         expect(endReasonFor({ winnerIndex: 1, state: won })).toBe("inningCap");
         expect(endReasonFor({ winnerIndex: null, state: won })).toBe("inningCap");
+    });
+});
+
+/**
+ * 조준 보고(2026-09-16 오너: "멀티가 너무 정적이다"). 내 차례에 겨누는 각도를 상대에게 흘려 보내
+ * 기다리는 쪽 화면에 내 큐대가 움직이게 한다. 값은 표시용이라 실패해도 조용하고, 아끼는 규칙이 둘 있다:
+ * 마지막 전송에서 AIM_REPORT_MS 가 지나야 하고, 각도가 AIM_EPS_RAD 이상 달라져야 한다.
+ */
+describe("조준 보고", () => {
+    it("내 차례에 겨누면 첫 각도는 곧바로 간다", async () => {
+        const m = make(HOST);
+        m.ctrl.startMatch(m.srv.public(HOST));
+        m.ctrl.setPhi(1);
+        expect(m.srv.aims).toEqual([1]);
+    });
+
+    it("간격 안의 변화는 모았다가 한 번만 — 마지막 각도로", async () => {
+        const m = make(HOST);
+        m.ctrl.startMatch(m.srv.public(HOST));
+        m.ctrl.setPhi(1);
+        m.ctrl.setPhi(1.2);
+        m.ctrl.setPhi(1.4);
+        m.ctrl.setPhi(1.6);
+        expect(m.srv.aims).toEqual([1]);                 // 간격 안이라 아직 안 보낸다
+        m.env.advance(AIM_REPORT_MS);
+        await settle();
+        expect(m.srv.aims).toEqual([1, 1.6]);            // 손이 멈춘 자리 하나만
+    });
+
+    it("손을 멈춰도 마지막 각도는 반드시 간다 — 안 그러면 상대 큐대가 옛 자리에 굳는다", async () => {
+        const m = make(HOST);
+        m.ctrl.startMatch(m.srv.public(HOST));
+        m.ctrl.setPhi(1);
+        m.ctrl.setPhi(2);
+        m.env.advance(AIM_REPORT_MS * 5);
+        await settle();
+        expect(m.srv.aims).toEqual([1, 2]);
+    });
+
+    it("눈에 안 보일 만큼 미세한 변화는 안 보낸다", async () => {
+        const m = make(HOST);
+        m.ctrl.startMatch(m.srv.public(HOST));
+        m.ctrl.setPhi(1);
+        m.env.advance(AIM_REPORT_MS * 2);
+        m.ctrl.setPhi(1 + AIM_EPS_RAD / 2);
+        m.env.advance(AIM_REPORT_MS * 2);
+        await settle();
+        expect(m.srv.aims).toEqual([1]);
+    });
+
+    it("세기만 바꾸면 안 보낸다 — 큐대가 가리키는 쪽이 그대로다", async () => {
+        const m = make(HOST);
+        m.ctrl.startMatch(m.srv.public(HOST));
+        m.ctrl.setPhi(1);
+        m.env.advance(AIM_REPORT_MS * 2);
+        m.ctrl.setPower(3);
+        m.env.advance(AIM_REPORT_MS * 2);
+        await settle();
+        expect(m.srv.aims).toEqual([1]);
+    });
+
+    it("당점을 옆으로 주면 보낸다 — 보정이 큐대를 실제로 틀기 때문", async () => {
+        // 조준선을 유지하려고 스쿼트만큼 큐 방향을 돌린다(simReducer). 상대 화면의 큐대도 그만큼 돌아야 맞다.
+        const m = make(HOST);
+        m.ctrl.startMatch(m.srv.public(HOST));
+        m.ctrl.setPhi(1);
+        m.env.advance(AIM_REPORT_MS * 2);
+        m.ctrl.setSpin(0.4, 0);
+        m.env.advance(AIM_REPORT_MS * 2);
+        await settle();
+        expect(m.srv.aims).toHaveLength(2);
+        expect(m.srv.aims[1]).toBe(m.s().input.phi);
+    });
+
+    it("상대 차례(대기)엔 한 번도 안 보낸다 — 입력 자체가 잠겨 있다", async () => {
+        const m = make(GUEST);
+        m.ctrl.startMatch(m.srv.public(GUEST));
+        expect(m.s().phase).toBe("waiting");
+        m.ctrl.setPhi(1);
+        m.env.advance(AIM_REPORT_MS * 2);
+        await settle();
+        expect(m.srv.aims).toEqual([]);
+    });
+
+    it("정리한 뒤엔 예약된 전송이 살아남지 않는다", async () => {
+        const m = make(HOST);
+        m.ctrl.startMatch(m.srv.public(HOST));
+        m.ctrl.setPhi(1);
+        m.ctrl.setPhi(2);                                 // 예약만 걸린 상태
+        m.ctrl.dispose();
+        m.env.advance(AIM_REPORT_MS * 5);
+        await settle();
+        expect(m.srv.aims).toEqual([1]);
     });
 });

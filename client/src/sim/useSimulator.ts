@@ -120,6 +120,8 @@ export interface MatchView {
     readonly opponentAway: boolean;
     /** 핸디전(참가할 때 서버가 두 사람 에버리지로 다마수를 정한 방) */
     readonly handicap: boolean;
+    /** 상대가 지금 겨누는 방향(rad). 상대 차례에만 온다 — 큐대를 그려 "지켜보는" 느낌을 만든다. */
+    readonly opponentAim: { readonly phi: number; readonly at: string } | null;
     /** 마지막 이모지 인사(보낸 사람 자리 포함). 화면이 상대 것만 띄운다. */
     readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
 }
@@ -243,6 +245,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             watchers: m.watchers ?? 0,
             opponentAway: m.opponentAway === true,
             handicap: m.handicap === true,
+            opponentAim: m.opponentAim ?? null,
         } : null;
         return {
             phase: core.phase,

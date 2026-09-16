@@ -17,7 +17,7 @@ import {
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
-    SHOT_CLOCK_STRIKES, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH, isMatchEmoji, PRESENCE_MS, ABSENT_GRACE_MS,
+    SHOT_CLOCK_STRIKES, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH, isMatchEmoji, PRESENCE_MS, ABSENT_GRACE_MS, AIM_FRESH_MS,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
@@ -130,6 +130,15 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         createdAt: m.createdAt, startedAt: m.startedAt, lastShotAt: m.lastShotAt, finishedAt: m.finishedAt,
         // 40초 룰: 시계 기준 시각과 서버 시각(클라이언트 시계 보정용)
         turnSeenAt: m.turnSeenAt, serverNow: new Date(),
+        /**
+         * 상대 조준(2026-09-16 오너: "멀티가 너무 정적이다"). 지금 치는 사람이 겨누는 방향 — 기다리는 쪽 화면이
+         * 큐대를 그린다. 내 차례면 볼 것이 없고, 낡은 값(AIM_FRESH_MS)은 아예 안 보낸다(상대가 앱을 닫은 경우).
+         * 예상 경로는 주지 않는다 — 그건 가락 미리보기 제한을 무의미하게 만든다.
+         */
+        opponentAim: m.status === "playing" && m.turn !== myIndex && m.aimPhi != null && m.aimAt
+            && Date.now() - m.aimAt.getTime() <= AIM_FRESH_MS
+            ? { phi: m.aimPhi, at: m.aimAt }
+            : null,
         // 상대가 지금 화면을 보고 있나 — 자리를 비우면 시계가 늦게(ABSENT_GRACE_MS) 시작하므로,
         // 그 사이 남은 사람 화면이 멈춘 것처럼 보이지 않게 이유를 알려 준다(2026-09-15).
         opponentAway: m.status === "playing" && (() => {
@@ -575,6 +584,23 @@ router.post("/sim/matches/:id/claim", requireAuth, asyncHandler(async (req: Auth
     if (!row) return sendError(res, 409, "이미 끝난 대전입니다");
     notify(myIndex === 0 ? m.guestId : m.hostId, "온라인게임 대전 종료", "48시간 동안 응답이 없어 상대의 승리로 끝났어요.", m.id);
     return sendSuccess(res, { status: "finished", winnerIndex: myIndex });
+}));
+
+/**
+ * POST /sim/matches/:id/aim — 내가 겨누는 방향을 알린다(2026-09-16). 기다리는 상대 화면에 큐대로 그려진다.
+ *
+ * 아주 가볍게 둔다: 대전 행을 돌려주지 않고(응답을 읽을 이유가 없다), version 도 올리지 않는다
+ * (올리면 상대가 매번 "다시 맞췄다"로 스냅한다). 내 차례가 아니면 조용히 무시한다 — 경쟁 상태라 에러가 아니다.
+ * 클라이언트가 간격·각도 변화로 눌러 보내므로(AIM_REPORT_MS·AIM_EPS_RAD) 가만히 있으면 요청이 아예 없다.
+ */
+router.post("/sim/matches/:id/aim", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const phi = Number((req.body ?? {}).phi);
+    if (!Number.isFinite(phi)) return sendError(res, 400, "조준 값이 올바르지 않습니다");
+    const m = await storage.simMatch.get(req.params.id);
+    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "대전이 없습니다");
+    if (m.status !== "playing") return sendSuccess(res, { ok: true });
+    await storage.simMatch.setAim(m.id, m.hostId === req.userId ? 0 : 1, phi);
+    return sendSuccess(res, { ok: true });
 }));
 
 /**

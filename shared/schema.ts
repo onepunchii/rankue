@@ -1854,6 +1854,12 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   rematchBy: jsonb("rematch_by"),
   /** 재경기로 만들어진 새 대전. 한 번 정해지면 안 바뀐다(양쪽이 같은 방으로 들어가는 기준점). */
   rematchId: uuid("rematch_id"),
+  /**
+   * 상대에게 보여 줄 조준 방향(rad, 2026-09-16). 치는 쪽이 겨누는 동안 드문드문 적고, 차례가 바뀌면 지운다.
+   * 값 하나뿐이라 컬럼으로 둔다(이모지와 같은 이유) — 남길 기록이 아니라 몇 초짜리 현재 상태다.
+   */
+  aimPhi: doublePrecision("aim_phi"),
+  aimAt: timestamp("aim_at"),
   /** 이모지 인사(2026-09-09 오너): 마지막 하나만 둔다 — 대화 내역이 아니라 순간 반응이라 쌓을 이유가 없다. */
   emojiCode: text("emoji_code"),
   /** 보낸 사람 자리(0 = 호스트, 1 = 게스트) */

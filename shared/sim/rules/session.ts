@@ -110,6 +110,17 @@ export const REPLAY_GRACE_MS = 10_000;
  */
 export const ABSENT_GRACE_MS = 60_000;
 
+/* ── 상대 조준 보여 주기(2026-09-16 오너: "멀티가 너무 정적이다") ──
+ * 치는 사람이 겨누는 방향을 기다리는 사람 화면에도 큐대로 보여 준다. 실제 당구장에서 상대가 자세 잡는 걸
+ * 지켜보는 것과 같다 — 숨은 정보가 아니다(원래 다 보인다). 예상 경로는 주지 않는다: 그건 가락 제한을 무의미하게 만든다.
+ */
+/** 이 시간이 지난 조준 값은 낡은 것 — 서버가 내보내지 않고 화면도 큐대를 지운다(상대가 앱을 닫은 경우). */
+export const AIM_FRESH_MS = 8_000;
+/** 조준을 서버에 알리는 최소 간격(ms). 40초를 꽉 채워 조준해도 요청은 서른 번 남짓이다. */
+export const AIM_REPORT_MS = 1_200;
+/** 이만큼(rad, 약 0.6°) 이상 돌았을 때만 알린다 — 가만히 있으면 요청이 아예 없다. */
+export const AIM_EPS_RAD = 0.01;
+
 /** 시간 초과: 샷 없이 이닝을 넘기는 결과(무득점·이닝 소모). applyShot 에 그대로 넣는다. */
 export function timeoutOutcome(): ShotOutcome {
     return { code: "foul-timeout", points: 0, scored: false, consumesInning: true, cushionsBeforeSecond: 0, cushionsBeforeFirst: 0, contacts: [], kisses: 0 };

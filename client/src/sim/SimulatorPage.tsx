@@ -92,6 +92,7 @@ import { reportGestureRecover, type TelemetryMode } from "./gestureTelemetry";
 import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
 import { sameCueInput } from "./simReducer";
+import { easeOppAim, OPP_AIM_PULLBACK } from "./match/oppAim";
 import type { CueInput, Phase } from "./simReducer";
 import type { SimPreview } from "./simController";
 import { TopBar } from "./components/TopBar";
@@ -180,6 +181,8 @@ interface View {
     cameraView: RendererView;
     /** 조준 보정(일반 모드). 오버레이·카메라·두께 활성은 aimPhi(큐 방향 + 스쿼트)로 본다. */
     assist: boolean;
+    /** 상대가 지금 겨누는 각도(대전 대기 중에만). 여기에 상대 큐대만 얹는다 — 조준선·길은 안 준다. */
+    opponentAim: number | null;
 }
 
 export function SimulatorPage() {
@@ -537,18 +540,26 @@ export function SimulatorPage() {
         return () => ro.disconnect();
     }, []);
 
+    /**
+     * 상대가 겨누는 각도 — 내 차례가 아니고(waiting) 서버가 낡지 않은 값을 줄 때만.
+     * 서버가 이미 AIM_FRESH_MS 로 걸러 주므로(상대가 앱을 닫으면 null 이 온다) 여기선 화면 상태만 본다.
+     */
+    const opponentAim = sim.phase === "waiting" ? sim.match?.opponentAim?.phi ?? null : null;
+    /** 직전 프레임에 그린 상대 큐 각도(따라가는 중간값). 값이 없어지면 null 로 비워 큐대를 지운다. */
+    const oppAimRef = useRef<number | null>(null);
+
     // rAF 루프가 읽는 뷰 — 렌더마다 갱신(할당만, 재렌더 없음)
     const viewRef = useRef<View>({
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist, opponentAim,
     });
     viewRef.current = {
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist, opponentAim,
     };
     useEffect(() => {
         dirtyRef.current = true;
-    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview, cameraView, assist]);
+    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview, cameraView, assist, opponentAim]);
 
     const { frameAt } = sim;
     useEffect(() => {
@@ -560,18 +571,24 @@ export function SimulatorPage() {
             if (!renderer) return;
             const frame = frameAt(performance.now());
             // 선수 시점 카메라가 아직 움직이는 중이면(needsFrame) dirty 가 아니어도 그린다 — 오버레이도 같은 자세로 다시 얹힌다
-            if (!frame.playing && !dirtyRef.current && !renderer.needsFrame?.() && strokeRef.current === null) return;
-            dirtyRef.current = false;
             const v = viewRef.current;
+            // 상대 큐대는 받은 각도로 프레임마다 조금씩 따라간다 — 따라가는 중이면 dirty 가 아니어도 그려야 움직인다.
+            const opp = easeOppAim(oppAimRef.current, v.opponentAim);
+            oppAimRef.current = opp?.phi ?? null;
+            if (!frame.playing && !dirtyRef.current && !renderer.needsFrame?.() && strokeRef.current === null && !opp?.moving) return;
+            dirtyRef.current = false;
             renderer.draw({
                 balls: frame.balls,
                 // 큐대는 조준 중에만. 샷을 누르면 STROKE_MS 동안 당김이 0 으로 줄며(앞으로 밀리며) 그 뒤 공이 출발한다.
+                // 상대 차례엔 상대가 겨누는 각도로 큐대만 얹는다(화면이 멈춰 있지 않게). 세기는 안 오므로 당김은 고정.
                 cue: {
-                    phi: v.input.phi,
-                    pullback: strokeRef.current === null
-                        ? pullbackFor(v.input.V0)
-                        : pullbackFor(v.input.V0) * Math.max(0, 1 - (performance.now() - strokeRef.current) / STROKE_MS),
-                    visible: v.phase === "aim",
+                    phi: opp ? opp.phi : v.input.phi,
+                    pullback: opp
+                        ? OPP_AIM_PULLBACK
+                        : strokeRef.current === null
+                            ? pullbackFor(v.input.V0)
+                            : pullbackFor(v.input.V0) * Math.max(0, 1 - (performance.now() - strokeRef.current) / STROKE_MS),
+                    visible: v.phase === "aim" || opp !== null,
                     ballId: v.cueBallId,
                 },
                 // 큐볼은 큐 스틱이 가리키므로 링을 두르지 않는다 — 8px 남짓한 공에 링이 겹치면 속이 빈 공처럼 보였다(실측).

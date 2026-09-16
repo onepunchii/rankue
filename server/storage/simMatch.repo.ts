@@ -190,6 +190,15 @@ export class SimMatchRepository {
         return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null }));
     }
 
+    /**
+     * 조준 방향 기록(2026-09-16). **version 을 올리지 않는다** — 올리면 상대 화면이 매번 "다시 맞췄다"로 스냅한다.
+     * 지금 차례인 사람의 것만 받는다(WHERE turn). 낡음 판정은 읽는 쪽에서 aim_at 으로 한다.
+     */
+    async setAim(id: string, playerIndex: number, phi: number): Promise<void> {
+        await db.update(hiqSimMatches).set({ aimPhi: phi, aimAt: new Date() })
+            .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.status, "playing"), eq(hiqSimMatches.turn, playerIndex)));
+    }
+
     /* ────────── "한 판 더"(2026-09-15 오너: 라포) ────────── */
 
     /**
@@ -361,6 +370,7 @@ export class SimMatchRepository {
                 lastShotAt: new Date(),
                 // 다음 차례가 접속 중이면 재생 여유 뒤 시계가 바로 돈다(같은 사람이 이어 칠 때도). 아니면 조준 화면을 열 때.
                 turnSeenAt: nextTurnSeenAt(m, a.newTurn, a.finished, REPLAY_GRACE_MS),
+                aimPhi: null, aimAt: null,
                 ...(a.finished ? { status: "finished" as const, finishedAt: new Date(), winnerId, endReason: a.endReason } : {}),
             }).where(eq(hiqSimMatches.id, a.matchId)).returning();
 
@@ -419,6 +429,8 @@ export class SimMatchRepository {
                 state: a.newState, turn: a.newTurn, version: m.version + 1, lastShotAt: new Date(),
                 // 시간 초과엔 재생이 없다 — 접속 중이면 바로 시작
                 turnSeenAt: nextTurnSeenAt(m, a.newTurn, a.finished, 0),
+                // 차례가 바뀌면 옛 조준은 남의 것이다 — 지운다(2026-09-16)
+                aimPhi: null, aimAt: null,
                 ...(a.strikeIndex === 0 ? { hostTimeouts: m.hostTimeouts + 1 } : a.strikeIndex === 1 ? { guestTimeouts: m.guestTimeouts + 1 } : {}),
                 ...(a.finished ? { status: "finished" as const, finishedAt: new Date(), winnerId, endReason: a.endReason } : {}),
             }).where(eq(hiqSimMatches.id, a.id)).returning();

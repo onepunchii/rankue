@@ -123,6 +123,8 @@ export interface MatchPublic {
     readonly version: number;
     /** 상대가 지금 화면을 안 보고 있다(자리 비움). 진행 중일 때만 의미가 있다. */
     readonly opponentAway: boolean;
+    /** 상대가 지금 겨누는 방향(rad, ISO 시각). 내 차례거나 값이 낡았으면 null — 서버가 걸러 준다. */
+    readonly opponentAim: { readonly phi: number; readonly at: string } | null;
     /** 정본 세션 상태. waiting 이면 null. players[0]=호스트(white), players[1]=게스트(yellow) */
     readonly state: SessionState | null;
     readonly balls: readonly BallState[] | null;
@@ -402,6 +404,9 @@ export function parseMatch(raw: unknown): MatchPublic {
         version: raw.version,
         // 옛 서버 응답에는 없다 — 없으면 "자리에 있다"로 본다(없던 안내가 새로 생기는 쪽이 안전).
         opponentAway: raw.opponentAway === true,
+        opponentAim: isRecord(raw.opponentAim) && typeof raw.opponentAim.phi === "number" && Number.isFinite(raw.opponentAim.phi)
+            ? { phi: raw.opponentAim.phi, at: isoOrNull(raw.opponentAim.at) ?? "" }
+            : null,
         state,
         balls,
         winnerIndex: playerIndexOrNull(raw.winnerIndex),
@@ -618,6 +623,8 @@ export interface MatchApi {
     timeout?(id: string): Promise<MatchPublic>;
     /** 이모지 인사 보내기. 너무 자주 보내면 429. */
     sendEmoji?(id: string, code: string): Promise<MatchPublic>;
+    /** 내가 겨누는 방향 알리기(2026-09-16). 응답은 읽지 않는다 — 실패해도 조용히 넘어간다. */
+    sendAim?(id: string, phi: number): Promise<void>;
 }
 
 /** request 를 주입해 만든다(테스트는 가짜 request). 응답은 {success,data} 가 이미 벗겨진 data 여야 한다. */
@@ -656,6 +663,9 @@ export function createMatchApi(request: RequestFn): MatchApi {
         },
         async sendEmoji(id, code) {
             return parseMatch(await request(matchEmojiUrl(id), { method: "POST", body: { code } }));
+        },
+        async sendAim(id, phi) {
+            await request(`${matchUrl(id)}/aim`, { method: "POST", body: { phi } });
         },
         async getShots(id, from) {
             return parseMatchShots(await request(matchShotsUrl(id, from), { method: "GET" }));

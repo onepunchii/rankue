@@ -33,7 +33,7 @@ import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout, isValidLayout } from "@shared/sim/layouts";
 import { cuePhiForAim } from "./aimAssist";
 import { aimAssistFor } from "./setupPresets";
-import { applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
+import { AIM_EPS_RAD, AIM_REPORT_MS, applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
 import { SHORT_PREVIEW_TAIL_M, MATCH_PREVIEW_CUSHIONS, buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
 import { SimAudio } from "./audio";
@@ -451,6 +451,7 @@ export class SimController {
         this.gen++;
         this.stopLoop();
         this.clearPreviewTimer();
+        if (this.aimTimer !== null) { this.clearTimer(this.aimTimer); this.aimTimer = null; }
         this.cancelFeedback();
         this.matchCleanup();
         this.audio?.dispose();
@@ -465,6 +466,42 @@ export class SimController {
 
     setInput(patch: Partial<CueInput>): void {
         this.store.dispatch({ type: "setInput", patch });
+        this.reportAim();
+    }
+
+    /* ── 상대에게 내 조준 보여 주기(2026-09-16 오너: "멀티가 너무 정적이다") ──
+     * 기다리는 쪽 화면에 내 큐대가 그려진다. 모든 입력이 setInput 을 지나므로 여기 한 곳에서만 재면 된다.
+     * 아끼는 규칙 둘: 마지막 전송에서 AIM_REPORT_MS 가 지나야 하고, 각도가 AIM_EPS_RAD 이상 달라져야 한다.
+     * 가만히 겨누고 있으면 요청이 아예 없다. 간격에 걸린 변화는 버리지 않고 남은 시간 뒤에 한 번 보낸다(trailing)
+     * — 안 그러면 손을 멈춘 마지막 각도가 상대에게 영영 안 간다.
+     */
+    private aimSent: { phi: number; at: number; turn: number; matchId: string } | null = null;
+    private aimTimer: unknown = null;
+
+    private reportAim(): void {
+        if (this.disposed || !this.matchApi.sendAim) return;
+        const s = this.store.get();
+        if (s.mode !== "match" || !s.match || s.match.status !== "playing" || s.phase !== "aim") return;
+        if (s.match.turn !== s.match.myIndex) return;
+        const last = this.aimSent;
+        const fresh = !last || last.matchId !== s.match.matchId || last.turn !== s.match.turn;
+        if (fresh) { this.sendAimNow(); return; }
+        if (Math.abs(s.input.phi - last.phi) < AIM_EPS_RAD) return;
+        const wait = Math.max(0, AIM_REPORT_MS - (this.now() - last.at));
+        if (wait === 0) { this.sendAimNow(); return; }
+        if (this.aimTimer === null) {
+            this.aimTimer = this.setTimer(() => { this.aimTimer = null; this.sendAimNow(); }, wait);
+        }
+    }
+
+    /** 지금 상태를 다시 읽고 보낸다(예약된 전송이 도착했을 때 옛 각도를 보내지 않으려고). 실패는 조용히 — 표시용 값이다. */
+    private sendAimNow(): void {
+        if (this.disposed || !this.matchApi.sendAim) return;
+        const s = this.store.get();
+        if (s.mode !== "match" || !s.match || s.match.status !== "playing" || s.phase !== "aim") return;
+        if (s.match.turn !== s.match.myIndex) return;
+        this.aimSent = { phi: s.input.phi, at: this.now(), turn: s.match.turn, matchId: s.match.matchId };
+        void this.matchApi.sendAim(s.match.matchId, s.input.phi).catch(() => undefined);
     }
     setPhi(phi: number): void {
         this.setInput({ phi });
