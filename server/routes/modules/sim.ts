@@ -131,14 +131,16 @@ router.get("/sim/ratings/me", requireAuth, asyncHandler(async (req: AuthRequest,
 // 대전 목록은 /sim/matches 를 그대로 쓴다(목록 화면과 캐시 공유). 실전 성적(RP·에버리지)은 절대 섞지 않는다.
 router.get("/sim/stats/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const memberId = req.userId!;
-    const [ratings, matchRatings, sessions, ranks, drillWeeks] = await Promise.all([
+    const [ratings, matchRatings, matchRecords, sessions, ranks, drillWeeks] = await Promise.all([
         storage.sim.myRatings(memberId),
         storage.sim.myMatchRatings(memberId),      // 공식 기록(대전) — 2026-09-12 부터 대시보드는 이쪽을 본다
+        // 종목·테이블별 승패(상한 없음). 대전 목록(최근 20)으로 세던 것을 대체한다 — 2026-09-16 테스터 제보.
+        storage.simMatch.myRecords(memberId),
         storage.sim.listSessionSummaries(memberId, 100),
         storage.sim.myRanks(memberId),
         storage.simDrill.myWeeks(memberId, 12),
     ]);
-    return sendSuccess(res, { ratings, matchRatings, sessions, ranks, drillWeeks, currentWeekId: weekIdFor(Date.now()) });
+    return sendSuccess(res, { ratings, matchRatings, matchRecords, sessions, ranks, drillWeeks, currentWeekId: weekIdFor(Date.now()) });
 }));
 
 // GET /sim/rank?gameType&tableId&country=KR|all — 온라인 대전 랭킹(배치 3판 뒤). country 없음/all = 전체, 있으면 그 나라(순위 번호는 전역).

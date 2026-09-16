@@ -18,7 +18,7 @@ import { gameLabel } from "../match/matchView";
 import { formatAvg } from "../entry/entryStats";
 import { fetchSimStats, SIM_STATS_QUERY_KEY, type StatsFetcher } from "./dashApi";
 import {
-    availableCombos, bestAvgOf, bestHighRunOf, comboKey, drillSeries, drillTotals, matchSummary, overallAvg, ratingFor, recentForm, sameCombo,
+    availableCombos, bestAvgOf, bestHighRunOf, comboKey, drillSeries, drillTotals, matchSummary, overallAvg, ratingFor, recentForm, recordFor, sameCombo,
     sessionSeries, shortDate, signedAvg, type Combo, matchSeries} from "./dashStats";
 import { Columns, FormStrip, TrendLine } from "./charts";
 
@@ -90,8 +90,11 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
     const form = recentForm(series, FORM_N);
     const rating = data && combo ? ratingFor(data.ratings, combo) : undefined;
     const mr = data && combo ? (data.matchRatings ?? []).find((r) => r.gameType === combo.gameType) : undefined;
-    const rank = data && combo ? data.ranks.find((r) => sameCombo(r, combo)) : undefined;
+    // 사다리는 2026-09-12 부터 테이블을 합쳤다 — 순위는 종목으로만 찾는다(테이블까지 맞추면 영영 못 찾아 "–" 만 나왔다).
+    const rank = data && combo ? data.ranks.find((r) => r.gameType === combo.gameType) : undefined;
     const ms = matchSummary(rows, combo, FORM_N);
+    // 승패는 서버의 조합별 전체 집계로 본다. 대전 목록은 최근 20개뿐이라 새 대전이 생길 때마다 승수가 흔들렸다.
+    const record = recordFor(data?.matchRecords, combo, ms);
     const nowMs = now ?? Date.now();
     const drills = useMemo(() => (data ? drillSeries(data.drillWeeks, nowMs, 8) : []), [data, nowMs]);
     const totals = data ? drillTotals(data.drillWeeks) : { attempts: 0, successes: 0, cushions: 0 };
@@ -158,12 +161,13 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                                     )}
                                 </div>
                                 <p className="rk-num text-[12.5px] font-medium text-ink-3 mt-2">
-                                    {t("sim.dash.heroSubMatch").replace("{n}", n(mr?.matches ?? series.length))}
+                                    {t("sim.dash.heroSubMatch").replace("{n}", n(record.total || series.length))}
                                 </p>
                             </section>
 
                             <div className="grid grid-cols-3 gap-2">
-                                <Tile label={t("sim.dash.kMatches")} value={n(mr?.matches ?? series.length)} />
+                                {/* 대전 수는 이 칩(종목·테이블)의 수여야 한다 — 종목 합산(mr.matches)을 쓰면 "22판인데 1승 3패" 가 된다. */}
+                                <Tile label={t("sim.dash.kMatches")} value={n(record.total || series.length)} />
                                 <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(Math.max(0, ...series.map((p) => p.avg)))} tone="best" />
                                 <Tile label={t("sim.dash.kHighRun")} value={n(Math.max(0, ...series.map((p) => p.highRun)))} tone="best" />
                                 <Tile label={t("sim.dash.kRank")} value={rank ? t("sim.dash.rankValue").replace("{r}", n(rank.rank)) : "–"} sub={rank ? t("sim.dash.rankOf").replace("{n}", n(rank.total)) : undefined} />
@@ -173,7 +177,7 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                                         sub={(() => { const st = rankStatus(mr?.rating ?? 1000, mr?.matches ?? 0); return st.tier ? t(st.tier.nameKey) : t("sim.rank.unranked").replace("{n}", n(mr?.matches ?? 0)).replace("{m}", n(PLACEMENT_MATCHES)); })()}
                                     />
                                 </button>
-                                <Tile label={t("sim.dash.kRecord")} value={t("sim.entry.record").replace("{w}", n(ms.wins)).replace("{l}", n(ms.losses))} />
+                                <Tile label={t("sim.dash.kRecord")} value={t("sim.entry.record").replace("{w}", n(record.wins)).replace("{l}", n(record.losses))} />
                             </div>
 
                             <section className={card}>
@@ -211,7 +215,7 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                             action={<button type="button" onClick={onLobby} className={pillSm}>{t("sim.entry.create")}</button>}
                         />
                         <div className="grid grid-cols-3 gap-2 mt-3">
-                            <Tile label={t("sim.dash.kRecord")} value={t("sim.entry.record").replace("{w}", n(ms.wins)).replace("{l}", n(ms.losses))} />
+                            <Tile label={t("sim.dash.kRecord")} value={t("sim.entry.record").replace("{w}", n(record.wins)).replace("{l}", n(record.losses))} />
                             <Tile
                                 label={t("sim.dash.kStreak")}
                                 value={ms.streak ? t(ms.streak.kind === "W" ? "sim.dash.streakWin" : "sim.dash.streakLoss").replace("{n}", n(ms.streak.n)) : "–"}

@@ -190,6 +190,22 @@ export function matchSummary(matches: readonly DashMatchRow[], combo: Combo | nu
     return { wins, losses, active, myTurn, results: results.slice(-formLen), streak };
 }
 
+/**
+ * 화면에 쓸 전적. 서버가 준 조합별 집계(상한 없음)를 쓰고, 없으면 대전 목록에서 센 값으로 떨어진다(옛 서버 대비).
+ *
+ * 무승부는 **양쪽 다 승**으로 더한다 — 2026-09-16 오너: "어차피 둘이 모두 같은 거라면 둘 다 승이 보기 좋다".
+ * 데이터는 정직하게(wins/losses/draws) 두고 합치는 것은 여기 한 곳에서만 한다.
+ */
+export function recordFor(
+    records: readonly { gameType: string; tableId: string; wins: number; losses: number; draws: number; total: number }[] | undefined,
+    combo: Combo | null,
+    fallback: { wins: number; losses: number },
+): { wins: number; losses: number; total: number } {
+    const r = combo && records ? records.find((x) => x.gameType === combo.gameType && x.tableId === combo.tableId) : undefined;
+    if (!r) return { wins: fallback.wins, losses: fallback.losses, total: fallback.wins + fallback.losses };
+    return { wins: r.wins + r.draws, losses: r.losses, total: r.total };
+}
+
 export interface DrillWeekPoint {
     readonly weekId: string;
     readonly weekNo: number;

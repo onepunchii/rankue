@@ -227,6 +227,38 @@ export class SimMatchRepository {
     }
 
     /**
+     * 내 온라인 전적 — 종목·테이블별로 **끝난 대전 전부**를 센다(2026-09-16 테스터 제보).
+     *
+     * 왜 따로 만드나: 대시보드는 `/sim/matches`(listMine, 최근 20개)로 승패를 세고 있었다. 새 대전이 생길 때마다
+     * 옛 대전이 창 밖으로 밀려나 **승수가 왔다갔다** 했다("17승 2패 → 18승 2패 → 17승 1패").
+     * 레이팅 행(hiq_sim_match_ratings)도 못 쓴다 — 테이블을 합쳐 놓아서 조합별로 못 나누고,
+     * 2026-09-12 합치기 때 값이 실제와 어긋나 있다(실측: rankue 4구 rated 22 / 실제 25).
+     *
+     * 무승부(winner_id is null)는 따로 돌려준다. 화면에서 승으로 합치는 것은 오너 결정(둘 다 승)이라
+     * 데이터는 정직하게 두고 표시에서 더한다.
+     */
+    async myRecords(memberId: string): Promise<Array<{ gameType: string; tableId: string; wins: number; losses: number; draws: number; total: number }>> {
+        const rows = await db.select({
+            gameType: hiqSimMatches.gameType,
+            tableId: hiqSimMatches.tableId,
+            wins: sql<number>`count(*) filter (where ${hiqSimMatches.winnerId} = ${memberId})::int`,
+            draws: sql<number>`count(*) filter (where ${hiqSimMatches.winnerId} is null)::int`,
+            total: sql<number>`count(*)::int`,
+        }).from(hiqSimMatches)
+            .where(and(
+                eq(hiqSimMatches.status, "finished"),
+                sql`${hiqSimMatches.guestId} is not null`,
+                or(eq(hiqSimMatches.hostId, memberId), eq(hiqSimMatches.guestId, memberId)),
+            ))
+            .groupBy(hiqSimMatches.gameType, hiqSimMatches.tableId);
+        return rows.map((r) => ({
+            gameType: r.gameType, tableId: r.tableId,
+            wins: r.wins, draws: r.draws, total: r.total,
+            losses: Math.max(0, r.total - r.wins - r.draws),
+        }));
+    }
+
+    /**
      * 두 사람의 온라인 대전 상대전적(끝난 대전만). "오늘까지 3승 2패" 한 줄을 위한 것.
      * 기권·무응답 승리도 결과는 결과라 그대로 센다. 승자가 없는 행(중단)은 total 에서 빠진다.
      */
@@ -424,7 +456,10 @@ export class SimMatchRepository {
         const da = Math.round(ELO_K * (sa - ea));
         for (const [i, id] of ids.entries()) {
             const delta = i === 0 ? da : -da;
-            const won = winnerId === id ? 1 : 0;
+            // 무승부는 **양쪽 다 승**으로 센다(2026-09-16 오너: "어차피 둘이 모두 같은 거라면 둘 다 승이 보기 좋다").
+            // 랭킹 화면이 패를 `matches - wins` 로 뽑으므로, 여기서 세지 않으면 무승부가 패로 보인다.
+            // 레이팅 값 자체는 위에서 sa=0.5 로 계산하니 영향이 없다 — 표기만 바뀐다.
+            const won = winnerId === null || winnerId === id ? 1 : 0;
             await tx.insert(hiqSimMatchRatings).values({
                 memberId: id, gameType: m.gameType,
                 rating: 1000 + delta, matches: 1, wins: won, updatedAt: new Date(),

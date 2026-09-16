@@ -63,9 +63,23 @@ export interface SimMatchRatingRow {
     readonly wins: number;
 }
 
+/**
+ * 온라인 전적 — 종목·테이블별, **끝난 대전 전부**(서버 simMatch.myRecords).
+ * 예전에는 대전 목록(최근 20개)으로 세서 새 대전이 생길 때마다 승수가 왔다갔다 했다(2026-09-16 테스터 제보).
+ */
+export interface SimMatchRecord {
+    readonly gameType: DashGameType;
+    readonly tableId: DashTableId;
+    readonly wins: number;
+    readonly losses: number;
+    readonly draws: number;
+    readonly total: number;
+}
+
 export interface SimStats {
     readonly ratings: readonly SimRatingRow[];
     readonly matchRatings: readonly SimMatchRatingRow[];
+    readonly matchRecords: readonly SimMatchRecord[];
     readonly sessions: readonly SimSessionSummary[];
     readonly ranks: readonly SimRank[];
     readonly drillWeeks: readonly SimDrillWeek[];
@@ -87,6 +101,12 @@ export function parseSimStats(raw: unknown): SimStats {
         matchRatings: arr(o.matchRatings).map((r) => ({
             gameType: r.gameType === "4c" ? "4c" as const : "3c" as const,
             rating: num(r.rating, 1000), matches: num(r.matches), wins: num(r.wins),
+        })),
+        // 옛 서버 응답에는 없다 — 없으면 빈 배열(화면이 예전처럼 목록에서 센다).
+        matchRecords: arr(o.matchRecords).map((r) => ({
+            gameType: r.gameType === "4c" ? "4c" as const : "3c" as const,
+            tableId: r.tableId === "JUNGDAE_KR" ? "JUNGDAE_KR" as const : "DAEDAE" as const,
+            wins: num(r.wins), losses: num(r.losses), draws: num(r.draws), total: num(r.total),
         })),
         ratings: arr(o.ratings).map((r) => ({
             gameType: r.gameType === "4c" ? "4c" : "3c",

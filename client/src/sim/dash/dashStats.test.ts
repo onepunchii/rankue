@@ -5,8 +5,7 @@ import type { SimRatingRow, SimSessionSummary } from "./dashApi";
 import { parseSimStats } from "./dashApi";
 import {
     availableCombos, drillSeries, drillTotals, matchSummary, pooledAvg, recentForm, sessionSeries, shortDate, signedAvg, weekNumber,
-    type DashMatchRow,
-} from "./dashStats";
+    recordFor, type DashMatchRow } from "./dashStats";
 
 const S = (o: Partial<SimSessionSummary> & { id: string }): SimSessionSummary => ({
     kind: "solo", gameType: "3c", tableId: "DAEDAE", cushionModel: "han2005", condition: 1, targetScore: 15, inningCap: 0,
@@ -121,5 +120,33 @@ describe("dashStats", () => {
         expect(st.ranks[0]).toEqual({ gameType: "3c", tableId: "DAEDAE", rank: 2, total: 9 });
         expect(st.drillWeeks).toEqual([]);
         expect(parseSimStats(undefined).currentWeekId).toBe("");
+    });
+});
+
+describe("recordFor — 전적은 서버 집계로(2026-09-16 테스터 제보)", () => {
+    const combo = { gameType: "3c", tableId: "DAEDAE" } as const;
+    const records = [
+        { gameType: "3c", tableId: "DAEDAE", wins: 17, losses: 2, draws: 1, total: 20 },
+        { gameType: "4c", tableId: "JUNGDAE_KR", wins: 3, losses: 9, draws: 0, total: 12 },
+    ];
+
+    it("조합이 맞는 행을 쓴다 — 목록에서 센 값(흔들리는 값)이 아니라", () => {
+        const r = recordFor(records, combo, { wins: 5, losses: 1 });
+        expect(r.total).toBe(20);
+        expect(r.losses).toBe(2);
+    });
+
+    it("무승부는 승에 더한다 — 오너 규칙(둘 다 승)", () => {
+        expect(recordFor(records, combo, { wins: 0, losses: 0 }).wins).toBe(18);   // 17 + 무승부 1
+    });
+
+    it("종목만 같고 테이블이 다르면 내 행이 아니다", () => {
+        const r = recordFor(records, { gameType: "3c", tableId: "JUNGDAE_KR" }, { wins: 4, losses: 6 });
+        expect(r).toEqual({ wins: 4, losses: 6, total: 10 });   // 폴백
+    });
+
+    it("옛 서버(집계 없음)나 칩 없음이면 목록에서 센 값으로 떨어진다", () => {
+        expect(recordFor(undefined, combo, { wins: 2, losses: 3 })).toEqual({ wins: 2, losses: 3, total: 5 });
+        expect(recordFor(records, null, { wins: 1, losses: 1 })).toEqual({ wins: 1, losses: 1, total: 2 });
     });
 });

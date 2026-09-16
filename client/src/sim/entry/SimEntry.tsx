@@ -67,17 +67,25 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
     const week = useQuery({ queryKey: DRILL_WEEK_QUERY_KEY, queryFn: () => drillApi.getWeek(), enabled: !!member, staleTime: 30_000 });
     const rooms = useQuery({ queryKey: ROOMS_QUERY_KEY, queryFn: () => matchApi.listRooms(), enabled: !!member, staleTime: 10_000 });
 
-    const record = matchRecord(matches.data ?? []);
+    const listRecord = matchRecord(matches.data ?? []);
     const drill = week.data ? weekProgress(week.data) : null;
     const order = entryOrder(readLast());
     const top = order[0];
     const openRooms = rooms.data?.length ?? 0;
-    const myRank = useQuery<{ placement: number; boards: { gameType: "3c" | "4c"; matches: number; rank: number | null; total: number }[] }>({
+    const myRank = useQuery<{ placement: number; boards: { gameType: "3c" | "4c"; matches: number; wins?: number; rank: number | null; total: number }[] }>({
         queryKey: ["/api/hiq/sim/rank/me"],
         queryFn: async () => (await apiRequest("/api/hiq/sim/rank/me")) ?? { placement: 3, boards: [] },
         enabled: !!member,
         staleTime: 30_000,
     });
+
+    // 전적은 서버 합계(랭킹 보드)로 본다 — 대전 목록은 최근 20개뿐이라 새 대전이 생길 때마다 승수가 흔들렸다
+    // (2026-09-16 테스터 제보: "17승 2패 → 18승 2패 → 17승 1패"). 진행 중·내 차례 수는 지금 상태라 목록이 맞다.
+    // 무승부는 서버 wins 에 이미 포함돼 있다(오너 규칙: 둘 다 승).
+    const boardTotals = (myRank.data?.boards ?? []).reduce((a, b) => ({ w: a.w + (b.wins ?? 0), m: a.m + (b.matches ?? 0) }), { w: 0, m: 0 });
+    const record = boardTotals.m > 0
+        ? { ...listRecord, wins: boardTotals.w, losses: Math.max(0, boardTotals.m - boardTotals.w) }
+        : listRecord;
     // 두 판(3쿠션·4구) 중 **가장 높은 순위**(숫자가 작은 쪽). 같으면 사람이 많은 판을 보여 준다.
     // 2026-09-12 부터 대대·중대는 합쳐져 판이 넷에서 둘로 줄었다.
     const bestBoard = (myRank.data?.boards ?? [])
