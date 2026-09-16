@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-    CHAT_COOLDOWN_MS, CHAT_MAX_CHARS, CHAT_MAX_PER_MATCH,
+    CHAT_CODES, CHAT_COOLDOWN_MS, CHAT_EXTRA_CODES, CHAT_MAX_CHARS, CHAT_MAX_PER_MATCH, CHAT_QUICK_CODES,
     chatLength, chatReject, clampChatText, isChatCode, normalizeChatText,
 } from "./chat";
+import { MATCH_EMOJIS } from "./rules/session";
 
 const NOW = Date.UTC(2026, 8, 16, 12, 0, 0);
 const at = (msAgo: number) => NOW - msAgo;
@@ -33,6 +34,35 @@ describe("normalizeChatText", () => {
 
     it("공백뿐이면 빈 문자열 — 라우트가 이걸로 빈 전송을 막는다", () => {
         expect(normalizeChatText("   \n  ")).toBe("");
+    });
+});
+
+describe("고정 문구 목록", () => {
+    it("상단 띠의 이모지 6개를 하나도 빠짐없이 담는다", () => {
+        // 갈라지면 진행 중인 대전 행·옛 채팅 줄에 있는 코드가 화면에서 조용히 사라진다.
+        for (const c of MATCH_EMOJIS) expect(CHAT_CODES).toContain(c);
+    });
+
+    it("급해서 타이핑할 수 없는 말만 더했다 — 자유 입력이 주 기능이다", () => {
+        expect(CHAT_EXTRA_CODES).toEqual(["oops", "wait", "thanks"]);
+        expect(CHAT_CODES).toHaveLength(MATCH_EMOJIS.length + CHAT_EXTRA_CODES.length);
+        // 칩 열이 두 줄을 넘으면 테이블을 덮는다
+        expect(CHAT_CODES.length).toBeLessThanOrEqual(10);
+    });
+
+    it("중복이 없다", () => {
+        expect(new Set(CHAT_CODES).size).toBe(CHAT_CODES.length);
+        expect(new Set(CHAT_QUICK_CODES).size).toBe(CHAT_QUICK_CODES.length);
+    });
+
+    it("패널에 그리는 여섯은 전부 서버가 받아 주는 코드다", () => {
+        for (const c of CHAT_QUICK_CODES) expect(CHAT_CODES).toContain(c);
+    });
+
+    it("패널은 여섯 — 320px 두 줄이 상한이다(세 줄이면 당구대를 덮는다)", () => {
+        expect(CHAT_QUICK_CODES).toHaveLength(6);
+        // 새로 넣은 셋은 패널에서만 보낼 수 있으니 반드시 들어 있어야 한다
+        for (const c of CHAT_EXTRA_CODES) expect(CHAT_QUICK_CODES).toContain(c);
     });
 });
 

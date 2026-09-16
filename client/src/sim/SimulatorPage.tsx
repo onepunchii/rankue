@@ -901,6 +901,8 @@ export function SimulatorPage() {
      * 몇 번씩 마운트를 오가는데, 안에 두면 그때마다 쓰던 글이 날아간다.
      */
     const [chatDraft, setChatDraft] = useState("");
+    /** 1탭 문구판이 펼쳐졌나. 펼친 동안엔 상대 차례 카드를 감춰 칩 두 줄 자리를 내준다. */
+    const [chatQuickOpen, setChatQuickOpen] = useState(false);
     /** 칩 열의 한마디는 12초 뒤 사라진다 — 그걸 다시 계산하려면 시계가 돌아야 한다. 말이 있을 때만 돈다. */
     const chatLines = isMatch && sim.match ? sim.match.chat : EMPTY_CHAT;
     const lastChatAt = chatLines.length > 0 ? chatLines[chatLines.length - 1].at : "";
@@ -911,10 +913,10 @@ export function SimulatorPage() {
         const id = setInterval(() => setChatNow(Date.now()), 1000);
         return () => clearInterval(id);
     }, [lastChatAt]);
-    const onSendChat = useCallback(async (text: string) => {
-        // clientKey: 응답만 유실된 재시도를 서버가 한 줄로 합친다(모바일에서 흔하다).
-        return actionsRef.current.sendChat({ text, clientKey: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}` });
-    }, []);
+    /** clientKey: 응답만 유실된 재시도를 서버가 한 줄로 합친다(모바일에서 흔하다). */
+    const chatKey = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const onSendChat = useCallback(async (text: string) => actionsRef.current.sendChat({ text, clientKey: chatKey() }), []);
+    const onSendChatCode = useCallback(async (code: string) => actionsRef.current.sendChat({ code, clientKey: chatKey() }), []);
 
     // 내 자리를 ref 에 실어 onOutcome 이 볼 수 있게 한다(옵션 객체는 sim 보다 먼저 만들어진다).
     myIndexRef.current = isMatch && sim.match ? sim.match.myIndex : null;
@@ -1529,9 +1531,21 @@ export function SimulatorPage() {
                       * 재생(shooting)까지 포함하는 이유는 상대가 연속 득점할 때 입력칸과 키보드를 살려 두기 위해서다.
                       */}
                     {isMatch && sim.match && (sim.phase === "waiting" || sim.phase === "shooting") && (
-                        <div className="absolute inset-x-0 bottom-3 z-[3] flex flex-col items-center gap-2 px-4 pointer-events-none">
-                            {sim.phase === "waiting" && !bannerVisible && (
-                                <div className="pointer-events-auto rounded-card bg-surface-1 border border-surface-line px-4 py-3 text-center max-w-[320px] w-full">
+                        <div
+                            className="absolute inset-x-0 z-[3] flex flex-col items-center gap-2 px-4 pointer-events-none"
+                            /*
+                             * 키보드 위로 띄운다. 앱(네이티브)은 웹뷰를 일부러 안 줄이므로(keyboardAvoid 의 setResizeMode "none")
+                             * bottom 만 주면 입력줄이 키보드 **밑에 깔린다** — 2026-09-16 오너 제보의 원인이 이것이다.
+                             * 웹·구형 APK 는 뷰포트가 줄어 변수가 0 이고 max() 가 평소 값을 고른다. 두 경로 다 맞는다.
+                             * ⚠ bottom 에 transition 을 걸지 마라 — 걸면 크로미움이 변수 변경을 bottom 에 반영하지 않아
+                             *   키보드가 입력줄을 그대로 덮는다(2026-08-22 크루 채팅에서 실측).
+                             */
+                            style={{ bottom: "max(0.75rem, calc(var(--keyboard-height, 0px) + 0.5rem))" }}
+                        >
+                            {/* 키보드가 뜨면 이 카드는 사라진다(hide-on-keyboard) — 127px 을 비워 당구대를 더 보여 준다.
+                                상대 시계는 상단 띠에도 작게 떠 있어 잃는 정보가 없다. */}
+                            {sim.phase === "waiting" && !bannerVisible && !chatQuickOpen && (
+                                <div className="hide-on-keyboard pointer-events-auto rounded-card bg-surface-1 border border-surface-line px-4 py-3 text-center max-w-[320px] w-full">
                                     <p className="text-[12px] font-medium text-ink-4">{sim.match.opponentName}</p>
                                     {/* 깔끔하게: "상대 차례예요" + 상대 시계(접속 중이면 바로 돈다). 안내 문구는 없앴다(2026-09-08 오너). */}
                                     <p className="text-[14px] font-semibold text-ink-1">{t("sim.match.waitingTurn")}</p>
@@ -1550,7 +1564,11 @@ export function SimulatorPage() {
                             {/* 한마디 입력. canChat 은 **서버가 보는 차례**로 판단한다 — 내가 친 직후엔 로컬 턴이 먼저
                                 넘어가지만 서버의 turn 은 샷이 기록될 때까지 아직 나라서, 그 창에 쓴 글은 거부된다. */}
                             {sim.match.canChat && (
-                                <MatchChatBar draft={chatDraft} onDraft={setChatDraft} onSend={onSendChat} />
+                                <MatchChatBar
+                                    draft={chatDraft} onDraft={setChatDraft}
+                                    onSend={onSendChat} onSendCode={onSendChatCode}
+                                    quickOpen={chatQuickOpen} onQuickOpen={setChatQuickOpen}
+                                />
                             )}
                         </div>
                     )}

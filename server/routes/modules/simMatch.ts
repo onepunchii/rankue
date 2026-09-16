@@ -17,12 +17,12 @@ import {
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
-    SHOT_CLOCK_STRIKES, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH, isMatchEmoji, MATCH_EMOJIS, PRESENCE_MS, ABSENT_GRACE_MS, AIM_FRESH_MS,
+    SHOT_CLOCK_STRIKES, EMOJI_COOLDOWN_MS, EMOJI_MAX_PER_MATCH, isMatchEmoji, PRESENCE_MS, ABSENT_GRACE_MS, AIM_FRESH_MS,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
 import {
-    CHAT_COOLDOWN_MS, CHAT_MAX_CHARS, CHAT_MAX_PER_MATCH, CHAT_PAGE_MAX,
+    CHAT_CODES, CHAT_COOLDOWN_MS, CHAT_MAX_CHARS, CHAT_MAX_PER_MATCH, CHAT_PAGE_MAX,
     chatLength, isChatCode, normalizeChatText,
 } from "../../../shared/sim/chat.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
@@ -615,7 +615,7 @@ router.post("/sim/matches/:id/chat", requireAuth, asyncHandler(async (req: AuthR
     let kind: "text" | "code";
     let text: string;
     if (typeof body.code === "string") {
-        if (!isChatCode(body.code, MATCH_EMOJIS as readonly string[])) return sendError(res, 400, "보낼 수 없는 인사입니다");
+        if (!isChatCode(body.code, CHAT_CODES)) return sendError(res, 400, "보낼 수 없는 인사입니다");
         kind = "code";
         text = body.code;
     } else if (typeof body.text === "string") {

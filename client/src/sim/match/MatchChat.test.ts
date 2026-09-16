@@ -10,6 +10,7 @@ import { JSDOM, VirtualConsole } from "jsdom";
 import { readFileSync } from "fs";
 import path from "path";
 import { ko } from "../../lib/i18n/ko";
+import { CHAT_QUICK_CODES } from "@shared/sim/chat";
 import type { ChatLine } from "../matchApi";
 
 const i18n = vi.hoisted(() => ({ ctx: null as unknown }));
@@ -78,24 +79,25 @@ function opensPointerEvents(el: Element, root: Element): boolean {
 
 describe("MatchChatBar", () => {
     const noop = async () => "ok" as const;
+    const bar = (p: Record<string, unknown>) => React.createElement(Chat.MatchChatBar, { onSend: noop, onSendCode: noop, quickOpen: false, onQuickOpen: () => undefined, ...p } as never);
 
     it("입력칸과 보내기 버튼은 스스로 pointer-events-auto 를 켠다 — 부모가 none 이라 상속만으론 안 눌린다", () => {
-        const c = mount(React.createElement(Chat.MatchChatBar, { draft: "", onDraft: () => undefined, onSend: noop }));
+        const c = mount(bar({ draft: "", onDraft: () => undefined }));
         const input = c.querySelector("input")!;
-        const button = c.querySelector("button")!;
         expect(input).not.toBeNull();
         expect(opensPointerEvents(input, c)).toBe(true);
-        expect(opensPointerEvents(button, c)).toBe(true);
+        for (const b of Array.from(c.querySelectorAll("button"))) expect(opensPointerEvents(b, c)).toBe(true);
     });
 
     it("빈 초안이면 보내기가 잠긴다(공백만 있어도)", () => {
-        const c = mount(React.createElement(Chat.MatchChatBar, { draft: "   ", onDraft: () => undefined, onSend: noop }));
-        expect(c.querySelector("button")!.hasAttribute("disabled")).toBe(true);
+        const c = mount(bar({ draft: "   ", onDraft: () => undefined }));
+        const send = Array.from(c.querySelectorAll("button")).find((b) => b.textContent === ko["sim.chat.send"])!;
+        expect(send.hasAttribute("disabled")).toBe(true);
     });
 
     it("30자를 넘겨 입력하면 코드포인트 기준으로 잘려서 올라간다", () => {
         const got: string[] = [];
-        const c = mount(React.createElement(Chat.MatchChatBar, { draft: "", onDraft: (v: string) => got.push(v), onSend: noop }));
+        const c = mount(bar({ draft: "", onDraft: (v: string) => got.push(v) }));
         const input = c.querySelector("input")! as HTMLInputElement;
         React.act(() => {
             // React 는 값 변화를 자체 추적기로 판단한다 — input.value 에 직접 넣으면 "안 바뀐 것"으로 보고
@@ -106,6 +108,47 @@ describe("MatchChatBar", () => {
         });
         expect(got).toHaveLength(1);
         expect([...got[0]]).toHaveLength(Chat.CHAT_MAX_CHARS);
+    });
+});
+
+describe("빠른 한마디 칩 — 키보드를 아예 안 여는 길", () => {
+    const noop = async () => "ok" as const;
+    const bar = (p: Record<string, unknown>) => React.createElement(Chat.MatchChatBar, { onSend: noop, onSendCode: noop, quickOpen: false, onQuickOpen: () => undefined, ...p } as never);
+    const quickButton = (c: HTMLElement) =>
+        Array.from(c.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === ko["sim.chat.quick"])!;
+
+    it("접혀 있으면 칩이 DOM 에 아예 없다 — 자리를 안 쓴다", () => {
+        const c = mount(bar({ draft: "", onDraft: () => undefined }));
+        const toggle = quickButton(c);
+        expect(toggle).toBeDefined();
+        expect(toggle.getAttribute("aria-expanded")).toBe("false");
+        expect(c.textContent).not.toContain(ko["sim.emoji.oops"]);
+    });
+
+    it("☺ 를 누르면 밖으로 알린다 — 펼친 동안 대기 카드가 비켜 줘야 해서 상태가 밖에 있다", () => {
+        const got: boolean[] = [];
+        const c = mount(bar({ draft: "", onDraft: () => undefined, onQuickOpen: (v: boolean) => got.push(v) }));
+        React.act(() => { quickButton(c).dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
+        expect(got).toEqual([true]);
+    });
+
+    it("펼치면 여섯 문구가 나오고, 글이 아니라 **코드**로 보낸다", async () => {
+        const sent: string[] = [];
+        const c = mount(bar({
+            draft: "", onDraft: () => undefined, quickOpen: true,
+            onSendCode: async (code: string) => { sent.push(code); return "ok" as const; },
+        }));
+        for (const code of CHAT_QUICK_CODES) expect(c.textContent).toContain(ko[`sim.emoji.${code}`]);
+        const oops = Array.from(c.querySelectorAll("button")).find((b) => b.textContent?.includes(ko["sim.emoji.oops"]))!;
+        await React.act(async () => { oops.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
+        // 코드로 보내야 상대 화면에 **상대 언어로** 뜬다. 한국어 문장을 text 로 보내면 그게 깨진다.
+        expect(sent).toEqual(["oops"]);
+    });
+
+    it("칩도 pointer-events-auto 를 켠다 — 부모가 none 이라 상속만으론 안 눌린다", () => {
+        const c = mount(bar({ draft: "", onDraft: () => undefined, quickOpen: true }));
+        expect(c.querySelectorAll("button").length).toBeGreaterThan(CHAT_QUICK_CODES.length);
+        for (const b of Array.from(c.querySelectorAll("button"))) expect(opensPointerEvents(b, c)).toBe(true);
     });
 });
 
@@ -155,6 +198,37 @@ describe("MatchChatLog", () => {
  * 좌표를 못 재는 jsdom 에서 하단 겹침을 막을 수 있는 유일한 형태의 단언이다.
  * 입력 띠는 두께 독(bottom-2, 높이 DOCK_HEIGHT)과 **같은 자리**에 있으므로, 내 조준 중에는 DOM 에 있으면 안 된다.
  */
+/**
+ * 키보드 회피(2026-09-16 오너 제보 "키보드 침범"). 앱은 웹뷰를 일부러 안 줄이므로(setResizeMode "none")
+ * bottom 만 주면 입력줄이 키보드 밑에 깔린다. 웹에서는 뷰포트가 줄어 우연히 멀쩡해 보여서 테스트에 안 잡혔다.
+ */
+describe("키보드 회피", () => {
+    const src = () => readFileSync(path.resolve(process.cwd(), "client/src/sim/SimulatorPage.tsx"), "utf8");
+
+    it("입력 띠가 --keyboard-height 만큼 올라간다", () => {
+        const s = src();
+        const i = s.indexOf("<MatchChatBar");
+        const block = s.slice(s.lastIndexOf("<div", i - 2000 > 0 ? i - 2000 : 0), i);
+        expect(block).toContain("var(--keyboard-height");
+    });
+
+    it("bottom 에 transition 을 걸지 않는다 — 걸면 크로미움이 변수 변경을 반영하지 않는다", () => {
+        const s = src();
+        const i = s.indexOf('style={{ bottom: "max(0.75rem');
+        expect(i).toBeGreaterThan(-1);
+        const near = s.slice(i - 600, i + 200);
+        expect(near).not.toMatch(/transition-\[?bottom|transition-all/);
+    });
+
+    it("키보드가 뜨면 대기 카드가 사라진다 — 127px 을 비워 당구대를 더 보여 준다", () => {
+        expect(src()).toContain("hide-on-keyboard pointer-events-auto rounded-card");
+    });
+
+    it("문구판을 펼치면 대기 카드가 비켜 준다 — 칩 두 줄과 카드가 같이 쌓이면 테이블을 덮는다", () => {
+        expect(src()).toContain('sim.phase === "waiting" && !bannerVisible && !chatQuickOpen');
+    });
+});
+
 describe("입력 띠는 내 조준 중에 존재하지 않는다", () => {
     it("SimulatorPage 의 마운트 조건이 waiting·shooting 으로 묶여 있다", () => {
         const src = readFileSync(path.resolve(process.cwd(), "client/src/sim/SimulatorPage.tsx"), "utf8");

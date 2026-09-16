@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { CHAT_FRESH_MS, CHAT_LOG_LINES, CHAT_MAX_CHARS, chatLength, clampChatText } from "@shared/sim/chat";
+import { CHAT_FRESH_MS, CHAT_LOG_LINES, CHAT_MAX_CHARS, CHAT_QUICK_CODES, chatLength, clampChatText } from "@shared/sim/chat";
 import type { ChatLine } from "../matchApi";
 import type { ChatSendResult } from "../simController";
 import { EMOJI_GLYPH } from "./EmojiBar";
@@ -29,10 +29,19 @@ function isFresh(line: ChatLine, now: number): boolean {
     return !Number.isFinite(at) || now - at < CHAT_FRESH_MS;
 }
 
+/**
+ * 고정 문구의 그림. 상단 띠의 여섯 개(EMOJI_GLYPH)에 채팅 전용 셋을 얹는다.
+ * 기존 여섯과 헷갈리지 않게 골랐다 — 손 모양(👋)과 시계(⏰)는 이미 쓰이고 있다.
+ */
+const CHAT_GLYPH: Readonly<Record<string, string>> = {
+    ...EMOJI_GLYPH,
+    oops: "😖", wait: "⏸️", thanks: "🙌",
+};
+
 /** 코드 줄은 **보는 사람의 언어로** 그린다 — 저장된 건 코드뿐이라 상대 화면엔 상대 언어로 뜬다. */
 function lineText(line: ChatLine, t: (k: string) => string): string {
     if (line.kind !== "code") return line.text;
-    const glyph = (EMOJI_GLYPH as Record<string, string | undefined>)[line.text];
+    const glyph = CHAT_GLYPH[line.text];
     const label = t(`sim.emoji.${line.text}`);
     return glyph ? `${glyph} ${label}` : label;
 }
@@ -75,10 +84,15 @@ export const MatchChatLog = memo(function MatchChatLog({ lines, myIndex, now }: 
  * 초안(draft)을 **밖에서** 들고 있는 이유: 상대가 연속 득점하면 재생·결과 배너 때문에 이 컴포넌트가 몇 번씩
  * 마운트를 오간다. 안에 두면 그때마다 쓰던 글이 날아간다.
  */
-export function MatchChatBar({ draft, onDraft, onSend, disabled }: {
+export function MatchChatBar({ draft, onDraft, onSend, onSendCode, quickOpen, onQuickOpen, disabled }: {
     draft: string;
     onDraft: (v: string) => void;
     onSend: (text: string) => Promise<ChatSendResult>;
+    /** 1탭 고정 문구. 키보드를 아예 안 여는 길이라 이 기능의 절반이다. */
+    onSendCode: (code: string) => Promise<ChatSendResult>;
+    /** 문구판이 펼쳐졌나. **밖에서** 들고 있다 — 펼친 동안 상대 차례 카드를 감춰 자리를 내주기 때문. */
+    quickOpen: boolean;
+    onQuickOpen: (v: boolean) => void;
     /** 전송 중 */
     disabled?: boolean;
 }) {
@@ -109,10 +123,52 @@ export function MatchChatBar({ draft, onDraft, onSend, disabled }: {
         );
     }, [draft, busy, onSend, onDraft, t]);
 
+    const sendCode = useCallback(async (code: string) => {
+        if (busy) return;
+        setBusy(true);
+        setNote(null);
+        const r = await onSendCode(code);
+        setBusy(false);
+        onQuickOpen(false);                  // 고르면 바로 접는다 — 칩 열이 테이블을 오래 덮지 않게
+        if (r !== "ok") setNote(r === "too-fast" ? t("sim.emoji.tooFast") : r === "limit" ? t("sim.emoji.limit") : t("sim.chat.failed"));
+    }, [busy, onSendCode, onQuickOpen, t]);
+
     return (
         <div className="pointer-events-auto w-full max-w-[320px] flex flex-col items-stretch gap-1">
             {note && <span className="self-center rk-chip bg-surface-1 border border-surface-line text-ink-2">{note}</span>}
+            {/* 1탭 문구판. 펼친 동안만 자리를 쓰고, 하나 고르면 접힌다. 키보드가 필요 없는 길이다. */}
+            {quickOpen && (
+                <div className="flex flex-wrap justify-center gap-1">
+                    {CHAT_QUICK_CODES.map((code) => (
+                        <button
+                            key={code} type="button" disabled={disabled || busy}
+                            onClick={() => { void sendCode(code); }}
+                            className={cn(
+                                "h-8 px-2.5 rounded-pill inline-flex items-center gap-1",
+                                "bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-1",
+                                "active:bg-surface-3 disabled:opacity-40",
+                            )}
+                        >
+                            <span className="text-[13px] leading-none">{CHAT_GLYPH[code]}</span>
+                            {t(`sim.emoji.${code}`)}
+                        </button>
+                    ))}
+                </div>
+            )}
             <div className="flex items-center gap-1.5">
+                <button
+                    type="button"
+                    onClick={() => { onQuickOpen(!quickOpen); inputRef.current?.blur(); }}
+                    aria-label={t("sim.chat.quick")}
+                    aria-expanded={quickOpen}
+                    className={cn(
+                        "shrink-0 h-11 w-11 rounded-pill text-[17px] leading-none",
+                        "border border-surface-line active:bg-surface-3",
+                        quickOpen ? "bg-brand text-brand-fg" : "bg-surface-1 text-ink-2",
+                    )}
+                >
+                    ☺
+                </button>
                 <input
                     ref={inputRef}
                     value={draft}
