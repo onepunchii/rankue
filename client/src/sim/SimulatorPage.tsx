@@ -1113,18 +1113,21 @@ export function SimulatorPage() {
     const solvedKeyRef = useRef("");
     // 찾은 길은 그때의 배치에만 유효하다 — 공이 움직이면(샷·손으로 옮김) 목록을 비운다
     const pathStale = solvedKeyRef.current !== ballsKey;
-    const paths = useMemo(
-        () => (pathView && !pathStale ? rankedPaths(solver.result?.candidates ?? [], PATH_TOP_N) : []),
-        [pathView, pathStale, solver.result],
+    // 찾은 길(성공 확률 순). 길 찾기 화면은 상위 셋, 대전은 1등 하나만 쓴다 — 아래에서 나눈다.
+    const rankedAll = useMemo(
+        () => (pathStale ? [] : rankedPaths(solver.result?.candidates ?? [], PATH_TOP_N)),
+        [pathStale, solver.result],
     );
+    const paths = pathView ? rankedAll : [];
     const [pathPick, setPathPick] = useState(0);
     useEffect(() => { setPathPick(0); }, [solver.result]);
     const pickedPath = paths[pathPick] ?? paths[0] ?? null;
 
-    const openSolver = useCallback(() => {
+    /** sheet: false 면 결과 시트를 열지 않고 탐색만 한다(대전의 길 찾기 — 오른쪽 바에 길 하나만 뜬다). */
+    const openSolver = useCallback((opts?: { sheet?: boolean }) => {
         if (!sim.config || !sim.params || sim.phase !== "aim") return;
         solvedKeyRef.current = ballsKey;
-        setSolverOpen(true);
+        setSolverOpen(opts?.sheet !== false);
         void solver.solve({
             balls: sim.balls, cueBallId: sim.cueBallId, gameType: sim.config.gameType, rules: sim.config.rules,
             params: sim.params, seed: solverSeedRef.current,
@@ -1155,13 +1158,16 @@ export function SimulatorPage() {
         toast({ title: t("sim.solver.applied") });
     }, [actions, toast, t]);
     // 길을 고르면 큐대가 그 길로 향한다 — 입력(방향·세기·당점)을 그 샷으로 넣는다(2026-09-08 오너). 샷 버튼은 그대로 친다.
-    const onPickPath = useCallback((i: number) => {
-        setPathPick(i);
-        const c = paths[i];
+    // 길 찾기 화면과 대전의 길 버튼이 같은 적용부를 쓴다.
+    const applyPath = useCallback((c: SolveCandidate | null) => {
         if (!c || !sim.config) return;
         actions.setInput({ phi: c.input.phi, V0: c.input.V0, a: c.input.a, b: c.input.b, theta: 0 });
         setSolverPreview({ candidate: c, paths: buildPreviewPaths(c.result, { cueBallId: sim.cueBallId, gameType: sim.config.gameType }) });
-    }, [paths, sim.config, sim.cueBallId, actions]);
+    }, [sim.config, sim.cueBallId, actions]);
+    const onPickPath = useCallback((i: number) => {
+        setPathPick(i);
+        applyPath(paths[i] ?? null);
+    }, [paths, applyPath]);
     // 길을 찾으면 1등 길을 바로 고른다 — 큐대가 그 길을 향하고 카드가 채워진다
     const autoPickedRef = useRef<unknown>(null);
     useEffect(() => {
@@ -1185,6 +1191,30 @@ export function SimulatorPage() {
     useEffect(() => { if (pathView && solver.result) setSolverOpen(false); }, [pathView, solver.result]);
     // 연습·드릴(채점 뒤)에서만. 기록 세션·대전엔 넘기지 않는다.
     const solverAllowed = sim.mode === "solo" && !sim.record && !drillLocked;
+    /**
+     * 대전 중 길 찾기 — **관리자 전용**(2026-09-16 오너). 오른쪽 바에 성공 확률이 가장 높은 길 하나만 띄우고,
+     * 그 버튼을 누르면 큐대가 그 길을 향한다(입력을 그대로 넣는다). 샷은 평소처럼 치면 그 길로 이어진다.
+     *
+     * 왜 관리자만인가: 조준 보조라 상대는 알 수 없다. 테스트·시연용이라 한 사람에게만 연다.
+     * 한계: 이 판정은 화면 쪽에서만 한다(서버가 막지 않는다) — 솔버는 브라우저에서 도는 계산이라
+     * 마음먹으면 누구나 밖에서 같은 계산을 할 수 있고, 샷 자체는 서버가 다시 시뮬레이션해 검증한다.
+     * 즉 '기록을 속이는 길' 이 아니라 '조준을 도와주는 화면' 이다.
+     */
+    const isAdmin = member?.role === "super_admin" || member?.role === "admin";
+    const matchSolverAllowed = isAdmin && isMatch && !pathView;
+    // 대전에선 1등 길 하나만 쓴다. 공이 움직이면(pathStale) 비어 다시 '찾기' 로 돌아간다.
+    const matchPath = matchSolverAllowed ? (rankedAll[0] ?? null) : null;
+
+    // 대전(관리자): 내 차례가 되면 배치마다 한 번 알아서 찾아 둔다 — 오른쪽 바에 길이 이미 떠 있게.
+    // 누를 것은 "길" 하나뿐이고, 누르면 큐대가 그 길로 향한다(자동으로 조준까지 바꾸지는 않는다).
+    const autoSolvedRef = useRef("");
+    useEffect(() => {
+        if (!matchSolverAllowed || sim.phase !== "aim") return;
+        if (autoSolvedRef.current === ballsKey || solver.status === "running") return;
+        autoSolvedRef.current = ballsKey;
+        openSolver({ sheet: false });
+    }, [matchSolverAllowed, sim.phase, ballsKey, solver.status, openSolver]);
+
 
     const onSetupStart = useCallback((config: SimSetupConfig, opts: { record: boolean }) => {
         setDrill(null);
@@ -1226,7 +1256,21 @@ export function SimulatorPage() {
             active: thetaDeg > 0, caption: thetaDeg > 0 ? `${thetaDeg}°` : null, disabled: !aiming,
         },
     ];
-    if (solverAllowed && !pathView) railAim.push({ id: "solver", label: t("sim.solver.button"), icon: <SolverIcon />, onPress: openSolver, disabled: !aiming });
+    if (solverAllowed && !pathView) railAim.push({ id: "solver", label: t("sim.solver.button"), icon: <SolverIcon />, onPress: () => openSolver(), disabled: !aiming });
+    // 대전(관리자): 찾기 → 결과가 오면 같은 자리에 1등 길 칩. 칩을 누르면 큐대가 그 길로 향한다.
+    if (matchSolverAllowed) {
+        railAim.push(matchPath
+            ? {
+                id: "match-path", label: t("sim.path.nth").replace("{n}", "1"), hint: t("sim.path.nth").replace("{n}", "1"),
+                icon: <PathChip rank={1} pct={successPct(matchPath)} active={solverPreview !== null} />, bare: true,
+                active: solverPreview !== null, onPress: () => applyPath(matchPath), disabled: !aiming,
+            }
+            : {
+                id: "match-path-find", label: t("sim.solver.button"), icon: <SolverIcon />,
+                onPress: () => openSolver({ sheet: false }), disabled: !aiming || solver.status === "running",
+                caption: solver.status === "running" ? "…" : null,
+            });
+    }
     // 길 찾기 화면의 오른쪽 바: 찾은 길 1·2·3(성공률이 캡션) + 다시 찾기/무작위 배치. 당점·큐 각·이닝·소리는 여기서 쓸 일이 없어 뺀다.
     if (pathView) {
         if (paths.length > 0) {
