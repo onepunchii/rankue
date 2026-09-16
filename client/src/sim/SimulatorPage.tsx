@@ -1497,6 +1497,7 @@ export function SimulatorPage() {
                         <ThicknessDock
                             active={active} disabled={!aiming}
                             onThickness={onThickness} onNudge={onNudge}
+                            spin={{ a: sim.input.a, b: sim.input.b }} onSpin={onSpin}
                             onUndo={undoInDock ? onUndo : null}
                             className={cn(
                                 "absolute left-2 bottom-2 z-[3] transition-opacity duration-150",

@@ -191,7 +191,8 @@ export class HiqService {
         return { member, isNew, redirectTo: "/dashboard" };
     }
 
-    async register(data: InsertHiqMember) {
+    /** countryCode: 전화 가입 경로도 국가를 채운다(2026-09-17) — 예전엔 소셜 경로에만 있어 전화 가입자가 전부 비어 있었다. */
+    async register(data: InsertHiqMember, countryCode?: string) {
         // 1. Create Profile (Identity) first if password provided
         let profileId: string | undefined;
 
@@ -212,6 +213,7 @@ export class HiqService {
                     nickname: data.name,
                     // 전화 가입도 @핸들 자동 부여(한글 이름은 정규화에서 걸러져 player_#### 폴백)
                     handle: await generateHandle(data.name),
+                    countryCode: countryCode || undefined,
                     securityQuestion: data.securityQuestion,
                     securityAnswer: normalizedAnswer
                 });

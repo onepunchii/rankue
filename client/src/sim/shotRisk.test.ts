@@ -17,13 +17,14 @@ describe("shotRisk", () => {
         expect(offsetRatio(max, 0, max)).toBeCloseTo(1, 12);
         expect(offsetRatio(0.3, 0.4, 0)).toBe(0);
         expect(shotRisk({ a: 0, b: 0, theta: 0, V0: 2.5 }, max, null)).toBeNull();
-        expect(shotRisk({ a: max * 0.9, b: 0, theta: 0, V0: 2.5 }, max, null)).toEqual({ kind: "miscue", level: "warn" });
+        // 미스큐 경고는 2026-09-17 에 뺐다 — 엔진이 당점을 클램프해 게임에서 일어나지 않는 일이라서다.
+        expect(shotRisk({ a: max * 0.9, b: 0, theta: 0, V0: 2.5 }, max, null)).toBeNull();
         expect(shotRisk({ a: 0, b: -max * 0.7, theta: 35 * DEG, V0: 2.5 }, max, null)).toEqual({ kind: "masse", level: "warn" });
         expect(shotRisk({ a: 0, b: -max * 0.5, theta: 35 * DEG, V0: 2.5 }, max, null)).toBeNull();
         // 미리보기가 없으면 점프는 판단하지 않는다(어림 없음)
         expect(shotRisk({ a: 0, b: 0, theta: 45 * DEG, V0: 9 }, max, null)).toBeNull();
-        // 미스큐가 점프보다 우선
-        expect(shotRisk({ a: max * 0.9, b: 0, theta: 50 * DEG, V0: 5 }, max, null)!.kind).toBe("miscue");
+        // 당점이 링에 바짝 붙어도 그것만으로는 아무 말도 하지 않는다(큐 각이 서야 마세)
+        expect(shotRisk({ a: max * 0.9, b: 0, theta: 50 * DEG, V0: 5 }, max, null)!.kind).toBe("masse");
     });
     it("미리보기: 수평 샷은 안 뜨고, 45° 세게 치면 큐볼이 1 cm 이상 뜬다 → 점프 안내", () => {
         const flat = simulateShot(balls, { cueBallId: "white", phi: Math.PI / 2, V0: 3, a: 0, b: 0, theta: 0 }, params);

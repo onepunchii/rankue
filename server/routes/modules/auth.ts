@@ -12,6 +12,30 @@ import { screenMemberProfile } from "../../utils/crewModeration.js";
 
 const router = Router();
 
+/**
+ * 접속 국가(ISO alpha-2). Vercel 이 붙여 주는 IP 헤더 하나가 유일한 출처다 — 유저에게 묻지 않는다.
+ * 국가 랭킹과 대전 헤더의 국기가 이 값을 쓴다.
+ *
+ * 2026-09-17 실측: 이 수집이 **소셜(구글·애플) 가입 경로에만** 있어서 전화번호로 가입한 41명이 전부 비어 있었다
+ * (소셜 36명 중 35명은 잡혀 있었다). 그래서 헤더 읽기를 한 곳으로 모으고, 전화 가입·로그인에서도 채운다.
+ */
+function ipCountry(req: { headers: Record<string, unknown> }): string | undefined {
+    const raw = req.headers["x-vercel-ip-country"];
+    if (typeof raw !== "string") return undefined;
+    const cc = raw.toUpperCase().slice(0, 2);
+    return /^[A-Z]{2}$/.test(cc) ? cc : undefined;
+}
+
+/**
+ * 국가가 비어 있으면 이번 접속 국가로 한 번 채운다. **이미 있으면 절대 덮지 않는다** —
+ * 여행이나 VPN 으로 접속할 때마다 국적이 바뀌면 안 된다. 조건부 UPDATE 한 문장이라 실패해도 로그인은 살린다.
+ */
+async function fillCountry(profileId: string | null | undefined, req: { headers: Record<string, unknown> }): Promise<void> {
+    const cc = ipCountry(req);
+    if (!profileId || !cc) return;
+    try { await storage.users.fillProfileCountryIfEmpty(profileId, cc); } catch { /* 로그인을 막지 않는다 */ }
+}
+
 // --- Lightweight in-memory brute-force protection (dependency-free) ---
 // Keyed by action + phone + ip. Counts failed credential attempts inside a rolling
 // window and locks the key out once the threshold is crossed; a successful auth
@@ -71,7 +95,7 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
         return sendError(res, 429, `로그인 시도가 너무 많습니다. ${rl.retryAfterSec}초 후 다시 시도해주세요.`);
     }
 
-    let result;
+    let result: Awaited<ReturnType<typeof hiqService.login>>;
     try {
         result = await hiqService.login(phone, storeSlug, password);
     } catch (err: any) {
@@ -87,6 +111,8 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
             res.clearCookie('hiq_user_id', { path: '/' });
             return sendError(res, 403, SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
         }
+        // 예전 가입자는 국가가 비어 있다 — 이번 접속 국가로 한 번만 채운다(이미 있으면 그대로).
+        await fillCountry(result.member.profileId, req);
         res.cookie('hiq_user_id', result.member.id, {
             maxAge: 30 * 24 * 60 * 60 * 1000,
             httpOnly: true,
@@ -123,12 +149,11 @@ router.post("/social", asyncHandler(async (req: any, res: any) => {
         return sendError(res, 401, "토큰 검증에 실패했습니다");
     }
 
-    // Vercel이 붙여주는 IP 국가 헤더 — 국가 랭킹의 축(유저 입력 없이 자동 수집)
-    const countryCode = typeof req.headers["x-vercel-ip-country"] === "string"
-        ? (req.headers["x-vercel-ip-country"] as string).toUpperCase().slice(0, 2)
-        : undefined;
+    const countryCode = ipCountry(req);
 
     const result = await hiqService.socialLogin(provider, identity, typeof name === "string" ? name.slice(0, 40) : undefined, countryCode);
+    // 가입 때만 넣던 값이라 그 전에 만든 계정은 비어 있다 — 로그인할 때 한 번 채운다(이미 있으면 그대로).
+    await fillCountry(result.member.profileId, req);
     clearAttempts(key);
     if (await isMemberSuspended(result.member.id)) {
         res.clearCookie('hiq_user_id', { path: '/' });
@@ -161,7 +186,9 @@ router.post("/register", asyncHandler(async (req: any, res: any) => {
     const screenedName = screenMemberProfile({ name: validation.data.name });
     if (!screenedName.ok) return sendError(res, 400, screenedName.reason);
 
-    const result = await hiqService.register(validation.data);
+    // 전화번호 가입은 한국 번호 흐름이다(2026-09-17 오너: "전화번호는 다 한국이야").
+    // 헤더가 오면 그 값을 쓰고, 서버리스 밖·로컬처럼 헤더가 없을 때만 KR 로 둔다.
+    const result = await hiqService.register(validation.data, ipCountry(req) ?? "KR");
     // 번호로 이미 정지된 프로필에 매장 회원 행만 새로 붙이는 우회를 막는다 — 가입 경로도 로그인과 같이 확인한다.
     if (await isMemberSuspended(result.member.id)) {
         return sendError(res, 403, SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);

@@ -18,7 +18,7 @@ import type {
     InsertHiqMember,
     HiqMember
 } from "../../shared/schema.js";
-import { eq, desc, asc, and, or, ne, sql, gt, gte, inArray } from "drizzle-orm";
+import { eq, desc, asc, and, or, ne, sql, gt, gte, inArray, isNull } from "drizzle-orm";
 import { pushTokenVariants } from "../services/pushNative.js";
 
 // SECURITY: 남에게 보이는 응답(랭킹·상대목록·검색·타인 프로필)은 반드시 이 화이트리스트로만 셀렉트한다.
@@ -89,6 +89,20 @@ export class UserRepository {
             .where(eq(profiles.id, id))
             .returning();
         return updated;
+    }
+
+    /**
+     * 국가를 **비어 있을 때만** 채운다(2026-09-17). 국가는 유저가 입력하지 않고 Vercel 의 IP 헤더로만 잡는데,
+     * 예전에는 소셜 가입 경로에서만 넣어서 전화번호로 가입한 사람은 전부 비어 있었다(실측: 전화 41명 중 0명).
+     * 그래서 다음 로그인 때 한 번 채운다.
+     *
+     * **이미 값이 있으면 절대 덮지 않는다** — 여행이나 VPN 으로 접속할 때마다 국적이 바뀌면 안 된다.
+     * 조건부 UPDATE 한 문장이라 읽기가 없고, 이미 채워진 사람에게는 행이 안 바뀐다.
+     */
+    async fillProfileCountryIfEmpty(profileId: string, countryCode: string): Promise<void> {
+        await db.update(profiles)
+            .set({ countryCode })
+            .where(and(eq(profiles.id, profileId), isNull(profiles.countryCode)));
     }
 
     // --- Member Management ---
