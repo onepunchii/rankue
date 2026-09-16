@@ -33,6 +33,7 @@ import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout, isValidLayout } from "@shared/sim/layouts";
 import { aimPhi as aimPhiFromCue, cuePhiForAim } from "./aimAssist";
 import { nearerThicknessPhi } from "./aim";
+import { spinWithVertical } from "./controlsMath";
 import { aimAssistFor } from "./setupPresets";
 import { AIM_EPS_RAD, AIM_REPORT_MS, applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
@@ -548,6 +549,15 @@ export class SimController {
     /** 당점 (a, b) — R 비율. 반지름 0.5R 밖은 미스큐 링으로 클램프된다. */
     setSpin(a: number, b: number): void {
         this.setInput({ a, b });
+    }
+    /**
+     * 당점 프리셋(독의 공 세 개). 세로는 누른 값 그대로 두고 옆당점만 링 안으로 줄인다 —
+     * 그냥 setSpin 을 쓰면 둘이 함께 줄어 "누른 당점으로 안 간다"(2026-09-17 오너 제보).
+     */
+    setSpinVertical(b: number): void {
+        const s = this.store.get();
+        const next = spinWithVertical(s.input.a, b, this.aux.setup?.params.cue.maxOffset);
+        this.setInput(next);
     }
     setPower(V0: number): void {
         this.setInput({ V0 });

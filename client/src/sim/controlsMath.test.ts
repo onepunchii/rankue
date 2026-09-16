@@ -6,7 +6,7 @@ import { V0_MAX, V0_MIN, clampSpin } from "./simReducer";
 import {
     activeThickness, ELEVATION_MAX_DEG, ELEVATION_STEPS_DEG, elevationFromArc, FINE_STEP_RAD, formatPower, formatSpeed, formatSpin, nearestStep,
     padOffsetFor, powerFromPercent, powerFromSlider, powerPercent, pullbackFor, snapElevationDeg, spinFromPad, spinReadout, stepPower, THICKNESS_UI_STEPS,
-    thicknessStepLabel, nextElevationRad, elevationDeg } from "./controlsMath";
+    thicknessStepLabel, nextElevationRad, elevationDeg , spinWithVertical } from "./controlsMath";
 
 const table = TABLES.DAEDAE;
 const R = table.ball.R;
@@ -167,5 +167,40 @@ describe("controlsMath 당점 읽기·큐 각 단계(레이아웃 B 시트)", ()
         expect(elevationFromArc(10, 10)).toBe(0);   // 아래쪽(화면 y 아래 양수)
         expect(elevationFromArc(-10, -1)).toBeCloseTo(45, 6); // 왼쪽 위는 상한으로 클램프
         expect(elevationFromArc(-10, 5)).toBe(0);
+    });
+});
+
+describe("spinWithVertical — 방금 누른 세로 당점이 이긴다", () => {
+    const MAX = 0.5;
+    const near = (v: number, x: number) => expect(v).toBeCloseTo(x, 6);
+
+    it("세로는 정확히 그 값으로 앉는다 — 옆당점이 커도 깎이지 않는다", () => {
+        // 예전 버그: clampSpin 이 둘을 함께 줄여 b 가 -0.3 이 아니라 -0.26 쯤에 앉았다(2026-09-17 제보).
+        near(spinWithVertical(0.45, -0.3, MAX).b, -0.3);
+        near(spinWithVertical(-0.5, 0.3, MAX).b, 0.3);
+    });
+
+    it("대신 옆당점이 링 안으로 줄어든다 — 부호는 지킨다", () => {
+        const r = spinWithVertical(0.45, -0.3, MAX);
+        near(Math.abs(r.a), Math.sqrt(MAX * MAX - 0.09));   // 0.4
+        expect(r.a).toBeGreaterThan(0);                     // 우측 당점이 좌측으로 넘어가지 않는다
+        expect(spinWithVertical(-0.45, -0.3, MAX).a).toBeLessThan(0);
+    });
+
+    it("링 안이면 옆당점을 건드리지 않는다", () => {
+        const r = spinWithVertical(0.2, -0.3, MAX);
+        near(r.a, 0.2);
+        near(r.b, -0.3);
+    });
+
+    it("세로를 최대로 주면 옆당점 자리가 없다 — 프리셋을 100%로 두지 않는 이유다", () => {
+        const r = spinWithVertical(0.4, MAX, MAX);
+        near(r.a, 0);
+        expect(Math.abs(r.b)).toBeLessThanOrEqual(MAX);
+    });
+
+    it("이상한 값은 0 으로", () => {
+        near(spinWithVertical(NaN, -0.3, MAX).a, 0);
+        near(spinWithVertical(0.2, NaN, MAX).b, 0);
     });
 });

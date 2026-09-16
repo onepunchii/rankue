@@ -181,3 +181,20 @@ export function nextElevationRad(thetaRad: number): number {
     const next = i < 0 || i === ELEVATION_STEPS_DEG.length - 1 ? ELEVATION_STEPS_DEG[0] : ELEVATION_STEPS_DEG[i + (ELEVATION_STEPS_DEG[i] === deg ? 1 : 0)];
     return (next * Math.PI) / 180;
 }
+
+/**
+ * 당점 프리셋: **세로를 정확히 그 값으로** 두고, 옆당점만 미스큐 링 안으로 줄인다(2026-09-17 오너 제보).
+ *
+ * 왜 필요한가: clampSpin 은 링을 넘으면 a·b 를 **함께** 비례로 줄인다. 그래서 옆당점을 크게 준 뒤 아래 당점을
+ * 누르면 b 가 -0.3 이 아니라 -0.26 쯤에 앉았고, 칩도 안 켜졌다 — 누른 대로 안 되는 것처럼 보였다.
+ * 방금 누른 쪽이 이겨야 한다: b 는 그대로 두고 남는 폭(√(max² − b²))만큼만 a 를 허용한다.
+ * 부호는 지킨다 — 우측 당점을 준 사람이 아래를 눌렀다고 좌측으로 넘어가면 안 된다.
+ */
+export function spinWithVertical(a: number, b: number, maxOffset: number = DEFAULT_CUE.maxOffset): { a: number; b: number } {
+    if (!Number.isFinite(a)) a = 0;
+    if (!Number.isFinite(b)) b = 0;
+    const max = Math.max(0, maxOffset - 1e-9);
+    const vb = Math.max(-max, Math.min(max, b));
+    const room = Math.sqrt(Math.max(0, max * max - vb * vb));
+    return { a: Math.max(-room, Math.min(room, a)), b: vb };
+}

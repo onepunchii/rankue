@@ -23,7 +23,8 @@ interface Props {
     onNudge: (dir: -1 | 1) => void;
     /** 지금 당점 — 프리셋 칩의 켜짐 표시에 쓴다. */
     spin: { readonly a: number; readonly b: number };
-    onSpin: (a: number, b: number) => void;
+    /** 세로 당점만 바꾼다(옆당점은 링 안으로 줄어들 뿐 사라지지 않는다). */
+    onSpinVertical: (b: number) => void;
     /** 되돌리기(연습·드릴에서 샷 뒤). 없으면 자리를 비운다. */
     onUndo?: (() => void) | null;
     className?: string;
@@ -89,7 +90,7 @@ export const ThicknessDock = memo(function ThicknessDock(p: Props) {
                         <button
                             key={preset.key} type="button" aria-pressed={on} disabled={p.disabled}
                             aria-label={label} title={label}
-                            onClick={() => p.onSpin(p.spin.a, preset.b)}
+                            onClick={() => p.onSpinVertical(preset.b)}
                             className={cn(CHIP, "w-10 flex items-center justify-center", on ? CHIP_ON : CHIP_OFF)}
                         >
                             <SpinIcon a={0} b={preset.b} />

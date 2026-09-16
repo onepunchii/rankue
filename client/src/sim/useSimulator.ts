@@ -57,6 +57,8 @@ export interface SimulatorActions {
     setThickness(step: number, side?: "left" | "right"): void;
     /** 당점 (a, b) R 비율. 0.5R 밖은 미스큐 링으로 클램프. */
     setSpin(a: number, b: number): void;
+    /** 당점 프리셋: 세로만 정확히 맞추고 옆당점은 링 안으로 줄인다. */
+    setSpinVertical(b: number): void;
     /** m/s, [0.2, 9] */
     setPower(V0: number): void;
     /** rad, [0, 20°] */
@@ -213,6 +215,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         nudgePhi: (d) => ctrl.nudgePhi(d),
         setThickness: (step, side) => ctrl.setThickness(step, side),
         setSpin: (a, b) => ctrl.setSpin(a, b),
+        setSpinVertical: (b) => ctrl.setSpinVertical(b),
         setPower: (V0) => ctrl.setPower(V0),
         setElevation: (theta) => ctrl.setElevation(theta),
         shoot: () => ctrl.shoot(),

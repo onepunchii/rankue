@@ -974,6 +974,7 @@ export function SimulatorPage() {
     const onThickness = useCallback((step: ThicknessStep) => actions.setThickness(step), [actions]);
     const onNudge = useCallback((dir: -1 | 1) => actions.nudgePhi(dir * FINE_STEP_RAD), [actions]);
     const onSpin = useCallback((a: number, b: number) => actions.setSpin(a, b), [actions]);
+    const onSpinVertical = useCallback((b: number) => actions.setSpinVertical(b), [actions]);
     const onElevation = useCallback((theta: number) => actions.setElevation(theta), [actions]);
     const onPower = useCallback((V0: number) => actions.setPower(V0), [actions]);
     // 샷: 큐대가 STROKE_MS 동안 앞으로 밀린 뒤 공이 출발한다(조준 단계에서 그린다 — 예전엔 재생 중에 그려 큐가 굴러가는 공을 따라갔다)
@@ -1497,7 +1498,7 @@ export function SimulatorPage() {
                         <ThicknessDock
                             active={active} disabled={!aiming}
                             onThickness={onThickness} onNudge={onNudge}
-                            spin={{ a: sim.input.a, b: sim.input.b }} onSpin={onSpin}
+                            spin={{ a: sim.input.a, b: sim.input.b }} onSpinVertical={onSpinVertical}
                             onUndo={undoInDock ? onUndo : null}
                             className={cn(
                                 "absolute left-2 bottom-2 z-[3] transition-opacity duration-150",
