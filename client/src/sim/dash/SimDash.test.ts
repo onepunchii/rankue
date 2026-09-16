@@ -224,6 +224,50 @@ describe("SimDash", () => {
         expect(h.container.querySelector("[role=group]")).toBeNull();
     });
 
+    /**
+     * 2026-09-16 테스터: "3구대대/3구중대/4구대대/4구중대 위 항목을 누르면 꼭 세 번째 화면에서 에러가 납니다".
+     * 세 번째가 4구 대대라는 가정으로, 그 조합을 **연습 기록만 있고 끝난 대전은 하나도 없는** 상태로 만들어
+     * 칩을 차례로 눌러 본다(에러가 나면 render 가 던져 테스트가 실패한다).
+     */
+    it("칩이 넷일 때 4구 대대(연습만 있고 대전 없음)를 눌러도 안 깨진다", async () => {
+        const stx: SimStats = {
+            ...stats(),
+            matchRecords: [
+                { gameType: "3c", tableId: "DAEDAE", wins: 7, losses: 9, draws: 1, total: 17 },
+                { gameType: "3c", tableId: "JUNGDAE_KR", wins: 4, losses: 10, draws: 1, total: 15 },
+                { gameType: "4c", tableId: "JUNGDAE_KR", wins: 7, losses: 18, draws: 0, total: 25 },
+            ],
+            ratings: [
+                { gameType: "3c", tableId: "DAEDAE", sessions: 12, totalScore: 104, totalInnings: 240, bestAvg: 0.5, bestHighRun: 4, simRating: 1024, matches: 3, wins: 2, updatedAt: day(12) },
+                { gameType: "3c", tableId: "JUNGDAE_KR", sessions: 3, totalScore: 20, totalInnings: 60, bestAvg: 0.4, bestHighRun: 3, simRating: 1000, matches: 0, wins: 0, updatedAt: day(9) },
+                // 문제의 조합: 연습만 있고 대전은 한 판도 없다
+                { gameType: "4c", tableId: "DAEDAE", sessions: 2, totalScore: 60, totalInnings: 20, bestAvg: 3, bestHighRun: 9, simRating: 1000, matches: 0, wins: 0, updatedAt: day(6) },
+                { gameType: "4c", tableId: "JUNGDAE_KR", sessions: 6, totalScore: 300, totalInnings: 200, bestAvg: 2, bestHighRun: 7, simRating: 1000, matches: 0, wins: 0, updatedAt: day(3) },
+            ],
+            ranks: [{ gameType: "3c", tableId: "DAEDAE", rank: 3, total: 12 }],
+        };
+        // 한 샷도 못 친 기권 대전(이닝 0)도 섞는다 — 나눗셈이 깨지는 자리다
+        const rows = [
+            ...matches(),
+            M("z1", { gameType: "4c", tableId: "JUNGDAE_KR", finishedAt: day(6), state: st({ score: 0, innings: 0, highRun: 0 }) }),
+            M("z2", { gameType: "3c", tableId: "JUNGDAE_KR", winnerIndex: 1, finishedAt: day(7), state: st({ score: 0, innings: 0, highRun: 0 }) }),
+        ];
+        const h = mount({ stats: stx, rows });
+        await settle(h, () => hero(h) !== "");
+        const chips = () => buttons(h).filter((b) => b.getAttribute("aria-pressed") !== null);
+        expect(chips().length).toBe(4);
+        // 넷을 차례로 누른다 — 세 번째에서 던지면 여기서 실패한다
+        for (let i = 0; i < 4; i++) {
+            await click(chips()[i]);
+            expect(text(h)).toContain("대전 전적");
+        }
+        // 4구 대대(대전 없음)를 고르면 빈 안내가 뜨고 전적은 0승 0패다
+        const daedae4c = chips().find((b) => (b.textContent ?? "").includes("4구") && (b.textContent ?? "").includes("대대"));
+        expect(daedae4c).toBeTruthy();
+        await click(daedae4c!);
+        expect(text(h)).toContain("0승 0패");
+    });
+
     it("불러오기 실패는 문구와 다시 시도", async () => {
         const h = mount({ statsApi: async () => { throw new Error("boom"); } });
         await settle(h, () => text(h).includes(ko["sim.dash.failed"]));
