@@ -110,9 +110,6 @@ export function ArcSwing({ club, ballPos, teeBottomPx, homeBottomPx, onShot, onA
 
     const onDown = (e: RPE) => {
         if (phase === "swing") { const r = release.current; if (r) fire(needleAt(e.timeStamp - r.t0, r.sweepMs).errMs, false); return; }
-        const b = boxRef.current?.getBoundingClientRect(); if (!b) return;
-        // 링 근처(=공의 집)에서만 끌기가 시작된다. 위쪽은 조준 띠·클럽 바가 산다
-        if (e.clientY < b.bottom - homeBottomPx - RING_R - 30) return;
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         start.current = { x: e.clientX, y: e.clientY };
         done.current = false;
@@ -171,8 +168,16 @@ export function ArcSwing({ club, ballPos, teeBottomPx, homeBottomPx, onShot, onA
     const over = power > 100;
 
     return (
-        <div ref={boxRef} className="absolute inset-0 select-none touch-none" style={{ overscrollBehavior: "none" }}
-            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+        <div ref={boxRef} className="absolute inset-0 select-none pointer-events-none" style={{ overscrollBehavior: "none" }}>
+            {/*
+              터치를 먹는 판은 이것 하나뿐이다 — 나머지(클럽 바·조준 띠·헤더 버튼)가 살아 있어야 한다.
+              평소엔 링 주변(아래)만, 바늘이 도는 동안엔 화면 전체(아무 데나 탭).  2026-09-16 오너 제보: 채 선택이 안 됨
+            */}
+            <div
+                className="absolute inset-x-0 touch-none pointer-events-auto"
+                style={phase === "swing" ? { top: 0, bottom: 0 } : { top: `calc(100% - ${homeBottomPx + RING_R + 34}px)`, bottom: 0 }}
+                onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+            />
 
             {/* 아크 미터 — 오버스윙이면 떨린다 */}
             <svg width={arcW} height={ARC_H} className="absolute pointer-events-none"
