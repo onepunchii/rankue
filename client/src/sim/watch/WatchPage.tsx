@@ -2,8 +2,8 @@
  * 관전 · 다시보기 화면(2026-09-12 오너 요청 → 2026-09-13 "호스트나 참여자처럼 보이는데 보기만 가능한 권한").
  *
  * **선수 화면과 같은 부품**으로 짓는다 — 머리줄(TopBar: 규칙 칩·점수·차례·40초 시계·관전자 수), 이닝 시트,
- * 같은 렌더러(Canvas2D → 가능하면 3D). 다른 점은 조작이 없다는 것뿐이다: 조준선·큐대·세기 레일·샷 버튼·기권이 없고
- * 나가기만 있다.
+ * 같은 렌더러(Canvas2D → 가능하면 3D). 다른 점은 **조작**이 없다는 것뿐이다: 세기 레일·샷 버튼·기권이 없고 나가기만 있다.
+ * 보는 것은 선수와 같아야 한다(2026-09-16 오너) — 치는 사람이 겨누는 큐대도 그대로 그린다. 조준선·예상 경로는 없다.
  *
  * 선수용 코드(SimulatorPage·simController)는 건드리지 않는다. 그쪽은 "나는 선수다" 를 전제로 돌아가서
  * 관전 모드를 끼워 넣으면 실제 대전이 위험하다 — 부품을 같이 쓰되 화면은 따로 둔다(2026-09-13 오너와 합의).
@@ -26,7 +26,8 @@ import { Canvas2DRenderer } from "../render/Canvas2DRenderer";
 import type { Renderer, RendererView, SafeInsets } from "../render/Renderer";
 import { readZoomPref, safeLocalStorage, selectRendererKind, type RendererKind } from "../render/rendererChoice";
 import { matchApi, matchConfig, type MatchPublic, type MatchShot } from "../matchApi";
-import { paramsFromConfig } from "../simReducer";
+import { cueBallIdOf, paramsFromConfig } from "../simReducer";
+import { easeOppAim, OPP_AIM_PULLBACK } from "../match/oppAim";
 import { effectiveBall, makePlayback, startClock, clockTime, type Playback, type PlaybackClock } from "../playback";
 import { TopBar } from "../components/TopBar";
 import { ShotClock } from "../components/ShotClock";
@@ -79,6 +80,11 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     const viewRef = useRef<RendererView>("top");
     viewRef.current = view;
     const aimRef = useRef<{ cueBallId: string; phi: number }>({ cueBallId: "white", phi: Math.PI / 2 });
+    /** 지금 치는 사람이 겨누는 각도(서버가 관전자에게도 보낸다) 와 그 사람의 큐볼. 없으면 큐대를 안 그린다. */
+    const liveAimRef = useRef<number | null>(null);
+    const liveCueRef = useRef<"white" | "yellow">("white");
+    /** 직전 프레임에 그린 큐 각도 — 받은 값으로 순간이동하지 않고 조금씩 따라간다(선수 화면과 같은 규칙). */
+    const oppAimRef = useRef<number | null>(null);
     const rendererKindRef = useRef<RendererKind | null>(null);
     if (rendererKindRef.current === null) rendererKindRef.current = selectRendererKind();
 
@@ -92,6 +98,9 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     const config = useMemo(() => (matchRef.current ? matchConfig(matchRef.current) : null), [paramsKey]);
     const params = useMemo(() => (config ? paramsFromConfig(config) : null), [config]);
     const session = (match?.state as SessionState | null) ?? null;
+    const live = match?.status === "playing";
+    liveAimRef.current = live && match?.opponentAim ? match.opponentAim.phi : null;
+    liveCueRef.current = cueBallIdOf(session);
     const names = useMemo(() => [match?.hostName || t("sim.watch.host"), match?.guestName || t("sim.watch.guest")], [match, t]);
 
     /* ── 렌더러: 선수 화면과 같은 것을 쓴다. Canvas2D 를 먼저 올리고, 3D 가 되는 기기면 바꿔 끼운다. ── */
@@ -137,13 +146,19 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                 dirtyRef.current = true;
                 if (tt >= anim.pb.duration) { animRef.current = null; anim.done(); }
             }
-            if (!dirtyRef.current && !(r.needsFrame?.() ?? false)) return;
+            // 치는 사람의 큐대 — 재생 중엔 그리지 않는다(공이 굴러가는데 큐대가 남아 있으면 이상하다).
+            const opp = animRef.current ? null : easeOppAim(oppAimRef.current, liveAimRef.current);
+            oppAimRef.current = opp?.phi ?? null;
+            if (!dirtyRef.current && !(r.needsFrame?.() ?? false) && !opp?.moving) return;
             dirtyRef.current = false;
             const aim = animRef.current ?? aimRef.current;
+            // 조준 중엔 카메라도 치는 사람 쪽을 본다 — 직전 샷의 각도에 머물면 "끝난 판"처럼 보인다.
+            const camBall = opp ? liveCueRef.current : aim.cueBallId;
             r.draw({
                 balls: ballsRef.current,
+                cue: opp ? { phi: opp.phi, pullback: OPP_AIM_PULLBACK, visible: true, ballId: liveCueRef.current } : undefined,
                 highlightBallId: aim.cueBallId,
-                view: { cueBallId: aim.cueBallId, phi: aim.phi, mode: animRef.current ? "overview" : "follow" },
+                view: { cueBallId: camBall, phi: opp ? opp.phi : aim.phi, mode: animRef.current ? "overview" : "follow" },
             });
         });
         // 재생 중에 화면이 가려지면 프레임이 멈춰 영영 안 끝난다 — 마지막 상태로 붙이고 끝낸 것으로 친다.
@@ -231,34 +246,50 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         return () => { alive = false; };
     }, [matchId, t]);
 
-    /* ── 진행 중: 폴링 → 새 샷이 있으면 이어 재생 ── */
+    /**
+     * 진행 중: 폴링 → 새 샷이 있으면 이어 재생.
+     *
+     * **의존성은 matchId 와 "진행 중인가" 둘뿐이어야 한다.** 예전엔 [match, playedShots, animating, playList] 였는데,
+     * tick 안의 `setMatch(m)` 가 곧바로 이 effect 를 다시 만들어 `alive` 를 false 로 바꿨다. 그 다음 줄의
+     * `await getShots(...)` 가 돌아왔을 땐 이미 `if (!alive) return` 에 걸려 샷이 버려졌고, 다음 폴링도 똑같이
+     * 버려서 **새 샷이 영영 재생되지 않았다** — 상대가 쳐도 관전 화면이 그대로 멈춰 있던 진짜 원인
+     * (2026-09-16 오너 제보). 샷이 없는 변화(시간 초과)는 await 가 없어 우연히 살아 있었다.
+     * 그래서 자주 바뀌는 값은 전부 ref 로 읽는다. 위 params 주석과 같은 함정이다.
+     */
+    const playedRef = useRef(0);
+    playedRef.current = playedShots;
+    const animatingRef = useRef(false);
+    animatingRef.current = animating;
+    const playListRef = useRef(playList);
+    playListRef.current = playList;
+
     useEffect(() => {
-        if (!match || match.status !== "playing") return;
+        if (!live) return;
         let alive = true;
         let timer: ReturnType<typeof setTimeout> | null = null;
         const tick = async () => {
             if (!alive) return;
-            const delay = nextPollMs(match.status, document.visibilityState === "visible");
+            const delay = nextPollMs(matchRef.current?.status ?? "playing", document.visibilityState === "visible");
             if (delay === null) { timer = setTimeout(tick, 2000); return; }   // 가려진 동안은 가볍게 되돌아온다
             try {
                 const m = await matchApi.getMatch(matchId);
                 if (!alive) return;
                 setMatch(m);
-                const plan = planWatch({ serverShots: m.shots, playedShots, animating });
+                const plan = planWatch({ serverShots: m.shots, playedShots: playedRef.current, animating: animatingRef.current });
                 if (plan.kind === "fetch") {
                     const shots = await matchApi.getShots(matchId, plan.from);
                     if (!alive) return;
                     const list = normalizeShots(shots, plan.from);
-                    await playList(list, list, (m.state as SessionState | null)?.turn ?? 0);
-                } else if (!animating && m.balls && m.shots === playedShots) {
+                    await playListRef.current(list, list, (m.state as SessionState | null)?.turn ?? 0);
+                } else if (!animatingRef.current && m.balls && m.shots === playedRef.current) {
                     ballsRef.current = m.balls; dirtyRef.current = true;      // 시간 초과 등 샷 없는 변화
                 }
             } catch { /* 일시적 오류 — 다음 주기에 다시 */ }
             if (alive) timer = setTimeout(tick, delay);
         };
-        timer = setTimeout(tick, nextPollMs(match.status, true) ?? 2000);
+        timer = setTimeout(tick, nextPollMs("playing", true) ?? 2000);
         return () => { alive = false; if (timer) clearTimeout(timer); };
-    }, [match, matchId, playedShots, animating, playList]);
+    }, [matchId, live]);
 
     /* ── 끝난 대전: 샷을 통째로 받아 두고 직접 넘겨 본다 ── */
     useEffect(() => {
