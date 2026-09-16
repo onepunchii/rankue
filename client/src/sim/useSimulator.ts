@@ -16,16 +16,16 @@ import type { SimParams } from "@shared/sim/params";
 import type { SessionState, ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
 import { simApi, type SimApi } from "./simApi";
-import type { MatchApi, MatchEndReason, MatchPublic, MatchStatus, PlayerIndex } from "./matchApi";
+import type { ChatLine, MatchApi, MatchEndReason, MatchPublic, MatchStatus, PlayerIndex } from "./matchApi";
 import { cueBallIdOf, type CueInput, type Phase, type SimMode } from "./simReducer";
 import {
     SimController,
-    type PlaybackSpeed, type SimCallbacks, type SimFrame, type SimPreview, type StartOptions,
+    type ChatSendResult, type PlaybackSpeed, type SimCallbacks, type SimFrame, type SimPreview, type StartOptions,
 } from "./simController";
 
-export type { SimFrame, SimPreview, StartOptions, PlaybackSpeed, OfflineReason, MatchEvent } from "./simController";
+export type { SimFrame, SimPreview, StartOptions, PlaybackSpeed, OfflineReason, MatchEvent, ChatSendResult } from "./simController";
 export type { CueInput, Phase, SimMode } from "./simReducer";
-export type { MatchPublic, MatchStatus, MatchEndReason, PlayerIndex } from "./matchApi";
+export type { ChatLine, MatchPublic, MatchStatus, MatchEndReason, PlayerIndex } from "./matchApi";
 
 export interface UseSimulatorOptions extends SimCallbacks {
     /** useGameAudio().getCtx — 제스처로 잠금 해제된 공유 AudioContext. 없으면 무음. */
@@ -82,6 +82,8 @@ export interface SimulatorActions {
     timeout(): Promise<boolean>;
     /** 이모지 인사(대전). 거부 사유를 돌려준다. */
     sendEmoji(code: string): Promise<"ok" | "too-fast" | "limit" | "failed">;
+    /** 한마디 보내기. 자유 입력은 { text }, 고정 인사는 { code }. */
+    sendChat(body: { text?: string; code?: string; clientKey?: string }): Promise<ChatSendResult>;
 }
 
 /** 네트워크 대전 뷰(mode="match" 에서만). 이름은 players 순서(0 호스트·흰 공, 1 게스트·노란 공). */
@@ -122,6 +124,14 @@ export interface MatchView {
     readonly handicap: boolean;
     /** 상대가 지금 겨누는 방향(rad). 상대 차례에만 온다 — 큐대를 그려 "지켜보는" 느낌을 만든다. */
     readonly opponentAim: { readonly phi: number; readonly at: string } | null;
+    /** 이 대전에서 오간 한마디(오래된 것부터). 내가 보낸 것도 들어 있다. */
+    readonly chat: readonly ChatLine[];
+    /**
+     * 지금 글을 쓸 수 있나 — **서버가 보는 차례**로 판단한다(로컬 세션 턴이 아니라).
+     * 내가 친 직후엔 로컬 턴이 먼저 넘어가지만 서버의 turn 은 샷이 실제로 기록될 때까지 아직 나다.
+     * 그 창에서 쓴 글은 409 로 거부되므로, 애초에 입력칸을 내주지 않는다.
+     */
+    readonly canChat: boolean;
     /** 마지막 이모지 인사(보낸 사람 자리 포함). 화면이 상대 것만 띄운다. */
     readonly emoji: { readonly code: string; readonly from: number; readonly at: string } | null;
 }
@@ -216,6 +226,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         sync: () => ctrl.sync(),
         timeout: () => ctrl.timeout(),
         sendEmoji: (code: string) => ctrl.sendEmoji(code),
+        sendChat: (body) => ctrl.sendChat(body),
     }), [ctrl]);
 
     return useMemo<Simulator>(() => {
@@ -246,6 +257,8 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             opponentAway: m.opponentAway === true,
             handicap: m.handicap === true,
             opponentAim: m.opponentAim ?? null,
+            chat: aux.chat,
+            canChat: m.status === "playing" && m.turn !== m.myIndex && core.queue.length === 0,
         } : null;
         return {
             phase: core.phase,

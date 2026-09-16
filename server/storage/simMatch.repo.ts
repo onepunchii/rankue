@@ -4,12 +4,13 @@
  * 시뮬 대전 성적(Elo)은 hiqSimMatchRatings.rating 에만 쓴다(2026-09-12 부터 대대·중대 통합).
  */
 import { db } from "../db.js";
-import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchRatings, hiqMembers } from "../../shared/schema.js";
+import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchChats, hiqSimMatchRatings, hiqMembers } from "../../shared/schema.js";
 import { alias } from "drizzle-orm/pg-core";
 import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
-import type { HiqSimMatch, HiqSimMatchShot } from "../../shared/schema.js";
+import type { HiqSimMatch, HiqSimMatchShot, HiqSimMatchChat } from "../../shared/schema.js";
 import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS } from "../../shared/sim/rules/session.js";
 import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
+import { CHAT_PAGE_MAX, chatReject, type ChatReject } from "../../shared/sim/chat.js";
 
 const ELO_K = 24;
 const LIVE = ["waiting", "playing"] as const;
@@ -335,6 +336,74 @@ export class SimMatchRepository {
         return db.select().from(hiqSimMatchShots)
             .where(and(eq(hiqSimMatchShots.matchId, matchId), gte(hiqSimMatchShots.idx, fromIdx)))
             .orderBy(hiqSimMatchShots.idx);
+    }
+
+    /** 채팅 따라잡기 — 샷과 같은 커서 규약(seq >= from). unique(match_id, seq) 의 btree 를 그대로 쓴다. */
+    async getChats(matchId: string, fromSeq = 0, limit = CHAT_PAGE_MAX): Promise<HiqSimMatchChat[]> {
+        return db.select().from(hiqSimMatchChats)
+            .where(and(eq(hiqSimMatchChats.matchId, matchId), gte(hiqSimMatchChats.seq, fromSeq)))
+            .orderBy(hiqSimMatchChats.seq)
+            .limit(limit);
+    }
+
+    /**
+     * 채팅 한 줄 보내기(원자적). 대전 행을 잠그고 seq 를 채번한 뒤 자식 행을 넣는다 —
+     * 두 사람이 같은 순간에 보내도 seq 가 겹치지 않고, 한 줄도 덮이지 않는다(이모지 단일 슬롯과 다른 점).
+     *
+     * 판단은 전부 shared/sim/chat.ts 의 chatReject 가 한다(DB 없이 테스트하려고 뺐다).
+     * 쿨다운 집계에서 **sender_index 를 빼먹지 마라** — 그게 이모지 쿨다운이 상대 전송에 풀리던 버그의 정체다.
+     *
+     * 이 함수는 version·lastShotAt·turnSeenAt·emoji_* 를 건드리지 않는다. 말을 걸었다고 40초 시계가
+     * 다시 시작되거나 상대 화면이 스냅되면 안 된다.
+     */
+    async sendChat(a: {
+        matchId: string;
+        from: 0 | 1;
+        senderId: string;
+        kind: "text" | "code";
+        text: string;
+        clientKey: string | null;
+        cooldownMs: number;
+        maxPerMatch: number;
+    }): Promise<{ ok: true; row: HiqSimMatchChat; chatSeq: number } | { ok: false; reason: NonNullable<ChatReject> }> {
+        return db.transaction(async (tx) => {
+            const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, a.matchId)).for("update");
+            if (!m) return { ok: false as const, reason: "gone" as const };
+
+            // 같은 전송의 재시도면 새 줄을 만들지 않고 그때 넣은 줄을 그대로 돌려준다(응답만 유실된 경우).
+            if (a.clientKey) {
+                const [dup] = await tx.select().from(hiqSimMatchChats).where(and(
+                    eq(hiqSimMatchChats.matchId, a.matchId),
+                    eq(hiqSimMatchChats.senderIndex, a.from),
+                    eq(hiqSimMatchChats.clientKey, a.clientKey),
+                )).limit(1);
+                if (dup) return { ok: true as const, row: dup, chatSeq: m.chatSeq };
+            }
+
+            const [agg] = await tx.select({
+                count: sql<number>`count(*) filter (where ${hiqSimMatchChats.senderIndex} = ${a.from})::int`,
+                lastMineAt: sql<Date | null>`max(${hiqSimMatchChats.createdAt}) filter (where ${hiqSimMatchChats.senderIndex} = ${a.from})`,
+                lastAnyAt: sql<Date | null>`max(${hiqSimMatchChats.createdAt})`,
+            }).from(hiqSimMatchChats).where(eq(hiqSimMatchChats.matchId, a.matchId));
+
+            const reject = chatReject({
+                status: m.status, turn: m.turn, from: a.from, kind: a.kind,
+                count: agg?.count ?? 0,
+                lastMineAt: agg?.lastMineAt ? new Date(agg.lastMineAt).getTime() : null,
+                lastAnyAt: agg?.lastAnyAt ? new Date(agg.lastAnyAt).getTime() : null,
+                now: Date.now(),
+                cooldownMs: a.cooldownMs, maxPerMatch: a.maxPerMatch,
+            });
+            if (reject) return { ok: false as const, reason: reject };
+
+            const seq = m.chatSeq + 1;
+            const [row] = await tx.insert(hiqSimMatchChats).values({
+                matchId: a.matchId, seq, senderIndex: a.from, senderId: a.senderId,
+                kind: a.kind, text: a.text, clientKey: a.clientKey,
+            }).returning();
+            await tx.update(hiqSimMatches).set({ chatSeq: seq }).where(eq(hiqSimMatches.id, a.matchId));
+            return { ok: true as const, row, chatSeq: seq };
+        });
     }
 
     /**

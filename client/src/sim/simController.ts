@@ -48,7 +48,7 @@ import {
 } from "./simApi";
 import {
     classifyMatchError, matchApi as defaultMatchApi, matchConfig,
-    type MatchApi, type MatchEndReason, type MatchPublic, type MatchShot, type PostShotResponse,
+    type ChatLine, type MatchApi, type MatchEndReason, type MatchPublic, type MatchShot, type PostShotResponse,
 } from "./matchApi";
 import {
     createSimStore, cueBallIdOf, matchStateFrom, paramsFromConfig, sameBalls, thicknessPhi,
@@ -135,7 +135,16 @@ export interface SimAux {
     readonly lastResult: SimResult | null;
     /** 서버 시각 − 이 기기 시각(ms). 대전 폴링마다 갱신 — 40초 시계는 서버 시각 기준으로 센다. */
     readonly serverOffsetMs: number;
+    /**
+     * 이 대전에서 오간 채팅(2026-09-16). 코어 상태가 아니라 aux 에 둔다 — 샷·공 배치와 달리 재생·스냅·해시와
+     * 아무 관계가 없는 표시용 값이라, 코어에 넣으면 스냅 판단과 메타 비교를 괜히 지나간다.
+     * 내가 보낸 줄도 여기 들어간다(seq 로 병합하므로 폴링으로 같은 줄이 다시 와도 중복되지 않는다).
+     */
+    readonly chat: readonly ChatLine[];
 }
+
+/** 한마디 전송 결과. 서버가 내는 거부를 **전부** 담는다 — 빠뜨리면 그 안내 문구가 죽은 키가 된다. */
+export type ChatSendResult = "ok" | "too-fast" | "limit" | "blocked" | "your-turn" | "failed";
 
 export interface SimSnapshot {
     readonly core: SimCoreState;
@@ -164,7 +173,7 @@ export interface ControllerDeps {
     readonly previewDelayMs?: number;
 }
 
-const INITIAL_AUX: SimAux = { setup: null, preview: null, speed: 1, syncing: false, duration: 0, lastResult: null, serverOffsetMs: 0 };
+const INITIAL_AUX: SimAux = { setup: null, preview: null, speed: 1, syncing: false, duration: 0, lastResult: null, serverOffsetMs: 0, chat: [] };
 /** exit 가 진행 중인 서버 호출을 기다리는 상한 (ms). */
 export const EXIT_SYNC_WAIT_MS = 3000;
 /** 대전 폴링 주기: 상대 차례가 된 뒤 처음 1분은 빠르게, 그 뒤 느리게. */
@@ -378,7 +387,8 @@ export class SimController {
         const params = paramsFromConfig(config);
         const match = matchStateFrom(m, m.myIndex);
         this.waitingSince = this.now();
-        this.setAux({ setup: { config, params }, preview: null, duration: 0, speed: 1, lastResult: null });
+        // setAux 는 병합이라 chat 을 명시하지 않으면 옛 대전의 대화가 새 방에 그대로 남는다(재경기가 그 경로다).
+        this.setAux({ setup: { config, params }, preview: null, duration: 0, speed: 1, lastResult: null, chat: [] });
         this.store.dispatch({ type: "startMatch", match, session: m.state, balls: m.balls, shots: m.shots, aimAssist: m.aimAssist ?? true });
         this.unwake = (this.deps.onWake ?? defaultOnWake)(() => this.wake());
         this.schedulePoll();
@@ -891,6 +901,53 @@ export class SimController {
         return out;
     }
 
+    /** 지금까지 이어 받은 채팅 커서(마지막으로 받은 seq). 구멍이 있으면 전진시키지 않는다. */
+    private chatFrom = 0;
+
+    /** 받은 줄을 seq 로 병합해 aux 에 쌓는다. 내 전송 응답과 폴링이 같은 줄을 줘도 한 번만 남는다. */
+    private mergeChat(lines: readonly ChatLine[]): void {
+        if (lines.length === 0) return;
+        const bySeq = new Map<number, ChatLine>();
+        for (const c of this.aux.chat) bySeq.set(c.seq, c);
+        for (const c of lines) bySeq.set(c.seq, c);
+        this.setAux({ chat: [...bySeq.values()].sort((a, b) => a.seq - b.seq) });
+        // 커서는 **끊김 없이 이어지는 만큼만** 전진한다. 중간이 비면 그대로 둬서 다음 폴링이 그 줄부터 다시 받는다.
+        let want = this.chatFrom;
+        while (bySeq.has(want + 1)) want += 1;
+        this.chatFrom = want;
+    }
+
+    private async fetchChats(gen: number, id: string, serverSeq: number): Promise<void> {
+        if (this.disposed || !this.matchApi.getChats || serverSeq <= this.chatFrom) return;
+        const lines = await this.matchApi.getChats(id, this.chatFrom + 1);
+        if (gen !== this.gen) return;
+        this.mergeChat(lines);
+    }
+
+    /**
+     * 한마디 보내기. **직렬 체인 밖**에서 보낸다 — 체인에 태우면 상대 샷 재생(playbackDone)이 끝날 때까지
+     * 몇 초씩 묶였다가 그 사이 차례가 넘어와 거부되고, 폴링·샷 전송까지 채팅 때문에 늦는다.
+     * 응답을 대전 상태에 반영하지 않으므로(로그에만 붙는다) 큐·스냅·재생과 경쟁할 값이 하나도 없다.
+     */
+    async sendChat(body: { text?: string; code?: string; clientKey?: string }): Promise<ChatSendResult> {
+        const s = this.store.get();
+        if (this.disposed || s.mode !== "match" || !s.match || s.match.status !== "playing" || !this.matchApi.sendChat) return "failed";
+        const gen = this.gen;
+        try {
+            const r = await this.matchApi.sendChat(s.match.matchId, body);
+            if (gen !== this.gen) return "ok";
+            this.mergeChat([r.line]);
+            return "ok";
+        } catch (e) {
+            const code = (e as { data?: { code?: string } })?.data?.code;
+            if (code === "TOO_FAST") return "too-fast";
+            if (code === "LIMIT") return "limit";
+            if (code === "FILTERED") return "blocked";
+            if (code === "YOUR_TURN") return "your-turn";
+            return "failed";
+        }
+    }
+
     async timeout(): Promise<boolean> {
         const s = this.store.get();
         if (this.disposed || s.mode !== "match" || !s.match || s.match.status !== "playing" || !this.matchApi.timeout) return false;
@@ -975,6 +1032,7 @@ export class SimController {
     }
 
     private matchCleanup(): void {
+        this.chatFrom = 0;
         this.clearPollTimer();
         if (this.retryTimer !== null) { this.clearTimer(this.retryTimer); this.retryTimer = null; }
         if (this.unwake) { this.unwake(); this.unwake = null; }
@@ -1032,6 +1090,10 @@ export class SimController {
                 try { m = await this.matchApi.getMatch(id, ack ? { ack: true } : undefined); } catch { return; }   // 다음 주기에 다시
                 if (gen !== this.gen) return;
                 await this.applyMatchUpdate(gen, m);
+                // 채팅은 applyMatchUpdate **밖**에서 받는다. 안에 넣으면 (1) 채팅 GET 하나가 실패할 때
+                // 그 폴링의 샷 따라잡기·스냅·메타 갱신이 통째로 건너뛰어지고, (2) "상대가 치면서 말도 한"
+                // 응답은 안쪽의 조기 반환(replayMissed 등)에 걸려 말이 누락된다.
+                try { await this.fetchChats(gen, id, m.chatSeq); } catch { /* 다음 폴링이 다시 */ }
             } finally {
                 this.pollInFlight = false;
                 if (gen === this.gen) this.schedulePoll();

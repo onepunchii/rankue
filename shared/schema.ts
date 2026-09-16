@@ -1868,6 +1868,12 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   /** 자리별 보낸 횟수 {"0":n,"1":m} — 한 대전 상한을 세는 용도. */
   emojiCounts: jsonb("emoji_counts"),
   /**
+   * 오간 채팅 줄 수(2026-09-16). 폴링 응답이 이 숫자 하나만 싣고, 클라이언트는 **늘었을 때만** /chats 를 부른다
+   * — shots ↔ 샷 idx 와 똑같은 규약이라 추가 폴링이 0이다. 본문은 절대 여기 두지 않는다:
+   * 이모지처럼 단일 슬롯에 두면 둘이 같은 폴링 창(2~5초)에 보낼 때 앞의 말이 소리 없이 사라진다.
+   */
+  chatSeq: integer("chat_seq").default(0).notNull(),
+  /**
    * 관전자 표시(2026-09-12): {"<회원 id>": epoch ms} — 관전 화면이 폴링할 때마다 자기 시각을 적는다.
    * 시각이 WATCHER_WINDOW_MS 안인 사람만 "보고 있는 중"으로 센다. 이름은 담지 않는다(숫자만 보인다).
    * 새 테이블을 만들지 않은 이유: 오래 남길 기록이 아니라 몇 초짜리 현재 상태이고, 대전 행 하나만 읽으면 끝이라서.
@@ -1904,8 +1910,41 @@ export const hiqSimMatchShots = pgTable("hiq_sim_match_shots", {
   uniq: unique().on(t.matchId, t.idx),
 }));
 
+/**
+ * 대전 채팅 한 줄(2026-09-16 오너: "일단 자유로운 챗이 가능하게").
+ *
+ * 왜 자식 테이블인가: 이모지는 대전 행의 단일 슬롯이라 마지막 하나가 앞의 것을 덮는다. 순간 반응이라 손해가 작았지만
+ * 대화는 다르다 — 두 사람이 같은 폴링 창에 하나씩 보내면 한쪽 말이 아무에게도 안 보인 채 사라진다.
+ * seq 를 가진 행으로 두면 커서(from)로 읽어 한 줄도 안 빠진다. 샷(hiq_sim_match_shots)과 같은 구조다.
+ *
+ * kind: 자유 입력은 "text"(본문 그대로), 고정 인사는 "code"(코드만 저장하고 화면이 자기 언어로 그린다 —
+ * 5개 언어 앱이라 한국어 문장을 저장하면 스페인어 상대 화면에 한국어가 뜬다).
+ *
+ * id 를 uuid PK 로 두는 건 **나중에 신고를 붙일 자리**다. 지금은 신고를 안 만들지만(오너: 유저 많아지면),
+ * hiq_reports.targetId 가 uuid notNull 이라 그때 가서 스키마를 못 바꾸면 곤란해진다. 지금 넣는 비용은 0이다.
+ *
+ * clientKey: 같은 전송의 재시도를 한 줄로 합친다. 모바일에서 응답만 유실되는 일이 흔한데, 그때 사용자가 다시
+ * 누르면 같은 말이 두 줄로 남거나 "너무 자주 보냈다"는 거짓 안내가 뜬다.
+ */
+export const hiqSimMatchChats = pgTable("hiq_sim_match_chats", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  matchId: uuid("match_id").references(() => hiqSimMatches.id, { onDelete: "cascade" }).notNull(),
+  /** 1부터. 대전 행의 chat_seq 와 짝이다(그 값이 지금까지 오간 줄 수). */
+  seq: integer("seq").notNull(),
+  senderIndex: integer("sender_index").notNull(),
+  senderId: uuid("sender_id").references(() => hiqMembers.id).notNull(),
+  kind: text("kind", { enum: ["text", "code"] }).default("text").notNull(),
+  text: text("text").notNull(),
+  clientKey: text("client_key"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.matchId, t.seq),
+  uniqClient: unique().on(t.matchId, t.senderIndex, t.clientKey),
+}));
+
 export type HiqSimMatch = typeof hiqSimMatches.$inferSelect;
 export type HiqSimMatchShot = typeof hiqSimMatchShots.$inferSelect;
+export type HiqSimMatchChat = typeof hiqSimMatchChats.$inferSelect;
 
 // --- 8.12 시뮬레이터 드릴 래더 (주간 고정 문제, 문제당 채점 1회) ---
 export const hiqSimDrillAttempts = pgTable("hiq_sim_drill_attempts", {

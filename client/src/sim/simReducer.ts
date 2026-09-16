@@ -194,6 +194,11 @@ export interface MatchState {
     readonly handicap: boolean;
     /** 상대가 지금 겨누는 방향(2026-09-16). 기다리는 동안 큐대를 그린다. */
     readonly opponentAim: { readonly phi: number; readonly at: string } | null;
+    /**
+     * 오간 채팅 줄 수. 본문이 아니라 카운터만 둔다 — 늘어난 걸 보고 컨트롤러가 /chats 를 부른다.
+     * 이 값이 **sameMatchMeta 에 들어가야** 상대가 말만 한 폴링(다른 건 하나도 안 바뀐 순간)이 버려지지 않는다.
+     */
+    readonly chatSeq: number;
 }
 
 /** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
@@ -213,6 +218,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         opponentAway: m.opponentAway === true,
         handicap: m.handicap === true,
         opponentAim: m.opponentAim ?? null,
+        chatSeq: m.chatSeq ?? 0,
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
         emoji: m.emoji ?? null,
@@ -227,6 +233,9 @@ export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
         && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName
         && a.timeouts[0] === b.timeouts[0] && a.timeouts[1] === b.timeouts[1]
         && a.opponentAway === b.opponentAway
+        // 상대가 말만 한 순간은 다른 필드가 하나도 안 바뀐다 — 이게 빠지면 matchSync 의 조기 반환이
+        // 그 응답을 통째로 버려 채팅이 화면에 영영 안 닿는다(2026-09-16 상대 조준과 똑같은 함정).
+        && a.chatSeq === b.chatSeq
         // 상대 조준은 여기 없다 — 자주 바뀌는 표시용 값이라 따로 본다(sameOpponentAim).
         && (a.emoji?.at ?? null) === (b.emoji?.at ?? null);
 }

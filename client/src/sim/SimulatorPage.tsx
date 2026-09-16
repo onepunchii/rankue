@@ -93,6 +93,8 @@ import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
 import { sameCueInput } from "./simReducer";
 import { easeOppAim, OPP_AIM_PULLBACK } from "./match/oppAim";
+import { MatchChatBar, MatchChatLog } from "./match/MatchChat";
+import type { ChatLine } from "./matchApi";
 import type { CueInput, Phase } from "./simReducer";
 import type { SimPreview } from "./simController";
 import { TopBar } from "./components/TopBar";
@@ -159,6 +161,8 @@ const TABLE_INSETS: SafeInsets = { top: 8, right: 68, bottom: DOCK_HEIGHT + 8, l
  * (큐 슬라이더 최소 높이가 우선). 375×812 는 768 이라 8개까지 기본.
  */
 const COMPACT_BELOW_PX = 720;
+/** 대전이 아닐 때의 빈 채팅 — 매 렌더 새 배열을 만들면 memo 가 무의미해진다. */
+const EMPTY_CHAT: readonly ChatLine[] = [];
 /** 오른쪽 열에서 툴바를 뺀 고정 높이(md, px): 열 상하 여백(top/bottom-1.5) 12 + 큐 슬라이더 알약 최소 + 간격 8×3 + ± 36 + 샷 64. */
 const RIGHT_FIXED_MD = 12 + POWER_RAIL_MIN_MD + 8 * 3 + 36 + 64;
 
@@ -892,6 +896,26 @@ export function SimulatorPage() {
         const id = setInterval(() => setEmojiNow(Date.now()), 500);
         return () => clearInterval(id);
     }, [emojiAt]);
+    /**
+     * 채팅 초안(2026-09-16). **입력칸 밖**에 둔다 — 상대가 연속 득점하면 재생·결과 배너 때문에 하단 블록이
+     * 몇 번씩 마운트를 오가는데, 안에 두면 그때마다 쓰던 글이 날아간다.
+     */
+    const [chatDraft, setChatDraft] = useState("");
+    /** 칩 열의 한마디는 12초 뒤 사라진다 — 그걸 다시 계산하려면 시계가 돌아야 한다. 말이 있을 때만 돈다. */
+    const chatLines = isMatch && sim.match ? sim.match.chat : EMPTY_CHAT;
+    const lastChatAt = chatLines.length > 0 ? chatLines[chatLines.length - 1].at : "";
+    const [chatNow, setChatNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!lastChatAt) return;
+        setChatNow(Date.now());
+        const id = setInterval(() => setChatNow(Date.now()), 1000);
+        return () => clearInterval(id);
+    }, [lastChatAt]);
+    const onSendChat = useCallback(async (text: string) => {
+        // clientKey: 응답만 유실된 재시도를 서버가 한 줄로 합친다(모바일에서 흔하다).
+        return actionsRef.current.sendChat({ text, clientKey: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}` });
+    }, []);
+
     // 내 자리를 ref 에 실어 onOutcome 이 볼 수 있게 한다(옵션 객체는 sim 보다 먼저 만들어진다).
     myIndexRef.current = isMatch && sim.match ? sim.match.myIndex : null;
     // 대전이 막 시작됐으면(아직 아무도 안 쳤다) 인사 화면을 한 번 띄운다.
@@ -1393,6 +1417,11 @@ export function SimulatorPage() {
                         {sim.phase === "shooting" && (
                             <span className={chipNeutral}>{sim.playback.speed === 4 ? t("sim.hud.fastForward") : t("sim.hud.holdToFastForward")}</span>
                         )}
+                        {/* 오간 한마디(2026-09-16). 이 열은 이미 pointer-events-none 이라 글자 위 터치도 조준으로 지나간다 —
+                            **auto 를 붙이지 마라.** 조준 중에도 보인다: 상대 말이 안 보이면 대화가 아니라 편지가 된다. */}
+                        {isMatch && sim.match && (
+                            <MatchChatLog lines={chatLines} myIndex={sim.match.myIndex} now={chatNow} />
+                        )}
                         {drill && (
                             <span className={drillLocked ? chipBrand : chipNeutral}>
                                 {drillLocked
@@ -1494,23 +1523,35 @@ export function SimulatorPage() {
                             </div>
                         </div>
                     )}
-                    {isMatch && sim.phase === "waiting" && sim.match && !bannerVisible && (
-                        <div className="absolute inset-x-0 bottom-3 z-[3] flex flex-col items-center gap-2 px-4">
-                            <div className="rounded-card bg-surface-1 border border-surface-line px-4 py-3 text-center max-w-[320px] w-full">
-                                <p className="text-[12px] font-medium text-ink-4">{sim.match.opponentName}</p>
-                                {/* 깔끔하게: "상대 차례예요" + 상대 시계(접속 중이면 바로 돈다). 안내 문구는 없앴다(2026-09-08 오너). */}
-                                <p className="text-[14px] font-semibold text-ink-1">{t("sim.match.waitingTurn")}</p>
-                                {clock && !clock.mine && <ShotClock seconds={clock.seconds} mine={false} size={56} className="mt-1.5" />}
-                                {/* 시계가 아직 안 도는 동안(상대 자리 비움 유예) 화면이 멈춘 것처럼 보이지 않게 이유를 적는다(2026-09-15 오너 제보). */}
-                                {!clock && sim.match.opponentAway && (
-                                    <p className="mt-1.5 text-[12px] font-medium text-ink-3">{t("sim.match.opponentAway")}</p>
-                                )}
-                                {sim.match.canClaim && (
-                                    <button type="button" onClick={() => { void onClaim(); }} className="mt-2 h-11 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
-                                        {t("sim.match.claim")}
-                                    </button>
-                                )}
-                            </div>
+                    {/*
+                      * 상대 차례 블록. **조건에 phase 가 들어가는 것이 중요하다** — 내 조준(aim) 중에 이 띠가 살아 있으면
+                      * 정확히 같은 자리(bottom, 높이 DOCK_HEIGHT 대역)에 있는 두께 독·미세 방향조절 키를 덮는다(2026-09-15 사고).
+                      * 재생(shooting)까지 포함하는 이유는 상대가 연속 득점할 때 입력칸과 키보드를 살려 두기 위해서다.
+                      */}
+                    {isMatch && sim.match && (sim.phase === "waiting" || sim.phase === "shooting") && (
+                        <div className="absolute inset-x-0 bottom-3 z-[3] flex flex-col items-center gap-2 px-4 pointer-events-none">
+                            {sim.phase === "waiting" && !bannerVisible && (
+                                <div className="pointer-events-auto rounded-card bg-surface-1 border border-surface-line px-4 py-3 text-center max-w-[320px] w-full">
+                                    <p className="text-[12px] font-medium text-ink-4">{sim.match.opponentName}</p>
+                                    {/* 깔끔하게: "상대 차례예요" + 상대 시계(접속 중이면 바로 돈다). 안내 문구는 없앴다(2026-09-08 오너). */}
+                                    <p className="text-[14px] font-semibold text-ink-1">{t("sim.match.waitingTurn")}</p>
+                                    {clock && !clock.mine && <ShotClock seconds={clock.seconds} mine={false} size={56} className="mt-1.5" />}
+                                    {/* 시계가 아직 안 도는 동안(상대 자리 비움 유예) 화면이 멈춘 것처럼 보이지 않게 이유를 적는다(2026-09-15 오너 제보). */}
+                                    {!clock && sim.match.opponentAway && (
+                                        <p className="mt-1.5 text-[12px] font-medium text-ink-3">{t("sim.match.opponentAway")}</p>
+                                    )}
+                                    {sim.match.canClaim && (
+                                        <button type="button" onClick={() => { void onClaim(); }} className="mt-2 h-11 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
+                                            {t("sim.match.claim")}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                            {/* 한마디 입력. canChat 은 **서버가 보는 차례**로 판단한다 — 내가 친 직후엔 로컬 턴이 먼저
+                                넘어가지만 서버의 turn 은 샷이 기록될 때까지 아직 나라서, 그 창에 쓴 글은 거부된다. */}
+                            {sim.match.canChat && (
+                                <MatchChatBar draft={chatDraft} onDraft={setChatDraft} onSend={onSendChat} />
+                            )}
                         </div>
                     )}
                     {coachOpen && !pathView && sim.phase === "aim" && sim.mode === "solo" && <CoachHint onClose={closeCoach} />}

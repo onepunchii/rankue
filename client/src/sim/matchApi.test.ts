@@ -13,7 +13,7 @@ const api = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 vi.mock("@/lib/queryClient", () => ({ apiRequest: api.apiRequest }));
 
 import {
-    matchesUrl, matchUrl, matchCodeUrl, matchJoinUrl, matchShotsUrl, matchResignUrl, matchClaimUrl,
+    matchesUrl, matchUrl, matchCodeUrl, matchJoinUrl, matchShotsUrl, matchResignUrl, matchClaimUrl, matchChatUrl, matchChatsUrl,
     toCreateMatchBody, toJoinBody, sanitizeCode, isCompleteCode, formatCode,
     parseMatch, parseMatchList, parseMatchShot, parseMatchShots, parsePostShotResponse, parseResignResponse, parseClaimResponse,
     matchErrorCode, classifyMatchError,
@@ -221,6 +221,47 @@ describe("파생값", () => {
         expect(matchConfig({ ...m, fullPreview: true }).matchPreview).toBe("full");
         expect(matchConfig({ ...m, aimAssist: false }).mode).toBe("reality");
         expect(matchConfig({ ...m, myIndex: 1 }).target).toBe(15);
+    });
+});
+
+/**
+ * 채팅 배선. 이 두 가지가 **무증상으로** 죽는 자리라 따로 못 박는다:
+ *  1) 폴링 카운터의 키 이름 — parseMatch 는 화이트리스트라, 서버가 다른 이름으로 보내면 값이 늘 0 이 되고
+ *     /chats 가 한 번도 안 불려 상대 말이 화면에 아예 안 닿는다. 오류도 안 난다.
+ *  2) 선언과 구현 — 예전에 sendEmoji 를 인터페이스에만 넣고 createMatchApi 구현을 빠뜨려 이모지가 통째로 안 나갔다.
+ */
+describe("채팅 배선", () => {
+    it("서버가 보내는 키 이름(chatSeq) 그대로 파싱한다", () => {
+        expect(parseMatch({ ...rawMatch, chatSeq: 7 }).chatSeq).toBe(7);
+        // 옛 서버 응답·관전자에는 없다 — 그때는 0(채팅을 받으러 가지 않는다)
+        expect(parseMatch(rawMatch).chatSeq).toBe(0);
+        expect(parseMatch({ ...rawMatch, chatSeq: "3" }).chatSeq).toBe(0);
+    });
+
+    it("sendChat: 본문이 그대로 실린다 — text 든 code 든 한 함수로", async () => {
+        const line = { id: "c1", seq: 1, from: 1, kind: "text", text: "아깝다", at: "2026-09-16T00:00:00.000Z" };
+        const request = vi.fn(async () => ({ line, chatSeq: 1 }));
+        const a = createMatchApi(request);
+        const r = await a.sendChat!("m-1", { text: "아깝다", clientKey: "k1" });
+        expect(request).toHaveBeenLastCalledWith(matchChatUrl("m-1"), { method: "POST", body: { text: "아깝다", clientKey: "k1" } });
+        expect(r.line.text).toBe("아깝다");
+        expect(r.chatSeq).toBe(1);
+        // 고정 인사도 같은 경로로 간다(코드로 저장돼야 상대 화면에 상대 언어로 뜬다)
+        await a.sendChat!("m-1", { code: "nice" });
+        expect(request).toHaveBeenLastCalledWith(matchChatUrl("m-1"), { method: "POST", body: { code: "nice" } });
+    });
+
+    it("getChats: from 커서, 모양이 틀린 줄은 버린다", async () => {
+        const rows = [
+            { id: "c1", seq: 1, from: 0, kind: "text", text: "하이", at: "2026-09-16T00:00:00.000Z" },
+            { seq: 2, from: 1, kind: "text", text: "id 가 없다" },              // 버려진다
+            { id: "c3", seq: 3, from: 1, kind: "code", text: "nice", at: "" },
+        ];
+        const request = vi.fn(async () => rows);
+        const got = await createMatchApi(request).getChats!("m-1", 1);
+        expect(request).toHaveBeenLastCalledWith(matchChatsUrl("m-1", 1), { method: "GET" });
+        expect(got.map((c) => c.seq)).toEqual([1, 3]);
+        expect(got[1].kind).toBe("code");
     });
 });
 

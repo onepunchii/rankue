@@ -47,6 +47,12 @@ export function matchClaimUrl(id: string): string {
 export function matchEmojiUrl(id: string): string {
     return `${matchUrl(id)}/emoji`;
 }
+export function matchChatUrl(id: string): string {
+    return `${matchUrl(id)}/chat`;
+}
+export function matchChatsUrl(id: string, from = 0): string {
+    return `${matchUrl(id)}/chats?from=${from}`;
+}
 
 export function matchTimeoutUrl(id: string): string {
     return `${matchUrl(id)}/timeout`;
@@ -125,6 +131,13 @@ export interface MatchPublic {
     readonly opponentAway: boolean;
     /** 상대가 지금 겨누는 방향(rad, ISO 시각). 내 차례거나 값이 낡았으면 null — 서버가 걸러 준다. */
     readonly opponentAim: { readonly phi: number; readonly at: string } | null;
+    /**
+     * 지금까지 오간 채팅 줄 수(2026-09-16). shots 와 같은 규약 — **늘었을 때만** /chats 를 부른다.
+     * 본문은 여기 없다(폴링 응답을 키우지 않고, 단일 슬롯 유실도 만들지 않는다). 옛 서버·관전자는 0.
+     * **서버 publicMatch 의 키 이름과 글자 하나까지 같아야 한다** — parseMatch 가 화이트리스트라, 이름이 어긋나면
+     * 값이 늘 0 이 되어 /chats 가 한 번도 안 불리고 상대 말이 화면에 아예 안 닿는다(무증상 실패).
+     */
+    readonly chatSeq: number;
     /** 정본 세션 상태. waiting 이면 null. players[0]=호스트(white), players[1]=게스트(yellow) */
     readonly state: SessionState | null;
     readonly balls: readonly BallState[] | null;
@@ -194,6 +207,35 @@ export interface MyHandicaps {
 export interface WatchLists {
     readonly live: readonly WatchCard[];
     readonly replays: readonly WatchCard[];
+}
+
+/**
+ * 채팅 한 줄. `kind === "code"` 면 text 칸에 고정 인사 코드가 들어 있고 화면이 **보는 사람의 언어로** 그린다
+ * — 5개 언어 앱이라 한국어 문장을 저장하면 스페인어 상대 화면에 한국어가 뜬다.
+ * id 는 나중에 신고를 붙일 때 대상 키다(지금은 안 쓴다).
+ */
+export interface ChatLine {
+    readonly id: string;
+    readonly seq: number;
+    /** 보낸 사람 자리(0 = 호스트, 1 = 게스트) */
+    readonly from: number;
+    readonly kind: "text" | "code";
+    readonly text: string;
+    readonly at: string;
+}
+
+export function parseChatLine(raw: unknown): ChatLine | null {
+    if (!isRecord(raw)) return null;
+    const { id, seq, from, kind, text } = raw;
+    if (typeof id !== "string" || typeof seq !== "number" || !Number.isFinite(seq)) return null;
+    if (typeof text !== "string") return null;
+    return {
+        id, seq,
+        from: from === 1 ? 1 : 0,
+        kind: kind === "code" ? "code" : "text",
+        text,
+        at: isoOrNull(raw.at) ?? "",
+    };
 }
 
 export interface MatchShot {
@@ -407,6 +449,7 @@ export function parseMatch(raw: unknown): MatchPublic {
         opponentAim: isRecord(raw.opponentAim) && typeof raw.opponentAim.phi === "number" && Number.isFinite(raw.opponentAim.phi)
             ? { phi: raw.opponentAim.phi, at: isoOrNull(raw.opponentAim.at) ?? "" }
             : null,
+        chatSeq: typeof raw.chatSeq === "number" && Number.isFinite(raw.chatSeq) ? raw.chatSeq : 0,
         state,
         balls,
         winnerIndex: playerIndexOrNull(raw.winnerIndex),
@@ -625,6 +668,14 @@ export interface MatchApi {
     sendEmoji?(id: string, code: string): Promise<MatchPublic>;
     /** 내가 겨누는 방향 알리기(2026-09-16). 응답은 읽지 않는다 — 실패해도 조용히 넘어간다. */
     sendAim?(id: string, phi: number): Promise<void>;
+    /**
+     * 한마디 보내기(2026-09-16). 자유 입력은 `{ text }`, 고정 인사는 `{ code }` — **한 함수로 둘 다 받는다.**
+     * 두 경로로 나누면 칩이 한국어 문장을 text 로 보내게 되어 상대 언어 화면에 한국어가 뜬다.
+     * clientKey 는 재시도를 한 줄로 합치는 키다(응답만 유실되는 일이 모바일에서 흔하다).
+     */
+    sendChat?(id: string, body: { text?: string; code?: string; clientKey?: string }): Promise<{ line: ChatLine; chatSeq: number }>;
+    /** 놓친 채팅 따라잡기. seq >= from 인 줄을 순서대로. */
+    getChats?(id: string, from?: number): Promise<readonly ChatLine[]>;
 }
 
 /** request 를 주입해 만든다(테스트는 가짜 request). 응답은 {success,data} 가 이미 벗겨진 data 여야 한다. */
@@ -666,6 +717,16 @@ export function createMatchApi(request: RequestFn): MatchApi {
         },
         async sendAim(id, phi) {
             await request(`${matchUrl(id)}/aim`, { method: "POST", body: { phi } });
+        },
+        async sendChat(id, body) {
+            const r = await request(matchChatUrl(id), { method: "POST", body }) as { line?: unknown; chatSeq?: unknown };
+            const line = parseChatLine(r?.line);
+            if (!line) throw new Error("채팅 응답이 올바르지 않습니다");
+            return { line, chatSeq: typeof r?.chatSeq === "number" ? r.chatSeq : line.seq };
+        },
+        async getChats(id, from = 0) {
+            const rows = await request(matchChatsUrl(id, from), { method: "GET" });
+            return Array.isArray(rows) ? rows.map(parseChatLine).filter((c): c is ChatLine => c !== null) : [];
         },
         async getShots(id, from) {
             return parseMatchShots(await request(matchShotsUrl(id, from), { method: "GET" }));
