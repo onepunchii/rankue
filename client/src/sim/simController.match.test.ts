@@ -103,6 +103,8 @@ class FakeMatchServer {
     calls = { get: 0, shots: 0, post: 0, resign: 0, claim: 0 };
     /** 상대에게 보여 줄 조준 보고(phi) — 순서대로 쌓인다. */
     aims: number[] = [];
+    /** 서버에 남은 마지막 조준(한 벌만 — 실제 컬럼 aim_phi/aim_at 과 같다). */
+    aim: { phi: number; from: PlayerIndex } | null = null;
     private gate: Promise<void> | null = null;
     private release_: (() => void) | null = null;
     /** 라우트 paramsFor 와 같다(컨트롤러의 paramsFromConfig 와 같은 값이어야 해시가 맞는다). */
@@ -139,6 +141,8 @@ class FakeMatchServer {
             createdAt: new Date(r.startedAt).toISOString(), startedAt: new Date(r.startedAt).toISOString(),
             lastShotAt: r.lastShotAt === null ? null : new Date(r.lastShotAt).toISOString(), finishedAt: null,
             claimableAt: r.status === "playing" ? new Date(since + CLAIM_AFTER_MS).toISOString() : null,
+            // 내 조준은 나에게 안 보낸다(라우트 publicMatch 와 같은 규칙)
+            opponentAim: this.aim && this.aim.from !== myIndex ? { phi: this.aim.phi, at: new Date(this.wall()).toISOString() } : null,
         };
     }
 
@@ -214,7 +218,10 @@ class FakeMatchServer {
             lookupCode: vi.fn(async () => this.public(viewer)),
             joinMatch: vi.fn(async () => this.public(viewer)),
             getMatch: vi.fn(async () => { this.calls.get++; await guard(); return this.public(viewer); }),
-            sendAim: vi.fn(async (_id: string, phi: number) => { this.aims.push(phi); }),
+            sendAim: vi.fn(async (_id: string, phi: number) => {
+                this.aims.push(phi);
+                this.aim = { phi, from: (viewer === HOST ? 0 : 1) as PlayerIndex };
+            }),
             getShots: vi.fn(async (_id: string, from = 0) => {
                 this.calls.shots++;
                 await guard();
@@ -760,5 +767,35 @@ describe("조준 보고", () => {
         m.env.advance(AIM_REPORT_MS * 5);
         await settle();
         expect(m.srv.aims).toEqual([1]);
+    });
+});
+
+/** 보낸 조준이 기다리는 쪽 화면 상태까지 실제로 닿는가 — 초기 구현이 여기서 끊겼다(회귀). */
+describe("조준 도달", () => {
+    it("상대가 조준만 하고 있어도(다른 건 하나도 안 바뀐다) 새 각도가 폴링으로 들어온다", async () => {
+        const host = make(HOST);
+        host.ctrl.startMatch(host.srv.public(HOST));
+        const guest = make(GUEST);
+        // 두 사람이 같은 서버를 본다
+        const srv = host.srv;
+        const gApi = srv.apiFor(GUEST);
+        const g = new SimController({ ...guest.env.deps, api: soloApi, matchApi: gApi, haptics: false });
+        g.startMatch(srv.public(GUEST));
+        expect(g.store.get().phase).toBe("waiting");
+        expect(g.store.get().match!.opponentAim).toBeNull();
+
+        host.ctrl.setPhi(1.4);                            // 호스트가 겨눈다 → 서버에 각도 한 벌
+        guest.env.advance(POLL_FAST_MS);
+        await settle();
+        expect(g.store.get().match!.opponentAim?.phi).toBe(1.4);
+
+        // 각도만 또 바뀐 경우에도(차례·샷 수·공 그대로) 화면 상태가 따라와야 한다
+        host.env.advance(AIM_REPORT_MS);
+        host.ctrl.setPhi(2.0);
+        await settle();
+        guest.env.advance(POLL_FAST_MS);
+        await settle();
+        expect(g.store.get().match!.opponentAim?.phi).toBe(2.0);
+        g.dispose();
     });
 });

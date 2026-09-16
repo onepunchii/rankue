@@ -227,8 +227,18 @@ export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
         && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName
         && a.timeouts[0] === b.timeouts[0] && a.timeouts[1] === b.timeouts[1]
         && a.opponentAway === b.opponentAway
-        // 조준은 자주 바뀌는 표시용 값이라 **메타 비교에서 뺀다** — 넣으면 폴링마다 메타가 달라져 스냅이 돈다.
+        // 상대 조준은 여기 없다 — 자주 바뀌는 표시용 값이라 따로 본다(sameOpponentAim).
         && (a.emoji?.at ?? null) === (b.emoji?.at ?? null);
+}
+
+/**
+ * 상대가 겨누는 각도가 그대로인가. sameMatchMeta 와 나눠 둔 이유는 성격이 달라서다 — 차례·점수는 "바뀌면 큰일"이고
+ * 조준은 폴링마다 조금씩 바뀌는 그림값이다. 다만 **matchSync 는 이것도 봐야 한다**: 상대가 조준만 하고 있는
+ * 바로 그 순간엔 다른 게 하나도 안 바뀌어서, 안 보면 새 각도가 화면에 영영 도달하지 못한다(초기 구현의 버그).
+ * 스냅(서버 정본으로 되돌리기) 판단에는 영향이 없다 — 그건 컨트롤러가 샷 수·공 위치로만 정한다.
+ */
+export function sameOpponentAim(a: MatchState, b: MatchState): boolean {
+    return (a.opponentAim?.phi ?? null) === (b.opponentAim?.phi ?? null);
 }
 
 /** 서버가 끝냈는데(기권·무응답 승리) 세션은 아직 playing 이면 세션에도 종료를 표시한다. */
@@ -634,7 +644,7 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             if (s.mode !== "match" || !s.match || !s.session || s.phase === "setup") return s;
             const session = sessionForMatch(s.session, a.match);
             const queue = resetTries(s.queue);
-            if (sameMatchMeta(s.match, a.match) && session === s.session && !s.offline && queue === s.queue) return s;
+            if (sameMatchMeta(s.match, a.match) && sameOpponentAim(s.match, a.match) && session === s.session && !s.offline && queue === s.queue) return s;
             return rephase({ ...s, match: a.match, session, queue, offline: false });
         }
 
