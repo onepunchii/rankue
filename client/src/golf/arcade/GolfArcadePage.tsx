@@ -14,7 +14,16 @@ import { cn } from "@/lib/utils";
 import { RANKUE_PARK, coursePar } from "@shared/golf/courses";
 import { toParLabel } from "@shared/golf/course";
 import { useMiniGolf } from "./useMiniGolf";
+import { MiniGolf3D } from "./MiniGolf3D";
 import { MiniGolfBoard } from "./MiniGolfBoard";
+
+/** WebGL 이 없으면 2D 보드로 — 게임이 아예 안 뜨는 것보다 낫다(구형 웹뷰·GPU 차단 환경) */
+const WEBGL_OK = (() => {
+    try {
+        const c = document.createElement("canvas");
+        return !!(c.getContext("webgl2") || c.getContext("webgl"));
+    } catch { return false; }
+})();
 
 const API = "/api/hiq/golf/arcade";
 interface RoomPlayer { memberId: string; name: string; strokes: number[]; finishedAt: string | null; joinedAt: string }
@@ -151,9 +160,10 @@ function Round({ mode, room, me, onExit, onHoleDone }: { mode: "solo" | "room"; 
         else if (ev.some((e) => e.kind === "wall" || e.kind === "bumper")) { navigator.vibrate?.(12); vibrate.current = now; }
     }, [state.lastEvents]);
 
-    const board = useMemo(() => (
-        <MiniGolfBoard hole={state.hole} ballRef={game.ballRef} phase={state.phase} tickCount={game.tickCount} onShoot={game.shoot} onFrame={game.tick} />
-    ), [state.hole, state.phase, game.tickCount, game.shoot, game.tick, game.ballRef]);
+    const board = useMemo(() => {
+        const props = { hole: state.hole, ballRef: game.ballRef, phase: state.phase, tickCount: game.tickCount, onShoot: game.shoot, onFrame: game.tick };
+        return WEBGL_OK ? <MiniGolf3D {...props} /> : <MiniGolfBoard {...props} />;
+    }, [state.hole, state.phase, game.tickCount, game.shoot, game.tick, game.ballRef]);
 
     // 방 모드: 이미 서버에 기록된 홀이 있으면(새로고침) 그 자리까지 건너뛴다 — 단순화를 위해 1차는 처음부터
     const others = (room?.players ?? []).filter((p) => p.memberId !== me?.memberId);

@@ -1,0 +1,10 @@
+3D 모델 출처 — 전부 Creative Commons Zero (CC0), 상업 이용·수정 자유, 출처 표기 의무 없음.
+표기는 예의로 남긴다.
+
+  Kenney Minigolf Kit (v3.1)  https://kenney.nl/assets/minigolf-kit
+    flag-red/blue/green.glb, windmill.glb, castle.glb, structure-gate.glb, obstacle-diamond.glb, Textures/colormap.png
+
+  Kenney Nature Kit          https://kenney.nl/assets/nature-kit
+    tree_default.glb, tree_pineRoundA.glb, rock_smallA.glb
+
+콜로맵(colormap.png)은 미니골프 키트 모델이 외부 URI 로 참조한다 — 반드시 GLB 옆 Textures/ 에 둘 것.
