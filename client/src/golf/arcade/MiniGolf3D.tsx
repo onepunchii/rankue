@@ -26,6 +26,8 @@ interface Props {
     tickCount: number;
     onShoot: (dragX: number, dragY: number) => boolean;
     onFrame: (elapsedSec: number) => void;
+    /** 마지막 스텝의 사건 — 컵인·OB 연출에 쓴다 */
+    lastEvents?: readonly { kind: string }[];
 }
 
 const MODELS = "/golf/models";
@@ -34,6 +36,33 @@ const COL = {
     rough: 0x3f8f3c, greenTop: 0x62c24d, greenSide: 0x3f8a36, sky: 0x8ecae6,
     wood: 0xc9a15e, woodDark: 0x8a6a34, bumper: 0xf0b43c, cup: 0x10180f, lime: 0x64dd17, limeCss: "#64DD17",
 };
+
+/**
+ * GLB 는 파일당 한 번만 받아서 캐시하고, 쓸 때마다 clone 한다.
+ * clone 은 geometry·material 을 공유하므로 GPU 메모리가 늘지 않는다 — 그래서 dispose 대상에서도 뺀다.
+ */
+const modelCache = new Map<string, Promise<THREE.Object3D>>();
+function loadModel(file: string): Promise<THREE.Object3D> {
+    let p = modelCache.get(file);
+    if (!p) {
+        p = new Promise<THREE.Object3D>((res, rej) => new GLTFLoader().load(`${MODELS}/${file}`, (g) => res(g.scene), undefined, rej));
+        modelCache.set(file, p);
+    }
+    return p;
+}
+
+/** 우리가 만든 geometry·material 만 버린다(캐시 모델의 것은 건드리지 않는다) */
+function disposeOwned(root: THREE.Object3D) {
+    root.traverse((n) => {
+        const m = n as THREE.Mesh;
+        if (!m.isMesh || !m.userData.own) return;
+        m.geometry.dispose();
+        for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+            (mat as THREE.MeshStandardMaterial).map?.dispose();
+            mat.dispose();
+        }
+    });
+}
 
 /** 깎은 줄무늬 — 그린 윗면 텍스처 */
 function stripeTexture(): THREE.Texture {
@@ -64,6 +93,7 @@ function slab(pts: readonly Vec[], depth: number, mats: THREE.Material | THREE.M
     geo.translate(0, depth, 0);
     const m = new THREE.Mesh(geo, mats);
     m.receiveShadow = true;
+    m.userData.own = true;
     return m;
 }
 
@@ -78,17 +108,17 @@ function rails(pts: readonly Vec[], y: number, mat: THREE.Material): THREE.Group
         const bar = new THREE.Mesh(new THREE.BoxGeometry(len + WALL_T, WALL_H, WALL_T), mat);
         bar.position.set((s.a.x + s.b.x) / 2, y + WALL_H / 2, (s.a.y + s.b.y) / 2);
         bar.rotation.y = -Math.atan2(dy, dx);
-        bar.castShadow = true; bar.receiveShadow = true;
+        bar.castShadow = true; bar.receiveShadow = true; bar.userData.own = true;
         g.add(bar);
         const post = new THREE.Mesh(postGeo, mat);
         post.position.set(s.a.x, y + WALL_H / 2, s.a.y);
-        post.castShadow = true;
+        post.castShadow = true; post.userData.own = true;
         g.add(post);
     }
     return g;
 }
 
-export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame }: Props) {
+export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame, lastEvents }: Props) {
     const wrapRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const dragRef = useRef<Vec | null>(null);
@@ -103,6 +133,12 @@ export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame }
         renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera;
         course: THREE.Group; ball: THREE.Mesh; aim: THREE.Line; ghost: THREE.Line; shadow: THREE.Mesh;
         ground: THREE.Plane; ray: THREE.Raycaster;
+        /** 컵인·OB 물결 */
+        ring: THREE.Mesh; ringMat: THREE.MeshBasicMaterial; ringT: number; ringLife: number;
+        /** 깃대(컵인 때 튄다) */
+        flag: THREE.Object3D | null; flagT: number;
+        /** 카메라 목표(홀 전환 때 부드럽게 옮긴다) */
+        camTo: THREE.Vector3; lookTo: THREE.Vector3; camReady: boolean;
     } | null>(null);
 
     // ── 초기화 ──
@@ -183,7 +219,19 @@ export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame }
         ghost.visible = false;
         scene.add(ghost);
 
-        R.current = { renderer, scene, camera, course, ball, aim, ghost, shadow, ground: new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), ray: new THREE.Raycaster() };
+        // 컵인·OB 물결(평소엔 숨김)
+        const ringMat = new THREE.MeshBasicMaterial({ color: COL.lime, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 40), ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.visible = false;
+        scene.add(ring);
+
+        R.current = {
+            renderer, scene, camera, course, ball, aim, ghost, shadow,
+            ground: new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), ray: new THREE.Raycaster(),
+            ring, ringMat, ringT: 0, ringLife: 0, flag: null, flagT: 0,
+            camTo: new THREE.Vector3(), lookTo: new THREE.Vector3(), camReady: false,
+        };
 
         const ro = new ResizeObserver(() => {
             const w = wrap.clientWidth, h = wrap.clientHeight;
@@ -202,7 +250,9 @@ export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame }
     useEffect(() => {
         const r = R.current; if (!r) return;
         const g = r.course;
+        disposeOwned(g);          // 9홀을 돌면 그냥 clear() 만으로는 GPU 메모리가 계속 쌓인다
         g.clear();
+        r.flag = null;
 
         const stripe = stripeTexture();
         const topMat = new THREE.MeshStandardMaterial({ map: stripe, roughness: 0.95 });
@@ -228,7 +278,7 @@ export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame }
                 new THREE.MeshStandardMaterial({ color: COL.bumper, roughness: 0.5 }),
             );
             m.position.set(c.c.x, GREEN_H + (WALL_H + 0.5) / 2, c.c.y);
-            m.castShadow = true; m.receiveShadow = true;
+            m.castShadow = true; m.receiveShadow = true; m.userData.own = true;
             g.add(m);
         }
 
@@ -238,10 +288,12 @@ export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame }
             new THREE.MeshStandardMaterial({ color: COL.cup, roughness: 1, side: THREE.DoubleSide }),
         );
         cup.position.set(hole.cup.x, GREEN_H - 0.5, hole.cup.y);
+        cup.userData.own = true;
         g.add(cup);
         const cupFloor = new THREE.Mesh(new THREE.CircleGeometry(CUP_R, 20), new THREE.MeshStandardMaterial({ color: 0x0b120a }));
         cupFloor.rotation.x = -Math.PI / 2;
         cupFloor.position.set(hole.cup.x, GREEN_H - 1.0, hole.cup.y);
+        cupFloor.userData.own = true;
         g.add(cupFloor);
 
         // 티 마커
@@ -251,6 +303,7 @@ export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame }
         );
         tee.rotation.x = -Math.PI / 2;
         tee.position.set(hole.tee.x, GREEN_H + 0.02, hole.tee.y);
+        tee.userData.own = true;
         g.add(tee);
 
         // ── 이 홀의 실제 범위에 카메라를 맞춘다 ──
@@ -266,29 +319,34 @@ export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame }
             // 기울인 화면에서 세로로 필요한 크기 ≈ 깊이·sin(tilt) + 높이 여유, 가로는 aspect 로 나눈다
             const needV = Math.max(boxD * Math.sin(TILT) * 0.5 + 3, (boxW * 0.5) / cam.aspect);
             const dist = needV / halfV;
-            cam.position.set(cxm, Math.sin(TILT) * dist, czm + Math.cos(TILT) * dist);
-            cam.lookAt(cxm, 0, czm);
+            r.camTo.set(cxm, Math.sin(TILT) * dist, czm + Math.cos(TILT) * dist);
+            r.lookTo.set(cxm, 0, czm);
+            if (!r.camReady) {                      // 첫 홀은 즉시, 이후 홀은 프레임 루프가 부드럽게 옮긴다
+                cam.position.copy(r.camTo);
+                cam.lookAt(r.lookTo);
+                r.camReady = true;
+            }
             cam.updateProjectionMatrix();
         };
         fitRef.current = fit;
         fit();
 
         // ── Kenney 소품(CC0) ──
-        const loader = new GLTFLoader();
         let dead = false;
-        const put = (file: string, x: number, z: number, scale: number, rotY = 0, y = 0) => {
-            loader.load(`${MODELS}/${file}`, (gltf) => {
-                if (dead) return;
-                const o = gltf.scene;
+        const put = (file: string, x: number, z: number, scale: number, rotY = 0, y = 0, keep?: (o: THREE.Object3D) => void) => {
+            loadModel(file).then((proto) => {
+                if (dead) return;                       // 홀이 이미 바뀐 뒤 도착한 모델은 버린다
+                const o = proto.clone(true);
+                keep?.(o);
                 o.scale.setScalar(scale);
                 o.position.set(x, y, z);
                 o.rotation.y = rotY;
                 o.traverse((n) => { if ((n as THREE.Mesh).isMesh) { n.castShadow = true; n.receiveShadow = true; } });
                 g.add(o);
-            });
+            }).catch(() => { /* 모델이 없어도 게임은 돌아간다 */ });
         };
         // 깃대는 컵 위
-        put("flag-red.glb", hole.cup.x, hole.cup.y, 3.6, 0, GREEN_H);
+        put("flag-red.glb", hole.cup.x, hole.cup.y, 3.6, 0, GREEN_H, (o) => { const rr = R.current; if (rr) { rr.flag = o; rr.flagT = 0; } });
         // 홀마다 다른 랜드마크 — 코스 밖 러프에 세운다(물리에 안 닿는다)
         const idx = Number(hole.id.replace(/\D/g, "")) || 1;
         const landmark = ["windmill.glb", "castle.glb", "structure-gate.glb"][idx % 3];
@@ -306,25 +364,85 @@ export function MiniGolf3D({ hole, ballRef, phase, tickCount, onShoot, onFrame }
     // ── 프레임 루프 ──
     useEffect(() => {
         let id = 0, last: number | null = null;
+        let wasInCup = false;
+        const spinAxis = new THREE.Vector3();
+        const spinQ = new THREE.Quaternion();
+        const camLook = new THREE.Vector3();
         const loop = (t: number) => {
             const r = R.current;
-            const dt = last === null ? 0 : (t - last) / 1000;
+            const dt = last === null ? 0 : Math.min(0.05, (t - last) / 1000);
             last = t;
             if (!document.hidden) onFrameRef.current(dt);
             if (r) {
                 const b = ballRef.current;
-                const y = b.inCup ? GREEN_H - 0.55 : GREEN_H + BALL_R;
-                r.ball.position.set(b.x, y, b.y);
-                r.ball.visible = true;
+
+                // 공 — 컵에 들어가면 가라앉는다
+                const targetY = b.inCup ? GREEN_H - 0.62 : GREEN_H + BALL_R;
+                r.ball.position.x = b.x;
+                r.ball.position.z = b.y;
+                r.ball.position.y += (targetY - r.ball.position.y) * Math.min(1, dt * 9);
                 r.shadow.position.set(b.x, GREEN_H + 0.03, b.y);
                 r.shadow.visible = !b.inCup;
+
+                // 구르는 회전 — ω = (ŷ × v)/R. 굴러간 만큼 실제로 돈다
+                const sp = Math.hypot(b.vx, b.vy);
+                if (sp > 0.01 && !b.inCup) {
+                    spinAxis.set(b.vy, 0, -b.vx).normalize();
+                    spinQ.setFromAxisAngle(spinAxis, (sp / BALL_R) * dt);
+                    r.ball.quaternion.premultiply(spinQ);
+                }
+
+                // 컵인 순간 — 물결 + 깃대 튐
+                if (b.inCup && !wasInCup) {
+                    r.ring.position.set(hole.cup.x, GREEN_H + 0.05, hole.cup.y);
+                    r.ringMat.color.set(COL.lime);
+                    r.ringT = 0; r.ringLife = 0.9; r.ring.visible = true;
+                    r.flagT = 0.8;
+                }
+                wasInCup = b.inCup;
+
+                // 물결 퍼짐
+                if (r.ringLife > 0) {
+                    r.ringT += dt;
+                    const k = Math.min(1, r.ringT / r.ringLife);
+                    const sc = 0.6 + k * 5.4;
+                    r.ring.scale.set(sc, sc, sc);
+                    r.ringMat.opacity = 0.85 * (1 - k);
+                    if (k >= 1) { r.ringLife = 0; r.ring.visible = false; }
+                }
+                // 깃대 튐(감쇠 진동)
+                if (r.flag && r.flagT > 0) {
+                    r.flagT = Math.max(0, r.flagT - dt);
+                    const a = r.flagT / 0.8;
+                    r.flag.rotation.z = Math.sin(r.flagT * 26) * 0.16 * a;
+                    if (r.flagT === 0) r.flag.rotation.z = 0;
+                }
+
+                // 홀 전환 카메라 — 임계 감쇠처럼 부드럽게
+                if (r.camReady && r.camTo.lengthSq() > 0) {
+                    const k = Math.min(1, dt * 4.5);
+                    r.camera.position.lerp(r.camTo, k);
+                    camLook.copy(r.lookTo);
+                    r.camera.lookAt(camLook);
+                }
+
                 r.renderer.render(r.scene, r.camera);
             }
             id = requestAnimationFrame(loop);
         };
         id = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(id);
-    }, [ballRef]);
+    }, [ballRef, hole]);
+
+    // ── OB — 붉은 물결 ──
+    useEffect(() => {
+        const r = R.current;
+        if (!r || !lastEvents?.some((e) => e.kind === "ob")) return;
+        const b = ballRef.current;
+        r.ring.position.set(b.restX, GREEN_H + 0.05, b.restY);
+        r.ringMat.color.set(0xff5a3c);
+        r.ringT = 0; r.ringLife = 0.7; r.ring.visible = true;
+    }, [lastEvents, ballRef]);
 
     // ── 조준선·예상 경로 갱신 ──
     useEffect(() => {

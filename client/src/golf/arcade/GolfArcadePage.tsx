@@ -161,9 +161,10 @@ function Round({ mode, room, me, onExit, onHoleDone }: { mode: "solo" | "room"; 
     }, [state.lastEvents]);
 
     const board = useMemo(() => {
-        const props = { hole: state.hole, ballRef: game.ballRef, phase: state.phase, tickCount: game.tickCount, onShoot: game.shoot, onFrame: game.tick };
-        return WEBGL_OK ? <MiniGolf3D {...props} /> : <MiniGolfBoard {...props} />;
-    }, [state.hole, state.phase, game.tickCount, game.shoot, game.tick, game.ballRef]);
+        const props = { hole: state.hole, ballRef: game.ballRef, phase: state.phase, tickCount: game.tickCount, onShoot: game.shoot, onFrame: game.tick, lastEvents: state.lastEvents };
+        const { lastEvents, ...flat } = props;
+        return WEBGL_OK ? <MiniGolf3D {...props} /> : <MiniGolfBoard {...flat} />;
+    }, [state.hole, state.phase, state.lastEvents, game.tickCount, game.shoot, game.tick, game.ballRef]);
 
     // 방 모드: 이미 서버에 기록된 홀이 있으면(새로고침) 그 자리까지 건너뛴다 — 단순화를 위해 1차는 처음부터
     const others = (room?.players ?? []).filter((p) => p.memberId !== me?.memberId);
