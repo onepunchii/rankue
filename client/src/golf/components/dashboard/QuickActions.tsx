@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import {
     LucideHash,
+    LucideChevronRight,
+    LucideFlag,
 } from "lucide-react";
 
 interface QuickActionsProps {
@@ -57,6 +59,24 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                     </div>
                 </motion.button>
             </div>
+
+            <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setLocation('/golf/play')}
+                className="w-full mb-4 relative z-10 bg-white/[0.03] border border-white/5 rounded-2xl py-8 px-6 flex items-center justify-between shadow-lg backdrop-blur-sm group hover:border-[#64DD17]/30 transition-colors"
+                title="3D 필드 골프 & 미니골프 플레이"
+            >
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-[#64DD17]/10 flex items-center justify-center group-hover:bg-[#64DD17] transition-colors">
+                        <LucideFlag className="w-7 h-7 text-[#64DD17] group-hover:text-[#051907] transition-colors" />
+                    </div>
+                    <div className="text-left">
+                        <h3 className="text-xl font-extrabold text-white">FIELD GOLF 3D</h3>
+                        <p className="text-sm font-semibold text-white/40 group-hover:text-[#64DD17] transition-colors mt-0.5">3D 코스에서 직접 샷 & 미니골프</p>
+                    </div>
+                </div>
+                <LucideChevronRight className="w-6 h-6 text-white/20 group-hover:text-white transition-colors" />
+            </motion.button>
 
             {/* 온라인게임(미니골프 대전, 2026-09-14 오너: "골프 홈에 온라인게임") — 당구 온라인게임과 같은 자리 */}
             <motion.button

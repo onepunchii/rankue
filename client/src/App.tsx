@@ -38,6 +38,7 @@ import HiqPbaPlayer from "@/pages/hiq/pba-player";
 import HiqGolfRanking from "@/pages/hiq/golf-ranking";
 import HiqGolfer from "@/pages/hiq/golfer";
 import HiqWorldPlayer from "@/pages/hiq/world-player";
+import GolfPlay from "@/golf/pages/GolfPlay";
 import GolfNewGame from "@/golf/pages/NewGame";
 import GolfScorecard from "@/golf/pages/GamePage";
 import GameResult from "@/golf/pages/GameResult";
@@ -277,6 +278,9 @@ function AppRoutes() {
       <Route path="/golf/course/:id"><GolfOnly><GolfCourseDetail /></GolfOnly></Route>
       <Route path="/golf/booking-list/:id?"><GolfOnly><GolfBookingList /></GolfOnly></Route>
       <Route path="/golf/proam"><GolfOnly><GolfProAm /></GolfOnly></Route>
+      {/* 3D 필드 골프 & 미니골프(2026-09-17) — 물리 진짜 계산하는 단독 페이지 */}
+      <Route path="/golf/play"><GolfOnly><GolfPlay /></GolfOnly></Route>
+      <Route path="/golf/minigolf"><GolfOnly><MiniGolfPlay /></GolfOnly></Route>
       {/* 골프 온라인게임(미니골프 대전, 2026-09-14) */}
       <Route path="/golf/arcade"><GolfOnly><GolfArcadePage /></GolfOnly></Route>
       {/* 필드 골프 연습장(2026-09-15 확정안 3주차 게이트) */}
