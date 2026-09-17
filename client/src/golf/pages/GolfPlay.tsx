@@ -78,11 +78,8 @@ export default function GolfPlay() {
   const handleMove = useCallback((p: Vec3) => setBallPos(p), []);
   const handleHole = useCallback(() => {
     setHoled(true);
-    setStrokes(s => {
-      setMessage(`홀인! 총 ${s + 1}타`);
-      return s + 1;
-    });
-  }, []);
+    setMessage(`홀인! 총 ${strokes}타`);
+  }, [strokes]);
 
   const dist = Math.hypot(FIELD_HOLE.holePosition.x - ballPos.x, FIELD_HOLE.holePosition.z - ballPos.z);
 
