@@ -2,11 +2,11 @@ import type { GolfTerrain, Vec3 } from "./types";
 
 const GRAVITY = 9.81;
 const AIR_DRAG = 0.18;
-const MAGNUS = 0.06;
+const MAGNUS = 0.004;
 const RESTITUTION_GRASS = 0.32;
 const RESTITUTION_GREEN = 0.28;
 const ROLL_FRICTION = 2.6;
-const GREEN_ROLL_FRICTION = 1.1;
+const GREEN_ROLL_FRICTION = 0.35;
 const BUNKER_FRICTION = 9.0;
 const STOP_SPEED = 0.12;
 const BALL_RADIUS = 0.02135 * 10;
@@ -58,7 +58,7 @@ function integrate(
   result: StepResult,
 ): void {
   const groundY = terrain.heightAt(pos.x, pos.z);
-  const airborne = pos.y > groundY + BALL_RADIUS * 1.2;
+  const airborne = pos.y > groundY + BALL_RADIUS * 1.05;
 
   if (airborne) {
     vel.x += (wind.x - vel.x * 0.02) * dt;
@@ -74,9 +74,8 @@ function integrate(
   } else {
     pos.y = groundY + BALL_RADIUS;
     const n = terrain.normalAt(pos.x, pos.z);
-    const slopeAccel = 9.81 * n.x;
-    vel.x += slopeAccel * dt * 8;
-    vel.z += (9.81 * n.z) * dt * 8;
+    vel.x += 9.81 * (-n.x / n.y) * dt * 0.5;
+    vel.z += 9.81 * (-n.z / n.y) * dt * 0.5;
 
     const surface = terrain.surfaceAt(pos.x, pos.z);
     const friction =
@@ -92,9 +91,10 @@ function integrate(
       vel.z *= factor;
     }
 
-    if (horizSpeed < STOP_SPEED && Math.abs(n.x) < 0.04 && Math.abs(n.z) < 0.04) {
+    if (horizSpeed < STOP_SPEED && Math.abs(n.x) < 0.14 && Math.abs(n.z) < 0.14) {
       vel.x = 0;
       vel.z = 0;
+      vel.y = 0;
     }
   }
 
@@ -112,19 +112,24 @@ function integrate(
       vel.x *= 0.75;
       vel.z *= 0.75;
     } else {
-      vel.y = 0;
+      vel.y = Math.max(0, vel.y);
     }
   }
 
   const dx = pos.x - hole.x;
   const dz = pos.z - hole.z;
-  const dy = pos.y - hole.y;
+  const groundHoleY = terrain.heightAt(hole.x, hole.z);
+  const dy = pos.y - groundHoleY;
   const distSq = dx * dx + dz * dz;
-  if (distSq < 0.108 * 0.108 && Math.abs(dy) < 0.2 && Math.hypot(vel.x, vel.z) < 3.2) {
+  if (distSq < 0.216 * 0.216 && dy < 0.35 && Math.hypot(vel.x, vel.z) < 7.5) {
     result.enteredHole = true;
     vel.x = 0;
     vel.y = 0;
     vel.z = 0;
+  } else if (distSq < 0.55 * 0.55 && Math.hypot(vel.x, vel.z) < 7.5 && vel.y >= 0) {
+    vel.x += -dx * 2.55;
+    vel.z += -dz * 2.55;
+    vel.y = -1.1;
   }
 }
 
