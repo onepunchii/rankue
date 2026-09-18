@@ -13,7 +13,7 @@ import { JSDOM, VirtualConsole } from "jsdom";
 import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout } from "@shared/sim/layouts";
 import { DEFAULT_CUE, TABLES } from "@shared/sim/params";
-import { createSession, DEFAULT_3C_RULES, type SessionState } from "@shared/sim/rules";
+import { applyShot, createSession, DEFAULT_3C_RULES, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { BallState, ShotInput } from "@shared/sim/types";
 import { ko } from "../../lib/i18n/ko";
 import type { MatchPublic, MatchShot } from "../matchApi";
@@ -185,4 +185,35 @@ describe("WatchPage 진행 중 관전", () => {
         await wait(4200);
         expect(api.getShots).toHaveBeenCalledTimes(1);
     }, 20_000);
+});
+
+describe("WatchPage 중간에 들어온 관전자(2026-09-18)", () => {
+    it("앞 이닝 점수가 다 보인다 — 여태 친 샷을 한 번에 받아 이닝 시트를 채운다(재생은 안 한다)", async () => {
+        // 호스트 1이닝 1점·미스 → 게스트 1이닝 미스 → 호스트 2이닝 1점(진행 중)
+        const out = (code: ShotOutcome["code"], points: number): ShotOutcome =>
+            ({ code, points, scored: points > 0, consumesInning: points === 0, cushionsBeforeSecond: 3, cushionsBeforeFirst: 0, contacts: [], kisses: 0 });
+        const seq: [number, ShotOutcome][] = [[0, out("point", 1)], [0, out("miss-cushions", 0)], [1, out("miss-cushions", 0)], [0, out("point", 1)]];
+        let state = sess(0);
+        const rows: MatchShot[] = [];
+        for (const [player, o] of seq) {
+            const r = applyShot(state, o);
+            const p = r.session.players[player];
+            rows.push({ ...shotRow(), idx: rows.length, playerIndex: player, outcomeCode: o.code, points: o.points, inning: o.consumesInning ? p.innings : p.innings + 1 });
+            state = r.session;
+        }
+        const m = { ...publicMatch({ shots: rows.length, balls: OPENING, turn: state.turn }), state } as MatchPublic;
+        api.getMatch.mockImplementation(() => slow(m));
+        api.getShots.mockImplementation(() => slow(rows));
+
+        const h = mount();
+        await wait(120);
+        expect(api.getShots).toHaveBeenCalledWith("m-1", 0);
+        // 머리줄을 눌러 이닝 시트를 연다
+        const summary = h.container.querySelector<HTMLButtonElement>(`button[aria-label*="${ko["sim.controls.innings"]}"]`);
+        expect(summary).not.toBeNull();
+        React.act(() => { summary!.click(); });
+        const body = h.container.querySelector('[role="dialog"] tbody');
+        const cells = Array.from(body?.querySelectorAll("tr") ?? []).map((tr) => Array.from(tr.querySelectorAll("td")).map((td) => td.textContent));
+        expect(cells).toEqual([["1", "1", "0"], ["2", "1", "–"]]);
+    }, 10_000);
 });

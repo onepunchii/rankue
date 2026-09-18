@@ -126,6 +126,18 @@ export function timeoutOutcome(): ShotOutcome {
     return { code: "foul-timeout", points: 0, scored: false, consumesInning: true, cushionsBeforeSecond: 0, cushionsBeforeFirst: 0, contacts: [], kisses: 0 };
 }
 
+/**
+ * 이 샷이 그 선수의 몇 번째 이닝이었나(1부터). applyShot **뒤의** 선수 상태로 센다 — 이닝을 소모한 샷이면
+ * innings 가 이미 올라가 있어 그 값이 이번 이닝이고, 아니면(득점·no-shot·후구로 넘긴 결승점) 진행 중 이닝 = innings + 1.
+ *
+ * 서버가 샷 행마다 이 값을 적는다(2026-09-18 오너: "방 나갔다 다시 이어 하면 이닝별 스코어가 다 지워져 있다").
+ * 샷 행만으로는 이닝을 되짚을 수 없기 때문이다 — 40초 시간 초과는 샷 행 없이 이닝을 넘긴다. 화면의 이닝 기록
+ * (client inningLog.appendShot)도 같은 함수를 써서 두 쪽의 셈이 갈라지지 않게 한다.
+ */
+export function shotInning(outcome: Pick<ShotOutcome, "consumesInning">, playerAfter: Pick<PlayerState, "innings">): number {
+    return Math.max(1, outcome.consumesInning ? playerAfter.innings : playerAfter.innings + 1);
+}
+
 export interface ApplyResult {
     readonly session: SessionState;
     /** 마무리 규칙 때문에 득점이 무효 처리됐으면 원래 outcome 을 이렇게 바꾼 것 */

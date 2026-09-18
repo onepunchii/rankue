@@ -118,6 +118,14 @@ describe("응답 검증", () => {
         expect(() => parseMatchList({})).toThrow(TypeError);
         expect(parseMatchList([rawMatch])).toHaveLength(1);
     });
+    it("parseMatchShot: 서버가 적은 이닝 번호(2026-09-18~)는 1 이상 정수만, 옛 샷·이상한 값은 null", () => {
+        const base = { idx: 0, playerIndex: 0, preState: balls, input, hash: "a".repeat(16), outcomeCode: "point", points: 1, cushions: 3 };
+        expect(parseMatchShot({ ...base, inning: 3 }).inning).toBe(3);
+        expect(parseMatchShot(base).inning).toBeNull();
+        expect(parseMatchShot({ ...base, inning: null }).inning).toBeNull();
+        for (const bad of [0, -1, 1.5, "2", Number.NaN]) expect(parseMatchShot({ ...base, inning: bad }).inning).toBeNull();
+    });
+
     it("parseMatchShot: preState·input 검사, 입력의 여분 키는 버린다", () => {
         const s = parseMatchShot({ idx: 2, playerIndex: 1, preState: balls, input: { ...input, junk: 1 }, hash: "a".repeat(16), outcomeCode: "point", points: 1, cushions: 3, createdAt: "2026-09-07T00:02:00.000Z" });
         expect(s.idx).toBe(2);

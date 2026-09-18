@@ -21,7 +21,7 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { simulateShot } from "@shared/sim/simulate";
 import type { BallState, SimResult } from "@shared/sim/types";
-import { SHOT_CLOCK_S, type SessionState, type ShotOutcome } from "@shared/sim/rules";
+import { SHOT_CLOCK_S, type SessionState } from "@shared/sim/rules";
 import { Canvas2DRenderer } from "../render/Canvas2DRenderer";
 import type { Renderer, RendererView, SafeInsets } from "../render/Renderer";
 import { readZoomPref, safeLocalStorage, selectRendererKind, type RendererKind } from "../render/rendererChoice";
@@ -32,26 +32,20 @@ import { effectiveBall, makePlayback, startClock, clockTime, type Playback, type
 import { TopBar, type MatchHeaderPlayer } from "../components/TopBar";
 import { ShotClock } from "../components/ShotClock";
 import { InningSheet } from "../components/InningSheet";
-import { appendShot, EMPTY_LOG, type InningLog } from "../inningLog";
+import { rebuildInningLog } from "../inningLog";
 import { matchParamsKey, nextPollMs, normalizeShots, planWatch, shouldSkipAnimation } from "./watchPlan";
 
 const INSETS: SafeInsets = { top: 8, right: 8, bottom: 8, left: 8 };
 const SPEEDS = [1, 2, 4] as const;
 type Speed = typeof SPEEDS[number];
 
-/** 저장된 샷 한 줄 → 이닝 표가 아는 모양. 이닝을 소모했는지는 다음 샷이 누구 차례였는지로 안다(서버가 따로 안 적는다). */
-function outcomeOf(s: MatchShot, next: MatchShot | undefined, sessionTurn: number): ShotOutcome {
-    const consumesInning = next ? next.playerIndex !== s.playerIndex : sessionTurn !== s.playerIndex;
-    return {
-        code: s.outcomeCode as ShotOutcome["code"],
-        points: s.points,
-        scored: s.points > 0,
-        consumesInning,
-        cushionsBeforeSecond: s.cushions ?? 0,
-        cushionsBeforeFirst: 0,
-        contacts: [],
-        kisses: 0,
-    } as ShotOutcome;
+/** 폴링으로 받은 샷을 지금까지 아는 샷에 합친다(같은 idx 는 새 값, idx 순). */
+function mergeShots(cur: readonly MatchShot[], add: readonly MatchShot[]): readonly MatchShot[] {
+    if (add.length === 0) return cur;
+    const byIdx = new Map<number, MatchShot>();
+    for (const s of cur) byIdx.set(s.idx, s);
+    for (const s of add) byIdx.set(s.idx, s);
+    return [...byIdx.values()].sort((a, b) => a.idx - b.idx);
 }
 
 export default function WatchPage({ matchId }: { matchId: string }) {
@@ -64,7 +58,12 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     const [speed, setSpeed] = useState<Speed>(1);
     const [replayShots, setReplayShots] = useState<readonly MatchShot[]>([]);
     const [autoPlay, setAutoPlay] = useState(false);
-    const [log, setLog] = useState<InningLog>(EMPTY_LOG);
+    /**
+     * 지금까지 받은 샷 전부(idx 순). 이닝 기록은 여기서 **이미 재생한 샷만** 골라 그때그때 다시 만든다(rebuildInningLog).
+     * 예전엔 재생할 때마다 한 줄씩 쌓았는데 세 가지가 틀렸다(2026-09-18): 중간에 들어온 관전자는 앞 이닝이 비어 있었고,
+     * 이닝 번호를 **지금** 세션에서 세서 다시보기에선 모든 샷이 마지막 이닝 한 줄에 몰렸고, 공이 구르기 전에 줄이 먼저 떴다.
+     */
+    const [knownShots, setKnownShots] = useState<readonly MatchShot[]>([]);
     const [sheetOpen, setSheetOpen] = useState(false);
     const [view, setView] = useState<RendererView>("top");
     const [viewSupported, setViewSupported] = useState(false);
@@ -99,6 +98,16 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     const params = useMemo(() => (config ? paramsFromConfig(config) : null), [config]);
     const session = (match?.state as SessionState | null) ?? null;
     const live = match?.status === "playing";
+    /** 이닝 기록 — 이미 재생한 샷까지만(다시보기는 넘긴 데까지). 끝난 대전은 다시보기 목록이 곧 전체 기록이다. */
+    const allShots = finished && replayShots.length > 0 ? replayShots : knownShots;
+    const log = useMemo(() => rebuildInningLog(allShots.filter((s) => s.idx < playedShots), session), [allShots, playedShots, session]);
+    /**
+     * 샷 없이 끝난 이닝(시간 초과)을 0 으로 채울 끝낸 이닝 수. 세션이 **재생한 데까지와 같은 시점**일 때만 준다 —
+     * 공이 구르는 동안이나 다시보기 중간엔 세션이 앞서 있어 아직 안 친 이닝까지 0 으로 채워 버린다.
+     */
+    const caughtUp = !!match && !animating && playedShots >= match.shots;
+    const completedKey = caughtUp && session ? session.players.map((p) => p.innings).join(",") : "";
+    const completed = useMemo(() => (completedKey ? completedKey.split(",").map(Number) : undefined), [completedKey]);
     liveAimRef.current = live && match?.opponentAim ? match.opponentAim.phi : null;
     liveCueRef.current = cueBallIdOf(session);
     const names = useMemo(() => [match?.hostName || t("sim.watch.host"), match?.guestName || t("sim.watch.guest")], [match, t]);
@@ -211,7 +220,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     };
 
     /* ── 샷 하나를 재생한다(재시뮬 → 궤적). 가려져 있거나 밀렸으면 결과 배치로 바로 붙인다. ── */
-    const playShot = useCallback(async (s: MatchShot, next: MatchShot | undefined, sessionTurn: number, skip: boolean): Promise<void> => {
+    const playShot = useCallback(async (s: MatchShot, skip: boolean): Promise<void> => {
         if (!params) return;
         let result: SimResult;
         try {
@@ -220,7 +229,6 @@ export default function WatchPage({ matchId }: { matchId: string }) {
             return;   // 엔진 버전이 달라 재시뮬이 안 되는 옛 대전 — 그 샷은 건너뛴다
         }
         aimRef.current = { cueBallId: s.input.cueBallId, phi: s.input.phi };
-        setLog((l) => appendShot(l, outcomeOf(s, next, sessionTurn), { ...(session ?? {} as SessionState), turn: sessionTurn } as SessionState, s.playerIndex));
         const hidden = typeof document !== "undefined" && document.hidden;
         if (skip || hidden) {
             ballsRef.current = result.final;
@@ -235,16 +243,16 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         });
         ballsRef.current = result.final;
         dirtyRef.current = true;
-    }, [params, session]);
+    }, [params]);
 
-    const playList = useCallback(async (list: readonly MatchShot[], all: readonly MatchShot[], sessionTurn: number) => {
+    const playList = useCallback(async (list: readonly MatchShot[]) => {
         if (list.length === 0) return;
         setAnimating(true);
         const skipUntil = shouldSkipAnimation(list.length) ? list.length - 1 : 0;
         for (let i = 0; i < list.length; i++) {
             if (!aliveRef.current) break;
             const s = list[i];
-            await playShot(s, all[s.idx + 1] ?? list[i + 1], sessionTurn, i < skipUntil);
+            await playShot(s, i < skipUntil);
             setPlayedShots(s.idx + 1);
         }
         setAnimating(false);
@@ -258,6 +266,16 @@ export default function WatchPage({ matchId }: { matchId: string }) {
             setMatch(m);
             if (m.balls) { ballsRef.current = m.balls; dirtyRef.current = true; }
             setPlayedShots(m.shots);
+            // 중간에 들어온 관전자도 앞 이닝이 다 보이게 — 여태 친 샷을 한 번에 받아 둔다(재생은 안 한다).
+            // 끝난 대전은 아래 다시보기 effect 가 같은 목록을 받는다.
+            if (m.status === "playing" && m.shots > 0) {
+                const load = (attempt: number) => {
+                    matchApi.getShots(matchId, 0).then((shots) => {
+                        if (alive) setKnownShots((cur) => mergeShots(cur, shots));
+                    }, () => { if (alive && attempt < 2) setTimeout(() => load(attempt + 1), 3000); });
+                };
+                load(1);
+            }
         }).catch(() => { if (alive) setError(t("sim.watch.gone")); });
         return () => { alive = false; };
     }, [matchId, t]);
@@ -296,7 +314,8 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                     const shots = await matchApi.getShots(matchId, plan.from);
                     if (!alive) return;
                     const list = normalizeShots(shots, plan.from);
-                    await playListRef.current(list, list, (m.state as SessionState | null)?.turn ?? 0);
+                    setKnownShots((cur) => mergeShots(cur, list));
+                    await playListRef.current(list);
                 } else if (!animatingRef.current && m.balls && m.shots === playedRef.current) {
                     ballsRef.current = m.balls; dirtyRef.current = true;      // 시간 초과 등 샷 없는 변화
                 }
@@ -320,7 +339,6 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                 aimRef.current = { cueBallId: list[0].input.cueBallId, phi: list[0].input.phi };
                 dirtyRef.current = true;
                 setPlayedShots(0);
-                setLog(EMPTY_LOG);
             }
         }).catch(() => { /* 목록 없이도 결과 화면은 보인다 */ });
         return () => { alive = false; };
@@ -332,9 +350,9 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         const next = replayShots[playedShots];
         if (!next) { setAutoPlay(false); return; }
         let alive = true;
-        void (async () => { if (alive) await playList([next], replayShots, session?.turn ?? 0); })();
+        void (async () => { if (alive) await playList([next]); })();
         return () => { alive = false; };
-    }, [autoPlay, animating, finished, replayShots, playedShots, playList, session]);
+    }, [autoPlay, animating, finished, replayShots, playedShots, playList]);
 
     const restart = () => {
         if (replayShots.length === 0) return;
@@ -343,7 +361,6 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         ballsRef.current = replayShots[0].preState as BallState[];
         dirtyRef.current = true;
         setPlayedShots(0);
-        setLog(EMPTY_LOG);
     };
 
     /* ── 40초 시계: 선수 화면과 같은 계산(서버가 적은 turnSeenAt 부터, 서버 시각 보정) ── */
@@ -413,7 +430,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                             className="h-11 flex-1 rounded-tile bg-brand text-brand-fg text-[14px] font-bold disabled:opacity-40"
                         >{autoPlay ? t("sim.watch.pause") : t("sim.watch.play")}</button>
                         <button
-                            onClick={() => { setAutoPlay(false); const nx = replayShots[playedShots]; if (nx) void playList([nx], replayShots, session?.turn ?? 0); }}
+                            onClick={() => { setAutoPlay(false); const nx = replayShots[playedShots]; if (nx) void playList([nx]); }}
                             disabled={animating || playedShots >= replayShots.length}
                             className="h-11 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2 disabled:opacity-40"
                         >{t("sim.watch.nextShot")}</button>
@@ -432,7 +449,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                 )}
             </footer>
 
-            <InningSheet open={sheetOpen} onOpenChange={setSheetOpen} log={log} session={session} names={names} phase={finished ? "finished" : "waiting"} />
+            <InningSheet open={sheetOpen} onOpenChange={setSheetOpen} log={log} completed={completed} session={session} names={names} phase={finished ? "finished" : "waiting"} />
         </div>
     );
 }

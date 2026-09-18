@@ -254,6 +254,8 @@ export interface MatchShot {
     readonly outcomeCode: string;
     readonly points: number;
     readonly cushions: number;
+    /** 친 사람의 이닝 번호(서버가 2026-09-18 부터 적는다). 그 전 샷은 null — 화면이 샷 순서로 추정한다. */
+    readonly inning?: number | null;
     readonly createdAt: string;
 }
 
@@ -501,6 +503,7 @@ export function parseMatchShot(raw: unknown): MatchShot {
         outcomeCode: typeof raw.outcomeCode === "string" ? raw.outcomeCode : "",
         points: typeof raw.points === "number" ? raw.points : 0,
         cushions: typeof raw.cushions === "number" ? raw.cushions : 0,
+        inning: typeof raw.inning === "number" && Number.isInteger(raw.inning) && raw.inning >= 1 ? raw.inning : null,
         createdAt: isoOrNull(raw.createdAt) ?? "",
     };
 }

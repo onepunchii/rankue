@@ -104,8 +104,18 @@ export interface SimCallbacks {
     readonly onMismatch?: (mismatches: number) => void;
     /** 서버 기록을 포기한 순간 1회(솔로 세션). 이후 샷은 로컬에만 남는다. */
     readonly onOffline?: (reason: OfflineReason) => void;
-    /** 재생이 끝나 공이 멈춘 뒤(스냅 반영 후). 토스트·이닝 시트 갱신용. 따라잡기 재생도 온다. */
-    readonly onOutcome?: (outcome: ShotOutcome, session: SessionState, shooter: number) => void;
+    /**
+     * 재생이 끝나 공이 멈춘 뒤(스냅 반영 후). 토스트·이닝 시트 갱신용. 따라잡기 재생도 온다.
+     * `idx` 는 이 샷의 번호(0부터) — 대전에선 서버 샷 번호와 같다(화면이 서버 기록과 이어 붙일 때 쓴다).
+     */
+    readonly onOutcome?: (outcome: ShotOutcome, session: SessionState, shooter: number, idx: number) => void;
+    /**
+     * 대전의 기준점이 바뀌었다 — 화면의 이닝 기록을 서버 기록으로 다시 맞춰야 한다(2026-09-18 오너: "방 나갔다 다시
+     * 이어 하면 이닝별 스코어가 다 지워져 있다"). `shots` 는 그 순간 서버 샷 수, `state` 는 그 시점 세션.
+     *  - fresh: 대전을 새로 열었다(다시 들어오기·목록에서 열기·한 판 더). 앞 대전의 기록은 버린다.
+     *  - 아니면: 서버 정본으로 갈아탔다(거부된 내 샷·어긋난 재생). idx ≥ shots 줄은 그 순간 무효다.
+     */
+    readonly onMatchBase?: (base: { readonly matchId: string; readonly shots: number; readonly state: SessionState | null; readonly fresh: boolean }) => void;
     /** 당점이 미스큐 범위라 샷이 거부됐다(setSpin 이 클램프하므로 정상 경로에선 나오지 않는다). */
     readonly onMiscue?: () => void;
     /** 네트워크 대전 이벤트. */
@@ -392,6 +402,8 @@ export class SimController {
         // setAux 는 병합이라 chat 을 명시하지 않으면 옛 대전의 대화가 새 방에 그대로 남는다(재경기가 그 경로다).
         this.setAux({ setup: { config, params }, preview: null, duration: 0, speed: 1, lastResult: null, chat: [] });
         this.store.dispatch({ type: "startMatch", match, session: m.state, balls: m.balls, shots: m.shots, aimAssist: m.aimAssist ?? true });
+        // 폴링(따라잡기 재생)보다 먼저 알린다 — 화면이 앞 대전 기록을 비운 뒤에 이 대전의 새 줄이 쌓이게.
+        this.callbacks.onMatchBase?.({ matchId: m.id, shots: m.shots, state: m.state, fresh: true });
         this.unwake = (this.deps.onWake ?? defaultOnWake)(() => this.wake());
         this.schedulePoll();
         return true;
@@ -690,7 +702,7 @@ export class SimController {
         if (this.aux.speed !== 1) this.setSpeed(1);
         const after = this.store.get();
         if (snapped) this.callbacks.onMismatch?.(after.mismatches);
-        if (after.outcomeLast && after.session) this.callbacks.onOutcome?.(after.outcomeLast, after.session, after.shooterLast);
+        if (after.outcomeLast && after.session) this.callbacks.onOutcome?.(after.outcomeLast, after.session, after.shooterLast, after.shotIdx - 1);
         this.afterMeta(before, after);
         this.resolvePlaybackWaiters();
     }
@@ -1130,6 +1142,9 @@ export class SimController {
         const before = this.store.get();
         this.store.dispatch({ type: "matchSnap", match: meta, session: m.state, balls: m.balls, shots: m.shots, mismatch: opts.count });
         const after = this.store.get();
+        // 어긋나서 갈아탔으면(재생 누락·거부된 샷·미스매치) 화면의 이닝 기록도 서버 기록으로 다시 맞춘다.
+        // 샷 없이 차례만 넘어간 스냅(시간 초과)이나 따라잡기가 정확히 끝난 스냅은 기록이 이미 맞다.
+        if (opts.notify !== null) this.callbacks.onMatchBase?.({ matchId: m.id, shots: m.shots, state: m.state, fresh: false });
         if (opts.notify === "mismatch") this.callbacks.onMismatch?.(after.mismatches);
         else if (opts.notify === "resynced") this.callbacks.onMatch?.("resynced");
         this.afterMeta(before, after);
@@ -1311,7 +1326,12 @@ export class SimController {
             final: res.final, session: res.mismatch ? res.state : null, outcome: res.outcome ?? undefined,
         });
         const after = this.store.get();
-        if (res.mismatch && s.phase !== "shooting") this.callbacks.onMismatch?.(after.mismatches);
+        if (res.mismatch && s.phase !== "shooting") {
+            // 재생이 이미 끝나 onOutcome 이 **로컬** 결과로 이닝 기록을 쌓은 뒤다 — 서버 결과로 그 줄을 바꿔 끼운다.
+            // (재생 중에 온 미스매치는 pendingSnap 으로 서버 결과가 onOutcome 에 실려 가므로 여기 올 필요가 없다.)
+            this.callbacks.onMatchBase?.({ matchId, shots: p.idx + 1, state: res.state, fresh: false });
+            this.callbacks.onMismatch?.(after.mismatches);
+        }
         this.afterMeta(s, after);
         if (res.duplicate) {
             // 재전송의 멱등 응답엔 결과가 없다 — 행을 읽어 배치를 맞춘다(그 사이 상대 샷이 있었으면 따라잡는다).

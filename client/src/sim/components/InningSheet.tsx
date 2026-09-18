@@ -13,15 +13,17 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     log: InningLog;
+    /** 선수별 끝낸 이닝 수(샷 없이 끝난 시간 초과 이닝을 0 으로 채운다 — inningRows). 기록과 같은 시점의 값만 넘긴다. */
+    completed?: readonly number[];
     session: SessionState | null;
     names: readonly string[];
     phase: Phase;
 }
 
-export const InningSheet = memo(function InningSheet({ open, onOpenChange, log, session, names, phase }: Props) {
+export const InningSheet = memo(function InningSheet({ open, onOpenChange, log, completed, session, names, phase }: Props) {
     const { t } = useT();
     const count = session?.players.length ?? 1;
-    const rows = useMemo(() => inningRows(log, count), [log, count]);
+    const rows = useMemo(() => inningRows(log, count, completed), [log, count, completed]);
     const sums = useMemo(() => totals(rows, count), [rows, count]);
 
     return (

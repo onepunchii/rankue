@@ -11,7 +11,12 @@ vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout } from "@shared/sim/layouts";
 import { DEFAULT_CUE, TABLES } from "@shared/sim/params";
-import { applyShot, createSession, evaluateShot, isOpeningShot, DEFAULT_3C_RULES, AIM_EPS_RAD, AIM_REPORT_MS, type SessionState } from "@shared/sim/rules";
+import {
+    applyShot, createSession, evaluateShot, isOpeningShot, shotInning, timeoutOutcome, DEFAULT_3C_RULES, AIM_EPS_RAD, AIM_REPORT_MS,
+    type SessionState,
+} from "@shared/sim/rules";
+import { appendShot, EMPTY_LOG, inningRows, type InningLog } from "./inningLog";
+import { makeHistoryLoader } from "./matchHistory";
 import type { BallState, ShotInput } from "@shared/sim/types";
 import { MAX_RETRIES } from "./simReducer";
 import type { ShotRequest, SimApi } from "./simApi";
@@ -100,6 +105,8 @@ class FakeMatchServer {
     mode: NetMode = "ok";
     /** getShots 가 돌려주는 해시를 망가뜨린다(결정론 깨짐 흉내). */
     tamperHash = false;
+    /** 2026-09-18 전 샷 행처럼 이닝 번호 없이 준다(화면이 샷 순서로 추정해야 한다). */
+    legacyShots = false;
     calls = { get: 0, shots: 0, post: 0, resign: 0, claim: 0 };
     /** 상대에게 보여 줄 조준 보고(phi) — 순서대로 쌓인다. */
     aims: number[] = [];
@@ -171,7 +178,8 @@ class FakeMatchServer {
         const finished = applied.session.status === "finished";
         this.log.push({
             idx: req.idx, playerIndex: myIndex, memberId: viewer, preState: r.balls, input: req.input, hash: result.hash,
-            outcomeCode: applied.outcome.code, points: applied.outcome.points, cushions: applied.outcome.cushionsBeforeSecond, createdAt: "",
+            outcomeCode: applied.outcome.code, points: applied.outcome.points, cushions: applied.outcome.cushionsBeforeSecond,
+            inning: shotInning(applied.outcome, applied.session.players[myIndex]), createdAt: "",
         });
         r.state = applied.session;
         r.balls = result.final;
@@ -200,6 +208,14 @@ class FakeMatchServer {
         return this.record(viewer, { idx: this.row.shots, input, clientHash: preview.hash });
     }
 
+    /** 40초 시간 초과(라우트 POST /timeout): 샷 행 없이 차례인 사람의 이닝을 넘긴다. */
+    timeoutNow(): void {
+        const r = this.row;
+        r.state = applyShot(r.state, timeoutOutcome()).session;
+        r.turn = r.state.turn;
+        r.version++;
+    }
+
     finish(winnerId: string | null, endReason: MatchPublic["endReason"]): void {
         this.row.status = "finished";
         this.row.winnerId = winnerId;
@@ -225,7 +241,9 @@ class FakeMatchServer {
             getShots: vi.fn(async (_id: string, from = 0) => {
                 this.calls.shots++;
                 await guard();
-                return this.log.filter((s) => s.idx >= from).map((s) => ({ ...s, hash: this.tamperHash ? "0".repeat(16) : s.hash }));
+                return this.log.filter((s) => s.idx >= from).map((s) => ({
+                    ...s, hash: this.tamperHash ? "0".repeat(16) : s.hash, inning: this.legacyShots ? null : s.inning,
+                }));
             }),
             postShot: vi.fn(async (_id: string, req: ShotRequest) => {
                 this.calls.post++;
@@ -797,5 +815,151 @@ describe("조준 도달", () => {
         await settle();
         expect(g.store.get().match!.opponentAim?.phi).toBe(2.0);
         g.dispose();
+    });
+});
+
+/* ------------------------------------------------------------ 이닝 기록 되살리기(2026-09-18) */
+
+/**
+ * 화면(SimulatorPage)과 같은 배선: onOutcome 마다 한 줄, onMatchBase 면 로더가 서버 기록으로 앞부분을 채운다.
+ * `gate` 를 주면 로더의 기록 요청만 붙잡아 둔다(그사이 폴링·재생은 계속 돈다).
+ */
+function withPageLog(m: ReturnType<typeof make>, gate?: Promise<void>) {
+    let log: InningLog = EMPTY_LOG;
+    let openId: string | null = null;
+    const loader = makeHistoryLoader({
+        getShots: async (id, from) => { if (gate) await gate; return m.matchApi.getShots(id, from); },
+        update: (fn) => { log = fn(log); },
+        isOpen: (id) => openId === id,
+        setTimer: () => undefined,
+    });
+    m.cb.onOutcome.mockImplementation((outcome, session, shooter, idx) => { log = appendShot(log, outcome, session, shooter, idx); });
+    (m.cb as Record<string, unknown>).onMatchBase = vi.fn((b: Parameters<typeof loader>[0]) => { openId = b.matchId; loader(b); });
+    m.ctrl.setCallbacks(m.cb);
+    return { log: () => log, onMatchBase: (m.cb as unknown as { onMatchBase: ReturnType<typeof vi.fn> }).onMatchBase };
+}
+
+/** 서버가 샷마다 적은 정답(친 사람·이닝·점수). */
+const truth = (srv: FakeMatchServer) => srv.log.map((s) => `${s.idx}:${s.playerIndex}:${s.inning}:${s.points}`);
+const got = (log: InningLog) => log.entries.map((e) => `${e.idx}:${e.player}:${e.inning}:${e.points}`);
+
+describe("이닝 기록 되살리기 — 나갔다 다시 들어와도 이닝별 점수가 남는다(2026-09-18 오너 제보)", () => {
+    it("대전을 열면 폴링보다 먼저 기준점(fresh, 그 순간 샷 수·세션)을 알린다", () => {
+        const m = make(GUEST);
+        const onMatchBase = vi.fn();
+        m.ctrl.setCallbacks({ ...m.cb, onMatchBase });
+        m.srv.shootAs(HOST);
+        m.ctrl.startMatch(m.srv.public(GUEST));
+        expect(onMatchBase).toHaveBeenCalledTimes(1);
+        expect(onMatchBase).toHaveBeenCalledWith({ matchId: "m-1", shots: 1, state: m.srv.row.state, fresh: true });
+        expect(m.srv.calls.shots).toBe(0);
+    });
+
+    it("다시 들어오면 서버 기록으로 앞 이닝이 채워지고(시간 초과 이닝 포함), 그 뒤 샷은 이어서 쌓인다", async () => {
+        const m = make(GUEST);
+        const page = withPageLog(m);
+        m.srv.shootAs(HOST, POINT_SHOT);                 // 호스트 1이닝 득점
+        m.srv.shootAs(HOST);                             // 호스트 1이닝 미스 → 게스트
+        expect(m.srv.row.turn).toBe(1);
+        m.srv.timeoutNow();                              // 게스트 시간 초과(행 없음) → 호스트 2이닝
+        m.srv.shootAs(HOST);                             // 호스트 2이닝
+        m.ctrl.startMatch(m.srv.public(GUEST));          // 이 순간 게스트가 다시 들어온다
+        await settle();
+        // 서버 정답: 호스트 1이닝 1점 · 1이닝 미스 · (게스트 시간 초과) · 호스트 2이닝 미스 → 게스트 차례
+        expect(truth(m.srv)).toEqual(["0:0:1:1", "1:0:1:0", "2:0:2:0"]);
+        expect(m.srv.row.turn).toBe(1);
+        expect(got(page.log())).toEqual(truth(m.srv));
+        // 게스트의 1이닝(시간 초과)은 빈칸이 아니라 0, 게스트 2이닝은 아직 안 쳤으니 빈칸
+        const done = m.srv.row.state.players.map((p) => p.innings);
+        expect(inningRows(page.log(), 2, done).map((r) => r.cells)).toEqual([[1, 0], [0, null]]);
+        // 이어서 내가 치면 그 줄이 뒤에 붙는다(서버 샷 번호 3)
+        aimAtYellow(m.ctrl);
+        await m.ctrl.shoot();
+        m.playOut();
+        await settle();
+        expect(m.srv.log).toHaveLength(4);
+        expect(got(page.log())).toEqual(truth(m.srv));
+    });
+
+    it("옛 샷 행(서버 이닝 없음)도 샷 순서로 이닝을 되짚는다", async () => {
+        const m = make(GUEST);
+        const page = withPageLog(m);
+        m.srv.legacyShots = true;
+        m.srv.shootAs(HOST, POINT_SHOT);
+        m.srv.shootAs(HOST);
+        m.srv.timeoutNow();
+        m.srv.shootAs(HOST);
+        m.ctrl.startMatch(m.srv.public(GUEST));
+        await settle();
+        expect(got(page.log())).toEqual(truth(m.srv));
+    });
+
+    it("기록을 받는 사이 상대가 쳐서 재생이 먼저 끝나도 줄이 겹치거나 빠지지 않는다", async () => {
+        let open!: () => void;
+        const gate = new Promise<void>((r) => { open = r; });
+        const m = make(HOST);
+        const page = withPageLog(m, gate);
+        m.srv.shootAs(HOST);                             // 호스트 미스 → 게스트
+        expect(m.srv.row.turn).toBe(1);
+        m.ctrl.startMatch(m.srv.public(HOST));           // 호스트가 다시 들어온다(기록 요청은 붙잡혀 있다)
+        m.srv.shootAs(GUEST);                            // 그사이 게스트가 친다
+        m.env.advance(POLL_FAST_MS);
+        await settle();
+        m.playOut();
+        await settle();
+        expect(got(page.log())).toEqual([truth(m.srv)[1]]);   // 재생한 줄만 먼저
+        open();
+        await settle();
+        expect(got(page.log())).toEqual(truth(m.srv));        // 앞 줄이 앞에 끼워진다
+    });
+
+    it("재생 줄의 번호(idx)는 서버 샷 번호다", async () => {
+        const m = make(GUEST);
+        m.ctrl.startMatch(m.srv.public(GUEST));
+        m.srv.shootAs(HOST, POINT_SHOT);
+        m.srv.shootAs(HOST);
+        m.env.advance(POLL_FAST_MS);
+        await settle();
+        m.playOut();
+        await settle();
+        m.playOut();
+        await settle();
+        expect(m.cb.onOutcome.mock.calls.map((c) => c[3])).toEqual([0, 1]);
+    });
+
+    it("내 샷이 거부돼 서버 정본으로 갈아타면 기준점을 다시 알린다(fresh 아님) — 거부된 줄은 지워진다", async () => {
+        const m = make(HOST);
+        const page = withPageLog(m);
+        m.ctrl.startMatch(m.srv.public(HOST));
+        m.srv.row.turn = 1;
+        m.srv.row.state = { ...m.srv.row.state, turn: 1 };
+        m.srv.row.version++;
+        aimAtYellow(m.ctrl);
+        await m.ctrl.shoot();
+        m.playOut();
+        await settle();
+        expect(m.cb.onMatch).toHaveBeenCalledWith("resynced");
+        expect(page.onMatchBase).toHaveBeenLastCalledWith(expect.objectContaining({ shots: 0, fresh: false }));
+        expect(page.log().entries).toEqual([]);
+    });
+
+    it("재생이 끝난 뒤 도착한 미스매치 응답: 로컬 결과로 쌓인 줄을 서버 결과로 바꿔 끼운다", async () => {
+        const m = make(HOST);
+        const page = withPageLog(m);
+        m.ctrl.startMatch(m.srv.public(HOST));
+        m.srv.hold();
+        aimAtYellow(m.ctrl);
+        await m.ctrl.shoot();
+        m.playOut();
+        await settle();
+        expect(page.log().entries).toHaveLength(1);
+        // 서버가 다른 조건으로 재시뮬한다 → 해시가 달라 mismatch 응답
+        (m.srv as unknown as { params: typeof m.srv.params }).params = { ...m.srv.params, condition: 0.8 };
+        m.srv.release();
+        await settle();
+        expect(m.cb.onMismatch).toHaveBeenCalled();
+        expect(page.onMatchBase).toHaveBeenLastCalledWith(expect.objectContaining({ shots: 1, fresh: false }));
+        await settle();
+        expect(got(page.log())).toEqual(truth(m.srv));
     });
 });

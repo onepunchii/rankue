@@ -46,6 +46,8 @@ export interface MatchShotArgs {
     outcomeCode: string;
     points: number;
     cushions: number;
+    /** 친 사람의 이닝 번호(shotInning). 다시 들어온 화면이 이닝별 점수판을 이 값으로 되살린다. */
+    inning: number;
     newState: unknown;
     newBalls: unknown;
     newTurn: number;
@@ -441,6 +443,7 @@ export class SimMatchRepository {
                 matchId: a.matchId, idx: a.idx, playerIndex: a.playerIndex, memberId: a.memberId,
                 preState: a.preState, input: a.input, hash: a.hash, clientHash: a.clientHash,
                 eventCount: a.eventCount, outcomeCode: a.outcomeCode, points: a.points, cushions: a.cushions,
+                inning: a.inning,
             }).returning();
 
             const mismatch = a.clientHash !== null && a.clientHash !== a.hash;

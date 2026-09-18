@@ -1905,6 +1905,12 @@ export const hiqSimMatchShots = pgTable("hiq_sim_match_shots", {
   outcomeCode: text("outcome_code").notNull(),
   points: integer("points").notNull(),
   cushions: integer("cushions").default(0).notNull(),
+  /**
+   * 친 사람의 몇 번째 이닝이었나(1부터, shared/sim/rules shotInning). 2026-09-18 추가 — 그 전 행은 null.
+   * 샷 행만으로는 이닝을 되짚을 수 없다: 40초 시간 초과는 행 없이 이닝을 넘기고, 둘이 연달아 넘기면
+   * 행 순서에 흔적이 전혀 안 남는다. 다시 들어온 화면·관전 화면이 이닝별 점수판을 이 값으로 다시 그린다.
+   */
+  inning: integer("inning"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({
   uniq: unique().on(t.matchId, t.idx),

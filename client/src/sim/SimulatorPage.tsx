@@ -85,6 +85,7 @@ import { fileNameFor, gameBadge, replayShortText, sessionStatsLine, shotSubtitle
 import { useShare } from "./share/useShare";
 import { activeThickness, elevationDeg, FINE_STEP_RAD, pullbackFor, stepPower, type ThicknessStep } from "./controlsMath";
 import { appendShot, EMPTY_LOG, inningRows, popShot, type InningLog } from "./inningLog";
+import { makeHistoryLoader } from "./matchHistory";
 import { beginGesture, moveGesture, planGestureReset, staleResetReason, type Gesture, type GestureResetReason, pinchZoom} from "./tableGestures";
 import { reportGestureRecover, type TelemetryMode } from "./gestureTelemetry";
 import { RISK_KEYS, shotRisk } from "./shotRisk";
@@ -251,8 +252,20 @@ export function SimulatorPage() {
     const cameraViewRef = useRef(cameraView);
     const [viewSupported, setViewSupported] = useState(false);
     const [log, setLog] = useState<InningLog>(EMPTY_LOG);
-    /** 세로 이닝 점수판(대전)의 행 — 이닝 시트와 같은 기록에서 뽑는다. */
-    const scoreRows = useMemo(() => inningRows(log, 2), [log]);
+    /**
+     * 대전 기록 되살리기(2026-09-18 오너: "방 나갔다 다시 이어 하면 이닝별 스코어가 다 지워져 있다").
+     * 컨트롤러가 기준점(onMatchBase)을 알리면 서버 샷 기록을 받아 그 앞부분을 채운다 — 경합 규칙은 matchHistory.ts.
+     * 로더는 번호표를 들고 있어 화면 수명 동안 하나만 만든다.
+     */
+    const openMatchIdRef = useRef<string | null>(null);
+    const historyLoaderRef = useRef<ReturnType<typeof makeHistoryLoader> | null>(null);
+    if (historyLoaderRef.current === null) {
+        historyLoaderRef.current = makeHistoryLoader({
+            getShots: (id, from) => matchApi.getShots(id, from),
+            update: setLog,
+            isOpen: (id) => openMatchIdRef.current === id,
+        });
+    }
     const [banner, setBanner] = useState<{ outcome: ShotOutcome; id: number } | null>(null);
     const [bannerVisible, setBannerVisible] = useState(false);
     // 굿샷 권유(2026-09-15 라포 4번): 상대가 득점한 직후에만 잠깐 뜨는 큰 버튼. run 은 상대의 지금 연속 득점.
@@ -280,8 +293,8 @@ export function SimulatorPage() {
         onMismatch: () => toast({ title: t("sim.sync.mismatch") }),
         onOffline: (reason) => toast({ title: t(OFFLINE_KEYS[reason]) }),
         onMiscue: () => toast({ title: t("sim.shot.miscue") }),
-        onOutcome: (outcome, session, shooter) => {
-            setLog((l) => appendShot(l, outcome, session, shooter));
+        onOutcome: (outcome, session, shooter, idx) => {
+            setLog((l) => appendShot(l, outcome, session, shooter, idx));
             setBanner({ outcome, id: session.shotCount });
             void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
         },
@@ -295,8 +308,21 @@ export function SimulatorPage() {
             else if (e === "timeout-me") toast({ title: t("sim.match.timeoutMe") });
             else if (e === "timeout-opponent") toast({ title: t("sim.match.timeoutOpponent") });
         },
+        onMatchBase: (b) => historyLoaderRef.current?.(b),
     });
     const { actions } = sim;
+    openMatchIdRef.current = sim.mode === "match" ? sim.match?.id ?? null : null;
+    /**
+     * 선수별 끝낸 이닝 수 — 샷 없이 끝난 이닝(40초 시간 초과)을 점수판에 0 으로 채우는 데 쓴다.
+     * 공이 구르는 동안(shooting)엔 세션이 이미 샷 **뒤** 값이라 그대로 쓰면 결과(놓쳤다)가 공이 멈추기 전에 칸에 먼저 뜬다 —
+     * 그동안은 직전 값을 붙들어 둔다.
+     */
+    const completedRef = useRef("");
+    if (sim.phase !== "shooting") completedRef.current = sim.session ? sim.session.players.map((p) => p.innings).join(",") : "";
+    const completedKey = completedRef.current;
+    const completed = useMemo(() => (completedKey ? completedKey.split(",").map(Number) : undefined), [completedKey]);
+    /** 세로 이닝 점수판(대전)의 행 — 이닝 시트와 같은 기록에서 뽑는다. */
+    const scoreRows = useMemo(() => inningRows(log, 2, completed), [log, completed]);
     const table = sim.params?.table ?? TABLES.DAEDAE;
     // ── 해법 찾기(연습·드릴 전용, 워커) ─────────────────────────────────
     const solver = useSolver();
@@ -1749,7 +1775,7 @@ export function SimulatorPage() {
                 onCancel={solver.cancel} onRetry={retrySolver}
             />
             <ResignConfirm open={resignOpen} onOpenChange={setResignOpen} busy={exiting} onConfirm={() => { void onResign(); }} />
-            <InningSheet open={sheetOpen} onOpenChange={setSheetOpen} log={log} session={sim.session} names={names} phase={sim.phase} />
+            <InningSheet open={sheetOpen} onOpenChange={setSheetOpen} log={log} completed={completed} session={sim.session} names={names} phase={sim.phase} />
             <EndDialog
                 open={endOpen} onOpenChange={(o) => { if (!o) setEndDismissed(true); }}
                 session={sim.session} phase={sim.phase} names={names}

@@ -16,7 +16,7 @@ import {
     type SimParams, type BallState, type ShotInput,
 } from "../../../shared/sim/index.js";
 import {
-    createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
+    createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, shotInning, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
     SHOT_CLOCK_STRIKES, PRESENCE_MS, ABSENT_GRACE_MS, AIM_FRESH_MS,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
@@ -492,7 +492,7 @@ router.get("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: AuthR
     const shots = await storage.simMatch.getShots(m.id, from);
     return sendSuccess(res, shots.map((s) => ({
         idx: s.idx, playerIndex: s.playerIndex, preState: s.preState, input: s.input, hash: s.hash,
-        outcomeCode: s.outcomeCode, points: s.points, cushions: s.cushions, createdAt: s.createdAt,
+        outcomeCode: s.outcomeCode, points: s.points, cushions: s.cushions, inning: s.inning ?? null, createdAt: s.createdAt,
     })));
 }));
 
@@ -552,6 +552,7 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
             preState, input, hash: result.hash, clientHash: clientHash ?? null,
             eventCount: result.events.length,
             outcomeCode: applied.outcome.code, points: applied.outcome.points, cushions: applied.outcome.cushionsBeforeSecond,
+            inning: shotInning(applied.outcome, applied.session.players[myIndex]),
             newState: applied.session, newBalls: result.final, newTurn: applied.session.turn,
             finished, winnerIndex: applied.session.winnerIndex, endReason,
         });

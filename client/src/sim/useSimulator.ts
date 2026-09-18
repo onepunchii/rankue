@@ -200,6 +200,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         onOutcome: options.onOutcome,
         onMiscue: options.onMiscue,
         onMatch: options.onMatch,
+        onMatchBase: options.onMatchBase,
     });
 
     useEffect(() => { ctrl.setMuted(options.muted === true); }, [ctrl, options.muted]);

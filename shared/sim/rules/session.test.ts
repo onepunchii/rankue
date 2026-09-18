@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createSession, applyShot, currentPlayer, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S } from "./session.js";
+import { createSession, applyShot, currentPlayer, shotInning, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S } from "./session.js";
 import { DEFAULT_3C_RULES, DEFAULT_4C_RULES } from "./evaluate.js";
 import type { ShotOutcome } from "./types.js";
 
@@ -162,5 +162,36 @@ describe("시간 초과(40초 룰)", () => {
         expect(r.session.shotCount).toBe(1);
         expect(SHOT_CLOCK_S).toBe(40);
         expect(SHOT_CLOCK_GRACE_S).toBe(10);
+    });
+});
+
+describe("shotInning — 샷 행에 적는 이닝 번호(2026-09-18)", () => {
+    const pt: ShotOutcome = { code: "point", points: 1, scored: true, consumesInning: false, cushionsBeforeSecond: 3, cushionsBeforeFirst: 0, contacts: [], kisses: 0 };
+    const miss: ShotOutcome = { ...pt, code: "miss-cushions", points: 0, scored: false, consumesInning: true };
+    const noShot: ShotOutcome = { ...miss, code: "no-shot", consumesInning: false };
+
+    it("적용 뒤 선수 상태로 센다: 이닝을 닫은 샷은 innings, 이어 치는 샷·no-shot 은 innings + 1", () => {
+        let s = createSession({ rules: DEFAULT_3C_RULES, players: [{ id: "a", target: 9 }, { id: "b", target: 9 }] });
+        const seen: string[] = [];
+        for (const o of [noShot, pt, miss, miss, pt, miss]) {
+            const shooter = s.turn;
+            const r = applyShot(s, o);
+            seen.push(`${shooter}:${shotInning(r.outcome, r.session.players[shooter])}`);
+            s = r.session;
+        }
+        expect(seen).toEqual(["0:1", "0:1", "0:1", "1:1", "0:2", "0:2"]);
+    });
+
+    it("시간 초과로 넘어간 이닝을 건너뛴다 — 샷 행이 없어도 다음 샷 번호가 맞다", () => {
+        let s = createSession({ rules: DEFAULT_3C_RULES, players: [{ id: "a", target: 9 }, { id: "b", target: 9 }] });
+        s = applyShot(s, miss).session;                 // a 1이닝
+        s = applyShot(s, timeoutOutcome()).session;     // b 1이닝(시간 초과)
+        s = applyShot(s, timeoutOutcome()).session;     // a 2이닝(시간 초과)
+        const r = applyShot(s, miss);                   // b 2이닝
+        expect(shotInning(r.outcome, r.session.players[1])).toBe(2);
+    });
+
+    it("0 이하로는 안 내려간다", () => {
+        expect(shotInning({ consumesInning: true }, { innings: 0 })).toBe(1);
     });
 });
