@@ -114,6 +114,11 @@ interface PageParts {
   title: string;
   desc: string;
   canonical: string;
+  /**
+   * 색인에서 뺀다(링크는 따라간다). 사람에게는 쓸모 있지만 검색 결과로는 얇은 페이지용 —
+   * 날짜별 브리핑이 그렇다(2026-09-18: 본문 한 문장짜리가 매일 하나씩 쌓여 사이트 품질 신호를 끌어내렸다).
+   */
+  noindex?: boolean;
   /** hreflang 대체 URL 을 선언할 언어들. 사이트맵의 hreflang 과 짝을 맞춘다. */
   altLangs?: string[];
   /**
@@ -185,7 +190,7 @@ function page(p: PageParts): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${esc(p.title)}</title>
   <meta name="description" content="${esc(p.desc)}" />
-  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta name="robots" content="${p.noindex ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1"}" />
   <link rel="canonical" href="${esc(p.canonical)}" />${alts}
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="RANKUE" />
@@ -915,7 +920,13 @@ export function registerPrerender(app: Express) {
       res.send(page({
         title: `${esc(G.tour[tour])} — ${G.listTitle}`,
         desc: G.listDesc,
-        canonical: `${ORIGIN}/golf-ranking?tour=${tour}${lang === "ko" ? "" : `&lang=${lang}`}`,
+        /*
+         * 기본 투어(owgr)는 맨 주소 /golf-ranking 이 대표다. 예전엔 /golf-ranking 이 canonical 로 ?tour=owgr 을 가리키고,
+         * 사이트맵에는 둘 다 올라가 있어 구글이 같은 페이지 둘로 보고 하나를 버렸다(2026-09-18 서치 콘솔).
+         */
+        canonical: tour === "owgr"
+          ? `${ORIGIN}/golf-ranking${lang === "ko" ? "" : `?lang=${lang}`}`
+          : `${ORIGIN}/golf-ranking?tour=${tour}${lang === "ko" ? "" : `&lang=${lang}`}`,
         lang,
         jsonLd: [{
           "@context": "https://schema.org", "@type": "ItemList", name: G.tour[tour],
@@ -1166,11 +1177,19 @@ ${list}
     }
     res.setHeader("X-Prerender", "briefing");
     noStore(res);
+    /*
+     * 2026-09-18 서치 콘솔 "크롤링됨 - 색인 안 됨": 날짜별 브리핑은 본문이 한 문장(276자)이고 매일 하나씩 생겨
+     * 핵심 사이트맵 64개 중 30개를 차지했다 — 거의 같은 얇은 페이지를 자동으로 찍어 내는 전형적인 저품질 신호다.
+     * 게다가 /briefing 의 canonical 이 "오늘 날짜"라 대표 주소가 매일 바뀌었다.
+     * 이제 /briefing 한 장만 색인한다(자기 자신이 대표). 날짜 페이지는 링크로는 남기되 noindex.
+     */
+    const isArchive = Boolean(raw);
     res.send(
       page({
         title: briefingTitle(date),
         desc: briefingDesc(b, date),
-        canonical: `${ORIGIN}/briefing/${date}`,
+        canonical: isArchive ? `${ORIGIN}/briefing/${date}` : `${ORIGIN}/briefing`,
+        noindex: isArchive,
         body: `<main>
   <nav><a href="/world-ranking">← 세계 랭킹</a></nav>
   <h1>오늘의 당구 브리핑 — ${esc(briefingDateKo(date))}</h1>

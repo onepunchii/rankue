@@ -120,16 +120,9 @@ async function coreParts(): Promise<string[]> {
     console.warn("[sitemap] community failed:", (e as Error)?.message);
   }
 
-  // 브리핑 아카이브 — 오늘(KST) + 최근 30일 고정 URL (AEO). 과거분은 결정적 재계산이라 저장 불필요.
-  {
-    const { todayKst } = await import("../shared/briefingMeta.js");
-    const base = new Date(todayKst() + "T00:00:00Z").getTime();
-    parts.push(entry(`${ORIGIN}/briefing`, { changefreq: "daily", priority: "0.6" }));
-    for (let i = 0; i < 30; i++) {
-      const d = new Date(base - i * 86400000).toISOString().slice(0, 10);
-      parts.push(entry(`${ORIGIN}/briefing/${d}`, { changefreq: "monthly", priority: "0.3", lastmod: d }));
-    }
-  }
+  // 브리핑은 /briefing 한 장만 올린다(2026-09-18). 날짜별 아카이브 30개는 본문이 한 문장이라 핵심 사이트맵의
+  // 절반을 얇은 페이지로 채우고 있었다 — 그 페이지들은 이제 noindex 이고(prerender), 사이트맵에서도 뺀다.
+  parts.push(entry(`${ORIGIN}/briefing`, { changefreq: "daily", priority: "0.6" }));
   return parts;
 }
 
@@ -172,7 +165,8 @@ async function golfParts(): Promise<string[]> {
   try {
     const players = await storage.golfRank.getPlayersForSitemap();
     parts.push(entry(`${ORIGIN}/golf-ranking`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }));
-    for (const tour of ["owgr", "rolex", "kpga", "klpga"]) parts.push(entry(`${ORIGIN}/golf-ranking?tour=${tour}`, { changefreq: "weekly", priority: "0.6" }));
+    // owgr 은 맨 주소(/golf-ranking)가 대표라 여기서 빼고 나머지 투어만 — 중복 URL 을 올리면 구글이 하나를 버린다.
+    for (const tour of ["rolex", "kpga", "klpga"]) parts.push(entry(`${ORIGIN}/golf-ranking?tour=${tour}`, { changefreq: "weekly", priority: "0.6" }));
     for (const p of players) parts.push(entry(`${ORIGIN}/golfer/${p.tour}/${p.playerId}`, { changefreq: "weekly", priority: "0.4", lastmod: p.lastmod, image: golferCardUrl(ORIGIN, p.tour, p.playerId) }));
   } catch (e) {
     console.warn("[sitemap] golf players failed:", (e as Error)?.message);
