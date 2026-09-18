@@ -2060,6 +2060,7 @@ export const ko: Dict = {
   "sim.chat.blocked": "이 말은 보낼 수 없어요",
   "sim.chat.failed": "말을 보내지 못했어요",
   "sim.chat.turnOnly": "상대 차례에 쓸 수 있어요",
+  "sim.chat.emptyWaiting": "{name} 님이 치는 동안 한마디 나눠 보세요",
   "sim.emoji.oops": "아깝다",
   "sim.emoji.wait": "잠깐만요",
   "sim.emoji.thanks": "고마워요",

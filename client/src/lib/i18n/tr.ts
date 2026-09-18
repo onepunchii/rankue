@@ -2058,6 +2058,7 @@ const tr: Dict = {
   "sim.chat.blocked": "Bu mesaj gönderilemez",
   "sim.chat.failed": "Mesaj gönderilemedi",
   "sim.chat.turnOnly": "Sıra rakipteyken yazabilirsin",
+  "sim.chat.emptyWaiting": "{name} vururken sohbet et",
   "sim.emoji.oops": "Az kaldı",
   "sim.emoji.wait": "Bir saniye",
   "sim.emoji.thanks": "Teşekkürler",

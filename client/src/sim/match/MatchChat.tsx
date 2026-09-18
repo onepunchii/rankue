@@ -78,6 +78,71 @@ export const MatchChatLog = memo(function MatchChatLog({ lines, myIndex, now }: 
     );
 });
 
+/** 대화창에 쌓아 두는 줄 수. 키보드가 뜨면 마지막 둘만 남는다(나머지는 hide-on-keyboard). */
+export const CHAT_CARD_LINES = 4;
+
+/**
+ * 상대 차례 카드 = 대화창(2026-09-18 오너가 고른 안 A).
+ *
+ * 예전 카드는 상대 이름 · "상대 차례예요" · 큰 40초 시계였는데, **셋 다 헤더에 이미 있었다**(이름 둘, 시계 둘).
+ * 내용은 중복인데 당구대 아래 레일을 가장 많이 가렸다. 그 자리를 대화창으로 바꾼다 — 기다리는 시간이 곧 대화하는
+ * 시간이라서다. 왼쪽 위의 한마디는 12초 뒤 사라지지만, 여기는 최근 몇 줄이 계속 남는다("멀티가 정적이다"의 진범이
+ * "3초 뜨고 증발"이었다).
+ *
+ * 줄 모양은 채팅 관례대로: 상대는 왼쪽, 나는 오른쪽(brand). 아직 아무 말도 없으면 누구 차례인지를 담은 안내 한 줄을
+ * 둔다 — 예전 "상대 차례예요"가 하던 일을 잃지 않으려고.
+ *
+ * 키보드가 뜨면 마지막 두 줄만 남긴다: 답을 쓰는 동안 방금 받은 말은 보여야 하고, 나머지는 당구대를 내준다.
+ * 자리 비움 안내와 승리 주장 버튼은 필요할 때만 맨 위에 붙는다(키보드가 뜨면 감춘다).
+ */
+export function MatchChatCard({ lines, myIndex, opponentName, away, onClaim }: {
+    lines: readonly ChatLine[];
+    myIndex: number;
+    opponentName: string;
+    /** 상대가 자리를 비워 시계가 아직 안 돈다 */
+    away: boolean;
+    /** 48시간 무응답 승리 주장(가능할 때만) */
+    onClaim: (() => void) | null;
+}) {
+    const { t } = useT();
+    const shown = lines.slice(-CHAT_CARD_LINES);
+    return (
+        <div className="pointer-events-auto w-full max-w-[320px] rounded-card bg-surface-1 border border-surface-line px-3 py-2.5 flex flex-col gap-1.5">
+            {away && <p className="hide-on-keyboard text-center text-[12px] font-medium text-ink-3">{t("sim.match.opponentAway")}</p>}
+            {onClaim && (
+                <button type="button" onClick={onClaim} className="hide-on-keyboard h-11 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
+                    {t("sim.match.claim")}
+                </button>
+            )}
+            {shown.length === 0 ? (
+                <p className="py-1 text-center text-[12.5px] font-medium text-ink-3">
+                    {t("sim.chat.emptyWaiting").replace("{name}", opponentName)}
+                </p>
+            ) : (
+                <ul className="flex flex-col gap-1" aria-live="polite">
+                    {shown.map((l, i) => {
+                        const mine = l.from === myIndex;
+                        // 키보드가 뜨면 마지막 두 줄만 — 오래된 줄은 당구대에 자리를 내준다
+                        const older = i < shown.length - 2;
+                        return (
+                            <li key={l.id} className={cn("flex", mine ? "justify-end" : "justify-start", older && "hide-on-keyboard")}>
+                                <span
+                                    className={cn(
+                                        "max-w-[85%] px-2.5 py-1 rounded-2xl text-[13px] leading-snug break-words",
+                                        mine ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-1",
+                                    )}
+                                >
+                                    {lineText(l, t)}
+                                </span>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+}
+
 /** 1탭 문구 칩 묶음. 320 px 에서 두 줄로 앉는다(실측). 누를 것이라 pointer-events-auto 를 스스로 켠다. */
 export function QuickChips({ onPick, disabled }: { onPick: (code: string) => void; disabled?: boolean }) {
     const { t } = useT();

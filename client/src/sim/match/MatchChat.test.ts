@@ -220,8 +220,11 @@ describe("키보드 회피", () => {
         expect(near).not.toMatch(/transition-\[?bottom|transition-all/);
     });
 
-    it("키보드가 뜨면 대기 카드가 사라진다 — 127px 을 비워 당구대를 더 보여 준다", () => {
-        expect(src()).toContain("hide-on-keyboard pointer-events-auto rounded-card");
+    it("대기 카드는 대화창이다 — 헤더와 겹치던 이름·큰 시계를 뺐다(2026-09-18 안 A)", () => {
+        const s = src();
+        expect(s).toContain("<MatchChatCard");
+        // 예전 카드의 큰 시계(56px)가 다시 들어오면 헤더 시계와 두 번 겹친다
+        expect(s).not.toMatch(/ShotClock[^>]*size=\{56\}/);
     });
 
     it("문구판을 펼치면 대기 카드가 비켜 준다 — 칩 두 줄과 카드가 같이 쌓이면 테이블을 덮는다", () => {
@@ -241,5 +244,47 @@ describe("입력 띠는 내 조준 중에 존재하지 않는다", () => {
         const cond = src.slice(open, src.indexOf("\n", open + 1) + 200);
         expect(cond).toContain('sim.phase === "waiting" || sim.phase === "shooting"');
         expect(cond).not.toContain('sim.phase === "aim"');
+    });
+});
+
+
+describe("MatchChatCard — 상대 차례 대화창", () => {
+    const card = (p: Record<string, unknown>) => React.createElement(Chat.MatchChatCard, { lines: [], myIndex: 0, opponentName: "최영환", away: false, onClaim: null, ...p } as never);
+
+    it("아직 말이 없으면 누구 차례인지 담은 안내 한 줄 — 예전 '상대 차례예요'가 하던 일", () => {
+        const c = mount(card({}));
+        expect(c.textContent).toContain("최영환");
+        expect(c.textContent).toContain(ko["sim.chat.emptyWaiting"].replace("{name}", "최영환"));
+    });
+
+    it("최근 네 줄만, 상대는 왼쪽 · 나는 오른쪽", () => {
+        const lines = [1, 2, 3, 4, 5].map((n) => line({ id: `c${n}`, seq: n, text: `말${n}`, from: n % 2 }));
+        const c = mount(card({ lines }));
+        expect(c.textContent).not.toContain("말1");
+        for (const n of [2, 3, 4, 5]) expect(c.textContent).toContain(`말${n}`);
+        const items = Array.from(c.querySelectorAll("li"));
+        const mine = items.find((li) => li.textContent === "말2")!;    // from 0 = 나
+        const theirs = items.find((li) => li.textContent === "말3")!;  // from 1 = 상대
+        expect(mine.className).toContain("justify-end");
+        expect(theirs.className).toContain("justify-start");
+    });
+
+    it("키보드가 뜨면 마지막 두 줄만 남는다 — 답을 쓰는 동안 방금 받은 말은 보여야 한다", () => {
+        const lines = [1, 2, 3, 4].map((n) => line({ id: `c${n}`, seq: n, text: `말${n}` }));
+        const c = mount(card({ lines }));
+        const items = Array.from(c.querySelectorAll("li"));
+        expect(items.map((li) => li.className.includes("hide-on-keyboard"))).toEqual([true, true, false, false]);
+    });
+
+    it("자리 비움·승리 주장은 필요할 때만, 누를 것만 스스로 켠다", () => {
+        const none = mount(card({}));
+        expect(none.querySelector("button")).toBeNull();
+        let claimed = 0;
+        const c = mount(card({ away: true, onClaim: () => { claimed += 1; } }));
+        expect(c.textContent).toContain(ko["sim.match.opponentAway"]);
+        const btn = c.querySelector("button")!;
+        expect(opensPointerEvents(btn, c)).toBe(true);
+        React.act(() => { btn.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
+        expect(claimed).toBe(1);
     });
 });

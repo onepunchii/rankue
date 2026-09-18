@@ -2058,6 +2058,7 @@ const en: Dict = {
   "sim.chat.blocked": "That message can't be sent",
   "sim.chat.failed": "Couldn't send your message",
   "sim.chat.turnOnly": "You can chat on your opponent's turn",
+  "sim.chat.emptyWaiting": "Chat with {name} while they shoot",
   "sim.emoji.oops": "So close",
   "sim.emoji.wait": "One sec",
   "sim.emoji.thanks": "Thanks!",

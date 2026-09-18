@@ -69,7 +69,6 @@ import { endReasonText, shouldOpenMatch } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
 import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
-import { ShotClock } from "./components/ShotClock";
 import { MatchEndRapport } from "./match/MatchEndRapport";
 import { MatchIntro, INTRO_MS } from "./match/MatchIntro";
 import { aimPhi } from "./aimAssist";
@@ -85,14 +84,15 @@ import { decodeReplay, encodeReplay, forSoloSession, replaySource, replayUrl, RE
 import { fileNameFor, gameBadge, replayShortText, sessionStatsLine, shotSubtitle, shotTitle } from "./share/shareCard";
 import { useShare } from "./share/useShare";
 import { activeThickness, elevationDeg, FINE_STEP_RAD, pullbackFor, stepPower, type ThicknessStep } from "./controlsMath";
-import { appendShot, EMPTY_LOG, popShot, type InningLog } from "./inningLog";
+import { appendShot, EMPTY_LOG, inningRows, popShot, type InningLog } from "./inningLog";
 import { beginGesture, moveGesture, planGestureReset, staleResetReason, type Gesture, type GestureResetReason, pinchZoom} from "./tableGestures";
 import { reportGestureRecover, type TelemetryMode } from "./gestureTelemetry";
 import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
 import { sameCueInput } from "./simReducer";
 import { easeOppAim, OPP_AIM_PULLBACK } from "./match/oppAim";
-import { MatchChatBar, MatchChatLog, MatchQuickAim } from "./match/MatchChat";
+import { MatchChatBar, MatchChatCard, MatchChatLog, MatchQuickAim } from "./match/MatchChat";
+import { MatchScoreStrip } from "./match/MatchScoreStrip";
 import type { ChatLine } from "./matchApi";
 import type { CueInput, Phase } from "./simReducer";
 import type { SimPreview } from "./simController";
@@ -250,6 +250,8 @@ export function SimulatorPage() {
     const cameraViewRef = useRef(cameraView);
     const [viewSupported, setViewSupported] = useState(false);
     const [log, setLog] = useState<InningLog>(EMPTY_LOG);
+    /** 세로 이닝 점수판(대전)의 행 — 이닝 시트와 같은 기록에서 뽑는다. */
+    const scoreRows = useMemo(() => inningRows(log, 2), [log]);
     const [banner, setBanner] = useState<{ outcome: ShotOutcome; id: number } | null>(null);
     const [bannerVisible, setBannerVisible] = useState(false);
     // 굿샷 권유(2026-09-15 라포 4번): 상대가 득점한 직후에만 잠깐 뜨는 큰 버튼. run 은 상대의 지금 연속 득점.
@@ -1405,7 +1407,8 @@ export function SimulatorPage() {
                         )}
                         {/* 오간 한마디(2026-09-16). 이 열은 이미 pointer-events-none 이라 글자 위 터치도 조준으로 지나간다 —
                             **auto 를 붙이지 마라.** 조준 중에도 보인다: 상대 말이 안 보이면 대화가 아니라 편지가 된다. */}
-                        {isMatch && sim.match && (
+                        {/* 상대 차례엔 아래 대화창이 같은 말을 계속 보여 주므로 여기는 조준·재생 중에만 */}
+                        {isMatch && sim.match && sim.phase !== "waiting" && (
                             <MatchChatLog lines={chatLines} myIndex={sim.match.myIndex} now={chatNow} />
                         )}
                         {/* 조준 중 1탭 문구(2026-09-16). 하단 입력줄은 상대 차례에만 있는데, 상대가 빗나간 직후
@@ -1523,6 +1526,26 @@ export function SimulatorPage() {
                       * 정확히 같은 자리(bottom, 높이 DOCK_HEIGHT 대역)에 있는 두께 독·미세 방향조절 키를 덮는다(2026-09-15 사고).
                       * 재생(shooting)까지 포함하는 이유는 상대가 연속 득점할 때 입력칸과 키보드를 살려 두기 위해서다.
                       */}
+                    {/*
+                      * 세로 이닝 점수판(2026-09-18 안 A) — 조작 버튼이 사라져 비는 오른쪽 띠에 앉는다. 누를 수 없다(같은 자리를
+                      * 내 차례엔 조작 버튼이 쓴다). 아래 끝은 대화창 위에서 멈추고, 넘치면 오래된 이닝이 위로 잘린다.
+                      * 한계: 이 화면이 열린 뒤의 샷만 쌓인다(이닝 시트와 같다) — 도중에 들어오면 그 전 이닝은 비어 있다.
+                      */}
+                    {isMatch && sim.match && sim.session && sim.session.players.length === 2 && (sim.phase === "waiting" || sim.phase === "shooting") && (
+                        <MatchScoreStrip
+                            /* 아래 끝 = 대화창이 가장 커졌을 때(4줄 + 승리 주장 버튼)의 위쪽 — 375 폭에서 카드(가운데 320)의
+                               오른쪽 끝이 이 띠(오른쪽 64)와 36 px 겹치므로 세로로 비켜 둔다. 키보드가 뜨면 대화창이 통째로 올라와
+                               겹치니 그동안은 숨긴다(hide-on-keyboard) — 쓰는 동안엔 대화가 먼저다. */
+                            className="hide-on-keyboard absolute right-1 top-2 z-[3] w-[60px]"
+                            style={{ bottom: DOCK_HEIGHT + 150 }}
+                            rows={scoreRows}
+                            order={[sim.match.myIndex, sim.match.myIndex === 0 ? 1 : 0]}
+                            balls={[
+                                sim.session.players[sim.match.myIndex]?.cueBallId === "yellow" ? "yellow" : "white",
+                                sim.session.players[sim.match.myIndex === 0 ? 1 : 0]?.cueBallId === "yellow" ? "yellow" : "white",
+                            ]}
+                        />
+                    )}
                     {isMatch && sim.match && (sim.phase === "waiting" || sim.phase === "shooting") && (
                         <div
                             className="absolute inset-x-0 z-[3] flex flex-col items-center gap-2 px-4 pointer-events-none"
@@ -1537,22 +1560,14 @@ export function SimulatorPage() {
                         >
                             {/* 키보드가 뜨면 이 카드는 사라진다(hide-on-keyboard) — 127px 을 비워 당구대를 더 보여 준다.
                                 상대 시계는 상단 띠에도 작게 떠 있어 잃는 정보가 없다. */}
+                            {/* 상대 차례 카드 = 대화창(2026-09-18 안 A). 이름·"상대 차례예요"·큰 시계는 헤더와 겹쳐 뺐다.
+                                자리 비움 안내는 시계가 아직 안 돌 때만(2026-09-15 제보: 멈춘 것처럼 보이지 않게). */}
                             {sim.phase === "waiting" && !bannerVisible && !chatQuickOpen && (
-                                <div className="hide-on-keyboard pointer-events-auto rounded-card bg-surface-1 border border-surface-line px-4 py-3 text-center max-w-[320px] w-full">
-                                    <p className="text-[12px] font-medium text-ink-4">{sim.match.opponentName}</p>
-                                    {/* 깔끔하게: "상대 차례예요" + 상대 시계(접속 중이면 바로 돈다). 안내 문구는 없앴다(2026-09-08 오너). */}
-                                    <p className="text-[14px] font-semibold text-ink-1">{t("sim.match.waitingTurn")}</p>
-                                    {clock && !clock.mine && <ShotClock seconds={clock.seconds} mine={false} size={56} className="mt-1.5" />}
-                                    {/* 시계가 아직 안 도는 동안(상대 자리 비움 유예) 화면이 멈춘 것처럼 보이지 않게 이유를 적는다(2026-09-15 오너 제보). */}
-                                    {!clock && sim.match.opponentAway && (
-                                        <p className="mt-1.5 text-[12px] font-medium text-ink-3">{t("sim.match.opponentAway")}</p>
-                                    )}
-                                    {sim.match.canClaim && (
-                                        <button type="button" onClick={() => { void onClaim(); }} className="mt-2 h-11 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
-                                            {t("sim.match.claim")}
-                                        </button>
-                                    )}
-                                </div>
+                                <MatchChatCard
+                                    lines={chatLines} myIndex={sim.match.myIndex} opponentName={sim.match.opponentName}
+                                    away={!clock && sim.match.opponentAway}
+                                    onClaim={sim.match.canClaim ? () => { void onClaim(); } : null}
+                                />
                             )}
                             {/* 한마디 입력. canChat 은 **서버가 보는 차례**로 판단한다 — 내가 친 직후엔 로컬 턴이 먼저
                                 넘어가지만 서버의 turn 은 샷이 기록될 때까지 아직 나라서, 그 창에 쓴 글은 거부된다. */}

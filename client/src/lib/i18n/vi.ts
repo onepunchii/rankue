@@ -2058,6 +2058,7 @@ const vi: Dict = {
   "sim.chat.blocked": "Câu này không gửi được",
   "sim.chat.failed": "Không gửi được tin nhắn",
   "sim.chat.turnOnly": "Chỉ nhắn được trong lượt đối thủ",
+  "sim.chat.emptyWaiting": "Trò chuyện với {name} trong lúc họ đánh",
   "sim.emoji.oops": "Tiếc quá",
   "sim.emoji.wait": "Chờ chút",
   "sim.emoji.thanks": "Cảm ơn",
