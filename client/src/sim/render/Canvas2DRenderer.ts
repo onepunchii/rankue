@@ -16,6 +16,7 @@
  * 마운트는 반드시 크기를 가져야 하고(absolute 자식은 부모를 키우지 않는다), position 이 static 이면 relative 로 바꾼다.
  */
 import type { TableSpec } from "@shared/sim/params";
+import { feltColors } from "./felt";
 import type { RenderFrame, Renderer, SafeInsets, Viewport } from "./Renderer";
 import { computeLayout, NO_INSETS, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, readPalette, rgba, scaleColor, type Palette } from "./tokens";
@@ -32,8 +33,7 @@ export interface Canvas2DRendererOptions {
 }
 
 // ── 팔레트(캔버스 내부 전용) ──────────────────────────────────────────────
-const FELT_CENTRE = "#1A7A48";
-const FELT_EDGE = "#0B5D3B";
+// 라사 색은 테이블마다 다르다(대대 파랑 · 중대 초록) — ./felt.ts
 const FELT_VIGNETTE = "rgba(0, 0, 0, 0.38)";
 const RAIL_WOOD = "#5A3A22";
 const RAIL_WOOD_EDGE = "#3E2716";
@@ -439,10 +439,11 @@ export class Canvas2DRenderer implements Renderer {
         // 라사: 가운데가 살짝 밝고 레일 쪽으로 어두워지는 비네트
         const cx = play.x + play.w / 2;
         const cy = play.y + play.h / 2;
+        const fc = feltColors(this.table);
         const felt = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.hypot(play.w, play.h) * 0.6);
-        felt.addColorStop(0, FELT_CENTRE);
-        felt.addColorStop(0.7, FELT_EDGE);
-        felt.addColorStop(1, FELT_EDGE);
+        felt.addColorStop(0, fc.centre);
+        felt.addColorStop(0.7, fc.edge);
+        felt.addColorStop(1, fc.edge);
         ctx.fillStyle = felt;
         ctx.fillRect(play.x, play.y, play.w, play.h);
 

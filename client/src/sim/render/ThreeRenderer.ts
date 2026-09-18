@@ -38,6 +38,7 @@ import {
     Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, BoxGeometry } from "three";
 import type { BallState } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
+import { feltColors } from "./felt";
 import { ZOOM_MIN, type RenderFrame, type Renderer, type RendererView, type SafeInsets, type Viewport, ZOOM_MAX } from "./Renderer";
 import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, parseColor, readPalette, rgba, scaleColor, type Palette, type RGBA } from "./tokens";
@@ -84,8 +85,7 @@ export interface ThreeRendererStats {
 }
 
 // ── 팔레트(WebGL 내부 전용 — 물리적 사물) ──────────────────────────────
-const FELT_CENTRE = "#1A7A48";
-const FELT_EDGE = "#0B5D3B";
+// 라사 색은 테이블마다 다르다(대대 파랑 · 중대 초록) — ./felt.ts
 const FELT_VIGNETTE = "rgba(0, 0, 0, 0.38)";
 const RAIL_WOOD = 0x5a3a22;
 const RAIL_WOOD_EDGE = 0x3e2716;
@@ -883,7 +883,7 @@ export class ThreeRenderer implements Renderer {
             this.clothMat.color.set(0xffffff);
         } else {
             this.clothMat.map = null;
-            this.clothMat.color.set(FELT_EDGE);
+            this.clothMat.color.set(feltColors(table).edge);
         }
         this.clothMat.needsUpdate = true;
         const cloth = new Mesh(clothGeo, this.clothMat);
@@ -1152,12 +1152,13 @@ export class ThreeRenderer implements Renderer {
 /** 라사: 가운데가 살짝 밝은 비네트 + 레일 안쪽 그늘 띠 + 결정론 노이즈. Canvas2DRenderer 의 정적 층과 같은 톤. */
 export function paintCloth(ctx: CanvasRenderingContext2D, w: number, h: number, table: TableSpec): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = FELT_EDGE;
+    const fc = feltColors(table);
+    ctx.fillStyle = fc.edge;
     ctx.fillRect(0, 0, w, h);
     const felt = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.hypot(w, h) * 0.6);
-    felt.addColorStop(0, FELT_CENTRE);
-    felt.addColorStop(0.7, FELT_EDGE);
-    felt.addColorStop(1, FELT_EDGE);
+    felt.addColorStop(0, fc.centre);
+    felt.addColorStop(0.7, fc.edge);
+    felt.addColorStop(1, fc.edge);
     ctx.fillStyle = felt;
     ctx.fillRect(0, 0, w, h);
 
