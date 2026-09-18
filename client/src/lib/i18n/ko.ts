@@ -2064,6 +2064,8 @@ export const ko: Dict = {
   "sim.chat.open": "대화",
   "sim.chat.myTurn": "내 차례예요 · 시계는 계속 가요",
   "sim.chat.myTurnClock": "내 차례예요 · {n}초 남음",
+  "sim.chat.expand": "대화 더 보기",
+  "sim.chat.collapse": "대화 접기",
   "sim.emoji.oops": "아깝다",
   "sim.emoji.wait": "잠깐만요",
   "sim.emoji.thanks": "고마워요",

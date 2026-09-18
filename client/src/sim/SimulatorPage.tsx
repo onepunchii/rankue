@@ -891,6 +891,8 @@ export function SimulatorPage() {
     const [chatQuickOpen, setChatQuickOpen] = useState(false);
     /** 내 차례에 말풍선으로 연 대화창(2026-09-18 오너: "칠 때도 쓰게"). 조준이 끝나면(샷·차례 바뀜) 저절로 닫힌다. */
     const [aimChatOpen, setAimChatOpen] = useState(false);
+    /** 대화창을 위로 펼쳤나(화면 중간까지, 2026-09-18). 내 차례가 되면 접는다 — 조준에 당구대가 필요하다. */
+    const [chatExpanded, setChatExpanded] = useState(false);
     /** 마지막으로 본 대화 줄 번호 — 이보다 뒤의 상대 말이 있으면 말풍선에 빨간 점. */
     const [seenChatSeq, setSeenChatSeq] = useState(0);
     /** 칩 열의 한마디는 12초 뒤 사라진다 — 그걸 다시 계산하려면 시계가 돌아야 한다. 말이 있을 때만 돈다. */
@@ -905,6 +907,8 @@ export function SimulatorPage() {
     }, [lastChatAt]);
     // 조준이 끝나면(샷을 쳤거나 차례가 넘어갔다) 내 차례 대화창은 닫는다 — 다음 내 차례에 저절로 다시 떠 있으면 조작을 덮는다.
     useEffect(() => { if (sim.phase !== "aim") setAimChatOpen(false); }, [sim.phase]);
+    // 내 차례가 되는 순간 펼친 대화창을 접는다 — 다음 조준 때 화면 절반이 대화로 덮여 있으면 안 된다.
+    useEffect(() => { if (sim.phase === "aim") setChatExpanded(false); }, [sim.phase]);
     /** 대화 줄이 화면에 보이는 동안은 본 것으로 친다(상대 차례 대화창, 또는 내 차례에 연 대화창). */
     const chatVisible = isMatch && (sim.phase === "waiting" || aimChatOpen);
     const lastChatSeq = chatLines.length > 0 ? chatLines[chatLines.length - 1].seq : 0;
@@ -916,6 +920,16 @@ export function SimulatorPage() {
         () => chatMaxHeight({ width: tableW, height: tableH, table, insets: TABLE_INSETS, bottomGap: 12, floor: 60 }),
         [tableW, tableH, table],
     );
+    /*
+     * 대화창 높이(2026-09-18 오너: "당구천은 조금 덮어도 돼, 내역이 너무 짧게 보인다").
+     *  · 접힘: 천 아래끝(chatMaxH)에서 한 줄 반쯤 더 — 천 맨 아래 가장자리만 살짝 덮는다.
+     *  · 펼침: 테이블 영역의 55 %(화면 중간쯤)까지. 키보드가 떠 있으면 그 위에 남는 만큼으로 줄인다 —
+     *    안 그러면 상자 윗부분이 헤더 위로 밀려 나간다.
+     */
+    const CHAT_COLLAPSED_EXTRA = 40;
+    const chatBoxMax: number | string = chatExpanded
+        ? `min(${Math.max(chatMaxH + CHAT_COLLAPSED_EXTRA, Math.round(tableH * 0.55))}px, calc(100dvh - var(--keyboard-height, 0px) - 150px))`
+        : chatMaxH + CHAT_COLLAPSED_EXTRA;
 
     /** clientKey: 응답만 유실된 재시도를 서버가 한 줄로 합친다(모바일에서 흔하다). */
     const chatKey = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -1553,7 +1567,7 @@ export function SimulatorPage() {
                       * 내 차례엔 조작 버튼이 쓴다). 아래 끝은 대화창 위에서 멈추고, 넘치면 오래된 이닝이 위로 잘린다.
                       * 한계: 이 화면이 열린 뒤의 샷만 쌓인다(이닝 시트와 같다) — 도중에 들어오면 그 전 이닝은 비어 있다.
                       */}
-                    {isMatch && sim.match && sim.session && sim.session.players.length === 2 && (sim.phase === "waiting" || sim.phase === "shooting") && (
+                    {isMatch && sim.match && sim.session && sim.session.players.length === 2 && (sim.phase === "waiting" || sim.phase === "shooting") && !chatExpanded && (
                         <MatchScoreStrip
                             /* 아래 끝 = 대화창이 가장 커졌을 때(4줄 + 승리 주장 버튼)의 위쪽 — 375 폭에서 카드(가운데 320)의
                                오른쪽 끝이 이 띠(오른쪽 64)와 36 px 겹치므로 세로로 비켜 둔다. 키보드가 뜨면 대화창이 통째로 올라와
@@ -1601,8 +1615,10 @@ export function SimulatorPage() {
                                 draft={chatDraft} onDraft={setChatDraft}
                                 onSend={onSendChat} onSendCode={onSendChatCode}
                                 quickOpen={chatQuickOpen} onQuickOpen={setChatQuickOpen}
-                                showLines={!bannerVisible && sim.phase !== "shooting"}
-                                maxHeight={chatMaxH}
+                                /* 펼친 동안은 사용자가 대화를 읽는 중이라 배너·재생 때도 줄을 접지 않는다 */
+                                showLines={chatExpanded || (!bannerVisible && sim.phase !== "shooting")}
+                                maxHeight={chatBoxMax}
+                                expanded={chatExpanded} onExpanded={setChatExpanded}
                                 myTurn={sim.phase === "aim" ? { seconds: clock?.mine ? clock.seconds : null, onClose: () => setAimChatOpen(false) } : null}
                                 away={sim.phase === "waiting" && !clock && sim.match.opponentAway}
                                 onClaim={sim.phase === "waiting" && sim.match.canClaim ? () => { void onClaim(); } : null}

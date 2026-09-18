@@ -2062,6 +2062,8 @@ const tr: Dict = {
   "sim.chat.open": "Sohbet",
   "sim.chat.myTurn": "Sıra sende · süre işliyor",
   "sim.chat.myTurnClock": "Sıra sende · {n} sn kaldı",
+  "sim.chat.expand": "Daha fazla sohbet",
+  "sim.chat.collapse": "Sohbeti daralt",
   "sim.emoji.oops": "Az kaldı",
   "sim.emoji.wait": "Bir saniye",
   "sim.emoji.thanks": "Teşekkürler",

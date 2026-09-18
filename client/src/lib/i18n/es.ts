@@ -2062,6 +2062,8 @@ const es: Dict = {
   "sim.chat.open": "Chat",
   "sim.chat.myTurn": "Tu turno · el reloj sigue corriendo",
   "sim.chat.myTurnClock": "Tu turno · quedan {n} s",
+  "sim.chat.expand": "Ver más mensajes",
+  "sim.chat.collapse": "Contraer chat",
   "sim.emoji.oops": "Por poco",
   "sim.emoji.wait": "Un momento",
   "sim.emoji.thanks": "¡Gracias!",

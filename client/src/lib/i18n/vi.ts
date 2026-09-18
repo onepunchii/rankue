@@ -2062,6 +2062,8 @@ const vi: Dict = {
   "sim.chat.open": "Trò chuyện",
   "sim.chat.myTurn": "Lượt của bạn · đồng hồ vẫn chạy",
   "sim.chat.myTurnClock": "Lượt của bạn · còn {n} giây",
+  "sim.chat.expand": "Xem thêm tin nhắn",
+  "sim.chat.collapse": "Thu gọn trò chuyện",
   "sim.emoji.oops": "Tiếc quá",
   "sim.emoji.wait": "Chờ chút",
   "sim.emoji.thanks": "Cảm ơn",

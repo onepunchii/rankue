@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { CHAT_FRESH_MS, CHAT_LOG_LINES, CHAT_MAX_CHARS, CHAT_QUICK_CODES, chatLength, clampChatText } from "@shared/sim/chat";
@@ -78,8 +78,10 @@ export const MatchChatLog = memo(function MatchChatLog({ lines, myIndex, now }: 
     );
 });
 
-/** 대화창에 보여 주는 최대 줄 수. 실제 몇 줄이 보일지는 높이 상한(chatMaxHeight)이 정한다 — 넘치면 오래된 줄이 위로 잘린다. */
-export const CHAT_CARD_LINES = 4;
+/**
+ * 대화 내역은 전부 들고 스크롤한다(2026-09-18 오너: "채팅 내역이 너무 짧게 보인다, 스크롤되게").
+ * 몇 줄이 보일지는 상자 높이가 정한다 — 접힘은 바닥 근처, 펼침은 화면 중간까지.
+ */
 
 /**
  * 1탭 문구 칩 — **한 줄 가로 스크롤**(2026-09-18). 대화 줄 자리에 바꿔 끼우므로, 줄을 두 줄로 접으면 문구판을
@@ -180,8 +182,11 @@ export function MatchMiniChat(p: {
     onQuickOpen: (v: boolean) => void;
     /** 대화 줄을 보일지(결과 배너가 뜨는 2.4초 동안엔 접는다 — 배너와 겹치지 않게). 입력줄은 늘 남는다. */
     showLines: boolean;
-    /** 이 상자의 최대 높이(px) — 당구 천을 덮지 않는 값 */
-    maxHeight: number;
+    /** 이 상자의 최대 높이 — 접힘/펼침에 따라 부르는 쪽이 준다(px 숫자 또는 CSS 식). */
+    maxHeight: number | string;
+    /** 위로 펼쳤나(화면 중간까지). 밖에서 든다 — 펼친 동안 오른쪽 점수판을 감추기 때문. */
+    expanded: boolean;
+    onExpanded: (v: boolean) => void;
     /** 내 차례에 연 경우: 남은 초와 닫기 */
     myTurn?: { readonly seconds: number | null; readonly onClose: () => void } | null;
     /** 상대가 자리를 비워 시계가 아직 안 돈다(상대 차례) */
@@ -194,7 +199,16 @@ export function MatchMiniChat(p: {
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement | null>(null);
-    const shown = p.lines.slice(-CHAT_CARD_LINES);
+    const shown = p.lines;
+    /*
+     * 스크롤: 새 말이 오면 맨 아래로 — 단, **이미 아래를 보고 있을 때만**. 위로 올려 옛 대화를 읽는 중에 새 말이 왔다고
+     * 끌어내리면 읽던 자리를 잃는다. 펼치거나 접을 때는 늘 맨 아래로(방금 오간 말이 보여야 한다).
+     */
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const atBottomRef = useRef(true);
+    const toBottom = () => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; };
+    useLayoutEffect(() => { if (atBottomRef.current) toBottom(); }, [shown.length, p.showLines]);
+    useLayoutEffect(() => { atBottomRef.current = true; toBottom(); }, [p.expanded]);
 
     // 사라질 때(= 차례가 바뀌거나 닫힘) 키보드를 먼저 내린다. 안 그러면 iOS 에서 키보드가 잠깐 남아 조작 독을 덮는다.
     useEffect(() => () => { inputRef.current?.blur(); }, []);
@@ -228,6 +242,16 @@ export function MatchMiniChat(p: {
             className="pointer-events-auto w-full max-w-[340px] rounded-card bg-surface-1 border border-surface-line p-2 flex flex-col gap-1.5 overflow-hidden"
             style={{ maxHeight: p.maxHeight }}
         >
+            {/* 위로 펼치기 손잡이 — 누르면 화면 중간까지 올라오고, 다시 누르면 접힌다. */}
+            <button
+                type="button" onClick={() => p.onExpanded(!p.expanded)}
+                aria-label={t(p.expanded ? "sim.chat.collapse" : "sim.chat.expand")} aria-expanded={p.expanded}
+                className="shrink-0 -mt-1 -mb-0.5 h-5 w-full flex items-center justify-center text-ink-3 active:text-ink-1"
+            >
+                <svg viewBox="0 0 24 12" width="22" height="11" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d={p.expanded ? "M5 3l7 6 7-6" : "M5 9l7-6 7 6"} />
+                </svg>
+            </button>
             {p.myTurn && (
                 <div className="shrink-0 flex items-center gap-2 px-1">
                     <span className="flex-1 min-w-0 text-[12px] font-semibold text-ink-2 truncate">
@@ -261,24 +285,35 @@ export function MatchMiniChat(p: {
                         </p>
                     )
                 ) : (
-                    <ul className="flex-1 min-h-0 flex flex-col justify-end gap-1 overflow-hidden" aria-live="polite">
-                        {shown.map((l, i) => {
-                            const mine = l.from === p.myIndex;
-                            const older = i < shown.length - 2;
-                            return (
-                                <li key={l.id} className={cn("shrink-0 flex", mine ? "justify-end" : "justify-start", older && "hide-on-keyboard")}>
-                                    <span
-                                        className={cn(
-                                            "max-w-[85%] px-2.5 py-0.5 rounded-2xl text-[12.5px] leading-snug truncate",
-                                            mine ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-1",
-                                        )}
-                                    >
-                                        {lineText(l, t)}
-                                    </span>
-                                </li>
-                            );
-                        })}
-                    </ul>
+                    /*
+                     * 스크롤 상자 + 안쪽 min-h-full·justify-end. 바깥에 justify-end 를 주면 넘친 윗부분이 스크롤로 닿지 않는다
+                     * (flex-end 오버플로 함정) — 안쪽이 상자보다 작을 땐 아래로 붙고, 넘치면 바깥이 평범하게 스크롤된다.
+                     */
+                    <div
+                        ref={scrollRef}
+                        onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; }}
+                        className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    >
+                        <ul className="min-h-full flex flex-col justify-end gap-1" aria-live="polite">
+                            {shown.map((l) => {
+                                const mine = l.from === p.myIndex;
+                                return (
+                                    <li key={l.id} className={cn("shrink-0 flex", mine ? "justify-end" : "justify-start")}>
+                                        <span
+                                            className={cn(
+                                                // 펼치면 긴 말도 다 보이게 줄바꿈, 접힘에선 한 줄로
+                                                "max-w-[85%] px-2.5 py-0.5 rounded-2xl text-[12.5px] leading-snug",
+                                                p.expanded ? "break-words" : "truncate",
+                                                mine ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-1",
+                                            )}
+                                        >
+                                            {lineText(l, t)}
+                                        </span>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
                 )
             )}
             <div className="shrink-0 flex items-center gap-1.5">

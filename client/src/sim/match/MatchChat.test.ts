@@ -84,6 +84,7 @@ const mini = (p: Record<string, unknown>) => React.createElement(Chat.MatchMiniC
     draft: "", onDraft: () => undefined, onSend: noop, onSendCode: noop,
     quickOpen: false, onQuickOpen: () => undefined,
     showLines: true, maxHeight: 132, myTurn: null, away: false, onClaim: null,
+    expanded: false, onExpanded: () => undefined,
     ...p,
 } as never);
 const quickButton = (c: HTMLElement) =>
@@ -134,19 +135,22 @@ describe("MatchMiniChat — 대화 줄과 입력을 한 상자에(2026-09-18)", 
         expect(c.textContent).toContain(ko["sim.chat.emptyWaiting"].replace("{name}", "최영환"));
     });
 
-    it("최근 네 줄까지, 상대는 왼쪽 · 나는 오른쪽", () => {
+    it("대화 내역을 **전부** 들고 스크롤한다 — 상대는 왼쪽 · 나는 오른쪽(2026-09-18: 너무 짧게 보였다)", () => {
         const lines = [1, 2, 3, 4, 5].map((n) => line({ id: `c${n}`, seq: n, text: `말${n}`, from: n % 2 }));
         const c = mount(mini({ lines }));
-        expect(c.textContent).not.toContain("말1");
+        for (const n of [1, 2, 3, 4, 5]) expect(c.textContent).toContain(`말${n}`);
+        expect(c.querySelector(".overflow-y-auto")).not.toBeNull();
         const items = Array.from(c.querySelectorAll("li"));
         expect(items.find((li) => li.textContent === "말2")!.className).toContain("justify-end");    // from 0 = 나
         expect(items.find((li) => li.textContent === "말3")!.className).toContain("justify-start");  // from 1 = 상대
     });
 
-    it("키보드가 뜨면 마지막 두 줄만 남는다", () => {
-        const lines = [1, 2, 3, 4].map((n) => line({ id: `c${n}`, seq: n, text: `말${n}` }));
-        const c = mount(mini({ lines }));
-        expect(Array.from(c.querySelectorAll("li")).map((li) => li.className.includes("hide-on-keyboard"))).toEqual([true, true, false, false]);
+    it("스크롤 상자는 안쪽이 아래로 붙는다 — 바깥 justify-end 는 넘친 윗부분이 스크롤로 안 닿는 함정이 있다", () => {
+        const c = mount(mini({ lines: [line({ id: "a", seq: 1 })] }));
+        const scroller = c.querySelector(".overflow-y-auto")!;
+        expect(scroller.className).not.toContain("justify-end");
+        expect(scroller.querySelector("ul")!.className).toContain("justify-end");
+        expect(scroller.querySelector("ul")!.className).toContain("min-h-full");
     });
 
     it("결과 배너·재생 중엔 줄을 접고 입력줄은 남긴다 — 쓰던 글과 키보드가 살아 있게", () => {
@@ -164,6 +168,33 @@ describe("MatchMiniChat — 대화 줄과 입력을 한 상자에(2026-09-18)", 
         const btn = Array.from(c.querySelectorAll("button")).find((b) => b.textContent === ko["sim.match.claim"])!;
         React.act(() => { btn.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
         expect(claimed).toBe(1);
+    });
+});
+
+describe("위로 펼치기(2026-09-18 오너: 중간까지 올라오게)", () => {
+    const handle = (c: HTMLElement) => Array.from(c.querySelectorAll("button")).find((b) =>
+        b.getAttribute("aria-label") === ko["sim.chat.expand"] || b.getAttribute("aria-label") === ko["sim.chat.collapse"])!;
+
+    it("손잡이를 누르면 밖으로 알린다 — 펼친 동안 점수판이 비켜야 해서 상태가 밖에 있다", () => {
+        const got: boolean[] = [];
+        const c = mount(mini({ onExpanded: (v: boolean) => got.push(v) }));
+        expect(handle(c).getAttribute("aria-expanded")).toBe("false");
+        React.act(() => { handle(c).dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
+        expect(got).toEqual([true]);
+    });
+
+    it("펼치면 긴 말도 줄바꿈으로 다 보이고, 접힘에선 한 줄로 자른다", () => {
+        const long = line({ id: "a", seq: 1, text: "그건 채팅치는사람 알아서하는거지뭐 ㅋㅋ 정말로" });
+        const folded = mount(mini({ lines: [long] }));
+        expect(folded.querySelector("li span")!.className).toContain("truncate");
+        const open = mount(mini({ lines: [long], expanded: true }));
+        expect(open.querySelector("li span")!.className).toContain("break-words");
+        expect(handle(open).getAttribute("aria-label")).toBe(ko["sim.chat.collapse"]);
+    });
+
+    it("높이는 CSS 식도 받는다 — 펼침은 키보드 높이를 빼고 준다", () => {
+        const c = mount(mini({ maxHeight: "min(380px, calc(100dvh - var(--keyboard-height, 0px) - 150px))" }));
+        expect((c.querySelector("[data-sim-chat]") as HTMLElement).style.maxHeight).toContain("min(");
     });
 });
 
@@ -316,6 +347,12 @@ describe("대화 띠와 조준 조작의 자리 다툼", () => {
 
     it("내 차례엔 오른쪽 샷 버튼 자리를 비운다 — 반쯤 가려진 샷 버튼이 남지 않게", () => {
         expect(src()).toContain('sim.phase === "aim" ? "items-start pl-2 pr-[78px]"');
+    });
+
+    it("내 차례가 되면 펼친 대화창을 접고, 펼친 동안엔 오른쪽 점수판을 감춘다", () => {
+        const s = src();
+        expect(s).toContain('if (sim.phase === "aim") setChatExpanded(false)');
+        expect(s).toMatch(/sim\.phase === "shooting"\) && !chatExpanded && \(\s*<MatchScoreStrip|!chatExpanded && \(/);
     });
 
     it("조준이 끝나면 내 차례 대화창은 닫힌다 — 다음 내 차례에 저절로 떠 있으면 조작을 덮는다", () => {
