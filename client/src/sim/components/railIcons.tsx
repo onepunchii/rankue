@@ -187,13 +187,20 @@ export function ChevronRightIcon() {
 /**
  * 길 찾기 오른쪽 바의 길 칩(2026-09-08 오너: 원 안에 원 없이, 색 원 하나에 여유 % 만 — 번호 없음).
  * 순위 색: 1 노란 공 · 2 빨간 공 · 3 백구 · 4·5 회색. 고른 칩은 진한 테두리.
+ *
+ * 4·5 는 **불투명한 회색**이다(2026-09-18 오너: "길4·길5 는 공 모양이 투명이라서 안 보인다"). 예전엔
+ * --surface-line 으로 칠했는데 그건 얇은 구분선용 색이라 투명도가 9~12 % 뿐이다 — 칩 바탕으로 쓰니
+ * 원이 사라지고 숫자만 떠 있었다. 앱 테마 토큰이 아니라 고정 회색을 쓴다: 이 칩은 어두운 당구 화면에도
+ * 밝은 화면에도 같은 원으로 보여야 하고, 흰 글자 대비 4.7:1 이다.
+ * 선 색과는 맞출 필요가 없다 — 길은 순위 색이 아니라 공 색(수구·적구)으로 그린다(Overlay).
  */
+const PATH_CHIP_GRAY = "bg-[#6E7470] text-white";
 const PATH_CHIP = [
     "bg-ball-yellow text-ink-1",
     "bg-ball-red text-white",
     "bg-ball-white text-ink-1 border-surface-line-strong",
-    "bg-surface-line text-ink-2",
-    "bg-surface-line text-ink-2",
+    PATH_CHIP_GRAY,
+    PATH_CHIP_GRAY,
 ] as const;
 
 export function PathChip({ rank, pct, active }: { rank: number; pct: number | null; active: boolean }) {
