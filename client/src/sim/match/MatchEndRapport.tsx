@@ -4,6 +4,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { CHAT_END_CODES } from "@shared/sim/chat";
+import { matchApi, type ChatLine } from "../matchApi";
 
 /**
  * 끝난 대전 화면에 붙는 "상대가 누구였나" 묶음(2026-09-15 오너: "라포를 느낄 방안").
@@ -32,10 +34,24 @@ interface RematchState {
     rematch: { mine: boolean; theirs: boolean; matchId: string | null } | null;
 }
 
-export function MatchEndRapport({ matchId, onRematch }: { matchId: string; onRematch: (newMatchId: string) => void }) {
+export function MatchEndRapport({ matchId, myIndex, onRematch }: { matchId: string; myIndex: number; onRematch: (newMatchId: string) => void }) {
     const { t } = useT();
     const { toast } = useToast();
     const [added, setAdded] = useState(false);
+
+    // 마무리 인사(2026-09-18 오너: "끝나면 바로 결과 창이 나와서 인사할 시간이 없네"). 서버는 끝난 뒤 30분까지 받는다.
+    // 대전 컨트롤러는 끝나면 폴링을 멈추므로 재경기처럼 여기서 가볍게 본다. 새 방이 정해지면 같이 멈춘다.
+    const { data: chat, refetch: refetchChat } = useQuery<readonly ChatLine[]>({
+        queryKey: [`/api/hiq/sim/matches/${matchId}/chats`, "end"],
+        queryFn: async () => (await matchApi.getChats?.(matchId, 0)) ?? [],
+        refetchInterval: REMATCH_POLL_MS,
+    });
+    const greet = useMutation({
+        mutationFn: async (code: string) => matchApi.sendChat?.(matchId, { code, clientKey: `end-${code}-${Date.now()}` }),
+        onSuccess: () => { void refetchChat(); },
+        onError: () => toast({ title: t("sim.emoji.limit") }),
+    });
+    const recent = (chat ?? []).slice(-3);
 
     const { data: info } = useQuery<RapportInfo>({
         queryKey: [`/api/hiq/sim/matches/${matchId}/rapport`],
@@ -112,6 +128,32 @@ export function MatchEndRapport({ matchId, onRematch }: { matchId: string; onRem
                 >
                     {isRival ? t("sim.rematch.rivalAlready") : t("sim.rematch.addRival")}
                 </button>
+            </div>
+            {recent.length > 0 && (
+                <ul className="mt-2.5 space-y-1">
+                    {recent.map((l) => (
+                        <li key={l.id} className={cn("flex", l.from === myIndex ? "justify-end" : "justify-start")}>
+                            <span className={cn(
+                                "max-w-[85%] truncate rounded-pill px-2.5 py-1 text-[12px] font-semibold",
+                                l.from === myIndex ? "bg-brand/15 text-ink-1" : "bg-black/[0.05] text-ink-1",
+                            )}>
+                                {l.from !== myIndex && <span className="text-ink-3">{name} · </span>}
+                                {l.kind === "code" ? t(`sim.emoji.${l.text}`) : l.text}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <div className="mt-2 flex gap-1.5">
+                {CHAT_END_CODES.map((code) => (
+                    <button
+                        key={code} type="button" disabled={greet.isPending}
+                        onClick={() => greet.mutate(code)}
+                        className="flex-1 min-w-0 h-9 px-2 rounded-pill border border-surface-line text-[12px] font-semibold text-ink-2 truncate active:bg-surface-3 disabled:opacity-60"
+                    >
+                        {t(`sim.emoji.${code}`)}
+                    </button>
+                ))}
             </div>
         </div>
     );

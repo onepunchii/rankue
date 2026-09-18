@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-    CHAT_CODES, CHAT_COOLDOWN_MS, CHAT_EXTRA_CODES, CHAT_MAX_CHARS, CHAT_MAX_PER_MATCH, CHAT_QUICK_CODES,
+    CHAT_CODES, CHAT_COOLDOWN_MS, CHAT_EXTRA_CODES, CHAT_END_CODES, CHAT_MAX_CHARS, CHAT_MAX_PER_MATCH, CHAT_QUICK_CODES,
     chatLength, chatReject, clampChatText, isChatCode, normalizeChatText,
 } from "./chat";
 import { MATCH_EMOJIS } from "./rules/session";
@@ -45,9 +45,11 @@ describe("고정 문구 목록", () => {
 
     it("급해서 타이핑할 수 없는 말만 더했다 — 자유 입력이 주 기능이다", () => {
         expect(CHAT_EXTRA_CODES).toEqual(["oops", "wait", "thanks"]);
-        expect(CHAT_CODES).toHaveLength(MATCH_EMOJIS.length + CHAT_EXTRA_CODES.length);
+        // 결과 창의 마무리 인사(2026-09-18)는 게임 중 칩 열에 안 나온다 — 서버가 받아 주는 목록에만 더한다
+        expect(CHAT_CODES).toHaveLength(MATCH_EMOJIS.length + CHAT_EXTRA_CODES.length + CHAT_END_CODES.length);
+        for (const c of CHAT_END_CODES) expect(CHAT_QUICK_CODES).not.toContain(c);
         // 칩 열이 두 줄을 넘으면 테이블을 덮는다
-        expect(CHAT_CODES.length).toBeLessThanOrEqual(10);
+        expect(CHAT_QUICK_CODES.length).toBeLessThanOrEqual(10);
     });
 
     it("중복이 없다", () => {
@@ -118,5 +120,16 @@ describe("chatReject", () => {
 
     it("끝난 대전이 차례보다 먼저 판정된다 — 끝난 판에 '내 차례'는 의미가 없다", () => {
         expect(chatReject({ ...base, status: "finished", turn: 0 })).toBe("gone");
+    });
+});
+
+describe("끝난 뒤 마무리 인사(2026-09-18)", () => {
+    const base = { status: "finished", turn: 0, from: 0 as const, kind: "code" as const, count: 0, lastMineAt: null, now: 10_000_000 };
+    it("끝난 지 30분 안이면 받고, 지나면 gone. 끝난 시각을 모르면 gone", async () => {
+        const { chatReject: reject, CHAT_AFTER_END_MS: win } = await import("./chat");
+        expect(reject({ ...base, finishedAt: base.now - 60_000 })).toBeNull();
+        expect(reject({ ...base, finishedAt: base.now - win })).toBe("gone");
+        expect(reject({ ...base })).toBe("gone");
+        expect(reject({ ...base, status: "canceled", finishedAt: base.now })).toBe("gone");
     });
 });

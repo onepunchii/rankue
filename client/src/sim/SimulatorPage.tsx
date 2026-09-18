@@ -1786,6 +1786,7 @@ export function SimulatorPage() {
                 rapport={isMatch && sim.match ? (
                     <MatchEndRapport
                         matchId={sim.match.id}
+                        myIndex={sim.match.myIndex}
                         onRematch={(id) => { setEndDismissed(true); navigate(`/online-game?match=${id}`, { replace: true }); }}
                     />
                 ) : undefined}

@@ -409,6 +409,7 @@ export class SimMatchRepository {
                 lastMineAt: agg?.lastMineAt ? new Date(agg.lastMineAt).getTime() : null,
                 lastAnyAt: agg?.lastAnyAt ? new Date(agg.lastAnyAt).getTime() : null,
                 now: Date.now(),
+                finishedAt: m.finishedAt ? m.finishedAt.getTime() : null,
                 cooldownMs: a.cooldownMs, maxPerMatch: a.maxPerMatch,
             });
             if (reject) return { ok: false as const, reason: reject };

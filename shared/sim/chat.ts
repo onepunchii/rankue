@@ -27,7 +27,14 @@
  */
 export const CHAT_EXTRA_CODES = ["oops", "wait", "thanks"] as const;
 /** 서버가 받아 주는 코드 전부(옛 이모지 여섯 + 새 셋). 넉넉히 받아 두면 화면 쪽을 바꿔도 서버를 안 건드린다. */
-export const CHAT_CODES: readonly string[] = ["hi", "nice", "wow", "sorry", "oops", "wait", "thanks", "fight", "hurry"];
+export const CHAT_CODES: readonly string[] = ["hi", "nice", "wow", "sorry", "oops", "wait", "thanks", "fight", "hurry", "gg", "goodgame", "again"];
+/**
+ * 끝난 대전 결과 창의 마무리 인사(2026-09-18 오너: "게임이 끝나면 바로 결과 창이 나와서 인사할 시간이 없네").
+ * 한 판 더 버튼 옆에 둔다 — 인사와 재경기가 한자리에 있어야 "수고하셨습니다 → 한 판 더?" 로 이어진다.
+ */
+export const CHAT_END_CODES: readonly string[] = ["gg", "goodgame", "again"];
+/** 끝난 뒤에도 이만큼은 인사를 주고받을 수 있다. 결과 창을 오래 열어 두는 사람은 드물어 넉넉히 둔다. */
+export const CHAT_AFTER_END_MS = 30 * 60_000;
 /**
  * 1탭 패널에 **실제로 그리는** 여섯. 320 px 폭에서 두 줄에 들어간다 — 세 줄이면 당구대를 덮고,
  * 그쯤 되면 "빠른 한마디"가 아니라 두 번째 화면이다.
@@ -103,13 +110,16 @@ export function chatReject(x: {
     lastAnyAt?: number | null;
     /** 지금(epoch ms) */
     now: number;
+    /** 대전이 끝난 시각(epoch ms). 끝난 뒤 CHAT_AFTER_END_MS 동안은 마무리 인사를 받는다. */
+    finishedAt?: number | null;
     cooldownMs?: number;
     maxPerMatch?: number;
 }): ChatReject {
     const now = x.now;
     const cooldownMs = x.cooldownMs ?? CHAT_COOLDOWN_MS;
     const maxPerMatch = x.maxPerMatch ?? CHAT_MAX_PER_MATCH;
-    if (x.status !== "playing") return "gone";
+    const afterEnd = x.status === "finished" && typeof x.finishedAt === "number" && x.now - x.finishedAt < CHAT_AFTER_END_MS;
+    if (x.status !== "playing" && !afterEnd) return "gone";
     // 차례는 가리지 않는다(2026-09-18 오너: "칠 때도 쓰게 해 달라는 요청"). 예전엔 내 차례 글을 서버가 막았는데,
     // 막은 이유가 "키보드가 조작 버튼을 **저절로** 덮는다"였다. 이제 내 차례 대화창은 사용자가 말풍선을 눌러
     // 직접 여는 것이라 막을 이유가 없다 — 40초는 계속 가므로 화면이 남은 시간을 대화창에 같이 보여 준다.
