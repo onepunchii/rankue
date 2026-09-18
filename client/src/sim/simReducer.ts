@@ -685,6 +685,12 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
                 balls: a.final,
                 session: a.session,
                 outcomeLast: a.outcome,
+                /*
+                 * 친 사람도 같이 적는다(2026-09-18 버그). 빠져 있어서 상대 샷의 득점이 **직전에 친 사람(나)**에게 붙었다 —
+                 * 세로 점수판과 이닝 시트에 두 사람 점수가 전부 내 칸으로 쌓였다. 재생이 끝나면 컨트롤러가
+                 * onOutcome(outcomeLast, session, shooterLast) 로 이 값을 그대로 넘긴다.
+                 */
+                shooterLast: a.playerIndex,
                 shotIdx: s.shotIdx + 1,
                 mismatches: s.mismatches + (a.mismatch ? 1 : 0),
                 pendingSnap: null,

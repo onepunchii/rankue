@@ -534,6 +534,15 @@ describe("대전: 따라잡기 재생", () => {
         expect(u.input.phi).toBeCloseTo(defaultPhi(u.balls, "yellow", "3c"), 12);
         expect(simReducer(u, { type: "setInput", patch: { V0: 3 } }).input.V0).toBe(3);
     });
+    it("상대 샷의 친 사람을 상대로 적는다 — 빠지면 상대 득점이 내 이닝 칸에 붙는다(2026-09-18 버그)", () => {
+        // 초기값이 0 이라 "상대(0)가 쳤다"만 보면 버그 코드도 우연히 통과한다 — 1 → 0 으로 **바뀌는지** 봐야 한다.
+        const g = startMatch(1);                                              // 나는 게스트(1), 상대(0)부터
+        const a = simReducer(replay(g, MISS, 0), { type: "playbackEnd" });    // 상대 빗나감 → 내 차례
+        const b = replay(a, MISS, 1);                                         // 내 샷(다른 기기)의 따라잡기
+        expect(b.shooterLast).toBe(1);                                        // 버그: 0 에 머물러 상대 칸으로 갔다
+        const c = replay(simReducer(b, { type: "playbackEnd" }), POINT, 0);   // 다시 상대
+        expect(c.shooterLast).toBe(0);
+    });
     it("상대가 득점하면 재생 뒤에도 waiting", () => {
         const u = simReducer(replay(startMatch(1), POINT, 0), { type: "playbackEnd" });
         expect(u.phase).toBe("waiting");
