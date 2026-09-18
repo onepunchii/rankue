@@ -78,84 +78,25 @@ export const MatchChatLog = memo(function MatchChatLog({ lines, myIndex, now }: 
     );
 });
 
-/** 대화창에 쌓아 두는 줄 수. 키보드가 뜨면 마지막 둘만 남는다(나머지는 hide-on-keyboard). */
+/** 대화창에 보여 주는 최대 줄 수. 실제 몇 줄이 보일지는 높이 상한(chatMaxHeight)이 정한다 — 넘치면 오래된 줄이 위로 잘린다. */
 export const CHAT_CARD_LINES = 4;
 
 /**
- * 상대 차례 카드 = 대화창(2026-09-18 오너가 고른 안 A).
- *
- * 예전 카드는 상대 이름 · "상대 차례예요" · 큰 40초 시계였는데, **셋 다 헤더에 이미 있었다**(이름 둘, 시계 둘).
- * 내용은 중복인데 당구대 아래 레일을 가장 많이 가렸다. 그 자리를 대화창으로 바꾼다 — 기다리는 시간이 곧 대화하는
- * 시간이라서다. 왼쪽 위의 한마디는 12초 뒤 사라지지만, 여기는 최근 몇 줄이 계속 남는다("멀티가 정적이다"의 진범이
- * "3초 뜨고 증발"이었다).
- *
- * 줄 모양은 채팅 관례대로: 상대는 왼쪽, 나는 오른쪽(brand). 아직 아무 말도 없으면 누구 차례인지를 담은 안내 한 줄을
- * 둔다 — 예전 "상대 차례예요"가 하던 일을 잃지 않으려고.
- *
- * 키보드가 뜨면 마지막 두 줄만 남긴다: 답을 쓰는 동안 방금 받은 말은 보여야 하고, 나머지는 당구대를 내준다.
- * 자리 비움 안내와 승리 주장 버튼은 필요할 때만 맨 위에 붙는다(키보드가 뜨면 감춘다).
+ * 1탭 문구 칩 — **한 줄 가로 스크롤**(2026-09-18). 대화 줄 자리에 바꿔 끼우므로, 줄을 두 줄로 접으면 문구판을
+ * 열 때마다 대화창이 커져 당구 천을 덮는다. 한 줄이면 높이가 그대로다. 누를 것이라 pointer-events-auto 를 스스로 켠다.
  */
-export function MatchChatCard({ lines, myIndex, opponentName, away, onClaim }: {
-    lines: readonly ChatLine[];
-    myIndex: number;
-    opponentName: string;
-    /** 상대가 자리를 비워 시계가 아직 안 돈다 */
-    away: boolean;
-    /** 48시간 무응답 승리 주장(가능할 때만) */
-    onClaim: (() => void) | null;
-}) {
-    const { t } = useT();
-    const shown = lines.slice(-CHAT_CARD_LINES);
-    return (
-        <div className="pointer-events-auto w-full max-w-[320px] rounded-card bg-surface-1 border border-surface-line px-3 py-2.5 flex flex-col gap-1.5">
-            {away && <p className="hide-on-keyboard text-center text-[12px] font-medium text-ink-3">{t("sim.match.opponentAway")}</p>}
-            {onClaim && (
-                <button type="button" onClick={onClaim} className="hide-on-keyboard h-11 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
-                    {t("sim.match.claim")}
-                </button>
-            )}
-            {shown.length === 0 ? (
-                <p className="py-1 text-center text-[12.5px] font-medium text-ink-3">
-                    {t("sim.chat.emptyWaiting").replace("{name}", opponentName)}
-                </p>
-            ) : (
-                <ul className="flex flex-col gap-1" aria-live="polite">
-                    {shown.map((l, i) => {
-                        const mine = l.from === myIndex;
-                        // 키보드가 뜨면 마지막 두 줄만 — 오래된 줄은 당구대에 자리를 내준다
-                        const older = i < shown.length - 2;
-                        return (
-                            <li key={l.id} className={cn("flex", mine ? "justify-end" : "justify-start", older && "hide-on-keyboard")}>
-                                <span
-                                    className={cn(
-                                        "max-w-[85%] px-2.5 py-1 rounded-2xl text-[13px] leading-snug break-words",
-                                        mine ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-1",
-                                    )}
-                                >
-                                    {lineText(l, t)}
-                                </span>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-        </div>
-    );
-}
-
-/** 1탭 문구 칩 묶음. 320 px 에서 두 줄로 앉는다(실측). 누를 것이라 pointer-events-auto 를 스스로 켠다. */
 export function QuickChips({ onPick, disabled }: { onPick: (code: string) => void; disabled?: boolean }) {
     const { t } = useT();
     return (
-        <div className="pointer-events-auto flex flex-wrap justify-center gap-1">
+        <div className="pointer-events-auto shrink-0 flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-0.5 px-0.5 py-0.5">
             {CHAT_QUICK_CODES.map((code) => (
                 <button
                     key={code} type="button" disabled={disabled}
                     onClick={() => onPick(code)}
                     className={cn(
-                        "h-8 px-2.5 rounded-pill inline-flex items-center gap-1",
-                        "bg-surface-1 border border-surface-line text-[12px] font-semibold text-ink-1",
-                        "active:bg-surface-3 disabled:opacity-40",
+                        "shrink-0 h-8 px-2.5 rounded-pill inline-flex items-center gap-1",
+                        "bg-surface-3 text-[12px] font-semibold text-ink-1",
+                        "active:bg-surface-line disabled:opacity-40",
                     )}
                 >
                     <span className="text-[13px] leading-none">{CHAT_GLYPH[code]}</span>
@@ -166,7 +107,7 @@ export function QuickChips({ onPick, disabled }: { onPick: (code: string) => voi
     );
 }
 
-/** ☺ 토글. 열고 닫는 일만 한다 — 열렸을 때 무엇이 비켜야 하는지는 부르는 쪽이 안다. */
+/** ☺ 토글. 열고 닫는 일만 한다. */
 export function QuickToggle({ open, onToggle, className }: { open: boolean; onToggle: () => void; className?: string }) {
     const { t } = useT();
     return (
@@ -174,9 +115,8 @@ export function QuickToggle({ open, onToggle, className }: { open: boolean; onTo
             type="button" onClick={onToggle}
             aria-label={t("sim.chat.quick")} aria-expanded={open}
             className={cn(
-                "pointer-events-auto shrink-0 h-11 w-11 rounded-pill text-[17px] leading-none",
-                "border border-surface-line active:bg-surface-3",
-                open ? "bg-brand text-brand-fg" : "bg-surface-1 text-ink-2",
+                "pointer-events-auto shrink-0 h-10 w-10 rounded-pill text-[16px] leading-none active:bg-surface-3",
+                open ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-2",
                 className,
             )}
         >
@@ -186,111 +126,181 @@ export function QuickToggle({ open, onToggle, className }: { open: boolean; onTo
 }
 
 /**
- * 조준 중(내 차례)에 쓰는 1탭 문구. 왼쪽 위 칩 열 안에 들어간다.
+ * 내 차례(조준 중)에 대화창을 여는 말풍선(2026-09-18 오너: "칠 때도 쓰게 해 달라").
  *
- * 왜 여기가 필요한가: 하단 입력줄은 상대 차례에만 있는데(키보드가 조작을 덮으면 안 되니까), 상대가 빗나간
- * 직후 "아깝다"를 보내고 싶은 그 순간이 바로 내 차례다. 서버도 고정 문구는 차례를 안 따진다(키보드가 없다).
+ * 왼쪽 위 칩 열에 둔다 — **샷 버튼 옆에 두지 않는 이유**: 대화하려다 샷 버튼을 잘못 누르면 샷이 나가고 되돌릴 수 없다.
+ * 반대 방향 오터치(샷 하려다 이걸 누름)는 대화창이 열릴 뿐이다. 그리고 여기는 상대 한마디가 뜨는 바로 그 자리라
+ * 읽은 곳에서 답하게 된다. 안 읽은 상대 말이 있으면 빨간 점을 단다.
  */
-export function MatchQuickAim({ open, onOpen, onSendCode }: {
-    open: boolean;
-    onOpen: (v: boolean) => void;
-    onSendCode: (code: string) => void;
-}) {
+export function MatchChatToggle({ open, unread, onToggle }: { open: boolean; unread: boolean; onToggle: () => void }) {
+    const { t } = useT();
     return (
-        <>
-            {open && <QuickChips onPick={(code) => { onOpen(false); onSendCode(code); }} />}
-            <QuickToggle open={open} onToggle={() => onOpen(!open)} className="h-9 w-9 text-[15px]" />
-        </>
+        <button
+            type="button" onClick={onToggle}
+            aria-label={t("sim.chat.open")} aria-expanded={open}
+            className={cn(
+                "pointer-events-auto relative h-9 w-9 rounded-pill flex items-center justify-center border border-surface-line active:bg-surface-3",
+                open ? "bg-brand text-brand-fg" : "bg-surface-1 text-ink-2",
+            )}
+        >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z" />
+            </svg>
+            {unread && !open && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-pill bg-ball-red border-2 border-surface-1" />}
+        </button>
     );
 }
 
 /**
- * 입력 한 줄. 상대 차례에만 나타난다.
+ * 미니 대화창 — 대화 줄과 입력줄을 **한 상자**에(2026-09-18 오너: "분리될 필요가 없네, 미니 채팅 모양이면 되네").
  *
- * 초안(draft)을 **밖에서** 들고 있는 이유: 상대가 연속 득점하면 재생·결과 배너 때문에 이 컴포넌트가 몇 번씩
- * 마운트를 오간다. 안에 두면 그때마다 쓰던 글이 날아간다.
+ * 예전엔 대화 카드와 입력줄이 따로 떠서 사이 간격과 카드 여백이 두 번 들어갔다. 한 상자로 합치면 그만큼 줄고,
+ * ☺ 문구판도 대화 줄 **자리에 바꿔 끼워** 열어도 높이가 안 는다.
+ *
+ * 높이 상한(maxHeight)은 부르는 쪽이 chatMaxHeight 로 준다 — 이 상자 윗변이 당구 천 아래끝보다 아래에 오게 해서
+ * **공을 가릴 수 없게** 한다(오너: "뒤에 공이 있으면 안 보이잖아"). 줄이 넘치면 오래된 줄이 위로 잘린다.
+ *
+ * 쓰이는 자리 둘:
+ *   · 상대 차례 — 늘 떠 있다. 아직 말이 없으면 누구 차례인지 담은 안내 한 줄.
+ *   · 내 차례 — 말풍선을 눌렀을 때만. 맨 위에 "내 차례 · 남은 초"와 닫기(40초는 계속 가고 세 번 넘기면 실격패라,
+ *     쓰는 동안에도 시간이 보여야 한다).
+ *
+ * 초안(draft)은 밖에서 든다 — 상대가 연속 득점하면 재생·배너 때문에 줄 영역이 여러 번 접혔다 펴져도 쓰던 글이 남게.
+ * 키보드가 뜨면 마지막 두 줄만 남기고(hide-on-keyboard) 나머지는 당구대에 자리를 내준다.
  */
-export function MatchChatBar({ draft, onDraft, onSend, onSendCode, quickOpen, onQuickOpen, disabled }: {
+export function MatchMiniChat(p: {
+    lines: readonly ChatLine[];
+    myIndex: number;
+    opponentName: string;
     draft: string;
     onDraft: (v: string) => void;
     onSend: (text: string) => Promise<ChatSendResult>;
-    /** 1탭 고정 문구. 키보드를 아예 안 여는 길이라 이 기능의 절반이다. */
     onSendCode: (code: string) => Promise<ChatSendResult>;
-    /** 문구판이 펼쳐졌나. **밖에서** 들고 있다 — 펼친 동안 상대 차례 카드를 감춰 자리를 내주기 때문. */
     quickOpen: boolean;
     onQuickOpen: (v: boolean) => void;
-    /** 전송 중 */
+    /** 대화 줄을 보일지(결과 배너가 뜨는 2.4초 동안엔 접는다 — 배너와 겹치지 않게). 입력줄은 늘 남는다. */
+    showLines: boolean;
+    /** 이 상자의 최대 높이(px) — 당구 천을 덮지 않는 값 */
+    maxHeight: number;
+    /** 내 차례에 연 경우: 남은 초와 닫기 */
+    myTurn?: { readonly seconds: number | null; readonly onClose: () => void } | null;
+    /** 상대가 자리를 비워 시계가 아직 안 돈다(상대 차례) */
+    away?: boolean;
+    /** 48시간 무응답 승리 주장(가능할 때만) */
+    onClaim?: (() => void) | null;
     disabled?: boolean;
 }) {
     const { t } = useT();
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement | null>(null);
+    const shown = p.lines.slice(-CHAT_CARD_LINES);
 
-    // 언마운트(= 내 차례가 됐다) 직전에 키보드를 내린다. 안 그러면 iOS 에서 키보드가 잠깐 남아
-    // 40초가 도는 동안 조작 독을 덮는다.
+    // 사라질 때(= 차례가 바뀌거나 닫힘) 키보드를 먼저 내린다. 안 그러면 iOS 에서 키보드가 잠깐 남아 조작 독을 덮는다.
     useEffect(() => () => { inputRef.current?.blur(); }, []);
 
     const send = useCallback(async () => {
-        const text = draft.trim();
+        const text = p.draft.trim();
         if (!text || busy) return;
         setBusy(true);
         setNote(null);
-        const r = await onSend(text);
+        const r = await p.onSend(text);
         setBusy(false);
-        if (r === "ok") { onDraft(""); return; }
-        // 거부 종류에 따라 초안을 지킬지 정한다. 고쳐 쓸 수 있는 건 남기고, 더 못 보내는 것만 비운다.
-        if (r === "limit") { onDraft(""); setNote(t("sim.emoji.limit")); return; }
-        setNote(
-            r === "too-fast" ? t("sim.emoji.tooFast")
-                : r === "blocked" ? t("sim.chat.blocked")
-                    : r === "your-turn" ? t("sim.chat.turnOnly")
-                        : t("sim.chat.failed"),
-        );
-    }, [draft, busy, onSend, onDraft, t]);
+        if (r === "ok") { p.onDraft(""); return; }
+        // 고쳐 쓸 수 있는 거부는 초안을 남기고, 더 못 보내는 것만 비운다.
+        if (r === "limit") { p.onDraft(""); setNote(t("sim.emoji.limit")); return; }
+        setNote(r === "too-fast" ? t("sim.emoji.tooFast") : r === "blocked" ? t("sim.chat.blocked") : t("sim.chat.failed"));
+    }, [p, busy, t]);
 
     const sendCode = useCallback(async (code: string) => {
         if (busy) return;
         setBusy(true);
         setNote(null);
-        const r = await onSendCode(code);
+        const r = await p.onSendCode(code);
         setBusy(false);
-        onQuickOpen(false);                  // 고르면 바로 접는다 — 칩 열이 테이블을 오래 덮지 않게
+        p.onQuickOpen(false);                 // 고르면 바로 접는다
         if (r !== "ok") setNote(r === "too-fast" ? t("sim.emoji.tooFast") : r === "limit" ? t("sim.emoji.limit") : t("sim.chat.failed"));
-    }, [busy, onSendCode, onQuickOpen, t]);
+    }, [p, busy, t]);
 
     return (
-        <div className="pointer-events-auto w-full max-w-[320px] flex flex-col items-stretch gap-1">
-            {note && <span className="self-center rk-chip bg-surface-1 border border-surface-line text-ink-2">{note}</span>}
-            {/* 1탭 문구판. 펼친 동안만 자리를 쓰고, 하나 고르면 접힌다. 키보드가 필요 없는 길이다. */}
-            {quickOpen && <QuickChips onPick={(code) => { void sendCode(code); }} disabled={disabled || busy} />}
-            <div className="flex items-center gap-1.5">
-                <QuickToggle open={quickOpen} onToggle={() => { onQuickOpen(!quickOpen); inputRef.current?.blur(); }} />
+        <div
+            data-sim-chat=""
+            className="pointer-events-auto w-full max-w-[340px] rounded-card bg-surface-1 border border-surface-line p-2 flex flex-col gap-1.5 overflow-hidden"
+            style={{ maxHeight: p.maxHeight }}
+        >
+            {p.myTurn && (
+                <div className="shrink-0 flex items-center gap-2 px-1">
+                    <span className="flex-1 min-w-0 text-[12px] font-semibold text-ink-2 truncate">
+                        {p.myTurn.seconds !== null
+                            ? t("sim.chat.myTurnClock").replace("{n}", String(p.myTurn.seconds))
+                            : t("sim.chat.myTurn")}
+                    </span>
+                    <button
+                        type="button" onClick={p.myTurn.onClose} aria-label={t("sim.common.close")}
+                        className="shrink-0 h-7 px-2.5 rounded-pill bg-surface-3 text-[12px] font-semibold text-ink-2 active:bg-surface-line"
+                    >
+                        {t("sim.common.close")}
+                    </button>
+                </div>
+            )}
+            {p.away && <p className="hide-on-keyboard shrink-0 text-center text-[12px] font-medium text-ink-3">{t("sim.match.opponentAway")}</p>}
+            {p.onClaim && (
+                <button type="button" onClick={p.onClaim} className="hide-on-keyboard shrink-0 h-10 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
+                    {t("sim.match.claim")}
+                </button>
+            )}
+            {note && <span className="shrink-0 self-center rk-chip bg-surface-3 text-ink-2">{note}</span>}
+            {/* 줄 영역: 문구판이 열리면 그 자리를 문구판이 쓴다(높이 그대로). 넘치면 오래된 줄이 위로 잘린다. */}
+            {p.quickOpen ? (
+                <QuickChips onPick={(code) => { void sendCode(code); }} disabled={p.disabled || busy} />
+            ) : p.showLines && (
+                shown.length === 0 ? (
+                    !p.myTurn && (
+                        <p className="shrink-0 py-0.5 text-center text-[12.5px] font-medium text-ink-3">
+                            {t("sim.chat.emptyWaiting").replace("{name}", p.opponentName)}
+                        </p>
+                    )
+                ) : (
+                    <ul className="flex-1 min-h-0 flex flex-col justify-end gap-1 overflow-hidden" aria-live="polite">
+                        {shown.map((l, i) => {
+                            const mine = l.from === p.myIndex;
+                            const older = i < shown.length - 2;
+                            return (
+                                <li key={l.id} className={cn("shrink-0 flex", mine ? "justify-end" : "justify-start", older && "hide-on-keyboard")}>
+                                    <span
+                                        className={cn(
+                                            "max-w-[85%] px-2.5 py-0.5 rounded-2xl text-[12.5px] leading-snug truncate",
+                                            mine ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-1",
+                                        )}
+                                    >
+                                        {lineText(l, t)}
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )
+            )}
+            <div className="shrink-0 flex items-center gap-1.5">
+                <QuickToggle open={p.quickOpen} onToggle={() => { p.onQuickOpen(!p.quickOpen); inputRef.current?.blur(); }} />
                 <input
                     ref={inputRef}
-                    value={draft}
+                    value={p.draft}
                     // 글자 수는 코드포인트로 센다. maxLength 속성은 UTF-16 이라 이모지에서 서버 판정과 어긋난다.
-                    onChange={(e) => onDraft(clampChatText(e.target.value))}
+                    onChange={(e) => p.onDraft(clampChatText(e.target.value))}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void send(); } }}
                     placeholder={t("sim.chat.placeholder")}
                     aria-label={t("sim.chat.placeholder")}
                     enterKeyHint="send"
                     inputMode="text"
-                    className={cn(
-                        "flex-1 min-w-0 h-11 px-3.5 rounded-pill",
-                        "bg-surface-1 border border-surface-line text-[14px] text-ink-1 placeholder:text-ink-4",
-                        "outline-none focus:border-brand",
-                    )}
+                    className="flex-1 min-w-0 h-10 px-3 rounded-pill bg-surface-3 text-[14px] text-ink-1 placeholder:text-ink-4 outline-none focus:ring-1 focus:ring-brand"
                 />
                 <button
                     type="button"
                     onClick={() => { void send(); }}
-                    disabled={disabled || busy || chatLength(draft.trim()) === 0}
+                    disabled={p.disabled || busy || chatLength(p.draft.trim()) === 0}
                     aria-label={t("sim.chat.send")}
-                    className={cn(
-                        "shrink-0 h-11 px-4 rounded-pill text-[13px] font-bold",
-                        "bg-brand text-brand-fg active:scale-[0.97] transition-transform disabled:opacity-40",
-                    )}
+                    className="shrink-0 h-10 px-3.5 rounded-pill bg-brand text-brand-fg text-[13px] font-bold active:scale-[0.97] transition-transform disabled:opacity-40"
                 >
                     {t("sim.chat.send")}
                 </button>

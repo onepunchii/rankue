@@ -91,7 +91,8 @@ import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
 import { sameCueInput } from "./simReducer";
 import { easeOppAim, OPP_AIM_PULLBACK } from "./match/oppAim";
-import { MatchChatBar, MatchChatCard, MatchChatLog, MatchQuickAim } from "./match/MatchChat";
+import { MatchChatLog, MatchChatToggle, MatchMiniChat } from "./match/MatchChat";
+import { chatMaxHeight } from "./match/chatLayout";
 import { MatchScoreStrip } from "./match/MatchScoreStrip";
 import type { ChatLine } from "./matchApi";
 import type { CueInput, Phase } from "./simReducer";
@@ -270,6 +271,8 @@ export function SimulatorPage() {
     const [placing, setPlacing] = useState<string | null>(null);
     // 테이블 영역 높이(ResizeObserver). 오른쪽 열의 compact 여부를 여기서(높이 + 툴바 버튼 수) 정한다
     const [tableH, setTableH] = useState(0);
+    /** 테이블 영역 폭 — 대화창 높이 상한(천을 덮지 않게)을 렌더러와 같은 배치 계산으로 구할 때 쓴다. */
+    const [tableW, setTableW] = useState(0);
 
     const sim = useSimulator({
         getAudioContext: getCtx,
@@ -531,6 +534,7 @@ export function SimulatorPage() {
         const measure = () => {
             dirtyRef.current = true;
             setTableH(el.clientHeight);
+            setTableW(el.clientWidth);
         };
         const ro = new ResizeObserver(measure);
         ro.observe(el);
@@ -885,6 +889,10 @@ export function SimulatorPage() {
     const [chatDraft, setChatDraft] = useState("");
     /** 1탭 문구판이 펼쳐졌나. 펼친 동안엔 상대 차례 카드를 감춰 칩 두 줄 자리를 내준다. */
     const [chatQuickOpen, setChatQuickOpen] = useState(false);
+    /** 내 차례에 말풍선으로 연 대화창(2026-09-18 오너: "칠 때도 쓰게"). 조준이 끝나면(샷·차례 바뀜) 저절로 닫힌다. */
+    const [aimChatOpen, setAimChatOpen] = useState(false);
+    /** 마지막으로 본 대화 줄 번호 — 이보다 뒤의 상대 말이 있으면 말풍선에 빨간 점. */
+    const [seenChatSeq, setSeenChatSeq] = useState(0);
     /** 칩 열의 한마디는 12초 뒤 사라진다 — 그걸 다시 계산하려면 시계가 돌아야 한다. 말이 있을 때만 돈다. */
     const chatLines = isMatch && sim.match ? sim.match.chat : EMPTY_CHAT;
     const lastChatAt = chatLines.length > 0 ? chatLines[chatLines.length - 1].at : "";
@@ -895,6 +903,20 @@ export function SimulatorPage() {
         const id = setInterval(() => setChatNow(Date.now()), 1000);
         return () => clearInterval(id);
     }, [lastChatAt]);
+    // 조준이 끝나면(샷을 쳤거나 차례가 넘어갔다) 내 차례 대화창은 닫는다 — 다음 내 차례에 저절로 다시 떠 있으면 조작을 덮는다.
+    useEffect(() => { if (sim.phase !== "aim") setAimChatOpen(false); }, [sim.phase]);
+    /** 대화 줄이 화면에 보이는 동안은 본 것으로 친다(상대 차례 대화창, 또는 내 차례에 연 대화창). */
+    const chatVisible = isMatch && (sim.phase === "waiting" || aimChatOpen);
+    const lastChatSeq = chatLines.length > 0 ? chatLines[chatLines.length - 1].seq : 0;
+    useEffect(() => { if (chatVisible) setSeenChatSeq(lastChatSeq); }, [chatVisible, lastChatSeq]);
+    const myIdx = sim.match?.myIndex ?? -1;
+    const chatUnread = chatLines.some((l) => l.seq > seenChatSeq && l.from !== myIdx);
+    /** 대화창 높이 상한 — 윗변이 당구 천 아래끝보다 아래에 오게(공을 가릴 수 없게). 렌더러와 같은 배치 계산을 쓴다. */
+    const chatMaxH = useMemo(
+        () => chatMaxHeight({ width: tableW, height: tableH, table, insets: TABLE_INSETS, bottomGap: 12, floor: 60 }),
+        [tableW, tableH, table],
+    );
+
     /** clientKey: 응답만 유실된 재시도를 서버가 한 줄로 합친다(모바일에서 흔하다). */
     const chatKey = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const onSendChat = useCallback(async (text: string) => actionsRef.current.sendChat({ text, clientKey: chatKey() }), []);
@@ -1413,11 +1435,10 @@ export function SimulatorPage() {
                         )}
                         {/* 조준 중 1탭 문구(2026-09-16). 하단 입력줄은 상대 차례에만 있는데, 상대가 빗나간 직후
                             "아깝다"를 보내고 싶은 순간이 바로 내 차례다. 읽은 자리 바로 아래에서 답한다. */}
+                        {/* 내 차례 대화(2026-09-18). 샷 버튼 옆이 아니라 여기 — 대화하려다 샷 버튼을 잘못 누르면 샷이 나가고 되돌릴 수 없다.
+                            여기는 상대 한마디가 뜨는 바로 그 자리라 읽은 곳에서 답한다. */}
                         {isMatch && sim.match?.status === "playing" && sim.phase === "aim" && (
-                            <MatchQuickAim
-                                open={chatQuickOpen} onOpen={setChatQuickOpen}
-                                onSendCode={(code) => { void onQuickCode(code); }}
-                            />
+                            <MatchChatToggle open={aimChatOpen} unread={chatUnread} onToggle={() => setAimChatOpen((v) => !v)} />
                         )}
                         {drill && (
                             <span className={drillLocked ? chipBrand : chipNeutral}>
@@ -1505,7 +1526,8 @@ export function SimulatorPage() {
                             onUndo={undoInDock ? onUndo : null}
                             className={cn(
                                 "absolute left-2 bottom-2 z-[3] transition-opacity duration-150",
-                                controlsHidden ? "opacity-0 pointer-events-none" : "opacity-100",
+                                // 내 차례 대화창을 열면 그 자리를 대화창이 덮는다 — 반쯤 비친 버튼이 남지 않게 누를 수 없게 한다
+                                controlsHidden || aimChatOpen ? "opacity-0 pointer-events-none" : "opacity-100",
                             )}
                         />
                     )}
@@ -1546,9 +1568,22 @@ export function SimulatorPage() {
                             ]}
                         />
                     )}
-                    {isMatch && sim.match && (sim.phase === "waiting" || sim.phase === "shooting") && (
+                    {/*
+                      * 미니 대화창(2026-09-18). 상대 차례·재생 중엔 늘, 내 차례엔 말풍선을 눌러 열었을 때만.
+                      * **조건에 phase 가 들어가는 것이 중요하다** — 조준 중에 저절로 떠 있으면 같은 자리의 두께 독·미세 방향조절을
+                      * 덮는다(2026-09-15 사고). 내 차례 대화는 사용자가 직접 연 경우라 그동안 독을 감춘다(아래 ThicknessDock).
+                      */}
+                    {isMatch && sim.match && (sim.phase === "waiting" || sim.phase === "shooting" || (sim.phase === "aim" && aimChatOpen)) && (
                         <div
-                            className="absolute inset-x-0 z-[3] flex flex-col items-center gap-2 px-4 pointer-events-none"
+                            className={cn(
+                                "absolute inset-x-0 z-[3] flex flex-col gap-2 pointer-events-none",
+                                /*
+                                 * 내 차례엔 두께 독 자리(왼쪽)에만 앉는다. 가운데 340 px 로 두면 오른쪽 샷 버튼(x 303~367)의 왼쪽을 덮고
+                                 * 오른쪽 10 px 만 삐져나와 눌리는 반쯤 가려진 버튼이 된다(실측). 샷 버튼은 온전히 남겨 바로 칠 수 있게
+                                 * 하고(치면 대화창은 저절로 닫힌다), 오른쪽을 78 px 비워 탭 간격 하한 6 px 을 지킨다.
+                                 */
+                                sim.phase === "aim" ? "items-start pl-2 pr-[78px]" : "items-center px-4",
+                            )}
                             /*
                              * 키보드 위로 띄운다. 앱(네이티브)은 웹뷰를 일부러 안 줄이므로(keyboardAvoid 의 setResizeMode "none")
                              * bottom 만 주면 입력줄이 키보드 **밑에 깔린다** — 2026-09-16 오너 제보의 원인이 이것이다.
@@ -1558,26 +1593,21 @@ export function SimulatorPage() {
                              */
                             style={{ bottom: "max(0.75rem, calc(var(--keyboard-height, 0px) + 0.5rem))" }}
                         >
-                            {/* 키보드가 뜨면 이 카드는 사라진다(hide-on-keyboard) — 127px 을 비워 당구대를 더 보여 준다.
-                                상대 시계는 상단 띠에도 작게 떠 있어 잃는 정보가 없다. */}
-                            {/* 상대 차례 카드 = 대화창(2026-09-18 안 A). 이름·"상대 차례예요"·큰 시계는 헤더와 겹쳐 뺐다.
-                                자리 비움 안내는 시계가 아직 안 돌 때만(2026-09-15 제보: 멈춘 것처럼 보이지 않게). */}
-                            {sim.phase === "waiting" && !bannerVisible && !chatQuickOpen && (
-                                <MatchChatCard
-                                    lines={chatLines} myIndex={sim.match.myIndex} opponentName={sim.match.opponentName}
-                                    away={!clock && sim.match.opponentAway}
-                                    onClaim={sim.match.canClaim ? () => { void onClaim(); } : null}
-                                />
-                            )}
-                            {/* 한마디 입력. canChat 은 **서버가 보는 차례**로 판단한다 — 내가 친 직후엔 로컬 턴이 먼저
-                                넘어가지만 서버의 turn 은 샷이 기록될 때까지 아직 나라서, 그 창에 쓴 글은 거부된다. */}
-                            {sim.match.canChat && (
-                                <MatchChatBar
-                                    draft={chatDraft} onDraft={setChatDraft}
-                                    onSend={onSendChat} onSendCode={onSendChatCode}
-                                    quickOpen={chatQuickOpen} onQuickOpen={setChatQuickOpen}
-                                />
-                            )}
+                            {/* 대화 줄과 입력을 한 상자에(오너: "분리될 필요가 없네"). 높이 상한 = 당구 천을 덮지 않는 값.
+                                대화 줄은 결과 배너가 뜨는 동안·재생 중엔 접는다(배너와 겹치지 않게, 굴러가는 공을 덜 가리게) —
+                                입력줄은 남겨 쓰던 글과 키보드가 살아 있다. 자리 비움은 시계가 아직 안 돌 때만. */}
+                            <MatchMiniChat
+                                lines={chatLines} myIndex={sim.match.myIndex} opponentName={sim.match.opponentName}
+                                draft={chatDraft} onDraft={setChatDraft}
+                                onSend={onSendChat} onSendCode={onSendChatCode}
+                                quickOpen={chatQuickOpen} onQuickOpen={setChatQuickOpen}
+                                showLines={!bannerVisible && sim.phase !== "shooting"}
+                                maxHeight={chatMaxH}
+                                myTurn={sim.phase === "aim" ? { seconds: clock?.mine ? clock.seconds : null, onClose: () => setAimChatOpen(false) } : null}
+                                away={sim.phase === "waiting" && !clock && sim.match.opponentAway}
+                                onClaim={sim.phase === "waiting" && sim.match.canClaim ? () => { void onClaim(); } : null}
+                                disabled={!sim.match.canChat}
+                            />
                         </div>
                     )}
                     {coachOpen && !pathView && sim.phase === "aim" && sim.mode === "solo" && <CoachHint onClose={closeCoach} />}

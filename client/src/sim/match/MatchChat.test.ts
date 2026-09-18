@@ -77,31 +77,50 @@ function opensPointerEvents(el: Element, root: Element): boolean {
     return false;
 }
 
-describe("MatchChatBar", () => {
-    const noop = async () => "ok" as const;
-    const bar = (p: Record<string, unknown>) => React.createElement(Chat.MatchChatBar, { onSend: noop, onSendCode: noop, quickOpen: false, onQuickOpen: () => undefined, ...p } as never);
+/** 미니 대화창 기본 props — 테스트마다 필요한 것만 덮어쓴다. */
+const noop = async () => "ok" as const;
+const mini = (p: Record<string, unknown>) => React.createElement(Chat.MatchMiniChat, {
+    lines: [], myIndex: 0, opponentName: "최영환",
+    draft: "", onDraft: () => undefined, onSend: noop, onSendCode: noop,
+    quickOpen: false, onQuickOpen: () => undefined,
+    showLines: true, maxHeight: 132, myTurn: null, away: false, onClaim: null,
+    ...p,
+} as never);
+const quickButton = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === ko["sim.chat.quick"])!;
 
-    it("입력칸과 보내기 버튼은 스스로 pointer-events-auto 를 켠다 — 부모가 none 이라 상속만으론 안 눌린다", () => {
-        const c = mount(bar({ draft: "", onDraft: () => undefined }));
-        const input = c.querySelector("input")!;
-        expect(input).not.toBeNull();
-        expect(opensPointerEvents(input, c)).toBe(true);
+describe("MatchMiniChat — 대화 줄과 입력을 한 상자에(2026-09-18)", () => {
+    it("한 상자다 — 대화 줄과 입력칸이 같은 [data-sim-chat] 안에 있다", () => {
+        const c = mount(mini({ lines: [line({ id: "a", seq: 1, text: "안되나" })] }));
+        const box = c.querySelector("[data-sim-chat]")!;
+        expect(box).not.toBeNull();
+        expect(box.querySelector("input")).not.toBeNull();
+        expect(box.textContent).toContain("안되나");
+    });
+
+    it("높이 상한을 받는다 — 당구 천을 덮지 않는 값", () => {
+        const c = mount(mini({ maxHeight: 121 }));
+        expect((c.querySelector("[data-sim-chat]") as HTMLElement).style.maxHeight).toBe("121px");
+    });
+
+    it("누를 것은 전부 스스로 pointer-events-auto 를 켠다 — 부모가 none 이라 상속만으론 안 눌린다", () => {
+        const c = mount(mini({}));
+        expect(opensPointerEvents(c.querySelector("input")!, c)).toBe(true);
         for (const b of Array.from(c.querySelectorAll("button"))) expect(opensPointerEvents(b, c)).toBe(true);
     });
 
     it("빈 초안이면 보내기가 잠긴다(공백만 있어도)", () => {
-        const c = mount(bar({ draft: "   ", onDraft: () => undefined }));
+        const c = mount(mini({ draft: "   " }));
         const send = Array.from(c.querySelectorAll("button")).find((b) => b.textContent === ko["sim.chat.send"])!;
         expect(send.hasAttribute("disabled")).toBe(true);
     });
 
     it("30자를 넘겨 입력하면 코드포인트 기준으로 잘려서 올라간다", () => {
         const got: string[] = [];
-        const c = mount(bar({ draft: "", onDraft: (v: string) => got.push(v) }));
+        const c = mount(mini({ onDraft: (v: string) => got.push(v) }));
         const input = c.querySelector("input")! as HTMLInputElement;
         React.act(() => {
-            // React 는 값 변화를 자체 추적기로 판단한다 — input.value 에 직접 넣으면 "안 바뀐 것"으로 보고
-            // onChange 를 부르지 않는다. 네이티브 setter 로 넣어야 추적기를 지나간다.
+            // React 는 값 변화를 자체 추적기로 판단한다 — 네이티브 setter 로 넣어야 onChange 가 불린다.
             const setValue = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value")!.set!;
             setValue.call(input, "가".repeat(40));
             input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
@@ -109,46 +128,95 @@ describe("MatchChatBar", () => {
         expect(got).toHaveLength(1);
         expect([...got[0]]).toHaveLength(Chat.CHAT_MAX_CHARS);
     });
+
+    it("아직 말이 없으면 누구 차례인지 담은 안내 한 줄(상대 차례)", () => {
+        const c = mount(mini({}));
+        expect(c.textContent).toContain(ko["sim.chat.emptyWaiting"].replace("{name}", "최영환"));
+    });
+
+    it("최근 네 줄까지, 상대는 왼쪽 · 나는 오른쪽", () => {
+        const lines = [1, 2, 3, 4, 5].map((n) => line({ id: `c${n}`, seq: n, text: `말${n}`, from: n % 2 }));
+        const c = mount(mini({ lines }));
+        expect(c.textContent).not.toContain("말1");
+        const items = Array.from(c.querySelectorAll("li"));
+        expect(items.find((li) => li.textContent === "말2")!.className).toContain("justify-end");    // from 0 = 나
+        expect(items.find((li) => li.textContent === "말3")!.className).toContain("justify-start");  // from 1 = 상대
+    });
+
+    it("키보드가 뜨면 마지막 두 줄만 남는다", () => {
+        const lines = [1, 2, 3, 4].map((n) => line({ id: `c${n}`, seq: n, text: `말${n}` }));
+        const c = mount(mini({ lines }));
+        expect(Array.from(c.querySelectorAll("li")).map((li) => li.className.includes("hide-on-keyboard"))).toEqual([true, true, false, false]);
+    });
+
+    it("결과 배너·재생 중엔 줄을 접고 입력줄은 남긴다 — 쓰던 글과 키보드가 살아 있게", () => {
+        const c = mount(mini({ showLines: false, lines: [line({ id: "a", seq: 1, text: "안되나" })] }));
+        expect(c.textContent).not.toContain("안되나");
+        expect(c.querySelector("input")).not.toBeNull();
+    });
+
+    it("자리 비움·승리 주장은 필요할 때만", () => {
+        const none = mount(mini({}));
+        expect(none.textContent).not.toContain(ko["sim.match.claim"]);
+        let claimed = 0;
+        const c = mount(mini({ away: true, onClaim: () => { claimed += 1; } }));
+        expect(c.textContent).toContain(ko["sim.match.opponentAway"]);
+        const btn = Array.from(c.querySelectorAll("button")).find((b) => b.textContent === ko["sim.match.claim"])!;
+        React.act(() => { btn.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
+        expect(claimed).toBe(1);
+    });
 });
 
-describe("빠른 한마디 칩 — 키보드를 아예 안 여는 길", () => {
-    const noop = async () => "ok" as const;
-    const bar = (p: Record<string, unknown>) => React.createElement(Chat.MatchChatBar, { onSend: noop, onSendCode: noop, quickOpen: false, onQuickOpen: () => undefined, ...p } as never);
-    const quickButton = (c: HTMLElement) =>
-        Array.from(c.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === ko["sim.chat.quick"])!;
+describe("내 차례 대화창 — 말풍선으로 직접 연다(2026-09-18)", () => {
+    it("맨 위에 남은 초와 닫기 — 40초는 계속 가고 세 번 넘기면 실격패다", () => {
+        let closed = 0;
+        const c = mount(mini({ myTurn: { seconds: 32, onClose: () => { closed += 1; } } }));
+        expect(c.textContent).toContain(ko["sim.chat.myTurnClock"].replace("{n}", "32"));
+        const close = Array.from(c.querySelectorAll("button")).find((b) => b.textContent === ko["sim.common.close"])!;
+        React.act(() => { close.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
+        expect(closed).toBe(1);
+    });
 
-    it("접혀 있으면 칩이 DOM 에 아예 없다 — 자리를 안 쓴다", () => {
-        const c = mount(bar({ draft: "", onDraft: () => undefined }));
-        const toggle = quickButton(c);
-        expect(toggle).toBeDefined();
-        expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    it("내 차례엔 '상대가 치는 동안' 안내를 띄우지 않는다 — 틀린 말이라서", () => {
+        const c = mount(mini({ myTurn: { seconds: 20, onClose: () => undefined } }));
+        expect(c.textContent).not.toContain(ko["sim.chat.emptyWaiting"].replace("{name}", "최영환"));
+    });
+
+    it("말풍선: 안 읽은 상대 말이 있으면 빨간 점, 열면 점이 사라진다", () => {
+        const withDot = mount(React.createElement(Chat.MatchChatToggle, { open: false, unread: true, onToggle: () => undefined }));
+        expect(withDot.querySelector(".bg-ball-red")).not.toBeNull();
+        const opened = mount(React.createElement(Chat.MatchChatToggle, { open: true, unread: true, onToggle: () => undefined }));
+        expect(opened.querySelector(".bg-ball-red")).toBeNull();
+        expect(opensPointerEvents(opened.querySelector("button")!, opened)).toBe(true);
+    });
+});
+
+describe("빠른 한마디 — 대화 줄 자리에 바꿔 끼운다", () => {
+    it("접혀 있으면 칩이 DOM 에 없다", () => {
+        const c = mount(mini({}));
+        expect(quickButton(c).getAttribute("aria-expanded")).toBe("false");
         expect(c.textContent).not.toContain(ko["sim.emoji.oops"]);
     });
 
-    it("☺ 를 누르면 밖으로 알린다 — 펼친 동안 대기 카드가 비켜 줘야 해서 상태가 밖에 있다", () => {
+    it("☺ 를 누르면 밖으로 알린다", () => {
         const got: boolean[] = [];
-        const c = mount(bar({ draft: "", onDraft: () => undefined, onQuickOpen: (v: boolean) => got.push(v) }));
+        const c = mount(mini({ onQuickOpen: (v: boolean) => got.push(v) }));
         React.act(() => { quickButton(c).dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
         expect(got).toEqual([true]);
     });
 
-    it("펼치면 여섯 문구가 나오고, 글이 아니라 **코드**로 보낸다", async () => {
-        const sent: string[] = [];
-        const c = mount(bar({
-            draft: "", onDraft: () => undefined, quickOpen: true,
-            onSendCode: async (code: string) => { sent.push(code); return "ok" as const; },
-        }));
+    it("펼치면 대화 줄 **대신** 칩이 나온다 — 상자 높이가 늘지 않게", () => {
+        const c = mount(mini({ quickOpen: true, lines: [line({ id: "a", seq: 1, text: "안되나" })] }));
         for (const code of CHAT_QUICK_CODES) expect(c.textContent).toContain(ko[`sim.emoji.${code}`]);
-        const oops = Array.from(c.querySelectorAll("button")).find((b) => b.textContent?.includes(ko["sim.emoji.oops"]))!;
-        await React.act(async () => { oops.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
-        // 코드로 보내야 상대 화면에 **상대 언어로** 뜬다. 한국어 문장을 text 로 보내면 그게 깨진다.
-        expect(sent).toEqual(["oops"]);
+        expect(c.textContent).not.toContain("안되나");
     });
 
-    it("칩도 pointer-events-auto 를 켠다 — 부모가 none 이라 상속만으론 안 눌린다", () => {
-        const c = mount(bar({ draft: "", onDraft: () => undefined, quickOpen: true }));
-        expect(c.querySelectorAll("button").length).toBeGreaterThan(CHAT_QUICK_CODES.length);
-        for (const b of Array.from(c.querySelectorAll("button"))) expect(opensPointerEvents(b, c)).toBe(true);
+    it("칩은 글이 아니라 **코드**로 보낸다 — 상대 화면엔 상대 언어로 뜬다", async () => {
+        const sent: string[] = [];
+        const c = mount(mini({ quickOpen: true, onSendCode: async (code: string) => { sent.push(code); return "ok" as const; } }));
+        const oops = Array.from(c.querySelectorAll("button")).find((b) => b.textContent?.includes(ko["sim.emoji.oops"]))!;
+        await React.act(async () => { oops.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
+        expect(sent).toEqual(["oops"]);
     });
 });
 
@@ -205,10 +273,10 @@ describe("MatchChatLog", () => {
 describe("키보드 회피", () => {
     const src = () => readFileSync(path.resolve(process.cwd(), "client/src/sim/SimulatorPage.tsx"), "utf8");
 
-    it("입력 띠가 --keyboard-height 만큼 올라간다", () => {
+    it("대화 띠가 --keyboard-height 만큼 올라간다", () => {
         const s = src();
-        const i = s.indexOf("<MatchChatBar");
-        const block = s.slice(s.lastIndexOf("<div", i - 2000 > 0 ? i - 2000 : 0), i);
+        const i = s.indexOf("<MatchMiniChat");
+        const block = s.slice(Math.max(0, i - 2500), i);
         expect(block).toContain("var(--keyboard-height");
     });
 
@@ -216,75 +284,41 @@ describe("키보드 회피", () => {
         const s = src();
         const i = s.indexOf('style={{ bottom: "max(0.75rem');
         expect(i).toBeGreaterThan(-1);
-        const near = s.slice(i - 600, i + 200);
-        expect(near).not.toMatch(/transition-\[?bottom|transition-all/);
+        expect(s.slice(i - 600, i + 200)).not.toMatch(/transition-\[?bottom|transition-all/);
     });
 
-    it("대기 카드는 대화창이다 — 헤더와 겹치던 이름·큰 시계를 뺐다(2026-09-18 안 A)", () => {
+    it("예전 대기 카드의 큰 시계(56px)가 돌아오지 않았다 — 헤더 시계와 두 번 겹친다", () => {
+        expect(src()).not.toMatch(/ShotClock[^>]*size=\{56\}/);
+    });
+});
+
+/**
+ * 좌표를 못 재는 jsdom 에서 하단 겹침을 막을 수 있는 유일한 형태의 단언이다.
+ * 대화 띠는 두께 독과 같은 자리라, 내 조준 중에는 **사용자가 직접 연 경우(aimChatOpen)에만** 있어야 하고,
+ * 그때는 독이 누를 수 없게 감춰져야 한다.
+ */
+describe("대화 띠와 조준 조작의 자리 다툼", () => {
+    const src = () => readFileSync(path.resolve(process.cwd(), "client/src/sim/SimulatorPage.tsx"), "utf8");
+
+    it("조준 중엔 aimChatOpen 일 때만 마운트된다", () => {
         const s = src();
-        expect(s).toContain("<MatchChatCard");
-        // 예전 카드의 큰 시계(56px)가 다시 들어오면 헤더 시계와 두 번 겹친다
-        expect(s).not.toMatch(/ShotClock[^>]*size=\{56\}/);
+        const i = s.indexOf("<MatchMiniChat");
+        const open = s.slice(0, i).lastIndexOf("{isMatch && sim.match && (");
+        const cond = s.slice(open, s.indexOf("\n", open + 1));
+        expect(cond).toContain('sim.phase === "aim" && aimChatOpen');
+        // 조준이 조건 없이 들어가 있으면 안 된다
+        expect(cond).not.toMatch(/sim\.phase === "aim"\s*\|\|/);
     });
 
-    it("문구판을 펼치면 대기 카드가 비켜 준다 — 칩 두 줄과 카드가 같이 쌓이면 테이블을 덮는다", () => {
-        expect(src()).toContain('sim.phase === "waiting" && !bannerVisible && !chatQuickOpen');
-    });
-});
-
-describe("입력 띠는 내 조준 중에 존재하지 않는다", () => {
-    it("SimulatorPage 의 마운트 조건이 waiting·shooting 으로 묶여 있다", () => {
-        const src = readFileSync(path.resolve(process.cwd(), "client/src/sim/SimulatorPage.tsx"), "utf8");
-        const i = src.indexOf("<MatchChatBar");
-        expect(i, "MatchChatBar 를 붙인 자리가 없다").toBeGreaterThan(-1);
-        // 그 블록을 여는 조건 줄을 거슬러 찾는다
-        const head = src.slice(0, i);
-        const open = head.lastIndexOf("{isMatch && sim.match && (");
-        expect(open).toBeGreaterThan(-1);
-        const cond = src.slice(open, src.indexOf("\n", open + 1) + 200);
-        expect(cond).toContain('sim.phase === "waiting" || sim.phase === "shooting"');
-        expect(cond).not.toContain('sim.phase === "aim"');
-    });
-});
-
-
-describe("MatchChatCard — 상대 차례 대화창", () => {
-    const card = (p: Record<string, unknown>) => React.createElement(Chat.MatchChatCard, { lines: [], myIndex: 0, opponentName: "최영환", away: false, onClaim: null, ...p } as never);
-
-    it("아직 말이 없으면 누구 차례인지 담은 안내 한 줄 — 예전 '상대 차례예요'가 하던 일", () => {
-        const c = mount(card({}));
-        expect(c.textContent).toContain("최영환");
-        expect(c.textContent).toContain(ko["sim.chat.emptyWaiting"].replace("{name}", "최영환"));
+    it("내 차례 대화창을 열면 두께 독은 누를 수 없게 감춘다", () => {
+        expect(src()).toContain('controlsHidden || aimChatOpen ? "opacity-0 pointer-events-none"');
     });
 
-    it("최근 네 줄만, 상대는 왼쪽 · 나는 오른쪽", () => {
-        const lines = [1, 2, 3, 4, 5].map((n) => line({ id: `c${n}`, seq: n, text: `말${n}`, from: n % 2 }));
-        const c = mount(card({ lines }));
-        expect(c.textContent).not.toContain("말1");
-        for (const n of [2, 3, 4, 5]) expect(c.textContent).toContain(`말${n}`);
-        const items = Array.from(c.querySelectorAll("li"));
-        const mine = items.find((li) => li.textContent === "말2")!;    // from 0 = 나
-        const theirs = items.find((li) => li.textContent === "말3")!;  // from 1 = 상대
-        expect(mine.className).toContain("justify-end");
-        expect(theirs.className).toContain("justify-start");
+    it("내 차례엔 오른쪽 샷 버튼 자리를 비운다 — 반쯤 가려진 샷 버튼이 남지 않게", () => {
+        expect(src()).toContain('sim.phase === "aim" ? "items-start pl-2 pr-[78px]"');
     });
 
-    it("키보드가 뜨면 마지막 두 줄만 남는다 — 답을 쓰는 동안 방금 받은 말은 보여야 한다", () => {
-        const lines = [1, 2, 3, 4].map((n) => line({ id: `c${n}`, seq: n, text: `말${n}` }));
-        const c = mount(card({ lines }));
-        const items = Array.from(c.querySelectorAll("li"));
-        expect(items.map((li) => li.className.includes("hide-on-keyboard"))).toEqual([true, true, false, false]);
-    });
-
-    it("자리 비움·승리 주장은 필요할 때만, 누를 것만 스스로 켠다", () => {
-        const none = mount(card({}));
-        expect(none.querySelector("button")).toBeNull();
-        let claimed = 0;
-        const c = mount(card({ away: true, onClaim: () => { claimed += 1; } }));
-        expect(c.textContent).toContain(ko["sim.match.opponentAway"]);
-        const btn = c.querySelector("button")!;
-        expect(opensPointerEvents(btn, c)).toBe(true);
-        React.act(() => { btn.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
-        expect(claimed).toBe(1);
+    it("조준이 끝나면 내 차례 대화창은 닫힌다 — 다음 내 차례에 저절로 떠 있으면 조작을 덮는다", () => {
+        expect(src()).toContain('if (sim.phase !== "aim") setAimChatOpen(false)');
     });
 });

@@ -260,7 +260,9 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             opponentAim: m.opponentAim ?? null,
             countries: m.countries ?? [null, null],
             chat: aux.chat,
-            canChat: m.status === "playing" && m.turn !== m.myIndex && core.queue.length === 0,
+            // 차례는 안 본다(2026-09-18) — 내 차례 대화창은 말풍선을 눌러 직접 연다. 보낼 샷이 남은 동안만 막는다
+            // (그 창에선 서버 상태가 아직 내 샷을 모른다).
+            canChat: m.status === "playing" && core.queue.length === 0,
         } : null;
         return {
             phase: core.phase,

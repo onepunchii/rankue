@@ -110,10 +110,10 @@ export function chatReject(x: {
     const cooldownMs = x.cooldownMs ?? CHAT_COOLDOWN_MS;
     const maxPerMatch = x.maxPerMatch ?? CHAT_MAX_PER_MATCH;
     if (x.status !== "playing") return "gone";
-    // 글은 **내가 기다리는 동안에만** 쓴다. 안전 때문이 아니라 화면 때문이다 — 내 차례에 키보드가 올라오면
-    // 두께 독·미세 방향조절·샷 버튼이 덮이는데 40초 시계는 계속 돌고, 세 번이면 실격패다.
-    // 고정 인사(code)는 키보드가 없으므로 차례를 가리지 않는다.
-    if (x.kind === "text" && x.turn === x.from) return "your-turn";
+    // 차례는 가리지 않는다(2026-09-18 오너: "칠 때도 쓰게 해 달라는 요청"). 예전엔 내 차례 글을 서버가 막았는데,
+    // 막은 이유가 "키보드가 조작 버튼을 **저절로** 덮는다"였다. 이제 내 차례 대화창은 사용자가 말풍선을 눌러
+    // 직접 여는 것이라 막을 이유가 없다 — 40초는 계속 가므로 화면이 남은 시간을 대화창에 같이 보여 준다.
+    // (x.turn 은 판단에 안 쓰지만 인자는 남긴다 — 호출부가 대전 행을 잠근 채 한 번에 넘긴다.)
     if (x.count >= maxPerMatch) return "limit";
     if (x.lastMineAt !== null && now - x.lastMineAt < cooldownMs) return "cooldown";
     return null;

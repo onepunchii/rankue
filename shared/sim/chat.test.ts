@@ -81,8 +81,9 @@ describe("chatReject", () => {
         expect(chatReject(base)).toBeNull();
     });
 
-    it("내 차례엔 글을 못 쓴다 — 키보드가 조작을 덮고 40초가 도는 중이다", () => {
-        expect(chatReject({ ...base, turn: 0 })).toBe("your-turn");
+    it("내 차례에도 글을 쓸 수 있다 — 대화창을 사용자가 직접 열 때만 뜬다(2026-09-18)", () => {
+        // 예전엔 "your-turn" 으로 막았다. 막은 이유(키보드가 조작을 저절로 덮는다)가 사라졌다.
+        expect(chatReject({ ...base, turn: 0 })).toBeNull();
     });
 
     it("고정 인사는 내 차례에도 보낼 수 있다 — 키보드가 없다", () => {
