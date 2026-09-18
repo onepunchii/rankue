@@ -88,6 +88,13 @@ describe("MatchScoreStrip", () => {
         expect(el.querySelector("button")).toBeNull();
     });
 
+    it("칸 나눔: 선수 사이 세로선은 한 줄로 끝까지, 이닝 사이는 가로선(첫 줄 제외)", () => {
+        const el = mount(rows, [0, 1]);
+        expect(el.querySelectorAll(".left-1\\/2.w-px")).toHaveLength(1);
+        const r = Array.from(el.querySelectorAll(".grid.h-\\[22px\\]"));
+        expect(r.map((x) => x.className.includes("border-t"))).toEqual([false, true, true]);
+    });
+
     it("지금 이닝 수를 머리에 보인다", () => {
         expect(mount(rows, [0, 1]).textContent).toContain("3");
     });

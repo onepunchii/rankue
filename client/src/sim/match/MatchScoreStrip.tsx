@@ -11,6 +11,8 @@ import type { InningRow } from "../inningLog";
  * 원래 세로로 읽는 정보다. 랭큐의 핵심("손안의 당구 점수판")과도 같고, 지금까지는 헤더를 눌러야만 열렸다.
  *
  * 규칙: 득점은 숫자, 0점은 가운데 점(·), 아직 치지 않은 칸은 비운다. 각자의 하이런(이닝 최고 득점)은 강조한다.
+ * 칸 나눔도 실제 점수판처럼(2026-09-18 오너): 선수 사이는 **위아래로 끝까지 이어지는 세로선**, 이닝 사이는 가로선.
+ * 세로선을 행마다 긋지 않고 한 줄로 따로 둔 이유 — 이닝이 적을 때 위쪽 빈 공간에서 선이 끊겨 보이지 않게.
  * 칸 순서는 헤더와 같다 — 왼쪽이 나, 오른쪽이 상대. 새 이닝은 아래에 붙고, 넘치면 오래된 이닝이 위로 잘린다
  * (실제 점수판처럼 아래로 채워 간다. 높이를 재지 않고 justify-end + overflow-hidden 으로 해결한다).
  *
@@ -45,15 +47,21 @@ export const MatchScoreStrip = memo(function MatchScoreStrip({ rows, order, ball
                 </span>
                 <span className="w-full grid grid-cols-2">
                     {balls.map((b, i) => (
-                        <span key={i} className="flex justify-center">
+                        <span key={i} className={cn("flex justify-center", i === 0 && "border-r border-surface-line")}>
                             <span className={cn("w-[9px] h-[9px] rounded-pill", b === "white" ? "bg-ball-white border border-surface-line-strong" : "bg-ball-yellow")} />
                         </span>
                     ))}
                 </span>
             </div>
-            <div className="flex-1 min-h-0 flex flex-col justify-end overflow-hidden px-1 pb-1">
-                {rows.map((r) => (
-                    <div key={r.inning} className="shrink-0 grid grid-cols-2 h-[22px] items-center">
+            <div className="relative flex-1 min-h-0 flex flex-col justify-end overflow-hidden px-1 pb-1">
+                {/* 선수 사이 세로선 — 이닝 수와 상관없이 위아래로 끝까지 */}
+                <span aria-hidden="true" className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-surface-line" />
+                {rows.map((r, i) => (
+                    <div
+                        key={r.inning}
+                        /* 이닝 사이 가로선 — 맨 위 줄에는 긋지 않는다(머리 아래 선이 이미 있다) */
+                        className={cn("relative shrink-0 grid grid-cols-2 h-[22px] items-center", i > 0 && "border-t border-surface-line")}
+                    >
                         {order.map((p, col) => {
                             const v = r.cells[p];
                             const isHigh = v !== null && v > 0 && v === high[col];
