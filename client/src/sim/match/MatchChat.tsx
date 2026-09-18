@@ -292,7 +292,12 @@ export function MatchMiniChat(p: {
                     <div
                         ref={scrollRef}
                         onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; }}
-                        className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                        className={cn(
+                            "flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                            // 접힘은 딱 두 줄(2026-09-18 오너: "다이가 가려지지 않게, 어차피 위로 늘리면 다 보인다").
+                            // 한 줄 = 12.5px × 1.375 + 위아래 2px ≈ 21px, 두 줄 + 간격 4px ≈ 47px. 더 지난 말은 스크롤·펼치기로.
+                            !p.expanded && "max-h-[47px]",
+                        )}
                     >
                         <ul className="min-h-full flex flex-col justify-end gap-1" aria-live="polite">
                             {shown.map((l) => {
