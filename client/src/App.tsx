@@ -39,6 +39,7 @@ import HiqGolfRanking from "@/pages/hiq/golf-ranking";
 import HiqGolfer from "@/pages/hiq/golfer";
 import HiqWorldPlayer from "@/pages/hiq/world-player";
 import GolfPlay from "@/golf/pages/GolfPlay";
+import MiniGolfPlay from "@/golf/pages/MiniGolfPlay";
 import GolfNewGame from "@/golf/pages/NewGame";
 import GolfScorecard from "@/golf/pages/GamePage";
 import GameResult from "@/golf/pages/GameResult";
