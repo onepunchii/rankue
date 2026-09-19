@@ -3,6 +3,8 @@ import { storage } from "../../storage/index.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { SUGGESTION_REPLY_TYPE } from "../../lib/suggestionBox.js";
+import { randomInt } from "crypto";
+import { hashPassword } from "../../services/hiqService.js";
 
 const router = Router();
 
@@ -40,6 +42,23 @@ router.get("/activity", checkSuperAdmin, asyncHandler(async (_req: any, res: any
 router.get("/members", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const members = await storage.getAllMembersForAdmin();
     return sendSuccess(res, members);
+}));
+
+/**
+ * POST /admin/members/:id/reset-pin — 임시 PIN 발급(2026-09-19 오너: 다대맨 문의 "PIN 을 잊어 애플로 새로 들어왔더니 기록이 다 없다").
+ * 전화번호 계정은 가입 때 본인이 정한 4자리 PIN 이 있고 기본값이 없다. 보안 질문 답까지 잊으면 되찾을 길이 없어
+ * 사용자가 새 계정을 만들고 기록을 잃는다. 운영자가 문의로 본인을 확인한 뒤 임시 PIN 을 발급해 전달한다.
+ * PIN 은 응답으로 **한 번만** 보여 주고 서버 로그에는 남기지 않는다(누가 언제 초기화했는지만 남긴다).
+ */
+router.post("/members/:id/reset-pin", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const member = await storage.getMemberById(req.params.id);
+    if (!member || !member.profileId) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    const profile = await storage.getProfile(member.profileId);
+    if (!profile || !profile.phone) return sendError(res, 400, "전화번호 계정이 아닙니다(구글·애플 로그인은 PIN 이 없습니다)");
+    const pin = String(randomInt(0, 10_000)).padStart(4, "0");
+    await storage.updateProfile(profile.id, { password: await hashPassword(pin) });
+    console.info("[admin] PIN 초기화", JSON.stringify({ memberId: member.id, profileId: profile.id, by: req.signedCookies?.hiq_partner_auth ?? null }));
+    return sendSuccess(res, { pin, name: member.name, phone: profile.phone });
 }));
 
 // GET /admin/members/:id/games — 그 회원의 최근 경기(기록 정리용 목록)

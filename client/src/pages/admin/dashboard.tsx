@@ -208,6 +208,13 @@ export default function AdminDashboard() {
     const [memberSearch, setMemberSearch] = useState("");
     // 기록 정리 대화상자(잘못 만든 경기 삭제) — 회원 표의 '기록' 버튼이 연다
     const [gamesFor, setGamesFor] = useState<{ id: string; name: string } | null>(null);
+    /** 임시 PIN 발급 결과 — 사용자에게 전달할 때까지 창에 띄워 둔다(한 번만 보인다). */
+    const [pinResult, setPinResult] = useState<{ pin: string; name: string; phone: string } | null>(null);
+    const resetPin = useMutation({
+        mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/members/${id}/reset-pin`, { method: "POST" }) as Promise<{ pin: string; name: string; phone: string }>,
+        onSuccess: (r) => setPinResult(r),
+        onError: (e: any) => toast({ title: "PIN 초기화 실패", description: e?.message ?? "", variant: "destructive" }),
+    });
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
     // Queries
@@ -1168,11 +1175,20 @@ export default function AdminDashboard() {
                                                     <td className="p-4 text-right font-mono">{(m.activeDays7 ?? 0) > 0 ? <span className="font-bold text-[rgba(0,0,0,0.87)]">{m.activeDays7}일</span> : <span className="text-black/25">-</span>}</td>
                                                     <td className="p-4 text-right font-mono text-black/60">{m.avgSessionMin30 ? `${m.avgSessionMin30}분` : <span className="text-black/25">-</span>}</td>
                                                     <td className="p-4 text-black/50 font-mono">{m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "-"}</td>
-                                                    <td className="p-4 text-right">
+                                                    <td className="p-4 text-right whitespace-nowrap">
                                                         <button
                                                             onClick={() => setGamesFor({ id: m.id, name: m.name })}
                                                             className="h-8 px-3 rounded-lg border border-black/15 text-xs font-bold text-black/60 hover:border-brand/40 hover:text-brand"
                                                         >기록</button>
+                                                        {m.phone && !String(m.phone).startsWith("social:") && (
+                                                            <button
+                                                                disabled={resetPin.isPending}
+                                                                onClick={() => {
+                                                                    if (window.confirm(`${m.name}(${m.phone}) 님의 PIN 을 임시 PIN 으로 바꿉니다.\n본인 확인을 마쳤나요? 지금 PIN 은 더 이상 쓸 수 없습니다.`)) resetPin.mutate(m.id);
+                                                                }}
+                                                                className="ml-1.5 h-8 px-3 rounded-lg border border-black/15 text-xs font-bold text-black/60 hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                                                            >PIN 초기화</button>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1186,6 +1202,17 @@ export default function AdminDashboard() {
                     )}
 
                     <MemberGamesDialog member={gamesFor} onClose={() => setGamesFor(null)} />
+                    <Dialog open={pinResult !== null} onOpenChange={(o) => { if (!o) setPinResult(null); }}>
+                        <DialogContent className="max-w-sm">
+                            <h2 className="text-lg font-black text-[rgba(0,0,0,0.87)]">임시 PIN 발급 완료</h2>
+                            <p className="text-sm text-black/60">{pinResult?.name} · {pinResult?.phone}</p>
+                            <p className="my-2 text-center font-mono text-4xl font-black tracking-[0.3em] text-brand">{pinResult?.pin}</p>
+                            <p className="text-xs text-black/50 leading-relaxed">
+                                이 창을 닫으면 다시 볼 수 없습니다. 사용자에게 전달하세요 — 전화번호 + 이 PIN 으로 로그인하면 기존 기록이 그대로 있습니다.
+                                PIN 을 바꾸고 싶으면 로그인 화면의 "PIN을 잊으셨나요?"(보안 질문)로 바꿀 수 있습니다.
+                            </p>
+                        </DialogContent>
+                    </Dialog>
 
                     {tab === "golf-orders" && <GolfOrdersView />}
                     {tab === "online-game" && <OnlineGameView />}
