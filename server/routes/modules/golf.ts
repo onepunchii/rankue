@@ -14,9 +14,16 @@ const router = Router();
 
 // --- Golf Booking Routes ---
 router.get("/bookings", asyncHandler(async (req: AuthRequest, res: any) => {
+    // ?mine=1 — 내가 올린 글 전부, 날짜와 무관(2026-09-21 '내역' 시트). 목록은 하루치만 받으므로 따로 둔다.
+    if (req.query.mine === "1") {
+        if (!req.userId) return sendError(res, 401, "로그인이 필요합니다");
+        const mine = await storage.getGolfBookings(undefined, { ownerId: req.userId, includeBlinded: true, limit: 100 });
+        return sendSuccess(res, await withJoinCounts(mine as any[], req.userId));
+    }
     const date = req.query.date as string | undefined;
-    // Pass all query params as filters
-    const bookings = await storage.getGolfBookings(date, req.query);
+    // 화면 질의를 그대로 필터로 넘기되, 서버 전용 키(ownerId·includeBlinded)는 지운다 — 남의 글 목록이나 가려진 글을 못 꺼내게.
+    const { ownerId: _o, includeBlinded: _b, ...filters } = req.query as Record<string, unknown>;
+    const bookings = await storage.getGolfBookings(date, filters);
     return sendSuccess(res, await withJoinCounts(bookings as any[], req.userId));
 }));
 

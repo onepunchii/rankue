@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookingCreateSheet } from "../components/booking/BookingCreateSheet";
+import { MyListingsSheet, MY_LISTINGS_QUERY_KEY } from "../components/booking/MyListingsSheet";
 import { JoinCreateSheet } from "../components/join/JoinCreateSheet";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { distanceKm, isKoreaCoord, JOIN_TYPE_LABEL, JOIN_TYPES, type JoinType } from "@shared/golfJoin";
@@ -43,7 +44,7 @@ export default function BookingList() {
     const [viewType, setViewType] = useState<'ALL' | 'BOOKING' | 'JOIN'>('BOOKING');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [showOnlyMyBookings, setShowOnlyMyBookings] = useState(false);
+    const [myListingsOpen, setMyListingsOpen] = useState(false);
     /**
      * 조인 종류(필드/스크린/파크)와 "내 주변"(2026-09-21 오너: 스크린 조인은 내 위치 기반으로).
      * 위치는 누를 때 한 번 묻는다 — 목록을 열 때마다 권한 창이 뜨면 안 된다.
@@ -187,10 +188,6 @@ export default function BookingList() {
             if (viewType === 'JOIN' && item.listingType !== 'JOIN') return false;
             if (viewType === 'JOIN' && joinKind !== 'ALL' && (item.joinType ?? 'FIELD') !== joinKind) return false;
 
-            // 3. 내역(내가 올린 것만) — 회원 id 로 본다. 예전엔 전화번호로 봐서 소셜 회원(전화 없음)은 자기 글을 못 찾았다.
-            if (showOnlyMyBookings && user) {
-                if (item.ownerId !== user.id && !(user.phone && item.managerPhone === user.phone)) return false;
-            }
 
             // 4. Time filtering
             const timeFilters = selectedFilters.time;
@@ -238,7 +235,7 @@ export default function BookingList() {
             }
             return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
         });
-    }, [bookings, viewType, selectedFilters, selectedDate, weekDates, joinKind, nearMe, location, showOnlyMyBookings, user]);
+    }, [bookings, viewType, selectedFilters, selectedDate, weekDates, joinKind, nearMe, location]);
 
     // 내가 올린 글 내리기(부킹·조인 공통). 서버가 글쓴이·운영자만 받는다.
     const deleteMutation = useMutation({
@@ -247,9 +244,21 @@ export default function BookingList() {
             toast({ title: "내렸어요" });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings/counts"] });
+            queryClient.invalidateQueries({ queryKey: MY_LISTINGS_QUERY_KEY });
         },
         onError: (e: any) => toast({ title: e?.message || "내리지 못했어요", variant: "destructive" }),
     });
+    /** 내역에서 "보기": 그 글의 탭·날짜로 옮기고 카드를 펼친다(검색 결과 누를 때와 같은 동작). */
+    const goToListing = useCallback((item: any) => {
+        setMyListingsOpen(false);
+        const type = item.listingType === 'JOIN' ? 'JOIN' : 'BOOKING';
+        if (viewType !== type) setViewType(type);
+        const idx = weekDates.findIndex(d => d.fullDate === kstDateKey(item.datetime));
+        if (idx !== -1) pickDate(idx);
+        else toast({ title: "지난 글이에요", description: "목록은 오늘부터 30일까지만 보여요." });
+        setExpandedBookingId(item.id);
+        setTimeout(() => document.getElementById(`booking-${item.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+    }, [viewType, weekDates, pickDate, toast]);
     const handleDelete = useCallback((item: any) => {
         if (window.confirm("이 글을 내릴까요? 되돌릴 수 없어요.")) deleteMutation.mutate(item.id);
     }, [deleteMutation]);
@@ -320,9 +329,8 @@ export default function BookingList() {
                     <div className="flex items-center gap-2">
                         {user && (
                             <button
-                                onClick={() => setShowOnlyMyBookings((v) => !v)}
-                                className={cn("h-9 px-3 rounded-full text-[12.5px] font-medium border whitespace-nowrap transition-colors",
-                                    showOnlyMyBookings ? "bg-white text-black border-white" : "bg-white/[0.04] border-white/10 text-white/60")}
+                                onClick={() => setMyListingsOpen(true)}
+                                className="h-9 px-3 rounded-full text-[12.5px] font-medium border whitespace-nowrap transition-colors bg-white/[0.04] border-white/10 text-white/70 active:bg-white/10"
                                 title="내가 올린 글"
                             >내역</button>
                         )}
@@ -472,6 +480,8 @@ export default function BookingList() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            <MyListingsSheet open={myListingsOpen} onOpenChange={setMyListingsOpen} onGo={goToListing} onDelete={handleDelete} />
 
             <ShareSheet
                 open={isShareModalOpen}

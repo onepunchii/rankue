@@ -275,8 +275,10 @@ export class GolfRepository {
     }
 
     async getGolfBookings(date?: string, filters?: any): Promise<GolfBooking[]> {
-        // 신고 누적·운영자 조치로 가려진 매물은 목록에서 뺀다(행은 남는다 — 추적용)
-        const conditions: any[] = [eq(golfBookings.isBlinded, false)];
+        // 신고 누적·운영자 조치로 가려진 매물은 목록에서 뺀다(행은 남는다 — 추적용). 내 글 내역(includeBlinded)은 예외.
+        const conditions: any[] = filters?.includeBlinded ? [] : [eq(golfBookings.isBlinded, false)];
+        // 내가 올린 글만(2026-09-21 '내역'). 화면 질의 문자열로는 못 준다 — 라우트가 로그인 id 로만 넣는다.
+        if (typeof filters?.ownerId === "string" && filters.ownerId) conditions.push(eq(golfBookings.ownerId, filters.ownerId));
         if (date) {
             const targetDate = new Date(date);
             const start = new Date(targetDate);
