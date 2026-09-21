@@ -127,13 +127,13 @@ router.delete("/rooms/:key/messages/:id", requireAuth, asyncHandler(async (req: 
 router.post("/dm", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const ids = Array.isArray(req.body?.memberIds) ? (req.body.memberIds as unknown[]).map(String).filter((s) => UUID.test(s) && s !== req.userId) : [];
     if (ids.length === 0 || ids.length > 7) return sendError(res, 400, "함께할 사람을 1~7명 골라 주세요");
+    // 방은 종목을 가진다 — 골프 탭에서 연 방은 골프 친구와만, 골프 탭에만 보인다(2026-09-21).
+    const sport = sportOf(req.body?.sport);
     const friends = new Set<string>();
-    for (const sport of ["BILLIARDS", "GOLF"] as const) {
-        for (const f of await storage.getFriends(req.userId!, sport)) if ((f as any)?.status === "accepted") friends.add(String((f as any).friend?.id ?? (f as any).id));
-    }
+    for (const f of await storage.getFriends(req.userId!, sport)) if ((f as any)?.status === "accepted") friends.add(String((f as any).friend?.id ?? (f as any).id));
     const strangers = ids.filter((id) => !friends.has(id));
-    if (strangers.length > 0) return sendError(res, 403, "친구(라이벌)로 등록된 사람과만 대화방을 열 수 있어요", "NOT_FRIENDS");
-    const r = await storage.chat.getOrCreateDm(req.userId!, ids);
+    if (strangers.length > 0) return sendError(res, 403, sport === "GOLF" ? "골프 친구로 등록된 사람과만 대화방을 열 수 있어요" : "친구(라이벌)로 등록된 사람과만 대화방을 열 수 있어요", "NOT_FRIENDS");
+    const r = await storage.chat.getOrCreateDm(req.userId!, ids, sport);
     return sendSuccess(res, { key: `dm:${r.id}`, created: r.created });
 }));
 

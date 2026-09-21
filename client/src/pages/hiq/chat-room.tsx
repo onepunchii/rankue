@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LucideChevronLeft, LucideMapPin, LucideUsers } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useSport } from "@/contexts/SportContext";
 import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { ChatRoom, type ChatMsg } from "@/components/hiq/chat/ChatRoom";
@@ -23,7 +24,7 @@ interface RoomInfo {
     key: string; kind: "crew" | "listing" | "dm" | "support"; id: string;
     title: string; subtitle: string;
     members: { id: string; name: string; profileImageUrl: string | null }[];
-    canManage: boolean; crewId?: string; booking?: any;
+    canManage: boolean; crewId?: string; booking?: any; sport?: "BILLIARDS" | "GOLF";
 }
 
 export default function ChatRoomPage() {
@@ -39,6 +40,10 @@ export default function ChatRoomPage() {
 
     const info = useQuery<RoomInfo>({ queryKey: ["/api/hiq/chat/rooms", key, "info"], queryFn: () => apiRequest(`/api/hiq/chat/rooms/${key}/info`), enabled: !!kind && !!id, retry: false });
     const forbidden = info.isError && (info.error as any)?.status === 403;
+    // 푸시로 골프 방에 들어왔는데 앱이 당구 모드면 골프 테마·골프 채팅 탭으로 맞춘다(방마다 종목이 있다).
+    const { currentSport, setSport } = useSport();
+    const roomSport = info.data?.sport;
+    useEffect(() => { if (roomSport && roomSport !== currentSport) setSport(roomSport); }, [roomSport, currentSport, setSport]);
 
     const [messages, setMessages] = useState<ChatMsg[]>([]);
     const [loading, setLoading] = useState(true);
@@ -166,7 +171,8 @@ export default function ChatRoomPage() {
     }, [d, b, member?.id, setLocation, t]);
 
     return (
-        <div className="h-[100dvh] flex flex-col bg-surface-0 text-ink-1">
+        // 키보드가 뜨면 그 높이만큼 방을 줄인다 — 웹뷰가 안 줄어드는 iOS·안드로이드(edge-to-edge)에서 입력줄이 키보드 뒤로 숨었다(2026-09-21).
+        <div className="flex flex-col bg-surface-0 text-ink-1" style={{ height: "calc(100dvh - var(--keyboard-height, 0px))" }}>
             <header className="shrink-0 h-14 px-2 flex items-center gap-1 border-b border-surface-line bg-surface-0">
                 <button type="button" onClick={() => (window.history.length > 1 ? window.history.back() : setLocation("/chat"))} aria-label="뒤로" className="w-10 h-10 rounded-full flex items-center justify-center text-ink-2 active:bg-surface-2">
                     <LucideChevronLeft className="w-6 h-6" />

@@ -444,6 +444,8 @@ export type HiqChatMessage = typeof hiqChatMessages.$inferSelect;
 export const hiqChatRooms = pgTable("hiq_chat_rooms", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   kind: text("kind", { enum: ["dm"] }).default("dm").notNull(),
+  /** 채팅 탭이 종목별이라 방도 종목을 가진다(2026-09-21) — 골프 친구와의 방은 골프 탭에만. */
+  sport: text("sport", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
   title: text("title"),
   createdBy: uuid("created_by").references(() => hiqMembers.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),

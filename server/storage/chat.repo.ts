@@ -128,26 +128,26 @@ export class ChatRepository {
     }
 
     /* ── 1:1 · 소그룹 ───────────────────────────────────── */
-    /** 같은 두 사람의 1:1 방이 있으면 그것을, 없으면 새로. 셋 이상은 늘 새 방. */
-    async getOrCreateDm(creatorId: string, memberIds: string[]): Promise<{ id: string; created: boolean }> {
+    /** 같은 두 사람의 **같은 종목** 1:1 방이 있으면 그것을, 없으면 새로. 셋 이상은 늘 새 방. */
+    async getOrCreateDm(creatorId: string, memberIds: string[], sport: "BILLIARDS" | "GOLF"): Promise<{ id: string; created: boolean }> {
         const ids = [...new Set([creatorId, ...memberIds])];
         if (ids.length === 2) {
             const found = await db.execute(sql`
                 SELECT r.id FROM hiq_chat_rooms r
-                WHERE r.kind = 'dm'
+                WHERE r.kind = 'dm' AND r.sport = ${sport}
                   AND (SELECT count(*) FROM hiq_chat_room_members m WHERE m.room_id = r.id) = 2
                   AND (SELECT count(*) FROM hiq_chat_room_members m WHERE m.room_id = r.id AND m.member_id IN (${ids[0]}::uuid, ${ids[1]}::uuid)) = 2
                 LIMIT 1`);
             const row = (found.rows as any[])[0];
             if (row) return { id: String(row.id), created: false };
         }
-        const [room] = await db.insert(hiqChatRooms).values({ kind: "dm", createdBy: creatorId }).returning();
+        const [room] = await db.insert(hiqChatRooms).values({ kind: "dm", sport, createdBy: creatorId }).returning();
         await db.insert(hiqChatRoomMembers).values(ids.map((memberId) => ({ roomId: room.id, memberId })));
         return { id: room.id, created: true };
     }
 
     /* ── 방 정보(머리줄·고정 카드) ───────────────────────── */
-    async roomInfo(ref: RoomRef, viewerId: string): Promise<{ title: string; subtitle: string; members: { id: string; name: string; profileImageUrl: string | null }[]; canManage: boolean; crewId?: string; booking?: any }> {
+    async roomInfo(ref: RoomRef, viewerId: string): Promise<{ title: string; subtitle: string; members: { id: string; name: string; profileImageUrl: string | null }[]; canManage: boolean; crewId?: string; booking?: any; sport?: "BILLIARDS" | "GOLF" }> {
         const memberIds = await this.roomMembers(ref);
         // 남의 메시지를 지울 수 있나 — 크루 운영진·앱 운영자. 화면이 삭제 단추를 보일지 정하는 데만 쓴다(서버 검사는 따로).
         let canManage = await this.isAdmin(viewerId);
@@ -159,17 +159,18 @@ export class ChatRepository {
             .from(hiqMembers).leftJoin(profiles, eq(profiles.id, hiqMembers.profileId)).where(inArray(hiqMembers.id, memberIds)) : [];
         const members = people.map((p) => ({ id: String(p.id), name: p.name, profileImageUrl: p.profileImageUrl ?? null }));
         if (ref.kind === "crew") {
-            const [c] = await db.select({ name: hiqCrews.name }).from(hiqCrews).where(eq(hiqCrews.id, ref.id)).limit(1);
-            return { title: c?.name ?? "크루", subtitle: `크루 · ${members.length}명`, members, canManage, crewId: ref.id };
+            const [c] = await db.select({ name: hiqCrews.name, sport: hiqCrews.sportCategory }).from(hiqCrews).where(eq(hiqCrews.id, ref.id)).limit(1);
+            return { title: c?.name ?? "크루", subtitle: `크루 · ${members.length}명`, members, canManage, crewId: ref.id, sport: c?.sport === "GOLF" ? "GOLF" : "BILLIARDS" };
         }
         if (ref.kind === "listing") {
             const [b] = await db.select().from(golfBookings).where(eq(golfBookings.id, ref.id)).limit(1);
             const title = b ? (b.isBlind ? b.blindName ?? b.courseName : b.courseName) : "대화방";
-            return { title, subtitle: `${b?.listingType === "JOIN" ? "조인" : "부킹"} · 확정된 분들만`, members, canManage, booking: b };
+            return { title, subtitle: `${b?.listingType === "JOIN" ? "조인" : "부킹"} · 확정된 분들만`, members, canManage, booking: b, sport: "GOLF" };
         }
         if (ref.kind === "dm") {
             const others = members.filter((m) => m.id !== viewerId);
-            return { title: others.map((m) => m.name).join(", ") || "나", subtitle: members.length > 2 ? `${members.length}명` : "1:1", members, canManage };
+            const [room] = await db.select({ sport: hiqChatRooms.sport }).from(hiqChatRooms).where(eq(hiqChatRooms.id, ref.id)).limit(1);
+            return { title: others.map((m) => m.name).join(", ") || "나", subtitle: members.length > 2 ? `${members.length}명` : "1:1", members, canManage, sport: room?.sport ?? "BILLIARDS" };
         }
         const isAdmin = await this.isAdmin(viewerId);
         const owner = members.find((m) => m.id === ref.id);
@@ -211,8 +212,10 @@ export class ChatRepository {
             }
         }
 
-        // 1:1 · 소그룹(종목 무관 — 사람 사이의 대화다)
-        const dms = await db.select({ roomId: hiqChatRoomMembers.roomId }).from(hiqChatRoomMembers).where(eq(hiqChatRoomMembers.memberId, memberId));
+        // 1:1 · 소그룹 — 방이 종목을 가진다(2026-09-21 오너: "골프 채팅과 당구 채팅은 구별되게")
+        const dms = await db.select({ roomId: hiqChatRoomMembers.roomId }).from(hiqChatRoomMembers)
+            .innerJoin(hiqChatRooms, eq(hiqChatRooms.id, hiqChatRoomMembers.roomId))
+            .where(and(eq(hiqChatRoomMembers.memberId, memberId), eq(hiqChatRooms.sport, sport)));
         if (dms.length > 0) {
             const roomIds = dms.map((d) => d.roomId);
             const mem = await db.select({ roomId: hiqChatRoomMembers.roomId, id: hiqMembers.id, name: hiqMembers.name, img: profiles.profileImageUrl })

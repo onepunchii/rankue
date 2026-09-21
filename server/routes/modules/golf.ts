@@ -131,6 +131,9 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
 }));
 
 router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    // 내리기 전에 알릴 사람을 먼저 본다 — 신청 행은 글과 함께 cascade 로 지워진다.
+    const requesters = UUID.test(req.params.id) ? await storage.activeRequesterIds(req.params.id) : [];
+    const before: any = UUID.test(req.params.id) ? await storage.getGolfBooking(req.params.id) : undefined;
     const member = await storage.getMemberById(req.userId!);
     if (!member?.phone) return sendError(res, 403, "권한이 없습니다");
     // 운영자는 아무 매물이나 내릴 수 있다 — 사기 글을 내릴 방법이 없으면 신고가 무의미하다(2026-09-09).
@@ -141,6 +144,15 @@ router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest
         ? await storage.deleteGolfBooking(req.params.id)
         : await storage.deleteGolfBooking(req.params.id, member.phone, req.userId!);
     if (!deleted) return sendError(res, 404, "삭제할 예약이 없거나 권한이 없습니다");
+    // 확정·대기 중이던 사람에게 알린다(2026-09-21) — 예전엔 글이 사라진 것을 아무도 몰랐다.
+    if (before && requesters.length > 0) {
+        const isJoin = before.listingType === "JOIN";
+        await Promise.allSettled(requesters.map((r) => notificationService.sendAndSaveNotification({
+            memberId: r.memberId, title: isJoin ? "조인 글이 내려갔어요" : "부킹 글이 내려갔어요",
+            body: `${before.courseName} ${teeText(before)} 글을 올린 분이 내렸어요.${r.status === "accepted" ? " 확정됐던 자리라 다시 찾아보셔야 해요." : ""}`,
+            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list?view=${isJoin ? "JOIN" : "BOOKING"}` },
+        }).catch((e) => console.error("[GolfJoinNotify]", e))));
+    }
     return sendSuccess(res, { success: true });
 }));
 
@@ -179,9 +191,11 @@ router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthReq
     if (r === "already") return sendError(res, 409, "이미 신청했어요", "ALREADY_APPLIED");
     if (r === "full") return sendError(res, 409, isJoin ? "자리가 다 찼어요" : "이미 예약이 확정된 티타임이에요", "JOIN_FULL");
     // 올린 사람에게 알린다 — 승인제라 그 사람이 봐야 다음이 있다.
+    // ⚠️ 알림은 **기다린다** — 서버리스(Vercel)는 응답을 보내면 실행이 얼어붙어 기다리지 않은 푸시가 통째로 사라진다
+    // (2026-09-21 오너: "호스트한테 알림이 잘 안 와요" 의 원인). 이 파일의 모든 알림이 같은 규칙이다.
     if (booking.ownerId) {
         const me = await storage.getMemberById(req.userId!);
-        notificationService.sendAndSaveNotification({
+        await notificationService.sendAndSaveNotification({
             memberId: booking.ownerId,
             title: isJoin ? "조인 신청이 왔어요" : "예약 신청이 왔어요",
             body: isJoin
@@ -218,17 +232,25 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
     if (!booking) return sendError(res, 404, "조인 글을 찾을 수 없어요");
     if (!(await canManageBooking(req, booking))) return sendError(res, 403, "글쓴이만 할 수 있어요");
     const accept = req.body?.accept === true;
-    const r = await storage.decideJoinRequest(req.params.id, req.params.memberId, accept, joinCapacity(booking));
-    if (r === "full") return sendError(res, 409, "자리가 다 찼어요", "JOIN_FULL");
-    if (r === "gone") return sendError(res, 409, "대기 중인 신청이 아니에요");
     const isJoin = booking.listingType === "JOIN";
+    const r = await storage.decideJoinRequest(req.params.id, req.params.memberId, accept, joinCapacity(booking));
+    if (r === "full") return sendError(res, 409, isJoin ? "자리가 다 찼어요" : "이미 다른 분께 확정한 티타임이에요", "JOIN_FULL");
+    if (r === "gone") return sendError(res, 409, "대기 중인 신청이 아니에요");
     // 확정되면 대화방에 들어온다(2026-09-21 채팅) — 시스템 메시지로 알리고, 푸시는 방으로 바로 보낸다.
     if (accept) {
         const who = await storage.getMemberById(req.params.memberId);
         await storage.chat.addMessage({ key: `listing:${booking.id}`, senderId: null, type: "system", message: `${who?.name ?? "회원"}님이 확정됐어요. 이제 여기서 대화해요.` })
             .catch((e) => console.error("[ListingChatSystem]", e));
     }
-    notificationService.sendAndSaveNotification({
+    // 부킹은 한 팀만 — 한 명을 확정하면 나머지 대기는 자동 거절하고 알린다(예전엔 그 사람들이 영영 '대기'였다).
+    if (accept && !isJoin) {
+        const others = await storage.rejectOtherPending(booking.id, req.params.memberId);
+        await Promise.allSettled(others.map((memberId) => notificationService.sendAndSaveNotification({
+            memberId, title: "예약이 다른 분께 확정됐어요", body: `${booking.courseName} ${teeText(booking)}은 다른 분께 확정됐어요. 다른 티타임을 찾아보세요.`,
+            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list?view=BOOKING` },
+        }).catch((e) => console.error("[GolfJoinNotify]", e))));
+    }
+    await notificationService.sendAndSaveNotification({
         memberId: req.params.memberId,
         title: accept ? (isJoin ? "조인이 확정됐어요" : "예약이 확정됐어요") : (isJoin ? "조인 신청이 거절됐어요" : "예약 신청이 거절됐어요"),
         body: accept
@@ -284,7 +306,7 @@ router.delete("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthR
     if (booking?.ownerId) {
         const me = await storage.getMemberById(req.userId!);
         const isJoin = booking.listingType === "JOIN";
-        notificationService.sendAndSaveNotification({
+        await notificationService.sendAndSaveNotification({
             memberId: booking.ownerId, title: isJoin ? "조인 신청이 취소됐어요" : "예약 신청이 취소됐어요",
             body: `${me?.name ?? "회원"}님이 ${booking.courseName} ${teeText(booking)} 신청을 취소했어요.`,
             category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=${isJoin ? "JOIN" : "BOOKING"}` },
@@ -428,7 +450,7 @@ async function withJoinCounts(rows: any[], userId?: string) {
             // joinApplied 는 **자리를 차지한** 인원(승인됨) — 화면의 n/정원. 대기는 따로.
             joinApplied: c?.accepted ?? 0,
             joinPending: c?.pending ?? 0,
-            joinCapacity: r.listingType === "JOIN" ? joinCapacity(r) : null,
+            joinCapacity: joinCapacity(r),
             myJoinStatus: myStatus,
             joinedByMe: myStatus === "applied" || myStatus === "accepted",
         };

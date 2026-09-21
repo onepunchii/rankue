@@ -173,6 +173,7 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }}
                         rows={1}
                         disabled={disabled}
+                        onFocus={() => { atBottomRef.current = true; setTimeout(toBottom, 60); setTimeout(toBottom, 320); }}
                         placeholder={disabled ? t("chat.readOnly") : t("chat.placeholder")}
                         className="flex-1 min-h-[42px] max-h-[120px] px-3.5 py-2.5 rounded-2xl bg-surface-2 text-[14px] text-ink-1 placeholder:text-ink-4 outline-none resize-none focus:ring-1 focus:ring-brand disabled:opacity-50"
                         style={{ height: "auto" }}

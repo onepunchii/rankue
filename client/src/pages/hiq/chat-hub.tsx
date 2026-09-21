@@ -134,7 +134,7 @@ export default function ChatHub() {
                     </ul>
                 )}
             </main>
-            <FriendPicker open={pickerOpen} onOpenChange={setPickerOpen} />
+            <FriendPicker open={pickerOpen} onOpenChange={setPickerOpen} sport={currentSport} />
             <HiqNavigation />
         </div>
     );

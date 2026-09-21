@@ -18,7 +18,8 @@ export function GolfHeader({ member: _member }: GolfHeaderProps) {
     const { setSport } = useSport();
     const [, setLocation] = useLocation();
     const [notifOpen, setNotifOpen] = useState(false);
-    const { data: notifs } = useQuery<any[]>({ queryKey: ["/api/hiq/notifications"] });
+    // 종목을 붙여야 골프 알림이 온다 — 없이 부르면 당구 알림만 세어 골프 배지가 늘 0 이었다(2026-09-21).
+    const { data: notifs } = useQuery<any[]>({ queryKey: ["/api/hiq/notifications", { sport: "GOLF" }], refetchInterval: 60_000, staleTime: 30_000 });
     const unread = notifs?.filter((n) => !n.isRead).length || 0;
 
     return (

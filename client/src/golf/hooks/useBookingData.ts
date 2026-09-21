@@ -28,8 +28,12 @@ export const useBookingData = (weekDates: any[], selectedDate: number, viewType:
         }
     });
 
+    // 신청·승인·취소가 남의 화면에도 곧 보여야 한다(2026-09-21 오너: "실시간 전송이 안 돼요") — 소켓이 없어 15초 폴링 + 돌아올 때 새로.
     const bookingsQuery = useQuery<GolfBooking[]>({
         enabled: hasDates,
+        staleTime: 10_000,
+        refetchInterval: 15_000,
+        refetchOnWindowFocus: true,
         queryKey: [viewType === 'JOIN' ? '/api/hiq/golf/joins' : '/api/hiq/golf/bookings', {
             date: selectedFullDate,
             filters: JSON.stringify(selectedFilters),

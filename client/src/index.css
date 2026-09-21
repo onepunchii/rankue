@@ -1354,9 +1354,17 @@ body {
    웹뷰가 리사이즈되지 않으므로(iOS contentInset:never, Android adjustPan) 다이얼로그를
    보이는 영역 안으로 직접 끌어올린다. 다이얼로그는 translate(-50%,-50%)로 중앙 정렬돼 있어
    translate 값을 유지한 채 키보드 높이의 절반만큼 위로 민다. */
-body.keyboard-open [role="dialog"] {
+body.keyboard-open [role="dialog"][class*="translate-y-[-50%]"] {
   transform: translate(-50%, calc(-50% - var(--keyboard-height, 0px) / 2)) !important;
   max-height: calc(100dvh - var(--keyboard-height, 0px) - 2rem);
+  overflow-y: auto;
+}
+/* 아래에서 올라오는 시트(Radix Sheet side=bottom)는 가운데 정렬이 아니다 — 위 규칙을 그대로 받으면
+   translate(-50%) 때문에 화면 왼쪽 절반으로 밀려 반쪽만 보였다(2026-09-21 오너 새 대화 화면).
+   시트는 transform 대신 bottom 을 키보드 높이만큼 올리고, 남은 높이 안에서 스크롤한다. */
+body.keyboard-open [role="dialog"][class*="bottom-0"] {
+  bottom: var(--keyboard-height, 0px);
+  max-height: calc(100dvh - var(--keyboard-height, 0px));
   overflow-y: auto;
 }
 

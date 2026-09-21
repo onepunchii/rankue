@@ -510,6 +510,22 @@ export class GolfRepository {
         return rows.map((r) => ({ ...r.booking, myJoinStatus: r.myJoinStatus, myHeadcount: r.myHeadcount, requestedAt: r.requestedAt, changedAt: r.changedAt }));
     }
 
+    /** 부킹은 한 팀만 확정된다 — 한 명을 확정하면 나머지 대기(applied)는 거절로 돌리고 그 사람들을 돌려준다(알림용). */
+    async rejectOtherPending(bookingId: string, keepMemberId: string): Promise<string[]> {
+        const rows = await db.update(golfJoinRequests)
+            .set({ status: "rejected", updatedAt: new Date() })
+            .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.status, "applied"), sql`${golfJoinRequests.memberId} <> ${keepMemberId}::uuid`))
+            .returning({ memberId: golfJoinRequests.memberId });
+        return rows.map((r) => String(r.memberId));
+    }
+
+    /** 대기·확정 중인 신청자 id — 글을 내릴 때 알리려고(행은 cascade 로 지워진다). */
+    async activeRequesterIds(bookingId: string): Promise<{ memberId: string; status: string }[]> {
+        const rows = await db.select({ memberId: golfJoinRequests.memberId, status: golfJoinRequests.status }).from(golfJoinRequests)
+            .where(and(eq(golfJoinRequests.bookingId, bookingId), inArray(golfJoinRequests.status, ["applied", "accepted"])));
+        return rows.map((r) => ({ memberId: String(r.memberId), status: r.status }));
+    }
+
     /**
      * 조인 글에 누가 신청했는지 — 글쓴이에게만 보여 준다.
      *

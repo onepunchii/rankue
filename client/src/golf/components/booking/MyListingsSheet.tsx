@@ -105,8 +105,8 @@ function Row({ item, past, kind, onGo, onDelete, onCancel }: { item: any; past: 
 export function MyListingsSheet({ open, onOpenChange, onGo, onDelete, onCancelRequest, initialTab = "mine" }: Props) {
     const [tab, setTab] = useState<"mine" | "applied">(initialTab);
     useEffect(() => { if (open) setTab(initialTab); }, [open, initialTab]);
-    const mine = useQuery<any[]>({ queryKey: MY_LISTINGS_QUERY_KEY, queryFn: () => apiRequest("/api/hiq/golf/bookings?mine=1"), enabled: open, staleTime: 10_000 });
-    const applied = useQuery<any[]>({ queryKey: MY_REQUESTS_QUERY_KEY, queryFn: () => apiRequest("/api/hiq/golf/bookings?applied=1"), enabled: open, staleTime: 10_000 });
+    const mine = useQuery<any[]>({ queryKey: MY_LISTINGS_QUERY_KEY, queryFn: () => apiRequest("/api/hiq/golf/bookings?mine=1"), enabled: open, staleTime: 10_000, refetchInterval: open ? 15_000 : false });
+    const applied = useQuery<any[]>({ queryKey: MY_REQUESTS_QUERY_KEY, queryFn: () => apiRequest("/api/hiq/golf/bookings?applied=1"), enabled: open, staleTime: 10_000, refetchInterval: open ? 15_000 : false });
     // 내 신청 탭을 보면 "봤다" — 헤더 빨간 점의 기준
     useEffect(() => { if (open && tab === "applied" && applied.isSuccess) markRequestsSeen(); }, [open, tab, applied.isSuccess]);
 

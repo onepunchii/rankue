@@ -62,6 +62,10 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
 
     const { data, isLoading, isError } = useQuery<{ teeTime: string; applicants: Applicant[] }>({
         enabled,
+        // 새 신청이 오면 호스트 화면에 곧 뜨게 — 열려 있는 동안만 8초 폴링
+        refetchInterval: enabled ? 8_000 : false,
+        refetchOnWindowFocus: true,
+        staleTime: 3_000,
         queryKey: ["/api/hiq/golf/bookings", bookingId, "applicants"],
         queryFn: () => apiRequest(`/api/hiq/golf/bookings/${bookingId}/applicants`),
     });
@@ -87,7 +91,8 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
         onSuccess: (_d, v) => {
             toast({ title: v.accept ? "확정했어요 — 신청한 분께 알렸어요" : "거절했어요" });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings", bookingId, "applicants"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] }); // mine·applied 도 이 접두로 같이 새로
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/joins"] }); // 조인 탭 목록은 키가 다르다
         },
         onError: (e: any) => toast({ title: e?.message || "처리하지 못했어요", variant: "destructive" }),
     });

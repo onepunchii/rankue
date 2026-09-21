@@ -68,6 +68,8 @@ class Storage {
     async myJoinStatuses(memberId: string, ids: string[]) { return this.golf.myJoinStatuses(memberId, ids); }
     async decideJoinRequest(bookingId: string, memberId: string, accept: boolean, capacity: number) { return this.golf.decideJoinRequest(bookingId, memberId, accept, capacity); }
     async listMyRequests(memberId: string) { return this.golf.listMyRequests(memberId); }
+    async rejectOtherPending(bookingId: string, keepMemberId: string) { return this.golf.rejectOtherPending(bookingId, keepMemberId); }
+    async activeRequesterIds(bookingId: string) { return this.golf.activeRequesterIds(bookingId); }
     async applyToJoin(bookingId: string, memberId: string, capacity: number, headcount = 1) { return this.golf.applyToJoin(bookingId, memberId, capacity, headcount); }
     async cancelJoinRequest(bookingId: string, memberId: string) { return this.golf.cancelJoinRequest(bookingId, memberId); }
     async listJoinApplicants(bookingId: string) { return this.golf.listJoinApplicants(bookingId); }
