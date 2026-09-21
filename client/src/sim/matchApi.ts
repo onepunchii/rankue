@@ -9,6 +9,7 @@
  *
  * 실전 경기 API(/api/hiq/game/*)는 절대 부르지 않는다 — 시뮬 대전 성적은 hiqSimRatings 에만 쓰이고 RP 와 분리돼 있다.
  */
+import { CHAT_FROM_WATCHER } from "@shared/sim/chat";
 import type { BallState, ShotInput, SimEvent, Snapshot } from "@shared/sim/types";
 import type { CushionModelId, TableSpec } from "@shared/sim/params";
 import type { FinishType, GameType, Rules, SessionState, ShotOutcome } from "@shared/sim/rules";
@@ -237,7 +238,9 @@ export function parseChatLine(raw: unknown): ChatLine | null {
     if (typeof text !== "string") return null;
     return {
         id, seq,
-        from: from === 1 ? 1 : 0,
+        // 0·1 선수, 2 관전자(shared/sim/chat CHAT_FROM_WATCHER). 예전엔 0·1 로만 잘라서 관전자 응원이 **호스트 말**로
+        // 둔갑해 초록 말풍선으로 떴다(2026-09-21 오너 캡처).
+        from: from === 1 ? 1 : from === CHAT_FROM_WATCHER ? CHAT_FROM_WATCHER : 0,
         kind: kind === "code" ? "code" : "text",
         text,
         at: isoOrNull(raw.at) ?? "",

@@ -235,7 +235,10 @@ export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
         && a.opponentAway === b.opponentAway
         // 상대가 말만 한 순간은 다른 필드가 하나도 안 바뀐다 — 이게 빠지면 matchSync 의 조기 반환이
         // 그 응답을 통째로 버려 채팅이 화면에 영영 안 닿는다(2026-09-16 상대 조준과 똑같은 함정).
-        && a.chatSeq === b.chatSeq;
+        && a.chatSeq === b.chatSeq
+        // 관전자 수(2026-09-21 오너: "관전자 숫자 표시가 안 나온다"). 관전자가 들어오거나 나가는 순간도 다른 필드는 그대로라
+        // 여기 없으면 그 응답이 버려져 👀 가 영영 0 이었다 — 채팅 카운터와 똑같은 함정을 세 번째로 밟았다.
+        && a.watchers === b.watchers;
         // 상대 조준은 여기 없다 — 자주 바뀌는 표시용 값이라 따로 본다(sameOpponentAim).
         // 국가(countries)도 없다 — 대전 중에 바뀌지 않는다.
 }

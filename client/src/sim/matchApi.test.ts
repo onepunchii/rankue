@@ -264,12 +264,14 @@ describe("채팅 배선", () => {
             { id: "c1", seq: 1, from: 0, kind: "text", text: "하이", at: "2026-09-16T00:00:00.000Z" },
             { seq: 2, from: 1, kind: "text", text: "id 가 없다" },              // 버려진다
             { id: "c3", seq: 3, from: 1, kind: "code", text: "nice", at: "" },
+            { id: "c4", seq: 4, from: 2, kind: "code", text: "clap", at: "" },   // 관전자(2)는 그대로 2 — 0 으로 뭉개면 호스트 말이 된다
         ];
         const request = vi.fn(async () => rows);
         const got = await createMatchApi(request).getChats!("m-1", 1);
         expect(request).toHaveBeenLastCalledWith(matchChatsUrl("m-1", 1), { method: "GET" });
-        expect(got.map((c) => c.seq)).toEqual([1, 3]);
+        expect(got.map((c) => c.seq)).toEqual([1, 3, 4]);
         expect(got[1].kind).toBe("code");
+        expect(got.map((c) => c.from)).toEqual([0, 1, 2]);
     });
 });
 

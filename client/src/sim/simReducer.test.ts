@@ -451,6 +451,8 @@ describe("대전: 메타 헬퍼", () => {
         expect(sameMatchMeta(host, matchStateFrom({ ...m, opponentAim: { phi: 1.2, at: "2026-09-16T00:00:00.000Z" } }, 0))).toBe(true);
         // 쓰리아웃 횟수도 메타 — 바뀌면 스냅한다
         expect(sameMatchMeta(host, matchStateFrom({ ...m, timeouts: [1, 0] }, 0))).toBe(false);
+        // 관전자가 들어온 순간(다른 건 그대로)도 갱신이다 — 빠지면 👀 가 영영 0(2026-09-21)
+        expect(sameMatchMeta(host, matchStateFrom({ ...m, watchers: 2 }, 0))).toBe(false);
         expect(sameMatchMeta(host, matchStateFrom({ ...m, turnSeenAt: "2026-09-07T00:00:00.000Z" }, 0))).toBe(false);
         // 국가는 메타가 아니다 — 대전 중에 바뀌지 않으므로 비교할 이유가 없다(헤더 국기용 표시값일 뿐)
         expect(sameMatchMeta(host, matchStateFrom({ ...m, hostCountry: "KR", guestCountry: "VN" }, 0))).toBe(true);
