@@ -49,7 +49,7 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
     const phoneOk = !!member?.phone && !String(member.phone).startsWith("social:");
 
     const [query, setQuery] = useState("");
-    const [course, setCourse] = useState<{ id: number | string; name: string; region: string } | null>(null);
+    const [course, setCourse] = useState<{ id: number | string; name: string; region: string; subType?: string } | null>(null);
     const today = kstDateKey(Date.now());
     const [date, setDate] = useState(today);
     const [time, setTime] = useState("");
@@ -115,6 +115,9 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
     });
 
     const label = "text-[12px] font-medium text-white/50";
+    // 익명 표시 이름 프리셋 — 옛 폼과 같은 넷(권역 명문 · 권역 회원제/퍼블릭 · IC 인근 · 접근성). 직접 입력도 된다.
+    const zone = course ? course.region.substring(0, 2) : "";
+    const aliases = course ? [`${zone}권 명문`, course.subType === "회원제" ? `${zone}권 회원제` : `${zone}권 퍼블릭`, "IC 인근 골프장", "접근성 좋은 구장"] : [];
 
     return (
         <div className="h-full flex flex-col bg-[#121212] text-white">
@@ -138,7 +141,7 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
                             <ul className="absolute z-10 left-0 right-0 mt-1 rounded-xl bg-[#1E1E1E] border border-white/10 overflow-hidden shadow-xl">
                                 {hits.map((c) => (
                                     <li key={c.id}>
-                                        <button type="button" onClick={() => { setCourse({ id: c.id, name: c.name, region: c.region }); setQuery(c.name); }} className="w-full text-left px-4 py-2.5 hover:bg-white/[0.06]">
+                                        <button type="button" onClick={() => { setCourse({ id: c.id, name: c.name, region: c.region, subType: (c as any).subType }); setQuery(c.name); }} className="w-full text-left px-4 py-2.5 hover:bg-white/[0.06]">
                                             <span className="block text-[14px] text-white">{c.name}</span>
                                             <span className="block text-[12px] text-white/45">{c.region} · {c.address}</span>
                                         </button>
@@ -198,7 +201,14 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
                                     <span>골프장 이름 숨기기</span>
                                     <input type="checkbox" checked={blind} onChange={(e) => { setBlind(e.target.checked); if (e.target.checked && !blindName && course) setBlindName(`${course.region} 골프장`); }} className="w-5 h-5 accent-[#64DD17]" />
                                 </label>
-                                {blind && <input value={blindName} onChange={(e) => setBlindName(e.target.value.slice(0, 30))} placeholder="대신 보일 이름 (예: 경기 남부 골프장)" className={field} />}
+                                {blind && (
+                                    <>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {aliases.map((a) => <button key={a} type="button" onClick={() => setBlindName(a)} className={chip(blindName === a)}>{a}</button>)}
+                                        </div>
+                                        <input value={blindName} onChange={(e) => setBlindName(e.target.value.slice(0, 30))} placeholder="대신 보일 이름 직접 입력" className={field} />
+                                    </>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <span className={label}>취소·환불 규정</span>
