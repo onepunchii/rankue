@@ -1458,7 +1458,7 @@ export function SimulatorPage() {
                         )}
                         {/* 대전 알림은 헤더에서 여기로 내려왔다(2026-09-16 헤더 재설계) — 헤더는 "누가 치고 시간이 얼마 남았나"만 말한다. */}
                         {isMatch && (sim.match?.watchers ?? 0) > 0 && (
-                            <span className={cn(chipNeutral, "text-brand font-bold")}>
+                            <span className={cn(chipNeutral, "bg-[#6E5BC8]/30 text-[#DCD3FF] font-bold")}>
                                 {t("sim.watch.viewers").replace("{n}", String(sim.match?.watchers ?? 0))}
                             </span>
                         )}

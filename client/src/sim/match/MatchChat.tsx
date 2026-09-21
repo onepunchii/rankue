@@ -43,6 +43,15 @@ export const CHAT_GLYPH: Readonly<Record<string, string>> = {
     luck: "🍀", tense: "😅", showoff: "😎", comeback: "💪", watching: "👀", gg: "🤝", goodgame: "🏆", again: "🔁",
 };
 
+/**
+ * 관전자 색 — **보라 하나**로 통일한다(2026-09-21 오너: "관전자 인원과 관전자가 보내는 멘트는 색을 다르게, 선수인지 관전자인지
+ * 판단이 안 된다"). 선수 말풍선은 brand(나)·회색(상대)이라 세 번째 색이 필요하고, 두 종목 어디에도 안 쓰는 보라를 골랐다.
+ * 말풍선·"관전" 꼬리표·👀 인원이 전부 같은 보라라 "보라 = 관전"이 한 번에 읽힌다. 선수 화면·관전 화면이 같은 값을 쓴다.
+ */
+export const WATCHER_BUBBLE = "bg-[#6E5BC8]/30 text-[#DCD3FF] border border-[#8C7AD1]/40";
+export const WATCHER_TAG = "text-[11px] font-bold text-[#B8A7FF] mr-1";
+export const WATCHER_CHIP = "rounded-pill bg-[#6E5BC8]/30 text-[#DCD3FF] text-[11px] font-bold rk-num px-2 py-0.5";
+
 /** 코드 줄은 **보는 사람의 언어로** 그린다 — 저장된 건 코드뿐이라 상대 화면엔 상대 언어로 뜬다. */
 function lineText(line: ChatLine, t: (k: string) => string): string {
     if (line.kind !== "code") return line.text;
@@ -265,7 +274,7 @@ export function MatchMiniChat(p: {
                 </svg>
                 {/* 보는 사람 — 손잡이 오른쪽 끝에. 0 명이면 자리도 차지하지 않는다. */}
                 {(p.watchers ?? 0) > 0 && (
-                    <span className="absolute right-1 text-[11px] font-bold text-ink-3 rk-num">
+                    <span className={cn("absolute right-0", WATCHER_CHIP)}>
                         👀 {p.watchers}
                     </span>
                 )}
@@ -328,11 +337,11 @@ export function MatchMiniChat(p: {
                                                 "max-w-[85%] px-2.5 py-0.5 rounded-2xl text-[12.5px] leading-snug",
                                                 p.expanded ? "break-words" : "truncate",
                                                 // 관전자 응원은 선수 말과 다른 색이다 — 누가 한 말인지가 먼저 읽혀야 한다.
-                                                l.from === CHAT_FROM_WATCHER ? "bg-surface-2 text-ink-2 border border-surface-line"
+                                                l.from === CHAT_FROM_WATCHER ? WATCHER_BUBBLE
                                                     : mine ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-1",
                                             )}
                                         >
-                                            {l.from === CHAT_FROM_WATCHER && <span className="text-[11px] font-bold text-ink-3 mr-1">{t("sim.chat.watcherTag")}</span>}
+                                            {l.from === CHAT_FROM_WATCHER && <span className={WATCHER_TAG}>{t("sim.chat.watcherTag")}</span>}
                                             {lineText(l, t)}
                                         </span>
                                     </li>

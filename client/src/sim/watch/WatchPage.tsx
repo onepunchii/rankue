@@ -32,7 +32,7 @@ import { effectiveBall, makePlayback, startClock, clockTime, type Playback, type
 import { TopBar, type MatchHeaderPlayer } from "../components/TopBar";
 import { ShotClock } from "../components/ShotClock";
 import { InningSheet } from "../components/InningSheet";
-import { QuickChips, CHAT_GLYPH } from "../match/MatchChat";
+import { QuickChips, CHAT_GLYPH, WATCHER_BUBBLE, WATCHER_CHIP, WATCHER_TAG } from "../match/MatchChat";
 import { CHAT_FROM_WATCHER, CHAT_WATCH_CODES } from "@shared/sim/chat";
 import { rebuildInningLog } from "../inningLog";
 import { matchParamsKey, nextPollMs, normalizeShots, planWatch, shouldSkipAnimation } from "./watchPlan";
@@ -440,9 +440,9 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                         <li key={l.id} className="flex">
                             <span className={cn(
                                 "max-w-[90%] truncate rounded-pill px-2.5 py-1 text-[12.5px] font-medium",
-                                l.from === CHAT_FROM_WATCHER ? "bg-surface-2 text-ink-2 border border-surface-line" : "bg-surface-3 text-ink-1",
+                                l.from === CHAT_FROM_WATCHER ? WATCHER_BUBBLE : "bg-surface-3 text-ink-1",
                             )}>
-                                <span className="text-[11px] font-bold text-ink-3 mr-1">
+                                <span className={l.from === CHAT_FROM_WATCHER ? WATCHER_TAG : "text-[11px] font-bold text-ink-3 mr-1"}>
                                     {l.from === CHAT_FROM_WATCHER ? t("sim.chat.watcherTag") : names[l.from] ?? ""}
                                 </span>
                                 {l.kind === "code" ? `${CHAT_GLYPH[l.text] ? CHAT_GLYPH[l.text] + " " : ""}${t(`sim.emoji.${l.text}`)}` : l.text}
@@ -451,7 +451,10 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                     ))}
                 </ul>
             )}
-            <div className="shrink-0 px-4 pt-2">
+            <div className="shrink-0 px-4 pt-2 flex items-center gap-2">
+                {/* 나도 관전자다 — 내가 보낼 응원이 어떤 색으로 뜨는지, 지금 몇 명이 보는지 같은 보라로 */}
+                {(match?.watchers ?? 0) > 0 && <span className={cn("shrink-0", WATCHER_CHIP)}>👀 {match!.watchers}</span>}
+                <div className="min-w-0 flex-1">
                 <QuickChips
                     codes={CHAT_WATCH_CODES}
                     disabled={cheering}
@@ -463,6 +466,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                             .finally(() => { if (aliveRef.current) setCheering(false); });
                     }}
                 />
+                </div>
             </div>
 
             <footer className="shrink-0 px-4 py-3 space-y-2">
