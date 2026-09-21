@@ -94,6 +94,7 @@ export default function BookingList() {
                 dayName: i === 0 ? "오늘" : dayOfWeek,
                 dateNum,
                 displayDate: `${month}/${dateNum} ${dayOfWeek}요일`,
+                monthLabel: `${month}월`,
                 fullDate: `${day.getUTCFullYear()}-${String(month).padStart(2, '0')}-${String(dateNum).padStart(2, '0')}`,
             };
         });
@@ -287,15 +288,15 @@ export default function BookingList() {
         <div className="min-h-screen bg-[#0A0A0A] text-white pb-nav font-sans selection:bg-[#64DD17]/30">
             {/* Header */}
             <div className="sticky top-0 z-50 bg-[#0A0A0A]/90 backdrop-blur-2xl border-b border-white/5">
-                <div className="px-6 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                <div className="px-5 h-16 flex items-center justify-between gap-2 overflow-hidden">
+                    <div className="flex items-center gap-2.5 min-w-0">
                         <button onClick={() => window.history.back()} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors" title="뒤로가기">
                             <LucideChevronLeft className="w-6 h-6" />
                         </button>
-                        {/* 날짜는 줄바꿈하지 않는다 — "9/9 수요일" 이 두 줄로 깨져 있었다(2026-09-09) */}
-                        <div className={cn("px-4 py-2 rounded-full border shrink-0", viewType === 'JOIN' ? "bg-[#FF6B00]/10 border-[#FF6B00]/20" : "bg-[#64DD17]/10 border-[#64DD17]/20")}>
-                            <h1 className={cn("text-sm font-black tracking-tight whitespace-nowrap", theme.text)}>
-                                {weekDates[selectedDate].displayDate}
+                        {/* 달만 적는다(2026-09-21 오너: "9/25 금요일"이 길어 모바일에서 헤더가 옆으로 밀렸다 — 날짜는 바로 아래 띠가 보여 준다). */}
+                        <div className={cn("px-3.5 py-2 rounded-full border shrink-0", viewType === 'JOIN' ? "bg-[#FF6B00]/10 border-[#FF6B00]/20" : "bg-[#64DD17]/10 border-[#64DD17]/20")}>
+                            <h1 className={cn("text-sm font-black tracking-tight whitespace-nowrap", theme.text)} aria-label={weekDates[selectedDate].displayDate}>
+                                {weekDates[selectedDate].monthLabel}
                             </h1>
                         </div>
 
