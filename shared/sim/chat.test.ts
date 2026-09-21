@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-    CHAT_CODES, CHAT_COOLDOWN_MS, CHAT_EXTRA_CODES, CHAT_END_CODES, CHAT_MAX_CHARS, CHAT_MAX_PER_MATCH, CHAT_QUICK_CODES,
+    CHAT_CODES, CHAT_COOLDOWN_MS, CHAT_EXTRA_CODES, CHAT_END_CODES, CHAT_FROM_WATCHER, CHAT_FUN_CODES, CHAT_MAX_CHARS,
+    CHAT_MAX_PER_MATCH, CHAT_QUICK_CODES, CHAT_WATCH_CODES,
     chatLength, chatReject, clampChatText, isChatCode, normalizeChatText,
 } from "./chat";
 import { MATCH_EMOJIS } from "./rules/session";
@@ -45,8 +46,9 @@ describe("고정 문구 목록", () => {
 
     it("급해서 타이핑할 수 없는 말만 더했다 — 자유 입력이 주 기능이다", () => {
         expect(CHAT_EXTRA_CODES).toEqual(["oops", "wait", "thanks"]);
-        // 결과 창의 마무리 인사(2026-09-18)는 게임 중 칩 열에 안 나온다 — 서버가 받아 주는 목록에만 더한다
-        expect(CHAT_CODES).toHaveLength(MATCH_EMOJIS.length + CHAT_EXTRA_CODES.length + CHAT_END_CODES.length);
+        // 결과 창의 마무리 인사(2026-09-18)·농담 문구(2026-09-21)는 서버가 받아 주는 목록에 함께 있다
+        expect(CHAT_CODES).toHaveLength(MATCH_EMOJIS.length + CHAT_EXTRA_CODES.length + CHAT_END_CODES.length + CHAT_FUN_CODES.length + 1);
+        expect(CHAT_CODES).toContain("watching");
         for (const c of CHAT_END_CODES) expect(CHAT_QUICK_CODES).not.toContain(c);
         // 칩 열이 두 줄을 넘으면 테이블을 덮는다
         expect(CHAT_QUICK_CODES.length).toBeLessThanOrEqual(10);
@@ -131,5 +133,22 @@ describe("끝난 뒤 마무리 인사(2026-09-18)", () => {
         expect(reject({ ...base, finishedAt: base.now - win })).toBe("gone");
         expect(reject({ ...base })).toBe("gone");
         expect(reject({ ...base, status: "canceled", finishedAt: base.now })).toBe("gone");
+    });
+});
+
+describe("관전자 응원(2026-09-21)", () => {
+    it("관전자는 고정 문구만 — 자유 입력은 거부한다", async () => {
+        const { chatReject: reject } = await import("./chat");
+        const base = { status: "playing", turn: 0, count: 0, lastMineAt: null, now: 1_000_000 };
+        expect(reject({ ...base, from: CHAT_FROM_WATCHER, kind: "code" })).toBeNull();
+        expect(reject({ ...base, from: CHAT_FROM_WATCHER, kind: "text" })).toBe("watcher-text");
+        // 선수는 그대로 자유 입력이 된다
+        expect(reject({ ...base, from: 0, kind: "text" })).toBeNull();
+    });
+
+    it("관전 문구는 전부 서버가 받아 주는 코드이고, 선수 전용 말(잠깐만요·시간 초과 재촉)은 빠져 있다", () => {
+        for (const c of CHAT_WATCH_CODES) expect(CHAT_CODES).toContain(c);
+        for (const c of ["wait", "hurry", "sorry", "oops"]) expect(CHAT_WATCH_CODES).not.toContain(c);
+        expect(new Set(CHAT_WATCH_CODES).size).toBe(CHAT_WATCH_CODES.length);
     });
 });

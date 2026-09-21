@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
-import { canReadChat } from "./simMatch";
+import { canReadChat, canWriteChatText } from "./simMatch";
 
 const read = (f: string) => readFileSync(path.resolve(process.cwd(), f), "utf8");
 /** 주석은 빼고 본다 — 규칙을 설명하는 주석이 규칙을 지킨 것처럼 보이면 안 된다. */
@@ -15,9 +15,31 @@ describe("채팅을 읽을 수 있는 사람", () => {
         expect(canReadChat(m, "g")).toBe(true);
     });
 
-    it("관전자는 안 된다 — 신고·차단을 이번에 안 만든 근거가 이 한 줄이다", () => {
+    /**
+     * 2026-09-21 오너: "관전 시에도 채팅을 하게 해 달라는 요청". 관전자에게 연 것은 **읽기와 고정 문구**뿐이다 —
+     * 자유 입력을 열면 신고·차단이 먼저 있어야 한다(9/16 결정). 그 경계가 이 두 함수에 있다.
+     */
+    it("관전자는 공개·비밀번호 없는 대전만 읽는다", () => {
+        const open = { ...m, hostId: "h", guestId: "g", isPublic: true, passwordHash: null, status: "playing" };
+        expect(canReadChat(open, "watcher")).toBe(true);
+        expect(canReadChat({ ...open, isPublic: false }, "watcher")).toBe(false);
+        expect(canReadChat({ ...open, passwordHash: "x" }, "watcher")).toBe(false);
+        expect(canReadChat({ ...open, status: "waiting" }, "watcher")).toBe(false);
+        // 옛 호출부(공개 여부를 안 넘기는 곳)는 선수만 통과한다
         expect(canReadChat(m, "watcher")).toBe(false);
-        expect(canReadChat({ hostId: "h", guestId: null }, "watcher")).toBe(false);
+    });
+
+    it("자유 입력은 두 선수만 — 관전자는 canWriteChatText 에서 막힌다", () => {
+        const open = { hostId: "h", guestId: "g", isPublic: true, passwordHash: null, status: "playing" };
+        expect(canWriteChatText(open, "h")).toBe(true);
+        expect(canWriteChatText(open, "g")).toBe(true);
+        expect(canWriteChatText(open, "watcher")).toBe(false);
+    });
+
+    it("라우트가 관전자에게는 응원 목록만 받는다", () => {
+        const src = code("server/routes/modules/simMatch.ts");
+        expect(src).toContain("isChatCode(body.code, watcher ? CHAT_WATCH_CODES : CHAT_CODES)");
+        expect(src).toContain("canWriteChatText(m, req.userId!)");
     });
 
     it("채팅 라우트는 isWatchable 을 쓰지 않는다 — 샷 라우트와 일부러 다르다", () => {

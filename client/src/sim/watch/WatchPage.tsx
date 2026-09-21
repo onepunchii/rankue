@@ -25,13 +25,15 @@ import { SHOT_CLOCK_S, type SessionState } from "@shared/sim/rules";
 import { Canvas2DRenderer } from "../render/Canvas2DRenderer";
 import type { Renderer, RendererView, SafeInsets } from "../render/Renderer";
 import { readZoomPref, safeLocalStorage, selectRendererKind, type RendererKind } from "../render/rendererChoice";
-import { matchApi, matchConfig, type MatchPublic, type MatchShot } from "../matchApi";
+import { matchApi, matchConfig, type ChatLine, type MatchPublic, type MatchShot } from "../matchApi";
 import { cueBallIdOf, paramsFromConfig } from "../simReducer";
 import { easeOppAim, OPP_AIM_PULLBACK } from "../match/oppAim";
 import { effectiveBall, makePlayback, startClock, clockTime, type Playback, type PlaybackClock } from "../playback";
 import { TopBar, type MatchHeaderPlayer } from "../components/TopBar";
 import { ShotClock } from "../components/ShotClock";
 import { InningSheet } from "../components/InningSheet";
+import { QuickChips, CHAT_GLYPH } from "../match/MatchChat";
+import { CHAT_FROM_WATCHER, CHAT_WATCH_CODES } from "@shared/sim/chat";
 import { rebuildInningLog } from "../inningLog";
 import { matchParamsKey, nextPollMs, normalizeShots, planWatch, shouldSkipAnimation } from "./watchPlan";
 
@@ -64,6 +66,13 @@ export default function WatchPage({ matchId }: { matchId: string }) {
      * 이닝 번호를 **지금** 세션에서 세서 다시보기에선 모든 샷이 마지막 이닝 한 줄에 몰렸고, 공이 구르기 전에 줄이 먼저 떴다.
      */
     const [knownShots, setKnownShots] = useState<readonly MatchShot[]>([]);
+    /**
+     * 오간 한마디(2026-09-21 오너: "관전 시에도 채팅을 하게 해 달라는 요청"). 관전자는 **읽기 + 고정 응원 문구**만 된다 —
+     * 자유 입력은 서버가 선수에게만 연다. 폴링은 따로 돌리지 않고 대전 행의 chatSeq 가 늘었을 때만 받는다(샷과 같은 규약).
+     */
+    const [chat, setChat] = useState<readonly ChatLine[]>([]);
+    const chatSeqRef = useRef(-1);
+    const [cheering, setCheering] = useState(false);
     const [sheetOpen, setSheetOpen] = useState(false);
     const [view, setView] = useState<RendererView>("top");
     const [viewSupported, setViewSupported] = useState(false);
@@ -309,6 +318,10 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                 const m = await matchApi.getMatch(matchId);
                 if (!alive) return;
                 setMatch(m);
+                if (m.chatSeq !== chatSeqRef.current) {
+                    chatSeqRef.current = m.chatSeq;
+                    matchApi.getChats?.(matchId, 0).then((lines) => { if (alive) setChat(lines); }, () => { /* 다음 주기에 다시 */ });
+                }
                 const plan = planWatch({ serverShots: m.shots, playedShots: playedRef.current, animating: animatingRef.current });
                 if (plan.kind === "fetch") {
                     const shots = await matchApi.getShots(matchId, plan.from);
@@ -418,6 +431,38 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                         </div>
                     </div>
                 )}
+            </div>
+
+            {/* 관전 한마디: 오간 말 몇 줄 + 응원 문구(고정). 끝난 대전에서도 잠깐은 인사할 수 있다(서버가 30분까지 받는다). */}
+            {chat.length > 0 && (
+                <ul className="shrink-0 px-4 pt-2 space-y-1">
+                    {chat.slice(-3).map((l) => (
+                        <li key={l.id} className="flex">
+                            <span className={cn(
+                                "max-w-[90%] truncate rounded-pill px-2.5 py-1 text-[12.5px] font-medium",
+                                l.from === CHAT_FROM_WATCHER ? "bg-surface-2 text-ink-2 border border-surface-line" : "bg-surface-3 text-ink-1",
+                            )}>
+                                <span className="text-[11px] font-bold text-ink-3 mr-1">
+                                    {l.from === CHAT_FROM_WATCHER ? t("sim.chat.watcherTag") : names[l.from] ?? ""}
+                                </span>
+                                {l.kind === "code" ? `${CHAT_GLYPH[l.text] ? CHAT_GLYPH[l.text] + " " : ""}${t(`sim.emoji.${l.text}`)}` : l.text}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <div className="shrink-0 px-4 pt-2">
+                <QuickChips
+                    codes={CHAT_WATCH_CODES}
+                    disabled={cheering}
+                    onPick={(code) => {
+                        setCheering(true);
+                        void matchApi.sendChat?.(matchId, { code, clientKey: `w-${code}-${Date.now()}` })
+                            .then((r) => { if (aliveRef.current) { setChat((c) => (c.some((x) => x.id === r.line.id) ? c : [...c, r.line])); chatSeqRef.current = r.chatSeq; } })
+                            .catch(() => { /* 쿨다운·끝난 대전 — 다음에 */ })
+                            .finally(() => { if (aliveRef.current) setCheering(false); });
+                    }}
+                />
             </div>
 
             <footer className="shrink-0 px-4 py-3 space-y-2">

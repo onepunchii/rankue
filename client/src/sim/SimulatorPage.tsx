@@ -1648,6 +1648,7 @@ export function SimulatorPage() {
                                 myTurn={sim.phase === "aim" ? { seconds: clock?.mine ? clock.seconds : null, onClose: () => setAimChatOpen(false) } : null}
                                 away={sim.phase === "waiting" && !clock && sim.match.opponentAway}
                                 onClaim={sim.phase === "waiting" && sim.match.canClaim ? () => { void onClaim(); } : null}
+                                watchers={sim.match.watchers ?? 0}
                                 disabled={!sim.match.canChat}
                             />
                         </div>

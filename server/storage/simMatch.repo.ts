@@ -389,7 +389,8 @@ export class SimMatchRepository {
      */
     async sendChat(a: {
         matchId: string;
-        from: 0 | 1;
+        /** 0·1 선수, 2 관전자(shared/sim/chat CHAT_FROM_WATCHER) */
+        from: number;
         senderId: string;
         kind: "text" | "code";
         text: string;
@@ -411,9 +412,11 @@ export class SimMatchRepository {
                 if (dup) return { ok: true as const, row: dup, chatSeq: m.chatSeq };
             }
 
+            // 보낸 **사람** 기준으로 센다 — 관전자는 자리 번호(2)를 함께 쓰므로 자리로 세면 한 사람의 쿨다운이
+            // 다른 관전자에게 걸린다(2026-09-21 관전 응원). 선수는 자리 = 사람이라 값이 같다.
             const [agg] = await tx.select({
-                count: sql<number>`count(*) filter (where ${hiqSimMatchChats.senderIndex} = ${a.from})::int`,
-                lastMineAt: sql<Date | null>`max(${hiqSimMatchChats.createdAt}) filter (where ${hiqSimMatchChats.senderIndex} = ${a.from})`,
+                count: sql<number>`count(*) filter (where ${hiqSimMatchChats.senderId} = ${a.senderId})::int`,
+                lastMineAt: sql<Date | null>`max(${hiqSimMatchChats.createdAt}) filter (where ${hiqSimMatchChats.senderId} = ${a.senderId})`,
                 lastAnyAt: sql<Date | null>`max(${hiqSimMatchChats.createdAt})`,
             }).from(hiqSimMatchChats).where(eq(hiqSimMatchChats.matchId, a.matchId));
 

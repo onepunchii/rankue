@@ -22,7 +22,7 @@ import {
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
 import {
-    CHAT_CODES, CHAT_COOLDOWN_MS, CHAT_MAX_CHARS, CHAT_MAX_PER_MATCH, CHAT_PAGE_MAX,
+    CHAT_CODES, CHAT_COOLDOWN_MS, CHAT_FROM_WATCHER, CHAT_MAX_CHARS, CHAT_MAX_PER_MATCH, CHAT_PAGE_MAX, CHAT_WATCH_CODES,
     chatLength, isChatCode, normalizeChatText,
 } from "../../../shared/sim/chat.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
@@ -103,12 +103,20 @@ export function isWatchable(m: { isPublic: boolean; passwordHash: string | null;
 }
 
 /**
- * 채팅을 읽고 쓸 수 있는 사람 — **두 선수뿐이다.** 샷 라우트와 달리 isWatchable 을 쓰지 않는다.
- * 관전자는 공 배치와 점수만 본다(당구는 숨은 정보가 없어 그게 안전하다). 반면 채팅은 사람이 쓴 글이라
- * 보는 사람이 늘면 신고·차단 같은 운영 장치가 필요해지는데, 2026-09-16 오너 결정으로 그건 유저가 많아지면 붙인다.
- * 그때까지 읽는 사람을 둘로 묶어 두는 것이 그 결정의 전제다.
+ * 채팅을 **읽을** 수 있는 사람 — 두 선수 + 관전 가능한 대전의 관전자(2026-09-21 오너: "관전 시에도 채팅을 하게 해 달라").
+ *
+ * 관전자에게 열리는 것은 읽기와 **고정 문구**뿐이다(canWriteChatText 가 자유 입력을 선수로 묶는다).
+ * 9/16 에 "신고·차단은 유저가 많아지면"이라고 정했을 때의 전제가 "사람이 쓴 글을 읽는 사람이 둘뿐"이었는데,
+ * 고정 문구만 열면 관전자가 만들 수 있는 말이 우리가 고른 목록으로 한정돼 그 전제가 깨지지 않는다.
+ * 관전 자체가 비밀번호 없는 공개 대전에만 열리므로(isWatchable), 비공개 방의 대화는 그대로 둘만의 것이다.
  */
-export function canReadChat(m: { hostId: string; guestId: string | null }, viewerId: string): boolean {
+export function canReadChat(m: { hostId: string; guestId: string | null; isPublic?: boolean; passwordHash?: string | null; status?: string }, viewerId: string): boolean {
+    if (m.hostId === viewerId || m.guestId === viewerId) return true;
+    return isWatchable({ isPublic: m.isPublic === true, passwordHash: m.passwordHash ?? null, status: m.status ?? "" });
+}
+
+/** 자유 입력은 두 선수만 — 관전자는 고정 문구만 보낸다(shared/sim/chat chatReject 가 서버에서 다시 막는다). */
+export function canWriteChatText(m: { hostId: string; guestId: string | null }, viewerId: string): boolean {
     return m.hostId === viewerId || m.guestId === viewerId;
 }
 
@@ -116,6 +124,7 @@ export function canReadChat(m: { hostId: string; guestId: string | null }, viewe
  * 클라이언트에 주는 채팅 한 줄. **id 를 반드시 싣는다** — 파서가 필수로 보고, 나중에 신고를 붙일 때 대상 키다.
  * sender_id 는 내보내지 않는다(이 파일의 규칙: 상대 회원 id 는 필요 없으니 이름만).
  */
+/** 관전자가 보낸 줄은 이름을 싣지 않는다 — 화면은 "관전"으로만 그린다(누가 봤는지 남기지 않는다). */
 function chatLine(c: { id: string; seq: number; senderIndex: number; kind: string; text: string; createdAt: Date }) {
     return { id: c.id, seq: c.seq, from: c.senderIndex, kind: c.kind, text: c.text, at: c.createdAt };
 }
@@ -170,7 +179,8 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
          * 본문을 여기 실으면 이모지와 같은 유실(둘이 같은 폴링 창에 보내면 앞말이 덮인다)이 표시 경로에서 되살아난다.
          * 관전자(myIndex < 0)에게는 늘 0 — 채팅은 두 선수만 읽고 쓴다(canReadChat).
          */
-        chatSeq: myIndex >= 0 ? m.chatSeq : 0,
+        // 관전자도 대화를 읽으므로 카운터를 준다 — 늘었을 때만 /chats 를 부르는 규약은 선수와 같다.
+        chatSeq: myIndex >= 0 || isWatchable(m) ? m.chatSeq : 0,
         // 상대가 지금 화면을 보고 있나 — 자리를 비우면 시계가 늦게(ABSENT_GRACE_MS) 시작하므로,
         // 그 사이 남은 사람 화면이 멈춘 것처럼 보이지 않게 이유를 알려 준다(2026-09-15).
         opponentAway: m.status === "playing" && (() => {
@@ -502,7 +512,7 @@ router.get("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: AuthR
 // GET /sim/matches/:id/chats?from=N — 놓친 채팅 따라잡기. 샷과 같은 커서 규약.
 router.get("/sim/matches/:id/chats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const m = await storage.simMatch.get(req.params.id);
-    // 샷 라우트(:isWatchable 허용)와 **일부러 다르다** — 채팅은 두 선수만 읽는다. 이유는 canReadChat 주석.
+    // 두 선수 + 관전자(공개·비밀번호 없는 대전). 쓰기는 아래 POST 가 따로 가른다.
     if (!m || !canReadChat(m, req.userId!)) return sendError(res, 404, "대전이 없습니다");
     const from = Math.max(0, parseInt(String(req.query.from ?? "0"), 10) || 0);
     const rows = await storage.simMatch.getChats(m.id, from, CHAT_PAGE_MAX);
@@ -600,15 +610,18 @@ router.post("/sim/matches/:id/chat", requireAuth, asyncHandler(async (req: AuthR
     const clientKey = typeof body.clientKey === "string" && body.clientKey.length <= 64 ? body.clientKey : null;
     const m = await storage.simMatch.get(req.params.id);
     if (!m || !canReadChat(m, req.userId!)) return sendError(res, 404, "대전이 없습니다");
-    const myIndex = m.hostId === req.userId ? 0 : 1;
+    const myIndex = m.hostId === req.userId ? 0 : m.guestId === req.userId ? 1 : CHAT_FROM_WATCHER;
+    const watcher = myIndex === CHAT_FROM_WATCHER;
 
     let kind: "text" | "code";
     let text: string;
     if (typeof body.code === "string") {
-        if (!isChatCode(body.code, CHAT_CODES)) return sendError(res, 400, "보낼 수 없는 인사입니다");
+        // 관전자는 응원 목록만 — 선수용 문구(잠깐만요 등)를 관전자가 보내면 대화가 엉킨다.
+        if (!isChatCode(body.code, watcher ? CHAT_WATCH_CODES : CHAT_CODES)) return sendError(res, 400, "보낼 수 없는 인사입니다");
         kind = "code";
         text = body.code;
     } else if (typeof body.text === "string") {
+        if (!canWriteChatText(m, req.userId!)) return sendError(res, 403, "관전 중에는 정해진 문구만 보낼 수 있어요", "WATCHER_TEXT");
         // 원문 방어값(정규화 전). 이걸 넘기면 정규화·필터에 긴 문자열을 태울 이유가 없다.
         if (body.text.length > 400) return sendError(res, 400, `${CHAT_MAX_CHARS}자 이내로 보낼 수 있어요`);
         const t = normalizeChatText(body.text);
@@ -629,6 +642,7 @@ router.post("/sim/matches/:id/chat", requireAuth, asyncHandler(async (req: AuthR
     if (!r.ok) {
         if (r.reason === "gone") return sendError(res, 409, "진행 중인 대전이 아닙니다");
         if (r.reason === "your-turn") return sendError(res, 409, "상대 차례에 쓸 수 있어요", "YOUR_TURN");
+        if (r.reason === "watcher-text") return sendError(res, 403, "관전 중에는 정해진 문구만 보낼 수 있어요", "WATCHER_TEXT");
         if (r.reason === "cooldown") return sendError(res, 429, "잠시 뒤에 보낼 수 있어요", "TOO_FAST");
         return sendError(res, 429, "이 대전에서 보낼 수 있는 횟수를 다 썼어요", "LIMIT");
     }

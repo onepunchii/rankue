@@ -27,7 +27,24 @@
  */
 export const CHAT_EXTRA_CODES = ["oops", "wait", "thanks"] as const;
 /** 서버가 받아 주는 코드 전부(옛 이모지 여섯 + 새 셋). 넉넉히 받아 두면 화면 쪽을 바꿔도 서버를 안 건드린다. */
-export const CHAT_CODES: readonly string[] = ["hi", "nice", "wow", "sorry", "oops", "wait", "thanks", "fight", "hurry", "gg", "goodgame", "again"];
+export const CHAT_CODES: readonly string[] = [
+    "hi", "nice", "wow", "sorry", "oops", "wait", "thanks", "fight", "hurry", "gg", "goodgame", "again",
+    ...["clap", "luck", "tense", "showoff", "comeback", "watching"],
+];
+/**
+ * 가볍게 약 올리는 말(2026-09-21 오너: "정해진 문구를 더 추가해 줘, 놀릴 수도 있고 다양하게").
+ * 기준은 **당구장에서 웃으며 할 수 있는 말**이다 — 놀리는 쪽이어도 상대를 깎아내리지 않는다.
+ * 고정 문구라 고를 수 있는 말이 곧 이 앱이 허용하는 말이고, 여기 없는 말은 애초에 만들 수 없다(관전자에게 자유 입력을 안 여는 근거다).
+ */
+export const CHAT_FUN_CODES: readonly string[] = ["clap", "luck", "tense", "showoff", "comeback"];
+/**
+ * 관전자가 보낼 수 있는 문구(2026-09-21 오너: "관전 시에도 채팅을 하게 해 달라는 요청").
+ * **자유 입력은 없다** — 읽는 사람이 둘에서 여럿으로 늘면 신고·차단이 필요해지는데 그건 유저가 많아지면 붙이기로 했다(9/16).
+ * 고정 문구만 열어 두면 그 장치 없이도 안전하다. 응원과 가벼운 농담까지만 담는다.
+ */
+export const CHAT_WATCH_CODES: readonly string[] = ["nice", "wow", "clap", "fight", "luck", "watching"];
+/** 관전자 자리 번호(선수는 0·1). 화면은 이 값을 보고 "관전" 말풍선으로 그린다. */
+export const CHAT_FROM_WATCHER = 2;
 /**
  * 끝난 대전 결과 창의 마무리 인사(2026-09-18 오너: "게임이 끝나면 바로 결과 창이 나와서 인사할 시간이 없네").
  * 한 판 더 버튼 옆에 둔다 — 인사와 재경기가 한자리에 있어야 "수고하셨습니다 → 한 판 더?" 로 이어진다.
@@ -41,6 +58,8 @@ export const CHAT_AFTER_END_MS = 30 * 60_000;
  * 여기서 빠진 hi·wow·hurry 는 상단 띠의 이모지 인사에 그대로 있다(같은 말을 두 군데서 고르게 하지 않는다).
  */
 export const CHAT_QUICK_CODES: readonly string[] = ["nice", "oops", "thanks", "wait", "sorry", "fight"];
+/** 1탭 패널 둘째 줄 — 가볍게 약 올리는 말(2026-09-21). 위 여섯과 합쳐 열두 개가 두 판으로 나뉜다. */
+export const CHAT_QUICK_FUN_CODES: readonly string[] = CHAT_FUN_CODES;
 
 /** 한 줄 최대 글자(코드포인트). 오너 지정. 짧을수록 칩 한 줄에 들어가고, 거래·시비를 담기도 어렵다. */
 export const CHAT_MAX_CHARS = 30;
@@ -80,7 +99,7 @@ export function clampChatText(raw: string): string {
     return cps.length <= CHAT_MAX_CHARS ? raw : cps.slice(0, CHAT_MAX_CHARS).join("");
 }
 
-export type ChatReject = "gone" | "your-turn" | "cooldown" | "limit" | null;
+export type ChatReject = "gone" | "your-turn" | "cooldown" | "limit" | "watcher-text" | null;
 
 /**
  * 시각은 전부 **epoch ms 숫자**로 받는다. shared/sim 은 결정론이 불변이라 시계 객체를 쓰지 않는다
@@ -100,7 +119,8 @@ export function chatReject(x: {
     status: string;
     /** 대전 행의 지금 차례(서버 정본) */
     turn: number;
-    from: 0 | 1;
+    /** 0·1 은 선수, CHAT_FROM_WATCHER(2)는 관전자 */
+    from: number;
     kind: "text" | "code";
     /** 내가 이 대전에서 지금까지 보낸 줄 수 */
     count: number;
@@ -124,6 +144,8 @@ export function chatReject(x: {
     // 막은 이유가 "키보드가 조작 버튼을 **저절로** 덮는다"였다. 이제 내 차례 대화창은 사용자가 말풍선을 눌러
     // 직접 여는 것이라 막을 이유가 없다 — 40초는 계속 가므로 화면이 남은 시간을 대화창에 같이 보여 준다.
     // (x.turn 은 판단에 안 쓰지만 인자는 남긴다 — 호출부가 대전 행을 잠근 채 한 번에 넘긴다.)
+    // 관전자는 고정 문구만(자유 입력 없음) — 화면이 아니라 여기서 막는다.
+    if (x.from === CHAT_FROM_WATCHER && x.kind !== "code") return "watcher-text";
     if (x.count >= maxPerMatch) return "limit";
     if (x.lastMineAt !== null && now - x.lastMineAt < cooldownMs) return "cooldown";
     return null;

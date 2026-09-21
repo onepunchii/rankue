@@ -1,7 +1,10 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { CHAT_FRESH_MS, CHAT_LOG_LINES, CHAT_MAX_CHARS, CHAT_QUICK_CODES, chatLength, clampChatText } from "@shared/sim/chat";
+import {
+    CHAT_FRESH_MS, CHAT_FROM_WATCHER, CHAT_LOG_LINES, CHAT_MAX_CHARS, CHAT_QUICK_CODES, CHAT_QUICK_FUN_CODES,
+    chatLength, clampChatText,
+} from "@shared/sim/chat";
 import type { ChatLine } from "../matchApi";
 import type { ChatSendResult } from "../simController";
 
@@ -36,6 +39,8 @@ function isFresh(line: ChatLine, now: number): boolean {
 export const CHAT_GLYPH: Readonly<Record<string, string>> = {
     hi: "👋", nice: "👍", wow: "😮", hurry: "⏰", sorry: "🙏", fight: "🔥",
     oops: "😖", wait: "⏸️", thanks: "🙌",
+    // 가볍게 약 올리는 말·관전 응원(2026-09-21). clap 은 문구 자체에 👏 가 있어 비워 둔다.
+    luck: "🍀", tense: "😅", showoff: "😎", comeback: "💪", watching: "👀", gg: "🤝", goodgame: "🏆", again: "🔁",
 };
 
 /** 코드 줄은 **보는 사람의 언어로** 그린다 — 저장된 건 코드뿐이라 상대 화면엔 상대 언어로 뜬다. */
@@ -87,11 +92,16 @@ export const MatchChatLog = memo(function MatchChatLog({ lines, myIndex, now }: 
  * 1탭 문구 칩 — **한 줄 가로 스크롤**(2026-09-18). 대화 줄 자리에 바꿔 끼우므로, 줄을 두 줄로 접으면 문구판을
  * 열 때마다 대화창이 커져 당구 천을 덮는다. 한 줄이면 높이가 그대로다. 누를 것이라 pointer-events-auto 를 스스로 켠다.
  */
-export function QuickChips({ onPick, disabled }: { onPick: (code: string) => void; disabled?: boolean }) {
+export function QuickChips({ onPick, disabled, codes = [...CHAT_QUICK_CODES, ...CHAT_QUICK_FUN_CODES] }: {
+    onPick: (code: string) => void;
+    disabled?: boolean;
+    /** 그릴 문구(기본: 기본 여섯 + 가볍게 약 올리는 다섯). 관전 화면은 응원 목록만 준다. */
+    codes?: readonly string[];
+}) {
     const { t } = useT();
     return (
         <div className="pointer-events-auto shrink-0 flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-0.5 px-0.5 py-0.5">
-            {CHAT_QUICK_CODES.map((code) => (
+            {codes.map((code) => (
                 <button
                     key={code} type="button" disabled={disabled}
                     onClick={() => onPick(code)}
@@ -101,7 +111,7 @@ export function QuickChips({ onPick, disabled }: { onPick: (code: string) => voi
                         "active:bg-surface-line disabled:opacity-40",
                     )}
                 >
-                    <span className="text-[13px] leading-none">{CHAT_GLYPH[code]}</span>
+                    {CHAT_GLYPH[code] && <span className="text-[13px] leading-none">{CHAT_GLYPH[code]}</span>}
                     {t(`sim.emoji.${code}`)}
                 </button>
             ))}
@@ -193,6 +203,8 @@ export function MatchMiniChat(p: {
     away?: boolean;
     /** 48시간 무응답 승리 주장(가능할 때만) */
     onClaim?: (() => void) | null;
+    /** 지금 보고 있는 관전자 수(2026-09-21 오너: "채팅 바에 관전하는 사람 표시가 필요해"). 0 이면 안 그린다. */
+    watchers?: number;
     disabled?: boolean;
 }) {
     const { t } = useT();
@@ -246,11 +258,17 @@ export function MatchMiniChat(p: {
             <button
                 type="button" onClick={() => p.onExpanded(!p.expanded)}
                 aria-label={t(p.expanded ? "sim.chat.collapse" : "sim.chat.expand")} aria-expanded={p.expanded}
-                className="shrink-0 -mt-1 -mb-0.5 h-5 w-full flex items-center justify-center text-ink-3 active:text-ink-1"
+                className="relative shrink-0 -mt-1 -mb-0.5 h-5 w-full flex items-center justify-center text-ink-3 active:text-ink-1"
             >
                 <svg viewBox="0 0 24 12" width="22" height="11" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d={p.expanded ? "M5 3l7 6 7-6" : "M5 9l7-6 7 6"} />
                 </svg>
+                {/* 보는 사람 — 손잡이 오른쪽 끝에. 0 명이면 자리도 차지하지 않는다. */}
+                {(p.watchers ?? 0) > 0 && (
+                    <span className="absolute right-1 text-[11px] font-bold text-ink-3 rk-num">
+                        👀 {p.watchers}
+                    </span>
+                )}
             </button>
             {p.myTurn && (
                 <div className="shrink-0 flex items-center gap-2 px-1">
@@ -309,9 +327,12 @@ export function MatchMiniChat(p: {
                                                 // 펼치면 긴 말도 다 보이게 줄바꿈, 접힘에선 한 줄로
                                                 "max-w-[85%] px-2.5 py-0.5 rounded-2xl text-[12.5px] leading-snug",
                                                 p.expanded ? "break-words" : "truncate",
-                                                mine ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-1",
+                                                // 관전자 응원은 선수 말과 다른 색이다 — 누가 한 말인지가 먼저 읽혀야 한다.
+                                                l.from === CHAT_FROM_WATCHER ? "bg-surface-2 text-ink-2 border border-surface-line"
+                                                    : mine ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-1",
                                             )}
                                         >
+                                            {l.from === CHAT_FROM_WATCHER && <span className="text-[11px] font-bold text-ink-3 mr-1">{t("sim.chat.watcherTag")}</span>}
                                             {lineText(l, t)}
                                         </span>
                                     </li>
