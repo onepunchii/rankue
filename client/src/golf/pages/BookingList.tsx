@@ -432,7 +432,8 @@ export default function BookingList() {
                 // 조인·부킹 모두 로그인한 누구나 올린다(2026-09-21 오너 A안). 부킹은 시트가 휴대폰 번호를 요구한다.
                 !!user && (
                     <AnimatePresence>
-                        {!isCreateModalOpen && (
+                        {/* 내역 시트가 떠 있는 동안도 숨긴다 — 시트 위에 떠서 줄을 가렸다(2026-09-21 오너 캡처) */}
+                        {!isCreateModalOpen && !myListingsOpen && (
                             <motion.button
                                 initial={{ scale: 0, opacity: 0, y: 20 }}
                                 animate={{ scale: 1, opacity: 1, y: 0 }}
