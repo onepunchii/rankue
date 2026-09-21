@@ -44,9 +44,18 @@ function useWidth(fallback: number): [RefObject<HTMLDivElement>, number] {
     return [ref, w];
 }
 
-/** 문지르기·키보드로 고른 인덱스. 마우스가 떠나면 풀리고, 터치는 마지막 위치를 유지한다. */
+/**
+ * 문지르기·키보드로 고른 인덱스. 마우스가 떠나면 풀리고, 터치는 마지막 위치를 유지한다.
+ *
+ * **고른 값은 지금 점 개수 안으로 잘라서 돌려준다.** 같은 차트가 다른 자료로 다시 그려질 때
+ * (온라인게임 대시보드에서 3쿠션 중대 → 대대 → 4구 중대 탭을 옮길 때) 점 개수가 줄어드는데,
+ * 고른 번호를 그대로 두면 `pts[idx]` 가 undefined 가 되어 화면이 통째로 하얗게 죽었다
+ * (2026-09-21 오너 제보: "에버리지 추이 차트 선택 뒤 탭을 옮기면 먹통"). 자르기는 읽는 쪽에서 한다 —
+ * effect 로 되돌리면 한 번은 옛 번호로 그려진 뒤라 이미 늦는다.
+ */
 function useScrub(count: number, indexAt: (localX: number) => number) {
-    const [idx, setIdx] = useState<number | null>(null);
+    const [raw, setIdx] = useState<number | null>(null);
+    const idx = raw === null || count === 0 ? null : Math.min(raw, count - 1);
     const localX = (e: PointerEvent<SVGRectElement>) => e.clientX - e.currentTarget.getBoundingClientRect().left;
     const onPointer = (e: PointerEvent<SVGRectElement>) => {
         if (count === 0) return;
