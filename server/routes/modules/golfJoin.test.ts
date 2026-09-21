@@ -9,15 +9,21 @@ import path from "path";
 const read = (f: string) => readFileSync(path.resolve(process.cwd(), f), "utf8");
 const code = (f: string) => read(f).split("\n").filter((l) => !l.trim().startsWith("*") && !l.trim().startsWith("//") && !l.trim().startsWith("/*")).join("\n");
 
-describe("조인 글 올리기는 누구나, 부킹은 매니저만", () => {
+describe("조인·부킹 모두 누구나 올린다(2026-09-21 A안) — 부킹만 연락처가 필요하고 올린 쪽을 적는다", () => {
     const route = code("server/routes/modules/golf.ts");
     const i = route.indexOf('router.post("/bookings", requireAuth');
     const block = route.slice(i, route.indexOf("router.", i + 10));
 
-    it("전부 조인이면 권한·연락처 검사를 건너뛴다", () => {
+    it("권한 검사는 없고, 조인이 아니면 연락처가 있어야 한다", () => {
         expect(block).toContain('items.every((it: any) => it?.listingType === "JOIN")');
-        expect(block).toContain("if (!allJoin && !BOOKING_WRITER_ROLES.includes(String(role)))");
+        expect(block).not.toContain("NOT_BOOKING_MANAGER");
         expect(block).toContain("if (!allJoin && !phone)");
+    });
+
+    it("매장·매니저 권한이면 STORE, 아니면 PERSONAL — 개인은 핫딜을 못 켠다", () => {
+        expect(block).toContain('BOOKING_WRITER_ROLES.includes(String(role)) ? "STORE" : "PERSONAL"');
+        expect(block).toContain('if (sellerType === "PERSONAL") rest.isHotDeal = false;');
+        expect(block).toContain('sellerType: rest.listingType === "JOIN" ? null : sellerType');
     });
 
     it("자리 목록은 shared 규칙으로 검증하고 모집 인원은 자리에서 센다", () => {

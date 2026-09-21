@@ -53,14 +53,14 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
     const member = await storage.getMemberById(req.userId!);
     if (!member) return sendError(res, 403, "권한이 없습니다");
 
-    // 조인(같이 칠 사람 모집)은 **누구나** 올린다(2026-09-21 오너: "누구나 만들기 쉽게"). 매니저 권한은 부킹(매장이 파는 티)에만.
-    // 조인은 연락처도 필요 없다 — 신청·승인이 앱 안에서 끝나고, 문자 문의 버튼은 부킹에만 있다.
+    // 조인(같이 칠 사람 모집)은 **누구나**, 부킹(티타임 판매·양도)도 **누구나**(2026-09-21 오너 A안). 예전엔 부킹이
+    // 매니저·매장 권한 전용이라 일반 회원은 아무것도 올릴 수 없었다. 대신 부킹은 올린 쪽을 적어 카드에 '매장 / 개인 양도'
+    // 배지를 단다 — 돈이 먼저 오가는 글이라 보는 사람이 누구 글인지 알아야 한다. 신고 3건이면 자동으로 가려진다(기존).
+    // 조인은 연락처가 필요 없고(신청·승인이 앱 안에서 끝난다), 부킹은 문자 문의 버튼이 있어 휴대폰 번호가 있어야 한다.
     const items = Array.isArray(req.body) ? req.body : [req.body];
     const allJoin = items.length > 0 && items.every((it: any) => it?.listingType === "JOIN");
     const role = (member as any).role ?? (member.profileId ? (await storage.getProfile(member.profileId) as any)?.role : null);
-    if (!allJoin && !BOOKING_WRITER_ROLES.includes(String(role))) {
-        return sendError(res, 403, "티타임을 등록할 수 있는 계정이 아니에요", "NOT_BOOKING_MANAGER");
-    }
+    const sellerType = BOOKING_WRITER_ROLES.includes(String(role)) ? "STORE" : "PERSONAL";
     const phone = usablePhone(member.phone);
     if (!allJoin && !phone) return sendError(res, 400, "연락 가능한 휴대폰 번호를 먼저 등록해 주세요", "NO_CONTACT_PHONE");
 
@@ -68,7 +68,9 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
 
     for (const item of items) {
         // 클라이언트가 보낸 신원 값은 버린다(덮어쓰기가 아니라 제거 — 스키마가 넓어져도 새지 않게).
-        const { managerPhone: _p, ownerId: _o, ...rest } = item ?? {};
+        const { managerPhone: _p, ownerId: _o, sellerType: _s, ...rest } = item ?? {};
+        // 개인은 매장만 쓰는 값을 못 건드린다 — 핫딜 리본은 매장 매물 표시다.
+        if (sellerType === "PERSONAL") rest.isHotDeal = false;
         // 조인의 자리·종류·비용·장소(2026-09-21). 자리가 오면 모집 인원은 자리에서 센다 — 두 값이 어긋나지 않게.
         if (rest.listingType === "JOIN") {
             if (rest.slots !== undefined) {
@@ -98,6 +100,7 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
             datetime: new Date(item.datetime),
             ownerId: req.userId,
             managerPhone: phone ?? "",
+            sellerType: rest.listingType === "JOIN" ? null : sellerType,
         };
 
         const validation = insertGolfBookingSchema.safeParse(data);

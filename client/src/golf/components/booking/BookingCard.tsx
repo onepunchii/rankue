@@ -23,9 +23,11 @@ interface BookingCardProps {
     meId?: string;
     /** 내 위치(있으면 조인 카드에 거리를 적는다) */
     myLocation?: { lat: number; lng: number } | null;
+    /** 내가 올린 글 내리기 */
+    onDelete?: (item: any) => void;
 }
 
-export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType, meId, myLocation }: BookingCardProps) => {
+export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType, meId, myLocation, onDelete }: BookingCardProps) => {
     const [reportOpen, setReportOpen] = useState(false);
     const isExpanded = expandedBookingId === item.id;
     const theme = viewType === 'JOIN' ? THEME_COLORS.JOIN : THEME_COLORS.BOOKING;
@@ -93,6 +95,13 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 </span>
                             )}
                         </div>
+                        {!isJoin && (
+                            // 누가 올렸나(2026-09-21 A안) — 돈이 먼저 오가는 글이라 매장인지 개인 양도인지 먼저 보인다. 옛 글은 매장.
+                            <span className={cn("self-start px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold",
+                                item.sellerType === 'PERSONAL' ? "bg-[#4DA3FF]/15 text-[#7CBBFF]" : "bg-[#64DD17]/15 text-[#8BE84A]")}>
+                                {item.sellerType === 'PERSONAL' ? '개인 양도' : '매장'}
+                            </span>
+                        )}
                         {isJoin && joinType && (
                             <div className="flex items-center gap-2">
                                 <SlotDots slots={slots} filled={applied} size={18} />
@@ -267,14 +276,22 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 </button>
                                 {/* 신고 — 사기 매물을 내릴 방법이 코드에 하나도 없었다(2026-09-09 검토).
                                     같은 사람 셋이 신고하면 서버가 자동으로 가린다. */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setReportOpen(true); }}
-                                    className="w-14 h-14 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
-                                    title="신고하기"
-                                    aria-label="신고하기"
-                                >
-                                    <LucideFlag className="w-5 h-5" />
-                                </button>
+                                {isMine && onDelete ? (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onDelete(item); }}
+                                        className="h-14 px-4 rounded-2xl bg-white/5 border border-white/5 text-[13px] font-medium text-white/60 hover:text-red-400 hover:bg-red-500/10 active:scale-95 transition-all"
+                                        title="내리기"
+                                    >내리기</button>
+                                ) : (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setReportOpen(true); }}
+                                        className="w-14 h-14 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
+                                        title="신고하기"
+                                        aria-label="신고하기"
+                                    >
+                                        <LucideFlag className="w-5 h-5" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </motion.div>

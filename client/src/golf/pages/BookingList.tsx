@@ -12,7 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { BookingCreateForm } from "../components/BookingCreateForm";
+import { BookingCreateSheet } from "../components/booking/BookingCreateSheet";
 import { JoinCreateSheet } from "../components/join/JoinCreateSheet";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { distanceKm, isKoreaCoord, JOIN_TYPE_LABEL, JOIN_TYPES, type JoinType } from "@shared/golfJoin";
@@ -43,7 +43,6 @@ export default function BookingList() {
     const [viewType, setViewType] = useState<'ALL' | 'BOOKING' | 'JOIN'>('BOOKING');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [isBookingManager, setIsBookingManager] = useState(false);
     const [showOnlyMyBookings, setShowOnlyMyBookings] = useState(false);
     /**
      * 조인 종류(필드/스크린/파크)와 "내 주변"(2026-09-21 오너: 스크린 조인은 내 위치 기반으로).
@@ -162,12 +161,6 @@ export default function BookingList() {
 
     // Auth check
     const { data: user } = useQuery<any>({ queryKey: ["/api/hiq/me"] });
-    useEffect(() => {
-        if (user) {
-            const authorizedRoles = ['admin', 'super_admin', 'store_owner', 'booking_manager'];
-            setIsBookingManager(authorizedRoles.includes(user.role));
-        }
-    }, [user]);
 
     // My Crews for sharing
     // 종목을 반드시 실어 보낸다 — 예전엔 안 보내서 당구 크루까지 목록에 뜨고,
@@ -193,9 +186,9 @@ export default function BookingList() {
             if (viewType === 'JOIN' && item.listingType !== 'JOIN') return false;
             if (viewType === 'JOIN' && joinKind !== 'ALL' && (item.joinType ?? 'FIELD') !== joinKind) return false;
 
-            // 3. User specific filtering
+            // 3. 내역(내가 올린 것만) — 회원 id 로 본다. 예전엔 전화번호로 봐서 소셜 회원(전화 없음)은 자기 글을 못 찾았다.
             if (showOnlyMyBookings && user) {
-                if (item.managerPhone !== user.phone) return false;
+                if (item.ownerId !== user.id && !(user.phone && item.managerPhone === user.phone)) return false;
             }
 
             // 4. Time filtering
@@ -244,7 +237,21 @@ export default function BookingList() {
             }
             return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
         });
-    }, [bookings, viewType, selectedFilters, selectedDate, weekDates, joinKind, nearMe, location]);
+    }, [bookings, viewType, selectedFilters, selectedDate, weekDates, joinKind, nearMe, location, showOnlyMyBookings, user]);
+
+    // 내가 올린 글 내리기(부킹·조인 공통). 서버가 글쓴이·운영자만 받는다.
+    const deleteMutation = useMutation({
+        mutationFn: async (id: string) => apiRequest(`/api/hiq/golf/bookings/${id}`, { method: "DELETE" }),
+        onSuccess: () => {
+            toast({ title: "내렸어요" });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings/counts"] });
+        },
+        onError: (e: any) => toast({ title: e?.message || "내리지 못했어요", variant: "destructive" }),
+    });
+    const handleDelete = useCallback((item: any) => {
+        if (window.confirm("이 글을 내릴까요? 되돌릴 수 없어요.")) deleteMutation.mutate(item.id);
+    }, [deleteMutation]);
 
     // 조인 신청은 기록으로 남긴다. 그전엔 문자 앱만 열고 아무것도 안 남아서 몇 명 찼는지도,
     // 누가 신청했는지도, 안 나타났는지도 알 수 없었다(2026-09-09 검토).
@@ -310,6 +317,14 @@ export default function BookingList() {
 
                     </div>
                     <div className="flex items-center gap-2">
+                        {user && (
+                            <button
+                                onClick={() => setShowOnlyMyBookings((v) => !v)}
+                                className={cn("h-9 px-3 rounded-full text-[12.5px] font-medium border whitespace-nowrap transition-colors",
+                                    showOnlyMyBookings ? "bg-white text-black border-white" : "bg-white/[0.04] border-white/10 text-white/60")}
+                                title="내가 올린 글"
+                            >내역</button>
+                        )}
                         <button onClick={() => setIsSearchOpen(true)} className="p-2 rounded-full hover:bg-white/5 transition-colors" title="검색">
                             <LucideSearch className="w-5 h-5 opacity-40 hover:opacity-100 transition-opacity" />
                         </button>
@@ -393,6 +408,7 @@ export default function BookingList() {
                                 onReserve={handleReserve}
                                     onApply={handleApply}
                                 onShare={handleShare}
+                                onDelete={handleDelete}
                                 viewType={viewType}
                                 meId={(user as any)?.id}
                                 myLocation={nearMe ? location : null}
@@ -403,8 +419,8 @@ export default function BookingList() {
             </main>
 
             {
-                // 조인은 로그인한 누구나 만든다(2026-09-21). 부킹 만들기는 매니저만.
-                (isBookingManager || (viewType === 'JOIN' && !!user)) && (
+                // 조인·부킹 모두 로그인한 누구나 올린다(2026-09-21 오너 A안). 부킹은 시트가 휴대폰 번호를 요구한다.
+                !!user && (
                     <AnimatePresence>
                         {!isCreateModalOpen && (
                             <motion.button
@@ -422,7 +438,7 @@ export default function BookingList() {
                                 )}
                             >
                                 <LucidePlus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
-                                <span>{viewType === 'JOIN' ? "조인 만들기" : "부킹 만들기"}</span>
+                                <span>{viewType === 'JOIN' ? "조인 만들기" : "부킹 올리기"}</span>
                             </motion.button>
                         )}
                     </AnimatePresence>
@@ -442,15 +458,16 @@ export default function BookingList() {
                             />
                         </div>
                     ) : (
-                        <BookingCreateForm
-                            onClose={() => setIsCreateModalOpen(false)}
-                            initialMode={viewType === 'ALL' ? 'BOOKING' : viewType as 'BOOKING' | 'JOIN'}
-                            onCreated={(day, type) => {
-                                setViewType(type);
-                                const idx = weekDates.findIndex(d => d.fullDate === day);
-                                if (idx !== -1) pickDate(idx);
-                            }}
-                        />
+                        <div className="relative h-full">
+                            <BookingCreateSheet
+                                onClose={() => setIsCreateModalOpen(false)}
+                                onCreated={(day) => {
+                                    setViewType('BOOKING');
+                                    const idx = weekDates.findIndex(d => d.fullDate === day);
+                                    if (idx !== -1) pickDate(idx);
+                                }}
+                            />
+                        </div>
                     )}
                 </DialogContent>
             </Dialog>

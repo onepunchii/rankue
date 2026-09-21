@@ -680,6 +680,8 @@ export const golfBookings = pgTable("golf_bookings", {
    * · venueName 스크린·파크 장소 이름 · lat/lng 장소 좌표(있을 때만 — "내 주변" 정렬용).
    * 옛 글은 전부 null → 화면이 slotsFromLegacy 로 자리를 만든다.
    */
+  /** 부킹 올린 쪽(2026-09-21 오너 A안: 누구나 올린다) — STORE 매장·매니저, PERSONAL 개인 양도. 카드 배지가 이걸 본다. 옛 글은 null(매장). */
+  sellerType: text("seller_type", { enum: ["STORE", "PERSONAL"] }),
   joinType: text("join_type", { enum: ["FIELD", "SCREEN", "PARK"] }),
   slots: jsonb("slots").$type<{ role: "HOST" | "GUEST" | "OPEN"; gender: "M" | "F" | "ANY" }[]>(),
   costMode: text("cost_mode", { enum: ["FIXED", "SPLIT"] }),
