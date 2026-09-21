@@ -14,6 +14,14 @@ const router = Router();
 
 // --- Golf Booking Routes ---
 router.get("/bookings", asyncHandler(async (req: AuthRequest, res: any) => {
+    // ?applied=1 — 내가 신청한 글(조인·부킹)과 내 상태(2026-09-21 '내 신청' 탭).
+    if (req.query.applied === "1") {
+        if (!req.userId) return sendError(res, 401, "로그인이 필요합니다");
+        const rows = await storage.listMyRequests(req.userId);
+        const counted = await withJoinCounts(rows as any[], req.userId);
+        // withJoinCounts 가 myJoinStatus 를 다시 채우지만 같은 값이다. 연락처는 확정된 글만.
+        return sendSuccess(res, counted);
+    }
     // ?mine=1 — 내가 올린 글 전부, 날짜와 무관(2026-09-21 '내역' 시트). 목록은 하루치만 받으므로 따로 둔다.
     if (req.query.mine === "1") {
         if (!req.userId) return sendError(res, 401, "로그인이 필요합니다");
@@ -159,28 +167,42 @@ const DEFAULT_JOIN_CAPACITY = 3;   // 4인 1팀에서 방장을 뺀 자리
 router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!UUID.test(req.params.id)) return sendError(res, 404, "조인 글을 찾을 수 없어요");
     const booking: any = await storage.getGolfBooking(req.params.id);
-    if (!booking || booking.isBlinded) return sendError(res, 404, "조인 글을 찾을 수 없어요");
-    if (booking.listingType !== "JOIN") return sendError(res, 400, "조인 글이 아니에요");
-    if (booking.ownerId && booking.ownerId === req.userId) return sendError(res, 400, "내가 올린 조인이에요");
+    if (!booking || booking.isBlinded) return sendError(res, 404, "글을 찾을 수 없어요");
+    const isJoin = booking.listingType === "JOIN";
+    if (booking.ownerId && booking.ownerId === req.userId) return sendError(res, 400, isJoin ? "내가 올린 조인이에요" : "내가 올린 부킹이에요");
     if (new Date(booking.datetime).getTime() <= Date.now()) return sendError(res, 400, "이미 지난 티타임이에요");
+    // 부킹 예약 신청(2026-09-21 오너: "푸시로 승부") — 문자 대신 앱 안에서 신청→승인→확정. 인원 1~4.
+    const headcount = isJoin ? 1 : Math.max(1, Math.min(4, Math.floor(Number(req.body?.headcount)) || 1));
 
     const capacity = joinCapacity(booking);
-    const r = await storage.applyToJoin(req.params.id, req.userId!, capacity);
+    const r = await storage.applyToJoin(req.params.id, req.userId!, capacity, headcount);
     if (r === "already") return sendError(res, 409, "이미 신청했어요", "ALREADY_APPLIED");
-    if (r === "full") return sendError(res, 409, "자리가 다 찼어요", "JOIN_FULL");
-    // 호스트에게 알린다 — 승인제라 호스트가 봐야 다음이 있다.
+    if (r === "full") return sendError(res, 409, isJoin ? "자리가 다 찼어요" : "이미 예약이 확정된 티타임이에요", "JOIN_FULL");
+    // 올린 사람에게 알린다 — 승인제라 그 사람이 봐야 다음이 있다.
     if (booking.ownerId) {
         const me = await storage.getMemberById(req.userId!);
         notificationService.sendAndSaveNotification({
-            memberId: booking.ownerId, title: "조인 신청이 왔어요", body: `${me?.name ?? "회원"}님이 ${booking.courseName} 조인에 신청했어요. 승인해 주세요.`,
-            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=JOIN` },
+            memberId: booking.ownerId,
+            title: isJoin ? "조인 신청이 왔어요" : "예약 신청이 왔어요",
+            body: isJoin
+                ? `${me?.name ?? "회원"}님이 ${booking.courseName} 조인에 신청했어요. 승인해 주세요.`
+                : `${me?.name ?? "회원"}님 · ${headcount}명 · ${booking.courseName} ${teeText(booking)} — 승인해 주세요.`,
+            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=${isJoin ? "JOIN" : "BOOKING"}` },
         }).catch((e) => console.error("[GolfJoinNotify]", e));
     }
     return sendSuccess(res, { applied: true });
 }));
 
-/** 정원 = 모집 자리 수. 자리가 없는 옛 글은 모집 인원, 그것도 없으면 기본 3. */
+/** 푸시 본문용 티타임 "9/25 07:40"(한국시각). */
+function teeText(booking: { datetime: Date | string }): string {
+    const d = new Date(booking.datetime);
+    const k = new Date(d.getTime() + 9 * 3_600_000);
+    return `${k.getUTCMonth() + 1}/${k.getUTCDate()} ${String(k.getUTCHours()).padStart(2, "0")}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/** 정원 = 모집 자리 수. 자리가 없는 옛 글은 모집 인원, 그것도 없으면 기본 3. 부킹은 1 — 티타임 하나는 한 팀에게만 확정된다. */
 function joinCapacity(booking: any): number {
+    if (booking.listingType !== "JOIN") return 1;
     const slots = Array.isArray(booking.slots) ? normalizeSlots(booking.slots) : null;
     if (slots) return openSlotCount(slots);
     return Number(booking.joinHeadcount) > 0 ? Number(booking.joinHeadcount) : openSlotCount(slotsFromLegacy(booking.joinHeadcount, booking.joinCondition));
@@ -199,11 +221,14 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
     const r = await storage.decideJoinRequest(req.params.id, req.params.memberId, accept, joinCapacity(booking));
     if (r === "full") return sendError(res, 409, "자리가 다 찼어요", "JOIN_FULL");
     if (r === "gone") return sendError(res, 409, "대기 중인 신청이 아니에요");
+    const isJoin = booking.listingType === "JOIN";
     notificationService.sendAndSaveNotification({
         memberId: req.params.memberId,
-        title: accept ? "조인이 확정됐어요" : "조인 신청이 거절됐어요",
-        body: accept ? `${booking.courseName} 조인에 자리가 확정됐어요. 티타임을 확인해 주세요.` : `${booking.courseName} 조인은 이번엔 함께하지 못하게 됐어요.`,
-        category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=JOIN` },
+        title: accept ? (isJoin ? "조인이 확정됐어요" : "예약이 확정됐어요") : (isJoin ? "조인 신청이 거절됐어요" : "예약 신청이 거절됐어요"),
+        body: accept
+            ? (isJoin ? `${booking.courseName} ${teeText(booking)} 자리가 확정됐어요.` : `${booking.courseName} ${teeText(booking)} 예약이 확정됐어요. 연락처가 열렸어요.`)
+            : `${booking.courseName} ${teeText(booking)}은 이번엔 함께하지 못하게 됐어요.`,
+        category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=${isJoin ? "JOIN" : "BOOKING"}` },
     }).catch((e) => console.error("[GolfJoinNotify]", e));
     return sendSuccess(res, { status: accept ? "accepted" : "rejected" });
 }));
@@ -241,6 +266,16 @@ router.delete("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthR
     }
     const ok = await storage.cancelJoinRequest(req.params.id, req.userId!);
     if (!ok) return sendError(res, 404, "신청 내역이 없어요");
+    // 올린 사람이 모르고 있으면 안 된다 — 확정해 둔 사람이 빠지면 자리가 다시 비는 일이다(2026-09-21).
+    if (booking?.ownerId) {
+        const me = await storage.getMemberById(req.userId!);
+        const isJoin = booking.listingType === "JOIN";
+        notificationService.sendAndSaveNotification({
+            memberId: booking.ownerId, title: isJoin ? "조인 신청이 취소됐어요" : "예약 신청이 취소됐어요",
+            body: `${me?.name ?? "회원"}님이 ${booking.courseName} ${teeText(booking)} 신청을 취소했어요.`,
+            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=${isJoin ? "JOIN" : "BOOKING"}` },
+        }).catch((e) => console.error("[GolfJoinNotify]", e));
+    }
     return sendSuccess(res, { applied: false });
 }));
 
@@ -368,8 +403,14 @@ async function withJoinCounts(rows: any[], userId?: string) {
     return rows.map((r) => {
         const c = counts.get(r.id);
         const myStatus = mine.get(r.id) ?? null;
+        // 연락처(2026-09-21): 매장 글은 번호가 영업용이라 그대로, 개인 양도 글은 **올린 사람과 확정된 신청자**에게만.
+        // 예약 신청이 앱 안에서 끝나므로 확정 전엔 번호가 필요 없다 — 모두에게 열면 전화번호 수집 창구가 된다.
+        const isOwner = !!userId && r.ownerId === userId;
+        const showPhone = r.listingType !== "BOOKING" || r.sellerType !== "PERSONAL" || isOwner || myStatus === "accepted";
+        const { managerPhone, ...safe } = r;
         return {
-            ...r,
+            ...safe,
+            managerPhone: showPhone ? managerPhone : null,
             // joinApplied 는 **자리를 차지한** 인원(승인됨) — 화면의 n/정원. 대기는 따로.
             joinApplied: c?.accepted ?? 0,
             joinPending: c?.pending ?? 0,

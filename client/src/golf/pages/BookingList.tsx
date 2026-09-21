@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookingCreateSheet } from "../components/booking/BookingCreateSheet";
-import { MyListingsSheet, MY_LISTINGS_QUERY_KEY } from "../components/booking/MyListingsSheet";
+import { MyListingsSheet, MY_LISTINGS_QUERY_KEY, MY_REQUESTS_QUERY_KEY, hasUnseenRequestChange, readRequestsSeen } from "../components/booking/MyListingsSheet";
 import { JoinCreateSheet } from "../components/join/JoinCreateSheet";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { distanceKm, isKoreaCoord, JOIN_TYPE_LABEL, JOIN_TYPES, type JoinType } from "@shared/golfJoin";
@@ -266,19 +266,34 @@ export default function BookingList() {
     // 조인 신청은 기록으로 남긴다. 그전엔 문자 앱만 열고 아무것도 안 남아서 몇 명 찼는지도,
     // 누가 신청했는지도, 안 나타났는지도 알 수 없었다(2026-09-09 검토).
     const applyMutation = useMutation({
-        mutationFn: async ({ id, joined }: { id: string; joined: boolean }) =>
-            apiRequest(`/api/hiq/golf/bookings/${id}/apply`, { method: joined ? "DELETE" : "POST" }),
+        mutationFn: async ({ id, joined, headcount }: { id: string; joined: boolean; headcount?: number; isJoin: boolean }) =>
+            apiRequest(`/api/hiq/golf/bookings/${id}/apply`, joined ? { method: "DELETE" } : { method: "POST", body: { headcount: headcount ?? 1 } }),
         onSuccess: (_d, v) => {
-            toast({ title: v.joined ? "신청을 취소했어요" : "조인을 신청했어요" });
+            toast({
+                title: v.joined ? "신청을 취소했어요" : v.isJoin ? "조인을 신청했어요" : "예약 신청을 보냈어요",
+                description: v.joined ? undefined : "올린 분이 승인하면 알림으로 알려 드려요.",
+            });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/joins"] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
         },
         onError: (e: any) => toast({ title: e?.message || "신청하지 못했어요", variant: "destructive" }),
     });
 
-    const handleApply = useCallback((item: any) => {
-        applyMutation.mutate({ id: item.id, joined: !!item.joinedByMe });
+    const handleApply = useCallback((item: any, headcount?: number) => {
+        applyMutation.mutate({ id: item.id, joined: !!item.joinedByMe, headcount, isJoin: item.listingType === 'JOIN' });
     }, [applyMutation]);
+
+    // 내 신청에 안 본 변화(확정·거절)가 있으면 헤더 "내역"에 빨간 점. 가볍게 1분마다.
+    const myRequests = useQuery<any[]>({
+        queryKey: MY_REQUESTS_QUERY_KEY,
+        queryFn: () => apiRequest("/api/hiq/golf/bookings?applied=1"),
+        enabled: !!user,
+        staleTime: 30_000,
+        refetchInterval: 60_000,
+    });
+    const [seenAt, setSeenAt] = useState(readRequestsSeen);
+    useEffect(() => { if (!myListingsOpen) setSeenAt(readRequestsSeen()); }, [myListingsOpen]);
+    const unseen = hasUnseenRequestChange(myRequests.data, seenAt);
 
     const handleReserve = useCallback((item: any) => {
         const phoneNumber = item.managerPhone || "010-1234-5678";
@@ -330,9 +345,12 @@ export default function BookingList() {
                         {user && (
                             <button
                                 onClick={() => setMyListingsOpen(true)}
-                                className="h-9 px-3 rounded-full text-[12.5px] font-medium border whitespace-nowrap transition-colors bg-white/[0.04] border-white/10 text-white/70 active:bg-white/10"
-                                title="내가 올린 글"
-                            >내역</button>
+                                className="relative h-9 px-3 rounded-full text-[12.5px] font-medium border whitespace-nowrap transition-colors bg-white/[0.04] border-white/10 text-white/70 active:bg-white/10"
+                                title="내가 올린 글 · 신청한 글"
+                            >
+                                내역
+                                {unseen && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" aria-label="새 소식" />}
+                            </button>
                         )}
                         <button onClick={() => setIsSearchOpen(true)} className="p-2 rounded-full hover:bg-white/5 transition-colors" title="검색">
                             <LucideSearch className="w-5 h-5 opacity-40 hover:opacity-100 transition-opacity" />
@@ -483,7 +501,12 @@ export default function BookingList() {
                 </DialogContent>
             </Dialog>
 
-            <MyListingsSheet open={myListingsOpen} onOpenChange={setMyListingsOpen} onGo={goToListing} onDelete={handleDelete} />
+            <MyListingsSheet
+                open={myListingsOpen} onOpenChange={setMyListingsOpen}
+                initialTab={unseen ? "applied" : "mine"}
+                onGo={goToListing} onDelete={handleDelete}
+                onCancelRequest={(item) => { if (window.confirm("신청을 취소할까요?")) applyMutation.mutate({ id: item.id, joined: true, isJoin: item.listingType === 'JOIN' }); }}
+            />
 
             <ShareSheet
                 open={isShareModalOpen}

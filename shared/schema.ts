@@ -719,6 +719,8 @@ export const golfJoinRequests = pgTable("golf_join_requests", {
    * 표시를 지울 수 있었다(2026-09-10 검토). 이 두 칸은 재신청해도 안 줄어든다.
    */
   cancelCount: integer("cancel_count").default(0).notNull(),
+  /** 부킹 예약 신청 인원(1~4, 2026-09-21). 조인 신청은 1 — 한 사람이 한 자리다. */
+  headcount: integer("headcount").default(1).notNull(),
   noShowCount: integer("no_show_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

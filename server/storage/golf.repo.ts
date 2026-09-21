@@ -424,7 +424,7 @@ export class GolfRepository {
      * 신청한다. 정원이 차 있으면 거절한다 — 마지막 한 자리에 둘이 동시에 들어오는 경우까지 막으려면
      * 세고 넣는 사이가 갈라지면 안 되므로, 한 문장 안에서 세고 넣는다.
      */
-    async applyToJoin(bookingId: string, memberId: string, capacity: number): Promise<"ok" | "full" | "already"> {
+    async applyToJoin(bookingId: string, memberId: string, capacity: number, headcount = 1): Promise<"ok" | "full" | "already"> {
         const [existing] = await db.select({ status: golfJoinRequests.status })
             .from(golfJoinRequests)
             .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId)))
@@ -433,14 +433,14 @@ export class GolfRepository {
 
         // 정원은 **승인된** 사람으로 센다(호스트 승인제). 대기는 정원과 무관하게 받는다.
         const inserted = await db.execute(sql`
-            INSERT INTO golf_join_requests (booking_id, member_id, status, updated_at)
-            SELECT ${bookingId}::uuid, ${memberId}::uuid, 'applied', now()
+            INSERT INTO golf_join_requests (booking_id, member_id, status, headcount, updated_at)
+            SELECT ${bookingId}::uuid, ${memberId}::uuid, 'applied', ${headcount}, now()
             WHERE (
               SELECT count(*) FROM golf_join_requests
               WHERE booking_id = ${bookingId}::uuid AND status = 'accepted'
             ) < ${capacity}
             ON CONFLICT (booking_id, member_id)
-            DO UPDATE SET status = 'applied', updated_at = now()
+            DO UPDATE SET status = 'applied', headcount = ${headcount}, updated_at = now()
             RETURNING id
         `);
         return (inserted.rows?.length ?? 0) > 0 ? "ok" : "full";
@@ -487,6 +487,30 @@ export class GolfRepository {
     }
 
     /**
+     * 내가 신청한 글(조인·부킹) — 글과 내 신청 상태를 함께(2026-09-21 '내 신청' 탭). 최근 30일 지난 글까지.
+     * 취소한 글은 뺀다(다시 신청하면 다시 뜬다).
+     */
+    async listMyRequests(memberId: string, limit = 100): Promise<any[]> {
+        const rows = await db.select({
+            booking: golfBookings,
+            myJoinStatus: golfJoinRequests.status,
+            myHeadcount: golfJoinRequests.headcount,
+            requestedAt: golfJoinRequests.createdAt,
+            changedAt: golfJoinRequests.updatedAt,
+        })
+            .from(golfJoinRequests)
+            .innerJoin(golfBookings, eq(golfBookings.id, golfJoinRequests.bookingId))
+            .where(and(
+                eq(golfJoinRequests.memberId, memberId),
+                inArray(golfJoinRequests.status, ["applied", "accepted", "rejected", "noshow"]),
+                sql`${golfBookings.datetime} > now() - interval '30 days'`,
+            ))
+            .orderBy(asc(golfBookings.datetime))
+            .limit(limit);
+        return rows.map((r) => ({ ...r.booking, myJoinStatus: r.myJoinStatus, myHeadcount: r.myHeadcount, requestedAt: r.requestedAt, changedAt: r.changedAt }));
+    }
+
+    /**
      * 조인 글에 누가 신청했는지 — 글쓴이에게만 보여 준다.
      *
      * 왜 필요했나: 신청은 쌓이는데 그걸 볼 화면이 없으면 글쓴이는 여전히 누가 오는지 모른다.
@@ -499,6 +523,7 @@ export class GolfRepository {
         const rows = await db.select({
             memberId: golfJoinRequests.memberId,
             status: golfJoinRequests.status,
+            headcount: golfJoinRequests.headcount,
             appliedAt: golfJoinRequests.createdAt,
             changedAt: golfJoinRequests.updatedAt,
             name: hiqMembers.name,

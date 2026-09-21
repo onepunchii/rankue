@@ -22,8 +22,8 @@ interface BookingCardProps {
     expandedBookingId: string | null;
     onExpand: (id: string | null) => void;
     onReserve: (item: any) => void;
-    /** 조인 신청·취소. 조인 글에서만 쓴다. */
-    onApply?: (item: any) => void;
+    /** 신청·취소(조인은 한 자리, 부킹은 인원과 함께). */
+    onApply?: (item: any, headcount?: number) => void;
     onShare: (item: any) => void;
     viewType: 'ALL' | 'BOOKING' | 'JOIN';
     /** 로그인한 회원 id. 내가 올린 조인 글이면 신청자 목록을 연다. */
@@ -41,6 +41,9 @@ const pill = "h-9 px-3 rounded-full bg-white/[0.06] text-[12.5px] font-medium te
 
 export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType, meId, myLocation, onDelete }: BookingCardProps) => {
     const [reportOpen, setReportOpen] = useState(false);
+    // 부킹 예약 신청의 인원 고르기(2026-09-21 오너: "푸시로 승부" — 문자 대신 앱 안에서 신청→승인→확정)
+    const [picking, setPicking] = useState(false);
+    const [headcount, setHeadcount] = useState(1);
     const isExpanded = expandedBookingId === item.id;
     const isJoin = item.listingType === 'JOIN';
     // 자리 모델(2026-09-21): 정원 = 모집 자리 수, 찬 자리 = 승인된 사람 수. 옛 글은 모집 인원으로.
@@ -66,13 +69,15 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
     const caddie = (item.options || []).includes('no_caddie') ? '노캐디' : (item.options || []).includes('marshal') ? '드라이빙 캐디' : '일반캐디';
     const optionLabels: string[] = (item.options || []).map((id: string) => SPECIAL_OPTIONS.find(o => o.id === id)?.label || JOIN_OPTIONS.find(o => o.id === id)?.label || id);
 
-    const primaryText = !isJoin ? "예약 문자 보내기"
-        : isMine ? `내가 올린 조인 · 확정 ${applied}/${capacity}`
-            : myStatus === "accepted" ? "확정됐어요 · 취소하기"
-                : myStatus === "applied" ? "승인 기다리는 중 · 취소하기"
-                    : myStatus === "rejected" ? "이번엔 함께하지 못해요"
-                        : joinFull ? "자리가 찼어요" : `조인 신청하기 ${applied}/${capacity}`;
-    const primaryDisabled = past || (isJoin && (isMine || myStatus === "rejected" || (joinFull && !item.joinedByMe)));
+    const primaryText = isMine ? (isJoin ? `내가 올린 조인 · 확정 ${applied}/${capacity}` : (applied > 0 ? "예약 확정됨 · 내 글" : pending > 0 ? `예약 신청 ${pending}건 · 내 글` : "내가 올린 부킹"))
+        : myStatus === "accepted" ? (isJoin ? "확정됐어요 · 취소하기" : "예약 확정 · 취소하기")
+            : myStatus === "applied" ? "승인 기다리는 중 · 취소하기"
+                : myStatus === "rejected" ? "이번엔 함께하지 못해요"
+                    : joinFull ? (isJoin ? "자리가 찼어요" : "이미 확정된 티타임이에요")
+                        : isJoin ? `조인 신청하기 ${applied}/${capacity}` : "예약 신청";
+    const primaryDisabled = past || isMine || myStatus === "rejected" || (joinFull && !item.joinedByMe);
+    // 문자: 매장 글은 번호가 영업용이라 늘 열려 있고, 개인 양도 글은 확정된 뒤에만 번호가 온다(서버가 가린다).
+    const canSms = !isJoin && !!item.managerPhone && !isMine;
 
     return (
         <>
@@ -177,7 +182,8 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                     </div>
                                 </div>
                             )}
-                            {isJoin && isMine && <JoinApplicants bookingId={item.id} enabled={isExpanded} />}
+                            {/* 내 글이면 신청자(승인·거절) — 부킹 예약 신청도 같은 목록이다 */}
+                            {isMine && <JoinApplicants bookingId={item.id} enabled={isExpanded} />}
 
                             {/* 옵션 */}
                             {optionLabels.length > 0 && (
@@ -204,10 +210,40 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 <p className="text-[13px] text-white/75 leading-relaxed whitespace-pre-wrap break-words">{item.comment}</p>
                             )}
 
-                            {/* 버튼: 조인은 앱 안 신청, 부킹은 문자 문의 */}
+                            {/* 확정된 부킹: 연락처가 열린다 */}
+                            {!isJoin && myStatus === "accepted" && item.managerPhone && (
+                                <div className={cn(box, "flex items-center justify-between gap-2")}>
+                                    <div>
+                                        <div className={label}>연락처</div>
+                                        <div className="rk-num text-[15px] font-semibold text-white">{item.managerPhone}</div>
+                                    </div>
+                                    <button onClick={(e) => { e.stopPropagation(); onReserve(item); }} className="h-10 px-4 rounded-xl bg-[#64DD17] text-[#051907] text-[13px] font-semibold">문자 보내기</button>
+                                </div>
+                            )}
+
+                            {/* 부킹 예약 신청: 인원만 고르고 끝 */}
+                            {picking && !isJoin && (
+                                <div className={cn(box, "space-y-2")} onClick={stop}>
+                                    <div className={label}>몇 명이 가나요?</div>
+                                    <div className="flex gap-1.5">
+                                        {[1, 2, 3, 4].map((n) => (
+                                            <button key={n} type="button" onClick={() => setHeadcount(n)} className={cn("flex-1 h-10 rounded-xl text-[14px] font-medium border transition-colors", headcount === n ? "bg-[#64DD17] border-[#64DD17] text-[#051907]" : "bg-white/[0.04] border-white/[0.08] text-white/70")}>{n}명</button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[12px] text-white/45">올린 분이 승인하면 확정 알림과 함께 연락처가 열려요.</p>
+                                </div>
+                            )}
+
+                            {/* 버튼: 조인·부킹 모두 앱 안 신청. 부킹은 인원을 고른 뒤 보낸다. */}
                             <div className="flex gap-2 pt-1">
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); if (isJoin && isMine) return; if (isJoin && onApply) onApply(item); else onReserve(item); }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (isMine || !onApply) return;
+                                        if (isJoin || item.joinedByMe) { onApply(item); return; }
+                                        if (!picking) { setPicking(true); return; }
+                                        onApply(item, headcount); setPicking(false);
+                                    }}
                                     disabled={primaryDisabled}
                                     className={cn(
                                         "flex-1 h-12 rounded-xl text-[14px] font-semibold transition-colors disabled:opacity-40",
@@ -215,8 +251,11 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                     )}
                                     style={isJoin && item.joinedByMe ? undefined : { backgroundColor: accent }}
                                 >
-                                    {primaryText}
+                                    {picking && !isJoin && !item.joinedByMe ? `${headcount}명 예약 신청 보내기` : primaryText}
                                 </button>
+                                {canSms && (
+                                    <button onClick={(e) => { e.stopPropagation(); onReserve(item); }} className="h-12 px-3.5 rounded-xl bg-white/[0.05] border border-white/[0.06] text-[13px] font-medium text-white/70 active:bg-white/10" title="문자로 문의">문자</button>
+                                )}
                                 <button onClick={(e) => { e.stopPropagation(); onShare(item); }} className="w-12 h-12 rounded-xl bg-white/[0.05] border border-white/[0.06] flex items-center justify-center text-white/60 active:bg-white/10" title="공유하기" aria-label="공유하기">
                                     <LucideShare2 className="w-[18px] h-[18px]" />
                                 </button>

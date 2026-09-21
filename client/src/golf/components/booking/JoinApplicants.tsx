@@ -18,6 +18,7 @@ import { kstDateLabel, kstTime } from "@/lib/kst";
 interface Applicant {
     memberId: string;
     status: "applied" | "accepted" | "rejected" | "cancelled" | "noshow";
+    headcount?: number;
     appliedAt: string;
     changedAt: string;
     name: string;
@@ -137,6 +138,7 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-[13px] font-bold text-white truncate">{a.name}</span>
+                                        {Number(a.headcount) > 1 && <span className="text-[11px] font-medium text-white/60 shrink-0">{a.headcount}명</span>}
                                         <span className={cn("px-1.5 py-0.5 rounded border text-[9px] font-black shrink-0", STATUS_STYLE[a.status])}>
                                             {STATUS_LABEL[a.status]}
                                         </span>
