@@ -260,6 +260,18 @@ body {
 
 :root[data-sport="GOLF"] .text-black\/87,
 :root[data-sport="GOLF"] .text-black\/70 { color: var(--ink-1); }
+
+/*
+ * 굵기 한 단계 낮추기(2026-09-21 오너: "골프 글꼴이 두껍다, 조인에 비해서").
+ * 골프 화면은 font-black(900)이 315곳, extrabold 52곳인데 medium 은 27곳뿐이라 화면이 통째로 무겁다.
+ * 프리텐다드(가변)로 바꾸면서 900 이 더 굵게 보이게 됐다. 파일 315곳을 하나씩 고치는 대신 골프 테마 안에서만
+ * 클래스의 뜻을 낮춘다 — 위계(900>800>700>600)는 그대로 두고 전체를 내린다. 시스템 글꼴 폴백은 650·550 을
+ * 가까운 굵기로 맞춘다. 새 조인 화면(600 상한)은 이 규칙이 있어도 그대로다.
+ */
+:root[data-sport="GOLF"] .font-black { font-weight: 700; }
+:root[data-sport="GOLF"] .font-extrabold { font-weight: 650; }
+:root[data-sport="GOLF"] .font-bold { font-weight: 600; }
+:root[data-sport="GOLF"] .font-semibold { font-weight: 550; }
 :root[data-sport="GOLF"] .text-black\/60,
 :root[data-sport="GOLF"] .text-black\/55,
 :root[data-sport="GOLF"] .text-black\/50 { color: var(--ink-2); }
