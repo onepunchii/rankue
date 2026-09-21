@@ -15,6 +15,7 @@ import { gameLabel, rulesLabel, inningCapLabel } from "./matchView";
 import { roomSetKey, shouldRefreshWatch, WATCH_LIST_REFETCH_MS, WATCH_QUERY_KEY } from "../watch/watchPlan";
 import { isValidTarget } from "../setupPresets";
 import { TargetPicker } from "./MatchLobby";
+import { MyRoomRow, useMyOpenRoom } from "./MyRoomRow";
 
 export const ROOMS_QUERY_KEY = ["sim-rooms"] as const;
 export const ROOMS_REFETCH_MS = 10_000;
@@ -25,6 +26,8 @@ export interface RoomListProps {
     /** 참가가 끝나 playing 이 된 대전 — 페이지가 actions.startMatch 로 연다 */
     onOpen: (m: MatchPublic) => void;
     onCreate: () => void;
+    /** 내가 열어 둔 방으로 돌아가기(대기 화면). 없으면 내 방 줄을 그리지 않는다. */
+    onEnterMine?: () => void;
     onClose: () => void;
     api?: MatchApi;
     /** 내 실전 핸디(있으면 다마수 기본값) */
@@ -204,12 +207,13 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
     );
 }
 
-export function RoomList({ onOpen, onWatch, onCreate, onClose, api = defaultApi, myHandi, autoJoinId, now = Date.now }: RoomListProps) {
+export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api = defaultApi, myHandi, autoJoinId, now = Date.now }: RoomListProps) {
     const { t } = useT();
     const q = useQuery({ queryKey: ROOMS_QUERY_KEY, queryFn: () => api.listRooms(), staleTime: 0, refetchInterval: ROOMS_REFETCH_MS });
     // 게임 중인 공개 방 — 참가 목록에서는 빠지지만 관전으로 들어갈 수 있어 같은 목록에 이어 붙인다.
     const watch = useQuery({ queryKey: WATCH_QUERY_KEY, queryFn: () => api.getWatchable(), refetchInterval: WATCH_LIST_REFETCH_MS, enabled: !!onWatch });
     const [target, setTarget] = useState<MatchPublic | null>(null);
+    const { room: mine } = useMyOpenRoom(api, !!onEnterMine);
     const qc = useQueryClient();
     const nowMs = now();
     const rows = useMemo(() => q.data ?? [], [q.data]);
@@ -257,6 +261,12 @@ export function RoomList({ onOpen, onWatch, onCreate, onClose, api = defaultApi,
                 </span>
                 <button type="button" onClick={onCreate} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black">{t("sim.entry.roomCreate")}</button>
             </div>
+            {/* 내가 연 방 — 참가 목록에는 안 들어간다(내 방엔 내가 못 들어간다). 들어가기·닫기만 준다. */}
+            {mine && onEnterMine && (
+                <div className="mb-3 rounded-tile border border-surface-line bg-surface-1">
+                    <MyRoomRow room={mine} onEnter={onEnterMine} api={api} />
+                </div>
+            )}
             {q.isPending && <p className="text-[13px] font-medium text-white/60 min-h-11 flex items-center">{t("sim.rooms.loading")}</p>}
             {q.isError && (
                 <div className="flex items-center justify-between gap-3 min-h-11">

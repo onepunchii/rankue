@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { matchApi, type MatchPublic } from "@/sim/matchApi";
 import { ROOMS_QUERY_KEY, roomAge } from "@/sim/match/RoomList";
+import { MyRoomRow, useMyOpenRoom } from "@/sim/match/MyRoomRow";
 import { gameLabel } from "@/sim/match/matchView";
 
 const EntryShowcase = lazy(() => import("@/sim/entry/EntryShowcase").then((m) => ({ default: m.EntryShowcase })));
@@ -98,6 +99,8 @@ export function OnlineGameCard() {
     });
     const list = rooms.data ?? [];
     const shown = list.slice(0, MAX_ROWS);
+    // 내가 연 방은 위 목록에서 빠진다(내 방엔 내가 참가할 수 없다) — 따로 한 줄로 보여 준다.
+    const { room: myRoom } = useMyOpenRoom(matchApi, !!member);
 
     return (
         <div className="col-span-2 rounded-3xl overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
@@ -127,13 +130,14 @@ export function OnlineGameCard() {
             </motion.button>
 
             {/* 방 줄: 있으면 바로 참가, 없으면 방을 여는 쪽으로 민다 */}
-            <div className={cn("divide-y divide-black/[0.06]", shown.length > 0 && "border-t border-black/[0.06]")}>
+            <div className={cn("divide-y divide-black/[0.06]", (shown.length > 0 || myRoom) && "border-t border-black/[0.06]")}>
+                {myRoom && <MyRoomRow room={myRoom} onEnter={() => setLocation("/online-game?lobby=1")} className="bg-brand/[0.04]" />}
                 {shown.map((m) => (
                     <RoomRow key={m.id} m={m} onJoin={() => setLocation(`/online-game?rooms=1&join=${m.id}`)} />
                 ))}
             </div>
             <div className="px-4 py-3 flex items-center gap-2 border-t border-black/[0.06]">
-                {shown.length === 0 && (
+                {shown.length === 0 && !myRoom && (
                     <span className="flex-1 min-w-0 text-[12.5px] font-medium text-black/45 truncate">
                         {rooms.isPending && member ? t("sim.rooms.loading") : t("sim.rooms.empty")}
                     </span>
@@ -150,7 +154,7 @@ export function OnlineGameCard() {
                     type="button" onClick={() => setLocation("/online-game?lobby=1&public=1")}
                     className={cn(
                         "h-10 px-4 rounded-pill bg-brand text-brand-fg text-[13px] font-bold active:scale-[0.98] transition-transform",
-                        shown.length === 0 && list.length <= MAX_ROWS ? "shrink-0" : "flex-1",
+                        shown.length === 0 && !myRoom && list.length <= MAX_ROWS ? "shrink-0" : "flex-1",
                     )}
                 >
                     {t("sim.entry.roomCreate")}

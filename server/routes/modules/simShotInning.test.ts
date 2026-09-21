@@ -35,3 +35,29 @@ describe("샷 행 이닝 번호가 서버를 끝까지 통과한다", () => {
         expect(read("migrations/sim_shot_inning.sql")).toMatch(/alter table hiq_sim_match_shots add column if not exists inning integer;/);
     });
 });
+
+/**
+ * 멀티방 열림 알림의 도배 방지 기준(2026-09-21 오너: "푸시가 갈 때도 있고 안 갈 때도 있다").
+ * 예전엔 제목만 보고 **전체 기준**으로 막아서, 다른 사람이 30분 안에 방을 열었으면 내 방은 알림이 통째로 안 나갔다.
+ * 지금은 방장 기준이다 — 이 검사가 사라지면 조용히 옛 동작으로 돌아간다(오류도, 실패하는 테스트도 없이).
+ */
+describe("방 열림 알림은 방장 기준으로만 막는다", () => {
+    const route = code("server/routes/modules/simMatch.ts");
+    const i = route.indexOf("async function broadcastRoomOpened(");
+    const block = route.slice(i, route.indexOf("\nfunction notify(", i));
+
+    it("방장의 최근 공개 방 수를 보고, 제목 전체 기준(hasRecentTitle)은 쓰지 않는다", () => {
+        expect(i).toBeGreaterThan(-1);
+        expect(block).toContain("recentPublicRoomsByHost(hostId, ROOM_BROADCAST_QUIET_MIN, m.id)");
+        expect(block).not.toContain("hasRecentTitle");
+    });
+
+    it("저장소 질의는 지금 만든 방을 빼고 센다(자기 자신 때문에 늘 막히면 안 된다)", () => {
+        const repo = code("server/storage/simMatch.repo.ts");
+        const j = repo.indexOf("async recentPublicRoomsByHost(");
+        expect(j).toBeGreaterThan(-1);
+        const q = repo.slice(j, repo.indexOf("\n    async ", j + 20));
+        expect(q).toContain("hiqSimMatches.id} <> ${excludeId}");
+        expect(q).toContain("hiqSimMatches.isPublic, true");
+    });
+});

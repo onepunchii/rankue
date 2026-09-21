@@ -71,9 +71,11 @@ const room = (over: Partial<MatchPublic> = {}): MatchPublic => ({
     myIndex: -1, turn: 0, shots: 0, version: 1, state: null, balls: null, winnerIndex: null, endReason: null, engineVersion: "v", paramsHash: "h",
     createdAt: new Date(NOW - 5 * 60_000).toISOString(), startedAt: null, lastShotAt: null, finishedAt: null, claimableAt: null, turnSeenAt: null, serverNow: null, ...over,
 });
-function api(rows: MatchPublic[], joinRoom?: MatchApi["joinRoom"], live: unknown[] = []): MatchApi {
+function api(rows: MatchPublic[], joinRoom?: MatchApi["joinRoom"], live: unknown[] = [], mine: MatchPublic[] = []): MatchApi {
     return {
         listRooms: vi.fn(async () => rows),
+        listMatches: vi.fn(async () => mine),
+        resign: vi.fn(async () => ({ status: "canceled" as const })),
         joinRoom: joinRoom ?? vi.fn(async (id) => room({ id, status: "playing", myIndex: 1 })),
         getWatchable: vi.fn(async () => ({ live, replays: [] })),
     } as unknown as MatchApi;
@@ -85,16 +87,16 @@ const liveCard = (over: Record<string, unknown> = {}) => ({
     targets: [20, 20], scores: [7, 5], innings: 9, turn: 0, shots: 18, winnerIndex: null, watchers: 2,
     startedAt: new Date(NOW - 60_000).toISOString(), finishedAt: null, lastShotAt: null, ...over,
 });
-function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; myHandi?: { handi3c: number | null; handi4c: number | null }; live?: unknown[]; onWatch?: (id: string) => void; autoJoinId?: string }) {
+function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; myHandi?: { handi3c: number | null; handi4c: number | null }; live?: unknown[]; onWatch?: (id: string) => void; autoJoinId?: string; mine?: MatchPublic[]; onEnterMine?: () => void }) {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
     const qc = new rq.QueryClient({ defaultOptions: { queries: { retry: false } } });
     const onOpen = vi.fn(); const onCreate = vi.fn();
-    const a = api(props.rows, props.joinRoom, props.live ?? []);
+    const a = api(props.rows, props.joinRoom, props.live ?? [], props.mine ?? []);
     React.act(() => {
         root.render(React.createElement(rq.QueryClientProvider, { client: qc },
-            React.createElement(RoomList, { onOpen, onWatch: props.onWatch, onCreate, onClose: () => undefined, api: a, myHandi: props.myHandi, autoJoinId: props.autoJoinId, now: () => NOW })));
+            React.createElement(RoomList, { onOpen, onWatch: props.onWatch, onCreate, onEnterMine: props.onEnterMine, onClose: () => undefined, api: a, myHandi: props.myHandi, autoJoinId: props.autoJoinId, now: () => NOW })));
     });
     const h = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); }, onOpen, onCreate, api: a };
     live.push(h);
@@ -168,6 +170,27 @@ describe("RoomList", () => {
  * 게임 중인 방(2026-09-12 오너: "게임중이라도 방이 보이고 게임중이라고 표시되고, 선택되면 관전으로").
  * 시작한 방은 참가 목록(listRooms)에서 빠지지만 관전 목록으로 같은 자리에 이어 붙는다.
  */
+describe("RoomList: 내가 연 방", () => {
+    it("참가 목록에는 없지만 '내 방이 열려 있어요' 줄로 따로 보인다 — 들어가기·닫기", async () => {
+        const onEnterMine = vi.fn();
+        const myRoom = room({ id: "mine", hostName: "나", myIndex: 0, hostTarget: 25 });
+        const h = mount({ rows: [room()], mine: [myRoom, room({ id: "old", status: "finished" })], onEnterMine });
+        await settle(h, () => text(h).includes(ko["sim.rooms.mineOpen"]));
+        expect(text(h)).toContain("다마수 25");
+        click(buttons(h).find((b) => b.textContent === ko["sim.rooms.mineEnter"])!);
+        expect(onEnterMine).toHaveBeenCalled();
+        click(buttons(h).find((b) => b.textContent === ko["sim.rooms.mineClose"])!);
+        await settle(h, () => (h.api.resign as ReturnType<typeof vi.fn>).mock.calls.length > 0);
+        expect(h.api.resign).toHaveBeenCalledWith("mine");
+    });
+
+    it("열어 둔 방이 없으면 그 줄이 없다", async () => {
+        const h = mount({ rows: [room()], mine: [], onEnterMine: vi.fn() });
+        await settle(h, () => text(h).includes("방장"));
+        expect(text(h)).not.toContain(ko["sim.rooms.mineOpen"]);
+    });
+});
+
 describe("RoomList: 홈 카드에서 고른 방(autoJoinId)", () => {
     it("목록이 오면 그 방의 참가 창이 바로 열리고, 닫으면 다시 열리지 않는다", async () => {
         const h = mount({ rows: [room(), room({ id: "r2", hostName: "고수" })], autoJoinId: "r2", myHandi: { handi3c: 15, handi4c: null } });

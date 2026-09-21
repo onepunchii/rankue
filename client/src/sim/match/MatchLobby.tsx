@@ -177,6 +177,24 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [created, setCreated] = useState<MatchPublic | null>(null);
+    /**
+     * 이미 열어 둔 내 방으로 돌아오기(2026-09-21 오너: "방을 만들고 나갔는데 다시 볼 길이 없다").
+     * 방은 한 번에 하나라 대기 중인 내 방이 있으면 그게 이 화면이 보여 줄 방이다 — 만들기 폼 대신 대기 화면으로 연다.
+     * 폼을 만지기 시작한 뒤에 끼어들지 않게 **처음 한 번만** 본다.
+     */
+    const restoredRef = useRef(false);
+    useEffect(() => {
+        if (restoredRef.current || created || creating) return;
+        restoredRef.current = true;
+        let alive = true;
+        void (async () => {
+            try {
+                const mine = (await api.listMatches()).find((m) => m.status === "waiting" && m.myIndex === 0);
+                if (alive && mine) setCreated(mine);
+            } catch { /* 없으면 평소대로 만들기 폼 */ }
+        })();
+        return () => { alive = false; };
+    }, [api, created, creating]);
     const [copied, setCopied] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
     const [canceling, setCanceling] = useState(false);

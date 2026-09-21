@@ -207,9 +207,12 @@ const ROOM_BROADCAST_LIMIT = 300;
 /** 방송을 기다려 주는 상한(ms) — 넘으면 남은 건 다음 요청 없이 그대로 끝난다. */
 const ROOM_BROADCAST_WAIT_MS = 6000;
 
-async function broadcastRoomOpened(hostId: string, hostName: string, m: { gameType: "3c" | "4c"; tableId: "DAEDAE" | "JUNGDAE_KR"; hostTarget: number }): Promise<number> {
+async function broadcastRoomOpened(hostId: string, hostName: string, m: { id: string; gameType: "3c" | "4c"; tableId: "DAEDAE" | "JUNGDAE_KR"; hostTarget: number }): Promise<number> {
     const title = "멀티방이 열렸어요";
-    if (await storage.notifs.hasRecentTitle(title, ROOM_BROADCAST_QUIET_MIN)) return 0;
+    // 도배 방지는 **방장 기준**이다(2026-09-21 오너: "푸시가 갈 때도 있고 안 갈 때도 있다").
+    // 예전엔 제목만 보고 전체 기준으로 막아서, 남이 25분 전에 방을 열었으면 내 방은 알림이 통째로 안 나갔다.
+    // 사람이 적은 지금은 서로 다른 사람이 열 때마다 알리는 편이 맞다 — 한 사람이 연달아 여는 것만 막는다.
+    if (await storage.simMatch.recentPublicRoomsByHost(hostId, ROOM_BROADCAST_QUIET_MIN, m.id) > 0) return 0;
     const targets = await storage.notifs.listPushableMembers([hostId], ROOM_BROADCAST_LIMIT);
     const body = `${hostName}님이 ${gameText(m)} ${m.hostTarget}점 방을 열었어요. 지금 들어가면 바로 대전`;
     // 서버리스는 응답을 보내면 함수를 얼려 버린다 — 응답 뒤에 남겨 두면 한 건도 안 나간다(실측: 로컬 16명 → 프로덕션 0명).

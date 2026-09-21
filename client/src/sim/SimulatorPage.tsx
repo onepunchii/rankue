@@ -1702,6 +1702,7 @@ export function SimulatorPage() {
                         onOpen={openMatch}
                         onWatch={(id) => navigate(`/online-game?watch=${id}`)}
                         onCreate={() => navigate("/online-game?lobby=1&public=1")}
+                        onEnterMine={() => navigate("/online-game?lobby=1")}
                         onClose={() => navigate("/online-game", { replace: true })}
                         autoJoinId={params.get("join") ?? undefined}
                         myHandi={member ? { handi3c: member.handi3c, handi4c: member.handi4c } : undefined}

@@ -340,6 +340,20 @@ export class SimMatchRepository {
             .returning({ id: hiqSimMatches.id, code: hiqSimMatches.code, invitedId: hiqSimMatches.invitedId });
     }
 
+    /**
+     * 이 방장이 minutes 분 안에 연 다른 공개 방 수(지금 방은 뺀다). 방 열림 알림 도배 방지에 쓴다.
+     * 알림 행으로는 셀 수 없다 — 알림은 **받는 사람** 기준이라 누가 열었는지가 안 남는다.
+     */
+    async recentPublicRoomsByHost(hostId: string, minutes: number, excludeId: string): Promise<number> {
+        const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(hiqSimMatches)
+            .where(and(
+                eq(hiqSimMatches.hostId, hostId), eq(hiqSimMatches.isPublic, true),
+                sql`${hiqSimMatches.id} <> ${excludeId}`,
+                sql`${hiqSimMatches.createdAt} > now() - make_interval(mins => ${minutes})`,
+            ));
+        return row?.n ?? 0;
+    }
+
     /** 상대가 hours 시간 넘게 안 들어온 waiting 대전을 canceled 로. */
     async cleanupStaleWaiting(hours = 24): Promise<number> {
         const rows = await db.update(hiqSimMatches)
