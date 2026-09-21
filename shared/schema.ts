@@ -420,6 +420,38 @@ export const hiqCrewPhotos = pgTable("hiq_crew_photos", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/**
+ * 조인·부킹 글의 대화방(2026-09-21 오너: "전체 → 메시지, 기가막힌 채팅"). 글 하나에 방 하나.
+ * 들어오는 사람 = 올린 사람 + **확정된** 신청자(대기 중은 못 들어온다 — 승인 전에 대화가 열리면 호스트에게 도배가 간다).
+ * 회원 목록 테이블은 두지 않는다 — 글 소유자와 golf_join_requests.status='accepted' 가 곧 명단이다.
+ * 시스템 메시지(sender null): 확정·빠짐·리마인더. 크루 채팅(hiq_crew_chats)과 같은 모양의 메시지 UI 가 두 방을 그린다.
+ */
+export const hiqListingChats = pgTable("hiq_listing_chats", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  bookingId: uuid("booking_id").references(() => golfBookings.id, { onDelete: "cascade" }).notNull(),
+  senderId: uuid("sender_id").references(() => hiqMembers.id),
+  message: text("message").notNull(),
+  type: text("type", { enum: ["text", "system"] }).default("text").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  idxRoom: index("idx_listing_chats_room").on(t.bookingId, t.createdAt),
+}));
+export type HiqListingChat = typeof hiqListingChats.$inferSelect;
+
+/**
+ * 방별 읽은 시각(2026-09-21) — 안 읽은 수와 하단 탭 배지의 근거. roomKey = "crew:<crewId>" | "listing:<bookingId>".
+ * 크루 채팅은 이 표가 생기기 전 메시지를 전부 '읽음'으로 본다(행이 없으면 생성 시각 기준이 아니라 지금 기준).
+ */
+export const hiqChatReads = pgTable("hiq_chat_reads", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  roomKey: text("room_key").notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  lastReadAt: timestamp("last_read_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.roomKey, t.memberId),
+}));
+
 // 8.4 크루 채팅 (Crew Chats)
 export const hiqCrewChats = pgTable("hiq_crew_chats", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),

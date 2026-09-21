@@ -1,4 +1,4 @@
-import { ChevronsUp, HelpCircle, Bell, MessageSquare } from "@/lib/icons";
+import { ChevronsUp, HelpCircle, Bell, LucideMenu } from "@/lib/icons";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { BallCluster } from "../ui/BilliardBall";
@@ -61,12 +61,13 @@ export const DashboardHeader = ({
                             <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#f2f0eb]" />
                         )}
                     </button>
+                    {/* 전체(≡)는 여기로 올라왔다 — 하단 탭의 그 자리는 채팅이 쓴다(2026-09-21 오너) */}
                     <button
-                        onClick={() => setLocation("/club")}
-                        title={t("dashboardHeader.messages")}
+                        onClick={() => setLocation("/menu")}
+                        title={t("dashboardHeader.menu")}
                         className="w-11 h-11 rounded-full bg-brand/10 flex items-center justify-center active:scale-95 transition-transform"
                     >
-                        <MessageSquare className="w-[21px] h-[21px] text-brand" />
+                        <LucideMenu className="w-[21px] h-[21px] text-brand" />
                     </button>
                 </div>
             </div>

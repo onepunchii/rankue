@@ -3,6 +3,7 @@ import golfRouter from "./modules/golf.js";
 import golfArcadeRouter from "./modules/golfArcade.js";
 import { requireGolfAccess } from "../middleware/golfAccess.js";
 import crewRouter from "./modules/crew.js";
+import chatRouter from "./modules/chat.js";
 import authRouter from "./modules/auth.js";
 import adminRouter from "./modules/admin.js";
 import partnerRouter from "./modules/partner.js";
@@ -32,6 +33,8 @@ router.use("/golf", ...requireGolfAccess, golfRouter);
 
 // 2. Crew (/crews)
 router.use("/crews", crewRouter);
+// 채팅 허브(2026-09-21): 크루 방 + 조인·부킹 방 목록, 읽음, 조인·부킹 방 메시지
+router.use("/chat", chatRouter);
 
 // 3. Admin (/admin)
 // - Handles /admin/stats, /admin/users, etc.

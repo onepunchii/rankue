@@ -222,13 +222,20 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
     if (r === "full") return sendError(res, 409, "자리가 다 찼어요", "JOIN_FULL");
     if (r === "gone") return sendError(res, 409, "대기 중인 신청이 아니에요");
     const isJoin = booking.listingType === "JOIN";
+    // 확정되면 대화방에 들어온다(2026-09-21 채팅) — 시스템 메시지로 알리고, 푸시는 방으로 바로 보낸다.
+    if (accept) {
+        const who = await storage.getMemberById(req.params.memberId);
+        await storage.chat.addListingChat({ bookingId: booking.id, senderId: null, type: "system", message: `${who?.name ?? "회원"}님이 확정됐어요. 이제 여기서 대화해요.` })
+            .catch((e) => console.error("[ListingChatSystem]", e));
+    }
     notificationService.sendAndSaveNotification({
         memberId: req.params.memberId,
         title: accept ? (isJoin ? "조인이 확정됐어요" : "예약이 확정됐어요") : (isJoin ? "조인 신청이 거절됐어요" : "예약 신청이 거절됐어요"),
         body: accept
-            ? (isJoin ? `${booking.courseName} ${teeText(booking)} 자리가 확정됐어요.` : `${booking.courseName} ${teeText(booking)} 예약이 확정됐어요. 연락처가 열렸어요.`)
+            ? (isJoin ? `${booking.courseName} ${teeText(booking)} 자리가 확정됐어요. 채팅방이 열렸어요.` : `${booking.courseName} ${teeText(booking)} 예약이 확정됐어요. 연락처와 채팅방이 열렸어요.`)
             : `${booking.courseName} ${teeText(booking)}은 이번엔 함께하지 못하게 됐어요.`,
-        category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=${isJoin ? "JOIN" : "BOOKING"}` },
+        category: "GOLF", type: "JOIN", pref: "golf",
+        params: { url: accept ? `/chat/listing/${booking.id}` : `/golf/booking-list/${booking.id}?view=${isJoin ? "JOIN" : "BOOKING"}` },
     }).catch((e) => console.error("[GolfJoinNotify]", e));
     return sendSuccess(res, { status: accept ? "accepted" : "rejected" });
 }));
@@ -264,8 +271,15 @@ router.delete("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthR
     if (booking && new Date(booking.datetime).getTime() <= Date.now()) {
         return sendError(res, 400, "이미 지난 티타임이라 취소할 수 없어요", "TEE_TIME_PASSED");
     }
+    // 확정됐던 사람이 빠지면 방에도 남긴다(취소 전에 명단을 봐야 한다)
+    const wasInRoom = booking ? await storage.chat.isListingRoomMember(req.params.id, req.userId!) : false;
     const ok = await storage.cancelJoinRequest(req.params.id, req.userId!);
     if (!ok) return sendError(res, 404, "신청 내역이 없어요");
+    if (wasInRoom && booking?.ownerId !== req.userId) {
+        const me = await storage.getMemberById(req.userId!);
+        await storage.chat.addListingChat({ bookingId: req.params.id, senderId: null, type: "system", message: `${me?.name ?? "회원"}님이 빠졌어요.` })
+            .catch((e) => console.error("[ListingChatSystem]", e));
+    }
     // 올린 사람이 모르고 있으면 안 된다 — 확정해 둔 사람이 빠지면 자리가 다시 비는 일이다(2026-09-21).
     if (booking?.ownerId) {
         const me = await storage.getMemberById(req.userId!);

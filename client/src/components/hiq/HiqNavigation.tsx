@@ -5,12 +5,15 @@ import {
     LucideHome,
     LucideTrophy,
     LucideBarChart3,
-    LucideMenu,
+    LucideMessageSquare,
     LucideUsers,
     LucideFlag,
     LucideCalendarDays
 } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { useT } from "@/lib/i18n";
@@ -39,6 +42,16 @@ export function HiqNavigation() {
      *     독립 대화 탭은 대화가 크루와 조인 글 안에서 일어나는 구조와 안 맞는다.
      */
     const isGolf = currentSport === "GOLF";
+    // 채팅 탭 배지 — 안 읽은 메시지 합계. 1분마다, 로그인했을 때만.
+    const { member } = useAuth();
+    const { data: unreadData } = useQuery<{ unread: number }>({
+        queryKey: ["/api/hiq/chat/unread", currentSport],
+        queryFn: () => apiRequest(`/api/hiq/chat/unread?sport=${currentSport}`),
+        enabled: !!member,
+        refetchInterval: 60_000,
+        staleTime: 30_000,
+    });
+    const chatUnread = unreadData?.unread ?? 0;
     const tabs = isGolf
         ? [
             { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
@@ -47,14 +60,16 @@ export function HiqNavigation() {
             // 부킹 화면이 열렸다(목록의 기본 보기가 부킹이다).
             { id: "join", label: "hiqNavigation.join", icon: LucideCalendarDays, path: "/golf/booking-list", to: "/golf/booking-list?view=JOIN" },
             { id: "round", label: "hiqNavigation.round", icon: LucideBarChart3, path: "/history" },
-            { id: "menu", label: "hiqNavigation.menu", icon: LucideMenu, path: "/menu" },
+            // 전체(≡)는 머리줄로 올라갔고 이 자리는 채팅이다(2026-09-21 오너: "전체 대신 메시지")
+            { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
         ]
         : [
             { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
             { id: "friend", label: "hiqNavigation.friend", icon: LucideUsers, path: "/friends" },
             { id: "log", label: "hiqNavigation.log", icon: LucideBarChart3, path: "/history" },
-            { id: "menu", label: "hiqNavigation.menu", icon: LucideMenu, path: "/menu" },
+            // 전체(≡)는 머리줄로 올라갔고 이 자리는 채팅이다(2026-09-21 오너: "전체 대신 메시지")
+            { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
         ];
 
     // 조인은 상세(/golf/booking-list/:id)로 들어가도 그 탭이 켜져 있어야 한다 — 정확히 같을 때만 보면 꺼진다.
@@ -85,6 +100,11 @@ export function HiqNavigation() {
                                     className="w-7 h-7 transition-all duration-300"
                                     style={active ? { color: activeColor } : { color: 'var(--nav-idle)' }}
                                 />
+                                {tab.id === "chat" && chatUnread > 0 && (
+                                    <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10.5px] font-semibold flex items-center justify-center rk-num" aria-label={`안 읽은 메시지 ${chatUnread}`}>
+                                        {chatUnread > 99 ? "99+" : chatUnread}
+                                    </span>
+                                )}
                             </div>
                             <span className="text-[12px] font-semibold transition-all duration-300" style={active ? { color: activeColor } : { color: 'var(--nav-idle)' }}>
                                 {t(tab.label)}

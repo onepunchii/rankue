@@ -6,6 +6,7 @@ import { AppSessionRepository } from "./appSession.repo.js";
 import { AdminRepository } from "./admin.repo.js";
 import { NotificationRepository } from "./notification.repo.js";
 import { CommunityRepository } from "./community.repo.js";
+import { ChatRepository } from "./chat.repo.js";
 import { UmbRepository } from "./umb.repo.js";
 import { PbaRepository } from "./pba.repo.js";
 import { GolfRankRepository } from "./golfRank.repo.js";
@@ -24,6 +25,7 @@ class Storage {
     public admin = new AdminRepository();
     public notifs = new NotificationRepository();
     public community = new CommunityRepository();
+    public chat = new ChatRepository();
     public umb = new UmbRepository();
     public pba = new PbaRepository();
     public golfRank = new GolfRankRepository();   // 골프 랭킹(2026-09-13) — 공개 읽기

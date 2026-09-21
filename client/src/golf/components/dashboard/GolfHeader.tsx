@@ -1,14 +1,25 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LucideArrowLeftRight } from "lucide-react";
+import { LucideArrowLeftRight, LucideBell, LucideMenu } from "lucide-react";
 import { useSport } from "@/contexts/SportContext";
+import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
 
 interface GolfHeaderProps {
-    member: any; // 추후 HiqMember 타입으로 교체 권장
+    member: any;
 }
 
-export function GolfHeader({ member }: GolfHeaderProps) {
+/**
+ * 골프 홈 머리줄(2026-09-21 오너: "골프 헤더도 당구처럼 알림·전체 아이콘으로").
+ * 왼쪽은 종목 전환, 오른쪽은 🔔 알림 · ≡ 전체. 예전 오른쪽(핸디캡 티어 + 아바타)은 뺐다 — 핸디캡은 바로 아래 큰 숫자가 말한다.
+ */
+export function GolfHeader({ member: _member }: GolfHeaderProps) {
     const { setSport } = useSport();
+    const [, setLocation] = useLocation();
+    const [notifOpen, setNotifOpen] = useState(false);
+    const { data: notifs } = useQuery<any[]>({ queryKey: ["/api/hiq/notifications"] });
+    const unread = notifs?.filter((n) => !n.isRead).length || 0;
 
     return (
         <div className="flex items-center justify-between mb-8 relative z-10">
@@ -24,22 +35,22 @@ export function GolfHeader({ member }: GolfHeaderProps) {
                 </div>
             </Button>
 
-            <div className="flex items-center gap-3">
-                <div className="text-right">
-                    <div className="text-[10px] font-extrabold text-[#64DD17] uppercase tracking-widest">
-                        {member?.golfHandicap > 0 ? `+${member.golfHandicap}` : 'SCRATCH'}
-                    </div>
-                    <div className="text-sm font-semibold text-white">
-                        {member?.nickname || member?.name}
-                    </div>
-                </div>
-                <Avatar className="w-10 h-10 border-2 border-[#64DD17]/20">
-                    <AvatarImage src={member?.profileImageUrl} />
-                    <AvatarFallback className="bg-[#1a1a1a] text-[#64DD17] font-bold">
-                        {member?.name?.[0]}
-                    </AvatarFallback>
-                </Avatar>
+            <div className="flex items-center gap-2">
+                <button
+                    type="button" onClick={() => setNotifOpen(true)} title="알림"
+                    className="relative w-11 h-11 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
+                >
+                    <LucideBell className="w-[20px] h-[20px] text-[#64DD17]" />
+                    {unread > 0 && <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#0A0A0A]" />}
+                </button>
+                <button
+                    type="button" onClick={() => setLocation("/menu")} title="전체"
+                    className="w-11 h-11 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
+                >
+                    <LucideMenu className="w-[20px] h-[20px] text-[#64DD17]" />
+                </button>
             </div>
+            <NotificationInbox open={notifOpen} onClose={() => setNotifOpen(false)} />
         </div>
     );
 }

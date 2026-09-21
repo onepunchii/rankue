@@ -49,6 +49,13 @@ export function CrewChatTab({ crewId, isMember, isAdmin, currentMemberId, onSett
         enabled: !!crewId && isMember,
         refetchInterval: 3000, // Poll every 3 seconds for basic real-time feel
     });
+    // 읽음(2026-09-21 채팅 허브): 이 탭이 열려 있는 동안 새 메시지가 오면 "봤다"를 적는다 — 하단 채팅 탭 배지·목록 안 읽은 수의 근거.
+    const lastSeenCountRef = useRef(-1);
+    useEffect(() => {
+        if (!isMember || !chats || chats.length === lastSeenCountRef.current) return;
+        lastSeenCountRef.current = chats.length;
+        void apiRequest("/api/hiq/chat/read", { method: "POST", body: JSON.stringify({ key: `crew:${crewId}` }) }).catch(() => { /* 다음에 */ });
+    }, [chats, isMember, crewId]);
 
     // 2. Send chat with optimistic update
     const sendChatMutation = useMutation({
