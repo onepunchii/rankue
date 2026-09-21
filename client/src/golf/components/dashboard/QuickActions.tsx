@@ -12,6 +12,16 @@ interface QuickActionsProps {
     onOpenJoin: () => void;
 }
 
+/**
+ * 골프 게임(필드 골프 3D · 온라인 골프) 입구를 보일지 — 2026-09-21 오너: "완성도가 떨어지고 별로다, 지우지 말고 가리자".
+ *
+ * 왜 지우지 않나: 지금까지 **플레이 기록이 0건**이라(방 0 · 참가자 0) 가려도 잃는 사용자가 없는데,
+ * shared/golf/field 물리 엔진은 테스트가 붙은 결정론 코드라 다시 만들려면 비용이 크다. 완성도가 낮아 보이는 건
+ * 엔진이 아니라 그 위에 임시로 얹은 화면이다. 그래서 **입구만 닫는다** — 라우트(/golf/play·/golf/arcade·/golf/range)는
+ * 그대로라 주소를 직접 치면 열리고, 다듬어서 다시 열 땐 이 값을 true 로 되돌리면 된다.
+ */
+const SHOW_GOLF_GAMES = false;
+
 export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) {
     const [, setLocation] = useLocation();
 
@@ -60,6 +70,7 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                 </motion.button>
             </div>
 
+            {SHOW_GOLF_GAMES && (<>
             <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setLocation('/golf/play')}
@@ -92,6 +103,7 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                 </div>
                 <span className="relative z-10 text-[#64DD17] font-extrabold text-[18px] group-hover:translate-x-1 transition-transform">›</span>
             </motion.button>
+            </>)}
 
             {/* GOLF BOOKING 배너는 2026-09-10 뺐다. 홈 맨 위 긴급티 티커가 그 자리를 맡고,
                 부킹 목록은 하단 네비 '조인' 탭으로 들어간다(오너). */}
