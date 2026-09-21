@@ -380,6 +380,7 @@ export class UserRepository {
     async isFriend(memberId: string, otherId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<boolean> {
         const [row] = await db.select({ id: hiqFriendships.id }).from(hiqFriendships).where(and(
             eq(hiqFriendships.sportCategory, sport),
+            eq(hiqFriendships.status, "accepted"), // 레거시 pending 행이 남아 있다 — 1:1 방 개설의 문지기로 쓰이므로 수락된 관계만
             or(
                 and(eq(hiqFriendships.requesterId, memberId), eq(hiqFriendships.receiverId, otherId)),
                 and(eq(hiqFriendships.requesterId, otherId), eq(hiqFriendships.receiverId, memberId)),

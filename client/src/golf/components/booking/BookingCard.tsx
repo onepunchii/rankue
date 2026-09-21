@@ -71,8 +71,8 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
 
     const primaryText = isMine ? (isJoin ? `내가 올린 조인 · 확정 ${applied}/${capacity}` : (applied > 0 ? "예약 확정됨 · 내 글" : pending > 0 ? `예약 신청 ${pending}건 · 내 글` : "내가 올린 부킹"))
         : myStatus === "accepted" ? (isJoin ? "확정됐어요 · 취소하기" : "예약 확정 · 취소하기")
-            : myStatus === "applied" ? "승인 기다리는 중 · 취소하기"
-                : myStatus === "rejected" ? "이번엔 함께하지 못해요"
+            : myStatus === "applied" ? (joinFull ? "마감 · 자리 나면 알려 드려요 · 취소" : "승인 기다리는 중 · 취소하기")
+                : myStatus === "rejected" ? "올린 분이 받지 않은 신청이에요"
                     : joinFull ? (isJoin ? "자리가 찼어요" : "이미 확정된 티타임이에요")
                         : isJoin ? `조인 신청하기 ${applied}/${capacity}` : "예약 신청";
     const primaryDisabled = past || isMine || myStatus === "rejected" || (joinFull && !item.joinedByMe);
@@ -240,6 +240,8 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         if (isMine || !onApply) return;
+                                        // 확정된 자리의 취소는 되돌릴 수 없다(취소 기록이 남고 올린 분께 알림이 간다) — 내역 시트처럼 확인을 받는다.
+                                        if (myStatus === "accepted" && !window.confirm(isJoin ? "확정된 조인을 취소할까요?\n올린 분께 알림이 가고 취소 기록이 남아요." : "확정된 예약을 취소할까요?\n올린 분께 알림이 가고 취소 기록이 남아요.")) return;
                                         if (isJoin || item.joinedByMe) { onApply(item); return; }
                                         if (!picking) { setPicking(true); return; }
                                         onApply(item, headcount); setPicking(false);

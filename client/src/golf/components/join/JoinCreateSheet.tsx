@@ -171,6 +171,7 @@ export function JoinCreateSheet({ onClose, onCreated }: Props) {
         },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
+            qc.invalidateQueries({ queryKey: ["/api/hiq/golf/joins"] }); // 조인 탭 목록은 키가 다르다 — 오늘 글을 오늘 화면에서 올리면 안 새로워졌다
             qc.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings/counts"] });
             toast({ title: "조인을 올렸어요", description: "신청이 오면 알려 드릴게요." });
             onCreated?.(date);

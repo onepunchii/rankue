@@ -223,7 +223,7 @@ export function GlobalSearch({ isOpen, onClose, onSelectBooking, viewType }: Glo
                                                     </div>
                                                     <div>
                                                         <div className="text-sm font-black text-white group-hover:text-[#64DD17] transition-colors flex items-center gap-1.5">
-                                                            {item.courseName || item.blindName}
+                                                            {item.isBlind ? (item.blindName || item.courseName) : item.courseName}
                                                             {item.isBlind && <span className="text-[8px] px-1 bg-white/10 text-white/40 rounded italic font-bold">BLIND</span>}
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-0.5">

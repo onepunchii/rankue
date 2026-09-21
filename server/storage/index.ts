@@ -68,12 +68,13 @@ class Storage {
     async myJoinStatuses(memberId: string, ids: string[]) { return this.golf.myJoinStatuses(memberId, ids); }
     async decideJoinRequest(bookingId: string, memberId: string, accept: boolean, capacity: number) { return this.golf.decideJoinRequest(bookingId, memberId, accept, capacity); }
     async listMyRequests(memberId: string) { return this.golf.listMyRequests(memberId); }
-    async rejectOtherPending(bookingId: string, keepMemberId: string) { return this.golf.rejectOtherPending(bookingId, keepMemberId); }
+    async pendingRequesterIds(bookingId: string) { return this.golf.pendingRequesterIds(bookingId); }
+    async countRecentBookingsByOwner(ownerId: string, minutes: number) { return this.golf.countRecentBookingsByOwner(ownerId, minutes); }
     async activeRequesterIds(bookingId: string) { return this.golf.activeRequesterIds(bookingId); }
     async applyToJoin(bookingId: string, memberId: string, capacity: number, headcount = 1) { return this.golf.applyToJoin(bookingId, memberId, capacity, headcount); }
     async cancelJoinRequest(bookingId: string, memberId: string) { return this.golf.cancelJoinRequest(bookingId, memberId); }
     async listJoinApplicants(bookingId: string) { return this.golf.listJoinApplicants(bookingId); }
-    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean) { return this.golf.setJoinNoShow(bookingId, memberId, noShow); }
+    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean, capacity?: number) { return this.golf.setJoinNoShow(bookingId, memberId, noShow, capacity); }
     async deleteGolfBooking(id: string, managerPhone?: string, ownerId?: string) { return this.golf.deleteGolfBooking(id, managerPhone, ownerId); }
     async getGolfJoins(filters?: any) { return this.golf.getGolfJoins(filters); }
     async createGolfJoin(data: any) { return this.golf.createGolfJoin(data); }
@@ -159,7 +160,7 @@ class Storage {
     async getCrewPhoto(id: string) { return this.crews.getCrewPhoto(id); }
     async deleteCrewPhoto(id: string) { return this.crews.deleteCrewPhoto(id); }
     /** 크루 채팅은 2026-09-21 부터 hiq_chat_messages("crew:<id>") 에 있다 — 옛 이름은 라우트 호환용. */
-    async getCrewChats(crewId: string, memberId?: string) { return memberId ? this.chat.messages({ kind: "crew", id: crewId, key: `crew:${crewId}` }, memberId) : []; }
+    async getCrewChats(crewId: string, memberId?: string) { return memberId ? this.chat.messages({ kind: "crew", id: crewId, key: `crew:${crewId}` }, memberId, { limit: 100 }) : []; }
     async createCrewChat(data: { crewId: string; senderId: string; message: string; type?: string; metadata?: unknown }) {
         const row = await this.chat.addMessage({ key: `crew:${data.crewId}`, senderId: data.senderId, message: data.message, type: data.type ?? "text", metadata: data.metadata });
         return { ...row, crewId: data.crewId };

@@ -890,6 +890,8 @@ export const ko: Dict = {
   "chat.support": "운영자 문의",
   "chat.newChat": "새 대화",
   "chat.newChatDesc": "친구(라이벌)로 등록된 사람과 대화방을 열어요",
+  "chat.loadOlder": "이전 대화 더 보기",
+  "chat.roomGone": "끝났거나 내려간 방이에요",
   "chat.filterAll": "전체",
   "chat.filterListing": "조인·부킹",
   "chat.filterCrew": "크루",

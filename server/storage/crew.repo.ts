@@ -371,6 +371,9 @@ export class CrewRepository {
 
             // 5. Delete Chats
             await tx.delete(hiqCrewChats).where(eq(hiqCrewChats.crewId, crewId));
+            // 2026-09-21 부터 크루 채팅은 hiq_chat_messages("crew:<id>") 에 있다 — 여기서 안 지우면 크루가 없어져도 대화가 남는다.
+            await tx.execute(sql`DELETE FROM hiq_chat_messages WHERE room_key = ${`crew:${crewId}`}`);
+            await tx.execute(sql`DELETE FROM hiq_chat_reads WHERE room_key = ${`crew:${crewId}`}`);
 
             // 6. Delete Settlements (and items/participants)
             const settlements = await tx.select({ id: hiqSettlements.id }).from(hiqSettlements).where(eq(hiqSettlements.crewId, crewId));

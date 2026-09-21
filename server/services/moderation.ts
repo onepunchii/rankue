@@ -136,7 +136,8 @@ async function deleteReportedContent(targetType: ReportTargetType, id: string): 
         }
         case "crew_chat":
             // 채팅의 사진·메타데이터는 서버가 만든 것만 있어(crew.ts POST chats) 지울 Blob 이 없다.
-            await storage.crews.deleteCrewChat(id);
+            // storage.crews.deleteCrewChat 은 옛 표(hiq_crew_chats)를 지운다 — 채팅은 새 표에 있다. 위임 메서드로 지운다.
+            await storage.deleteCrewChat(id);
             return;
         default:
             return;

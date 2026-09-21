@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { costText } from "@/golf/components/join/joinUi";
 import { apiRequest } from '@/lib/queryClient';
 import { kstDateKey, kstDateLabel, kstTime } from '@/lib/kst';
 
@@ -35,10 +36,13 @@ export const useShare = () => {
 
     const handleExternalShare = useCallback(async (item: any) => {
         const shareUrl = buildGolfShareUrl(item);
+        const isJoin = item.listingType === "JOIN";
+        const name = item.isBlind ? (item.blindName || "비공개 골프장") : item.courseName;
         const shareData = {
-            title: `[랭큐] ${item.courseName || item.blindName} 예약`,
+            title: `[랭큐] ${name} ${isJoin ? "조인" : "예약"}`,
             // 시각은 한국 시각으로 고정한다 — 기기 시계를 따르면 해외 접속자에게 다른 시간이 찍힌다.
-            text: `${kstDateLabel(item.datetime)} ${kstTime(item.datetime)}\n그린피: ${item.greenFee.toLocaleString()}원`,
+            // 조인은 1/N 이면 greenFee 가 0 이다 — 그대로 쓰면 "그린피: 0원" 이 나갔다. 화면과 같은 규칙(costText)으로 적는다.
+            text: `${kstDateLabel(item.datetime)} ${kstTime(item.datetime)}\n${isJoin ? `비용: ${costText(item)}` : `그린피: ${Number(item.greenFee ?? 0).toLocaleString()}원`}`,
             url: shareUrl,
         };
 

@@ -75,7 +75,12 @@ export default function HiqClubDetail() {
         return new URLSearchParams(window.location.search).get('open');
     });
     const [isCreateSettlementOpen, setIsCreateSettlementOpen] = useState(false);
-    const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
+    // 채팅의 정산 카드(chat-room openCard)가 ?settlement=<id> 로 보낸다 — 예전엔 아무도 안 읽어 크루 홈만 떴다(2026-09-22 리뷰).
+    const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(() => {
+        if (typeof window === 'undefined') return null;
+        const v = new URLSearchParams(window.location.search).get('settlement');
+        return v && /^[0-9a-f-]{36}$/i.test(v) ? v : null;
+    });
     const [selectedPost, setSelectedPost] = useState<any>(null);
     const [sportTab, setSportTab] = useState<'BILLIARDS' | 'GOLF'>('BILLIARDS');
 

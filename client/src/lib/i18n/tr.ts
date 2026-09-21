@@ -888,6 +888,8 @@ const tr: Dict = {
   "chat.support": "Destek",
   "chat.newChat": "Yeni sohbet",
   "chat.newChatDesc": "Arkadaşlarınla (rakip) oda aç",
+  "chat.loadOlder": "Önceki mesajları yükle",
+  "chat.roomGone": "Bu oda sona erdi veya kaldırıldı",
   "chat.filterAll": "Tümü",
   "chat.filterListing": "Join·Rezervasyon",
   "chat.filterCrew": "Ekip",

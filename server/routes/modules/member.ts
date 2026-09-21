@@ -331,7 +331,8 @@ router.post("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: 
         if (sender) {
             // 이름은 회원 레코드 우선(프로필 미연결 계정도 알림이 가야 한다).
             const senderName = sender.name || (sender.profileId ? (await storage.getProfile(sender.profileId))?.nickname : null);
-            notificationService.sendAndSaveNotification({
+            // 기다린다(서버리스) — 안 기다리면 응답과 함께 얼어 라이벌 추가 알림이 사라진다.
+            await notificationService.sendAndSaveNotification({
                 memberId: finalTargetId,
                 title: "👊 라이벌 추가",
                 body: senderName ? `${senderName}님이 회원님을 라이벌로 추가했어요!` : "누군가가 라이벌로 추가했습니다",
@@ -340,7 +341,7 @@ router.post("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: 
                 params: { url: "/friends" },
             }).catch((err: any) => console.error("[FriendAddNotif]", err));
         }
-    } catch(e) {}
+    } catch (e) { console.error("[FriendAddNotif]", e); }
 
     return sendSuccess(res, result);
 }));

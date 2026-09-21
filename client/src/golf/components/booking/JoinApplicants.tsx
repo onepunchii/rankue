@@ -78,7 +78,7 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
             }),
         onSuccess: (_d, v) => {
             toast({ title: v.noShow ? "안 옴으로 표시했어요" : "표시를 되돌렸어요" });
-            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings", bookingId, "applicants"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] }); // applicants·mine·부킹 탭 목록을 접두로 함께
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/joins"] });
         },
         onError: (e: any) => toast({ title: e?.message || "표시하지 못했어요", variant: "destructive" }),
@@ -102,7 +102,8 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
     const teePassed = !!data?.teeTime && new Date(data.teeTime).getTime() <= Date.now();
     const applicants = data?.applicants ?? [];
     const pendingCount = applicants.filter((a) => a.status === "applied").length;
-    const acceptedCount = applicants.filter((a) => a.status === "accepted" || a.status === "noshow").length;
+    // 서버의 카드 집계(joinApplied)와 같은 기준 — 노쇼는 자리를 비우므로 확정에서 뺀다(예전엔 패널과 카드의 숫자가 어긋났다).
+    const acceptedCount = applicants.filter((a) => a.status === "accepted").length;
 
     return (
         <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
@@ -168,6 +169,14 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
                                             className="h-8 px-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 text-[12px] font-medium flex items-center gap-1 disabled:opacity-40"
                                         ><LucideX className="w-3.5 h-3.5" />거절</button>
                                     </span>
+                                )}
+                                {/* 거절은 신청자에게 최종이다(재신청이 막힌다) — 마음이 바뀐 호스트는 여기서 되돌려 확정한다. */}
+                                {!teePassed && a.status === "rejected" && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); decideMutation.mutate({ memberId: a.memberId, accept: true }); }}
+                                        disabled={decideMutation.isPending}
+                                        className="shrink-0 h-8 px-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 text-[11px] font-medium flex items-center gap-1 disabled:opacity-40"
+                                    ><LucideUndo2 className="w-3 h-3" />거절 취소 · 확정</button>
                                 )}
                                 {teePassed && (a.status === "accepted" || a.status === "noshow") && (
                                     <button

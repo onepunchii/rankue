@@ -15,7 +15,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { JOIN_TYPE_LABEL } from "@shared/golfJoin";
 import { FriendPicker } from "@/components/hiq/chat/FriendPicker";
 import { LucidePlus, LucideHeadset } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface ChatRoomRow {
     key: string;
@@ -73,6 +73,8 @@ export default function ChatHub() {
     const showChips = kindsPresent.length >= 2;
     const activeKind = showChips && kindsPresent.includes(kindFilter as ChatRoomRow["kind"]) ? kindFilter : "all";
     const rooms = activeKind === "all" ? allRooms : allRooms.filter((r) => r.kind === activeKind);
+    // 고른 종류가 목록에서 사라졌으면(방이 닫힘·종목 전환) 고른 것도 지운다 — 안 지우면 나중에 그 종류가 돌아올 때 고르지도 않은 필터가 되살아난다.
+    useEffect(() => { if (q.data && kindFilter !== "all" && activeKind === "all") setKindFilter("all"); }, [q.data, kindFilter, activeKind]);
     const unreadOf = (k: "all" | ChatRoomRow["kind"]) => allRooms.filter((r) => k === "all" || r.kind === k).reduce((n, r) => n + r.unread, 0);
     const roomPath = (r: ChatRoomRow) => (r.kind === "crew" ? `/chat/crew/${r.id}` : `/chat/${r.kind}/${r.id}`);
 

@@ -24,6 +24,9 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
     const { data: notifications, isLoading } = useQuery<any[]>({
         queryKey: ["/api/hiq/notifications", { sport: currentSport }],
         enabled: open,
+        // 푸시를 받고 바로 열어도 그 알림이 있어야 한다 — 전역 5분 캐시를 그대로 쓰면 없다.
+        staleTime: 0,
+        refetchOnMount: "always",
     });
 
     const readMutation = useMutation({
@@ -202,6 +205,8 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                                 body: JSON.stringify({
                                                     title: t("notificationInbox.testTitle"),
                                                     body: t("notificationInbox.testBody"),
+                                                    // 지금 보고 있는 알림함의 종목으로 — 서버 기본값이 GOLF 라 당구 탭에서는 눌러도 아무것도 안 떴다.
+                                                    category: currentSport,
                                                     type: "NOTICE"
                                                 })
                                             });

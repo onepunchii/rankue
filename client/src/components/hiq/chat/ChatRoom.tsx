@@ -42,6 +42,12 @@ interface Props {
     emptyText?: string;
     /** 새 메시지를 봤다고 알린다(아래를 보고 있을 때) */
     onSeen?: () => void;
+    /** 위로 더 읽기(2026-09-22) — 방은 최근 60건으로 열리고, 맨 위에 닿으면 앞 쪽을 더 받는다 */
+    hasOlder?: boolean;
+    loadingOlder?: boolean;
+    onLoadOlder?: () => void;
+    /** 방이 바뀌면 다시 맨 아래에서 시작한다 */
+    roomKey?: string;
 }
 
 /** 카드형: 정산 요청, 골프 부킹 공유(옛 크루 채팅은 type text + metadata.type 으로 구분했다). */
@@ -62,7 +68,7 @@ const timeLabel = (iso: string) => {
     return `${h < 12 ? "오전" : "오후"} ${h % 12 === 0 ? 12 : h % 12}:${m}`;
 };
 
-export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onOpenCard, pinned, loading, disabled, emptyText, onSeen }: Props) {
+export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onOpenCard, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey }: Props) {
     const { t } = useT();
     // 길게 누르기(600ms) → 삭제. 마우스에서는 우클릭도 같다.
     const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,8 +81,20 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
     const toBottom = () => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; };
-    useLayoutEffect(() => { if (atBottomRef.current) { toBottom(); onSeen?.(); } }, [messages.length]);
+    // 앞에 옛 메시지가 붙으면(위로 더 읽기) 보던 자리를 지킨다: 늘어난 높이만큼 스크롤을 내린다.
+    const firstIdRef = useRef<string | undefined>(undefined);
+    const prevHeightRef = useRef(0);
+    useLayoutEffect(() => {
+        const el = listRef.current;
+        const firstId = messages[0]?.id;
+        const prepended = !!el && !!firstIdRef.current && firstId !== firstIdRef.current && messages.some((m) => m.id === firstIdRef.current);
+        if (el && prepended) el.scrollTop += el.scrollHeight - prevHeightRef.current;
+        else if (atBottomRef.current) { toBottom(); if (messages.length > 0) onSeen?.(); }
+        firstIdRef.current = firstId;
+        prevHeightRef.current = el?.scrollHeight ?? 0;
+    }, [messages]);
     useEffect(() => { toBottom(); }, [loading]);
+    useEffect(() => { atBottomRef.current = true; firstIdRef.current = undefined; }, [roomKey]);
 
     const send = async () => {
         const v = text.trim();
@@ -92,9 +110,17 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
             {pinned && <div className="shrink-0">{pinned}</div>}
             <div
                 ref={listRef}
-                onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; if (atBottomRef.current) onSeen?.(); }}
+                onScroll={(e) => {
+                    const el = e.currentTarget;
+                    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                    if (atBottomRef.current) onSeen?.();
+                    if (el.scrollTop < 120 && hasOlder && !loadingOlder) onLoadOlder?.();
+                }}
                 className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-1.5"
             >
+                {hasOlder && messages.length > 0 && (
+                    <div className="flex justify-center py-2 text-ink-4">{loadingOlder ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <button type="button" onClick={() => onLoadOlder?.()} className="text-[12px] font-medium text-ink-3 px-3 py-1 rounded-full bg-surface-2">{t("chat.loadOlder")}</button>}</div>
+                )}
                 {loading && messages.length === 0 && (
                     <div className="flex items-center justify-center py-10 text-ink-3"><LucideLoader2 className="w-5 h-5 animate-spin" /></div>
                 )}

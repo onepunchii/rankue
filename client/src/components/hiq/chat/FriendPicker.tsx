@@ -6,7 +6,7 @@
  * Radix Sheet 를 안 쓴다: 검색칸에 포커스가 가 키보드가 뜨면 index.css 의 다이얼로그 키보드 회피가
  * 시트를 화면 왼쪽 절반으로 밀어 반쪽만 보였다. 여기서는 전체 화면 층으로 그리고 키보드 높이만큼 아래를 비운다.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { LucideLoader2, LucideCheck, LucideX, LucideSearch } from "lucide-react";
@@ -20,7 +20,7 @@ interface Friend { id: string; name: string; profileImageUrl: string | null }
 function normalize(rows: any[]): Friend[] {
     return (rows ?? [])
         .filter((r) => (r?.status ?? "accepted") === "accepted")
-        .map((r) => ({ id: String(r.friend?.id ?? r.id), name: r.friend?.name ?? r.name ?? "", profileImageUrl: r.profile?.profileImageUrl ?? r.friend?.profileImageUrl ?? null }))
+        .map((r) => ({ id: String(r.friend?.id ?? r.id), name: r.friend?.name ?? r.name ?? "", profileImageUrl: r.profileImageUrl ?? r.profile?.profileImageUrl ?? r.friend?.profileImageUrl ?? null }))
         .filter((f) => f.id && f.name);
 }
 
@@ -37,12 +37,16 @@ export function FriendPicker({ open, onOpenChange, sport }: { open: boolean; onO
     }, [friendsQ.data, q]);
 
     const close = () => { onOpenChange(false); setPicked([]); setQ(""); };
+    const panelRef = useRef<HTMLDivElement>(null);
 
     // 열려 있는 동안 뒤 화면이 같이 스크롤되지 않게, 뒤로가기(ESC)로 닫힌다.
     useEffect(() => {
         if (!open) return;
         const prev = document.body.style.overflow;
         document.body.style.overflow = "hidden";
+        // 층이 열리면 포커스를 안으로 옮긴다 — 안 옮기면 키보드·스크린리더의 포커스가 가려진 뒤 화면에 남는다.
+        // (검색칸에 바로 포커스를 주지는 않는다: 열자마자 키보드가 올라와 목록을 가린다.)
+        panelRef.current?.focus();
         const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
         window.addEventListener("keydown", onKey);
         return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
@@ -59,7 +63,7 @@ export function FriendPicker({ open, onOpenChange, sport }: { open: boolean; onO
     const golf = sport === "GOLF";
 
     return (
-        <div role="dialog" aria-modal="true" aria-label={t("chat.newChat")} className="fixed inset-0 z-[60] flex flex-col bg-surface-0 text-ink-1" style={{ paddingBottom: "var(--keyboard-height, 0px)" }}>
+        <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t("chat.newChat")} className="fixed inset-0 z-[60] flex flex-col bg-surface-0 text-ink-1 outline-none" style={{ paddingBottom: "var(--keyboard-height, 0px)" }}>
             <header className="shrink-0 h-14 px-2 flex items-center gap-1 border-b border-surface-line">
                 <button type="button" onClick={close} aria-label="닫기" className="w-10 h-10 rounded-full flex items-center justify-center text-ink-2 active:bg-surface-2">
                     <LucideX className="w-5 h-5" />

@@ -888,6 +888,8 @@ const es: Dict = {
   "chat.support": "Soporte",
   "chat.newChat": "Nuevo chat",
   "chat.newChatDesc": "Abre una sala con tus amigos (rivales)",
+  "chat.loadOlder": "Ver mensajes anteriores",
+  "chat.roomGone": "Esta sala terminó o fue retirada",
   "chat.filterAll": "Todo",
   "chat.filterListing": "Join·Reserva",
   "chat.filterCrew": "Crew",

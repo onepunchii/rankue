@@ -888,6 +888,8 @@ const vi: Dict = {
   "chat.support": "Hỗ trợ",
   "chat.newChat": "Trò chuyện mới",
   "chat.newChatDesc": "Mở phòng với bạn bè (đối thủ)",
+  "chat.loadOlder": "Xem tin nhắn cũ hơn",
+  "chat.roomGone": "Phòng này đã kết thúc hoặc bị gỡ",
   "chat.filterAll": "Tất cả",
   "chat.filterListing": "Join·Đặt chỗ",
   "chat.filterCrew": "Crew",

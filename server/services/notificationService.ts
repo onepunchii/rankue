@@ -46,6 +46,10 @@ export function pushOptionsFor(type: string | undefined, params: any, url: strin
     let u: URL | null = null;
     try { u = new URL(url, 'https://rankue.local'); } catch { u = null; }
     if (!u) return opts;
+    // 채팅 방(2026-09-21 한 체계): 방마다 한 묶음, 같은 방의 새 메시지는 앞 알림을 바꿔 끼운다 — 수다스러운 방이
+    // 알림 트레이를 메시지 수만큼 채우지 않게. 예전 크루 채팅은 params.crewId 로 이걸 했는데 새 경로는 url 만 보낸다.
+    const room = /^\/chat\/(crew|listing|dm|support)\/([^/]+)$/.exec(u.pathname);
+    if (room && type === 'CHAT') { opts.group = `chat:${room[1]}:${room[2]}`; opts.tag = `chat:${room[1]}:${room[2]}`; }
     const post = /^\/community\/([^/]+)$/.exec(u.pathname);
     if (post) opts.group = `community:${post[1]}`;
     if (u.pathname === '/online-game') {

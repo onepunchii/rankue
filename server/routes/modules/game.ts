@@ -355,7 +355,9 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
     try {
         if (!wasAlreadyFinished) {
             const opponentIds = boundIds.filter((id: string) => id !== req.userId);
-            for (const oid of opponentIds) {
+            // 한 번에 보내고 함께 기다린다 — 한 명씩 기다리면 상대 3명(4인 라운드)일 때 푸시 상한(8초)이 세 번 쌓인다.
+            await Promise.allSettled(opponentIds.map((oid: string) =>
+                // 기다린다 — 서버리스는 응답 뒤 실행을 얼려, 안 기다린 알림은 푸시도 알림함 기록도 사라진다(2026-09-22 리뷰).
                 notificationService.sendAndSaveNotification({
                     memberId: oid,
                     title: "🏁 경기 종료",
@@ -365,8 +367,8 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
                     // /history/:id 라우트는 존재하지 않는다(상세는 /history 안의 다이얼로그) —
                     // 그대로 두면 알림을 탭한 사람이 404 페이지로 떨어진다.
                     params: { url: `/history` },
-                }).catch((err: any) => console.error("[GameFinishNotif]", err));
-            }
+                }).catch((err: any) => console.error("[GameFinishNotif]", err))
+            ));
         }
     } catch(e) { console.error("[Notify] 경기 종료:", e); }
     return sendSuccess(res, {
@@ -491,7 +493,7 @@ router.post("/invite/:code/join", requireAuth, asyncHandler(async (req: AuthRequ
     try {
         if (!alreadyAccepted && inviteBefore?.hostId) {
             const guest = await storage.getMemberById(req.userId!);
-            notificationService.sendAndSaveNotification({
+            await notificationService.sendAndSaveNotification({
                 memberId: inviteBefore.hostId,
                 title: "🎯 초대 참가 수락",
                 body: guest?.name ? `${guest.name}님이 초대에 응했어요!` : "상대방이 초대에 응했어요!",

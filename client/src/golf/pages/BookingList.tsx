@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     LucideChevronLeft,
@@ -40,6 +41,10 @@ export default function BookingList() {
     // 되짚기 응답이 늦게 왔을 때 "사용자가 그 사이 직접 날짜를 골랐는지" 를 본다.
     // 골랐으면 덮어쓰지 않는다 — 응답이 몇 초 뒤 도착해 화면이 혼자 튀는 걸 막는다.
     const userPickedDate = useRef(false);
+    // 주소(경로·질의)를 구독한다 — 같은 화면에서 주소만 바뀌는 이동(하단 '조인' 탭, 푸시 클릭)을 알아채려고.
+    const [routePath] = useLocation();
+    const routeSearch = useSearch();
+    const lastRouteRef = useRef("");
     const pickDate = useCallback((idx: number) => { userPickedDate.current = true; setSelectedDate(idx); }, []);
     const [viewType, setViewType] = useState<'ALL' | 'BOOKING' | 'JOIN'>('BOOKING');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -102,8 +107,14 @@ export default function BookingList() {
     }, [todayKey]);
 
     // Handle deep linking from URL
+    // 경로·질의가 바뀔 때마다 다시 맞춘다(2026-09-22 리뷰): 이 화면 안의 하단 '조인' 탭(?view=JOIN)이나 푸시 클릭은
+    // 같은 컴포넌트 인스턴스로 주소만 바뀌는데, 예전 의존성([weekDates, toast])으로는 마운트 때 한 번만 돌아 아무 일도 없었다.
     useEffect(() => {
         if (weekDates.length === 0) return;
+        // 새 주소로 왔을 때만 가드를 푼다 — 이 effect 는 자정에 weekDates 가 새로 만들어져도 돌기 때문에, 무조건 풀면
+        // 사용자가 고른 날짜가 옛 딥링크의 날짜로 되돌아간다.
+        const route = `${routePath}?${routeSearch}`;
+        if (lastRouteRef.current !== route) { lastRouteRef.current = route; userPickedDate.current = false; }
         const params = new URLSearchParams(window.location.search);
         const dateParam = params.get('date');
         const viewParam = params.get('view');
@@ -143,10 +154,10 @@ export default function BookingList() {
             })
             .catch(() => { /* 지워졌거나 가려진 글 — 목록은 그대로 오늘을 보여 준다 */ });
         return () => { cancelled = true; };
-    }, [weekDates, toast]);
+    }, [weekDates, toast, routePath, routeSearch]);
 
     const { bookingCounts, bookings, isLoading, isError } = useBookingData(weekDates, selectedDate, viewType, selectedFilters);
-    const { expandedBookingId, setExpandedBookingId } = useDeepLink(bookings);
+    const { expandedBookingId, setExpandedBookingId } = useDeepLink(bookings, routePath);
 
     // Handle 'highlight' query param
     useEffect(() => {
@@ -243,6 +254,7 @@ export default function BookingList() {
         onSuccess: () => {
             toast({ title: "내렸어요" });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/joins"] }); // 조인 탭 목록은 키가 다르다 — 안 넣으면 내린 카드가 그대로 남는다
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings/counts"] });
             queryClient.invalidateQueries({ queryKey: MY_LISTINGS_QUERY_KEY });
         },
@@ -451,7 +463,7 @@ export default function BookingList() {
                 !!user && (
                     <AnimatePresence>
                         {/* 내역 시트가 떠 있는 동안도 숨긴다 — 시트 위에 떠서 줄을 가렸다(2026-09-21 오너 캡처) */}
-                        {!isCreateModalOpen && !myListingsOpen && (
+                        {!isCreateModalOpen && !myListingsOpen && !isSearchOpen && (
                             <motion.button
                                 initial={{ scale: 0, opacity: 0, y: 20 }}
                                 animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -483,6 +495,7 @@ export default function BookingList() {
                                 onCreated={(day) => {
                                     const idx = weekDates.findIndex(d => d.fullDate === day);
                                     if (idx !== -1) pickDate(idx);
+                                    else toast({ title: "올렸어요 — 목록은 오늘부터 30일까지만 보여요", description: "그날이 가까워지면 목록에 나타나요. '내역'에서는 지금도 볼 수 있어요." });
                                 }}
                             />
                         </div>
@@ -494,6 +507,7 @@ export default function BookingList() {
                                     setViewType('BOOKING');
                                     const idx = weekDates.findIndex(d => d.fullDate === day);
                                     if (idx !== -1) pickDate(idx);
+                                    else toast({ title: "올렸어요 — 목록은 오늘부터 30일까지만 보여요", description: "그날이 가까워지면 목록에 나타나요. '내역'에서는 지금도 볼 수 있어요." });
                                 }}
                             />
                         </div>

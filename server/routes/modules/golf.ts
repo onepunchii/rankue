@@ -8,7 +8,7 @@ import { notifyCrewChat } from "../../services/crewChatNotify.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { z } from "zod";
 import { notificationService } from "../../services/notificationService.js";
-import { JOIN_TYPES, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, type JoinType } from "../../../shared/golfJoin.js";
+import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, type JoinType } from "../../../shared/golfJoin.js";
 
 const router = Router();
 
@@ -25,12 +25,14 @@ router.get("/bookings", asyncHandler(async (req: AuthRequest, res: any) => {
     // ?mine=1 — 내가 올린 글 전부, 날짜와 무관(2026-09-21 '내역' 시트). 목록은 하루치만 받으므로 따로 둔다.
     if (req.query.mine === "1") {
         if (!req.userId) return sendError(res, 401, "로그인이 필요합니다");
-        const mine = await storage.getGolfBookings(undefined, { ownerId: req.userId, includeBlinded: true, limit: 100 });
+        // 티타임순(asc)이라 하한 없이 limit 만 걸면 **가장 오래된 글부터** 채워 '다가오는'이 잘린다 — 최근 60일부터로 잡고 넉넉히 받는다.
+        const mine = await storage.getGolfBookings(undefined, { ownerId: req.userId, includeBlinded: true, sinceDays: 60, limit: 400 });
         return sendSuccess(res, await withJoinCounts(mine as any[], req.userId));
     }
     const date = req.query.date as string | undefined;
-    // 화면 질의를 그대로 필터로 넘기되, 서버 전용 키(ownerId·includeBlinded)는 지운다 — 남의 글 목록이나 가려진 글을 못 꺼내게.
-    const { ownerId: _o, includeBlinded: _b, ...filters } = req.query as Record<string, unknown>;
+    if (!validDate(date) || !validDate(req.query.startDate) || !validDate(req.query.endDate)) return sendError(res, 400, "날짜가 올바르지 않아요");
+    // 화면 질의를 그대로 필터로 넘기되, 서버 전용 키(ownerId·includeBlinded·limit)는 지운다 — 남의 글 목록이나 가려진 글을 못 꺼내게.
+    const { ownerId: _o, includeBlinded: _b, limit: _l, sinceDays: _s, ...filters } = req.query as Record<string, unknown>;
     const bookings = await storage.getGolfBookings(date, filters);
     return sendSuccess(res, await withJoinCounts(bookings as any[], req.userId));
 }));
@@ -40,13 +42,23 @@ router.get("/bookings/counts", asyncHandler(async (req: any, res: any) => {
     if (!startDate || !endDate) {
         return sendError(res, 400, "시작일과 종료일은 필수입니다.");
     }
+    if (!validDate(startDate) || !validDate(endDate)) return sendError(res, 400, "날짜가 올바르지 않아요");
     // 필터를 그대로 넘긴다 — 예전엔 안 넘겨서 날짜 칩이 "12개" 라고 하는데 목록엔 2개만 있었다(2026-09-09 검토).
     const counts = await storage.getGolfBookingCounts(startDate as string, endDate as string, viewType as string, req.query);
     return sendSuccess(res, counts);
 }));
 
+/** 질의로 온 날짜가 없거나(undefined) 읽을 수 있는 날짜인가. 못 읽는 값이 저장소까지 가면 Invalid Date 가 500 을 낸다(2026-09-22 리뷰). */
+function validDate(v: unknown): boolean {
+    if (v === undefined || v === null || v === "") return true;
+    return typeof v === "string" && v.length <= 40 && !Number.isNaN(new Date(v).getTime());
+}
+
 /** 매물을 올릴 수 있는 역할. 화면(BookingList.tsx)과 같은 목록을 서버에서도 검사한다 — 화면만 가리면 주소로 뚫린다. */
 const BOOKING_WRITER_ROLES = ["admin", "super_admin", "store_owner", "booking_manager"];
+const MAX_ITEMS_PER_POST = 40;   // 부킹 시트는 티오프 시간을 여러 개 담아 한 번에 보낸다
+/** 한 시간에 올릴 수 있는 글 — 매장·매니저는 재고를 몰아 올리므로 넉넉히, 개인은 도배를 막을 만큼만. */
+const postsPerHour = (sellerType: string) => (sellerType === "STORE" ? 400 : 40);
 
 /** 연락 가능한 휴대폰인가. 소셜 가입 회원의 phone 은 "social:google:..." 이라 sms: 링크가 죽는다. */
 function cutText(v: unknown, n: number): string | null | undefined {
@@ -73,13 +85,18 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
     // 배지를 단다 — 돈이 먼저 오가는 글이라 보는 사람이 누구 글인지 알아야 한다. 신고 3건이면 자동으로 가려진다(기존).
     // 조인은 연락처가 필요 없고(신청·승인이 앱 안에서 끝난다), 부킹은 문자 문의 버튼이 있어 휴대폰 번호가 있어야 한다.
     const items = Array.isArray(req.body) ? req.body : [req.body];
+    // 한 번에·한 시간에 올릴 수 있는 수(2026-09-22 리뷰) — 배열 본문에 상한이 없어 한 요청으로 수천 건을 만들 수 있었다.
+    if (items.length === 0 || items.length > MAX_ITEMS_PER_POST) return sendError(res, 400, `한 번에 ${MAX_ITEMS_PER_POST}건까지 올릴 수 있어요. 나눠서 올려 주세요`);
     const allJoin = items.length > 0 && items.every((it: any) => it?.listingType === "JOIN");
     const role = (member as any).role ?? (member.profileId ? (await storage.getProfile(member.profileId) as any)?.role : null);
     const sellerType = BOOKING_WRITER_ROLES.includes(String(role)) ? "STORE" : "PERSONAL";
+    const hourCap = postsPerHour(sellerType);
+    if ((await storage.countRecentBookingsByOwner(req.userId!, 60)) + items.length > hourCap) return sendError(res, 429, `한 시간에 ${hourCap}건까지 올릴 수 있어요. 잠시 뒤에 다시 올려 주세요`, "TOO_MANY_POSTS");
     const phone = usablePhone(member.phone);
     if (!allJoin && !phone) return sendError(res, 400, "연락 가능한 휴대폰 번호를 먼저 등록해 주세요", "NO_CONTACT_PHONE");
 
-    const results: GolfBooking[] = [];
+    // 먼저 전부 검증하고, 다 통과해야 넣는다 — 중간 항목에서 400 이 나면 앞 항목만 저장돼 다시 올릴 때 중복이 됐다.
+    const validated: any[] = [];
 
     for (const item of items) {
         // 클라이언트가 보낸 신원 값은 버린다(덮어쓰기가 아니라 제거 — 스키마가 넓어져도 새지 않게).
@@ -93,6 +110,9 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
                 if (!slots) return sendError(res, 400, "자리 구성이 올바르지 않아요(호스트 1 + 모집 자리 1 이상, 최대 4자리)");
                 rest.slots = slots;
                 rest.joinHeadcount = openSlotCount(slots);
+            } else {
+                // 자리 없이 온 옛 형식 — 모집 인원을 1~3 으로 묶는다(4인 1팀). 안 묶으면 정원을 아무 숫자로나 만들 수 있었다.
+                rest.joinHeadcount = Math.max(1, Math.min(MAX_SLOTS - 1, Math.floor(Number(rest.joinHeadcount)) || MAX_SLOTS - 1));
             }
             if (rest.joinType !== undefined && !JOIN_TYPES.includes(rest.joinType)) return sendError(res, 400, "조인 종류가 올바르지 않아요");
             if (rest.costMode !== undefined && rest.costMode !== "FIXED" && rest.costMode !== "SPLIT") return sendError(res, 400, "비용 방식이 올바르지 않아요");
@@ -123,17 +143,20 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
             return sendError(res, 400, validation.error.message);
         }
 
-        const booking = await storage.createGolfBooking(validation.data as any);
-        results.push(booking);
+        validated.push(validation.data);
     }
+
+    const results: GolfBooking[] = [];
+    for (const data of validated) results.push(await storage.createGolfBooking(data as any));
 
     return sendSuccess(res, results);
 }));
 
 router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "삭제할 예약이 없거나 권한이 없습니다");
     // 내리기 전에 알릴 사람을 먼저 본다 — 신청 행은 글과 함께 cascade 로 지워진다.
-    const requesters = UUID.test(req.params.id) ? await storage.activeRequesterIds(req.params.id) : [];
-    const before: any = UUID.test(req.params.id) ? await storage.getGolfBooking(req.params.id) : undefined;
+    const requesters = await storage.activeRequesterIds(req.params.id);
+    const before: any = await storage.getGolfBooking(req.params.id);
     const member = await storage.getMemberById(req.userId!);
     if (!member?.phone) return sendError(res, 403, "권한이 없습니다");
     // 운영자는 아무 매물이나 내릴 수 있다 — 사기 글을 내릴 방법이 없으면 신고가 무의미하다(2026-09-09).
@@ -144,12 +167,14 @@ router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest
         ? await storage.deleteGolfBooking(req.params.id)
         : await storage.deleteGolfBooking(req.params.id, member.phone, req.userId!);
     if (!deleted) return sendError(res, 404, "삭제할 예약이 없거나 권한이 없습니다");
+    // 글과 함께 그 방도 닫는다 — 안 지우면 아무도 못 들어가는 방의 메시지만 남는다(명단이 글에서 나오므로 전원 403).
+    await storage.chat.deleteRoom(`listing:${req.params.id}`).catch((e) => console.error("[ListingRoomCleanup]", e));
     // 확정·대기 중이던 사람에게 알린다(2026-09-21) — 예전엔 글이 사라진 것을 아무도 몰랐다.
     if (before && requesters.length > 0) {
         const isJoin = before.listingType === "JOIN";
         await Promise.allSettled(requesters.map((r) => notificationService.sendAndSaveNotification({
             memberId: r.memberId, title: isJoin ? "조인 글이 내려갔어요" : "부킹 글이 내려갔어요",
-            body: `${before.courseName} ${teeText(before)} 글을 올린 분이 내렸어요.${r.status === "accepted" ? " 확정됐던 자리라 다시 찾아보셔야 해요." : ""}`,
+            body: `${r.status === "accepted" ? before.courseName : listingName(before)} ${teeText(before)} 글을 올린 분이 내렸어요.${r.status === "accepted" ? " 확정됐던 자리라 다시 찾아보셔야 해요." : ""}`,
             category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list?view=${isJoin ? "JOIN" : "BOOKING"}` },
         }).catch((e) => console.error("[GolfJoinNotify]", e))));
     }
@@ -189,6 +214,9 @@ router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthReq
     const capacity = joinCapacity(booking);
     const r = await storage.applyToJoin(req.params.id, req.userId!, capacity, headcount);
     if (r === "already") return sendError(res, 409, "이미 신청했어요", "ALREADY_APPLIED");
+    if (r === "rejected") return sendError(res, 403, "올린 분이 받지 않은 신청이라 다시 신청할 수 없어요", "APPLY_REJECTED");
+    if (r === "cooldown") return sendError(res, 429, "방금 취소했어요. 1분 뒤에 다시 신청해 주세요", "APPLY_COOLDOWN");
+    if (r === "too_many") return sendError(res, 429, "이 글에는 더 신청할 수 없어요(취소 3번)", "APPLY_TOO_MANY");
     if (r === "full") return sendError(res, 409, isJoin ? "자리가 다 찼어요" : "이미 예약이 확정된 티타임이에요", "JOIN_FULL");
     // 올린 사람에게 알린다 — 승인제라 그 사람이 봐야 다음이 있다.
     // ⚠️ 알림은 **기다린다** — 서버리스(Vercel)는 응답을 보내면 실행이 얼어붙어 기다리지 않은 푸시가 통째로 사라진다
@@ -207,6 +235,11 @@ router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthReq
     return sendSuccess(res, { applied: true });
 }));
 
+/** 알림·메시지에 쓰는 글 이름 — 비공개(isBlind) 글은 확정 전 사람에게도 가는 알림이라 가명으로. */
+function listingName(booking: { isBlind?: boolean | null; blindName?: string | null; courseName: string }): string {
+    return booking.isBlind ? (booking.blindName || "비공개 골프장") : booking.courseName;
+}
+
 /** 푸시 본문용 티타임 "9/25 07:40"(한국시각). */
 function teeText(booking: { datetime: Date | string }): string {
     const d = new Date(booking.datetime);
@@ -219,7 +252,8 @@ function joinCapacity(booking: any): number {
     if (booking.listingType !== "JOIN") return 1;
     const slots = Array.isArray(booking.slots) ? normalizeSlots(booking.slots) : null;
     if (slots) return openSlotCount(slots);
-    return Number(booking.joinHeadcount) > 0 ? Number(booking.joinHeadcount) : openSlotCount(slotsFromLegacy(booking.joinHeadcount, booking.joinCondition));
+    // 옛 글의 모집 인원도 4인 1팀 안으로 묶는다 — 자리 없이 저장된 큰 숫자가 그대로 정원이 되지 않게.
+    return Number(booking.joinHeadcount) > 0 ? Math.min(MAX_SLOTS - 1, Number(booking.joinHeadcount)) : openSlotCount(slotsFromLegacy(booking.joinHeadcount, booking.joinCondition));
 }
 
 /**
@@ -233,6 +267,7 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
     if (!(await canManageBooking(req, booking))) return sendError(res, 403, "글쓴이만 할 수 있어요");
     const accept = req.body?.accept === true;
     const isJoin = booking.listingType === "JOIN";
+    if (accept && new Date(booking.datetime).getTime() <= Date.now()) return sendError(res, 400, "이미 지난 티타임이에요", "TEE_TIME_PASSED");
     const r = await storage.decideJoinRequest(req.params.id, req.params.memberId, accept, joinCapacity(booking));
     if (r === "full") return sendError(res, 409, isJoin ? "자리가 다 찼어요" : "이미 다른 분께 확정한 티타임이에요", "JOIN_FULL");
     if (r === "gone") return sendError(res, 409, "대기 중인 신청이 아니에요");
@@ -242,20 +277,25 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
         await storage.chat.addMessage({ key: `listing:${booking.id}`, senderId: null, type: "system", message: `${who?.name ?? "회원"}님이 확정됐어요. 이제 여기서 대화해요.` })
             .catch((e) => console.error("[ListingChatSystem]", e));
     }
-    // 부킹은 한 팀만 — 한 명을 확정하면 나머지 대기는 자동 거절하고 알린다(예전엔 그 사람들이 영영 '대기'였다).
-    if (accept && !isJoin) {
-        const others = await storage.rejectOtherPending(booking.id, req.params.memberId);
-        await Promise.allSettled(others.map((memberId) => notificationService.sendAndSaveNotification({
-            memberId, title: "예약이 다른 분께 확정됐어요", body: `${booking.courseName} ${teeText(booking)}은 다른 분께 확정됐어요. 다른 티타임을 찾아보세요.`,
-            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list?view=BOOKING` },
-        }).catch((e) => console.error("[GolfJoinNotify]", e))));
+    // 이번 승인으로 자리가 다 찼으면 남은 대기자에게 알린다(조인·부킹 공통). 거절로 돌리지는 않는다 —
+    // 거절은 재신청이 막히는 최종 상태라(2026-09-22), 확정자가 빠져 자리가 다시 나면 이 사람들이 돌아올 수 있어야 한다.
+    if (accept) {
+        const counts = await storage.countJoinRequests([booking.id]);
+        if ((counts.get(booking.id)?.accepted ?? 0) >= joinCapacity(booking)) {
+            const waiting = await storage.pendingRequesterIds(booking.id);
+            await Promise.allSettled(waiting.map((memberId) => notificationService.sendAndSaveNotification({
+                memberId, title: isJoin ? "조인 자리가 다 찼어요" : "예약이 다른 분께 확정됐어요",
+                body: `${listingName(booking)} ${teeText(booking)} — 자리가 다시 나면 알려 드릴게요. 기다리기 싫으면 신청을 취소해도 돼요.`,
+                category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=${isJoin ? "JOIN" : "BOOKING"}` },
+            }).catch((e) => console.error("[GolfJoinNotify]", e))));
+        }
     }
     await notificationService.sendAndSaveNotification({
         memberId: req.params.memberId,
         title: accept ? (isJoin ? "조인이 확정됐어요" : "예약이 확정됐어요") : (isJoin ? "조인 신청이 거절됐어요" : "예약 신청이 거절됐어요"),
         body: accept
             ? (isJoin ? `${booking.courseName} ${teeText(booking)} 자리가 확정됐어요. 채팅방이 열렸어요.` : `${booking.courseName} ${teeText(booking)} 예약이 확정됐어요. 연락처와 채팅방이 열렸어요.`)
-            : `${booking.courseName} ${teeText(booking)}은 이번엔 함께하지 못하게 됐어요.`,
+            : `${listingName(booking)} ${teeText(booking)}은 이번엔 함께하지 못하게 됐어요.`,
         category: "GOLF", type: "JOIN", pref: "golf",
         params: { url: accept ? `/chat/listing/${booking.id}` : `/golf/booking-list/${booking.id}?view=${isJoin ? "JOIN" : "BOOKING"}` },
     }).catch((e) => console.error("[GolfJoinNotify]", e));
@@ -297,6 +337,15 @@ router.delete("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthR
     const wasInRoom = booking ? await storage.chat.canAccess({ kind: "listing", id: req.params.id, key: `listing:${req.params.id}` }, req.userId!) : false;
     const ok = await storage.cancelJoinRequest(req.params.id, req.userId!);
     if (!ok) return sendError(res, 404, "신청 내역이 없어요");
+    // 확정됐던 사람이 빠졌다 = 자리가 다시 났다. 기다리던 사람들에게 알린다(호스트가 그중에서 다시 승인한다).
+    if (wasInRoom && booking && booking.ownerId !== req.userId) {
+        const isJoinListing = booking.listingType === "JOIN";
+        const waiting = await storage.pendingRequesterIds(req.params.id);
+        await Promise.allSettled(waiting.map((memberId) => notificationService.sendAndSaveNotification({
+            memberId, title: "자리가 다시 났어요", body: `${listingName(booking)} ${teeText(booking)} — 확정됐던 분이 빠졌어요. 올린 분이 승인하면 알려 드릴게요.`,
+            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=${isJoinListing ? "JOIN" : "BOOKING"}` },
+        }).catch((e) => console.error("[GolfJoinNotify]", e))));
+    }
     if (wasInRoom && booking?.ownerId !== req.userId) {
         const me = await storage.getMemberById(req.userId!);
         await storage.chat.addMessage({ key: `listing:${req.params.id}`, senderId: null, type: "system", message: `${me?.name ?? "회원"}님이 빠졌어요.` })
@@ -362,8 +411,9 @@ router.post("/bookings/:id/applicants/:memberId/noshow", requireAuth, asyncHandl
         return sendError(res, 400, "티타임이 지난 뒤에 표시할 수 있어요", "TEE_TIME_NOT_PASSED");
     }
     const noShow = req.body?.noShow !== false;
-    const ok = await storage.setJoinNoShow(req.params.id, req.params.memberId, noShow);
-    if (!ok) return sendError(res, 404, noShow ? "신청 중인 사람이 아니에요" : "노쇼로 표시된 사람이 아니에요");
+    const r = await storage.setJoinNoShow(req.params.id, req.params.memberId, noShow, joinCapacity(booking));
+    if (r === "full") return sendError(res, 409, "그 사이 자리가 차서 되돌릴 수 없어요", "JOIN_FULL");
+    if (r === "gone") return sendError(res, 404, noShow ? "신청 중인 사람이 아니에요" : "노쇼로 표시된 사람이 아니에요");
     return sendSuccess(res, { noShow });
 }));
 
@@ -441,9 +491,17 @@ async function withJoinCounts(rows: any[], userId?: string) {
         const myStatus = mine.get(r.id) ?? null;
         // 연락처(2026-09-21): 매장 글은 번호가 영업용이라 그대로, 개인 양도 글은 **올린 사람과 확정된 신청자**에게만.
         // 예약 신청이 앱 안에서 끝나므로 확정 전엔 번호가 필요 없다 — 모두에게 열면 전화번호 수집 창구가 된다.
+        // ⚠️ 2026-09-22 리뷰: 이 조건이 `listingType !== "BOOKING"` 으로 시작해 **조인 글은 호스트 개인 번호가 누구에게나** 나갔다.
+        // 공개는 매장 부킹 하나뿐이다. 조인과 개인 양도는 올린 사람·확정된 사람에게만.
         const isOwner = !!userId && r.ownerId === userId;
-        const showPhone = r.listingType !== "BOOKING" || r.sellerType !== "PERSONAL" || isOwner || myStatus === "accepted";
+        const isConfirmed = myStatus === "accepted" || myStatus === "noshow";
+        const isStoreBooking = r.listingType !== "JOIN" && r.sellerType !== "PERSONAL";
+        const showPhone = isStoreBooking || isOwner || myStatus === "accepted";
         const { managerPhone, ...safe } = r;
+        // 비공개(isBlind) 글은 실명·장소·좌표를 서버에서 가린다 — 화면만 가명으로 바꿔 그리면 응답 JSON 과 검색 결과에 실명이 그대로 있다.
+        // 지역(region)은 남긴다: 지역 필터가 서버에서 걸리므로 가려도 걸러지는 것으로 드러나고, 가명 글도 지역으로는 찾을 수 있어야 한다.
+        const mask = !!r.isBlind && !isOwner && !isConfirmed;
+        if (mask) Object.assign(safe, { courseName: r.blindName || "비공개 골프장", courseId: null, venueName: null, lat: null, lng: null });
         return {
             ...safe,
             managerPhone: showPhone ? managerPhone : null,
@@ -459,6 +517,7 @@ async function withJoinCounts(rows: any[], userId?: string) {
 
 router.get("/joins", asyncHandler(async (req: AuthRequest, res: any) => {
     const date = req.query.date as string | undefined;
+    if (!validDate(date)) return sendError(res, 400, "날짜가 올바르지 않아요");
     const joins = await storage.getGolfJoins({ date, ...req.query });
     return sendSuccess(res, await withJoinCounts(joins as any[], req.userId));
 }));

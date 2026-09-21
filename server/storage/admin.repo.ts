@@ -23,6 +23,7 @@ import {
     hiqCrewPhotos,
     hiqCrewPhotoComments,
     hiqCrewChats,
+    hiqChatMessages,
     hiqNotifications,
     golfBookings,
     hiqPlayerCheers} from "../../shared/schema.js";
@@ -720,18 +721,23 @@ export class AdminRepository {
         });
 
         job("crew_chat", async (ids) => {
+            // 크루 채팅은 2026-09-21 부터 hiq_chat_messages("crew:<id>") 에 있다(옛 행도 id 그대로 이관됨).
+            // 옛 표를 보면 새 메시지의 신고가 '원문 없음'이 되어 삭제·정지 조치가 목록에서 빠졌다(2026-09-22 리뷰).
             const rows = await db.select({
-                id: hiqCrewChats.id,
-                crewId: hiqCrewChats.crewId,
-                senderId: hiqCrewChats.senderId,
-                message: hiqCrewChats.message,
-                type: hiqCrewChats.type,
-                createdAt: hiqCrewChats.createdAt,
-            }).from(hiqCrewChats).where(inArray(hiqCrewChats.id, ids));
-            for (const r of rows) put("crew_chat", r.id, {
-                text: previewText(r.message), authorId: r.senderId, crewId: r.crewId,
-                meta: r.type === "text" ? "채팅" : `채팅 · ${r.type}`, link: crewLink(r.crewId), createdAt: r.createdAt,
-            });
+                id: hiqChatMessages.id,
+                roomKey: hiqChatMessages.roomKey,
+                senderId: hiqChatMessages.senderId,
+                message: hiqChatMessages.message,
+                type: hiqChatMessages.type,
+                createdAt: hiqChatMessages.createdAt,
+            }).from(hiqChatMessages).where(inArray(hiqChatMessages.id, ids));
+            for (const r of rows) {
+                const crewId = r.roomKey.startsWith("crew:") ? r.roomKey.slice(5) : null;
+                put("crew_chat", r.id, {
+                    text: previewText(r.message), authorId: r.senderId, crewId,
+                    meta: r.type === "text" ? "채팅" : `채팅 · ${r.type}`, link: crewId ? crewLink(crewId) : null, createdAt: r.createdAt,
+                });
+            }
         });
 
         job("member", async (ids) => {

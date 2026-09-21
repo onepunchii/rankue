@@ -14,7 +14,7 @@ import {
     hiqChatMessages, hiqChatRooms, hiqChatRoomMembers, hiqChatReads, hiqCrewMembers, hiqCrews, hiqMembers, profiles,
     golfBookings, golfJoinRequests, hiqBlocks,
 } from "../../shared/schema.js";
-import { eq, and, or, asc, gt, sql, inArray } from "drizzle-orm";
+import { eq, and, or, asc, desc, gt, gte, lt, sql, inArray } from "drizzle-orm";
 
 export type RoomKind = "crew" | "listing" | "dm" | "support";
 export interface RoomRef { kind: RoomKind; id: string; key: string }
@@ -33,11 +33,13 @@ export interface ChatRoomSummary {
 }
 
 export function parseRoomKey(key: string): RoomRef | null {
-    const m = /^(crew|listing|dm|support):([0-9a-f-]{36})$/i.exec(key);
+    const m = /^(crew|listing|dm|support):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(key);
     return m ? { kind: m[1] as RoomKind, id: m[2], key: `${m[1]}:${m[2]}` } : null;
 }
 
 const ADMIN_ROLES: ("admin" | "super_admin")[] = ["admin", "super_admin"];
+/** 옛 크루 채팅을 이 표로 옮긴 때(UTC). 그 전 대화는 크루 방의 '안 읽음'으로 세지 않는다. */
+const CHAT_UNIFIED_AT = "2026-09-21 12:00:00";
 
 export class ChatRepository {
     /* ── 명단 ─────────────────────────────────────────── */
@@ -83,27 +85,53 @@ export class ChatRepository {
     }
 
     /* ── 메시지 ─────────────────────────────────────────── */
-    async messages(ref: RoomRef, viewerId: string, afterAt?: Date, limit = 200) {
-        // 크루: 가입 뒤 메시지만. 차단한 사람의 글은 어느 방이든 안 보인다.
+    /**
+     * 메시지. 세 가지로 부른다(2026-09-22 리뷰로 고침):
+     *  - 아무것도 없이: **가장 최근** PAGE 건(시간순으로 뒤집어 준다). 예전엔 asc+limit 라 방을 열면 가장 오래된 200건이 와서,
+     *    이관된 크루 방은 몇 달 전 대화가 뜨고 그 상태로 읽음 처리돼 방금 온 메시지를 놓쳤다.
+     *  - after: 그 뒤에 온 것만(2.5초 폴링).
+     *  - before: 그 앞의 PAGE 건(위로 올려 더 읽기).
+     * 크루는 가입 뒤 메시지만, 차단한 사람의 글은 어느 방이든 안 보인다.
+     */
+    async messages(ref: RoomRef, viewerId: string, opts: { after?: Date; before?: Date; limit?: number } = {}) {
+        const { after, before } = opts;
+        const limit = Math.max(1, Math.min(opts.limit ?? (after ? 200 : 60), 200));
         let since: Date | undefined;
         if (ref.kind === "crew") {
             const [m] = await db.select({ joinedAt: hiqCrewMembers.joinedAt }).from(hiqCrewMembers)
                 .where(and(eq(hiqCrewMembers.crewId, ref.id), eq(hiqCrewMembers.memberId, viewerId))).limit(1);
             since = m?.joinedAt;
         }
-        const from = [since, afterAt].filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0];
         const rows = await db.select({ chat: hiqChatMessages, senderName: hiqMembers.name, senderProfileImage: profiles.profileImageUrl })
             .from(hiqChatMessages)
             .leftJoin(hiqMembers, eq(hiqChatMessages.senderId, hiqMembers.id))
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
             .where(and(
                 eq(hiqChatMessages.roomKey, ref.key),
-                from ? (afterAt && from === afterAt ? gt(hiqChatMessages.createdAt, from) : sql`${hiqChatMessages.createdAt} >= ${from}`) : undefined,
+                // Date 는 **drizzle 연산자로** 넘긴다 — raw sql 에 Date 를 넣으면 드라이버가 로컬 시각 문자열로 바꾸고,
+                // timestamp(시간대 없음) 열은 오프셋을 버려 KST 기기에서 9시간 어긋났다(서버는 UTC 라 우연히 맞는다).
+                since ? gte(hiqChatMessages.createdAt, since) : undefined,
+                after ? gt(hiqChatMessages.createdAt, after) : undefined,
+                before ? lt(hiqChatMessages.createdAt, before) : undefined,
                 sql`NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE ${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = ${hiqChatMessages.senderId})`,
             ))
-            .orderBy(asc(hiqChatMessages.createdAt))
+            .orderBy(after ? asc(hiqChatMessages.createdAt) : desc(hiqChatMessages.createdAt))
             .limit(limit);
+        if (!after) rows.reverse();
         return rows.map((r) => ({ ...r.chat, sender: r.senderName ? { name: r.senderName, profileImageUrl: r.senderProfileImage } : null }));
+    }
+
+    /** 이 방에서 이 사람이 최근 n초 동안 보낸 수 — 도배(=방 전원에게 푸시 도배)를 막는 데 쓴다. */
+    async recentSendCount(key: string, senderId: string, seconds: number): Promise<number> {
+        const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(hiqChatMessages)
+            .where(and(eq(hiqChatMessages.roomKey, key), eq(hiqChatMessages.senderId, senderId), sql`${hiqChatMessages.createdAt} > now() - make_interval(secs => ${seconds})`));
+        return Number(row?.n ?? 0);
+    }
+
+    /** 방의 메시지를 통째로 지운다 — 크루·글이 없어질 때(열쇠만 남은 죽은 방을 안 남긴다). */
+    async deleteRoom(key: string): Promise<void> {
+        await db.delete(hiqChatMessages).where(eq(hiqChatMessages.roomKey, key));
+        await db.delete(hiqChatReads).where(eq(hiqChatReads.roomKey, key));
     }
 
     async getMessage(id: string) {
@@ -130,9 +158,12 @@ export class ChatRepository {
     /* ── 1:1 · 소그룹 ───────────────────────────────────── */
     /** 같은 두 사람의 **같은 종목** 1:1 방이 있으면 그것을, 없으면 새로. 셋 이상은 늘 새 방. */
     async getOrCreateDm(creatorId: string, memberIds: string[], sport: "BILLIARDS" | "GOLF"): Promise<{ id: string; created: boolean }> {
-        const ids = [...new Set([creatorId, ...memberIds])];
+        const ids = [...new Set([creatorId, ...memberIds])].sort();
+        return await db.transaction(async (tx) => {
         if (ids.length === 2) {
-            const found = await db.execute(sql`
+            // 같은 둘·같은 종목의 만들기를 줄 세운다 — 유니크 제약이 없어 동시에 두 번 누르면 방이 두 개 생겼다(2026-09-22 리뷰).
+            await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`dm:${sport}:${ids.join(",")}`}))`);
+            const found = await tx.execute(sql`
                 SELECT r.id FROM hiq_chat_rooms r
                 WHERE r.kind = 'dm' AND r.sport = ${sport}
                   AND (SELECT count(*) FROM hiq_chat_room_members m WHERE m.room_id = r.id) = 2
@@ -141,9 +172,10 @@ export class ChatRepository {
             const row = (found.rows as any[])[0];
             if (row) return { id: String(row.id), created: false };
         }
-        const [room] = await db.insert(hiqChatRooms).values({ kind: "dm", sport, createdBy: creatorId }).returning();
-        await db.insert(hiqChatRoomMembers).values(ids.map((memberId) => ({ roomId: room.id, memberId })));
+        const [room] = await tx.insert(hiqChatRooms).values({ kind: "dm", sport, createdBy: creatorId }).returning();
+        await tx.insert(hiqChatRoomMembers).values(ids.map((memberId) => ({ roomId: room.id, memberId })));
         return { id: room.id, created: true };
+        });
     }
 
     /* ── 방 정보(머리줄·고정 카드) ───────────────────────── */
@@ -248,21 +280,25 @@ export class ChatRepository {
 
         // 마지막 메시지 · 안 읽은 수 — 방 열쇠 배열로 한 번에
         const keys = rooms.map((r) => r.key);
+        // 방 안(messages)과 같은 눈으로 본다: 차단한 사람의 글과 가입 전 크루 대화는 미리보기에도 안 나온다(2026-09-22 리뷰).
+        const visible = sql`
+              AND NOT EXISTS (SELECT 1 FROM hiq_blocks b WHERE b.blocker_id = ${memberId}::uuid AND b.blocked_id = c.sender_id)
+              AND (cm.joined_at IS NULL OR c.created_at >= cm.joined_at)`;
+        const crewJoin = sql`LEFT JOIN hiq_crew_members cm ON c.room_key = 'crew:' || cm.crew_id::text AND cm.member_id = ${memberId}::uuid`;
         const last = await db.execute(sql`
             SELECT DISTINCT ON (c.room_key) c.room_key, c.message, c.type, c.created_at, m.name AS sender_name
-            FROM hiq_chat_messages c LEFT JOIN hiq_members m ON m.id = c.sender_id
-            WHERE c.room_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)})
+            FROM hiq_chat_messages c LEFT JOIN hiq_members m ON m.id = c.sender_id ${crewJoin}
+            WHERE c.room_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)}) ${visible}
             ORDER BY c.room_key, c.created_at DESC`);
         const lastBy = new Map<string, any>((last.rows as any[]).map((r) => [String(r.room_key), r]));
-        const reads = await db.select({ roomKey: hiqChatReads.roomKey, lastReadAt: hiqChatReads.lastReadAt }).from(hiqChatReads).where(eq(hiqChatReads.memberId, memberId));
-        const readAt = new Map<string, Date>(reads.map((r) => [r.roomKey, r.lastReadAt] as [string, Date]));
-        // 크루는 읽음 행이 생기기 전 메시지를 전부 '안 읽음'으로 세지 않는다(표가 새로 생겼다). 다른 방은 처음부터 센다.
+        // 크루는 읽음 표가 생기기 전(이관 전) 대화를 '안 읽음'으로 세지 않는다 — 기준은 **이관 시각과 가입 시각 중 늦은 쪽**.
+        // 예전엔 기준이 now() 라, 방에 한 번 들어가 읽음 행이 생기기 전까지 배지가 영원히 0 이었다(2026-09-22 리뷰).
         const unread = await db.execute(sql`
             SELECT c.room_key, count(*)::int AS n FROM hiq_chat_messages c
-            LEFT JOIN hiq_chat_reads r ON r.room_key = c.room_key AND r.member_id = ${memberId}::uuid
-            WHERE c.room_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)})
+            LEFT JOIN hiq_chat_reads r ON r.room_key = c.room_key AND r.member_id = ${memberId}::uuid ${crewJoin}
+            WHERE c.room_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)}) ${visible}
               AND (c.sender_id IS NULL OR c.sender_id <> ${memberId}::uuid)
-              AND c.created_at > COALESCE(r.last_read_at, CASE WHEN c.room_key LIKE 'crew:%' THEN now() ELSE to_timestamp(0) END)
+              AND c.created_at > COALESCE(r.last_read_at, CASE WHEN c.room_key LIKE 'crew:%' THEN GREATEST(COALESCE(cm.joined_at, to_timestamp(0)), ${CHAT_UNIFIED_AT}::timestamp) ELSE to_timestamp(0) END)
             GROUP BY c.room_key`);
         const unreadBy = new Map<string, number>((unread.rows as any[]).map((r) => [String(r.room_key), Number(r.n)] as [string, number]));
         for (const r of rooms) {
@@ -270,7 +306,6 @@ export class ChatRepository {
             r.lastMessage = l ? { text: l.type === "text" || l.type === "system" ? String(l.message) : "카드를 공유했어요", at: new Date(l.created_at), senderName: l.type === "system" ? null : (l.sender_name ?? null) } : null;
             r.unread = unreadBy.get(r.key) ?? 0;
         }
-        void readAt;
         rooms.sort((a, b) => {
             const ta = a.lastMessage?.at.getTime() ?? 0, tb = b.lastMessage?.at.getTime() ?? 0;
             if (ta !== tb) return tb - ta;

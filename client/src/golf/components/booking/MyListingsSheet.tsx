@@ -7,13 +7,13 @@
  * 신청한 글은 **상태 칩**(대기·확정·거절·안 옴)이 핵심이다 — 확정된 글은 지도·길찾기까지 여기서 바로.
  * 헤더의 "내역" 단추에 빨간 점을 찍는 기준(안 본 확정·거절)도 이 시트가 열릴 때 "봤다"로 정리한다(markRequestsSeen).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LucideLoader2 } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { kstDateKey, kstDateLabel, kstTime } from "@/lib/kst";
+import { kstDateLabel, kstTime } from "@/lib/kst";
 import { JoinTypeBadge, SlotDots, costText, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, slotsOf } from "../join/joinUi";
 
 export const MY_LISTINGS_QUERY_KEY = ["/api/hiq/golf/bookings", "mine"] as const;
@@ -91,7 +91,8 @@ function Row({ item, past, kind, onGo, onDelete, onCancel }: { item: any; past: 
                 )}
             </div>
             {/* 확정된 글: 가는 길과 연락처를 여기서 바로 */}
-            {kind === "applied" && accepted && !past && (
+            {/* 티타임이 지나도 6시간은 남긴다 — 늦어서 연락해야 하는 바로 그때 '지난 글'로 내려가며 번호·길찾기가 사라지면 안 된다 */}
+            {kind === "applied" && accepted && Date.now() < new Date(item.datetime).getTime() + 6 * 3_600_000 && (
                 <div className="flex items-center gap-1.5 flex-wrap">
                     {!item.isBlind && <a href={kakaoMapUrl(name, item.lat, item.lng)} target="_blank" rel="noreferrer" className="h-8 px-3 rounded-full bg-white/[0.06] text-[12px] font-medium text-white/80 inline-flex items-center">지도</a>}
                     {!item.isBlind && <a href={kakaoRouteUrl(name, item.lat, item.lng)} target="_blank" rel="noreferrer" className="h-8 px-3 rounded-full bg-white/[0.06] text-[12px] font-medium text-white/80 inline-flex items-center">길찾기</a>}
@@ -104,21 +105,33 @@ function Row({ item, past, kind, onGo, onDelete, onCancel }: { item: any; past: 
 
 export function MyListingsSheet({ open, onOpenChange, onGo, onDelete, onCancelRequest, initialTab = "mine" }: Props) {
     const [tab, setTab] = useState<"mine" | "applied">(initialTab);
-    useEffect(() => { if (open) setTab(initialTab); }, [open, initialTab]);
+    // 탭은 **열리는 순간에만** 맞춘다 — initialTab 은 폴링으로 바뀌는 값이라, 의존성에 두면 열어 둔 채 새 알림이 올 때 보던 탭이 뒤집혔다.
+    const initialTabRef = useRef(initialTab);
+    initialTabRef.current = initialTab;
+    useEffect(() => { if (open) setTab(initialTabRef.current); }, [open]);
     const mine = useQuery<any[]>({ queryKey: MY_LISTINGS_QUERY_KEY, queryFn: () => apiRequest("/api/hiq/golf/bookings?mine=1"), enabled: open, staleTime: 10_000, refetchInterval: open ? 15_000 : false });
     const applied = useQuery<any[]>({ queryKey: MY_REQUESTS_QUERY_KEY, queryFn: () => apiRequest("/api/hiq/golf/bookings?applied=1"), enabled: open, staleTime: 10_000, refetchInterval: open ? 15_000 : false });
     // 내 신청 탭을 보면 "봤다" — 헤더 빨간 점의 기준
     useEffect(() => { if (open && tab === "applied" && applied.isSuccess) markRequestsSeen(); }, [open, tab, applied.isSuccess]);
 
     const q = tab === "mine" ? mine : applied;
-    const todayKey = kstDateKey(Date.now());
+    // 열려 있는 동안 30초마다, 그리고 열릴 때마다 시각을 새로 잡는다 — 목록 응답이 같으면(구조 공유) q.data 참조가 그대로라
+    // 의존성이 q.data 뿐이면 분류가 처음 계산한 시각에 얼어붙는다.
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!open) return;
+        setNow(Date.now());
+        const id = setInterval(() => setNow(Date.now()), 30_000);
+        return () => clearInterval(id);
+    }, [open]);
     const { upcoming, past } = useMemo(() => {
         const rows = [...(q.data ?? [])].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
         return {
-            upcoming: rows.filter((r) => kstDateKey(r.datetime) >= todayKey),
-            past: rows.filter((r) => kstDateKey(r.datetime) < todayKey).reverse(),
+            // **시각** 기준 — 날짜로만 가르면 오늘 이미 지난 티타임이 '다가오는'에 남아 취소 단추가 뜨는데, 서버는 시각으로 막는다(400).
+            upcoming: rows.filter((r) => new Date(r.datetime).getTime() > now),
+            past: rows.filter((r) => new Date(r.datetime).getTime() <= now).reverse(),
         };
-    }, [q.data, todayKey]);
+    }, [q.data, now]);
 
     const render = (rows: any[], isPast: boolean) => rows.map((it) => (
         <Row key={it.id} item={it} past={isPast} kind={tab} onGo={() => onGo(it)} onDelete={() => onDelete(it)} onCancel={() => onCancelRequest(it)} />

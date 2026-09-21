@@ -303,9 +303,10 @@ export class GolfRepository {
             conditions.push(...buildGolfFilterConditions(filters));
 
             if (filters.courseName && filters.courseName !== "") {
+                // 비공개(isBlind) 글은 **가명으로만** 잡힌다 — 실명으로도 잡히면 "남서울"을 쳐서 가명 글의 실명을 확정할 수 있다(2026-09-22 리뷰).
                 conditions.push(
                     or(
-                        like(golfBookings.courseName, `%${filters.courseName}%`),
+                        and(eq(golfBookings.isBlind, false), like(golfBookings.courseName, `%${filters.courseName}%`)),
                         like(golfBookings.blindName, `%${filters.courseName}%`)
                     )
                 );
@@ -322,9 +323,21 @@ export class GolfRepository {
 
         const filteredConditions = conditions.filter((c): c is NonNullable<typeof c> => c !== undefined);
 
-        return await db.select().from(golfBookings)
+        // 내 글 목록처럼 날짜 없이 부르는 질의의 하한(일). 티타임이 이보다 오래된 글은 뺀다.
+        const sinceDays = Number(filters?.sinceDays);
+        if (Number.isFinite(sinceDays) && sinceDays > 0) filteredConditions.push(sql`${golfBookings.datetime} > now() - make_interval(days => ${Math.floor(sinceDays)})`);
+        const q = db.select().from(golfBookings)
             .where(filteredConditions.length > 0 ? and(...filteredConditions) : undefined)
             .orderBy(asc(golfBookings.datetime));
+        const limit = Number(filters?.limit);
+        return Number.isFinite(limit) && limit > 0 ? await q.limit(Math.min(limit, 500)) : await q;
+    }
+
+    /** 최근 n분 동안 이 회원이 올린 글 수 — 등록 도배를 막는 데 쓴다. */
+    async countRecentBookingsByOwner(ownerId: string, minutes: number): Promise<number> {
+        const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(golfBookings)
+            .where(and(eq(golfBookings.ownerId, ownerId), sql`${golfBookings.createdAt} > now() - make_interval(mins => ${minutes})`));
+        return Number(row?.n ?? 0);
     }
 
     /**
@@ -424,12 +437,20 @@ export class GolfRepository {
      * 신청한다. 정원이 차 있으면 거절한다 — 마지막 한 자리에 둘이 동시에 들어오는 경우까지 막으려면
      * 세고 넣는 사이가 갈라지면 안 되므로, 한 문장 안에서 세고 넣는다.
      */
-    async applyToJoin(bookingId: string, memberId: string, capacity: number, headcount = 1): Promise<"ok" | "full" | "already"> {
-        const [existing] = await db.select({ status: golfJoinRequests.status })
+    async applyToJoin(bookingId: string, memberId: string, capacity: number, headcount = 1): Promise<"ok" | "full" | "already" | "rejected" | "cooldown" | "too_many"> {
+        const [existing] = await db.select({ status: golfJoinRequests.status, cancelCount: golfJoinRequests.cancelCount, updatedAt: golfJoinRequests.updatedAt })
             .from(golfJoinRequests)
             .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId)))
             .limit(1);
         if (existing?.status === "applied" || existing?.status === "accepted") return "already";
+        // 거절은 이 글에 한해 최종이다(2026-09-22 오너 결정) — 예전엔 서버가 거절된 사람의 재신청을 그대로 받아
+        // 거절이 무효가 되고 호스트에게 푸시가 되풀이됐다. 마음이 바뀐 호스트는 신청자 목록에서 되돌릴 수 있다.
+        if (existing?.status === "rejected" || existing?.status === "noshow") return "rejected";
+        // 신청↔취소 되풀이로 호스트에게 푸시를 퍼붓지 못하게: 취소 뒤 1분은 쉬고, 같은 글에 취소 3번이면 끝.
+        if (existing?.status === "cancelled") {
+            if (Number(existing.cancelCount ?? 0) >= 3) return "too_many";
+            if (existing.updatedAt && Date.now() - new Date(existing.updatedAt).getTime() < 60_000) return "cooldown";
+        }
 
         // 정원은 **승인된** 사람으로 센다(호스트 승인제). 대기는 정원과 무관하게 받는다.
         const inserted = await db.execute(sql`
@@ -474,16 +495,21 @@ export class GolfRepository {
                 .returning({ id: golfJoinRequests.id });
             return rows.length > 0 ? "ok" : "gone";
         }
-        const r = await db.execute(sql`
-            UPDATE golf_join_requests SET status = 'accepted', updated_at = now()
-            WHERE booking_id = ${bookingId}::uuid AND member_id = ${memberId}::uuid AND status = 'applied'
-              AND (SELECT count(*) FROM golf_join_requests WHERE booking_id = ${bookingId}::uuid AND status = 'accepted') < ${capacity}
-            RETURNING id
-        `);
-        if ((r.rows?.length ?? 0) > 0) return "ok";
-        const [row] = await db.select({ status: golfJoinRequests.status }).from(golfJoinRequests)
-            .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId))).limit(1);
-        return row?.status === "applied" ? "full" : "gone";
+        // 글 행을 잠그고 세고 바꾼다 — 한 문장짜리 `count < 정원` 은 READ COMMITTED 에서 동시 승인 둘이 서로의
+        // 미커밋 행을 못 세어 둘 다 통과했다(2026-09-22 리뷰). 같은 파일의 매치 참가와 같은 방식.
+        // 거절해 둔 사람도 승인할 수 있다(거절 되돌리기) — 거절이 최종이 된 만큼 호스트에게 무를 길이 있어야 한다.
+        return await db.transaction(async (tx) => {
+            await tx.select({ id: golfBookings.id }).from(golfBookings).where(eq(golfBookings.id, bookingId)).for("update");
+            const [row] = await tx.select({ status: golfJoinRequests.status }).from(golfJoinRequests)
+                .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId))).limit(1);
+            if (row?.status !== "applied" && row?.status !== "rejected") return "gone" as const;
+            const [cnt] = await tx.select({ n: sql<number>`count(*)::int` }).from(golfJoinRequests)
+                .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.status, "accepted")));
+            if (Number(cnt?.n ?? 0) >= capacity) return "full" as const;
+            await tx.update(golfJoinRequests).set({ status: "accepted", updatedAt: new Date() })
+                .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId)));
+            return "ok" as const;
+        });
     }
 
     /**
@@ -502,6 +528,7 @@ export class GolfRepository {
             .innerJoin(golfBookings, eq(golfBookings.id, golfJoinRequests.bookingId))
             .where(and(
                 eq(golfJoinRequests.memberId, memberId),
+                eq(golfBookings.isBlinded, false), // 운영자가 가린 글은 본 목록에 없어 '보기'를 눌러도 아무 일도 없었다
                 inArray(golfJoinRequests.status, ["applied", "accepted", "rejected", "noshow"]),
                 sql`${golfBookings.datetime} > now() - interval '30 days'`,
             ))
@@ -510,12 +537,14 @@ export class GolfRepository {
         return rows.map((r) => ({ ...r.booking, myJoinStatus: r.myJoinStatus, myHeadcount: r.myHeadcount, requestedAt: r.requestedAt, changedAt: r.changedAt }));
     }
 
-    /** 부킹은 한 팀만 확정된다 — 한 명을 확정하면 나머지 대기(applied)는 거절로 돌리고 그 사람들을 돌려준다(알림용). */
-    async rejectOtherPending(bookingId: string, keepMemberId: string): Promise<string[]> {
-        const rows = await db.update(golfJoinRequests)
-            .set({ status: "rejected", updatedAt: new Date() })
-            .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.status, "applied"), sql`${golfJoinRequests.memberId} <> ${keepMemberId}::uuid`))
-            .returning({ memberId: golfJoinRequests.memberId });
+    /**
+     * 아직 대기(applied) 중인 신청자 — 마감·자리 재개를 알릴 사람들.
+     * 예전엔 부킹 확정 시 나머지를 거절로 돌렸는데(rejectOtherPending), 거절이 최종이 되면서(2026-09-22) 그러면
+     * 확정자가 취소해 자리가 다시 나도 아무도 돌아올 수 없다. 대기는 **대기열로 남기고** 알림만 보낸다.
+     */
+    async pendingRequesterIds(bookingId: string): Promise<string[]> {
+        const rows = await db.select({ memberId: golfJoinRequests.memberId }).from(golfJoinRequests)
+            .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.status, "applied")));
         return rows.map((r) => String(r.memberId));
     }
 
@@ -578,27 +607,40 @@ export class GolfRepository {
 
     /**
      * 안 나타났다고 표시하거나 되돌린다. 글쓴이 확인은 라우트가 한다.
-     * 되돌리면 'applied' 로 — 잘못 누른 걸 못 고치면 표시를 무서워서 못 쓴다.
+     * 되돌리면 'accepted' 로(정원 안에서만) — 잘못 누른 걸 못 고치면 표시를 무서워서 못 쓴다.
      * 본인이 취소한 행('cancelled')은 건드리지 않는다. 취소와 노쇼는 다른 일이다.
      */
-    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean): Promise<boolean> {
-        const rows = await db.update(golfJoinRequests)
-            .set({
-                status: noShow ? "noshow" : "accepted",
-                // 되돌리면 숫자도 되돌린다(0 아래로는 안 내려간다). 표시가 다시 신청으로 지워지지 않게
-                // 숫자는 status 와 따로 남는다.
-                noShowCount: noShow
-                    ? sql`${golfJoinRequests.noShowCount} + 1`
-                    : sql`greatest(${golfJoinRequests.noShowCount} - 1, 0)`,
-                updatedAt: new Date(),
-            })
-            .where(and(
-                eq(golfJoinRequests.bookingId, bookingId),
-                eq(golfJoinRequests.memberId, memberId),
-                eq(golfJoinRequests.status, noShow ? "accepted" : "noshow"),
-            ))
-            .returning({ id: golfJoinRequests.id });
-        return rows.length > 0;
+    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean, capacity = Number.MAX_SAFE_INTEGER): Promise<"ok" | "gone" | "full"> {
+        return await db.transaction(async (tx) => {
+            await tx.select({ id: golfBookings.id }).from(golfBookings).where(eq(golfBookings.id, bookingId)).for("update");
+            if (!noShow) {
+                // 노쇼는 자리를 비운다 — 그 사이 다른 대기자를 승인했다면 되돌릴 자리가 없다.
+                const [cnt] = await tx.select({ n: sql<number>`count(*)::int` }).from(golfJoinRequests)
+                    .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.status, "accepted")));
+                if (Number(cnt?.n ?? 0) >= capacity) {
+                    const [row] = await tx.select({ status: golfJoinRequests.status }).from(golfJoinRequests)
+                        .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId))).limit(1);
+                    return row?.status === "noshow" ? "full" as const : "gone" as const;
+                }
+            }
+            const rows = await tx.update(golfJoinRequests)
+                .set({
+                    status: noShow ? "noshow" : "accepted",
+                    // 되돌리면 숫자도 되돌린다(0 아래로는 안 내려간다). 표시가 다시 신청으로 지워지지 않게
+                    // 숫자는 status 와 따로 남는다.
+                    noShowCount: noShow
+                        ? sql`${golfJoinRequests.noShowCount} + 1`
+                        : sql`greatest(${golfJoinRequests.noShowCount} - 1, 0)`,
+                    updatedAt: new Date(),
+                })
+                .where(and(
+                    eq(golfJoinRequests.bookingId, bookingId),
+                    eq(golfJoinRequests.memberId, memberId),
+                    eq(golfJoinRequests.status, noShow ? "accepted" : "noshow"),
+                ))
+                .returning({ id: golfJoinRequests.id });
+            return rows.length > 0 ? "ok" as const : "gone" as const;
+        });
     }
 
     async createGolfJoin(data: InsertGolfJoin): Promise<GolfJoin> {
