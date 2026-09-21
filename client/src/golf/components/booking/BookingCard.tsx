@@ -4,8 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LucideChevronRight, LucideUsers, LucideCheckCircle2, LucideCircleDollarSign, LucideMessageSquare, LucideShare2, LucideFlag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { THEME_COLORS, SPECIAL_OPTIONS } from '../../constants/booking';
+import { JOIN_OPTIONS } from '@shared/golfJoin';
 import { JoinApplicants } from './JoinApplicants';
 import { kstHour, kstMinute } from '@/lib/kst';
+import { SlotDots, JoinTypeBadge, costText, joinTypeOf, slotsOf } from '../join/joinUi';
+import { distanceKm, formatDistance, isKoreaCoord } from '@shared/golfJoin';
 
 interface BookingCardProps {
     item: any;
@@ -18,17 +21,24 @@ interface BookingCardProps {
     viewType: 'ALL' | 'BOOKING' | 'JOIN';
     /** 로그인한 회원 id. 내가 올린 조인 글이면 신청자 목록을 연다. */
     meId?: string;
+    /** 내 위치(있으면 조인 카드에 거리를 적는다) */
+    myLocation?: { lat: number; lng: number } | null;
 }
 
-export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType, meId }: BookingCardProps) => {
+export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType, meId, myLocation }: BookingCardProps) => {
     const [reportOpen, setReportOpen] = useState(false);
     const isExpanded = expandedBookingId === item.id;
     const theme = viewType === 'JOIN' ? THEME_COLORS.JOIN : THEME_COLORS.BOOKING;
     const isJoin = item.listingType === 'JOIN';
-    const capacity = Number(item.joinHeadcount) > 0 ? Number(item.joinHeadcount) : 3;
+    // 자리 모델(2026-09-21): 정원 = 모집 자리 수, 찬 자리 = 승인된 사람 수. 옛 글은 모집 인원으로.
+    const slots = isJoin ? slotsOf(item) : [];
+    const capacity = Number(item.joinCapacity) > 0 ? Number(item.joinCapacity) : Number(item.joinHeadcount) > 0 ? Number(item.joinHeadcount) : 3;
     const applied = Number(item.joinApplied ?? 0);
     const joinFull = applied >= capacity;
     const isMine = !!meId && item.ownerId === meId;
+    const myStatus: string | null = item.myJoinStatus ?? (item.joinedByMe ? "applied" : null);
+    const joinType = isJoin ? joinTypeOf(item) : null;
+    const km = isJoin && myLocation && isKoreaCoord(item.lat, item.lng) ? distanceKm(myLocation.lat, myLocation.lng, item.lat, item.lng) : null;
 
     return (
         <>
@@ -83,32 +93,36 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 </span>
                             )}
                         </div>
-                        {item.listingType === 'JOIN' && (
-                            <div className="flex gap-1">
-                                <span className="px-1.5 py-0.5 rounded bg-[#FF6B00]/20 text-[#FF6B00] text-[9px] font-black uppercase tracking-tighter border border-[#FF6B00]/20 flex items-center gap-1">
-                                    <LucideUsers className="w-2.5 h-2.5" />
-                                    {item.joinHeadcount}명 모집
-                                </span>
+                        {isJoin && joinType && (
+                            <div className="flex items-center gap-2">
+                                <SlotDots slots={slots} filled={applied} size={18} />
+                                <JoinTypeBadge type={joinType} />
+                                {item.joinPending > 0 && isMine && <span className="text-[11px] font-medium text-[#FF8A33]">대기 {item.joinPending}</span>}
                             </div>
                         )}
-                        <div className="flex items-center gap-2 text-[11px] font-bold text-[#888888] uppercase tracking-widest">
+                        <div className="flex items-center gap-2 text-[11.5px] font-medium text-[#9A9A9A]">
                             <span>{item.isBlind ? "위치 비공개" : item.region}</span>
-                            <span className="w-0.5 h-2 bg-white/10 rounded-full" />
-                            <span>
-                                {(item.options || []).includes('no_caddie')
-                                    ? '노캐디'
-                                    : (item.options || []).includes('marshal')
-                                        ? '드라이빙 캐디'
-                                        : '일반캐디'}
-                            </span>
+                            {km !== null && <><span className="w-0.5 h-2 bg-white/10 rounded-full" /><span className="text-[#7CBBFF]">{formatDistance(km)}</span></>}
+                            {(!isJoin || joinType === 'FIELD') && (
+                                <>
+                                    <span className="w-0.5 h-2 bg-white/10 rounded-full" />
+                                    <span>
+                                        {(item.options || []).includes('no_caddie')
+                                            ? '노캐디'
+                                            : (item.options || []).includes('marshal')
+                                                ? '드라이빙 캐디'
+                                                : '일반캐디'}
+                                    </span>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-4">
                     <div className="text-right">
-                        <div className={cn("text-lg font-black tracking-tighter", theme.text)}>
-                            {item.greenFee.toLocaleString()}<span className="text-xs ml-0.5 opacity-60">원</span>
+                        <div className={cn("text-lg font-semibold tracking-tight", theme.text)}>
+                            {isJoin ? costText(item) : <>{item.greenFee.toLocaleString()}<span className="text-xs ml-0.5 opacity-60">원</span></>}
                         </div>
                     </div>
                     <div className={cn(
@@ -139,10 +153,11 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                             <LucideUsers className="w-3.5 h-3.5" />
                                             조인 모집 정보
                                         </div>
-                                        <div className="text-xs font-black text-[#FF6B00]">
-                                            {item.joinHeadcount}명 급구
+                                        <div className="text-xs font-semibold text-[#FF6B00]">
+                                            {applied}/{capacity} 확정
                                         </div>
                                     </div>
+                                    <SlotDots slots={slots} filled={applied} size={26} />
                                     {item.joinCondition && (
                                         <div className="flex flex-wrap gap-2">
                                             {item.joinCondition.split(',').map((cond: string) => (
@@ -158,7 +173,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                             {/* 내가 올린 조인이면 누가 신청했는지 — 그리고 티타임이 지나면 안 온 사람 표시 */}
                             {isJoin && isMine && <JoinApplicants bookingId={item.id} enabled={isExpanded} />}
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className={cn("grid gap-4", isJoin ? "grid-cols-1" : "grid-cols-2")}>
                                 <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
                                     <div className="text-[10px] font-black text-white/20 uppercase tracking-widest flex items-center gap-1">
                                         <LucideCheckCircle2 className="w-3 h-3" />
@@ -166,7 +181,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                         {(item.options || []).length > 0 ? (item.options || []).map((optId: string) => {
-                                            const optLabel = SPECIAL_OPTIONS.find(o => o.id === optId)?.label || optId;
+                                            const optLabel = SPECIAL_OPTIONS.find(o => o.id === optId)?.label || JOIN_OPTIONS.find(o => o.id === optId)?.label || optId;
                                             return (
                                                 <span key={optId} className={cn("px-2 py-1 rounded-lg text-[10px] font-bold", theme.bg.replace('bg-', 'bg-') + '/10', theme.text)}>
                                                     {optLabel}
@@ -177,7 +192,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                         )}
                                     </div>
                                 </div>
-                                <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+                                {!isJoin && <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
                                     <div className="text-[10px] font-black text-white/20 uppercase tracking-widest flex items-center gap-1">
                                         <LucideCircleDollarSign className="w-3 h-3" />
                                         취소/환불 규정
@@ -199,7 +214,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                             <div>{item.policyCustomText || "매니저에게 문의"}</div>
                                         )}
                                     </div>
-                                </div>
+                                </div>}
                             </div>
 
                             {item.comment && (item.comment as string).length > 0 && (
@@ -222,9 +237,9 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                         if (isJoin && isMine) return;
                                         if (isJoin && onApply) onApply(item); else onReserve(item);
                                     }}
-                                    disabled={isJoin && ((isMine) || (joinFull && !item.joinedByMe))}
+                                    disabled={isJoin && ((isMine) || myStatus === "rejected" || (joinFull && !item.joinedByMe))}
                                     className={cn(
-                                        "flex-1 py-4 rounded-2xl text-sm font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:hover:scale-100",
+                                        "flex-1 py-4 rounded-2xl text-sm font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:hover:scale-100",
                                         isJoin
                                             ? (item.joinedByMe ? 'bg-white/10 text-white border border-white/20' : 'bg-[#FF6B00] text-white shadow-[0_4px_20px_-4px_rgba(255,107,0,0.3)]')
                                             : 'bg-[#64DD17] text-[#051907] shadow-[0_4px_20px_-4px_rgba(100,221,23,0.3)]'
@@ -232,9 +247,11 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 >
                                     <span>
                                         {!isJoin ? "예약 문자 보내기"
-                                            : isMine ? `내가 올린 조인 · ${applied}/${capacity}`
-                                                : item.joinedByMe ? "신청 취소하기"
-                                                    : joinFull ? "자리가 찼어요" : `조인 신청하기 ${applied}/${capacity}`}
+                                            : isMine ? `내가 올린 조인 · 확정 ${applied}/${capacity}`
+                                                : myStatus === "accepted" ? "확정됐어요 · 취소하기"
+                                                    : myStatus === "applied" ? "승인 기다리는 중 · 취소하기"
+                                                        : myStatus === "rejected" ? "이번엔 함께하지 못해요"
+                                                            : joinFull ? "자리가 찼어요" : `조인 신청하기 ${applied}/${capacity}`}
                                     </span>
                                     {!item.joinedByMe && !(isJoin && isMine) && <LucideChevronRight className="w-4 h-4" />}
                                 </button>

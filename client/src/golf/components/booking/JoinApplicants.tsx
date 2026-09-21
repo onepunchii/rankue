@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LucideUserX, LucideUndo2, LucideLoader2 } from "lucide-react";
+import { LucideUserX, LucideUndo2, LucideLoader2, LucideCheck, LucideX } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ import { kstDateLabel, kstTime } from "@/lib/kst";
 
 interface Applicant {
     memberId: string;
-    status: "applied" | "cancelled" | "noshow";
+    status: "applied" | "accepted" | "rejected" | "cancelled" | "noshow";
     appliedAt: string;
     changedAt: string;
     name: string;
@@ -28,13 +28,17 @@ interface Applicant {
 }
 
 const STATUS_LABEL: Record<Applicant["status"], string> = {
-    applied: "신청 중",
+    applied: "대기",
+    accepted: "확정",
+    rejected: "거절",
     cancelled: "취소함",
     noshow: "안 옴",
 };
 
 const STATUS_STYLE: Record<Applicant["status"], string> = {
     applied: "bg-[#FF6B00]/15 text-[#FF6B00] border-[#FF6B00]/20",
+    accepted: "bg-[#64DD17]/15 text-[#8BE84A] border-[#64DD17]/20",
+    rejected: "bg-white/5 text-white/40 border-white/10",
     cancelled: "bg-white/5 text-white/40 border-white/10",
     noshow: "bg-red-500/15 text-red-400 border-red-500/20",
 };
@@ -75,11 +79,24 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
         onError: (e: any) => toast({ title: e?.message || "표시하지 못했어요", variant: "destructive" }),
     });
 
+    // 호스트 승인제(2026-09-21 오너). 승인은 정원 안에서만 — 넘치면 서버가 409 로 막는다.
+    const decideMutation = useMutation({
+        mutationFn: ({ memberId, accept }: { memberId: string; accept: boolean }) =>
+            apiRequest(`/api/hiq/golf/bookings/${bookingId}/applicants/${memberId}/decision`, { method: "POST", body: { accept } }),
+        onSuccess: (_d, v) => {
+            toast({ title: v.accept ? "확정했어요 — 신청한 분께 알렸어요" : "거절했어요" });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings", bookingId, "applicants"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
+        },
+        onError: (e: any) => toast({ title: e?.message || "처리하지 못했어요", variant: "destructive" }),
+    });
+
     if (!enabled) return null;
 
     const teePassed = !!data?.teeTime && new Date(data.teeTime).getTime() <= Date.now();
     const applicants = data?.applicants ?? [];
-    const activeCount = applicants.filter((a) => a.status === "applied").length;
+    const pendingCount = applicants.filter((a) => a.status === "applied").length;
+    const acceptedCount = applicants.filter((a) => a.status === "accepted" || a.status === "noshow").length;
 
     return (
         <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
@@ -88,7 +105,7 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
                     신청자
                 </div>
                 <div className="text-[10px] font-black text-[#FF6B00]">
-                    {isLoading ? "…" : `${activeCount}명 신청 중`}
+                    {isLoading ? "…" : `확정 ${acceptedCount} · 대기 ${pendingCount}`}
                 </div>
             </div>
 
@@ -130,8 +147,22 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
                                     </div>
                                 </div>
 
-                                {/* 티타임 전에는 노쇼 단추를 아예 안 만든다 */}
-                                {teePassed && a.status !== "cancelled" && (
+                                {/* 티타임 전: 대기 중인 신청에 승인·거절. 티타임 뒤: 확정된 사람에게 노쇼 표시. */}
+                                {!teePassed && a.status === "applied" && (
+                                    <span className="shrink-0 flex gap-1.5">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); decideMutation.mutate({ memberId: a.memberId, accept: true }); }}
+                                            disabled={decideMutation.isPending}
+                                            className="h-8 px-3 rounded-xl bg-[#64DD17] text-[#051907] text-[12px] font-semibold flex items-center gap-1 disabled:opacity-40"
+                                        ><LucideCheck className="w-3.5 h-3.5" />승인</button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); decideMutation.mutate({ memberId: a.memberId, accept: false }); }}
+                                            disabled={decideMutation.isPending}
+                                            className="h-8 px-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 text-[12px] font-medium flex items-center gap-1 disabled:opacity-40"
+                                        ><LucideX className="w-3.5 h-3.5" />거절</button>
+                                    </span>
+                                )}
+                                {teePassed && (a.status === "accepted" || a.status === "noshow") && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();

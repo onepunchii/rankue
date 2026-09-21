@@ -13,6 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookingCreateForm } from "../components/BookingCreateForm";
+import { JoinCreateSheet } from "../components/join/JoinCreateSheet";
+import { useNativeBridge } from "@/hooks/useNativeBridge";
+import { distanceKm, isKoreaCoord, JOIN_TYPE_LABEL, JOIN_TYPES, type JoinType } from "@shared/golfJoin";
 import { GlobalSearch } from "../components/GlobalSearch";
 import { kstDateKey, kstDateLabel, kstHour, kstTime } from "@/lib/kst";
 
@@ -42,6 +45,13 @@ export default function BookingList() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isBookingManager, setIsBookingManager] = useState(false);
     const [showOnlyMyBookings, setShowOnlyMyBookings] = useState(false);
+    /**
+     * 조인 종류(필드/스크린/파크)와 "내 주변"(2026-09-21 오너: 스크린 조인은 내 위치 기반으로).
+     * 위치는 누를 때 한 번 묻는다 — 목록을 열 때마다 권한 창이 뜨면 안 된다.
+     */
+    const [joinKind, setJoinKind] = useState<'ALL' | JoinType>('ALL');
+    const [nearMe, setNearMe] = useState(false);
+    const { location, requestLocation, locationStatus } = useNativeBridge();
 
     // Custom Hooks
     const { selectedFilters, toggleFilter, clearFilter } = useBookingFilters();
@@ -181,6 +191,7 @@ export default function BookingList() {
             // 2. Type filtering
             if (viewType === 'BOOKING' && item.listingType === 'JOIN') return false;
             if (viewType === 'JOIN' && item.listingType !== 'JOIN') return false;
+            if (viewType === 'JOIN' && joinKind !== 'ALL' && (item.joinType ?? 'FIELD') !== joinKind) return false;
 
             // 3. User specific filtering
             if (showOnlyMyBookings && user) {
@@ -218,6 +229,12 @@ export default function BookingList() {
 
             return true;
         }).sort((a, b) => {
+            // 내 주변: 좌표 있는 글을 가까운 순으로 먼저, 좌표 없는 글은 시간순으로 뒤에
+            if (viewType === 'JOIN' && nearMe && location) {
+                const da = isKoreaCoord(a.lat, a.lng) ? distanceKm(location.lat, location.lng, a.lat, a.lng) : Infinity;
+                const db = isKoreaCoord(b.lat, b.lng) ? distanceKm(location.lat, location.lng, b.lat, b.lng) : Infinity;
+                if (da !== db) return da - db;
+            }
             const sortFilters = selectedFilters.price.filter(p => p.startsWith('sort_'));
             if (sortFilters.includes('sort_low')) return a.greenFee - b.greenFee;
             if (sortFilters.includes('sort_discount')) {
@@ -227,7 +244,7 @@ export default function BookingList() {
             }
             return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
         });
-    }, [bookings, viewType, selectedFilters, selectedDate, weekDates]);
+    }, [bookings, viewType, selectedFilters, selectedDate, weekDates, joinKind, nearMe, location]);
 
     // 조인 신청은 기록으로 남긴다. 그전엔 문자 앱만 열고 아무것도 안 남아서 몇 명 찼는지도,
     // 누가 신청했는지도, 안 나타났는지도 알 수 없었다(2026-09-09 검토).
@@ -313,6 +330,29 @@ export default function BookingList() {
                     clearFilter={clearFilter}
                     viewType={viewType}
                 />
+                {viewType === 'JOIN' && (
+                    <div className="px-6 pb-3 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+                        {(['ALL', ...JOIN_TYPES] as const).map((k) => (
+                            <button
+                                key={k} type="button" onClick={() => setJoinKind(k)}
+                                className={cn("shrink-0 h-8 px-3 rounded-full text-[12.5px] font-medium border transition-colors",
+                                    joinKind === k ? "bg-[#FF6B00] border-[#FF6B00] text-white" : "bg-white/[0.04] border-white/10 text-white/60")}
+                            >{k === 'ALL' ? '전체' : JOIN_TYPE_LABEL[k]}</button>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (nearMe) { setNearMe(false); return; }
+                                void requestLocation().then((r) => {
+                                    if (r === 'granted') setNearMe(true);
+                                    else toast({ title: r === 'denied' ? "위치 권한이 꺼져 있어요" : "지금은 위치를 알 수 없어요", description: "설정에서 위치를 허용하면 가까운 조인부터 보여 드려요." });
+                                });
+                            }}
+                            className={cn("shrink-0 ml-auto h-8 px-3 rounded-full text-[12.5px] font-medium border transition-colors",
+                                nearMe ? "bg-[#4DA3FF] border-[#4DA3FF] text-white" : "bg-white/[0.04] border-white/10 text-white/60")}
+                        >📍 내 주변{nearMe && locationStatus !== 'granted' ? '…' : ''}</button>
+                    </div>
+                )}
             </div>
 
             <main className="p-6">
@@ -355,6 +395,7 @@ export default function BookingList() {
                                 onShare={handleShare}
                                 viewType={viewType}
                                 meId={(user as any)?.id}
+                                myLocation={nearMe ? location : null}
                             />
                         ))}
                     </div>
@@ -362,7 +403,8 @@ export default function BookingList() {
             </main>
 
             {
-                isBookingManager && (
+                // 조인은 로그인한 누구나 만든다(2026-09-21). 부킹 만들기는 매니저만.
+                (isBookingManager || (viewType === 'JOIN' && !!user)) && (
                     <AnimatePresence>
                         {!isCreateModalOpen && (
                             <motion.button
@@ -374,7 +416,7 @@ export default function BookingList() {
                                 onClick={() => setIsCreateModalOpen(true)}
                                 className={cn(
                                     // 하단 네비 위로 띄운다 — bottom-8 이면 네비를 덮어 라운드·전체 탭이 안 눌린다(2026-09-09)
-                                    "fixed right-6 z-[60] bottom-[calc(5.5rem+env(safe-area-inset-bottom))] px-6 py-4 rounded-full font-black text-sm uppercase tracking-widest flex items-center gap-2 transition-all",
+                                    "fixed right-6 z-[60] bottom-[calc(5.5rem+env(safe-area-inset-bottom))] px-5 py-3.5 rounded-full font-semibold text-[14px] flex items-center gap-2 transition-all",
                                     theme.bg, theme.shadow,
                                     viewType === 'JOIN' ? 'text-white' : 'text-[#051907]'
                                 )}
@@ -389,15 +431,27 @@ export default function BookingList() {
 
             <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                 <DialogContent className="p-0 border-none bg-transparent max-w-md w-full h-[90vh] overflow-hidden flex flex-col" hideClose={true}>
-                    <BookingCreateForm
-                        onClose={() => setIsCreateModalOpen(false)}
-                        initialMode={viewType === 'ALL' ? 'BOOKING' : viewType as 'BOOKING' | 'JOIN'}
-                        onCreated={(day, type) => {
-                            setViewType(type);
-                            const idx = weekDates.findIndex(d => d.fullDate === day);
-                            if (idx !== -1) pickDate(idx);
-                        }}
-                    />
+                    {viewType === 'JOIN' ? (
+                        <div className="relative h-full">
+                            <JoinCreateSheet
+                                onClose={() => setIsCreateModalOpen(false)}
+                                onCreated={(day) => {
+                                    const idx = weekDates.findIndex(d => d.fullDate === day);
+                                    if (idx !== -1) pickDate(idx);
+                                }}
+                            />
+                        </div>
+                    ) : (
+                        <BookingCreateForm
+                            onClose={() => setIsCreateModalOpen(false)}
+                            initialMode={viewType === 'ALL' ? 'BOOKING' : viewType as 'BOOKING' | 'JOIN'}
+                            onCreated={(day, type) => {
+                                setViewType(type);
+                                const idx = weekDates.findIndex(d => d.fullDate === day);
+                                if (idx !== -1) pickDate(idx);
+                            }}
+                        />
+                    )}
                 </DialogContent>
             </Dialog>
 

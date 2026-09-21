@@ -7,6 +7,8 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { notifyCrewChat } from "../../services/crewChatNotify.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { z } from "zod";
+import { notificationService } from "../../services/notificationService.js";
+import { JOIN_TYPES, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, type JoinType } from "../../../shared/golfJoin.js";
 
 const router = Router();
 
@@ -32,6 +34,12 @@ router.get("/bookings/counts", asyncHandler(async (req: any, res: any) => {
 const BOOKING_WRITER_ROLES = ["admin", "super_admin", "store_owner", "booking_manager"];
 
 /** 연락 가능한 휴대폰인가. 소셜 가입 회원의 phone 은 "social:google:..." 이라 sms: 링크가 죽는다. */
+function cutText(v: unknown, n: number): string | null | undefined {
+    if (v === undefined) return undefined;
+    if (v === null) return null;
+    return typeof v === "string" ? v.slice(0, n) : null;
+}
+
 function usablePhone(phone: string | null | undefined): string | null {
     if (!phone || phone.startsWith("social:")) return null;
     const d = phone.replace(/\D/g, "");
@@ -45,20 +53,38 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
     const member = await storage.getMemberById(req.userId!);
     if (!member) return sendError(res, 403, "권한이 없습니다");
 
+    // 조인(같이 칠 사람 모집)은 **누구나** 올린다(2026-09-21 오너: "누구나 만들기 쉽게"). 매니저 권한은 부킹(매장이 파는 티)에만.
+    // 조인은 연락처도 필요 없다 — 신청·승인이 앱 안에서 끝나고, 문자 문의 버튼은 부킹에만 있다.
+    const items = Array.isArray(req.body) ? req.body : [req.body];
+    const allJoin = items.length > 0 && items.every((it: any) => it?.listingType === "JOIN");
     const role = (member as any).role ?? (member.profileId ? (await storage.getProfile(member.profileId) as any)?.role : null);
-    if (!BOOKING_WRITER_ROLES.includes(String(role))) {
+    if (!allJoin && !BOOKING_WRITER_ROLES.includes(String(role))) {
         return sendError(res, 403, "티타임을 등록할 수 있는 계정이 아니에요", "NOT_BOOKING_MANAGER");
     }
     const phone = usablePhone(member.phone);
-    if (!phone) return sendError(res, 400, "연락 가능한 휴대폰 번호를 먼저 등록해 주세요", "NO_CONTACT_PHONE");
+    if (!allJoin && !phone) return sendError(res, 400, "연락 가능한 휴대폰 번호를 먼저 등록해 주세요", "NO_CONTACT_PHONE");
 
-    // Multi-create support from frontend
-    const items = Array.isArray(req.body) ? req.body : [req.body];
     const results: GolfBooking[] = [];
 
     for (const item of items) {
         // 클라이언트가 보낸 신원 값은 버린다(덮어쓰기가 아니라 제거 — 스키마가 넓어져도 새지 않게).
         const { managerPhone: _p, ownerId: _o, ...rest } = item ?? {};
+        // 조인의 자리·종류·비용·장소(2026-09-21). 자리가 오면 모집 인원은 자리에서 센다 — 두 값이 어긋나지 않게.
+        if (rest.listingType === "JOIN") {
+            if (rest.slots !== undefined) {
+                const slots = normalizeSlots(rest.slots);
+                if (!slots) return sendError(res, 400, "자리 구성이 올바르지 않아요(호스트 1 + 모집 자리 1 이상, 최대 4자리)");
+                rest.slots = slots;
+                rest.joinHeadcount = openSlotCount(slots);
+            }
+            if (rest.joinType !== undefined && !JOIN_TYPES.includes(rest.joinType)) return sendError(res, 400, "조인 종류가 올바르지 않아요");
+            if (rest.costMode !== undefined && rest.costMode !== "FIXED" && rest.costMode !== "SPLIT") return sendError(res, 400, "비용 방식이 올바르지 않아요");
+            if (rest.costMode === "SPLIT" && (rest.greenFee === undefined || rest.greenFee === null)) rest.greenFee = 0;
+            if (!isKoreaCoord(rest.lat, rest.lng)) { rest.lat = null; rest.lng = null; }
+            rest.venueName = cutText(rest.venueName, 40);
+            // 스크린·파크는 골프장 마스터가 없다 — 장소 이름이 곧 코스 이름이다(목록·검색이 courseName 을 본다).
+            if ((rest.joinType === "SCREEN" || rest.joinType === "PARK") && !rest.courseName) { rest.courseName = rest.venueName ?? ""; rest.courseId = rest.courseId ?? "venue"; }
+        }
         // 공개되는 자유 입력은 서버에서 자른다 — 화면 maxLength 는 API 로 우회된다.
         // 길이 제한이 없으면 글 본문에 계좌번호·안내문을 통째로 붙일 수 있다(2026-09-09 검토).
         const cut = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : v);
@@ -71,7 +97,7 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
             courseName: cut(rest.courseName, 60),
             datetime: new Date(item.datetime),
             ownerId: req.userId,
-            managerPhone: phone,
+            managerPhone: phone ?? "",
         };
 
         const validation = insertGolfBookingSchema.safeParse(data);
@@ -128,11 +154,71 @@ router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthReq
     if (booking.ownerId && booking.ownerId === req.userId) return sendError(res, 400, "내가 올린 조인이에요");
     if (new Date(booking.datetime).getTime() <= Date.now()) return sendError(res, 400, "이미 지난 티타임이에요");
 
-    const capacity = Number(booking.joinHeadcount) > 0 ? Number(booking.joinHeadcount) : DEFAULT_JOIN_CAPACITY;
+    const capacity = joinCapacity(booking);
     const r = await storage.applyToJoin(req.params.id, req.userId!, capacity);
     if (r === "already") return sendError(res, 409, "이미 신청했어요", "ALREADY_APPLIED");
     if (r === "full") return sendError(res, 409, "자리가 다 찼어요", "JOIN_FULL");
+    // 호스트에게 알린다 — 승인제라 호스트가 봐야 다음이 있다.
+    if (booking.ownerId) {
+        const me = await storage.getMemberById(req.userId!);
+        notificationService.sendAndSaveNotification({
+            memberId: booking.ownerId, title: "조인 신청이 왔어요", body: `${me?.name ?? "회원"}님이 ${booking.courseName} 조인에 신청했어요. 승인해 주세요.`,
+            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=JOIN` },
+        }).catch((e) => console.error("[GolfJoinNotify]", e));
+    }
     return sendSuccess(res, { applied: true });
+}));
+
+/** 정원 = 모집 자리 수. 자리가 없는 옛 글은 모집 인원, 그것도 없으면 기본 3. */
+function joinCapacity(booking: any): number {
+    const slots = Array.isArray(booking.slots) ? normalizeSlots(booking.slots) : null;
+    if (slots) return openSlotCount(slots);
+    return Number(booking.joinHeadcount) > 0 ? Number(booking.joinHeadcount) : openSlotCount(slotsFromLegacy(booking.joinHeadcount, booking.joinCondition));
+}
+
+/**
+ * POST /bookings/:id/applicants/:memberId/decision — 호스트의 승인·거절(2026-09-21 오너: "호스트 승인제").
+ * 승인은 정원 안에서만 된다. 결과는 신청한 사람에게 푸시로 간다.
+ */
+router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id) || !UUID.test(req.params.memberId)) return sendError(res, 404, "조인 글을 찾을 수 없어요");
+    const booking: any = await storage.getGolfBooking(req.params.id);
+    if (!booking) return sendError(res, 404, "조인 글을 찾을 수 없어요");
+    if (!(await canManageBooking(req, booking))) return sendError(res, 403, "글쓴이만 할 수 있어요");
+    const accept = req.body?.accept === true;
+    const r = await storage.decideJoinRequest(req.params.id, req.params.memberId, accept, joinCapacity(booking));
+    if (r === "full") return sendError(res, 409, "자리가 다 찼어요", "JOIN_FULL");
+    if (r === "gone") return sendError(res, 409, "대기 중인 신청이 아니에요");
+    notificationService.sendAndSaveNotification({
+        memberId: req.params.memberId,
+        title: accept ? "조인이 확정됐어요" : "조인 신청이 거절됐어요",
+        body: accept ? `${booking.courseName} 조인에 자리가 확정됐어요. 티타임을 확인해 주세요.` : `${booking.courseName} 조인은 이번엔 함께하지 못하게 됐어요.`,
+        category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=JOIN` },
+    }).catch((e) => console.error("[GolfJoinNotify]", e));
+    return sendSuccess(res, { status: accept ? "accepted" : "rejected" });
+}));
+
+/**
+ * GET /places?q= — 스크린·파크 장소 검색(카카오 로컬). KAKAO_REST_KEY 가 없으면 501 을 주고 화면은 이름 직접 입력으로 간다.
+ * 좌표가 있어야 "내 주변" 정렬이 된다 — 그래서 키가 생기면 이 경로 하나로 조인이 지도 위에 선다.
+ */
+router.get("/places", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const key = process.env.KAKAO_REST_KEY;
+    const q = String(req.query.q ?? "").trim().slice(0, 40);
+    if (!key) return sendError(res, 501, "장소 검색을 아직 쓸 수 없어요", "NO_PLACE_API");
+    if (q.length < 2) return sendSuccess(res, []);
+    const u = new URL("https://dapi.kakao.com/v2/local/search/keyword.json");
+    u.searchParams.set("query", q);
+    u.searchParams.set("size", "8");
+    const lat = Number(req.query.lat), lng = Number(req.query.lng);
+    if (isKoreaCoord(lat, lng)) { u.searchParams.set("x", String(lng)); u.searchParams.set("y", String(lat)); u.searchParams.set("sort", "distance"); }
+    const r = await fetch(u, { headers: { Authorization: `KakaoAK ${key}` } });
+    if (!r.ok) return sendError(res, 502, "장소 검색이 잠시 안 돼요");
+    const j = await r.json() as { documents?: any[] };
+    return sendSuccess(res, (j.documents ?? []).map((d) => ({
+        name: String(d.place_name ?? ""), address: String(d.road_address_name || d.address_name || ""),
+        lat: Number(d.y), lng: Number(d.x), category: String(d.category_name ?? ""),
+    })).filter((d) => d.name && isKoreaCoord(d.lat, d.lng)));
 }));
 
 router.delete("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -267,13 +353,21 @@ async function withJoinCounts(rows: any[], userId?: string) {
     const ids = rows.map((r) => r.id);
     const [counts, mine] = await Promise.all([
         storage.countJoinRequests(ids),
-        userId ? storage.myJoinRequestIds(userId, ids) : Promise.resolve(new Set<string>()),
+        userId ? storage.myJoinStatuses(userId, ids) : Promise.resolve(new Map<string, string>()),
     ]);
-    return rows.map((r) => ({
-        ...r,
-        joinApplied: counts.get(r.id) ?? 0,
-        joinedByMe: mine.has(r.id),
-    }));
+    return rows.map((r) => {
+        const c = counts.get(r.id);
+        const myStatus = mine.get(r.id) ?? null;
+        return {
+            ...r,
+            // joinApplied 는 **자리를 차지한** 인원(승인됨) — 화면의 n/정원. 대기는 따로.
+            joinApplied: c?.accepted ?? 0,
+            joinPending: c?.pending ?? 0,
+            joinCapacity: r.listingType === "JOIN" ? joinCapacity(r) : null,
+            myJoinStatus: myStatus,
+            joinedByMe: myStatus === "applied" || myStatus === "accepted",
+        };
+    });
 }
 
 router.get("/joins", asyncHandler(async (req: AuthRequest, res: any) => {

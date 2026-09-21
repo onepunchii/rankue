@@ -674,6 +674,18 @@ export const golfBookings = pgTable("golf_bookings", {
   listingType: text("listing_type").default("BOOKING").notNull(),
   joinHeadcount: integer("join_headcount"),
   joinCondition: text("join_condition"),
+  /**
+   * 조인 2026-09-21(오너: "심플하고 누구나 만들기 쉽게, 남녀 구별, 스크린 조인").
+   * joinType 필드/스크린/파크 · slots 자리 목록(shared/golfJoin JoinSlot[], 첫 자리는 호스트) · costMode FIXED(그린피)/SPLIT(1/N)
+   * · venueName 스크린·파크 장소 이름 · lat/lng 장소 좌표(있을 때만 — "내 주변" 정렬용).
+   * 옛 글은 전부 null → 화면이 slotsFromLegacy 로 자리를 만든다.
+   */
+  joinType: text("join_type", { enum: ["FIELD", "SCREEN", "PARK"] }),
+  slots: jsonb("slots").$type<{ role: "HOST" | "GUEST" | "OPEN"; gender: "M" | "F" | "ANY" }[]>(),
+  costMode: text("cost_mode", { enum: ["FIXED", "SPLIT"] }),
+  venueName: text("venue_name"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
   /** 신고 누적·운영자 조치로 가려진 매물. 커뮤니티 글과 같은 방식이다(지우지 않고 가린다 — 추적이 남는다). */
   isBlinded: boolean("is_blinded").default(false).notNull(),
   blindReason: text("blind_reason"),
@@ -698,7 +710,7 @@ export const golfJoinRequests = pgTable("golf_join_requests", {
    * 행을 지우지 않는다 — 반복 취소·노쇼를 나중에 볼 수 있어야 한다.
    * 취소한 시각은 updated_at 이다(취소 때 함께 갱신된다). 티타임과 견주면 '몇 시간 전 취소'가 나온다.
    */
-  status: text("status", { enum: ["applied", "cancelled", "noshow"] }).default("applied").notNull(),
+  status: text("status", { enum: ["applied", "accepted", "rejected", "cancelled", "noshow"] }).default("applied").notNull(),
   /**
    * 이 글에서 이 사람이 **여태까지** 취소한/안 나타난 횟수. status 한 칸만 두면 다시 신청하는 순간
    * 지워진다 — 취소·재신청을 반복하는 사람이 늘 깨끗해 보이고, 노쇼로 찍힌 사람도 재신청 한 번으로

@@ -111,6 +111,11 @@ function buildGolfFilterConditions(filters: any): any[] {
         if (both.length > 0) out.push(both.length === 1 ? both[0] : or(...both));
     }
 
+    // 조인 종류(필드/스크린/파크). 옛 글(null)은 필드로 본다.
+    const joinType = typeof filters?.joinType === "string" ? filters.joinType : "";
+    if (joinType === "FIELD") out.push(or(isNull(golfBookings.joinType), eq(golfBookings.joinType, "FIELD")));
+    else if (joinType === "SCREEN" || joinType === "PARK") out.push(eq(golfBookings.joinType, joinType));
+
     // 시간대 — 한국시각 기준. 'all' 은 거르지 않는다는 뜻이다.
     const times = list(filters?.time).filter((t) => t !== "all");
     if (times.length > 0) {
@@ -383,30 +388,34 @@ export class GolfRepository {
     // 조인 글은 golf_bookings(listing_type='JOIN') 행이고, 신청은 여기 따로 쌓인다.
     // 그전엔 '조인 신청하기' 가 문자만 열고 아무것도 안 남겼다(2026-09-09).
 
-    /** 조인 글별 현재 신청 인원. 목록에 뿌리려고 한 번에 센다. */
-    async countJoinRequests(bookingIds: string[]): Promise<Map<string, number>> {
+    /**
+     * 조인 글별 인원 — accepted(자리 차지)와 applied(승인 대기)를 따로 센다(2026-09-21 호스트 승인제).
+     * 자리를 차지하는 건 **승인된 사람뿐**이다. 신청은 정원과 무관하게 쌓이고 호스트가 고른다.
+     */
+    async countJoinRequests(bookingIds: string[]): Promise<Map<string, { accepted: number; pending: number }>> {
         if (bookingIds.length === 0) return new Map();
         const rows = await db.select({
             bookingId: golfJoinRequests.bookingId,
-            n: sql<number>`count(*)::int`,
+            accepted: sql<number>`count(*) filter (where ${golfJoinRequests.status} = 'accepted')::int`,
+            pending: sql<number>`count(*) filter (where ${golfJoinRequests.status} = 'applied')::int`,
         })
             .from(golfJoinRequests)
-            .where(and(inArray(golfJoinRequests.bookingId, bookingIds), eq(golfJoinRequests.status, "applied")))
+            .where(inArray(golfJoinRequests.bookingId, bookingIds))
             .groupBy(golfJoinRequests.bookingId);
-        return new Map(rows.map((r) => [r.bookingId, Number(r.n)]));
+        return new Map(rows.map((r) => [r.bookingId, { accepted: Number(r.accepted), pending: Number(r.pending) }]));
     }
 
-    /** 내가 신청해 둔 조인 글 id 들. */
-    async myJoinRequestIds(memberId: string, bookingIds: string[]): Promise<Set<string>> {
-        if (bookingIds.length === 0) return new Set();
-        const rows = await db.select({ bookingId: golfJoinRequests.bookingId })
+    /** 내 신청 상태(조인 글 id → status). 취소한 글은 없는 것으로 본다(다시 신청할 수 있다). */
+    async myJoinStatuses(memberId: string, bookingIds: string[]): Promise<Map<string, string>> {
+        if (bookingIds.length === 0) return new Map();
+        const rows = await db.select({ bookingId: golfJoinRequests.bookingId, status: golfJoinRequests.status })
             .from(golfJoinRequests)
             .where(and(
                 eq(golfJoinRequests.memberId, memberId),
-                eq(golfJoinRequests.status, "applied"),
+                inArray(golfJoinRequests.status, ["applied", "accepted", "rejected", "noshow"]),
                 inArray(golfJoinRequests.bookingId, bookingIds),
             ));
-        return new Set(rows.map((r) => r.bookingId));
+        return new Map(rows.map((r) => [r.bookingId, r.status]));
     }
 
     /**
@@ -418,14 +427,15 @@ export class GolfRepository {
             .from(golfJoinRequests)
             .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId)))
             .limit(1);
-        if (existing?.status === "applied") return "already";
+        if (existing?.status === "applied" || existing?.status === "accepted") return "already";
 
+        // 정원은 **승인된** 사람으로 센다(호스트 승인제). 대기는 정원과 무관하게 받는다.
         const inserted = await db.execute(sql`
             INSERT INTO golf_join_requests (booking_id, member_id, status, updated_at)
             SELECT ${bookingId}::uuid, ${memberId}::uuid, 'applied', now()
             WHERE (
               SELECT count(*) FROM golf_join_requests
-              WHERE booking_id = ${bookingId}::uuid AND status = 'applied'
+              WHERE booking_id = ${bookingId}::uuid AND status = 'accepted'
             ) < ${capacity}
             ON CONFLICT (booking_id, member_id)
             DO UPDATE SET status = 'applied', updated_at = now()
@@ -444,10 +454,34 @@ export class GolfRepository {
             .where(and(
                 eq(golfJoinRequests.bookingId, bookingId),
                 eq(golfJoinRequests.memberId, memberId),
-                eq(golfJoinRequests.status, "applied"),
+                inArray(golfJoinRequests.status, ["applied", "accepted"]),
             ))
             .returning({ id: golfJoinRequests.id });
         return rows.length > 0;
+    }
+
+    /**
+     * 호스트의 승인·거절(2026-09-21 호스트 승인제). 대기(applied) 상태에서만 바뀐다.
+     * 승인은 **정원 안에서만** — 세고 바꾸는 사이가 갈라지면 마지막 자리에 둘이 들어오므로 한 문장에서 한다.
+     */
+    async decideJoinRequest(bookingId: string, memberId: string, accept: boolean, capacity: number): Promise<"ok" | "full" | "gone"> {
+        if (!accept) {
+            const rows = await db.update(golfJoinRequests)
+                .set({ status: "rejected", updatedAt: new Date() })
+                .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId), eq(golfJoinRequests.status, "applied")))
+                .returning({ id: golfJoinRequests.id });
+            return rows.length > 0 ? "ok" : "gone";
+        }
+        const r = await db.execute(sql`
+            UPDATE golf_join_requests SET status = 'accepted', updated_at = now()
+            WHERE booking_id = ${bookingId}::uuid AND member_id = ${memberId}::uuid AND status = 'applied'
+              AND (SELECT count(*) FROM golf_join_requests WHERE booking_id = ${bookingId}::uuid AND status = 'accepted') < ${capacity}
+            RETURNING id
+        `);
+        if ((r.rows?.length ?? 0) > 0) return "ok";
+        const [row] = await db.select({ status: golfJoinRequests.status }).from(golfJoinRequests)
+            .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId))).limit(1);
+        return row?.status === "applied" ? "full" : "gone";
     }
 
     /**
@@ -507,7 +541,7 @@ export class GolfRepository {
     async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean): Promise<boolean> {
         const rows = await db.update(golfJoinRequests)
             .set({
-                status: noShow ? "noshow" : "applied",
+                status: noShow ? "noshow" : "accepted",
                 // 되돌리면 숫자도 되돌린다(0 아래로는 안 내려간다). 표시가 다시 신청으로 지워지지 않게
                 // 숫자는 status 와 따로 남는다.
                 noShowCount: noShow
@@ -518,7 +552,7 @@ export class GolfRepository {
             .where(and(
                 eq(golfJoinRequests.bookingId, bookingId),
                 eq(golfJoinRequests.memberId, memberId),
-                eq(golfJoinRequests.status, noShow ? "applied" : "noshow"),
+                eq(golfJoinRequests.status, noShow ? "accepted" : "noshow"),
             ))
             .returning({ id: golfJoinRequests.id });
         return rows.length > 0;
