@@ -85,7 +85,7 @@ const liveCard = (over: Record<string, unknown> = {}) => ({
     targets: [20, 20], scores: [7, 5], innings: 9, turn: 0, shots: 18, winnerIndex: null, watchers: 2,
     startedAt: new Date(NOW - 60_000).toISOString(), finishedAt: null, lastShotAt: null, ...over,
 });
-function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; myHandi?: { handi3c: number | null; handi4c: number | null }; live?: unknown[]; onWatch?: (id: string) => void }) {
+function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; myHandi?: { handi3c: number | null; handi4c: number | null }; live?: unknown[]; onWatch?: (id: string) => void; autoJoinId?: string }) {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -94,7 +94,7 @@ function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; my
     const a = api(props.rows, props.joinRoom, props.live ?? []);
     React.act(() => {
         root.render(React.createElement(rq.QueryClientProvider, { client: qc },
-            React.createElement(RoomList, { onOpen, onWatch: props.onWatch, onCreate, onClose: () => undefined, api: a, myHandi: props.myHandi, now: () => NOW })));
+            React.createElement(RoomList, { onOpen, onWatch: props.onWatch, onCreate, onClose: () => undefined, api: a, myHandi: props.myHandi, autoJoinId: props.autoJoinId, now: () => NOW })));
     });
     const h = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); }, onOpen, onCreate, api: a };
     live.push(h);
@@ -168,6 +168,22 @@ describe("RoomList", () => {
  * 게임 중인 방(2026-09-12 오너: "게임중이라도 방이 보이고 게임중이라고 표시되고, 선택되면 관전으로").
  * 시작한 방은 참가 목록(listRooms)에서 빠지지만 관전 목록으로 같은 자리에 이어 붙는다.
  */
+describe("RoomList: 홈 카드에서 고른 방(autoJoinId)", () => {
+    it("목록이 오면 그 방의 참가 창이 바로 열리고, 닫으면 다시 열리지 않는다", async () => {
+        const h = mount({ rows: [room(), room({ id: "r2", hostName: "고수" })], autoJoinId: "r2", myHandi: { handi3c: 15, handi4c: null } });
+        await settle(h, () => h.container.querySelector("[role=dialog]") !== null);
+        const dlg = h.container.querySelector("[role=dialog]")!;
+        expect(dlg.textContent).toContain("고수");
+        click(Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent === ko["sim.common.close"] || b.getAttribute("aria-label") === ko["sim.common.close"]) ?? dlg.querySelector("button")!);
+    });
+
+    it("그사이 방이 차서 없어졌으면 목록만 보인다(창을 억지로 열지 않는다)", async () => {
+        const h = mount({ rows: [room()], autoJoinId: "gone" });
+        await settle(h, () => text(h).includes("방장"));
+        expect(h.container.querySelector("[role=dialog]")).toBeNull();
+    });
+});
+
 describe("RoomList: 게임 중인 방 줄", () => {
     it("대기 방이 없어도 게임 중인 방이 있으면 '열린 방이 없어요' 대신 그 방을 보여 준다", async () => {
         const onWatch = vi.fn();

@@ -29,6 +29,11 @@ export interface RoomListProps {
     api?: MatchApi;
     /** 내 실전 핸디(있으면 다마수 기본값) */
     myHandi?: { handi3c: number | null; handi4c: number | null };
+    /**
+     * 이 방의 참가 창을 바로 연다(홈 카드에서 방을 눌러 들어온 경우 ?rooms=1&join=<id>).
+     * 목록이 도착한 뒤 한 번만 연다 — 닫으면 다시 열리지 않는다. 그사이 방이 차서 없어졌으면 목록만 보인다.
+     */
+    autoJoinId?: string;
     now?: () => number;
 }
 
@@ -199,7 +204,7 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
     );
 }
 
-export function RoomList({ onOpen, onWatch, onCreate, onClose, api = defaultApi, myHandi, now = Date.now }: RoomListProps) {
+export function RoomList({ onOpen, onWatch, onCreate, onClose, api = defaultApi, myHandi, autoJoinId, now = Date.now }: RoomListProps) {
     const { t } = useT();
     const q = useQuery({ queryKey: ROOMS_QUERY_KEY, queryFn: () => api.listRooms(), staleTime: 0, refetchInterval: ROOMS_REFETCH_MS });
     // 게임 중인 공개 방 — 참가 목록에서는 빠지지만 관전으로 들어갈 수 있어 같은 목록에 이어 붙인다.
@@ -224,6 +229,16 @@ export function RoomList({ onOpen, onWatch, onCreate, onClose, api = defaultApi,
         roomIdsRef.current = ids;
         if (shouldRefreshWatch(prev, ids)) void qc.invalidateQueries({ queryKey: WATCH_QUERY_KEY });
     }, [rows, q.isSuccess, onWatch, qc]);
+
+    // 홈 카드에서 고른 방 — 목록이 오면 그 방의 참가 창을 한 번 연다.
+    const autoOpenedRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!autoJoinId || autoOpenedRef.current === autoJoinId || !q.isSuccess) return;
+        const room = rows.find((m) => m.id === autoJoinId);
+        if (!room) return;
+        autoOpenedRef.current = autoJoinId;
+        setTarget(room);
+    }, [autoJoinId, rows, q.isSuccess]);
     return (
         <div className="rank-arcade w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
             <div className="flex items-start justify-between gap-3 mb-3">

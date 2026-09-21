@@ -2,36 +2,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Target, Swords, LogIn, GameController, HelpCircle, LucideMessageCircle, LucideStore } from "@/lib/icons";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useT } from "@/lib/i18n";
-
-// 온라인게임 타일 배경: 진입 화면의 살아 있는 3D 테이블(2026-09-08 오너). 홈 번들엔 안 넣고, 화면이 뜬 뒤 타일이 보일 때만 불러온다.
-// three.js 는 쇼케이스가 다시 늦게 불러오고, 안 되는 기기는 Canvas2D. 화면 밖이면 멈추고, 동작 줄이기 설정이면 정지 화면.
-const EntryShowcase = lazy(() => import("@/sim/entry/EntryShowcase").then((m) => ({ default: m.EntryShowcase })));
-
-/** 화면이 뜨고 한숨 돌린 뒤(idle) + 타일이 보일 때 장면을 붙인다. 보이지 않으면 paused. */
-function useLiveScene(ref: React.RefObject<HTMLElement>): { mount: boolean; paused: boolean } {
-    const [idle, setIdle] = useState(false);
-    const [visible, setVisible] = useState(false);
-    useEffect(() => {
-        const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-        if (typeof w.requestIdleCallback === "function") {
-            const id = w.requestIdleCallback(() => setIdle(true), { timeout: 1500 });
-            return () => w.cancelIdleCallback?.(id);
-        }
-        const t = setTimeout(() => setIdle(true), 700);
-        return () => clearTimeout(t);
-    }, []);
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-        if (typeof IntersectionObserver === "undefined") { setVisible(true); return; }
-        const io = new IntersectionObserver((entries) => setVisible(entries.some((e) => e.isIntersecting)), { threshold: 0.15 });
-        io.observe(el);
-        return () => io.disconnect();
-    }, [ref]);
-    return { mount: idle && visible, paused: !visible };
-}
+import { OnlineGameCard } from "./OnlineGameCard";
 
 interface QuickActionsProps {
     onStartGame: (mode: "practice" | "match") => void;
@@ -41,11 +14,6 @@ interface QuickActionsProps {
 export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => {
     const [, setLocation] = useLocation();
     const { t } = useT();
-    const sceneRef = useRef<HTMLButtonElement>(null);
-    const scene = useLiveScene(sceneRef);
-    const [sceneMounted, setSceneMounted] = useState(false);
-    useEffect(() => { if (scene.mount) setSceneMounted(true); }, [scene.mount]);
-
     const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
     // 시뮬레이터: 진입 화면(싱글 / 친구와 대전)으로. 설정 창은 그 화면 안에서 연다.
     const handleOnlineGameClick = () => setLocation("/online-game");
@@ -153,25 +121,8 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
                     </div>
                 </motion.button>
 
-                {/* 시뮬레이터 (세로 2칸, 좌측 히어로) — 매칭(우측 히어로)과 지그재그. 커뮤니티와 자리를 바꿨다(2026-09-08 오너: 시뮬레이터가 더 중요). /online-game 진입 화면 */}
-                <motion.button
-                    ref={sceneRef}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleOnlineGameClick}
-                    className="relative overflow-hidden row-span-2 h-[276px] rounded-3xl bg-[#0B5D3B] flex flex-col justify-end p-6 text-left shadow-[0_8px_24px_rgba(11,93,59,0.30)]"
-                >
-                    {/* 살아 있는 테이블(늦게 붙음). 뜨기 전엔 노란 바탕이 그대로 보인다 */}
-                    {sceneMounted && (
-                        <Suspense fallback={null}>
-                            <EntryShowcase className="absolute inset-0 bg-[#0B5D3B]" paused={scene.paused} />
-                        </Suspense>
-                    )}
-                    {/* 아이콘 없이 장면 위에 글만(2026-09-08 오너) */}
-                    <div className="relative -mx-6 -mb-6 px-6 pb-6 pt-8 bg-black/35">
-                        <span className="block text-[21px] font-bold text-white leading-tight">{t("quickActions.simTitle")}</span>
-                        <span className="block text-[13px] font-medium text-white/85 mt-2 leading-snug">{t("quickActions.simDesc")}</span>
-                    </div>
-                </motion.button>
+                {/* 온라인게임 (가로 2칸) — 타일 + 지금 열린 멀티방(2026-09-21 오너). 장면·방 목록은 OnlineGameCard 안에 있다. */}
+                <OnlineGameCard />
 
                 {/* 매장 찾기 (1x1) */}
                 <motion.button

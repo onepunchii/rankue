@@ -1703,6 +1703,7 @@ export function SimulatorPage() {
                         onWatch={(id) => navigate(`/online-game?watch=${id}`)}
                         onCreate={() => navigate("/online-game?lobby=1&public=1")}
                         onClose={() => navigate("/online-game", { replace: true })}
+                        autoJoinId={params.get("join") ?? undefined}
                         myHandi={member ? { handi3c: member.handi3c, handi4c: member.handi4c } : undefined}
                     />
                     {/* 끝난 공개 대전 다시보기. 게임 중인 방은 위 목록에 '게임 중 · 관전'으로 함께 뜬다. */}
