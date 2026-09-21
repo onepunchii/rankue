@@ -69,8 +69,9 @@ export default function GolfDashboard() {
         ? officialStats.cumulativeAverage
         : (me?.golfAvgScore ? Number(me.golfAvgScore).toFixed(1) : "0.0");
 
+    // golf-home: 홈은 굵기를 낮추지 않는다(2026-09-21 오너: "홈은 바꾸면 안 돼, 두께가 생명이라") — index.css 골프 블록 참고
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white p-6 pb-32 font-sans relative overflow-x-hidden">
+        <div className="golf-home min-h-screen bg-[#0A0A0A] text-white p-6 pb-32 font-sans relative overflow-x-hidden">
             {/* Background Texture/Gradient */}
             <div className="fixed inset-0 pointer-events-none">
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#64DD17]/5 rounded-full blur-[128px] -translate-y-1/2 translate-x-1/2" />

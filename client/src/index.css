@@ -272,6 +272,11 @@ body {
 :root[data-sport="GOLF"] .font-extrabold { font-weight: 650; }
 :root[data-sport="GOLF"] .font-bold { font-weight: 600; }
 :root[data-sport="GOLF"] .font-semibold { font-weight: 550; }
+/* 골프 홈(golf/pages/Dashboard.tsx 루트 .golf-home)만 원래 굵기 — 오너: "홈은 바꾸면 안 돼, 두께가 생명이라". */
+:root[data-sport="GOLF"] .golf-home .font-black { font-weight: 900; }
+:root[data-sport="GOLF"] .golf-home .font-extrabold { font-weight: 800; }
+:root[data-sport="GOLF"] .golf-home .font-bold { font-weight: 700; }
+:root[data-sport="GOLF"] .golf-home .font-semibold { font-weight: 600; }
 :root[data-sport="GOLF"] .text-black\/60,
 :root[data-sport="GOLF"] .text-black\/55,
 :root[data-sport="GOLF"] .text-black\/50 { color: var(--ink-2); }
