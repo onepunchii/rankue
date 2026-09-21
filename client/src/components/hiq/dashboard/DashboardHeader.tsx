@@ -49,7 +49,7 @@ export const DashboardHeader = ({
                         className="group inline-flex items-center gap-2 mb-2.5 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20 active:scale-95 transition-transform"
                     >
                         <span className="w-2 h-2 rounded-full bg-brand shadow-[0_0_8px_rgb(var(--brand))]" />
-                        <span className="text-[12px] font-semibold text-brand tracking-tight">BILLIARDS MODE</span>
+                        <span className="text-[12px] font-semibold text-brand tracking-tight">당구 모드</span>
                         <LucideArrowLeftRight className="w-3 h-3 text-brand/60 group-hover:text-brand" />
                     </button>
                     <h1 className="text-[26px] leading-none font-bold text-ink-1 tracking-tight truncate">

@@ -31,7 +31,7 @@ export function GolfHeader({ member: _member }: GolfHeaderProps) {
             >
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md transition-all group-hover:border-[#64DD17]/50">
                     <div className="w-2 h-2 rounded-full bg-[#64DD17] shadow-[0_0_8px_#64DD17]" />
-                    <span className="text-xs font-semibold text-white/80 group-hover:text-white">GOLF MODE</span>
+                    <span className="text-xs font-semibold text-white/80 group-hover:text-white">골프 모드</span>
                     <LucideArrowLeftRight className="w-3 h-3 text-white/40 group-hover:text-[#64DD17]" />
                 </div>
             </Button>

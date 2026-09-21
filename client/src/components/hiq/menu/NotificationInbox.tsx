@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { LucideX, LucideBell, LucideCheck, LucideTrash2, LucideChevronRight } from "@/lib/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -79,7 +80,9 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
         // NOTICE 등 목적지 페이지가 없는 알림은 읽음 처리만 하고 이동하지 않는다 (전용 페이지 부재).
     };
 
-    return (
+    // body 로 포털 — 헤더(relative z-10)의 층 안에서 그리면 z-[101] 이 그 층 안에서만 유효해
+    // 홈의 카드(transform 층)가 알림함 위로 비쳐 "투명"해 보였다(2026-09-21 골프 헤더).
+    return createPortal(
         <AnimatePresence>
             {open && (
                 <>
@@ -216,6 +219,7 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body,
     );
 }

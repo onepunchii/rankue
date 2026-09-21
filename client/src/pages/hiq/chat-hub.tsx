@@ -60,10 +60,20 @@ export default function ChatHub() {
         refetchInterval: 15_000,
         staleTime: 5_000,
     });
-    const rooms = q.data ?? [];
+    const allRooms = q.data ?? [];
     const golf = currentSport === "GOLF";
     const [pickerOpen, setPickerOpen] = useState(false);
     const isAdmin = (member as any)?.role === "admin" || (member as any)?.role === "super_admin";
+    // 종류 칩(2026-09-21 오너: "종목에 맞는 채팅 카테고리") — 골프는 조인·부킹/크루/친구, 당구는 크루/친구.
+    // 방이 있는 종류만 칩이 되고, 두 종류 이상일 때만 줄이 보인다(방 두세 개인 사람에게 칩은 소음).
+    const [kindFilter, setKindFilter] = useState<"all" | ChatRoomRow["kind"]>("all");
+    const kindOrder: ChatRoomRow["kind"][] = golf ? ["listing", "crew", "dm", "support"] : ["crew", "dm", "support"];
+    const kindLabel: Record<ChatRoomRow["kind"], string> = { listing: t("chat.filterListing"), crew: t("chat.filterCrew"), dm: t("chat.filterDm"), support: t("chat.filterSupport") };
+    const kindsPresent = kindOrder.filter((k) => allRooms.some((r) => r.kind === k));
+    const showChips = kindsPresent.length >= 2;
+    const activeKind = showChips && kindsPresent.includes(kindFilter as ChatRoomRow["kind"]) ? kindFilter : "all";
+    const rooms = activeKind === "all" ? allRooms : allRooms.filter((r) => r.kind === activeKind);
+    const unreadOf = (k: "all" | ChatRoomRow["kind"]) => allRooms.filter((r) => k === "all" || r.kind === k).reduce((n, r) => n + r.unread, 0);
     const roomPath = (r: ChatRoomRow) => (r.kind === "crew" ? `/chat/crew/${r.id}` : `/chat/${r.kind}/${r.id}`);
 
     return (
@@ -84,12 +94,30 @@ export default function ChatHub() {
                 )}
             </header>
 
+            {member && showChips && (
+                <div className="sticky top-14 z-30 bg-surface-0/90 backdrop-blur px-3 py-2 flex gap-1.5 overflow-x-auto scrollbar-hide">
+                    {(["all", ...kindsPresent] as ("all" | ChatRoomRow["kind"])[]).map((k) => {
+                        const on = activeKind === k;
+                        const n = unreadOf(k);
+                        return (
+                            <button
+                                key={k} type="button" onClick={() => setKindFilter(k)}
+                                className={cn("h-8 px-3 rounded-full text-[12.5px] font-semibold whitespace-nowrap inline-flex items-center gap-1.5 transition-colors",
+                                    on ? "bg-ink-1 text-surface-0" : "bg-surface-2 text-ink-2")}
+                            >
+                                {k === "all" ? t("chat.filterAll") : kindLabel[k]}
+                                {n > 0 && <span className={cn("min-w-[16px] h-4 px-1 rounded-full text-[10px] rk-num flex items-center justify-center", on ? "bg-surface-0/20 text-surface-0" : "bg-brand text-brand-fg")}>{n > 99 ? "99+" : n}</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
             <main className="px-3 pt-2">
                 {!member ? (
                     <p className="py-16 text-center text-[13px] font-medium text-ink-3">{t("chat.loginNeeded")}</p>
                 ) : q.isPending ? (
                     <div className="flex justify-center py-16 text-ink-3"><LucideLoader2 className="w-5 h-5 animate-spin" /></div>
-                ) : rooms.length === 0 ? (
+                ) : allRooms.length === 0 ? (
                     <div className="py-16 px-6 text-center space-y-3">
                         <p className="text-[15px] font-semibold text-ink-1">{t("chat.emptyTitle")}</p>
                         <p className="text-[13px] font-medium text-ink-3 leading-relaxed">{golf ? t("chat.emptyGolf") : t("chat.emptyBilliards")}</p>

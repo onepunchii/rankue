@@ -252,9 +252,9 @@ function GolfSideLeft() {
                 </span>
             </Link>
 
-            <p className="mt-9 inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.24em] text-brand">
+            <p className="mt-9 inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.08em] text-brand">
                 <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-brand" />
-                GOLF MODE
+                골프 모드
             </p>
             <h2 className="mt-3 text-[32px] 2xl:text-[36px] font-extrabold leading-[1.15] tracking-[-0.035em] text-ink-1">
                 스코어는 랭큐가,
