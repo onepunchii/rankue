@@ -71,3 +71,54 @@ export function costText(item: { costMode?: string | null; greenFee?: number | n
     const fee = Number(item.greenFee ?? 0);
     return fee > 0 ? `${fee.toLocaleString()}원` : "비용 미정";
 }
+
+/* ── 카드 공용(2026-09-21 카드 재설계): 카카오맵 링크 · D-day · 모집 성별 글자 ─────────────────────── */
+
+/** 카카오맵 열기(공식 URL 스킴, 키 불필요). 좌표가 있으면 핀으로, 없으면 이름 검색. 앱에선 카카오맵 앱이 받는다. */
+export function kakaoMapUrl(name: string, lat?: number | null, lng?: number | null): string {
+    const n = encodeURIComponent(name);
+    return typeof lat === "number" && typeof lng === "number" ? `https://map.kakao.com/link/map/${n},${lat},${lng}` : `https://map.kakao.com/link/search/${n}`;
+}
+/** 길찾기. 좌표가 없으면 길찾기가 안 되므로 검색으로 대신한다. */
+export function kakaoRouteUrl(name: string, lat?: number | null, lng?: number | null): string {
+    const n = encodeURIComponent(name);
+    return typeof lat === "number" && typeof lng === "number" ? `https://map.kakao.com/link/to/${n},${lat},${lng}` : `https://map.kakao.com/link/search/${n}`;
+}
+
+/** 한국 날짜 열쇠(YYYY-MM-DD) 둘의 날 차이. */
+function dayDiff(fromKey: string, toKey: string): number {
+    const [a, b] = [fromKey, toKey].map((k) => { const [y, m, d] = k.split("-").map(Number); return Date.UTC(y, m - 1, d); });
+    return Math.round((b - a) / 86_400_000);
+}
+/** 티타임까지: 오늘 · 내일 · D-n · 지남. 목록이 날짜별이라 날짜 대신 이게 더 쓸모 있다. */
+export function dayLabel(dateKey: string, todayKey: string): string {
+    const d = dayDiff(todayKey, dateKey);
+    if (d < 0) return "지남";
+    if (d === 0) return "오늘";
+    if (d === 1) return "내일";
+    return `D-${d}`;
+}
+
+/** 모집 자리의 성별 요약: "성별무관" · "남성" · "여성" · "남 1 · 여 1" 처럼. */
+export function openGenderText(slots: readonly JoinSlot[]): string {
+    const open = slots.filter((s) => s.role === "OPEN");
+    if (open.length === 0) return "";
+    const n = { M: 0, F: 0, ANY: 0 };
+    for (const s of open) n[s.gender]++;
+    if (n.M === open.length) return "남성";
+    if (n.F === open.length) return "여성";
+    if (n.ANY === open.length) return "성별무관";
+    return (["M", "F", "ANY"] as const).filter((g) => n[g] > 0).map((g) => `${GENDER_LABEL[g]} ${n[g]}`).join(" · ");
+}
+
+/** 자리 설명 칩: 같은 역할·성별끼리 묶는다 — "호스트 남 · 동반자 여 · 모집 무관 ×2". */
+export function slotLegend(slots: readonly JoinSlot[]): string[] {
+    const ROLE: Record<JoinSlot["role"], string> = { HOST: "호스트", GUEST: "동반자", OPEN: "모집" };
+    const out: { key: string; label: string; n: number }[] = [];
+    for (const s of slots) {
+        const key = `${s.role}:${s.gender}`;
+        const hit = out.find((o) => o.key === key);
+        if (hit) hit.n++; else out.push({ key, label: `${ROLE[s.role]} ${GENDER_LABEL[s.gender]}`, n: 1 });
+    }
+    return out.map((o) => (o.n > 1 ? `${o.label} ×${o.n}` : o.label));
+}
