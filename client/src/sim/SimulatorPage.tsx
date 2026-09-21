@@ -1456,12 +1456,8 @@ export function SimulatorPage() {
                                 {t("sim.share.button")}
                             </button>
                         )}
-                        {/* 대전 알림은 헤더에서 여기로 내려왔다(2026-09-16 헤더 재설계) — 헤더는 "누가 치고 시간이 얼마 남았나"만 말한다. */}
-                        {isMatch && (sim.match?.watchers ?? 0) > 0 && (
-                            <span className={cn(chipNeutral, "bg-[#6E5BC8]/30 text-[#DCD3FF] font-bold")}>
-                                {t("sim.watch.viewers").replace("{n}", String(sim.match?.watchers ?? 0))}
-                            </span>
-                        )}
+                        {/* 대전 알림은 헤더에서 여기로 내려왔다(2026-09-16 헤더 재설계) — 헤더는 "누가 치고 시간이 얼마 남았나"만 말한다.
+                            관전자 수는 여기 없다 — 대화창 손잡이 옆 👀 하나만 둔다(2026-09-21 오너: "거기만 보여도 될 것 같아"). */}
                         {isMatch && (sim.session?.pendingWinner ?? null) !== null && (
                             <span className="rk-chip bg-ball-yellow text-ink-1 font-bold max-w-full truncate" title={t("sim.match.finalInningHint")}>
                                 {t("sim.match.finalInning")}
