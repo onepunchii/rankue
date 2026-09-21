@@ -13,10 +13,13 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { JOIN_TYPE_LABEL } from "@shared/golfJoin";
+import { FriendPicker } from "@/components/hiq/chat/FriendPicker";
+import { LucidePlus, LucideHeadset } from "lucide-react";
+import { useState } from "react";
 
 export interface ChatRoomRow {
     key: string;
-    kind: "crew" | "listing";
+    kind: "crew" | "listing" | "dm" | "support";
     id: string;
     title: string;
     subtitle: string;
@@ -59,13 +62,25 @@ export default function ChatHub() {
     });
     const rooms = q.data ?? [];
     const golf = currentSport === "GOLF";
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const isAdmin = (member as any)?.role === "admin" || (member as any)?.role === "super_admin";
+    const roomPath = (r: ChatRoomRow) => (r.kind === "crew" ? `/chat/crew/${r.id}` : `/chat/${r.kind}/${r.id}`);
 
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 pb-nav">
-            <header className="sticky top-0 z-40 bg-surface-0/90 backdrop-blur border-b border-surface-line px-5 h-14 flex items-center justify-between">
+            <header className="sticky top-0 z-40 bg-surface-0/90 backdrop-blur border-b border-surface-line px-5 h-14 flex items-center justify-between gap-2">
                 <h1 className="text-[18px] font-semibold">{t("chat.title")}</h1>
-                {rooms.some((r) => r.unread > 0) && (
-                    <span className="text-[12px] font-medium text-ink-3">{t("chat.unreadRooms").replace("{n}", String(rooms.filter((r) => r.unread > 0).length))}</span>
+                {member && (
+                    <div className="flex items-center gap-1.5">
+                        {!isAdmin && (
+                            <button type="button" onClick={() => setLocation(`/chat/support/${member.id}`)} className="h-9 px-3 rounded-full bg-surface-2 text-[12.5px] font-medium text-ink-2 inline-flex items-center gap-1.5" title={t("chat.support")}>
+                                <LucideHeadset className="w-4 h-4" /> {t("chat.support")}
+                            </button>
+                        )}
+                        <button type="button" onClick={() => setPickerOpen(true)} className="h-9 px-3 rounded-full bg-brand text-brand-fg text-[12.5px] font-semibold inline-flex items-center gap-1" title={t("chat.newChat")}>
+                            <LucidePlus className="w-4 h-4" /> {t("chat.newChat")}
+                        </button>
+                    </div>
                 )}
             </header>
 
@@ -88,18 +103,19 @@ export default function ChatHub() {
                             <li key={r.key}>
                                 <button
                                     type="button"
-                                    onClick={() => setLocation(r.kind === "crew" ? `/crew/${r.id}/chat` : `/chat/listing/${r.id}`)}
+                                    onClick={() => setLocation(roomPath(r))}
                                     className="w-full px-2 py-3 flex items-center gap-3 text-left active:bg-surface-2 rounded-xl transition-colors"
                                 >
-                                    <span className={cn("w-12 h-12 rounded-2xl shrink-0 overflow-hidden flex items-center justify-center text-[15px] font-semibold",
-                                        r.kind === "crew" ? "bg-brand/10 text-brand" : r.listing?.listingType === "JOIN" ? "bg-[#FF6B00]/12 text-[#FF8A33]" : "bg-[#64DD17]/12 text-[#6DBE2A]")}>
-                                        {r.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : r.kind === "crew" ? r.title.charAt(0) : (r.listing?.listingType === "JOIN" ? "조" : "부")}
+                                    <span className={cn("w-12 h-12 shrink-0 overflow-hidden flex items-center justify-center text-[15px] font-semibold",
+                                        r.kind === "dm" ? "rounded-full bg-surface-3 text-ink-2" : "rounded-2xl",
+                                        r.kind === "crew" ? "bg-brand/10 text-brand" : r.kind === "support" ? "bg-[#6E5BC8]/20 text-[#B8A7FF]" : r.kind === "listing" ? (r.listing?.listingType === "JOIN" ? "bg-[#FF6B00]/12 text-[#FF8A33]" : "bg-[#64DD17]/12 text-[#6DBE2A]") : "")}>
+                                        {r.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : r.kind === "support" ? <LucideHeadset className="w-5 h-5" /> : r.kind === "listing" ? (r.listing?.listingType === "JOIN" ? "조" : "부") : r.title.charAt(0)}
                                     </span>
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-center gap-2 min-w-0">
                                             <span className="text-[15px] font-semibold text-ink-1 truncate">{r.title}</span>
                                             <span className="text-[11.5px] font-medium text-ink-4 shrink-0">
-                                                {r.kind === "crew" ? r.subtitle : `${r.listing?.joinType ? JOIN_TYPE_LABEL[r.listing.joinType as keyof typeof JOIN_TYPE_LABEL] ?? "" : r.listing?.listingType === "JOIN" ? "조인" : "부킹"} · ${r.listing ? teeLabel(r.listing.datetime) : ""}`}
+                                                {r.kind === "listing" ? `${r.listing?.joinType ? JOIN_TYPE_LABEL[r.listing.joinType as keyof typeof JOIN_TYPE_LABEL] ?? "" : r.listing?.listingType === "JOIN" ? "조인" : "부킹"} · ${r.listing ? teeLabel(r.listing.datetime) : ""}` : r.subtitle}
                                             </span>
                                         </span>
                                         <span className={cn("block text-[13px] truncate mt-0.5", r.unread > 0 ? "text-ink-1 font-medium" : "text-ink-3")}>
@@ -118,6 +134,7 @@ export default function ChatHub() {
                     </ul>
                 )}
             </main>
+            <FriendPicker open={pickerOpen} onOpenChange={setPickerOpen} />
             <HiqNavigation />
         </div>
     );

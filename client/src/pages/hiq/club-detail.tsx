@@ -25,7 +25,7 @@ import { ClubSettingsDialog } from "@/components/hiq/ClubSettingsDialog";
 import { CreateActivityDialog } from "@/components/hiq/CreateActivityDialog";
 import { CreateGolfActivityModal } from "@/components/hiq/club/activity/CreateGolfActivityModal";
 import { CreatePostDialog } from "@/components/hiq/CreatePostDialog";
-import { CrewBoardTab, CrewChatTab, CrewGalleryTab, CrewHomeTab, CrewPollTab, CrewTournamentTab } from "@/components/hiq/tabs";
+import { CrewBoardTab, CrewGalleryTab, CrewHomeTab, CrewPollTab, CrewTournamentTab } from "@/components/hiq/tabs";
 import { CreatePollDialog } from "@/components/hiq/CreatePollDialog";
 import { CreateSettlementDialog } from "@/components/hiq/settlement/CreateSettlementDialog";
 import { SettlementDetailDialog } from "@/components/hiq/settlement/SettlementDetailDialog";
@@ -80,7 +80,12 @@ export default function HiqClubDetail() {
     const [sportTab, setSportTab] = useState<'BILLIARDS' | 'GOLF'>('BILLIARDS');
 
     // Swipe Navigation Logic (Removed 'poll' from direct swipe)
-    const TABS: Array<'home' | 'board' | 'gallery' | 'chat'> = ['home', 'board', 'gallery', 'chat'];
+    // 채팅 탭은 2026-09-21 채팅 탭(/chat/crew/:id)으로 옮겼다 — 딥링크 'chat' 은 그리로 보낸다.
+    const TABS: Array<'home' | 'board' | 'gallery'> = ['home', 'board', 'gallery'];
+    useEffect(() => {
+        const tab = (crewParams?.tab ?? new URLSearchParams(window.location.search).get('tab'))?.toLowerCase();
+        if (tab === 'chat' && id) setLocation(`/chat/crew/${id}`, { replace: true });
+    }, [id, crewParams?.tab]);
     // Force refresh on mount to ensure fresh data after the fix
     useEffect(() => {
         if (id) {
@@ -207,7 +212,7 @@ export default function HiqClubDetail() {
             toast({ title: t("clubDetail.settlementCreated"), description: t("clubDetail.settlementSentToChat") });
             setIsCreateSettlementOpen(false);
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}/chats`] });
-            setActiveTab('chat');
+            setLocation(`/chat/crew/${id}`);
         },
         onError: (err: Error) => {
             toast({ title: t("clubDetail.createFailed"), description: err.message, variant: "destructive" });
@@ -431,34 +436,6 @@ export default function HiqClubDetail() {
                         </motion.div>
                     )}
 
-                    {activeTab === 'chat' && (
-                        <motion.div
-                            key="chat"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            drag="x"
-                            dragDirectionLock
-                            dragConstraints={{ left: 0, right: 0 }}
-                            dragElastic={0.2}
-                            onDragEnd={(_, info) => {
-                                const swipe = info.offset.x;
-                                const velocity = info.velocity.x;
-                                if (swipe < -100 || velocity < -500) handleSwipe(1);
-                                else if (swipe > 100 || velocity > 500) handleSwipe(-1);
-                            }}
-                            className="h-full flex flex-col overflow-hidden"
-                        >
-                            <CrewChatTab
-                                crewId={id as string}
-                                isMember={isMember}
-                                isAdmin={isAdmin}
-                                currentMemberId={me?.id}
-                                onSettlementClick={(id) => setSelectedSettlementId(id)}
-                            />
-                        </motion.div>
-                    )}
-
                     {activeTab === 'poll' && (
                         <motion.div
                             key="poll"
@@ -516,13 +493,14 @@ export default function HiqClubDetail() {
                     { id: 'home', label: 'clubDetail.tabHome', icon: LucideHome },
                     { id: 'board', label: 'clubDetail.tabBoard', icon: LucideFileText },
                     { id: 'gallery', label: 'clubDetail.tabGallery', icon: LucideImage },
-                    { id: 'chat', label: 'clubDetail.tabChat', icon: LucideMessageCircle },
+                    // 채팅은 채팅 탭(/chat/crew/:id)에 있다 — 여기 단추는 그리로 가는 문(2026-09-21)
+                    { id: 'chatroom', label: 'clubDetail.tabChat', icon: LucideMessageCircle },
                 ].map((tab) => {
                     const isActive = activeTab === tab.id;
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            onClick={() => { if (tab.id === 'chatroom') setLocation(`/chat/crew/${id}`); else setActiveTab(tab.id as any); }}
                             className={cn(
                                 "flex-1 flex flex-col items-center justify-center h-full transition-all active:scale-95 relative",
                                 isActive ? "text-brand" : "text-ink-3 hover:text-ink-2"

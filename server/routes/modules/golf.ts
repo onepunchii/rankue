@@ -225,7 +225,7 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
     // 확정되면 대화방에 들어온다(2026-09-21 채팅) — 시스템 메시지로 알리고, 푸시는 방으로 바로 보낸다.
     if (accept) {
         const who = await storage.getMemberById(req.params.memberId);
-        await storage.chat.addListingChat({ bookingId: booking.id, senderId: null, type: "system", message: `${who?.name ?? "회원"}님이 확정됐어요. 이제 여기서 대화해요.` })
+        await storage.chat.addMessage({ key: `listing:${booking.id}`, senderId: null, type: "system", message: `${who?.name ?? "회원"}님이 확정됐어요. 이제 여기서 대화해요.` })
             .catch((e) => console.error("[ListingChatSystem]", e));
     }
     notificationService.sendAndSaveNotification({
@@ -272,12 +272,12 @@ router.delete("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthR
         return sendError(res, 400, "이미 지난 티타임이라 취소할 수 없어요", "TEE_TIME_PASSED");
     }
     // 확정됐던 사람이 빠지면 방에도 남긴다(취소 전에 명단을 봐야 한다)
-    const wasInRoom = booking ? await storage.chat.isListingRoomMember(req.params.id, req.userId!) : false;
+    const wasInRoom = booking ? await storage.chat.canAccess({ kind: "listing", id: req.params.id, key: `listing:${req.params.id}` }, req.userId!) : false;
     const ok = await storage.cancelJoinRequest(req.params.id, req.userId!);
     if (!ok) return sendError(res, 404, "신청 내역이 없어요");
     if (wasInRoom && booking?.ownerId !== req.userId) {
         const me = await storage.getMemberById(req.userId!);
-        await storage.chat.addListingChat({ bookingId: req.params.id, senderId: null, type: "system", message: `${me?.name ?? "회원"}님이 빠졌어요.` })
+        await storage.chat.addMessage({ key: `listing:${req.params.id}`, senderId: null, type: "system", message: `${me?.name ?? "회원"}님이 빠졌어요.` })
             .catch((e) => console.error("[ListingChatSystem]", e));
     }
     // 올린 사람이 모르고 있으면 안 된다 — 확정해 둔 사람이 빠지면 자리가 다시 비는 일이다(2026-09-21).

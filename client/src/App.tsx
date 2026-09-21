@@ -24,7 +24,7 @@ import HiqHistory from "@/pages/hiq/history";
 import HiqRanking from "@/pages/hiq/ranking";
 import HiqMenu from "@/pages/hiq/menu";
 import HiqChatHub from "@/pages/hiq/chat-hub";
-import HiqListingChat from "@/pages/hiq/chat-listing";
+import HiqChatRoom from "@/pages/hiq/chat-room";
 import HiqSettings from "@/pages/hiq/settings";
 import HiqFriends from "@/pages/hiq/friends";
 import HiqClub from "@/pages/hiq/club";
@@ -122,7 +122,7 @@ const FramedHistory = framed(HiqHistory);
 const FramedRanking = framed(HiqRanking);
 const FramedMenu = framed(HiqMenu);
 const FramedChatHub = framed(HiqChatHub);
-const FramedListingChat = framed(HiqListingChat);
+const FramedChatRoom = framed(HiqChatRoom);
 const FramedCommunity = framed(HiqCommunity);
 const FramedCommunityPost = framed(HiqCommunityPost);
 // 데이터 표 페이지들은 데스크탑에서 넓게 (사이드 패널 없이 중앙 720px)
@@ -294,7 +294,7 @@ function AppRoutes() {
       <Route path="/ranking" component={FramedRanking} />
       <Route path="/menu" component={FramedMenu} />
       {/* 채팅(2026-09-21): 하단 탭 '전체' 자리. 조인·부킹 방은 글 id 로 */}
-      <Route path="/chat/listing/:id" component={FramedListingChat} />
+      <Route path="/chat/:kind/:id" component={FramedChatRoom} />
       <Route path="/chat" component={FramedChatHub} />
       <Route path="/community" component={FramedCommunity} />
       <Route path="/community/:id" component={FramedCommunityPost} />

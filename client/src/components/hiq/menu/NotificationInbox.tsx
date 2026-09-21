@@ -95,7 +95,7 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="fixed top-0 right-0 bottom-0 w-full max-w-[400px] bg-white border-l border-black/10 z-[101] shadow-[0_0_40px_rgba(0,0,0,0.12)] flex flex-col text-ink-1"
+                        className="fixed top-0 right-0 bottom-0 w-full max-w-[400px] bg-[var(--rk-inbox-bg,#ffffff)] border-l border-black/10 z-[101] shadow-[0_0_40px_rgba(0,0,0,0.12)] flex flex-col text-ink-1"
                     >
                         {/* Header */}
                         <div className="p-6 border-b border-black/10 flex items-center justify-between">

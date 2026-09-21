@@ -421,23 +421,41 @@ export const hiqCrewPhotos = pgTable("hiq_crew_photos", {
 });
 
 /**
- * 조인·부킹 글의 대화방(2026-09-21 오너: "전체 → 메시지, 기가막힌 채팅"). 글 하나에 방 하나.
- * 들어오는 사람 = 올린 사람 + **확정된** 신청자(대기 중은 못 들어온다 — 승인 전에 대화가 열리면 호스트에게 도배가 간다).
- * 회원 목록 테이블은 두지 않는다 — 글 소유자와 golf_join_requests.status='accepted' 가 곧 명단이다.
- * 시스템 메시지(sender null): 확정·빠짐·리마인더. 크루 채팅(hiq_crew_chats)과 같은 모양의 메시지 UI 가 두 방을 그린다.
+ * 채팅 메시지 — 방 종류와 무관하게 한 표(2026-09-21 오너: "크루 안 채팅은 빼고 채팅 탭 하나로, 친구·라이벌 1:1, 관리자 문의").
+ * room_key 가 방이다: "crew:<crewId>" · "listing:<bookingId>"(조인·부킹) · "dm:<roomId>"(1:1·소그룹) · "support:<memberId>"(관리자 문의).
+ * 명단은 종류마다 유래가 다르다 — 크루는 크루원, 조인·부킹은 올린 사람+확정된 사람, dm 은 hiq_chat_room_members, support 는 그 회원+운영자.
+ * sender_id null = 시스템 메시지. type: text | system | photo | settlement(정산 카드) 등 — 카드는 서버만 만든다.
+ * 옛 크루 채팅(hiq_crew_chats)은 이 표로 옮겼다(id 유지). 옛 표는 보관만.
  */
-export const hiqListingChats = pgTable("hiq_listing_chats", {
+export const hiqChatMessages = pgTable("hiq_chat_messages", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
-  bookingId: uuid("booking_id").references(() => golfBookings.id, { onDelete: "cascade" }).notNull(),
+  roomKey: text("room_key").notNull(),
   senderId: uuid("sender_id").references(() => hiqMembers.id),
   message: text("message").notNull(),
-  type: text("type", { enum: ["text", "system"] }).default("text").notNull(),
+  type: text("type").default("text").notNull(),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({
-  idxRoom: index("idx_listing_chats_room").on(t.bookingId, t.createdAt),
+  idxRoom: index("idx_chat_messages_room").on(t.roomKey, t.createdAt),
 }));
-export type HiqListingChat = typeof hiqListingChats.$inferSelect;
+export type HiqChatMessage = typeof hiqChatMessages.$inferSelect;
+
+/** 1:1·소그룹 방(dm). 크루·조인·문의 방은 행이 없다(명단이 다른 표에서 나온다). */
+export const hiqChatRooms = pgTable("hiq_chat_rooms", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  kind: text("kind", { enum: ["dm"] }).default("dm").notNull(),
+  title: text("title"),
+  createdBy: uuid("created_by").references(() => hiqMembers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export const hiqChatRoomMembers = pgTable("hiq_chat_room_members", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  roomId: uuid("room_id").references(() => hiqChatRooms.id, { onDelete: "cascade" }).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.roomId, t.memberId),
+}));
 
 /**
  * 방별 읽은 시각(2026-09-21) — 안 읽은 수와 하단 탭 배지의 근거. roomKey = "crew:<crewId>" | "listing:<bookingId>".

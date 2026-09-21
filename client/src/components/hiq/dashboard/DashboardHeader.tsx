@@ -7,6 +7,8 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
 import { useT } from "@/lib/i18n";
+import { useSport } from "@/contexts/SportContext";
+import { LucideArrowLeftRight } from "lucide-react";
 
 interface DashboardHeaderProps {
     member: any;
@@ -28,6 +30,7 @@ export const DashboardHeader = ({
     tier
 }: DashboardHeaderProps) => {
     const { t } = useT();
+    const { setSport } = useSport();
     const pct3c = getPercentile('3c');
     const trend = getTrend();
     const [, setLocation] = useLocation();
@@ -40,10 +43,15 @@ export const DashboardHeader = ({
             {/* Top bar: greeting + profile */}
             <div className="flex items-center justify-between mb-7 gap-3">
                 <div className="min-w-0">
-                    <div className="inline-flex items-center gap-1.5 mb-2.5 px-2.5 py-1 rounded-full bg-brand/10">
-                        <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-                        <span className="text-[11px] font-bold text-brand tracking-tight">{t("dashboardHeader.billiardsMode")}</span>
-                    </div>
+                    {/* 종목 전환 — 골프 홈의 "GOLF MODE ⇄" 와 같은 모양(2026-09-21 오너: "당구에서도 동일하게, 디자인 같이") */}
+                    <button
+                        type="button" onClick={() => setSport("GOLF")} title={t("dashboardHeader.switchToGolf")}
+                        className="group inline-flex items-center gap-2 mb-2.5 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20 active:scale-95 transition-transform"
+                    >
+                        <span className="w-2 h-2 rounded-full bg-brand shadow-[0_0_8px_rgb(var(--brand))]" />
+                        <span className="text-[12px] font-semibold text-brand tracking-tight">BILLIARDS MODE</span>
+                        <LucideArrowLeftRight className="w-3 h-3 text-brand/60 group-hover:text-brand" />
+                    </button>
                     <h1 className="text-[26px] leading-none font-bold text-ink-1 tracking-tight truncate">
                         {member?.nickname || member?.name}
                         <span className="text-[15px] font-medium text-black/40 ml-1">{t("dashboardHeader.honorific")}</span>

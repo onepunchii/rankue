@@ -30,6 +30,11 @@ interface Props {
     onSend: (text: string) => Promise<void>;
     /** 실패한 메시지 다시 보내기 */
     onRetry?: (msg: ChatMsg) => void;
+    /** 길게 눌러 삭제(내 메시지·운영진). canDelete 가 true 인 메시지만 */
+    onDelete?: (msg: ChatMsg) => void;
+    canDelete?: (msg: ChatMsg) => boolean;
+    /** 카드형 메시지(정산·부킹 공유)를 눌렀을 때 */
+    onOpenCard?: (msg: ChatMsg) => void;
     /** 맨 위에 고정되는 카드(글 정보·지도) */
     pinned?: ReactNode;
     loading?: boolean;
@@ -38,6 +43,9 @@ interface Props {
     /** 새 메시지를 봤다고 알린다(아래를 보고 있을 때) */
     onSeen?: () => void;
 }
+
+/** 카드형: 정산 요청, 골프 부킹 공유(옛 크루 채팅은 type text + metadata.type 으로 구분했다). */
+const isCard = (m: ChatMsg) => m.type === "settlement" || (m as any).metadata?.type === "GOLF_BOOKING";
 
 const dayKey = (iso: string) => {
     const d = new Date(new Date(iso).getTime() + 9 * 3_600_000);
@@ -54,8 +62,12 @@ const timeLabel = (iso: string) => {
     return `${h < 12 ? "오전" : "오후"} ${h % 12 === 0 ? 12 : h % 12}:${m}`;
 };
 
-export function ChatRoom({ messages, meId, onSend, onRetry, pinned, loading, disabled, emptyText, onSeen }: Props) {
+export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onOpenCard, pinned, loading, disabled, emptyText, onSeen }: Props) {
     const { t } = useT();
+    // 길게 누르기(600ms) → 삭제. 마우스에서는 우클릭도 같다.
+    const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const holdStart = (m: ChatMsg) => { if (!onDelete || !canDelete?.(m)) return; holdRef.current = setTimeout(() => { holdRef.current = null; onDelete(m); }, 600); };
+    const holdEnd = () => { if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; } };
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
@@ -117,18 +129,32 @@ export function ChatRoom({ messages, meId, onSend, onRetry, pinned, loading, dis
                                     <div className={cn("max-w-[78%] flex flex-col", mine ? "items-end" : "items-start")}>
                                         {!mine && !grouped && <span className="mb-0.5 ml-1 text-[11.5px] font-medium text-ink-3">{m.sender?.name}</span>}
                                         <div className={cn("flex items-end gap-1.5", mine ? "flex-row-reverse" : "flex-row")}>
-                                            <span
-                                                onClick={() => { if (m.failed && onRetry) onRetry(m); }}
-                                                className={cn(
-                                                    "px-3 py-2 rounded-2xl text-[14px] leading-snug whitespace-pre-wrap break-words",
-                                                    mine ? "bg-brand text-brand-fg rounded-br-md" : "bg-surface-2 text-ink-1 rounded-bl-md",
-                                                    m.pending && "opacity-60",
-                                                    m.failed && "bg-red-500/15 text-red-500 border border-red-500/30 cursor-pointer",
-                                                )}
-                                            >
-                                                {m.message}
-                                                {m.failed && <span className="block text-[11px] mt-0.5">{t("chat.failedTap")}</span>}
-                                            </span>
+                                            {isCard(m) ? (
+                                                <button
+                                                    type="button" onClick={() => onOpenCard?.(m)}
+                                                    onPointerDown={() => holdStart(m)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => { e.preventDefault(); if (canDelete?.(m)) onDelete?.(m); }}
+                                                    className="max-w-full text-left rounded-2xl border border-surface-line bg-surface-1 px-3.5 py-3 active:bg-surface-2"
+                                                >
+                                                    <span className="block text-[11px] font-semibold text-brand mb-0.5">{m.type === "settlement" ? t("chat.cardSettlement") : t("chat.cardBooking")}</span>
+                                                    <span className="block text-[14px] font-medium text-ink-1 whitespace-pre-wrap break-words">{m.message}</span>
+                                                    {m.type === "settlement" && (m as any).metadata?.totalAmount > 0 && <span className="block rk-num text-[13px] text-ink-2 mt-0.5">{Number((m as any).metadata.totalAmount).toLocaleString()}원</span>}
+                                                    <span className="block text-[12px] font-medium text-brand mt-1.5">{t("chat.cardOpen")} ›</span>
+                                                </button>
+                                            ) : (
+                                                <span
+                                                    onClick={() => { if (m.failed && onRetry) onRetry(m); }}
+                                                    onPointerDown={() => holdStart(m)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => { e.preventDefault(); if (canDelete?.(m)) onDelete?.(m); }}
+                                                    className={cn(
+                                                        "px-3 py-2 rounded-2xl text-[14px] leading-snug whitespace-pre-wrap break-words select-none",
+                                                        mine ? "bg-brand text-brand-fg rounded-br-md" : "bg-surface-2 text-ink-1 rounded-bl-md",
+                                                        m.pending && "opacity-60",
+                                                        m.failed && "bg-red-500/15 text-red-500 border border-red-500/30 cursor-pointer",
+                                                    )}
+                                                >
+                                                    {m.type === "photo" && (m as any).metadata?.photoUrl ? <img src={(m as any).metadata.photoUrl} alt="" className="max-w-[220px] rounded-lg" /> : m.message}
+                                                    {m.failed && <span className="block text-[11px] mt-0.5">{t("chat.failedTap")}</span>}
+                                                </span>
+                                            )}
                                             <span className="text-[10.5px] text-ink-4 shrink-0 mb-0.5">{m.pending ? "…" : timeLabel(m.createdAt)}</span>
                                         </div>
                                     </div>

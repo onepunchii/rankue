@@ -156,10 +156,14 @@ class Storage {
     async createCrewPhoto(data: any) { return this.crews.createCrewPhoto(data); }
     async getCrewPhoto(id: string) { return this.crews.getCrewPhoto(id); }
     async deleteCrewPhoto(id: string) { return this.crews.deleteCrewPhoto(id); }
-    async getCrewChats(id: string, mid?: string) { return this.crews.getCrewChats(id, mid); }
-    async createCrewChat(data: any) { return this.crews.createCrewChat(data); }
-    async getCrewChat(id: string) { return this.crews.getCrewChat(id); }
-    async deleteCrewChat(id: string) { return this.crews.deleteCrewChat(id); }
+    /** 크루 채팅은 2026-09-21 부터 hiq_chat_messages("crew:<id>") 에 있다 — 옛 이름은 라우트 호환용. */
+    async getCrewChats(crewId: string, memberId?: string) { return memberId ? this.chat.messages({ kind: "crew", id: crewId, key: `crew:${crewId}` }, memberId) : []; }
+    async createCrewChat(data: { crewId: string; senderId: string; message: string; type?: string; metadata?: unknown }) {
+        const row = await this.chat.addMessage({ key: `crew:${data.crewId}`, senderId: data.senderId, message: data.message, type: data.type ?? "text", metadata: data.metadata });
+        return { ...row, crewId: data.crewId };
+    }
+    async getCrewChat(chatId: string) { const m = await this.chat.getMessage(chatId); return m ? { ...m, crewId: m.roomKey.startsWith("crew:") ? m.roomKey.slice(5) : null } : undefined; }
+    async deleteCrewChat(chatId: string) { return this.chat.deleteMessage(chatId); }
     async searchCrews(q?: string, s?: string, lat?: number, lng?: number, viewerCountry?: string) { return this.crews.searchCrews(q, s, lat, lng, viewerCountry); }
     async joinCrew(cid: string, mid: string) { return this.crews.joinCrew(cid, mid); }
     async updateCrew(id: string, data: any) { return this.crews.updateCrew(id, data); }

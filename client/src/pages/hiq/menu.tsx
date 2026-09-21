@@ -444,7 +444,8 @@ export default function HiqMenu() {
                             ]
                             : []),
                         ...(!isGuest
-                            ? [{ icon: LucideMail, label: t("menu.suggestionBox"), desc: t("menu.suggestionBoxDesc"), onClick: () => setSuggestionOpen(true) }]
+                            // 건의함 → 관리자 문의 채팅(2026-09-21 오너: "건의함 대신 빠른 답변처럼"). 옛 건의함 창은 남겨 두되 입구는 채팅이다.
+                            ? [{ icon: LucideMail, label: t("menu.supportChat"), desc: t("menu.supportChatDesc"), onClick: () => setLocation(`/chat/support/${member?.id}`) }]
                             : []),
                         { icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') },
                         { icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') },
