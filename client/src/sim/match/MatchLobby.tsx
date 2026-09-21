@@ -183,6 +183,9 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
      * 폼을 만지기 시작한 뒤에 끼어들지 않게 **처음 한 번만** 본다.
      */
     const restoredRef = useRef(false);
+    // 응답이 **늦게** 와서 그사이 사용자가 만든 방을 덮어쓰면 안 된다 — 응답 시점에 다시 본다(전체 테스트에서 드물게 겹쳤다).
+    const createdRef = useRef<MatchPublic | null>(null);
+    createdRef.current = created;
     useEffect(() => {
         if (restoredRef.current || created || creating) return;
         restoredRef.current = true;
@@ -190,7 +193,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
         void (async () => {
             try {
                 const mine = (await api.listMatches()).find((m) => m.status === "waiting" && m.myIndex === 0);
-                if (alive && mine) setCreated(mine);
+                if (alive && mine && !createdRef.current) setCreated(mine);
             } catch { /* 없으면 평소대로 만들기 폼 */ }
         })();
         return () => { alive = false; };
