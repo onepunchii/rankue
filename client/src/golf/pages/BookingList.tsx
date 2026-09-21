@@ -355,14 +355,17 @@ export default function BookingList() {
                     viewType={viewType}
                 />
                 {viewType === 'JOIN' && (
-                    <div className="px-6 pb-3 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-                        {(['ALL', ...JOIN_TYPES] as const).map((k) => (
-                            <button
-                                key={k} type="button" onClick={() => setJoinKind(k)}
-                                className={cn("shrink-0 h-8 px-3 rounded-full text-[12.5px] font-medium border transition-colors",
-                                    joinKind === k ? "bg-[#FF6B00] border-[#FF6B00] text-white" : "bg-white/[0.04] border-white/10 text-white/60")}
-                            >{k === 'ALL' ? '전체' : JOIN_TYPE_LABEL[k]}</button>
-                        ))}
+                    <div className="px-5 pb-2.5 flex items-center gap-2">
+                        {/* 종류는 알약 하나 안의 분절 스위치 — 필터 칩과 생김새가 같으면 무엇이 필터이고 무엇이 탭인지 헷갈린다 */}
+                        <div className="flex-1 min-w-0 flex rounded-full bg-white/[0.05] border border-white/[0.08] p-0.5">
+                            {(['ALL', ...JOIN_TYPES] as const).map((k) => (
+                                <button
+                                    key={k} type="button" onClick={() => setJoinKind(k)}
+                                    className={cn("flex-1 min-w-0 h-8 rounded-full text-[12.5px] font-medium truncate transition-colors",
+                                        joinKind === k ? "bg-[#FF6B00] text-white" : "text-white/60")}
+                                >{k === 'ALL' ? '전체' : JOIN_TYPE_LABEL[k]}</button>
+                            ))}
+                        </div>
                         <button
                             type="button"
                             onClick={() => {
@@ -372,19 +375,17 @@ export default function BookingList() {
                                     else toast({ title: r === 'denied' ? "위치 권한이 꺼져 있어요" : "지금은 위치를 알 수 없어요", description: "설정에서 위치를 허용하면 가까운 조인부터 보여 드려요." });
                                 });
                             }}
-                            className={cn("shrink-0 ml-auto h-8 px-3 rounded-full text-[12.5px] font-medium border transition-colors",
-                                nearMe ? "bg-[#4DA3FF] border-[#4DA3FF] text-white" : "bg-white/[0.04] border-white/10 text-white/60")}
+                            className={cn("shrink-0 h-9 px-3 rounded-full text-[12.5px] font-medium border transition-colors",
+                                nearMe ? "bg-[#4DA3FF] border-[#4DA3FF] text-white" : "bg-white/[0.04] border-white/[0.08] text-white/65")}
                         >📍 내 주변{nearMe && locationStatus !== 'granted' ? '…' : ''}</button>
                     </div>
                 )}
             </div>
 
-            <main className="p-6">
-                <div className="mb-6">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">
-                        {isLoading ? "불러오는 중..." : `총 ${filteredTimes.length}개의 티타임이 검색되었습니다`}
-                    </p>
-                </div>
+            <main className="px-5 pt-3 pb-6">
+                <p className="mb-3 text-[12px] font-medium text-white/40">
+                    {isLoading ? "불러오는 중…" : `${viewType === 'JOIN' ? '조인' : '티타임'} ${filteredTimes.length}`}
+                </p>
 
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4 text-white/20">
