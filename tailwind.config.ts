@@ -5,6 +5,11 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      // 프리텐다드(2026-09-21 오너). index.html 이 가변 폰트를 받고, index.css 의 본문 스택과 같다 — font-sans 클래스가
+      // 붙은 곳(골프 선수 페이지 등)이 tailwind 기본 스택으로 되돌아가지 않게 여기서도 잡는다.
+      fontFamily: {
+        sans: ['"Pretendard Variable"', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', '"Apple SD Gothic Neo"', 'Inter', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+      },
       fontSize: {
         // 모바일 최적화 폰트 크기
         'mobile-xs': ['0.75rem', { lineHeight: '1rem' }],

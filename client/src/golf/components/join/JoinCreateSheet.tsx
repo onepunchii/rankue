@@ -39,7 +39,9 @@ const chip = (on: boolean) => cn(
     "h-9 px-3.5 rounded-full text-[13px] font-medium border transition-colors",
     on ? "bg-[#FF6B00] border-[#FF6B00] text-white" : "bg-white/[0.04] border-white/10 text-white/70",
 );
-const seg = (on: boolean) => cn("flex-1 h-10 rounded-lg text-[13.5px] font-medium transition-colors", on ? "bg-white text-black" : "text-white/60");
+// 고른 칸은 강조색으로. bg-white 를 쓰면 안 된다 — 골프 테마(index.css :root[data-sport="GOLF"] .bg-white)가 어두운 면으로
+// 바꿔 놓아 검정 글자가 사라진다(2026-09-21 오너 캡처: "스크린" 이 안 보임).
+const seg = (on: boolean) => cn("flex-1 h-10 rounded-lg text-[13.5px] font-medium transition-colors", on ? "bg-[#FF6B00] text-white" : "text-white/60");
 
 function addDays(key: string, n: number): string {
     const [y, m, d] = key.split("-").map(Number);
