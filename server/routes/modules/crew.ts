@@ -12,15 +12,20 @@ import { notifyCrewChat } from "../../services/crewChatNotify.js";
 import { requireTermsAccepted } from "../../middleware/terms.js";
 import { screenCrewFields, screenCrewText, screenCrewProfile, screenCrewBody, changedCrewProfileFields, isCrewReportTarget, isReportReason, type CrewReportTarget } from "../../utils/crewModeration.js";
 
+import { isSuperAdmin } from "../../lib/superAdmin.js";
+
 const router = Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Membership gate: returns the member's role, or sends a 403/404 and returns null.
 // Non-members and pending (승인 대기) members are rejected from writing crew content.
+// 슈퍼 관리자는 가입하지 않아도 통과한다 — 신고를 확인하려면 그 크루의 글·채팅을 볼 수 있어야 한다(2026-09-23 오너).
+// 'leader' 를 돌려주므로 이 문을 지나는 라우트 안의 운영진 검사도 함께 통과한다.
 async function requireCrewMember(req: AuthRequest, res: any): Promise<string | null> {
     const membership = await storage.getCrewMembership(req.params.id, req.userId!);
     if (!membership || membership.role === 'pending') {
+        if (await isSuperAdmin(req.userId)) return 'leader';
         sendError(res, 403, "err.crew.membersOnly");
         return null;
     }
@@ -144,7 +149,7 @@ router.patch("/:id/activities/:activityId", requireAuth, requireTermsAccepted, a
     if (!crewData) return sendError(res, 404, "err.crew.notFound");
 
     const me = crewData.members.find((m: any) => m.member.id === req.userId);
-    if (!me || (me.role !== 'leader' && me.role !== 'manage')) {
+    if ((!me || (me.role !== 'leader' && me.role !== 'manage')) && !(await isSuperAdmin(req.userId))) {
         return sendError(res, 403, "err.crew.editAdminOnly");
     }
 
@@ -195,7 +200,7 @@ router.delete("/:id/activities/:activityId", requireAuth, asyncHandler(async (re
     if (!crewData) return sendError(res, 404, "err.crew.notFound");
 
     const me = crewData.members.find((m: any) => m.member.id === req.userId);
-    if (!me || (me.role !== 'leader' && me.role !== 'manage')) {
+    if ((!me || (me.role !== 'leader' && me.role !== 'manage')) && !(await isSuperAdmin(req.userId))) {
         return sendError(res, 403, "err.crew.deleteAdminOnly");
     }
 
@@ -723,7 +728,7 @@ router.get("/:id/polls/options/:optionId/votes", requireAuth, asyncHandler(async
 
     // Only members of the poll's OWN crew may inspect voters.
     const membership = await storage.getCrewMembership(poll.crewId, req.userId!);
-    if (!membership || membership.role === 'pending') {
+    if ((!membership || membership.role === 'pending') && !(await isSuperAdmin(req.userId))) {
         return sendError(res, 403, "err.crew.membersOnly");
     }
 
@@ -746,7 +751,7 @@ async function requireCrewAdmin(req: AuthRequest, res: any): Promise<boolean> {
     const crewData = await storage.getCrew(req.params.id);
     if (!crewData) { sendError(res, 404, "err.crew.notFound"); return false; }
     const me = crewData.members.find((m: any) => m.member.id === req.userId);
-    if (!me || (me.role !== 'leader' && me.role !== 'manage')) {
+    if ((!me || (me.role !== 'leader' && me.role !== 'manage')) && !(await isSuperAdmin(req.userId))) {
         sendError(res, 403, "err.crew.tournamentAdminOnly");
         return false;
     }
@@ -1151,7 +1156,7 @@ router.patch("/:id", requireAuth, requireTermsAccepted, asyncHandler(async (req:
     const crewId = req.params.id;
     const data = await storage.getCrew(crewId);
     const me = data?.members.find((m: any) => m.member.id === req.userId);
-    if (!me || (me.role !== 'leader' && me.role !== 'manage')) {
+    if ((!me || (me.role !== 'leader' && me.role !== 'manage')) && !(await isSuperAdmin(req.userId))) {
         return sendError(res, 403, "err.common.forbidden");
     }
 
@@ -1257,7 +1262,7 @@ router.delete("/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: an
 
     // Check leader - strictly leader only
     const me = crew.members.find((m: any) => m.member.id === req.userId);
-    if (!me || me.role !== 'leader') {
+    if ((!me || me.role !== 'leader') && !(await isSuperAdmin(req.userId))) {
         return sendError(res, 403, "err.crew.leaderOnly");
     }
 
@@ -1284,7 +1289,7 @@ router.post("/:id/members/:memberId/approve", requireAuth, asyncHandler(async (r
 
     // Auth Check: Leader or Manager
     const me = data.members.find((m: any) => m.member.id === req.userId);
-    if (!me || (me.role !== 'leader' && me.role !== 'manage')) {
+    if ((!me || (me.role !== 'leader' && me.role !== 'manage')) && !(await isSuperAdmin(req.userId))) {
         return sendError(res, 403, "err.common.forbidden");
     }
 
@@ -1370,7 +1375,7 @@ router.patch("/:id/members/:memberId/role", requireAuth, asyncHandler(async (req
     const me = data?.members.find((m: any) => m.member.id === req.userId);
 
     // Only leader can change roles
-    if (!me || me.role !== 'leader') {
+    if ((!me || me.role !== 'leader') && !(await isSuperAdmin(req.userId))) {
         return sendError(res, 403, "err.crew.roleLeaderOnly");
     }
 

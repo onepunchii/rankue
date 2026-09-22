@@ -17,8 +17,8 @@ export function HandicapCard({ member, avgScore }: HandicapCardProps) {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8 relative z-10"
         >
+            {/* 윗줄 "GOLF HANDICAP" 은 뺐다(2026-09-23 오너) — 바로 아래 큰 숫자 옆 HDCP 가 같은 말을 한다. */}
             <div className="flex flex-col items-center justify-center py-6">
-                <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.4em] mb-4">GOLF HANDICAP</span>
                 <div className="flex items-baseline gap-2">
                     <span className="text-8xl font-black text-white tracking-tighter drop-shadow-2xl">
                         {displayScore}

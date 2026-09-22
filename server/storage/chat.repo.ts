@@ -10,6 +10,7 @@
  * 속도: 메시지는 afterAt 뒤만(폴링), 방 목록의 마지막 메시지는 DISTINCT ON 한 문장, 안 읽은 수는 방 열쇠 배열로 한 문장.
  */
 import { db } from "../db.js";
+import { isSuperAdmin } from "../lib/superAdmin.js";
 import {
     hiqChatMessages, hiqChatRooms, hiqChatRoomMembers, hiqChatReads, hiqCrewMembers, hiqCrews, hiqMembers, profiles,
     golfBookings, golfJoinRequests, hiqBlocks,
@@ -82,7 +83,11 @@ export class ChatRepository {
 
     async canAccess(ref: RoomRef, memberId: string): Promise<boolean> {
         if (ref.kind === "support") return ref.id === memberId || (await this.isAdmin(memberId));
-        return (await this.roomMembers(ref)).includes(memberId);
+        if ((await this.roomMembers(ref)).includes(memberId)) return true;
+        // 슈퍼 관리자는 가입하지 않아도 크루 방을 본다 — 신고를 확인하려면 원문이 필요하다(2026-09-23 오너).
+        // 가입 행이 없으니 messages() 의 joinedAt 컷도 안 걸려 **처음부터의 대화**가 보인다.
+        // 조인·부킹(listing)·1:1(dm)은 사생활이라 열지 않는다 — 그쪽 신고는 신고 큐로 본다.
+        return ref.kind === "crew" && (await isSuperAdmin(memberId));
     }
 
     /* ── 메시지 ─────────────────────────────────────────── */
