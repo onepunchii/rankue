@@ -105,7 +105,7 @@ export const RegionSheet = ({ isOpen, onClose, regionId, conqueredCourses, onGoT
                                 onClose();
                             }
                         }}
-                        className="w-full mt-8 h-14 rounded-2xl bg-white text-black font-black uppercase tracking-widest hover:bg-white/90"
+                        className="w-full mt-8 h-14 rounded-2xl bg-[#ffffff] text-[#0a0a0a] font-black uppercase tracking-widest hover:opacity-90"
                     >
                         전체 구장 가이드 보기
                     </Button>

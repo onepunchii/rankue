@@ -45,7 +45,7 @@ export const FilterTabs = ({ mainTab, setMainTab, subFilter, setSubFilter, searc
                             onClick={() => setSubFilter(val)}
                             className={cn(
                                 "shrink-0 px-6 py-2.5 rounded-full text-xs font-black transition-all border",
-                                subFilter === val ? "bg-white text-black border-white" : "bg-white/5 border-white/10 text-white/40"
+                                subFilter === val ? "bg-[#ffffff] text-[#0a0a0a] border-white" : "bg-white/5 border-white/10 text-white/60"
                             )}
                         >
                             {val === 'All' ? '전체' : val === 'Conquered' ? '정복함' : val === 'Locked' ? '미정복' : '지역순'}

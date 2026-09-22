@@ -1,6 +1,9 @@
 /**
  * 내역 — 내가 올린 글 | 내가 신청한 글(2026-09-21).
  *
+ * ⚠️ 고른 탭에 `bg-white text-black` 을 쓰면 안 된다 — 골프 테마가 .bg-white 만 어두운 면으로 되받고(.index.css 257-261)
+ *   .text-black 은 그대로 둬서 검은 글씨가 어두운 바탕에 얹혀 통째로 안 보인다(2026-09-23 오너 제보). 임의값 hex 로 쓴다.
+ *
  * 왜 시트인가: 목록은 고른 날짜 **하루치만** 받아온다. 내 글·내 신청은 날짜와 무관하게 한 번에 보여야 하고,
  * 여기서 바로 내리거나·취소하거나·그 날짜로 옮겨 갈 수 있어야 한다. 다가오는 글이 먼저, 지난 글은 흐리게 아래에.
  *
@@ -147,7 +150,7 @@ export function MyListingsSheet({ open, onOpenChange, onGo, onDelete, onCancelRe
                 <div className="px-5 pb-3 shrink-0">
                     <div className="flex rounded-full bg-white/[0.05] border border-white/[0.08] p-0.5">
                         {(["mine", "applied"] as const).map((k) => (
-                            <button key={k} type="button" onClick={() => setTab(k)} className={cn("flex-1 h-9 rounded-full text-[13px] font-medium transition-colors", tab === k ? "bg-white text-black" : "text-white/60")}>
+                            <button key={k} type="button" onClick={() => setTab(k)} className={cn("flex-1 h-9 rounded-full text-[13px] font-medium transition-colors", tab === k ? "bg-[#ffffff] text-[#0a0a0a] font-semibold" : "text-white/70 active:text-white")}>
                                 {k === "mine" ? "내가 올린 글" : "내가 신청한 글"}
                             </button>
                         ))}
