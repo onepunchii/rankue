@@ -123,7 +123,10 @@ router.post("/rooms/:key/cards/sim-invite", ...billiardsGate, asyncHandler(async
     const spaced = `${code.slice(0, 3)} ${code.slice(3)}`;
     const summary = `🎱 같이 한 판 · ${gameTypeKo(m.gameType)} · 코드 ${spaced}`;
     return postCard(res, room, "SIM_INVITE", summary, {
-        matchId: m.id, code, gameType: m.gameType, tableId: m.tableId, target: m.hostTarget, hostName: m.hostName,
+        // ⚠️ hostTarget 은 **핸디전이면 상대가 들어오는 순간 두 사람의 온라인 기록으로 다시 정해진다**(simMatch 의 handicapTargets).
+        // 그래서 핸디전 카드에는 목표 숫자를 싣지 않는다 — 화면이 "핸디전"이라고만 적는다(2026-09-23 오너: "다마수 계산 없이?").
+        matchId: m.id, code, gameType: m.gameType, tableId: m.tableId, handicap: m.handicap,
+        ...(m.handicap ? {} : { target: m.hostTarget }), hostName: m.hostName,
     }, {
         push: msg(`notif.chat.card.body.SIM_INVITE.${m.gameType}`, { code: spaced }),
         // 알림을 누르면 채팅이 아니라 **판으로 바로** 들어간다 — 초대한 사람은 이미 대기방에 있다(2026-09-23 오너).

@@ -2772,5 +2772,10 @@ const tr: Dict = {
   "chat.attach.golfMatch.desc": "PIN kart olarak paylaşılır, odadakiler hemen katılır",
   "chat.attach.golfMatch.coursePlaceholder": "Saha adı",
   "chat.attach.golfMatch.create": "PIN oluştur",
+  "chat.attach.simInvitePick": "Sadece oyunu seç — gerisini biz ayarlarız",
+  "chat.attach.simInviteHandicap": "Handikap",
+  "chat.attach.simInviteNote": "Büyük masa · şifresiz · rakibin katıldığında hedefler iki oyuncunun çevrimiçi kaydına göre belirlenir. Açık odan varsa o kullanılır.",
+  "chat.card.handicap": "Handikaplı maç",
+  "chat.card.handicapDesc": "Rakip katılınca hedefler iki kaydına göre belirlenir",
 };
 export default tr;

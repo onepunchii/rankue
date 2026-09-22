@@ -40,6 +40,11 @@ export interface MatchLobbyProps {
     /** 테스트·주입용. 기본 matchApi */
     api?: MatchApi;
     initialTab?: LobbyTab;
+    /**
+     * 이 대전 방을 바로 연다(채팅의 '같이 한 판' 처럼 방을 만든 직후 들어올 때).
+     * 목록 스캔(listMatches)은 최근 20건만 보므로, 재사용한 옛 대기 방은 못 찾아 만들기 폼이 떠 버린다(2026-09-23 오너).
+     */
+    initialRoomId?: string;
     /** 만들기/코드로 참가 탭 줄을 보일지. 기본 false — 진입 화면 카드가 이미 둘을 나눠 주므로 한 화면엔 한 가지만(2026-09-08 오너). */
     showTabs?: boolean;
     /** 호스트가 상대를 기다리는 동안의 폴링 주기 (ms). 기본 2000 */
@@ -148,7 +153,7 @@ export function TargetPicker({ id, gameType, text, onText, label }: {
 
 /* ------------------------------------------------------------------ 만들기 */
 
-function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void; initialPublic?: boolean }) {
+function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, initialRoomId }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void; initialPublic?: boolean; initialRoomId?: string }) {
     const { t } = useT();
     const [gameType, setGameType] = useState<GameType>("3c");
     const [tableId, setTableId] = useState<TableId>(defaultTableFor("3c"));
@@ -192,12 +197,15 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false }:
         let alive = true;
         void (async () => {
             try {
-                const mine = (await api.listMatches()).find((m) => m.status === "waiting" && m.myIndex === 0);
-                if (alive && mine && !createdRef.current) setCreated(mine);
+                // 열쇠가 있으면 그 방을 바로 — 없을 때만 목록에서 찾는다.
+                const mine = initialRoomId
+                    ? await api.getMatch(initialRoomId).catch(() => null)
+                    : (await api.listMatches()).find((m) => m.status === "waiting" && m.myIndex === 0) ?? null;
+                if (alive && mine && mine.status === "waiting" && mine.myIndex === 0 && !createdRef.current) setCreated(mine);
             } catch { /* 없으면 평소대로 만들기 폼 */ }
         })();
         return () => { alive = false; };
-    }, [api, created, creating]);
+    }, [api, created, creating, initialRoomId]);
     const [copied, setCopied] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
     const [canceling, setCanceling] = useState(false);
@@ -638,7 +646,7 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
 
 /* ------------------------------------------------------------------ 로비 */
 
-export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", showTabs = false, pollMs = 2000, initialPublic = false, initialCode }: MatchLobbyProps) {
+export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", showTabs = false, pollMs = 2000, initialPublic = false, initialCode, initialRoomId }: MatchLobbyProps) {
     const { t } = useT();
     const [tab, setTab] = useState<LobbyTab>(initialTab);
     const title = showTabs ? t("sim.match.title") : tab === "create" ? (initialPublic ? t("sim.entry.roomCreate") : t("sim.entry.create")) : t("sim.entry.join");
@@ -674,7 +682,7 @@ export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, in
             )}
 
             {tab === "create"
-                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} initialPublic={initialPublic} />
+                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} initialPublic={initialPublic} initialRoomId={initialRoomId} />
                 : <JoinTab api={api} onStarted={onStarted} onCreated={onCreated} initialCode={initialCode} />}
         </div>
     );

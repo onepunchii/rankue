@@ -2772,5 +2772,10 @@ const es: Dict = {
   "chat.attach.golfMatch.desc": "El PIN se publica como tarjeta para que todos se unan",
   "chat.attach.golfMatch.coursePlaceholder": "Nombre del campo",
   "chat.attach.golfMatch.create": "Crear PIN",
+  "chat.attach.simInvitePick": "Elige la modalidad — del resto nos encargamos",
+  "chat.attach.simInviteHandicap": "Hándicap",
+  "chat.attach.simInviteNote": "Mesa grande · sin contraseña · los objetivos se calculan con el historial en línea de ambos cuando entra tu rival. Si ya tienes una sala abierta, se reutiliza.",
+  "chat.card.handicap": "Partida con hándicap",
+  "chat.card.handicapDesc": "Los objetivos se fijan con el historial de ambos al entrar el rival",
 };
 export default es;

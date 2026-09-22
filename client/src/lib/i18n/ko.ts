@@ -2774,4 +2774,9 @@ export const ko: Dict = {
   "chat.attach.golfMatch.desc": "핀이 카드로 올라가고, 방 사람들이 바로 참가해요",
   "chat.attach.golfMatch.coursePlaceholder": "코스명",
   "chat.attach.golfMatch.create": "핀 만들기",
+  "chat.attach.simInvitePick": "종목만 고르면 방이 열려요. 나머지는 알아서 맞춰 드려요",
+  "chat.attach.simInviteHandicap": "핸디전",
+  "chat.attach.simInviteNote": "대대 · 비밀번호 없음 · 상대가 들어오면 두 사람의 온라인 기록으로 각자 목표가 정해져요. 이미 열어 둔 방이 있으면 그 방을 씁니다.",
+  "chat.card.handicap": "핸디전",
+  "chat.card.handicapDesc": "상대가 들어오면 두 사람 기록으로 목표가 정해져요",
 };

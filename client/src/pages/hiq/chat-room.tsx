@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ChatRoom, type ChatMsg } from "@/components/hiq/chat/ChatRoom";
 import { cardKind } from "@/components/hiq/chat/ChatCard";
 import { AttachSheet, type AttachItem } from "@/components/hiq/chat/attach/AttachSheet";
+import { SimInviteSheet } from "@/components/hiq/chat/attach/SimInviteSheet";
 import { RecentGamesPicker } from "@/components/hiq/chat/attach/RecentGamesPicker";
 import { StorePicker } from "@/components/hiq/chat/attach/StorePicker";
 import { GolfListingPicker } from "@/components/hiq/chat/attach/GolfListingPicker";
@@ -214,7 +215,8 @@ export default function ChatRoomPage() {
     // + 첨부(2026-09-23): 종류를 고르면 서버가 카드를 만든다(가짜 카드 방지 — 보내기 라우트는 metadata 를 버린다).
     // 돌아온 행을 바로 목록에 끼운다 — 낙관 행은 없다(카드 값은 서버가 채운다).
     const [attachOpen, setAttachOpen] = useState(false);
-    const [picker, setPicker] = useState<null | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND">(null);
+    const [simBusy, setSimBusy] = useState(false);
+    const [picker, setPicker] = useState<null | "SIM_INVITE" | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND">(null);
     // 경로의 종류는 metadata.type 과 같은 이름(SIM_INVITE·GAME_RESULT·…) — 서버 라우터(chatCards.ts)와 맞춘 계약.
     const postCard = useCallback(async (item: AttachItem, body: Record<string, unknown>, after?: (row: ChatMsg) => void) => {
         const myKey = key;
@@ -231,9 +233,9 @@ export default function ChatRoomPage() {
     }, [key, merge, t, toast]);
     const onPickAttach = useCallback((item: AttachItem) => {
         switch (item) {
-            // 같이 한 판: 카드를 올리고 **나는 곧바로 대기방으로** 간다(2026-09-23 오너: "둘이 바로 들어가게").
-            // 상대는 알림을 누르면 바로 판으로 들어온다(서버가 그 카드의 푸시만 참가 화면으로 보낸다). 뒤로 누르면 채팅으로 돌아온다.
-            case "SIM_INVITE": void postCard("SIM_INVITE", {}, () => setLocation("/online-game?lobby=1")); break;
+            // 같이 한 판: 종목을 고르면 카드를 올리고 **나는 곧바로 그 대기방으로** 간다(2026-09-23 오너).
+            // 방 열쇠를 주소에 실어 로비가 그 방을 바로 연다 — 목록 스캔(최근 20건)에 맡기면 재사용한 옛 방을 못 찾아 만들기 폼이 뜬다.
+            case "SIM_INVITE": setPicker("SIM_INVITE"); break;
             case "MY_STATS": void postCard("MY_STATS", {}); break;
             default: setPicker(item);                                         // 고를 것이 있는 종류
         }
@@ -320,6 +322,18 @@ export default function ChatRoomPage() {
             {canAttach && (
                 <>
                     <AttachSheet open={attachOpen} onOpenChange={setAttachOpen} sport={attachSport} roomKind={d.kind} onPick={onPickAttach} />
+                    <SimInviteSheet
+                        open={picker === "SIM_INVITE"} onOpenChange={(o) => { if (!o) setPicker(null); }} busy={simBusy}
+                        onPick={(gameType) => {
+                            setSimBusy(true);
+                            void postCard("SIM_INVITE", { gameType }, (row) => {
+                                setPicker(null); setSimBusy(false);
+                                const id = (row as any)?.metadata?.matchId;
+                                // 방 열쇠를 싣는다 — 로비가 목록을 뒤지지 않고 그 방을 바로 연다.
+                                setLocation(id ? `/online-game?lobby=1&room=${encodeURIComponent(String(id))}` : "/online-game?lobby=1");
+                            }).finally(() => setSimBusy(false));
+                        }}
+                    />
                     <RecentGamesPicker open={picker === "GAME_RESULT"} onOpenChange={(o) => { if (!o) setPicker(null); }} onPick={(gameId) => { setPicker(null); void postCard("GAME_RESULT", { gameId }); }} />
                     <StorePicker open={picker === "STORE"} onOpenChange={(o) => { if (!o) setPicker(null); }} onPick={(pick) => { setPicker(null); void postCard("STORE", pick.code ? { code: pick.code } : { slug: pick.slug }); }} />
                     <GolfListingPicker open={picker === "GOLF_BOOKING"} onOpenChange={(o) => { if (!o) setPicker(null); }} onPick={(bookingId) => { setPicker(null); void postCard("GOLF_BOOKING", { bookingId }); }} />
