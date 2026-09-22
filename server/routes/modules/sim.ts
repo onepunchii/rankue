@@ -8,6 +8,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { storage } from "../../storage/index.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
+import { msg } from "../../lib/i18n.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import {
@@ -76,20 +77,20 @@ function paramsFor(s: { tableId: "DAEDAE" | "JUNGDAE_KR"; cushionModel: string; 
 // POST /sim/sessions — 세션 개설
 router.post("/sim/sessions", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const parsed = createSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, "입력이 올바르지 않습니다");
+    if (!parsed.success) return sendError(res, 400, "err.sim.badInput");
     const b = parsed.data;
     const rules: Rules = b.rules ?? (b.gameType === "3c" ? DEFAULT_3C_RULES : DEFAULT_4C_RULES);
-    if (rules.gameType !== b.gameType) return sendError(res, 400, "규칙과 종목이 다릅니다");
+    if (rules.gameType !== b.gameType) return sendError(res, 400, "err.sim.rulesMismatch");
 
     const table = TABLES[b.tableId];
     const players = b.players ?? [{ id: req.userId!, target: b.target }];
     const state = createSession({ rules, finishType: b.finishType, inningCap: b.inningCap, players });
 
     const balls: readonly BallState[] = b.balls ?? openingLayout(b.gameType, table, "white");
-    if (!isValidLayout(balls, table)) return sendError(res, 400, "공 배치가 올바르지 않습니다");
+    if (!isValidLayout(balls, table)) return sendError(res, 400, "err.sim.badLayout");
     const need = b.gameType === "3c" ? ["white", "yellow", "red"] : ["white", "yellow", "red1", "red2"];
     if (need.some((id) => !balls.some((x) => x.id === id)) || balls.length !== need.length) {
-        return sendError(res, 400, "공 구성이 올바르지 않습니다");
+        return sendError(res, 400, "err.sim.badBallSet");
     }
 
     const params = paramsFor({ tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition });
@@ -162,7 +163,7 @@ router.get("/sim/rank/me", requireAuth, asyncHandler(async (req: AuthRequest, re
 // GET /sim/sessions/:id — 상세(샷 로그 포함, 리플레이용)
 router.get("/sim/sessions/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const s = await storage.sim.getSession(req.params.id);
-    if (!s || s.memberId !== req.userId) return sendError(res, 404, "세션이 없습니다");
+    if (!s || s.memberId !== req.userId) return sendError(res, 404, "err.sim.sessionNotFound");
     const shots = await storage.sim.getShots(s.id);
     return sendSuccess(res, { session: s, shots });
 }));
@@ -170,18 +171,18 @@ router.get("/sim/sessions/:id", requireAuth, asyncHandler(async (req: AuthReques
 // POST /sim/sessions/:id/shots — 샷 제출 → 서버 재시뮬 → 판정 → 기록
 router.post("/sim/sessions/:id/shots", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const parsed = shotSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, "샷 입력이 올바르지 않습니다");
+    if (!parsed.success) return sendError(res, 400, "err.sim.badShot");
     const { idx, input, clientHash } = parsed.data;
-    if (input.a * input.a + input.b * input.b > 0.25 + 1e-12) return sendError(res, 400, "미스큐 범위입니다");
+    if (input.a * input.a + input.b * input.b > 0.25 + 1e-12) return sendError(res, 400, "err.sim.miscue");
 
     const s = await storage.sim.getSession(req.params.id);
-    if (!s || s.memberId !== req.userId) return sendError(res, 404, "세션이 없습니다");
-    if (s.status !== "playing") return sendError(res, 409, "끝난 세션입니다");
-    if (idx !== s.shots) return sendError(res, 409, `샷 순서가 맞지 않습니다 (서버 ${s.shots})`, "IDX_MISMATCH");
+    if (!s || s.memberId !== req.userId) return sendError(res, 404, "err.sim.sessionNotFound");
+    if (s.status !== "playing") return sendError(res, 409, "err.sim.sessionEnded");
+    if (idx !== s.shots) return sendError(res, 409, msg("err.sim.idxMismatch", { n: s.shots }), "IDX_MISMATCH");
 
     const state = s.state as SessionState;
     const me = currentPlayer(state);
-    if (input.cueBallId !== me.cueBallId) return sendError(res, 400, "이 차례의 큐볼이 아닙니다");
+    if (input.cueBallId !== me.cueBallId) return sendError(res, 400, "err.sim.wrongCueBall");
 
     const preState = s.balls as BallState[];
     const params = paramsFor(s);
@@ -218,7 +219,7 @@ router.post("/sim/sessions/:id/shots", requireAuth, asyncHandler(async (req: Aut
 router.post("/sim/sessions/:id/close", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const status = req.body?.status === "finished" ? "finished" : "abandoned";
     const row = await storage.sim.closeSession(req.params.id, req.userId!, status);
-    if (!row) return sendError(res, 404, "세션이 없습니다");
+    if (!row) return sendError(res, 404, "err.sim.sessionNotFound");
     return sendSuccess(res, row);
 }));
 

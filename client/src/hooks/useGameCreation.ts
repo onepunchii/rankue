@@ -313,8 +313,9 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                     // The server 404s a code that no longer exists / has expired. Keep showing a
                     // dead PIN as if it were live and the host waits forever for a guest who can
                     // never join — surface it and let them mint a fresh one.
+                    // 문구가 아니라 상태로 본다 — 서버 오류 문구는 이제 사용자 언어로 나가서 한국어 비교가 안 맞는다(2026-09-22).
                     const msg = String(e?.message || "");
-                    if (msg.includes("존재하지") || msg.includes("404")) {
+                    if (e?.status === 404 || msg.includes("404")) {
                         setInviteError(t("gameCreation.pinExpired"));
                         setInviteCode(null);
                         return;

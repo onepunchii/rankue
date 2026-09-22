@@ -118,6 +118,11 @@ export class UserRepository {
 
     // 내부 전용 — 전 컬럼(phone·계좌·profileId 포함). 알림 발송·본인 조회 등 서버 내부에서만 쓴다.
     // 남의 정보를 응답으로 내보낼 때는 절대 쓰지 말고 getMemberPublicById를 쓸 것.
+    /** 앱 언어 — 푸시를 받는 사람 언어로 만들 때 쓴다(GET /me 가 바뀔 때만 부른다). */
+    async setMemberLocale(id: string, locale: string): Promise<void> {
+        await db.update(hiqMembers).set({ locale }).where(eq(hiqMembers.id, id));
+    }
+
     async getMemberById(id: string): Promise<HiqMember | undefined> {
         const [member] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, id));
         return member;

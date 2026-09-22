@@ -10,6 +10,7 @@ import { deleteBlobs } from "../../utils/blob.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
 // 약관 미동의 회원의 UGC 작성 거절(TERMS_REQUIRED) — 작성 라우트에만 건다(middleware/terms.ts)
 import { requireTermsAccepted } from "../../middleware/terms.js";
+import { msg } from "../../lib/i18n.js";
 
 const router = Router();
 
@@ -36,8 +37,8 @@ const optionalAuth = (req: AuthRequest, _res: Response, next: NextFunction) => {
 // 비로그인 허용 엔드포인트라 크롤러가 임의 값을 넣는다 — 잘못된 입력은 500이 아니라 400.
 router.get("/posts", optionalAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
     const { board, tag, cursor, lang } = req.query as Record<string, string | undefined>;
-    if (board && !BOARDS.includes(board as any)) return sendError(res, 400, "잘못된 게시판입니다");
-    if (cursor && isNaN(Date.parse(cursor))) return sendError(res, 400, "잘못된 커서입니다");
+    if (board && !BOARDS.includes(board as any)) return sendError(res, 400, "err.community.badBoard");
+    if (cursor && isNaN(Date.parse(cursor))) return sendError(res, 400, "err.community.badCursor");
     // 언어 필터 — 정렬이 아니라 필터인 이유: 커서가 createdAt 기반이라 "내 언어 우선 정렬"은
     // 페이지를 넘길 때 언어 그룹 경계에서 커서가 깨진다. 필터는 커서와 그대로 호환된다.
     const LANGS = ["ko", "en", "es", "tr", "vi"];
@@ -48,9 +49,9 @@ router.get("/posts", optionalAuth, asyncHandler(async (req: AuthRequest, res: Re
 
 // GET /posts/:id — 상세 + 댓글
 router.get("/posts/:id", optionalAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
-    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "게시글을 찾을 수 없습니다");
+    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "err.community.postNotFound");
     const post = await storage.community.getPost(req.params.id, req.userId);
-    if (!post) return sendError(res, 404, "게시글을 찾을 수 없습니다");
+    if (!post) return sendError(res, 404, "err.community.postNotFound");
     const comments = await storage.community.getComments(req.params.id, req.userId);
     return sendSuccess(res, { ...post, comments });
 }));
@@ -59,13 +60,13 @@ router.get("/posts/:id", optionalAuth, asyncHandler(async (req: AuthRequest, res
 router.post("/posts", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: Response) => {
     const { board, title, content, images, historyId, tags, regionName, storeId, language } = req.body || {};
 
-    if (!BOARDS.includes(board)) return sendError(res, 400, "잘못된 게시판입니다");
-    if (typeof content !== "string" || !content.trim()) return sendError(res, 400, "내용을 입력해주세요");
-    if (content.length > 4000) return sendError(res, 400, "내용이 너무 깁니다 (4000자 이내)");
-    if (images && (!Array.isArray(images) || images.length > 3)) return sendError(res, 400, "사진은 최대 3장입니다");
+    if (!BOARDS.includes(board)) return sendError(res, 400, "err.community.badBoard");
+    if (typeof content !== "string" || !content.trim()) return sendError(res, 400, "err.community.contentRequired");
+    if (content.length > 4000) return sendError(res, 400, "err.community.contentTooLong");
+    if (images && (!Array.isArray(images) || images.length > 3)) return sendError(res, 400, "err.community.maxImages");
     // 본인이 업로드한 Blob만 첨부 가능 — 남의 이미지 URL 삽입(→삭제 시 원본 파괴) 차단
     if (images?.some((u: unknown) => !isOwnUploadUrl(u, req.userId!))) {
-        return sendError(res, 400, "이미지가 올바르지 않습니다. 다시 업로드해주세요");
+        return sendError(res, 400, "err.community.badImage");
     }
 
     const safeTags = Array.isArray(tags) ? tags.slice(0, 5).map((t: any) => String(t).slice(0, 20)) : [];
@@ -78,25 +79,25 @@ router.post("/posts", requireAuth, requireTermsAccepted, asyncHandler(async (req
 
     // 한 큐 자랑: 사진 또는 경기결과 카드 중 최소 1개 필수 (캡션이 곧 제목)
     if (board === "brag" && !images?.length && !historyId) {
-        return sendError(res, 400, "자랑 글에는 사진 또는 경기 결과가 필요합니다");
+        return sendError(res, 400, "err.community.bragNeedsMedia");
     }
 
     // 결과 카드는 클라이언트가 아니라 서버가 전적 DB에서 스냅샷 — 위조 불가
     let gameCard: Awaited<ReturnType<typeof storage.community.buildGameCard>> = null;
     if (historyId) {
-        if (!UUID_RE.test(historyId)) return sendError(res, 400, "잘못된 경기 기록입니다");
+        if (!UUID_RE.test(historyId)) return sendError(res, 400, "err.community.badHistory");
         gameCard = await storage.community.buildGameCard(historyId, req.userId!);
-        if (!gameCard) return sendError(res, 400, "본인의 경기 기록만 첨부할 수 있습니다");
+        if (!gameCard) return sendError(res, 400, "err.community.ownHistoryOnly");
     }
 
     // 우리 매장·레슨: 소속 근거는 최근 30일 내 경기를 기록한 매장 (GPS 미사용)
     let storeName: string | undefined;
     if (board === "store" || board === "lesson") {
         if (storeId) {
-            if (!UUID_RE.test(storeId)) return sendError(res, 400, "잘못된 매장입니다");
+            if (!UUID_RE.test(storeId)) return sendError(res, 400, "err.community.badStore");
             const myStores = await storage.community.getMyRecentStores(req.userId!);
             const match = myStores.find(s => s.id === storeId);
-            if (!match) return sendError(res, 400, "최근 30일 내 경기 기록이 있는 매장만 선택할 수 있습니다");
+            if (!match) return sendError(res, 400, "err.community.storeRecentOnly");
             storeName = match.name;
         }
     }
@@ -128,10 +129,10 @@ router.post("/posts", requireAuth, requireTermsAccepted, asyncHandler(async (req
 
 // DELETE /posts/:id — 본인 글만. 이미지 Blob도 함께 정리(고아 방지).
 router.delete("/posts/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
-    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "게시글을 찾을 수 없습니다");
+    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "err.community.postNotFound");
     const post = await storage.community.getPostRaw(req.params.id);
-    if (!post) return sendError(res, 404, "게시글을 찾을 수 없습니다");
-    if (post.authorId !== req.userId) return sendError(res, 403, "본인 글만 삭제할 수 있습니다");
+    if (!post) return sendError(res, 404, "err.community.postNotFound");
+    if (post.authorId !== req.userId) return sendError(res, 403, "err.community.ownPostOnly");
     await storage.community.deletePost(req.params.id);
     if (post.images?.length) await deleteBlobs(post.images);
     return sendSuccess(res, { success: true });
@@ -140,14 +141,14 @@ router.delete("/posts/:id", requireAuth, asyncHandler(async (req: AuthRequest, r
 // --- 댓글 ---
 
 router.post("/posts/:id/comments", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: Response) => {
-    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "게시글을 찾을 수 없습니다");
+    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "err.community.postNotFound");
     const content = (req.body?.content || "").trim();
-    if (!content) return sendError(res, 400, "내용을 입력해주세요");
-    if (content.length > 1000) return sendError(res, 400, "댓글이 너무 깁니다 (1000자 이내)");
+    if (!content) return sendError(res, 400, "err.community.contentRequired");
+    if (content.length > 1000) return sendError(res, 400, "err.community.commentTooLong");
 
     const post = await storage.community.getPostRaw(req.params.id);
-    if (!post) return sendError(res, 404, "게시글을 찾을 수 없습니다");
-    if (post.isBlinded) return sendError(res, 400, "블라인드된 글에는 댓글을 달 수 없습니다");
+    if (!post) return sendError(res, 404, "err.community.postNotFound");
+    if (post.isBlinded) return sendError(res, 400, "err.community.blindedNoComment");
 
     const filter = checkContent(content);
     if (filter.blocked) return sendError(res, 400, filter.reason!);
@@ -158,12 +159,12 @@ router.post("/posts/:id/comments", requireAuth, requireTermsAccepted, asyncHandl
     let replyToAuthorId: string | null = null;
     const rawParent = req.body?.parentId;
     if (rawParent !== undefined && rawParent !== null && rawParent !== "") {
-        if (typeof rawParent !== "string" || !UUID_RE.test(rawParent)) return sendError(res, 404, "답글을 달 댓글을 찾을 수 없습니다");
+        if (typeof rawParent !== "string" || !UUID_RE.test(rawParent)) return sendError(res, 404, "err.community.replyParentNotFound");
         const parent = await storage.community.getCommentRaw(rawParent);
-        if (!parent || parent.postId !== req.params.id) return sendError(res, 404, "답글을 달 댓글을 찾을 수 없습니다");
+        if (!parent || parent.postId !== req.params.id) return sendError(res, 404, "err.community.replyParentNotFound");
         const top = parent.parentId ? await storage.community.getCommentRaw(parent.parentId) : parent;
         if (!top || top.isBlinded || top.deletedAt || parent.isBlinded || parent.deletedAt) {
-            return sendError(res, 400, "이 댓글에는 답글을 달 수 없습니다");
+            return sendError(res, 400, "err.community.cannotReply");
         }
         parentId = top.id;
         replyToAuthorId = parent.authorId;
@@ -181,8 +182,8 @@ router.post("/posts/:id/comments", requireAuth, requireTermsAccepted, asyncHandl
     // "연락받고 싶은 상대"의 푸시로 정확히 배달되는 마스킹 우회가 된다.
     // 답글이면 답한 사람에게 '새 답글', 글 작성자에게 '새 댓글'. 같은 사람이면 한 번만(답글 알림으로).
     const targets: { memberId: string; title: string }[] = [];
-    if (replyToAuthorId && replyToAuthorId !== req.userId) targets.push({ memberId: replyToAuthorId, title: "💬 새 답글" });
-    if (post.authorId !== req.userId && post.authorId !== replyToAuthorId) targets.push({ memberId: post.authorId, title: "💬 새 댓글" });
+    if (replyToAuthorId && replyToAuthorId !== req.userId) targets.push({ memberId: replyToAuthorId, title: "notif.community.newReply.title" });
+    if (post.authorId !== req.userId && post.authorId !== replyToAuthorId) targets.push({ memberId: post.authorId, title: "notif.community.newComment.title" });
     if (targets.length) {
         try {
             // 받는 사람이 댓글 쓴 사람을 차단했으면 알리지 않는다 — 크루 댓글 알림과 같은 규칙(검토 code:R5).
@@ -190,10 +191,15 @@ router.post("/posts/:id/comments", requireAuth, requireTermsAccepted, asyncHandl
             const blockers = await storage.crews.getBlockerIds(req.userId!);
             const liveTargets = targets.filter((tg) => !blockers.has(tg.memberId));
             const commenter = await storage.getMemberById(req.userId!);
+            const text = comment.content.slice(0, 40);
+            // 이름이 없으면 '누군가님: …' — 받는 사람 언어로 풀리게 키를 따로 둔다
+            const body = commenter?.name
+                ? msg("notif.community.comment.body", { name: commenter.name, text })
+                : msg("notif.community.comment.bodyAnon", { text });
             await Promise.allSettled(liveTargets.map((tg) => notificationService.sendAndSaveNotification({
                 memberId: tg.memberId,
                 title: tg.title,
-                body: `${commenter?.name || "누군가"}님: ${comment.content.slice(0, 40)}`,
+                body,
                 category: "BILLIARDS",
                 type: "COMMUNITY",
                 params: { url: `/community/${post.id}` },
@@ -204,10 +210,10 @@ router.post("/posts/:id/comments", requireAuth, requireTermsAccepted, asyncHandl
 }));
 
 router.delete("/comments/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
-    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "댓글을 찾을 수 없습니다");
+    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "err.community.commentNotFound");
     const comment = await storage.community.getCommentRaw(req.params.id);
-    if (!comment) return sendError(res, 404, "댓글을 찾을 수 없습니다");
-    if (comment.authorId !== req.userId) return sendError(res, 403, "본인 댓글만 삭제할 수 있습니다");
+    if (!comment) return sendError(res, 404, "err.community.commentNotFound");
+    if (comment.authorId !== req.userId) return sendError(res, 403, "err.community.ownCommentOnly");
     await storage.community.deleteComment(req.params.id);
     return sendSuccess(res, { success: true });
 }));
@@ -215,9 +221,9 @@ router.delete("/comments/:id", requireAuth, asyncHandler(async (req: AuthRequest
 // --- 좋아요 ---
 
 router.post("/posts/:id/like", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
-    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "게시글을 찾을 수 없습니다");
+    if (!UUID_RE.test(req.params.id)) return sendError(res, 404, "err.community.postNotFound");
     const post = await storage.community.getPostRaw(req.params.id);
-    if (!post) return sendError(res, 404, "게시글을 찾을 수 없습니다");
+    if (!post) return sendError(res, 404, "err.community.postNotFound");
     const result = await storage.community.toggleLike(req.params.id, req.userId!);
     return sendSuccess(res, result);
 }));
@@ -257,12 +263,12 @@ async function reportTargetAuthor(targetType: string, id: string): Promise<strin
 
 router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
     const { targetType, targetId, reason, detail } = req.body || {};
-    if (!REPORT_TARGETS.includes(targetType)) return sendError(res, 400, "잘못된 신고 대상입니다");
-    if (typeof targetId !== "string" || !UUID_RE.test(targetId)) return sendError(res, 400, "신고 대상이 없습니다");
-    if (!REPORT_REASONS.includes(reason)) return sendError(res, 400, "신고 사유를 선택해주세요");
+    if (!REPORT_TARGETS.includes(targetType)) return sendError(res, 400, "err.community.badReportTarget");
+    if (typeof targetId !== "string" || !UUID_RE.test(targetId)) return sendError(res, 400, "err.community.reportTargetMissing");
+    if (!REPORT_REASONS.includes(reason)) return sendError(res, 400, "err.community.reportReasonRequired");
     const authorId = await reportTargetAuthor(targetType, targetId);
-    if (authorId === null) return sendError(res, 404, "신고할 대상을 찾을 수 없습니다");
-    if (authorId === req.userId) return sendError(res, 400, "본인 콘텐츠는 신고할 수 없습니다");
+    if (authorId === null) return sendError(res, 404, "err.community.reportTargetNotFound");
+    if (authorId === req.userId) return sendError(res, 400, "err.community.cannotReportSelf");
 
     const result = await storage.community.report({
         targetType, targetId,
@@ -284,8 +290,8 @@ router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: 
         try {
             await notificationService.sendAndSaveNotification({
                 memberId: result.authorId,
-                title: "⚠️ 게시물 블라인드 안내",
-                body: "신고 누적으로 게시물이 블라인드되었습니다. 부당하다면 앱에서 바로 이의제기할 수 있습니다.",
+                title: "notif.moderation.blind.title",
+                body: "notif.community.autoBlind.body",
                 category: "BILLIARDS",
                 type: "COMMUNITY",
                 params: { url: targetType === "community_post" ? `/community/${targetId}` : "/community" },
@@ -298,14 +304,14 @@ router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: 
 // 이의제기 — 블라인드된 본인 글/댓글에 원탭
 router.post("/appeals", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
     const { targetType, targetId, text } = req.body || {};
-    if (!["community_post", "community_comment"].includes(targetType)) return sendError(res, 400, "잘못된 대상입니다");
-    if (typeof targetId !== "string" || !UUID_RE.test(targetId)) return sendError(res, 400, "잘못된 대상입니다");
+    if (!["community_post", "community_comment"].includes(targetType)) return sendError(res, 400, "err.community.badAppealTarget");
+    if (typeof targetId !== "string" || !UUID_RE.test(targetId)) return sendError(res, 400, "err.community.badAppealTarget");
     const ok = await storage.community.appeal({
         targetType, targetId,
         authorId: req.userId!,
         text: String(text || "").slice(0, 500) || "이의제기합니다",
     });
-    if (!ok) return sendError(res, 400, "이의제기할 수 없는 게시물입니다");
+    if (!ok) return sendError(res, 400, "err.community.cannotAppeal");
     return sendSuccess(res, { appealed: true });
 }));
 
@@ -313,16 +319,16 @@ router.post("/appeals", requireAuth, asyncHandler(async (req: AuthRequest, res: 
 
 router.post("/blocks", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
     const { memberId } = req.body || {};
-    if (typeof memberId !== "string" || !UUID_RE.test(memberId)) return sendError(res, 400, "차단할 사용자가 없습니다");
-    if (memberId === req.userId) return sendError(res, 400, "자신을 차단할 수 없습니다");
+    if (typeof memberId !== "string" || !UUID_RE.test(memberId)) return sendError(res, 400, "err.community.blockTargetMissing");
+    if (memberId === req.userId) return sendError(res, 400, "err.community.cannotBlockSelf");
     const target = await storage.getMemberById(memberId);
-    if (!target) return sendError(res, 404, "사용자를 찾을 수 없습니다");
+    if (!target) return sendError(res, 404, "err.community.memberNotFound");
     await storage.community.block(req.userId!, memberId);
     return sendSuccess(res, { blocked: true });
 }));
 
 router.delete("/blocks/:memberId", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
-    if (!UUID_RE.test(req.params.memberId)) return sendError(res, 400, "잘못된 사용자입니다");
+    if (!UUID_RE.test(req.params.memberId)) return sendError(res, 400, "err.community.badMember");
     await storage.community.unblock(req.userId!, req.params.memberId);
     return sendSuccess(res, { blocked: false });
 }));

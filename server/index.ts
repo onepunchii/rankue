@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { localeMiddleware } from "./middleware/locale.js";
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes.js";
@@ -18,6 +19,9 @@ if (!process.env.COOKIE_SECRET) {
 app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// 요청 언어(x-locale) → res.locals.locale. 오류 메시지가 이 언어로 나간다.
+app.use(localeMiddleware);
 
 // Global Request Logger
 app.use((req, res, next) => {

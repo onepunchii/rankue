@@ -11,11 +11,32 @@
  */
 import { storage } from "../storage/index.js";
 import { notificationService } from "./notificationService.js";
-import { rankChangeMessage } from "../../shared/playerAlerts.js";
+import type { RankChangeInput } from "../../shared/playerAlerts.js";
+import { msg, type I18nText } from "../lib/i18n.js";
 import type { UmbCategory } from "./umbService.js";
 import { isGolfTour, type GolfTour } from "../../shared/golfTours.js";
 
 export type FollowAlertResult = Record<string, { candidates: number; sent: number }>;
+
+/**
+ * shared/playerAlerts.rankChangeMessage 와 같은 규칙(변동 없으면 null · 처음 등재 · 1위 · 상승 · 하락)을 받는 사람 언어로 풀 수 있게
+ * 키+자리표시자 꼴로 돌려준다. notificationService 가 hiq_members.locale 로 푼다.
+ */
+export function rankChangeI18n(v: RankChangeInput): { title: I18nText; body: I18nText } | null {
+    const { name, rank, prevRank, points } = v;
+    if (prevRank !== null && prevRank === rank) return null;
+    if (prevRank === null) {
+        return { title: msg("notif.umb.rankEntry.title", { name }), body: msg("notif.umb.rankEntry.body", { rank, points }) };
+    }
+    const d = prevRank - rank;
+    if (rank === 1) {
+        return { title: msg("notif.umb.rankNo1.title", { name }), body: msg("notif.umb.rankNo1.body", { prevRank, d, points }) };
+    }
+    if (d > 0) {
+        return { title: msg("notif.umb.rankUp.title", { name, rank }), body: msg("notif.umb.rankUp.body", { prevRank, rank, d, points }) };
+    }
+    return { title: msg("notif.umb.rankDown.title", { name, rank }), body: msg("notif.umb.rankDown.body", { prevRank, rank, d: -d, points }) };
+}
 
 const CATEGORIES: ReadonlySet<string> = new Set(["players", "ladies", "juniors"]);
 
@@ -42,12 +63,12 @@ export async function notifyFollowersForCategory(category: UmbCategory): Promise
 
     let sent = 0;
     for (const r of rows) {
-        const msg = rankChangeMessage({ name: r.nativeName || r.playerName, rank: r.rank, prevRank: r.prevRank, points: r.points });
-        if (!msg) continue;
+        const m = rankChangeI18n({ name: r.nativeName || r.playerName, rank: r.rank, prevRank: r.prevRank, points: r.points });
+        if (!m) continue;
         await notificationService.sendAndSaveNotification({
             memberId: r.memberId,
-            title: msg.title,
-            body: msg.body,
+            title: m.title,
+            body: m.body,
             category: "BILLIARDS",
             type: "PLAYER_RANK",
             pref: "players",
@@ -81,10 +102,10 @@ export async function notifyGolfFollowersForTour(tour: GolfTour): Promise<{ cand
     const rows = await storage.golfRank.followedRows(tour, latest, prev);
     let sent = 0;
     for (const r of rows) {
-        const msg = rankChangeMessage({ name: r.nativeName || r.playerName, rank: r.rank, prevRank: r.prevRank, points: r.points });
-        if (!msg) continue;
+        const m = rankChangeI18n({ name: r.nativeName || r.playerName, rank: r.rank, prevRank: r.prevRank, points: r.points });
+        if (!m) continue;
         await notificationService.sendAndSaveNotification({
-            memberId: r.memberId, title: msg.title, body: msg.body,
+            memberId: r.memberId, title: m.title, body: m.body,
             category: "GOLF", type: "PLAYER_RANK", pref: "golf",   // 종목이 먼저다 — 골프 알림은 골프 칸 하나로(shared/notificationPrefs)
             params: { url: `/golfer/${tour}/${r.playerUmbId}`, edition: latest, playerUmbId: r.playerUmbId },
         }).catch((e) => console.error(`[FollowAlerts] golf ${r.memberId} ← ${r.playerUmbId} 발송 실패:`, (e as Error)?.message));

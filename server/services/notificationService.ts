@@ -1,3 +1,4 @@
+import { render, memberLocale, type I18nText } from "../lib/i18n.js";
 import { storage } from '../storage/index.js';
 import { isPushAllowed, prefKeyFor, type PrefKey } from "../../shared/notificationPrefs.js";
 import { InsertHiqNotification } from '../../shared/schema.js';
@@ -65,18 +66,22 @@ export class NotificationService {
      */
     async sendAndSaveNotification(params: {
         memberId: string;
-        title: string;
-        body: string;
+        /** 문장, 사전 키, 또는 msg(key, params) — 키·I18nText 는 **받는 사람** 언어(hiq_members.locale)로 푼다. */
+        title: string | I18nText;
+        body: string | I18nText;
         category?: string;
         type?: string;
         params?: any;
         /** 알림 카테고리(설정에서 끌 수 있는 묶음). 생략하면 type 으로 고른다 — shared/notificationPrefs. */
         pref?: PrefKey;
     }) {
-        const { memberId, title, body, category, type, params: deepLinkParams } = params;
+        const { memberId, category, type, params: deepLinkParams } = params;
 
         const member = await storage.getMemberById(memberId);
         if (!member) return;
+        const locale = memberLocale(member);
+        const title = render(locale, params.title);
+        const body = render(locale, params.body);
 
         // 1. DB에 알림 내역 먼저 저장. 푸시 가능 여부(프로필·토큰)와 무관하게 인앱 알림함에는 남아야 한다.
         // (매장에서 전화번호만으로 등록된 회원은 profileId가 없어서, 예전엔 여기서 나가버려 알림함이 영영 비어 있었다.)

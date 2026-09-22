@@ -5,6 +5,7 @@ import { hiqService } from "../../services/hiqService.js";
 import { notificationService } from "../../services/notificationService.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { msg } from "../../lib/i18n.js";
 
 const router = Router();
 
@@ -28,7 +29,7 @@ router.get("/public-stores", asyncHandler(async (_req: any, res: any) => {
 
 router.get("/public-stores/:slug", asyncHandler(async (req: any, res: any) => {
     const store = await storage.getPublicStoreBySlug(req.params.slug);
-    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다");
+    if (!store) return sendError(res, 404, "err.game.storeNotFound");
     return sendSuccess(res, store);
 }));
 
@@ -42,7 +43,7 @@ router.get("/branding/:slug", asyncHandler(async (req: any, res: any) => {
 // GET /game/:id
 router.get("/game/:id", asyncHandler(async (req: any, res: any) => {
     const game = await storage.getHiqGameById(req.params.id);
-    if (!game) return sendError(res, 404, "경기를 찾을 수 없습니다");
+    if (!game) return sendError(res, 404, "err.game.notFound", "GAME_NOT_FOUND");
 
     // Self-healing: If name is missing but ID exists, fetch and update it
     let needsUpdate = false;
@@ -82,7 +83,7 @@ router.get("/game/ongoing/mine", requireAuth, asyncHandler(async (req: AuthReque
 // POST /game/start
 router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
-    if (!member) return sendError(res, 404, "회원 정보를 찾을 수 없습니다");
+    if (!member) return sendError(res, 404, "err.game.memberNotFound");
 
     // The creator ALWAYS occupies player slot 1, forced from the session — never trust a
     // body-supplied player1Id (which would let an attacker fabricate ranked games "for"
@@ -102,7 +103,7 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
         ? await storage.tournaments.resolveSeat(String(req.body.tournamentMatchId), player1Id)
         : null;
     if (req.body?.tournamentMatchId && !seat) {
-        return sendError(res, 403, "이 대진의 참가자가 아니거나 이미 끝난 경기입니다");
+        return sendError(res, 403, "err.game.notSeatParticipant");
     }
 
     const consented = seat
@@ -114,7 +115,7 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
     // unranked scoreboard) and the host had no idea why. Fail loudly so they can re-issue a PIN.
     for (const raw of [req.body.player2Id, req.body.player3Id, req.body.player4Id]) {
         if (raw && !consented.has(raw)) {
-            return sendError(res, 400, "상대의 참가 확인이 만료되었습니다. 새 핀으로 다시 참가해주세요.");
+            return sendError(res, 400, "err.game.consentExpired", "CONSENT_EXPIRED");
         }
     }
 
@@ -199,7 +200,7 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
         } catch (e) {
             console.error("[Tournament] 대진에 경기 연결 실패 — 방금 만든 경기를 되돌린다:", e);
             try { await storage.tournaments.discardOrphanGame(game.id); } catch (e2) { console.error("[Tournament] 되돌리기 실패:", e2); }
-            return sendError(res, 409, "상대가 이미 이 경기를 시작했습니다. 대진표를 새로고침해주세요.");
+            return sendError(res, 409, "err.game.seatTaken");
         }
     }
 
@@ -213,9 +214,9 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
 // Only a participant of the game may score/finish it.
 const assertParticipant = async (gameId: string, userId: string, res: any) => {
     const g = await storage.getHiqGameById(gameId);
-    if (!g) { sendError(res, 404, "경기를 찾을 수 없습니다"); return null; }
+    if (!g) { sendError(res, 404, "err.game.notFound", "GAME_NOT_FOUND"); return null; }
     const players = [g.player1Id, g.player2Id, g.player3Id, g.player4Id].filter(Boolean);
-    if (!players.includes(userId)) { sendError(res, 403, "이 경기의 참가자가 아닙니다"); return null; }
+    if (!players.includes(userId)) { sendError(res, 403, "err.game.notParticipant"); return null; }
     return g;
 };
 
@@ -226,7 +227,7 @@ const assertParticipant = async (gameId: string, userId: string, res: any) => {
 router.delete("/game/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const game = await assertParticipant(req.params.id, req.userId!, res);
     if (!game) return;
-    if (game.status === "finished") return sendError(res, 409, "끝난 경기는 지울 수 없습니다");
+    if (game.status === "finished") return sendError(res, 409, "err.game.finishedNoDelete");
     // 대진 경기였다면 그 칸을 다시 연다 — 승수는 유지, 이번 판만 없던 일로.
     try { await storage.tournaments.detachGame(game.id); } catch (e) { console.error("[Discard] 대진 분리 실패:", e); }
     const removed = await storage.games.discardGame(game.id);
@@ -240,7 +241,7 @@ router.patch("/game/:id/score", requireAuth, asyncHandler(async (req: AuthReques
 
     // 종료된 경기는 되돌릴 수 없다. 이 라우트가 finished 경기에 status:'playing_base'를 써넣을 수
     // 있었기 때문에, 되돌린 뒤 /finish를 다시 호출하면 history 4건과 RP가 그대로 한 번 더 쌓였다.
-    if (game.status === "finished") return sendError(res, 409, "이미 종료된 경기는 수정할 수 없습니다");
+    if (game.status === "finished") return sendError(res, 409, "err.game.finishedNoEdit");
 
     // Whitelist only score/inning/high-run columns. Never let a participant set winnerId,
     // isRanked, playerNId (slot reassignment), playerNTarget, storeId, or status:'finished'
@@ -298,7 +299,7 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
         if (finalData[k] === undefined) continue;
         const n = Number(finalData[k]);
         if (!Number.isFinite(n) || n < -999 || n > 999) {
-            return sendError(res, 400, "점수 값이 올바르지 않습니다");
+            return sendError(res, 400, "err.game.invalidScore");
         }
         finalData[k] = Math.round(n);
     }
@@ -306,7 +307,7 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
         const n = Number(finalData.totalInnings);
         // 이닝 0은 평균 계산의 분모라 성립하지 않는다(경기가 끝났다면 최소 1이닝은 쳤다).
         if (!Number.isFinite(n) || n < 1 || n > 999) {
-            return sendError(res, 400, "이닝 수가 올바르지 않습니다");
+            return sendError(res, 400, "err.game.invalidInnings");
         }
         finalData.totalInnings = Math.round(n);
     }
@@ -360,8 +361,8 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
                 // 기다린다 — 서버리스는 응답 뒤 실행을 얼려, 안 기다린 알림은 푸시도 알림함 기록도 사라진다(2026-09-22 리뷰).
                 notificationService.sendAndSaveNotification({
                     memberId: oid,
-                    title: "🏁 경기 종료",
-                    body: "경기가 종료되었습니다. 결과를 확인해보세요.",
+                    title: "notif.game.finished.title",
+                    body: "notif.game.finished.body",
                     category: game?.gameType === "golf" ? "GOLF" : "BILLIARDS",
                     type: "MATCH",
                     // /history/:id 라우트는 존재하지 않는다(상세는 /history 안의 다이얼로그) —
@@ -383,7 +384,7 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
 router.post("/game/:id/claim", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const { targetSlot } = req.body;
     const success = await storage.claimGameRecord(req.params.id, req.userId!, targetSlot);
-    if (!success) return sendError(res, 400, "기록 연동 실패 (게임 없음 또는 이미 연동됨)");
+    if (!success) return sendError(res, 400, "err.game.claimFailed");
     return sendSuccess(res, { success: true });
 }));
 
@@ -407,11 +408,11 @@ router.get("/history/:id/detail", requireAuth, asyncHandler(async (req: AuthRequ
     const historyId = req.params.id;
     const history = await storage.getGameHistoryById(historyId);
 
-    if (!history) return sendError(res, 404, "기록을 찾을 수 없습니다.");
+    if (!history) return sendError(res, 404, "err.game.historyNotFound");
 
     // Ownership: hiqGameHistory has one row per participant (memberId). Only the owner of
     // the history row may read its detail. Return 404 to avoid an id-existence oracle.
-    if (history.memberId !== req.userId) return sendError(res, 404, "기록을 찾을 수 없습니다.");
+    if (history.memberId !== req.userId) return sendError(res, 404, "err.game.historyNotFound");
 
     let gameData: any = null;
 
@@ -423,7 +424,7 @@ router.get("/history/:id/detail", requireAuth, asyncHandler(async (req: AuthRequ
 
     if (gameData) return sendSuccess(res, gameData);
 
-    return sendError(res, 404, "상세 게임 정보를 찾을 수 없습니다.");
+    return sendError(res, 404, "err.game.detailNotFound");
 }));
 
 router.get("/stats/analysis", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -449,7 +450,7 @@ router.get("/tournaments/active", asyncHandler(async (req: any, res: any) => {
 
 router.get("/tournaments/:id", asyncHandler(async (req: any, res: any) => {
     const tournament = await storage.getTournamentById(req.params.id);
-    if (!tournament) return sendError(res, 404, "대회 없음");
+    if (!tournament) return sendError(res, 404, "err.game.tournamentNotFound");
     return sendSuccess(res, tournament);
 }));
 
@@ -457,12 +458,12 @@ router.get("/tournaments/:id", asyncHandler(async (req: any, res: any) => {
 // --- Misc / Settlements ---
 router.get("/settlements/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const settlement = await storage.getSettlement(req.params.id);
-    if (!settlement) return sendError(res, 404, "정산 내역 없음");
+    if (!settlement) return sendError(res, 404, "err.game.settlementNotFound");
     // Only members of the settlement's crew may view it (it leaks bank account + member
     // phone numbers). Mirror the hardened crew-membership gate.
     const membership = await storage.getCrewMembership(settlement.crewId, req.userId!);
     if (!membership || membership.role === "pending") {
-        return sendError(res, 403, "크루 멤버만 이용할 수 있습니다");
+        return sendError(res, 403, "err.game.crewMembersOnly");
     }
     return sendSuccess(res, settlement);
 }));
@@ -475,7 +476,7 @@ router.post("/invite", requireAuth, asyncHandler(async (req: AuthRequest, res: a
 
 router.get("/invite/:code", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const invite = await storage.getInviteStatus(req.params.code);
-    if (!invite) return sendError(res, 404, "존재하지 않는 코드");
+    if (!invite) return sendError(res, 404, "err.game.inviteNotFound", "INVITE_NOT_FOUND");
     return sendSuccess(res, invite);
 }));
 
@@ -488,15 +489,15 @@ router.post("/invite/:code/join", requireAuth, asyncHandler(async (req: AuthRequ
         && inviteBefore.guests.some((g: any) => g?.id === req.userId);
 
     const success = await storage.joinInvite(req.params.code, req.userId!);
-    if (!success) return sendError(res, 400, "만료되었거나 유효하지 않은 코드");
+    if (!success) return sendError(res, 400, "err.game.inviteInvalid", "INVITE_INVALID");
     // P0: 게스트 참가 수락 → 호스트에게 알림 (최초 수락 1회만)
     try {
         if (!alreadyAccepted && inviteBefore?.hostId) {
             const guest = await storage.getMemberById(req.userId!);
             await notificationService.sendAndSaveNotification({
                 memberId: inviteBefore.hostId,
-                title: "🎯 초대 참가 수락",
-                body: guest?.name ? `${guest.name}님이 초대에 응했어요!` : "상대방이 초대에 응했어요!",
+                title: "notif.game.inviteAccepted.title",
+                body: guest?.name ? msg("notif.game.inviteAccepted.body", { name: guest.name }) : "notif.game.inviteAccepted.bodyAnon",
                 category: "BILLIARDS",
                 type: "MATCH",
                 params: { url: `/history` },

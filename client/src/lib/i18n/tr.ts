@@ -2703,5 +2703,6 @@ const tr: Dict = {
   "landing.inputError": "Giriş hatası",
   "landing.pinTooShort": "En az 4 haneli bir PIN girin.",
   "landing.errorPrefix": "Hata:",
+  "chat.sharedCard": "Bir kart paylaştı",
 };
 export default tr;

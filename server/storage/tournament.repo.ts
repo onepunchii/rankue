@@ -10,6 +10,7 @@ import {
     hiqGameHistory,
 } from "../../shared/schema.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { msg } from "../lib/i18n.js";
 import { planKnockout, planLeague, advanceTarget, bracketSize, totalRounds } from "../../shared/tournamentBracket.js";
 
 // 크루 토너먼트 저장소.
@@ -199,16 +200,16 @@ export class TournamentRepository {
         return await db.transaction(async (tx) => {
             const [t] = await tx.select().from(hiqCrewTournaments)
                 .where(eq(hiqCrewTournaments.id, tournamentId)).for("update");
-            if (!t) throw notFound("대회를 찾을 수 없습니다");
-            if (t.status !== "recruiting") throw conflict("접수가 마감된 대회입니다");
+            if (!t) throw notFound(msg("err.tournament.notFound"));
+            if (t.status !== "recruiting") throw conflict(msg("err.tournament.closed"));
             if (t.recruitEnd && new Date(t.recruitEnd).getTime() < Date.now()) {
-                throw conflict("접수 기간이 끝났습니다");
+                throw conflict(msg("err.tournament.recruitEnded"));
             }
 
             const existing = await tx.select().from(hiqCrewTournamentParticipants)
                 .where(eq(hiqCrewTournamentParticipants.tournamentId, tournamentId));
-            if (existing.some((p) => p.memberId === memberId)) throw conflict("이미 신청했습니다");
-            if (existing.length >= t.maxPlayers) throw conflict("정원이 찼습니다");
+            if (existing.some((p) => p.memberId === memberId)) throw conflict(msg("err.tournament.alreadyJoined"));
+            if (existing.length >= t.maxPlayers) throw conflict(msg("err.tournament.full"));
 
             const [row] = await tx.insert(hiqCrewTournamentParticipants)
                 .values({ tournamentId, memberId }).returning();
@@ -219,8 +220,8 @@ export class TournamentRepository {
     /** 참가 취소 — 대진이 나오기 전까지만. 대진이 이미 짜였으면 자리에 구멍이 난다. */
     async leave(tournamentId: string, memberId: string) {
         const [t] = await db.select().from(hiqCrewTournaments).where(eq(hiqCrewTournaments.id, tournamentId));
-        if (!t) throw notFound("대회를 찾을 수 없습니다");
-        if (t.status !== "recruiting") throw conflict("대진이 이미 짜여서 취소할 수 없습니다");
+        if (!t) throw notFound(msg("err.tournament.notFound"));
+        if (t.status !== "recruiting") throw conflict(msg("err.tournament.drawnNoCancel"));
         await db.delete(hiqCrewTournamentParticipants).where(and(
             eq(hiqCrewTournamentParticipants.tournamentId, tournamentId),
             eq(hiqCrewTournamentParticipants.memberId, memberId),
@@ -239,8 +240,8 @@ export class TournamentRepository {
         return await db.transaction(async (tx) => {
             const [t] = await tx.select().from(hiqCrewTournaments)
                 .where(eq(hiqCrewTournaments.id, tournamentId)).for("update");
-            if (!t) throw notFound("대회를 찾을 수 없습니다");
-            if (t.status === "ended" || t.status === "canceled") throw conflict("이미 끝난 대회입니다");
+            if (!t) throw notFound(msg("err.tournament.notFound"));
+            if (t.status === "ended" || t.status === "canceled") throw conflict(msg("err.tournament.ended"));
 
             const started = await tx.select({ id: hiqCrewTournamentMatches.id })
                 .from(hiqCrewTournamentMatches)
@@ -248,7 +249,7 @@ export class TournamentRepository {
                     eq(hiqCrewTournamentMatches.tournamentId, tournamentId),
                     inArray(hiqCrewTournamentMatches.status, ["playing", "done"]),
                 ));
-            if (started.length > 0) throw conflict("이미 시작된 경기가 있어 다시 뽑을 수 없습니다");
+            if (started.length > 0) throw conflict(msg("err.tournament.redrawBlocked"));
 
             const parts = await tx
                 .select({
@@ -261,7 +262,7 @@ export class TournamentRepository {
                 .where(eq(hiqCrewTournamentParticipants.tournamentId, tournamentId));
             // 오너 결정(2026-09-04): 2명부터. 유저가 "둘이 타이틀 걸고" 쓰던 방식을 되살린다 —
             // 2인 대회는 곧 단판(또는 N판) 승부이고, 그 결과도 명예의 전당에 남는다.
-            if (parts.length < 2) throw badRequest("대회는 2명부터 대진을 짤 수 있습니다");
+            if (parts.length < 2) throw badRequest(msg("err.tournament.minPlayers"));
 
             const ratingOf = (p: typeof parts[number]) => (t.gameType === "3c" ? p.rating3c : p.rating4c) ?? 0;
             const ordered = [...parts].sort((a, b) => ratingOf(b) - ratingOf(a));
@@ -337,14 +338,14 @@ export class TournamentRepository {
                 .for("update");
             const ma = rows.find((r) => r.id === a.matchId);
             const mb = rows.find((r) => r.id === b.matchId);
-            if (!ma || !mb) throw notFound("대진을 찾을 수 없습니다");
-            if (ma.round !== 1 || mb.round !== 1) throw badRequest("첫 라운드 자리만 바꿀 수 있습니다");
+            if (!ma || !mb) throw notFound(msg("err.tournament.matchNotFound"));
+            if (ma.round !== 1 || mb.round !== 1) throw badRequest(msg("err.tournament.firstRoundOnly"));
             for (const m of [ma, mb]) {
                 if (m.status === "playing" || m.status === "done") {
-                    throw conflict("이미 시작된 경기의 자리는 바꿀 수 없습니다");
+                    throw conflict(msg("err.tournament.seatStarted"));
                 }
             }
-            if (a.matchId === b.matchId && a.side === b.side) throw badRequest("같은 자리입니다");
+            if (a.matchId === b.matchId && a.side === b.side) throw badRequest(msg("err.tournament.sameSeat"));
 
             const val = (m: typeof ma, side: "p1" | "p2") => (side === "p1" ? m.p1Id : m.p2Id);
             const av = val(ma, a.side);
@@ -444,7 +445,7 @@ export class TournamentRepository {
                 isNull(hiqCrewTournamentMatches.gameId),
             ))
             .returning({ tournamentId: hiqCrewTournamentMatches.tournamentId });
-        if (updated.length === 0) throw conflict("이미 시작된 대진입니다");
+        if (updated.length === 0) throw conflict(msg("err.tournament.matchStarted"));
 
         await db.update(hiqCrewTournaments)
             .set({ status: "ongoing", updatedAt: new Date() })
@@ -465,8 +466,8 @@ export class TournamentRepository {
             eq(hiqCrewTournamentMatches.id, matchId),
             eq(hiqCrewTournamentMatches.tournamentId, tournamentId),
         ));
-        if (!m) throw notFound("대진을 찾을 수 없습니다");
-        if (m.status !== "playing") throw conflict("진행 중인 경기만 되돌릴 수 있습니다");
+        if (!m) throw notFound(msg("err.tournament.matchNotFound"));
+        if (m.status !== "playing") throw conflict(msg("err.tournament.notPlaying"));
         await db.update(hiqCrewTournamentMatches)
             .set({ status: "ready", gameId: null, startedAt: null, p1Score: null, p2Score: null })
             .where(eq(hiqCrewTournamentMatches.id, matchId));

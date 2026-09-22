@@ -1,3 +1,4 @@
+import { getLocale } from "./i18n";
 import {
   QueryClient,
   QueryFunction,
@@ -73,6 +74,8 @@ export async function apiRequest(
 
   const headers: Record<string, string> = {
     ...options?.headers,
+    // 서버가 오류·라벨을 이 언어로 만든다(2026-09-22). 푸시는 GET /me 때 이 값을 회원에 저장해 받는 사람 언어로.
+    "x-locale": getLocale(),
   };
 
   // SaaS 테넌트 식별

@@ -27,6 +27,7 @@ import {
 } from "../../shared/schema.js";
 import { eq, and, desc, asc, sql, or, gte, like, inArray, ne } from "drizzle-orm";
 import { notFound, conflict } from "../utils/errors.js";
+import { msg } from "../lib/i18n.js";
 import type {
     InsertHiqCrew,
     HiqCrew,
@@ -219,15 +220,15 @@ export class CrewRepository {
             const [crew] = await tx.select().from(hiqCrews)
                 .where(eq(hiqCrews.id, crewId))
                 .for('update');
-            if (!crew) throw notFound("Crew not found");
+            if (!crew) throw notFound(msg("err.crewRepo.notFound"));
 
             // Check if already joined
             const [existing] = await tx.select().from(hiqCrewMembers)
                 .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
 
             if (existing) {
-                if (existing.role === 'pending') throw conflict("가입 승인 대기 중입니다");
-                throw conflict("이미 활동 중인 멤버입니다");
+                if (existing.role === 'pending') throw conflict(msg("err.crewRepo.pendingApproval"));
+                throw conflict(msg("err.crewRepo.alreadyMember"));
             }
 
             // Determine Role if not provided
@@ -242,7 +243,7 @@ export class CrewRepository {
                 const [row] = await tx.select({ count: sql<number>`count(*)` })
                     .from(hiqCrewMembers)
                     .where(and(eq(hiqCrewMembers.crewId, crewId), ne(hiqCrewMembers.role, 'pending')));
-                if (Number(row?.count || 0) >= limit) throw conflict("크루 정원이 가득 찼습니다");
+                if (Number(row?.count || 0) >= limit) throw conflict(msg("err.crewRepo.full"));
             }
 
             await tx.insert(hiqCrewMembers).values({
@@ -308,19 +309,19 @@ export class CrewRepository {
             const [crew] = await tx.select().from(hiqCrews)
                 .where(eq(hiqCrews.id, crewId))
                 .for('update');
-            if (!crew) throw notFound("Crew not found");
+            if (!crew) throw notFound(msg("err.crewRepo.notFound"));
 
             const [target] = await tx.select().from(hiqCrewMembers)
                 .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
-            if (!target) throw notFound("대상을 찾을 수 없습니다");
-            if (target.role !== 'pending') throw conflict("이미 승인된 멤버입니다");
+            if (!target) throw notFound(msg("err.crewRepo.targetNotFound"));
+            if (target.role !== 'pending') throw conflict(msg("err.crewRepo.alreadyApproved"));
 
             const limit = crew.maxMembers ?? 0;
             if (limit > 0) {
                 const [row] = await tx.select({ count: sql<number>`count(*)` })
                     .from(hiqCrewMembers)
                     .where(and(eq(hiqCrewMembers.crewId, crewId), ne(hiqCrewMembers.role, 'pending')));
-                if (Number(row?.count || 0) >= limit) throw conflict("크루 정원이 가득 찼습니다");
+                if (Number(row?.count || 0) >= limit) throw conflict(msg("err.crewRepo.full"));
             }
 
             await tx.update(hiqCrewMembers)
@@ -584,19 +585,19 @@ export class CrewRepository {
                 .where(eq(hiqCrewActivities.id, activityId))
                 .for('update');
 
-            if (!activity) throw notFound("Activity not found");
+            if (!activity) throw notFound(msg("err.crewRepo.activityNotFound"));
 
             const participants = await tx.select().from(hiqCrewActivityParticipants).where(eq(hiqCrewActivityParticipants.activityId, activityId));
 
             // Only count active participants ('joined')
             const activeParticipants = participants.filter(p => p.status === 'joined');
             if (activeParticipants.length >= (activity.maxParticipants || 999)) {
-                throw conflict("정원 초과입니다");
+                throw conflict(msg("err.crewRepo.activityFull"));
             }
 
             // Check if already joined
             const existing = participants.find(p => p.memberId === memberId);
-            if (existing) throw conflict("이미 참여 중입니다");
+            if (existing) throw conflict(msg("err.crewRepo.alreadyJoined"));
 
             await tx.insert(hiqCrewActivityParticipants).values({
                 activityId, memberId, status: 'joined'
@@ -1034,11 +1035,11 @@ export class CrewRepository {
 
     async votePoll(pollId: string, optionId: string, memberId: string) {
         const [poll] = await db.select().from(hiqPolls).where(eq(hiqPolls.id, pollId));
-        if (!poll) throw notFound("Poll not found");
-        if (poll.status === 'closed') throw conflict("Poll is closed");
+        if (!poll) throw notFound(msg("err.crewRepo.pollNotFound"));
+        if (poll.status === 'closed') throw conflict(msg("err.crewRepo.pollClosed"));
         // Enforce the deadline server-side — 'status' is never flipped to 'closed' anywhere,
         // so endTime is the real source of truth for whether voting is open.
-        if (poll.endTime && poll.endTime < new Date()) throw conflict("Poll is closed");
+        if (poll.endTime && poll.endTime < new Date()) throw conflict(msg("err.crewRepo.pollClosed"));
 
         return await db.transaction(async (tx) => {
             // Check whether the member already voted for THIS option FIRST (before any delete),

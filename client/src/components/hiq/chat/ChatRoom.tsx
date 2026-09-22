@@ -53,6 +53,18 @@ interface Props {
     roomKey?: string;
 }
 
+/**
+ * 시스템 메시지는 방 전원이 보는데 언어가 제각각이라, 서버가 metadata.i18n = { key, params } 를 함께 저장하고
+ * 화면이 자기 언어로 푼다(2026-09-22). 옛 메시지(키 없음)는 저장된 한국어 그대로.
+ */
+export function systemText(m: ChatMsg, t: (k: string) => string): string {
+    const i = (m as any).metadata?.i18n as { key?: string; params?: Record<string, unknown> } | undefined;
+    if (!i?.key) return m.message;
+    const raw = t(i.key);
+    if (raw === i.key) return m.message;
+    return raw.replace(/\{(\w+)\}/g, (mm, k) => (i.params && i.params[k] !== undefined && i.params[k] !== null ? String(i.params[k]) : mm));
+}
+
 /** 카드형: 정산 요청, 골프 부킹 공유(옛 크루 채팅은 type text + metadata.type 으로 구분했다). */
 const isCard = (m: ChatMsg) => m.type === "settlement" || (m as any).metadata?.type === "GOLF_BOOKING";
 
@@ -154,7 +166,7 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                 </div>
                             )}
                             {system ? (
-                                <p className="my-2 text-center text-[12px] font-medium text-ink-3"><span className="px-2.5 py-1 rounded-full bg-surface-2">{m.message}</span></p>
+                                <p className="my-2 text-center text-[12px] font-medium text-ink-3"><span className="px-2.5 py-1 rounded-full bg-surface-2">{systemText(m, t)}</span></p>
                             ) : (
                                 <div className={cn("flex items-end gap-2", mine ? "justify-end" : "justify-start", grouped ? "mt-0.5" : "mt-2")}>
                                     {!mine && (

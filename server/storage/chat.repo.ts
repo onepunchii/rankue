@@ -15,6 +15,7 @@ import {
     golfBookings, golfJoinRequests, hiqBlocks,
 } from "../../shared/schema.js";
 import { eq, and, or, asc, desc, gt, gte, lt, sql, inArray } from "drizzle-orm";
+import { tr, type Locale } from "../lib/i18n.js";
 
 export type RoomKind = "crew" | "listing" | "dm" | "support";
 export interface RoomRef { kind: RoomKind; id: string; key: string }
@@ -27,7 +28,7 @@ export interface ChatRoomSummary {
     subtitle: string;
     imageUrl: string | null;
     listing?: { listingType: string; joinType: string | null; datetime: Date; courseName: string; region: string; lat: number | null; lng: number | null; ownerId: string | null; isBlind: boolean };
-    lastMessage: { text: string; at: Date; senderName: string | null } | null;
+    lastMessage: { text: string; at: Date; senderName: string | null; i18n?: { key: string; params?: Record<string, unknown> } | null } | null;
     unread: number;
     memberCount: number;
 }
@@ -179,7 +180,8 @@ export class ChatRepository {
     }
 
     /* ── 방 정보(머리줄·고정 카드) ───────────────────────── */
-    async roomInfo(ref: RoomRef, viewerId: string): Promise<{ title: string; subtitle: string; members: { id: string; name: string; profileImageUrl: string | null }[]; canManage: boolean; crewId?: string; booking?: any; sport?: "BILLIARDS" | "GOLF" }> {
+    /** locale: 응답에 실리는 라벨(부제·대체 제목)의 언어 — 라우트가 localeOf(res) 를 넘긴다. */
+    async roomInfo(ref: RoomRef, viewerId: string, locale: Locale = "ko"): Promise<{ title: string; subtitle: string; members: { id: string; name: string; profileImageUrl: string | null }[]; canManage: boolean; crewId?: string; booking?: any; sport?: "BILLIARDS" | "GOLF" }> {
         const memberIds = await this.roomMembers(ref);
         // 남의 메시지를 지울 수 있나 — 크루 운영진·앱 운영자. 화면이 삭제 단추를 보일지 정하는 데만 쓴다(서버 검사는 따로).
         let canManage = await this.isAdmin(viewerId);
@@ -192,25 +194,26 @@ export class ChatRepository {
         const members = people.map((p) => ({ id: String(p.id), name: p.name, profileImageUrl: p.profileImageUrl ?? null }));
         if (ref.kind === "crew") {
             const [c] = await db.select({ name: hiqCrews.name, sport: hiqCrews.sportCategory }).from(hiqCrews).where(eq(hiqCrews.id, ref.id)).limit(1);
-            return { title: c?.name ?? "크루", subtitle: `크루 · ${members.length}명`, members, canManage, crewId: ref.id, sport: c?.sport === "GOLF" ? "GOLF" : "BILLIARDS" };
+            return { title: c?.name ?? tr(locale, "ui.chat.crew"), subtitle: tr(locale, "ui.chat.crewCount", { n: members.length }), members, canManage, crewId: ref.id, sport: c?.sport === "GOLF" ? "GOLF" : "BILLIARDS" };
         }
         if (ref.kind === "listing") {
             const [b] = await db.select().from(golfBookings).where(eq(golfBookings.id, ref.id)).limit(1);
-            const title = b ? (b.isBlind ? b.blindName ?? b.courseName : b.courseName) : "대화방";
-            return { title, subtitle: `${b?.listingType === "JOIN" ? "조인" : "부킹"} · 확정된 분들만`, members, canManage, booking: b, sport: "GOLF" };
+            const title = b ? (b.isBlind ? b.blindName ?? b.courseName : b.courseName) : tr(locale, "ui.chat.room");
+            return { title, subtitle: tr(locale, "ui.chat.listingConfirmed", { type: tr(locale, b?.listingType === "JOIN" ? "ui.chat.join" : "ui.chat.booking") }), members, canManage, booking: b, sport: "GOLF" };
         }
         if (ref.kind === "dm") {
             const others = members.filter((m) => m.id !== viewerId);
             const [room] = await db.select({ sport: hiqChatRooms.sport }).from(hiqChatRooms).where(eq(hiqChatRooms.id, ref.id)).limit(1);
-            return { title: others.map((m) => m.name).join(", ") || "나", subtitle: members.length > 2 ? `${members.length}명` : "1:1", members, canManage, sport: room?.sport ?? "BILLIARDS" };
+            return { title: others.map((m) => m.name).join(", ") || tr(locale, "ui.chat.me"), subtitle: members.length > 2 ? tr(locale, "ui.chat.memberCount", { n: members.length }) : tr(locale, "ui.chat.dm"), members, canManage, sport: room?.sport ?? "BILLIARDS" };
         }
         const isAdmin = await this.isAdmin(viewerId);
         const owner = members.find((m) => m.id === ref.id);
-        return { title: isAdmin ? `${owner?.name ?? "회원"} · 문의` : "랭큐 운영자", subtitle: isAdmin ? "관리자 문의 방" : "빠르게 답해 드릴게요", members, canManage };
+        return { title: isAdmin ? tr(locale, "ui.chat.supportOf", { name: owner?.name ?? tr(locale, "ui.chat.member") }) : tr(locale, "ui.chat.supportTitle"), subtitle: isAdmin ? tr(locale, "ui.chat.supportAdminSubtitle") : tr(locale, "ui.chat.supportSubtitle"), members, canManage };
     }
 
     /* ── 내 방 목록 ─────────────────────────────────────── */
-    async myRooms(memberId: string, sport: "BILLIARDS" | "GOLF"): Promise<ChatRoomSummary[]> {
+    /** locale: 응답에 실리는 라벨(부제·대체 제목)의 언어 — 라우트가 localeOf(res) 를 넘긴다. */
+    async myRooms(memberId: string, sport: "BILLIARDS" | "GOLF", locale: Locale = "ko"): Promise<ChatRoomSummary[]> {
         const rooms: ChatRoomSummary[] = [];
         // 크루(종목별)
         const crews = await db.select({ crew: hiqCrews }).from(hiqCrewMembers)
@@ -220,7 +223,7 @@ export class ChatRepository {
         const crewCounts = crewIds.length ? await db.select({ crewId: hiqCrewMembers.crewId, n: sql<number>`count(*)::int` }).from(hiqCrewMembers)
             .where(and(inArray(hiqCrewMembers.crewId, crewIds), sql`${hiqCrewMembers.role} <> 'pending'`)).groupBy(hiqCrewMembers.crewId) : [];
         const crewCount = new Map<string, number>(crewCounts.map((c) => [String(c.crewId), Number(c.n)] as [string, number]));
-        for (const c of crews) rooms.push({ key: `crew:${c.crew.id}`, kind: "crew", id: c.crew.id, title: c.crew.name, subtitle: `크루 · ${crewCount.get(c.crew.id) ?? 0}명`, imageUrl: (c.crew as any).emblem ?? null, lastMessage: null, unread: 0, memberCount: crewCount.get(c.crew.id) ?? 0 });
+        for (const c of crews) rooms.push({ key: `crew:${c.crew.id}`, kind: "crew", id: c.crew.id, title: c.crew.name, subtitle: tr(locale, "ui.chat.crewCount", { n: crewCount.get(c.crew.id) ?? 0 }), imageUrl: (c.crew as any).emblem ?? null, lastMessage: null, unread: 0, memberCount: crewCount.get(c.crew.id) ?? 0 });
 
         // 조인·부킹(골프)
         if (sport === "GOLF") {
@@ -237,7 +240,7 @@ export class ChatRepository {
                 const n = (accBy.get(b.id) ?? 0) + (b.ownerId ? 1 : 0);
                 rooms.push({
                     key: `listing:${b.id}`, kind: "listing", id: b.id, title: b.isBlind ? (b.blindName ?? b.courseName) : b.courseName,
-                    subtitle: `${b.listingType === "JOIN" ? "조인" : "부킹"} · ${n}명`, imageUrl: null,
+                    subtitle: tr(locale, "ui.chat.listingCount", { type: tr(locale, b.listingType === "JOIN" ? "ui.chat.join" : "ui.chat.booking"), n }), imageUrl: null,
                     listing: { listingType: b.listingType, joinType: b.joinType ?? null, datetime: b.datetime, courseName: b.courseName, region: b.region, lat: b.lat ?? null, lng: b.lng ?? null, ownerId: b.ownerId ?? null, isBlind: b.isBlind },
                     lastMessage: null, unread: 0, memberCount: n,
                 });
@@ -258,7 +261,7 @@ export class ChatRepository {
             for (const rid of roomIds) {
                 const all = byRoom.get(rid) ?? [];
                 const others = all.filter((m) => m.id !== memberId);
-                rooms.push({ key: `dm:${rid}`, kind: "dm", id: rid, title: others.map((m) => m.name).join(", ") || "나", subtitle: all.length > 2 ? `${all.length}명` : "1:1", imageUrl: others[0]?.img ?? null, lastMessage: null, unread: 0, memberCount: all.length });
+                rooms.push({ key: `dm:${rid}`, kind: "dm", id: rid, title: others.map((m) => m.name).join(", ") || tr(locale, "ui.chat.me"), subtitle: all.length > 2 ? tr(locale, "ui.chat.memberCount", { n: all.length }) : tr(locale, "ui.chat.dm"), imageUrl: others[0]?.img ?? null, lastMessage: null, unread: 0, memberCount: all.length });
             }
         }
 
@@ -270,10 +273,10 @@ export class ChatRepository {
             const ownerIds = keys.map((k) => k.slice("support:".length));
             const owners = ownerIds.length ? await db.select({ id: hiqMembers.id, name: hiqMembers.name, img: profiles.profileImageUrl }).from(hiqMembers).leftJoin(profiles, eq(profiles.id, hiqMembers.profileId)).where(inArray(hiqMembers.id, ownerIds)) : [];
             const nameBy = new Map<string, { id: string; name: string; img: string | null }>(owners.map((o) => [String(o.id), { id: String(o.id), name: o.name, img: o.img ?? null }] as [string, { id: string; name: string; img: string | null }]));
-            for (const k of keys) { const oid = k.slice("support:".length); const o = nameBy.get(oid); rooms.push({ key: k, kind: "support", id: oid, title: `${o?.name ?? "회원"} · 문의`, subtitle: "관리자 문의", imageUrl: o?.img ?? null, lastMessage: null, unread: 0, memberCount: 2 }); }
+            for (const k of keys) { const oid = k.slice("support:".length); const o = nameBy.get(oid); rooms.push({ key: k, kind: "support", id: oid, title: tr(locale, "ui.chat.supportOf", { name: o?.name ?? tr(locale, "ui.chat.member") }), subtitle: tr(locale, "ui.chat.adminInquiry"), imageUrl: o?.img ?? null, lastMessage: null, unread: 0, memberCount: 2 }); }
         } else {
             const [has] = await db.select({ n: sql<number>`count(*)::int` }).from(hiqChatMessages).where(eq(hiqChatMessages.roomKey, `support:${memberId}`));
-            if (Number(has?.n ?? 0) > 0) rooms.push({ key: `support:${memberId}`, kind: "support", id: memberId, title: "랭큐 운영자", subtitle: "관리자 문의", imageUrl: null, lastMessage: null, unread: 0, memberCount: 2 });
+            if (Number(has?.n ?? 0) > 0) rooms.push({ key: `support:${memberId}`, kind: "support", id: memberId, title: tr(locale, "ui.chat.supportTitle"), subtitle: tr(locale, "ui.chat.adminInquiry"), imageUrl: null, lastMessage: null, unread: 0, memberCount: 2 });
         }
 
         if (rooms.length === 0) return rooms;
@@ -286,7 +289,7 @@ export class ChatRepository {
               AND (cm.joined_at IS NULL OR c.created_at >= cm.joined_at)`;
         const crewJoin = sql`LEFT JOIN hiq_crew_members cm ON c.room_key = 'crew:' || cm.crew_id::text AND cm.member_id = ${memberId}::uuid`;
         const last = await db.execute(sql`
-            SELECT DISTINCT ON (c.room_key) c.room_key, c.message, c.type, c.created_at, m.name AS sender_name
+            SELECT DISTINCT ON (c.room_key) c.room_key, c.message, c.type, c.created_at, c.metadata->'i18n' AS i18n, m.name AS sender_name
             FROM hiq_chat_messages c LEFT JOIN hiq_members m ON m.id = c.sender_id ${crewJoin}
             WHERE c.room_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)}) ${visible}
             ORDER BY c.room_key, c.created_at DESC`);
@@ -303,7 +306,7 @@ export class ChatRepository {
         const unreadBy = new Map<string, number>((unread.rows as any[]).map((r) => [String(r.room_key), Number(r.n)] as [string, number]));
         for (const r of rooms) {
             const l = lastBy.get(r.key);
-            r.lastMessage = l ? { text: l.type === "text" || l.type === "system" ? String(l.message) : "카드를 공유했어요", at: new Date(l.created_at), senderName: l.type === "system" ? null : (l.sender_name ?? null) } : null;
+            r.lastMessage = l ? { text: l.type === "text" || l.type === "system" ? String(l.message) : tr(locale, "ui.chat.sharedCard"), at: new Date(l.created_at), senderName: l.type === "system" ? null : (l.sender_name ?? null), i18n: l.type === "system" && l.i18n ? l.i18n : (l.type !== "text" && l.type !== "system" ? { key: "chat.sharedCard" } : null) } : null;
             r.unread = unreadBy.get(r.key) ?? 0;
         }
         rooms.sort((a, b) => {

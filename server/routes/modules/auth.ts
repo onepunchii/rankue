@@ -5,6 +5,7 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { storage } from "../../storage/index.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { msg } from "../../lib/i18n.js";
 import { verifyGoogleIdToken, verifyAppleIdToken } from "../../lib/socialAuth.js";
 import { recordTermsAcceptance, isMemberSuspended, SUSPENDED_MESSAGE } from "../../middleware/terms.js";
 import { isTermsAccepted, ACCOUNT_SUSPENDED_CODE } from "../../../shared/terms.js";
@@ -92,7 +93,7 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
     const key = attemptKey('login', phone, req.ip);
     const rl = checkRateLimit(key);
     if (rl.limited) {
-        return sendError(res, 429, `로그인 시도가 너무 많습니다. ${rl.retryAfterSec}초 후 다시 시도해주세요.`);
+        return sendError(res, 429, msg("err.auth.loginTooMany", { sec: rl.retryAfterSec }));
     }
 
     let result: Awaited<ReturnType<typeof hiqService.login>>;
@@ -131,14 +132,14 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
 router.post("/social", asyncHandler(async (req: any, res: any) => {
     const { provider, idToken, name } = req.body ?? {};
     if ((provider !== "google" && provider !== "apple") || typeof idToken !== "string" || !idToken) {
-        return sendError(res, 400, "provider와 idToken이 필요합니다");
+        return sendError(res, 400, "err.auth.socialParamsRequired");
     }
 
     // 무차별 시도 방어 — 로그인과 같은 레이트리밋 재사용(키는 ip 기준)
     const key = attemptKey('social', provider, req.ip);
     const rl = checkRateLimit(key);
     if (rl.limited) {
-        return sendError(res, 429, `시도가 너무 많습니다. ${rl.retryAfterSec}초 후 다시 시도해주세요.`);
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
     }
 
     const identity = provider === "google"
@@ -146,7 +147,7 @@ router.post("/social", asyncHandler(async (req: any, res: any) => {
         : await verifyAppleIdToken(idToken);
     if (!identity) {
         registerFailure(key);
-        return sendError(res, 401, "토큰 검증에 실패했습니다");
+        return sendError(res, 401, "err.auth.tokenInvalid");
     }
 
     const countryCode = ipCountry(req);
@@ -250,8 +251,8 @@ router.post("/push-token", requireAuth, asyncHandler(async (req: AuthRequest, re
     // 새 웹은 { pushToken }, 이미 떠 있는 옛 웹 번들(nativeBridge·App.tsx)은 { token } 으로 보낸다 — 둘 다 받는다.
     const { pushToken, token: legacyToken } = req.body || {};
     const token = pushToken ?? legacyToken;
-    if (!token) return sendError(res, 400, "토큰이 필요합니다");
-    if (!isValidPushToken(token)) return sendError(res, 400, "푸시 토큰 형식이 올바르지 않습니다");
+    if (!token) return sendError(res, 400, "err.auth.pushTokenRequired");
+    if (!isValidPushToken(token)) return sendError(res, 400, "err.auth.pushTokenFormat");
 
     // 같은 기기 토큰을 쥐고 있던 다른 계정은 여기서 떼어진다(user.repo updatePushToken).
     await storage.updatePushToken(req.userId!, token);
@@ -261,12 +262,12 @@ router.post("/push-token", requireAuth, asyncHandler(async (req: AuthRequest, re
 // POST /reset-pin/question - Get security question for phone
 router.post("/reset-pin/question", asyncHandler(async (req: any, res: any) => {
     const { phone } = req.body;
-    if (!phone) return sendError(res, 400, "전화번호가 필요합니다");
+    if (!phone) return sendError(res, 400, "err.auth.phoneRequired");
 
     const key = attemptKey('reset-question', phone, req.ip);
     const rl = checkRateLimit(key);
     if (rl.limited) {
-        return sendError(res, 429, `요청이 너무 많습니다. ${rl.retryAfterSec}초 후 다시 시도해주세요.`);
+        return sendError(res, 429, msg("err.auth.requestTooMany", { sec: rl.retryAfterSec }));
     }
 
     try {
@@ -276,8 +277,8 @@ router.post("/reset-pin/question", asyncHandler(async (req: any, res: any) => {
         // Throttle repeated lookups (incl. misses) so this endpoint can't be used as a
         // fast user-enumeration / question-harvesting oracle.
         registerFailure(key);
-        if (err.message === "USER_NOT_FOUND") return sendError(res, 404, "등록되지 않은 번호입니다");
-        if (err.message === "NO_SECURITY_QUESTION") return sendError(res, 400, "보안 질문이 설정되지 않은 계정입니다. 고객센터에 문의해주세요.");
+        if (err.message === "USER_NOT_FOUND") return sendError(res, 404, "err.auth.phoneNotRegistered");
+        if (err.message === "NO_SECURITY_QUESTION") return sendError(res, 400, "err.auth.noSecurityQuestion");
         return sendError(res, 500, err.message);
     }
 }));
@@ -285,12 +286,12 @@ router.post("/reset-pin/question", asyncHandler(async (req: any, res: any) => {
 // POST /reset-pin/verify - Verify answer and reset PIN
 router.post("/reset-pin/verify", asyncHandler(async (req: any, res: any) => {
     const { phone, answer, newPin } = req.body;
-    if (!phone || !answer || !newPin) return sendError(res, 400, "필수 정보가 누락되었습니다");
+    if (!phone || !answer || !newPin) return sendError(res, 400, "err.auth.missingFields");
 
     const key = attemptKey('reset-verify', phone, req.ip);
     const rl = checkRateLimit(key);
     if (rl.limited) {
-        return sendError(res, 429, `시도가 너무 많습니다. ${rl.retryAfterSec}초 후 다시 시도해주세요.`);
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
     }
 
     try {
@@ -301,7 +302,7 @@ router.post("/reset-pin/verify", asyncHandler(async (req: any, res: any) => {
         if (err.message === "INVALID_ANSWER") {
             // Count each wrong security-answer guess toward the lockout threshold.
             registerFailure(key);
-            return sendError(res, 401, "정답이 일치하지 않습니다");
+            return sendError(res, 401, "err.auth.wrongAnswer");
         }
         return sendError(res, 500, err.message);
     }

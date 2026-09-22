@@ -2703,5 +2703,6 @@ const es: Dict = {
   "landing.inputError": "Error de entrada",
   "landing.pinTooShort": "Ingresa un PIN de al menos 4 dígitos.",
   "landing.errorPrefix": "Error:",
+  "chat.sharedCard": "Compartió una tarjeta",
 };
 export default es;

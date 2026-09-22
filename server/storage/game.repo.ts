@@ -16,6 +16,7 @@ import type {
 } from "../../shared/schema.js";
 import { eq, ne, desc, asc, and, or, sql, gt, inArray } from "drizzle-orm";
 import { notFound } from "../utils/errors.js";
+import { msg } from "../lib/i18n.js";
 import { scoringInnings } from "../../shared/averageRule.js";
 
 const HANDICAP_MAP_4C = [
@@ -121,7 +122,7 @@ export class GameRepository {
 
     async finishHiqGame(id: string, finalData: Partial<HiqGame>): Promise<HiqGame> {
         const currentGame = await this.getHiqGameById(id);
-        if (!currentGame) throw notFound("Game not found");
+        if (!currentGame) throw notFound(msg("err.game.notFound"));
 
         // Fast path: already finished.
         if (currentGame.status === "finished") return currentGame;
@@ -234,7 +235,7 @@ export class GameRepository {
         // Lost the race — another request finished it first. Return that result untouched.
         if (!finished) {
             const existing = await this.getHiqGameById(id);
-            if (!existing) throw notFound("Game not found");
+            if (!existing) throw notFound(msg("err.game.notFound"));
             return existing;
         }
 

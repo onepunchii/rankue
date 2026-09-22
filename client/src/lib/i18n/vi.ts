@@ -2703,5 +2703,6 @@ const vi: Dict = {
   "landing.inputError": "Lỗi nhập liệu",
   "landing.pinTooShort": "Vui lòng nhập mã PIN ít nhất 4 chữ số.",
   "landing.errorPrefix": "Lỗi:",
+  "chat.sharedCard": "Đã chia sẻ một thẻ",
 };
 export default vi;

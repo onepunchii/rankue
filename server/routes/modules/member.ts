@@ -4,6 +4,7 @@ import { golfAllowed } from "../../lib/golfAccess.js";
 import { put } from "@vercel/blob";
 import { deleteBlobs } from "../../utils/blob.js";
 import { storage, getRecentOpponents, searchUsers } from "../../storage/index.js";
+import { localeOf, msg } from "../../lib/i18n.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
@@ -35,18 +36,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Vercel Blob and return the public URL. DB rows keep only the URL, never base64.
 router.post("/upload", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        return sendError(res, 500, "이미지 저장소가 설정되지 않았습니다");
+        return sendError(res, 500, "err.member.uploadNotConfigured");
     }
     const { dataUrl, category } = req.body || {};
     if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
-        return sendError(res, 400, "이미지 데이터가 필요합니다");
+        return sendError(res, 400, "err.member.imageRequired");
     }
 
     const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
     const buffer = Buffer.from(base64, "base64");
     // Guard: compressed webp should be small; reject anything unreasonably large (8MB).
-    if (buffer.length === 0) return sendError(res, 400, "빈 이미지입니다");
-    if (buffer.length > 8 * 1024 * 1024) return sendError(res, 413, "이미지가 너무 큽니다");
+    if (buffer.length === 0) return sendError(res, 400, "err.member.imageEmpty");
+    if (buffer.length > 8 * 1024 * 1024) return sendError(res, 413, "err.member.imageTooLarge");
 
     const safeCat = String(category || "misc").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) || "misc";
     const { url } = await put(`hiq/${safeCat}/${req.userId}.webp`, buffer, {
@@ -65,7 +66,13 @@ router.post("/upload", requireAuth, asyncHandler(async (req: AuthRequest, res: a
 // GET /me
 router.get("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
-    if (!member) return sendError(res, 404, "회원 없음");
+    if (!member) return sendError(res, 404, "err.member.notFound");
+    // 앱 언어를 기억한다 — 푸시는 받는 사람 언어로 만들어야 하는데 그때는 요청이 없다. 바뀌었을 때만 쓴다.
+    const locale = localeOf(res);
+    if ((member as any).locale !== locale) {
+        await storage.setMemberLocale(member.id, locale).catch((e: unknown) => console.error("[MemberLocale]", e));
+        (member as any).locale = locale;
+    }
     // 저장된 세션(토큰)으로 자동 로그인해 앱을 연 것도 방문이다 — 하루 한 번만 오른다(incrementVisitCount 가 같은 날은 건너뜀). 2026-09-08 오너.
     storage.incrementVisitCount(member.id).catch((e: unknown) => console.error("[VisitCount]", e));
 
@@ -95,15 +102,15 @@ router.get("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =
 // PATCH /me/handle — @핸들 변경 (유니크·형식 검사. 글로벌 신원의 기본 식별자)
 router.patch("/me/handle", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
-    if (!member?.profileId) return sendError(res, 404, "프로필 없음");
+    if (!member?.profileId) return sendError(res, 404, "err.member.profileNotFound");
 
     const { normalizeHandle, isHandleTaken } = await import("../../lib/handle.js");
     const handle = normalizeHandle(String(req.body?.handle ?? ""));
-    if (!handle) return sendError(res, 400, "핸들은 영문 소문자·숫자·_ 3~20자여야 합니다 (숫자 시작 불가)");
+    if (!handle) return sendError(res, 400, "err.member.handleFormat");
 
     const current = await storage.getProfile(member.profileId);
     if (current?.handle === handle) return sendSuccess(res, { handle });
-    if (await isHandleTaken(handle)) return sendError(res, 409, "이미 사용 중인 핸들입니다");
+    if (await isHandleTaken(handle)) return sendError(res, 409, "err.member.handleTaken");
 
     await storage.updateProfile(member.profileId, { handle } as any);
     return sendSuccess(res, { handle });
@@ -168,16 +175,16 @@ router.post("/me/app-session/close", requireAuth, asyncHandler(async (req: AuthR
  */
 router.get("/me/notification-prefs", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
-    if (!member) return sendError(res, 404, "회원 정보 없음");
+    if (!member) return sendError(res, 404, "err.member.infoNotFound");
     return sendSuccess(res, { prefs: fullPrefs((member as { pushPrefs?: unknown }).pushPrefs) });
 }));
 
 /** PATCH /me/notification-prefs — 보낸 카테고리만 바꾼다. 모르는 키는 버린다(normalizePrefs). */
 router.patch("/me/notification-prefs", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
-    if (!member) return sendError(res, 404, "회원 정보 없음");
+    if (!member) return sendError(res, 404, "err.member.infoNotFound");
     const patch = normalizePrefs(req.body?.prefs);
-    if (Object.keys(patch).length === 0) return sendError(res, 400, "바꿀 알림 설정이 없습니다");
+    if (Object.keys(patch).length === 0) return sendError(res, 400, "err.member.noPrefsToChange");
     const next = { ...normalizePrefs((member as { pushPrefs?: unknown }).pushPrefs), ...patch };
     await storage.users.updateMember(req.userId!, { pushPrefs: next });
     return sendSuccess(res, { prefs: fullPrefs(next) });
@@ -185,7 +192,7 @@ router.patch("/me/notification-prefs", requireAuth, asyncHandler(async (req: Aut
 
 router.patch("/me", requireAuth, gateProfileUgc, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
-    if (!member) return sendError(res, 404, "회원 정보 없음");
+    if (!member) return sendError(res, 404, "err.member.infoNotFound");
 
     const { profileImageUrl, name: rawName, introduction: rawIntro } = req.body;
     // 이름·소개 필터 — 욕설·금전 내기·거래는 거부, 이름의 연락처는 거부, 소개의 연락처는 가린다(crewModeration).
@@ -241,7 +248,7 @@ router.patch("/me", requireAuth, gateProfileUgc, asyncHandler(async (req: AuthRe
 router.post("/me/terms", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const version = req.body?.version;
     if (!isTermsAccepted(version)) {
-        return sendError(res, 400, "약관이 새로 바뀌었어요. 화면을 새로고침한 뒤 다시 동의해 주세요", "TERMS_OUTDATED");
+        return sendError(res, 400, "err.member.termsOutdated", "TERMS_OUTDATED");
     }
     await recordTermsAcceptance(req.userId!, version);
     return sendSuccess(res, { termsVersion: version });
@@ -270,17 +277,17 @@ router.post("/me/recalculate-avg", requireAuth, asyncHandler(async (req: AuthReq
 
 // GET /members/:memberId - Get public member info
 router.get("/members/:memberId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    if (!UUID_RE.test(req.params.memberId)) return sendError(res, 400, "회원 ID가 올바르지 않습니다");
+    if (!UUID_RE.test(req.params.memberId)) return sendError(res, 400, "err.member.invalidId");
 
     const member = await storage.getMemberById(req.params.memberId);
-    if (!member) return sendError(res, 404, "회원 없음");
+    if (!member) return sendError(res, 404, "err.member.notFound");
     return sendSuccess(res, toPublicMember(member));
 }));
 
 // GET /opponents
 router.get("/opponents", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
-    if (!member) return sendError(res, 404, "회원 없음");
+    if (!member) return sendError(res, 404, "err.member.notFound");
 
     const sport = (req.query.sport as string) === "GOLF" ? "GOLF" : "BILLIARDS";
     const opponents = await storage.getAvailableOpponents(member.storeId, member.id, sport);
@@ -303,13 +310,13 @@ router.post("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: 
     // 검증 없이 넘기면 (a) 형식이 틀린 값은 Postgres 22P02로 500이 나고,
     // (b) 존재하는 UUID만 알면 아무 회원에게나 라이벌 추가 푸시를 쏠 수 있다.
     if (typeof finalTargetId !== "string" || !UUID_RE.test(finalTargetId)) {
-        return sendError(res, 400, "상대 회원 ID가 올바르지 않습니다");
+        return sendError(res, 400, "err.member.invalidTargetId");
     }
     if (finalTargetId === req.userId) {
-        return sendError(res, 400, "자기 자신은 라이벌로 추가할 수 없습니다");
+        return sendError(res, 400, "err.member.rivalSelf");
     }
     if (!(await storage.getMemberById(finalTargetId))) {
-        return sendError(res, 404, "회원 없음");
+        return sendError(res, 404, "err.member.notFound");
     }
 
     // 중복 방어. hiqFriendships 유니크 제약은 (requester, receiver, sport) 한 방향뿐이라
@@ -321,7 +328,7 @@ router.post("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: 
             and(eq(hiqFriendships.requesterId, finalTargetId), eq(hiqFriendships.receiverId, req.userId!))
         )
     )).limit(1);
-    if (existing) return sendError(res, 409, "이미 라이벌로 등록된 회원입니다");
+    if (existing) return sendError(res, 409, "err.member.rivalExists");
 
     const result = await storage.requestFriend(req.userId!, finalTargetId, sportCategory);
 
@@ -334,8 +341,8 @@ router.post("/friends", requireAuth, asyncHandler(async (req: AuthRequest, res: 
             // 기다린다(서버리스) — 안 기다리면 응답과 함께 얼어 라이벌 추가 알림이 사라진다.
             await notificationService.sendAndSaveNotification({
                 memberId: finalTargetId,
-                title: "👊 라이벌 추가",
-                body: senderName ? `${senderName}님이 회원님을 라이벌로 추가했어요!` : "누군가가 라이벌로 추가했습니다",
+                title: "notif.member.rivalAdded.title",
+                body: senderName ? msg("notif.member.rivalAdded.body", { name: senderName }) : "notif.member.rivalAdded.bodyAnon",
                 category: sportCategory,
                 type: "FRIEND",
                 params: { url: "/friends" },

@@ -26,9 +26,17 @@ export interface ChatRoomRow {
     subtitle: string;
     imageUrl: string | null;
     listing?: { listingType: string; joinType: string | null; datetime: string; courseName: string; region: string };
-    lastMessage: { text: string; at: string; senderName: string | null } | null;
+    lastMessage: { text: string; at: string; senderName: string | null; i18n?: { key: string; params?: Record<string, unknown> } | null } | null;
     unread: number;
     memberCount: number;
+}
+
+/** 시스템·카드 미리보기는 서버가 준 키로 내 언어로(ChatRoom.systemText 와 같은 규칙). */
+function previewText(l: { text: string; i18n?: { key: string; params?: Record<string, unknown> } | null }, t: (k: string) => string): string {
+    if (!l.i18n?.key) return l.text;
+    const raw = t(l.i18n.key);
+    if (raw === l.i18n.key) return l.text;
+    return raw.replace(/\{(\w+)\}/g, (mm, k) => (l.i18n?.params && l.i18n.params[k] !== undefined && l.i18n.params[k] !== null ? String(l.i18n.params[k]) : mm));
 }
 
 export const CHAT_ROOMS_KEY = (sport: string) => ["/api/hiq/chat/rooms", sport] as const;
@@ -152,7 +160,7 @@ export default function ChatHub() {
                                             </span>
                                         </span>
                                         <span className={cn("block text-[13px] truncate mt-0.5", r.unread > 0 ? "text-ink-1 font-medium" : "text-ink-3")}>
-                                            {r.lastMessage ? `${r.lastMessage.senderName ? r.lastMessage.senderName + ": " : ""}${r.lastMessage.text}` : t("chat.noMessagesYet")}
+                                            {r.lastMessage ? `${r.lastMessage.senderName ? r.lastMessage.senderName + ": " : ""}${previewText(r.lastMessage, t)}` : t("chat.noMessagesYet")}
                                         </span>
                                     </span>
                                     <span className="shrink-0 flex flex-col items-end gap-1">

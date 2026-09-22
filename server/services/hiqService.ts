@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { storage } from "../storage/index.js";
 import { HiqStore, HiqMember, InsertHiqMember } from "../../shared/schema.js";
 import { unauthorized, notFound, badRequest } from "../utils/errors.js";
+import { msg } from "../lib/i18n.js";
 import type { SocialIdentity } from "../lib/socialAuth.js";
 import { generateHandle } from "../lib/handle.js";
 
@@ -127,7 +128,7 @@ export class HiqService {
 
     async login(phone: string, storeSlug: string, password?: string) {
         const store = await storage.getStoreBySlug(storeSlug);
-        if (!store) throw notFound("STORE_NOT_FOUND");
+        if (!store) throw notFound(msg("err.hiq.storeNotFound"));
 
         const member = await storage.getMemberByPhone(store.id, phone);
         if (member) {

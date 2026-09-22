@@ -76,7 +76,8 @@ describe("운영자 조치(applyModerationAction)", () => {
             action: "blind", adminProfileId: "admin-p", authorMemberId: "a1", note: null,
         }));
         expect(m.send).toHaveBeenCalledWith(expect.objectContaining({ memberId: "a1", params: { url: "/community/t1" } }));
-        expect(m.send.mock.calls[0][0].body).toContain("이의제기");
+        // 문구는 받는 사람 언어로 풀리므로 키로 나간다(이의제기 가능한 대상 → bodyAppeal)
+        expect(m.send.mock.calls[0][0].body).toBe("notif.moderation.blind.bodyAppeal");
     });
 
     it("알림이 실패해도 조치는 성공으로 끝난다", async () => {

@@ -4,6 +4,7 @@ import { hiqCrewActivities, hiqCrewActivityParticipants, hiqPolls, hiqPollVotes,
 import { eq, and, gte, lte, ne, sql } from "drizzle-orm";
 import { notificationService } from "./notificationService.js";
 import { storage } from "../storage/index.js";
+import { msg } from "../lib/i18n.js";
 
 // Runs every 30 minutes
 const SCHEDULE = "*/30 * * * *";
@@ -68,15 +69,13 @@ async function sendActivityReminder(
 
   const sportCategory = await getCrewSportCategory(crewId);
   const timeStr = activityDate.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  const emoji = hoursLeft === 24 ? "📅" : "⏰";
-  const body = hoursLeft === 24
-    ? `내일 ${timeStr}에 "${title}"이(가) 있습니다. 지금 확인해주세요!`
-    : `곧 시작합니다! "${title}"이(가) ${timeStr}에 시작해요.`;
+  // 제목·본문은 받는 사람 언어로 풀린다(notificationService). 이모지(📅/⏰)는 사전 값 안에 있다.
+  const k = hoursLeft === 24 ? "notif.reminder.activity24" : "notif.reminder.activity1";
 
   await notificationService.sendAndSaveNotification({
     memberId: participantId,
-    title: `${emoji} [크루] 정모 리마인더`,
-    body,
+    title: msg(`${k}.title`),
+    body: msg(`${k}.body`, { time: timeStr, title }),
     category: sportCategory,
     type: "ACTIVITY_REMINDER",
     params: { url: `/crew/${crewId}/activity`, reminderKey },
@@ -103,8 +102,8 @@ async function sendPollReminder(pollId: string, participantId: string, crewId: s
 
   await notificationService.sendAndSaveNotification({
     memberId: participantId,
-    title: `📊 [크루] 투표 마감 임박`,
-    body: `"${title}" 투표가 ${timeStr}에 마감됩니다. 지금 투표해주세요!`,
+    title: msg("notif.reminder.poll.title"),
+    body: msg("notif.reminder.poll.body", { title, time: timeStr }),
     category: sportCategory,
     type: "POLL_REMINDER",
     params: { url: `/crew/${crewId}`, reminderKey },

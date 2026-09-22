@@ -1,5 +1,6 @@
 import { storage } from "../storage/index.js";
 import { notificationService } from "./notificationService.js";
+import { msg } from "../lib/i18n.js";
 
 /**
  * 크루 채팅 알림 — 두 곳에서 쓴다: 사람이 친 메시지(crew.ts)와 서버가 만든 카드(골프 부킹 공유).
@@ -31,7 +32,7 @@ export async function notifyCrewChat(opts: {
             .filter((m: any) => m.member.id !== opts.senderId)
             .filter((m: any) => !blockers.has(m.member.id));
         const sender = (crewData.members || []).find((m: any) => m.member.id === opts.senderId);
-        const senderName = sender?.member.name || "누군가";
+        const senderName: string | undefined = sender?.member.name || undefined;
 
         // 설정 조회도 멤버별로 병렬 — 순차 await 이면 큰 크루에서 응답이 느려진다.
         const results = await Promise.allSettled(targets.map(async (m: any) => {
@@ -39,8 +40,9 @@ export async function notifyCrewChat(opts: {
             if (!chatSetting.chatEnabled) return;
             await notificationService.sendAndSaveNotification({
                 memberId: m.member.id,
-                title: `💬 [${crewData.crew.name}] 새 메시지`,
-                body: `${senderName}: ${opts.preview}`,
+                // 받는 사람 언어로 풀린다(notificationService). preview 는 사용자 글이라 그대로.
+                title: msg("notif.chat.newMessage.title", { room: crewData.crew.name }),
+                body: senderName ? msg("notif.chat.newMessage.body", { name: senderName, text: opts.preview }) : msg("notif.chat.newMessageAnon.body", { text: opts.preview }),
                 category: crewData.crew.sportCategory || "BILLIARDS",
                 type: "CHAT",
                 params: { url: `/crew/${opts.crewId}/chat`, crewId: opts.crewId, tab: "chat" },

@@ -69,7 +69,7 @@ export async function requireTermsAccepted(req: AuthRequest, res: Response, next
         // 조회 실패 때 그냥 통과시키면 정지된 계정·미동의 회원이 그 틈에 글을 올린다(검토 policy:R10).
         // DB 가 흔들리는 순간이면 뒤따르는 글 저장도 대개 실패하므로, 잠시 뒤 다시 하라고 안내하는 편이 낫다.
         console.error("[Terms] gate lookup failed:", (e as Error)?.message);
-        return sendError(res, 503, "잠시 후 다시 시도해 주세요");
+        return sendError(res, 503, "err.common.retryLater");
     }
     if (state.banned) {
         passCache.delete(memberId);

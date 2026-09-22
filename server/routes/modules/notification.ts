@@ -39,8 +39,8 @@ router.post("/test-notification", requireAuth, asyncHandler(async (req: AuthRequ
 
     await notificationService.sendAndSaveNotification({
         memberId: req.userId!,
-        title: title || "🔔 테스트 알림",
-        body: body || "알림함 기능 테스트입니다.",
+        title: title || "notif.chat.test.title",
+        body: body || "notif.chat.test.body",
         category: category || "GOLF",
         type: type || "NOTICE",
         params: params || {}

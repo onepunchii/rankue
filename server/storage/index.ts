@@ -38,6 +38,7 @@ class Storage {
     // --- Backward Compatibility Wrappers ---
     // User / Member
     async getMemberById(id: string) { return this.users.getMemberById(id); }
+    async setMemberLocale(id: string, locale: string) { return this.users.setMemberLocale(id, locale); }
     async getMemberByPhone(storeId: string, phone: string) { return this.users.getMemberByPhone(storeId, phone); }
     async getMembersByPhone(phone: string) { return this.users.getMembersByPhone(phone); }
     async updateMember(id: string, data: any) { return this.users.updateMember(id, data); }

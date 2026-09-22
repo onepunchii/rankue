@@ -10,7 +10,7 @@ export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction)
     // set by an attacker) will not appear in signedCookies, so it is rejected.
     const userId = (req as any).signedCookies?.hiq_user_id;
     if (!userId) {
-        return sendError(res, 401, "로그인이 필요합니다");
+        return sendError(res, 401, "err.common.loginRequired");
     }
     req.userId = userId;
     next();

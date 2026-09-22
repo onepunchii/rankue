@@ -168,6 +168,8 @@ export const hiqMembers = pgTable("hiq_members", {
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  /** 앱 언어(ko·en·vi·tr·es). 푸시는 받는 사람 언어로 만들어야 하므로 저장한다 — GET /me 때 x-locale 헤더로 갱신(2026-09-22). */
+  locale: text("locale").default("ko").notNull(),
 }, (table) => [
   unique().on(table.storeId, table.phone), // 같은 매장에서 같은 번호 중복 방지 (기존 호환)
 ]);

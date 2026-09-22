@@ -9,11 +9,33 @@ import { notificationService } from "./notificationService.js";
 import { deleteBlobs } from "../utils/blob.js";
 import {
     reportKey, reportStatusForAction, authorNoticeFor, shouldAlertAdmins, buildReportAlert, snapshotNote,
-    REPORT_ALERT_TYPE, REPORT_QUEUE_URL,
+    REPORT_ALERT_TYPE, REPORT_QUEUE_URL, APPEALABLE_TARGETS,
     type ReportTargetType, type ModerationAction,
 } from "../lib/reportQueue.js";
 
 const ADMIN_BLIND_REASON = "운영 정책 위반으로 블라인드 처리되었습니다";
+
+/**
+ * 작성자 안내 문구의 사전 키 — 한국어 원문은 lib/reportQueue authorNoticeFor 와 같다(그쪽은 순수 규칙·테스트용으로 남긴다).
+ * 받는 사람 언어로 풀리도록 notificationService 에는 키를 넘긴다.
+ */
+function authorNoticeKeysFor(action: ModerationAction, targetType: ReportTargetType): { title: string; body: string } | null {
+    const canAppeal = APPEALABLE_TARGETS.includes(targetType);
+    switch (action) {
+        case "blind":
+            return { title: "notif.moderation.blind.title", body: canAppeal ? "notif.moderation.blind.bodyAppeal" : "notif.moderation.blind.body" };
+        case "delete":
+            return { title: "notif.moderation.delete.title", body: "notif.moderation.delete.body" };
+        case "unblind":
+            return { title: "notif.moderation.unblind.title", body: "notif.moderation.unblind.body" };
+        case "appeal_approve":
+            return { title: "notif.moderation.appealResult.title", body: "notif.moderation.appealApprove.body" };
+        case "appeal_reject":
+            return { title: "notif.moderation.appealResult.title", body: "notif.moderation.appealReject.body" };
+        default:
+            return null;
+    }
+}
 
 export type ModerationResult = { ok: true; closed: number } | { ok: false; status: number; message: string };
 
@@ -73,7 +95,7 @@ export async function applyModerationAction(p: {
     });
 
     // 작성자 안내 — 알림 실패가 조치를 실패로 만들면 안 된다(조치는 이미 끝났다).
-    const notice = authorNoticeFor(p.action, p.targetType);
+    const notice = authorNoticeFor(p.action, p.targetType) && authorNoticeKeysFor(p.action, p.targetType);
     if (notice && item.author && p.targetType !== "member") {
         try {
             await notificationService.sendAndSaveNotification({

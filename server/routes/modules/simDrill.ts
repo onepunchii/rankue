@@ -98,12 +98,12 @@ router.get("/sim/drills/ladder", requireAuth, asyncHandler(async (req: AuthReque
 // POST /sim/drills/:drillId/attempt — 이번 주 채점 시도(1회). 서버가 고정 배치에서 재시뮬해 판정한다.
 router.post("/sim/drills/:drillId/attempt", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const parsed = attemptSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, "샷 입력이 올바르지 않습니다");
+    if (!parsed.success) return sendError(res, 400, "err.sim.badShot");
     const { input, clientHash } = parsed.data;
-    if (input.a * input.a + input.b * input.b > 0.25 + 1e-12) return sendError(res, 400, "미스큐 범위입니다");
+    if (input.a * input.a + input.b * input.b > 0.25 + 1e-12) return sendError(res, 400, "err.sim.miscue");
     const weekId = currentWeekId();
     const drill = findDrill(req.params.drillId);
-    if (!drill || !drillsForWeek(weekId).some((d) => d.id === drill.id)) return sendError(res, 404, "이번 주 드릴이 아닙니다");
+    if (!drill || !drillsForWeek(weekId).some((d) => d.id === drill.id)) return sendError(res, 404, "err.sim.drillNotThisWeek");
 
     const balls = drillLayout(drill, TABLES[DRILL_TABLE]);
     const result = simulateShot(balls, input as ShotInput, DRILL_PARAMS);
@@ -114,7 +114,7 @@ router.post("/sim/drills/:drillId/attempt", requireAuth, asyncHandler(async (req
         success: outcome.scored, cushions: outcome.cushionsBeforeSecond, outcomeCode: outcome.code,
         engineVersion: ENGINE_VERSION,
     });
-    if (!row) return sendError(res, 409, "이번 주 이 드릴은 이미 채점했어요", "ALREADY_ATTEMPTED");
+    if (!row) return sendError(res, 409, "err.sim.drillAlreadyAttempted", "ALREADY_ATTEMPTED");
     return sendSuccess(res, {
         attempt: { ...row, route: outcome.scored ? routeOf(drill, result.events) : null },
         mismatch: clientHash !== undefined && clientHash !== result.hash,
