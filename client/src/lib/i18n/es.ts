@@ -2782,5 +2782,7 @@ const es: Dict = {
   "chat.attach.simInviteGo": "Abrir sala y enviar",
   "chat.attach.simInviteHandicapNote": "Cuando entre tu rival, los objetivos se calculan con el historial en línea de ambos — no se usa el hándicap declarado.",
   "chat.attach.simInviteSameNote": "Los dos juegan al mismo puntaje. Si ya tienes una sala igual abierta, se reutiliza.",
+  "golf.urgentRibbon": "⚡ Urgente",
+  "golf.urgentNote": "El carrito y el caddie se reparten en el campo",
 };
 export default es;

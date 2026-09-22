@@ -8,7 +8,8 @@ import { notifyCrewChat } from "../../services/crewChatNotify.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { z } from "zod";
 import { notificationService } from "../../services/notificationService.js";
-import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, type JoinType } from "../../../shared/golfJoin.js";
+import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, type JoinType } from "../../../shared/golfJoin.js";
+import { msg } from "../../lib/i18n.js";
 
 const router = Router();
 
@@ -71,6 +72,55 @@ function usablePhone(phone: string | null | undefined): string | null {
     if (!phone || phone.startsWith("social:")) return null;
     const d = phone.replace(/\D/g, "");
     return d.length >= 10 && d.length <= 11 ? phone : null;
+}
+
+/**
+ * 긴급 조인(당일 떨이) 전체 방송 — 2026-09-23 오너: "오늘인데 사람이 안 구해져서 10만원짜리 그린피를 만원에 올리는 것.
+ * 한 명만 채우면 카트비·캐디피는 N빵이니까. 그런 티는 골프 유저에게 전체 푸시가 가게 해서 우리만의 킬링 포인트로 —
+ * 다른 곳은 푸시알림이 없거든."
+ *
+ * 부킹매니저가 편해야 넘어온다(오너) → 매니저가 따로 켤 체크박스는 두지 않는다. 값과 시간만 보고 서버가 알아서 판단한다.
+ */
+const URGENT_BROADCAST_LIMIT = 300;
+/** 방송을 기다려 주는 상한(ms). 서버리스는 응답을 보내면 얼어붙어, 기다리지 않은 푸시는 한 건도 안 나간다(simMatch 방송과 같은 이유). */
+const URGENT_BROADCAST_WAIT_MS = 6000;
+/** 같은 사람이 이 시간 안에 또 방송하지는 못한다 — 재고를 몰아 올리는 매니저가 하루에 열 통을 쏘면 다들 알림을 끈다. */
+const URGENT_QUIET_HOURS = 6;
+/** 조용한 시간(한국 시각): 21시~08시엔 푸시를 안 보낸다. 글은 그대로 올라가고 긴급 배지도 붙는다 — 푸시만 건너뛴다. */
+const URGENT_PUSH_FROM_HOUR = 8;
+const URGENT_PUSH_UNTIL_HOUR = 21;
+
+/** 방송 본문의 티오프 시각 "07:40"(한국 시각). 긴급 조인은 늘 오늘이라 날짜는 붙이지 않는다. */
+function teeTimeOnly(datetime: Date | string): string {
+    const k = new Date(new Date(datetime).getTime() + 9 * 3_600_000);
+    return `${String(k.getUTCHours()).padStart(2, "0")}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+async function broadcastUrgentJoin(ownerId: string, b: any): Promise<number> {
+    const hour = kstHour(Date.now());
+    if (hour < URGENT_PUSH_FROM_HOUR || hour >= URGENT_PUSH_UNTIL_HOUR) return 0;
+    if (await storage.notifs.hasRecentGolfUrgent(ownerId, URGENT_QUIET_HOURS)) return 0;
+    const targets = await storage.notifs.listGolfPushMembers([ownerId], URGENT_BROADCAST_LIMIT);
+    if (targets.length === 0) return 0;
+    // 받는 사람이 수백 명이고 언어도 제각각이라 문장을 여기서 만들지 않는다 — 키로 보내고 서비스가 받는 사람 언어로 푼다.
+    // 비공개(isBlind) 글은 실명 대신 가명이다. 확정 전 사람에게 가는 알림에 실명이 실리면 가려 놓은 뜻이 없다.
+    const title = msg("notif.golf.urgent.title", { time: teeTimeOnly(b.datetime), region: b.region ?? "" });
+    const body = msg("notif.golf.urgent.body", {
+        course: listingName(b),
+        fee: Number(b.greenFee).toLocaleString("en-US"),
+        open: joinCapacity(b),
+    });
+    const sends = targets.map((memberId) => notificationService.sendAndSaveNotification({
+        memberId, title, body, category: "GOLF", type: "GOLF_URGENT", pref: "golf",
+        // ownerId 는 도배 방지(hasRecentGolfUrgent)가 되짚는 값이다 — 딥링크는 url 만 본다.
+        // teeAt: 푸시 유효기간을 티오프까지로 자른다(pushOptionsFor) — 꺼진 기기가 나중에 켜져도 지난 티는 안 뜬다.
+        params: { url: `/golf/booking-list/${b.id}?view=JOIN`, ownerId, teeAt: new Date(b.datetime).toISOString() },
+    }).catch((e) => { console.error("[GolfUrgentBroadcast]", e); }));
+    await Promise.race([
+        Promise.allSettled(sends),
+        new Promise((r) => setTimeout(r, URGENT_BROADCAST_WAIT_MS)),
+    ]);
+    return targets.length;
 }
 
 router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -148,6 +198,11 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
 
     const results: GolfBooking[] = [];
     for (const data of validated) results.push(await storage.createGolfBooking(data as any));
+
+    // 긴급 조인이면 골프 회원 전체에 알린다. 부킹 시트처럼 한 번에 여러 건을 올려도 **푸시는 1통**(첫 한 건)이다 —
+    // 40건이 40통이 되면 그날로 다들 알림을 끈다. 방송이 실패해도 글 등록은 성공이어야 하니 여기서 삼킨다.
+    const urgent = results.find((r) => isUrgentJoin(r as any, Date.now()));
+    if (urgent) await broadcastUrgentJoin(req.userId!, urgent).catch((e) => console.error("[GolfUrgentBroadcast]", e));
 
     return sendSuccess(res, results);
 }));
@@ -482,6 +537,9 @@ router.post("/bookings/:id/share/crew", requireAuth, asyncHandler(async (req: Au
 /** 목록에 '몇 명 찼는지'와 '내가 신청했는지'를 얹는다 — 화면이 그걸 알아야 신청/취소를 가른다. */
 async function withJoinCounts(rows: any[], userId?: string) {
     const ids = rows.map((r) => r.id);
+    // 긴급 여부는 컬럼이 아니라 계산이다(shared/golfJoin) — 시간이 지나 자격을 잃으면 배지도 저절로 사라진다.
+    // 한 응답 안에서는 같은 '지금'을 쓴다: 행마다 Date.now() 를 부르면 경계에 걸친 글이 같은 목록에서 엇갈릴 수 있다.
+    const now = Date.now();
     const [counts, mine] = await Promise.all([
         storage.countJoinRequests(ids),
         userId ? storage.myJoinStatuses(userId, ids) : Promise.resolve(new Map<string, string>()),
@@ -509,6 +567,7 @@ async function withJoinCounts(rows: any[], userId?: string) {
             joinApplied: c?.accepted ?? 0,
             joinPending: c?.pending ?? 0,
             joinCapacity: joinCapacity(r),
+            isUrgent: isUrgentJoin(r, now),
             myJoinStatus: myStatus,
             joinedByMe: myStatus === "applied" || myStatus === "accepted",
         };

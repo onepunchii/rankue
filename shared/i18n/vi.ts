@@ -401,5 +401,7 @@ export const vi: Record<string, string> = {
   "notif.chat.card.body.GOLF_BOOKING.BOOKING": "⛳ Đặt chỗ · {name} · {when}",
   "notif.chat.card.body.GOLF_MATCH": "⛳ {name} · PIN {pin}",
   "notif.chat.card.body.GOLF_ROUND": "⛳ {name} · {n} gậy",
+  "notif.golf.urgent.title": "⚡ Ghép sân gấp hôm nay lúc {time} · {region}",
+  "notif.golf.urgent.body": "{course} · Phí sân ₩{fee} · còn {open} chỗ — phí xe và caddie chia đều",
 };
 export default vi;

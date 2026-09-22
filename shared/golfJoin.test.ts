@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { distanceKm, formatDistance, isKoreaCoord, normalizeSlots, openSlotCount, slotsFromLegacy, JOIN_OPTIONS } from "./golfJoin";
+import { distanceKm, formatDistance, isKoreaCoord, isUrgentJoin, kstHour, normalizeSlots, openSlotCount, slotsFromLegacy, JOIN_OPTIONS, URGENT_MAX_FEE, URGENT_MIN_LEAD_MS } from "./golfJoin";
 
 describe("골프 조인 자리(slot) 규칙", () => {
     it("첫 자리는 호스트, 모집 자리가 하나는 있어야 하고, 2~4자리", () => {
@@ -50,5 +50,66 @@ describe("거리", () => {
         expect(isKoreaCoord(127, 37.5)).toBe(false);
         expect(isKoreaCoord("37.5", 127)).toBe(false);
         expect(isKoreaCoord(null, null)).toBe(false);
+    });
+});
+
+describe("긴급 조인(당일 떨이)", () => {
+    /** 한국 시각을 UTC 밀리초로 — 테스트가 돌아가는 기기 시간대에 결과가 흔들리지 않게 직접 만든다. */
+    const kst = (y: number, m: number, d: number, h: number, min = 0) => Date.UTC(y, m - 1, d, h - 9, min);
+
+    // 기준: 한국 2026-09-23(수) 09:00. 티오프는 같은 날 14:00(5시간 뒤).
+    const now = kst(2026, 9, 23, 9);
+    const base = { listingType: "JOIN", joinType: "FIELD", costMode: "FIXED", greenFee: 10000, datetime: new Date(kst(2026, 9, 23, 14)) };
+
+    it("오늘·필드·고정가·싼 값·시간 여유면 긴급이다", () => {
+        expect(isUrgentJoin(base, now)).toBe(true);
+        expect(isUrgentJoin({ ...base, datetime: new Date(kst(2026, 9, 23, 14)).toISOString() }, now)).toBe(true);  // 문자열 datetime 도 같다
+    });
+
+    it("값 경계: 19,999 · 20,000 은 긴급, 20,001 은 아니다", () => {
+        // 오너 확정(2026-09-23): 3만원 이하가 '던지는 가격'. 보통 조인은 10~15만원이라 섞이지 않는다.
+        expect(URGENT_MAX_FEE).toBe(30_000);
+        expect(isUrgentJoin({ ...base, greenFee: 25_000 }, now)).toBe(true);
+        expect(isUrgentJoin({ ...base, greenFee: 29_999 }, now)).toBe(true);
+        expect(isUrgentJoin({ ...base, greenFee: URGENT_MAX_FEE }, now)).toBe(true);
+        expect(isUrgentJoin({ ...base, greenFee: URGENT_MAX_FEE + 1 }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, greenFee: 100_000 }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, greenFee: 0 }, now)).toBe(true);
+        expect(isUrgentJoin({ ...base, greenFee: undefined }, now)).toBe(false);   // 값이 비면 0 으로 읽지 않는다
+        expect(isUrgentJoin({ ...base, greenFee: null }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, greenFee: -1 }, now)).toBe(false);
+    });
+
+    it("남은 시간 경계: 1시간 59분은 아니고 2시간 1분은 긴급", () => {
+        expect(isUrgentJoin({ ...base, datetime: new Date(now + URGENT_MIN_LEAD_MS - 60_000) }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, datetime: new Date(now + URGENT_MIN_LEAD_MS) }, now)).toBe(true);        // 딱 2시간은 포함
+        expect(isUrgentJoin({ ...base, datetime: new Date(now + URGENT_MIN_LEAD_MS + 60_000) }, now)).toBe(true);
+        expect(isUrgentJoin({ ...base, datetime: new Date(now - 3600_000) }, now)).toBe(false);                 // 이미 지난 티타임
+    });
+
+    it("어제·내일 티오프는 긴급이 아니다(한국 날짜 기준)", () => {
+        expect(isUrgentJoin({ ...base, datetime: new Date(kst(2026, 9, 22, 14)) }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, datetime: new Date(kst(2026, 9, 24, 14)) }, now)).toBe(false);
+        // 한국 자정 직전/직후 — UTC 날짜로 세면 둘 다 틀린다(UTC 로는 23일 15:00 이 24일이 아니다).
+        const lateNight = kst(2026, 9, 23, 21);
+        expect(isUrgentJoin({ ...base, datetime: new Date(kst(2026, 9, 23, 23, 30)) }, lateNight)).toBe(true);
+        expect(isUrgentJoin({ ...base, datetime: new Date(kst(2026, 9, 24, 1)) }, lateNight)).toBe(false);
+    });
+
+    it("SPLIT(1/N) · 스크린 · 파크 · 부킹은 긴급이 아니다", () => {
+        expect(isUrgentJoin({ ...base, costMode: "SPLIT", greenFee: 0 }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, costMode: null }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, joinType: "SCREEN" }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, joinType: "PARK" }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, joinType: null }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, listingType: "BOOKING" }, now)).toBe(false);
+        expect(isUrgentJoin({ ...base, datetime: "말도 안 되는 값" }, now)).toBe(false);
+    });
+
+    it("kstHour 는 한국 시각의 시를 준다(조용한 시간 판정)", () => {
+        expect(kstHour(kst(2026, 9, 23, 0, 30))).toBe(0);
+        expect(kstHour(kst(2026, 9, 23, 8))).toBe(8);
+        expect(kstHour(kst(2026, 9, 23, 20, 59))).toBe(20);
+        expect(kstHour(kst(2026, 9, 23, 21))).toBe(21);
     });
 });

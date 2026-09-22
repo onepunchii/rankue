@@ -2784,4 +2784,6 @@ export const ko: Dict = {
   "chat.attach.simInviteGo": "방 만들고 보내기",
   "chat.attach.simInviteHandicapNote": "상대가 들어오면 두 사람의 온라인 기록으로 각자 목표가 정해져요. 자기가 적은 다마수는 쓰지 않아요.",
   "chat.attach.simInviteSameNote": "둘 다 같은 점수로 쳐요. 이미 열어 둔 같은 설정의 방이 있으면 그 방을 씁니다.",
+  "golf.urgentRibbon": "⚡ 긴급",
+  "golf.urgentNote": "카트·캐디피는 현장에서 N빵",
 };

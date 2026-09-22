@@ -214,6 +214,9 @@ class Storage {
     async markNotificationAsRead(id: string, mid: string) { return this.notifs.markNotificationAsRead(id, mid); }
     async markAllNotificationsAsRead(mid: string) { return this.notifs.markAllNotificationsAsRead(mid); }
     async deleteNotification(id: string, mid: string) { return this.notifs.deleteNotification(id, mid); }
+    /** 골프 긴급 조인 전체 방송 대상(골프에 흔적이 있고 푸시 토큰이 있는 회원). */
+    async listGolfPushMembers(excludeIds: readonly string[], limit?: number) { return this.notifs.listGolfPushMembers(excludeIds, limit); }
+    async hasRecentGolfUrgent(ownerId: string, hours: number) { return this.notifs.hasRecentGolfUrgent(ownerId, hours); }
 }
 
 export const storage = new Storage();

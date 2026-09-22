@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { SPECIAL_OPTIONS } from '../../constants/booking';
 import { JOIN_OPTIONS, distanceKm, formatDistance, isKoreaCoord } from '@shared/golfJoin';
 import { JoinApplicants } from './JoinApplicants';
+import { useT } from '@/lib/i18n';
 import { kstDateKey, kstTime } from '@/lib/kst';
 import { SlotDots, JoinTypeBadge, costText, dayLabel, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, openGenderText, slotLegend, slotsOf } from '../join/joinUi';
 
@@ -40,6 +41,7 @@ const box = "rounded-xl bg-white/[0.04] border border-white/[0.06] p-3.5";
 const pill = "h-9 px-3 rounded-full bg-white/[0.06] text-[12.5px] font-medium text-white/85 inline-flex items-center active:bg-white/10";
 
 export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType, meId, myLocation, onDelete }: BookingCardProps) => {
+    const { t } = useT();
     const [reportOpen, setReportOpen] = useState(false);
     // 부킹 예약 신청의 인원 고르기(2026-09-21 오너: "푸시로 승부" — 문자 대신 앱 안에서 신청→승인→확정)
     const [picking, setPicking] = useState(false);
@@ -62,10 +64,15 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
     const dday = dayLabel(kstDateKey(item.datetime), kstDateKey(Date.now()));
     const accent = isJoin ? "#FF6B00" : "#64DD17";
     const accentText = isJoin ? "text-[#FF8A33]" : "text-[#8BE84A]";
+    // 긴급 조인(당일·그린피를 던진 필드 조인)은 서버가 목록에 isUrgent 로 얹어 준다 — 저장 컬럼이 아니라 계산값이다.
+    // 리본 순서: 지난 글 > ⚡ 긴급 > 마감 > 긴급 핫딜. 긴급을 마감보다 앞에 두는 건 전체 푸시를 받고 들어온 사람이
+    // "그 글이 맞나" 부터 확인하기 때문이다. 기존 '긴급 핫딜'(부킹의 수동 체크)과는 다른 것이라 둘 다 남긴다.
+    const urgent = !!item.isUrgent;
     const ribbon = past ? { text: "지난 글", cls: "bg-white/10 text-white/60" }
-        : isJoin && joinFull ? { text: "마감", cls: "bg-white/10 text-white/70" }
-            : !isJoin && item.isHotDeal ? { text: "긴급 핫딜", cls: "bg-red-500 text-white" }
-                : null;
+        : urgent ? { text: t("golf.urgentRibbon"), cls: "bg-[#FFC400] text-[#1A1200]" }
+            : isJoin && joinFull ? { text: "마감", cls: "bg-white/10 text-white/70" }
+                : !isJoin && item.isHotDeal ? { text: "긴급 핫딜", cls: "bg-red-500 text-white" }
+                    : null;
     const caddie = (item.options || []).includes('no_caddie') ? '노캐디' : (item.options || []).includes('marshal') ? '드라이빙 캐디' : '일반캐디';
     const optionLabels: string[] = (item.options || []).map((id: string) => SPECIAL_OPTIONS.find(o => o.id === id)?.label || JOIN_OPTIONS.find(o => o.id === id)?.label || id);
 
@@ -168,6 +175,14 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                     </div>
                                 )}
                             </div>
+
+                            {/* 긴급 조인이 왜 이 값인지 한 줄 — 그린피만 던진 것이지 공짜 라운드가 아니라는 걸 먼저 알려야 한다 */}
+                            {urgent && (
+                                <div className="flex items-center gap-2 rounded-xl bg-[#FFC400]/10 border border-[#FFC400]/25 px-3 py-2.5">
+                                    <span className="text-[13px] leading-none">⚡</span>
+                                    <span className="text-[12.5px] font-medium text-[#FFD966] leading-relaxed">{t("golf.urgentNote")}</span>
+                                </div>
+                            )}
 
                             {/* 조인: 자리 */}
                             {isJoin && (

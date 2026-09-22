@@ -2782,5 +2782,7 @@ const en: Dict = {
   "chat.attach.simInviteGo": "Open room & send",
   "chat.attach.simInviteHandicapNote": "When your opponent joins, both targets are set from your online records — self-reported handicaps aren't used.",
   "chat.attach.simInviteSameNote": "Both play to the same score. An open room with the same settings is reused.",
+  "golf.urgentRibbon": "⚡ Urgent",
+  "golf.urgentNote": "Cart & caddie fees split on site",
 };
 export default en;

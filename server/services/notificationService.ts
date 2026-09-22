@@ -51,6 +51,12 @@ export function pushOptionsFor(type: string | undefined, params: any, url: strin
     // 알림 트레이를 메시지 수만큼 채우지 않게. 예전 크루 채팅은 params.crewId 로 이걸 했는데 새 경로는 url 만 보낸다.
     const room = /^\/chat\/(crew|listing|dm|support)\/([^/]+)$/.exec(u.pathname);
     if (room && type === 'CHAT') { opts.group = `chat:${room[1]}:${room[2]}`; opts.tag = `chat:${room[1]}:${room[2]}`; }
+    // 긴급 조인: 티오프가 지나면 쓸모없는 알림이다 — 남은 시간만큼만 살린다(기기가 꺼져 있다 켜져도 지난 티는 안 뜬다).
+    if (type === 'GOLF_URGENT') {
+        const teeAt = params?.teeAt ? Date.parse(String(params.teeAt)) : NaN;
+        const left = Number.isFinite(teeAt) ? Math.floor((teeAt - Date.now()) / 1000) : NaN;
+        opts.ttlSec = Number.isFinite(left) ? Math.max(600, Math.min(left, 12 * 3600)) : 3 * 3600;
+    }
     const post = /^\/community\/([^/]+)$/.exec(u.pathname);
     if (post) opts.group = `community:${post[1]}`;
     if (u.pathname === '/online-game') {

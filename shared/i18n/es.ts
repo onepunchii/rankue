@@ -401,5 +401,7 @@ export const es: Record<string, string> = {
   "notif.chat.card.body.GOLF_BOOKING.BOOKING": "⛳ Reserva · {name} · {when}",
   "notif.chat.card.body.GOLF_MATCH": "⛳ {name} · PIN {pin}",
   "notif.chat.card.body.GOLF_ROUND": "⛳ {name} · {n} golpes",
+  "notif.golf.urgent.title": "⚡ Join urgente hoy a las {time} · {region}",
+  "notif.golf.urgent.body": "{course} · Green fee ₩{fee} · {open} plaza(s) — el carrito y el caddie se reparten a partes iguales",
 };
 export default es;

@@ -401,5 +401,7 @@ export const ko: Record<string, string> = {
   "notif.chat.card.body.GOLF_BOOKING.BOOKING": "⛳ 부킹 · {name} · {when}",
   "notif.chat.card.body.GOLF_MATCH": "⛳ {name} · 핀 {pin}",
   "notif.chat.card.body.GOLF_ROUND": "⛳ {name} · {n}타",
+  "notif.golf.urgent.title": "⚡ 오늘 {time} 긴급 조인 · {region}",
+  "notif.golf.urgent.body": "{course} · 그린피 {fee}원 · {open}자리 — 카트·캐디피는 N빵이에요",
 };
 export default ko;

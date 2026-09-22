@@ -2782,5 +2782,7 @@ const tr: Dict = {
   "chat.attach.simInviteGo": "Oda aç ve gönder",
   "chat.attach.simInviteHandicapNote": "Rakibin katıldığında hedefler ikinizin çevrimiçi kaydına göre belirlenir — beyan edilen handikap kullanılmaz.",
   "chat.attach.simInviteSameNote": "İkiniz de aynı sayıya oynar. Aynı ayarlarla açık odan varsa o kullanılır.",
+  "golf.urgentRibbon": "⚡ Acil",
+  "golf.urgentNote": "Araç ve kedi ücreti sahada paylaşılır",
 };
 export default tr;

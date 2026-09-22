@@ -2782,5 +2782,7 @@ const vi: Dict = {
   "chat.attach.simInviteGo": "Mở phòng & gửi",
   "chat.attach.simInviteHandicapNote": "Khi đối thủ vào, mục tiêu được tính từ thành tích trực tuyến của cả hai — không dùng handicap tự khai.",
   "chat.attach.simInviteSameNote": "Cả hai chơi cùng điểm. Nếu bạn đã có phòng cùng thiết lập thì dùng lại.",
+  "golf.urgentRibbon": "⚡ Gấp",
+  "golf.urgentNote": "Phí xe và caddie chia đều tại sân",
 };
 export default vi;
