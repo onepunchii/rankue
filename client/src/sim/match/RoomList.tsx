@@ -33,7 +33,7 @@ export interface RoomListProps {
     /** 내 실전 핸디(있으면 다마수 기본값) */
     myHandi?: { handi3c: number | null; handi4c: number | null };
     /**
-     * 이 방의 참가 창을 바로 연다(홈 카드에서 방을 눌러 들어온 경우 ?rooms=1&join=<id>).
+     * 이 방의 참가 창을 바로 연다(홈 카드에서 방을 눌러 들어온 경우 ?rooms=1&room=<id>).
      * 목록이 도착한 뒤 한 번만 연다 — 닫으면 다시 열리지 않는다. 그사이 방이 차서 없어졌으면 목록만 보인다.
      */
     autoJoinId?: string;

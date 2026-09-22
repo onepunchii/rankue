@@ -5,7 +5,9 @@
  * 왜 홈에 방 목록인가: 대전은 상대가 있어야 시작되는데, 방은 홈 → 온라인게임 → 멀티방까지 두 번 더 들어가야 보였다.
  * 열린 방이 하나라도 있는 순간을 홈에서 바로 보여 주는 것이 "사람이 있다"는 유일한 신호다.
  *
- * 방을 누르면 멀티방 화면으로 가면서 그 방의 참가 창이 바로 열린다(?rooms=1&join=<id>) — 비밀번호·다마수 확인은
+ * 방을 누르면 멀티방 화면으로 가면서 그 방의 참가 창이 바로 열린다(?rooms=1&room=<id>) — 비밀번호·다마수 확인은
+ * ⚠️ 이름이 room 인 이유: ?join= 은 6자리 초대 코드용이라 uuid 를 넣으면 숫자 6개만 뽑혀 엉뚱한 코드로 조회되고
+ * "초대가 만료됐거나…" 로 튕겨 나갔다(2026-09-22 오너).
  * 이미 있는 참가 창이 그대로 한다. 홈에서 참가 규칙을 두 번 구현하지 않는다.
  * 열린 방이 없으면(보통의 경우다) 줄 대신 "방 만들기"를 크게 둔다 — 빈 목록을 보여 주는 것보다 방을 하나 여는 게 낫다.
  */
@@ -133,7 +135,7 @@ export function OnlineGameCard() {
             <div className={cn("divide-y divide-black/[0.06]", (shown.length > 0 || myRoom) && "border-t border-black/[0.06]")}>
                 {myRoom && <MyRoomRow room={myRoom} onEnter={() => setLocation("/online-game?lobby=1")} className="bg-brand/[0.04]" />}
                 {shown.map((m) => (
-                    <RoomRow key={m.id} m={m} onJoin={() => setLocation(`/online-game?rooms=1&join=${m.id}`)} />
+                    <RoomRow key={m.id} m={m} onJoin={() => setLocation(`/online-game?rooms=1&room=${m.id}`)} />
                 ))}
             </div>
             <div className="px-4 py-3 flex items-center gap-2 border-t border-black/[0.06]">

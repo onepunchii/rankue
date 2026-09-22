@@ -397,6 +397,19 @@ export function isCompleteCode(code: string): boolean {
     return new RegExp(`^[0-9]{${MATCH_CODE_LENGTH}}$`).test(code);
 }
 
+/**
+ * 주소의 참가 파라미터를 가른다 — `?join=<6자리>` 는 푸시 초대 코드, `?room=<uuid>` 는 홈 카드에서 고른 멀티방.
+ * 숫자만 온 값만 코드로 본다: uuid 를 sanitizeCode 에 넣으면 그 안의 숫자 6개가 '코드'가 되어 엉뚱한 방을 찾다
+ * "초대가 만료됐거나…" 로 튕겼다(2026-09-22 오너). 옛 링크의 join=<uuid> 는 방 id 로 받아 준다.
+ */
+export function parseJoinParams(params: URLSearchParams): { joinCode: string; roomId: string | null } {
+    const join = params.get("join") ?? "";
+    const raw = /^\d+$/.test(join) ? sanitizeCode(join) : "";
+    const joinCode = isCompleteCode(raw) ? raw : "";
+    const roomId = params.get("room") ?? (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(join) ? join : null);
+    return { joinCode, roomId };
+}
+
 /** "123456" → "123 456" (읽기용) */
 export function formatCode(code: string): string {
     const c = sanitizeCode(code);

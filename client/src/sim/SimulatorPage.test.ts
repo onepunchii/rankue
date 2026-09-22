@@ -414,3 +414,20 @@ describe("SimulatorPage", () => {
         });
     });
 });
+
+describe("parseJoinParams — 홈 카드의 방 id 와 푸시 초대 코드를 가른다(2026-09-22)", () => {
+    it("6자리 숫자는 초대 코드", async () => {
+        const { parseJoinParams } = await import("./matchApi");
+        expect(parseJoinParams(new URLSearchParams("join=123456&auto=1"))).toEqual({ joinCode: "123456", roomId: null });
+    });
+    it("uuid 는 코드가 아니라 방 id — 예전엔 안의 숫자 6개가 코드로 뽑혀 '초대 만료' 로 튕겼다", async () => {
+        const { parseJoinParams } = await import("./matchApi");
+        const id = "3f9a1c2b-4d5e-4f60-8a71-92b3c4d5e6f7";
+        expect(parseJoinParams(new URLSearchParams(`rooms=1&join=${id}`))).toEqual({ joinCode: "", roomId: id });
+        expect(parseJoinParams(new URLSearchParams(`rooms=1&room=${id}`))).toEqual({ joinCode: "", roomId: id });
+    });
+    it("아무것도 없으면 둘 다 비어 있다", async () => {
+        const { parseJoinParams } = await import("./matchApi");
+        expect(parseJoinParams(new URLSearchParams("rooms=1"))).toEqual({ joinCode: "", roomId: null });
+    });
+});

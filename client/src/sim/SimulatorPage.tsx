@@ -61,7 +61,7 @@ import { RoomList } from "./match/RoomList";
 import { WatchList } from "./watch/WatchList";
 import WatchPage from "./watch/WatchPage";
 import { RankPage } from "./rank/RankPage";
-import { isCompleteCode, sanitizeCode } from "./matchApi";
+import { sanitizeCode, parseJoinParams } from "./matchApi";
 import { matchApi, type MatchPublic } from "./matchApi";
 import { MatchLobby } from "./match/MatchLobby";
 import { MATCH_LIST_QUERY_KEY } from "./match/queryKeys";
@@ -215,8 +215,8 @@ export function SimulatorPage() {
     // ?watch=<대전 id> 관전·다시보기(2026-09-12 오너). 읽기 전용 화면이라 시뮬레이터 세션을 열지 않는다.
     const watchId = params.get("watch");
     // ?join=<code>[&auto=1]: 푸시 초대 딥링크. auto 면 비밀번호 없는 대기 방에 바로 참가, 아니면 코드가 채워진 참가 화면
-    const joinCodeRaw = sanitizeCode(params.get("join") ?? "");
-    const joinCode = isCompleteCode(joinCodeRaw) ? joinCodeRaw : "";
+    // ?rooms=1&room=<id>: 홈 카드에서 고른 방의 참가 창을 바로 연다. 둘을 가르는 규칙은 parseJoinParams 에(uuid 를 코드로 오인하던 사고).
+    const { joinCode, roomId: roomParam } = parseJoinParams(params);
     const autoJoin = params.get("auto") === "1";
     const drillsView = params.get("drills") === "1";
     // 길 찾기(?path=1, 2026-09-08 오너): 공을 놓고 3쿠션 해법을 찾는 연습 세션. 오버레이가 아니라 세션이라 overlayParam 에는 넣지 않는다.
@@ -1701,7 +1701,7 @@ export function SimulatorPage() {
                         onCreate={() => navigate("/online-game?lobby=1&public=1")}
                         onEnterMine={() => navigate("/online-game?lobby=1")}
                         onClose={() => navigate("/online-game", { replace: true })}
-                        autoJoinId={params.get("join") ?? undefined}
+                        autoJoinId={roomParam ?? undefined}
                         myHandi={member ? { handi3c: member.handi3c, handi4c: member.handi4c } : undefined}
                     />
                     {/* 끝난 공개 대전 다시보기. 게임 중인 방은 위 목록에 '게임 중 · 관전'으로 함께 뜬다. */}
