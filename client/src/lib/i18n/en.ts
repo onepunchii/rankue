@@ -2704,5 +2704,6 @@ const en: Dict = {
   "landing.pinTooShort": "Enter a PIN of at least 4 digits.",
   "landing.errorPrefix": "Error:",
   "chat.sharedCard": "Shared a card",
+  "vsHistoryDialog.chat": "Chat",
 };
 export default en;

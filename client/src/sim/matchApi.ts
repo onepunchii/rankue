@@ -503,6 +503,8 @@ export function parseMatch(raw: unknown): MatchPublic {
         timeouts: Array.isArray(raw.timeouts) && raw.timeouts.length === 2
             ? [Number(raw.timeouts[0]) || 0, Number(raw.timeouts[1]) || 0] as const
             : [0, 0] as const,
+        // 관전자 수 — 여기서 안 옮기면 화면은 영영 undefined 를 보고 👀 n 을 안 그린다(2026-09-23 오너: "관전자 몇 명인지 안 나와").
+        watchers: typeof raw.watchers === "number" && Number.isFinite(raw.watchers) ? raw.watchers : 0,
     };
 }
 

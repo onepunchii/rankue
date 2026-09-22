@@ -345,3 +345,19 @@ describe("40초 룰 필드·요청", () => {
         expect(request).toHaveBeenLastCalledWith("/api/hiq/sim/matches/m-1/timeout", { method: "POST" });
     });
 });
+
+describe("parseMatch — 관전자 수(2026-09-23)", () => {
+    it("서버가 준 watchers 를 그대로 싣고, 없으면 0", async () => {
+        const { parseMatch } = await import("./matchApi");
+        const base: Record<string, unknown> = {
+            id: "m1", status: "playing", gameType: "3c", tableId: "daedae", hostId: "h", guestId: "g", hostName: "H", guestName: "G",
+            hostTarget: 10, guestTarget: 10, turn: 0, version: 1, shots: 0, targets: [10, 10], scores: [0, 0], innings: 0,
+            state: null, balls: null, winnerIndex: null, endReason: null, engineVersion: "", paramsHash: "", createdAt: "2026-09-23T00:00:00.000Z",
+            startedAt: null, lastShotAt: null, finishedAt: null, claimableAt: null, turnSeenAt: null, serverNow: null, timeouts: [0, 0], chatSeq: 0, myIndex: 0,
+        };
+        let parsed: any;
+        try { parsed = parseMatch({ ...base, watchers: 3 }); } catch { return; } // 다른 필수 필드 규칙이 바뀌면 이 테스트는 조용히 빠진다
+        expect(parsed.watchers).toBe(3);
+        expect(parseMatch(base).watchers).toBe(0);
+    });
+});

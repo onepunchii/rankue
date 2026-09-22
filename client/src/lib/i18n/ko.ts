@@ -2706,4 +2706,5 @@ export const ko: Dict = {
   "landing.pinTooShort": "비밀번호를 4자리 이상 입력해주세요.",
   "landing.errorPrefix": "오류:",
   "chat.sharedCard": "카드를 공유했어요",
+  "vsHistoryDialog.chat": "채팅",
 };

@@ -2704,5 +2704,6 @@ const tr: Dict = {
   "landing.pinTooShort": "En az 4 haneli bir PIN girin.",
   "landing.errorPrefix": "Hata:",
   "chat.sharedCard": "Bir kart paylaştı",
+  "vsHistoryDialog.chat": "Sohbet",
 };
 export default tr;

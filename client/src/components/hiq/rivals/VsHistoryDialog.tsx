@@ -1,8 +1,11 @@
 
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
-import { LucideFlag, LucideSword, LucideSwords, LucideCalendar } from "@/lib/icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { LucideFlag, LucideSword, LucideSwords, LucideCalendar, LucideMessageCircle } from "@/lib/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -12,6 +15,7 @@ import { HeadToHeadCard } from "./HeadToHeadCard";
 import { MatchResult } from "@/components/hiq/ui/FormBadges";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 interface VsHistoryDialogProps {
     friendId: string | null;
@@ -46,6 +50,16 @@ export const VsHistoryDialog = ({
     // "내 핀에 동의해 들어온 회원"만 허용하므로 상대를 코드로 미리 앉힐 수는 없다. 대신 핀이
     // 뜬 대결 로비까지 한 번에 데려다주는 게 현재 구조에서 가능한 최단 경로다.
     const [rematchOpen, setRematchOpen] = useState(false);
+
+    // 채팅(2026-09-23 오너: "라이벌 프로필에서 채팅으로 연결") — 같은 둘·같은 종목의 1:1 방이 있으면 그 방, 없으면 만든다.
+    const [, setLocation] = useLocation();
+    const { toast } = useToast();
+    const qc = useQueryClient();
+    const openChat = useMutation({
+        mutationFn: async () => apiRequest("/api/hiq/chat/dm", { method: "POST", body: { memberIds: [friendId], sport: currentSport } }) as Promise<{ key: string }>,
+        onSuccess: (r) => { void qc.invalidateQueries({ queryKey: ["/api/hiq/chat/rooms"] }); onClose(); const [kind, id] = r.key.split(":"); setLocation(`/chat/${kind}/${id}`); },
+        onError: (e: any) => toast({ title: e?.message || t("chat.dmFailed"), variant: "destructive" }),
+    });
 
     // 대시보드와 같은 키 → 캐시 공유. 로비가 목표 점수를 계산할 때 쓴다.
     const { data: history } = useQuery<HiqGameHistory[]>({
@@ -187,6 +201,15 @@ export const VsHistoryDialog = ({
                             className="px-6 h-14 rounded-full bg-black/[0.05] text-[15px] font-semibold text-black/60 active:scale-[0.98] transition-transform shrink-0"
                         >
                             {t("vsHistoryDialog.close")}
+                        </button>
+                        <button
+                            onClick={() => openChat.mutate()}
+                            disabled={!me || !friendId || openChat.isPending}
+                            className={cn("h-14 rounded-full bg-brand/10 text-brand text-[15px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50", isGolf ? "flex-1" : "px-5")}
+                            title={t("vsHistoryDialog.chat")}
+                        >
+                            <LucideMessageCircle className="w-5 h-5" />
+                            {t("vsHistoryDialog.chat")}
                         </button>
                         {!isGolf && (
                             <button
