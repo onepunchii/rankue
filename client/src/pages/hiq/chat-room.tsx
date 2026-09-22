@@ -324,9 +324,9 @@ export default function ChatRoomPage() {
                     <AttachSheet open={attachOpen} onOpenChange={setAttachOpen} sport={attachSport} roomKind={d.kind} onPick={onPickAttach} />
                     <SimInviteSheet
                         open={picker === "SIM_INVITE"} onOpenChange={(o) => { if (!o) setPicker(null); }} busy={simBusy}
-                        onPick={(gameType) => {
+                        onPick={(pick) => {
                             setSimBusy(true);
-                            void postCard("SIM_INVITE", { gameType }, (row) => {
+                            void postCard("SIM_INVITE", { ...pick }, (row) => {
                                 setPicker(null); setSimBusy(false);
                                 const id = (row as any)?.metadata?.matchId;
                                 // 방 열쇠를 싣는다 — 로비가 목록을 뒤지지 않고 그 방을 바로 연다.

@@ -96,7 +96,11 @@ async function postCard(res: any, room: Room, type: string, summary: string, met
 
 /* ── 당구 ─────────────────────────────────────────────── */
 
-const simInviteSchema = z.object({ gameType: z.enum(["3c", "4c"]).optional() });
+const simInviteSchema = z.object({
+    gameType: z.enum(["3c", "4c"]).optional(),
+    tableId: z.enum(["DAEDAE", "JUNGDAE_KR"]).optional(),
+    handicap: z.boolean().optional(),
+});
 
 // 🎱 온라인 대전 초대 — 내가 호스트인 대기 방이 있으면 그 방의 코드, 없으면 새로 만든다(POST /sim/matches 와 같은 기본값).
 router.post("/rooms/:key/cards/sim-invite", ...billiardsGate, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -105,17 +109,23 @@ router.post("/rooms/:key/cards/sim-invite", ...billiardsGate, asyncHandler(async
     const room = await openRoom(req, res, "BILLIARDS"); if (!room) return;
     const { me } = room;
     const wanted = parsed.data.gameType;
+    const wantTable = parsed.data.tableId;
+    const wantHandi = parsed.data.handicap;
     // 종목을 골랐는데 대기 방이 다른 종목이면 새로 만든다(만들 때 옛 방은 cancelOtherWaiting 으로 접힌다).
     // 목록은 host·guest 를 섞어 최신순으로 준다 — 20건만 보면 게스트로 몇 판 뛴 사이 내 대기 방이 밀려나고,
     // 못 찾아 새로 만들면 createHostMatch 가 원래 방을 취소해 앞서 올린 카드의 코드가 죽는다(2026-09-23 리뷰).
     const mine = await storage.simMatch.listMine(me.id, 100);
     // 비밀번호 방은 재사용하지 않는다 — 카드에는 코드만 실려서 받는 사람이 한 번에 못 들어온다.
-    let m = mine.find((x) => x.status === "waiting" && x.hostId === me.id && !x.passwordHash && (!wanted || x.gameType === wanted));
+    // 고른 값과 다른 방은 다시 쓰지 않는다 — 3쿠션 대대 방을 열어 둔 채 4구 중대를 고르면 새로 만들어야 한다.
+    let m = mine.find((x) => x.status === "waiting" && x.hostId === me.id && !x.passwordHash
+        && (!wanted || x.gameType === wanted) && (!wantTable || x.tableId === wantTable) && (wantHandi === undefined || x.handicap === wantHandi));
     if (!m) {
         const gameType = wanted ?? "3c";
+        // 테이블 기본값은 화면과 같다(3쿠션 대대 · 4구 중대) — 늘 대대로 만들면 4구가 엉뚱한 판이 된다.
+        const tableId = wantTable ?? (gameType === "3c" ? "DAEDAE" : "JUNGDAE_KR");
         const handi = gameType === "3c" ? me.handi3c : me.handi4c;
-        const target = typeof handi === "number" && handi >= 1 && handi <= 999 ? handi : 20;
-        const made = await createHostMatch(me.id, simCreateSchema.parse({ gameType, tableId: "DAEDAE", target }));
+        const target = typeof handi === "number" && handi >= 1 && handi <= 999 ? handi : gameType === "3c" ? 15 : 100;
+        const made = await createHostMatch(me.id, simCreateSchema.parse({ gameType, tableId, target, handicap: wantHandi ?? true }));
         if (!made) return sendError(res, 400, "err.sim.badInput");
         m = made.full;
     }
@@ -130,7 +140,8 @@ router.post("/rooms/:key/cards/sim-invite", ...billiardsGate, asyncHandler(async
     }, {
         push: msg(`notif.chat.card.body.SIM_INVITE.${m.gameType}`, { code: spaced }),
         // 알림을 누르면 채팅이 아니라 **판으로 바로** 들어간다 — 초대한 사람은 이미 대기방에 있다(2026-09-23 오너).
-        url: `/online-game?join=${encodeURIComponent(code)}&auto=1`,
+        // same=1: 핸디전이 아닌 방은 들어오는 쪽이 자기 다마수를 보내지 않게 해 **둘 다 같은 목표**가 되게 한다.
+        url: `/online-game?join=${encodeURIComponent(code)}&auto=1${m.handicap ? "" : "&same=1"}`,
     });
 }));
 

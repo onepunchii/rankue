@@ -2772,10 +2772,15 @@ const en: Dict = {
   "chat.attach.golfMatch.desc": "The PIN is posted as a card so everyone here can join",
   "chat.attach.golfMatch.coursePlaceholder": "Course name",
   "chat.attach.golfMatch.create": "Create PIN",
-  "chat.attach.simInvitePick": "Pick the game — everything else is set for you",
-  "chat.attach.simInviteHandicap": "Handicap",
-  "chat.attach.simInviteNote": "Large table · no password · targets are set from both players' online records when your opponent joins. An existing open room is reused.",
+  "chat.attach.simInvitePick": "Defaults are filled in — just tap to send",
   "chat.card.handicap": "Handicap match",
   "chat.card.handicapDesc": "Targets are set from both records when the opponent joins",
+  "chat.attach.simInviteGame": "Game",
+  "chat.attach.simInviteTable": "Table",
+  "chat.attach.simInviteTarget": "Target",
+  "chat.attach.simInviteSame": "Same score",
+  "chat.attach.simInviteGo": "Open room & send",
+  "chat.attach.simInviteHandicapNote": "When your opponent joins, both targets are set from your online records — self-reported handicaps aren't used.",
+  "chat.attach.simInviteSameNote": "Both play to the same score. An open room with the same settings is reused.",
 };
 export default en;

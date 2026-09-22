@@ -75,7 +75,7 @@ describe("2026-09-23 리뷰로 잠근 것", () => {
     it("같이 한 판: 비밀번호 방은 재사용하지 않고, 푸시는 참가 화면으로 바로 간다", () => {
         // 비밀번호 방을 재사용하면 카드에는 코드만 실려 받는 사람이 한 번에 못 들어온다.
         expect(src).toContain("!x.passwordHash");
-        expect(src).toContain("url: `/online-game?join=${encodeURIComponent(code)}&auto=1`");
+        expect(src).toContain('url: `/online-game?join=${encodeURIComponent(code)}&auto=1${m.handicap ? "" : "&same=1"}`');
     });
     it("랭큐매치 핀은 살아 있는 내 세션을 다시 쓴다 — 새로 만들면 '진행 중 라운드' 가 빈 방으로 바뀐다", () => {
         expect(src).toContain("getActiveGolfMatch(room.me.id)");
@@ -84,5 +84,22 @@ describe("2026-09-23 리뷰로 잠근 것", () => {
         for (const k of ["body.SIM_INVITE.", "body.GAME_RESULT.", "body.MY_STATS", "body.STORE", "body.GOLF_BOOKING.", "body.GOLF_MATCH", "body.GOLF_ROUND"]) {
             expect(src).toContain(`notif.chat.card.${k}`);
         }
+    });
+});
+
+describe("같이 한 판 — 고른 설정(2026-09-23 오너: 대대·중대·핸디전 선택)", () => {
+    const src = read("server/routes/modules/chatCards.ts");
+    it("종목·테이블·핸디전이 다르면 옛 방을 다시 쓰지 않는다", () => {
+        expect(src).toContain("(!wantTable || x.tableId === wantTable)");
+        expect(src).toContain("(wantHandi === undefined || x.handicap === wantHandi)");
+    });
+    it("테이블 기본값은 화면과 같다 — 4구를 늘 대대로 만들지 않는다", () => {
+        expect(src).toContain('wantTable ?? (gameType === "3c" ? "DAEDAE" : "JUNGDAE_KR")');
+    });
+    it("같은 점수 방은 링크에 same=1 — 들어오는 쪽이 자기 다마수를 안 보낸다", () => {
+        expect(src).toContain('"&same=1"');
+        const page = read("client/src/sim/SimulatorPage.tsx");
+        expect(page).toContain('const sameTarget = params.get("same") === "1";');
+        expect(page).toContain("sameTarget ? undefined :");
     });
 });

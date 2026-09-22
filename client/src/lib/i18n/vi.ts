@@ -2772,10 +2772,15 @@ const vi: Dict = {
   "chat.attach.golfMatch.desc": "Mã PIN được gửi dưới dạng thẻ để mọi người tham gia ngay",
   "chat.attach.golfMatch.coursePlaceholder": "Tên sân",
   "chat.attach.golfMatch.create": "Tạo PIN",
-  "chat.attach.simInvitePick": "Chỉ cần chọn thể loại — phần còn lại chúng tôi lo",
-  "chat.attach.simInviteHandicap": "Chấp",
-  "chat.attach.simInviteNote": "Bàn lớn · không mật khẩu · mục tiêu được tính từ thành tích trực tuyến của cả hai khi đối thủ vào. Nếu bạn đã có phòng mở thì dùng lại phòng đó.",
+  "chat.attach.simInvitePick": "Đã điền sẵn — chỉ cần chạm để gửi",
   "chat.card.handicap": "Trận chấp",
   "chat.card.handicapDesc": "Mục tiêu được tính từ thành tích của cả hai khi đối thủ vào",
+  "chat.attach.simInviteGame": "Thể loại",
+  "chat.attach.simInviteTable": "Bàn",
+  "chat.attach.simInviteTarget": "Mục tiêu",
+  "chat.attach.simInviteSame": "Cùng điểm",
+  "chat.attach.simInviteGo": "Mở phòng & gửi",
+  "chat.attach.simInviteHandicapNote": "Khi đối thủ vào, mục tiêu được tính từ thành tích trực tuyến của cả hai — không dùng handicap tự khai.",
+  "chat.attach.simInviteSameNote": "Cả hai chơi cùng điểm. Nếu bạn đã có phòng cùng thiết lập thì dùng lại.",
 };
 export default vi;

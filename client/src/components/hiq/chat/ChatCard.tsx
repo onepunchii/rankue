@@ -81,7 +81,9 @@ export function ChatCard({ msg, onOpen }: Props) {
             badge = t("chat.card.simInvite");
             body = (
                 <>
-                    <span className="block text-[14px] font-semibold text-ink-1">{gameType(md.gameType)} · {md.handicap ? t("chat.card.handicap") : md.target ? fill(t("chat.card.target"), { n: md.target }) : ""}</span>
+                    <span className="block text-[14px] font-semibold text-ink-1">
+                        {gameType(md.gameType)}{md.tableId ? ` · ${t(md.tableId === "DAEDAE" ? "sim.setup.tableDaedae" : "sim.setup.tableJungdae")}` : ""} · {md.handicap ? t("chat.card.handicap") : md.target ? fill(t("chat.card.target"), { n: md.target }) : ""}
+                    </span>
                     {md.handicap && <span className="block text-[12px] font-medium text-ink-3 leading-snug">{t("chat.card.handicapDesc")}</span>}
                     <span className="block text-[13px] text-ink-2 mt-0.5 rk-num">{fill(t("chat.card.code"), { code: codeLabel(md.code) })}</span>
                     {md.hostName && <span className="block text-[12px] text-ink-3">{fill(t("chat.card.host"), { name: md.hostName })}</span>}

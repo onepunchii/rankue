@@ -218,6 +218,7 @@ export function SimulatorPage() {
     // ?rooms=1&room=<id>: 홈 카드에서 고른 방의 참가 창을 바로 연다. 둘을 가르는 규칙은 parseJoinParams 에(uuid 를 코드로 오인하던 사고).
     const { joinCode, roomId: roomParam } = parseJoinParams(params);
     const autoJoin = params.get("auto") === "1";
+    const sameTarget = params.get("same") === "1";
     const drillsView = params.get("drills") === "1";
     // 길 찾기(?path=1, 2026-09-08 오너): 공을 놓고 3쿠션 해법을 찾는 연습 세션. 오버레이가 아니라 세션이라 overlayParam 에는 넣지 않는다.
     const pathView = params.get("path") === "1";
@@ -418,8 +419,9 @@ export function SimulatorPage() {
                     return;
                 }
                 if (!autoJoin || m.hasPassword) { toJoinScreen(); return; }
+                // same=1(채팅 '같이 한 판'의 같은 점수 방): 목표를 안 보내면 서버가 방장 목표를 그대로 준다 — 둘 다 같은 점수.
                 const handi = member ? (m.gameType === "3c" ? member.handi3c : member.handi4c) : null;
-                const target = handi !== null && handi !== undefined && handi >= 1 && handi <= 999 ? handi : m.hostTarget;
+                const target = sameTarget ? undefined : handi !== null && handi !== undefined && handi >= 1 && handi <= 999 ? handi : m.hostTarget;
                 const joined = await matchApi.joinMatch(joinCode, target);
                 void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
                 navigate(`/online-game?match=${joined.id}`, { replace: true });
@@ -428,7 +430,7 @@ export function SimulatorPage() {
                 navigate("/online-game", { replace: true });
             }
         })();
-    }, [joinCode, autoJoin, member, navigate, queryClient, toast, t]);
+    }, [joinCode, autoJoin, sameTarget, member, navigate, queryClient, toast, t]);
 
     // ?match=<id> (푸시 딥링크·목록에서 열기): 서버에서 받아 대전 모드로 연다
     useEffect(() => {
