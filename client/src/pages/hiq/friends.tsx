@@ -111,11 +111,11 @@ export default function HiqRivals() {
         return (
             <LoginGate
                 icon={LucideUsers}
-                title="라이벌"
-                desc="로그인하면 함께 친 상대가 라이벌로 쌓이고, 상대별 상대전적을 볼 수 있습니다."
+                title={t("rivalsConfig.label")}
+                desc={t("friendsPage.loginDesc")}
                 links={[
-                    { label: "크루 둘러보기 — 당구 동호회", to: "/club" },
-                    { label: "커뮤니티 둘러보기", to: "/community" },
+                    { label: t("friendsPage.linkCrew"), to: "/club" },
+                    { label: t("loginGate.linkCommunity"), to: "/community" },
                 ]}
             />
         );

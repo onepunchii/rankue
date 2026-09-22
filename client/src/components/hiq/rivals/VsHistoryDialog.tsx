@@ -107,14 +107,14 @@ export const VsHistoryDialog = ({
                         {(!isLoading || hasRecord) && (
                             <div className="px-4 pt-5">
                                 <HeadToHeadCard
-                                    opponentName={friend?.name || "상대"}
+                                    opponentName={friend?.name || t("gameCreationModal.opponent")}
                                     wins={record.wins}
                                     losses={record.losses}
                                     draws={record.draws}
                                     recentForm={vsForm}
                                     myAvg={isGolf ? null : avgOf(me, avgType)}
                                     opponentAvg={isGolf ? null : avgOf(friend, avgType)}
-                                    avgTypeLabel={avgType === "3c" ? "3쿠션" : "4구"}
+                                    avgTypeLabel={avgType === "3c" ? t("history.filter3c") : t("history.filter4c")}
                                 />
                             </div>
                         )}
@@ -195,7 +195,7 @@ export const VsHistoryDialog = ({
                                 className="flex-1 h-14 rounded-full bg-brand text-white text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50"
                             >
                                 <LucideSwords className="w-5 h-5" />
-                                한 판 더
+                                {t("vsHistoryDialog.rematch")}
                             </button>
                         )}
                     </div>

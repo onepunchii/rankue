@@ -20,6 +20,16 @@ import {
     type ApiFailure, type RequestFn, type ShotRequest,
 } from "./simApi";
 import { apiRequest } from "@/lib/queryClient";
+import { getLocale } from "../lib/i18n";
+
+/** 화면에 그대로 보이는 오류 문구(err.message). 훅을 못 쓰는 모듈이라 getLocale() 로 가른다. */
+const BAD_CHAT_MSG: Record<string, string> = {
+    ko: "채팅 응답이 올바르지 않습니다",
+    en: "Invalid chat response",
+    es: "La respuesta del chat no es válida",
+    tr: "Sohbet yanıtı geçersiz",
+    vi: "Phản hồi trò chuyện không hợp lệ",
+};
 
 /* ------------------------------------------------------------------ URL */
 
@@ -740,7 +750,7 @@ export function createMatchApi(request: RequestFn): MatchApi {
         async sendChat(id, body) {
             const r = await request(matchChatUrl(id), { method: "POST", body }) as { line?: unknown; chatSeq?: unknown };
             const line = parseChatLine(r?.line);
-            if (!line) throw new Error("채팅 응답이 올바르지 않습니다");
+            if (!line) throw new Error(BAD_CHAT_MSG[getLocale()] ?? BAD_CHAT_MSG.ko);
             return { line, chatSeq: typeof r?.chatSeq === "number" ? r.chatSeq : line.seq };
         },
         async getChats(id, from = 0) {

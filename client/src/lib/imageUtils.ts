@@ -3,6 +3,16 @@
  * DB rows should store ONLY the returned Blob URL — never base64 data URLs.
  */
 import { apiRequest } from "./queryClient";
+import { getLocale } from "./i18n";
+
+// toast 설명으로 그대로 보이는 오류 문구(err.message).
+const NO_URL_MSG: Record<string, string> = {
+    ko: "업로드 응답에 URL이 없습니다",
+    en: "Upload response has no URL",
+    es: "La respuesta de la subida no tiene URL",
+    tr: "Yükleme yanıtında URL yok",
+    vi: "Phản hồi tải lên không có URL",
+};
 
 /**
  * Downscale an image (longest side <= maxSize) and encode it as a WebP data URL.
@@ -68,7 +78,7 @@ export const uploadImage = async (
         body: { dataUrl, category },
     });
     const url = result?.url ?? result?.data?.url;
-    if (!url) throw new Error("업로드 응답에 URL이 없습니다");
+    if (!url) throw new Error(NO_URL_MSG[getLocale()] ?? NO_URL_MSG.ko);
     return url;
 };
 

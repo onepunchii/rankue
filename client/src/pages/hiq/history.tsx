@@ -67,11 +67,11 @@ export default function HiqHistory() {
         return (
             <LoginGate
                 icon={LucideBarChart3}
-                title="내 경기 기록"
-                desc="로그인하면 전적·평균(에버리지)·하이런과 성장 그래프가 쌓입니다."
+                title={t("historyPage.gateTitle")}
+                desc={t("historyPage.gateDesc")}
                 links={[
-                    { label: "세계 랭킹 — UMB 공식", to: "/world-ranking" },
-                    { label: "PBA 투어 랭킹", to: "/pba" },
+                    { label: t("loginGate.linkWorld"), to: "/world-ranking" },
+                    { label: t("loginGate.linkPba"), to: "/pba" },
                 ]}
             />
         );

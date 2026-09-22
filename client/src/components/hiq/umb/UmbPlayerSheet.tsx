@@ -27,14 +27,14 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 /** 대륙 비중 막대의 단색 램프 — 브랜드 녹색 한 가지의 농도 차이라 알록달록하지 않다 */
 const RAMP = ["bg-brand", "bg-brand/70", "bg-brand/50", "bg-brand/35", "bg-brand/25", "bg-brand/15", "bg-black/20", "bg-black/10"];
 
-/** 원 단위 상금 → "9.9억" / "5,015만" 처럼 짧게. 한국어 화면에서만 단위를 붙인다. */
+/** 원 단위 상금 → 한국어는 "9.9억" / "5,015만", 그 외 언어는 그 언어의 축약 표기(₩ 유지, 예: ₩990M / ₩50,2 mil). */
 function formatPrize(won: number, locale: string): string {
     if (locale === "ko") {
         if (won >= 100_000_000) return `${(won / 100_000_000).toFixed(won >= 1_000_000_000 ? 0 : 1)}억`;
         if (won >= 10_000) return `${Math.round(won / 10_000).toLocaleString("ko-KR")}만`;
         return won.toLocaleString("ko-KR");
     }
-    return `₩${Math.round(won / 1_000_000).toLocaleString()}M`;
+    return `₩${new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(won)}`;
 }
 
 /**
@@ -144,7 +144,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
     const history = data?.history || [];
     const eventLabels = new Map((data?.events || []).map(e => [e.colKey, e.label]));
     const chartData = history.map(h => ({
-        label: new Date(h.editionDate).toLocaleDateString("ko-KR", { year: "2-digit", month: "numeric" }),
+        label: new Date(h.editionDate).toLocaleDateString(dateLocale, { year: "2-digit", month: "numeric" }),
         rank: h.rank,
         points: h.points,
         edition: h.edition,

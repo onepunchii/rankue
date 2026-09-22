@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useT, type Locale } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 // 큐 컬렉션 — 기록 기반 뱃지 진열장 (마이페이지).
@@ -7,39 +7,6 @@ import { cn } from "@/lib/utils";
 // 등급: 1 나무큐 → 2 카본큐 → 3 금장큐 → 4 명인큐 (서버 계산, 소급 자동).
 
 interface Badge { id: string; value: number; tier: number; next: number | null }
-
-const L: Record<Locale, { title: string; subtitle: string; tiers: string[]; names: Record<string, string>; next: (n: number) => string; empty: string }> = {
-    ko: {
-        title: "큐 컬렉션", subtitle: "기록이 쌓이면 뱃지가 열립니다",
-        tiers: ["", "나무큐", "카본큐", "금장큐", "명인큐"],
-        names: { hr3c: "3쿠션 하이런", hr4c: "4구 하이런", innings: "이닝 클럽", games: "경기 수", wins: "승리", visits: "출석" },
-        next: (n) => `다음 등급까지 ${n.toLocaleString()}`, empty: "첫 경기를 기록하면 컬렉션이 시작됩니다",
-    },
-    en: {
-        title: "Cue collection", subtitle: "Badges unlock as your record grows",
-        tiers: ["", "Wood cue", "Carbon cue", "Gold cue", "Master cue"],
-        names: { hr3c: "3-cushion high run", hr4c: "4-ball high run", innings: "Innings club", games: "Games", wins: "Wins", visits: "Visits" },
-        next: (n) => `${n.toLocaleString()} to next tier`, empty: "Record your first game to start collecting",
-    },
-    vi: {
-        title: "Bộ sưu tập cơ", subtitle: "Huy hiệu mở khi thành tích tăng",
-        tiers: ["", "Cơ gỗ", "Cơ carbon", "Cơ vàng", "Cơ bậc thầy"],
-        names: { hr3c: "Series 3 băng", hr4c: "Series 4 bi", innings: "CLB lượt cơ", games: "Số trận", wins: "Thắng", visits: "Điểm danh" },
-        next: (n) => `Còn ${n.toLocaleString()} tới hạng sau`, empty: "Ghi trận đầu tiên để bắt đầu",
-    },
-    tr: {
-        title: "Isteka koleksiyonu", subtitle: "Kayıtların arttıkça rozetler açılır",
-        tiers: ["", "Ahşap", "Karbon", "Altın", "Usta"],
-        names: { hr3c: "3 bant seri", hr4c: "4 top seri", innings: "El kulübü", games: "Maç", wins: "Galibiyet", visits: "Devam" },
-        next: (n) => `Sonraki seviyeye ${n.toLocaleString()}`, empty: "İlk maçını kaydet, koleksiyon başlasın",
-    },
-    es: {
-        title: "Colección de tacos", subtitle: "Las insignias se desbloquean con tu historial",
-        tiers: ["", "Taco de madera", "Taco de carbono", "Taco dorado", "Taco maestro"],
-        names: { hr3c: "Serie 3 bandas", hr4c: "Serie 4 bolas", innings: "Club de entradas", games: "Partidas", wins: "Victorias", visits: "Asistencia" },
-        next: (n) => `${n.toLocaleString()} para el siguiente nivel`, empty: "Registra tu primera partida para empezar",
-    },
-};
 
 const TIER_STYLE = [
     "bg-black/[0.03] text-black/35",                 // 0 미획득
@@ -108,8 +75,8 @@ const BADGE_ICON: Record<string, React.ReactNode> = {
 };
 
 // 등급 게이지 — 큐 스틱 4마디: 채워진 마디 수 = 달성한 등급
-const TierGauge = ({ tier }: { tier: number }) => (
-    <div className="flex items-center gap-[3px] mt-1.5" aria-label={`등급 ${tier}/4`}>
+const TierGauge = ({ tier, label }: { tier: number; label: string }) => (
+    <div className="flex items-center gap-[3px] mt-1.5" aria-label={label}>
         {[0, 1, 2, 3].map((i) => (
             <span
                 key={i}
@@ -126,8 +93,9 @@ const TierGauge = ({ tier }: { tier: number }) => (
 );
 
 export const BadgeShelf = () => {
-    const { locale } = useT();
-    const t = L[locale] ?? L.ko;
+    const { t } = useT();
+    const tierName = (tier: number) => t(`badgeShelf.tier${tier}`);
+    const badgeName = (id: string) => t(`badgeShelf.name.${id}`);
     const { data } = useQuery<{ badges: Badge[] }>({
         queryKey: ["/api/hiq/me/badges"],
         staleTime: 10 * 60 * 1000,
@@ -139,11 +107,11 @@ export const BadgeShelf = () => {
     return (
         <div className="rk-card p-5">
             <div className="flex items-baseline justify-between mb-3">
-                <h3 className="text-[15px] font-bold text-ink-1">{t.title}</h3>
-                <span className="text-[11.5px] font-medium text-black/40">{t.subtitle}</span>
+                <h3 className="text-[15px] font-bold text-ink-1">{t("badgeShelf.title")}</h3>
+                <span className="text-[11.5px] font-medium text-black/40">{t("badgeShelf.subtitle")}</span>
             </div>
             {!hasProgress ? (
-                <p className="text-[13px] text-black/45 text-center py-4">{t.empty}</p>
+                <p className="text-[13px] text-black/45 text-center py-4">{t("badgeShelf.empty")}</p>
             ) : (
                 <div className="grid grid-cols-2 gap-2">
                     {badges.map((b) => (
@@ -151,13 +119,13 @@ export const BadgeShelf = () => {
                             <div className="flex items-start gap-2.5">
                                 <span className={cn("shrink-0 mt-0.5", b.tier === 0 && "opacity-45")}>{BADGE_ICON[b.id]}</span>
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-[12.5px] font-bold leading-tight">{t.names[b.id]}</p>
+                                    <p className="text-[12.5px] font-bold leading-tight">{badgeName(b.id)}</p>
                                     <p className="text-[12px] font-semibold mt-0.5 tabular-nums">
-                                        {b.tier > 0 ? `${t.tiers[b.tier]} · ${b.value.toLocaleString()}` : (b.next != null ? t.next(b.next - b.value) : "")}
+                                        {b.tier > 0 ? `${tierName(b.tier)} · ${b.value.toLocaleString()}` : (b.next != null ? t("badgeShelf.next").replace("{n}", (b.next - b.value).toLocaleString()) : "")}
                                     </p>
                                 </div>
                             </div>
-                            <TierGauge tier={b.tier} />
+                            <TierGauge tier={b.tier} label={t("badgeShelf.tierLabel").replace("{n}", String(b.tier))} />
                         </div>
                     ))}
                 </div>

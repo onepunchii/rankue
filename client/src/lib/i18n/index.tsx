@@ -6,13 +6,18 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 // 3쿠션 강국 기준 1차 언어: ko(원본)·en·vi(베트남)·tr(터키)·es(스페인·중남미)
 
 export type Locale = "ko" | "en" | "vi" | "tr" | "es";
-export const LOCALES: { code: Locale; label: string }[] = [
-  { code: "ko", label: "한국어" },
-  { code: "en", label: "English" },
-  { code: "vi", label: "Tiếng Việt" },
-  { code: "tr", label: "Türkçe" },
-  { code: "es", label: "Español" },
+/** label 은 그 언어의 자기 이름(고르는 사람이 읽을 수 있어야 한다), sub 는 지금 언어로 본 이름의 사전 키. */
+export const LOCALES: { code: Locale; label: string; sub: string }[] = [
+  { code: "ko", label: "한국어", sub: "lang.ko" },
+  { code: "en", label: "English", sub: "lang.en" },
+  { code: "vi", label: "Tiếng Việt", sub: "lang.vi" },
+  { code: "tr", label: "Türkçe", sub: "lang.tr" },
+  { code: "es", label: "Español", sub: "lang.es" },
 ];
+
+// 훅을 못 쓰는 곳(게스트 닉네임 생성·팀 이름·상금 단위)이 현재 언어를 읽는다. Provider 가 바뀔 때마다 갱신한다.
+let currentLocale: Locale = "ko";
+export function getLocale(): Locale { return currentLocale; }
 
 export type Dict = Record<string, string>;
 
@@ -74,6 +79,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(target);
     void ensure(target);
   }, [ensure]);
+  useEffect(() => { currentLocale = locale; document.documentElement.lang = locale; }, [locale]);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);

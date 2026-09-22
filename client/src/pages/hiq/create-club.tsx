@@ -594,7 +594,8 @@ export default function CreateClub() {
                                         {(currentSport === "GOLF"
                                             ? ["#매너골프", "#싱글목표", "#명랑골프", "#라운딩", "#스크린", "#초보환영", "#고수환영", "#2030", "#4050", "#주말골퍼"]
                                             // "#내기환영" 은 뺐다 — 앱이 금전 내기를 권하는 모양이 된다(감사 S5, shared/crewTags.ts)
-                                            : ["#빡겜", "#즐겜", "#매너필수", "#금연", "#초보환영", "#고수환영", "#2030", "#4050"]
+                                            // 당구 태그는 언어별 추천 목록(사전에 쉼표로 이어 둔다). 골프는 한국어에서만 열린다.
+                                            : t("clubSettings.billiardsTags").split(",").map(s => s.trim()).filter(Boolean)
                                         ).map(tag => (
                                             <button
                                                 key={tag}

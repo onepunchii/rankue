@@ -3,9 +3,11 @@ import { useLocation } from "wouter";
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { CrewMember, CrewData } from '@/types/crew';
+import { useT } from '@/lib/i18n';
 
 export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) => {
     const { toast } = useToast();
+    const { t } = useT();
     const queryClient = useQueryClient();
     const [_, setLocation] = useLocation();
 
@@ -30,13 +32,13 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
             const promoted = res?.promotedCount ?? res?.data?.promotedCount ?? 0;
             if (promoted > 0) {
                 queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
-                toast({ title: "크루 정보가 수정되었습니다", description: `대기 중이던 ${promoted}명이 자동 승인되었습니다` });
+                toast({ title: t("clubSettings.updated"), description: t("clubSettings.updatedPromoted").replace("{n}", String(promoted)) });
             } else {
-                toast({ title: "크루 정보가 수정되었습니다" });
+                toast({ title: t("clubSettings.updated") });
             }
         },
         onError: (err: Error) => {
-            toast({ title: "수정 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubSettings.updateFailed"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -51,10 +53,10 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
-            toast({ title: "권한이 변경되었습니다" });
+            toast({ title: t("clubSettings.roleChanged") });
         },
         onError: (err: Error) => {
-            toast({ title: "처리 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubSettings.actionFailed"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -66,10 +68,10 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
-            toast({ title: "가입이 승인되었습니다" });
+            toast({ title: t("clubSettings.approved") });
         },
         onError: (err: Error) => {
-            toast({ title: "승인 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubSettings.approveFailed"), description: err.message, variant: "destructive" });
         }
     });
 
@@ -81,10 +83,10 @@ export const useClubSettings = (crewId: string, initialMembers?: CrewMember[]) =
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/members`] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}`] });
-            toast({ title: "처리되었습니다" });
+            toast({ title: t("clubSettings.done") });
         },
         onError: (err: Error) => {
-            toast({ title: "처리 실패", description: err.message, variant: "destructive" });
+            toast({ title: t("clubSettings.actionFailed"), description: err.message, variant: "destructive" });
         }
     });
 

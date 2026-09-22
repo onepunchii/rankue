@@ -10,7 +10,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LucideSend, LucideLoader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useT, type Locale } from "@/lib/i18n";
+
+/** 앱 언어 → Intl 태그. 시각·날짜는 사전 키 대신 Intl 로 그 언어답게 그린다(표시 시간대는 KST 고정 — 서버·방 정보와 같은 기준). */
+export const INTL_TAG: Record<Locale, string> = { ko: "ko-KR", en: "en-US", es: "es-419", tr: "tr-TR", vi: "vi-VN" };
 
 export interface ChatMsg {
     id: string;
@@ -57,19 +60,26 @@ const dayKey = (iso: string) => {
     const d = new Date(new Date(iso).getTime() + 9 * 3_600_000);
     return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
 };
-const dayLabel = (iso: string) => {
+// 한국어는 예전 표기 그대로("9월 25일 목요일" · "오전 9:05"), 다른 언어는 Intl 이 그 언어 관례로("Thu, Sep 25" · "9:05 AM").
+const dayLabel = (iso: string, locale: Locale) => {
     const d = new Date(new Date(iso).getTime() + 9 * 3_600_000);
-    const names = ["일", "월", "화", "수", "목", "금", "토"];
-    return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 ${names[d.getUTCDay()]}요일`;
+    if (locale === "ko") {
+        const names = ["일", "월", "화", "수", "목", "금", "토"];
+        return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 ${names[d.getUTCDay()]}요일`;
+    }
+    return new Intl.DateTimeFormat(INTL_TAG[locale], { weekday: "short", month: "short", day: "numeric", timeZone: "Asia/Seoul" }).format(new Date(iso));
 };
-const timeLabel = (iso: string) => {
+const timeLabel = (iso: string, locale: Locale) => {
     const d = new Date(new Date(iso).getTime() + 9 * 3_600_000);
-    const h = d.getUTCHours(), m = String(d.getUTCMinutes()).padStart(2, "0");
-    return `${h < 12 ? "오전" : "오후"} ${h % 12 === 0 ? 12 : h % 12}:${m}`;
+    if (locale === "ko") {
+        const h = d.getUTCHours(), m = String(d.getUTCMinutes()).padStart(2, "0");
+        return `${h < 12 ? "오전" : "오후"} ${h % 12 === 0 ? 12 : h % 12}:${m}`;
+    }
+    return new Intl.DateTimeFormat(INTL_TAG[locale], { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(iso));
 };
 
 export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onOpenCard, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey }: Props) {
-    const { t } = useT();
+    const { t, locale } = useT();
     // 길게 누르기(600ms) → 삭제. 마우스에서는 우클릭도 같다.
     const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const holdStart = (m: ChatMsg) => { if (!onDelete || !canDelete?.(m)) return; holdRef.current = setTimeout(() => { holdRef.current = null; onDelete(m); }, 600); };
@@ -139,7 +149,7 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                             {newDay && (
                                 <div className="flex items-center gap-3 my-3">
                                     <span className="flex-1 h-px bg-surface-line" />
-                                    <span className="text-[11px] font-medium text-ink-4">{dayLabel(m.createdAt)}</span>
+                                    <span className="text-[11px] font-medium text-ink-4">{dayLabel(m.createdAt, locale)}</span>
                                     <span className="flex-1 h-px bg-surface-line" />
                                 </div>
                             )}
@@ -163,7 +173,7 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                                 >
                                                     <span className="block text-[11px] font-semibold text-brand mb-0.5">{m.type === "settlement" ? t("chat.cardSettlement") : t("chat.cardBooking")}</span>
                                                     <span className="block text-[14px] font-medium text-ink-1 whitespace-pre-wrap break-words">{m.message}</span>
-                                                    {m.type === "settlement" && (m as any).metadata?.totalAmount > 0 && <span className="block rk-num text-[13px] text-ink-2 mt-0.5">{Number((m as any).metadata.totalAmount).toLocaleString()}원</span>}
+                                                    {m.type === "settlement" && (m as any).metadata?.totalAmount > 0 && <span className="block rk-num text-[13px] text-ink-2 mt-0.5">{t("chat.amountWon").replace("{n}", Number((m as any).metadata.totalAmount).toLocaleString())}</span>}
                                                     <span className="block text-[12px] font-medium text-brand mt-1.5">{t("chat.cardOpen")} ›</span>
                                                 </button>
                                             ) : (
@@ -181,7 +191,7 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                                     {m.failed && <span className="block text-[11px] mt-0.5">{t("chat.failedTap")}</span>}
                                                 </span>
                                             )}
-                                            <span className="text-[10.5px] text-ink-4 shrink-0 mb-0.5">{m.pending ? "…" : timeLabel(m.createdAt)}</span>
+                                            <span className="text-[10.5px] text-ink-4 shrink-0 mb-0.5">{m.pending ? "…" : timeLabel(m.createdAt, locale)}</span>
                                         </div>
                                     </div>
                                 </div>

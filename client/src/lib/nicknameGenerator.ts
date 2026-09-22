@@ -1,4 +1,5 @@
-// 한국어 닉네임 생성기
+// 게스트 닉네임 생성기 — 한국어면 "멋진 고양이42", 그 외 언어면 "Swift Otter 42"(getLocale 로 가른다).
+import { getLocale } from "./i18n";
 
 const adjectives = [
   '귀여운', '멋진', '똑똑한', '재미있는', '활발한', '따뜻한', '시원한', '빠른', '느린', '큰',
@@ -21,12 +22,28 @@ const nouns = [
   '별', '달', '태양', '구름', '비', '눈', '바람', '천둥', '번개', '무지개'
 ];
 
+const enAdjectives = [
+  'Swift', 'Brave', 'Clever', 'Happy', 'Lucky', 'Calm', 'Bold', 'Quick', 'Gentle', 'Bright',
+  'Mighty', 'Silent', 'Wild', 'Cool', 'Sharp', 'Golden', 'Silver', 'Cosmic', 'Jolly', 'Witty',
+  'Noble', 'Steady', 'Fancy', 'Sunny', 'Smooth', 'Chill', 'Zesty', 'Fuzzy', 'Nimble', 'Merry'
+];
+
+const enNouns = [
+  'Otter', 'Fox', 'Tiger', 'Panda', 'Eagle', 'Wolf', 'Bear', 'Rabbit', 'Falcon', 'Dolphin',
+  'Koala', 'Lynx', 'Owl', 'Whale', 'Puma', 'Badger', 'Heron', 'Raven', 'Shark', 'Penguin',
+  'Comet', 'Maple', 'River', 'Cloud', 'Storm', 'Ember', 'Pebble', 'Willow', 'Breeze', 'Mango'
+];
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 export function generateRandomNickname(): string {
-  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
   const number = Math.floor(Math.random() * 999) + 1;
-  
-  return `${adjective} ${noun}${number}`;
+  if (getLocale() !== 'ko') {
+    return `${pick(enAdjectives)} ${pick(enNouns)} ${number}`;
+  }
+  return `${pick(adjectives)} ${pick(nouns)}${number}`;
 }
 
 export function generateMultipleNicknames(count: number = 5): string[] {

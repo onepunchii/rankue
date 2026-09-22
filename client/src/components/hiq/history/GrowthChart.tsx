@@ -16,6 +16,7 @@ import {
 import { format, isSameMonth, subMonths } from "date-fns";
 import { LucideTrendingUp, LucideTrendingDown } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { ExtendedGameHistory, FilterType } from "./types";
 
 /** 디자인 토큰과 같은 값. recharts는 CSS 변수를 못 받아서 리터럴로 둔다. */
@@ -61,7 +62,7 @@ interface GrowthChartProps {
 
 const fmtAvg = (v: number) => v.toFixed(3);
 
-const ChartTooltip = ({ active, payload, metric }: any) => {
+const ChartTooltip = ({ active, payload, metric, t }: any) => {
     if (!active || !payload?.length) return null;
     const p: GrowthPoint | undefined = payload[0]?.payload;
     if (!p) return null;
@@ -71,33 +72,33 @@ const ChartTooltip = ({ active, payload, metric }: any) => {
             <div className="flex items-center justify-between gap-3 mb-2">
                 <span className="text-[12px] font-medium text-black/45 tabular-nums">{p.fullDate}</span>
                 <span className={cn("text-[11px] font-bold", p.isWinner ? "text-brand" : "text-red-500")}>
-                    {p.isWinner ? "승" : "패"}
+                    {p.isWinner ? t("historyList.win") : t("historyList.loss")}
                 </span>
             </div>
             <div className="flex items-baseline gap-1.5 mb-2">
                 <span className="text-[15px] font-bold text-ink-1 tabular-nums leading-none">{p.score}</span>
-                <span className="text-[12px] font-medium text-black/45">득점</span>
+                <span className="text-[12px] font-medium text-black/45">{t("gameResult.score")}</span>
                 <span className="w-px h-3 bg-black/10 mx-0.5" />
                 <span className="text-[15px] font-bold text-ink-1 tabular-nums leading-none">{p.innings}</span>
-                <span className="text-[12px] font-medium text-black/45">이닝</span>
+                <span className="text-[12px] font-medium text-black/45">{t("historyList.inning")}</span>
             </div>
 
             {metric === "highRun" ? (
                 <div className="flex items-center justify-between gap-3">
-                    <span className="text-[12px] font-medium text-black/45">하이런</span>
+                    <span className="text-[12px] font-medium text-black/45">{t("gameResult.highRun")}</span>
                     <span className="text-[14px] font-bold text-brand tabular-nums leading-none">
                         {p.highRun}
-                        {p.isRecord && <span className="ml-1 text-[11px] font-semibold">최고 갱신</span>}
+                        {p.isRecord && <span className="ml-1 text-[11px] font-semibold">{t("growth.recordBroken")}</span>}
                     </span>
                 </div>
             ) : (
                 <div className="space-y-1">
                     <div className="flex items-center justify-between gap-3">
-                        <span className="text-[12px] font-medium text-black/45">평균</span>
+                        <span className="text-[12px] font-medium text-black/45">{t("historyList.average")}</span>
                         <span className="text-[14px] font-bold text-brand tabular-nums leading-none">{fmtAvg(p.avg)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                        <span className="text-[12px] font-medium text-black/45">누적</span>
+                        <span className="text-[12px] font-medium text-black/45">{t("growth.cumulative")}</span>
                         <span className="text-[13px] font-semibold text-ink-1 tabular-nums leading-none">{fmtAvg(p.cum)}</span>
                     </div>
                 </div>
@@ -107,12 +108,13 @@ const ChartTooltip = ({ active, payload, metric }: any) => {
 };
 
 export const GrowthChart = ({ history, filter, mainMode }: GrowthChartProps) => {
+    const { t } = useT();
     const [metric, setMetric] = useState<Metric>("avg");
 
     // 전체 탭은 3구·4구가 섞여 들어온다. 스케일이 10배 가까이 달라 한 선에 그리면
     // 톱니만 남고 성장이 안 보이므로, useGameStats가 정한 주 종목(mainMode)만 그린다.
     const modeType: "3c" | "4c" = filter === "all" ? (mainMode === "3-Cushion" ? "3c" : "4c") : filter;
-    const modeLabel = modeType === "3c" ? "3쿠션" : "4구";
+    const modeLabel = modeType === "3c" ? t("history.filter3c") : t("history.filter4c");
 
     const { points, best } = useMemo(() => {
         const src = (history || []).filter((g) => (filter === "all" ? g.gameType === modeType : true));
@@ -205,10 +207,10 @@ export const GrowthChart = ({ history, filter, mainMode }: GrowthChartProps) => 
                     </div>
                     <div className="min-w-0">
                         <p className="text-[15px] font-semibold text-ink-1 leading-tight">
-                            경기를 더 하면 성장 그래프가 나타나요
+                            {t("growth.emptyTitle")}
                         </p>
                         <p className="text-[13px] font-medium text-black/45 mt-1 leading-relaxed">
-                            공식 경기 {MIN_GAMES}판부터 평균·하이런 추이를 그려드려요. 지금까지 {points.length}판.
+                            {t("growth.emptyDesc").replace("{min}", String(MIN_GAMES)).replace("{n}", String(points.length))}
                         </p>
                     </div>
                 </div>
@@ -224,18 +226,18 @@ export const GrowthChart = ({ history, filter, mainMode }: GrowthChartProps) => 
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
                             <LucideTrendingUp className="w-4 h-4 text-brand shrink-0" />
-                            <h3 className="text-[15px] font-bold text-ink-1 leading-none">성장 그래프</h3>
+                            <h3 className="text-[15px] font-bold text-ink-1 leading-none">{t("growth.title")}</h3>
                         </div>
                         <p className="text-[12px] font-medium text-black/45 mt-1.5 tabular-nums">
-                            {modeLabel} · 최근 {view.length}경기
+                            {modeLabel} · {t("growth.recentGames").replace("{n}", String(view.length))}
                         </p>
                     </div>
 
                     {hasHighRun && (
                         <div className="flex gap-1 shrink-0">
                             {([
-                                { id: "avg" as Metric, label: "평균" },
-                                { id: "highRun" as Metric, label: "하이런" },
+                                { id: "avg" as Metric, label: t("historyList.average") },
+                                { id: "highRun" as Metric, label: t("gameResult.highRun") },
                             ]).map((tab) => (
                                 <button
                                     key={tab.id}
@@ -285,7 +287,7 @@ export const GrowthChart = ({ history, filter, mainMode }: GrowthChartProps) => 
                                     tick={{ fontSize: 10, fill: AXIS }}
                                 />
                                 <Tooltip
-                                    content={<ChartTooltip metric="avg" />}
+                                    content={<ChartTooltip metric="avg" t={t} />}
                                     cursor={{ stroke: "rgba(0,0,0,0.14)", strokeWidth: 1 }}
                                 />
                                 <Area
@@ -335,7 +337,7 @@ export const GrowthChart = ({ history, filter, mainMode }: GrowthChartProps) => 
                                     tick={{ fontSize: 10, fill: AXIS }}
                                 />
                                 <Tooltip
-                                    content={<ChartTooltip metric="highRun" />}
+                                    content={<ChartTooltip metric="highRun" t={t} />}
                                     cursor={{ fill: "rgba(0,0,0,0.04)" }}
                                 />
                                 <Bar dataKey="highRun" radius={[4, 4, 0, 0]} maxBarSize={18} animationDuration={600}>
@@ -353,16 +355,16 @@ export const GrowthChart = ({ history, filter, mainMode }: GrowthChartProps) => 
                     <div className="flex items-center gap-4 mt-3">
                         <span className="flex items-center gap-1.5 text-[12px] font-medium text-black/45">
                             <span className="w-3 h-[3px] rounded-full" style={{ background: BRAND }} />
-                            누적 평균
+                            {t("growth.legendCumulative")}
                         </span>
                         <span className="flex items-center gap-1.5 text-[12px] font-medium text-black/45">
                             <span className="w-3 h-[3px] rounded-full" style={{ background: BRAND_SOFT }} />
-                            경기별 평균
+                            {t("growth.legendPerGame")}
                         </span>
                     </div>
                 ) : (
                     <p className="text-[12px] font-medium text-black/45 mt-3 leading-relaxed">
-                        진한 막대는 그때까지의 최고 기록을 갱신한 경기예요 · 최고 하이런{" "}
+                        {t("growth.recordCaption")} · {t("growth.bestHighRun")}{" "}
                         <span className="text-brand font-bold tabular-nums">{best}</span>
                     </p>
                 )}
@@ -372,7 +374,7 @@ export const GrowthChart = ({ history, filter, mainMode }: GrowthChartProps) => 
                     <div className="mt-4 rounded-xl bg-black/[0.04] px-4 py-3 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                             <p className="text-[12px] font-medium text-black/45 mb-1 leading-none">
-                                이번 달 평균 · {monthly.cur.count}경기
+                                {t("growth.thisMonthAvg")} · {t("growth.gamesCount").replace("{n}", String(monthly.cur.count))}
                             </p>
                             <p className="text-[20px] font-bold text-ink-1 tabular-nums leading-none tracking-tight">
                                 {fmtAvg(monthly.cur.avg)}
@@ -380,10 +382,10 @@ export const GrowthChart = ({ history, filter, mainMode }: GrowthChartProps) => 
                         </div>
                         <div className="text-right shrink-0">
                             <p className="text-[12px] font-medium text-black/45 mb-1 leading-none tabular-nums">
-                                지난달 {fmtAvg(monthly.last.avg)}
+                                {t("growth.lastMonth")} {fmtAvg(monthly.last.avg)}
                             </p>
                             {Math.abs(monthly.delta) < 0.0005 ? (
-                                <p className="text-[14px] font-bold text-black/45 leading-none">변화 없음</p>
+                                <p className="text-[14px] font-bold text-black/45 leading-none">{t("growth.noChange")}</p>
                             ) : (
                                 <p
                                     className={cn(

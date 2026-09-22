@@ -1,4 +1,5 @@
 // localStorage 기반 게스트 인증 시스템
+import { generateRandomNickname } from './nicknameGenerator';
 interface GuestData {
   guestId: string;
   nickname: string;
@@ -19,14 +20,9 @@ export class GuestAuthManager {
     return `${this.GUEST_PREFIX}${timestamp}${random}`;
   }
 
-  // 랜덤 닉네임 생성
+  // 랜덤 닉네임 생성 — 언어별 생성기(nicknameGenerator)를 그대로 쓴다
   static generateNickname(): string {
-    const adjectives = ['귀여운', '멋진', '똑똑한', '재미있는', '활발한', '따뜻한', '시원한', '빠른', '느린', '큰'];
-    const nouns = ['고양이', '강아지', '토끼', '햄스터', '새', '물고기', '거북이', '나비', '벌', '개미'];
-    const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const noun = nouns[Math.floor(Math.random() * nouns.length)];
-    const number = Math.floor(Math.random() * 999) + 1;
-    return `${adjective} ${noun}${number}`;
+    return generateRandomNickname();
   }
 
   // 게스트 데이터 가져오기 (없으면 새로 생성)

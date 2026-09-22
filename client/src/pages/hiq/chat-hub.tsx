@@ -9,11 +9,12 @@ import { LucideLoader2, LucideChevronRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useSport } from "@/contexts/SportContext";
-import { useT } from "@/lib/i18n";
+import { useT, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { JOIN_TYPE_LABEL } from "@shared/golfJoin";
 import { FriendPicker } from "@/components/hiq/chat/FriendPicker";
+import { INTL_TAG } from "@/components/hiq/chat/ChatRoom";
 import { LucidePlus, LucideHeadset } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -32,24 +33,26 @@ export interface ChatRoomRow {
 
 export const CHAT_ROOMS_KEY = (sport: string) => ["/api/hiq/chat/rooms", sport] as const;
 
-/** "방금·n분 전·n시간 전·어제·9/25" — 목록용 짧은 시각 */
-export function agoLabel(iso: string, now = Date.now()): string {
+/** "방금·n분 전·n시간 전·어제·9/25" — 목록용 짧은 시각. 문구는 사전(t), 날짜는 한국어만 M/D 이고 다른 언어는 Intl 관례. */
+export function agoLabel(iso: string, t: (k: string) => string, locale: Locale, now = Date.now()): string {
     const ms = now - new Date(iso).getTime();
-    if (ms < 60_000) return "방금";
-    if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}분 전`;
-    if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}시간 전`;
-    if (ms < 2 * 86_400_000) return "어제";
+    if (ms < 60_000) return t("umb.cheerNow");
+    if (ms < 3_600_000) return t("umb.cheerMinAgo").replace("{n}", String(Math.floor(ms / 60_000)));
+    if (ms < 86_400_000) return t("umb.cheerHourAgo").replace("{n}", String(Math.floor(ms / 3_600_000)));
+    if (ms < 2 * 86_400_000) return t("chat.yesterday");
+    if (locale !== "ko") return new Intl.DateTimeFormat(INTL_TAG[locale], { month: "numeric", day: "numeric", timeZone: "Asia/Seoul" }).format(new Date(iso));
     const d = new Date(new Date(iso).getTime() + 9 * 3_600_000);
     return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
-function teeLabel(iso: string): string {
+function teeLabel(iso: string, locale: Locale): string {
+    if (locale !== "ko") return new Intl.DateTimeFormat(INTL_TAG[locale], { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(iso));
     const d = new Date(new Date(iso).getTime() + 9 * 3_600_000);
     return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
 export default function ChatHub() {
-    const { t } = useT();
+    const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const { member } = useAuth();
     const { currentSport } = useSport();
@@ -139,13 +142,13 @@ export default function ChatHub() {
                                     <span className={cn("w-12 h-12 shrink-0 overflow-hidden flex items-center justify-center text-[15px] font-semibold",
                                         r.kind === "dm" ? "rounded-full bg-surface-3 text-ink-2" : "rounded-2xl",
                                         r.kind === "crew" ? "bg-brand/10 text-brand" : r.kind === "support" ? "bg-[#6E5BC8]/20 text-[#B8A7FF]" : r.kind === "listing" ? (r.listing?.listingType === "JOIN" ? "bg-[#FF6B00]/12 text-[#FF8A33]" : "bg-[#64DD17]/12 text-[#6DBE2A]") : "")}>
-                                        {r.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : r.kind === "support" ? <LucideHeadset className="w-5 h-5" /> : r.kind === "listing" ? (r.listing?.listingType === "JOIN" ? "조" : "부") : r.title.charAt(0)}
+                                        {r.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : r.kind === "support" ? <LucideHeadset className="w-5 h-5" /> : r.kind === "listing" ? (r.listing?.listingType === "JOIN" ? t("chat.iconJoin") : t("chat.iconBooking")) : r.title.charAt(0)}
                                     </span>
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-center gap-2 min-w-0">
                                             <span className="text-[15px] font-semibold text-ink-1 truncate">{r.title}</span>
                                             <span className="text-[11.5px] font-medium text-ink-4 shrink-0">
-                                                {r.kind === "listing" ? `${r.listing?.joinType ? JOIN_TYPE_LABEL[r.listing.joinType as keyof typeof JOIN_TYPE_LABEL] ?? "" : r.listing?.listingType === "JOIN" ? "조인" : "부킹"} · ${r.listing ? teeLabel(r.listing.datetime) : ""}` : r.subtitle}
+                                                {r.kind === "listing" ? `${r.listing?.joinType ? JOIN_TYPE_LABEL[r.listing.joinType as keyof typeof JOIN_TYPE_LABEL] ?? "" : r.listing?.listingType === "JOIN" ? t("chat.join") : t("chat.booking")} · ${r.listing ? teeLabel(r.listing.datetime, locale) : ""}` : r.subtitle}
                                             </span>
                                         </span>
                                         <span className={cn("block text-[13px] truncate mt-0.5", r.unread > 0 ? "text-ink-1 font-medium" : "text-ink-3")}>
@@ -153,7 +156,7 @@ export default function ChatHub() {
                                         </span>
                                     </span>
                                     <span className="shrink-0 flex flex-col items-end gap-1">
-                                        <span className="text-[11px] text-ink-4">{r.lastMessage ? agoLabel(r.lastMessage.at) : ""}</span>
+                                        <span className="text-[11px] text-ink-4">{r.lastMessage ? agoLabel(r.lastMessage.at, t, locale) : ""}</span>
                                         {r.unread > 0
                                             ? <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-brand text-brand-fg text-[11px] font-semibold flex items-center justify-center rk-num">{r.unread > 99 ? "99+" : r.unread}</span>
                                             : <LucideChevronRight className="w-4 h-4 text-ink-4" />}

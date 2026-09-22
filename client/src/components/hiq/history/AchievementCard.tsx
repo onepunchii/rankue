@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useT, type Locale } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 // 주간 달성률 — 득점÷다마수. 다마수는 매장마다 스케일이 달라 남과 비교는 안 되지만
@@ -12,37 +12,8 @@ import { cn } from "@/lib/utils";
 
 interface Week { week: string; type: "3c" | "4c"; games: number; rate: number }
 
-const L: Record<Locale, { title: string; subtitle: string; vs: (d: number) => string; same: string; empty: string; games: string; thisWeek: string; weekOf: (d: string, g: number) => string }> = {
-    ko: {
-        title: "주간 달성률", subtitle: "득점 ÷ 내 다마수",
-        vs: (d) => (d > 0 ? `직전 주보다 +${d}%p` : `직전 주보다 ${d}%p`), same: "직전 주와 동일",
-        empty: "매칭 경기를 기록하면 주간 달성률이 쌓입니다", games: "경기", thisWeek: "이번 주", weekOf: (d, g) => `${d} 주 · ${g}경기`,
-    },
-    en: {
-        title: "Weekly achievement", subtitle: "Score ÷ my handicap",
-        vs: (d) => (d > 0 ? `+${d}%p vs previous week` : `${d}%p vs previous week`), same: "Same as the previous week",
-        empty: "Record match games to build your weekly rate", games: "games", thisWeek: "This week", weekOf: (d, g) => `Week of ${d} · ${g} games`,
-    },
-    vi: {
-        title: "Tỷ lệ đạt tuần", subtitle: "Điểm ÷ mức chấp của tôi",
-        vs: (d) => (d > 0 ? `+${d}%p so với tuần liền trước` : `${d}%p so với tuần liền trước`), same: "Bằng tuần liền trước",
-        empty: "Ghi các trận đấu để tích lũy tỷ lệ tuần", games: "trận", thisWeek: "Tuần này", weekOf: (d, g) => `Tuần ${d} · ${g} trận`,
-    },
-    tr: {
-        title: "Haftalık başarı", subtitle: "Skor ÷ handikapım",
-        vs: (d) => (d > 0 ? `Önceki haftaya +${d}%p` : `Önceki haftaya ${d}%p`), same: "Önceki haftayla aynı",
-        empty: "Maç kaydettikçe haftalık oranın oluşur", games: "maç", thisWeek: "Bu hafta", weekOf: (d, g) => `${d} haftası · ${g} maç`,
-    },
-    es: {
-        title: "Logro semanal", subtitle: "Puntos ÷ mi hándicap",
-        vs: (d) => (d > 0 ? `+${d}%p vs semana anterior` : `${d}%p vs semana anterior`), same: "Igual que la semana anterior",
-        empty: "Registra partidas para acumular tu tasa semanal", games: "partidas", thisWeek: "Esta semana", weekOf: (d, g) => `Semana del ${d} · ${g} partidas`,
-    },
-};
-
 export const AchievementCard = ({ filter }: { filter: string }) => {
-    const { locale } = useT();
-    const t = L[locale] ?? L.ko;
+    const { t, locale } = useT();
     const DATE_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", vi: "vi-VN", tr: "tr-TR", es: "es-ES" };
     const md = (iso: string) => new Date(iso).toLocaleDateString(DATE_LOCALE[locale] ?? "ko-KR", { month: "numeric", day: "numeric" });
     const { data } = useQuery<{ weeks: Week[] }>({
@@ -77,8 +48,8 @@ export const AchievementCard = ({ filter }: { filter: string }) => {
     if (withData.length === 0) {
         return (
             <div className="rk-card p-5 mb-6">
-                <h3 className="text-[15px] font-bold text-ink-1">{t.title}</h3>
-                <p className="text-[13px] text-black/45 text-center py-4">{t.empty}</p>
+                <h3 className="text-[15px] font-bold text-ink-1">{t("achievement.title")}</h3>
+                <p className="text-[13px] text-black/45 text-center py-4">{t("achievement.empty")}</p>
             </div>
         );
     }
@@ -98,7 +69,7 @@ export const AchievementCard = ({ filter }: { filter: string }) => {
         if (prev && pt.i === prev.i + 1) segments[segments.length - 1].push({ x: pt.x, y: pt.y });
         else segments.push([{ x: pt.x, y: pt.y }]);
     });
-    const chartLabel = `${t.title}: ${points.map((pt) => `${pt.rate}%`).join(", ")}`;
+    const chartLabel = `${t("achievement.title")}: ${points.map((pt) => `${pt.rate}%`).join(", ")}`;
     const prev = withData.length > 1 ? withData[withData.length - 2] : null;
     // 비교는 달력상 바로 앞 주일 때만 — 중간이 비었는데 "직전 주보다" 라고 하면 거짓말이 된다.
     const adjacent = prev != null && new Date(last.week).getTime() - new Date(prev.week).getTime() === 7 * 86400000;
@@ -107,8 +78,8 @@ export const AchievementCard = ({ filter }: { filter: string }) => {
     return (
         <div className="rk-card p-5 mb-6">
             <div className="flex items-baseline justify-between mb-3">
-                <h3 className="text-[15px] font-bold text-ink-1">{t.title}</h3>
-                <span className="text-[11.5px] font-medium text-black/40">{t.subtitle}</span>
+                <h3 className="text-[15px] font-bold text-ink-1">{t("achievement.title")}</h3>
+                <span className="text-[11.5px] font-medium text-black/40">{t("achievement.subtitle")}</span>
             </div>
             {/* 헤드라인 — 이번 주 숫자 하나가 주인공, 변화량은 곁들이 */}
             <div className="flex items-baseline gap-2 flex-wrap mb-4">
@@ -120,12 +91,12 @@ export const AchievementCard = ({ filter }: { filter: string }) => {
                         "text-[12.5px] font-bold leading-none",
                         delta > 0 ? "text-brand" : delta < 0 ? "text-red-500" : "text-black/40",
                     )}>
-                        {delta === 0 ? t.same : t.vs(delta)}
+                        {delta === 0 ? t("achievement.same") : t(delta > 0 ? "achievement.vsUp" : "achievement.vsDown").replace("{d}", String(Math.abs(delta)))}
                     </span>
                 )}
             </div>
             {/* 머리 숫자는 '가장 최근 기록이 있는 주' — 이번 주에 아직 안 쳤으면 지난 주다. 어느 주인지 밝혀 둔다. */}
-            <p className="text-[11.5px] font-medium text-black/40 -mt-3 mb-3.5">{t.weekOf(md(last.week), last.games)}</p>
+            <p className="text-[11.5px] font-medium text-black/40 -mt-3 mb-3.5">{t("achievement.weekOf").replace("{d}", md(last.week)).replace("{n}", String(last.games))}</p>
             {/* 선그래프 — 0~yMax 를 6~94 로 눌러 위아래 여백을 둔다(꼭짓점과 100% 선이 테두리에 붙지 않게) */}
             <div className="relative h-[84px]">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full" role="img" aria-label={chartLabel}>
@@ -142,7 +113,7 @@ export const AchievementCard = ({ filter }: { filter: string }) => {
                 {points.map((pt) => (
                     <span
                         key={pt.week}
-                        title={`${pt.rate}% · ${pt.games}${t.games}`}
+                        title={`${pt.rate}% · ${t("achievement.gamesCount").replace("{n}", String(pt.games))}`}
                         className={cn(
                             "absolute rounded-full bg-brand ring-2 ring-white",
                             pt.isLast ? "w-[9px] h-[9px]" : "w-[6px] h-[6px]",
@@ -159,7 +130,7 @@ export const AchievementCard = ({ filter }: { filter: string }) => {
                             className="absolute text-[9.5px] text-black/35 tabular-nums whitespace-nowrap"
                             style={{ left: `${(i / 7) * 100}%`, transform: i === 7 ? "translateX(-100%)" : "translateX(-50%)" }}
                         >
-                            {i === 7 ? t.thisWeek : new Date(w.week).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}
+                            {i === 7 ? t("achievement.thisWeek") : md(w.week)}
                         </span>
                     )
                 ))}

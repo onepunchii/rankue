@@ -231,15 +231,15 @@ export default function HiqMenu() {
                     <div className="w-14 h-14 rounded-full bg-brand/[0.08] flex items-center justify-center mb-4">
                         <LucideUser className="w-7 h-7 text-brand" />
                     </div>
-                    <h2 className="text-[17px] font-bold text-ink-1">로그인하고 시작하세요</h2>
+                    <h2 className="text-[17px] font-bold text-ink-1">{t("menu.guestTitle")}</h2>
                     <p className="text-[13px] text-black/50 mt-1.5 leading-relaxed">
-                        내 전적·평균(에버리지)과 크루, 라이벌이 이 계정에 쌓입니다.
+                        {t("menu.guestDesc")}
                     </p>
                     <button
                         onClick={() => goLogin(setLocation, "/menu")}
                         className="w-full mt-5 h-[50px] rounded-tile bg-brand text-white text-[15px] font-bold active:scale-[0.98] transition-transform"
                     >
-                        로그인하고 시작하기
+                        {t("loginGate.cta")}
                     </button>
                 </div>
             </div>
@@ -422,11 +422,11 @@ export default function HiqMenu() {
                         // 예전에는 사장님도 '파트너 프로그램' 홍보 카드를 찾아 눌러야 했다.
                         // SSO 가 로그인 상태를 그대로 파트너 세션으로 바꿔주므로 재로그인이 없다.
                         ...((member as any)?.role === "store_owner" && !isGolf
-                            ? [{ icon: LucideStore, label: "내 매장 관리", desc: "매장 정보 · 회원 · 통계", onClick: () => setLocation("/partner/dashboard") }]
+                            ? [{ icon: LucideStore, label: t("menu.myStore"), desc: t("menu.myStoreDesc"), onClick: () => setLocation("/partner/dashboard") }]
                             : []),
                         // 관리자 콘솔 — role 이 admin/super_admin 인 계정에게만 노출 (진입점 부재 문제 해결)
                         ...((member as any)?.role === "admin" || (member as any)?.role === "super_admin"
-                            ? [{ icon: LucideBriefcase, label: "관리자 콘솔", desc: "매장 클레임 · 입점 문의 · 회원 · 신고 관리", onClick: () => setLocation("/admin/dashboard") }]
+                            ? [{ icon: LucideBriefcase, label: t("menu.adminConsole"), desc: t("menu.adminConsoleDesc"), onClick: () => setLocation("/admin/dashboard") }]
                             : []),
                         // 매장 찾기 — 모바일의 유일한 상시 진입점 (하단 네비·홈에는 자리가 없다)
                         ...(isGolf ? [] : [{ icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") }]),
@@ -439,8 +439,8 @@ export default function HiqMenu() {
                         // 세계·PBA 랭킹은 로그인 없이도 보는 공개 콘텐츠 — 게스트에게 갈 곳을 준다
                         ...(isGuest && !isGolf
                             ? [
-                                { icon: LucideGlobe, label: "세계 랭킹", desc: "UMB 공식 세계 순위", onClick: () => setLocation("/world-ranking") },
-                                { icon: LucideTrophy, label: "PBA 투어", desc: "프로당구 시즌 랭킹·선수", onClick: () => setLocation("/pba") },
+                                { icon: LucideGlobe, label: t("umb.title"), desc: t("menu.worldRankingDesc"), onClick: () => setLocation("/world-ranking") },
+                                { icon: LucideTrophy, label: t("menu.pbaTour"), desc: t("menu.pbaTourDesc"), onClick: () => setLocation("/pba") },
                             ]
                             : []),
                         ...(!isGuest

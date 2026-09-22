@@ -2,6 +2,7 @@
  * Team Generation Logic for RankU
  * Supports GOLF (golfAvgScore) and BILLIARDS (avg4c)
  */
+import { getLocale, type Locale } from "./i18n";
 
 export type SportType = 'GOLF' | 'BILLIARDS';
 export type GenderDist = 'random' | 'spread' | 'group';
@@ -154,13 +155,24 @@ export const generateTeams = (
     return teams.sort((a, b) => a.id - b.id);
 };
 
+// 당구 라벨은 5개 언어 — 훅을 못 쓰는 모듈이라 getLocale() 로 가른다. 골프는 한국어에서만 열리므로 그대로.
+type BilliardsTerms = { teamLabel: string; scoreLabel: string; avgLabel: string; unit: string };
+const BILLIARDS_TERMS: Record<Locale, BilliardsTerms> = {
+    ko: { teamLabel: '팀', scoreLabel: '점수', avgLabel: '평균 점수', unit: '점' },
+    en: { teamLabel: 'Team', scoreLabel: 'Score', avgLabel: 'Avg score', unit: 'pts' },
+    es: { teamLabel: 'Equipo', scoreLabel: 'Puntos', avgLabel: 'Promedio', unit: 'pts' },
+    tr: { teamLabel: 'Takım', scoreLabel: 'Puan', avgLabel: 'Ortalama puan', unit: 'puan' },
+    vi: { teamLabel: 'Đội', scoreLabel: 'Điểm', avgLabel: 'Điểm trung bình', unit: 'điểm' },
+};
+
 export const getSportTerminology = (sportType: SportType) => {
+    const b = BILLIARDS_TERMS[getLocale()] ?? BILLIARDS_TERMS.ko;
     return {
-        teamLabel: sportType === 'GOLF' ? '조' : '팀',
-        scoreLabel: sportType === 'GOLF' ? '핸디' : '점수',
-        avgLabel: sportType === 'GOLF' ? '평균 핸디' : '평균 점수',
+        teamLabel: sportType === 'GOLF' ? '조' : b.teamLabel,
+        scoreLabel: sportType === 'GOLF' ? '핸디' : b.scoreLabel,
+        avgLabel: sportType === 'GOLF' ? '평균 핸디' : b.avgLabel,
         emoji: sportType === 'GOLF' ? '⛳️' : '🎱',
         scoreField: sportType === 'GOLF' ? 'golfAvgScore' : 'avg4c',
-        unit: sportType === 'GOLF' ? '타' : '점'
+        unit: sportType === 'GOLF' ? '타' : b.unit
     };
 };

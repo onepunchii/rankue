@@ -14,6 +14,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { useT } from "@/lib/i18n";
 import { LucideShare2, LucideDownload, LucideUsers, LucideChevronRight, LucideLink } from "@/lib/icons";
 
 /* ============================================================================
@@ -148,10 +149,21 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 
 /* -------------------------------------------------------------- 공통 라벨 */
 
-function typeLabelOf(gameType?: string | null) {
-    if (gameType === "4c") return "4구";
-    if (gameType === "3c") return "3구";
-    return "당구";
+/** 사전 조회 함수 — 캔버스 그리기(훅 불가)는 호출부의 t 를 받아 쓴다. */
+export type Tx = (key: string) => string;
+
+function typeLabelOf(t: Tx, gameType?: string | null) {
+    if (gameType === "4c") return t("shareCard.fourBall");
+    if (gameType === "3c") return t("shareCard.threeBall");
+    return t("shareCard.billiards");
+}
+
+function inningsLabelOf(t: Tx, innings: number) {
+    return t("shareCard.totalInnings").replace("{n}", String(Number(innings) || 0));
+}
+
+function statLineOf(t: Tx, avg: string, highRun: number) {
+    return t("shareCard.statLine").replace("{avg}", avg).replace("{hr}", String(Number(highRun) || 0));
 }
 
 function dateLabelOf(playedAt?: string | number | Date | null) {
@@ -168,7 +180,7 @@ function fileSlugOf(playedAt?: string | number | Date | null) {
 
 /* ------------------------------------------------------------ 캔버스 그리기 */
 
-export function drawShareCard(ctx: CanvasRenderingContext2D, data: ShareResultData) {
+export function drawShareCard(ctx: CanvasRenderingContext2D, data: ShareResultData, t: Tx) {
     const S = CANVAS_SIZE;
     const players = (data.players || []).slice(0, 4);
     const n = Math.max(1, players.length);
@@ -207,7 +219,7 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, data: ShareResultDa
 
     /* 헤더 --------------------------------------------------------------- */
     const headCy = CY + 84;
-    const typeLabel = typeLabelOf(data.gameType);
+    const typeLabel = typeLabelOf(t, data.gameType);
 
     setFont(ctx, 700, 30);
     const pillTextW = ctx.measureText(typeLabel).width;
@@ -224,7 +236,7 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, data: ShareResultDa
     setFont(ctx, 700, 42);
     ctx.fillStyle = INK_1;
     ctx.textAlign = "left";
-    ctx.fillText(isPractice ? "연습 기록" : "경기 결과", innerL + pillW + 20, headCy + 1);
+    ctx.fillText(isPractice ? t("shareCard.practiceRecord") : t("shareCard.matchResult"), innerL + pillW + 20, headCy + 1);
 
     setFont(ctx, 600, 28);
     ctx.fillStyle = INK_4;
@@ -284,11 +296,11 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, data: ShareResultDa
         let chipW = 0;
         if (showWin) {
             setFont(ctx, 700, Math.round(nameSize * 0.56));
-            chipW = ctx.measureText("승").width + Math.round(nameSize * 0.7);
+            chipW = ctx.measureText(t("shareCard.win")).width + Math.round(nameSize * 0.7);
             setFont(ctx, 700, nameSize);
         }
         const nameMax = innerR - scoreBlockW - 40 - textL - (showWin ? chipW + 16 : 0);
-        const name = fitText(ctx, p.name || "선수", nameMax);
+        const name = fitText(ctx, p.name || t("shareCard.player"), nameMax);
         const nameBaseline = cy - 6;
 
         ctx.textAlign = "left";
@@ -307,22 +319,23 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, data: ShareResultDa
             ctx.fillStyle = "#ffffff";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText("승", chipX + chipW / 2, chipY + chipH / 2 + 1);
+            ctx.fillText(t("shareCard.win"), chipX + chipW / 2, chipY + chipH / 2 + 1);
             ctx.textAlign = "left";
             ctx.textBaseline = "alphabetic";
         }
 
         setFont(ctx, 500, subSize);
         ctx.fillStyle = INK_3;
+        // 번역이 길면 점수 블록을 침범하므로 이름과 같은 최대폭으로 말줄임
         ctx.fillText(
-            `에버 ${p.avg} · 하이런 ${Number(p.highRun) || 0}`,
+            fitText(ctx, statLineOf(t, p.avg, p.highRun), innerR - scoreBlockW - 40 - textL),
             textL,
             nameBaseline + subSize + 14,
         );
     });
 
     /* 이닝 칩 ------------------------------------------------------------ */
-    const inningTxt = `총 ${Number(data.innings) || 0}이닝`;
+    const inningTxt = inningsLabelOf(t, data.innings);
     const chipCy = (regionBottom + footTop) / 2;
     setFont(ctx, 600, 30);
     const iw = ctx.measureText(inningTxt).width + 46;
@@ -344,7 +357,7 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, data: ShareResultDa
 
     setFont(ctx, 500, 26);
     ctx.fillStyle = "rgba(255,255,255,0.72)";
-    ctx.fillText("손안의 당구 점수판", innerL, footTop + 104);
+    ctx.fillText(fitText(ctx, t("shareCard.tagline"), innerR - innerL - 260), innerL, footTop + 104);
 
     setFont(ctx, 600, 28);
     ctx.fillStyle = "rgba(255,255,255,0.75)";
@@ -354,14 +367,14 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, data: ShareResultDa
 }
 
 /** 결과 카드를 PNG Blob 으로. 실패하면 null (앱은 죽지 않는다). */
-export async function renderShareBlob(data: ShareResultData): Promise<Blob | null> {
+export async function renderShareBlob(data: ShareResultData, t: Tx): Promise<Blob | null> {
     try {
         const canvas = document.createElement("canvas");
         canvas.width = CANVAS_SIZE;
         canvas.height = CANVAS_SIZE;
         const ctx = canvas.getContext("2d");
         if (!ctx) return null;
-        drawShareCard(ctx, data);
+        drawShareCard(ctx, data, t);
         return await new Promise<Blob | null>((resolve) => {
             try {
                 canvas.toBlob((b) => resolve(b), "image/png");
@@ -416,6 +429,7 @@ const PREVIEW_SCALE = {
 
 /** 공유될 PNG 와 동일한 레이아웃의 미리보기 카드. 이미지 생성이 실패해도 이건 항상 보인다. */
 export function ShareResultCard({ data, className }: { data: ShareResultData; className?: string }) {
+    const { t } = useT();
     const players = (data.players || []).slice(0, 4);
     const isPractice = !!data.isPractice;
     const sz =
@@ -428,10 +442,10 @@ export function ShareResultCard({ data, className }: { data: ShareResultData; cl
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                             <span className="rounded-full bg-brand px-2 py-[3px] text-[10px] font-bold leading-none text-brand-fg">
-                                {typeLabelOf(data.gameType)}
+                                {typeLabelOf(t, data.gameType)}
                             </span>
                             <span className="text-[13px] font-bold text-ink-1">
-                                {isPractice ? "연습 기록" : "경기 결과"}
+                                {isPractice ? t("shareCard.practiceRecord") : t("shareCard.matchResult")}
                             </span>
                         </div>
                         <span className="text-[10px] font-semibold tabular-nums text-black/45">
@@ -455,16 +469,16 @@ export function ShareResultCard({ data, className }: { data: ShareResultData; cl
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-1.5">
                                             <span className={cn("truncate font-bold text-ink-1", sz.name)}>
-                                                {p.name || "선수"}
+                                                {p.name || t("shareCard.player")}
                                             </span>
                                             {showWin && (
                                                 <span className="shrink-0 rounded-full bg-brand px-1.5 py-[2px] text-[9px] font-bold leading-none text-brand-fg">
-                                                    승
+                                                    {t("shareCard.win")}
                                                 </span>
                                             )}
                                         </div>
                                         <p className={cn("font-medium tabular-nums text-black/45", sz.sub)}>
-                                            에버 {p.avg} · 하이런 {Number(p.highRun) || 0}
+                                            {statLineOf(t, p.avg, p.highRun)}
                                         </p>
                                     </div>
                                     <div className="flex shrink-0 items-baseline gap-0.5">
@@ -488,7 +502,7 @@ export function ShareResultCard({ data, className }: { data: ShareResultData; cl
 
                     <div className="flex justify-center pb-3">
                         <span className="rounded-full bg-black/[0.045] px-2.5 py-1 text-[10px] font-semibold tabular-nums text-black/55">
-                            총 {Number(data.innings) || 0}이닝
+                            {inningsLabelOf(t, data.innings)}
                         </span>
                     </div>
                 </div>
@@ -497,7 +511,7 @@ export function ShareResultCard({ data, className }: { data: ShareResultData; cl
                     <div>
                         <p className="text-[12px] font-bold leading-tight text-brand-fg">랭큐 RANKUE</p>
                         <p className="text-[9px] font-medium leading-tight text-white/70">
-                            손안의 당구 점수판
+                            {t("shareCard.tagline")}
                         </p>
                     </div>
                     <span className="text-[9px] font-semibold text-white/75">{SITE}</span>
@@ -509,10 +523,10 @@ export function ShareResultCard({ data, className }: { data: ShareResultData; cl
 
 /* --------------------------------------------------- 버튼 + 공유 시트(진입점) */
 
-function buildShareText(data: ShareResultData) {
+function buildShareText(data: ShareResultData, t: Tx) {
     const players = (data.players || []).slice(0, 4);
-    const line = players.map((p) => `${p.name || "선수"} ${Number(p.score) || 0}`).join(" : ");
-    return `[랭큐] ${typeLabelOf(data.gameType)} ${line} (${Number(data.innings) || 0}이닝)\n손안의 당구 점수판 · ${SITE}`;
+    const line = players.map((p) => `${p.name || t("shareCard.player")} ${Number(p.score) || 0}`).join(" : ");
+    return `[${t("shareCard.brandShort")}] ${typeLabelOf(t, data.gameType)} ${line} (${inningsLabelOf(t, data.innings)})\n${t("shareCard.tagline")} · ${SITE}`;
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -542,7 +556,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 // 네이티브 앱 공유. WebView 안에서는 navigator.share 의 파일 공유도, <a download> 도
 // 동작하지 않아서(둘 다 조용히 아무 일도 안 일어난다) 파일을 캐시에 쓴 뒤
 // 네이티브 공유 시트를 띄우는 경로가 유일하게 확실하다.
-async function shareNative(blob: Blob, filename: string, text: string): Promise<boolean> {
+async function shareNative(blob: Blob, filename: string, text: string, title: string): Promise<boolean> {
     // 옛 안드로이드 앱(1.0.2)에는 Share·Filesystem 플러그인이 없다 — 부르면 실패 뒤에야 폴백하니 미리 거른다.
     if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable("Share") || !Capacitor.isPluginAvailable("Filesystem")) return false;
     try {
@@ -553,7 +567,7 @@ async function shareNative(blob: Blob, filename: string, text: string): Promise<
             data: base64,
             directory: Directory.Cache,
         });
-        await Share.share({ title: "랭큐 경기 결과", text, files: [written.uri] });
+        await Share.share({ title, text, files: [written.uri] });
         return true;
     } catch (e: any) {
         // 사용자가 공유 시트를 닫은 것도 여기로 온다 — 실패로 보고 폴백하면 안 된다.
@@ -599,6 +613,7 @@ export function ShareResultButton({
     className?: string;
 }) {
     const { toast } = useToast();
+    const { t } = useT();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     // 크루가 2개 이상이면 어디에 올릴지 골라야 한다. 1개면 바로 올리고, 0개면 버튼을 숨긴다.
@@ -615,8 +630,8 @@ export function ShareResultButton({
 
     const failToast = () =>
         toast({
-            title: "이미지를 만들지 못했어요",
-            description: "화면에 보이는 카드를 캡처해서 공유해 주세요.",
+            title: t("shareCard.imageFailed"),
+            description: t("shareCard.imageFailedDesc"),
             variant: "destructive",
         });
 
@@ -628,19 +643,19 @@ export function ShareResultButton({
         if (busy) return;
         setBusy(true);
         try {
-            const blob = await renderShareBlob(data);
+            const blob = await renderShareBlob(data, t);
             if (!blob) {
                 failToast();
                 return;
             }
 
             // 네이티브 앱이면 여기서 끝난다(웹 경로는 WebView에서 통하지 않는다).
-            if (await shareNative(blob, filename, buildShareText(data))) return;
+            if (await shareNative(blob, filename, buildShareText(data, t), t("shareCard.shareTitle"))) return;
 
             const nav = navigator as any;
             try {
                 const file = new File([blob], filename, { type: "image/png" });
-                const withText = { files: [file], title: "랭큐 경기 결과", text: buildShareText(data) };
+                const withText = { files: [file], title: t("shareCard.shareTitle"), text: buildShareText(data, t) };
                 const filesOnly = { files: [file] };
 
                 if (typeof nav.share === "function" && typeof nav.canShare === "function") {
@@ -663,8 +678,8 @@ export function ShareResultButton({
 
             downloadBlob(blob, filename);
             toast({
-                title: "이미지를 저장했어요",
-                description: "사진첩(다운로드)에서 단톡방에 올려보세요.",
+                title: t("shareCard.imageSaved"),
+                description: t("shareCard.imageSavedDesc"),
             });
         } catch (e) {
             console.warn("[ShareResultCard] share failed", e);
@@ -678,15 +693,15 @@ export function ShareResultButton({
         if (busy) return;
         setBusy(true);
         try {
-            const blob = await renderShareBlob(data);
+            const blob = await renderShareBlob(data, t);
             if (!blob) {
                 failToast();
                 return;
             }
             // 앱에서는 <a download> 가 통하지 않는다 → 네이티브 공유 시트("이미지 저장"도 여기서 고를 수 있다)
-            if (await shareNative(blob, filename, buildShareText(data))) return;
+            if (await shareNative(blob, filename, buildShareText(data, t), t("shareCard.shareTitle"))) return;
             downloadBlob(blob, filename);
-            toast({ title: "이미지를 저장했어요" });
+            toast({ title: t("shareCard.imageSaved") });
         } catch (e) {
             console.warn("[ShareResultCard] download failed", e);
             failToast();
@@ -700,7 +715,7 @@ export function ShareResultButton({
         if (busy) return;
         setBusy(true);
         try {
-            const blob = await renderShareBlob(data);
+            const blob = await renderShareBlob(data, t);
             if (!blob) { failToast(); return; }
 
             const dataUrl = await blobToDataUrl(blob);
@@ -709,19 +724,19 @@ export function ShareResultButton({
                 body: { dataUrl, category: "crew-photo" },
             });
             const url = up?.url ?? up?.data?.url;
-            if (!url) throw new Error("업로드 URL 없음");
+            if (!url) throw new Error("upload url missing");
 
             await apiRequest(`/api/hiq/crews/${crewId}/photos`, {
                 method: "POST",
-                body: { url, caption: buildShareText(data).split("\n")[0] },
+                body: { url, caption: buildShareText(data, t).split("\n")[0] },
             });
 
-            toast({ title: `${crewName} 사진첩에 올렸어요` });
+            toast({ title: t("shareCard.crewPosted").replace("{name}", crewName) });
             setPickCrew(false);
             setOpen(false);
         } catch (e) {
             console.warn("[ShareResultCard] crew share failed", e);
-            toast({ title: "크루에 올리지 못했어요", description: "잠시 후 다시 시도해주세요.", variant: "destructive" });
+            toast({ title: t("shareCard.crewPostFailed"), description: t("menu.deleteFailedDesc"), variant: "destructive" });
         } finally {
             setBusy(false);
         }
@@ -733,13 +748,13 @@ export function ShareResultButton({
 
     const handleCopyLink = async () => {
         if (!shareUrl) return;
-        const body = `${buildShareText(data)}\n${shareUrl}`;
+        const body = `${buildShareText(data, t)}\n${shareUrl}`;
 
         // 공유 시트를 쓸 수 있으면 그게 낫다(카톡을 바로 고를 수 있다). 텍스트 공유는 WebView에서도 통한다.
         try {
             const nav = navigator as any;
             if (typeof nav.share === "function") {
-                await nav.share({ title: "랭큐 경기 결과", text: buildShareText(data), url: shareUrl });
+                await nav.share({ title: t("shareCard.shareTitle"), text: buildShareText(data, t), url: shareUrl });
                 return;
             }
         } catch (e: any) {
@@ -748,8 +763,8 @@ export function ShareResultButton({
 
         toast(
             await copyText(body)
-                ? { title: "링크를 복사했어요", description: "단톡방에 붙여넣기 하세요." }
-                : { title: "복사하지 못했어요", description: shareUrl, variant: "destructive" },
+                ? { title: t("share.copied"), description: t("shareCard.pasteHint") }
+                : { title: t("shareCard.copyFailed"), description: shareUrl, variant: "destructive" },
         );
     };
 
@@ -766,7 +781,7 @@ export function ShareResultButton({
         <>
             <Button onClick={() => setOpen(true)} className={cn("rk-btn-primary gap-2", className)}>
                 <LucideShare2 className="h-5 w-5" />
-                결과 공유
+                {t("shareCard.shareResult")}
             </Button>
 
             <Dialog open={open} onOpenChange={setOpen}>
@@ -774,10 +789,10 @@ export function ShareResultButton({
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                             <LucideShare2 className="h-5 w-5 text-brand" />
-                            결과 공유
+                            {t("shareCard.shareResult")}
                         </DialogTitle>
                         <DialogDescription className="text-black/55">
-                            단톡방에 이대로 올릴 수 있어요.
+                            {t("shareCard.sheetDesc")}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -791,7 +806,7 @@ export function ShareResultButton({
                                 className="rk-btn-primary h-12 w-full gap-2 rounded-2xl"
                             >
                                 <LucideLink className="h-4 w-4" />
-                                링크로 공유 (카톡 등)
+                                {t("shareCard.shareLink")}
                             </Button>
                         )}
 
@@ -803,7 +818,7 @@ export function ShareResultButton({
                                 className="rk-btn-secondary h-12 w-full gap-2 rounded-2xl"
                             >
                                 <LucideUsers className="h-4 w-4" />
-                                크루에 올리기
+                                {t("shareCard.postToCrew")}
                             </Button>
                         )}
 
@@ -815,9 +830,9 @@ export function ShareResultButton({
             <Dialog open={pickCrew} onOpenChange={(o) => { if (!busy) setPickCrew(o); }}>
                 <DialogContent className="max-w-sm rounded-card bg-white text-[rgba(0,0,0,0.87)]">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-bold">어느 크루에 올릴까요?</DialogTitle>
+                        <DialogTitle className="text-xl font-bold">{t("shareCard.pickCrewTitle")}</DialogTitle>
                         <DialogDescription className="text-black/55">
-                            선택한 크루의 사진첩에 결과 카드가 올라갑니다.
+                            {t("shareCard.pickCrewDesc")}
                         </DialogDescription>
                     </DialogHeader>
 

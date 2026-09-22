@@ -109,8 +109,8 @@ export default function Landing() {
         if (requiresPassword && password.length < 4) {
             toast({
                 variant: "destructive",
-                title: "입력 오류",
-                description: "비밀번호를 4자리 이상 입력해주세요.",
+                title: t("landing.inputError"),
+                description: t("landing.pinTooShort"),
             });
             return;
         }
@@ -180,7 +180,7 @@ export default function Landing() {
                 <div className="text-brand font-bold text-4xl animate-pulse">RANKUE</div>
                 {brandError ? (
                     <div className="text-red-500 font-semibold bg-black/[0.04] p-4 rounded-tile">
-                        오류: {brandError.message}
+                        {t("landing.errorPrefix")} {brandError.message}
                     </div>
                 ) : (
                     <div className="w-48 h-1 bg-black/[0.06] rounded-full overflow-hidden">

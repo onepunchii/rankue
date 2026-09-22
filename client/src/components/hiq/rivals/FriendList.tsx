@@ -121,7 +121,7 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                                     </div>
                                                                     {rivalry && (
                                                                         <span className={cn("px-2 py-0.5 rounded-lg text-[12px] font-semibold leading-tight", rivalry.className)}>
-                                                                            {rivalry.text}
+                                                                            {t(rivalry.textKey)}
                                                                         </span>
                                                                     )}
                                                                 </>
@@ -158,7 +158,7 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                     <motion.button
                                                         whileTap={{ scale: 0.92 }}
                                                         onClick={(e) => { e.stopPropagation(); onSelectFriend(friend.id); }}
-                                                        title="상대전적 보기"
+                                                        title={t("h2h.viewTitle")}
                                                         className="w-12 h-12 rounded-tile bg-black/[0.04] flex items-center justify-center transition-all hover:bg-brand/10 hover:border-brand/30 group/btn"
                                                     >
                                                         <LucideTarget className="w-5 h-5 text-black/55 transition-colors group-hover/btn:text-brand" />

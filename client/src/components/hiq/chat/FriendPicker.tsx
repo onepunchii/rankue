@@ -65,14 +65,14 @@ export function FriendPicker({ open, onOpenChange, sport }: { open: boolean; onO
     return (
         <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t("chat.newChat")} className="fixed inset-0 z-[60] flex flex-col bg-surface-0 text-ink-1 outline-none" style={{ paddingBottom: "var(--keyboard-height, 0px)" }}>
             <header className="shrink-0 h-14 px-2 flex items-center gap-1 border-b border-surface-line">
-                <button type="button" onClick={close} aria-label="닫기" className="w-10 h-10 rounded-full flex items-center justify-center text-ink-2 active:bg-surface-2">
+                <button type="button" onClick={close} aria-label={t("chat.close")} className="w-10 h-10 rounded-full flex items-center justify-center text-ink-2 active:bg-surface-2">
                     <LucideX className="w-5 h-5" />
                 </button>
                 <div className="min-w-0 flex-1">
                     <h2 className="text-[16px] font-semibold truncate">{t("chat.newChat")}</h2>
-                    <p className="text-[11.5px] font-medium text-ink-3 truncate">{golf ? "골프 친구" : "당구 친구·라이벌"} · {t("chat.newChatDesc")}</p>
+                    <p className="text-[11.5px] font-medium text-ink-3 truncate">{golf ? t("chat.golfFriends") : t("chat.billiardsFriends")} · {t("chat.newChatDesc")}</p>
                 </div>
-                {picked.length > 0 && <span className="mr-3 text-[12.5px] font-semibold text-brand rk-num">{picked.length}명</span>}
+                {picked.length > 0 && <span className="mr-3 text-[12.5px] font-semibold text-brand rk-num">{t("chat.peopleN").replace("{n}", String(picked.length))}</span>}
             </header>
             <div className="px-4 py-2.5 shrink-0">
                 <label className="flex items-center gap-2 h-10 px-3.5 rounded-xl bg-surface-2">
@@ -85,7 +85,7 @@ export function FriendPicker({ open, onOpenChange, sport }: { open: boolean; onO
                     <div className="flex justify-center py-8 text-ink-3"><LucideLoader2 className="w-5 h-5 animate-spin" /></div>
                 ) : friends.length === 0 ? (
                     <div className="py-10 px-4 text-center space-y-2">
-                        <p className="text-[13px] font-medium text-ink-3">{q ? "찾는 이름이 없어요" : golf ? "아직 골프 친구가 없어요" : t("chat.noFriends")}</p>
+                        <p className="text-[13px] font-medium text-ink-3">{q ? t("chat.noSearchResult") : golf ? t("chat.noGolfFriends") : t("chat.noFriends")}</p>
                         {!q && <button type="button" onClick={() => { close(); setLocation("/friends"); }} className="text-[13px] font-semibold text-brand">{t("chat.goFriends")}</button>}
                     </div>
                 ) : (

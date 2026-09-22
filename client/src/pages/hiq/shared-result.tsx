@@ -3,6 +3,10 @@ import { useRoute, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useSeo } from "@/hooks/useSeo";
 import { BilliardBall } from "@/components/hiq/ui/BilliardBall";
+import { useT } from "@/lib/i18n";
+
+// 날짜 표기용 BCP-47 태그 — 로케일별 관례(ko 2026. 9. 22. / es 22/9/2026)를 브라우저에 맡긴다.
+const DATE_TAG: Record<string, string> = { ko: "ko-KR", en: "en-US", es: "es-419", tr: "tr-TR", vi: "vi-VN" };
 
 // 공유용 공개 결과 페이지 (/r/:id) — 로그인 없이 열린다.
 // 이미지 파일을 주고받는 대신 링크 하나를 던지는 방식: 앱 재빌드(=스토어 재심사)가 필요 없고,
@@ -14,6 +18,7 @@ const BALL = ["white", "yellow", "red", "red"] as const;
 export default function SharedResult() {
     const [, params] = useRoute("/r/:id");
     const [, setLocation] = useLocation();
+    const { t, locale } = useT();
     const gameId = params?.id;
 
     const { data: game, isLoading } = useQuery<any>({
@@ -23,7 +28,7 @@ export default function SharedResult() {
         retry: false,
     });
 
-    const typeLabel = game?.gameType === "3c" ? "3쿠션" : "4구";
+    const typeLabel = game?.gameType === "3c" ? t("sharedResult.threeCushion") : t("sharedResult.fourBall");
     const innings = Number(game?.totalInnings) || 0;
 
     const players = [1, 2, 3, 4]
@@ -44,15 +49,20 @@ export default function SharedResult() {
         win: hasWinnerFlag ? p.isWinner : p.target > 0 && p.score >= p.target,
     }));
 
+    const brand = t("sharedResult.brand");
+    const inningsTxt = t("sharedResult.totalInnings").replace("{n}", String(innings));
     const title = game
-        ? `${typeLabel} ${view.map((p) => `${p.name} ${p.score}`).join(" : ")} · 랭큐`
-        : "경기 결과 · 랭큐";
+        ? `${typeLabel} ${view.map((p) => `${p.name} ${p.score}`).join(" : ")} · ${brand}`
+        : `${t("sharedResult.metaTitle")} · ${brand}`;
 
     useSeo({
         title,
         description: game
-            ? `${typeLabel} 경기 결과 — ${view.map((p) => `${p.name} ${p.score}점`).join(", ")} (${innings}이닝). 손안의 당구 점수판, 랭큐.`
-            : "랭큐에서 기록한 당구 경기 결과입니다.",
+            ? t("sharedResult.metaDesc")
+                .replace("{type}", typeLabel)
+                .replace("{scores}", view.map((p) => t("sharedResult.scoreOf").replace("{name}", p.name ?? "").replace("{score}", String(p.score))).join(", "))
+                .replace("{innings}", inningsTxt)
+            : t("sharedResult.metaDescFallback"),
         path: `/r/${gameId ?? ""}`,
         image: "https://www.rankue.co.kr/og.png",
     });
@@ -64,8 +74,8 @@ export default function SharedResult() {
                     <div className="h-64 rounded-3xl bg-black/[0.04] animate-pulse" />
                 ) : !game ? (
                     <div className="rounded-3xl bg-white p-8 text-center shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                        <p className="text-[15px] font-semibold text-ink-1">경기를 찾을 수 없어요</p>
-                        <p className="mt-1 text-[13px] text-black/50">링크가 만료되었거나 삭제된 경기입니다.</p>
+                        <p className="text-[15px] font-semibold text-ink-1">{t("sharedResult.notFound")}</p>
+                        <p className="mt-1 text-[13px] text-black/50">{t("sharedResult.notFoundDesc")}</p>
                     </div>
                 ) : (
                     <>
@@ -75,7 +85,7 @@ export default function SharedResult() {
                                     {typeLabel}
                                 </span>
                                 <span className="text-[12px] font-medium text-black/40">
-                                    {game.createdAt ? new Date(game.createdAt).toLocaleDateString("ko-KR") : ""}
+                                    {game.createdAt ? new Date(game.createdAt).toLocaleDateString(DATE_TAG[locale] ?? "en-US") : ""}
                                 </span>
                             </div>
 
@@ -91,13 +101,13 @@ export default function SharedResult() {
                                                 <span className="truncate text-[15px] font-bold text-ink-1">{p.name}</span>
                                                 {p.win && (
                                                     <span className="shrink-0 rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                                                        승
+                                                        {t("sharedResult.win")}
                                                     </span>
                                                 )}
                                             </div>
                                             {p.highRun > 0 && (
                                                 <p className="mt-0.5 text-[12px] font-medium text-black/45 tabular-nums">
-                                                    하이런 {p.highRun}
+                                                    {t("sharedResult.highRun")} {p.highRun}
                                                 </p>
                                             )}
                                         </div>
@@ -115,22 +125,22 @@ export default function SharedResult() {
 
                             {innings > 0 && (
                                 <p className="mt-4 text-center text-[12.5px] font-semibold text-black/45 tabular-nums">
-                                    총 {innings}이닝
+                                    {inningsTxt}
                                 </p>
                             )}
                         </div>
 
                         {/* 링크를 받고 들어온 사람을 앱으로 — 이미지 공유엔 없던 유입 경로 */}
                         <div className="mt-6 rounded-3xl bg-brand p-6 text-center shadow-[0_8px_24px_rgba(0,98,65,0.20)]">
-                            <p className="text-[17px] font-bold text-white">손안의 당구 점수판</p>
+                            <p className="text-[17px] font-bold text-white">{t("sharedResult.tagline")}</p>
                             <p className="mt-1.5 text-[13px] font-medium text-white/80">
-                                터치로 점수 기록, 이닝·평균·하이런 자동 계산
+                                {t("sharedResult.pitch")}
                             </p>
                             <button
                                 onClick={() => setLocation("/")}
                                 className="mt-5 h-11 w-full rounded-full bg-white text-[14px] font-bold text-brand active:scale-[0.98] transition-transform"
                             >
-                                랭큐 시작하기
+                                {t("sharedResult.startRankue")}
                             </button>
                         </div>
                     </>

@@ -205,17 +205,17 @@ export default function ChatRoomPage() {
                 <div className="px-4 py-3 border-b border-surface-line bg-surface-1 flex items-center gap-3">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 min-w-0">
-                            {b.listingType === "JOIN" ? <JoinTypeBadge type={joinTypeOf(b)} /> : <span className="px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold bg-brand/10 text-brand">부킹</span>}
+                            {b.listingType === "JOIN" ? <JoinTypeBadge type={joinTypeOf(b)} /> : <span className="px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold bg-brand/10 text-brand">{t("chat.booking")}</span>}
                             <span className="text-[14px] font-semibold text-ink-1 truncate">{name}</span>
                         </div>
                         <div className="mt-0.5 text-[12px] font-medium text-ink-3 truncate flex items-center gap-1">
-                            <LucideMapPin className="w-3 h-3" /> {kstDateLabel(b.datetime)} {kstTime(b.datetime)} · {b.isBlind ? "위치 비공개" : b.region} · {d.members.length}명
+                            <LucideMapPin className="w-3 h-3" /> {kstDateLabel(b.datetime)} {kstTime(b.datetime)} · {b.isBlind ? t("chat.locationHidden") : b.region} · {t("chat.peopleN").replace("{n}", String(d.members.length))}
                         </div>
                     </div>
                     {!b.isBlind && (
                         <div className="flex gap-1.5 shrink-0">
-                            <a href={kakaoMapUrl(name, b.lat, b.lng)} target="_blank" rel="noreferrer" className="h-8 px-3 rounded-full bg-surface-2 text-[12px] font-medium text-ink-2 inline-flex items-center">지도</a>
-                            <a href={kakaoRouteUrl(name, b.lat, b.lng)} target="_blank" rel="noreferrer" className="h-8 px-3 rounded-full bg-surface-2 text-[12px] font-medium text-ink-2 inline-flex items-center">길찾기</a>
+                            <a href={kakaoMapUrl(name, b.lat, b.lng)} target="_blank" rel="noreferrer" className="h-8 px-3 rounded-full bg-surface-2 text-[12px] font-medium text-ink-2 inline-flex items-center">{t("chat.map")}</a>
+                            <a href={kakaoRouteUrl(name, b.lat, b.lng)} target="_blank" rel="noreferrer" className="h-8 px-3 rounded-full bg-surface-2 text-[12px] font-medium text-ink-2 inline-flex items-center">{t("chat.directions")}</a>
                         </div>
                     )}
                 </div>
@@ -243,7 +243,7 @@ export default function ChatRoomPage() {
         // 키보드가 뜨면 그 높이만큼 방을 줄인다 — 웹뷰가 안 줄어드는 iOS·안드로이드(edge-to-edge)에서 입력줄이 키보드 뒤로 숨었다(2026-09-21).
         <div className="flex flex-col bg-surface-0 text-ink-1" style={{ height: "calc(100dvh - var(--keyboard-height, 0px))" }}>
             <header className="shrink-0 h-14 px-2 flex items-center gap-1 border-b border-surface-line bg-surface-0">
-                <button type="button" onClick={() => (window.history.length > 1 ? window.history.back() : setLocation("/chat"))} aria-label="뒤로" className="w-10 h-10 rounded-full flex items-center justify-center text-ink-2 active:bg-surface-2">
+                <button type="button" onClick={() => (window.history.length > 1 ? window.history.back() : setLocation("/chat"))} aria-label={t("common.back")} className="w-10 h-10 rounded-full flex items-center justify-center text-ink-2 active:bg-surface-2">
                     <LucideChevronLeft className="w-6 h-6" />
                 </button>
                 <div className="min-w-0 flex-1">

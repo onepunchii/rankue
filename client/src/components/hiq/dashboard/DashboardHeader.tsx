@@ -5,10 +5,12 @@ import { BallCluster } from "../ui/BilliardBall";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { LanguageSheet } from "@/components/hiq/LanguageSheet";
+import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
 import { useT } from "@/lib/i18n";
 import { useSport } from "@/contexts/SportContext";
-import { LucideArrowLeftRight } from "lucide-react";
+import { LucideArrowLeftRight, LucideLanguages } from "lucide-react";
 
 interface DashboardHeaderProps {
     member: any;
@@ -35,6 +37,8 @@ export const DashboardHeader = ({
     const trend = getTrend();
     const [, setLocation] = useLocation();
     const [notifOpen, setNotifOpen] = useState(false);
+    const [langOpen, setLangOpen] = useState(false);
+    const golfOk = useGolfAccess();
     const { data: notifs } = useQuery<any[]>({ queryKey: ["/api/hiq/notifications"] });
     const unread = notifs?.filter((n) => !n.isRead).length || 0;
 
@@ -44,14 +48,14 @@ export const DashboardHeader = ({
             <div className="flex items-center justify-between mb-7 gap-3">
                 <div className="min-w-0">
                     {/* 종목 전환 — 골프 홈의 "GOLF MODE ⇄" 와 같은 모양(2026-09-21 오너: "당구에서도 동일하게, 디자인 같이") */}
-                    <button
+                    {golfOk && <button
                         type="button" onClick={() => setSport("GOLF")} title={t("dashboardHeader.switchToGolf")}
                         className="group inline-flex items-center gap-2 mb-2.5 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20 active:scale-95 transition-transform"
                     >
                         <span className="w-2 h-2 rounded-full bg-brand shadow-[0_0_8px_rgb(var(--brand))]" />
-                        <span className="text-[12px] font-semibold text-brand tracking-tight">당구 모드</span>
+                        <span className="text-[12px] font-semibold text-brand tracking-tight">{t("dashboardHeader.billiardsMode")}</span>
                         <LucideArrowLeftRight className="w-3 h-3 text-brand/60 group-hover:text-brand" />
-                    </button>
+                    </button>}
                     <h1 className="text-[26px] leading-none font-bold text-ink-1 tracking-tight truncate">
                         {member?.nickname || member?.name}
                         <span className="text-[15px] font-medium text-black/40 ml-1">{t("dashboardHeader.honorific")}</span>
@@ -69,6 +73,14 @@ export const DashboardHeader = ({
                             <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#f2f0eb]" />
                         )}
                     </button>
+                    {/* 언어(2026-09-22 오너): 외국인 가입이 늘어 홈에서 바로 바꾸게. 시트는 LanguageSheet. */}
+                    <button
+                        onClick={() => setLangOpen(true)}
+                        title={t("lang.title")}
+                        className="w-11 h-11 rounded-full bg-brand/10 flex items-center justify-center active:scale-95 transition-transform"
+                    >
+                        <LucideLanguages className="w-[21px] h-[21px] text-brand" />
+                    </button>
                     {/* 전체(≡)는 여기로 올라왔다 — 하단 탭의 그 자리는 채팅이 쓴다(2026-09-21 오너) */}
                     <button
                         onClick={() => setLocation("/menu")}
@@ -81,6 +93,8 @@ export const DashboardHeader = ({
             </div>
 
             <NotificationInbox open={notifOpen} onClose={() => setNotifOpen(false)} />
+
+            <LanguageSheet open={langOpen} onOpenChange={setLangOpen} />
 
             {/* Rating cards — clean flat white, single green accent */}
             <div className="grid grid-cols-2 gap-3">
