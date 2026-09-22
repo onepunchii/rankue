@@ -2,8 +2,9 @@
  * 대화방(2026-09-21) — 크루·조인/부킹·1:1·관리자 문의가 같은 화면. /chat/:kind/:id
  *
  * 폴링 2.5초, `after` 뒤만(새 게 없으면 빈 응답). 가려지면 쉰다. 보내면 즉시 말풍선, 실패는 빨갛게 눌러 재전송.
- * 읽음: 방을 열 때와 아래를 보고 있는 동안 새 메시지가 오면 "봤다". 카드형 메시지(정산·부킹 공유)는 눌러서 이동.
+ * 읽음: 방을 열 때와 아래를 보고 있는 동안 새 메시지가 오면 "봤다". 카드형 메시지(정산·부킹 공유·+ 첨부)는 눌러서 이동.
  * 내 메시지(크루는 운영진도)는 길게 눌러 삭제.
+ * + 첨부(2026-09-23): 종목별 카드(당구 대전 초대·경기 결과·매장, 골프 조인/부킹·랭큐매치 핀·라운드, 공통 내 기록) — 서버가 만들고 여기서는 끼우기만.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
@@ -15,6 +16,13 @@ import { useSport } from "@/contexts/SportContext";
 import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { ChatRoom, type ChatMsg } from "@/components/hiq/chat/ChatRoom";
+import { cardKind } from "@/components/hiq/chat/ChatCard";
+import { AttachSheet, type AttachItem } from "@/components/hiq/chat/attach/AttachSheet";
+import { RecentGamesPicker } from "@/components/hiq/chat/attach/RecentGamesPicker";
+import { StorePicker } from "@/components/hiq/chat/attach/StorePicker";
+import { GolfListingPicker } from "@/components/hiq/chat/attach/GolfListingPicker";
+import { GolfRoundsPicker } from "@/components/hiq/chat/attach/GolfRoundsPicker";
+import { GolfMatchCreateSheet } from "@/components/hiq/chat/attach/GolfMatchCreateSheet";
 import { JoinTypeBadge, joinTypeOf, kakaoMapUrl, kakaoRouteUrl } from "@/golf/components/join/joinUi";
 import { kstDateLabel, kstTime } from "@/lib/kst";
 
@@ -189,14 +197,53 @@ export default function ChatRoomPage() {
         } catch (e: any) { toast({ title: e?.message || t("chat.deleteFailed"), variant: "destructive" }); }
     }, [key, t, toast]);
 
+    // 카드 탭 → 종류별 이동(ChatCard 의 CARD_OPENABLE 과 짝). MY_STATS 는 갈 곳이 없다.
     const openCard = useCallback((msg: ChatMsg) => {
         const md = (msg as any).metadata ?? {};
-        if (msg.type === "settlement" && info.data?.crewId) setLocation(`/crew/${info.data.crewId}/home?settlement=${md.settlementId ?? ""}`);
-        else if (md.type === "GOLF_BOOKING" && md.bookingId) setLocation(`/golf/booking-list/${md.bookingId}`);
+        switch (cardKind(msg)) {
+            case "settlement": if (info.data?.crewId) setLocation(`/crew/${info.data.crewId}/home?settlement=${md.settlementId ?? ""}`); break;
+            case "GOLF_BOOKING": if (md.bookingId) setLocation(`/golf/booking-list/${md.bookingId}`); break;
+            case "SIM_INVITE": if (md.code) setLocation(`/online-game?join=${encodeURIComponent(String(md.code))}&auto=1`); break;
+            case "GAME_RESULT": if (md.gameId) setLocation(`/r/${md.gameId}`); break;
+            case "STORE": if (md.code) setLocation(`/stores/${md.code}`); else if (md.slug) setLocation(`/store/${md.slug}`); break;
+            case "GOLF_MATCH": if (md.pinCode) setLocation(`/golf/game/new?mode=join&pin=${encodeURIComponent(String(md.pinCode))}`); break;
+            case "GOLF_ROUND": if (md.sessionId) setLocation(`/golf/game/${md.sessionId}/result`); break;
+        }
     }, [info.data, setLocation]);
+
+    // + 첨부(2026-09-23): 종류를 고르면 서버가 카드를 만든다(가짜 카드 방지 — 보내기 라우트는 metadata 를 버린다).
+    // 돌아온 행을 바로 목록에 끼운다 — 낙관 행은 없다(카드 값은 서버가 채운다).
+    const [attachOpen, setAttachOpen] = useState(false);
+    const [picker, setPicker] = useState<null | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND">(null);
+    // 경로의 종류는 metadata.type 과 같은 이름(SIM_INVITE·GAME_RESULT·…) — 서버 라우터(chatCards.ts)와 맞춘 계약.
+    const postCard = useCallback(async (item: AttachItem, body: Record<string, unknown>, after?: (row: ChatMsg) => void) => {
+        const myKey = key;
+        try {
+            // 서버 라우트는 kebab-case(sim-invite …)다 — AttachItem 이름(SIM_INVITE)을 그대로 쓰면 404.
+            const row = await apiRequest(`/api/hiq/chat/rooms/${myKey}/cards/${item.toLowerCase().replace(/_/g, "-")}`, { method: "POST", body }) as ChatMsg;
+            if (keyRef.current !== myKey) return; // 그 사이 다른 방으로 갔다
+            sentIdsRef.current.set(row.id, Date.now());
+            merge([row]); // 폴링이 먼저 가져왔으면 같은 id 로 덮일 뿐 — lastAtRef 도 같은 규칙으로 앞당긴다
+            after?.(row);
+        } catch (e: any) {
+            toast({ title: e?.message || t("chat.attach.failed"), variant: "destructive" });
+        }
+    }, [key, merge, t, toast]);
+    const onPickAttach = useCallback((item: AttachItem) => {
+        switch (item) {
+            // 같이 한 판: 카드를 올리고 **나는 곧바로 대기방으로** 간다(2026-09-23 오너: "둘이 바로 들어가게").
+            // 상대는 알림을 누르면 바로 판으로 들어온다(서버가 그 카드의 푸시만 참가 화면으로 보낸다). 뒤로 누르면 채팅으로 돌아온다.
+            case "SIM_INVITE": void postCard("SIM_INVITE", {}, () => setLocation("/online-game?lobby=1")); break;
+            case "MY_STATS": void postCard("MY_STATS", {}); break;
+            default: setPicker(item);                                         // 고를 것이 있는 종류
+        }
+    }, [postCard, setLocation]);
 
     const d = info.data;
     const b = d?.booking;
+    // 방 종목: 서버가 준 sport, 없으면 조인·부킹 방은 골프, 그 밖은 지금 앱 모드.
+    const attachSport: "BILLIARDS" | "GOLF" = d?.sport ?? (d?.kind === "listing" ? "GOLF" : currentSport === "GOLF" ? "GOLF" : "BILLIARDS");
+    const canAttach = !!d && d.kind !== "support" && !!member;
     const pinned = useMemo(() => {
         if (!d) return null;
         if (d.kind === "listing" && b) {
@@ -261,6 +308,7 @@ export default function ChatRoomPage() {
             ) : (
                 <ChatRoom
                     messages={messages} meId={member?.id} onSend={send} onRetry={retry} onDelete={remove} onOpenCard={openCard}
+                    onAttach={canAttach ? () => setAttachOpen(true) : undefined}
                     canDelete={(m) => !!member && (m.senderId === member.id || !!d?.canManage)}
                     pinned={pinned} loading={loading || info.isPending} onSeen={markSeen}
                     hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={loadOlder} roomKey={key}
@@ -268,6 +316,17 @@ export default function ChatRoomPage() {
                     disabled={d?.kind === "listing" && !!b && new Date(b.datetime).getTime() < Date.now() - 2 * 86_400_000}
                     emptyText={d?.kind === "support" ? t("chat.emptySupport") : d?.kind === "listing" ? t("chat.emptyRoom") : t("chat.empty")}
                 />
+            )}
+            {canAttach && (
+                <>
+                    <AttachSheet open={attachOpen} onOpenChange={setAttachOpen} sport={attachSport} roomKind={d.kind} onPick={onPickAttach} />
+                    <RecentGamesPicker open={picker === "GAME_RESULT"} onOpenChange={(o) => { if (!o) setPicker(null); }} onPick={(gameId) => { setPicker(null); void postCard("GAME_RESULT", { gameId }); }} />
+                    <StorePicker open={picker === "STORE"} onOpenChange={(o) => { if (!o) setPicker(null); }} onPick={(pick) => { setPicker(null); void postCard("STORE", pick.code ? { code: pick.code } : { slug: pick.slug }); }} />
+                    <GolfListingPicker open={picker === "GOLF_BOOKING"} onOpenChange={(o) => { if (!o) setPicker(null); }} onPick={(bookingId) => { setPicker(null); void postCard("GOLF_BOOKING", { bookingId }); }} />
+                    <GolfRoundsPicker open={picker === "GOLF_ROUND"} onOpenChange={(o) => { if (!o) setPicker(null); }} onPick={(historyId) => { setPicker(null); void postCard("GOLF_ROUND", { historyId }); }} />
+                    {/* 조인·부킹 방이면 그 글의 코스명을 기본값으로 — 같은 골프장에서 치는 사람들이다 */}
+                    <GolfMatchCreateSheet open={picker === "GOLF_MATCH"} onOpenChange={(o) => { if (!o) setPicker(null); }} defaultCourseName={d.kind === "listing" && b && !b.isBlind ? b.courseName : undefined} onCreate={(courseName) => { setPicker(null); void postCard("GOLF_MATCH", { courseName }); }} />
+                </>
             )}
         </div>
     );

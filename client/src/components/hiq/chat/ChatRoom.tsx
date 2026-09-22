@@ -8,9 +8,10 @@
  * 날짜가 바뀌면 사이에 날짜 줄, 같은 사람이 1분 안에 이어 보내면 이름·아바타를 생략한다. 시스템 메시지는 가운데 작은 글.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { LucideSend, LucideLoader2 } from "lucide-react";
+import { LucideSend, LucideLoader2, LucidePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT, type Locale } from "@/lib/i18n";
+import { ChatCard } from "./ChatCard";
 
 /** 앱 언어 → Intl 태그. 시각·날짜는 사전 키 대신 Intl 로 그 언어답게 그린다(표시 시간대는 KST 고정 — 서버·방 정보와 같은 기준). */
 export const INTL_TAG: Record<Locale, string> = { ko: "ko-KR", en: "en-US", es: "es-419", tr: "tr-TR", vi: "vi-VN" };
@@ -19,9 +20,11 @@ export interface ChatMsg {
     id: string;
     senderId: string | null;
     message: string;
-    type: "text" | "system" | "photo" | "settlement" | string;
+    type: "text" | "system" | "photo" | "settlement" | "card" | string;
     createdAt: string;
     sender?: { name: string; profileImageUrl?: string | null } | null;
+    /** 카드(type card·settlement·옛 GOLF_BOOKING)와 시스템 메시지 i18n 이 여기에 실린다 — 종류는 metadata.type */
+    metadata?: Record<string, any> | null;
     /** 낙관적 추가 상태 */
     pending?: boolean;
     failed?: boolean;
@@ -36,8 +39,10 @@ interface Props {
     /** 길게 눌러 삭제(내 메시지·운영진). canDelete 가 true 인 메시지만 */
     onDelete?: (msg: ChatMsg) => void;
     canDelete?: (msg: ChatMsg) => boolean;
-    /** 카드형 메시지(정산·부킹 공유)를 눌렀을 때 */
+    /** 카드형 메시지(정산·부킹 공유·+ 로 붙인 카드)를 눌렀을 때 */
     onOpenCard?: (msg: ChatMsg) => void;
+    /** 입력줄 왼쪽 "+"(2026-09-23 종목별 첨부). 없으면 단추를 안 그린다 — 운영자 문의 방은 안 넘긴다. */
+    onAttach?: () => void;
     /** 맨 위에 고정되는 카드(글 정보·지도) */
     pinned?: ReactNode;
     loading?: boolean;
@@ -65,8 +70,8 @@ export function systemText(m: ChatMsg, t: (k: string) => string): string {
     return raw.replace(/\{(\w+)\}/g, (mm, k) => (i.params && i.params[k] !== undefined && i.params[k] !== null ? String(i.params[k]) : mm));
 }
 
-/** 카드형: 정산 요청, 골프 부킹 공유(옛 크루 채팅은 type text + metadata.type 으로 구분했다). */
-const isCard = (m: ChatMsg) => m.type === "settlement" || (m as any).metadata?.type === "GOLF_BOOKING";
+/** 카드형: 정산 요청, + 로 붙인 카드(type card), 옛 크루 채팅의 부킹 공유(type text + metadata.type 으로 구분했다). */
+const isCard = (m: ChatMsg) => m.type === "settlement" || m.type === "card" || !!(m as any).metadata?.type;
 
 const dayKey = (iso: string) => {
     const d = new Date(new Date(iso).getTime() + 9 * 3_600_000);
@@ -90,7 +95,7 @@ const timeLabel = (iso: string, locale: Locale) => {
     return new Intl.DateTimeFormat(INTL_TAG[locale], { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(iso));
 };
 
-export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onOpenCard, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey }: Props) {
+export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onOpenCard, onAttach, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey }: Props) {
     const { t, locale } = useT();
     // 길게 누르기(600ms) → 삭제. 마우스에서는 우클릭도 같다.
     const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -178,16 +183,13 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                         {!mine && !grouped && <span className="mb-0.5 ml-1 text-[11.5px] font-medium text-ink-3">{m.sender?.name}</span>}
                                         <div className={cn("flex items-end gap-1.5", mine ? "flex-row-reverse" : "flex-row")}>
                                             {isCard(m) ? (
-                                                <button
-                                                    type="button" onClick={() => onOpenCard?.(m)}
+                                                // 길게 누르기(삭제)는 카드 바깥 층이 받는다 — 카드 자체는 종류별 그림과 "열기" 만 안다.
+                                                <div
+                                                    className="max-w-full"
                                                     onPointerDown={() => holdStart(m)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => { e.preventDefault(); if (canDelete?.(m)) onDelete?.(m); }}
-                                                    className="max-w-full text-left rounded-2xl border border-surface-line bg-surface-1 px-3.5 py-3 active:bg-surface-2"
                                                 >
-                                                    <span className="block text-[11px] font-semibold text-brand mb-0.5">{m.type === "settlement" ? t("chat.cardSettlement") : t("chat.cardBooking")}</span>
-                                                    <span className="block text-[14px] font-medium text-ink-1 whitespace-pre-wrap break-words">{m.message}</span>
-                                                    {m.type === "settlement" && (m as any).metadata?.totalAmount > 0 && <span className="block rk-num text-[13px] text-ink-2 mt-0.5">{t("chat.amountWon").replace("{n}", Number((m as any).metadata.totalAmount).toLocaleString())}</span>}
-                                                    <span className="block text-[12px] font-medium text-brand mt-1.5">{t("chat.cardOpen")} ›</span>
-                                                </button>
+                                                    <ChatCard msg={m} onOpen={onOpenCard ? () => onOpenCard(m) : undefined} />
+                                                </div>
                                             ) : (
                                                 <span
                                                     onClick={() => { if (m.failed && onRetry) onRetry(m); }}
@@ -214,6 +216,14 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
             </div>
             <div className="shrink-0 border-t border-surface-line bg-surface-1 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
                 <div className="flex items-end gap-2">
+                    {onAttach && !disabled && (
+                        <button
+                            type="button" onClick={onAttach} aria-label={t("chat.attach.title")}
+                            className="w-[42px] h-[42px] rounded-full bg-surface-2 text-ink-2 flex items-center justify-center shrink-0 active:scale-95 transition-transform"
+                        >
+                            <LucidePlus className="w-5 h-5" />
+                        </button>
+                    )}
                     <textarea
                         ref={inputRef}
                         value={text}

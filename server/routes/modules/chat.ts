@@ -73,17 +73,21 @@ router.get("/rooms/:key/messages", requireAuth, asyncHandler(async (req: AuthReq
  * 같은 방 사람들에게 푸시. 크루는 크루별 채팅 알림 설정과 차단을 따르고(기존 notifyCrewChat 과 같은 규칙),
  * 나머지 방은 방 사람 전원(보낸 사람 제외). 서버리스라 응답 전에 기다린다.
  */
-async function notifyRoom(ref: RoomRef, senderId: string, preview: string, heading: I18nText, sport?: "BILLIARDS" | "GOLF"): Promise<void> {
+export async function notifyRoom(ref: RoomRef, senderId: string, preview: string | I18nText, heading: I18nText, sport?: "BILLIARDS" | "GOLF", urlOverride?: string): Promise<void> {
     const members = (await storage.chat.roomMembers(ref)).filter((m) => m !== senderId);
     const sender = await storage.getMemberById(senderId);
     const senderName = sender?.name;
     const blockers = await storage.crews.getBlockerIds(senderId);
-    const url = `/chat/${ref.kind}/${ref.id}`;
+    // 보통은 방으로 — 카드처럼 "누르면 바로 그 일을 하는" 알림만 딥링크를 덮어쓴다(같이 한 판 → 참가 화면).
+    const url = urlOverride ?? `/chat/${ref.kind}/${ref.id}`;
     // 알림함은 종목으로 갈린다 — 방의 종목을 따라야 한다. 예전엔 listing 만 골프로 쳐서 골프 크루·골프 친구 방 알림이
     // 당구 알림함에 쌓이고 골프 알림함에서는 안 보였다(2026-09-22 리뷰).
     const isGolf = sport === "GOLF" || ref.kind === "listing";
-    // 제목·본문은 받는 사람 언어로 풀린다(notificationService). 미리보기(preview)는 사용자 글이라 그대로.
-    const body: string | I18nText = ref.kind === "dm" ? preview : senderName ? msg("notif.chat.newMessage.body", { name: senderName, text: preview }) : msg("notif.chat.newMessageAnon.body", { text: preview });
+    // 제목·본문은 받는 사람 언어로 풀린다(notificationService). 사용자 글(preview 가 문자열)은 그대로 두고,
+    // 서버가 만든 문구(카드 요약 — I18nText)는 받는 사람 언어로 푼다. 이름을 덧붙이는 틀은 문자열일 때만 쓴다.
+    const body: string | I18nText = typeof preview !== "string" ? preview
+        : ref.kind === "dm" ? preview
+        : senderName ? msg("notif.chat.newMessage.body", { name: senderName, text: preview }) : msg("notif.chat.newMessageAnon.body", { text: preview });
     await Promise.allSettled(members.filter((m) => !blockers.has(m)).map(async (memberId) => {
         if (ref.kind === "crew") {
             const setting = await storage.notifs.getCrewNotificationSetting(ref.id, memberId);

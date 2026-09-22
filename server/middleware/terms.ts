@@ -1,4 +1,5 @@
 import type { Response, NextFunction } from "express";
+import { msg } from "../lib/i18n.js";
 import { eq, or } from "drizzle-orm";
 import { db } from "../db.js";
 import { hiqMembers, profiles } from "../../shared/schema.js";
@@ -55,7 +56,8 @@ export async function isMemberSuspended(memberId: string): Promise<boolean> {
     return (await memberGateState(memberId)).banned;
 }
 
-export const SUSPENDED_MESSAGE = `운영 정책 위반으로 이용이 정지된 계정입니다. 문의: ${TERMS_CONTACT_EMAIL}`;
+/** 정지 안내 — sendError 에 그대로 넣으면 받는 사람 언어로 풀린다(err.terms.suspended). */
+export const SUSPENDED_TEXT = msg("err.terms.suspended", { email: TERMS_CONTACT_EMAIL });
 
 /** requireAuth 뒤에 둔다. 정지된 계정이면 403 + ACCOUNT_SUSPENDED, 동의 기록이 없거나 옛 버전이면 403 + TERMS_REQUIRED. */
 export async function requireTermsAccepted(req: AuthRequest, res: Response, next: NextFunction) {
@@ -73,18 +75,13 @@ export async function requireTermsAccepted(req: AuthRequest, res: Response, next
     }
     if (state.banned) {
         passCache.delete(memberId);
-        return sendError(res, 403, SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
+        return sendError(res, 403, SUSPENDED_TEXT, ACCOUNT_SUSPENDED_CODE);
     }
     if (isTermsAccepted(state.termsVersion)) {
         remember(memberId, state.termsVersion!);
         return next();
     }
-    return sendError(
-        res,
-        403,
-        "이용약관에 동의해야 글·댓글·사진·채팅을 올릴 수 있어요. 화면을 새로고침한 뒤 약관에 동의해 주세요.",
-        TERMS_REQUIRED_CODE,
-    );
+    return sendError(res, 403, "err.terms.required", TERMS_REQUIRED_CODE);
 }
 
 /**

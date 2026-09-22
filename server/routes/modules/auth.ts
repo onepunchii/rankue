@@ -7,7 +7,7 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { msg } from "../../lib/i18n.js";
 import { verifyGoogleIdToken, verifyAppleIdToken } from "../../lib/socialAuth.js";
-import { recordTermsAcceptance, isMemberSuspended, SUSPENDED_MESSAGE } from "../../middleware/terms.js";
+import { recordTermsAcceptance, isMemberSuspended, SUSPENDED_TEXT } from "../../middleware/terms.js";
 import { isTermsAccepted, ACCOUNT_SUSPENDED_CODE } from "../../../shared/terms.js";
 import { screenMemberProfile } from "../../utils/crewModeration.js";
 
@@ -110,7 +110,7 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
         // 운영자가 정지한 계정은 들여보내지 않는다(약관 4조 무관용·이용 정지, 검토 policy:R1). 쿠키를 주기 전에 막는다.
         if (await isMemberSuspended(result.member.id)) {
             res.clearCookie('hiq_user_id', { path: '/' });
-            return sendError(res, 403, SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
+            return sendError(res, 403, SUSPENDED_TEXT, ACCOUNT_SUSPENDED_CODE);
         }
         // 예전 가입자는 국가가 비어 있다 — 이번 접속 국가로 한 번만 채운다(이미 있으면 그대로).
         await fillCountry(result.member.profileId, req);
@@ -158,7 +158,7 @@ router.post("/social", asyncHandler(async (req: any, res: any) => {
     clearAttempts(key);
     if (await isMemberSuspended(result.member.id)) {
         res.clearCookie('hiq_user_id', { path: '/' });
-        return sendError(res, 403, SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
+        return sendError(res, 403, SUSPENDED_TEXT, ACCOUNT_SUSPENDED_CODE);
     }
 
     res.cookie('hiq_user_id', result.member.id, {
@@ -192,7 +192,7 @@ router.post("/register", asyncHandler(async (req: any, res: any) => {
     const result = await hiqService.register(validation.data, ipCountry(req) ?? "KR");
     // 번호로 이미 정지된 프로필에 매장 회원 행만 새로 붙이는 우회를 막는다 — 가입 경로도 로그인과 같이 확인한다.
     if (await isMemberSuspended(result.member.id)) {
-        return sendError(res, 403, SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
+        return sendError(res, 403, SUSPENDED_TEXT, ACCOUNT_SUSPENDED_CODE);
     }
     if (isTermsAccepted(termsVersion)) {
         // 기록이 실패해도 가입은 살린다 — 첫 글쓰기 때 동의 시트가 다시 받는다

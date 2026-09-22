@@ -41,7 +41,8 @@ const rules4c = z.object({
     gameType: z.literal("4c"), pointUnit: z.number().int().min(1).max(10),
     threeCushionDouble: z.boolean(), passiveOpponentContactIsFoul: z.boolean(), foulPenaltyUnits: z.number().int().min(0).max(3),
 });
-const createSchema = z.object({
+/** 만들기 본문. 채팅 카드(chatCards.ts)가 같은 기본값으로 방을 만들 수 있게 내보낸다 — `.parse` 로 기본값이 채워진다. */
+export const createSchema = z.object({
     gameType: z.enum(["3c", "4c"]),
     tableId: z.enum(["DAEDAE", "JUNGDAE_KR"]),
     cushionModel: z.enum(["han2005", "sphereHalfSpace", "mathavan2010"]).default("han2005"),
@@ -267,32 +268,44 @@ async function notifyUrl(memberId: string | null | undefined, title: string | I1
     }).catch((e) => console.error("[SimMatchNotify]", e));
 }
 
-// POST /sim/matches — 대전 만들기(호스트)
-router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const parsed = createSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, "err.sim.badInput");
-    const b = parsed.data;
+/**
+ * 호스트 방 만들기의 본체 — 행 만들기 + 내 다른 대기 방 접기(초대받은 사람에게 닫힘 알림). 라우트와 채팅 카드
+ * (chatCards.ts 의 SIM_INVITE)가 같은 규칙으로 방을 만들도록 여기 하나로 둔다. 공개 방 방송은 라우트 몫.
+ * rules 가 종목과 안 맞으면 null(라우트는 400).
+ */
+export async function createHostMatch(hostId: string, b: z.infer<typeof createSchema>): Promise<{ full: MatchWithNames; closed: number } | null> {
     const rules: Rules = b.rules ?? (b.gameType === "3c" ? DEFAULT_3C_RULES : DEFAULT_4C_RULES);
-    if (rules.gameType !== b.gameType) return sendError(res, 400, "err.sim.rulesMismatch");
+    if (rules.gameType !== b.gameType) return null;
     const params = paramsFor({ tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition });
     const row = await storage.simMatch.create({
-        hostId: req.userId!, gameType: b.gameType, tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition,
+        hostId, gameType: b.gameType, tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition,
         aimAssist: b.aimAssist, fullPreview: b.fullPreview, handicap: b.handicap, rules, finishType: b.finishType, hostTarget: b.target, inningCap: b.inningCap,
         isPublic: b.isPublic, passwordHash: b.password ? hashRoomPassword(b.password) : null,
         engineVersion: ENGINE_VERSION, paramsHash: paramsHash(params),
     });
     // 방은 한 번에 하나 — 새로 만들면 내가 열어 둔 다른 대기 방은 접는다(2026-09-08 오너: "중복방 제거").
     // 시작된 대전은 그대로 둔다. 초대를 보냈던 방이면 그 사람에게 방이 닫혔다고 알린다.
-    const closed = await storage.simMatch.cancelOtherWaiting(req.userId!, row.id);
+    const closed = await storage.simMatch.cancelOtherWaiting(hostId, row.id);
     for (const c of closed) {
         if (c.invitedId) await notify(c.invitedId, "notif.sim.inviteClosed.title", "notif.sim.inviteClosed.body", row.id);
     }
     const full = await storage.simMatch.get(row.id);
+    return { full: full!, closed: closed.length };
+}
+
+// POST /sim/matches — 대전 만들기(호스트)
+router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const parsed = createSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, "err.sim.badInput");
+    const b = parsed.data;
+    const made = await createHostMatch(req.userId!, b);
+    if (!made) return sendError(res, 400, "err.sim.rulesMismatch");
+    const { full, closed } = made;
     // 멀티방(공개)이면 알림을 받을 수 있는 회원에게 방이 열렸다고 알린다. 응답을 기다리게 하지 않는다.
     if (b.isPublic && full) {
         await broadcastRoomOpened(req.userId!, full.hostName, full).catch((e) => console.error("[RoomBroadcast]", e));
     }
-    return sendSuccess(res, { ...publicMatch(full!, req.userId!), closedRooms: closed.length }, 201);
+    return sendSuccess(res, { ...publicMatch(full!, req.userId!), closedRooms: closed }, 201);
 }));
 
 // GET /sim/matches — 내 대전 목록

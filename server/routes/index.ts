@@ -4,6 +4,7 @@ import golfArcadeRouter from "./modules/golfArcade.js";
 import { requireGolfAccess } from "../middleware/golfAccess.js";
 import crewRouter from "./modules/crew.js";
 import chatRouter from "./modules/chat.js";
+import chatCardsRouter from "./modules/chatCards.js";
 import authRouter from "./modules/auth.js";
 import adminRouter from "./modules/admin.js";
 import partnerRouter from "./modules/partner.js";
@@ -35,6 +36,8 @@ router.use("/golf", ...requireGolfAccess, golfRouter);
 router.use("/crews", crewRouter);
 // 채팅 허브(2026-09-21): 크루 방 + 조인·부킹 방 목록, 읽음, 조인·부킹 방 메시지
 router.use("/chat", chatRouter);
+// 채팅 + 첨부 카드(2026-09-23): 서버만 카드를 만든다 — /chat/rooms/:key/cards/<종류>
+router.use("/chat", chatCardsRouter);
 
 // 3. Admin (/admin)
 // - Handles /admin/stats, /admin/users, etc.
