@@ -2786,5 +2786,6 @@ const en: Dict = {
   "golf.urgentNote": "Cart & caddie fees split on site",
   "sim.match.inviteRival": "Rival",
   "sim.match.inviteHandiNote": "Averages and ranks come from online matches. Dimmed values are defaults; ranking starts after 3 games.",
+  "sim.match.inviteAction": "Invite",
 };
 export default en;

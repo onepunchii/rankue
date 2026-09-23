@@ -2788,4 +2788,5 @@ export const ko: Dict = {
   "golf.urgentNote": "카트·캐디피는 현장에서 N빵",
   "sim.match.inviteRival": "라이벌",
   "sim.match.inviteHandiNote": "에버리지·순위는 온라인 대전 기록이에요. 흐린 값은 아직 기록이 모자라 기본값이고, 순위는 3판부터 매겨져요.",
+  "sim.match.inviteAction": "초대",
 };

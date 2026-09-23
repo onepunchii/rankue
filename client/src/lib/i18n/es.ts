@@ -2786,5 +2786,6 @@ const es: Dict = {
   "golf.urgentNote": "El carrito y el caddie se reparten en el campo",
   "sim.match.inviteRival": "Rival",
   "sim.match.inviteHandiNote": "El promedio y el puesto salen de las partidas en línea. Los valores atenuados son por defecto; el ranking empieza tras 3 partidas.",
+  "sim.match.inviteAction": "Invitar",
 };
 export default es;

@@ -2786,5 +2786,6 @@ const tr: Dict = {
   "golf.urgentNote": "Araç ve kedi ücreti sahada paylaşılır",
   "sim.match.inviteRival": "Rakip",
   "sim.match.inviteHandiNote": "Ortalama ve sıralama çevrimiçi maçlardan gelir. Soluk değerler varsayılandır; sıralama 3 maçtan sonra başlar.",
+  "sim.match.inviteAction": "Davet",
 };
 export default tr;

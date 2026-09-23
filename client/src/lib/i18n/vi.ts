@@ -2786,5 +2786,6 @@ const vi: Dict = {
   "golf.urgentNote": "Phí xe và caddie chia đều tại sân",
   "sim.match.inviteRival": "Đối thủ",
   "sim.match.inviteHandiNote": "Trung bình và thứ hạng lấy từ trận trực tuyến. Giá trị mờ là mặc định; xếp hạng bắt đầu sau 3 trận.",
+  "sim.match.inviteAction": "Mời",
 };
 export default vi;
