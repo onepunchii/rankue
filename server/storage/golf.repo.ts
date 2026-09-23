@@ -414,6 +414,62 @@ export class GolfRepository {
         return deleted.length > 0;
     }
 
+    /**
+     * 부킹을 조인으로 돌린다(2026-09-23 오너: "내가 올린 부킹 내역에서 조인 돌리기 버튼, 그때 옵션을 넣고 바로 전환").
+     *
+     * **id 를 유지한다** — 지우고 다시 만들지 않는다. 공유 링크(/golf/booking-list/<id>)·채팅 방 열쇠(listing:<id>)·
+     * 알림 딥링크가 전부 이 id 를 들고 있어서, 새 행으로 옮기면 그 링크들이 통째로 죽는다.
+     *
+     * 조건을 **where 에 담아** 한 문장으로 바꾼다: 읽고 나서 바꾸면 두 번 눌린 요청이 둘 다 통과해
+     * 나중 것이 앞의 자리 구성을 덮어쓴다. 이렇게 두면 두 번째는 0행을 돌려받고 라우트가 409 를 준다.
+     *   - 글쓴이 본인만(owner_id) · 아직 부킹인 글만(두 번 전환 방지) · 아직 안 지난 티타임만.
+     * ⚠️ 지난 티타임 검사는 now() 로 **DB 안에서** 한다. JS Date 를 sql 에 끼워 넣으면 9시간이 어긋난다(이 저장소의 상습 함정).
+     */
+    async convertBookingToJoin(id: string, ownerId: string, patch: {
+        slots: { role: "HOST" | "GUEST" | "OPEN"; gender: "M" | "F" | "ANY" }[];
+        joinHeadcount: number;
+        joinCondition: string;
+        costMode: "FIXED" | "SPLIT";
+        greenFee: number;
+    }): Promise<GolfBooking | undefined> {
+        const [row] = await db.update(golfBookings)
+            .set({
+                listingType: "JOIN",
+                joinType: "FIELD",       // 부킹 올리기 시트는 골프장 마스터에서만 고른다 — 스크린·파크 부킹은 없다.
+                slots: patch.slots,
+                joinHeadcount: patch.joinHeadcount,
+                joinCondition: patch.joinCondition,
+                costMode: patch.costMode,
+                greenFee: patch.greenFee,
+                // sellerType 은 **지우지 않는다**. 조인은 원래 null 이라, 남아 있으면 그게 곧 "부킹에서 건너온 글" 표시다.
+                // 화면(joinUi.isConvertedJoin)이 그걸 보고 첫 자리를 '호스트'가 아니라 '이미 찬 자리'로 그린다 — 유령 자리 방지.
+            })
+            .where(and(
+                eq(golfBookings.id, id),
+                eq(golfBookings.ownerId, ownerId),
+                ne(golfBookings.listingType, "JOIN"),
+                sql`${golfBookings.datetime} > now()`,
+            ))
+            .returning();
+        if (!row) return row;
+
+        // 넘어온 대기 신청의 인원을 1 로 맞춘다.
+        // 부킹 신청은 '팀 통째'라 1~4 명을 적어 보낼 수 있지만(apply 라우트), 조인 신청은 **늘 1 명**이다 — 자리 하나가 사람 하나다.
+        // 그 값을 그대로 두면 4 명짜리 대기 행이 조인 자리 **하나**로 세어진다: 정원 검사(applyToJoin·decideJoinRequest)도,
+        // 카드의 n/정원(countJoinRequests)도 `count(*)` 라 행을 셀 뿐 headcount 를 안 본다.
+        // 남은 2자리 조인에 그 사람을 승인하면 화면은 1/2 인데 현장엔 4 명이 온다 — 이미 팔린 자리까지 더하면 한 팀이 넘는다.
+        // 신청은 지우지 않는다(거절은 이 글에 한해 최종이라 대기열에서 빼면 되돌릴 길이 없다) — 인원만 자리 하나로 맞추고,
+        // 라우트가 "조인으로 바뀌었다"고 알려 그 사람이 스스로 취소할 수 있게 둔다.
+        await db.update(golfJoinRequests)
+            .set({ headcount: 1 })
+            .where(and(
+                eq(golfJoinRequests.bookingId, id),
+                eq(golfJoinRequests.status, "applied"),
+                ne(golfJoinRequests.headcount, 1),
+            ));
+        return row;
+    }
+
     /** 한 건 조회 — 조인 신청 전 검사(마감·본인 글·가려진 글)에 쓴다. */
     async getGolfBooking(id: string): Promise<GolfBooking | undefined> {
         const [row] = await db.select().from(golfBookings).where(eq(golfBookings.id, id)).limit(1);

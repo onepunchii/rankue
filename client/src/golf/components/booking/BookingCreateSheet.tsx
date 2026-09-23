@@ -6,11 +6,17 @@
  * 조인 시트와 같은 세 묶음: ① 어디·언제 ② 가격·옵션 ③ 더 보기(접힘: 익명·취소 규정·한마디). 굵기 600 까지만.
  * 같은 요금의 여러 시간은 "추가"로 칩만 쌓이고 한 번에 올라간다(매장 매니저의 일괄 등록은 그대로).
  *
- * 2026-09-23 오너: "부킹매니저가 일단 일이 편해야 많이 넘어온다." → 자리 고르는 한 줄을 가격 위에 뒀다.
- * 4자리(기본)는 예전과 완전히 같은 부킹이고, 1~3자리면 **같은 시트에서 그대로** 조인으로 올라간다.
- * 시트를 새로 여닫거나 타임마다 다시 고르게 하지 않는다 — 매니저의 기본 동작은 여러 타임 일괄 등록이다.
- *
- * 같은 날 오너: "'넘길 자리'가 무슨 말인지 모르겠다" → 말과 그림을 SeatsField 로 옮겼다(거기 주석 참고).
+ * ⚠️ 2026-09-23 오너 최종: **여기서 자리를 묻지 않는다.** 하루 동안 세 번 바뀐 자리(SeatsField)는 도로 걷어냈다.
+ *    오너: "부킹매니저가 부킹을 올릴 때 굳이 4자리 3자리 이렇게 올릴 필요가 없지 않을까?
+ *          … 내가 올린 부킹 내역에서 조인 돌리기로 버튼이 있고 그때 해당 옵션을 넣고 바로 조인으로 전환시키게."
+ *    걷어낸 이유는 셋이고, 다시 넣으려면 셋 다 풀어야 한다:
+ *    ① **올릴 때 묻는 건 예측이다.** 부킹은 앱 밖에서 팔린다(카드의 '문자' 버튼이 sms: 를 열 뿐이다).
+ *       4인 티타임을 올리는 순간 몇 자리가 팔릴지 아무도 모른다 — 실제 숫자는 팔린 뒤에 안다.
+ *    ② **일괄 등록과 부딪힌다.** 이 시트는 같은 가격의 여러 타임을 한 번에 올린다. 자리 하나를 고르면
+ *       07시·09시·11시에 똑같이 붙는데, 07시만 두 자리 팔리는 게 보통이다.
+ *    ③ **유령 자리.** 자리를 고르면 조인으로 올라가고, 조인의 첫 칸은 규칙상 호스트(= 올린 매니저)다.
+ *       매장은 그 팀에서 치지 않으니 신청자가 현장에 가면 'H' 자리에 아무도 없다.
+ *    그래서 부킹은 늘 부킹으로 올라가고, 자리·남녀 구성은 **팔리고 남은 뒤** 전환 시트(ToJoinSheet)에서 묻는다.
  */
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,8 +29,7 @@ import { COURSES } from "../../data/golfCourses";
 import { SPECIAL_OPTIONS } from "../../constants/booking";
 import { kstDateKey } from "@/lib/kst";
 import { DateField, TimeListField } from "../common/TeeTimePicker";
-import { MAX_SLOTS, type JoinSlot } from "@shared/golfJoin";
-import { SeatsField } from "./SeatsField";
+import { MY_LISTINGS_QUERY_KEY } from "./MyListingsSheet";
 
 interface Props {
     onClose: () => void;
@@ -57,10 +62,6 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
     const [date, setDate] = useState(today);
     const [times, setTimes] = useState<string[]>([]);
     const [fee, setFee] = useState("");
-    // 앱에서 채울 자리. 4 = 팀 전체 양도(= 예전 그대로의 부킹), 1~3 = 남은 자리를 앱이 채워 주는 조인.
-    // 기본값 4라 아무것도 안 건드리면 오늘과 결과가 같다 — 매니저에게 새 마찰이 0이어야 한다.
-    const [seats, setSeats] = useState(MAX_SLOTS);
-    const asJoin = seats < MAX_SLOTS;
     const [hotDeal, setHotDeal] = useState(false);
     const [options, setOptions] = useState<string[]>([]);
     const [more, setMore] = useState(false);
@@ -78,14 +79,6 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
 
     // 2026-09-23: 시간을 골라 놓고 "추가"를 안 눌러 빠뜨리는 사고(2026-09-10 제보)가 구조적으로 사라졌다.
     // TimeListField 는 고른 즉시 칩으로 담는다 — 칸에 머무는 '아직 안 담긴 시간' 이 없다.
-    // 조인으로 보낼 자리 넷: 첫 칸 HOST(올린 사람) + 고른 자리만큼 OPEN + 나머지는 GUEST(이미 찬 자리).
-    // normalizeSlots 규칙(2~4칸 · 첫 칸만 HOST · OPEN 1개 이상)을 그대로 지킨다 — 서버가 같은 함수로 검증한다.
-    // 매니저는 성별까지 고를 일이 없으니(자기가 치는 팀이 아니다) 전부 ANY 로 둔다.
-    const joinSlots = useMemo<JoinSlot[]>(() => [
-        { role: "HOST", gender: "ANY" },
-        ...Array.from({ length: seats }, (): JoinSlot => ({ role: "OPEN", gender: "ANY" })),
-        ...Array.from({ length: MAX_SLOTS - 1 - seats }, (): JoinSlot => ({ role: "GUEST", gender: "ANY" })),
-    ], [seats]);
 
     const missing =
         !phoneOk ? "휴대폰 번호를 먼저 등록해 주세요"
@@ -110,28 +103,16 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
                 isBlind: blind, blindName: blind ? blindName.trim() : null,
                 policyType: policy, policyCustomText: policy === "POLICY_CUSTOM" ? policyText.trim() : null,
                 comment: comment.trim() || null,
-                // 1~3자리면 같은 본문을 조인으로 바꿔 보낸다. 이 시트는 골프장 마스터에서 고르니 늘 FIELD 고,
-                // 가격을 적어 올리니 FIXED 다. joinHeadcount·joinCondition 은 옛 화면·검색이 보는 요약값.
-                ...(asJoin ? {
-                    listingType: "JOIN",
-                    joinType: "FIELD",
-                    costMode: "FIXED",
-                    slots: joinSlots,
-                    joinHeadcount: seats,
-                    joinCondition: "성별무관",
-                } : null),
             }));
             return apiRequest("/api/hiq/golf/bookings", { method: "POST", body });
         },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
-            // 조인으로 올렸으면 조인 목록도 갱신돼야 한다 — 키가 달라서 안 새로워졌다(조인 시트와 같은 이유).
-            qc.invalidateQueries({ queryKey: ["/api/hiq/golf/joins"] });
             qc.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings/counts"] });
+            qc.invalidateQueries({ queryKey: MY_LISTINGS_QUERY_KEY });  // '내역 → 내가 올린 글' 에서 바로 조인으로 돌릴 수 있어야 한다
             toast({
-                title: asJoin
-                    ? (times.length > 1 ? `${times.length}건을 조인으로 올렸어요` : "조인으로 올렸어요")
-                    : (times.length > 1 ? `${times.length}건을 올렸어요` : "부킹을 올렸어요"),
+                title: times.length > 1 ? `${times.length}건을 올렸어요` : "부킹을 올렸어요",
+                description: "자리가 남으면 '내역 → 내가 올린 글' 에서 조인으로 돌릴 수 있어요.",
             });
             onCreated?.(date);
             onClose();
@@ -144,7 +125,7 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
     const zone = course ? course.region.substring(0, 2) : "";
     const aliases = course ? [`${zone}권 명문`, course.subType === "회원제" ? `${zone}권 회원제` : `${zone}권 퍼블릭`, "IC 인근 골프장", "접근성 좋은 구장"] : [];
 
-    // 루트에 relative — 설명 팝업(SeatsField)이 이 시트 안에만 깔린다. 중첩 Dialog 를 쓰면 포커스 덫이 서로 싸운다.
+    // 루트에 relative — 아래 고정된 올리기 단추(absolute bottom-0)가 이 시트를 기준으로 붙는다.
     return (
         <div className="relative h-full flex flex-col bg-[#121212] text-white">
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] shrink-0">
@@ -182,11 +163,8 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
                     {times.length > 1 && <p className="text-[12px] text-white/45 break-keep">같은 가격으로 {times.length}건이 한 번에 올라가요.</p>}
                 </section>
 
-                {/* ② 자리·가격·옵션 */}
+                {/* ② 가격·옵션 */}
                 <section className="space-y-3">
-                    {/* 앱에서 채울 자리 — 가격 바로 위. 이 시트에서 올리는 모든 티타임에 함께 적용된다. */}
-                    <SeatsField seats={seats} onChange={setSeats} />
-
                     <span className={label}>1인 가격</span>
                     <div className="relative">
                         <input inputMode="numeric" value={fee} onChange={(e) => setFee(e.target.value.replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","))} placeholder="그린피 (1인)" className={cn(field, "pr-10")} />

@@ -207,6 +207,72 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
     return sendSuccess(res, results);
 }));
 
+/**
+ * POST /bookings/:id/to-join — 내가 올린 부킹을 그 자리에서 조인으로 돌린다.
+ *
+ * 2026-09-23 오너: "부킹매니저가 부킹을 올릴 때 굳이 4자리 3자리 이렇게 올릴 필요가 없지 않을까?
+ *   … 내가 올린 부킹 내역에서 조인 돌리기로 버튼이 있고 그때 해당 옵션을 넣고 바로 조인으로 전환시키게."
+ * 왜 올릴 때가 아니라 지금인가: 부킹은 **앱 밖에서** 팔린다(카드의 문자 버튼이 sms: 를 열 뿐이다).
+ * 앱은 몇 자리가 팔렸는지 알 길이 없으니, 남은 자리는 **판 사람이 아는 그 순간에** 입력해야 맞는 숫자가 된다.
+ *
+ * 문지기는 **글쓴이 본인뿐**이다(운영자도 아니다 — 운영자가 할 일은 사기 글을 내리는 것이지 남의 매물 구성을 바꾸는 게 아니다).
+ * 삭제 라우트가 쓰는 '번호로 되짚기'(owner_id 가 빈 옛 행)는
+ * 일부러 안 가져왔다. 전환은 곧 신청자를 받는다는 뜻이고, 신청자 명단(이름·사진·노쇼 이력)은 canManageBooking 만
+ * 열어 주는 것이다. 자기신고 문자열이던 manager_phone 으로 그 문을 열면 남의 글의 신청자가 통째로 넘어간다(2026-09-22 판단).
+ * 게다가 owner_id 가 빈 행은 전부 2026-09-09 이전 글이라 티타임이 이미 지났다 — 아래 '지난 티타임' 검사에 어차피 걸린다.
+ */
+router.post("/bookings/:id/to-join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "부킹을 찾을 수 없어요");
+    const booking: any = await storage.getGolfBooking(req.params.id);
+    if (!booking || booking.isBlinded) return sendError(res, 404, "부킹을 찾을 수 없어요");
+    if (!booking.ownerId || booking.ownerId !== req.userId) return sendError(res, 403, "글쓴이만 조인으로 돌릴 수 있어요");
+    if (booking.listingType === "JOIN") return sendError(res, 400, "이미 조인이에요", "ALREADY_JOIN");
+    if (new Date(booking.datetime).getTime() <= Date.now()) return sendError(res, 400, "이미 지난 티타임이에요", "TEE_TIME_PASSED");
+
+    // 자리 규칙은 조인 만들기와 **같은 함수**로 본다(첫 칸 HOST · 2~4칸 · 모집 1칸 이상). 정원은 자리에서 센다.
+    const slots = normalizeSlots(req.body?.slots);
+    if (!slots) return sendError(res, 400, "자리 구성이 올바르지 않아요(남은 자리 1~3)");
+    // 비용: 기본은 적어 둔 그린피 그대로(FIXED). 1/N 을 고르면 금액은 뜻이 없어 0 으로 둔다(조인 만들기와 같다).
+    const costMode = req.body?.costMode === "SPLIT" ? "SPLIT" : "FIXED";
+
+    // 이미 예약이 확정된 티타임은 못 돌린다 — 부킹의 정원은 1(한 팀 통째)이라 확정자는 네 자리를 다 산 사람이다.
+    // 그대로 조인으로 바꾸면 그 사람이 조인 자리 하나를 차지한 것처럼 세어져, 팔린 팀에 낯선 사람을 더 받게 된다.
+    const counts = await storage.countJoinRequests([booking.id]);
+    if ((counts.get(booking.id)?.accepted ?? 0) > 0) return sendError(res, 409, "이미 예약이 확정된 티타임이에요", "BOOKING_CONFIRMED");
+
+    const open = openSlotCount(slots);
+    const updated = await storage.convertBookingToJoin(booking.id, req.userId!, {
+        slots,
+        joinHeadcount: open,
+        // 옛 화면·검색이 보는 요약값(자리 정보의 요약본일 뿐이다) — 조인 만들기 시트와 같은 규칙으로 만든다.
+        joinCondition: slots.filter((s) => s.role === "OPEN").every((s) => s.gender === "M") ? "남성"
+            : slots.filter((s) => s.role === "OPEN").every((s) => s.gender === "F") ? "여성" : "성별무관",
+        costMode,
+        greenFee: costMode === "SPLIT" ? 0 : Number(booking.greenFee) || 0,
+    });
+    if (!updated) return sendError(res, 409, "지금은 조인으로 돌릴 수 없어요", "CONVERT_FAILED");
+
+    // 대기 중이던 예약 신청자에게 알린다 — 그 사람들이 신청한 것은 '팀 통째'였는데 이제 자리 하나짜리 조인이다.
+    // ⚠️ sendSuccess **전에** await — 서버리스는 응답을 보내면 실행이 얼어붙어 기다리지 않은 푸시는 한 통도 안 나간다.
+    const waiting = await storage.pendingRequesterIds(booking.id);
+    if (waiting.length > 0) {
+        await Promise.allSettled(waiting.map((memberId) => notificationService.sendAndSaveNotification({
+            memberId, title: "부킹이 조인으로 바뀌었어요",
+            // 신청은 대기열에 그대로 두되 인원은 1 로 맞춰진다(convertBookingToJoin) — 조인은 자리 하나가 사람 하나다.
+            // 여러 명으로 신청했던 사람에게 그 말을 안 하면, 일행을 데려갈 생각으로 기다리다 현장에서 어긋난다.
+            body: `${listingName(updated)} ${teeText(updated)} — 남은 ${open}자리를 받는 조인이 됐어요. 신청은 1자리로 두었어요(조인은 한 사람이 한 자리예요). 일행이 있으면 각자 신청해야 해요.`,
+            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=JOIN` },
+        }).catch((e) => console.error("[GolfJoinNotify]", e))));
+    }
+    // 돌린 글이 당일 떨이 조건(오늘·필드·고정가·3만원 이하)이면 긴급 조인 방송도 여기서 나간다 —
+    // 매니저가 남은 자리를 떨이로 넘기는 그 순간이 바로 전체 푸시가 값어치를 하는 때다(등록 라우트와 같은 규칙·같은 도배 제한).
+    if (isUrgentJoin(updated as any, Date.now())) {
+        await broadcastUrgentJoin(req.userId!, updated).catch((e) => console.error("[GolfUrgentBroadcast]", e));
+    }
+    const [withCounts] = await withJoinCounts([updated], req.userId);
+    return sendSuccess(res, withCounts);
+}));
+
 router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!UUID.test(req.params.id)) return sendError(res, 404, "삭제할 예약이 없거나 권한이 없습니다");
     // 내리기 전에 알릴 사람을 먼저 본다 — 신청 행은 글과 함께 cascade 로 지워진다.

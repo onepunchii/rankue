@@ -13,10 +13,11 @@ import { LucideChevronDown, LucideMapPin, LucideShare2, LucideFlag } from 'lucid
 import { cn } from '@/lib/utils';
 import { SPECIAL_OPTIONS } from '../../constants/booking';
 import { JOIN_OPTIONS, distanceKm, formatDistance, isKoreaCoord } from '@shared/golfJoin';
+import { courseCoord } from '../../data/courseCoords';
 import { JoinApplicants } from './JoinApplicants';
 import { useT } from '@/lib/i18n';
 import { kstDateKey, kstTime } from '@/lib/kst';
-import { SlotDots, JoinTypeBadge, costText, dayLabel, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, openGenderText, slotLegend, slotsOf } from '../join/joinUi';
+import { SlotDots, JoinTypeBadge, costText, dayLabel, hostSeatLabel, isConvertedJoin, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, openGenderText, slotLegend, slotsOf } from '../join/joinUi';
 
 interface BookingCardProps {
     item: any;
@@ -29,10 +30,12 @@ interface BookingCardProps {
     viewType: 'ALL' | 'BOOKING' | 'JOIN';
     /** 로그인한 회원 id. 내가 올린 조인 글이면 신청자 목록을 연다. */
     meId?: string;
-    /** 내 위치(있으면 조인 카드에 거리를 적는다) */
+    /** 내 위치(있으면 카드에 골프장까지의 거리를 적는다 — 부킹·조인 모두) */
     myLocation?: { lat: number; lng: number } | null;
     /** 내가 올린 글 내리기 */
     onDelete?: (item: any) => void;
+    /** 내가 올린 부킹을 조인으로 돌리기(2026-09-23) — 내 부킹 카드에만 붙는다 */
+    onToJoin?: (item: any) => void;
 }
 
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
@@ -40,7 +43,7 @@ const label = "text-[12px] font-medium text-white/50";
 const box = "rounded-xl bg-white/[0.04] border border-white/[0.06] p-3.5";
 const pill = "h-9 px-3 rounded-full bg-white/[0.06] text-[12.5px] font-medium text-white/85 inline-flex items-center active:bg-white/10";
 
-export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType, meId, myLocation, onDelete }: BookingCardProps) => {
+export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onApply, onShare, viewType, meId, myLocation, onDelete, onToJoin }: BookingCardProps) => {
     const { t } = useT();
     const [reportOpen, setReportOpen] = useState(false);
     // 부킹 예약 신청의 인원 고르기(2026-09-21 오너: "푸시로 승부" — 문자 대신 앱 안에서 신청→승인→확정)
@@ -50,6 +53,8 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
     const isJoin = item.listingType === 'JOIN';
     // 자리 모델(2026-09-21): 정원 = 모집 자리 수, 찬 자리 = 승인된 사람 수. 옛 글은 모집 인원으로.
     const slots = isJoin ? slotsOf(item) : [];
+    // 전환 글(부킹 → 조인)은 첫 칸에 아무도 없다 — 매장은 자기가 파는 팀에서 안 친다(joinUi.isConvertedJoin 주석).
+    const hostLabel = hostSeatLabel(item);
     const capacity = Number(item.joinCapacity) > 0 ? Number(item.joinCapacity) : Number(item.joinHeadcount) > 0 ? Number(item.joinHeadcount) : 3;
     const applied = Number(item.joinApplied ?? 0);
     const pending = Number(item.joinPending ?? 0);
@@ -57,7 +62,17 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
     const isMine = !!meId && item.ownerId === meId;
     const myStatus: string | null = item.myJoinStatus ?? (item.joinedByMe ? "applied" : null);
     const joinType = isJoin ? joinTypeOf(item) : null;
-    const km = myLocation && isKoreaCoord(item.lat, item.lng) ? distanceKm(myLocation.lat, myLocation.lng, item.lat, item.lng) : null;
+    /**
+     * 내 위치에서 이 골프장까지(2026-09-23 오너: "티타임에 내가 현재 위치와 골프장 거리를 표기해줘").
+     * 좌표는 두 곳에서 온다: 글에 저장된 lat/lng(스크린·파크 조인의 장소 검색 결과)와,
+     * 없으면 정적 원장의 course_id 로 찾은 골프장 좌표(golf/data/courseCoords — 부킹에는 좌표 칸이 없다).
+     * ⚠️ 비공개(isBlind) 글은 **거리도 안 적는다** — 서버가 이름·좌표를 가려 놨는데 거리를 적으면
+     *    원장에서 반경으로 골프장을 되짚을 수 있다(가려 놓은 뜻이 사라진다). 서버도 courseId 를 null 로 준다.
+     */
+    const spot = item.isBlind
+        ? null
+        : isKoreaCoord(item.lat, item.lng) ? { lat: item.lat as number, lng: item.lng as number } : courseCoord(item.courseId);
+    const km = myLocation && spot ? distanceKm(myLocation.lat, myLocation.lng, spot.lat, spot.lng) : null;
 
     const name: string = item.isBlind ? item.blindName : item.courseName;
     const past = new Date(item.datetime).getTime() <= Date.now();
@@ -128,7 +143,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                     </div>
                     {isJoin ? (
                         <div className="flex items-center gap-2 min-w-0">
-                            <SlotDots slots={slots} filled={applied} size={16} />
+                            <SlotDots slots={slots} filled={applied} size={16} hostLabel={hostLabel} />
                             <span className="text-[12px] font-medium text-white/60 truncate">
                                 {capacity}명 모집 · {openGenderText(slots)}
                                 {isMine && pending > 0 && <span className="text-[#FF8A33]"> · 대기 {pending}</span>}
@@ -138,7 +153,9 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                     <div className="flex items-center gap-1.5 text-[12px] font-medium text-white/45 truncate">
                         <span className="truncate">{item.isBlind ? "위치 비공개" : item.region}</span>
                         {km !== null && <><span className="w-0.5 h-2 bg-white/10 rounded-full shrink-0" /><span className="text-[#7CBBFF] shrink-0">{formatDistance(km)}</span></>}
-                        {(!isJoin || joinType === 'FIELD') && <><span className="w-0.5 h-2 bg-white/10 rounded-full shrink-0" /><span className="shrink-0">{caddie}</span></>}
+                        {/* 거리를 켜면 캐디 글자는 접힌 줄에서 뺀다 — 375px 에서 셋을 나란히 두면 지역이 '경…' 으로 잘려 아무 말도 아니게 된다.
+                            캐디 정보는 펼친 칸의 옵션 칩에 그대로 있다(2026-09-23 거리 표기를 넣으며 실측). */}
+                        {km === null && (!isJoin || joinType === 'FIELD') && <><span className="w-0.5 h-2 bg-white/10 rounded-full shrink-0" /><span className="shrink-0">{caddie}</span></>}
                     </div>
                 </div>
 
@@ -166,7 +183,10 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 <LucideMapPin className="w-4 h-4 text-white/45 shrink-0" />
                                 <div className="min-w-0 flex-1">
                                     <div className="text-[14px] font-medium text-white truncate">{name}</div>
-                                    <div className="text-[12px] text-white/45 truncate">{item.isBlind ? "위치 비공개 — 문의로 확인" : item.region}</div>
+                                    <div className="text-[12px] text-white/45 truncate">
+                                        {item.isBlind ? "위치 비공개 — 문의로 확인" : item.region}
+                                        {km !== null && <span className="text-[#7CBBFF]"> · 내 위치에서 {formatDistance(km)}</span>}
+                                    </div>
                                 </div>
                                 {!item.isBlind && (
                                     <div className="flex gap-1.5 shrink-0">
@@ -191,10 +211,16 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                         <span className={label}>자리</span>
                                         <span className="text-[12px] font-medium text-[#FF8A33]">확정 {applied}/{capacity}{pending > 0 && (isMine ? ` · 대기 ${pending}` : "")}</span>
                                     </div>
-                                    <SlotDots slots={slots} filled={applied} size={26} />
+                                    <SlotDots slots={slots} filled={applied} size={26} hostLabel={hostLabel} />
                                     <div className="flex flex-wrap gap-1.5">
-                                        {slotLegend(slots).map((t) => <span key={t} className="px-2 py-0.5 rounded-md bg-white/[0.06] text-[12px] text-white/70">{t}</span>)}
+                                        {slotLegend(slots, hostLabel).map((t) => <span key={t} className="px-2 py-0.5 rounded-md bg-white/[0.06] text-[12px] text-white/70">{t}</span>)}
                                     </div>
+                                    {/* 전환 글은 한 줄로 밝힌다 — 신청자가 현장에서 '호스트'를 찾지 않게 */}
+                                    {isConvertedJoin(item) && (
+                                        <p className="text-[12px] text-white/50 leading-relaxed break-keep">
+                                            {item.sellerType === 'PERSONAL' ? '양도하는 분이 팔고 남은 자리예요.' : '매장이 팔고 남은 자리예요.'} 이미 찬 자리는 다른 분들이라 현장에서 만나요.
+                                        </p>
+                                    )}
                                 </div>
                             )}
                             {/* 내 글이면 신청자(승인·거절) — 부킹 예약 신청도 같은 목록이다 */}
@@ -247,6 +273,18 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                     </div>
                                     <p className="text-[12px] text-white/45">올린 분이 승인하면 확정 알림과 함께 연락처가 열려요.</p>
                                 </div>
+                            )}
+
+                            {/*
+                              * 내 부킹을 조인으로 — 팔고 남은 자리가 있을 때(2026-09-23 오너).
+                              * 아래 버튼 줄이 아니라 그 위에 온전한 한 줄로 둔다: 줄에 이미 신청·문자·공유·내리기가 있어 375px 에서 이름이 잘린다.
+                              * 확정된 예약이 있으면 안 보인다 — 팀이 통째로 팔린 티타임에는 나눌 자리가 없다(서버도 409).
+                              */}
+                            {isMine && !isJoin && !past && onToJoin && applied === 0 && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onToJoin(item); }}
+                                    className="w-full h-11 rounded-xl border border-[#FF6B00]/35 bg-[#FF6B00]/10 text-[13.5px] font-medium text-[#FF8A33] active:bg-[#FF6B00]/20"
+                                >자리가 남았어요 — 조인으로 돌리기</button>
                             )}
 
                             {/* 버튼: 조인·부킹 모두 앱 안 신청. 부킹은 인원을 고른 뒤 보낸다. */}

@@ -89,3 +89,61 @@ describe("2026-09-22 리뷰로 잠근 것 — 연락처·비공개 가림, 거�
         expect(repo).not.toContain("async rejectOtherPending(");
     });
 });
+
+describe("부킹 → 조인 전환(2026-09-23 오너: '내가 올린 부킹 내역에서 조인 돌리기')", () => {
+    const route = code("server/routes/modules/golf.ts");
+    const repo = code("server/storage/golf.repo.ts");
+    const i = route.indexOf('router.post("/bookings/:id/to-join"');
+    const block = route.slice(i, route.indexOf("router.", i + 10));
+
+    it("라우트가 있고, 글쓴이 본인만 돌릴 수 있다 — 번호로 되짚는 길은 없다", () => {
+        expect(i).toBeGreaterThan(-1);
+        expect(block).toContain("!booking.ownerId || booking.ownerId !== req.userId");
+        expect(block).not.toContain("managerPhone");
+    });
+
+    it("두 번 전환·지난 티타임·이미 확정된 예약을 막는다", () => {
+        expect(block).toContain('booking.listingType === "JOIN"');
+        expect(block).toContain("TEE_TIME_PASSED");
+        expect(block).toContain("BOOKING_CONFIRMED");
+    });
+
+    it("자리는 조인과 같은 규칙으로 보고 정원은 자리에서 센다", () => {
+        expect(block).toContain("normalizeSlots(req.body?.slots)");
+        expect(block).toContain("openSlotCount(slots)");
+    });
+
+    it("전환은 id 를 유지하고(공유 링크·채팅방), 조건을 where 에 담아 한 문장으로 바꾼다", () => {
+        const conv = repo.slice(repo.indexOf("async convertBookingToJoin("), repo.indexOf("async getGolfBooking("));
+        expect(conv).toContain("db.update(golfBookings)");
+        expect(conv).not.toContain("db.insert(");
+        expect(conv).toContain("eq(golfBookings.ownerId, ownerId)");
+        expect(conv).toContain('ne(golfBookings.listingType, "JOIN")');
+        expect(conv).toContain("> now()");
+        // sellerType 을 지우면 전환 글이라는 표시가 사라져 화면이 첫 칸을 다시 '호스트'로 그린다(유령 자리).
+        expect(conv).not.toContain("sellerType: null");
+    });
+
+    it("넘어온 대기 신청의 인원을 1 로 맞춘다 — 안 그러면 4명짜리 부킹 신청이 조인 자리 하나로 세어진다", () => {
+        // 부킹 신청은 '팀 통째'라 1~4 명이고, 조인 신청은 늘 1 명이다(apply 라우트: isJoin ? 1 : ...).
+        // 정원 검사도 카드의 n/정원도 count(*) 라 headcount 를 안 본다 — 그대로 두면 2자리 조인에
+        // 4명이 승인돼 화면은 1/2 인데 현장엔 한 팀이 넘게 온다. 살아 있는 서버로 실제로 재현했다(2026-09-23).
+        const conv = repo.slice(repo.indexOf("async convertBookingToJoin("), repo.indexOf("async getGolfBooking("));
+        expect(conv).toContain("db.update(golfJoinRequests)");
+        expect(conv).toContain("set({ headcount: 1 })");
+        expect(conv).toContain('eq(golfJoinRequests.status, "applied")');
+        // 대기열에서 빼지는 않는다 — 거절은 이 글에 한해 최종이라 되돌릴 길이 없어진다(2026-09-22).
+        expect(conv).not.toContain('"rejected"');
+        expect(conv).not.toContain("db.delete(golfJoinRequests)");
+    });
+
+    it("알림·긴급 방송은 응답 전에 기다린다 — 서버리스는 응답 뒤 얼어붙는다", () => {
+        const notify = block.indexOf("await Promise.allSettled(waiting.map");
+        const broadcast = block.indexOf("await broadcastUrgentJoin(");
+        const success = block.indexOf("return sendSuccess(res");
+        expect(notify).toBeGreaterThan(-1);
+        expect(notify).toBeLessThan(success);
+        expect(broadcast).toBeGreaterThan(-1);
+        expect(broadcast).toBeLessThan(success);
+    });
+});

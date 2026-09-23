@@ -17,7 +17,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { kstDateLabel, kstTime } from "@/lib/kst";
-import { JoinTypeBadge, SlotDots, costText, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, slotsOf } from "../join/joinUi";
+import { JoinTypeBadge, SlotDots, costText, hostSeatLabel, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, slotsOf } from "../join/joinUi";
 
 export const MY_LISTINGS_QUERY_KEY = ["/api/hiq/golf/bookings", "mine"] as const;
 export const MY_REQUESTS_QUERY_KEY = ["/api/hiq/golf/bookings", "applied"] as const;
@@ -42,6 +42,8 @@ interface Props {
     onGo: (item: any) => void;
     /** 내가 올린 글 내리기 */
     onDelete: (item: any) => void;
+    /** 내가 올린 부킹을 조인으로 돌리기(2026-09-23 오너: "내가 올린 부킹 내역에서 조인 돌리기 버튼") */
+    onToJoin: (item: any) => void;
     /** 내가 한 신청 취소 */
     onCancelRequest: (item: any) => void;
     initialTab?: "mine" | "applied";
@@ -63,8 +65,13 @@ function Badge({ item }: { item: any }) {
     );
 }
 
-function Row({ item, past, kind, onGo, onDelete, onCancel }: { item: any; past: boolean; kind: "mine" | "applied"; onGo: () => void; onDelete?: () => void; onCancel?: () => void }) {
+function Row({ item, past, kind, onGo, onDelete, onToJoin, onCancel }: { item: any; past: boolean; kind: "mine" | "applied"; onGo: () => void; onDelete?: () => void; onToJoin?: () => void; onCancel?: () => void }) {
     const isJoin = item.listingType === "JOIN";
+    /**
+     * '조인 돌리기' 가 붙는 자리(2026-09-23). 내가 올린 **부킹**이고, 아직 안 지난 티타임이고,
+     * 아직 아무에게도 확정되지 않았을 때만. 확정된 티타임은 팀이 통째로 팔린 것이라 나눌 자리가 없다(서버도 409 로 막는다).
+     */
+    const canToJoin = kind === "mine" && !isJoin && !past && Number(item.joinApplied ?? 0) === 0;
     const name: string = item.isBlind ? item.blindName : item.courseName;
     const st = kind === "applied" ? STATUS[item.myJoinStatus] : null;
     const accepted = item.myJoinStatus === "accepted";
@@ -81,7 +88,7 @@ function Row({ item, past, kind, onGo, onDelete, onCancel }: { item: any; past: 
                         <span className="shrink-0">{kstDateLabel(item.datetime)} {kstTime(item.datetime)}</span>
                         <span className="w-0.5 h-2 bg-white/10 rounded-full shrink-0" />
                         {isJoin
-                            ? <span className="inline-flex items-center gap-1.5 truncate"><SlotDots slots={slotsOf(item)} filled={Number(item.joinApplied ?? 0)} size={14} />확정 {item.joinApplied ?? 0}/{item.joinCapacity ?? "?"}{kind === "mine" && Number(item.joinPending) > 0 && <span className="text-[#FF8A33]"> · 대기 {item.joinPending}</span>}</span>
+                            ? <span className="inline-flex items-center gap-1.5 truncate"><SlotDots slots={slotsOf(item)} filled={Number(item.joinApplied ?? 0)} size={14} hostLabel={hostSeatLabel(item)} />확정 {item.joinApplied ?? 0}/{item.joinCapacity ?? "?"}{kind === "mine" && Number(item.joinPending) > 0 && <span className="text-[#FF8A33]"> · 대기 {item.joinPending}</span>}</span>
                             : <span className="truncate">{item.greenFee ? `${Number(item.greenFee).toLocaleString()}원` : costText(item)}{kind === "applied" && item.myHeadcount > 1 ? ` · ${item.myHeadcount}명` : ""}{kind === "mine" && Number(item.joinPending) > 0 ? <span className="text-[#FF8A33]"> · 신청 {item.joinPending}</span> : null}</span>}
                     </div>
                 </div>
@@ -93,6 +100,14 @@ function Row({ item, past, kind, onGo, onDelete, onCancel }: { item: any; past: 
                     <button type="button" onClick={onCancel} className="h-9 px-3 rounded-full border border-white/10 text-[12.5px] font-medium text-white/55 shrink-0 active:text-red-400">취소</button>
                 )}
             </div>
+            {/* 팔고 남은 자리를 조인으로 — 위 줄은 375px 에서 '보기 · 내리기' 로 이미 꽉 찼다. 한 줄 내려 온전한 이름을 준다. */}
+            {canToJoin && onToJoin && (
+                <button
+                    type="button" onClick={onToJoin}
+                    className="w-full h-10 rounded-xl border border-[#FF6B00]/35 bg-[#FF6B00]/10 text-[13px] font-medium text-[#FF8A33] active:bg-[#FF6B00]/20"
+                >자리가 남았어요 — 조인으로 돌리기</button>
+            )}
+
             {/* 확정된 글: 가는 길과 연락처를 여기서 바로 */}
             {/* 티타임이 지나도 6시간은 남긴다 — 늦어서 연락해야 하는 바로 그때 '지난 글'로 내려가며 번호·길찾기가 사라지면 안 된다 */}
             {kind === "applied" && accepted && Date.now() < new Date(item.datetime).getTime() + 6 * 3_600_000 && (
@@ -106,7 +121,7 @@ function Row({ item, past, kind, onGo, onDelete, onCancel }: { item: any; past: 
     );
 }
 
-export function MyListingsSheet({ open, onOpenChange, onGo, onDelete, onCancelRequest, initialTab = "mine" }: Props) {
+export function MyListingsSheet({ open, onOpenChange, onGo, onDelete, onToJoin, onCancelRequest, initialTab = "mine" }: Props) {
     const [tab, setTab] = useState<"mine" | "applied">(initialTab);
     // 탭은 **열리는 순간에만** 맞춘다 — initialTab 은 폴링으로 바뀌는 값이라, 의존성에 두면 열어 둔 채 새 알림이 올 때 보던 탭이 뒤집혔다.
     const initialTabRef = useRef(initialTab);
@@ -137,7 +152,7 @@ export function MyListingsSheet({ open, onOpenChange, onGo, onDelete, onCancelRe
     }, [q.data, now]);
 
     const render = (rows: any[], isPast: boolean) => rows.map((it) => (
-        <Row key={it.id} item={it} past={isPast} kind={tab} onGo={() => onGo(it)} onDelete={() => onDelete(it)} onCancel={() => onCancelRequest(it)} />
+        <Row key={it.id} item={it} past={isPast} kind={tab} onGo={() => onGo(it)} onDelete={() => onDelete(it)} onToJoin={() => onToJoin(it)} onCancel={() => onCancelRequest(it)} />
     ));
 
     return (

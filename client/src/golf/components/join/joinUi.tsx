@@ -17,6 +17,24 @@ export function joinTypeOf(item: { joinType?: string | null }): JoinType {
     return item.joinType === "SCREEN" || item.joinType === "PARK" ? item.joinType : "FIELD";
 }
 
+/**
+ * 전환 글인가 — 매니저가 팔고 남은 부킹을 그 자리에서 조인으로 돌린 글(2026-09-23).
+ * 표시는 sellerType 하나로 안다: 조인은 sellerType 이 null 이고(POST /bookings), 부킹만 STORE·PERSONAL 이 박힌다.
+ * 전환 라우트가 그 값을 **지우지 않고 남겨** 두기 때문에, 조인인데 sellerType 이 있으면 부킹에서 건너온 글이다.
+ *
+ * 왜 갈라 봐야 하나(유령 자리): 자리 규칙(normalizeSlots)은 첫 칸을 반드시 HOST 로 못 박는다. 보통 조인에서는
+ * 그 자리에 **만든 사람이 실제로 앉지만**, 매장 매니저는 자기가 파는 팀에서 치지 않는다. 그대로 '호스트'라고 그리면
+ * 신청자가 현장에 가서 만날 사람이 없다. 그래서 전환 글의 첫 칸은 '호스트'가 아니라 그냥 **이미 찬 자리**로 그린다.
+ */
+export function isConvertedJoin(item: { listingType?: string | null; sellerType?: string | null }): boolean {
+    return item.listingType === "JOIN" && !!item.sellerType;
+}
+
+/** 첫 자리 이름. 보통은 '호스트', 전환 글은 null — null 이면 그림에서 'H' 를 지우고 찬 자리로만 센다. */
+export function hostSeatLabel(item: { listingType?: string | null; sellerType?: string | null }): string | null {
+    return isConvertedJoin(item) ? null : "호스트";
+}
+
 const GENDER_DOT: Record<SlotGender, string> = {
     M: "bg-[#4DA3FF]",
     F: "bg-[#FF6B9A]",
@@ -28,7 +46,7 @@ export const GENDER_LABEL: Record<SlotGender, string> = { M: "남", F: "여", AN
  * 자리 점. 채워진 자리(호스트·동반자)는 성별 색 원, 모집 자리는 ＋(받고 싶은 성별 색 테두리),
  * 승인된 사람 수만큼 모집 자리를 앞에서부터 채운다.
  */
-export function SlotDots({ slots, filled = 0, size = 22, className }: { slots: readonly JoinSlot[]; filled?: number; size?: number; className?: string }) {
+export function SlotDots({ slots, filled = 0, size = 22, className, hostLabel = "호스트" }: { slots: readonly JoinSlot[]; filled?: number; size?: number; className?: string; hostLabel?: string | null }) {
     let toFill = filled;
     return (
         <span className={cn("inline-flex items-center gap-1", className)} aria-label={`자리 ${slots.length}개`}>
@@ -43,9 +61,9 @@ export function SlotDots({ slots, filled = 0, size = 22, className }: { slots: r
                             taken ? cn(GENDER_DOT[s.gender], s.gender === "ANY" ? "text-white/80" : "text-white") : "border border-dashed text-white/50",
                             !taken && (s.gender === "M" ? "border-[#4DA3FF]/70" : s.gender === "F" ? "border-[#FF6B9A]/70" : "border-white/30"),
                         )}
-                        title={s.role === "HOST" ? "호스트" : s.role === "GUEST" ? "동반자" : `모집 · ${GENDER_LABEL[s.gender]}`}
+                        title={s.role === "HOST" ? (hostLabel ?? "이미 찬 자리") : s.role === "GUEST" ? "동반자" : `모집 · ${GENDER_LABEL[s.gender]}`}
                     >
-                        {taken ? (s.role === "HOST" ? "H" : "") : "+"}
+                        {taken ? (s.role === "HOST" && hostLabel ? "H" : "") : "+"}
                     </span>
                 );
             })}
@@ -53,10 +71,36 @@ export function SlotDots({ slots, filled = 0, size = 22, className }: { slots: r
     );
 }
 
+/**
+ * 자리 한 줄(나·동반자·모집)의 성별 토글. 모집 자리만 '무관'이 있다.
+ * 조인 만들기 시트에서 왔다 — 부킹을 조인으로 돌리는 시트(ToJoinSheet)가 **같은 문법**을 써야 하기 때문에 여기로 옮겼다.
+ * 색은 자리 점(SlotDots)과 같다: 남 #4DA3FF · 여 #FF6B9A · 무관 흰색. 두 화면이 다른 색을 쓰면 "파란 건 남자"가 안 통한다.
+ */
+export function GenderToggle({ value, onChange, allowAny }: { value: SlotGender; onChange: (g: SlotGender) => void; allowAny: boolean }) {
+    const opts: SlotGender[] = allowAny ? ["ANY", "M", "F"] : ["M", "F"];
+    return (
+        <span className="inline-flex rounded-full bg-white/[0.06] border border-white/10 p-0.5">
+            {opts.map((g) => (
+                <button
+                    key={g} type="button" onClick={() => onChange(g)}
+                    className={cn(
+                        "h-8 min-w-[44px] px-2.5 rounded-full text-[12.5px] font-medium transition-colors",
+                        value === g ? (g === "M" ? "bg-[#4DA3FF] text-white" : g === "F" ? "bg-[#FF6B9A] text-white" : "bg-white/25 text-white") : "text-white/55",
+                    )}
+                >
+                    {GENDER_LABEL[g]}
+                </button>
+            ))}
+        </span>
+    );
+}
+
 export function JoinTypeBadge({ type, className }: { type: JoinType; className?: string }) {
     return (
         <span className={cn(
-            "px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold",
+            // shrink-0·whitespace-nowrap 이 없으면 이름이 긴 카드에서 배지가 눌려 '필'/'드' 로 접힌다(2026-09-23 오너 스크린샷).
+            // 바로 옆 부킹 배지(BookingCard)에는 있었는데 여기만 빠져 있었다.
+            "shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold",
             type === "SCREEN" ? "bg-[#4DA3FF]/15 text-[#7CBBFF]" : type === "PARK" ? "bg-[#64DD17]/15 text-[#8BE84A]" : "bg-[#FF6B00]/15 text-[#FF8A33]",
             className,
         )}>
@@ -111,14 +155,21 @@ export function openGenderText(slots: readonly JoinSlot[]): string {
     return (["M", "F", "ANY"] as const).filter((g) => n[g] > 0).map((g) => `${GENDER_LABEL[g]} ${n[g]}`).join(" · ");
 }
 
-/** 자리 설명 칩: 같은 역할·성별끼리 묶는다 — "호스트 남 · 동반자 여 · 모집 무관 ×2". */
-export function slotLegend(slots: readonly JoinSlot[]): string[] {
-    const ROLE: Record<JoinSlot["role"], string> = { HOST: "호스트", GUEST: "동반자", OPEN: "모집" };
+/**
+ * 자리 설명 칩: 같은 역할·성별끼리 묶는다 — "호스트 남 · 동반자 여 · 모집 무관 ×2".
+ * hostLabel 이 null(전환 글)이면 첫 칸을 '이미 찬 자리'로 부르고 동반자와 **같은 묶음**으로 센다 —
+ * 매장 글에서 그 둘은 신청자에게 똑같은 것이다("두 자리는 이미 팔렸다").
+ */
+export function slotLegend(slots: readonly JoinSlot[], hostLabel: string | null = "호스트"): string[] {
+    const taken = hostLabel === null ? "이미 찬 자리" : null;
+    const name = (s: JoinSlot) => (s.role === "OPEN" ? "모집" : s.role === "HOST" ? (hostLabel ?? taken!) : (taken ?? "동반자"));
     const out: { key: string; label: string; n: number }[] = [];
     for (const s of slots) {
-        const key = `${s.role}:${s.gender}`;
-        const hit = out.find((o) => o.key === key);
-        if (hit) hit.n++; else out.push({ key, label: `${ROLE[s.role]} ${GENDER_LABEL[s.gender]}`, n: 1 });
+        // 찬 자리의 '무관' 은 적지 않는다 — 모르는 성별을 굳이 말하는 것이라 "이미 찬 자리 무관 ×2" 처럼 읽힌다.
+        // 모집 자리는 반대다: 무관이야말로 신청자가 알아야 할 조건이다.
+        const label = s.role !== "OPEN" && s.gender === "ANY" ? name(s) : `${name(s)} ${GENDER_LABEL[s.gender]}`;
+        const hit = out.find((o) => o.key === label);
+        if (hit) hit.n++; else out.push({ key: label, label, n: 1 });
     }
     return out.map((o) => (o.n > 1 ? `${o.label} ×${o.n}` : o.label));
 }

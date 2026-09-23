@@ -15,6 +15,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookingCreateSheet } from "../components/booking/BookingCreateSheet";
 import { MyListingsSheet, MY_LISTINGS_QUERY_KEY, MY_REQUESTS_QUERY_KEY, hasUnseenRequestChange, readRequestsSeen } from "../components/booking/MyListingsSheet";
+import { ToJoinSheet } from "../components/booking/ToJoinSheet";
 import { JoinCreateSheet } from "../components/join/JoinCreateSheet";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { distanceKm, isKoreaCoord, JOIN_TYPE_LABEL, JOIN_TYPES, type JoinType } from "@shared/golfJoin";
@@ -65,6 +66,12 @@ export default function BookingList() {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [myListingsOpen, setMyListingsOpen] = useState(false);
+    /**
+     * 조인으로 돌릴 부킹(2026-09-23 오너). 이 화면이 들고 있는다 — 내역 시트와 카드 **둘 다**에서 열리고,
+     * 내역(Sheet) 안에서 시트를 또 열면 포커스 덫이 서로 싸운다. 열 때 내역을 닫는 이유도 같다.
+     */
+    const [toJoinItem, setToJoinItem] = useState<any | null>(null);
+    const openToJoin = useCallback((item: any) => { setMyListingsOpen(false); setToJoinItem(item); }, []);
     /**
      * 조인 종류(필드/스크린/파크)와 "내 주변"(2026-09-21 오너: 스크린 조인은 내 위치 기반으로).
      * 위치는 누를 때 한 번 묻는다 — 목록을 열 때마다 권한 창이 뜨면 안 된다.
@@ -428,11 +435,12 @@ export default function BookingList() {
             onApply={handleApply}
             onShare={handleShare}
             onDelete={handleDelete}
+            onToJoin={openToJoin}
             viewType={viewType}
             meId={(user as any)?.id}
             myLocation={nearMe ? location : null}
         />
-    ), [expandedBookingId, setExpandedBookingId, handleReserve, handleApply, handleShare, handleDelete, viewType, user, nearMe, location]);
+    ), [expandedBookingId, setExpandedBookingId, handleReserve, handleApply, handleShare, handleDelete, openToJoin, viewType, user, nearMe, location]);
 
     return (
         <div className="min-h-screen bg-[#0A0A0A] text-white pb-nav font-sans selection:bg-[#64DD17]/30">
@@ -500,9 +508,15 @@ export default function BookingList() {
                     groupByCourse={viewType === 'JOIN' ? undefined : groupOn}
                     onToggleGroup={viewType === 'JOIN' ? undefined : toggleGroupOn}
                 />
-                {viewType === 'JOIN' && (
-                    <div className="px-5 pb-2.5 flex items-center gap-2">
-                        {/* 종류는 알약 하나 안의 분절 스위치 — 필터 칩과 생김새가 같으면 무엇이 필터이고 무엇이 탭인지 헷갈린다 */}
+                {/*
+                  * 위치 단추는 **두 탭 모두**에 있다(2026-09-23 오너: "티타임에 내가 현재 위치와 골프장 거리를 표기해줘").
+                  * 하는 일은 탭마다 다르다 — 조인은 가까운 순으로 정렬까지 하고(예전 '내 주변'), 부킹은 카드에 거리만 적는다.
+                  * 부킹까지 거리순으로 세우지는 않는다: 부킹 목록의 축은 티오프 시각이고, 같은 골프장 티타임이 줄줄이 붙어 있다.
+                  * 위치는 **누를 때 한 번** 묻는다. 목록을 열 때마다 권한 창이 뜨면 그건 기능이 아니라 방해다.
+                  */}
+                <div className="px-5 pb-2.5 flex items-center gap-2">
+                    {viewType === 'JOIN' && (
+                        /* 종류는 알약 하나 안의 분절 스위치 — 필터 칩과 생김새가 같으면 무엇이 필터이고 무엇이 탭인지 헷갈린다 */
                         <div className="flex-1 min-w-0 flex rounded-full bg-white/[0.05] border border-white/[0.08] p-0.5">
                             {(['ALL', ...JOIN_TYPES] as const).map((k) => (
                                 <button
@@ -512,20 +526,24 @@ export default function BookingList() {
                                 >{k === 'ALL' ? '전체' : JOIN_TYPE_LABEL[k]}</button>
                             ))}
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (nearMe) { setNearMe(false); return; }
-                                void requestLocation().then((r) => {
-                                    if (r === 'granted') setNearMe(true);
-                                    else toast({ title: r === 'denied' ? "위치 권한이 꺼져 있어요" : "지금은 위치를 알 수 없어요", description: "설정에서 위치를 허용하면 가까운 조인부터 보여 드려요." });
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (nearMe) { setNearMe(false); return; }
+                            void requestLocation().then((r) => {
+                                if (r === 'granted') setNearMe(true);
+                                else toast({
+                                    title: r === 'denied' ? "위치 권한이 꺼져 있어요" : "지금은 위치를 알 수 없어요",
+                                    description: viewType === 'JOIN' ? "설정에서 위치를 허용하면 가까운 조인부터 보여 드려요." : "설정에서 위치를 허용하면 골프장까지 거리를 적어 드려요.",
                                 });
-                            }}
-                            className={cn("shrink-0 h-9 px-3 rounded-full text-[12.5px] font-medium border transition-colors",
-                                nearMe ? "bg-[#4DA3FF] border-[#4DA3FF] text-white" : "bg-white/[0.04] border-white/[0.08] text-white/65")}
-                        >📍 내 주변{nearMe && locationStatus !== 'granted' ? '…' : ''}</button>
-                    </div>
-                )}
+                            });
+                        }}
+                        className={cn("shrink-0 h-9 px-3 rounded-full text-[12.5px] font-medium border transition-colors",
+                            viewType === 'JOIN' ? "" : "ml-auto",
+                            nearMe ? "bg-[#4DA3FF] border-[#4DA3FF] text-white" : "bg-white/[0.04] border-white/[0.08] text-white/65")}
+                    >📍 {viewType === 'JOIN' ? '내 주변' : '골프장까지 거리'}{nearMe && locationStatus !== 'granted' ? '…' : ''}</button>
+                </div>
             </div>
 
             <main className="px-5 pt-3 pb-6">
@@ -649,8 +667,15 @@ export default function BookingList() {
             <MyListingsSheet
                 open={myListingsOpen} onOpenChange={setMyListingsOpen}
                 initialTab={unseen ? "applied" : "mine"}
-                onGo={goToListing} onDelete={handleDelete}
+                onGo={goToListing} onDelete={handleDelete} onToJoin={openToJoin}
                 onCancelRequest={(item) => { if (window.confirm("신청을 취소할까요?")) applyMutation.mutate({ id: item.id, joined: true, isJoin: item.listingType === 'JOIN' }); }}
+            />
+
+            {/* 부킹 → 조인 전환. 끝나면 그 글이 있는 조인 탭·날짜로 옮겨 가 카드를 펼친다(내역의 '보기' 와 같은 동작). */}
+            <ToJoinSheet
+                item={toJoinItem}
+                onClose={() => setToJoinItem(null)}
+                onConverted={(converted) => goToListing(converted ?? { ...toJoinItem, listingType: 'JOIN' })}
             />
 
             <ShareSheet

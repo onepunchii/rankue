@@ -22,7 +22,7 @@ import {
     JOIN_OPTIONS, JOIN_TYPE_LABEL, JOIN_TYPES, normalizeSlots, openSlotCount,
     type CostMode, type JoinSlot, type JoinType, type SlotGender,
 } from "@shared/golfJoin";
-import { GENDER_LABEL, SlotDots } from "./joinUi";
+import { GenderToggle, SlotDots } from "./joinUi";
 import { kstDateKey } from "@/lib/kst";
 import { DateField, TimeField } from "../common/TeeTimePicker";
 
@@ -43,26 +43,6 @@ const chip = (on: boolean) => cn(
 // 고른 칸은 강조색으로. bg-white 를 쓰면 안 된다 — 골프 테마(index.css :root[data-sport="GOLF"] .bg-white)가 어두운 면으로
 // 바꿔 놓아 검정 글자가 사라진다(2026-09-21 오너 캡처: "스크린" 이 안 보임).
 const seg = (on: boolean) => cn("flex-1 h-10 rounded-lg text-[13.5px] font-medium transition-colors", on ? "bg-[#FF6B00] text-white" : "text-white/60");
-
-/** 자리 한 줄(나·동반자·모집)의 성별 토글. 모집 자리만 '무관'이 있다. */
-function GenderToggle({ value, onChange, allowAny }: { value: SlotGender; onChange: (g: SlotGender) => void; allowAny: boolean }) {
-    const opts: SlotGender[] = allowAny ? ["ANY", "M", "F"] : ["M", "F"];
-    return (
-        <span className="inline-flex rounded-full bg-white/[0.06] border border-white/10 p-0.5">
-            {opts.map((g) => (
-                <button
-                    key={g} type="button" onClick={() => onChange(g)}
-                    className={cn(
-                        "h-8 min-w-[44px] px-2.5 rounded-full text-[12.5px] font-medium transition-colors",
-                        value === g ? (g === "M" ? "bg-[#4DA3FF] text-white" : g === "F" ? "bg-[#FF6B9A] text-white" : "bg-white/25 text-white") : "text-white/55",
-                    )}
-                >
-                    {GENDER_LABEL[g]}
-                </button>
-            ))}
-        </span>
-    );
-}
 
 export function JoinCreateSheet({ onClose, onCreated }: Props) {
     const { toast } = useToast();

@@ -80,6 +80,7 @@ class Storage {
     async listJoinApplicants(bookingId: string) { return this.golf.listJoinApplicants(bookingId); }
     async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean, capacity?: number) { return this.golf.setJoinNoShow(bookingId, memberId, noShow, capacity); }
     async deleteGolfBooking(id: string, managerPhone?: string, ownerId?: string) { return this.golf.deleteGolfBooking(id, managerPhone, ownerId); }
+    async convertBookingToJoin(id: string, ownerId: string, patch: Parameters<GolfRepository["convertBookingToJoin"]>[2]) { return this.golf.convertBookingToJoin(id, ownerId, patch); }
     async getGolfJoins(filters?: any) { return this.golf.getGolfJoins(filters); }
     async createGolfJoin(data: any) { return this.golf.createGolfJoin(data); }
     async deleteGolfJoin(id: string, hostId?: string) { return this.golf.deleteGolfJoin(id, hostId); }
