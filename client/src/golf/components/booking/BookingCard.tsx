@@ -133,12 +133,15 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                 <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-1.5 min-w-0">
                         <span className="text-[15px] font-semibold text-white truncate" title={name}>{name}</span>
+                        {/* 부킹은 거의 다 업체가 올린다(운영 실측 10/10) — 그걸 카드마다 '매장' 이라고 적으면
+                            모든 카드에 같은 글자가 반복될 뿐 아무것도 구별하지 않는다. 게다가 '매장' 은 당구 말이라
+                            골프에서는 뜻이 안 통했다(2026-09-23 오너: "부킹에 매장이란 표현은 뭐야?").
+                            **예외일 때만 알린다** — 사는 사람이 조심해야 할 건 모르는 개인에게 사는 쪽이다. */}
                         {isJoin && joinType
                             ? <JoinTypeBadge type={joinType} />
-                            : <span className={cn("shrink-0 px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold",
-                                item.sellerType === 'PERSONAL' ? "bg-[#4DA3FF]/15 text-[#7CBBFF]" : "bg-[#64DD17]/15 text-[#8BE84A]")}>
-                                {item.sellerType === 'PERSONAL' ? '개인 양도' : '매장'}
-                            </span>}
+                            : item.sellerType === 'PERSONAL'
+                                ? <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold bg-[#4DA3FF]/15 text-[#7CBBFF]">개인 양도</span>
+                                : null}
                         {item.isBlind && <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-white/10 text-white/60 text-[10.5px] font-medium">비공개</span>}
                     </div>
                     {isJoin ? (
@@ -218,7 +221,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                     {/* 전환 글은 한 줄로 밝힌다 — 신청자가 현장에서 '호스트'를 찾지 않게 */}
                                     {isConvertedJoin(item) && (
                                         <p className="text-[12px] text-white/50 leading-relaxed break-keep">
-                                            {item.sellerType === 'PERSONAL' ? '양도하는 분이 팔고 남은 자리예요.' : '매장이 팔고 남은 자리예요.'} 이미 찬 자리는 다른 분들이라 현장에서 만나요.
+                                            이미 팔린 자리를 뺀 나머지예요. 찬 자리는 다른 분들이라 현장에서 만나요.
                                         </p>
                                     )}
                                 </div>
