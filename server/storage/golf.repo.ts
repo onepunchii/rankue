@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { URGENT_MAX_FEE, URGENT_MIN_LEAD_MS } from "../../shared/golfJoin.js";
 import {
     golfBookings,
     golfJoinRequests,
@@ -141,6 +142,24 @@ function buildGolfFilterConditions(filters: any): any[] {
     // 특가 상품(핫딜)만 — 홈의 긴급티 티커가 쓴다. 값이 있을 때만 거른다(없으면 전부).
     if (filters?.hotDeal === "1" || filters?.hotDeal === true || filters?.hotDeal === "true") {
         out.push(eq(golfBookings.isHotDeal, true));
+    }
+
+    /**
+     * 긴급 조인만 — 홈 배너가 쓴다. **shared/golfJoin.ts 의 isUrgentJoin 과 같은 조건**을 SQL 로 쓴 것이다.
+     * (한쪽만 고치면 배너에 뜬 글이 카드에선 긴급이 아닌 일이 생긴다 — 상수는 shared 에서 가져온다.)
+     * 조인 · 필드 · 고정가 · 그린피 ≤ URGENT_MAX_FEE · 지금+2시간 이후 · 한국 날짜로 오늘.
+     */
+    if (filters?.urgent === "1" || filters?.urgent === true || filters?.urgent === "true") {
+        const from = new Date(Date.now() + URGENT_MIN_LEAD_MS);
+        out.push(and(
+            eq(golfBookings.listingType, "JOIN"),
+            eq(golfBookings.joinType, "FIELD"),
+            eq(golfBookings.costMode, "FIXED"),
+            sql`${golfBookings.greenFee} is not null and ${golfBookings.greenFee} >= 0 and ${golfBookings.greenFee} <= ${URGENT_MAX_FEE}`,
+            gte(golfBookings.datetime, from),
+            // 한국 날짜로 오늘 — 서버가 UTC 라 날짜를 KST 로 옮겨 비교한다.
+            sql`(${golfBookings.datetime} at time zone 'UTC' at time zone 'Asia/Seoul')::date = (now() at time zone 'Asia/Seoul')::date`,
+        )!);
     }
 
     // 이미 지난 티타임 빼기 — '지금부터' 를 보여 주는 화면(티커)에 어제 것이 섞이면 안 된다.

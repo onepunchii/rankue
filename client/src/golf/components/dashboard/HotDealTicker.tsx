@@ -8,7 +8,12 @@ import { kstDateKey, kstDateLabel, kstTime } from "@/lib/kst";
 import { DATE_STRIP_DAYS } from "../../constants/booking";
 
 /**
- * 홈 맨 위의 **긴급티**. 티타임 등록에서 '특가 상품(Hot Deal)' 을 켠 매물만 흐른다(2026-09-10 오너).
+ * 홈 맨 위의 **긴급티**.
+ *
+ * 2026-09-23 오너: "긴급 조인 = 오늘인데 사람이 안 구해져서 10만원짜리 그린피를 천원·만원에 올리는 것.
+ * 1명만 채우면 카트·캐디피를 N빵하니까." → 그 글(shared/golfJoin isUrgentJoin)을 **먼저** 흘린다.
+ * 없을 때만 예전처럼 '특가 상품(Hot Deal)' 매물로 떨어진다 — 자리를 비워 두지 않으려고.
+ * 긴급 조인 한 장은 생김새가 다르다: 값(그린피)이 후킹 포인트라 그걸 가장 크게, 급한 정도는 날짜가 아니라 **남은 시간**으로.
  *
  * 예전 헤더 티커를 대신한다. 그쪽은 두 가지가 문제였다:
  *  1. 매물이 없으면 코드에 박아 둔 가짜('기흥CC', '스카이72')를 보여 줬다. 작게 흐를 땐 안 보였지만
@@ -32,6 +37,16 @@ interface Deal {
     joinHeadcount?: number | null;
     joinApplied?: number;
     region?: string | null;
+    isUrgent?: boolean;
+}
+
+/** 티오프까지 남은 시간 — 긴급 조인은 '오늘/내일' 이 아니라 시간이 문제다. */
+function timeLeft(datetime: string): string {
+    const min = Math.round((Date.parse(datetime) - Date.now()) / 60_000);
+    if (!Number.isFinite(min) || min <= 0) return "곧";
+    if (min < 60) return `${min}분 뒤`;
+    const h = Math.floor(min / 60), m = min % 60;
+    return m === 0 ? `${h}시간 뒤` : `${h}시간 ${m}분 뒤`;
 }
 
 /** '오늘' · '내일' · 'D-3'. 급한 것일수록 눈에 띄어야 한다. */
@@ -52,8 +67,17 @@ export function HotDealTicker() {
     const [idx, setIdx] = useState(0);
     const paused = useRef(false);
 
-    const { data, isLoading } = useQuery<Deal[]>({
+    // 긴급 조인(오늘·떨이 그린피)이 먼저다. 서버가 isUrgentJoin 과 같은 조건으로 거른다(urgent=1).
+    const urgentQ = useQuery<Deal[]>({
+        queryKey: ["/api/hiq/golf/bookings", "urgent-joins"],
+        queryFn: () => apiRequest(`/api/hiq/golf/bookings?${new URLSearchParams({ urgent: "1", upcoming: "1" }).toString()}`),
+        refetchInterval: 60_000,
+    });
+    // 긴급이 없을 때만 예전 특가 매물로 떨어진다 — 자리를 비워 두지 않는다.
+    const hasUrgent = (urgentQ.data?.length ?? 0) > 0;
+    const dealQ = useQuery<Deal[]>({
         queryKey: ["/api/hiq/golf/bookings", "hot-deals"],
+        enabled: !urgentQ.isPending && !hasUrgent,
         queryFn: () => {
             const params = new URLSearchParams({
                 startDate: kstDateKey(Date.now()),
@@ -65,12 +89,15 @@ export function HotDealTicker() {
         },
         refetchInterval: 60_000,
     });
+    const isLoading = urgentQ.isPending || (!hasUrgent && dealQ.isPending);
 
     // 급한 것부터
-    const deals = useMemo(
-        () => [...(data ?? [])].sort((a, b) => Date.parse(a.datetime) - Date.parse(b.datetime)).slice(0, 10),
-        [data],
-    );
+    const deals = useMemo(() => {
+        const rows = hasUrgent
+            ? (urgentQ.data ?? []).map((d) => ({ ...d, isUrgent: true }))
+            : (dealQ.data ?? []);
+        return [...rows].sort((a, b) => Date.parse(a.datetime) - Date.parse(b.datetime)).slice(0, 10);
+    }, [hasUrgent, urgentQ.data, dealQ.data]);
 
     useEffect(() => { setIdx(0); }, [deals.length]);
 
@@ -105,7 +132,7 @@ export function HotDealTicker() {
             >
                 <div>
                     <p className="text-[13px] font-bold text-white/70">지금 열린 긴급티가 없어요</p>
-                    <p className="text-[11px] font-medium text-white/30 mt-0.5">특가로 올린 티타임이 여기에 뜹니다</p>
+                    <p className="text-[11px] font-medium text-white/30 mt-0.5">오늘 급하게 나온 자리가 여기에 뜹니다</p>
                 </div>
                 <span className="shrink-0 h-9 px-4 rounded-pill bg-[#64DD17]/10 text-[#64DD17] text-[12px] font-black flex items-center gap-1.5 group-hover:bg-[#64DD17] group-hover:text-[#051907] transition-colors">
                     <LucidePlus className="w-3.5 h-3.5" />조인 만들기
@@ -128,6 +155,43 @@ export function HotDealTicker() {
             onPointerLeave={() => { paused.current = false; }}
             onTouchStart={() => { paused.current = true; }}
         >
+            {d.isUrgent ? (
+                /* 긴급 조인 — 한 가지 색(앰버)만 쓴다. 라임·주황·빨강을 같이 쓰면 신호등이 되어 뭘 볼지 모른다(2026-09-23 오너). */
+                <button
+                    onClick={() => open(d)}
+                    className="w-full rounded-2xl px-5 py-4 text-left transition-colors border bg-[#FF8A00]/[0.08] border-[#FF8A00]/25 hover:border-[#FF8A00]/55 active:scale-[0.995]"
+                >
+                    <span className="flex items-center gap-2">
+                        <span className="shrink-0 inline-flex items-center gap-1 h-5 px-2 rounded-md bg-[#FF8A00] text-[#1a0d00] text-[10px] font-black">
+                            <LucideZap className="w-3 h-3" />긴급
+                        </span>
+                        <span className="text-[12px] font-bold text-[#FFB866] tabular-nums">{timeLeft(d.datetime)}</span>
+                        <span className="ml-auto text-[11px] font-bold text-white/35 tabular-nums">{kstTime(d.datetime)} 티오프</span>
+                    </span>
+
+                    <span className="mt-2 flex items-end gap-3">
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-[15px] font-black text-white truncate">{name}</span>
+                            <span className="mt-0.5 flex items-center gap-1.5 text-[11.5px] font-bold text-white/45">
+                                {d.region && <span className="truncate">{d.region}</span>}
+                                {d.region && left != null && <span className="w-0.5 h-2 bg-white/15 rounded-full shrink-0" />}
+                                {left != null && (
+                                    <span className={cn("shrink-0 flex items-center gap-1", left === 0 ? "text-white/30" : "text-[#FFB866]")}>
+                                        <LucideUsers className="w-3 h-3" />{left === 0 ? "마감" : `${left}자리`}
+                                    </span>
+                                )}
+                            </span>
+                        </span>
+                        {/* 값이 후킹 포인트다 — 10만원짜리를 만원에 던지는 글이라 숫자가 가장 커야 한다 */}
+                        <span className="shrink-0 text-right leading-none">
+                            <span className="block text-[26px] font-black text-[#FF8A00] tabular-nums">{Number(d.greenFee).toLocaleString()}</span>
+                            <span className="block text-[11px] font-bold text-white/35 mt-0.5">그린피 · 1인</span>
+                        </span>
+                    </span>
+
+                    <span className="mt-2.5 block text-[11px] font-bold text-white/40">카트·캐디피는 현장에서 N빵이에요</span>
+                </button>
+            ) : (
             <button
                 onClick={() => open(d)}
                 className={cn(
@@ -175,6 +239,7 @@ export function HotDealTicker() {
 
                 <LucideChevronRight className="shrink-0 w-5 h-5 text-white/20" />
             </button>
+            )}
 
             {deals.length > 1 && (
                 <div className="mt-2 flex items-center justify-center gap-1.5">
@@ -185,7 +250,7 @@ export function HotDealTicker() {
                             aria-label={`${i + 1}번째 긴급티 보기`}
                             className={cn(
                                 "h-1.5 rounded-full transition-all",
-                                i === idx ? "w-4 bg-[#64DD17]" : "w-1.5 bg-white/15 hover:bg-white/30",
+                                i === idx ? (d.isUrgent ? "w-4 bg-[#FF8A00]" : "w-4 bg-[#64DD17]") : "w-1.5 bg-white/15 hover:bg-white/30",
                             )}
                         />
                     ))}
