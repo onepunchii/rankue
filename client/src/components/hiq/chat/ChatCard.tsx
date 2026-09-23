@@ -6,14 +6,21 @@
  * 옛 앱·모르는 종류는 message 를 그대로 보인다. 이동이 있는 종류만 "열기 ›" 를 단다(MY_STATS 는 이동 없음).
  * 사진·큰 자산은 없다(오너: 용량 최소) — 값 2~3줄이 전부.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { LucideLoader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { BallDot } from "@/components/hiq/BallDot";
 import { useT, type Locale } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { kstDateLabel, kstTime } from "@/lib/kst";
 import { INTL_TAG, type ChatMsg } from "./ChatRoom";
 
 interface Props {
     msg: ChatMsg;
     onOpen?: () => void;
+    /** 내 회원 id — 매칭 대결 카드가 "내가 방장인가"를 가린다(방장은 열기, 그 밖은 참가하기). */
+    meId?: string;
 }
 
 /** 이동이 있는 종류 — 없는 것(MY_STATS)은 "열기" 를 안 단다. chat-room.tsx 의 openCard 와 짝. */
@@ -21,7 +28,7 @@ interface Props {
  * 눌러서 갈 곳이 있는 카드. GOLF_ROUND 는 일부러 뺐다 — 라운드 결과 화면은 그 라운드 참가자만 열 수 있어서
  * (GET /golf/match/:id 가 403) 정작 보여 주려던 상대에게 실패한다. 카드 본문에 코스·타수·날짜가 다 있다(2026-09-23 리뷰).
  */
-export const CARD_OPENABLE = new Set(["settlement", "GOLF_BOOKING", "SIM_INVITE", "GAME_RESULT", "STORE", "GOLF_MATCH"]);
+export const CARD_OPENABLE = new Set(["settlement", "GOLF_BOOKING", "SIM_INVITE", "GAME_RESULT", "STORE", "GOLF_MATCH", "MATCH_INVITE"]);
 
 /** metadata.type(없으면 정산은 msg.type) — 카드 종류 하나로 정리한다. */
 export function cardKind(msg: ChatMsg): string {
@@ -46,10 +53,88 @@ const num = (v: unknown, digits?: number) => {
 /** 6자리 코드는 "123 456" 으로 — 온라인 대전 화면과 같은 표기. */
 const codeLabel = (code: unknown) => { const s = String(code ?? ""); return s.length === 6 ? `${s.slice(0, 3)} ${s.slice(3)}` : s; };
 
-export function ChatCard({ msg, onOpen }: Props) {
+interface MatchStatus { alive: boolean; joined: number; names: string[]; mine: boolean; hostId: string }
+
+/**
+ * 매칭 대결 카드 — **살아 있는 카드**다(2026-09-23).
+ * 핀을 받아 적을 필요가 없다: 카드가 핀을 들고 있고, "n/seats 참가"가 5초마다 갱신되며,
+ * 아직 안 들어온 사람은 [참가하기] 한 번으로 앉는다. 방장은 카드를 눌러 그 핀으로 매칭대결하기 화면을 이어받는다.
+ * 쿼리를 카드 안에서 도는 이유: 방에 카드가 여럿일 수 있고 각자 자기 핀만 물어보면 된다.
+ */
+function MatchInviteBody({ md, meId, canOpen }: { md: any; meId?: string; canOpen: boolean }) {
+    const { t } = useT();
+    const qc = useQueryClient();
+    const [justJoined, setJustJoined] = useState(false);
+    const code = md.code ? String(md.code) : "";
+    const seats = Number(md.seats) || 2;
+
+    const status = useQuery<MatchStatus>({
+        queryKey: ["/api/hiq/invite", code, "status"],
+        queryFn: () => apiRequest(`/api/hiq/invite/${code}/status`),
+        enabled: !!code,
+        refetchInterval: 5000,
+        staleTime: 2000,
+    });
+    const join = useMutation({
+        mutationFn: () => apiRequest(`/api/hiq/invite/${code}/join`, { method: "POST" }),
+        onSuccess: () => { setJustJoined(true); void qc.invalidateQueries({ queryKey: ["/api/hiq/invite", code, "status"] }); },
+    });
+
+    const s = status.data;
+    // 아직 못 물어봤으면 카드에 적힌 것만 믿는다 — 숫자가 깜빡이지 않게 방장 1명을 기본으로 둔다.
+    const joined = s ? s.joined : 1;
+    const alive = s ? s.alive : true;
+    const mine = (s?.mine ?? false) || justJoined;
+    const full = joined >= seats;
+    // 방장 판정은 카드 metadata 가 먼저, 서버가 준 hostId 로 한 번 더 — 옛 카드에 hostId 가 없어도 방장에게 [참가하기]가 뜨지 않게.
+    const isHost = !!meId && (String(md.hostId ?? "") === meId || s?.hostId === meId);
+
+    return (
+        <>
+            <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink-1">
+                <BallDot type={md.gameType === "4c" ? "4c" : "3c"} size={12} />
+                {md.gameType === "4c" ? t("chat.card.game4c") : t("chat.card.game3c")}
+                {md.target ? <span className="rk-num font-medium text-ink-2">· {fill(t("chat.card.target"), { n: md.target })}</span> : null}
+            </span>
+            <span className={cn("block text-[13px] mt-0.5 rk-num font-semibold", alive ? "text-brand" : "text-ink-3")}>
+                {fill(t("chat.card.matchSeats"), { n: joined, seats })}
+            </span>
+            {s && s.names.length > 0 && <span className="block text-[12px] text-ink-3 break-words">{s.names.join(" · ")}</span>}
+            <span className="block text-[12px] text-ink-3 mt-0.5 rk-num">{fill(t("chat.card.code"), { code: codeLabel(code) })}</span>
+
+            {!alive ? (
+                <span className="block text-[12px] font-medium text-ink-4 mt-1.5">{t("chat.card.matchEnded")}</span>
+            ) : isHost ? (
+                canOpen ? <span className="block text-[12px] font-medium text-brand mt-1.5">{t("chat.cardOpen")} ›</span> : null
+            ) : mine ? (
+                <span className="block text-[12px] font-medium text-ink-2 mt-1.5">{t("chat.card.matchJoined")}</span>
+            ) : full ? (
+                <span className="block text-[12px] font-medium text-ink-4 mt-1.5">{t("chat.card.matchFull")}</span>
+            ) : (
+                <>
+                    <button
+                        type="button" disabled={join.isPending}
+                        // 바깥 카드(방장 이어받기)와 겹치지 않게 — 참가는 이 버튼만의 일이다.
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!join.isPending) join.mutate(); }}
+                        className="mt-2 w-full h-9 rounded-lg bg-brand text-brand-fg text-[13px] font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                        {join.isPending && <LucideLoader2 className="w-3.5 h-3.5 animate-spin" />}
+                        {t("chat.card.matchJoin")}
+                    </button>
+                    {join.isError && <span className="block text-[11.5px] font-medium text-red-500 mt-1">{(join.error as any)?.message || t("chat.card.matchJoinFailed")}</span>}
+                </>
+            )}
+        </>
+    );
+}
+
+export function ChatCard({ msg, onOpen, meId }: Props) {
     const { t, locale } = useT();
     const md: any = (msg as any).metadata ?? {};
     const kind = cardKind(msg);
+    // 매칭 대결은 방장만 카드를 눌러 이어받는다 — 그 밖의 사람은 카드 안 [참가하기] 버튼으로 앉는다.
+    const isMatch = kind === "MATCH_INVITE";
+    const isHost = isMatch && !!meId && String(md.hostId ?? "") === meId;
     const gameType = (gt: unknown) => (gt === "4c" ? t("chat.card.game4c") : t("chat.card.game3c"));
 
     let badge: string;
@@ -132,6 +217,10 @@ export function ChatCard({ msg, onOpen }: Props) {
             );
             break;
         }
+        case "MATCH_INVITE":
+            badge = t("chat.card.matchInvite");
+            body = <MatchInviteBody md={md} meId={meId} canOpen={!!onOpen} />;
+            break;
         case "STORE":
             badge = t("chat.card.store");
             body = (
@@ -169,12 +258,28 @@ export function ChatCard({ msg, onOpen }: Props) {
             badge = t("chat.card.generic");
             body = <span className="block text-[14px] font-medium text-ink-1 whitespace-pre-wrap break-words">{msg.message}</span>;
     }
-    const openable = !!onOpen && CARD_OPENABLE.has(kind);
+    const openable = !!onOpen && CARD_OPENABLE.has(kind) && (!isMatch || isHost);
+    const shell = "max-w-full min-w-[180px] text-left rounded-2xl border border-surface-line bg-surface-1 px-3.5 py-3 active:bg-surface-2 select-none";
+
+    // 매칭 대결 카드는 안에 [참가하기] 버튼이 들어간다 — button 안의 button 은 못 쓰므로 껍데기를 div 로 바꾼다.
+    // (다른 카드는 그대로 button — 회귀를 만들지 않는다.)
+    if (isMatch) {
+        return (
+            <div
+                role={openable ? "button" : undefined} tabIndex={openable ? 0 : undefined}
+                onClick={() => { if (openable) onOpen?.(); }}
+                className={cn(shell, "block w-full")}
+            >
+                <span className="block text-[11px] font-semibold text-brand mb-0.5">{badge}</span>
+                {body}
+            </div>
+        );
+    }
 
     return (
         <button
             type="button" onClick={() => { if (openable) onOpen?.(); }}
-            className="max-w-full min-w-[180px] text-left rounded-2xl border border-surface-line bg-surface-1 px-3.5 py-3 active:bg-surface-2 select-none"
+            className={shell}
         >
             <span className="block text-[11px] font-semibold text-brand mb-0.5">{badge}</span>
             {body}

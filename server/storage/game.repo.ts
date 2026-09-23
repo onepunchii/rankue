@@ -620,6 +620,112 @@ export class GameRepository {
         return true;
     }
 
+    /* ── 매칭 대결 카드(2026-09-23) ───────────────────────────
+     * 채팅의 '매칭 대결' 카드는 **카드 자체가 대기실**이다 — 카드가 핀을 들고 있고, 보는 사람은
+     * [참가하기] 한 번으로 그 핀에 앉는다(핀 입력 없음). 그래서 카드는 두 가지를 물어야 한다:
+     *   · 올릴 때  — 내가 이미 연 핀이 살아 있나(있으면 그걸 다시 쓴다).
+     *   · 보일 때  — 그 핀이 아직 살아 있고 몇 명이 앉았나.
+     * 스키마는 그대로다(hiq_invites 만 본다). 새 열·새 표 없음.
+     */
+
+    /**
+     * 한 코드의 '지금 살아 있는 세대'. 죽었으면(만료·소비) null.
+     * 코드는 6자리뿐이라 만료된 뒤 **다른 호스트**에게 다시 날 수 있다 — 살아 있는 행들 중 가장 최근 행의
+     * 호스트만 이번 세대로 본다(옛 세대 행이 섞이면 남의 참가자가 내 카드에 뜬다).
+     * openedAt 은 이번 세대가 열린 시각 — 시작된 경기를 가려낼 때 기준이 된다.
+     */
+    private async liveInviteGeneration(code: string): Promise<{ hostId: string; openedAt: Date; guestIds: string[] } | null> {
+        const rows = await db.select().from(hiqInvites).where(and(
+            eq(hiqInvites.code, code),
+            ne(hiqInvites.status, "expired"),
+            gt(hiqInvites.expiresAt, new Date()),
+        )).orderBy(asc(hiqInvites.createdAt));
+        if (rows.length === 0) return null;
+        const hostId = String(rows[rows.length - 1].hostId);
+        const mine = rows.filter((r) => String(r.hostId) === hostId);
+        const guestIds: string[] = [];
+        for (const r of mine) {
+            const g = r.guestId ? String(r.guestId) : null;
+            // 같은 사람이 두 번 눌러 행이 둘이 될 수 있다(joinInvite 의 경합 분기) — 사람 수로 센다.
+            if (g && g !== hostId && !guestIds.includes(g)) guestIds.push(g);
+        }
+        return { hostId, openedAt: mine[0].createdAt as Date, guestIds };
+    }
+
+    /**
+     * 이 호스트가 그 시각 이후로 실전 경기를 시작했나.
+     * /game/start 는 재시도 안전을 위해 **초대를 소비하지 않는다**(소비는 종료 때) — 그래서 invite 행만 보면
+     * 이미 시작해 점수를 치고 있는 판도 "아직 모집 중"으로 보인다. 시작 시각으로 가려낸다.
+     * ⚠️ 기준 시각은 반드시 '이번 세대가 열린 시각'이다. 그냥 '진행 중 경기가 있나'로 물으면, 어제 끝내지 않고
+     * 남겨 둔 판 하나 때문에 방금 올린 카드가 태어나자마자 죽은 카드로 그려진다.
+     */
+    private async hasHostGameSince(hostId: string, since: Date): Promise<boolean> {
+        const [g] = await db.select({ id: hiqGames.id }).from(hiqGames).where(and(
+            eq(hiqGames.player1Id, hostId),
+            inArray(hiqGames.status, ["playing_base", "playing_finish"]),
+            inArray(hiqGames.gameType, ["3c", "4c"]),
+            gt(hiqGames.playedAt, since),
+        )).limit(1);
+        return !!g;
+    }
+
+    /**
+     * 카드를 올릴 때 다시 쓸, 살아 있는 내 핀 하나(없으면 null).
+     * 매번 새로 만들면 앞서 올린 카드의 코드가 참가자 없는 방을 가리켜, 카드 두 장이 서로 다른 대기실이 된다
+     * (온라인 대전 카드가 내 대기 방을 다시 쓰는 것과 같은 규칙).
+     * '살아 있다' = 만료 전 + 소비 안 됨(consumeInvites 가 status 를 expired 로, expiresAt 을 now 로 당긴다)
+     *              + 그 핀으로 경기가 아직 시작되지 않음.
+     * ⚠️ status='pending' 행만 찾으면 안 된다 — 첫 게스트가 들어오는 순간 joinInvite 가 바로 그 pending 행을
+     * accepted 로 바꿔 버려서, 한 명이라도 앉은 뒤에 올리는 카드는 늘 새 코드를 만들게 된다.
+     */
+    async getLivePendingInvite(hostId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<string | null> {
+        const [row] = await db.select({ code: hiqInvites.code }).from(hiqInvites).where(and(
+            eq(hiqInvites.hostId, hostId),
+            eq(hiqInvites.sportCategory, sport),
+            ne(hiqInvites.status, "expired"),
+            gt(hiqInvites.expiresAt, new Date()),
+        )).orderBy(desc(hiqInvites.createdAt)).limit(1);
+        if (!row) return null;
+        const gen = await this.liveInviteGeneration(String(row.code));
+        if (!gen || gen.hostId !== hostId) return null;
+        if (await this.hasHostGameSince(gen.hostId, gen.openedAt)) return null;
+        return String(row.code);
+    }
+
+    /**
+     * 카드가 3초마다 묻는 대기실 상태. 죽은 코드도 404 가 아니라 alive:false 로 답한다 — 카드는 사라지지 않고
+     * "끝난 대결"로 그려져야 하기 때문이다.
+     *  · joined — 앉은 사람 수, **호스트 포함**(카드가 "n/seats 참가"로 그린다. 자리 수 seats 에 호스트가 들어간다).
+     *  · names  — 참가한 게스트 이름들(호스트 이름은 카드 metadata 의 hostName 에 이미 있다).
+     *  · mine   — 내가 게스트로 이미 앉았나.
+     * 방 사람 누구나 부를 수 있다 — 이름은 채팅에서 이미 보이므로 새로 흘리는 정보가 없다(이름 말고는 싣지 않는다).
+     */
+    async getMatchInviteCardStatus(code: string, viewerId: string): Promise<{ alive: boolean; joined: number; names: string[]; mine: boolean; hostId: string }> {
+        const gen = await this.liveInviteGeneration(code);
+        if (!gen) {
+            // 만료·소비된 코드. 누구 카드였는지는 알려 준다(화면이 "내 카드"를 구분한다).
+            const [last] = await db.select({ hostId: hiqInvites.hostId }).from(hiqInvites)
+                .where(eq(hiqInvites.code, code)).orderBy(desc(hiqInvites.createdAt)).limit(1);
+            return { alive: false, joined: 0, names: [], mine: false, hostId: last ? String(last.hostId) : "" };
+        }
+        let names: string[] = [];
+        if (gen.guestIds.length > 0) {
+            const people = await db.select({ id: hiqMembers.id, name: hiqMembers.name })
+                .from(hiqMembers).where(inArray(hiqMembers.id, gen.guestIds));
+            const byId = new Map(people.map((p) => [String(p.id), p.name]));
+            // 들어온 순서 그대로 — 카드가 이름을 줄로 이어 붙인다.
+            names = gen.guestIds.map((id) => byId.get(id)).filter((n): n is string => !!n);
+        }
+        const started = await this.hasHostGameSince(gen.hostId, gen.openedAt);
+        return {
+            alive: !started,
+            joined: gen.guestIds.length + 1,
+            names,
+            mine: gen.guestIds.includes(viewerId),
+            hostId: gen.hostId,
+        };
+    }
+
     /**
      * 진행 중인 경기를 버린다 — 기록·RP 없이 행을 지운다.
      * 유저 건의(2026-09-03): 잘못 시작한 경기가 "진행 중"으로 영원히 남아, 없애려면 억지로

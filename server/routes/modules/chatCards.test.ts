@@ -6,7 +6,7 @@ const read = (f: string) => readFileSync(path.resolve(process.cwd(), f), "utf8")
 /** 주석은 빼고 본다 — 규칙을 설명하는 주석이 규칙을 지킨 것처럼 보이면 안 된다. */
 const code = (f: string) => read(f).split("\n").filter((l) => !l.trim().startsWith("*") && !l.trim().startsWith("//") && !l.trim().startsWith("/*")).join("\n");
 
-const CARDS = ["sim-invite", "game-result", "store", "my-stats", "golf-booking", "golf-match", "golf-round"];
+const CARDS = ["match-invite", "sim-invite", "game-result", "store", "my-stats", "golf-booking", "golf-match", "golf-round"];
 
 /**
  * 채팅 카드는 서버만 만든다(2026-09-23). 화면이 metadata 를 보내는 길은 없고, 카드 라우트마다 방 접근·종목 검사와
@@ -15,7 +15,7 @@ const CARDS = ["sim-invite", "game-result", "store", "my-stats", "golf-booking",
 describe("채팅 카드 라우트", () => {
     const src = code("server/routes/modules/chatCards.ts");
 
-    it("일곱 종류가 모두 있고 각각 openRoom 을 거친다", () => {
+    it("여덟 종류가 모두 있고 각각 openRoom 을 거친다", () => {
         for (const c of CARDS) {
             const marker = `router.post("/rooms/:key/cards/${c}"`;
             const i = src.indexOf(marker);
@@ -31,7 +31,7 @@ describe("채팅 카드 라우트", () => {
             const i = src.indexOf(`router.post("/rooms/:key/cards/${c}"`);
             return /await openRoom\(req, res, "([A-Z]+)"\)/.exec(src.slice(i))?.[1];
         };
-        for (const c of ["sim-invite", "game-result", "store"]) expect(want(c), c).toBe("BILLIARDS");
+        for (const c of ["match-invite", "sim-invite", "game-result", "store"]) expect(want(c), c).toBe("BILLIARDS");
         for (const c of ["golf-booking", "golf-match", "golf-round"]) expect(want(c), c).toBe("GOLF");
         expect(want("my-stats")).toBe("ANY");
     });

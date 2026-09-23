@@ -5,6 +5,7 @@
  * 여기서 실제 행(대전·경기·회원·매장·글·세션)을 읽어 만들기 때문에 없는 것으로 카드를 만들 수 없다(가짜 카드 방지).
  *
  *   POST /chat/rooms/:key/cards/sim-invite    { gameType? }    당구  🎱 온라인 대전(내 대기 방 재사용, 없으면 만든다 — 푸시가 참가 화면으로 바로 간다)
+ *   POST /chat/rooms/:key/cards/match-invite  { gameType, seats, target? }  당구  🎱 매칭 대결(실전 경기 — 카드가 핀을 들고 대기실이 된다)
  *   POST /chat/rooms/:key/cards/game-result   { gameId }       당구  🏁 경기 결과(내가 뛴 경기만)
  *   POST /chat/rooms/:key/cards/my-stats      {}               공통  📊 내 기록
  *   POST /chat/rooms/:key/cards/store         { code | slug }  당구  📍 매장(디렉터리 code · 파트너 slug/id)
@@ -142,6 +143,42 @@ router.post("/rooms/:key/cards/sim-invite", ...billiardsGate, asyncHandler(async
         // 알림을 누르면 채팅이 아니라 **판으로 바로** 들어간다 — 초대한 사람은 이미 대기방에 있다(2026-09-23 오너).
         // same=1: 핸디전이 아닌 방은 들어오는 쪽이 자기 다마수를 보내지 않게 해 **둘 다 같은 목표**가 되게 한다.
         url: `/online-game?join=${encodeURIComponent(code)}&auto=1${m.handicap ? "" : "&same=1"}`,
+    });
+}));
+
+const matchInviteSchema = z.object({
+    gameType: z.enum(["3c", "4c"]),
+    seats: z.number().int().min(2).max(4),
+    target: z.number().int().optional(),
+});
+
+/** 실전 경기 슬롯 상한 — hiq_games 에 player1~4 뿐이다(화면의 MAX_PLAYERS 와 같은 숫자). */
+const MATCH_MAX_SEATS = 4;
+
+// 🎱 매칭 대결(실전 경기) — **카드 자체가 대기실**이다. 카드가 핀을 들고, 보는 사람은 [참가하기] 한 번으로 앉는다.
+// 온라인 대전(SIM_INVITE)과 다른 것이다: 여기서 앉은 사람은 오프라인 테이블에서 치고 앱은 점수만 적는다.
+router.post("/rooms/:key/cards/match-invite", ...billiardsGate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const parsed = matchInviteSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, "err.chat.card.badInput");
+    const room = await openRoom(req, res, "BILLIARDS"); if (!room) return;
+    const { me, ref, info } = room;
+    const { gameType } = parsed.data;
+    // 1:1 방은 자리가 둘뿐이다 — 다른 값이 와도 2로 내린다(오너: "친구랑 대결은 2인, 크루는 4인까지").
+    // 크루 방은 크루원이 수십 명이라 방 인원으로 자리를 정할 수 없다 — 상한 4 는 스키마가 정한 상수다.
+    const seats = ref.kind === "dm" && info.members.length === 2
+        ? 2
+        : Math.min(MATCH_MAX_SEATS, Math.max(2, parsed.data.seats));
+    // 목표(핸디)는 경기 시작 때 player1Target 으로 들어간다 — 거기 상한(999)과 같은 스케일로 자른다. 0 이면 끝낼 방법이 없다.
+    const target = parsed.data.target === undefined ? undefined : Math.min(999, Math.max(1, Math.round(parsed.data.target)));
+    // 살아 있는 내 핀을 먼저 쓴다 — 새로 만들면 앞서 올린 카드가 아무도 못 앉는 죽은 대기실이 된다(SIM_INVITE 와 같은 규칙).
+    const code = (await storage.getLivePendingInvite(me.id, "BILLIARDS")) ?? await storage.createInvite(me.id);
+    const spaced = `${code.slice(0, 3)} ${code.slice(3)}`;
+    const summary = `🎱 매칭 대결 · ${gameTypeKo(gameType)} · ${seats}인 · 코드 ${spaced}`;
+    return postCard(res, room, "MATCH_INVITE", summary, {
+        code, gameType, seats, hostId: me.id, hostName: me.name, ...(target === undefined ? {} : { target }),
+    }, {
+        push: msg(`notif.chat.card.body.MATCH_INVITE.${gameType}`, { seats: String(seats) }),
+        // url 은 **덮어쓰지 않는다** — 방으로 가야 카드의 [참가하기]를 누른다(온라인 대전과 반대다: 그쪽은 눌러서 바로 판으로 간다).
     });
 }));
 

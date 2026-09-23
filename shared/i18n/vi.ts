@@ -403,5 +403,10 @@ export const vi: Record<string, string> = {
   "notif.chat.card.body.GOLF_ROUND": "⛳ {name} · {n} gậy",
   "notif.golf.urgent.title": "⚡ Ghép sân gấp hôm nay lúc {time} · {region}",
   "notif.golf.urgent.body": "{course} · Phí sân ₩{fee} · còn {open} chỗ — phí xe và caddie chia đều",
+  "notif.chat.card.MATCH_INVITE": "🎱 {room} · Trận trên bàn",
+  "notif.chat.card.body.MATCH_INVITE.3c": "🎱 3 băng · {seats} người — vào từ phòng",
+  "notif.chat.card.body.MATCH_INVITE.4c": "🎱 4 bi · {seats} người — vào từ phòng",
+  "notif.game.started.title": "🎱 Trận đấu đã bắt đầu",
+  "notif.game.started.body": "{host} đã bắt đầu trận đấu. Mở bảng điểm.",
 };
 export default vi;

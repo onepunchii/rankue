@@ -188,7 +188,8 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                                     className="max-w-full"
                                                     onPointerDown={() => holdStart(m)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => { e.preventDefault(); if (canDelete?.(m)) onDelete?.(m); }}
                                                 >
-                                                    <ChatCard msg={m} onOpen={onOpenCard ? () => onOpenCard(m) : undefined} />
+                                                    {/* meId 는 매칭 대결 카드가 "내가 방장인가"를 가리는 데 쓴다 */}
+                                                    <ChatCard msg={m} meId={meId} onOpen={onOpenCard ? () => onOpenCard(m) : undefined} />
                                                 </div>
                                             ) : (
                                                 <span

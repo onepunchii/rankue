@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { HiqMember } from "@shared/schema";
@@ -25,7 +25,7 @@ import { LoginGate } from "@/components/hiq/LoginGate";
 import { LucideRefreshCw, LucideZap, ChevronUp, ChevronDown, LucideHome } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 
 // 서버 GET /api/hiq/rankings 는 항상 상위 20명만 잘라서 준다(getTopRankings(storeId, 20, type)).
 // 응답 길이가 이 값에 닿았다면 뒤에 몇 명이 더 있는지 알 수 없다.
@@ -133,10 +133,44 @@ function HiqDashboardBilliards() {
         setModalState(prev => ({ ...prev, [key]: value }));
     };
 
+    // 채팅의 매칭 대결 카드에서 방장이 이어받아 들어오는 길:
+    // /dashboard?match=<code>&gameType=<3c|4c>&seats=<n>&target=<n>
+    // 카드가 들고 있던 핀을 그대로 경기 만들기 화면에 넘긴다(새 핀을 만들면 카드의 코드가 죽는다).
+    const search = useSearch();
+    const [matchInvite, setMatchInvite] = useState<{ code: string; gameType?: "3c" | "4c"; seats?: number; target?: number } | null>(null);
+    const matchParamRef = useRef(false);
+
     const handleStartGameClick = (mode: "practice" | "match") => {
+        // 홈 버튼으로 여는 길은 예전 그대로 — 지난 카드의 핀을 물고 들어가지 않게 비운다.
+        setMatchInvite(null);
         setStartGameMode(mode);
         toggleModal('game', true);
     };
+
+    useEffect(() => {
+        // 로그인 전이면 주소를 건드리지 않는다 — LoginGate 가 이 주소로 되돌아와야 한다.
+        if (!member || matchParamRef.current) return;
+
+        const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+        const code = (params.get("match") || "").trim();
+        if (!code) return;
+        matchParamRef.current = true;
+
+        const rawType = params.get("gameType");
+        const seats = Number(params.get("seats"));
+        const target = Number(params.get("target"));
+        setMatchInvite({
+            code,
+            gameType: rawType === "3c" || rawType === "4c" ? rawType : undefined,
+            seats: Number.isFinite(seats) && seats >= 2 && seats <= 4 ? seats : undefined,
+            target: Number.isFinite(target) && target > 0 ? Math.round(target) : undefined,
+        });
+        setStartGameMode("match");
+        toggleModal('game', true);
+
+        // 주소는 바로 지운다. 안 그러면 새로고침·뒤로가기 때마다 이미 시작한 경기의 핀으로 또 열린다.
+        setLocation("/dashboard", { replace: true });
+    }, [member, search, setLocation]);
 
     if (isLoading) {
         return (
@@ -272,10 +306,18 @@ function HiqDashboardBilliards() {
             {/* Modals */}
             <GameCreationModal
                 open={modalState.game}
-                onOpenChange={(v) => toggleModal('game', v)}
+                onOpenChange={(v) => {
+                    toggleModal('game', v);
+                    // 닫으면 이어받은 핀도 놓는다 — 다음에 홈 버튼으로 열 때 죽은 코드를 물고 있으면 안 된다.
+                    if (!v) setMatchInvite(null);
+                }}
                 member={member}
                 history={history}
                 initialMode={startGameMode}
+                initialCode={matchInvite?.code}
+                initialGameType={matchInvite?.gameType}
+                initialSeats={matchInvite?.seats}
+                initialTarget={matchInvite?.target}
             />
 
             <PinCodeModal

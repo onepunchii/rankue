@@ -4,7 +4,8 @@
  * 폴링 2.5초, `after` 뒤만(새 게 없으면 빈 응답). 가려지면 쉰다. 보내면 즉시 말풍선, 실패는 빨갛게 눌러 재전송.
  * 읽음: 방을 열 때와 아래를 보고 있는 동안 새 메시지가 오면 "봤다". 카드형 메시지(정산·부킹 공유·+ 첨부)는 눌러서 이동.
  * 내 메시지(크루는 운영진도)는 길게 눌러 삭제.
- * + 첨부(2026-09-23): 종목별 카드(당구 대전 초대·경기 결과·매장, 골프 조인/부킹·랭큐매치 핀·라운드, 공통 내 기록) — 서버가 만들고 여기서는 끼우기만.
+ * + 첨부(2026-09-23): 종목별 카드(당구 매칭 대결·온라인 대전 초대·경기 결과·매장, 골프 조인/부킹·랭큐매치 핀·라운드) — 서버가 만들고 여기서는 끼우기만.
+ *   매칭 대결 카드만 예외로 **살아 있다** — 참가 수가 갱신되고 방장이 누르면 그 핀으로 매칭대결하기 화면을 이어받는다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
@@ -19,6 +20,7 @@ import { ChatRoom, type ChatMsg } from "@/components/hiq/chat/ChatRoom";
 import { cardKind } from "@/components/hiq/chat/ChatCard";
 import { AttachSheet, type AttachItem } from "@/components/hiq/chat/attach/AttachSheet";
 import { SimInviteSheet } from "@/components/hiq/chat/attach/SimInviteSheet";
+import { MatchInviteSheet } from "@/components/hiq/chat/attach/MatchInviteSheet";
 import { RecentGamesPicker } from "@/components/hiq/chat/attach/RecentGamesPicker";
 import { StorePicker } from "@/components/hiq/chat/attach/StorePicker";
 import { GolfListingPicker } from "@/components/hiq/chat/attach/GolfListingPicker";
@@ -202,6 +204,18 @@ export default function ChatRoomPage() {
     const openCard = useCallback((msg: ChatMsg) => {
         const md = (msg as any).metadata ?? {};
         switch (cardKind(msg)) {
+            // 매칭 대결: **방장만** 그 핀으로 매칭대결하기 화면을 이어받는다(자리 앉히고 시작).
+            // 참가는 카드 안 [참가하기] 버튼이 하므로, 방장이 아니면 아무 데도 가지 않는다.
+            case "MATCH_INVITE": {
+                if (!md.code || !member || String(md.hostId ?? "") !== member.id) break;
+                const q = new URLSearchParams({ match: String(md.code), gameType: md.gameType === "4c" ? "4c" : "3c", seats: String(Number(md.seats) || 2) });
+                if (md.target != null) q.set("target", String(md.target));
+                // /dashboard 는 두 종목이 함께 쓰는 주소다(sportForPath 가 null) — 저장된 선호가 골프면 골프 홈이 떠서
+                // ?match= 가 통째로 버려진다. 당구 카드를 눌렀으니 종목을 당구로 돌려놓고 간다.
+                setSport("BILLIARDS");
+                setLocation(`/dashboard?${q.toString()}`);
+                break;
+            }
             case "settlement": if (info.data?.crewId) setLocation(`/crew/${info.data.crewId}/home?settlement=${md.settlementId ?? ""}`); break;
             case "GOLF_BOOKING": if (md.bookingId) setLocation(`/golf/booking-list/${md.bookingId}`); break;
             case "SIM_INVITE": if (md.code) setLocation(`/online-game?join=${encodeURIComponent(String(md.code))}&auto=1`); break;
@@ -210,13 +224,14 @@ export default function ChatRoomPage() {
             case "GOLF_MATCH": if (md.pinCode) setLocation(`/golf/game/new?mode=join&pin=${encodeURIComponent(String(md.pinCode))}`); break;
             case "GOLF_ROUND": if (md.sessionId) setLocation(`/golf/game/${md.sessionId}/result`); break;
         }
-    }, [info.data, setLocation]);
+    }, [info.data, member, setLocation, setSport]);
 
     // + 첨부(2026-09-23): 종류를 고르면 서버가 카드를 만든다(가짜 카드 방지 — 보내기 라우트는 metadata 를 버린다).
     // 돌아온 행을 바로 목록에 끼운다 — 낙관 행은 없다(카드 값은 서버가 채운다).
     const [attachOpen, setAttachOpen] = useState(false);
     const [simBusy, setSimBusy] = useState(false);
-    const [picker, setPicker] = useState<null | "SIM_INVITE" | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND">(null);
+    const [matchBusy, setMatchBusy] = useState(false);
+    const [picker, setPicker] = useState<null | "MATCH_INVITE" | "SIM_INVITE" | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND">(null);
     // 경로의 종류는 metadata.type 과 같은 이름(SIM_INVITE·GAME_RESULT·…) — 서버 라우터(chatCards.ts)와 맞춘 계약.
     const postCard = useCallback(async (item: AttachItem, body: Record<string, unknown>, after?: (row: ChatMsg) => void) => {
         const myKey = key;
@@ -236,7 +251,6 @@ export default function ChatRoomPage() {
             // 온라인 대전: 종목을 고르면 카드를 올리고 **나는 곧바로 그 대기방으로** 간다(2026-09-23 오너).
             // 방 열쇠를 주소에 실어 로비가 그 방을 바로 연다 — 목록 스캔(최근 20건)에 맡기면 재사용한 옛 방을 못 찾아 만들기 폼이 뜬다.
             case "SIM_INVITE": setPicker("SIM_INVITE"); break;
-            case "MY_STATS": void postCard("MY_STATS", {}); break;
             default: setPicker(item);                                         // 고를 것이 있는 종류
         }
     }, [postCard, setLocation]);
@@ -322,6 +336,16 @@ export default function ChatRoomPage() {
             {canAttach && (
                 <>
                     <AttachSheet open={attachOpen} onOpenChange={setAttachOpen} sport={attachSport} roomKind={d.kind} onPick={onPickAttach} />
+                    {/* 매칭 대결: 카드가 핀을 들고 방에 남는다 — 방장은 이 자리를 뜨지 않고, 나중에 카드를 눌러 이어받는다.
+                        1:1 방은 자리가 둘뿐이라 인원 줄을 아예 안 그린다. */}
+                    <MatchInviteSheet
+                        open={picker === "MATCH_INVITE"} onOpenChange={(o) => { if (!o) setPicker(null); }} busy={matchBusy}
+                        seatsFixed={d?.kind === "dm" && (d?.members?.length ?? 0) === 2 ? 2 : undefined}
+                        onPick={(pick) => {
+                            setMatchBusy(true);
+                            void postCard("MATCH_INVITE", { ...pick }, () => { setPicker(null); }).finally(() => setMatchBusy(false));
+                        }}
+                    />
                     <SimInviteSheet
                         open={picker === "SIM_INVITE"} onOpenChange={(o) => { if (!o) setPicker(null); }} busy={simBusy}
                         onPick={(pick) => {

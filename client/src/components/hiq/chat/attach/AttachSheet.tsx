@@ -1,17 +1,20 @@
 /**
  * 채팅 입력줄 "+" → 종목별 첨부 고르기(2026-09-23 오너: "당구·골프 채팅에 각각 + 아이콘").
- * 사진은 용량 때문에 뺐고, 우리가 이미 가진 DB·자산만 카드로 붙인다 — 당구는 온라인 대전 초대·경기 결과·내 기록·매장,
- * 골프는 조인/부킹 글·랭큐매치 핀·라운드 결과·내 기록. 카드는 서버만 만들므로 여기서는 종류만 고른다.
+ * 사진은 용량 때문에 뺐고, 우리가 이미 가진 DB·자산만 카드로 붙인다 — 당구는 매칭 대결·온라인 대전 초대·경기 결과·매장,
+ * 골프는 조인/부킹 글·랭큐매치 핀·라운드 결과. 카드는 서버만 만들므로 여기서는 종류만 고른다.
+ *
+ * '내 기록'은 오너 지시로 **보내는 길만** 없앴다(2026-09-23) — 그 자리에 매칭 대결이 들어간다.
+ * 이미 방에 남아 있는 MY_STATS 카드는 그대로 그려져야 하므로 ChatCard 의 case 와 서버 라우트는 건드리지 않았다.
  *
  * 아래에서 올라오는 시트(Radix Sheet). 검색칸이 없어 키보드 회피 문제(FriendPicker 참고)가 없다 — 검색이 있는 매장 고르기는
  * 다른 시트가 맡는다.
  */
 import type { ComponentType } from "react";
-import { LucideGamepad2, LucideFlag, LucideBarChart3, LucideMapPin, LucideCalendarDays, LucideKeyRound, LucideTrophy } from "lucide-react";
+import { LucideGamepad2, LucideFlag, LucideSwords, LucideMapPin, LucideCalendarDays, LucideKeyRound, LucideTrophy } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useT } from "@/lib/i18n";
 
-export type AttachItem = "SIM_INVITE" | "GAME_RESULT" | "MY_STATS" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND";
+export type AttachItem = "MATCH_INVITE" | "SIM_INVITE" | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND";
 
 interface Props {
     open: boolean;
@@ -23,17 +26,18 @@ interface Props {
 
 /** 타일 정의 — 이름·설명은 t("chat.attach.<key>")·t("chat.attach.<key>Desc"). */
 const TILES: Record<AttachItem, { key: string; Icon: ComponentType<{ className?: string }> }> = {
+    MATCH_INVITE: { key: "matchInvite", Icon: LucideSwords },
     SIM_INVITE: { key: "simInvite", Icon: LucideGamepad2 },
     GAME_RESULT: { key: "gameResult", Icon: LucideFlag },
-    MY_STATS: { key: "myStats", Icon: LucideBarChart3 },
     STORE: { key: "store", Icon: LucideMapPin },
     GOLF_BOOKING: { key: "golfBooking", Icon: LucideCalendarDays },
     GOLF_MATCH: { key: "golfMatch", Icon: LucideKeyRound },
     GOLF_ROUND: { key: "golfRound", Icon: LucideTrophy },
 };
 
-const BILLIARDS_ITEMS: AttachItem[] = ["SIM_INVITE", "GAME_RESULT", "MY_STATS", "STORE"];
-const GOLF_ITEMS: AttachItem[] = ["GOLF_BOOKING", "GOLF_MATCH", "GOLF_ROUND", "MY_STATS"];
+// 실제 테이블에서 치는 매칭 대결이 먼저다 — 대화 중 "한 판 치자"가 제일 잦은 쓰임이라 첫 칸.
+const BILLIARDS_ITEMS: AttachItem[] = ["MATCH_INVITE", "SIM_INVITE", "GAME_RESULT", "STORE"];
+const GOLF_ITEMS: AttachItem[] = ["GOLF_BOOKING", "GOLF_MATCH", "GOLF_ROUND"];
 
 export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick }: Props) {
     const { t } = useT();

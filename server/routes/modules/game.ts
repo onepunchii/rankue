@@ -208,6 +208,29 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
     // after a dropped response (or an app backgrounding) hit an already-expired invite, and the
     // opponent silently vanished from the retried game. Consumption happens at FINISH instead —
     // one PIN still yields at most one completed ranked game, but starts stay retry-safe.
+
+    // 시작 알림(2026-09-23) — 지금까지 게스트에게는 아무 알림이 없었다. 핀을 넣고 "참가 완료" 토스트를 본 뒤
+    // 방장이 시작했는지 알 길이 없어, 옆 사람 폰을 들여다보거나 다시 핀을 넣어 보곤 했다. 눌러서 점수판으로 바로 간다.
+    // 서버리스는 응답을 보내는 순간 실행을 얼린다 → **응답 전에 await**(안 기다리면 푸시도 알림함 기록도 사라진다).
+    // 실패는 로그만 — 알림 때문에 시작된 경기를 되돌릴 수는 없다.
+    const startedGuests = [player2Id, player3Id, player4Id]
+        .filter((id): id is string => !!id && id !== player1Id);
+    if (startedGuests.length > 0) {
+        try {
+            await Promise.allSettled(startedGuests.map((gid) =>
+                notificationService.sendAndSaveNotification({
+                    memberId: gid,
+                    title: msg("notif.game.started.title"),
+                    body: msg("notif.game.started.body", { host: p1Name }),
+                    // 알림함은 종목으로 갈린다 — 골프로 저장되는 판도 이 라우트를 지나므로 gameType 을 따른다(종료 알림과 같다).
+                    category: game.gameType === "golf" ? "GOLF" : "BILLIARDS",
+                    type: "MATCH",
+                    params: { url: `/game/${game.id}` },
+                }).catch((err: any) => console.error("[GameStartNotif]", err))
+            ));
+        } catch (e) { console.error("[Notify] 경기 시작:", e); }
+    }
+
     return sendSuccess(res, game);
 }));
 
@@ -472,6 +495,18 @@ router.get("/settlements/:id", requireAuth, asyncHandler(async (req: AuthRequest
 router.post("/invite", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const code = await storage.createInvite(req.userId!);
     return sendSuccess(res, { code });
+}));
+
+/** 핀은 6자리 숫자다(createInvite). 형식이 틀리면 DB 를 보지 않고 자른다. */
+const INVITE_CODE_RE = /^\d{6}$/;
+
+// GET /invite/:code/status — 채팅의 '매칭 대결' 카드가 3초마다 묻는 대기실 상태.
+// 만료·소비·이미 시작된 핀도 404 가 아니라 alive:false 로 200 이다 — 카드는 사라지지 않고 "끝난 대결"로 그려진다.
+// 방 사람 누구나 부를 수 있다(이름은 채팅에서 이미 보인다). 아래 GET /invite/:code 는 방장 로비용이라 그대로 둔다.
+router.get("/invite/:code/status", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const code = String(req.params.code ?? "");
+    if (!INVITE_CODE_RE.test(code)) return sendError(res, 400, "err.game.inviteInvalid", "INVITE_INVALID");
+    return sendSuccess(res, await storage.getMatchInviteCardStatus(code, req.userId!));
 }));
 
 router.get("/invite/:code", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {

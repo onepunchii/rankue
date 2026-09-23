@@ -124,6 +124,9 @@ class Storage {
     async createInvite(id: string) { return this.games.createInvite(id); }
     async getInviteStatus(code: string) { return this.games.getInviteStatus(code); }
     async joinInvite(code: string, id: string) { return this.games.joinInvite(code, id); }
+    // 매칭 대결 카드(2026-09-23) — 카드가 핀을 들고 대기실 노릇을 한다.
+    async getLivePendingInvite(hostId: string, sport?: "BILLIARDS" | "GOLF") { return this.games.getLivePendingInvite(hostId, sport); }
+    async getMatchInviteCardStatus(code: string, viewerId: string) { return this.games.getMatchInviteCardStatus(code, viewerId); }
 
     // Crew
     async getCrew(id: string) { return this.crews.getCrew(id); }

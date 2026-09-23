@@ -27,6 +27,14 @@ interface GameCreationProps {
      *  2번 슬롯에 바로 앉힌다(오너 결정 2026-08-30: 8명 대회면 PIN 을 7번 주고받아야 한다).
      *  목표 점수는 여기서 강제하지 않는다 — 매칭 화면에서 그때그때 맞춘다. */
     tournamentMatch?: { matchId: string; opponent: HiqMember } | null;
+    /** 채팅의 매칭 대결 카드에서 이어받은 핀. 카드가 이미 그 코드를 들고 방에 떠 있으므로
+     *  여기서 새 핀을 만들면 카드에 적힌 코드와 화면의 코드가 갈린다 — 그대로 이어서 쓴다. */
+    initialCode?: string | null;
+    /** 카드가 정한 종목·자리 수·방장 목표. 세션이 열릴 때 한 번만 반영하고, 그 뒤 호스트가
+     *  고친 값은 절대 덮어쓰지 않는다. */
+    initialGameType?: "3c" | "4c";
+    initialSeats?: number;
+    initialTarget?: number;
 }
 
 // hiq_games 스키마의 슬롯은 player1~4가 전부다. 그 이상으로 늘려봐야 저장될 자리가 없어
@@ -80,7 +88,18 @@ const calculateRecordAverage = (history: HiqGameHistory[] | undefined, type: '3c
     return totalInnings > 0 ? (totalScore / totalInnings).toFixed(3) : (defaultAvg || "0.000");
 };
 
-export const useGameCreation = ({ member, history, initialMode = "practice", initialType = "4c", open = true, tournamentMatch = null }: GameCreationProps) => {
+export const useGameCreation = ({
+    member,
+    history,
+    initialMode = "practice",
+    initialType = "4c",
+    open = true,
+    tournamentMatch = null,
+    initialCode = null,
+    initialGameType,
+    initialSeats,
+    initialTarget,
+}: GameCreationProps) => {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const { t } = useT();
@@ -117,26 +136,39 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
     const [finishTargetCount, setFinishTargetCount] = useState(1);
     const [usePbaRule, setUsePbaRule] = useState(false);
 
+    // 이어받은 핀이 실제로 state 에 들어갔는지. 아래 민팅 효과는 이 커밋에서 initializeGame 보다
+    // 먼저 돌기 때문에, 이 표시가 없으면 카드의 핀이 앉기 전에 새 핀을 하나 더 만들어버린다.
+    const inheritedCommittedRef = useRef(false);
+
     // Initialize logic
     const initializeGame = useCallback(() => {
         if (member) {
-            const recordAvg = calculateRecordAverage(history, gameType, memberAvgForType(member, gameType));
-            const initialTarget = calculateTargetScore(recordAvg, gameType);
+            // 채팅 카드에서 이어받았다면 카드가 정한 종목·자리 수가 이 세션의 출발점이다.
+            // 세션이 열릴 때 딱 한 번 — 그 뒤 호스트가 고른 값은 건드리지 않는다.
+            const type = initialGameType ?? gameType;
+            if (type !== gameType) setGameType(type);
+
+            const seats = initialSeats ? Math.min(MAX_PLAYERS, Math.max(1, initialSeats)) : numberOfPlayers;
+            if (seats !== numberOfPlayers) setNumberOfPlayersInternal(seats);
+
+            const recordAvg = calculateRecordAverage(history, type, memberAvgForType(member, type));
+            // 카드에 적어 보낸 목표가 있으면 그것이 방장의 목표다(핸디를 카드에서 이미 맞췄다).
+            const hostTarget = initialTarget && initialTarget > 0 ? initialTarget : calculateTargetScore(recordAvg, type);
 
             // 대진 경기는 상대가 정해져 있다 — 2인 고정으로 앉히고 상대 목표는 그 사람 기록으로.
             setPlayers(tournamentMatch
                 ? [
-                    { type: 'member', member, name: member.name, target: initialTarget, isHost: true },
+                    { type: 'member', member, name: member.name, target: hostTarget, isHost: true },
                     {
                         type: 'member',
                         member: tournamentMatch.opponent,
                         name: tournamentMatch.opponent.name,
-                        target: calculateTargetScore(memberAvgForType(tournamentMatch.opponent, gameType), gameType),
+                        target: calculateTargetScore(memberAvgForType(tournamentMatch.opponent, type), type),
                     },
                 ]
                 : [
-                    { type: 'member', member, name: member.name, target: initialTarget, isHost: true },
-                    ...Array(numberOfPlayers - 1).fill({ type: 'guest', target: DEFAULT_GUEST_TARGET, name: '' })
+                    { type: 'member', member, name: member.name, target: hostTarget, isHost: true },
+                    ...Array(seats - 1).fill({ type: 'guest', target: DEFAULT_GUEST_TARGET, name: '' })
                 ]);
 
             // Drop any previous PIN so each new session mints a fresh one.
@@ -144,12 +176,17 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
             // this in the same tick as setGameMode(initialMode), so `gameMode` in this closure is
             // still the PREVIOUS value. Reading it here silently skipped PIN creation for match
             // games. The effect below owns creation and reacts to the settled gameMode instead.
-            setInviteCode(null);
+            // 예외는 채팅 카드에서 이어받은 핀뿐이다 — 그건 이미 살아 있으니 그대로 쓴다.
+            setInviteCode(initialCode ?? null);
+            inheritedCommittedRef.current = !!initialCode;
+            // 이어받은 핀은 지난 세션이 남긴 오류 문구를 덮어쓴다(코드가 멀쩡한데 '실패'가 남아 있으면 안 된다).
+            if (initialCode) setInviteError(null);
             setDismissedIds([]);
             // 새 세션이므로 인원 수 수동 선택 기록도 초기화한다.
-            playerCountTouchedRef.current = false;
+            // 단, 카드가 자리 수를 정해 왔다면 그건 방장이 이미 고른 값이다 — 폴링이 늘리지 못하게 둔다.
+            playerCountTouchedRef.current = !!initialSeats;
         }
-    }, [member, history, gameType, numberOfPlayers, tournamentMatch]);
+    }, [member, history, gameType, numberOfPlayers, tournamentMatch, initialCode, initialGameType, initialSeats, initialTarget]);
 
     // Mint the match PIN whenever we're in match mode without one.
     // Keyed on the settled gameMode, so it works even when the mode is set in the same tick
@@ -177,6 +214,11 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
         // silently re-minting in a loop.
         if (inviteCode || inviteError || invitePendingRef.current) return;
 
+        // 채팅 카드에서 이어받은 핀은 initializeGame 이 넣는다. 이 효과가 같은 커밋에서 먼저 돌기
+        // 때문에 여기서 막지 않으면 카드의 코드가 앉기 전에 새 핀이 하나 더 생긴다.
+        // (만료 404 뒤 '다시 시도'는 이 표시가 이미 서 있어 정상적으로 새 핀을 만든다.)
+        if (initialCode && !inheritedCommittedRef.current) return;
+
         invitePendingRef.current = true;
         apiRequest("/api/hiq/invite", { method: "POST" })
             .then(res => setInviteCode(res.code))
@@ -186,12 +228,14 @@ export const useGameCreation = ({ member, history, initialMode = "practice", ini
                 setInviteError(t("gameCreation.pinCreateFail"));
             })
             .finally(() => { invitePendingRef.current = false; });
-    }, [open, gameMode, member, inviteCode, inviteError, tournamentMatch]);
+    }, [open, gameMode, member, inviteCode, inviteError, tournamentMatch, initialCode]);
 
     // Clearing the code + error re-triggers the mint effect above.
     const retryInvite = useCallback(() => {
         setInviteError(null);
         setInviteCode(null);
+        // 이어받은 핀이 만료돼 다시 시도를 누른 것이므로, 이제부터는 새 핀을 만들어야 한다.
+        inheritedCommittedRef.current = true;
     }, []);
 
     // Update Player Count

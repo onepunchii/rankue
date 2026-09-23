@@ -21,6 +21,12 @@ interface GameCreationModalProps {
     initialType?: "3c" | "4c";
     /** 크루 토너먼트 대진에서 열었을 때. 상대가 이미 정해져 있어 PIN 단계를 건너뛴다. */
     tournamentMatch?: { matchId: string; opponent: HiqMember } | null;
+    /** 채팅의 매칭 대결 카드를 방장이 눌러 들어왔을 때. 카드가 들고 있던 핀을 그대로 이어받고
+     *  (새 핀을 만들지 않는다), 카드가 정한 종목·자리 수·목표를 세션의 첫 상태로 쓴다. */
+    initialCode?: string;
+    initialGameType?: "3c" | "4c";
+    initialSeats?: number;
+    initialTarget?: number;
 }
 
 // Sub-component for individual Player Card (Internal to this file for now to keep context easy)
@@ -181,7 +187,7 @@ const PlayerCard = ({
     );
 };
 
-export const GameCreationModal = ({ open, onOpenChange, member, history, initialMode, initialType, tournamentMatch = null }: GameCreationModalProps) => {
+export const GameCreationModal = ({ open, onOpenChange, member, history, initialMode, initialType, tournamentMatch = null, initialCode, initialGameType, initialSeats, initialTarget }: GameCreationModalProps) => {
     const { t } = useT();
 
     // Connect logic hook
@@ -196,7 +202,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
         usePbaRule, setUsePbaRule,
         initializeGame,
         confirmStart, isStarting
-    } = useGameCreation({ member, history, initialMode, initialType, open, tournamentMatch });
+    } = useGameCreation({ member, history, initialMode, initialType, open, tournamentMatch, initialCode, initialGameType, initialSeats, initialTarget });
 
     // Keep a live ref to initializeGame so the open-effect can invoke the latest version
     // WITHOUT depending on it (initializeGame is recreated whenever gameType / numberOfPlayers
