@@ -56,11 +56,17 @@ const STATUS: Record<string, { label: string; cls: string }> = {
     noshow: { label: "안 옴", cls: "bg-red-500/15 text-red-400" },
 };
 
+/**
+ * 목록 카드(BookingCard)와 **같은 규칙**이어야 한다 — 두 화면이 같은 글을 다르게 부르면 안 된다.
+ * '매장' 은 안 그린다: 부킹은 거의 다 업체가 올려서 모든 줄에 같은 글자가 반복될 뿐이고,
+ * '매장' 은 당구 말이라 골프에서 뜻이 안 통했다(2026-09-23 오너). 예외인 '개인 양도'만 알린다.
+ */
 function Badge({ item }: { item: any }) {
     if (item.listingType === "JOIN") return <JoinTypeBadge type={joinTypeOf(item)} />;
+    if (item.sellerType !== "PERSONAL") return null;
     return (
-        <span className={cn("px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold", item.sellerType === "PERSONAL" ? "bg-[#4DA3FF]/15 text-[#7CBBFF]" : "bg-[#64DD17]/15 text-[#8BE84A]")}>
-            {item.sellerType === "PERSONAL" ? "개인 양도" : "매장"}
+        <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold bg-[#4DA3FF]/15 text-[#7CBBFF]">
+            개인 양도
         </span>
     );
 }
