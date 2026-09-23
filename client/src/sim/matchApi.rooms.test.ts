@@ -5,7 +5,7 @@ import { DEFAULT_3C_RULES } from "@shared/sim/rules";
 import { buildConfig } from "./setupPresets";
 import {
     classifyMatchError, createMatchApi, isValidRoomPassword, matchErrorCode, parseMatch, parseOpponents, toCreateMatchBody, toJoinBody,
-    roomsUrl, matchJoinByIdUrl, matchInviteUrl, opponentsUrl,
+    roomsUrl, matchJoinByIdUrl, matchInviteUrl, simOpponentsUrl,
 } from "./matchApi";
 
 const config = buildConfig({ gameType: "3c", target: 15 });
@@ -40,8 +40,14 @@ describe("matchApi · 멀티방·비밀번호·초대", () => {
         const plain = parseMatch(raw);
         expect([plain.isPublic, plain.hasPassword]).toEqual([undefined, undefined]);
         expect(parseMatch({ ...raw, code: "" }).code).toBe("");
-        expect(parseOpponents([{ id: "a", name: "가", handi3c: 18, handi4c: null }, { id: 1 }, null, { id: "b", name: "나" }])).toEqual([
-            { id: "a", name: "가", handi3c: 18, handi4c: null }, { id: "b", name: "나", handi3c: null, handi4c: null },
+        // 2026-09-23: 초대 목록은 실전 다마수가 아니라 **온라인 대전 에버리지·랭킹**을 싣는다(GET /sim/opponents).
+        const z = { avg: 0, target: 0, matches: 0, fromRecord: false, rank: null, rankTotal: null };
+        expect(parseOpponents([
+            { id: "a", name: "가", friend: true, b3c: { avg: 0.447, target: 15, matches: 10, fromRecord: true, rank: 5, rankTotal: 40 }, b4c: null },
+            { id: 1 }, null, { id: "b", name: "나" },
+        ])).toEqual([
+            { id: "a", name: "가", friend: true, b3c: { avg: 0.447, target: 15, matches: 10, fromRecord: true, rank: 5, rankTotal: 40 }, b4c: z },
+            { id: "b", name: "나", friend: false, b3c: z, b4c: z },
         ]);
         expect(parseOpponents("x")).toEqual([]);
     });
@@ -58,7 +64,7 @@ describe("matchApi · 멀티방·비밀번호·초대", () => {
             calls.push({ url, method: options?.method, body: options?.body });
             if (url === roomsUrl()) return [{ ...raw, code: "", isPublic: true }];
             if (url === matchInviteUrl("m1")) return { name: "친구" };
-            if (url === opponentsUrl()) return [{ id: "o1", name: "친구", handi3c: 20, handi4c: 80 }];
+            if (url === simOpponentsUrl()) return [{ id: "o1", name: "친구", friend: true, b3c: { avg: 0.5, target: 15, matches: 4, fromRecord: true, rank: 2, rankTotal: 9 }, b4c: null }];
             return { ...raw, status: "playing", myIndex: 1 };
         });
         const rooms = await api.listRooms();
@@ -68,7 +74,8 @@ describe("matchApi · 멀티방·비밀번호·초대", () => {
         expect(calls[1]).toEqual({ url: matchJoinByIdUrl("m1"), method: "POST", body: { target: 18, password: "pw" } });
         expect(await api.invite("m1", "o1")).toEqual({ name: "친구" });
         expect(calls[2].body).toEqual({ memberId: "o1" });
-        expect((await api.listOpponents())[0]).toMatchObject({ id: "o1", handi4c: 80 });
+        // 배치 전(rank null)·기록 없음도 0 으로 채워 화면이 분기 없이 그린다
+        expect((await api.listOpponents())[0]).toMatchObject({ id: "o1", friend: true, b3c: { avg: 0.5, rank: 2 }, b4c: { avg: 0, rank: null } });
         await api.createMatch(config, { isPublic: true, password: "1234" });
         expect(calls[4].body).toMatchObject({ isPublic: true, password: "1234" });
         await api.joinMatch("123456", 15, "abcd");

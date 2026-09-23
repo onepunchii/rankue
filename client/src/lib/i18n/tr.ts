@@ -2784,5 +2784,7 @@ const tr: Dict = {
   "chat.attach.simInviteSameNote": "İkiniz de aynı sayıya oynar. Aynı ayarlarla açık odan varsa o kullanılır.",
   "golf.urgentRibbon": "⚡ Acil",
   "golf.urgentNote": "Araç ve kedi ücreti sahada paylaşılır",
+  "sim.match.inviteRival": "Rakip",
+  "sim.match.inviteHandiNote": "Ortalama ve sıralama çevrimiçi maçlardan gelir. Soluk değerler varsayılandır; sıralama 3 maçtan sonra başlar.",
 };
 export default tr;

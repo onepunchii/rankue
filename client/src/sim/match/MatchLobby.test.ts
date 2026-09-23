@@ -113,7 +113,11 @@ function fakeApi(over: Partial<MatchApi> = {}): MatchApi {
         listRooms: vi.fn(async () => []),
         joinRoom: vi.fn(async () => match({ status: "playing", myIndex: 1 })),
         invite: vi.fn(async () => ({ name: "홍길동" })),
-        listOpponents: vi.fn(async () => [{ id: "op-1", name: "홍길동", handi3c: 20, handi4c: 80 }, { id: "op-2", name: "김철수", handi3c: null, handi4c: null }]),
+        // 2026-09-23: 초대 목록은 온라인 대전 에버리지·랭킹을 싣는다(GET /sim/opponents). 라이벌이 먼저 온다.
+        listOpponents: vi.fn(async () => [
+            { id: "op-1", name: "홍길동", friend: true, b3c: { avg: 0.447, target: 15, matches: 10, fromRecord: true, rank: 5, rankTotal: 40 }, b4c: { avg: 1.067, target: 120, matches: 10, fromRecord: true, rank: 3, rankTotal: 40 } },
+            { id: "op-2", name: "김철수", friend: false, b3c: { avg: 0.3, target: 10, matches: 0, fromRecord: false, rank: null, rankTotal: null }, b4c: { avg: 0.6, target: 60, matches: 0, fromRecord: false, rank: null, rankTotal: null } },
+        ]),
         // 2026-09-12 핸디전: 방 만들기 화면이 "내 다마수" 를 물어본다
         getMyHandicap: vi.fn(async () => ({ minInnings: 20, innings: 18, boards: [
             { gameType: "3c" as const, avg: 0.4, target: 7, matches: 8, innings: 40, fromRecord: true },
@@ -353,6 +357,10 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
         click(Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent?.includes("홍길동"))!);
         await flush();
         expect(api.invite).toHaveBeenCalledWith("m-1", "op-1");
+        // 에버리지·랭킹이 보이고(기록 있는 사람), 배치 전(op-2)에는 순위가 없다
+        expect(dlg.textContent).toContain("0.447");
+        expect(dlg.textContent).toContain("#5");
+        expect(dlg.textContent).toContain(ko["sim.match.inviteRival"]);
         expect(h.container.textContent).toContain(ko["sim.match.inviteSent"].replace("{name}", "홍길동"));
     });
 

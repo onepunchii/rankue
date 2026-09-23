@@ -4,6 +4,7 @@
  * 불변: 실전 경기 테이블·마감 함수·회원 성적 컬럼은 여기서 절대 참조하지 않는다(sim.guard.test.ts).
  */
 import { Router } from "express";
+import { PLACEMENT_MATCHES } from "../../../shared/sim/rank.js";
 import { createHash, randomBytes } from "crypto";
 import { z } from "zod";
 import { storage } from "../../storage/index.js";
@@ -395,6 +396,60 @@ router.get("/sim/handicap", requireAuth, asyncHandler(async (req: AuthRequest, r
         };
     }));
     return sendSuccess(res, { minInnings: MIN_INNINGS, innings: TARGET_INNINGS, boards: out });
+}));
+
+/**
+ * GET /sim/opponents — 초대 목록(2026-09-23 오너: "친구 목록에 3쿠션·4구 온라인게임 핸디가 안 나온다").
+ *
+ * 왜 실전 상대 목록(/opponents)을 그대로 안 쓰나: 거기 실린 다마수 칸은 **자기가 적는 실전 값**이라
+ * 회원 107명 중 2명·6명만 값이 있다(실측) — 목록이 거의 전부 "–" 가 된다. 게다가 온라인 대전은 기본이 핸디전이라
+ * 실제로 쓰는 값은 **온라인 기록으로 매긴 다마수**다. 그래서 여기서 그 값을 계산해 함께 준다.
+ * 이름·id 만 읽는 가벼운 질의를 쓴다 — 시뮬레이터는 실전 성적을 읽지도 쓰지도 않는다(sim.guard.test).
+ * 라이벌(친구)을 앞에 두고 같은 매장 회원을 뒤에 붙인다 — 화면 이름이 '친구에게 보내기' 다.
+ */
+router.get("/sim/opponents", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const me = await storage.getMemberById(req.userId!);
+    if (!me) return sendError(res, 404, "err.member.notFound");
+    const [friendIds, mates] = await Promise.all([
+        storage.listFriendIds(req.userId!, "BILLIARDS"),
+        storage.listStoreMemberNames(me.storeId, me.id),
+    ]);
+    const isFriend = new Set(friendIds);
+    // 라이벌이 위로 — 화면 이름이 '친구에게 보내기' 다. 그 안에서는 매장 목록 순서(최근 방문)를 지킨다.
+    const rows = mates
+        .filter((m) => m.id !== req.userId)
+        .map((m) => ({ id: m.id, name: m.name, friend: isFriend.has(m.id) }))
+        .sort((a, b) => Number(b.friend) - Number(a.friend));
+    const ids = rows.slice(0, 100).map((r) => r.id);   // 한 번에 보여 줄 만큼만 계산한다
+    const [rec3, rec4, rank3, rank4] = await Promise.all([
+        storage.simMatch.recentMatchRecords(ids, "3c", RECENT_MATCHES),
+        storage.simMatch.recentMatchRecords(ids, "4c", RECENT_MATCHES),
+        storage.sim.ranksFor(ids, "3c", PLACEMENT_MATCHES),
+        storage.sim.ranksFor(ids, "4c", PLACEMENT_MATCHES),
+    ]);
+    const board = (
+        id: string, gameType: "3c" | "4c",
+        rec: Map<string, { score: number; innings: number; matches: number }>,
+        rk: Map<string, { rank: number; total: number; matches: number }>,
+    ) => {
+        const record = rec.get(id) ?? { score: 0, innings: 0, matches: 0 };
+        const pointUnit = pointUnitOf(gameType === "4c" ? DEFAULT_4C_RULES : DEFAULT_3C_RULES);
+        const avg = playerAverage({ gameType, pointUnit, record });
+        const r = rk.get(id);
+        return {
+            // 오너가 보고 싶어 한 값(2026-09-23): 핸디전의 근거인 **에버리지**와 **랭킹**. target 은 참고로 함께.
+            avg: Math.round(avg * 1000) / 1000,
+            target: targetFor(avg, gameType, pointUnit),
+            matches: record.matches,
+            fromRecord: hasEnoughRecord(record),
+            // 배치(3판) 전이면 사다리에 없다 — null 이면 화면이 순위를 안 그린다.
+            rank: r?.rank ?? null, rankTotal: r?.total ?? null,
+        };
+    };
+    return sendSuccess(res, rows.slice(0, 100).map((r) => ({
+        id: r.id, name: r.name, friend: r.friend,
+        b3c: board(r.id, "3c", rec3, rank3), b4c: board(r.id, "4c", rec4, rank4),
+    })));
 }));
 
 // POST /sim/matches/code/:code/join — 게스트 참가 → 시작

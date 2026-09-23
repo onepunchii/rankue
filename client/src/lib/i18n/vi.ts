@@ -2784,5 +2784,7 @@ const vi: Dict = {
   "chat.attach.simInviteSameNote": "Cả hai chơi cùng điểm. Nếu bạn đã có phòng cùng thiết lập thì dùng lại.",
   "golf.urgentRibbon": "⚡ Gấp",
   "golf.urgentNote": "Phí xe và caddie chia đều tại sân",
+  "sim.match.inviteRival": "Đối thủ",
+  "sim.match.inviteHandiNote": "Trung bình và thứ hạng lấy từ trận trực tuyến. Giá trị mờ là mặc định; xếp hạng bắt đầu sau 3 trận.",
 };
 export default vi;

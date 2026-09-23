@@ -52,6 +52,8 @@ class Storage {
     async deleteAccount(memberId: string) { return this.users.deleteAccount(memberId); }
     async updateProfile(id: string, data: any) { return this.users.updateProfile(id, data); }
     async getFriends(id: string, sport?: string) { return this.users.getFriends(id, sport); }
+    async listStoreMemberNames(storeId: string, excludeId: string, limit?: number) { return this.users.listStoreMemberNames(storeId, excludeId, limit); }
+    async listFriendIds(id: string, sport?: "BILLIARDS" | "GOLF") { return this.users.listFriendIds(id, sport); }
     async isFriend(id: string, otherId: string, sport?: "BILLIARDS" | "GOLF") { return this.users.isFriend(id, otherId, sport); }
     async requestFriend(reqId: string, recId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS") { return this.users.requestFriend(reqId, recId, sport); }
     async getStoreMembersWithStats(id: string) { return this.users.getStoreMembersWithStats(id); }

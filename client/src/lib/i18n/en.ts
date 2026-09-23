@@ -2784,5 +2784,7 @@ const en: Dict = {
   "chat.attach.simInviteSameNote": "Both play to the same score. An open room with the same settings is reused.",
   "golf.urgentRibbon": "⚡ Urgent",
   "golf.urgentNote": "Cart & caddie fees split on site",
+  "sim.match.inviteRival": "Rival",
+  "sim.match.inviteHandiNote": "Averages and ranks come from online matches. Dimmed values are defaults; ranking starts after 3 games.",
 };
 export default en;

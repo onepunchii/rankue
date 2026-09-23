@@ -219,6 +219,27 @@ export class SimRepository {
      * 온라인 대전 랭킹(종목·테이블별). 배치(대전 3판) 를 마친 선수만 순위에 오르고, 전체 순위는 국가 필터와 무관하게 전역이다.
      * country 가 있으면 그 나라 행만 돌려준다(순위 번호는 전역 그대로 + 국가 순위). me 는 배치 전이어도 레이팅·판 수를 준다.
      */
+    /**
+     * 여러 사람의 온라인 대전 순위를 **한 번에**(초대 목록). 정렬·배치 조건은 rankLadder 와 **글자 그대로 같아야** 한다 —
+     * 다르면 초대 목록의 #5 와 랭킹 화면의 #5 가 다른 사람이 된다.
+     * 배치(matches < placement) 전이면 그 사람은 사다리에 없다 → Map 에 없음(화면이 순위를 안 그린다).
+     */
+    async ranksFor(memberIds: readonly string[], gameType: "3c" | "4c", placement = 3): Promise<Map<string, { rank: number; total: number; matches: number }>> {
+        const out = new Map<string, { rank: number; total: number; matches: number }>();
+        if (memberIds.length === 0) return out;
+        const ids = [...new Set(memberIds)];
+        const ranked = sql`
+            select r.member_id, r.matches,
+                   rank() over (order by r.rating desc, r.wins desc, r.matches asc) as rank,
+                   count(*) over () as total
+            from hiq_sim_match_ratings r join hiq_members mem on mem.id = r.member_id
+            where r.game_type = ${gameType} and r.matches >= ${placement}`;
+        const rows = (await db.execute(sql`
+            select * from (${ranked}) x where x.member_id in ${ids}`)).rows as Record<string, unknown>[];
+        for (const r of rows) out.set(String(r.member_id), { rank: Number(r.rank ?? 0), total: Number(r.total ?? 0), matches: Number(r.matches ?? 0) });
+        return out;
+    }
+
     async rankLadder(memberId: string, gameType: "3c" | "4c", country: string | null, limit = 100, placement = 3) {
         // 2026-09-12: 대대·중대를 합친 hiq_sim_match_ratings 를 본다(오너 지시). 테이블 구분은 사다리에서 사라졌다.
         const ranked = sql`

@@ -145,6 +145,42 @@ export class SimMatchRepository {
      * 방장은 players[0], 게스트는 players[1] 이다(세션을 만들 때 그 순서로 넣는다 — joinAndStart).
      * 기권·무응답으로 끝난 판도 친 만큼은 기록이라 그대로 센다.
      */
+    /**
+     * 여러 사람의 최근 기록을 **한 번에**. 초대 목록이 사람마다 recentMatchRecord 를 부르면 50번 질의가 된다.
+     * 사람당 limit 판까지만 세는 건 같다 — 끝난 순서로 받아 JS 에서 사람별로 끊는다.
+     */
+    async recentMatchRecords(memberIds: readonly string[], gameType: "3c" | "4c", perMember: number): Promise<Map<string, { score: number; innings: number; matches: number }>> {
+        const out = new Map<string, { score: number; innings: number; matches: number }>();
+        if (memberIds.length === 0) return out;
+        const ids = [...new Set(memberIds)];
+        for (const id of ids) out.set(id, { score: 0, innings: 0, matches: 0 });
+        const rows = await db.select({ hostId: hiqSimMatches.hostId, guestId: hiqSimMatches.guestId, state: hiqSimMatches.state })
+            .from(hiqSimMatches)
+            .where(and(
+                eq(hiqSimMatches.status, "finished"),
+                eq(hiqSimMatches.gameType, gameType),
+                or(inArray(hiqSimMatches.hostId, ids as string[]), inArray(hiqSimMatches.guestId, ids as string[])),
+                sql`${hiqSimMatches.state} is not null`,
+            ))
+            .orderBy(desc(hiqSimMatches.finishedAt))
+            .limit(Math.max(1, Math.min(ids.length * perMember, 2000)));
+        for (const r of rows) {
+            const players = (r.state as { players?: { score?: number; innings?: number }[] } | null)?.players;
+            if (!players) continue;
+            for (const [idx, id] of [[0, r.hostId], [1, r.guestId]] as const) {
+                if (!id || !out.has(id)) continue;
+                const acc = out.get(id)!;
+                if (acc.matches >= perMember) continue;   // 사람당 최근 perMember 판까지만
+                const p = players[idx];
+                if (!p) continue;
+                acc.score += p.score ?? 0;
+                acc.innings += p.innings ?? 0;
+                acc.matches += 1;
+            }
+        }
+        return out;
+    }
+
     async recentMatchRecord(memberId: string, gameType: "3c" | "4c", limit: number): Promise<{ score: number; innings: number; matches: number }> {
         const rows = await db.select({ hostId: hiqSimMatches.hostId, state: hiqSimMatches.state })
             .from(hiqSimMatches)

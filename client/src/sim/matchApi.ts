@@ -85,6 +85,10 @@ export function matchJoinByIdUrl(id: string): string {
 export function matchInviteUrl(id: string): string {
     return `${SIM_API_BASE}/matches/${encodeURIComponent(id)}/invite`;
 }
+export function simOpponentsUrl(): string {
+    return `${SIM_API_BASE}/opponents`;
+}
+
 export function opponentsUrl(): string {
     return "/api/hiq/opponents";
 }
@@ -347,11 +351,25 @@ export interface JoinMatchBody {
 }
 
 /** 초대 보낼 수 있는 상대(GET /api/hiq/opponents 의 필요한 부분만). */
+/**
+ * 초대 목록 한 줄(GET /sim/opponents). 전부 **온라인 대전** 값이다 — 자기가 적는 실전 다마수가 아니다.
+ * avg: 핸디전의 근거인 에버리지 · target: 그 에버리지로 매긴 목표 · rank: 온라인 랭킹(배치 3판 전이면 null).
+ */
+export interface OpponentBoard {
+    readonly avg: number;
+    readonly target: number;
+    readonly matches: number;
+    /** 기록으로 매긴 값인가 — false 면 아직 종목 기본값이다(화면이 흐리게 그린다). */
+    readonly fromRecord: boolean;
+    readonly rank: number | null;
+    readonly rankTotal: number | null;
+}
 export interface OpponentLite {
     readonly id: string;
     readonly name: string;
-    readonly handi3c: number | null;
-    readonly handi4c: number | null;
+    readonly friend: boolean;
+    readonly b3c: OpponentBoard;
+    readonly b4c: OpponentBoard;
 }
 
 /* ------------------------------------------------------------------ 요청 매핑 */
@@ -384,16 +402,25 @@ export function toJoinBody(target?: number, password?: string): JoinMatchBody {
     return body;
 }
 
+const board = (v: unknown): OpponentBoard => {
+    const o = isRecord(v) ? v : {};
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    return {
+        avg: num(o.avg),
+        target: num(o.target),
+        matches: num(o.matches),
+        fromRecord: o.fromRecord === true,
+        rank: typeof o.rank === "number" && Number.isFinite(o.rank) && o.rank > 0 ? o.rank : null,
+        rankTotal: typeof o.rankTotal === "number" && Number.isFinite(o.rankTotal) ? o.rankTotal : null,
+    };
+};
+
 export function parseOpponents(raw: unknown): readonly OpponentLite[] {
     if (!Array.isArray(raw)) return [];
     const out: OpponentLite[] = [];
     for (const r of raw) {
         if (!isRecord(r) || typeof r.id !== "string" || typeof r.name !== "string") continue;
-        out.push({
-            id: r.id, name: r.name,
-            handi3c: typeof r.handi3c === "number" ? r.handi3c : null,
-            handi4c: typeof r.handi4c === "number" ? r.handi4c : null,
-        });
+        out.push({ id: r.id, name: r.name, friend: r.friend === true, b3c: board(r.b3c), b4c: board(r.b4c) });
     }
     return out;
 }
@@ -738,7 +765,7 @@ export function createMatchApi(request: RequestFn): MatchApi {
             return { name: isRecord(raw) && typeof raw.name === "string" ? raw.name : "" };
         },
         async listOpponents() {
-            return parseOpponents(await request(opponentsUrl(), { method: "GET" }));
+            return parseOpponents(await request(simOpponentsUrl(), { method: "GET" }));
         },
         async getMatch(id, opts) {
             return parseMatch(await request(opts?.ack ? matchAckUrl(id) : matchUrl(id), { method: "GET" }));

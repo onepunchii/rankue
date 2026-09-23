@@ -255,6 +255,32 @@ export class UserRepository {
         return enhancedMembers;
     }
 
+    /**
+     * 초대 목록용 **이름만** — 온라인 대전(simMatch)이 쓴다.
+     * getAvailableOpponents 는 실전 다마수·에버리지·레이팅 칸을 통째로 실어 오는데, 시뮬레이터는 그 값을 읽지도 쓰지도
+     * 않는다는 게 규칙이다(sim.guard.test, 2026-08-30 오염 사고). 그래서 여기서는 id·이름만 뽑는다.
+     */
+    async listStoreMemberNames(storeId: string, excludeId: string, limit = 200): Promise<{ id: string; name: string }[]> {
+        const rows = await db.select({ id: hiqMembers.id, name: hiqMembers.name, updatedAt: hiqMembers.updatedAt })
+            .from(hiqMembers)
+            .where(and(eq(hiqMembers.storeId, storeId), ne(hiqMembers.id, excludeId)))
+            .orderBy(desc(hiqMembers.updatedAt), hiqMembers.name)
+            .limit(limit);
+        return rows.map((r) => ({ id: String(r.id), name: r.name }));
+    }
+
+    /** 친구 id 만 — getFriends 는 친구마다 상대전적을 계산한다(N+1). 목록 정렬에만 쓸 때는 이걸 쓴다. */
+    async listFriendIds(memberId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<string[]> {
+        const rows = await db.select({ a: hiqFriendships.requesterId, b: hiqFriendships.receiverId })
+            .from(hiqFriendships)
+            .where(and(
+                eq(hiqFriendships.sportCategory, sport),
+                eq(hiqFriendships.status, "accepted"),
+                or(eq(hiqFriendships.requesterId, memberId), eq(hiqFriendships.receiverId, memberId)),
+            ));
+        return rows.map((r) => (String(r.a) === memberId ? String(r.b) : String(r.a)));
+    }
+
     async getAvailableOpponents(storeId: string, currentUserId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<any[]> {
         const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
 
