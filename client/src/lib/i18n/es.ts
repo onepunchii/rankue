@@ -1190,7 +1190,7 @@ const es: Dict = {
   "pinReset.successDesc1": "Ya puedes iniciar sesión",
   "pinReset.successDesc2": "con tu nuevo PIN.",
   "pinReset.title": "Restablecer PIN",
-  "playerCard.bankShot": "Tiro de banda",
+  "playerCard.bankShot": "Banda",
   "playerCard.average": "Prom.",
   "playerCard.defaultName": "Jugador",
   "playerCard.endInning": "Terminar entrada",

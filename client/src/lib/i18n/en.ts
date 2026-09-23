@@ -1190,7 +1190,7 @@ const en: Dict = {
   "pinReset.successDesc1": "You can now log in",
   "pinReset.successDesc2": "with your new PIN.",
   "pinReset.title": "Reset PIN",
-  "playerCard.bankShot": "Bank shot",
+  "playerCard.bankShot": "Bank",
   "playerCard.average": "Avg",
   "playerCard.defaultName": "Player",
   "playerCard.endInning": "End Inning",

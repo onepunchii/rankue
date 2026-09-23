@@ -1192,7 +1192,7 @@ export const ko: Dict = {
   "pinReset.successDesc1": "새로운 PIN 번호로",
   "pinReset.successDesc2": "로그인하실 수 있습니다.",
   "pinReset.title": "PIN 재설정",
-  "playerCard.bankShot": "뱅크샷",
+  "playerCard.bankShot": "뱅크",
   "playerCard.average": "평균",
   "playerCard.defaultName": "선수",
   "playerCard.endInning": "이닝 종료",

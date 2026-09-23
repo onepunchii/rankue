@@ -1190,7 +1190,7 @@ const tr: Dict = {
   "pinReset.successDesc1": "Artık yeni PIN'inizle",
   "pinReset.successDesc2": "giriş yapabilirsiniz.",
   "pinReset.title": "PIN sıfırlama",
-  "playerCard.bankShot": "Bant atışı",
+  "playerCard.bankShot": "Bant",
   "playerCard.average": "Ort.",
   "playerCard.defaultName": "Oyuncu",
   "playerCard.endInning": "Eli Bitir",

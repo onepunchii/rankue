@@ -232,7 +232,7 @@ export function PlayerCard({
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); onBankShot(); }}
-                            className="h-16 px-6 rounded-2xl border-2 border-brand text-brand bg-white flex items-center gap-2 pointer-events-auto relative z-50 active:scale-95 transition-transform"
+                            className="h-16 px-5 rounded-2xl border-2 border-brand text-brand bg-white flex items-center gap-1.5 whitespace-nowrap shrink-0 pointer-events-auto relative z-50 active:scale-95 transition-transform"
                         >
                             <span className="text-sm font-semibold">{t("playerCard.bankShot")}</span>
                             <span className="text-2xl font-bold tabular-nums">+2</span>

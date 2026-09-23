@@ -1190,7 +1190,7 @@ const vi: Dict = {
   "pinReset.successDesc1": "Bạn có thể đăng nhập",
   "pinReset.successDesc2": "bằng PIN mới.",
   "pinReset.title": "Đặt lại PIN",
-  "playerCard.bankShot": "Cú băng",
+  "playerCard.bankShot": "Băng",
   "playerCard.average": "TB",
   "playerCard.defaultName": "Cơ thủ",
   "playerCard.endInning": "Kết thúc lượt",
