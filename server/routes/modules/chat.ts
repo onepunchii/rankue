@@ -78,7 +78,7 @@ export async function notifyRoom(ref: RoomRef, senderId: string, preview: string
     const sender = await storage.getMemberById(senderId);
     const senderName = sender?.name;
     const blockers = await storage.crews.getBlockerIds(senderId);
-    // 보통은 방으로 — 카드처럼 "누르면 바로 그 일을 하는" 알림만 딥링크를 덮어쓴다(같이 한 판 → 참가 화면).
+    // 보통은 방으로 — 카드처럼 "누르면 바로 그 일을 하는" 알림만 딥링크를 덮어쓴다(온라인 대전 카드 → 참가 화면).
     const url = urlOverride ?? `/chat/${ref.kind}/${ref.id}`;
     // 알림함은 종목으로 갈린다 — 방의 종목을 따라야 한다. 예전엔 listing 만 골프로 쳐서 골프 크루·골프 친구 방 알림이
     // 당구 알림함에 쌓이고 골프 알림함에서는 안 보였다(2026-09-22 리뷰).

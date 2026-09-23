@@ -392,7 +392,7 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
     });
 });
 
-describe("MatchLobby · 방 열쇠로 바로 열기(2026-09-23 '같이 한 판')", () => {
+describe("MatchLobby · 방 열쇠로 바로 열기(2026-09-23 '온라인 대전' 카드)", () => {
     it("initialRoomId 가 있으면 목록을 뒤지지 않고 그 방의 대기 화면을 연다", async () => {
         // 목록(listMatches)은 최근 20건만 본다 — 재사용한 옛 대기 방은 거기 없어 만들기 폼이 떴다(오너 제보).
         const mineOld = match({ id: "m-old", code: "778899" });

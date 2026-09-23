@@ -41,7 +41,7 @@ export interface MatchLobbyProps {
     api?: MatchApi;
     initialTab?: LobbyTab;
     /**
-     * 이 대전 방을 바로 연다(채팅의 '같이 한 판' 처럼 방을 만든 직후 들어올 때).
+     * 이 대전 방을 바로 연다(채팅의 '온라인 대전' 카드처럼 방을 만든 직후 들어올 때).
      * 목록 스캔(listMatches)은 최근 20건만 보므로, 재사용한 옛 대기 방은 못 찾아 만들기 폼이 떠 버린다(2026-09-23 오너).
      */
     initialRoomId?: string;

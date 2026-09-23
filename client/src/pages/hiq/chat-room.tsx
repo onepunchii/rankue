@@ -233,7 +233,7 @@ export default function ChatRoomPage() {
     }, [key, merge, t, toast]);
     const onPickAttach = useCallback((item: AttachItem) => {
         switch (item) {
-            // 같이 한 판: 종목을 고르면 카드를 올리고 **나는 곧바로 그 대기방으로** 간다(2026-09-23 오너).
+            // 온라인 대전: 종목을 고르면 카드를 올리고 **나는 곧바로 그 대기방으로** 간다(2026-09-23 오너).
             // 방 열쇠를 주소에 실어 로비가 그 방을 바로 연다 — 목록 스캔(최근 20건)에 맡기면 재사용한 옛 방을 못 찾아 만들기 폼이 뜬다.
             case "SIM_INVITE": setPicker("SIM_INVITE"); break;
             case "MY_STATS": void postCard("MY_STATS", {}); break;

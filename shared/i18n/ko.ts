@@ -381,7 +381,7 @@ export const ko: Record<string, string> = {
   "err.chat.card.notYourGame": "내가 뛴 경기만 공유할 수 있어요",
   "err.chat.card.storeNotFound": "매장을 찾을 수 없어요",
   "err.chat.card.bookingNotFound": "티타임을 찾을 수 없어요",
-  "notif.chat.card.SIM_INVITE": "🎱 {room} · 같이 한 판",
+  "notif.chat.card.SIM_INVITE": "🎱 {room} · 온라인 대전",
   "notif.chat.card.GAME_RESULT": "🏁 {room} · 경기 결과",
   "notif.chat.card.MY_STATS": "📊 {room} · 기록 공유",
   "notif.chat.card.STORE": "📍 {room} · 매장 공유",

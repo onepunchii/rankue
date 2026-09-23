@@ -4,7 +4,7 @@
  * 카드는 **서버만 만든다**. 보내기 라우트(chat.ts)는 metadata 를 버리므로 화면이 카드 모양을 지정할 수 없다 —
  * 여기서 실제 행(대전·경기·회원·매장·글·세션)을 읽어 만들기 때문에 없는 것으로 카드를 만들 수 없다(가짜 카드 방지).
  *
- *   POST /chat/rooms/:key/cards/sim-invite    { gameType? }    당구  🎱 같이 한 판(내 대기 방 재사용, 없으면 만든다 — 푸시가 참가 화면으로 바로 간다)
+ *   POST /chat/rooms/:key/cards/sim-invite    { gameType? }    당구  🎱 온라인 대전(내 대기 방 재사용, 없으면 만든다 — 푸시가 참가 화면으로 바로 간다)
  *   POST /chat/rooms/:key/cards/game-result   { gameId }       당구  🏁 경기 결과(내가 뛴 경기만)
  *   POST /chat/rooms/:key/cards/my-stats      {}               공통  📊 내 기록
  *   POST /chat/rooms/:key/cards/store         { code | slug }  당구  📍 매장(디렉터리 code · 파트너 slug/id)
@@ -131,7 +131,7 @@ router.post("/rooms/:key/cards/sim-invite", ...billiardsGate, asyncHandler(async
     }
     const code = String(m.code);
     const spaced = `${code.slice(0, 3)} ${code.slice(3)}`;
-    const summary = `🎱 같이 한 판 · ${gameTypeKo(m.gameType)} · 코드 ${spaced}`;
+    const summary = `🎱 온라인 대전 · ${gameTypeKo(m.gameType)} · 코드 ${spaced}`;
     return postCard(res, room, "SIM_INVITE", summary, {
         // ⚠️ hostTarget 은 **핸디전이면 상대가 들어오는 순간 두 사람의 온라인 기록으로 다시 정해진다**(simMatch 의 handicapTargets).
         // 그래서 핸디전 카드에는 목표 숫자를 싣지 않는다 — 화면이 "핸디전"이라고만 적는다(2026-09-23 오너: "다마수 계산 없이?").

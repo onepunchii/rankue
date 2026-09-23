@@ -72,7 +72,7 @@ describe("채팅 카드 라우트", () => {
 
 describe("2026-09-23 리뷰로 잠근 것", () => {
     const src = read("server/routes/modules/chatCards.ts");
-    it("같이 한 판: 비밀번호 방은 재사용하지 않고, 푸시는 참가 화면으로 바로 간다", () => {
+    it("온라인 대전: 비밀번호 방은 재사용하지 않고, 푸시는 참가 화면으로 바로 간다", () => {
         // 비밀번호 방을 재사용하면 카드에는 코드만 실려 받는 사람이 한 번에 못 들어온다.
         expect(src).toContain("!x.passwordHash");
         expect(src).toContain('url: `/online-game?join=${encodeURIComponent(code)}&auto=1${m.handicap ? "" : "&same=1"}`');
@@ -87,7 +87,7 @@ describe("2026-09-23 리뷰로 잠근 것", () => {
     });
 });
 
-describe("같이 한 판 — 고른 설정(2026-09-23 오너: 대대·중대·핸디전 선택)", () => {
+describe("온라인 대전 — 고른 설정(2026-09-23 오너: 대대·중대·핸디전 선택)", () => {
     const src = read("server/routes/modules/chatCards.ts");
     it("종목·테이블·핸디전이 다르면 옛 방을 다시 쓰지 않는다", () => {
         expect(src).toContain("(!wantTable || x.tableId === wantTable)");

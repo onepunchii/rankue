@@ -381,7 +381,7 @@ export const es: Record<string, string> = {
   "err.chat.card.notYourGame": "Solo puedes compartir partidas en las que jugaste",
   "err.chat.card.storeNotFound": "No se encontró el local",
   "err.chat.card.bookingNotFound": "No se encontró el horario de salida",
-  "notif.chat.card.SIM_INVITE": "🎱 {room} · Jugar juntos",
+  "notif.chat.card.SIM_INVITE": "🎱 {room} · Partida en línea",
   "notif.chat.card.GAME_RESULT": "🏁 {room} · Resultado",
   "notif.chat.card.MY_STATS": "📊 {room} · Estadísticas",
   "notif.chat.card.STORE": "📍 {room} · Sala compartida",

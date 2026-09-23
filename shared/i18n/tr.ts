@@ -381,7 +381,7 @@ export const tr: Record<string, string> = {
   "err.chat.card.notYourGame": "Yalnızca oynadığın maçları paylaşabilirsin",
   "err.chat.card.storeNotFound": "Salon bulunamadı",
   "err.chat.card.bookingNotFound": "Tee saati bulunamadı",
-  "notif.chat.card.SIM_INVITE": "🎱 {room} · Birlikte oyna",
+  "notif.chat.card.SIM_INVITE": "🎱 {room} · Çevrimiçi maç",
   "notif.chat.card.GAME_RESULT": "🏁 {room} · Maç sonucu",
   "notif.chat.card.MY_STATS": "📊 {room} · İstatistik paylaşıldı",
   "notif.chat.card.STORE": "📍 {room} · Salon paylaşıldı",

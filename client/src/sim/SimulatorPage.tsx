@@ -419,7 +419,7 @@ export function SimulatorPage() {
                     return;
                 }
                 if (!autoJoin || m.hasPassword) { toJoinScreen(); return; }
-                // same=1(채팅 '같이 한 판'의 같은 점수 방): 목표를 안 보내면 서버가 방장 목표를 그대로 준다 — 둘 다 같은 점수.
+                // same=1(채팅 '온라인 대전' 카드의 같은 점수 방): 목표를 안 보내면 서버가 방장 목표를 그대로 준다 — 둘 다 같은 점수.
                 const handi = member ? (m.gameType === "3c" ? member.handi3c : member.handi4c) : null;
                 const target = sameTarget ? undefined : handi !== null && handi !== undefined && handi >= 1 && handi <= 999 ? handi : m.hostTarget;
                 const joined = await matchApi.joinMatch(joinCode, target);

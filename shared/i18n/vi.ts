@@ -381,7 +381,7 @@ export const vi: Record<string, string> = {
   "err.chat.card.notYourGame": "Bạn chỉ có thể chia sẻ trận đấu mình đã chơi",
   "err.chat.card.storeNotFound": "Không tìm thấy quán",
   "err.chat.card.bookingNotFound": "Không tìm thấy giờ tee",
-  "notif.chat.card.SIM_INVITE": "🎱 {room} · Chơi cùng nhau",
+  "notif.chat.card.SIM_INVITE": "🎱 {room} · Trận trực tuyến",
   "notif.chat.card.GAME_RESULT": "🏁 {room} · Kết quả trận",
   "notif.chat.card.MY_STATS": "📊 {room} · Chia sẻ thống kê",
   "notif.chat.card.STORE": "📍 {room} · Chia sẻ quán",

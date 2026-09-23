@@ -381,7 +381,7 @@ export const en: Record<string, string> = {
   "err.chat.card.notYourGame": "You can only share games you played in",
   "err.chat.card.storeNotFound": "Store not found",
   "err.chat.card.bookingNotFound": "Tee time not found",
-  "notif.chat.card.SIM_INVITE": "🎱 {room} · Play together",
+  "notif.chat.card.SIM_INVITE": "🎱 {room} · Online match",
   "notif.chat.card.GAME_RESULT": "🏁 {room} · Game result",
   "notif.chat.card.MY_STATS": "📊 {room} · Stats shared",
   "notif.chat.card.STORE": "📍 {room} · Store shared",
