@@ -64,6 +64,12 @@ export const PARTY_OPTION_IDS: string[] = [...PARTY_OPTIONS.map(o => o.id), 'sol
 /** 인원 축이면 true(→ OR), 아니면 조건 축(→ AND). */
 export const isPartyOption = (id: string) => PARTY_OPTION_IDS.includes(id);
 
+/**
+ * ⚠️ **지금 화면 어디에도 안 그려진다.** 필터 줄이 A안으로 바뀌면서(2026-09-23) 시간대 셋이 빠른 칩으로
+ * 바깥에 나왔고, 상세필터 시트에 시간 섹션이 없어졌다. 칩 라벨('1부')은 FilterBar 가 직접 갖고 있고,
+ * 빈 화면은 TIME_SHORT_LABEL 을 쓴다. 이 긴 라벨은 **나중에 시간 섹션이 다시 생길 때를 위해** 남겨 둔 것이다.
+ * 경계 숫자는 golfTimeSpan(bookingFilter.ts)·서버 SQL(golf.repo.ts)과 맞춰 뒀으니, 되살릴 때 셋을 같이 봐라.
+ */
 export const TIME_OPTIONS = [
     { id: 'all', label: '전체 시간' },
     { id: 'morning', label: '1부 (새벽 ~ 11:00)' },
