@@ -408,5 +408,6 @@ export const vi: Record<string, string> = {
   "notif.chat.card.body.MATCH_INVITE.4c": "🎱 4 bi · {seats} người — vào từ phòng",
   "notif.game.started.title": "🎱 Trận đấu đã bắt đầu",
   "notif.game.started.body": "{host} đã bắt đầu trận đấu. Mở bảng điểm.",
+  "err.chat.leaveNotAllowed": "Không thể rời phòng này từ đây",
 };
 export default vi;

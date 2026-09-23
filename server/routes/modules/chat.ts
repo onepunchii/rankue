@@ -7,6 +7,8 @@
  *   GET    /chat/rooms/:key/messages          최근 60건 · ?after= 그 뒤만(2.5초 폴링) · ?before= 그 앞 60건(위로 더 읽기)
  *   POST   /chat/rooms/:key/messages          보내기 → 같은 방 사람들에게 푸시
  *   DELETE /chat/rooms/:key/messages/:id      글쓴이·크루 운영진·운영자
+ *   POST   /chat/rooms/:key/mute { muted }    이 방 알림 끄기/켜기(크루는 크루 알림 설정으로 간다)
+ *   POST   /chat/rooms/:key/leave             1:1·소그룹 방 나가기(크루·조인/부킹 방은 안 된다)
  *   POST   /chat/dm { memberIds }             1:1(같은 둘이면 기존 방)·소그룹 방 만들기
  * key = "crew:<id>" | "listing:<id>" | "dm:<id>" | "support:<memberId>"
  */
@@ -58,15 +60,69 @@ async function openRoom(req: AuthRequest, res: any): Promise<RoomRef | null> {
     return ref;
 }
 
+/**
+ * 이 방 알림이 꺼져 있나. **크루는 크루 알림 설정**(설정 화면과 같은 값)을, 나머지 방은 hiq_chat_reads.muted 를 본다.
+ * 한 가지를 두 곳에 저장하지 않으려는 것이다 — 크루 설정에서 끈 사람이 채팅 메뉴에서 "켜짐"을 보면 안 된다.
+ */
+async function isMuted(ref: RoomRef, memberId: string): Promise<boolean> {
+    if (ref.kind === "crew") return !(await storage.notifs.getCrewNotificationSetting(ref.id, memberId)).chatEnabled;
+    return (await storage.chat.myRead(ref.key, memberId)).muted;
+}
+
 router.get("/rooms/:key/info", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const ref = await openRoom(req, res); if (!ref) return;
-    return sendSuccess(res, { key: ref.key, kind: ref.kind, id: ref.id, ...(await storage.chat.roomInfo(ref, req.userId!, localeOf(res))) });
+    // lastReadAt 은 **읽음 처리 전** 값이다 — 화면이 "여기까지 읽었어요" 줄을 그 시각에 긋는다.
+    // 방을 열면 곧바로 POST /chat/read 가 커서를 지금으로 옮기므로, 이 값은 여기서 한 번 받은 것만 쓴다.
+    const [info, read, muted] = await Promise.all([
+        storage.chat.roomInfo(ref, req.userId!, localeOf(res)),
+        storage.chat.myRead(ref.key, req.userId!),
+        isMuted(ref, req.userId!),
+    ]);
+    return sendSuccess(res, { key: ref.key, kind: ref.kind, id: ref.id, ...info, lastReadAt: read.lastReadAt, muted });
+}));
+
+/** 이 방 알림 끄기/켜기. 크루는 크루 알림 설정의 '채팅' 스위치를 그대로 움직인다(설정 화면과 같은 값). */
+router.post("/rooms/:key/mute", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const ref = await openRoom(req, res); if (!ref) return;
+    const muted = req.body?.muted === true || req.body?.muted === "true";
+    if (ref.kind === "crew") {
+        const cur = await storage.notifs.getCrewNotificationSetting(ref.id, req.userId!);
+        await storage.notifs.upsertCrewNotificationSetting({ crewId: ref.id, memberId: req.userId!, ...cur, chatEnabled: !muted } as any);
+    } else {
+        await storage.chat.setMuted(ref.key, req.userId!, muted);
+    }
+    return sendSuccess(res, { muted });
+}));
+
+/**
+ * 방 나가기 — 1:1·소그룹만. 크루 방에서 나가는 것은 크루 탈퇴이고, 조인/부킹 방은 신청 취소라서
+ * 채팅 메뉴가 대신 할 수 있는 일이 아니다(둘 다 그쪽 화면에 따로 있다). 문의 방은 나갈 대상이 아니다.
+ * 나가면 남은 사람들에게 시스템 메시지로 알린다 — 말이 끊긴 이유를 알 수 있어야 한다. 푸시는 보내지 않는다.
+ */
+router.post("/rooms/:key/leave", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const ref = await openRoom(req, res); if (!ref) return;
+    if (ref.kind !== "dm") return sendError(res, 400, "err.chat.leaveNotAllowed", "LEAVE_NOT_ALLOWED");
+    const me = await storage.getMemberById(req.userId!);
+    const r = await storage.chat.leaveDm(ref.id, req.userId!);
+    if (r === "gone") return sendError(res, 404, "err.chat.roomNotFound");
+    if (r === "ok" && me?.name) {
+        await storage.chat.addMessage({
+            key: ref.key, senderId: null, message: `${me.name}님이 나갔어요`, type: "system",
+            metadata: { i18n: { key: "chat.system.left", params: { name: me.name } } },
+        });
+    }
+    return sendSuccess(res, { ok: true });
 }));
 
 router.get("/rooms/:key/messages", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const ref = await openRoom(req, res); if (!ref) return;
     const at = (v: unknown) => { const d = typeof v === "string" && v ? new Date(v) : undefined; return d && Number.isFinite(d.getTime()) ? d : undefined; };
-    return sendSuccess(res, await storage.chat.messages(ref, req.userId!, { after: at(req.query.after), before: at(req.query.before) }));
+    const messages = await storage.chat.messages(ref, req.userId!, { after: at(req.query.after), before: at(req.query.before) });
+    // reads=1 이면 방 사람들의 읽은 시각을 같이 준다 — 내 말풍선 옆 '안 읽은 사람 수'용.
+    // 응답 모양이 바뀌므로 **물어본 요청만** 객체로 준다(안 물어보면 예전처럼 배열).
+    // 요청을 따로 만들지 않은 이유: 2.5초 폴링이 둘이 되면 서버리스 호출이 그대로 두 배가 된다.
+    if (req.query.reads !== "1") return sendSuccess(res, messages);
+    return sendSuccess(res, { messages, reads: await storage.chat.readCursors(ref.key) });
 }));
 
 /**
@@ -75,6 +131,8 @@ router.get("/rooms/:key/messages", requireAuth, asyncHandler(async (req: AuthReq
  */
 export async function notifyRoom(ref: RoomRef, senderId: string, preview: string | I18nText, heading: I18nText, sport?: "BILLIARDS" | "GOLF", urlOverride?: string): Promise<void> {
     const members = (await storage.chat.roomMembers(ref)).filter((m) => m !== senderId);
+    // 이 방 알림을 끈 사람(채팅 ⋯ 메뉴). 크루 방은 아래에서 크루 설정을 따로 보므로 여기서는 빈 집합이다.
+    const muted = ref.kind === "crew" ? new Set<string>() : await storage.chat.mutedMemberIds(ref.key);
     const sender = await storage.getMemberById(senderId);
     const senderName = sender?.name;
     const blockers = await storage.crews.getBlockerIds(senderId);
@@ -88,7 +146,7 @@ export async function notifyRoom(ref: RoomRef, senderId: string, preview: string
     const body: string | I18nText = typeof preview !== "string" ? preview
         : ref.kind === "dm" ? preview
         : senderName ? msg("notif.chat.newMessage.body", { name: senderName, text: preview }) : msg("notif.chat.newMessageAnon.body", { text: preview });
-    await Promise.allSettled(members.filter((m) => !blockers.has(m)).map(async (memberId) => {
+    await Promise.allSettled(members.filter((m) => !blockers.has(m) && !muted.has(m)).map(async (memberId) => {
         if (ref.kind === "crew") {
             const setting = await storage.notifs.getCrewNotificationSetting(ref.id, memberId);
             if (!setting.chatEnabled) return;

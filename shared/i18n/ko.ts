@@ -408,5 +408,6 @@ export const ko: Record<string, string> = {
   "notif.chat.card.body.MATCH_INVITE.4c": "🎱 4구 · {seats}인 — 방에서 참가하기",
   "notif.game.started.title": "🎱 경기 시작",
   "notif.game.started.body": "{host}님이 경기를 시작했어요. 점수판으로 이동하세요.",
+  "err.chat.leaveNotAllowed": "이 방은 채팅에서 나갈 수 없어요",
 };
 export default ko;

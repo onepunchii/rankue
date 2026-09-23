@@ -4,13 +4,15 @@
  * 폴링 2.5초, `after` 뒤만(새 게 없으면 빈 응답). 가려지면 쉰다. 보내면 즉시 말풍선, 실패는 빨갛게 눌러 재전송.
  * 읽음: 방을 열 때와 아래를 보고 있는 동안 새 메시지가 오면 "봤다". 카드형 메시지(정산·부킹 공유·+ 첨부)는 눌러서 이동.
  * 내 메시지(크루는 운영진도)는 길게 눌러 삭제.
+ * ⋯ 메뉴(2026-09-23): 참여자 보기 · 이 방 알림 끄기 · 나가기(1:1·소그룹만).
+ *   읽음 줄 "여기까지 읽었어요"는 **방에 들어온 순간의 커서**로 한 번만 긋고, 내 말풍선 옆 숫자는 아직 안 읽은 사람 수다.
  * + 첨부(2026-09-23): 종목별 카드(당구 매칭 대결·온라인 대전 초대·경기 결과·매장, 골프 조인/부킹·랭큐매치 핀·라운드) — 서버가 만들고 여기서는 끼우기만.
  *   매칭 대결 카드만 예외로 **살아 있다** — 참가 수가 갱신되고 방장이 누르면 그 핀으로 매칭대결하기 화면을 이어받는다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { LucideChevronLeft, LucideMapPin, LucideUsers } from "lucide-react";
+import { LucideChevronLeft, LucideMapPin, LucideUsers, LucideMoreVertical } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useSport } from "@/contexts/SportContext";
@@ -18,6 +20,7 @@ import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { ChatRoom, type ChatMsg } from "@/components/hiq/chat/ChatRoom";
 import { cardKind } from "@/components/hiq/chat/ChatCard";
+import { ChatMenuSheet } from "@/components/hiq/chat/ChatMenuSheet";
 import { AttachSheet, type AttachItem } from "@/components/hiq/chat/attach/AttachSheet";
 import { SimInviteSheet } from "@/components/hiq/chat/attach/SimInviteSheet";
 import { MatchInviteSheet } from "@/components/hiq/chat/attach/MatchInviteSheet";
@@ -38,6 +41,10 @@ interface RoomInfo {
     title: string; subtitle: string;
     members: { id: string; name: string; profileImageUrl: string | null }[];
     canManage: boolean; crewId?: string; booking?: any; sport?: "BILLIARDS" | "GOLF";
+    /** 방에 들어온 순간의 내 읽음 커서 — "여기까지 읽었어요" 줄의 기준(읽음 처리 전 값이다). */
+    lastReadAt?: string | null;
+    /** 이 방 알림 꺼짐(크루는 크루 알림 설정의 채팅 스위치). */
+    muted?: boolean;
 }
 
 export default function ChatRoomPage() {
@@ -61,6 +68,14 @@ export default function ChatRoomPage() {
 
     const [messages, setMessages] = useState<ChatMsg[]>([]);
     const [loading, setLoading] = useState(true);
+    /**
+     * "여기까지 읽었어요" 줄의 기준 — 방에 들어온 그 순간의 커서를 **한 번만** 잡는다.
+     * 들어오자마자 POST /chat/read 가 커서를 지금으로 옮기므로, 다시 읽으면 줄이 곧장 맨 아래로 내려간다.
+     */
+    const [readLineAt, setReadLineAt] = useState<string | null>(null);
+    const readLineKeyRef = useRef<string | null>(null);
+    /** 방 사람들의 읽은 시각 — 내 말풍선 옆 숫자를 센다(폴링에 같이 실려 온다). */
+    const [reads, setReads] = useState<{ id: string; at: string }[]>([]);
     const [hasOlder, setHasOlder] = useState(false);
     const [loadingOlder, setLoadingOlder] = useState(false);
     const lastAtRef = useRef<string | null>(null);
@@ -92,6 +107,13 @@ export default function ChatRoomPage() {
         if (!lastAtRef.current || new Date(last) > new Date(lastAtRef.current)) lastAtRef.current = last;
     }, []);
 
+    // 이 방의 정보가 처음 온 순간의 커서를 잡는다. 방을 옮기면(키가 바뀌면) 다시 잡는다.
+    useEffect(() => {
+        if (!info.data || readLineKeyRef.current === key) return;
+        readLineKeyRef.current = key;
+        setReadLineAt(info.data.lastReadAt ?? null);
+    }, [info.data, key]);
+
     // 읽음: 5초에 한 번만 보내되, 막힌 호출은 **버리지 않고 뒤로 미룬다** — 버리면 그 5초 안에 온 마지막 메시지의 읽음이
     // 영영 기록되지 않아 방을 나가면 배지가 남았다.
     const markSeen = useCallback(() => {
@@ -112,7 +134,7 @@ export default function ChatRoomPage() {
         if (!kind || !id || forbidden) return;
         // 방이 바뀌면 처음부터 — 같은 컴포넌트가 재사용되므로(푸시로 방→방 이동) 안 비우면 앞 방 대화가 남고
         // 앞 방의 커서로 새 방을 물어 과거 메시지를 못 받았다(2026-09-22 리뷰).
-        setMessages([]); setLoading(true); setHasOlder(false);
+        setMessages([]); setLoading(true); setHasOlder(false); setReads([]);
         lastAtRef.current = null; seenAtRef.current = 0; sentIdsRef.current.clear();
         let alive = true;
         let busy = false;
@@ -126,9 +148,12 @@ export default function ChatRoomPage() {
                 try {
                     // 12번에 한 번(약 30초)은 최근 창을 통째로 다시 받아 **지워진 메시지**를 걷어낸다 — after 폴링은 새 것만 알려 준다.
                     const resync = lastAtRef.current !== null && ++ticks % 12 === 0;
-                    const after = lastAtRef.current && !resync ? `?after=${encodeURIComponent(lastAtRef.current)}` : "";
-                    const rows = await apiRequest(`/api/hiq/chat/rooms/${key}/messages${after}`) as ChatMsg[];
+                    const after = lastAtRef.current && !resync ? `&after=${encodeURIComponent(lastAtRef.current)}` : "";
+                    // reads=1 — 응답이 { messages, reads } 로 온다(요청 하나로 끝낸다. 폴링을 둘로 나누면 호출이 두 배가 된다).
+                    const res = await apiRequest(`/api/hiq/chat/rooms/${key}/messages?reads=1${after}`) as { messages: ChatMsg[]; reads: { id: string; at: string }[] };
                     if (!alive) return;
+                    const rows = res.messages ?? [];
+                    if (res.reads) setReads(res.reads);
                     if (!after) {
                         if (!resync) setHasOlder(rows.length >= PAGE);
                         const ids = new Set(rows.map((m) => m.id));
@@ -199,6 +224,46 @@ export default function ChatRoomPage() {
             setMessages((cur) => cur.filter((m) => m.id !== msg.id));
         } catch (e: any) { toast({ title: e?.message || t("chat.deleteFailed"), variant: "destructive" }); }
     }, [key, t, toast]);
+
+    /**
+     * 내 말풍선 옆 '아직 안 읽은 사람 수'. 방 사람(나 제외) 중 읽은 시각이 그 메시지보다 이른 사람을 센다.
+     * 읽음 행이 아예 없는 사람은 **안 읽은 것**으로 센다(행은 방을 처음 열 때 생긴다).
+     * 크루처럼 사람이 많은 방에서도 화면이 세는 값이라 서버 왕복이 늘지 않는다.
+     */
+    const readAtById = useMemo(() => new Map(reads.map((r) => [r.id, new Date(r.at).getTime()])), [reads]);
+    const memberIds = useMemo(() => (info.data?.members ?? []).map((m) => m.id), [info.data]);
+    const unreadBy = useCallback((m: ChatMsg) => {
+        if (!member || m.senderId !== member.id || memberIds.length < 2) return 0;
+        const at = new Date(m.createdAt).getTime();
+        return memberIds.filter((id) => id !== member.id && (readAtById.get(id) ?? 0) < at).length;
+    }, [member, memberIds, readAtById]);
+
+    // ⋯ 메뉴 — 참여자 보기 · 이 방 알림 끄기 · 나가기
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [menuBusy, setMenuBusy] = useState(false);
+    const muted = !!info.data?.muted;
+    const toggleMute = useCallback(async (next: boolean) => {
+        setMenuBusy(true);
+        try {
+            await apiRequest(`/api/hiq/chat/rooms/${key}/mute`, { method: "POST", body: { muted: next } });
+            // 방 정보를 다시 읽으면 lastReadAt 도 새로 오지만 읽음 줄은 이미 잡아 뒀으므로(readLineKeyRef) 흔들리지 않는다.
+            qc.setQueryData(["/api/hiq/chat/room-info", key], (old: any) => (old ? { ...old, muted: next } : old));
+            toast({ title: next ? t("chat.menu.mutedDone") : t("chat.menu.unmutedDone") });
+        } catch (e: any) { toast({ title: e?.message || t("chat.actionFailed"), variant: "destructive" }); }
+        finally { setMenuBusy(false); }
+    }, [key, qc, t, toast]);
+    const leaveRoom = useCallback(async () => {
+        if (!window.confirm(t("chat.menu.leaveConfirm"))) return;
+        setMenuBusy(true);
+        try {
+            await apiRequest(`/api/hiq/chat/rooms/${key}/leave`, { method: "POST" });
+            void qc.invalidateQueries({ queryKey: ["/api/hiq/chat/rooms"] });
+            void qc.invalidateQueries({ queryKey: ["/api/hiq/chat/unread"] });
+            setMenuOpen(false);
+            setLocation("/chat");
+        } catch (e: any) { toast({ title: e?.message || t("chat.actionFailed"), variant: "destructive" }); }
+        finally { setMenuBusy(false); }
+    }, [key, qc, setLocation, t, toast]);
 
     // 카드 탭 → 종류별 이동(ChatCard 의 CARD_OPENABLE 과 짝). MY_STATS 는 갈 곳이 없다.
     const openCard = useCallback((msg: ChatMsg) => {
@@ -313,6 +378,12 @@ export default function ChatRoomPage() {
                     <h1 className="text-[16px] font-semibold truncate">{d?.title ?? t("chat.title")}</h1>
                     {d && <p className="text-[11.5px] font-medium text-ink-3 truncate">{d.subtitle}</p>}
                 </div>
+                {/* ⋯ — 들어갈 수 있는 방에서만(못 들어가는 방은 참여자도 알림도 뜻이 없다) */}
+                {d && (
+                    <button type="button" onClick={() => setMenuOpen(true)} aria-label={t("chat.menu.title")} className="w-10 h-10 rounded-full flex items-center justify-center text-ink-2 active:bg-surface-2 shrink-0">
+                        <LucideMoreVertical className="w-5 h-5" />
+                    </button>
+                )}
             </header>
             {forbidden ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center">
@@ -328,9 +399,19 @@ export default function ChatRoomPage() {
                     canDelete={(m) => !!member && (m.senderId === member.id || !!d?.canManage)}
                     pinned={pinned} loading={loading || info.isPending} onSeen={markSeen}
                     hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={loadOlder} roomKey={key}
+                    readLineAt={readLineAt} unreadBy={unreadBy}
                     // 티타임 이틀 뒤 조인·부킹 방은 읽기만(서버도 같은 기준으로 막는다) — 목록에서 빠진 방에서 푸시만 오지 않게
                     disabled={d?.kind === "listing" && !!b && new Date(b.datetime).getTime() < Date.now() - 2 * 86_400_000}
                     emptyText={d?.kind === "support" ? t("chat.emptySupport") : d?.kind === "listing" ? t("chat.emptyRoom") : t("chat.empty")}
+                />
+            )}
+            {d && (
+                <ChatMenuSheet
+                    open={menuOpen} onOpenChange={setMenuOpen} members={d.members} meId={member?.id}
+                    muted={muted} busy={menuBusy}
+                    // 나가기는 1:1·소그룹만 — 크루는 탈퇴, 조인/부킹은 신청 취소라서 채팅 메뉴가 할 일이 아니다.
+                    canLeave={d.kind === "dm"}
+                    onToggleMute={(next) => void toggleMute(next)} onLeave={() => void leaveRoom()}
                 />
             )}
             {canAttach && (

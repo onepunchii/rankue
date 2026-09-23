@@ -408,5 +408,6 @@ export const en: Record<string, string> = {
   "notif.chat.card.body.MATCH_INVITE.4c": "🎱 4-Ball · {seats} players — join from the room",
   "notif.game.started.title": "🎱 Match started",
   "notif.game.started.body": "{host} started the match. Open the scoreboard.",
+  "err.chat.leaveNotAllowed": "You can't leave this chat from here",
 };
 export default en;

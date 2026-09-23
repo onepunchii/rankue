@@ -470,6 +470,12 @@ export const hiqChatReads = pgTable("hiq_chat_reads", {
   roomKey: text("room_key").notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
   lastReadAt: timestamp("last_read_at").defaultNow().notNull(),
+  /**
+   * 이 방 알림 끄기(2026-09-23 채팅 ⋯ 메뉴). 방을 나가지 않고 조용히 둘 수 있어야 한다.
+   * **크루 방은 이 값을 쓰지 않는다** — 크루 설정 화면의 hiq_crew_notification_settings.chat_enabled 가 이미 있고,
+   * 두 곳에 스위치를 두면 한쪽을 꺼도 다른 쪽이 "켜짐"으로 보인다. 크루는 그 표 하나만 본다.
+   */
+  muted: boolean("muted").default(false).notNull(),
 }, (t) => ({
   uniq: unique().on(t.roomKey, t.memberId),
 }));

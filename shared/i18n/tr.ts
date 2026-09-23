@@ -408,5 +408,6 @@ export const tr: Record<string, string> = {
   "notif.chat.card.body.MATCH_INVITE.4c": "🎱 4 Top · {seats} kişi — odadan katıl",
   "notif.game.started.title": "🎱 Maç başladı",
   "notif.game.started.body": "{host} maçı başlattı. Skor tablosunu aç.",
+  "err.chat.leaveNotAllowed": "Bu sohbetten buradan ayrılamazsın",
 };
 export default tr;

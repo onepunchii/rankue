@@ -157,8 +157,63 @@ export class ChatRepository {
     }
 
     async markRead(key: string, memberId: string): Promise<void> {
+        // muted 는 건드리지 않는다 — 읽을 때마다 알림 설정이 되살아나면 안 된다.
         await db.insert(hiqChatReads).values({ roomKey: key, memberId, lastReadAt: new Date() })
             .onConflictDoUpdate({ target: [hiqChatReads.roomKey, hiqChatReads.memberId], set: { lastReadAt: new Date() } });
+    }
+
+    /* ── 읽음 줄 · 안 읽은 사람 수 · 알림 끄기(2026-09-23) ───────────
+     * 셋 다 hiq_chat_reads 한 표에서 나온다 — 방·사람당 한 줄(마지막 읽은 시각 + 이 방 알림 끔).
+     */
+
+    /** 내가 이 방을 마지막으로 본 시각. 행이 없으면 null(= 이 방은 처음). */
+    async myRead(key: string, memberId: string): Promise<{ lastReadAt: Date | null; muted: boolean }> {
+        const [row] = await db.select({ at: hiqChatReads.lastReadAt, muted: hiqChatReads.muted })
+            .from(hiqChatReads).where(and(eq(hiqChatReads.roomKey, key), eq(hiqChatReads.memberId, memberId))).limit(1);
+        return { lastReadAt: (row?.at as Date) ?? null, muted: !!row?.muted };
+    }
+
+    /**
+     * 방 사람들의 읽은 시각 — 내 말풍선 옆 '안 읽은 사람 수'를 화면이 센다.
+     * 사람 수만큼(보통 2~수십)이라 폴링에 실어도 된다. 명단은 화면이 이미 방 정보로 들고 있다.
+     */
+    async readCursors(key: string): Promise<{ id: string; at: string }[]> {
+        const rows = await db.select({ id: hiqChatReads.memberId, at: hiqChatReads.lastReadAt })
+            .from(hiqChatReads).where(eq(hiqChatReads.roomKey, key));
+        return rows.map((r) => ({ id: String(r.id), at: (r.at as Date).toISOString() }));
+    }
+
+    /** 이 방 알림을 끈 사람들 — 푸시 보내기 전에 한 번에 뺀다(사람마다 묻지 않는다). */
+    async mutedMemberIds(key: string): Promise<Set<string>> {
+        const rows = await db.select({ id: hiqChatReads.memberId }).from(hiqChatReads)
+            .where(and(eq(hiqChatReads.roomKey, key), eq(hiqChatReads.muted, true)));
+        return new Set(rows.map((r) => String(r.id)));
+    }
+
+    /** 이 방 알림 끄기/켜기. 크루 방은 여기 오지 않는다(라우트가 크루 설정 표로 보낸다). */
+    async setMuted(key: string, memberId: string, muted: boolean): Promise<void> {
+        await db.insert(hiqChatReads).values({ roomKey: key, memberId, lastReadAt: new Date(), muted })
+            .onConflictDoUpdate({ target: [hiqChatReads.roomKey, hiqChatReads.memberId], set: { muted } });
+    }
+
+    /**
+     * 1:1·소그룹 방 나가기(2026-09-23). 크루·조인/부킹 방은 여기 오지 않는다 —
+     * 그쪽에서 나가는 것은 크루 탈퇴·조인 취소라서 채팅 메뉴가 할 일이 아니다.
+     * 마지막 한 사람이 나가면 방·대화·읽음 행까지 지운다(열쇠만 남은 죽은 방을 안 남긴다).
+     * 내 읽음 행도 지운다 — 남겨 두면 다시 초대돼도 옛 커서 때문에 지난 대화가 통째로 '읽음'이 된다.
+     */
+    async leaveDm(roomId: string, memberId: string): Promise<"ok" | "gone" | "last"> {
+        const key = `dm:${roomId}`;
+        const rows = await db.select({ id: hiqChatRoomMembers.memberId }).from(hiqChatRoomMembers).where(eq(hiqChatRoomMembers.roomId, roomId));
+        if (!rows.some((r) => String(r.id) === memberId)) return "gone";
+        await db.delete(hiqChatRoomMembers).where(and(eq(hiqChatRoomMembers.roomId, roomId), eq(hiqChatRoomMembers.memberId, memberId)));
+        await db.delete(hiqChatReads).where(and(eq(hiqChatReads.roomKey, key), eq(hiqChatReads.memberId, memberId)));
+        if (rows.length <= 1) {
+            await this.deleteRoom(key);
+            await db.delete(hiqChatRooms).where(eq(hiqChatRooms.id, roomId));
+            return "last";
+        }
+        return "ok";
     }
 
     /* ── 1:1 · 소그룹 ───────────────────────────────────── */

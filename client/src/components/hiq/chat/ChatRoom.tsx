@@ -56,6 +56,13 @@ interface Props {
     onLoadOlder?: () => void;
     /** 방이 바뀌면 다시 맨 아래에서 시작한다 */
     roomKey?: string;
+    /**
+     * "여기까지 읽었어요" 줄을 그을 시각(방에 들어온 순간의 내 읽음 커서). 부르는 쪽이 **방마다 한 번만** 잡아서 넘긴다 —
+     * 들어오자마자 읽음 처리가 되므로, 매번 다시 읽으면 줄이 곧바로 맨 아래로 내려가 버린다.
+     */
+    readLineAt?: string | null;
+    /** 내 말풍선 옆 '아직 안 읽은 사람 수'(0이면 안 그린다). 부르는 쪽이 방 사람들의 읽음 커서로 센다. */
+    unreadBy?: (m: ChatMsg) => number;
 }
 
 /**
@@ -95,7 +102,7 @@ const timeLabel = (iso: string, locale: Locale) => {
     return new Intl.DateTimeFormat(INTL_TAG[locale], { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(iso));
 };
 
-export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onOpenCard, onAttach, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey }: Props) {
+export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onOpenCard, onAttach, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey, readLineAt, unreadBy }: Props) {
     const { t, locale } = useT();
     // 길게 누르기(600ms) → 삭제. 마우스에서는 우클릭도 같다.
     const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,6 +129,19 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
     }, [messages]);
     useEffect(() => { toBottom(); }, [loading]);
     useEffect(() => { atBottomRef.current = true; firstIdRef.current = undefined; }, [roomKey]);
+
+    /**
+     * "여기까지 읽었어요" 줄이 붙을 메시지 — 내가 마지막으로 본 시각 뒤에 온 **남의** 첫 메시지.
+     * 내 메시지는 읽고 말고가 없으므로 기준에서 뺀다(내가 보낸 뒤 방을 나갔다 오면 내 말 위에 줄이 그어진다).
+     */
+    const readLineId = (() => {
+        if (!readLineAt || !meId) return null;
+        const at = new Date(readLineAt).getTime();
+        if (!Number.isFinite(at)) return null;
+        const m = messages.find((x) => !x.pending && !x.failed && x.senderId && x.senderId !== meId && new Date(x.createdAt).getTime() > at);
+        // 맨 첫 메시지 위에는 안 긋는다 — 방 전체가 '새 메시지'면 줄이 아무것도 나누지 않는다.
+        return m && messages[0]?.id !== m.id ? m.id : null;
+    })();
 
     const send = async () => {
         const v = text.trim();
@@ -170,6 +190,13 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                     <span className="flex-1 h-px bg-surface-line" />
                                 </div>
                             )}
+                            {m.id === readLineId && (
+                                <div className="flex items-center gap-2 my-3">
+                                    <span className="flex-1 h-px bg-brand/40" />
+                                    <span className="text-[11px] font-semibold text-brand">{t("chat.readLine")}</span>
+                                    <span className="flex-1 h-px bg-brand/40" />
+                                </div>
+                            )}
                             {system ? (
                                 <p className="my-2 text-center text-[12px] font-medium text-ink-3"><span className="px-2.5 py-1 rounded-full bg-surface-2">{systemText(m, t)}</span></p>
                             ) : (
@@ -206,7 +233,14 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                                     {m.failed && <span className="block text-[11px] mt-0.5">{t("chat.failedTap")}</span>}
                                                 </span>
                                             )}
-                                            <span className="text-[10.5px] text-ink-4 shrink-0 mb-0.5">{m.pending ? "…" : timeLabel(m.createdAt, locale)}</span>
+                                            {/* 내 말풍선에만, 아직 안 읽은 사람이 있을 때만 — 카카오톡의 그 숫자다. 시각 위에 작게 얹는다. */}
+                                            <span className="shrink-0 mb-0.5 flex flex-col items-end gap-0.5 leading-none">
+                                                {(() => {
+                                                    const n = mine && !m.pending && !m.failed ? (unreadBy?.(m) ?? 0) : 0;
+                                                    return n > 0 ? <span className="rk-num text-[10.5px] font-bold text-brand" aria-label={t("chat.unreadByN").replace("{n}", String(n))}>{n}</span> : null;
+                                                })()}
+                                                <span className="text-[10.5px] text-ink-4">{m.pending ? "…" : timeLabel(m.createdAt, locale)}</span>
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
