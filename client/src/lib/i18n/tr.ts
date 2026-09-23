@@ -2824,5 +2824,6 @@ const tr: Dict = {
   "dashboardHeader.golfMode": "Golf",
   "dashboardHeader.switchToBilliards": "Bilardoya geç",
   "notificationInbox.actionFailed": "İşlem tamamlanamadı",
+  "myCrewCard.seeMembers": "Üyeleri gör",
 };
 export default tr;

@@ -2824,5 +2824,6 @@ const en: Dict = {
   "dashboardHeader.golfMode": "Golf",
   "dashboardHeader.switchToBilliards": "Switch to billiards",
   "notificationInbox.actionFailed": "That didn't go through",
+  "myCrewCard.seeMembers": "See members",
 };
 export default en;

@@ -141,6 +141,7 @@ export const LucideTag = ((Ph as any).Tag ?? F) as Ph.Icon;
 export const LucideTarget = ((Ph as any).Target ?? F) as Ph.Icon;
 export const LucideTent = ((Ph as any).Tent ?? F) as Ph.Icon;
 export const LucideTimer = ((Ph as any).Timer ?? F) as Ph.Icon;
+export const LucideTranslate = ((Ph as any).Translate ?? F) as Ph.Icon;
 export const LucideTrash2 = ((Ph as any).Trash ?? F) as Ph.Icon;
 export const LucideTrendingDown = ((Ph as any).TrendDown ?? F) as Ph.Icon;
 export const LucideTrendingUp = ((Ph as any).TrendUp ?? F) as Ph.Icon;

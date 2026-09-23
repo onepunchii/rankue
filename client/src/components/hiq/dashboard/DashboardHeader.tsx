@@ -1,4 +1,4 @@
-import { ChevronsUp, HelpCircle, Bell, LucideMenu } from "@/lib/icons";
+import { ChevronsUp, HelpCircle, Bell, LucideMenu, LucideChevronDown, LucideTranslate } from "@/lib/icons";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { BallCluster } from "../ui/BilliardBall";
@@ -10,7 +10,6 @@ import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { NotificationInbox, UNREAD_COUNT_KEY } from "@/components/hiq/menu/NotificationInbox";
 import { useT } from "@/lib/i18n";
 import { useSport } from "@/contexts/SportContext";
-import { LucideChevronDown, LucideLanguages } from "lucide-react";
 
 interface DashboardHeaderProps {
     member: any;
@@ -57,7 +56,7 @@ export const DashboardHeader = ({
                         className="inline-flex items-center gap-1 mb-2.5 h-7 pl-3 pr-2 rounded-full bg-[#0a0a0a] active:scale-95 transition-transform"
                     >
                         <span className="text-[12.5px] font-semibold text-white tracking-tight">{t("dashboardHeader.billiardsMode")}</span>
-                        <LucideChevronDown className="w-3.5 h-3.5 text-white/55" />
+                        <LucideChevronDown className="w-3.5 h-3.5 text-[#ffffff]/55" />
                     </button>}
                     <h1 className="text-[26px] leading-none font-bold text-ink-1 tracking-tight truncate">
                         {member?.nickname || member?.name}
@@ -76,13 +75,15 @@ export const DashboardHeader = ({
                             <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#f2f0eb]" />
                         )}
                     </button>
-                    {/* 언어(2026-09-22 오너): 외국인 가입이 늘어 홈에서 바로 바꾸게. 시트는 LanguageSheet. */}
+                    {/* 언어(2026-09-22 오너): 외국인 가입이 늘어 홈에서 바로 바꾸게. 시트는 LanguageSheet.
+                        아이콘은 앱 세트(Phosphor duotone)로 — 2026-09-23 오너 "언어 아이콘 퀄리티가 떨어진다".
+                        이 자리만 lucide-react 에서 직접 가져와, 옆의 종·메뉴(듀오톤)와 획 굵기·채움이 달랐다. */}
                     <button
                         onClick={() => setLangOpen(true)}
                         title={t("lang.title")}
                         className="w-11 h-11 rounded-full bg-brand/10 flex items-center justify-center active:scale-95 transition-transform"
                     >
-                        <LucideLanguages className="w-[21px] h-[21px] text-brand" />
+                        <LucideTranslate className="w-[21px] h-[21px] text-brand" />
                     </button>
                     {/* 전체(≡)는 여기로 올라왔다 — 하단 탭의 그 자리는 채팅이 쓴다(2026-09-21 오너) */}
                     <button

@@ -2824,5 +2824,6 @@ const vi: Dict = {
   "dashboardHeader.golfMode": "Golf",
   "dashboardHeader.switchToBilliards": "Chuyển sang bi-a",
   "notificationInbox.actionFailed": "Không thực hiện được",
+  "myCrewCard.seeMembers": "Xem thành viên",
 };
 export default vi;

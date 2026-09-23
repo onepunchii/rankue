@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { LucideChevronRight } from "@/lib/icons";
+import { LucideChevronRight, LucideUsers } from "@/lib/icons";
 import { HiqCrew } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
@@ -11,7 +11,8 @@ import { useT } from "@/lib/i18n";
  *  - **왕관을 없앴다.** 바로 옆에 '리더'라고 적혀 있어서 같은 말을 두 번 하고 있었다.
  *  - **역할 뱃지를 이름 옆으로** 옮겼다. 예전엔 뱃지가 첫 줄을 통째로 차지해 크루 이름이 둘째 줄로 밀렸다 —
  *    이 카드에서 제일 먼저 읽혀야 하는 건 크루 이름이다.
- *  - **인원을 "4 / 20" 에서 "4/20" 한 덩어리**로. 아이콘과 공백을 빼고 숫자만 남겼다.
+ *  - **인원은 누를 수 있는 칸**이다(2026-09-23 오너: "인원수를 버튼식으로, 중요한 부분이라").
+ *    눌러서 그 크루의 멤버 목록으로 바로 간다 — 카드 전체를 누르면 크루 홈 맨 위다.
  *  - 지역을 인원보다 앞에 뒀다. 크루를 고를 때 먼저 보는 건 어디냐다.
  *  - 오른쪽 원형 버튼을 없애고 화살표만 남겼다. 카드 전체가 이미 누를 수 있다.
  *  - 색을 토큰으로 바꿨다(black/xx → ink·surface).
@@ -21,9 +22,11 @@ interface MyCrewCardProps {
     crew: HiqCrew & { memberCount?: number };
     role: string;
     onClick: () => void;
+    /** 인원 칸을 눌렀을 때 — 멤버 목록으로. 없으면 카드와 같은 곳으로 간다. */
+    onMembers?: () => void;
 }
 
-export const MyCrewCard = memo(({ crew, role, onClick }: MyCrewCardProps) => {
+export const MyCrewCard = memo(({ crew, role, onClick, onMembers }: MyCrewCardProps) => {
     const { t } = useT();
     const isLeader = role === "leader";
     const count = crew.memberCount || 1;
@@ -50,10 +53,21 @@ export const MyCrewCard = memo(({ crew, role, onClick }: MyCrewCardProps) => {
                         {isLeader ? t("myCrewCard.leader") : t("myCrewCard.member")}
                     </span>
                 </div>
-                <div className="mt-1 flex items-center gap-1.5 text-[12.5px] font-medium text-ink-3 min-w-0">
-                    <span className={cn("truncate", !crew.region && "text-ink-4")}>{crew.region || t("myCrewCard.noRegion")}</span>
-                    <span className="w-0.5 h-0.5 rounded-full bg-ink-4 shrink-0" />
-                    <span className={cn("rk-num shrink-0", nearlyFull && "font-semibold text-ink-2")}>{people}</span>
+                <div className="mt-1.5 flex items-center gap-2 min-w-0">
+                    {/* 인원 — 누르면 멤버 목록. 카드 전체도 누를 수 있으므로 버블링을 끊는다. */}
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); (onMembers ?? onClick)(); }}
+                        title={t("myCrewCard.seeMembers")}
+                        className={cn(
+                            "shrink-0 inline-flex items-center gap-1 h-6 pl-1.5 pr-2 rounded-md transition-colors",
+                            nearlyFull ? "bg-brand/10 text-brand" : "bg-surface-2 text-ink-2 active:bg-surface-3",
+                        )}
+                    >
+                        <LucideUsers className="w-3.5 h-3.5" />
+                        <span className="rk-num text-[12.5px] font-semibold">{people}</span>
+                    </button>
+                    <span className={cn("truncate text-[12.5px] font-medium text-ink-3", !crew.region && "text-ink-4")}>{crew.region || t("myCrewCard.noRegion")}</span>
                 </div>
             </div>
             <LucideChevronRight className="w-[18px] h-[18px] text-ink-4 shrink-0 transition-transform group-hover:translate-x-0.5" />

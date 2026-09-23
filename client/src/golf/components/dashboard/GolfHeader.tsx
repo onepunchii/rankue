@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { LucideChevronDown, LucideBell, LucideMenu } from "lucide-react";
+import { LucideChevronDown, LucideBell, LucideMenu } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { useT } from "@/lib/i18n";
 import { NotificationInbox, UNREAD_COUNT_KEY } from "@/components/hiq/menu/NotificationInbox";
@@ -28,8 +28,9 @@ export function GolfHeader({ member: _member }: GolfHeaderProps) {
         <div className="flex items-center justify-between mb-8 relative z-10">
             {/* 종목 전환(2026-09-23 오너). 당구 홈의 검정 알약과 짝 — 여기는 어두운 바탕이라 흰 알약에 검정 글자다.
                 라벨의 '모드'를 뺐고, 한국어로 박혀 있던 문구를 사전으로 옮겼다(외국어 사용자에게 한국어가 보였다).
-                ⚠️ `bg-white` 를 쓰면 안 된다 — 골프 테마가 .bg-white 를 surface-1(#17181a)로 덮어서
-                검정 글자와 겹쳐 통째로 안 보인다. 실제로 그렇게 만들었다가 화면에서 잡았다. 리터럴 hex 로. */}
+                ⚠️ 골프 테마는 `bg-white` 뿐 아니라 `text-black/45` 같은 **검정 계열 유틸리티도 밝은 색으로 바꿔 끼운다**
+                (index.css 의 :root[data-sport="GOLF"] 규칙들). 흰 알약 위에 그걸 쓰면 글자도 화살표도 배경에 묻는다 —
+                두 번 다 그렇게 만들었다가 화면에서 잡았다. 이 알약 안은 **리터럴 hex 만** 쓴다. */}
             <button
                 type="button"
                 onClick={() => setSport('BILLIARDS')}
@@ -37,7 +38,7 @@ export function GolfHeader({ member: _member }: GolfHeaderProps) {
                 className="inline-flex items-center gap-1 h-7 pl-3 pr-2 rounded-full bg-[#ffffff] active:scale-95 transition-transform"
             >
                 <span className="text-[12.5px] font-semibold text-[#0a0a0a] tracking-tight">{t("dashboardHeader.golfMode")}</span>
-                <LucideChevronDown className="w-3.5 h-3.5 text-black/45" />
+                <LucideChevronDown className="w-3.5 h-3.5 text-[#52525b]" />
             </button>
 
             <div className="flex items-center gap-2">

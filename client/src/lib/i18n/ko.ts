@@ -2826,4 +2826,5 @@ export const ko: Dict = {
   "dashboardHeader.golfMode": "골프",
   "dashboardHeader.switchToBilliards": "당구로",
   "notificationInbox.actionFailed": "처리하지 못했어요",
+  "myCrewCard.seeMembers": "멤버 보기",
 };

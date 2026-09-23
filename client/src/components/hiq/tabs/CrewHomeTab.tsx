@@ -1,4 +1,4 @@
-import { useState, memo, useMemo } from "react";
+import { useState, memo, useMemo, useEffect } from "react";
 import {
     LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus,
     LucideChevronDown, LucideUsers, LucideFlag, LucideTarget, LucideLogOut, LucideTrophy
@@ -65,6 +65,22 @@ export const CrewHomeTab = memo(({
     onPollClick, onTournamentClick, onCreateTournament, onOpenHallOfFame
 }: CrewHomeTabProps) => {
     const { t } = useT();
+    // 내 크루 카드의 인원 버튼으로 들어오면 멤버 구역까지 내린다. 주소는 한 번 쓰고 지운다 —
+    // 안 지우면 새로고침·뒤로가기마다 다시 튄다.
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const p = new URLSearchParams(window.location.search);
+        if (p.get("focus") !== "members") return;
+        p.delete("focus");
+        const qs = p.toString();
+        window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+        // 목록이 그려진 뒤에 재야 한다 — 두 프레임 뒤.
+        const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+            document.getElementById("crew-members")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }));
+        return () => cancelAnimationFrame(id);
+    }, []);
+
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
     const activeMembers = useMemo(() => members.filter((m: any) => m.role !== 'pending'), [members]);
@@ -361,8 +377,8 @@ export const CrewHomeTab = memo(({
                 )}
             </div>
 
-            {/* Members Section */}
-            <div className="px-6 pb-20">
+            {/* Members Section — 내 크루 카드의 인원 버튼이 ?focus=members 로 여기까지 데려온다(2026-09-23) */}
+            <div id="crew-members" className="px-6 pb-20 scroll-mt-4">
                 <div className="flex items-center gap-2 mb-6">
                     <div className="w-1.5 h-1.5 rounded-full bg-brand" />
                     <h2 className="text-[15px] font-semibold text-black/55">{t("crewHome.members")} <span className="ml-1 tabular-nums">{activeMembers.length}</span></h2>

@@ -52,6 +52,8 @@ export const MyCrewList = memo(({ currentSport }: MyCrewListProps) => {
                     crew={{ ...crew, memberCount }}
                     role={role}
                     onClick={() => setLocation(`/club/${crew.id}`)}
+                    // 인원 칸은 멤버 목록으로 — 크루 홈의 멤버 구역으로 스크롤한다(CrewHomeTab 이 focus 를 읽는다)
+                    onMembers={() => setLocation(`/club/${crew.id}?tab=home&focus=members`)}
                 />
             ))}
         </div>
