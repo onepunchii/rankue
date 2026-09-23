@@ -256,6 +256,21 @@ async function broadcastRoomOpened(hostId: string, hostName: string, m: { id: st
 async function notify(memberId: string | null | undefined, title: string | I18nText, body: string | I18nText, matchId: string): Promise<void> {
     await notifyUrl(memberId, title, body, `/online-game?match=${matchId}`);
 }
+
+/**
+ * 그 선수가 **지금 대전 화면을 보고 있나**(2026-09-23 오너: "당신 차례예요 알림, 필요없을듯한데").
+ * hostSeenAt/guestSeenAt 은 대전 화면 폴링(약 4초)마다 갱신된다 — 이미 40초 시계를 언제 돌릴지 정하는 데 쓰는 값이고,
+ * 화면의 '상대가 자리를 비웠어요' 표시도 같은 기준(PRESENCE_MS)이다. 판정을 한 군데로 모아 둔다.
+ *
+ * 실측(2026-09-23): '당신 차례예요' 1,548건 중 81%가 **받는 사람이 40초 안에 실제로 샷을 친** 순간에 갔다.
+ * 보고 있는 사람에게 보고 있는 것을 알린 셈이고, 그 기록이 알림함의 3분의 1을 차지했다.
+ * 자리를 비운 사람에게는 그대로 간다 — 그 알림의 존재 이유가 그쪽이다(안 오면 3진아웃으로 진다).
+ */
+function isWatching(m: { status: string; hostSeenAt: Date | null; guestSeenAt: Date | null }, playerIndex: 0 | 1): boolean {
+    if (m.status !== "playing") return false;
+    const seen = playerIndex === 0 ? m.hostSeenAt : m.guestSeenAt;
+    return !!seen && Date.now() - seen.getTime() <= PRESENCE_MS;
+}
 /**
  * 샷·시간초과처럼 **판이 도는 길목**에서 쓰는 상한 — 클라이언트는 이 응답들을 한 줄(serial)로 기다리며 그동안 폴링도 멈춘다.
  * 푸시 서버가 늘어지면(상한 8초) 판이 통째로 멈추므로 1.5초만 기다린다. 알림함 기록은 sendAndSaveNotification 안에서
@@ -581,7 +596,14 @@ router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: Au
             notify(timedOutId, "notif.sim.disqualified.title", msg("notif.sim.disqualified.body", { n: SHOT_CLOCK_STRIKES }), m.id),
         ]));
     } else if (finished) await capped(notify(otherId, "notif.sim.finished.title", "notif.sim.finished.checkResult", m.id));
-    else if (m.turn === myIndex) await capped(notify(otherId, "notif.sim.yourTurn.title", msg("notif.sim.yourTurn.opponentTimeout", { strikes, max: SHOT_CLOCK_STRIKES }), m.id));
+    else if (m.turn === myIndex) {
+        // 샷 경로와 같은 규칙 — 상대가 화면을 보고 있으면 '당신 차례예요'를 보내지 않는다(시계와 초과 횟수가 화면에 이미 있다).
+        // 실격·시간초과 통보(위아래 가지)는 보고 있어도 보낸다: 벌점과 승패는 한 줄 남는 게 맞다.
+        const otherIndex: 0 | 1 = m.turn === 0 ? 1 : 0;
+        if (!isWatching(m, otherIndex)) {
+            await capped(notify(otherId, "notif.sim.yourTurn.title", msg("notif.sim.yourTurn.opponentTimeout", { strikes, max: SHOT_CLOCK_STRIKES }), m.id));
+        }
+    }
     else await capped(notify(timedOutId, "notif.sim.timeout.title", msg("notif.sim.timeout.body", { strikes, max: SHOT_CLOCK_STRIKES }), m.id));
     const full = await storage.simMatch.get(m.id);
     return sendSuccess(res, publicMatch(full!, req.userId!));
@@ -671,7 +693,12 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
         const iWon = winnerIdx === myIndex;
         await capped(notify(opponentId, "notif.sim.finished.title", iWon ? msg("notif.sim.finished.lost", { name: meName }) : "notif.sim.finished.won", m.id));
     } else if (applied.session.turn !== myIndex) {
-        await capped(notify(opponentId, "notif.sim.yourTurn.title", msg("notif.sim.yourTurn.body", { name: meName }), m.id));
+        // 상대가 지금 화면을 보고 있으면 알리지 않는다 — 공이 구르는 걸 보고 있는 사람에게 "당신 차례예요"는 소음이다.
+        // 끝났다는 알림(위 가지)은 화면을 보고 있어도 보낸다: 판이 끝나면 폴링도 끝나 화면이 더 말해 주지 않는다.
+        const oppIndex: 0 | 1 = myIndex === 0 ? 1 : 0;
+        if (!isWatching(m, oppIndex)) {
+            await capped(notify(opponentId, "notif.sim.yourTurn.title", msg("notif.sim.yourTurn.body", { name: meName }), m.id));
+        }
     }
 
     const mismatch = clientHash !== undefined && clientHash !== result.hash;
