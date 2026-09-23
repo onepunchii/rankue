@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { kstDateLabel, kstTime } from "@/lib/kst";
+import { seatsTaken } from "@shared/golfJoin";
 
 /**
  * 내가 올린 조인 글에 **누가 신청했는지**, 그리고 안 나타난 사람 표시.
@@ -103,7 +104,8 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
     const applicants = data?.applicants ?? [];
     const pendingCount = applicants.filter((a) => a.status === "applied").length;
     // 서버의 카드 집계(joinApplied)와 같은 기준 — 노쇼는 자리를 비우므로 확정에서 뺀다(예전엔 패널과 카드의 숫자가 어긋났다).
-    const acceptedCount = applicants.filter((a) => a.status === "accepted").length;
+    // **사람 수**로 센다(2026-09-24). 부킹 신청 한 건은 1~4명이라, 행 수로 세면 카드가 '확정 2' 인데 여기는 '확정 1' 이 된다.
+    const acceptedCount = seatsTaken(applicants.filter((a) => a.status === "accepted"));
 
     return (
         <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">

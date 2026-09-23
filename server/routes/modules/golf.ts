@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { storage } from "../../storage/index.js";
+import type { SeatLimit } from "../../storage/golf.repo.js";
 import { insertGolfBookingSchema, GolfBooking, insertGolfJoinSchema, GolfJoin, insertGolfMembershipOrderSchema } from "../../../shared/schema.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
@@ -8,7 +9,7 @@ import { notifyCrewChat } from "../../services/crewChatNotify.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { z } from "zod";
 import { notificationService } from "../../services/notificationService.js";
-import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, type JoinType } from "../../../shared/golfJoin.js";
+import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, convertibleSeats, conversionSlots, recruitCondition, type JoinType, type SlotGender } from "../../../shared/golfJoin.js";
 import { msg } from "../../lib/i18n.js";
 
 const router = Router();
@@ -229,29 +230,29 @@ router.post("/bookings/:id/to-join", requireAuth, asyncHandler(async (req: AuthR
     if (booking.listingType === "JOIN") return sendError(res, 400, "이미 조인이에요", "ALREADY_JOIN");
     if (new Date(booking.datetime).getTime() <= Date.now()) return sendError(res, 400, "이미 지난 티타임이에요", "TEE_TIME_PASSED");
 
-    // 자리 규칙은 조인 만들기와 **같은 함수**로 본다(2~4칸 · 모집 1칸 이상 · HOST 는 있으면 첫 칸에만). 정원은 자리에서 센다.
-    // 전환 글에는 HOST 가 아예 없다 — 매장 매니저는 자기가 파는 팀에서 치지 않는다(유령 자리). 그래서 네 자리 전부 모집일 수 있다.
-    const slots = normalizeSlots(req.body?.slots);
-    if (!slots) return sendError(res, 400, "자리 구성이 올바르지 않아요(남은 자리 1~4)");
+    // 화면은 **'몇 자리 더 받을지'만** 말한다. 자리 배열은 서버가 만든다(shared/golfJoin.conversionSlots) —
+    // 화면이 보낸 배열을 믿으면 "두 자리 팔렸는데 네 자리 남았다"가 통과해 한 팀에 여섯 명을 받게 된다.
+    const more = Math.floor(Number(req.body?.more));
+    if (!Number.isFinite(more) || more < 1 || more > MAX_SLOTS) return sendError(res, 400, `더 받을 자리는 1~${MAX_SLOTS}자리예요`);
+    const genders: SlotGender[] = Array.isArray(req.body?.genders)
+        ? req.body.genders.filter((g: unknown) => g === "M" || g === "F" || g === "ANY")
+        : [];
     // 비용: 기본은 적어 둔 그린피 그대로(FIXED). 1/N 을 고르면 금액은 뜻이 없어 0 으로 둔다(조인 만들기와 같다).
     const costMode = req.body?.costMode === "SPLIT" ? "SPLIT" : "FIXED";
 
-    // 이미 예약이 확정된 티타임은 못 돌린다 — 부킹의 정원은 1(한 팀 통째)이라 확정자는 네 자리를 다 산 사람이다.
-    // 그대로 조인으로 바꾸면 그 사람이 조인 자리 하나를 차지한 것처럼 세어져, 팔린 팀에 낯선 사람을 더 받게 된다.
-    const counts = await storage.countJoinRequests([booking.id]);
-    if ((counts.get(booking.id)?.accepted ?? 0) > 0) return sendError(res, 409, "이미 예약이 확정된 티타임이에요", "BOOKING_CONFIRMED");
-
-    const open = openSlotCount(slots);
-    const updated = await storage.convertBookingToJoin(booking.id, req.userId!, {
-        slots,
-        joinHeadcount: open,
-        // 옛 화면·검색이 보는 요약값(자리 정보의 요약본일 뿐이다) — 조인 만들기 시트와 같은 규칙으로 만든다.
-        joinCondition: slots.filter((s) => s.role === "OPEN").every((s) => s.gender === "M") ? "남성"
-            : slots.filter((s) => s.role === "OPEN").every((s) => s.gender === "F") ? "여성" : "성별무관",
-        costMode,
-        greenFee: costMode === "SPLIT" ? 0 : Number(booking.greenFee) || 0,
-    });
-    if (!updated) return sendError(res, 409, "지금은 조인으로 돌릴 수 없어요", "CONVERT_FAILED");
+    // 팔린 자리를 세고 바꾸는 일은 한 트랜잭션 안에서 한다 — 여기서 미리 세어 두면 그 사이 승인이 끼어든다.
+    const result = await storage.convertBookingToJoin(booking.id, req.userId!, { more, genders, costMode });
+    if (!result.ok) {
+        // 네 자리가 **다** 팔렸을 때만 막는다. 두 자리만 팔린 티타임은 남은 두 자리를 돌릴 수 있어야 한다
+        // (2026-09-24 오너: "2명이니깐 2명을 더 조인으로 전환해도되고 해야되는데").
+        if (result.reason === "full") return sendError(res, 409, "네 자리가 다 팔린 티타임이에요", "BOOKING_CONFIRMED");
+        if (result.reason === "bad_slots") return sendError(res, 400, `남은 자리는 ${result.room ?? MAX_SLOTS}자리예요`, "TOO_MANY_SEATS");
+        if (result.reason === "already_join") return sendError(res, 400, "이미 조인이에요", "ALREADY_JOIN");
+        if (result.reason === "passed") return sendError(res, 400, "이미 지난 티타임이에요", "TEE_TIME_PASSED");
+        if (result.reason === "forbidden") return sendError(res, 403, "글쓴이만 조인으로 돌릴 수 있어요");
+        return sendError(res, 409, "지금은 조인으로 돌릴 수 없어요", "CONVERT_FAILED");
+    }
+    const { row: updated, open } = result;
 
     // 대기 중이던 예약 신청자에게 알린다 — 그 사람들이 신청한 것은 '팀 통째'였는데 이제 자리 하나짜리 조인이다.
     // ⚠️ sendSuccess **전에** await — 서버리스는 응답을 보내면 실행이 얼어붙어 기다리지 않은 푸시는 한 통도 안 나간다.
@@ -261,7 +262,7 @@ router.post("/bookings/:id/to-join", requireAuth, asyncHandler(async (req: AuthR
             memberId, title: "부킹이 조인으로 바뀌었어요",
             // 신청은 대기열에 그대로 두되 인원은 1 로 맞춰진다(convertBookingToJoin) — 조인은 자리 하나가 사람 하나다.
             // 여러 명으로 신청했던 사람에게 그 말을 안 하면, 일행을 데려갈 생각으로 기다리다 현장에서 어긋난다.
-            body: `${listingName(updated)} ${teeText(updated)} — 남은 ${open}자리를 받는 조인이 됐어요. 신청은 1자리로 두었어요(조인은 한 사람이 한 자리예요). 일행이 있으면 각자 신청해야 해요.`,
+            body: `${listingName(updated)} ${teeText(updated)} — ${open}자리를 받는 조인이 됐어요. 신청은 1자리로 두었어요 — 일행이 있으면 각자 신청해야 해요.`,
             category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list/${booking.id}?view=JOIN` },
         }).catch((e) => console.error("[GolfJoinNotify]", e))));
     }
@@ -333,8 +334,8 @@ router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthReq
     // 부킹 예약 신청(2026-09-21 오너: "푸시로 승부") — 문자 대신 앱 안에서 신청→승인→확정. 인원 1~4.
     const headcount = isJoin ? 1 : Math.max(1, Math.min(4, Math.floor(Number(req.body?.headcount)) || 1));
 
-    const capacity = joinCapacity(booking);
-    const r = await storage.applyToJoin(req.params.id, req.userId!, capacity, headcount);
+    const limit = seatLimit(booking);
+    const r = await storage.applyToJoin(req.params.id, req.userId!, limit, headcount);
     if (r === "already") return sendError(res, 409, "이미 신청했어요", "ALREADY_APPLIED");
     if (r === "rejected") return sendError(res, 403, "올린 분이 받지 않은 신청이라 다시 신청할 수 없어요", "APPLY_REJECTED");
     if (r === "cooldown") return sendError(res, 429, "방금 취소했어요. 1분 뒤에 다시 신청해 주세요", "APPLY_COOLDOWN");
@@ -369,13 +370,32 @@ function teeText(booking: { datetime: Date | string }): string {
     return `${k.getUTCMonth() + 1}/${k.getUTCDate()} ${String(k.getUTCHours()).padStart(2, "0")}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
 }
 
-/** 정원 = 모집 자리 수. 자리가 없는 옛 글은 모집 인원, 그것도 없으면 기본 3. 부킹은 1 — 티타임 하나는 한 팀에게만 확정된다. */
+/**
+ * 정원 = 모집 자리 수. 자리가 없는 옛 글은 모집 인원, 그것도 없으면 기본 3.
+ * **부킹은 1** — 티타임 하나는 한 팀에게만 확정된다. 이 1의 단위는 '자리'가 아니라 **'팀'** 이다.
+ * 그 팀이 몇 명인지는 신청의 headcount 가 말한다(1~4). 단위를 섞지 않으려면 seatLimit() 을 써라.
+ */
 function joinCapacity(booking: any): number {
     if (booking.listingType !== "JOIN") return 1;
     const slots = Array.isArray(booking.slots) ? normalizeSlots(booking.slots) : null;
     if (slots) return openSlotCount(slots);
     // 옛 글의 모집 인원도 4인 1팀 안으로 묶는다 — 자리 없이 저장된 큰 숫자가 그대로 정원이 되지 않게.
     return Number(booking.joinHeadcount) > 0 ? Math.min(MAX_SLOTS - 1, Number(booking.joinHeadcount)) : openSlotCount(slotsFromLegacy(booking.joinHeadcount, booking.joinCondition));
+}
+
+/**
+ * 정원과 **그 정원을 세는 단위**를 함께 준다(2026-09-24).
+ * 부킹은 팀을 판다 → 승인된 신청 건수로 센다. 조인은 자리를 판다 → 승인된 사람 수로 센다.
+ * 조인 신청은 늘 1명이라 조인 쪽 숫자는 예전(행 수)과 언제나 같다.
+ */
+function seatLimit(booking: any): SeatLimit {
+    return { capacity: joinCapacity(booking), unit: booking.listingType === "JOIN" ? "seats" : "parties" };
+}
+
+/** 앱이 아는 '팔린 자리'(사람 수). 부킹의 2명짜리 신청 하나는 2다 — 행 수로 세면 1이라 티타임이 잠긴다. */
+async function soldSeats(bookingId: string): Promise<number> {
+    const counts = await storage.countJoinRequests([bookingId]);
+    return counts.get(bookingId)?.seats ?? 0;
 }
 
 /**
@@ -390,7 +410,7 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
     const accept = req.body?.accept === true;
     const isJoin = booking.listingType === "JOIN";
     if (accept && new Date(booking.datetime).getTime() <= Date.now()) return sendError(res, 400, "이미 지난 티타임이에요", "TEE_TIME_PASSED");
-    const r = await storage.decideJoinRequest(req.params.id, req.params.memberId, accept, joinCapacity(booking));
+    const r = await storage.decideJoinRequest(req.params.id, req.params.memberId, accept, seatLimit(booking));
     if (r === "full") return sendError(res, 409, isJoin ? "자리가 다 찼어요" : "이미 다른 분께 확정한 티타임이에요", "JOIN_FULL");
     if (r === "gone") return sendError(res, 409, "대기 중인 신청이 아니에요");
     // 확정되면 대화방에 들어온다(2026-09-21 채팅) — 시스템 메시지로 알리고, 푸시는 방으로 바로 보낸다.
@@ -403,7 +423,10 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
     // 거절은 재신청이 막히는 최종 상태라(2026-09-22), 확정자가 빠져 자리가 다시 나면 이 사람들이 돌아올 수 있어야 한다.
     if (accept) {
         const counts = await storage.countJoinRequests([booking.id]);
-        if ((counts.get(booking.id)?.accepted ?? 0) >= joinCapacity(booking)) {
+        const c = counts.get(booking.id);
+        const lim = seatLimit(booking);
+        // 정원과 **같은 단위**로 센다 — 조인은 자리(사람 수), 부킹은 팀(건수).
+        if ((lim.unit === "seats" ? (c?.seats ?? 0) : (c?.accepted ?? 0)) >= lim.capacity) {
             const waiting = await storage.pendingRequesterIds(booking.id);
             await Promise.allSettled(waiting.map((memberId) => notificationService.sendAndSaveNotification({
                 memberId, title: isJoin ? "조인 자리가 다 찼어요" : "예약이 다른 분께 확정됐어요",
@@ -538,7 +561,7 @@ router.post("/bookings/:id/applicants/:memberId/noshow", requireAuth, asyncHandl
         return sendError(res, 400, "티타임이 지난 뒤에 표시할 수 있어요", "TEE_TIME_NOT_PASSED");
     }
     const noShow = req.body?.noShow !== false;
-    const r = await storage.setJoinNoShow(req.params.id, req.params.memberId, noShow, joinCapacity(booking));
+    const r = await storage.setJoinNoShow(req.params.id, req.params.memberId, noShow, seatLimit(booking));
     if (r === "full") return sendError(res, 409, "그 사이 자리가 차서 되돌릴 수 없어요", "JOIN_FULL");
     if (r === "gone") return sendError(res, 404, noShow ? "신청 중인 사람이 아니에요" : "노쇼로 표시된 사람이 아니에요");
     return sendSuccess(res, { noShow });
@@ -635,8 +658,10 @@ async function withJoinCounts(rows: any[], userId?: string) {
         return {
             ...safe,
             managerPhone: showPhone ? managerPhone : null,
-            // joinApplied 는 **자리를 차지한** 인원(승인됨) — 화면의 n/정원. 대기는 따로.
-            joinApplied: c?.accepted ?? 0,
+            // joinApplied 는 **자리를 차지한 사람 수**(승인됨) — 화면의 n/정원. 대기는 따로.
+            // 행 수가 아니라 headcount 합이다(2026-09-24): 부킹의 2명짜리 신청 하나는 2자리다.
+            // 조인 신청은 늘 1명이라 조인 글에서는 예전 값과 똑같다.
+            joinApplied: c?.seats ?? 0,
             joinPending: c?.pending ?? 0,
             joinCapacity: joinCapacity(r),
             isUrgent: isUrgentJoin(r, now),

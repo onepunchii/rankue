@@ -142,7 +142,11 @@ function mountEl(el: React.ReactElement): Harness {
 const click = (el: Element) => React.act(() => { el.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); });
 const buttons = (h: Harness) => Array.from(h.container.querySelectorAll("button"));
 const byText = (h: Harness, text: string) => buttons(h).find((b) => b.textContent === text) ?? null;
-const flush = () => React.act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+/**
+ * 매크로태스크를 **여러 번** 비운다. 한 틱만 기다리면 147개 파일이 병렬로 도는 부하에서
+ * react-query 응답이 늦어 "내 다마수"가 아직 — 인 채로 단언에 걸렸다(단독 실행은 늘 통과). 2026-09-24.
+ */
+const flush = (ticks = 4) => React.act(async () => { for (let i = 0; i < ticks; i++) await new Promise((r) => setTimeout(r, 0)); });
 const wait = (ms: number) => React.act(async () => { await new Promise((r) => setTimeout(r, ms)); });
 function type(input: HTMLInputElement, value: string) {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;

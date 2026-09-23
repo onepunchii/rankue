@@ -1,6 +1,6 @@
 import { UserRepository } from "./user.repo.js";
 import { CrewRepository } from "./crew.repo.js";
-import { GolfRepository } from "./golf.repo.js";
+import { GolfRepository, type SeatLimit } from "./golf.repo.js";
 import { GameRepository } from "./game.repo.js";
 import { AppSessionRepository } from "./appSession.repo.js";
 import { AdminRepository } from "./admin.repo.js";
@@ -70,15 +70,15 @@ class Storage {
     async getGolfBooking(id: string) { return this.golf.getGolfBooking(id); }
     async countJoinRequests(ids: string[]) { return this.golf.countJoinRequests(ids); }
     async myJoinStatuses(memberId: string, ids: string[]) { return this.golf.myJoinStatuses(memberId, ids); }
-    async decideJoinRequest(bookingId: string, memberId: string, accept: boolean, capacity: number) { return this.golf.decideJoinRequest(bookingId, memberId, accept, capacity); }
+    async decideJoinRequest(bookingId: string, memberId: string, accept: boolean, limit: SeatLimit) { return this.golf.decideJoinRequest(bookingId, memberId, accept, limit); }
     async listMyRequests(memberId: string) { return this.golf.listMyRequests(memberId); }
     async pendingRequesterIds(bookingId: string) { return this.golf.pendingRequesterIds(bookingId); }
     async countRecentBookingsByOwner(ownerId: string, minutes: number) { return this.golf.countRecentBookingsByOwner(ownerId, minutes); }
     async activeRequesterIds(bookingId: string) { return this.golf.activeRequesterIds(bookingId); }
-    async applyToJoin(bookingId: string, memberId: string, capacity: number, headcount = 1) { return this.golf.applyToJoin(bookingId, memberId, capacity, headcount); }
+    async applyToJoin(bookingId: string, memberId: string, limit: SeatLimit, headcount = 1) { return this.golf.applyToJoin(bookingId, memberId, limit, headcount); }
     async cancelJoinRequest(bookingId: string, memberId: string) { return this.golf.cancelJoinRequest(bookingId, memberId); }
     async listJoinApplicants(bookingId: string) { return this.golf.listJoinApplicants(bookingId); }
-    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean, capacity?: number) { return this.golf.setJoinNoShow(bookingId, memberId, noShow, capacity); }
+    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean, limit?: SeatLimit) { return this.golf.setJoinNoShow(bookingId, memberId, noShow, limit); }
     async deleteGolfBooking(id: string, managerPhone?: string, ownerId?: string) { return this.golf.deleteGolfBooking(id, managerPhone, ownerId); }
     async convertBookingToJoin(id: string, ownerId: string, patch: Parameters<GolfRepository["convertBookingToJoin"]>[2]) { return this.golf.convertBookingToJoin(id, ownerId, patch); }
     async getGolfJoins(filters?: any) { return this.golf.getGolfJoins(filters); }

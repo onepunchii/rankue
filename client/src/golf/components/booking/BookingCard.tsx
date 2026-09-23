@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LucideChevronDown, LucideMapPin, LucideShare2, LucideFlag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SPECIAL_OPTIONS } from '../../constants/booking';
-import { JOIN_OPTIONS, distanceKm, formatDistance, isKoreaCoord } from '@shared/golfJoin';
+import { JOIN_OPTIONS, MAX_SLOTS, distanceKm, formatDistance, isKoreaCoord } from '@shared/golfJoin';
 import { courseCoord } from '../../data/courseCoords';
 import { JoinApplicants } from './JoinApplicants';
 import { useT } from '@/lib/i18n';
@@ -148,7 +148,9 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                         <div className="flex items-center gap-2 min-w-0">
                             <SlotDots slots={slots} filled={applied} size={16} hostLabel={hostLabel} />
                             <span className="text-[12px] font-medium text-white/60 truncate">
-                                {capacity}명 모집 · {openGenderText(slots)}
+                                {/* 정원이 아니라 **남은 자리**를 적는다 — 전환 글은 이미 팔린 자리도 OPEN 이라
+                                    정원을 그대로 쓰면 '확정 2/4' 옆에 '4명 모집' 이 나란히 찍힌다(2026-09-24). */}
+                                {joinFull ? "자리가 찼어요" : `${Math.max(0, capacity - applied)}명 모집 · ${openGenderText(slots, applied)}`}
                                 {isMine && pending > 0 && <span className="text-[#FF8A33]"> · 대기 {pending}</span>}
                             </span>
                         </div>
@@ -216,7 +218,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                     </div>
                                     <SlotDots slots={slots} filled={applied} size={26} hostLabel={hostLabel} />
                                     <div className="flex flex-wrap gap-1.5">
-                                        {slotLegend(slots, hostLabel).map((t) => <span key={t} className="px-2 py-0.5 rounded-md bg-white/[0.06] text-[12px] text-white/70">{t}</span>)}
+                                        {slotLegend(slots, hostLabel, applied).map((t) => <span key={t} className="px-2 py-0.5 rounded-md bg-white/[0.06] text-[12px] text-white/70">{t}</span>)}
                                     </div>
                                 </div>
                             )}
@@ -278,7 +280,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                               * 아래 버튼 줄이 아니라 그 위에 온전한 한 줄로 둔다: 줄에 이미 신청·문자·공유·내리기가 있어 375px 에서 이름이 잘린다.
                               * 확정된 예약이 있으면 안 보인다 — 팀이 통째로 팔린 티타임에는 나눌 자리가 없다(서버도 409).
                               */}
-                            {isMine && !isJoin && !past && onToJoin && applied === 0 && (
+                            {isMine && !isJoin && !past && onToJoin && applied < MAX_SLOTS && (
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onToJoin(item); }}
                                     className="w-full h-11 rounded-xl border border-[#FF6B00]/35 bg-[#FF6B00]/10 text-[13.5px] font-medium text-[#FF8A33] active:bg-[#FF6B00]/20"

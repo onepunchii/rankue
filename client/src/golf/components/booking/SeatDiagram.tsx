@@ -10,9 +10,16 @@
  */
 import { MAX_SLOTS } from "@shared/golfJoin";
 
-/** 자리 넷 그림. open = 앱이 채울(모집) 자리 수. 찬 자리를 왼쪽, 모집 자리를 오른쪽에 둔다. */
-export function SeatDiagram({ open, accent = "#64DD17", openLabel = "앱이 채움" }: { open: number; accent?: string; openLabel?: string }) {
+/**
+ * 자리 넷 그림. open = 앱이 채울(모집) 자리 수. 찬 자리를 왼쪽, 모집 자리를 오른쪽에 둔다.
+ *
+ * sold 는 **앱에서 이미 팔린** 자리다(승인된 신청). 나머지 찬 자리는 앱 밖에서 판 것이다 —
+ * 둘을 같은 회색 사람으로 그리면 매니저가 "내가 방금 승인한 그 두 명이 어디 있지" 를 못 찾는다(2026-09-24).
+ * 그림의 순서는 저장되는 자리 순서와 같다: 앱 밖 판매 → 앱 확정 → 모집.
+ */
+export function SeatDiagram({ open, sold = 0, accent = "#64DD17", openLabel = "앱이 채움" }: { open: number; sold?: number; accent?: string; openLabel?: string }) {
     const taken = MAX_SLOTS - open;
+    const offApp = Math.max(0, taken - Math.max(0, sold));
     // rgba 를 문자열로 만들지 않고 hex 에 투명도를 붙인다 — 어느 강조색이 와도 같은 농도가 나온다.
     const fill = `${accent}1A`;   // 10%
     const dot = `${accent}29`;    // 16%
@@ -43,7 +50,7 @@ export function SeatDiagram({ open, accent = "#64DD17", openLabel = "앱이 채�
                             </>
                         )}
                         <text x={cx} y={70} textAnchor="middle" fontSize={10.5} fill="#8b9099">
-                            {isOpen ? openLabel : "찬 자리"}
+                            {isOpen ? openLabel : i < offApp ? "따로 팔림" : "앱 확정"}
                         </text>
                     </g>
                 );

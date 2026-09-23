@@ -147,9 +147,13 @@ export function dayLabel(dateKey: string, todayKey: string): string {
     return `D-${d}`;
 }
 
-/** 모집 자리의 성별 요약: "성별무관" · "남성" · "여성" · "남 1 · 여 1" 처럼. */
-export function openGenderText(slots: readonly JoinSlot[]): string {
-    const open = slots.filter((s) => s.role === "OPEN");
+/**
+ * 모집 자리의 성별 요약: "성별무관" · "남성" · "여성" · "남 1 · 여 1" 처럼.
+ * filled 은 **이미 찬 모집 자리** 수다(앞에서부터). SlotDots 와 같은 규칙 — 안 빼면
+ * 이미 팔린 자리까지 '모집'으로 세어 한 화면에서 '확정 2/4' 옆에 '4명 모집'이 찍힌다(2026-09-24).
+ */
+export function openGenderText(slots: readonly JoinSlot[], filled = 0): string {
+    const open = slots.filter((s) => s.role === "OPEN").slice(Math.max(0, filled));
     if (open.length === 0) return "";
     const n = { M: 0, F: 0, ANY: 0 };
     for (const s of open) n[s.gender]++;
@@ -164,14 +168,19 @@ export function openGenderText(slots: readonly JoinSlot[]): string {
  * hostLabel 이 null(전환 글)이면 첫 칸을 '이미 찬 자리'로 부르고 동반자와 **같은 묶음**으로 센다 —
  * 매장 글에서 그 둘은 신청자에게 똑같은 것이다("두 자리는 이미 팔렸다").
  */
-export function slotLegend(slots: readonly JoinSlot[], hostLabel: string | null = "호스트"): string[] {
+export function slotLegend(slots: readonly JoinSlot[], hostLabel: string | null = "호스트", filled = 0): string[] {
     const taken = hostLabel === null ? "이미 찬 자리" : null;
     const name = (s: JoinSlot) => (s.role === "OPEN" ? "모집" : s.role === "HOST" ? (hostLabel ?? taken!) : (taken ?? "동반자"));
     const out: { key: string; label: string; n: number }[] = [];
+    // 앞에서부터 filled 개의 모집 자리는 **이미 찼다** — SlotDots 와 같은 규칙. 남은 성별 조건만 '모집'으로 적는다.
+    // 안 빼면 '확정 2/4' 옆에 '모집 무관 ×4' 가 나란히 찍힌다(2026-09-24).
+    let toFill = Math.max(0, filled);
     for (const s of slots) {
+        const takenOpen = s.role === "OPEN" && toFill > 0 && (toFill--, true);
         // 찬 자리의 '무관' 은 적지 않는다 — 모르는 성별을 굳이 말하는 것이라 "이미 찬 자리 무관 ×2" 처럼 읽힌다.
         // 모집 자리는 반대다: 무관이야말로 신청자가 알아야 할 조건이다.
-        const label = s.role !== "OPEN" && s.gender === "ANY" ? name(s) : `${name(s)} ${GENDER_LABEL[s.gender]}`;
+        const label = takenOpen ? "이미 찬 자리"
+            : s.role !== "OPEN" && s.gender === "ANY" ? name(s) : `${name(s)} ${GENDER_LABEL[s.gender]}`;
         const hit = out.find((o) => o.key === label);
         if (hit) hit.n++; else out.push({ key: label, label, n: 1 });
     }

@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { URGENT_MAX_FEE, URGENT_MIN_LEAD_MS } from "../../shared/golfJoin.js";
+import { URGENT_MAX_FEE, URGENT_MIN_LEAD_MS, convertibleSeats, conversionSlots, recruitCondition, type SlotGender } from "../../shared/golfJoin.js";
 import {
     golfBookings,
     golfJoinRequests,
@@ -176,6 +176,32 @@ function buildGolfFilterConditions(filters: any): any[] {
     }
 
     return out;
+}
+
+/**
+ * 정원을 세는 **단위**. 부킹과 조인은 파는 물건이 달라 세는 것도 다르다(2026-09-24).
+ *   parties  부킹 — 티타임 하나를 한 팀에게 통째로 판다. 승인된 신청 **건수**를 센다(정원 1).
+ *   seats    조인 — 한 사람이 한 자리. 승인된 **사람 수**(headcount 합)를 센다(정원 = 모집 자리 수).
+ *
+ * 숫자만 넘기면 어느 쪽인지 알 수 없다. 그게 오너가 본 버그였다 — 2명짜리 부킹 신청 하나를
+ * count(*) 로 세어 '1자리'라 하고는, 네 자리 중 두 자리만 팔린 티타임을 '다 팔림'으로 잠갔다.
+ * 조인 신청은 늘 1명이라 조인 글에서는 두 단위의 값이 언제나 같다(= 갈아끼워도 조인은 안 바뀐다).
+ */
+export interface SeatLimit {
+    capacity: number;
+    unit: "parties" | "seats";
+}
+
+/** 부킹 → 조인 전환의 결과. 실패 이유를 라우트가 그대로 문구로 옮긴다. */
+export type ConvertResult =
+    | { ok: true; row: GolfBooking; sold: number; open: number }
+    | { ok: false; reason: "gone" | "forbidden" | "already_join" | "passed" | "full" | "bad_slots"; sold?: number; room?: number };
+
+/** 승인된 것을 그 단위로 세는 SQL 조각. */
+function seatExpr(limit: SeatLimit) {
+    return limit.unit === "seats"
+        ? sql<number>`coalesce(sum(${golfJoinRequests.headcount}), 0)::int`
+        : sql<number>`count(*)::int`;
 }
 
 export class GolfRepository {
@@ -426,48 +452,71 @@ export class GolfRepository {
      * ⚠️ 지난 티타임 검사는 now() 로 **DB 안에서** 한다. JS Date 를 sql 에 끼워 넣으면 9시간이 어긋난다(이 저장소의 상습 함정).
      */
     async convertBookingToJoin(id: string, ownerId: string, patch: {
-        slots: { role: "HOST" | "GUEST" | "OPEN"; gender: "M" | "F" | "ANY" }[];
-        joinHeadcount: number;
-        joinCondition: string;
+        /** 이제부터 **더 받을** 자리. 1 ~ (4 - 이미 팔린 자리). */
+        more: number;
+        /** 더 받을 자리마다 받고 싶은 성별. 모자라면 무관으로 채운다. */
+        genders: SlotGender[];
         costMode: "FIXED" | "SPLIT";
-        greenFee: number;
-    }): Promise<GolfBooking | undefined> {
-        const [row] = await db.update(golfBookings)
-            .set({
-                listingType: "JOIN",
-                joinType: "FIELD",       // 부킹 올리기 시트는 골프장 마스터에서만 고른다 — 스크린·파크 부킹은 없다.
-                slots: patch.slots,
-                joinHeadcount: patch.joinHeadcount,
-                joinCondition: patch.joinCondition,
-                costMode: patch.costMode,
-                greenFee: patch.greenFee,
-                // sellerType 은 **지우지 않는다**. 조인은 원래 null 이라, 남아 있으면 그게 곧 "부킹에서 건너온 글" 표시다.
-                // 화면(joinUi.isConvertedJoin)이 그걸 보고 첫 자리를 '호스트'가 아니라 '이미 찬 자리'로 그린다 — 유령 자리 방지.
-            })
-            .where(and(
-                eq(golfBookings.id, id),
-                eq(golfBookings.ownerId, ownerId),
-                ne(golfBookings.listingType, "JOIN"),
-                sql`${golfBookings.datetime} > now()`,
-            ))
-            .returning();
-        if (!row) return row;
+    }): Promise<ConvertResult> {
+        return await db.transaction(async (tx) => {
+            // 글 행을 잠그고 → 팔린 자리를 세고 → 자리를 만들어 → 바꾼다.
+            // 읽기와 쓰기 사이에 잠금이 없으면, 전환하는 사이 다른 탭에서 대기자를 승인해
+            // 정원(내가 만든 OPEN 수)보다 많은 사람이 확정된 글이 만들어진다(2026-09-24 검토).
+            const [row] = await tx.select().from(golfBookings).where(eq(golfBookings.id, id)).for("update").limit(1);
+            if (!row) return { ok: false as const, reason: "gone" as const };
+            if (!row.ownerId || row.ownerId !== ownerId) return { ok: false as const, reason: "forbidden" as const };
+            if (row.listingType === "JOIN") return { ok: false as const, reason: "already_join" as const };
+            if (new Date(row.datetime as any).getTime() <= Date.now()) return { ok: false as const, reason: "passed" as const };
 
-        // 넘어온 대기 신청의 인원을 1 로 맞춘다.
-        // 부킹 신청은 '팀 통째'라 1~4 명을 적어 보낼 수 있지만(apply 라우트), 조인 신청은 **늘 1 명**이다 — 자리 하나가 사람 하나다.
-        // 그 값을 그대로 두면 4 명짜리 대기 행이 조인 자리 **하나**로 세어진다: 정원 검사(applyToJoin·decideJoinRequest)도,
-        // 카드의 n/정원(countJoinRequests)도 `count(*)` 라 행을 셀 뿐 headcount 를 안 본다.
-        // 남은 2자리 조인에 그 사람을 승인하면 화면은 1/2 인데 현장엔 4 명이 온다 — 이미 팔린 자리까지 더하면 한 팀이 넘는다.
-        // 신청은 지우지 않는다(거절은 이 글에 한해 최종이라 대기열에서 빼면 되돌릴 길이 없다) — 인원만 자리 하나로 맞추고,
-        // 라우트가 "조인으로 바뀌었다"고 알려 그 사람이 스스로 취소할 수 있게 둔다.
-        await db.update(golfJoinRequests)
-            .set({ headcount: 1 })
-            .where(and(
-                eq(golfJoinRequests.bookingId, id),
-                eq(golfJoinRequests.status, "applied"),
-                ne(golfJoinRequests.headcount, 1),
-            ));
-        return row;
+            // 앱이 아는 '팔린 자리' = 승인된 신청의 **인원 합**. 2명짜리 신청 하나는 2자리다.
+            const [cnt] = await tx.select({ n: sql<number>`coalesce(sum(${golfJoinRequests.headcount}), 0)::int` })
+                .from(golfJoinRequests)
+                .where(and(eq(golfJoinRequests.bookingId, id), eq(golfJoinRequests.status, "accepted")));
+            const sold = Number(cnt?.n ?? 0);
+            const room = convertibleSeats(sold);
+            if (room < 1) return { ok: false as const, reason: "full" as const, sold };
+
+            // 자리는 **서버가 만든다**. 화면이 보낸 배열을 믿으면 "2자리 팔렸는데 4자리 남았다"가 통과해
+            // 한 팀에 여섯 명을 받게 된다. 화면은 '몇 자리 더 받을지'만 말한다.
+            const genders = patch.genders.slice(0, patch.more);
+            const slots = conversionSlots(sold, patch.more, genders);
+            if (!slots) return { ok: false as const, reason: "bad_slots" as const, sold, room };
+
+            const [updated] = await tx.update(golfBookings)
+                .set({
+                    listingType: "JOIN",
+                    joinType: "FIELD",       // 부킹 올리기 시트는 골프장 마스터에서만 고른다 — 스크린·파크 부킹은 없다.
+                    slots,
+                    // 옛 화면·검색이 보는 '모집 n명' 요약. **이제부터 받을 자리**다 — 정원(openSlotCount)을 넣으면
+                    // 이미 팔린 OPEN 칸까지 세어 "2자리 팔린 글이 4명 모집"이라고 적힌다(2026-09-24).
+                    joinHeadcount: patch.more,
+                    // 옛 화면·검색이 보는 요약값. **이제부터 받을** 자리만 본다 — 이미 팔린 OPEN 칸(무관)까지 세면 늘 '성별무관'이 된다.
+                    joinCondition: recruitCondition(genders),
+                    costMode: patch.costMode,
+                    greenFee: patch.costMode === "SPLIT" ? 0 : Number(row.greenFee) || 0,
+                    // sellerType 은 **지우지 않는다**. 조인은 원래 null 이라, 남아 있으면 그게 곧 "부킹에서 건너온 글" 표시다.
+                    // 화면(joinUi.isConvertedJoin)이 그걸 보고 첫 자리를 '호스트'가 아니라 '이미 찬 자리'로 그린다 — 유령 자리 방지.
+                })
+                .where(eq(golfBookings.id, id))
+                .returning();
+
+            // 넘어온 대기 신청의 인원을 1 로 맞춘다.
+            // 부킹 신청은 '팀 통째'라 1~4 명을 적어 보낼 수 있지만(apply 라우트), 조인 신청은 **늘 1 명**이다 — 자리 하나가 사람 하나다.
+            // 그 값을 그대로 두면 4 명짜리 대기 행이 조인 자리 **하나**로 세어진다… 였는데 이제 정원 검사는 사람 수로 본다.
+            // 그래도 1 로 맞추는 이유는 남았다: 조인 카드·자리 그림은 '한 자리 = 한 사람'을 전제로 그려지고,
+            // 신청자 스스로 인원을 줄일 화면이 없다. 4명짜리 대기를 그대로 두면 2자리 조인에서 영영 승인이 안 된다.
+            // 신청은 지우지 않는다(거절은 이 글에 한해 최종이라 대기열에서 빼면 되돌릴 길이 없다) — 인원만 자리 하나로 맞추고,
+            // 라우트가 "조인으로 바뀌었다"고 알려 그 사람이 스스로 취소할 수 있게 둔다.
+            // ⚠️ **승인된(accepted) 행은 건드리지 않는다.** 그 사람들이 이미 산 자리가 곧 sold 이고, 위에서 OPEN 칸으로 앉혀 두었다.
+            await tx.update(golfJoinRequests)
+                .set({ headcount: 1 })
+                .where(and(
+                    eq(golfJoinRequests.bookingId, id),
+                    eq(golfJoinRequests.status, "applied"),
+                    ne(golfJoinRequests.headcount, 1),
+                ));
+            return { ok: true as const, row: updated, sold, open: patch.more };
+        });
     }
 
     /** 한 건 조회 — 조인 신청 전 검사(마감·본인 글·가려진 글)에 쓴다. */
@@ -483,18 +532,26 @@ export class GolfRepository {
     /**
      * 조인 글별 인원 — accepted(자리 차지)와 applied(승인 대기)를 따로 센다(2026-09-21 호스트 승인제).
      * 자리를 차지하는 건 **승인된 사람뿐**이다. 신청은 정원과 무관하게 쌓이고 호스트가 고른다.
+     *
+     * 셋을 돌려준다 — 단위가 다르다:
+     *   accepted  승인된 **신청 건수**(팀 수). 부킹의 정원은 '한 팀'이라 이 숫자로 본다.
+     *   seats     승인된 **사람 수**(headcount 합). 조인의 정원은 자리라 이 숫자로 본다.
+     *   pending   대기 중인 신청 건수.
+     * 부킹 신청 한 건은 1~4명이라 둘이 갈린다(2026-09-24: 2명짜리 신청 하나 = accepted 1, seats 2).
+     * 조인 신청은 늘 1명이라 조인 글에서는 accepted 와 seats 가 늘 같다.
      */
-    async countJoinRequests(bookingIds: string[]): Promise<Map<string, { accepted: number; pending: number }>> {
+    async countJoinRequests(bookingIds: string[]): Promise<Map<string, { accepted: number; seats: number; pending: number }>> {
         if (bookingIds.length === 0) return new Map();
         const rows = await db.select({
             bookingId: golfJoinRequests.bookingId,
             accepted: sql<number>`count(*) filter (where ${golfJoinRequests.status} = 'accepted')::int`,
+            seats: sql<number>`coalesce(sum(${golfJoinRequests.headcount}) filter (where ${golfJoinRequests.status} = 'accepted'), 0)::int`,
             pending: sql<number>`count(*) filter (where ${golfJoinRequests.status} = 'applied')::int`,
         })
             .from(golfJoinRequests)
             .where(inArray(golfJoinRequests.bookingId, bookingIds))
             .groupBy(golfJoinRequests.bookingId);
-        return new Map(rows.map((r) => [r.bookingId, { accepted: Number(r.accepted), pending: Number(r.pending) }]));
+        return new Map(rows.map((r) => [r.bookingId, { accepted: Number(r.accepted), seats: Number(r.seats), pending: Number(r.pending) }]));
     }
 
     /** 내 신청 상태(조인 글 id → status). 취소한 글은 없는 것으로 본다(다시 신청할 수 있다). */
@@ -514,7 +571,15 @@ export class GolfRepository {
      * 신청한다. 정원이 차 있으면 거절한다 — 마지막 한 자리에 둘이 동시에 들어오는 경우까지 막으려면
      * 세고 넣는 사이가 갈라지면 안 되므로, 한 문장 안에서 세고 넣는다.
      */
-    async applyToJoin(bookingId: string, memberId: string, capacity: number, headcount = 1): Promise<"ok" | "full" | "already" | "rejected" | "cooldown" | "too_many"> {
+    /**
+     * 정원 한 칸 — **단위가 두 가지**다(2026-09-24).
+     *   parties  부킹. 티타임 하나를 **한 팀에게 통째로** 판다 → 승인된 신청 **건수**로 센다(정원 1).
+     *   seats    조인. 한 사람이 한 자리 → 승인된 **사람 수**(headcount 합)로 센다(정원 = 모집 자리 수).
+     *
+     * 숫자만 넘기면 어느 쪽인지 알 수 없다. 그게 오너가 본 버그였다 — 2명짜리 부킹 신청 하나를
+     * count(*) 로 세어 '1자리'라 하고는, 네 자리 중 두 자리만 팔린 티타임을 '다 팔림'으로 잠갔다.
+     */
+    async applyToJoin(bookingId: string, memberId: string, limit: SeatLimit, headcount = 1): Promise<"ok" | "full" | "already" | "rejected" | "cooldown" | "too_many"> {
         const [existing] = await db.select({ status: golfJoinRequests.status, cancelCount: golfJoinRequests.cancelCount, updatedAt: golfJoinRequests.updatedAt })
             .from(golfJoinRequests)
             .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId)))
@@ -530,13 +595,20 @@ export class GolfRepository {
         }
 
         // 정원은 **승인된** 사람으로 센다(호스트 승인제). 대기는 정원과 무관하게 받는다.
+        // 단위에 따라 세는 것이 다르다: 부킹은 팀(행), 조인은 자리(사람). SeatLimit 머리말 참고.
+        // 내 몫도 더해서 비교한다 — 조인은 늘 1이라 예전 `count < capacity` 와 값이 같고,
+        // 부킹은 `건수 + 1 <= 1` 이라 역시 '승인 0건일 때만' 으로 예전과 같다.
+        const taken = limit.unit === "seats"
+            ? sql`coalesce(sum(headcount), 0)`
+            : sql`count(*)`;
+        const mine = limit.unit === "seats" ? headcount : 1;
         const inserted = await db.execute(sql`
             INSERT INTO golf_join_requests (booking_id, member_id, status, headcount, updated_at)
             SELECT ${bookingId}::uuid, ${memberId}::uuid, 'applied', ${headcount}, now()
             WHERE (
-              SELECT count(*) FROM golf_join_requests
+              SELECT ${taken} FROM golf_join_requests
               WHERE booking_id = ${bookingId}::uuid AND status = 'accepted'
-            ) < ${capacity}
+            ) + ${mine} <= ${limit.capacity}
             ON CONFLICT (booking_id, member_id)
             DO UPDATE SET status = 'applied', headcount = ${headcount}, updated_at = now()
             RETURNING id
@@ -564,7 +636,7 @@ export class GolfRepository {
      * 호스트의 승인·거절(2026-09-21 호스트 승인제). 대기(applied) 상태에서만 바뀐다.
      * 승인은 **정원 안에서만** — 세고 바꾸는 사이가 갈라지면 마지막 자리에 둘이 들어오므로 한 문장에서 한다.
      */
-    async decideJoinRequest(bookingId: string, memberId: string, accept: boolean, capacity: number): Promise<"ok" | "full" | "gone"> {
+    async decideJoinRequest(bookingId: string, memberId: string, accept: boolean, limit: SeatLimit): Promise<"ok" | "full" | "gone"> {
         if (!accept) {
             const rows = await db.update(golfJoinRequests)
                 .set({ status: "rejected", updatedAt: new Date() })
@@ -577,12 +649,14 @@ export class GolfRepository {
         // 거절해 둔 사람도 승인할 수 있다(거절 되돌리기) — 거절이 최종이 된 만큼 호스트에게 무를 길이 있어야 한다.
         return await db.transaction(async (tx) => {
             await tx.select({ id: golfBookings.id }).from(golfBookings).where(eq(golfBookings.id, bookingId)).for("update");
-            const [row] = await tx.select({ status: golfJoinRequests.status }).from(golfJoinRequests)
+            const [row] = await tx.select({ status: golfJoinRequests.status, headcount: golfJoinRequests.headcount }).from(golfJoinRequests)
                 .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId))).limit(1);
             if (row?.status !== "applied" && row?.status !== "rejected") return "gone" as const;
-            const [cnt] = await tx.select({ n: sql<number>`count(*)::int` }).from(golfJoinRequests)
+            // 이 사람이 차지할 몫까지 더해서 본다 — 2명짜리 신청을 1로 세면 정원 넷에 다섯이 들어온다.
+            const [cnt] = await tx.select({ n: seatExpr(limit) }).from(golfJoinRequests)
                 .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.status, "accepted")));
-            if (Number(cnt?.n ?? 0) >= capacity) return "full" as const;
+            const mine = limit.unit === "seats" ? Math.max(1, Number(row.headcount) || 1) : 1;
+            if (Number(cnt?.n ?? 0) + mine > limit.capacity) return "full" as const;
             await tx.update(golfJoinRequests).set({ status: "accepted", updatedAt: new Date() })
                 .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId)));
             return "ok" as const;
@@ -687,18 +761,20 @@ export class GolfRepository {
      * 되돌리면 'accepted' 로(정원 안에서만) — 잘못 누른 걸 못 고치면 표시를 무서워서 못 쓴다.
      * 본인이 취소한 행('cancelled')은 건드리지 않는다. 취소와 노쇼는 다른 일이다.
      */
-    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean, capacity = Number.MAX_SAFE_INTEGER): Promise<"ok" | "gone" | "full"> {
+    async setJoinNoShow(bookingId: string, memberId: string, noShow: boolean, limit: SeatLimit = { capacity: Number.MAX_SAFE_INTEGER, unit: "parties" }): Promise<"ok" | "gone" | "full"> {
         return await db.transaction(async (tx) => {
             await tx.select({ id: golfBookings.id }).from(golfBookings).where(eq(golfBookings.id, bookingId)).for("update");
             if (!noShow) {
                 // 노쇼는 자리를 비운다 — 그 사이 다른 대기자를 승인했다면 되돌릴 자리가 없다.
-                const [cnt] = await tx.select({ n: sql<number>`count(*)::int` }).from(golfJoinRequests)
+                // 되돌리려는 사람이 차지할 몫까지 더해서 본다(부킹 2명짜리면 두 자리가 필요하다).
+                const [row] = await tx.select({ status: golfJoinRequests.status, headcount: golfJoinRequests.headcount }).from(golfJoinRequests)
+                    .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId))).limit(1);
+                // 애초에 되돌릴 대상이 아니면 '자리가 찼다'가 아니라 'gone' 이다 — 거짓 설명을 하지 않는다.
+                if (row?.status !== "noshow") return "gone" as const;
+                const [cnt] = await tx.select({ n: seatExpr(limit) }).from(golfJoinRequests)
                     .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.status, "accepted")));
-                if (Number(cnt?.n ?? 0) >= capacity) {
-                    const [row] = await tx.select({ status: golfJoinRequests.status }).from(golfJoinRequests)
-                        .where(and(eq(golfJoinRequests.bookingId, bookingId), eq(golfJoinRequests.memberId, memberId))).limit(1);
-                    return row?.status === "noshow" ? "full" as const : "gone" as const;
-                }
+                const mine = limit.unit === "seats" ? Math.max(1, Number(row.headcount) || 1) : 1;
+                if (Number(cnt?.n ?? 0) + mine > limit.capacity) return "full" as const;
             }
             const rows = await tx.update(golfJoinRequests)
                 .set({

@@ -30,6 +30,7 @@ import {
     JoinTypeBadge, SlotDots, costText, hostSeatLabel, joinTypeOf,
     kakaoMapUrl, kakaoRouteUrl, slotLegend, slotsOf,
 } from "../components/join/joinUi";
+import { MAX_SLOTS } from "@shared/golfJoin";
 import {
     MY_LISTINGS_QUERY_KEY, MY_REQUESTS_QUERY_KEY,
     hasUnseenRequestChange, markRequestsSeen, readRequestsSeen,
@@ -105,10 +106,14 @@ function Row({ item, kind, past, open, onToggle, onGo, onDelete, onToJoin, onCan
     const st = kind === "applied" ? STATUS[item.myJoinStatus] : null;
     const accepted = item.myJoinStatus === "accepted";
     /**
-     * '조인으로 전환' 이 붙는 자리(2026-09-23). 내가 올린 **부킹**이고, 아직 안 지난 티타임이고,
-     * 아직 아무에게도 확정되지 않았을 때만 — 확정된 티타임은 팀이 통째로 팔린 것이라 나눌 자리가 없다(서버도 409 로 막는다).
+     * '조인으로 전환' 이 붙는 자리. 내가 올린 **부킹**이고, 아직 안 지난 티타임이고, **자리가 남았을 때**.
+     *
+     * 2026-09-24 오너("국수맘이 2명 신청했는데 왜 조인으로 전환 버튼이 사라졌지? 2명이니깐 2명을 더
+     * 조인으로 전환해도되고 해야되는데"): 예전 조건은 `joinApplied === 0` 이었다. joinApplied 가 승인된
+     * **행 수**였던 탓에 2명짜리 신청 하나가 '다 팔림'이 되어, 네 자리 중 두 자리만 판 티타임이 잠겼다.
+     * 이제 joinApplied 는 **사람 수**이고, 네 자리가 다 찼을 때만 버튼이 사라진다(서버도 같은 기준).
      */
-    const canToJoin = kind === "mine" && !isJoin && !past && Number(item.joinApplied ?? 0) === 0;
+    const canToJoin = kind === "mine" && !isJoin && !past && Number(item.joinApplied ?? 0) < MAX_SLOTS;
     // 채팅방은 확정된 사람과 올린 사람만 들어간다(서버가 명단으로 막는다) — 못 들어갈 사람에게 단추를 보여 주지 않는다.
     const canChat = kind === "mine" ? Number(item.joinApplied ?? 0) > 0 : accepted;
     const slots = isJoin ? slotsOf(item) : null;
@@ -172,7 +177,7 @@ function Row({ item, kind, past, open, onToggle, onGo, onDelete, onToJoin, onCan
                         {slots && (
                             <>
                                 <dt className="text-white/35">자리</dt>
-                                <dd className="text-white/75">{slotLegend(slots, hostSeatLabel(item)).join(" · ")}</dd>
+                                <dd className="text-white/75">{slotLegend(slots, hostSeatLabel(item), Number(item.joinApplied ?? 0)).join(" · ")}</dd>
                             </>
                         )}
                         {kind === "applied" && Number(item.myHeadcount) > 1 && (
