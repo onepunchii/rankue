@@ -40,9 +40,6 @@ export function CourseStats({ course }: CourseStatsProps) {
                     {phone}
                 </a>
             )}
-            <p className="text-[11px] font-bold text-white/40 break-keep">
-                난이도·그린 스피드 같은 코스 분석은 랭큐 회원의 실제 라운드 기록이 쌓이면 보여 드릴게요.
-            </p>
         </div>
     );
 }

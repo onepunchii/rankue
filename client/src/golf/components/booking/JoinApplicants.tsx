@@ -202,12 +202,6 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
                     })}
                 </ul>
             )}
-
-            {!teePassed && applicants.length > 0 && (
-                <p className="text-[10px] font-bold text-white/20">
-                    안 온 사람 표시는 티타임이 지난 뒤에 할 수 있어요.
-                </p>
-            )}
         </div>
     );
 }

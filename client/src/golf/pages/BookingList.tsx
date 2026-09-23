@@ -72,12 +72,13 @@ export default function BookingList() {
      */
     const [toJoinItem, setToJoinItem] = useState<any | null>(null);
     const openToJoin = useCallback((item: any) => { setMyListingsOpen(false); setToJoinItem(item); }, []);
-    /**
-     * 조인 종류(필드/스크린/파크)와 "내 주변"(2026-09-21 오너: 스크린 조인은 내 위치 기반으로).
-     * 위치는 누를 때 한 번 묻는다 — 목록을 열 때마다 권한 창이 뜨면 안 된다.
-     */
+    /** 조인 종류(필드/스크린/파크) 스위치(2026-09-21 오너: 스크린 조인은 내 위치 기반으로). */
     const [joinKind, setJoinKind] = useState<'ALL' | JoinType>('ALL');
-    const [nearMe, setNearMe] = useState(false);
+    /**
+     * 필터 줄이 여는 시트(상세필터·정렬)가 떠 있나. 그 시트들은 FilterBar 안에 살지만
+     * **FAB 를 숨기는 건 이 화면**이다 — 시트 위로 '부킹 올리기' 가 떠올라 시트를 가렸다(2026-09-23 오너).
+     */
+    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     /** 골프장별 보기(부킹 전용 — 이유는 아래 groupingOn). */
     const [groupOn, setGroupOn] = useState(readGroupByCourse);
     const toggleGroupOn = useCallback(() => {
@@ -88,6 +89,19 @@ export default function BookingList() {
         });
     }, []);
     const { location, requestLocation, locationStatus } = useNativeBridge();
+    /**
+     * 위치(2026-09-23 오너: "골프장과의 거리 버튼은 제거하고 항상 거리가 표기되게").
+     * 물어볼 단추가 사라졌으니 목록이 **딱 한 번** 조용히 묻는다. 이미 받아 둔 위치가 있으면 그대로 쓴다.
+     * 거부·실패면 아무 말도 하지 않는다 — 거리가 없는 것이 곧 답이고, 목록 위에 경고를 띄울 일이 아니다.
+     * 두 번 묻지 않는다: locationStatus 가 정해지면 다시 부르지 않고, 거부된 뒤에는 권한 창 자체가 안 뜬다
+     * (capacitor 는 checkPermissions 가 denied 면 바로 끝내고, 웹은 거부된 오리진에서 즉시 error 로 떨어진다).
+     */
+    const askedLocation = useRef(false);
+    useEffect(() => {
+        if (askedLocation.current || location || locationStatus) return;
+        askedLocation.current = true;
+        void requestLocation().catch(() => { /* 거리를 안 적을 뿐이다 */ });
+    }, [location, locationStatus, requestLocation]);
 
     // Custom Hooks
     const { selectedFilters, toggleFilter, clearFilter } = useBookingFilters();
@@ -253,8 +267,13 @@ export default function BookingList() {
 
             return true;
         }).sort((a, b) => {
-            // 내 주변: 좌표 있는 글을 가까운 순으로 먼저, 좌표 없는 글은 시간순으로 뒤에
-            if (viewType === 'JOIN' && nearMe && location) {
+            /**
+             * 가까운 순(조인) — 좌표 있는 글을 가까운 순으로 먼저, 좌표 없는 글은 시간순으로 뒤에.
+             * 예전엔 '📍 내 주변' 단추가 켜는 정렬이었다. 단추가 사라지면서(거리는 이제 늘 적는다)
+             * 정렬 메뉴('최신순 ▽')의 한 줄로 옮겼다 — 정렬을 켜는 곳이 화면에 이미 있는데
+             * 같은 일을 하는 단추를 옆에 하나 더 두면 둘 중 무엇이 지금 걸린 건지 알 수 없다.
+             */
+            if (viewType === 'JOIN' && selectedFilters.price.includes('sort_near') && location) {
                 const da = isKoreaCoord(a.lat, a.lng) ? distanceKm(location.lat, location.lng, a.lat, a.lng) : Infinity;
                 const db = isKoreaCoord(b.lat, b.lng) ? distanceKm(location.lat, location.lng, b.lat, b.lng) : Infinity;
                 if (da !== db) return da - db;
@@ -268,7 +287,7 @@ export default function BookingList() {
             }
             return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
         });
-    }, [bookings, viewType, selectedFilters, selectedDate, weekDates, joinKind, nearMe, location]);
+    }, [bookings, viewType, selectedFilters, selectedDate, weekDates, joinKind, location]);
 
     /**
      * 골프장별 보기는 **부킹에서만** 켠다(2026-09-23 판단, 근거 넷).
@@ -281,9 +300,9 @@ export default function BookingList() {
      *  2. 묶음 줄의 값이 조인에서는 뜻이 어긋난다. 'N팀' 은 티타임 수인데 조인은 팀이 아니라
      *     **자리**를 판다(joinCapacity/joinApplied). 한 글이 곧 한 자리 묶음이라 대부분 '1팀' 이
      *     찍히고, 화면만 한 겹 깊어진다.
-     *  3. '📍 내 주변' 과 싸운다. 조인 정렬의 축은 골프장이 아니라 **내게서 가까운 순**인데,
+     *  3. '가까운 순' 정렬과 싸운다. 그때 조인 정렬의 축은 골프장이 아니라 **내게서 가까운 순**인데,
      *     묶으면 그 순서가 묶음 안으로 숨어 켜 둔 정렬이 안 보인다.
-     *  4. 조인 제어 줄에는 이미 종류 스위치(전체/필드/스크린/파크)와 📍내 주변이 한 줄 더 붙는다.
+     *  4. 조인 제어 줄에는 이미 종류 스위치(전체/필드/스크린/파크)가 한 줄 더 붙는다.
      *     320px 에서 가장 빡빡한 화면이다.
      * 부킹은 반대다 — 한 매장이 같은 골프장 티타임을 여럿 올리는 게 기본이라 묶을 게 실제로 있다.
      */
@@ -320,7 +339,7 @@ export default function BookingList() {
     /**
      * 지금 **결과를 줄이고 있는** 것들. 0건 화면이 "무엇 때문에 비었는지" 를 실제 이름으로 말하고,
      * 그 자리에서 하나씩 뗄 수 있게 하려고 모은다.
-     *  - 정렬(sort_)과 '📍 내 주변' 은 뺀다 — 순서만 바꾸지 결과를 줄이지 않는다.
+     *  - 정렬(sort_ — '가까운 순' 포함)은 뺀다 — 순서만 바꾸지 결과를 줄이지 않는다.
      *  - 시간의 'all' 은 훅의 기본값(= 아무것도 안 건 상태)이라 뺀다. 예전 필터 줄은 이걸 1로 세서
      *    첫 화면부터 "시간 ①" 배지가 켜져 있었다.
      *  - 조인 종류 스위치는 필터 줄 밖에 있지만 0건을 만들 수 있다 — 사용자에겐 이것도 '걸어 둔 것' 이다.
@@ -341,6 +360,26 @@ export default function BookingList() {
         }
         return out;
     }, [selectedFilters, viewType, joinKind, toggleFilter]);
+
+    /**
+     * '가까운 순'(조인 정렬)을 골랐는데 위치가 없으면 그때 한 번 더 묻는다.
+     * 위의 조용한 요청과 달리 **여기서는 실패를 알린다** — 사용자가 대놓고 고른 정렬이라,
+     * 아무 일도 안 일어나면 버튼이 고장 난 것으로 보인다.
+     */
+    const nearSort = viewType === 'JOIN' && selectedFilters.price.includes('sort_near');
+    const nearAsked = useRef(false);
+    useEffect(() => {
+        if (!nearSort) { nearAsked.current = false; return; }
+        if (location || nearAsked.current) return;
+        nearAsked.current = true;
+        void requestLocation().then((r) => {
+            if (r === 'granted') return;
+            toast({
+                title: r === 'denied' ? "위치 권한이 꺼져 있어요" : "지금은 위치를 알 수 없어요",
+                description: "설정에서 위치를 허용하면 가까운 조인부터 보여 드려요.",
+            });
+        });
+    }, [nearSort, location, requestLocation, toast]);
 
     /**
      * 보이는 칩만 끈다 — clearFilter('price') 를 부르면 정렬(sort_)까지 같이 날아가는데,
@@ -438,9 +477,9 @@ export default function BookingList() {
             onToJoin={openToJoin}
             viewType={viewType}
             meId={(user as any)?.id}
-            myLocation={nearMe ? location : null}
+            myLocation={location}
         />
-    ), [expandedBookingId, setExpandedBookingId, handleReserve, handleApply, handleShare, handleDelete, openToJoin, viewType, user, nearMe, location]);
+    ), [expandedBookingId, setExpandedBookingId, handleReserve, handleApply, handleShare, handleDelete, openToJoin, viewType, user, location]);
 
     return (
         <div className="min-h-screen bg-[#0A0A0A] text-white pb-nav font-sans selection:bg-[#64DD17]/30">
@@ -507,17 +546,18 @@ export default function BookingList() {
                     viewType={viewType}
                     groupByCourse={viewType === 'JOIN' ? undefined : groupOn}
                     onToggleGroup={viewType === 'JOIN' ? undefined : toggleGroupOn}
+                    onSheetOpenChange={setFilterSheetOpen}
                 />
                 {/*
-                  * 위치 단추는 **두 탭 모두**에 있다(2026-09-23 오너: "티타임에 내가 현재 위치와 골프장 거리를 표기해줘").
-                  * 하는 일은 탭마다 다르다 — 조인은 가까운 순으로 정렬까지 하고(예전 '내 주변'), 부킹은 카드에 거리만 적는다.
-                  * 부킹까지 거리순으로 세우지는 않는다: 부킹 목록의 축은 티오프 시각이고, 같은 골프장 티타임이 줄줄이 붙어 있다.
-                  * 위치는 **누를 때 한 번** 묻는다. 목록을 열 때마다 권한 창이 뜨면 그건 기능이 아니라 방해다.
+                  * 조인 종류 스위치(전체/필드/스크린/파크). 예전엔 이 줄 오른쪽에 '📍 내 주변'(조인) ·
+                  * '📍 골프장까지 거리'(부킹) 단추가 같이 있었는데, 2026-09-23 오너가 걷어냈다 —
+                  * "거리 버튼은 제거하고 항상 거리가 표기되게". 거리는 위치를 알면 늘 적고, 가까운 순 정렬은
+                  * 정렬 메뉴로 옮겼다(filteredTimes 의 sort_near 주석).
                   */}
-                <div className="px-5 pb-2.5 flex items-center gap-2">
-                    {viewType === 'JOIN' && (
-                        /* 종류는 알약 하나 안의 분절 스위치 — 필터 칩과 생김새가 같으면 무엇이 필터이고 무엇이 탭인지 헷갈린다 */
-                        <div className="flex-1 min-w-0 flex rounded-full bg-white/[0.05] border border-white/[0.08] p-0.5">
+                {viewType === 'JOIN' && (
+                    <div className="px-5 pb-2.5">
+                        {/* 알약 하나 안의 분절 스위치 — 필터 칩과 생김새가 같으면 무엇이 필터이고 무엇이 탭인지 헷갈린다 */}
+                        <div className="flex rounded-full bg-white/[0.05] border border-white/[0.08] p-0.5">
                             {(['ALL', ...JOIN_TYPES] as const).map((k) => (
                                 <button
                                     key={k} type="button" onClick={() => setJoinKind(k)}
@@ -526,24 +566,8 @@ export default function BookingList() {
                                 >{k === 'ALL' ? '전체' : JOIN_TYPE_LABEL[k]}</button>
                             ))}
                         </div>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (nearMe) { setNearMe(false); return; }
-                            void requestLocation().then((r) => {
-                                if (r === 'granted') setNearMe(true);
-                                else toast({
-                                    title: r === 'denied' ? "위치 권한이 꺼져 있어요" : "지금은 위치를 알 수 없어요",
-                                    description: viewType === 'JOIN' ? "설정에서 위치를 허용하면 가까운 조인부터 보여 드려요." : "설정에서 위치를 허용하면 골프장까지 거리를 적어 드려요.",
-                                });
-                            });
-                        }}
-                        className={cn("shrink-0 h-9 px-3 rounded-full text-[12.5px] font-medium border transition-colors",
-                            viewType === 'JOIN' ? "" : "ml-auto",
-                            nearMe ? "bg-[#4DA3FF] border-[#4DA3FF] text-white" : "bg-white/[0.04] border-white/[0.08] text-white/65")}
-                    >📍 {viewType === 'JOIN' ? '내 주변' : '골프장까지 거리'}{nearMe && locationStatus !== 'granted' ? '…' : ''}</button>
-                </div>
+                    </div>
+                )}
             </div>
 
             <main className="px-5 pt-3 pb-6">
@@ -611,8 +635,14 @@ export default function BookingList() {
                 // 조인·부킹 모두 로그인한 누구나 올린다(2026-09-21 오너 A안). 부킹은 시트가 휴대폰 번호를 요구한다.
                 !!user && (
                     <AnimatePresence>
-                        {/* 내역 시트가 떠 있는 동안도 숨긴다 — 시트 위에 떠서 줄을 가렸다(2026-09-21 오너 캡처) */}
-                        {!isCreateModalOpen && !myListingsOpen && !isSearchOpen && (
+                        {/*
+                          * 바닥 시트가 떠 있는 동안은 안 그린다. FAB 는 fixed z-[60] 이고 Radix 시트의 오버레이는 z-50,
+                          * 내용은 z-50(상세필터·정렬만 z-[70])이라 **그냥 두면 시트 위에 떠오른다** —
+                          * 전환 시트에서는 버튼을 통째로 가렸고, 상세필터에서는 어두운 막 위에 혼자 떠 있었다(2026-09-23 오너).
+                          * z-index 를 낮추는 길도 있지만, 시트가 떴을 때 FAB 는 **누를 일이 없는 버튼**이다 — 안 그리는 게 맞다.
+                          * 셋 다 여기서 안다: 전환(toJoinItem) · 내역(myListingsOpen) · 필터 줄의 시트(filterSheetOpen).
+                          */}
+                        {!isCreateModalOpen && !myListingsOpen && !isSearchOpen && !toJoinItem && !filterSheetOpen && (
                             <motion.button
                                 initial={{ scale: 0, opacity: 0, y: 20 }}
                                 animate={{ scale: 1, opacity: 1, y: 0 }}

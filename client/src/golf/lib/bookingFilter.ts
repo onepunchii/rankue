@@ -16,7 +16,7 @@ import { isPartyOption } from '../constants/booking';
  *         meal_inc·cart_free       AND  각각 독립된 요구다("노캐디 **그리고** 식사 제공")
  *   축 사이                        AND
  *
- * 날짜·종류(부킹/조인)·조인 종류·정렬·내 주변은 여기 없다 — 목록이 따로 본다.
+ * 날짜·종류(부킹/조인)·조인 종류·정렬('가까운 순' 포함)은 여기 없다 — 목록이 따로 본다.
  */
 
 export type GolfTimeSpan = 'morning' | 'afternoon' | 'night';

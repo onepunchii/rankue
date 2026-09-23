@@ -18,19 +18,21 @@ export function joinTypeOf(item: { joinType?: string | null }): JoinType {
 }
 
 /**
- * 전환 글인가 — 매니저가 팔고 남은 부킹을 그 자리에서 조인으로 돌린 글(2026-09-23).
+ * 전환 글인가 — 매니저가 팔고 남은 부킹을 그 자리에서 조인으로 바꾼 글(2026-09-23).
  * 표시는 sellerType 하나로 안다: 조인은 sellerType 이 null 이고(POST /bookings), 부킹만 STORE·PERSONAL 이 박힌다.
  * 전환 라우트가 그 값을 **지우지 않고 남겨** 두기 때문에, 조인인데 sellerType 이 있으면 부킹에서 건너온 글이다.
  *
- * 왜 갈라 봐야 하나(유령 자리): 자리 규칙(normalizeSlots)은 첫 칸을 반드시 HOST 로 못 박는다. 보통 조인에서는
- * 그 자리에 **만든 사람이 실제로 앉지만**, 매장 매니저는 자기가 파는 팀에서 치지 않는다. 그대로 '호스트'라고 그리면
- * 신청자가 현장에 가서 만날 사람이 없다. 그래서 전환 글의 첫 칸은 '호스트'가 아니라 그냥 **이미 찬 자리**로 그린다.
+ * 왜 갈라 봐야 하나(유령 자리): 보통 조인은 만든 사람이 첫 자리에 **실제로 앉지만**, 매장 매니저는 자기가 파는
+ * 팀에서 치지 않는다. 그대로 '호스트'라고 그리면 신청자가 현장에 가서 만날 사람이 없다.
+ * 이제 전환 시트는 HOST 자리를 아예 만들지 않는다(2026-09-23 자리 규칙을 넓혔다 — shared/golfJoin.normalizeSlots).
+ * 다만 그 전에 전환된 **옛 글에는 HOST 가 남아 있으므로** 여기서 계속 갈라 본다 — 그 첫 칸은 '호스트'가 아니라
+ * 그냥 **이미 찬 자리**로 그린다.
  */
 export function isConvertedJoin(item: { listingType?: string | null; sellerType?: string | null }): boolean {
     return item.listingType === "JOIN" && !!item.sellerType;
 }
 
-/** 첫 자리 이름. 보통은 '호스트', 전환 글은 null — null 이면 그림에서 'H' 를 지우고 찬 자리로만 센다. */
+/** 첫 자리 이름. 보통은 '호스트', 전환 글은 null — null 이면 그림에서 'H' 를 지우고 찬 자리로만 센다(자리에 HOST 가 없으면 아무 일도 안 한다). */
 export function hostSeatLabel(item: { listingType?: string | null; sellerType?: string | null }): string | null {
     return isConvertedJoin(item) ? null : "호스트";
 }
@@ -61,7 +63,9 @@ export function SlotDots({ slots, filled = 0, size = 22, className, hostLabel = 
                             taken ? cn(GENDER_DOT[s.gender], s.gender === "ANY" ? "text-white/80" : "text-white") : "border border-dashed text-white/50",
                             !taken && (s.gender === "M" ? "border-[#4DA3FF]/70" : s.gender === "F" ? "border-[#FF6B9A]/70" : "border-white/30"),
                         )}
-                        title={s.role === "HOST" ? (hostLabel ?? "이미 찬 자리") : s.role === "GUEST" ? "동반자" : `모집 · ${GENDER_LABEL[s.gender]}`}
+                        // 이름은 자리 칩(slotLegend)과 같아야 한다 — 전환 글(hostLabel=null)에는 호스트가 없고,
+                        // 찬 자리는 전부 '이미 찬 자리' 다. 여기만 '동반자'라고 부르면 같은 원을 두 이름으로 읽는다.
+                        title={s.role === "OPEN" ? `모집 · ${GENDER_LABEL[s.gender]}` : s.role === "HOST" ? (hostLabel ?? "이미 찬 자리") : (hostLabel === null ? "이미 찬 자리" : "동반자")}
                     >
                         {taken ? (s.role === "HOST" && hostLabel ? "H" : "") : "+"}
                     </span>

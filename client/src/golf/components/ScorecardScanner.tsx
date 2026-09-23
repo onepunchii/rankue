@@ -7,7 +7,6 @@ import {
     LucideCheckCircle2,
     LucideAlertCircle,
     LucideX,
-    LucideDatabase,
     LucideRotateCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -147,10 +146,6 @@ export const ScorecardScanner: React.FC<RawScannerProps> = ({
                                     <div className="flex items-start gap-3 p-4 rounded-2xl bg-white/5 border border-white/5">
                                         <LucideCheckCircle2 className="w-4 h-4 text-[#64DD17] mt-0.5" />
                                         <p className="text-xs text-white/50 leading-relaxed">디지털 타블렛 화면을 정면에서 밝게 찍을수록 정확도가 높습니다.</p>
-                                    </div>
-                                    <div className="flex items-start gap-3 p-4 rounded-2xl bg-white/5 border border-white/5">
-                                        <LucideDatabase className="w-4 h-4 text-[#64DD17] mt-0.5" />
-                                        <p className="text-xs text-white/50 leading-relaxed">수집된 PAR 정보는 랭큐 코스 마스터 데이터베이스 구축에 활용됩니다.</p>
                                     </div>
                                 </div>
                             </motion.div>

@@ -17,7 +17,7 @@ import { courseCoord } from '../../data/courseCoords';
 import { JoinApplicants } from './JoinApplicants';
 import { useT } from '@/lib/i18n';
 import { kstDateKey, kstTime } from '@/lib/kst';
-import { SlotDots, JoinTypeBadge, costText, dayLabel, hostSeatLabel, isConvertedJoin, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, openGenderText, slotLegend, slotsOf } from '../join/joinUi';
+import { SlotDots, JoinTypeBadge, costText, dayLabel, hostSeatLabel, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, openGenderText, slotLegend, slotsOf } from '../join/joinUi';
 
 interface BookingCardProps {
     item: any;
@@ -34,7 +34,7 @@ interface BookingCardProps {
     myLocation?: { lat: number; lng: number } | null;
     /** 내가 올린 글 내리기 */
     onDelete?: (item: any) => void;
-    /** 내가 올린 부킹을 조인으로 돌리기(2026-09-23) — 내 부킹 카드에만 붙는다 */
+    /** 내가 올린 부킹을 조인으로 전환(2026-09-23) — 내 부킹 카드에만 붙는다 */
     onToJoin?: (item: any) => void;
 }
 
@@ -53,7 +53,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
     const isJoin = item.listingType === 'JOIN';
     // 자리 모델(2026-09-21): 정원 = 모집 자리 수, 찬 자리 = 승인된 사람 수. 옛 글은 모집 인원으로.
     const slots = isJoin ? slotsOf(item) : [];
-    // 전환 글(부킹 → 조인)은 첫 칸에 아무도 없다 — 매장은 자기가 파는 팀에서 안 친다(joinUi.isConvertedJoin 주석).
+    // 전환 글(부킹 → 조인)에는 호스트가 없다 — 매장은 자기가 파는 팀에서 안 친다(joinUi.isConvertedJoin 주석).
     const hostLabel = hostSeatLabel(item);
     const capacity = Number(item.joinCapacity) > 0 ? Number(item.joinCapacity) : Number(item.joinHeadcount) > 0 ? Number(item.joinHeadcount) : 3;
     const applied = Number(item.joinApplied ?? 0);
@@ -218,12 +218,6 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                     <div className="flex flex-wrap gap-1.5">
                                         {slotLegend(slots, hostLabel).map((t) => <span key={t} className="px-2 py-0.5 rounded-md bg-white/[0.06] text-[12px] text-white/70">{t}</span>)}
                                     </div>
-                                    {/* 전환 글은 한 줄로 밝힌다 — 신청자가 현장에서 '호스트'를 찾지 않게 */}
-                                    {isConvertedJoin(item) && (
-                                        <p className="text-[12px] text-white/50 leading-relaxed break-keep">
-                                            이미 팔린 자리를 뺀 나머지예요. 찬 자리는 다른 분들이라 현장에서 만나요.
-                                        </p>
-                                    )}
                                 </div>
                             )}
                             {/* 내 글이면 신청자(승인·거절) — 부킹 예약 신청도 같은 목록이다 */}
@@ -280,6 +274,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
 
                             {/*
                               * 내 부킹을 조인으로 — 팔고 남은 자리가 있을 때(2026-09-23 오너).
+                              * 이름은 '조인으로 전환' 한 마디다(오너: "'자리가 남았어요 - 조인으로 돌리기'가 아니라 그냥 '조인으로 전환'").
                               * 아래 버튼 줄이 아니라 그 위에 온전한 한 줄로 둔다: 줄에 이미 신청·문자·공유·내리기가 있어 375px 에서 이름이 잘린다.
                               * 확정된 예약이 있으면 안 보인다 — 팀이 통째로 팔린 티타임에는 나눌 자리가 없다(서버도 409).
                               */}
@@ -287,7 +282,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onToJoin(item); }}
                                     className="w-full h-11 rounded-xl border border-[#FF6B00]/35 bg-[#FF6B00]/10 text-[13.5px] font-medium text-[#FF8A33] active:bg-[#FF6B00]/20"
-                                >자리가 남았어요 — 조인으로 돌리기</button>
+                                >조인으로 전환</button>
                             )}
 
                             {/* 버튼: 조인·부킹 모두 앱 안 신청. 부킹은 인원을 고른 뒤 보낸다. */}

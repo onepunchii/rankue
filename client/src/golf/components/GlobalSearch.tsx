@@ -260,7 +260,6 @@ export function GlobalSearch({ isOpen, onClose, onSelectBooking, viewType }: Glo
                 <div className="p-6 bg-gradient-to-t from-[#0A0A0A] to-transparent pointer-events-none">
                     <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/5 pointer-events-auto">
                         <p className="text-[10px] font-bold text-white/40 leading-relaxed">
-                            💡 검색 명칭을 정확하게 입력하시면 더 나은 결과를 얻을 수 있습니다. <br />
                             전체 예약 시스템의 데이터를 실시간으로 조회합니다.
                         </p>
                     </div>

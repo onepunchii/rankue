@@ -20,7 +20,9 @@ export const PRICE_OPTIONS = [
     { id: 'range_15_20', label: '15 ~ 20만원' },
     { id: 'over_20', label: '20만원 초과' },
     { id: 'sort_low', label: '가격 낮은순' },
-    { id: 'sort_discount', label: '할인율 높은순' }
+    { id: 'sort_discount', label: '할인율 높은순' },
+    // 조인 전용 정렬(2026-09-23, '📍 내 주변' 단추를 걷어내며 정렬 메뉴로 옮겼다). 상세필터 시트는 sort_ 접두를 걸러 안 보인다.
+    { id: 'sort_near', label: '가까운 순' }
 ];
 
 /**

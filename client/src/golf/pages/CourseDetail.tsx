@@ -88,9 +88,6 @@ export default function GolfCourseDetail() {
                     <h3 className="text-lg font-black tracking-widest mb-4">멤버 후기</h3>
                     <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-10 text-center">
                         <p className="text-sm font-bold text-white/70">아직 후기가 없어요</p>
-                        <p className="mt-1 text-[11px] font-bold text-white/40 break-keep">
-                            이 골프장에서 랭큐매치로 라운드를 끝낸 회원만 후기를 남길 수 있게 준비하고 있어요.
-                        </p>
                     </div>
                 </section>
             </main>

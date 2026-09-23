@@ -157,7 +157,7 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
         if (rest.listingType === "JOIN") {
             if (rest.slots !== undefined) {
                 const slots = normalizeSlots(rest.slots);
-                if (!slots) return sendError(res, 400, "자리 구성이 올바르지 않아요(호스트 1 + 모집 자리 1 이상, 최대 4자리)");
+                if (!slots) return sendError(res, 400, "자리 구성이 올바르지 않아요(모집 자리 1 이상, 2~4자리 · 호스트는 첫 자리에만)");
                 rest.slots = slots;
                 rest.joinHeadcount = openSlotCount(slots);
             } else {
@@ -229,9 +229,10 @@ router.post("/bookings/:id/to-join", requireAuth, asyncHandler(async (req: AuthR
     if (booking.listingType === "JOIN") return sendError(res, 400, "이미 조인이에요", "ALREADY_JOIN");
     if (new Date(booking.datetime).getTime() <= Date.now()) return sendError(res, 400, "이미 지난 티타임이에요", "TEE_TIME_PASSED");
 
-    // 자리 규칙은 조인 만들기와 **같은 함수**로 본다(첫 칸 HOST · 2~4칸 · 모집 1칸 이상). 정원은 자리에서 센다.
+    // 자리 규칙은 조인 만들기와 **같은 함수**로 본다(2~4칸 · 모집 1칸 이상 · HOST 는 있으면 첫 칸에만). 정원은 자리에서 센다.
+    // 전환 글에는 HOST 가 아예 없다 — 매장 매니저는 자기가 파는 팀에서 치지 않는다(유령 자리). 그래서 네 자리 전부 모집일 수 있다.
     const slots = normalizeSlots(req.body?.slots);
-    if (!slots) return sendError(res, 400, "자리 구성이 올바르지 않아요(남은 자리 1~3)");
+    if (!slots) return sendError(res, 400, "자리 구성이 올바르지 않아요(남은 자리 1~4)");
     // 비용: 기본은 적어 둔 그린피 그대로(FIXED). 1/N 을 고르면 금액은 뜻이 없어 0 으로 둔다(조인 만들기와 같다).
     const costMode = req.body?.costMode === "SPLIT" ? "SPLIT" : "FIXED";
 

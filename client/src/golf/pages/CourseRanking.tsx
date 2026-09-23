@@ -184,7 +184,6 @@ export default function CourseRanking() {
             <main className="p-6">
                 <div className="mb-8">
                     <h2 className="text-2xl font-black mb-2">오늘의 명문 코스 리서치</h2>
-                    <p className="text-xs font-semibold text-white/40 tracking-tight">취향과 필드 상태에 매칭되는 필터를 선택하세요.</p>
                 </div>
 
                 {/* Search Bar */}

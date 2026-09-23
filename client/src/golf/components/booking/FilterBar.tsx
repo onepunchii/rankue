@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     LucideSunHorizon, LucideSun, LucideMoonStars,
     LucideCurrencyKrw, LucideUsers, LucideUser, LucideUserMinus,
@@ -37,13 +37,23 @@ interface FilterBarProps {
      */
     groupByCourse?: boolean;
     onToggleGroup?: () => void;
+    /**
+     * 이 줄이 여는 바닥 시트(상세필터·정렬)가 떴다·닫혔다. 목록 화면이 그동안 FAB 를 안 그린다 —
+     * FAB 는 fixed z-[60] 이라 그냥 두면 시트 위로 떠오른다(2026-09-23 오너).
+     */
+    onSheetOpenChange?: (open: boolean) => void;
 }
 
-/** 정렬은 가격 시트에서 떼어내 제 버튼을 준다. 값은 여전히 price 배열에 sort_ 로 들어간다. */
-const SORT_IDS = ['sort_low', 'sort_discount'] as const;
+/**
+ * 정렬은 가격 시트에서 떼어내 제 버튼을 준다. 값은 여전히 price 배열에 sort_ 로 들어간다.
+ * '가까운 순'(sort_near)은 조인 탭에만 있다 — 2026-09-23 오너가 '📍 내 주변' 단추를 걷어내면서
+ * 그 단추가 켜던 정렬이 갈 곳이 여기다(부킹 목록의 축은 티오프 시각이라 거리순으로 세우지 않는다).
+ */
+const SORT_IDS = ['sort_low', 'sort_discount', 'sort_near'] as const;
 const SORT_LABEL: Record<string, string> = {
     sort_low: '가격 낮은순',
     sort_discount: '할인율 높은순',
+    sort_near: '가까운 순',
 };
 
 type QuickChip = { category: 'time' | 'price' | 'special'; id: string; label: string; icon: any };
@@ -78,14 +88,14 @@ const BOOKING_CHIPS: QuickChip[] = [
  * 대신 조인에서 제일 먼저 묻는 것 — "혼자 가도 받아 주나" — 를 꺼냈다.
  * 노캐디도 뺐다: JOIN_OPTIONS 에서 FIELD 전용이라, 바로 아래 종류 스위치(전체/필드/스크린/파크) 중
  * 셋에서는 뜻이 없는 칩이 자리만 차지한다. 상세필터 시트에는 그대로 있다.
- * 하나 줄인 만큼 종류 스위치 + 📍내 주변 줄이 더해지는 조인 화면의 가로 여유도 늘었다.
+ * 하나 줄인 만큼 종류 스위치 줄이 더해지는 조인 화면의 가로 여유도 늘었다.
  */
 const JOIN_CHIPS: QuickChip[] = [
     ...COMMON_CHIPS,
     { category: 'special', id: 'solo_ok', label: '1인', icon: LucideUser },
 ];
 
-export const FilterBar = ({ selectedFilters, toggleFilter, clearFilter, viewType, groupByCourse, onToggleGroup }: FilterBarProps) => {
+export const FilterBar = ({ selectedFilters, toggleFilter, clearFilter, viewType, groupByCourse, onToggleGroup, onSheetOpenChange }: FilterBarProps) => {
     const isJoin = viewType === 'JOIN';
     const accent = isJoin ? '#FF6B00' : '#64DD17';
     const onAccent = isJoin ? '#FFFFFF' : '#051907';
@@ -93,7 +103,20 @@ export const FilterBar = ({ selectedFilters, toggleFilter, clearFilter, viewType
     const chips = isJoin ? JOIN_CHIPS : BOOKING_CHIPS;
     const quickIds = useMemo(() => new Set(chips.map(c => c.id)), [chips]);
 
-    const activeSort = selectedFilters.price.find(p => p.startsWith('sort_'));
+    /**
+     * 걸린 정렬 하나. 탭을 바꿔도 필터는 남으므로 **그 탭에 없는 정렬은 안 센다** —
+     * 조인에서 '가까운 순'을 고르고 부킹 탭으로 넘어가면 알약엔 '가까운 순'이 적히는데
+     * 부킹 목록은 거리로 세우지 않고(sort_near 는 조인 전용) 정렬 시트엔 그 줄이 없어
+     * 체크 표시도 안 붙는다 — 무엇이 걸린 건지 알 수 없는 상태다.
+     * 여기서 빼면 알약은 '최신순'으로 돌아가고, 그 탭에서 정렬을 한 번 고르면 pickSort 가 실제로 지운다.
+     */
+    const activeSort = selectedFilters.price.find(p => p.startsWith('sort_') && (isJoin || p !== 'sort_near'));
+
+    // 두 시트의 열림을 하나로 합쳐 부모에게 알린다(FAB 숨김). 렌더 중이 아니라 effect 에서 — 부모 setState 다.
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [sortOpen, setSortOpen] = useState(false);
+    const anySheetOpen = detailOpen || sortOpen;
+    useEffect(() => { onSheetOpenChange?.(anySheetOpen); }, [anySheetOpen, onSheetOpenChange]);
 
     /**
      * 상세필터 배지 = **시트를 열어야만 보이는** 조건의 수.
@@ -155,11 +178,16 @@ export const FilterBar = ({ selectedFilters, toggleFilter, clearFilter, viewType
                         onAccent={onAccent}
                         badge={hiddenCount}
                         isJoin={isJoin}
+                        open={detailOpen}
+                        onOpenChange={setDetailOpen}
                     />
                     <SortMenu
                         activeSort={activeSort}
                         onPick={pickSort}
                         accent={accent}
+                        isJoin={isJoin}
+                        open={sortOpen}
+                        onOpenChange={setSortOpen}
                     />
                 </div>
                 {onToggleGroup && (
@@ -259,13 +287,23 @@ function GroupToggle({ on, onToggle, accent, onAccent }: {
 }
 
 /** 정렬 — 제 버튼, 값은 여전히 price 배열의 sort_ 로 들어간다. */
-function SortMenu({ activeSort, onPick, accent }: {
+function SortMenu({ activeSort, onPick, accent, isJoin, open, onOpenChange }: {
     activeSort?: string;
     onPick: (id: string | null) => void;
     accent: string;
+    isJoin: boolean;
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
 }) {
+    const options: { id: string | null; label: string }[] = [
+        { id: null, label: '최신순 (시간 빠른 순)' },
+        { id: 'sort_low', label: SORT_LABEL.sort_low },
+        { id: 'sort_discount', label: SORT_LABEL.sort_discount },
+        // 조인만 — 부킹 목록은 같은 골프장 티타임이 줄줄이 붙어 있어 거리순으로 세우면 시간이 뒤섞인다.
+        ...(isJoin ? [{ id: 'sort_near', label: SORT_LABEL.sort_near }] : []),
+    ];
     return (
-        <Sheet>
+        <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetTrigger asChild>
                 <button className="shrink-0">
                     <ControlPill active={!!activeSort} accent={accent}>
@@ -279,7 +317,7 @@ function SortMenu({ activeSort, onPick, accent }: {
                     <SheetTitle className="text-[17px] font-semibold text-white">정렬</SheetTitle>
                 </SheetHeader>
                 <div className="px-3 pb-5">
-                    {[{ id: null, label: '최신순 (시간 빠른 순)' }, { id: 'sort_low', label: SORT_LABEL.sort_low }, { id: 'sort_discount', label: SORT_LABEL.sort_discount }].map(o => {
+                    {options.map(o => {
                         const on = (o.id ?? undefined) === activeSort;
                         return (
                             <SheetClose asChild key={o.id ?? 'default'}>
@@ -301,7 +339,7 @@ function SortMenu({ activeSort, onPick, accent }: {
 }
 
 /** 상세필터 — 넷이던 시트를 하나로. 섹션 제목 + 칩 격자 + [초기화][적용]. */
-function DetailSheet({ selectedFilters, toggleFilter, onReset, accent, onAccent, badge, isJoin }: {
+function DetailSheet({ selectedFilters, toggleFilter, onReset, accent, onAccent, badge, isJoin, open, onOpenChange }: {
     selectedFilters: Record<string, string[]>;
     toggleFilter: (category: string, id: string) => void;
     onReset: () => void;
@@ -309,6 +347,8 @@ function DetailSheet({ selectedFilters, toggleFilter, onReset, accent, onAccent,
     onAccent: string;
     badge: number;
     isJoin: boolean;
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
 }) {
     /**
      * 인원과 조건을 **섹션으로 갈라** 보여 준다. 같은 칸에 섞여 있으면 "노캐디 + 식사 제공" 이
@@ -328,7 +368,7 @@ function DetailSheet({ selectedFilters, toggleFilter, onReset, accent, onAccent,
     ];
 
     return (
-        <Sheet>
+        <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetTrigger asChild>
                 <button className="shrink-0">
                     <ControlPill active={badge > 0} accent={accent}>

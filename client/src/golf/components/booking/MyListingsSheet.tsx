@@ -42,7 +42,7 @@ interface Props {
     onGo: (item: any) => void;
     /** 내가 올린 글 내리기 */
     onDelete: (item: any) => void;
-    /** 내가 올린 부킹을 조인으로 돌리기(2026-09-23 오너: "내가 올린 부킹 내역에서 조인 돌리기 버튼") */
+    /** 내가 올린 부킹을 조인으로 전환(2026-09-23 오너: "내가 올린 부킹 내역에서 조인 돌리기 버튼") */
     onToJoin: (item: any) => void;
     /** 내가 한 신청 취소 */
     onCancelRequest: (item: any) => void;
@@ -74,7 +74,7 @@ function Badge({ item }: { item: any }) {
 function Row({ item, past, kind, onGo, onDelete, onToJoin, onCancel }: { item: any; past: boolean; kind: "mine" | "applied"; onGo: () => void; onDelete?: () => void; onToJoin?: () => void; onCancel?: () => void }) {
     const isJoin = item.listingType === "JOIN";
     /**
-     * '조인 돌리기' 가 붙는 자리(2026-09-23). 내가 올린 **부킹**이고, 아직 안 지난 티타임이고,
+     * '조인으로 전환' 이 붙는 자리(2026-09-23). 내가 올린 **부킹**이고, 아직 안 지난 티타임이고,
      * 아직 아무에게도 확정되지 않았을 때만. 확정된 티타임은 팀이 통째로 팔린 것이라 나눌 자리가 없다(서버도 409 로 막는다).
      */
     const canToJoin = kind === "mine" && !isJoin && !past && Number(item.joinApplied ?? 0) === 0;
@@ -111,7 +111,7 @@ function Row({ item, past, kind, onGo, onDelete, onToJoin, onCancel }: { item: a
                 <button
                     type="button" onClick={onToJoin}
                     className="w-full h-10 rounded-xl border border-[#FF6B00]/35 bg-[#FF6B00]/10 text-[13px] font-medium text-[#FF8A33] active:bg-[#FF6B00]/20"
-                >자리가 남았어요 — 조인으로 돌리기</button>
+                >조인으로 전환</button>
             )}
 
             {/* 확정된 글: 가는 길과 연락처를 여기서 바로 */}

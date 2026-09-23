@@ -47,8 +47,17 @@ function isGender(v: unknown): v is SlotGender {
 }
 
 /**
- * 자리 목록을 정리한다. 첫 자리는 반드시 HOST(만든 사람) 하나, 나머지는 GUEST(내 동반자)·OPEN(모집) 자유.
- * 2~4자리. 잘못된 값은 null — 서버는 400, 화면은 게시 버튼을 잠근다.
+ * 자리 목록을 정리한다. 2~4자리, 모집(OPEN) 자리 1개 이상.
+ * HOST(만든 사람)는 **있으면 첫 자리에만** 둔다. 나머지는 GUEST(동반자)·OPEN(모집) 자유.
+ *
+ * 2026-09-23 오너("확정 되었다 취소 했는데 조인돌리기시 해당 인원이 포함되어있는거 같음"): 예전 규칙은
+ * `(i === 0) !== (role === "HOST")` 로 **첫 칸을 반드시 HOST 로** 못 박았다. 그래서 OPEN 은 최대 3이었고,
+ * 부킹을 조인으로 전환하는 시트는 한 자리도 안 팔린 티타임조차 "1자리는 이미 팔렸다"고 적어야 했다 —
+ * 매장 매니저는 자기가 파는 팀에서 치지 않으니 그 HOST 는 **아무도 안 앉는 유령 자리**였다.
+ * 이제 호스트 없는 구성(OPEN 넷 = 전부 모집)도 통과한다. 넓히는 방향이라 기존 HOST-첫칸 글은 전부 그대로 통과한다.
+ * HOST 둘, HOST 가 둘째 칸 이후에 오는 것은 여전히 거부한다(만든 사람은 한 명이고 자리 그림의 첫 칸이다).
+ *
+ * 잘못된 값은 null — 서버는 400, 화면은 게시 버튼을 잠근다.
  */
 export function normalizeSlots(input: unknown): JoinSlot[] | null {
     if (!Array.isArray(input) || input.length < 2 || input.length > MAX_SLOTS) return null;
@@ -59,7 +68,7 @@ export function normalizeSlots(input: unknown): JoinSlot[] | null {
         const role = s.role;
         if (role !== "HOST" && role !== "GUEST" && role !== "OPEN") return null;
         if (!isGender(s.gender)) return null;
-        if ((i === 0) !== (role === "HOST")) return null;   // HOST 는 첫 자리에만, 첫 자리는 HOST 만
+        if (role === "HOST" && i !== 0) return null;         // HOST 는 있으면 첫 자리에만(둘도 안 된다). 첫 자리가 HOST 가 아닌 건 괜찮다
         out.push({ role, gender: s.gender });
     }
     if (!out.some((s) => s.role === "OPEN")) return null;   // 모집 자리가 없으면 조인이 아니다

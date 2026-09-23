@@ -2,17 +2,64 @@ import { describe, it, expect } from "vitest";
 import { distanceKm, formatDistance, isKoreaCoord, isUrgentJoin, kstHour, normalizeSlots, openSlotCount, slotsFromLegacy, JOIN_OPTIONS, URGENT_MAX_FEE, URGENT_MIN_LEAD_MS } from "./golfJoin";
 
 describe("골프 조인 자리(slot) 규칙", () => {
-    it("첫 자리는 호스트, 모집 자리가 하나는 있어야 하고, 2~4자리", () => {
+    it("호스트는 있으면 첫 자리에만, 모집 자리가 하나는 있어야 하고, 2~4자리", () => {
         const ok = normalizeSlots([{ role: "HOST", gender: "M" }, { role: "GUEST", gender: "F" }, { role: "OPEN", gender: "ANY" }, { role: "OPEN", gender: "M" }]);
         expect(ok).not.toBeNull();
         expect(openSlotCount(ok!)).toBe(2);
         expect(normalizeSlots([{ role: "HOST", gender: "M" }])).toBeNull();                                   // 혼자
         expect(normalizeSlots([{ role: "HOST", gender: "M" }, { role: "GUEST", gender: "F" }])).toBeNull();     // 모집 자리 없음
-        expect(normalizeSlots([{ role: "OPEN", gender: "ANY" }, { role: "HOST", gender: "M" }])).toBeNull();    // 호스트가 첫 자리가 아님
+        expect(normalizeSlots([{ role: "OPEN", gender: "ANY" }, { role: "HOST", gender: "M" }])).toBeNull();    // 호스트가 둘째 칸에 있다(자리 그림의 첫 칸이어야 한다)
         expect(normalizeSlots([{ role: "HOST", gender: "M" }, { role: "HOST", gender: "F" }, { role: "OPEN", gender: "ANY" }])).toBeNull(); // 호스트 둘
         expect(normalizeSlots(Array.from({ length: 5 }, (_, i) => ({ role: i === 0 ? "HOST" : "OPEN", gender: "ANY" })))).toBeNull();
         expect(normalizeSlots([{ role: "HOST", gender: "X" }, { role: "OPEN", gender: "ANY" }])).toBeNull();
         expect(normalizeSlots("nope")).toBeNull();
+    });
+
+    /**
+     * 2026-09-23 오너: 확정이 취소돼 **한 자리도 안 팔린** 티타임을 조인으로 돌릴 수 있어야 한다.
+     * 예전 규칙은 첫 칸을 HOST 로 못 박아 OPEN 이 최대 3이었고, 매장 매니저는 그 팀에서 치지 않으니
+     * 그 HOST 는 아무도 안 앉는 유령 자리였다("1자리는 이미 팔렸고" 라는 거짓말이 화면에 남았다).
+     */
+    it("호스트 없는 자리 구성 — 전환 글은 넷 다 모집일 수 있다", () => {
+        const all = normalizeSlots(Array.from({ length: 4 }, () => ({ role: "OPEN", gender: "ANY" })));
+        expect(all).not.toBeNull();
+        expect(openSlotCount(all!)).toBe(4);
+        // 이미 팔린 자리는 GUEST 로 적는다 — 호스트가 없어도 통과해야 한다
+        const two = normalizeSlots([{ role: "GUEST", gender: "ANY" }, { role: "GUEST", gender: "ANY" }, { role: "OPEN", gender: "M" }, { role: "OPEN", gender: "ANY" }]);
+        expect(two).not.toBeNull();
+        expect(openSlotCount(two!)).toBe(2);
+        // 첫 칸이 GUEST 여도 된다(팔린 자리 하나 + 모집 셋)
+        expect(normalizeSlots([{ role: "GUEST", gender: "ANY" }, { role: "OPEN", gender: "ANY" }, { role: "OPEN", gender: "ANY" }, { role: "OPEN", gender: "ANY" }])).not.toBeNull();
+    });
+
+    /**
+     * 규칙을 넓혔으니 **옛 글이 그대로 통과하는지**가 진짜 질문이다(2026-09-23 리뷰).
+     * "통과한다"로는 모자란다 — 값이 조용히 바뀌면 이미 저장된 글의 자리 수·성별이 달라진다.
+     * 그래서 입력과 출력이 **같은 값**인지까지 본다. 운영 DB 의 slots 도 같은 방식으로 대조했다(전부 HOST 첫 칸, 0건 변형).
+     */
+    it("옛 글(HOST 첫 칸)은 값 그대로 통과한다", () => {
+        const 옛것 = [
+            [{ role: "HOST", gender: "M" }, { role: "OPEN", gender: "ANY" }, { role: "OPEN", gender: "F" }, { role: "OPEN", gender: "ANY" }],
+            [{ role: "HOST", gender: "M" }, { role: "GUEST", gender: "F" }, { role: "OPEN", gender: "ANY" }],
+            [{ role: "HOST", gender: "F" }, { role: "GUEST", gender: "ANY" }, { role: "GUEST", gender: "M" }, { role: "OPEN", gender: "ANY" }],
+            [{ role: "HOST", gender: "ANY" }, { role: "OPEN", gender: "ANY" }],
+        ];
+        for (const input of 옛것) {
+            const out = normalizeSlots(input);
+            expect(out, JSON.stringify(input)).not.toBeNull();
+            expect(out).toEqual(input);          // 값이 그대로여야 한다 — 저장된 글의 뜻이 바뀌면 안 된다
+            expect(openSlotCount(out!)).toBe(input.filter((s) => s.role === "OPEN").length);
+        }
+    });
+
+    it("호스트 자리는 여전히 첫 칸에 하나뿐이다", () => {
+        expect(normalizeSlots([{ role: "OPEN", gender: "ANY" }, { role: "HOST", gender: "M" }, { role: "OPEN", gender: "ANY" }])).toBeNull();  // 둘째 칸
+        expect(normalizeSlots([{ role: "OPEN", gender: "ANY" }, { role: "OPEN", gender: "ANY" }, { role: "HOST", gender: "M" }])).toBeNull();  // 끝 칸
+        expect(normalizeSlots([{ role: "GUEST", gender: "ANY" }, { role: "HOST", gender: "M" }, { role: "OPEN", gender: "ANY" }])).toBeNull(); // GUEST 뒤
+        expect(normalizeSlots([{ role: "HOST", gender: "M" }, { role: "HOST", gender: "F" }, { role: "OPEN", gender: "ANY" }])).toBeNull();    // 둘
+        expect(normalizeSlots([{ role: "GUEST", gender: "ANY" }, { role: "GUEST", gender: "ANY" }])).toBeNull();                               // 모집 자리 없음
+        expect(normalizeSlots([{ role: "OPEN", gender: "ANY" }])).toBeNull();                                                                  // 1칸
+        expect(normalizeSlots(Array.from({ length: 5 }, () => ({ role: "OPEN", gender: "ANY" })))).toBeNull();                                 // 5칸
     });
 
     it("옛 글은 모집 인원·조건으로 자리를 만든다", () => {

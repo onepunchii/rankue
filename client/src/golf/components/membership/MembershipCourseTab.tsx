@@ -161,10 +161,9 @@ export function MembershipCourseTab({ data }: MembershipCourseTabProps) {
                             <span className="text-xs font-bold text-white/40">DIFFICULTY</span>
                             <span className="text-xs font-black text-white/50">정보 준비중</span>
                         </div>
-                        <div className="h-1.5 bg-white/10 rounded-full relative mb-3 flex items-center">
+                        <div className="h-1.5 bg-white/10 rounded-full relative flex items-center">
                             <div className="h-full w-[50%] bg-white/20 rounded-full" />
                         </div>
-                        <p className="text-[10px] text-white/40 italic text-center">코스 상세 분석은 순차적으로 업데이트 예정입니다.</p>
 
                         <div className="flex flex-wrap gap-2 mt-4">
                             {data.tags.map((tag: string) => (
@@ -181,10 +180,9 @@ export function MembershipCourseTab({ data }: MembershipCourseTabProps) {
             <div className="space-y-6">
                 <div className="flex items-center justify-between mb-2">
                     <div>
-                        <h3 className="text-lg font-black italic tracking-widest uppercase mb-1 flex items-center gap-2">
+                        <h3 className="text-lg font-black italic tracking-widest uppercase flex items-center gap-2">
                             ⭐ 멤버 인사이트
                         </h3>
-                        <p className="text-[10px] font-bold text-white/30">핵심 데이터 요약 카드 (총 1,240개)</p>
                     </div>
                     <div className="text-right">
                         <div className="text-3xl font-black text-amber-400 tracking-tighter">4.9</div>

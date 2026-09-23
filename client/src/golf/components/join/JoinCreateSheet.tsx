@@ -207,7 +207,8 @@ export function JoinCreateSheet({ onClose, onCreated }: Props) {
                     </div>
                     {type !== "FIELD" && (
                         <div className="space-y-2">
-                            {placeApiOff && <p className="text-[12px] text-white/40">장소 검색은 곧 열려요. 매장 이름을 적고 지역만 골라 주세요.</p>}
+                            {/* 장소 검색이 꺼져 있어도 따로 안내하지 않는다(2026-09-23 오너: 없는 기능 예고를 걷어냈다) —
+                                입력칸 placeholder 가 무엇을 적는 칸인지 말하고, 바로 아래 지역 칩이 나머지를 받는다. */}
                             {!placeApiOff && !location && !place && (
                                 <button type="button" onClick={() => { void requestLocation(); }} className="inline-flex items-center gap-1.5 text-[12.5px] text-[#FF8A33]">
                                     <LucideMapPin className="w-3.5 h-3.5" /> 내 위치 근처부터 찾기
