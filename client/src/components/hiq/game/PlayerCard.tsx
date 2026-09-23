@@ -16,6 +16,8 @@ interface Props {
     finishRemaining?: number;
     theme: string;
     onTap: (zone: "top" | "bottom") => void;
+    /** PBA 룰 경기에서만 넘어온다 — 뱅크샷 +2. 없으면 버튼을 그리지 않는다. */
+    onBankShot?: () => void;
     onTurnClick?: () => void;
     showVs?: boolean;
     isSolo: boolean;
@@ -39,6 +41,7 @@ export function PlayerCard({
     finishRemaining,
     theme,
     onTap,
+    onBankShot,
     onTurnClick,
     showVs,
     isSolo,
@@ -222,6 +225,19 @@ export function PlayerCard({
                             ) : displayRemaining}
                         </span>
                     </div>
+
+                    {/* 뱅크샷 +2 — 카드의 위·아래 탭(±1)과 따로, 한 번에 2점. 탭 존(z-[45]) 위에 있어야 눌린다.
+                        목표 도달 뒤엔 숨긴다: 그때 다음 탭은 종료·마무리 판정이다. */}
+                    {isTurn && onBankShot && !isFinishMode && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onBankShot(); }}
+                            className="h-16 px-6 rounded-2xl border-2 border-brand text-brand bg-white flex items-center gap-2 pointer-events-auto relative z-50 active:scale-95 transition-transform"
+                        >
+                            <span className="text-sm font-semibold">{t("playerCard.bankShot")}</span>
+                            <span className="text-2xl font-bold tabular-nums">+2</span>
+                        </button>
+                    )}
 
                     <AnimatePresence>
                         {isTurn && (!isFinishMode || (finishRemaining ?? 0) > 0) && !hideEndInning && (

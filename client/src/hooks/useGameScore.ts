@@ -518,6 +518,47 @@ export function useGameScore(id: string) {
         }
     };
 
+    /**
+     * PBA 뱅크샷 +2(2026-09-24 해외 사용자 문의: "during match scoring don't see an option to mark a point as bank shot").
+     * 경기 만들기의 'PBA 룰(2점제/뱅크샷)' 은 저장만 되고 점수판이 읽지 않아, 뱅크샷을 적을 길이 없었다.
+     * 뱅크샷 = 빈쿠션(수구가 첫 적구보다 쿠션을 먼저 맞힌 득점), 쿠션 개수 무관, 2점.
+     *
+     * 한 번의 setGameState 로 +2 — 되돌리기 한 번에 통째로 취소된다(+1 두 번이면 되돌리기도 두 번이다).
+     * 목표 도달 이후(마무리·FINISH 단계)에는 쓰지 않는다 — 그때 다음 탭은 종료/마무리 판정이다.
+     */
+    const handleBankShot = (playerIndex: 1 | 2 | 3 | 4) => {
+        if (!game || gameState.currentTurn !== playerIndex) return;
+        const key = `p${playerIndex}Score` as keyof GameState;
+        const target = (game[`player${playerIndex}Target` as keyof HiqGame] as number) || 0;
+        const currentScore = gameState[key] as number;
+        if (target > 0 && currentScore >= target) return;
+
+        const runKey = `p${playerIndex}Run` as keyof GameState;
+        const highRunKey = `p${playerIndex}HighRun` as keyof GameState;
+        const newScore = currentScore + 2;
+        const newRun = (gameState[runKey] as number) + 2;
+        setGameState(prev => {
+            const run = (prev[runKey] as number) + 2;
+            return {
+                ...prev,
+                [key]: (prev[key] as number) + 2,
+                [runKey]: run,
+                [highRunKey]: Math.max(prev[highRunKey] as number, run),
+            };
+        });
+
+        if (target > 0 && newScore >= target) {
+            playEffect('finishing');
+            speak(`${t("tts.bankShot")} ${t("tts.finishingChance")}`);
+        } else {
+            playEffect('click');
+            const remaining = target - newScore;
+            speak(target > 0
+                ? `${t("tts.bankShot")} ${newRun}${t("tts.scoredSuffix")} ${remaining}${t("tts.remainingSuffix")}`
+                : `${t("tts.bankShot")} ${newRun}${t("tts.scoredSuffix")}`);
+        }
+    };
+
     return {
         game,
         isLoading,
@@ -533,6 +574,7 @@ export function useGameScore(id: string) {
         handleDragEnd,
         handleTurnChange, // Need to export for manual calls
         handleCardTap,
+        handleBankShot,
         finishMutation,
         discardMutation,
         speak

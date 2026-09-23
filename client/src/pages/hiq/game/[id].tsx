@@ -27,7 +27,7 @@ export default function HiqScoreboard() {
     const {
         game, isLoading, players, totalPlayers,
         gameState, canUndo, canRedo, undo, redo,
-        playerOrder, handleDragEnd, handleCardTap, handleTurnChange,
+        playerOrder, handleDragEnd, handleCardTap, handleBankShot, handleTurnChange,
         finishMutation, discardMutation, speak
     } = useGameScore(id || "");
 
@@ -125,6 +125,8 @@ export default function HiqScoreboard() {
                                             }
                                             theme={theme}
                                             onTap={(zone) => handleCardTap(playerId as 1 | 2 | 3 | 4, zone)}
+                                            // PBA 룰(3구) 경기에서만 — 저장만 되고 점수판이 안 읽던 설정이다(2026-09-24).
+                                            onBankShot={game.usePbaRule && game.gameType === "3c" ? () => handleBankShot(playerId as 1 | 2 | 3 | 4) : undefined}
                                             onTurnClick={() => {
                                                 // A slot with no target (0 — e.g. a guest whose target was never
                                                 // raised) has NO win condition. Without `target > 0`, `0 >= 0`
