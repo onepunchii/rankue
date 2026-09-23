@@ -229,7 +229,8 @@ if (typeof window !== "undefined") {
     persister,
     maxAge: 1000 * 60 * 60 * 24 * 7, // 1주일
     // v2.4: /api/hiq/me 에 golfAccess 가 생겼다 — 옛 캐시엔 없어서 배포 직후 골프 화면이 튕겼다(2026-09-11).
-    buster: "RANKUE_CACHE_v2.4",
+    // v2.5: 알림 목록 응답이 배열 → { items, nextBefore } 로 바뀌었다(2026-09-23). 옛 캐시가 남으면 첫 렌더에 '더 보기'가 없다.
+    buster: "RANKUE_CACHE_v2.5",
     // 진행 중 경기 행은 절대 영속화하지 않는다. 7일짜리 localStorage 스냅샷이
     // 앱 재실행 때 점수판에 먼저 하이드레이션되고, 점수판은 그 낡은 점수를 서버에
     // 다시 PATCH 해서 실제 진행 상황을 되돌렸다(예: 8이닝 친 경기가 0:0 으로).

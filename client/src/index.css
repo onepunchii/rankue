@@ -5,41 +5,25 @@
   filter: drop-shadow(0 0 8px var(--hiq-brand-color, #22c55e));
 }
 
-.tier-master {
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.2);
-  background-color: rgba(239, 68, 68, 0.05);
-}
+/* 등급 칩 색(2026-09-23 재조정 — 오너: "등급 부분 디자인이 마음에 안 듬").
+ * 예전 값은 **밝은 카드 위에서 안 읽혔다**: gold #ffd700, silver #e2e8f0 은 흰 바탕에 거의 안 보인다.
+ * 게다가 부르는 쪽이 `bg-black/[0.04]` 를 덧칠해 여기 바탕색이 매번 덮여 있었다(유틸리티가 뒤에 온다).
+ * 이제 글자는 읽히는 채도색, 바탕은 같은 색 10%. **부르는 쪽에서 bg-* 와 border 를 덧칠하지 마라.**
+ * 골프는 어두운 테마라 같은 계열의 밝은 쪽으로 바꿔 끼운다.
+ */
+.tier-master   { color: #dc2626; background-color: rgba(220, 38, 38, 0.10);  border-color: rgba(220, 38, 38, 0.22); }
+.tier-diamond  { color: #7c3aed; background-color: rgba(124, 58, 237, 0.10); border-color: rgba(124, 58, 237, 0.22); }
+.tier-platinum { color: #0e7490; background-color: rgba(14, 116, 144, 0.10); border-color: rgba(14, 116, 144, 0.22); }
+.tier-gold     { color: #a16207; background-color: rgba(161, 98, 7, 0.10);   border-color: rgba(161, 98, 7, 0.22); }
+.tier-silver   { color: #52525b; background-color: rgba(82, 82, 91, 0.10);   border-color: rgba(82, 82, 91, 0.22); }
+.tier-bronze   { color: #c2410c; background-color: rgba(194, 65, 12, 0.10);  border-color: rgba(194, 65, 12, 0.22); }
 
-.tier-diamond {
-  color: #a855f7;
-  border-color: rgba(168, 85, 247, 0.2);
-  background-color: rgba(168, 85, 247, 0.05);
-}
-
-.tier-platinum {
-  color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.2);
-  background-color: rgba(56, 189, 248, 0.05);
-}
-
-.tier-gold {
-  color: #ffd700;
-  border-color: rgba(255, 215, 0, 0.2);
-  background-color: rgba(255, 215, 0, 0.05);
-}
-
-.tier-silver {
-  color: #e2e8f0;
-  border-color: rgba(226, 232, 240, 0.2);
-  background-color: rgba(226, 232, 240, 0.05);
-}
-
-.tier-bronze {
-  color: #cd7f32;
-  border-color: rgba(205, 127, 50, 0.2);
-  background-color: rgba(205, 127, 50, 0.05);
-}
+:root[data-sport="GOLF"] .tier-master   { color: #f87171; background-color: rgba(248, 113, 113, 0.14); border-color: rgba(248, 113, 113, 0.26); }
+:root[data-sport="GOLF"] .tier-diamond  { color: #c4b5fd; background-color: rgba(196, 181, 253, 0.14); border-color: rgba(196, 181, 253, 0.26); }
+:root[data-sport="GOLF"] .tier-platinum { color: #67e8f9; background-color: rgba(103, 232, 249, 0.14); border-color: rgba(103, 232, 249, 0.26); }
+:root[data-sport="GOLF"] .tier-gold     { color: #fcd34d; background-color: rgba(252, 211, 77, 0.14);  border-color: rgba(252, 211, 77, 0.26); }
+:root[data-sport="GOLF"] .tier-silver   { color: #cbd5e1; background-color: rgba(203, 213, 225, 0.14); border-color: rgba(203, 213, 225, 0.26); }
+:root[data-sport="GOLF"] .tier-bronze   { color: #fdba74; background-color: rgba(253, 186, 116, 0.14); border-color: rgba(253, 186, 116, 0.26); }
 
 @tailwind base;
 @tailwind components;

@@ -22,10 +22,10 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
     return (
         <div className="space-y-4 relative z-10">
             <div className="flex items-center justify-between px-1">
-                <h2 className="text-[15px] font-semibold text-black/60">
+                <h2 className="text-[15px] font-semibold text-ink-2">
                     {currentSport === "GOLF" ? t("friendList.titleGolf") : t("friendList.titleBilliards")}
                 </h2>
-                <div className="px-3 py-1 rounded-full bg-black/[0.04] text-[12px] font-medium text-black/55 tabular-nums">
+                <div className="px-3 py-1 rounded-full bg-surface-2 text-[12px] font-medium text-ink-3 rk-num">
                     {friends.length}{t("friendList.countSuffix")}
                 </div>
             </div>
@@ -36,13 +36,13 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                     animate={{ opacity: 1, y: 0 }}
                     className="py-20 flex flex-col items-center text-center rk-card"
                 >
-                    <div className="w-20 h-20 rounded-2xl bg-black/[0.04] flex items-center justify-center mb-6">
-                        <LucideUsers className="w-9 h-9 text-black/40" />
+                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6">
+                        <LucideUsers className="w-9 h-9 text-ink-4" />
                     </div>
                     <h3 className="text-[19px] font-bold mb-2 text-ink-1 tracking-tight">
                         {t(config.emptyTitle)}
                     </h3>
-                    <p className="text-[13px] text-black/55 font-medium mb-8 leading-relaxed">
+                    <p className="text-[13px] text-ink-3 font-medium mb-8 leading-relaxed">
                         {t("friendList.emptyDescLine1")}<br />{t("friendList.emptyDescLine2")}
                     </p>
                     <Button
@@ -91,7 +91,7 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className="relative">
-                                                    <div className="w-14 h-14 rounded-tile bg-black/[0.04] flex items-center justify-center text-2xl overflow-hidden">
+                                                    <div className="w-14 h-14 rounded-tile bg-surface-2 flex items-center justify-center text-2xl overflow-hidden">
                                                         {(friend as any).profileImageUrl ? (
                                                             <img
                                                                 src={(friend as any).profileImageUrl}
@@ -102,7 +102,7 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                             tier.icon
                                                         )}
                                                     </div>
-                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center p-0.5 ">
+                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-surface-0 flex items-center justify-center p-0.5">
                                                         <div className="w-full h-full rounded-full bg-brand" />
                                                     </div>
                                                 </div>
@@ -114,9 +114,9 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                             // 않으면 처음 만난 상대에게도 "0승 0패"가 붙는다
                                                             h2hTotal > 0 ? (
                                                                 <>
-                                                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/[0.04] ">
+                                                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-surface-2">
                                                                         <span className="text-[12px] font-semibold text-brand tabular-nums">{friend.h2h!.wins}{t("friendList.winsSuffix")}</span>
-                                                                        <div className="w-0.5 h-2 bg-black/10 rounded-full" />
+                                                                        <div className="w-0.5 h-2 bg-surface-line rounded-full" />
                                                                         <span className="text-[12px] font-semibold text-red-500 tabular-nums">{friend.h2h!.losses}{t("friendList.lossesSuffix")}</span>
                                                                     </div>
                                                                     {rivalry && (
@@ -126,21 +126,27 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                                     )}
                                                                 </>
                                                             ) : (
-                                                                <div className="px-2 py-0.5 rounded-lg bg-black/[0.04] ">
-                                                                    <span className="text-[12px] font-medium text-black/55">{t("friendList.noRecord")}</span>
+                                                                <div className="px-2 py-0.5 rounded-lg bg-surface-2">
+                                                                    <span className="text-[12px] font-medium text-ink-3">{t("friendList.noRecord")}</span>
                                                                 </div>
                                                             )
                                                         )}
                                                     </div>
+                                                    {/* 등급과 값(2026-09-23 오너: "등급·AVG 부분 디자인이 마음에 안 듬").
+                                                        예전엔 등급 칩에 테두리 + bg-black/[0.04] 를 덧칠해 tier 클래스의 바탕색이 매번 덮였고,
+                                                        값은 12px 회색이라 이름 아래 회색 줄 하나로 뭉개졌다.
+                                                        이제 칩은 등급색 하나로, 값은 **숫자를 크게** 하고 단위를 작게 앞에 둔다. */}
                                                     <div className="flex items-center gap-2.5">
-                                                        <div className={cn("px-2.5 py-0.5 rounded-full border bg-black/[0.04] text-[12px] font-semibold", tier.class)}>
+                                                        <span className={cn("px-2 py-0.5 rounded-md text-[11px] font-bold tracking-wide", tier.class)}>
                                                             {t(tier.label)}
-                                                        </div>
-                                                        <div className="w-1 h-1 rounded-full bg-black/20" />
-                                                        <span className="text-[12px] font-medium text-black/55 tabular-nums">
-                                                            {currentSport === "GOLF"
-                                                                ? `HDCP ${(displayHandi || 0).toFixed(1)}`
-                                                                : `AVG ${((friend as any).avg3c || 0) > 0 ? (friend as any).avg3c?.toFixed(2) : ((friend as any).avg4c || 0)?.toFixed(2)}`}
+                                                        </span>
+                                                        <span className="flex items-baseline gap-1">
+                                                            <span className="text-[10.5px] font-semibold text-ink-4">{currentSport === "GOLF" ? "HDCP" : "AVG"}</span>
+                                                            <span className="rk-num text-[14px] font-bold text-ink-1 leading-none">
+                                                                {currentSport === "GOLF"
+                                                                    ? (displayHandi || 0).toFixed(1)
+                                                                    : (((friend as any).avg3c || 0) > 0 ? (friend as any).avg3c : ((friend as any).avg4c || 0))?.toFixed(2)}
+                                                            </span>
                                                         </span>
                                                     </div>
                                                 </div>
@@ -159,9 +165,9 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                         whileTap={{ scale: 0.92 }}
                                                         onClick={(e) => { e.stopPropagation(); onSelectFriend(friend.id); }}
                                                         title={t("h2h.viewTitle")}
-                                                        className="w-12 h-12 rounded-tile bg-black/[0.04] flex items-center justify-center transition-all hover:bg-brand/10 hover:border-brand/30 group/btn"
+                                                        className="w-12 h-12 rounded-tile bg-surface-2 flex items-center justify-center transition-all hover:bg-brand/10 group/btn"
                                                     >
-                                                        <LucideTarget className="w-5 h-5 text-black/55 transition-colors group-hover/btn:text-brand" />
+                                                        <LucideTarget className="w-5 h-5 text-ink-3 transition-colors group-hover/btn:text-brand" />
                                                     </motion.button>
                                                 </div>
                                             )}

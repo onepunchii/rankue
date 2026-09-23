@@ -58,7 +58,7 @@ router.use("/", authRouter);
 router.use("/", memberRouter);
 
 // 7. Notification (Root)
-// - /notifications, /test-notification
+// - /notifications, /notifications/unread-count
 router.use("/", notificationRouter);
 
 // 8. Game / Billiards / Core (Root)

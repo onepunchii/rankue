@@ -1347,7 +1347,11 @@ export const hiqNotifications = pgTable("hiq_notifications", {
   params: jsonb("params"), // JSON structure for deep linking
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  // 알림함은 늘 "내 것을 최신순으로 한 페이지"다. PK 하나뿐이던 시절엔 Seq Scan + Sort 였다
+  // (2026-09-23: 4,528행 중 한 계정이 893행). 커서 페이징(created_at < ?)까지 이 인덱스가 받는다.
+  index("hiq_notifications_member_created_idx").on(table.memberId, table.createdAt.desc()),
+]);
 
 // 대결 신청 — 크루 멤버끼리 "한 판 치자"를 보내는 가장 가벼운 신호.
 // 실제 경기 생성이 아니라 약속 제안이다(오너 결정 2026-08-22): 대부분 같은 매장에서

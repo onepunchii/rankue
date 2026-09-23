@@ -616,7 +616,7 @@ const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => {
         {sportCategory === 'GOLF' ? (
             <>
                 <div className="flex flex-col items-center gap-1">
-                    <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded-full mb-1 border", sheetData.tier.class)}>
+                    <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded-md mb-1", sheetData.tier.class)}>
                         <span className="text-[12px] font-semibold">{sheetData.tier.label}</span>
                     </div>
                     <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">

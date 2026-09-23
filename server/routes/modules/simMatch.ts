@@ -239,6 +239,10 @@ async function broadcastRoomOpened(hostId: string, hostName: string, m: { id: st
         // 전체 방송이라 '멀티방 열림' 묶음이다 — 내 대전 알림(sim)과 따로 끌 수 있어야 한다(2026-09-13 오너)
         pref: "rooms",
         params: { url: "/online-game?rooms=1" },
+        // 알림함에는 남기지 않는다(2026-09-23 오너 "남기지 말기"). 푸시는 tag 'room-open' + 30분 TTL 로
+        // 한 줄에 접히는데 DB 행만 영원히 남아, 한 사람 알림함에 110건 · 전체 2,023행이 이 방송이었다.
+        // 방이 닫힌 뒤에 남은 "방이 열렸어요"는 안내가 아니라 소음이다.
+        saveToInbox: false,
     }).catch((e) => { console.error("[RoomBroadcast]", e); }));
     await Promise.race([
         Promise.allSettled(sends),

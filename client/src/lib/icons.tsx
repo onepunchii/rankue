@@ -99,6 +99,7 @@ export const LucideMail = ((Ph as any).Envelope ?? F) as Ph.Icon;
 export const LucideMap = ((Ph as any).MapTrifold ?? F) as Ph.Icon;
 export const LucideMapPin = ((Ph as any).MapPin ?? F) as Ph.Icon;
 export const LucideMedal = ((Ph as any).Medal ?? F) as Ph.Icon;
+export const LucideMegaphone = ((Ph as any).Megaphone ?? F) as Ph.Icon;
 export const LucideMenu = ((Ph as any).List ?? F) as Ph.Icon;
 export const LucideMessageCircle = ((Ph as any).ChatCircle ?? F) as Ph.Icon;
 export const LucideMessageSquare = ((Ph as any).ChatText ?? F) as Ph.Icon;

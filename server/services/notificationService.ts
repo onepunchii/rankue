@@ -80,6 +80,15 @@ export class NotificationService {
         params?: any;
         /** 알림 카테고리(설정에서 끌 수 있는 묶음). 생략하면 type 으로 고른다 — shared/notificationPrefs. */
         pref?: PrefKey;
+        /**
+         * 알림함(DB)에 남길지. 기본 true. false 면 **저장만 건너뛰고 푸시는 그대로** 나간다.
+         *
+         * 멀티방 '방이 열렸어요' 전체 방송을 위한 문이다(2026-09-23 오너 "남기지 말기"). 푸시는 이미
+         * tag 'room-open' + 30분 TTL 로 한 줄에 접히는데 DB 행만 영구히 남아, 한 사람 알림함에 110건이 쌓였다
+         * (전체 4,528행 중 2,023행이 이 방송). 방이 닫힌 뒤의 그 줄은 안내가 아니라 소음이다.
+         * ⚠️ 관리자 broadcast·긴급 조인 같은 다른 전체 방송은 **남아야 하는 알림**이니 이 옵션을 쓰지 마라.
+         */
+        saveToInbox?: boolean;
     }) {
         const { memberId, category, type, params: deepLinkParams } = params;
 
@@ -91,26 +100,31 @@ export class NotificationService {
 
         // 1. DB에 알림 내역 먼저 저장. 푸시 가능 여부(프로필·토큰)와 무관하게 인앱 알림함에는 남아야 한다.
         // (매장에서 전화번호만으로 등록된 회원은 profileId가 없어서, 예전엔 여기서 나가버려 알림함이 영영 비어 있었다.)
-        const notificationData: InsertHiqNotification = {
-            memberId,
-            title,
-            body,
-            category,
-            type,
-            params: deepLinkParams,
-            isRead: false
-        };
-        await storage.createNotification(notificationData);
+        // saveToInbox:false 면 이 단계만 건너뛴다 — 아래 pref·토큰 분기는 그대로 돌아 푸시는 평소처럼 나간다.
+        const saveToInbox = params.saveToInbox !== false;
+        if (saveToInbox) {
+            const notificationData: InsertHiqNotification = {
+                memberId,
+                title,
+                body,
+                category,
+                type,
+                params: deepLinkParams,
+                isRead: false
+            };
+            await storage.createNotification(notificationData);
+        }
+        const kept = saveToInbox ? "saved to DB" : "not saved (push-only)";
 
         // 2. 푸시 토큰 조회 — pushToken은 profile에 있으므로 프로필이 없으면 푸시 단계만 건너뛴다.
         if (!member.profileId) {
-            console.log(`[Push] No profile for member ${memberId}, saved to DB only.`);
+            console.log(`[Push] No profile for member ${memberId}, ${kept}.`);
             return;
         }
-        // 2-1. 카테고리별 켬/끔(2026-09-13 오너). **푸시만** 막는다 — 위에서 이미 알림함에 저장했다.
+        // 2-1. 카테고리별 켬/끔(2026-09-13 오너). **푸시만** 막는다 — 알림함 저장은 위에서 이미 끝났다.
         const prefKey = params.pref ?? prefKeyFor(category, type);
         if (!isPushAllowed((member as { pushPrefs?: unknown }).pushPrefs, prefKey)) {
-            console.log(`[Push] Muted by member ${memberId} (${prefKey}), saved to DB only.`);
+            console.log(`[Push] Muted by member ${memberId} (${prefKey}), ${kept}.`);
             return;
         }
 
@@ -119,7 +133,7 @@ export class NotificationService {
 
         // 3. 실제 푸시 발송 — FCM(안드로이드)/APNs(iOS) 자동 판별. 토큰 없으면(NULL) DB만.
         if (!pushToken) {
-            console.log(`[Push] No token for member ${memberId}, saved to DB only.`);
+            console.log(`[Push] No token for member ${memberId}, ${kept}.`);
             return;
         }
         const url = deepLinkUrl(category, type, deepLinkParams);
@@ -138,7 +152,7 @@ export class NotificationService {
                 console.log(`[Push] Dead token cleared for ${who}: ${r.reason}`);
                 break;
             case 'noenv':
-                console.log(`[Push] Skipped (no push env: ${r.reason}) for ${who}, saved to DB.`);
+                console.log(`[Push] Skipped (no push env: ${r.reason}) for ${who}, ${kept}.`);
                 break;
             case 'config':
                 console.warn(`[Push] Not sent — server push config error for ${who}: ${r.reason}. Token kept.`);

@@ -7,10 +7,10 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { LanguageSheet } from "@/components/hiq/LanguageSheet";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
-import { NotificationInbox } from "@/components/hiq/menu/NotificationInbox";
+import { NotificationInbox, UNREAD_COUNT_KEY } from "@/components/hiq/menu/NotificationInbox";
 import { useT } from "@/lib/i18n";
 import { useSport } from "@/contexts/SportContext";
-import { LucideArrowLeftRight, LucideLanguages } from "lucide-react";
+import { LucideChevronDown, LucideLanguages } from "lucide-react";
 
 interface DashboardHeaderProps {
     member: any;
@@ -32,29 +32,32 @@ export const DashboardHeader = ({
     tier
 }: DashboardHeaderProps) => {
     const { t } = useT();
-    const { setSport } = useSport();
+    const { currentSport, setSport } = useSport();
     const pct3c = getPercentile('3c');
     const trend = getTrend();
     const [, setLocation] = useLocation();
     const [notifOpen, setNotifOpen] = useState(false);
     const [langOpen, setLangOpen] = useState(false);
     const golfOk = useGolfAccess();
-    const { data: notifs } = useQuery<any[]>({ queryKey: ["/api/hiq/notifications"] });
-    const unread = notifs?.filter((n) => !n.isRead).length || 0;
+    // 숫자 하나만 받는다 — 예전엔 목록 전량을 받아 세느라 오너 계정에서 330KB 가 오갔다(2026-09-23).
+    // 캐시 키 앞자리가 목록("/api/hiq/notifications")과 달라야 목록 무효화에 딸려가지 않는다.
+    const { data: notifCount } = useQuery<{ unread: number }>({ queryKey: [UNREAD_COUNT_KEY, { sport: currentSport }] });
+    const unread = notifCount?.unread || 0;
 
     return (
         <header className="pt-7 pb-2">
             {/* Top bar: greeting + profile */}
             <div className="flex items-center justify-between mb-7 gap-3">
                 <div className="min-w-0">
-                    {/* 종목 전환 — 골프 홈의 "GOLF MODE ⇄" 와 같은 모양(2026-09-21 오너: "당구에서도 동일하게, 디자인 같이") */}
+                    {/* 종목 전환(2026-09-23 오너: "더 심플하게. 검정 배경에 흰 글자, 아이콘도 변경, '모드'는 빼고 당구·골프로").
+                        색을 토큰이 아니라 **검정·흰색 그대로** 쓰는 게 의도다 — 이 알약은 제 배경의 반대색이어야 눈에 띈다.
+                        당구 홈은 밝은 바탕이라 검정 알약, 골프 홈은 어두운 바탕이라 흰 알약(GolfHeader 와 짝). */}
                     {golfOk && <button
                         type="button" onClick={() => setSport("GOLF")} title={t("dashboardHeader.switchToGolf")}
-                        className="group inline-flex items-center gap-2 mb-2.5 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20 active:scale-95 transition-transform"
+                        className="inline-flex items-center gap-1 mb-2.5 h-7 pl-3 pr-2 rounded-full bg-[#0a0a0a] active:scale-95 transition-transform"
                     >
-                        <span className="w-2 h-2 rounded-full bg-brand shadow-[0_0_8px_rgb(var(--brand))]" />
-                        <span className="text-[12px] font-semibold text-brand tracking-tight">{t("dashboardHeader.billiardsMode")}</span>
-                        <LucideArrowLeftRight className="w-3 h-3 text-brand/60 group-hover:text-brand" />
+                        <span className="text-[12.5px] font-semibold text-white tracking-tight">{t("dashboardHeader.billiardsMode")}</span>
+                        <LucideChevronDown className="w-3.5 h-3.5 text-white/55" />
                     </button>}
                     <h1 className="text-[26px] leading-none font-bold text-ink-1 tracking-tight truncate">
                         {member?.nickname || member?.name}

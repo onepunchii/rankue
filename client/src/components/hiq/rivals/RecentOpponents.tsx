@@ -45,7 +45,7 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                                         <div className="flex justify-between items-start mb-5">
                                             <div>
                                                 <h3 className="text-[22px] font-bold text-ink-1 mb-1.5 tracking-tight">{opponent.name}</h3>
-                                                <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-black/[0.04]", tier.class)}>
+                                                <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md", tier.class)}>
                                                     <span className="text-xs">{tier.icon}</span>
                                                     <span className="text-[12px] font-semibold">{t(tier.label)}</span>
                                                 </div>

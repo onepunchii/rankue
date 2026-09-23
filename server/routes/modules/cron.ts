@@ -103,15 +103,24 @@ router.post("/golf-ingest", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, { result, followAlerts });
 }));
 
-// 시뮬레이터 정리: 방치된 playing 세션(6시간) → abandoned, 상대가 안 들어온 waiting 대전(24시간) → canceled.
-// 실전 경기·성적과 무관한 시뮬 테이블만 건드린다.
+/** 알림함 보존 기간(오너 결정 2026-09-23). 읽은 것도 안 읽은 것도 이 날짜가 지나면 지운다. */
+const NOTIFICATION_KEEP_DAYS = 7;
+
+// 매일 도는 정리 크론. 이름은 sim-cleanup 이지만 "하루 한 번 치우는 것들"을 같이 태운다 —
+// Vercel 요금제가 크론 개수를 세기 때문에 정리마다 항목을 새로 만들지 않는다(vercel.json 참고).
+//  · 시뮬레이터: 방치된 playing 세션(6시간) → abandoned, 상대가 안 들어온 waiting 대전(24시간) → canceled.
+//    실전 경기·성적과 무관한 시뮬 테이블만 건드린다.
+//  · 알림함: 7일 지난 알림 삭제. **안 읽은 것도 지운다**(오너 결정 2026-09-23) — 안 읽은 걸 남기면
+//    546건 중 388건이 안 읽음인 계정은 알림함이 영원히 줄지 않는다.
 async function handleSimCleanup(req: any, res: any) {
     const secret = process.env.CRON_SECRET;
     if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
     if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "unauthorized");
     const sessions = await storage.sim.cleanupStale(6);
     const matches = await storage.simMatch.cleanupStaleWaiting(24);
-    return sendSuccess(res, { sessions, matches });
+    // 몇 건이 걷혔는지 응답에 싣는다 — 크론 결과 화면만 보고도 청소가 도는지 알 수 있어야 한다.
+    const notifications = await storage.notifs.deleteOlderThan(NOTIFICATION_KEEP_DAYS);
+    return sendSuccess(res, { sessions, matches, notifications });
 }
 router.get("/sim-cleanup", asyncHandler(handleSimCleanup));
 router.post("/sim-cleanup", asyncHandler(handleSimCleanup));
