@@ -24,6 +24,7 @@ import {
 } from "@shared/golfJoin";
 import { GENDER_LABEL, SlotDots } from "./joinUi";
 import { kstDateKey } from "@/lib/kst";
+import { DateField, TimeField } from "../common/TeeTimePicker";
 
 interface Props {
     onClose: () => void;
@@ -42,12 +43,6 @@ const chip = (on: boolean) => cn(
 // 고른 칸은 강조색으로. bg-white 를 쓰면 안 된다 — 골프 테마(index.css :root[data-sport="GOLF"] .bg-white)가 어두운 면으로
 // 바꿔 놓아 검정 글자가 사라진다(2026-09-21 오너 캡처: "스크린" 이 안 보임).
 const seg = (on: boolean) => cn("flex-1 h-10 rounded-lg text-[13.5px] font-medium transition-colors", on ? "bg-[#FF6B00] text-white" : "text-white/60");
-
-function addDays(key: string, n: number): string {
-    const [y, m, d] = key.split("-").map(Number);
-    const t = new Date(Date.UTC(y, m - 1, d + n));
-    return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
-}
 
 /** 자리 한 줄(나·동반자·모집)의 성별 토글. 모집 자리만 '무관'이 있다. */
 function GenderToggle({ value, onChange, allowAny }: { value: SlotGender; onChange: (g: SlotGender) => void; allowAny: boolean }) {
@@ -246,15 +241,9 @@ export function JoinCreateSheet({ onClose, onCreated }: Props) {
                         </div>
                     )}
 
-                    <div className="flex gap-1.5">
-                        {[["오늘", 0], ["내일", 1], ["모레", 2]].map(([l, n]) => (
-                            <button key={l as string} type="button" onClick={() => setDate(addDays(today, n as number))} className={chip(date === addDays(today, n as number))}>{l as string}</button>
-                        ))}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        <input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} className={cn(field, "[color-scheme:dark]")} aria-label="날짜" />
-                        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={cn(field, "[color-scheme:dark]")} aria-label="시간" />
-                    </div>
+                    {/* 부킹 시트와 같은 달력·시계(TeeTimePicker). 조인은 시간이 보통 하나라 단수 쪽을 쓴다. */}
+                    <DateField value={date} onChange={setDate} today={today} accent={ACCENT} onAccent="#ffffff" />
+                    <TimeField value={time} onChange={setTime} accent={ACCENT} onAccent="#ffffff" />
                 </section>
 
                 {/* ② 누구 */}

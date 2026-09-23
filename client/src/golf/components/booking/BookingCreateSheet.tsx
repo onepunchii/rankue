@@ -6,13 +6,15 @@
  * 조인 시트와 같은 세 묶음: ① 어디·언제 ② 가격·옵션 ③ 더 보기(접힘: 익명·취소 규정·한마디). 굵기 600 까지만.
  * 같은 요금의 여러 시간은 "추가"로 칩만 쌓이고 한 번에 올라간다(매장 매니저의 일괄 등록은 그대로).
  *
- * 2026-09-23 오너: "부킹매니저가 일단 일이 편해야 많이 넘어온다." → '넘길 자리' 한 줄을 가격 위에 뒀다.
- * 4명(기본)은 예전과 완전히 같은 부킹이고, 1~3명이면 **같은 시트에서 그대로** 조인으로 올라간다.
+ * 2026-09-23 오너: "부킹매니저가 일단 일이 편해야 많이 넘어온다." → 자리 고르는 한 줄을 가격 위에 뒀다.
+ * 4자리(기본)는 예전과 완전히 같은 부킹이고, 1~3자리면 **같은 시트에서 그대로** 조인으로 올라간다.
  * 시트를 새로 여닫거나 타임마다 다시 고르게 하지 않는다 — 매니저의 기본 동작은 여러 타임 일괄 등록이다.
+ *
+ * 같은 날 오너: "'넘길 자리'가 무슨 말인지 모르겠다" → 말과 그림을 SeatsField 로 옮겼다(거기 주석 참고).
  */
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LucideX, LucideLoader2, LucideSearch, LucideChevronDown } from "lucide-react";
+import { LucideX, LucideLoader2, LucideSearch, LucideChevronDown, LucideZap } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,7 +22,9 @@ import { cn } from "@/lib/utils";
 import { COURSES } from "../../data/golfCourses";
 import { SPECIAL_OPTIONS } from "../../constants/booking";
 import { kstDateKey } from "@/lib/kst";
+import { DateField, TimeListField } from "../common/TeeTimePicker";
 import { MAX_SLOTS, type JoinSlot } from "@shared/golfJoin";
+import { SeatsField } from "./SeatsField";
 
 interface Props {
     onClose: () => void;
@@ -34,12 +38,6 @@ const chip = (on: boolean) => cn(
     "h-9 px-3.5 rounded-full text-[13px] font-medium border transition-colors",
     on ? "bg-[#64DD17] border-[#64DD17] text-[#051907]" : "bg-white/[0.04] border-white/10 text-white/70",
 );
-
-function addDays(key: string, n: number): string {
-    const [y, m, d] = key.split("-").map(Number);
-    const t = new Date(Date.UTC(y, m - 1, d + n));
-    return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
-}
 
 const POLICIES = [
     { id: "POLICY_STANDARD", label: "표준", desc: "우천 시 현장 기준 환불 · 4일 전 취소 가능" },
@@ -57,10 +55,9 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
     const [course, setCourse] = useState<{ id: number | string; name: string; region: string; subType?: string } | null>(null);
     const today = kstDateKey(Date.now());
     const [date, setDate] = useState(today);
-    const [time, setTime] = useState("");
     const [times, setTimes] = useState<string[]>([]);
     const [fee, setFee] = useState("");
-    // 넘길 자리. 4 = 팀 전체 양도(= 예전 그대로의 부킹), 1~3 = 남은 자리를 앱이 채워 주는 조인.
+    // 앱에서 채울 자리. 4 = 팀 전체 양도(= 예전 그대로의 부킹), 1~3 = 남은 자리를 앱이 채워 주는 조인.
     // 기본값 4라 아무것도 안 건드리면 오늘과 결과가 같다 — 매니저에게 새 마찰이 0이어야 한다.
     const [seats, setSeats] = useState(MAX_SLOTS);
     const asJoin = seats < MAX_SLOTS;
@@ -79,14 +76,8 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
         return COURSES.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 5);
     }, [query, course]);
 
-    const addTime = () => {
-        if (!time) return;
-        setTimes((a) => (a.includes(time) ? a : [...a, time].sort()));
-        setTime("");
-    };
-    // 시간을 골라 놓고 "추가"를 안 누른 채 올리는 일이 많다(2026-09-10 제보) — 입력칸의 시간도 함께 센다.
-    const allTimes = time && !times.includes(time) ? [...times, time].sort() : times;
-
+    // 2026-09-23: 시간을 골라 놓고 "추가"를 안 눌러 빠뜨리는 사고(2026-09-10 제보)가 구조적으로 사라졌다.
+    // TimeListField 는 고른 즉시 칩으로 담는다 — 칸에 머무는 '아직 안 담긴 시간' 이 없다.
     // 조인으로 보낼 자리 넷: 첫 칸 HOST(올린 사람) + 고른 자리만큼 OPEN + 나머지는 GUEST(이미 찬 자리).
     // normalizeSlots 규칙(2~4칸 · 첫 칸만 HOST · OPEN 1개 이상)을 그대로 지킨다 — 서버가 같은 함수로 검증한다.
     // 매니저는 성별까지 고를 일이 없으니(자기가 치는 팀이 아니다) 전부 ANY 로 둔다.
@@ -100,7 +91,7 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
         !phoneOk ? "휴대폰 번호를 먼저 등록해 주세요"
             : !course ? "골프장을 골라 주세요"
                 : !date ? "날짜를 골라 주세요"
-                    : allTimes.length === 0 ? "티오프 시간을 골라 주세요"
+                    : times.length === 0 ? "티오프 시간을 골라 주세요"
                         : !fee ? "1인 가격을 적어 주세요"
                             : blind && !blindName.trim() ? "익명 표시 이름을 적어 주세요"
                                 : policy === "POLICY_CUSTOM" && !policyText.trim() ? "취소 규정을 적어 주세요"
@@ -108,7 +99,7 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
 
     const create = useMutation({
         mutationFn: async () => {
-            const body = allTimes.map((t) => ({
+            const body = times.map((t) => ({
                 listingType: "BOOKING",
                 courseId: String(course!.id), courseName: course!.name, region: course!.region,
                 // 시간대를 반드시 붙인다 — 없으면 서버(UTC)가 9시간 밀린 티타임으로 저장한다.
@@ -139,8 +130,8 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
             qc.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings/counts"] });
             toast({
                 title: asJoin
-                    ? (allTimes.length > 1 ? `${allTimes.length}건을 조인으로 올렸어요` : "조인으로 올렸어요")
-                    : (allTimes.length > 1 ? `${allTimes.length}건을 올렸어요` : "부킹을 올렸어요"),
+                    ? (times.length > 1 ? `${times.length}건을 조인으로 올렸어요` : "조인으로 올렸어요")
+                    : (times.length > 1 ? `${times.length}건을 올렸어요` : "부킹을 올렸어요"),
             });
             onCreated?.(date);
             onClose();
@@ -153,8 +144,9 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
     const zone = course ? course.region.substring(0, 2) : "";
     const aliases = course ? [`${zone}권 명문`, course.subType === "회원제" ? `${zone}권 회원제` : `${zone}권 퍼블릭`, "IC 인근 골프장", "접근성 좋은 구장"] : [];
 
+    // 루트에 relative — 설명 팝업(SeatsField)이 이 시트 안에만 깔린다. 중첩 Dialog 를 쓰면 포커스 덫이 서로 싸운다.
     return (
-        <div className="h-full flex flex-col bg-[#121212] text-white">
+        <div className="relative h-full flex flex-col bg-[#121212] text-white">
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] shrink-0">
                 <h2 className="text-[17px] font-semibold">부킹 올리기</h2>
                 <button type="button" onClick={onClose} aria-label="닫기" className="p-2 -mr-2 text-white/50"><LucideX className="w-5 h-5" /></button>
@@ -185,47 +177,15 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
                         )}
                     </div>
 
-                    <div className="flex gap-1.5">
-                        {[["오늘", 0], ["내일", 1], ["모레", 2]].map(([l, n]) => (
-                            <button key={l as string} type="button" onClick={() => setDate(addDays(today, n as number))} className={chip(date === addDays(today, n as number))}>{l as string}</button>
-                        ))}
-                    </div>
-                    <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                        <input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} className={cn(field, "[color-scheme:dark]")} aria-label="날짜" />
-                        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTime(); }} className={cn(field, "[color-scheme:dark]")} aria-label="티오프 시간" />
-                        <button type="button" onClick={addTime} disabled={!time} className="h-11 px-4 rounded-xl bg-white/[0.08] text-[14px] font-medium text-white disabled:opacity-35">추가</button>
-                    </div>
-                    {times.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                            {times.map((t) => (
-                                <button key={t} type="button" onClick={() => setTimes((a) => a.filter((x) => x !== t))} className="h-8 pl-3 pr-2 rounded-full bg-[#64DD17]/15 text-[#8BE84A] text-[13px] font-medium inline-flex items-center gap-1" aria-label={`${t} 빼기`}>
-                                    {t} <span className="text-[#8BE84A]/60">×</span>
-                                </button>
-                            ))}
-                            <span className="self-center text-[12px] text-white/45">같은 가격으로 {times.length}건</span>
-                        </div>
-                    )}
+                    <DateField value={date} onChange={setDate} today={today} accent={ACCENT} onAccent="#051907" />
+                    <TimeListField times={times} onChange={setTimes} accent={ACCENT} onAccent="#051907" />
+                    {times.length > 1 && <p className="text-[12px] text-white/45 break-keep">같은 가격으로 {times.length}건이 한 번에 올라가요.</p>}
                 </section>
 
-                {/* ② 넘길 자리·가격·옵션 */}
+                {/* ② 자리·가격·옵션 */}
                 <section className="space-y-3">
-                    {/* 넘길 자리 — 가격 바로 위. 이 시트에서 올리는 모든 티타임에 함께 적용된다. */}
-                    <div className="flex items-center gap-2">
-                        <span className={label}>넘길 자리</span>
-                        <div className="ml-auto flex gap-1.5">
-                            {[4, 3, 2, 1].map((n) => (
-                                <button key={n} type="button" onClick={() => setSeats(n)} className={chip(seats === n)} aria-pressed={seats === n}>{n}명</button>
-                            ))}
-                        </div>
-                    </div>
-                    {asJoin && (
-                        <div className="rounded-xl bg-[#4DA3FF]/10 border border-[#4DA3FF]/25 p-3 space-y-1">
-                            <p className="text-[12.5px] text-[#7CBBFF] leading-relaxed">
-                                {seats}자리는 <span className="font-semibold">조인</span>으로 올라가요 — 같이 칠 {seats}명을 앱이 찾아 드려요.
-                            </p>
-                            <p className="text-[12px] text-white/45 leading-relaxed">골프장에 따라 2·3인은 조인 의무 또는 4인 요금일 수 있어요.</p>
-                        </div>
-                    )}
+                    {/* 앱에서 채울 자리 — 가격 바로 위. 이 시트에서 올리는 모든 티타임에 함께 적용된다. */}
+                    <SeatsField seats={seats} onChange={setSeats} />
 
                     <span className={label}>1인 가격</span>
                     <div className="relative">
@@ -233,7 +193,14 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
                         <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] text-white/45">원</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                        <button type="button" onClick={() => setHotDeal((v) => !v)} className={cn(chip(hotDeal), hotDeal && "bg-red-500 border-red-500 text-white")}>🔥 긴급 할인</button>
+                        {/* '긴급' 은 앱 전체에서 앰버 #FFB020 하나다(홈 티커의 ⚡긴급 배지와 같은 색).
+                            예전엔 여기만 빨강 + 🔥 이모지라, 같은 말이 화면마다 다른 색으로 나왔다. */}
+                        <button
+                            type="button" onClick={() => setHotDeal((v) => !v)} aria-pressed={hotDeal}
+                            className={cn(chip(hotDeal), "inline-flex items-center gap-1", hotDeal && "bg-[#FFB020] border-[#FFB020] text-[#2A1800]")}
+                        >
+                            <LucideZap className={cn("w-3.5 h-3.5", !hotDeal && "text-[#FFB020]")} />긴급 할인
+                        </button>
                         {SPECIAL_OPTIONS.map((o) => (
                             <button key={o.id} type="button" onClick={() => setOptions((a) => (a.includes(o.id) ? a.filter((x) => x !== o.id) : [...a, o.id]))} className={chip(options.includes(o.id))}>{o.label}</button>
                         ))}
@@ -268,7 +235,7 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
                                     {POLICIES.map((p) => <button key={p.id} type="button" onClick={() => setPolicy(p.id)} className={chip(policy === p.id)}>{p.label}</button>)}
                                 </div>
                                 {policy !== "POLICY_CUSTOM"
-                                    ? <p className="text-[12px] text-white/45">{POLICIES.find((p) => p.id === policy)?.desc}</p>
+                                    ? <p className="text-[12px] text-white/45 break-keep">{POLICIES.find((p) => p.id === policy)?.desc}</p>
                                     : <textarea value={policyText} onChange={(e) => setPolicyText(e.target.value.slice(0, 300))} rows={2} placeholder="취소·환불 규정을 적어 주세요" className={cn(field, "h-auto py-2.5 resize-none")} />}
                             </div>
                             <textarea value={comment} onChange={(e) => setComment(e.target.value.slice(0, 300))} rows={2} placeholder="한마디 (선택) — 예: 카트비 포함, 2인 플레이 가능" className={cn(field, "h-auto py-2.5 resize-none")} />
@@ -283,7 +250,7 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
                     className={cn("w-full h-12 rounded-xl text-[15px] font-semibold transition-colors", missing ? "bg-white/[0.06] text-white/40" : "text-[#051907]")}
                     style={missing ? undefined : { backgroundColor: ACCENT }}
                 >
-                    {create.isPending ? <LucideLoader2 className="w-5 h-5 animate-spin inline" /> : (missing ?? (allTimes.length > 1 ? `${allTimes.length}건 올리기` : "올리기"))}
+                    {create.isPending ? <LucideLoader2 className="w-5 h-5 animate-spin inline" /> : (missing ?? (times.length > 1 ? `${times.length}건 올리기` : "올리기"))}
                 </button>
             </div>
         </div>
