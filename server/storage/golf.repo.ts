@@ -122,9 +122,11 @@ function buildGolfFilterConditions(filters: any): any[] {
     if (times.length > 0) {
         const kstHour = sql<number>`extract(hour from (${golfBookings.datetime} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul'))`;
         const spans: any[] = [];
-        if (times.includes("morning")) spans.push(sql`${kstHour} < 12`);
-        if (times.includes("afternoon")) spans.push(sql`${kstHour} >= 12 AND ${kstHour} < 17`);
-        if (times.includes("night")) spans.push(sql`${kstHour} >= 17`);
+        // 경계 11시·15시 — 화면의 golfTimeSpan(client/src/golf/lib/bookingFilter.ts)과 **반드시 같아야** 한다.
+        // 한쪽만 고치면 날짜 띠 배지에 3건인데 열면 1건이 나온다(2026-09-23 오너가 정한 관행 기준).
+        if (times.includes("morning")) spans.push(sql`${kstHour} < 11`);
+        if (times.includes("afternoon")) spans.push(sql`${kstHour} >= 11 AND ${kstHour} < 15`);
+        if (times.includes("night")) spans.push(sql`${kstHour} >= 15`);
         if (spans.length > 0) out.push(or(...spans));
     }
 

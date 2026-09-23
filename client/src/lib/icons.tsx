@@ -135,6 +135,12 @@ export const LucideSparkles = ((Ph as any).Sparkle ?? F) as Ph.Icon;
 export const LucideStamp = ((Ph as any).Stamp ?? F) as Ph.Icon;
 export const LucideStar = ((Ph as any).Star ?? F) as Ph.Icon;
 export const LucideStore = ((Ph as any).Storefront ?? F) as Ph.Icon;
+/** 골프 빠른 칩(1부·2부·3부·10만↓·노캐디) — 2026-09-23 필터 줄 A안. */
+export const LucideSunHorizon = ((Ph as any).SunHorizon ?? F) as Ph.Icon;
+export const LucideSun = ((Ph as any).Sun ?? F) as Ph.Icon;
+export const LucideMoonStars = ((Ph as any).MoonStars ?? F) as Ph.Icon;
+export const LucideUserMinus = ((Ph as any).UserMinus ?? F) as Ph.Icon;
+export const LucideCurrencyKrw = ((Ph as any).CurrencyKrw ?? F) as Ph.Icon;
 export const LucideSword = ((Ph as any).Sword ?? F) as Ph.Icon;
 export const LucideSwords = ((Ph as any).Sword ?? F) as Ph.Icon;
 export const LucideTag = ((Ph as any).Tag ?? F) as Ph.Icon;

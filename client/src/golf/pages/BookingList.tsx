@@ -22,7 +22,9 @@ import { GlobalSearch } from "../components/GlobalSearch";
 import { kstDateKey, kstDateLabel, kstHour, kstTime } from "@/lib/kst";
 
 // Constants & Hooks
-import { THEME_COLORS, DATE_STRIP_DAYS } from "../constants/booking";
+import { THEME_COLORS, DATE_STRIP_DAYS, filterLabel } from "../constants/booking";
+import { matchesGolfFilters } from "../lib/bookingFilter";
+import { groupByCourse, groupSortOf } from "../lib/courseGroups";
 import { useBookingFilters } from "../hooks/useBookingFilters";
 import { useDeepLink } from "../hooks/useDeepLink";
 import { useBookingData } from "../hooks/useBookingData";
@@ -32,7 +34,20 @@ import { useShare } from "../hooks/useShare";
 import { BookingCard } from "../components/booking/BookingCard";
 import { DateSelector } from "../components/booking/DateSelector";
 import { FilterBar } from "../components/booking/FilterBar";
+import { EmptyResult, type ActiveFilter } from "../components/booking/EmptyResult";
+import { CourseGroupRow } from "../components/booking/CourseGroupRow";
 import { ShareSheet } from "../components/booking/ShareSheet";
+
+/**
+ * '골프장별 보기' 를 켜 둔 상태를 기억한다(2026-09-23 오너). 묶어 보는 쪽을 좋아하는 사람이
+ * 목록에 들어올 때마다 다시 켜야 하면 그건 설정이 아니라 매번 하는 일이다.
+ * 열쇠 이름은 이 저장소 관례(golf_recent_searches)를 따른다.
+ * ⚠️ 읽기·쓰기 모두 try/catch — 사파리 프라이빗 모드에서는 localStorage 접근 자체가 던진다.
+ */
+const GROUP_BY_COURSE_KEY = "golf_group_by_course";
+const readGroupByCourse = (): boolean => {
+    try { return localStorage.getItem(GROUP_BY_COURSE_KEY) === "1"; } catch { return false; }
+};
 
 export default function BookingList() {
     const queryClient = useQueryClient();
@@ -56,6 +71,15 @@ export default function BookingList() {
      */
     const [joinKind, setJoinKind] = useState<'ALL' | JoinType>('ALL');
     const [nearMe, setNearMe] = useState(false);
+    /** 골프장별 보기(부킹 전용 — 이유는 아래 groupingOn). */
+    const [groupOn, setGroupOn] = useState(readGroupByCourse);
+    const toggleGroupOn = useCallback(() => {
+        setGroupOn(prev => {
+            const next = !prev;
+            try { localStorage.setItem(GROUP_BY_COURSE_KEY, next ? "1" : "0"); } catch { /* 저장 못 해도 이번 화면에선 바뀐다 */ }
+            return next;
+        });
+    }, []);
     const { location, requestLocation, locationStatus } = useNativeBridge();
 
     // Custom Hooks
@@ -200,34 +224,25 @@ export default function BookingList() {
             if (viewType === 'JOIN' && joinKind !== 'ALL' && (item.joinType ?? 'FIELD') !== joinKind) return false;
 
 
-            // 4. Time filtering
-            const timeFilters = selectedFilters.time;
-            if (timeFilters.length > 0 && !timeFilters.includes('all')) {
-                const hour = Number(kstHour(item.datetime));
-                let category = 'night';
-                if (hour < 12) category = 'morning';
-                else if (hour < 17) category = 'afternoon';
-                if (!timeFilters.includes(category)) return false;
-            }
-
-            const priceFilters = selectedFilters.price.filter(p => !p.startsWith('sort_'));
-            if (priceFilters.length > 0) {
-                const price = item.greenFee;
-                const match = priceFilters.some(filter => {
-                    if (filter === 'under_10') return price <= 100000;
-                    if (filter === 'range_10_15') return price > 100000 && price <= 150000;
-                    if (filter === 'range_15_20') return price > 150000 && price <= 200000;
-                    if (filter === 'over_20') return price > 200000;
-                    return false;
-                });
-                if (!match) return false;
-            }
-
-            if (selectedFilters.special.length > 0) {
-                const itemOptions = item.options || [];
-                const hasAny = selectedFilters.special.some(f => itemOptions.includes(f));
-                if (!hasAny) return false;
-            }
+            /**
+             * 4. 시간 · 가격 · 인원 · 조건 — **같은 축 안에서는 OR, 축과 축 사이는 AND**
+             *    (오너 2026-09-23 결정, 표준 상거래 필터 문법). 판정은 golf/lib/bookingFilter.ts 한 곳에 있고
+             *    값을 넣어 돌리는 테스트(bookingFilter.test.ts)가 그 표를 굳힌다.
+             *
+             *    - 인원(couple_2·player_3, 조인이면 solo_ok·three_ok)은 서로 **대안**이라 OR.
+             *    - 조건(노캐디·마샬·식사·카트…)은 각각 **독립된 요구**라 AND. 2026-09-23 전에는 여기가
+             *      `.some()` 이라, '노캐디' 를 고른 사람 앞에 캐디 있는 매물이 '식사 제공' 이라는 이유만으로
+             *      끼어들었다.
+             *
+             * ⚠️ 서버(golf.repo.ts)는 아직 jsonb_exists_any = OR 로 한 번 거른다. OR 결과는 여기서
+             *    구하는 AND 결과의 **상위집합**이고 목록 질의에 limit 이 없으니 화면 판정이 이긴다.
+             *    다만 날짜 띠의 건수는 서버가 센 것이라 AND 로 좁힌 실제 개수보다 클 수 있다.
+             */
+            if (!matchesGolfFilters(selectedFilters, {
+                hour: Number(kstHour(item.datetime)),
+                greenFee: item.greenFee,
+                options: item.options || [],
+            })) return false;
 
             return true;
         }).sort((a, b) => {
@@ -247,6 +262,85 @@ export default function BookingList() {
             return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
         });
     }, [bookings, viewType, selectedFilters, selectedDate, weekDates, joinKind, nearMe, location]);
+
+    /**
+     * 골프장별 보기는 **부킹에서만** 켠다(2026-09-23 판단, 근거 넷).
+     *
+     *  1. 조인의 '장소' 는 골프장이 아니다. JoinCreateSheet 는 스크린·파크 조인을 올릴 때
+     *     `courseId: "venue"` 라는 **고정 문자열**을 넣는다(join/JoinCreateSheet.tsx:148).
+     *     묶음 열쇠가 courseId 라 그대로 켜면 그 날의 스크린·파크 조인이 **전부 한 묶음**으로
+     *     뭉친다 — 서로 다른 동네의 다른 가게가 '스크린' 한 줄이 된다. 이름으로 열쇠를 바꾸면
+     *     이번엔 손으로 적는 상호(place?.name ?? query)라 '강남스크린'·'강남 스크린' 이 갈린다.
+     *  2. 묶음 줄의 값이 조인에서는 뜻이 어긋난다. 'N팀' 은 티타임 수인데 조인은 팀이 아니라
+     *     **자리**를 판다(joinCapacity/joinApplied). 한 글이 곧 한 자리 묶음이라 대부분 '1팀' 이
+     *     찍히고, 화면만 한 겹 깊어진다.
+     *  3. '📍 내 주변' 과 싸운다. 조인 정렬의 축은 골프장이 아니라 **내게서 가까운 순**인데,
+     *     묶으면 그 순서가 묶음 안으로 숨어 켜 둔 정렬이 안 보인다.
+     *  4. 조인 제어 줄에는 이미 종류 스위치(전체/필드/스크린/파크)와 📍내 주변이 한 줄 더 붙는다.
+     *     320px 에서 가장 빡빡한 화면이다.
+     * 부킹은 반대다 — 한 매장이 같은 골프장 티타임을 여럿 올리는 게 기본이라 묶을 게 실제로 있다.
+     */
+    const groupingOn = groupOn && viewType !== 'JOIN';
+
+    /**
+     * 거르고 정렬까지 끝난 filteredTimes 를 **묶기만** 한다. 거르는·정렬하는 규칙은 손대지 않는다.
+     * 묶음의 순서는 지금 걸린 정렬을 따르고(groupSortOf), 묶음 안의 순서는 받은 순서 그대로다.
+     */
+    const grouped = useMemo(
+        () => (groupingOn ? groupByCourse(filteredTimes as any[], groupSortOf(selectedFilters.price)) : null),
+        [groupingOn, filteredTimes, selectedFilters.price],
+    );
+
+    /**
+     * 펼쳐 둔 묶음. 묶음 목록이 바뀌면(날짜·필터·탭) 다시 잡는다 —
+     * **골프장이 하나뿐이면 자동으로 펼친다**(2026-09-23 오너). 경쟁 앱은 전부 접고 시작하지만
+     * 그쪽은 한 날에 골프장이 수십 곳이다. 우리는 하루에 한두 곳이라 전부 접으면 화면이 텅 빈다 —
+     * 접을 게 하나뿐인데 접어 두는 건 뜻이 없다. 둘 이상일 때만 접힌 채로 시작한다.
+     * (렌더 중 setState 는 "prop 이 바뀔 때 state 맞추기" 의 정석 — effect 로 하면 한 프레임 접혔다 펴진다.)
+     */
+    const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+    // 열쇠를 **정렬해서** 잇는다 — 정렬만 바꿨을 때(묶음 순서만 뒤집힌다) 펼쳐 둔 걸 접지 않으려고.
+    const groupSig = grouped ? grouped.groups.map(g => g.key).sort().join('|') : '';
+    const [prevGroupSig, setPrevGroupSig] = useState(groupSig);
+    if (prevGroupSig !== groupSig) {
+        setPrevGroupSig(groupSig);
+        setOpenGroups(grouped && grouped.groups.length === 1 ? { [grouped.groups[0].key]: true } : {});
+    }
+    const toggleGroup = useCallback((key: string) => {
+        setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
+    }, []);
+
+    /**
+     * 지금 **결과를 줄이고 있는** 것들. 0건 화면이 "무엇 때문에 비었는지" 를 실제 이름으로 말하고,
+     * 그 자리에서 하나씩 뗄 수 있게 하려고 모은다.
+     *  - 정렬(sort_)과 '📍 내 주변' 은 뺀다 — 순서만 바꾸지 결과를 줄이지 않는다.
+     *  - 시간의 'all' 은 훅의 기본값(= 아무것도 안 건 상태)이라 뺀다. 예전 필터 줄은 이걸 1로 세서
+     *    첫 화면부터 "시간 ①" 배지가 켜져 있었다.
+     *  - 조인 종류 스위치는 필터 줄 밖에 있지만 0건을 만들 수 있다 — 사용자에겐 이것도 '걸어 둔 것' 이다.
+     */
+    const activeFilters = useMemo(() => {
+        const out: ActiveFilter[] = [];
+        const push = (category: string, ids: string[]) => ids.forEach(id => out.push({
+            key: `${category}:${id}`,
+            label: filterLabel(category, id),
+            remove: () => toggleFilter(category, id),
+        }));
+        push('region', selectedFilters.region);
+        push('time', selectedFilters.time.filter(id => id !== 'all'));
+        push('price', selectedFilters.price.filter(id => !id.startsWith('sort_')));
+        push('special', selectedFilters.special);
+        if (viewType === 'JOIN' && joinKind !== 'ALL') {
+            out.push({ key: `kind:${joinKind}`, label: JOIN_TYPE_LABEL[joinKind], remove: () => setJoinKind('ALL') });
+        }
+        return out;
+    }, [selectedFilters, viewType, joinKind, toggleFilter]);
+
+    /**
+     * 보이는 칩만 끈다 — clearFilter('price') 를 부르면 정렬(sort_)까지 같이 날아가는데,
+     * 정렬은 애초에 0건의 원인이 아니라 사용자가 잃을 이유가 없다.
+     * toggleFilter 는 함수형 setState 라 연달아 불러도 서로 덮지 않는다.
+     */
+    const clearAllFilters = useCallback(() => { activeFilters.forEach(f => f.remove()); }, [activeFilters]);
 
     // 내가 올린 글 내리기(부킹·조인 공통). 서버가 글쓴이·운영자만 받는다.
     const deleteMutation = useMutation({
@@ -320,6 +414,26 @@ export default function BookingList() {
         window.open(`sms:${phoneNumber}${delimiter}body=${encodeURIComponent(messageBody)}`, '_self');
     }, []);
 
+    /**
+     * 카드 한 장. 낱개 목록과 골프장별 묶음이 **같은 카드**를 쓴다 —
+     * 프롭이 두 곳에 갈라져 있으면 한쪽만 고치는 일이 생긴다(토글 OFF 면 화면이 예전과 완전히 같아야 한다).
+     */
+    const renderCard = useCallback((item: any) => (
+        <BookingCard
+            key={item.id}
+            item={item}
+            expandedBookingId={expandedBookingId}
+            onExpand={setExpandedBookingId}
+            onReserve={handleReserve}
+            onApply={handleApply}
+            onShare={handleShare}
+            onDelete={handleDelete}
+            viewType={viewType}
+            meId={(user as any)?.id}
+            myLocation={nearMe ? location : null}
+        />
+    ), [expandedBookingId, setExpandedBookingId, handleReserve, handleApply, handleShare, handleDelete, viewType, user, nearMe, location]);
+
     return (
         <div className="min-h-screen bg-[#0A0A0A] text-white pb-nav font-sans selection:bg-[#64DD17]/30">
             {/* Header */}
@@ -383,6 +497,8 @@ export default function BookingList() {
                     toggleFilter={toggleFilter}
                     clearFilter={clearFilter}
                     viewType={viewType}
+                    groupByCourse={viewType === 'JOIN' ? undefined : groupOn}
+                    onToggleGroup={viewType === 'JOIN' ? undefined : toggleGroupOn}
                 />
                 {viewType === 'JOIN' && (
                     <div className="px-5 pb-2.5 flex items-center gap-2">
@@ -430,30 +546,45 @@ export default function BookingList() {
                         </button>
                     </div>
                 ) : filteredTimes.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-                        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-2">
-                            <LucideSearch className="w-6 h-6 text-white/10" />
-                        </div>
-                        <p className="text-sm font-bold text-white/40">조건에 맞는 티타임이 없습니다.</p>
-                        <button onClick={() => clearFilter('region')} className="text-xs font-black text-[#64DD17] uppercase tracking-widest">필터 초기화</button>
+                    <EmptyResult
+                        activeFilters={activeFilters}
+                        onClearAll={clearAllFilters}
+                        viewType={viewType}
+                        dateLabel={weekDates[selectedDate].displayDate}
+                    />
+                ) : grouped ? (
+                    /* 골프장별 보기 — 묶음 줄을 늘어놓고, 펼친 묶음만 카드를 그린다 */
+                    <div>
+                        {grouped.groups.map((g) => (
+                            <CourseGroupRow
+                                key={g.key}
+                                group={g}
+                                open={!!openGroups[g.key]}
+                                onToggle={() => toggleGroup(g.key)}
+                                accent={viewType === 'JOIN' ? '#FF6B00' : '#64DD17'}
+                            >
+                                {g.items.map(renderCard)}
+                            </CourseGroupRow>
+                        ))}
+                        {/*
+                          * 블라인드 글은 묶지 않고 낱개로, 맨 아래에.
+                          * 이름이 가려져 있어(blindName: 'OO cc') 어느 골프장인지 알 수 없다 —
+                          * 같은 blindName 끼리 묶으면 서로 다른 골프장을 한 줄로 합치는 것이고,
+                          * 전부 '비공개 골프장' 하나로 합치면 묶음 줄의 가격·시간 범위가 아무 뜻도
+                          * 없는 숫자가 된다. 가릴 만해서 가린 것이니 묶지 않는다(courseGroups.ts).
+                          */}
+                        {grouped.ungrouped.length > 0 && (
+                            <>
+                                <p className="mt-4 mb-2 text-[11.5px] font-medium text-white/30">
+                                    골프장을 가린 글 {grouped.ungrouped.length}
+                                </p>
+                                {grouped.ungrouped.map(renderCard)}
+                            </>
+                        )}
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {filteredTimes.map((item) => (
-                            <BookingCard
-                                key={item.id}
-                                item={item}
-                                expandedBookingId={expandedBookingId}
-                                onExpand={setExpandedBookingId}
-                                onReserve={handleReserve}
-                                    onApply={handleApply}
-                                onShare={handleShare}
-                                onDelete={handleDelete}
-                                viewType={viewType}
-                                meId={(user as any)?.id}
-                                myLocation={nearMe ? location : null}
-                            />
-                        ))}
+                        {filteredTimes.map(renderCard)}
                     </div>
                 )}
             </main>
