@@ -1,7 +1,7 @@
 /**
  * 채팅 + → "조인·부킹 글" 고르기(2026-09-23). 내가 올린 글(?mine=1)과 내가 신청한 글(?applied=1)을 합친다 —
  * 채팅에 올릴 만한 글은 이 둘뿐이다(남의 글을 대신 퍼 나르지 않는다). 같은 글이 둘 다에 있을 수 있어 id 로 중복 제거,
- * 티타임 오름차순, **시각** 기준으로 지난 글은 뺀다(날짜로만 가르면 오늘 지난 티타임이 남는다 — MyListingsSheet 와 같은 기준).
+ * 티타임 오름차순, **시각** 기준으로 지난 글은 뺀다(날짜로만 가르면 오늘 지난 티타임이 남는다 — 내 예약 페이지와 같은 기준).
  * 고르면 bookingId 만 넘긴다 — 카드는 서버가 글을 다시 읽어 만든다(비공개 글의 blindName 처리도 서버).
  */
 import { useMemo } from "react";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 export function GolfListingPicker({ open, onOpenChange, onPick }: { open: boolean; onOpenChange: (o: boolean) => void; onPick: (bookingId: string) => void }) {
     const { t, locale } = useT();
-    // MyListingsSheet 와 같은 키를 쓴다 — 거기서 받아 둔 목록이 있으면 바로 보인다.
+    // 내 예약 페이지(golf/lib/myListings)와 같은 키를 쓴다 — 거기서 받아 둔 목록이 있으면 바로 보인다.
     const mine = useQuery<any[]>({ queryKey: ["/api/hiq/golf/bookings", "mine"], queryFn: () => apiRequest("/api/hiq/golf/bookings?mine=1"), enabled: open, staleTime: 10_000 });
     const applied = useQuery<any[]>({ queryKey: ["/api/hiq/golf/bookings", "applied"], queryFn: () => apiRequest("/api/hiq/golf/bookings?applied=1"), enabled: open, staleTime: 10_000 });
     const rows = useMemo(() => {

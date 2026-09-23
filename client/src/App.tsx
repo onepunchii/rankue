@@ -50,6 +50,7 @@ import GolfCourseRanking from "@/golf/pages/CourseRanking";
 import GolfElite60 from "@/golf/pages/Elite60";
 import GolfCourseDetail from "@/golf/pages/CourseDetail";
 import GolfBookingList from "@/golf/pages/BookingList";
+import GolfMyBookings from "@/golf/pages/MyBookings";
 import GolfProAm from "@/golf/pages/ProAm";
 import MembershipExchange from "@/golf/pages/MembershipExchange";
 import MembershipDetail from "@/golf/pages/MembershipDetail";
@@ -282,6 +283,9 @@ function AppRoutes() {
       <Route path="/golf/elite60"><GolfOnly><GolfElite60 /></GolfOnly></Route>
       <Route path="/golf/course/:id"><GolfOnly><GolfCourseDetail /></GolfOnly></Route>
       <Route path="/golf/booking-list/:id?"><GolfOnly><GolfBookingList /></GolfOnly></Route>
+      {/* 내 예약(2026-09-23) — 하단 탭 '라운드' 자리를 받았다. 시트였던 '내역'이 주소를 갖는다:
+          알림이 "내 신청이 어떻게 됐나"로 바로 보낼 곳이 생긴다. */}
+      <Route path="/golf/my-bookings"><GolfOnly><GolfMyBookings /></GolfOnly></Route>
       <Route path="/golf/proam"><GolfOnly><GolfProAm /></GolfOnly></Route>
       {/* 3D 필드 골프 & 미니골프(2026-09-17) — 물리 진짜 계산하는 단독 페이지 */}
       <Route path="/golf/play"><GolfOnly><GolfPlay /></GolfOnly></Route>

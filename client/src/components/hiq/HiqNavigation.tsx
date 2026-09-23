@@ -8,7 +8,8 @@ import {
     LucideMessageSquare,
     LucideUsers,
     LucideFlag,
-    LucideCalendarDays
+    LucideCalendarDays,
+    LucideCalendarCheck
 } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { useQuery } from "@tanstack/react-query";
@@ -35,9 +36,14 @@ export function HiqNavigation() {
     /**
      * 하단 탭은 종목마다 다르다(2026-09-09 오너).
      * 당구: 홈 · 크루 · 친구 · 기록 · 전체
-     * 골프: 홈 · 크루 · 조인 · 라운드 · 전체
+     * 골프: 홈 · 크루 · 조인 · 내 예약 · 채팅
      *   - 친구를 뺀 이유: 그 화면은 당구 상대전적을 보여주고, 크루 중심이면 사람은 크루 안에 있다.
      *   - 조인을 넣은 이유: 자리가 나면 빨리 들어가야 하는 화면이라 두 번 눌러 가면 늦는다.
+     *   - '라운드'(/history)를 내리고 '내 예약'을 올린 이유(2026-09-23 오너): 골프의 /history 는 여섯 덩어리 중
+     *     **넷이 꺼진** 반쯤 빈 화면이었다(성장 그래프·주간 달성률·시뮬 기록 등은 currentSport !== "GOLF" 조건). 남는 건
+     *     요약 카드와 목록뿐인데, 그 요약은 홈의 스코어 트렌드가 이미 더 잘 보여 준다. 반대로 부킹·조인 내역은
+     *     시트 안에만 있어 주소가 없었고, 하루에도 몇 번씩 "승인됐나" 를 보러 오는 화면이다 — 상시 탭은 이쪽이 맞다.
+     *     라운드 기록으로 가는 길은 둘로 늘렸다: 홈의 스코어 트렌드 카드(누르면 /history)와 전체 메뉴의 '라운드 기록'.
      *   - 프로암·메세지는 넣지 않았다. 프로암은 응모 기간에만 의미가 있어 상시 탭이면 대부분 비고,
      *     독립 대화 탭은 대화가 크루와 조인 글 안에서 일어나는 구조와 안 맞는다.
      */
@@ -59,7 +65,8 @@ export function HiqNavigation() {
             // to 는 이동할 주소, path 는 탭 켜짐 판정용 경로다. 질의를 안 붙이면 '조인' 탭인데
             // 부킹 화면이 열렸다(목록의 기본 보기가 부킹이다).
             { id: "join", label: "hiqNavigation.join", icon: LucideCalendarDays, path: "/golf/booking-list", to: "/golf/booking-list?view=JOIN" },
-            { id: "round", label: "hiqNavigation.round", icon: LucideBarChart3, path: "/history" },
+            // 아이콘은 달력+체크(예약) — LucideBarChart3 은 기록 아이콘이라 당구 '기록' 탭과 헷갈린다.
+            { id: "myBookings", label: "hiqNavigation.myBookings", icon: LucideCalendarCheck, path: "/golf/my-bookings" },
             // 전체(≡)는 머리줄로 올라갔고 이 자리는 채팅이다(2026-09-21 오너: "전체 대신 메시지")
             { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
         ]

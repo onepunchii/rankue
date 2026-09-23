@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookingCreateSheet } from "../components/booking/BookingCreateSheet";
-import { MyListingsSheet, MY_LISTINGS_QUERY_KEY, MY_REQUESTS_QUERY_KEY, hasUnseenRequestChange, readRequestsSeen } from "../components/booking/MyListingsSheet";
+import { MY_LISTINGS_QUERY_KEY, MY_REQUESTS_QUERY_KEY, hasUnseenRequestChange, readRequestsSeen } from "../lib/myListings";
 import { ToJoinSheet } from "../components/booking/ToJoinSheet";
 import { JoinCreateSheet } from "../components/join/JoinCreateSheet";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
@@ -58,20 +58,16 @@ export default function BookingList() {
     // 골랐으면 덮어쓰지 않는다 — 응답이 몇 초 뒤 도착해 화면이 혼자 튀는 걸 막는다.
     const userPickedDate = useRef(false);
     // 주소(경로·질의)를 구독한다 — 같은 화면에서 주소만 바뀌는 이동(하단 '조인' 탭, 푸시 클릭)을 알아채려고.
-    const [routePath] = useLocation();
+    const [routePath, setLocation] = useLocation();
     const routeSearch = useSearch();
     const lastRouteRef = useRef("");
     const pickDate = useCallback((idx: number) => { userPickedDate.current = true; setSelectedDate(idx); }, []);
     const [viewType, setViewType] = useState<'ALL' | 'BOOKING' | 'JOIN'>('BOOKING');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [myListingsOpen, setMyListingsOpen] = useState(false);
-    /**
-     * 조인으로 돌릴 부킹(2026-09-23 오너). 이 화면이 들고 있는다 — 내역 시트와 카드 **둘 다**에서 열리고,
-     * 내역(Sheet) 안에서 시트를 또 열면 포커스 덫이 서로 싸운다. 열 때 내역을 닫는 이유도 같다.
-     */
+    /** 조인으로 돌릴 부킹(2026-09-23 오너). 이 화면의 카드에서 연다 — 내 예약 페이지도 같은 시트를 제 화면에서 연다. */
     const [toJoinItem, setToJoinItem] = useState<any | null>(null);
-    const openToJoin = useCallback((item: any) => { setMyListingsOpen(false); setToJoinItem(item); }, []);
+    const openToJoin = useCallback((item: any) => { setToJoinItem(item); }, []);
     /** 조인 종류(필드/스크린/파크) 스위치(2026-09-21 오너: 스크린 조인은 내 위치 기반으로). */
     const [joinKind, setJoinKind] = useState<'ALL' | JoinType>('ALL');
     /**
@@ -400,9 +396,8 @@ export default function BookingList() {
         },
         onError: (e: any) => toast({ title: e?.message || "내리지 못했어요", variant: "destructive" }),
     });
-    /** 내역에서 "보기": 그 글의 탭·날짜로 옮기고 카드를 펼친다(검색 결과 누를 때와 같은 동작). */
+    /** 이 화면 안에서 그 글로 옮겨 간다: 탭·날짜를 맞추고 카드를 펼친다(검색 결과 누를 때와 같은 동작). */
     const goToListing = useCallback((item: any) => {
-        setMyListingsOpen(false);
         const type = item.listingType === 'JOIN' ? 'JOIN' : 'BOOKING';
         if (viewType !== type) setViewType(type);
         const idx = weekDates.findIndex(d => d.fullDate === kstDateKey(item.datetime));
@@ -443,8 +438,16 @@ export default function BookingList() {
         staleTime: 30_000,
         refetchInterval: 60_000,
     });
+    // 내 예약 페이지에 다녀오면 '봤다' 시각이 바뀌어 있다 — 돌아왔을 때 다시 읽어야 점이 꺼진다.
     const [seenAt, setSeenAt] = useState(readRequestsSeen);
-    useEffect(() => { if (!myListingsOpen) setSeenAt(readRequestsSeen()); }, [myListingsOpen]);
+    useEffect(() => {
+        const refresh = () => setSeenAt(readRequestsSeen());
+        // visibilitychange 는 document 에서 난다 — window 로도 거슬러 오지만(bubbles), 받는 곳을 헷갈리지 않게 문서에 건다.
+        document.addEventListener("visibilitychange", refresh);
+        window.addEventListener("focus", refresh);
+        return () => { document.removeEventListener("visibilitychange", refresh); window.removeEventListener("focus", refresh); };
+    }, []);
+    useEffect(() => { setSeenAt(readRequestsSeen()); }, [routePath]);
     const unseen = hasUnseenRequestChange(myRequests.data, seenAt);
 
     const handleReserve = useCallback((item: any) => {
@@ -515,13 +518,15 @@ export default function BookingList() {
 
                     </div>
                     <div className="flex items-center gap-2">
+                        {/* 내역 시트를 열던 자리다(2026-09-23 페이지로 옮겼다). 입구는 그대로 두고 갈 곳만 바꿨다 —
+                            여기서 여는 데 익숙한 사람의 손가락을 옮기게 하지 않는다. 하단 탭에도 같은 페이지가 있다. */}
                         {user && (
                             <button
-                                onClick={() => setMyListingsOpen(true)}
+                                onClick={() => setLocation(`/golf/my-bookings?tab=${unseen ? "applied" : "mine"}`)}
                                 className="relative h-9 px-3 rounded-full text-[12.5px] font-medium border whitespace-nowrap transition-colors bg-white/[0.04] border-white/10 text-white/70 active:bg-white/10"
                                 title="내가 올린 글 · 신청한 글"
                             >
-                                내역
+                                내 예약
                                 {unseen && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" aria-label="새 소식" />}
                             </button>
                         )}
@@ -640,9 +645,9 @@ export default function BookingList() {
                           * 내용은 z-50(상세필터·정렬만 z-[70])이라 **그냥 두면 시트 위에 떠오른다** —
                           * 전환 시트에서는 버튼을 통째로 가렸고, 상세필터에서는 어두운 막 위에 혼자 떠 있었다(2026-09-23 오너).
                           * z-index 를 낮추는 길도 있지만, 시트가 떴을 때 FAB 는 **누를 일이 없는 버튼**이다 — 안 그리는 게 맞다.
-                          * 셋 다 여기서 안다: 전환(toJoinItem) · 내역(myListingsOpen) · 필터 줄의 시트(filterSheetOpen).
+                          * 셋 다 여기서 안다: 전환(toJoinItem) · 검색(isSearchOpen) · 필터 줄의 시트(filterSheetOpen).
                           */}
-                        {!isCreateModalOpen && !myListingsOpen && !isSearchOpen && !toJoinItem && !filterSheetOpen && (
+                        {!isCreateModalOpen && !isSearchOpen && !toJoinItem && !filterSheetOpen && (
                             <motion.button
                                 initial={{ scale: 0, opacity: 0, y: 20 }}
                                 animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -693,13 +698,6 @@ export default function BookingList() {
                     )}
                 </DialogContent>
             </Dialog>
-
-            <MyListingsSheet
-                open={myListingsOpen} onOpenChange={setMyListingsOpen}
-                initialTab={unseen ? "applied" : "mine"}
-                onGo={goToListing} onDelete={handleDelete} onToJoin={openToJoin}
-                onCancelRequest={(item) => { if (window.confirm("신청을 취소할까요?")) applyMutation.mutate({ id: item.id, joined: true, isJoin: item.listingType === 'JOIN' }); }}
-            />
 
             {/* 부킹 → 조인 전환. 끝나면 그 글이 있는 조인 탭·날짜로 옮겨 가 카드를 펼친다(내역의 '보기' 와 같은 동작). */}
             <ToJoinSheet

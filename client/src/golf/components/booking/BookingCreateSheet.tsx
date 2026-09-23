@@ -29,7 +29,7 @@ import { COURSES } from "../../data/golfCourses";
 import { SPECIAL_OPTIONS } from "../../constants/booking";
 import { kstDateKey } from "@/lib/kst";
 import { DateField, TimeListField } from "../common/TeeTimePicker";
-import { MY_LISTINGS_QUERY_KEY } from "./MyListingsSheet";
+import { MY_LISTINGS_QUERY_KEY } from "../../lib/myListings";
 
 interface Props {
     onClose: () => void;

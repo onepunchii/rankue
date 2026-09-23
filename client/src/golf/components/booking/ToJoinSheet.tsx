@@ -23,7 +23,7 @@ import { kstDateLabel, kstTime } from "@/lib/kst";
 import { MAX_SLOTS, normalizeSlots, openSlotCount, type CostMode, type JoinSlot, type SlotGender } from "@shared/golfJoin";
 import { GenderToggle, SlotDots } from "../join/joinUi";
 import { SeatDiagram } from "./SeatDiagram";
-import { MY_LISTINGS_QUERY_KEY } from "./MyListingsSheet";
+import { MY_LISTINGS_QUERY_KEY } from "../../lib/myListings";
 
 const ACCENT = "#FF6B00";
 
