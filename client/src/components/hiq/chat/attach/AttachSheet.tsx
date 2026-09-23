@@ -10,7 +10,7 @@
  * 다른 시트가 맡는다.
  */
 import type { ComponentType } from "react";
-import { LucideGamepad2, LucideFlag, LucideSwords, LucideMapPin, LucideCalendarDays, LucideKeyRound, LucideTrophy } from "lucide-react";
+import { LucideGamepad2, LucideFlag, LucideTarget, LucideMapPin, LucideCalendarDays, LucideKeyRound, LucideTrophy } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useT } from "@/lib/i18n";
 
@@ -24,9 +24,9 @@ interface Props {
     onPick: (item: AttachItem) => void;
 }
 
-/** 타일 정의 — 이름·설명은 t("chat.attach.<key>")·t("chat.attach.<key>Desc"). */
+/** 타일 정의 — 이름은 t("chat.attach.<key>"). 설명 줄은 2026-09-23 에 뺐다(오너: "내용이 너무 많아"). */
 const TILES: Record<AttachItem, { key: string; Icon: ComponentType<{ className?: string }> }> = {
-    MATCH_INVITE: { key: "matchInvite", Icon: LucideSwords },
+    MATCH_INVITE: { key: "matchInvite", Icon: LucideTarget },
     SIM_INVITE: { key: "simInvite", Icon: LucideGamepad2 },
     GAME_RESULT: { key: "gameResult", Icon: LucideFlag },
     STORE: { key: "store", Icon: LucideMapPin },
@@ -48,22 +48,23 @@ export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick }: Pro
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="bottom" hideClose className="bg-surface-0 text-ink-1 border-surface-line rounded-t-2xl p-0 pb-[calc(1rem+env(safe-area-inset-bottom))] focus:outline-none">
-                <SheetHeader className="px-5 pt-5 pb-3 text-left">
-                    <SheetTitle className="text-[16px] font-semibold text-ink-1">{t("chat.attach.title")}</SheetTitle>
-                    <SheetDescription className="text-[12.5px] font-medium text-ink-3">{sport === "GOLF" ? t("chat.attach.descGolf") : t("chat.attach.descBilliards")}</SheetDescription>
+                <SheetHeader className="px-5 pt-4 pb-1 text-left">
+                    <SheetTitle className="text-[15px] font-semibold text-ink-1">{t("chat.attach.title")}</SheetTitle>
+                    <SheetDescription className="sr-only">{sport === "GOLF" ? t("chat.attach.descGolf") : t("chat.attach.descBilliards")}</SheetDescription>
                 </SheetHeader>
-                <div className="px-4 grid grid-cols-2 gap-2.5">
+                {/* 이름만 남긴 한 줄짜리 칸(2026-09-23 오너: "내용이 너무 많아 심플하고 아이콘도 깔끔하게").
+                    설명 줄은 뺐다 — 이름만으로 뜻이 서는 넷뿐이고, 설명이 붙으면 시트가 화면 절반을 먹는다. */}
+                <div className="px-4 pt-2 grid grid-cols-4 gap-1">
                     {items.map((item) => {
                         const { key, Icon } = TILES[item];
                         return (
                             <button
                                 key={item} type="button"
                                 onClick={() => { onOpenChange(false); onPick(item); }}
-                                className="text-left rounded-2xl border border-surface-line bg-surface-2 px-3.5 py-3.5 active:bg-surface-3 transition-colors"
+                                className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl active:bg-surface-2 transition-colors"
                             >
-                                <span className="w-9 h-9 rounded-full bg-brand/10 text-brand flex items-center justify-center"><Icon className="w-[18px] h-[18px]" /></span>
-                                <span className="block mt-2.5 text-[14px] font-semibold text-ink-1">{t(`chat.attach.${key}`)}</span>
-                                <span className="block mt-0.5 text-[12px] font-medium text-ink-3 leading-snug">{t(`chat.attach.${key}Desc`)}</span>
+                                <span className="w-[52px] h-[52px] rounded-2xl bg-surface-2 text-ink-1 flex items-center justify-center"><Icon className="w-[22px] h-[22px]" /></span>
+                                <span className="text-[12px] font-medium text-ink-2 text-center leading-tight">{t(`chat.attach.${key}`)}</span>
                             </button>
                         );
                     })}
