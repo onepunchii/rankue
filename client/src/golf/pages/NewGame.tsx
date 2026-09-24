@@ -16,6 +16,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { GolfBackButton } from "../components/common/GolfBackButton";
+import { CourseLogo } from "../components/course/CourseLogo";
 
 // import { COURSES } from "@/golf/data/golfCourses"; // 더 이상 사용하지 않음
 import { useDebounce } from "@/hooks/use-debounce";
@@ -35,13 +36,13 @@ const formatMoney = (amount: number) => new Intl.NumberFormat('ko-KR').format(am
  */
 
 const RECENT_KEY = "rankue_golf_recent_clubs";
-type ClubLite = { id: string; name: string; region?: string | null };
+type ClubLite = { id: string; name: string; region?: string | null; logo?: string | null };
 function readRecentClubs(): ClubLite[] {
     try { const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]"); return Array.isArray(v) ? v.slice(0, 5) : []; } catch { return []; }
 }
 function rememberRecentClub(c: ClubLite) {
     try {
-        const next = [{ id: String(c.id), name: c.name, region: c.region ?? null }, ...readRecentClubs().filter((x) => String(x.id) !== String(c.id))].slice(0, 5);
+        const next = [{ id: String(c.id), name: c.name, region: c.region ?? null, logo: c.logo ?? null }, ...readRecentClubs().filter((x) => String(x.id) !== String(c.id))].slice(0, 5);
         localStorage.setItem(RECENT_KEY, JSON.stringify(next));
     } catch { /* 저장소를 못 쓰는 환경 */ }
 }
@@ -89,7 +90,8 @@ function ClubRow({ club, onPick }: { club: any; onPick: (c: any) => void }) {
     return (
         <li>
             <button type="button" onClick={() => onPick(club)} className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-[#FFFFFF0A]">
-                <LucideMapPin className="w-4 h-4 shrink-0 text-[#FFFFFF59]" />
+                {/* 골프장 로고(골프장 페이지와 같은 흰 판) — 없으면 이름 글자. 위치 핀보다 어느 곳인지 한눈에 보인다(2026-09-24 오너) */}
+                <CourseLogo logo={club.logo} name={club.name} size="sm" className="w-10 h-10" />
                 <span className="flex-1 min-w-0">
                     <span className="block text-[15px] font-medium text-[#ffffff] truncate">{club.name}</span>
                     {club.region && <span className="block text-[12.5px] text-[#FFFFFF73] truncate">{club.region}</span>}
@@ -399,9 +401,7 @@ export default function GolfNewGame() {
                                 <Label>골프장</Label>
                                 {selectedCourseData ? (
                                     <div className="flex items-center gap-3 rounded-2xl bg-[#FFFFFF0A] ring-1 ring-inset ring-[#64DD174D] px-4 py-3.5">
-                                        <span className="w-9 h-9 rounded-full bg-[#64DD171F] flex items-center justify-center shrink-0">
-                                            <LucideMapPin className="w-[18px] h-[18px] text-[#8BE84A]" />
-                                        </span>
+                                        <CourseLogo logo={selectedCourseData.logo} name={selectedCourseData.name} size="sm" />
                                         <span className="flex-1 min-w-0">
                                             <span className="block text-[16px] font-semibold text-[#ffffff] truncate">{selectedCourseData.name}</span>
                                             <span className="block text-[12.5px] text-[#FFFFFF80] truncate tabular-nums">

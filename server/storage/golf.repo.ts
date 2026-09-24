@@ -12,6 +12,7 @@ import {
     golfClubs,
     golfClubCourses,
     rankueGolfClubs,
+    golfCoursePages,
     rankueGolfCourses,
     golfMembershipOrders
 } from "../../shared/schema.js";
@@ -30,10 +31,11 @@ import type {
     InsertGolfMembershipOrder,
     GolfMembershipOrder
 } from "../../shared/schema.js";
-import { eq, ne, desc, asc, and, or, sql, gte, lte, isNull, like, ilike, inArray } from "drizzle-orm";
+import { eq, ne, desc, asc, and, or, sql, gte, lte, isNull, isNotNull, like, ilike, inArray } from "drizzle-orm";
 import { notFound, conflict, badRequest } from "../utils/errors.js";
 import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords, passportRegionGroup } from "../../shared/golfRegions.js";
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
+import { courseNameKey } from "../../shared/golfCourse.js";
 import {
     resolvePars, sanitizeScores, isCompleteRound, roundTotals, settleMatch, rulesFor, isGuestId, GUEST_PREFIX, rankRound,
     type CoursePars,
@@ -204,6 +206,32 @@ function seatExpr(limit: SeatLimit) {
         : sql<number>`count(*)::int`;
 }
 
+/**
+ * 라운드 만들기 목록에 붙일 로고 — golf_course_pages(이름·옛 이름·로고)를 이름 열쇠로 묶는다. 10분 캐시.
+ * 같은 열쇠가 서로 다른 로고로 두 번 나오면 그 열쇠는 버린다(엉뚱한 로고보다 로고 없는 게 낫다).
+ */
+let logoCache: { at: number; map: Map<string, string> } | null = null;
+async function clubLogoIndex(): Promise<Map<string, string>> {
+    if (logoCache && Date.now() - logoCache.at < 10 * 60_000) return logoCache.map;
+    const map = new Map<string, string>();
+    const bad = new Set<string>();
+    try {
+        const rows = await db.select({ name: golfCoursePages.name, aliases: golfCoursePages.aliases, logo: golfCoursePages.logo })
+            .from(golfCoursePages).where(isNotNull(golfCoursePages.logo));
+        for (const r of rows) {
+            for (const n of [r.name, ...(r.aliases ?? [])]) {
+                const k = courseNameKey(n);
+                if (!k || bad.has(k)) continue;
+                const prev = map.get(k);
+                if (prev && prev !== r.logo) { map.delete(k); bad.add(k); continue; }
+                map.set(k, r.logo!);
+            }
+        }
+    } catch (e) { console.warn("[golf] logo index failed:", (e as Error)?.message); }
+    logoCache = { at: Date.now(), map };
+    return map;
+}
+
 export class GolfRepository {
     /**
      * 지역 코드는 **여기서** 굳힌다 — 라우트가 아니라 저장소에서. 넣는 길이 하나만 있는 게 아니라
@@ -255,11 +283,14 @@ export class GolfRepository {
             clubs = await db.select().from(rankueGolfClubs).orderBy(asc(rankueGolfClubs.name));
         }
 
+        const logos = await clubLogoIndex();
         // Calculate distance and sort if user location is provided
         let result = clubs.map(c => ({
             ...c,
             totalHoles: 18, // Default
             imageUrl: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?auto=format&fit=crop&q=80&w=800",
+            // 골프장 페이지(golf_course_pages)의 로고 — id 체계가 달라 이름 열쇠로 잇는다. 열쇠가 겹치면(두 곳) 붙이지 않는다.
+            logo: logos.get(courseNameKey(c.name)) ?? null,
             distance: (userLat && userLng && c.latitude && c.longitude)
                 ? getDistanceFromLatLonInKm(userLat, userLng, c.latitude, c.longitude)
                 : undefined

@@ -88,6 +88,8 @@ const nameCore = (s: string) => s.toLowerCase()
     .replace(/\(\s*구\s*[,:：]?[^)]*\)/g, "")
     .replace(/컨트리클럽|컨트리|골프앤리조트|골프리조트|골프클럽|골프장|골프앤|리조트|클럽|club|golf|resort|country|c\.c|g\.c|cc|gc/g, "")
     .replace(/[\s()·.,&㈜\-_]/g, "");
+/** 이름 열쇠 — 표기만 다른 같은 골프장("360도"·"360도CC")을 같게 본다. 라운드 만들기 목록(rankue_golf_clubs)에 로고를 붙일 때도 쓴다(2026-09-24). */
+export const courseNameKey = (s: string) => nameCore(s);
 function bigramSim(a: string, b: string): number {
     const bg = (s: string) => { const r: string[] = []; for (let i = 0; i < s.length - 1; i++) r.push(s.slice(i, i + 2)); return r; };
     const A = bg(a), B = bg(b); if (!A.length || !B.length) return a === b ? 1 : 0;
