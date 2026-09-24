@@ -58,7 +58,7 @@ const BOT_RE =
 // `!isBot → next()` 가지는 도달할 수 없다(= 실사용자가 serveStatic 폴백으로 새지 않는다).
 // 로컬 dev/start 에서는 vercel 라우팅이 없어 이 가지를 타고, 그때는 dist/public 이
 // 실제로 있으므로 정상적으로 앱 셸이 나간다. 서버 정규식을 vercel 보다 좁히지 말 것.
-function isBot(req: Request): boolean {
+export function isBot(req: Request): boolean {
   return BOT_RE.test(req.get("user-agent") || "");
 }
 
@@ -75,12 +75,12 @@ function isBot(req: Request): boolean {
 // 그건 설계된 안전장치가 아니라 우연이다. 여기서는 그 우연에 기대지 않는다.
 //
 // 봇 트래픽은 양이 적어 캐시가 없어도 비용이 무의미하다. 정확성을 택한다.
-function noStore(res: { setHeader: (k: string, v: string) => unknown }) {
+export function noStore(res: { setHeader: (k: string, v: string) => unknown }) {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
   res.setHeader("Vary", "User-Agent"); // 혹시 어딘가 캐시돼도 UA 별로 분리되게
 }
 
-function esc(s: unknown): string {
+export function esc(s: unknown): string {
   return String(s ?? "").replace(/[<>&"']/g, (c) =>
     ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
@@ -95,7 +95,7 @@ const HUB_L10N: Record<string, { home: string; wr: string; pba: string; golf: st
   tr: { home: "RANKUE ana sayfa", wr: "Bilardo dünya sıralaması", pba: "PBA Tour sıralaması", golf: "Golf sıralamaları", stores: "Kore'deki bilardo salonları", briefing: "Günlük bilardo bülteni", community: "Topluluk", about: "RANKUE Hakkında", support: "Destek" },
   es: { home: "Inicio RANKUE", wr: "Ranking mundial de billar", pba: "Ranking PBA Tour", golf: "Rankings de golf", stores: "Salas de billar en Corea", briefing: "Boletín diario de billar", community: "Comunidad", about: "Acerca de RANKUE", support: "Soporte" },
 };
-function hubNav(lang = "ko"): string {
+export function hubNav(lang = "ko"): string {
   const H = HUB_L10N[lang] ?? HUB_L10N.en;
   const q = lang === "ko" ? "" : `?lang=${lang}`;
   const golfQ = lang === "en" ? "?lang=en" : "";
@@ -117,7 +117,7 @@ const OG_LOCALE: Record<string, string> = {
   ko: "ko_KR", en: "en_US", vi: "vi_VN", tr: "tr_TR", es: "es_ES", ja: "ja_JP", zh: "zh_CN",
 };
 
-interface PageParts {
+export interface PageParts {
   lang?: string;
   title: string;
   desc: string;
@@ -164,7 +164,7 @@ function withToc(body: string, lang: string): string {
   return at >= 0 ? out.slice(0, at + 5) + nav + out.slice(at + 5) : out;
 }
 
-function page(p: PageParts): string {
+export function page(p: PageParts): string {
   // 상호(reciprocal) hreflang: 어느 언어판을 내보내든 **같은 전체 클러스터**를 선언해야
   // 구글이 묶음으로 인식한다. 한쪽만 선언하면 선언 전체가 무시된다.
   const base = p.altBase ?? p.canonical;
@@ -226,7 +226,7 @@ ${withToc(p.body, p.lang ?? "ko")}
 // next() 로 흘리면 serveStatic 의 SPA 폴백이 index.html 을 sendFile 하려 하는데,
 // api 함수 번들에는 dist/public 이 없어서(vercel.json 의 api 빌드에 includeFiles 미지정)
 // 500 이 된다. 없는 리소스는 404, 색인 대상이 아닌 화면은 noindex 로 명시해 끝낸다.
-function sendGone(res: Parameters<Parameters<Express["get"]>[1]>[1], title: string, msg: string) {
+export function sendGone(res: Parameters<Parameters<Express["get"]>[1]>[1], title: string, msg: string) {
   res.status(404).setHeader("X-Prerender", "404");
   noStore(res);
   res.send(
@@ -241,7 +241,7 @@ function sendGone(res: Parameters<Parameters<Express["get"]>[1]>[1], title: stri
   );
 }
 
-function sendNoindex(res: Parameters<Parameters<Express["get"]>[1]>[1], title: string) {
+export function sendNoindex(res: Parameters<Parameters<Express["get"]>[1]>[1], title: string) {
   res.setHeader("X-Prerender", "noindex");
   noStore(res);
   res.send(
@@ -258,7 +258,7 @@ function sendNoindex(res: Parameters<Parameters<Express["get"]>[1]>[1], title: s
 // DB 조회가 **예외로 실패**했을 때 쓰는 응답. 404 를 내면 안 된다 —
 // 일시적 DB 장애 중에 크롤러가 방문하면 "이 URL 은 없다"로 읽고 색인에서 빼 버린다.
 // 503 + Retry-After 는 "지금은 못 준다, 나중에 다시 와라"라서 색인에 영향이 없다.
-function sendUnavailable(res: Parameters<Parameters<Express["get"]>[1]>[1]) {
+export function sendUnavailable(res: Parameters<Parameters<Express["get"]>[1]>[1]) {
   res.status(503).setHeader("X-Prerender", "503");
   res.setHeader("Retry-After", "600");
   noStore(res);

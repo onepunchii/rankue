@@ -5,8 +5,9 @@
  *
  * 둘째 판(2026-09-24 오너: "홈에 배너를 조금 더 시각적으로 눈에 보이게"):
  *  - 지도를 카드 반쪽 크기로 키우고 점을 격자 점으로(CourseDotMap 셋째 판) — 한반도가 또렷하게 떠 보인다.
- *  - 지도 쪽에서 번지는 라임 빛 + 라임 테두리 — 옆 타일(ENTER CODE·ONLINE GOLF)과 같은 집안.
- *  - 흐린 ▷ 대신 라임 동그라미 화살표 — 눌러서 들어가는 카드라는 게 한눈에.
+ *  - 셋째 판(같은 날 오너: "배경을 조인 주황으로 입혀 줘 · 테두리에 저렇게 있으니 이상해"): 라임 테두리·빛을 걷고
+ *    **주황 면 카드**로 — 위의 RANKUE MATCH(라임 면)와 짝을 이룬다. 점은 흰색, 글이 있는 곳은 짙은 점(CourseDotMap onColor).
+ *  - 흐린 ▷ 대신 흰 동그라미 화살표 — 눌러서 들어가는 카드라는 게 한눈에.
  *  - 홈은 굵기를 낮추지 않는다(2026-09-21 오너) — 제목 extrabold.
  */
 import { useMemo } from "react";
@@ -15,9 +16,6 @@ import { LucideArrowRight, LucideStar } from "@/lib/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { useCourseList, useMyWatches } from "../../../lib/courseApi";
 import { CourseDotMap, type MapDot } from "./CourseDotMap";
-import { LiveBadges } from "./CourseRow";
-
-const CARD_BG = "#101410";
 
 export function CourseHomeEntry() {
     const { member } = useAuth();
@@ -41,36 +39,38 @@ export function CourseHomeEntry() {
     return (
         <Link
             href="/golf/courses"
-            className="group block w-full mb-4 relative z-10 rounded-[2rem] overflow-hidden border border-[#64DD174D] shadow-2xl shadow-[#64DD17]/10 active:scale-[0.99] transition-transform"
-            style={{ backgroundColor: CARD_BG }}
+            className="group block w-full mb-4 relative z-10 rounded-[2rem] overflow-hidden bg-gradient-to-br from-[#FF8A3D] to-[#E85200] shadow-2xl shadow-[#FF6B00]/20 active:scale-[0.99] transition-transform"
         >
-            {/* 지도 쪽에서 번지는 빛 */}
-            <span aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(110%_85%_at_88%_38%,#64DD1726_0%,#64DD170A_38%,transparent_70%)]" />
+            {/* 지도 쪽을 살짝 밝힌다 — 면이 한 색으로만 누르면 지도가 납작해 보인다 */}
+            <span aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(90%_80%_at_85%_40%,#FFFFFF26_0%,transparent_65%)]" />
             <span className="relative flex items-stretch min-h-[192px]">
                 <span className="flex-1 min-w-0 p-6 pr-1 flex flex-col">
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] text-[#8BE84A]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#64DD17]" />
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] text-[#FFFFFFD9]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#FFFFFF]" />
                         전국 골프장
                     </span>
                     <span className="mt-2 block text-[26px] font-extrabold text-[#FFFFFF] leading-[0.98]">GOLF<br />COURSES</span>
-                    <span className="mt-2.5 block text-[12px] font-semibold text-[#FFFFFF80]">
+                    <span className="mt-2.5 block text-[12px] font-semibold text-[#FFFFFFCC]">
                         {rows.length ? `${rows.length.toLocaleString()}곳 · ` : ""}그린피 · 회원권 시세
                     </span>
                     <span className="mt-auto pt-4 flex items-center gap-1.5 flex-wrap min-h-[20px]">
-                        <LiveBadges counts={counts} />
+                        {/* 주황 바탕 위라 색 칩(부킹 라임·조인 주황)은 묻힌다 — 흰 반투명 칩 하나로 */}
+                        {([["긴급", counts.urgent], ["부킹", counts.booking], ["조인", counts.join]] as const).filter(([, n]) => n > 0).map(([label, n]) => (
+                            <span key={label} className="h-5 px-1.5 rounded bg-[#FFFFFF33] text-[#FFFFFF] text-[12px] font-semibold leading-5 tabular-nums">{label} {n}</span>
+                        ))}
                         {watchN > 0 && (
-                            <span className="h-5 px-1.5 rounded bg-[#FFC43D1F] text-[#FFD266] text-[12px] font-semibold leading-5 inline-flex items-center gap-1 tabular-nums">
+                            <span className="h-5 px-1.5 rounded bg-[#FFFFFF33] text-[#FFFFFF] text-[12px] font-semibold leading-5 inline-flex items-center gap-1 tabular-nums">
                                 <LucideStar weight="fill" className="w-3 h-3" />관심 {watchN}
                             </span>
                         )}
                     </span>
                 </span>
                 <span className="relative w-[46%] shrink-0">
-                    <CourseDotMap dots={dots} focus={null} aspect={0.8} cols={30} bg={CARD_BG} className="absolute inset-0 w-full h-full" />
+                    <CourseDotMap dots={dots} focus={null} aspect={0.8} cols={30} onColor className="absolute inset-0 w-full h-full" />
                 </span>
             </span>
-            <span className="absolute right-4 bottom-4 w-10 h-10 rounded-full bg-[#64DD17] flex items-center justify-center shadow-lg shadow-[#64DD17]/30 transition-transform group-active:scale-95">
-                <LucideArrowRight weight="bold" className="w-5 h-5 text-[#051907]" />
+            <span className="absolute right-4 bottom-4 w-10 h-10 rounded-full bg-[#FFFFFF] flex items-center justify-center shadow-lg shadow-[#7A2A00]/30 transition-transform group-active:scale-95">
+                <LucideArrowRight weight="bold" className="w-5 h-5 text-[#E85200]" />
             </span>
         </Link>
     );

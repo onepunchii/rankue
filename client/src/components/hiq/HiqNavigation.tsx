@@ -122,7 +122,7 @@ export function HiqNavigation() {
                             key={tab.id}
                             whileTap={{ scale: 0.9 }}
                             // 안 본 신청 소식이 있으면 '내가 신청한 글' 탭으로 바로(예전 머리 단추와 같은 동작)
-                            onClick={() => setLocation(tab.id === "myBookings" && bookingUnseen ? "/golf/my-bookings?tab=applied" : (tab as any).to ?? tab.path)}
+                            onClick={() => setLocation(tab.id === "myBookings" && bookingUnseen ? "/golf/my-bookings?role=applied" : (tab as any).to ?? tab.path)}
                             className="flex-1 flex flex-col items-center justify-center py-2 gap-2 relative group"
                         >
                             <div className={`relative transition-all duration-300 ${active ? 'scale-110' : 'opacity-55 group-hover:opacity-100'}`}>

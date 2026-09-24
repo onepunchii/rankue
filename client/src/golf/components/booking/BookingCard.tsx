@@ -91,7 +91,7 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
     const caddie = (item.options || []).includes('no_caddie') ? '노캐디' : (item.options || []).includes('marshal') ? '드라이빙 캐디' : '일반캐디';
     const optionLabels: string[] = (item.options || []).map((id: string) => SPECIAL_OPTIONS.find(o => o.id === id)?.label || JOIN_OPTIONS.find(o => o.id === id)?.label || id);
 
-    const primaryText = isMine ? (isJoin ? `내가 올린 조인 · 확정 ${applied}/${capacity}` : (applied > 0 ? "예약 확정됨 · 내 글" : pending > 0 ? `예약 신청 ${pending}건 · 내 글` : "내가 올린 부킹"))
+    const primaryText = isMine ? (isJoin ? `내 모집 · 확정 ${applied}/${capacity}` : (applied > 0 ? "내 모집 · 예약 확정됨" : pending > 0 ? `내 모집 · 예약 신청 ${pending}건` : "내 모집 · 부킹"))
         : myStatus === "accepted" ? (isJoin ? "확정됐어요 · 취소하기" : "예약 확정 · 취소하기")
             : myStatus === "applied" ? (joinFull ? "마감 · 자리 나면 알려 드려요 · 취소" : "승인 기다리는 중 · 취소하기")
                 : myStatus === "rejected" ? "올린 분이 받지 않은 신청이에요"

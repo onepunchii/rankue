@@ -42,7 +42,7 @@ function esc(s: string): string {
 const day = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
 
 // image: 선수 카드 PNG(/og/…) — 이미지 사이트맵 확장. 구글 이미지·썸네일 발견 경로(2026-09-14).
-function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; priority?: string; lastmod?: Date | string | null; image?: string }): string {
+export function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; priority?: string; lastmod?: Date | string | null; image?: string }): string {
   let alts = "";
   if (opts?.langs && opts.langs.length) {
     const sep = loc.includes("?") ? "&" : "?";

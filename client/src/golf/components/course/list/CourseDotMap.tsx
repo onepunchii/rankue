@@ -26,6 +26,11 @@ const LIVE_FILL: Record<"booking" | "join" | "urgent", string> = {
 /** 한 칸의 골프장 수 → 밝기(1·2·3곳 이상). 한 칸에 점 하나라 반투명이어도 겹쳐 뿌예지지 않는다. */
 const ON_FILL = ["#FFFFFF6B", "#FFFFFFA6", "#FFFFFFE6"] as const;
 const DIM_FILL = "#FFFFFF1F";
+/**
+ * 색 바탕 위(홈 배너 주황 카드, 2026-09-24 오너 "배경을 조인 주황으로") — 라임·주황 점이 바탕에 묻힌다.
+ * 그래서 점은 흰색 단계로, 글이 있는 칸은 **짙은 점 + 흰 테두리**로 뒤집어 그린다(색 대신 명암으로 '지금 있음'을 말한다).
+ */
+const ON_COLOR = { on: ["#FFFFFF66", "#FFFFFFA6", "#FFFFFFF2"] as const, dim: "#FFFFFF33", live: "#2A0E00", ring: "#FFFFFF" };
 
 // 등거리 투영에 위도 36° 코사인을 곱한다 — 한반도 안에서는 이 정도면 모양이 맞는다.
 const px = (lng: number) => (lng - 125.5) * 81;
@@ -83,7 +88,7 @@ function toCells(dots: MapDot[], g: number): Cell[] {
 
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
-export function CourseDotMap({ dots, focus, aspect = 0.62, cols = 34, bg = "#111111", className }: {
+export function CourseDotMap({ dots, focus, aspect = 0.62, cols = 34, bg = "#111111", onColor = false, className }: {
     dots: MapDot[];
     /** 당겨 볼 점들(지역·시군의 골프장). 없으면 전국. */
     focus: { lat: number; lng: number }[] | null;
@@ -93,6 +98,8 @@ export function CourseDotMap({ dots, focus, aspect = 0.62, cols = 34, bg = "#111
     cols?: number;
     /** 색 점 둘레 테두리(옆 점과 떼는 선) — 지도가 놓인 바탕색 */
     bg?: string;
+    /** 색 바탕(주황 카드 등) 위에 그린다 — 흰 점 + 짙은 '지금 있음' 점 */
+    onColor?: boolean;
     className?: string;
 }) {
     const target = useMemo(() => fitBox(focus?.length ? focus : dots, aspect), [focus, dots, aspect]);
@@ -123,9 +130,13 @@ export function CourseDotMap({ dots, focus, aspect = 0.62, cols = 34, bg = "#111
         <svg viewBox={box.join(" ")} preserveAspectRatio="xMidYMid meet" className={className} aria-hidden="true" shapeRendering="geometricPrecision">
             {cells.map((c) => {
                 if (c.tone === "booking" || c.tone === "join" || c.tone === "urgent") {
-                    return <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.5} fill={LIVE_FILL[c.tone]} stroke={bg} strokeWidth={g * 0.16} paintOrder="stroke" />;
+                    return onColor
+                        ? <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.46} fill={ON_COLOR.live} stroke={ON_COLOR.ring} strokeWidth={g * 0.14} />
+                        : <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.5} fill={LIVE_FILL[c.tone]} stroke={bg} strokeWidth={g * 0.16} paintOrder="stroke" />;
                 }
-                const fill = c.tone === "dim" ? DIM_FILL : ON_FILL[Math.min(c.n, 3) - 1];
+                const fill = onColor
+                    ? (c.tone === "dim" ? ON_COLOR.dim : ON_COLOR.on[Math.min(c.n, 3) - 1])
+                    : (c.tone === "dim" ? DIM_FILL : ON_FILL[Math.min(c.n, 3) - 1]);
                 return <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.3} fill={fill} />;
             })}
         </svg>

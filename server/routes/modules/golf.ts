@@ -446,7 +446,7 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
                 body: `${listingName(booking)} ${teeText(booking)} — 자리가 다시 나면 알려 드릴게요. 기다리기 싫으면 신청을 취소해도 돼요.`,
                 // 글 상세가 아니라 **내 신청 목록**으로 보낸다(2026-09-23): 이 알림이 권하는 일("신청을 취소해도 돼요")이
                 // 거기에 있다. 글 상세에서는 자리가 다 찼으니 신청 단추도 없어 할 수 있는 게 없었다.
-                category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/my-bookings?tab=applied` },
+                category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/my-bookings?tab=${isJoin ? "join" : "booking"}&role=applied` },
             }).catch((e) => console.error("[GolfJoinNotify]", e))));
         }
     }
@@ -460,7 +460,7 @@ router.post("/bookings/:id/applicants/:memberId/decision", requireAuth, asyncHan
         // 확정은 채팅방으로(거기서 다음 이야기를 한다). 거절은 **내 신청 목록**으로 — 글 상세로 보내 봐야
         // 거절은 재신청이 막힌 최종 상태라(2026-09-22) 그 화면엔 할 수 있는 일이 하나도 없다.
         // 내 신청 목록에는 '거절' 칩과 "다른 티타임을 찾아보세요" 가 있고, 다른 신청들이 함께 보인다(2026-09-23).
-        params: { url: accept ? `/chat/listing/${booking.id}` : `/golf/my-bookings?tab=applied` },
+        params: { url: accept ? `/chat/listing/${booking.id}` : `/golf/my-bookings?tab=${isJoin ? "join" : "booking"}&role=applied` },
     }).catch((e) => console.error("[GolfJoinNotify]", e));
     return sendSuccess(res, { status: accept ? "accepted" : "rejected" });
 }));

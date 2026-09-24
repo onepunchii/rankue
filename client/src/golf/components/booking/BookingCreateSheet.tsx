@@ -109,10 +109,10 @@ export function BookingCreateSheet({ onClose, onCreated }: Props) {
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
             qc.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings/counts"] });
-            qc.invalidateQueries({ queryKey: MY_LISTINGS_QUERY_KEY });  // '내역 → 내가 올린 글' 에서 바로 조인으로 돌릴 수 있어야 한다
+            qc.invalidateQueries({ queryKey: MY_LISTINGS_QUERY_KEY });  // '내 예약 → 부킹' 에서 바로 조인으로 돌릴 수 있어야 한다
             toast({
                 title: times.length > 1 ? `${times.length}건을 올렸어요` : "부킹을 올렸어요",
-                description: "자리가 남으면 '내역 → 내가 올린 글' 에서 조인으로 돌릴 수 있어요.",
+                description: "자리가 남으면 '내 예약 → 부킹' 에서 조인으로 돌릴 수 있어요.",
             });
             onCreated?.(date);
             onClose();

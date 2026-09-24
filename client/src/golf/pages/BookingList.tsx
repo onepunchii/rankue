@@ -662,7 +662,7 @@ export default function BookingList() {
                                 onCreated={(day) => {
                                     const idx = weekDates.findIndex(d => d.fullDate === day);
                                     if (idx !== -1) pickDate(idx);
-                                    else toast({ title: "올렸어요 — 목록은 오늘부터 30일까지만 보여요", description: "그날이 가까워지면 목록에 나타나요. '내역'에서는 지금도 볼 수 있어요." });
+                                    else toast({ title: "올렸어요 — 목록은 오늘부터 30일까지만 보여요", description: "그날이 가까워지면 목록에 나타나요. '내 예약'에서는 지금도 볼 수 있어요." });
                                 }}
                             />
                         </div>
@@ -674,7 +674,7 @@ export default function BookingList() {
                                     setViewType('BOOKING');
                                     const idx = weekDates.findIndex(d => d.fullDate === day);
                                     if (idx !== -1) pickDate(idx);
-                                    else toast({ title: "올렸어요 — 목록은 오늘부터 30일까지만 보여요", description: "그날이 가까워지면 목록에 나타나요. '내역'에서는 지금도 볼 수 있어요." });
+                                    else toast({ title: "올렸어요 — 목록은 오늘부터 30일까지만 보여요", description: "그날이 가까워지면 목록에 나타나요. '내 예약'에서는 지금도 볼 수 있어요." });
                                 }}
                             />
                         </div>
@@ -682,7 +682,7 @@ export default function BookingList() {
                 </DialogContent>
             </Dialog>
 
-            {/* 부킹 → 조인 전환. 끝나면 그 글이 있는 조인 탭·날짜로 옮겨 가 카드를 펼친다(내역의 '보기' 와 같은 동작). */}
+            {/* 부킹 → 조인 전환. 끝나면 그 글이 있는 조인 탭·날짜로 옮겨 가 카드를 펼친다(내 예약의 '글 보기' 와 같은 동작). */}
             <ToJoinSheet
                 item={toJoinItem}
                 onClose={() => setToJoinItem(null)}
