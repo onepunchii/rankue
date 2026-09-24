@@ -10,9 +10,19 @@ interface Props {
     canRedo: boolean;
     onUndo: () => void;
     onRedo: () => void;
+    /**
+     * PBA 룰 경기의 뱅크샷 +2 — 지금 차례인 선수에게 들어간다. 없으면 버튼을 안 그린다.
+     * 카드 안에 두면 차례가 바뀔 때마다 위치가 옮겨 다니고, 4인이면 카드 폭(약 210px)을 넘쳤다(2026-09-24).
+     * 여기 두면 늘 같은 자리이고, 잘못 눌렀을 때 되돌리기가 바로 옆이다.
+     */
+    onBankShot?: () => void;
+    /** 지금 차례인 선수의 공 색 — 누구 점수인지 버튼에서 보인다. */
+    bankColor?: string;
+    /** 목표 도달 뒤(마무리·FINISH)엔 잠근다. 숨기지 않는 건 버튼 자리가 흔들리지 않게 하려는 것이다. */
+    bankDisabled?: boolean;
 }
 
-export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo, onRedo }: Props) {
+export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo, onRedo, onBankShot, bankColor, bankDisabled }: Props) {
     const { t } = useT();
     // Timer State moved here to prevent re-rendering of parent
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -73,7 +83,20 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
             </div>
 
             {/* Right Section: Controls */}
-            <div className="flex items-center justify-end gap-3 w-1/4">
+            <div className="flex items-center justify-end gap-6 w-1/4 min-w-fit">
+                {onBankShot && (
+                    <button
+                        type="button"
+                        onClick={onBankShot}
+                        disabled={bankDisabled}
+                        className="h-12 px-4 rounded-2xl border-2 bg-white flex items-center gap-2 whitespace-nowrap active:scale-95 transition-transform disabled:opacity-35"
+                        style={{ borderColor: bankColor ?? "#0f6b4f", color: bankColor ?? "#0f6b4f" }}
+                    >
+                        <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: bankColor ?? "#0f6b4f" }} />
+                        <span className="text-sm font-semibold">{t("playerCard.bankShot")}</span>
+                        <span className="text-xl font-bold tabular-nums">+2</span>
+                    </button>
+                )}
                 <Button
                     onClick={onExit}
                     className="h-12 px-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-semibold"

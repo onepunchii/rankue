@@ -16,8 +16,11 @@ interface Props {
     finishRemaining?: number;
     theme: string;
     onTap: (zone: "top" | "bottom") => void;
-    /** PBA 룰 경기에서만 넘어온다 — 뱅크샷 +2. 없으면 버튼을 그리지 않는다. */
-    onBankShot?: () => void;
+    /**
+     * 3~4인 경기 — 카드 폭이 폰 가로에서 약 210px 이다(2026-09-24 오너: "4인시 화면이 잘리네").
+     * 여백·글씨를 줄이고 이름을 말줄임한다. 큰 점수와 탭 영역은 그대로 둔다(멀리서 보는 점수판이다).
+     */
+    compact?: boolean;
     onTurnClick?: () => void;
     showVs?: boolean;
     isSolo: boolean;
@@ -27,6 +30,11 @@ interface Props {
     dragListeners?: any;
     isDragging?: boolean;
     onInningClick?: () => void;
+}
+
+/** 선수별 공 색(흰 카드에서도 보이는 값). 하단 바의 뱅크 버튼이 '지금 차례인 선수' 색으로 같이 쓴다. */
+export function playerThemeColor(theme: string): string {
+    return theme === 'white' ? '#374151' : theme === 'yellow' ? '#CA8A04' : theme === 'red' ? '#DC2626' : '#2563EB';
 }
 
 export function PlayerCard({
@@ -41,7 +49,7 @@ export function PlayerCard({
     finishRemaining,
     theme,
     onTap,
-    onBankShot,
+    compact = false,
     onTurnClick,
     showVs,
     isSolo,
@@ -55,9 +63,7 @@ export function PlayerCard({
     const { t } = useT();
     // Light-theme-safe ball identity colors — pure white / bright yellow are invisible on a
     // white card, so player identity shifts to readable equivalents (graphite / deep gold / red / blue).
-    const themeColor = theme === 'white' ? '#374151' :
-        theme === 'yellow' ? '#CA8A04' :
-            theme === 'red' ? '#DC2626' : '#2563EB';
+    const themeColor = playerThemeColor(theme);
 
     const displayScore = score;
     const displayRun = run;
@@ -78,15 +84,15 @@ export function PlayerCard({
             <div
                 {...dragAttributes}
                 {...dragListeners}
-                className="flex-[0_0_15%] flex items-center justify-between px-8 relative z-50 border-b transition-all duration-300 pointer-events-none touch-none"
+                className={`flex-[0_0_15%] flex items-center justify-between ${compact ? 'px-3 gap-2' : 'px-8'} relative z-50 border-b transition-all duration-300 pointer-events-none touch-none`}
                 style={{
                     backgroundColor: 'rgba(0, 0, 0, 0.04)',
                     borderColor: isTurn ? themeColor : 'rgba(0, 0, 0, 0.1)'
                 }}
             >
                 {/* Content Container - Capture Drag Here */}
-                <div className="flex items-center gap-3 pointer-events-auto cursor-grab active:cursor-grabbing">
-                    <h2 className={`text-3xl lg:text-4xl font-bold ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/50'}`}>
+                <div className="flex items-center gap-3 min-w-0 pointer-events-auto cursor-grab active:cursor-grabbing">
+                    <h2 className={`${compact ? 'text-xl truncate' : 'text-3xl lg:text-4xl'} font-bold ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/50'}`}>
                         {player?.name || t("playerCard.defaultName")}
                     </h2>
                     {isSolo && (
@@ -96,10 +102,10 @@ export function PlayerCard({
                     )}
                 </div>
 
-                <div className="flex items-center gap-3 pointer-events-auto">
+                <div className="flex items-center gap-3 shrink-0 pointer-events-auto">
                     <div className="flex flex-col items-end">
                         <span className="text-[12px] font-medium text-black/40">{t("playerCard.target")}</span>
-                        <span className={`text-xl font-semibold tabular-nums ${isTurn ? 'text-black/60' : 'text-black/40'}`}>{target}</span>
+                        <span className={`${compact ? 'text-base' : 'text-xl'} font-semibold tabular-nums ${isTurn ? 'text-black/60' : 'text-black/40'}`}>{target}</span>
                     </div>
                 </div>
             </div>
@@ -165,7 +171,7 @@ export function PlayerCard({
                             className="flex flex-col items-center"
                         >
                             <h1
-                                className="text-[12vw] lg:text-[190px] leading-none font-bold tabular-nums"
+                                className={`${compact ? 'text-[10vw]' : 'text-[12vw]'} lg:text-[190px] leading-none font-bold tabular-nums`}
                                 style={{ color: isTurn ? themeColor : 'rgba(0,0,0,0.18)' }}
                             >
                                 {displayScore}
@@ -198,46 +204,34 @@ export function PlayerCard({
 
             {/* Info Footer (15%) - Symmetric & Clean */}
             <div
-                className="flex-[0_0_15%] flex items-center justify-between px-5 relative z-50 border-t transition-all duration-300 pointer-events-none"
+                className={`flex-[0_0_15%] flex items-center justify-between ${compact ? 'px-3 gap-2' : 'px-5'} relative z-50 border-t transition-all duration-300 pointer-events-none`}
                 style={{
                     backgroundColor: 'rgba(0, 0, 0, 0.04)',
                     borderColor: isTurn ? themeColor : 'rgba(0, 0, 0, 0.1)'
                 }}
             >
                 {/* Left Section: Average (Top) & High Run (Bottom) */}
-                <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                        <span className="text-[12px] font-medium text-black/55 w-12 text-right">{t("playerCard.average")}</span>
-                        <span className={`text-2xl font-bold tabular-nums ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/45'}`}>{avg}</span>
+                <div className={`flex flex-col ${compact ? 'gap-0.5 min-w-0' : 'gap-3'}`}>
+                    <div className={`flex items-center ${compact ? 'gap-1.5' : 'gap-3'}`}>
+                        <span className={`text-[12px] font-medium text-black/55 ${compact ? 'whitespace-nowrap' : 'w-12 text-right'}`}>{t("playerCard.average")}</span>
+                        <span className={`${compact ? 'text-base' : 'text-2xl'} font-bold tabular-nums ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/45'}`}>{avg}</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <span className="text-[12px] font-medium text-black/55 w-12 text-right">{t("playerCard.highRun")}</span>
-                        <span className={`text-2xl font-bold tabular-nums ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/45'}`}>{displayHighRun}</span>
+                    <div className={`flex items-center ${compact ? 'gap-1.5' : 'gap-3'}`}>
+                        <span className={`text-[12px] font-medium text-black/55 ${compact ? 'whitespace-nowrap' : 'w-12 text-right'}`}>{t("playerCard.highRun")}</span>
+                        <span className={`${compact ? 'text-base' : 'text-2xl'} font-bold tabular-nums ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/45'}`}>{displayHighRun}</span>
                     </div>
                 </div>
 
                 {/* Right Section: To Go & Button */}
-                <div className="flex items-center gap-10">
+                <div className={`flex items-center shrink-0 ${compact ? 'gap-2' : 'gap-10'}`}>
                     <div className="flex flex-col items-end">
-                        <span className={`text-6xl lg:text-7xl font-bold tabular-nums leading-none ${isTurn ? 'text-brand' : 'text-black/40'}`}>
+                        <span className={`${compact ? 'text-4xl' : 'text-6xl lg:text-7xl'} font-bold tabular-nums leading-none ${isTurn ? 'text-brand' : 'text-black/40'}`}>
                             {displayRemaining === 0 ? (
                                 <span className="text-transparent">0</span>
                             ) : displayRemaining}
                         </span>
                     </div>
 
-                    {/* 뱅크샷 +2 — 카드의 위·아래 탭(±1)과 따로, 한 번에 2점. 탭 존(z-[45]) 위에 있어야 눌린다.
-                        목표 도달 뒤엔 숨긴다: 그때 다음 탭은 종료·마무리 판정이다. */}
-                    {isTurn && onBankShot && !isFinishMode && (
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onBankShot(); }}
-                            className="h-16 px-5 rounded-2xl border-2 border-brand text-brand bg-white flex items-center gap-1.5 whitespace-nowrap shrink-0 pointer-events-auto relative z-50 active:scale-95 transition-transform"
-                        >
-                            <span className="text-sm font-semibold">{t("playerCard.bankShot")}</span>
-                            <span className="text-2xl font-bold tabular-nums">+2</span>
-                        </button>
-                    )}
 
                     <AnimatePresence>
                         {isTurn && (!isFinishMode || (finishRemaining ?? 0) > 0) && !hideEndInning && (
@@ -250,7 +244,7 @@ export function PlayerCard({
                                     e.stopPropagation();
                                     onTurnClick && onTurnClick();
                                 }}
-                                className="rk-btn-primary h-16 px-8 rounded-2xl flex items-center justify-center gap-3 transition-all pointer-events-auto relative z-50"
+                                className={`rk-btn-primary ${compact ? 'h-12 px-3 gap-1.5' : 'h-16 px-8 gap-3'} rounded-2xl flex items-center justify-center whitespace-nowrap transition-all pointer-events-auto relative z-50`}
                             >
                                 <span className="text-sm font-semibold">
                                     {t("playerCard.endInning")}

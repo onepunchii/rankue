@@ -4,7 +4,7 @@ import { usePreventZoom } from "@/hooks/usePreventZoom";
 import { useKeepAwake } from "@/hooks/useKeepAwake";
 import { useGameScore } from "@/hooks/useGameScore";
 import { LandscapeGuard } from "@/components/hiq/LandscapeGuard";
-import { PlayerCard } from "@/components/hiq/game/PlayerCard";
+import { PlayerCard, playerThemeColor } from "@/components/hiq/game/PlayerCard";
 import { ScoreboardBottomBar } from "@/components/hiq/game/ScoreboardBottomBar";
 import { InningHistoryModal } from "@/components/hiq/game/InningHistoryModal";
 import { SortablePlayerWrapper } from "@/components/hiq/game/SortablePlayerWrapper";
@@ -13,6 +13,9 @@ import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortabl
 import { HiqMember } from "@shared/schema";
 import { useT } from "@/lib/i18n";
 import { scoringInnings } from "@shared/averageRule";
+
+/** 선수 번호 → 공 색 이름. 카드와 하단 바(뱅크 버튼)가 같은 표를 본다. */
+const THEMES = ["white", "yellow", "red", "blue"] as const;
 
 export default function HiqScoreboard() {
     usePreventZoom();
@@ -100,7 +103,7 @@ export default function HiqScoreboard() {
                                 const run = gameState[`p${playerId}Run` as keyof typeof gameState] as number;
                                 const highRun = gameState[`p${playerId}HighRun` as keyof typeof gameState] as number;
 
-                                const theme = playerId === 1 ? 'white' : playerId === 2 ? 'yellow' : playerId === 3 ? 'red' : 'blue';
+                                const theme = THEMES[playerId - 1];
 
                                 if (playerId > totalPlayers) return null;
 
@@ -125,8 +128,7 @@ export default function HiqScoreboard() {
                                             }
                                             theme={theme}
                                             onTap={(zone) => handleCardTap(playerId as 1 | 2 | 3 | 4, zone)}
-                                            // PBA 룰(3구) 경기에서만 — 저장만 되고 점수판이 안 읽던 설정이다(2026-09-24).
-                                            onBankShot={game.usePbaRule && game.gameType === "3c" ? () => handleBankShot(playerId as 1 | 2 | 3 | 4) : undefined}
+                                            compact={totalPlayers >= 3}
                                             onTurnClick={() => {
                                                 // A slot with no target (0 — e.g. a guest whose target was never
                                                 // raised) has NO win condition. Without `target > 0`, `0 >= 0`
@@ -166,6 +168,15 @@ export default function HiqScoreboard() {
                     canRedo={canRedo}
                     onUndo={() => { undo(); speak(t("gameScoreboard.undo")); }}
                     onRedo={() => { redo(); speak(t("gameScoreboard.redo")); }}
+                    // PBA 룰(3구) 경기에서만 — 저장만 되고 점수판이 안 읽던 설정이다(2026-09-24).
+                    onBankShot={game.usePbaRule && game.gameType === "3c" ? () => handleBankShot(gameState.currentTurn as 1 | 2 | 3 | 4) : undefined}
+                    bankColor={playerThemeColor(THEMES[gameState.currentTurn - 1])}
+                    bankDisabled={(() => {
+                        const turn = gameState.currentTurn;
+                        const target = (game[`player${turn}Target` as keyof typeof game] as number) || 0;
+                        const score = gameState[`p${turn}Score` as keyof typeof gameState] as number;
+                        return target > 0 && score >= target;
+                    })()}
                 />
             </div>
         </LandscapeGuard>
