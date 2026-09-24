@@ -1,23 +1,15 @@
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    LucideTrophy,
-    LucideCoins,
-    LucideSwords,
     LucideCheckCircle2,
     LucideSearch,
     LucideX,
     LucideUsers,
     LucideLoader2,
     LucideMapPin,
-    LucideUser,
-    LucideCheck,
-    LucideSparkles,
-    LucideZap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMoneyUnit } from "../lib/money";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -26,57 +18,87 @@ import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { GolfBackButton } from "../components/common/GolfBackButton";
 
 // import { COURSES } from "@/golf/data/golfCourses"; // 더 이상 사용하지 않음
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useDebounce } from "@/hooks/use-debounce";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 
 const formatMoney = (amount: number) => new Intl.NumberFormat('ko-KR').format(amount);
 
-// 1. 코스 리스트 아이템 컴포넌트 분리 및 메모이제이션
-const CourseItem = memo(({ course, isSelected, onSelect }: any) => (
-    <button
-        onClick={() => onSelect(course)}
-        className={cn(
-            "w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left",
-            isSelected
-                ? "bg-[#64DD17]/10 border-[#64DD17]/50 shadow-lg shadow-[#64DD17]/5"
-                : "bg-white/5 border-white/5 hover:border-white/10"
-        )}
-    >
-        <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-white/5">
-            <img
-                src={course.imageUrl}
-                alt={course.name}
-                className="w-full h-full object-cover"
-                loading="lazy"
-            />
-        </div>
-        <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white truncate">{course.name}</h3>
-                {course.isRankue60 && (
-                    <span className="px-1.5 py-0.5 rounded bg-[#FFD700] text-black text-[8px] font-black uppercase tracking-tighter">Elite 60</span>
-                )}
-            </div>
-            <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mt-0.5">
-                {course.distance ? `${course.distance.toFixed(1)}km` : course.region} · {course.totalHoles} Holes
-            </p>
-        </div>
-        {isSelected && (
-            <div className="w-6 h-6 rounded-full bg-[#64DD17] flex items-center justify-center">
-                <LucideCheck className="w-3 h-3 text-black" />
-            </div>
-        )}
-    </button>
-));
+/**
+ * 라운드 만들기(2026-09-24 둘째 판 — 오너: "유저가 손쉽게 만질 수 있는 화면인가? 더 콤팩트하게 … 전반·후반 체크도 어렵고
+ * 골프장을 골라 주세요도 어렵고, 서치바에 가장 가까운 골프장 자동 검색 … 디자인 전면 수정").
+ *
+ * 무엇을 바꿨나:
+ *  - **한 화면**. 큰 카드 여섯 장(골프장·게임 방식 2·기록 방식 2)을 세 줄로 — 골프장 · 코스 · 방식. 시작 단추는 바닥에 붙는다.
+ *  - 골프장은 **검색창이 화면에 바로 있다**(따로 뜨는 창 없음). 비어 있으면 **가까운 골프장**(위치)과 **최근 친 곳**(이 기기)을 먼저 보여 준다.
+ *  - 전반·후반은 드롭다운 대신 **칩 한 번**. 코스가 1~2개인 골프장은 자동으로 채운다(9홀짜리는 두 번 돈다).
+ *  - 영어 대문자 제목·기울인 굵은 글씨(BATTLE FIELD·GAME MODE…)를 걷고 골프장 화면과 같은 말투로.
+ * ⚠️ 리터럴 색만 — 골프 테마가 `.bg-white`·`.text-black/*` 를 바꿔 끼운다.
+ */
 
-CourseItem.displayName = "CourseItem";
+const RECENT_KEY = "rankue_golf_recent_clubs";
+type ClubLite = { id: string; name: string; region?: string | null };
+function readRecentClubs(): ClubLite[] {
+    try { const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]"); return Array.isArray(v) ? v.slice(0, 5) : []; } catch { return []; }
+}
+function rememberRecentClub(c: ClubLite) {
+    try {
+        const next = [{ id: String(c.id), name: c.name, region: c.region ?? null }, ...readRecentClubs().filter((x) => String(x.id) !== String(c.id))].slice(0, 5);
+        localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+    } catch { /* 저장소를 못 쓰는 환경 */ }
+}
+const kmText = (km?: number) => (km == null ? "" : km < 10 ? `${km.toFixed(1)}km` : `${Math.round(km)}km`);
+
+/** 두세 칸 고르기 — 고른 칸은 흰 면. */
+function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[] }) {
+    return (
+        <div className="flex rounded-full bg-[#FFFFFF0D] p-0.5" role="radiogroup">
+            {options.map((o) => (
+                <button
+                    key={o.v} type="button" role="radio" aria-checked={value === o.v} onClick={() => onChange(o.v)}
+                    className={cn(
+                        "flex-1 h-10 rounded-full text-[14px] transition-colors",
+                        value === o.v ? "bg-[#ffffff] text-[#0a0a0a] font-semibold" : "text-[#FFFFFFB3] font-medium active:text-[#ffffff]",
+                    )}
+                >{o.label}</button>
+            ))}
+        </div>
+    );
+}
+
+function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+    return (
+        <button
+            type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)}
+            className={cn("shrink-0 w-12 h-7 rounded-full p-0.5 transition-colors", on ? "bg-[#64DD17]" : "bg-[#FFFFFF24]")}
+        >
+            <span className={cn("block w-6 h-6 rounded-full bg-[#ffffff] transition-transform", on ? "translate-x-5" : "translate-x-0")} />
+        </button>
+    );
+}
+
+function Label({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
+    return (
+        <div className="flex items-center justify-between mb-2.5">
+            <h2 className="text-[13px] font-semibold text-[#FFFFFF99]">{children}</h2>
+            {right}
+        </div>
+    );
+}
+
+/** 골프장 한 줄 — 검색 결과·가까운 곳·최근 공용 */
+function ClubRow({ club, onPick }: { club: any; onPick: (c: any) => void }) {
+    return (
+        <li>
+            <button type="button" onClick={() => onPick(club)} className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-[#FFFFFF0A]">
+                <LucideMapPin className="w-4 h-4 shrink-0 text-[#FFFFFF59]" />
+                <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-medium text-[#ffffff] truncate">{club.name}</span>
+                    {club.region && <span className="block text-[12.5px] text-[#FFFFFF73] truncate">{club.region}</span>}
+                </span>
+                {club.distance != null && <span className="shrink-0 text-[13px] text-[#FFFFFF8C] tabular-nums">{kmText(club.distance)}</span>}
+            </button>
+        </li>
+    );
+}
 
 export default function GolfNewGame() {
     const [_, setLocation] = useLocation();
@@ -97,7 +119,6 @@ export default function GolfNewGame() {
 
     const [courseSearch, setCourseSearch] = useState("");
     const debouncedSearch = useDebounce(courseSearch, 300);
-    const [isCourseSearchOpen, setIsCourseSearchOpen] = useState(false);
     const [selectedCourseData, setSelectedCourseData] = useState<any>(null);
     const [selectedFrontCourse, setSelectedFrontCourse] = useState<string>("");
     const [selectedBackCourse, setSelectedBackCourse] = useState<string>("");
@@ -137,7 +158,7 @@ export default function GolfNewGame() {
             }
             return await apiRequest(`/api/hiq/golf/clubs?${params.toString()}`);
         },
-        enabled: isCourseSearchOpen || !selectedCourseData,
+        enabled: !selectedCourseData,
     });
 
     // 세부 코스 목록 조회
@@ -177,6 +198,22 @@ export default function GolfNewGame() {
         }
     }, [selectedFrontCourse, subCourses, selectedBackCourse]);
 
+    // 코스가 1~2개면 고를 게 없다 — 1개(9홀)는 두 번 돌고, 2개는 앞·뒤로. 이미 고른 값은 건드리지 않는다.
+    useEffect(() => {
+        if (!selectedCourseData || selectedFrontCourse || selectedBackCourse) return;
+        if (subCourses.length === 1) { setSelectedFrontCourse(subCourses[0].name); setSelectedBackCourse(subCourses[0].name); }
+        else if (subCourses.length === 2) { setSelectedFrontCourse(subCourses[0].name); setSelectedBackCourse(subCourses[1].name); }
+    }, [selectedCourseData, subCourses, selectedFrontCourse, selectedBackCourse]);
+
+    const pickClub = useCallback((c: any) => {
+        // 골프장을 바꾸면 전반/후반도 비운다 — 예전엔 앞 골프장의 코스 이름이 남아 엉뚱한 코스로 방이 만들어졌고 파가 전부 기본값이 됐다.
+        if (c?.id !== selectedCourseData?.id) { setSelectedFrontCourse(""); setSelectedBackCourse(""); }
+        setSelectedCourseData(c);
+        setCourseSearch("");
+    }, [selectedCourseData?.id]);
+    const [recentClubs] = useState<ClubLite[]>(readRecentClubs);
+    const nearClubs = useMemo(() => (dbClubs ?? []).filter((c: any) => c.distance != null).slice(0, 5), [dbClubs]);
+
     // Create Match Mutation
     const createMatch = useMutation({
         mutationFn: async () => {
@@ -204,6 +241,7 @@ export default function GolfNewGame() {
             });
         },
         onSuccess: (data: any) => {
+            if (selectedCourseData) rememberRecentClub(selectedCourseData);
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/match/active"] });
             if (data.status === 'playing') {
                 // 혼자 기록은 서버가 바로 '진행 중' 으로 연다.
@@ -333,463 +371,292 @@ export default function GolfNewGame() {
 
 
     return (
-        <div className="min-h-screen bg-[#09090b] text-white pb-32 font-sans relative">
-            {/* Background Effects (Static) */}
-            <div className="fixed inset-0 pointer-events-none">
-                <div className="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] bg-[#64DD17]/5 rounded-full blur-[128px]" />
-                <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-[#64DD17]/5 rounded-full blur-[96px]" />
-            </div>
+        <div className="min-h-screen bg-[#0A0A0A] text-white pb-36 font-sans relative">
 
-            {/* Header */}
-            <header className="px-6 pt-12 pb-4 relative z-10 flex items-center justify-between">
-                <GolfBackButton onClick={handleBack} label="뒤로 가기" />
-                <div className="text-center">
-                    <h1 className="text-2xl font-black italic tracking-tighter">
-                        GAME <span className="text-[#64DD17]">SETUP</span>
+            {/* 머리 — 뒤로 + 제목 한 줄(골프 화면 공통 말투) */}
+            <header className="sticky top-0 z-40 bg-[#0A0A0AE6] backdrop-blur-md border-b border-[#FFFFFF0F]" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+                <div className="h-14 px-3 flex items-center gap-1.5">
+                    <GolfBackButton onClick={handleBack} label="뒤로 가기" className="-ml-1" />
+                    <h1 className="text-[17px] font-semibold tracking-tight text-[#ffffff]">
+                        {step === 'lobby' ? "대기실" : step === 'join' ? "코드로 입장" : "라운드 만들기"}
                     </h1>
-                    <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] mt-0.5">오늘의 승부를 설계하세요</p>
                 </div>
-                {/* 뒤로 단추의 -ml-2 와 짝 — 가운데 제목이 4px 왼쪽으로 쏠리지 않게 */}
-                <div className="w-10 -mr-2" />
             </header>
 
             <main className="relative z-10">
-                {/* Course Search Dialog */}
-                <Dialog open={isCourseSearchOpen} onOpenChange={setIsCourseSearchOpen}>
-                    <DialogContent className="max-w-md w-full h-[80vh] bg-[#0A0A0A] border-white/10 p-0 overflow-hidden flex flex-col [&>button]:hidden">
-                        <div className="p-6 pb-4 border-b border-white/5 space-y-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <h2 className="text-xl font-black text-white tracking-tighter">라운드 장소 선택</h2>
-                                <button
-                                    onClick={() => setIsCourseSearchOpen(false)}
-                                    className="p-2 hover:bg-white/5 rounded-full text-white/40"
-                                    aria-label="닫기"
-                                    title="닫기"
-                                >
-                                    <LucideX className="w-5 h-5" />
-                                </button>
-                            </div>
-                            <div className="relative">
-                                <LucideSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                                <input
-                                    type="text"
-                                    autoFocus
-                                    placeholder="골프장 이름 또는 지역 검색"
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-white focus:outline-none focus:border-[#64DD17]/50 transition-all placeholder:text-white/10"
-                                    value={courseSearch}
-                                    onChange={(e) => setCourseSearch(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
-                            {filteredCourses.map((course) => (
-                                <CourseItem
-                                    key={course.id}
-                                    course={course}
-                                    isSelected={selectedCourseData?.name === course.name}
-                                    onSelect={(c: any) => {
-                                        // 골프장을 바꾸면 전반/후반도 비운다 — 예전엔 앞 골프장의 코스 이름이 남아
-                                        // 엉뚱한 코스로 방이 만들어졌고 파가 전부 기본값이 됐다.
-                                        if (c?.id !== selectedCourseData?.id) {
-                                            setSelectedFrontCourse("");
-                                            setSelectedBackCourse("");
-                                        }
-                                        setSelectedCourseData(c);
-                                        setIsCourseSearchOpen(false);
-                                        setCourseSearch("");
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    </DialogContent>
-                </Dialog>
 
                 <AnimatePresence mode="wait">
                     {step === 'setup' && (
                         <motion.div
                             key="setup"
-                            initial={{ opacity: 0, y: 10 }}
+                            initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="px-5 mt-6 space-y-8 pb-10"
+                            exit={{ opacity: 0, y: -8 }}
+                            className="max-w-md mx-auto px-5 pt-5 pb-10 space-y-7"
                         >
-                            {/* Course Select Section */}
+                            {/* ── 골프장 ── 검색창이 화면에 바로 있다. 비어 있으면 가까운 곳·최근 친 곳 */}
                             <section>
-                                <label className="text-sm font-semibold text-white/40 uppercase tracking-[0.2em] mb-3 block px-1">BATTLE FIELD</label>
-                                <div
-                                    onClick={() => setIsCourseSearchOpen(true)}
-                                    className="relative h-44 rounded-2xl overflow-hidden border border-[#64DD17]/30 group cursor-pointer active:scale-[0.98] transition-transform shadow-lg shadow-[#64DD17]/5"
-                                >
-                                    <img
-                                        src={selectedCourseData?.imageUrl || "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?auto=format&fit=crop&q=80&w=800"}
-                                        alt="Course"
-                                        className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                                    <div className="absolute inset-0 p-5 flex flex-col justify-between">
-                                        <div className="flex items-center justify-between w-full">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
-                                                    <LucideMapPin className="w-6 h-6 text-[#64DD17]" />
-                                                </div>
-                                                <div>
-                                                    <h2 className="text-2xl font-black italic tracking-tight">{selectedCourseData?.name || "골프장을 골라 주세요"}</h2>
-                                                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{selectedCourseData ? `${selectedCourseData.region ?? ""}${subCourses.length ? ` · 코스 ${subCourses.length}개` : ""}` : "눌러서 검색"}</p>
-                                                </div>
-                                            </div>
-                                            <div className="px-4 py-2 rounded-full bg-white/10 border border-white/20 text-[10px] font-black backdrop-blur-md group-hover:bg-[#64DD17] group-hover:text-black group-hover:border-[#64DD17] transition-all uppercase">
-                                                Change
-                                            </div>
-                                        </div>
-
-                                        {/* 전국 634곳 중 317곳은 코스 구성 자료가 없다. 그런 골프장을 고르면 목록이 비어
-                                            '방 만들기' 가 영영 안 눌렸다 — 그래서 직접 적을 수 있게 한다.
-                                            적어 주면 원장에 남아서 다음 사람은 고르기만 하면 된다(2026-09-10). */}
-                                        {selectedCourseData && subCourses.length === 0 ? (
-                                            <div className="mt-4 space-y-2" onClick={(e) => e.stopPropagation()}>
-                                                <p className="text-[10px] font-bold text-white/50">
-                                                    이 골프장은 코스 정보가 아직 없어요. 오늘 도는 코스를 적어 주세요.
-                                                </p>
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        value={selectedFrontCourse}
-                                                        onChange={(e) => setSelectedFrontCourse(e.target.value.slice(0, 20))}
-                                                        placeholder="전반 (예: 동코스)"
-                                                        aria-label="전반 코스 이름"
-                                                        className="flex-1 bg-black/40 border border-white/10 text-[11px] font-black h-12 rounded-xl px-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-[#64DD17]/50"
-                                                    />
-                                                    <input
-                                                        value={selectedBackCourse}
-                                                        onChange={(e) => setSelectedBackCourse(e.target.value.slice(0, 20))}
-                                                        placeholder="후반 (예: 서코스)"
-                                                        aria-label="후반 코스 이름"
-                                                        className="flex-1 bg-black/40 border border-white/10 text-[11px] font-black h-12 rounded-xl px-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-[#64DD17]/50"
-                                                    />
-                                                </div>
-                                            </div>
-                                        ) : (
-                                        <div className="flex items-center gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
-                                            <Select
-                                                value={selectedFrontCourse}
-                                                onValueChange={setSelectedFrontCourse}
-                                                disabled={!selectedCourseData}
-                                            >
-                                                <SelectTrigger className="flex-1 bg-black/40 border-white/10 text-[11px] font-black h-12 rounded-xl focus:ring-1 focus:ring-[#64DD17]/50">
-                                                    <SelectValue placeholder="전반 선택" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-[#0A0A0A] border-white/10 text-white rounded-none">
-                                                    {subCourses.map(course => (
-                                                        <SelectItem key={course.id} value={course.name} className="text-[11px] hover:bg-white/5 font-bold">
-                                                            {course.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <Select
-                                                value={selectedBackCourse}
-                                                onValueChange={setSelectedBackCourse}
-                                                disabled={!selectedCourseData}
-                                            >
-                                                <SelectTrigger className="flex-1 bg-black/40 border-white/10 text-[11px] font-black h-12 rounded-xl focus:ring-1 focus:ring-[#64DD17]/50">
-                                                    <SelectValue placeholder="후반 선택" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-[#0A0A0A] border-white/10 text-white rounded-none">
-                                                    {subCourses.map(course => (
-                                                        <SelectItem key={course.id} value={course.name} className="text-[11px] hover:bg-white/5 font-bold">
-                                                            {course.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </section>
-
-                            {/* Game Mode Selection */}
-                            <section>
-                                <label className="text-sm font-semibold text-white/40 uppercase tracking-[0.2em] mb-3 block px-1">GAME MODE</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => setSelectedGame('stroke')}
-                                        className={cn(
-                                            "relative p-5 rounded-2xl border text-left transition-all duration-300 overflow-hidden group",
-                                            selectedGame === 'stroke'
-                                                ? "bg-[#64DD17]/10 border-[#64DD17] ring-1 ring-[#64DD17]/50 shadow-lg shadow-[#64DD17]/10"
-                                                : "bg-[#18181b] border-white/5 hover:border-white/10"
-                                        )}
-                                    >
-                                        <div className={cn(
-                                            "w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-all duration-500",
-                                            selectedGame === 'stroke' ? "bg-[#64DD17] text-[#09090b] shadow-[0_0_15px_rgba(100,221,23,0.4)]" : "bg-white/5 text-white/40 group-hover:bg-white/10"
-                                        )}>
-                                            <LucideTrophy className="w-5 h-5" />
-                                        </div>
-                                        <div className="font-black text-lg mb-0.5 italic">스트로크</div>
-                                        <div className="text-[10px] text-white/40 font-medium leading-relaxed">진정한 실력 승부<br />타수 합계 대결</div>
-                                        {selectedGame === 'stroke' && <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#64DD17] shadow-[0_0_10px_#64DD17]" />}
-                                    </button>
-
-                                    <button
-                                        onClick={() => setSelectedGame('skins')}
-                                        className={cn(
-                                            "relative p-5 rounded-2xl border text-left transition-all duration-300 overflow-hidden group",
-                                            selectedGame === 'skins'
-                                                ? "bg-[#FFD700]/10 border-[#FFD700] ring-1 ring-[#FFD700]/50 shadow-lg shadow-[#FFD700]/10"
-                                                : "bg-[#18181b] border-white/5 hover:border-white/10"
-                                        )}
-                                    >
-                                        <div className={cn(
-                                            "w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-all duration-500",
-                                            selectedGame === 'skins' ? "bg-[#FFD700] text-[#09090b] shadow-[0_0_15px_rgba(255,215,0,0.4)]" : "bg-white/5 text-white/40 group-hover:bg-white/10"
-                                        )}>
-                                            <LucideCoins className="w-5 h-5" />
-                                        </div>
-                                        <div className="font-black text-lg mb-0.5 italic">타당 게임</div>
-                                        <div className="text-[10px] text-white/60 font-medium leading-relaxed">타수 차이만큼 포인트 교환<br />치열한 스코어 경쟁</div>
-                                        {selectedGame === 'skins' && <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_10px_#FFD700]" />}
-                                    </button>
-                                </div>
-                            </section>
-
-                            {/* Record Mode (Stroke Only) */}
-                            {selectedGame === 'stroke' && (
-                                <section className="space-y-4">
-                                    <label className="text-sm font-semibold text-white/40 uppercase tracking-[0.2em] mb-3 block px-1">RECORD TYPE</label>
-                                    <div className="grid grid-cols-2 gap-3">
+                                <Label>골프장</Label>
+                                {selectedCourseData ? (
+                                    <div className="flex items-center gap-3 rounded-2xl bg-[#FFFFFF0A] ring-1 ring-inset ring-[#64DD174D] px-4 py-3.5">
+                                        <span className="w-9 h-9 rounded-full bg-[#64DD171F] flex items-center justify-center shrink-0">
+                                            <LucideMapPin className="w-[18px] h-[18px] text-[#8BE84A]" />
+                                        </span>
+                                        <span className="flex-1 min-w-0">
+                                            <span className="block text-[16px] font-semibold text-[#ffffff] truncate">{selectedCourseData.name}</span>
+                                            <span className="block text-[12.5px] text-[#FFFFFF80] truncate tabular-nums">
+                                                {[selectedCourseData.region, kmText(selectedCourseData.distance), subCourses.length ? `코스 ${subCourses.length}개` : ""].filter(Boolean).join(" · ")}
+                                            </span>
+                                        </span>
                                         <button
-                                            onClick={() => setStrokeMode('solo')}
-                                            className={cn(
-                                                "relative p-5 rounded-2xl border text-left transition-all duration-300 overflow-hidden group",
-                                                strokeMode === 'solo'
-                                                    ? "bg-[#64DD17]/10 border-[#64DD17] ring-1 ring-[#64DD17]/50 shadow-lg shadow-[#64DD17]/10"
-                                                    : "bg-[#18181b] border-white/5 hover:border-white/10"
-                                            )}
-                                        >
-                                            <div className={cn(
-                                                "w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-all duration-500",
-                                                strokeMode === 'solo' ? "bg-[#64DD17] text-[#09090b] shadow-[0_0_15px_rgba(100,221,23,0.4)]" : "bg-white/5 text-white/40 group-hover:bg-white/10"
-                                            )}>
-                                                <LucideUser className="w-5 h-5" />
-                                            </div>
-                                            <div className="font-black text-lg mb-0.5 italic">혼자 기록하기</div>
-                                            <div className="text-[10px] text-white/40 font-medium leading-relaxed">나만의 연습 라운드<br />스코어 집중 분석</div>
-                                            {strokeMode === 'solo' && <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#64DD17] shadow-[0_0_10px_#64DD17]" />}
-                                        </button>
-
-                                        <button
-                                            onClick={() => setStrokeMode('group')}
-                                            className={cn(
-                                                "relative p-5 rounded-2xl border text-left transition-all duration-300 overflow-hidden group",
-                                                strokeMode === 'group'
-                                                    ? "bg-[#64DD17]/10 border-[#64DD17] ring-1 ring-[#64DD17]/50 shadow-lg shadow-[#64DD17]/10"
-                                                    : "bg-[#18181b] border-white/5 hover:border-white/10"
-                                            )}
-                                        >
-                                            <div className={cn(
-                                                "w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-all duration-500",
-                                                strokeMode === 'group' ? "bg-[#64DD17] text-[#09090b] shadow-[0_0_15px_rgba(100,221,23,0.4)]" : "bg-white/5 text-white/40 group-hover:bg-white/10"
-                                            )}>
-                                                <LucideUsers className="w-5 h-5" />
-                                            </div>
-                                            <div className="font-black text-lg mb-0.5 italic">다함께 기록하기</div>
-                                            <div className="text-[10px] text-white/40 font-medium leading-relaxed">동반자와 실시간<br />라이브 스코어보드</div>
-                                            {strokeMode === 'group' && <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#64DD17] shadow-[0_0_10px_#64DD17]" />}
-                                        </button>
+                                            type="button"
+                                            onClick={() => { setSelectedCourseData(null); setSelectedFrontCourse(""); setSelectedBackCourse(""); }}
+                                            className="shrink-0 h-9 px-3.5 rounded-full bg-[#FFFFFF14] text-[13px] font-medium text-[#ffffff] active:bg-[#FFFFFF24]"
+                                        >바꾸기</button>
                                     </div>
-                                </section>
-                            )}
-
-                            {/* 앱 없는 동반자 — 이름만으로 점수판에 넣는다(기록·통계엔 안 들어간다). 예전엔 앱을 안 깐
-                                동반자는 넣을 방법이 없어서, 4명 중 한 명만 앱이 없어도 랭큐매치를 못 썼다. */}
-                            {!isSolo && (
-                                <section>
-                                    <label className="text-sm font-semibold text-white/40 tracking-[0.2em] mb-3 block px-1">앱 없는 동반자</label>
-                                    {guestNames.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mb-2">
-                                            {guestNames.map((n, i) => (
-                                                <span key={`${n}-${i}`} className="flex items-center gap-1 h-9 pl-3 pr-1 rounded-full bg-white/10 text-sm font-bold">
-                                                    {n}
-                                                    <button
-                                                        onClick={() => setGuestNames((g) => g.filter((_, j) => j !== i))}
-                                                        aria-label={`${n} 빼기`}
-                                                        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10"
-                                                    >
-                                                        <LucideX className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {guestNames.length < 3 && (
-                                        <form
-                                            className="flex gap-2"
-                                            onSubmit={(e) => {
-                                                e.preventDefault();
-                                                const n = guestDraft.trim().slice(0, 12);
-                                                if (!n) return;
-                                                setGuestNames((g) => [...g, n].slice(0, 3));
-                                                setGuestDraft("");
-                                            }}
-                                        >
+                                ) : (
+                                    <>
+                                        <label className="h-12 rounded-2xl bg-[#FFFFFF0D] flex items-center gap-2.5 px-4 ring-1 ring-inset ring-transparent focus-within:ring-[#64DD1780]">
+                                            <LucideSearch className="w-[18px] h-[18px] text-[#FFFFFF66] shrink-0" />
                                             <input
-                                                value={guestDraft}
-                                                onChange={(e) => setGuestDraft(e.target.value.slice(0, 12))}
-                                                placeholder="이름 (예: 김프로)"
-                                                aria-label="앱 없는 동반자 이름"
-                                                className="flex-1 bg-[#18181b] border border-white/10 rounded-xl h-12 px-4 text-sm font-bold text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-[#64DD17]/50"
+                                                type="text" enterKeyHint="search"
+                                                value={courseSearch}
+                                                onChange={(e) => setCourseSearch(e.target.value)}
+                                                placeholder="골프장 이름·지역 (예: 레이크사이드, 용인)"
+                                                aria-label="골프장 검색"
+                                                className="flex-1 min-w-0 bg-transparent text-[15px] text-[#ffffff] placeholder:text-[#FFFFFF59] focus:outline-none"
                                             />
-                                            <Button type="submit" disabled={!guestDraft.trim()} className="h-12 px-5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-black border-none">
-                                                추가
-                                            </Button>
-                                        </form>
-                                    )}
-                                    <p className="mt-2 text-[11px] font-bold text-white/40 break-keep px-1">
-                                        앱이 없는 사람도 이름만으로 넣을 수 있어요. 점수는 방장이 적고 기록은 남지 않아요. (앱으로 들어오는 사람과 합쳐 최대 4명)
-                                    </p>
-                                </section>
-                            )}
-
-                            {/* Stakes & Options (타당 게임 Only) */}
-                            {selectedGame === 'skins' && (
-                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                                    <section>
-                                        <label className="text-sm font-semibold text-white/40 uppercase tracking-[0.2em] mb-3 block px-1">게임 규칙 · 1타당 포인트</label>
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {[1000, 5000, 10000, 20000].map((amount) => (
-                                                <button
-                                                    key={amount}
-                                                    onClick={() => setStake(amount)}
-                                                    className={cn(
-                                                        "py-4 rounded-xl text-xs font-black transition-all border relative overflow-hidden",
-                                                        stake === amount
-                                                            ? "bg-amber-400 border-amber-400 text-black shadow-lg scale-[1.05] z-10"
-                                                            : "bg-[#18181b] border-white/5 text-white/30 hover:bg-[#202025]"
-                                                    )}
-                                                >
-                                                    {amount / 1000}천{unit === 'KRW' ? '원' : 'P'}
+                                            {courseSearch && (
+                                                <button type="button" onClick={() => setCourseSearch("")} aria-label="지우기" className="w-7 h-7 -mr-1.5 rounded-full flex items-center justify-center bg-[#FFFFFF14]">
+                                                    <LucideX className="w-3.5 h-3.5" />
                                                 </button>
-                                            ))}
-                                        </div>
-                                    </section>
+                                            )}
+                                        </label>
 
-                                    <section className="bg-[#18181b] rounded-3xl p-1 border border-white/5 shadow-2xl">
-                                        <div className="flex items-center justify-between p-5">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-11 h-11 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 shadow-inner">
-                                                    <LucideSwords className="w-6 h-6" />
-                                                </div>
-                                                <div>
-                                                    <div className="font-black text-sm italic uppercase tracking-tighter">배판 자동화</div>
-                                                    <div className="text-[10px] text-white/30 font-bold">버디/트리플 발생 시 다음 홀 배판</div>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => setUseDouble(!useDouble)}
-                                                className={cn(
-                                                    "w-12 h-6 rounded-full transition-all duration-300 relative p-1",
-                                                    useDouble ? "bg-[#64DD17]" : "bg-white/10"
+                                        {debouncedSearch ? (
+                                            // 검색 결과 — 가까운 순(위치가 있으면 서버가 거리로 정렬한다)
+                                            <ul className="mt-2 rounded-2xl bg-[#FFFFFF08] divide-y divide-[#FFFFFF0F] overflow-hidden">
+                                                {(dbClubs ?? []).slice(0, 12).map((c: any) => <ClubRow key={c.id} club={c} onPick={pickClub} />)}
+                                                {dbClubs && dbClubs.length === 0 && (
+                                                    <li className="px-4 py-5 text-[13px] text-[#FFFFFF73]">'{debouncedSearch}'(으)로 찾은 골프장이 없어요.</li>
                                                 )}
-                                                aria-label="배판 자동화 토글"
-                                            >
-                                                <div className={cn(
-                                                    "w-4 h-4 rounded-full bg-[#ffffff] transition-transform duration-300",
-                                                    useDouble ? "translate-x-6" : "translate-x-0"
-                                                )} />
-                                            </button>
-                                        </div>
-                                        {useDouble && (
-                                            <div className="flex gap-2 p-1 bg-black/40 rounded-2xl border border-white/5">
-                                                {[
-                                                    { id: 'current', label: '당홀 배판' },
-                                                    { id: 'next', label: '다음홀 배판' }
-                                                ].map(mode => (
-                                                    <button
-                                                        key={mode.id}
-                                                        onClick={() => setDoublingMode(mode.id as any)}
-                                                        className={cn(
-                                                            "flex-1 py-3 rounded-xl text-[11px] font-black transition-all",
-                                                            doublingMode === mode.id ? "bg-[#64DD17] text-[#051907]" : "text-white/40"
-                                                        )}
-                                                    >
-                                                        {mode.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </section>
-
-                                    {/* 특별 상금 */}
-                                    <section className="space-y-4">
-                                        <div className="flex items-center justify-between px-1">
-                                            <div className="flex items-center gap-2">
-                                                <label className="text-sm font-black text-white italic uppercase tracking-tighter">버디/이글 보너스</label>
-                                                <span className="text-[10px] font-bold text-white/50">상대 1명당 받아요</span>
-                                            </div>
-                                            <button
-                                                onClick={() => setIsExtrasEnabled(!isExtrasEnabled)}
-                                                className={cn(
-                                                    "w-10 h-5 rounded-full transition-all duration-300 relative p-0.5",
-                                                    isExtrasEnabled ? "bg-amber-400" : "bg-white/10"
-                                                )}
-                                                aria-label="특별 상금 활성화 토글"
-                                                title="특별 상금 활성화"
-                                            >
-                                                <div className={cn(
-                                                    "w-4 h-4 rounded-full bg-[#ffffff] transition-transform duration-300",
-                                                    isExtrasEnabled ? "translate-x-5" : "translate-x-0"
-                                                )} />
-                                            </button>
-                                        </div>
-
-                                        <AnimatePresence>
-                                            {isExtrasEnabled && (
-                                                <motion.div
-                                                    initial={{ height: 0, opacity: 0 }}
-                                                    animate={{ height: "auto", opacity: 1 }}
-                                                    exit={{ height: 0, opacity: 0 }}
-                                                    className="overflow-hidden space-y-3"
-                                                >
-                                                    <div className="bg-[#18181b] rounded-2xl border border-white/5 p-4 space-y-4">
-                                                        {/* Birdie */}
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-md font-black text-white italic uppercase whitespace-nowrap">버디</span>
-                                                            <div className="flex items-center gap-2 bg-black/40 rounded-xl px-3 py-2 border border-white/5 w-[180px]">
-                                                                <input
-                                                                    type="number"
-                                                                    className="w-full bg-transparent text-right text-lg font-black text-amber-400 focus:outline-none placeholder:text-white/10"
-                                                                    value={birdieAmount}
-                                                                    onChange={(e) => setBirdieAmount(Math.min(100000, Math.max(0, Math.round(Number(e.target.value) || 0))))}
-                                                                    aria-label="버디 상금"
-                                                                    placeholder="10000"
-                                                                />
-                                                                <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">{unit === 'KRW' ? '원' : 'P'}</span>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Eagle */}
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-md font-black text-white italic uppercase whitespace-nowrap">이글</span>
-                                                            <div className="flex items-center gap-2 bg-black/40 rounded-xl px-3 py-2 border border-white/5 w-[180px]">
-                                                                <input
-                                                                    type="number"
-                                                                    className="w-full bg-transparent text-right text-lg font-black text-amber-400 focus:outline-none placeholder:text-white/10"
-                                                                    value={eagleAmount}
-                                                                    onChange={(e) => setEagleAmount(Math.min(200000, Math.max(0, Math.round(Number(e.target.value) || 0))))}
-                                                                    aria-label="이글 상금"
-                                                                    placeholder="20000"
-                                                                />
-                                                                <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">{unit === 'KRW' ? '원' : 'P'}</span>
-                                                            </div>
+                                                {!dbClubs && <li className="px-4 py-5 text-[13px] text-[#FFFFFF59]">찾는 중…</li>}
+                                            </ul>
+                                        ) : (
+                                            <div className="mt-4 space-y-4">
+                                                {recentClubs.length > 0 && (
+                                                    <div>
+                                                        <p className="mb-2 text-[12px] text-[#FFFFFF73]">최근 친 곳</p>
+                                                        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-5 px-5">
+                                                            {recentClubs.map((c) => (
+                                                                <button
+                                                                    key={c.id} type="button" onClick={() => pickClub(c)}
+                                                                    className="shrink-0 h-9 px-3.5 rounded-full bg-[#FFFFFF0D] text-[13.5px] font-medium text-[#FFFFFFD9] active:bg-[#FFFFFF1A] whitespace-nowrap"
+                                                                >{c.name}</button>
+                                                            ))}
                                                         </div>
                                                     </div>
-                                                </motion.div>
+                                                )}
+                                                <div>
+                                                    <p className="mb-2 text-[12px] text-[#FFFFFF73]">가까운 골프장</p>
+                                                    {nearClubs.length > 0 ? (
+                                                        <ul className="rounded-2xl bg-[#FFFFFF08] divide-y divide-[#FFFFFF0F] overflow-hidden">
+                                                            {nearClubs.map((c: any) => <ClubRow key={c.id} club={c} onPick={pickClub} />)}
+                                                        </ul>
+                                                    ) : (
+                                                        <button
+                                                            type="button" onClick={() => requestLocation()}
+                                                            className="w-full h-12 rounded-2xl bg-[#FFFFFF08] text-[14px] font-medium text-[#FFFFFFCC] inline-flex items-center justify-center gap-2 active:bg-[#FFFFFF0F]"
+                                                        >
+                                                            <LucideMapPin className="w-4 h-4 text-[#8BE84A]" />내 위치로 가까운 골프장 찾기
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </section>
+
+                            {/* ── 코스 ── 드롭다운 대신 칩 한 번. 1~2개면 위에서 자동으로 채웠다. */}
+                            {selectedCourseData && (
+                                <section>
+                                    <Label right={subCourses.length > 1 && selectedFrontCourse && selectedBackCourse ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => { const f = selectedFrontCourse; setSelectedFrontCourse(selectedBackCourse); setSelectedBackCourse(f); }}
+                                            className="text-[12.5px] text-[#FFFFFF99] active:text-[#ffffff]"
+                                        >앞뒤 바꾸기 ⇄</button>
+                                    ) : undefined}>코스</Label>
+                                    {/* 전국 634곳 중 317곳은 코스 구성 자료가 없다 — 직접 적으면 원장에 남아 다음 사람은 고르기만 한다(2026-09-10). */}
+                                    {subCourses.length === 0 ? (
+                                        <div className="space-y-2">
+                                            <p className="text-[12.5px] text-[#FFFFFF80]">코스 정보가 아직 없어요. 오늘 도는 코스를 적어 주세요.</p>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    value={selectedFrontCourse}
+                                                    onChange={(e) => setSelectedFrontCourse(e.target.value.slice(0, 20))}
+                                                    placeholder="전반 (예: 동코스)" aria-label="전반 코스 이름"
+                                                    className="flex-1 min-w-0 h-12 rounded-xl bg-[#FFFFFF0D] px-3.5 text-[15px] text-[#ffffff] placeholder:text-[#FFFFFF59] focus:outline-none focus:ring-1 focus:ring-[#64DD1780]"
+                                                />
+                                                <input
+                                                    value={selectedBackCourse}
+                                                    onChange={(e) => setSelectedBackCourse(e.target.value.slice(0, 20))}
+                                                    placeholder="후반 (예: 서코스)" aria-label="후반 코스 이름"
+                                                    className="flex-1 min-w-0 h-12 rounded-xl bg-[#FFFFFF0D] px-3.5 text-[15px] text-[#ffffff] placeholder:text-[#FFFFFF59] focus:outline-none focus:ring-1 focus:ring-[#64DD1780]"
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2.5">
+                                            {([["전반", selectedFrontCourse, setSelectedFrontCourse], ["후반", selectedBackCourse, setSelectedBackCourse]] as const).map(([half, val, set]) => (
+                                                <div key={half} className="flex items-center gap-3">
+                                                    <span className="w-9 shrink-0 text-[13px] text-[#FFFFFF8C]">{half}</span>
+                                                    <div className="flex-1 min-w-0 flex gap-1.5 overflow-x-auto scrollbar-hide">
+                                                        {subCourses.map((c: any) => (
+                                                            <button
+                                                                key={c.id} type="button" aria-pressed={val === c.name} onClick={() => set(c.name)}
+                                                                className={cn(
+                                                                    "shrink-0 h-10 px-4 rounded-full text-[14px] whitespace-nowrap transition-colors",
+                                                                    val === c.name ? "bg-[#ffffff] text-[#0a0a0a] font-semibold" : "bg-[#FFFFFF0D] text-[#FFFFFFB3] font-medium active:bg-[#FFFFFF1A]",
+                                                                )}
+                                                            >{c.name}</button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </section>
+                            )}
+
+                            {/* ── 방식 ── 큰 카드 넷 → 작은 토글 둘 */}
+                            <section className="space-y-3">
+                                <Label>방식</Label>
+                                <Segmented
+                                    value={selectedGame}
+                                    onChange={setSelectedGame}
+                                    options={[{ v: 'stroke', label: "스트로크" }, { v: 'skins', label: "타당 게임" }]}
+                                />
+                                {selectedGame === 'stroke' ? (
+                                    <>
+                                        <Segmented
+                                            value={strokeMode}
+                                            onChange={setStrokeMode}
+                                            options={[{ v: 'group', label: "함께 기록" }, { v: 'solo', label: "혼자 기록" }]}
+                                        />
+                                        <p className="text-[12.5px] text-[#FFFFFF73] px-1">
+                                            {strokeMode === 'group' ? "동반자와 같은 점수판을 봐요. 핀번호로 들어와요." : "나 혼자 스코어만 적어요. 바로 시작해요."}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <p className="text-[12.5px] text-[#FFFFFF73] px-1">홀마다 타수 차이만큼 포인트를 주고받아요.</p>
+                                )}
+                            </section>
+
+                            {/* ── 타당 설정 ── 한 상자 안에 세 줄 */}
+                            {selectedGame === 'skins' && (
+                                <section>
+                                    <Label>포인트</Label>
+                                    <div className="rounded-2xl bg-[#FFFFFF08] divide-y divide-[#FFFFFF0F]">
+                                        <div className="px-4 py-3.5">
+                                            <p className="text-[13px] text-[#FFFFFF99] mb-2.5">1타당</p>
+                                            <div className="grid grid-cols-4 gap-1.5">
+                                                {[1000, 5000, 10000, 20000].map((amount) => (
+                                                    <button
+                                                        key={amount} type="button" aria-pressed={stake === amount} onClick={() => setStake(amount)}
+                                                        className={cn(
+                                                            "h-10 rounded-xl text-[13.5px] tabular-nums transition-colors",
+                                                            stake === amount ? "bg-[#ffffff] text-[#0a0a0a] font-semibold" : "bg-[#FFFFFF0D] text-[#FFFFFFB3] font-medium",
+                                                        )}
+                                                    >{amount >= 10000 ? `${amount / 10000}만` : `${amount / 1000}천`}{unit === 'KRW' ? '원' : 'P'}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="px-4 py-3.5">
+                                            <div className="flex items-center gap-3">
+                                                <span className="flex-1 min-w-0">
+                                                    <span className="block text-[14px] font-medium text-[#ffffff]">배판</span>
+                                                    <span className="block text-[12px] text-[#FFFFFF73]">버디·트리플이 나오면 판을 두 배로</span>
+                                                </span>
+                                                <Toggle on={useDouble} onChange={setUseDouble} label="배판" />
+                                            </div>
+                                            {useDouble && (
+                                                <div className="mt-3">
+                                                    <Segmented
+                                                        value={doublingMode}
+                                                        onChange={setDoublingMode}
+                                                        options={[{ v: 'next', label: "다음 홀부터" }, { v: 'current', label: "그 홀부터" }]}
+                                                    />
+                                                </div>
                                             )}
-                                        </AnimatePresence>
-                                    </section>
-                                </div>
+                                        </div>
+                                        <div className="px-4 py-3.5">
+                                            <div className="flex items-center gap-3">
+                                                <span className="flex-1 min-w-0">
+                                                    <span className="block text-[14px] font-medium text-[#ffffff]">버디·이글 보너스</span>
+                                                    <span className="block text-[12px] text-[#FFFFFF73]">상대 1명당 받아요</span>
+                                                </span>
+                                                <Toggle on={isExtrasEnabled} onChange={setIsExtrasEnabled} label="버디·이글 보너스" />
+                                            </div>
+                                            {isExtrasEnabled && (
+                                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                                    {([["버디", birdieAmount, setBirdieAmount, 100000], ["이글", eagleAmount, setEagleAmount, 200000]] as const).map(([lbl, val, set, max]) => (
+                                                        <label key={lbl} className="h-12 rounded-xl bg-[#FFFFFF0D] px-3.5 flex items-center gap-2">
+                                                            <span className="text-[13px] text-[#FFFFFF99] shrink-0">{lbl}</span>
+                                                            <input
+                                                                type="number" inputMode="numeric" value={val}
+                                                                onChange={(e) => set(Math.min(max, Math.max(0, Math.round(Number(e.target.value) || 0))))}
+                                                                aria-label={`${lbl} 보너스`}
+                                                                className="flex-1 min-w-0 bg-transparent text-right text-[15px] font-semibold text-[#ffffff] tabular-nums focus:outline-none"
+                                                            />
+                                                            <span className="text-[12px] text-[#FFFFFF73] shrink-0">{unit === 'KRW' ? '원' : 'P'}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* ── 앱 없는 동반자 ── 이름만으로 점수판에(기록·통계엔 안 들어간다). 예전엔 한 명만 앱이 없어도 랭큐매치를 못 썼다. */}
+                            {!isSolo && (
+                                <section>
+                                    <Label right={<span className="text-[12px] text-[#FFFFFF59] tabular-nums">{guestNames.length}/3</span>}>앱 없는 동반자</Label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {guestNames.map((n, i) => (
+                                            <span key={`${n}-${i}`} className="inline-flex items-center gap-0.5 h-10 pl-3.5 pr-1 rounded-full bg-[#FFFFFF14] text-[14px] font-medium text-[#ffffff]">
+                                                {n}
+                                                <button type="button" onClick={() => setGuestNames((g) => g.filter((_, j) => j !== i))} aria-label={`${n} 빼기`} className="w-8 h-8 flex items-center justify-center rounded-full active:bg-[#FFFFFF1A]">
+                                                    <LucideX className="w-3.5 h-3.5" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                        {guestNames.length < 3 && (
+                                            <form
+                                                className="flex-1 min-w-[150px] flex h-10 rounded-full bg-[#FFFFFF0D] pl-4 pr-1 items-center"
+                                                onSubmit={(e) => {
+                                                    e.preventDefault();
+                                                    const n = guestDraft.trim().slice(0, 12);
+                                                    if (!n) return;
+                                                    setGuestNames((g) => [...g, n].slice(0, 3));
+                                                    setGuestDraft("");
+                                                }}
+                                            >
+                                                <input
+                                                    value={guestDraft}
+                                                    onChange={(e) => setGuestDraft(e.target.value.slice(0, 12))}
+                                                    placeholder="이름 추가"
+                                                    aria-label="앱 없는 동반자 이름"
+                                                    className="flex-1 min-w-0 bg-transparent text-[14px] text-[#ffffff] placeholder:text-[#FFFFFF59] focus:outline-none"
+                                                />
+                                                <button type="submit" disabled={!guestDraft.trim()} className="h-8 px-3 rounded-full bg-[#FFFFFF1A] text-[13px] font-medium text-[#ffffff] disabled:opacity-40">추가</button>
+                                            </form>
+                                        )}
+                                    </div>
+                                    <p className="mt-2 text-[12px] text-[#FFFFFF59] break-keep">점수는 방장이 적고 기록은 남지 않아요. 앱으로 들어오는 사람과 합쳐 최대 4명.</p>
+                                </section>
                             )}
                         </motion.div>
                     )}
@@ -797,56 +664,60 @@ export default function GolfNewGame() {
                     {step === 'lobby' && (
                         <motion.div
                             key="lobby"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="p-6 h-full flex flex-col items-center justify-center text-center pb-32"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="max-w-md mx-auto px-5 pt-6 pb-10"
                         >
-                            <div className="w-full max-w-sm bg-[#111111] border border-[#64DD17]/30 rounded-[3rem] p-10 shadow-2xl relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#64DD17] to-transparent opacity-50" />
-                                <p className="text-[10px] font-black text-[#64DD17] uppercase tracking-[0.3em] mb-4">MATCH PIN CODE</p>
-                                <h2 className="text-7xl font-black text-white italic tracking-tighter mb-8 drop-shadow-[0_0_20px_rgba(100,221,23,0.3)]">
-                                    {activeSession?.pinCode?.split("").map((c: string, i: number) => (
-                                        <span key={i} className="mx-1">{c}</span>
-                                    ))}
-                                </h2>
+                            {/* 핀번호 한 장 — 숫자가 주인공. 네온 그림자·기울인 굵은 글씨는 걷었다(2026-09-24) */}
+                            <section className="rounded-3xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] px-5 pt-5 pb-6 text-center">
+                                <p className="text-[13px] text-[#FFFFFF8C]">핀번호</p>
+                                <p className="mt-1 text-[56px] leading-none font-bold tracking-[0.18em] text-[#ffffff] tabular-nums pl-[0.18em]">{activeSession?.pinCode}</p>
+                                <p className="mt-3 text-[13px] text-[#FFFFFFB3] truncate">
+                                    {[activeSession?.courseName, activeSession?.frontCourseName && activeSession?.backCourseName ? `${activeSession.frontCourseName} → ${activeSession.backCourseName}` : ""].filter(Boolean).join(" · ")}
+                                </p>
+                                <div className="mt-5 flex gap-2">
+                                    <button type="button" onClick={copyPin} className="flex-1 h-11 rounded-full bg-[#FFFFFF14] text-[14px] font-medium text-[#ffffff] active:bg-[#FFFFFF24]">번호 복사</button>
+                                    <button type="button" onClick={shareInvite} className="flex-[1.6] h-11 rounded-full bg-[#FAE100] text-[14px] font-semibold text-[#1A1600] active:bg-[#F2D000]">초대 링크 보내기</button>
+                                </div>
+                                <p className="mt-3 text-[12px] text-[#FFFFFF66] break-keep">링크를 받은 동반자는 누르기만 하면 들어와요. 번호는 홈의 [핀 번호 입력]에서.</p>
+                            </section>
 
-                                <div className="grid grid-cols-4 gap-4 mt-8">
+                            {/* 자리 넷 — 한 줄에 한 사람 */}
+                            <section className="mt-6">
+                                <div className="flex items-center justify-between mb-2.5">
+                                    <h2 className="text-[13px] font-semibold text-[#FFFFFF99]">함께하는 사람</h2>
+                                    <span className="text-[12px] text-[#FFFFFF59] tabular-nums">{sessionInfo?.players?.length ?? 1}/4</span>
+                                </div>
+                                <ul className="rounded-2xl bg-[#FFFFFF08] divide-y divide-[#FFFFFF0F]">
                                     {[0, 1, 2, 3].map((i) => {
                                         const player = sessionInfo?.players?.[i];
                                         return (
-                                            <div key={i} className="flex flex-col items-center space-y-2">
-                                                <div className={cn(
-                                                    "w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-500",
-                                                    player ? "bg-[#64DD17]/20 border-[#64DD17] shadow-lg" : "bg-white/5 border-white/10"
+                                            <li key={i} className="flex items-center gap-3 px-4 h-14">
+                                                <span className={cn(
+                                                    "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                                                    player ? "bg-[#64DD171F]" : "bg-[#FFFFFF0A] ring-1 ring-inset ring-dashed ring-[#FFFFFF26]",
                                                 )}>
-                                                    {player ? <LucideCheckCircle2 className="w-5 h-5 text-[#64DD17]" /> : <LucideUsers className="w-4 h-4 text-white/10" />}
-                                                </div>
-                                                <p className={cn("text-[9px] font-black uppercase", player ? "text-[#64DD17]" : "text-white/20")}>
-                                                    {player ? (i === 0 ? "방장" : player.isGuest ? "게스트" : "입장") : "대기"}
-                                                </p>
-                                                {player && <p className="text-[10px] font-bold text-white max-w-[50px] truncate">{player.name}</p>}
-                                            </div>
+                                                    {player ? <LucideCheckCircle2 className="w-4 h-4 text-[#8BE84A]" /> : <LucideUsers className="w-3.5 h-3.5 text-[#FFFFFF40]" />}
+                                                </span>
+                                                <span className={cn("flex-1 min-w-0 truncate text-[15px]", player ? "font-medium text-[#ffffff]" : "text-[#FFFFFF59]")}>
+                                                    {player ? player.name : "기다리는 중"}
+                                                </span>
+                                                {player && (
+                                                    <span className="shrink-0 h-6 px-2 rounded-md bg-[#FFFFFF0F] text-[12px] text-[#FFFFFFB3] leading-6">
+                                                        {i === 0 ? "방장" : player.isGuest ? "앱 없음" : "입장"}
+                                                    </span>
+                                                )}
+                                            </li>
                                         );
                                     })}
-                                </div>
-                            </div>
+                                </ul>
+                            </section>
 
-                            <div className="mt-6 flex gap-2 w-full max-w-sm">
-                                <Button variant="ghost" className="flex-1 h-12 rounded-2xl bg-white/5 border border-white/10 text-white font-bold" onClick={copyPin}>
-                                    번호 복사
-                                </Button>
-                                <Button className="flex-[2] h-12 rounded-2xl bg-[#FAE100] hover:bg-[#F2D000] text-black font-black border-none" onClick={shareInvite}>
-                                    초대 링크 보내기
-                                </Button>
-                            </div>
-                            <p className="mt-4 text-xs text-white/50 font-bold leading-relaxed max-w-[270px] break-keep">
-                                링크를 받은 동반자는 누르기만 하면 들어와요. 번호로는 홈의 [핀 번호 입력]에서 들어올 수 있어요.
-                            </p>
-
-                            <div className="mt-12 w-full max-w-sm">
+                            <div className="mt-8">
                                 {isHost ? (
-                                    <Button
-                                        className="w-full h-16 bg-[#64DD17] border-none text-[#051907] font-black text-lg rounded-2xl shadow-xl active:scale-95 transition-all"
+                                    <button
+                                        type="button"
+                                        className="w-full h-14 rounded-2xl bg-[#64DD17] text-[#051907] text-[16px] font-semibold active:bg-[#58C414] disabled:bg-[#FFFFFF14] disabled:text-[#FFFFFF73]"
                                         onClick={() => {
                                             apiRequest(`/api/hiq/golf/match/${activeSession.id}/start`, { method: "POST" })
                                                 .then(() => setLocation(`/golf/game/${activeSession.id}`))
@@ -854,18 +725,15 @@ export default function GolfNewGame() {
                                         }}
                                         disabled={!sessionInfo?.players || sessionInfo.players.length < 2}
                                     >
-                                        {sessionInfo?.players?.length < 2 ? "참여 대기 중..." : "게임 시작"}
-                                    </Button>
+                                        {sessionInfo?.players?.length < 2 ? "동반자를 기다리는 중…" : "라운드 시작"}
+                                    </button>
                                 ) : (
-                                    <div className="w-full h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10">
-                                        <div className="flex flex-col items-center">
-                                            <LucideLoader2 className="w-5 h-5 text-[#64DD17] animate-spin mb-1" />
-                                            <span className="text-xs text-white/60 font-bold">방장이 게임을 시작하길 기다리는 중...</span>
-                                        </div>
+                                    <div className="w-full h-14 rounded-2xl bg-[#FFFFFF08] flex items-center justify-center gap-2 text-[14px] text-[#FFFFFFB3]">
+                                        <LucideLoader2 className="w-4 h-4 text-[#8BE84A] animate-spin" />방장이 시작하길 기다리는 중
                                     </div>
                                 )}
                                 {isHost && (
-                                    <button onClick={abandonLobby} className="mt-3 w-full h-11 rounded-2xl text-[13px] font-bold text-[#FF6E6E] hover:bg-[#FF6E6E]/10">
+                                    <button type="button" onClick={abandonLobby} className="mt-2 w-full h-11 rounded-2xl text-[13px] font-medium text-[#FF6E6E] active:bg-[#FF6E6E14]">
                                         방 없애기
                                     </button>
                                 )}
@@ -876,52 +744,54 @@ export default function GolfNewGame() {
                     {step === 'join' && (
                         <motion.div
                             key="join"
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="h-full flex flex-col p-6"
+                            className="max-w-md mx-auto px-5 pt-10 pb-10 flex flex-col"
                         >
-                            <div className="text-center pt-8 mb-12">
-                                <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-2">핀번호 입력</h2>
-                                <p className="text-sm text-white/40 font-bold">방장이 부른 숫자 4자리를 입력하세요</p>
+                            <div className="text-center mb-8">
+                                <h2 className="text-[22px] font-bold tracking-tight text-[#ffffff]">핀번호 4자리</h2>
+                                <p className="mt-1 text-[14px] text-[#FFFFFF8C]">방장이 알려 준 숫자를 눌러 주세요</p>
                             </div>
 
-                            <div className="flex justify-center gap-4 mb-16">
+                            <div className="flex justify-center gap-3 mb-10">
                                 {[0, 1, 2, 3].map((i) => (
                                     <div
                                         key={i}
                                         className={cn(
-                                            "w-14 h-20 rounded-2xl border-2 flex items-center justify-center text-3xl font-black transition-all",
-                                            pinEntry[i] ? "border-[#64DD17] text-[#64DD17] bg-[#64DD17]/5" : "border-white/10 bg-white/5 text-white/20"
+                                            "w-14 h-[72px] rounded-2xl flex items-center justify-center text-[32px] font-bold tabular-nums transition-colors",
+                                            pinEntry[i] ? "bg-[#FFFFFF14] text-[#ffffff] ring-1 ring-inset ring-[#64DD1780]"
+                                                : i === pinEntry.length ? "bg-[#FFFFFF0A] ring-1 ring-inset ring-[#FFFFFF40]" : "bg-[#FFFFFF0A]",
                                         )}
                                     >
-                                        {pinEntry[i] || "_"}
+                                        {pinEntry[i] ?? ""}
                                     </div>
                                 ))}
                             </div>
 
-                            <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto w-full mb-12">
+                            <div className="grid grid-cols-3 gap-2.5 w-full">
                                 {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'CLR', '0', 'DEL'].map((k) => (
                                     <button
                                         key={k}
+                                        type="button"
                                         onClick={() => {
                                             if (k === 'CLR') setPinEntry([]);
                                             else if (k === 'DEL') setPinEntry(prev => prev.slice(0, -1));
                                             else handlePinPress(k);
                                         }}
                                         className={cn(
-                                            "h-16 rounded-2xl font-black text-xl transition-all active:scale-95",
-                                            ['CLR', 'DEL'].includes(k) ? "bg-white/5 text-white/40" : "bg-white/10 text-white border border-white/10 hover:bg-white/20"
+                                            "h-16 rounded-2xl transition-colors active:bg-[#FFFFFF24]",
+                                            ['CLR', 'DEL'].includes(k) ? "bg-transparent text-[15px] font-medium text-[#FFFFFF99]" : "bg-[#FFFFFF0D] text-[24px] font-semibold text-[#ffffff] tabular-nums",
                                         )}
-                                        aria-label={k === 'DEL' ? 'Delete' : k}
+                                        aria-label={k === 'DEL' ? '한 칸 지우기' : k === 'CLR' ? '모두 지우기' : k}
                                     >
-                                        {k === 'DEL' ? <LucideX className="mx-auto w-5 h-5" /> : k}
+                                        {k === 'DEL' ? "⌫" : k === 'CLR' ? "모두 지우기" : k}
                                     </button>
                                 ))}
                             </div>
 
                             {joinMatch.isPending && (
-                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50">
-                                    <LucideLoader2 className="w-10 h-10 text-[#64DD17] animate-spin" />
+                                <div className="fixed inset-0 bg-[#000000A6] flex items-center justify-center z-50">
+                                    <LucideLoader2 className="w-9 h-9 text-[#8BE84A] animate-spin" />
                                 </div>
                             )}
                         </motion.div>
@@ -930,18 +800,23 @@ export default function GolfNewGame() {
             </main>
 
             {step === 'setup' && (
-                <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#09090b] via-[#09090b]/95 to-transparent z-40">
+                <div className="fixed bottom-0 inset-x-0 z-40 bg-[#0A0A0AF2] border-t border-[#FFFFFF14] px-5 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
                     <div className="max-w-md mx-auto">
+                        {/* 무엇으로 시작하는지 한 줄 — 누르기 전에 확인 */}
+                        {selectedCourseData && (
+                            <p className="mb-2 text-[12.5px] text-[#FFFFFF8C] truncate text-center tabular-nums">
+                                {[selectedCourseData.name, selectedFrontCourse && selectedBackCourse ? `${selectedFrontCourse} → ${selectedBackCourse}` : "", selectedGame === 'skins' ? `타당 ${formatMoney(stake)}${unit === 'KRW' ? '원' : 'P'}` : isSolo ? "혼자 기록" : "함께 기록"].filter(Boolean).join(" · ")}
+                            </p>
+                        )}
                         {/* 왜 안 눌리는지 버튼이 말해 준다 — 예전엔 회색으로 죽어 있기만 했다(2026-09-10) */}
-                        <Button
-                            className="w-full h-16 bg-[#64DD17] text-[#09090b] font-black text-lg rounded-2xl shadow-xl shadow-[#64DD17]/20 border-none active:scale-[0.98] transition-all hover:bg-[#52c41a] disabled:opacity-50 disabled:grayscale"
+                        <button
+                            type="button"
+                            className="w-full h-14 rounded-2xl bg-[#64DD17] text-[#051907] text-[16px] font-semibold active:bg-[#58C414] disabled:bg-[#FFFFFF14] disabled:text-[#FFFFFF73] inline-flex items-center justify-center"
                             onClick={() => { rememberTypedCourses(); createMatch.mutate(); }}
                             disabled={createMatch.isPending || !!setupMissing}
                         >
-                            {createMatch.isPending ? <LucideLoader2 className="w-6 h-6 animate-spin" /> : (
-                                <span>{setupMissing ?? (selectedGame === 'stroke' && strokeMode === 'solo' ? "기록 시작" : "방 만들기")}</span>
-                            )}
-                        </Button>
+                            {createMatch.isPending ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : (setupMissing ?? (isSolo ? "기록 시작" : "방 만들기"))}
+                        </button>
                     </div>
                 </div>
             )}

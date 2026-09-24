@@ -30,7 +30,7 @@ import type {
     InsertGolfMembershipOrder,
     GolfMembershipOrder
 } from "../../shared/schema.js";
-import { eq, ne, desc, asc, and, or, sql, gte, lte, isNull, like, inArray } from "drizzle-orm";
+import { eq, ne, desc, asc, and, or, sql, gte, lte, isNull, like, ilike, inArray } from "drizzle-orm";
 import { notFound, conflict, badRequest } from "../utils/errors.js";
 import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords, passportRegionGroup } from "../../shared/golfRegions.js";
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
@@ -246,8 +246,10 @@ export class GolfRepository {
     async getGolfClubs(search?: string, userLat?: number, userLng?: number): Promise<any[]> {
         let clubs;
         if (search) {
+            // 이름뿐 아니라 지역으로도 찾는다(라운드 만들기 검색창 "용인"·"제주" — 2026-09-24). 대소문자 무시(88CC·OKCC).
+            const q = `%${search.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
             clubs = await db.select().from(rankueGolfClubs)
-                .where(like(rankueGolfClubs.name, `%${search}%`))
+                .where(or(ilike(rankueGolfClubs.name, q), ilike(rankueGolfClubs.region, q)))
                 .orderBy(asc(rankueGolfClubs.name));
         } else {
             clubs = await db.select().from(rankueGolfClubs).orderBy(asc(rankueGolfClubs.name));
