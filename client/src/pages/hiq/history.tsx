@@ -22,6 +22,7 @@ import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginGate } from "@/components/hiq/LoginGate";
 import { BallDot } from "@/components/hiq/BallDot";
+import { GolfRoundReport } from "@/golf/pages/RoundReport";
 
 export default function HiqHistory() {
     const { t } = useT();
@@ -76,6 +77,9 @@ export default function HiqHistory() {
             />
         );
     }
+
+    // 골프는 전용 화면(2026-09-24 오너: 라운딩 리포트 디자인 변경) — 당구 문법(등급·대문자 라벨)이 골프에 그대로 입혀져 있었다
+    if ((currentSport as string) === "GOLF") return <GolfRoundReport history={history as any} />;
 
     return (
         <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] px-5 pt-5 pb-nav font-sans relative overflow-x-hidden">
