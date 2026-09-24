@@ -41,14 +41,40 @@ export const PBA_LIST_TITLE_KO = "PBA 투어 랭킹 · 프로당구 상금(연�
 export const PBA_LIST_DESC_KO =
     "프로당구 PBA·LPBA 시즌별 랭킹. 선수 상금 순위와 랭킹 포인트, 통산 기록을 랭큐에서. 프로당구는 연봉제가 아니라 대회 상금이 선수 수입의 중심입니다.";
 
-export const pbaPlayerTitleKo = (nameKo: string, league: string) =>
-    `${nameKo} 상금·연봉 — ${league} 프로당구 선수 | 랭큐`;
+/** 통산 상금 글 — 프리렌더 prizeStr 와 같은 식(ko "2억 700만원", 그 밖 "2억 700만 KRW"). 없으면 "-". */
+export const pbaPrizeText = (careerPrize: number | null | undefined, lang: string = "ko") =>
+    careerPrize != null ? `${formatPrizeKo(careerPrize)}${lang === "ko" ? "원" : " KRW"}` : "-";
+
+/** 가장 최근 시즌의 상금랭킹 — 제목·설명에 '지금 몇 위인가'를 싣는다(2026-09-24). 순위가 없는 시즌은 건너뛴다. */
+export interface PbaSeasonRank { season: number; rank: number }
+export function pbaLatestSeasonRank(seasons: ReadonlyArray<{ season: number; prizeRank: number | null }> | null | undefined): PbaSeasonRank | null {
+    let best: PbaSeasonRank | null = null;
+    for (const s of seasons ?? []) if (s.prizeRank != null && (!best || s.season > best.season)) best = { season: s.season, rank: s.prizeRank };
+    return best;
+}
+
+/**
+ * ko 제목·설명 — 화면(pba-player.tsx)과 프리렌더가 **이 둘만** 부른다(PBA_L10N.ko 도 같은 함수).
+ * 상금은 pbaPrizeText 로 만든 글("330만원")을 받는다 — 예전엔 화면만 '원'을 빼서 봇과 한 글자 달랐다.
+ */
+export const pbaPlayerTitleKo = (nameKo: string, league: string, prize?: string | null) =>
+    // 통산 상금을 제목에 — "OOO 연봉" 검색에 숫자로 답하되, 그 숫자가 연봉이 아니라 '통산 상금'임을 같은 줄에 적는다(2026-09-24)
+    prize && prize !== "-" ? `${nameKo} 상금·연봉 — ${league} 통산 상금 ${prize} | 랭큐` : `${nameKo} 상금·연봉 — ${league} 프로당구 선수 | 랭큐`;
 
 export const pbaPlayerDescKo = (
     nameKo: string, nameEn: string | null | undefined, league: string,
-    careerPrize: number | null | undefined, average: unknown, highRun: unknown,
-) =>
-    `${nameKo}${nameEn ? ` (${nameEn})` : ""} — ${league} 통산 상금 ${careerPrize != null ? formatPrizeKo(careerPrize) : "-"}, 에버리지 ${average ?? "-"}, 하이런 ${highRun ?? "-"}. 프로당구는 연봉제가 아니라 상금 중심입니다.`;
+    prize: string, average: unknown, highRun: unknown, seasonRank?: PbaSeasonRank | null,
+) => {
+    // 모든 선수 페이지 끝에 붙던 "프로당구는 연봉제가 아니라 상금 중심입니다."는 뺐다 — 481곳이 같은 문장이었다. 답은 본문·FAQ 에 있다(2026-09-24)
+    // 값이 없는 칸은 뺀다 — 기록이 없는 15명은 "통산 상금 -, 에버리지 -, 하이런 -."로 줄표만 늘어섰다(2026-09-24)
+    const facts = [
+        prize && prize !== "-" ? `통산 상금 ${prize}` : "",
+        seasonRank ? `${seasonRank.season}-${String(seasonRank.season + 1).slice(2)} 시즌 상금랭킹 ${seasonRank.rank}위` : "",
+        average != null && average !== "" ? `에버리지 ${average}` : "",
+        highRun != null && highRun !== "" ? `하이런 ${highRun}` : "",
+    ].filter(Boolean);
+    return `${nameKo}${nameEn ? ` (${nameEn})` : ""} — ${league} ${facts.length ? facts.join(", ") : "프로당구 선수"}.`;
+};
 
 /** "OOO 연봉 얼마?" 질문에 대한 정답 — FAQ 구조화데이터·화면 공용. */
 export const pbaIncomeAnswerKo = (nameKo: string, careerPrize: number | null | undefined) =>
@@ -65,8 +91,9 @@ export type PbaLang = (typeof PBA_LANGS)[number];
 interface PbaL10n {
     listTitle: string;
     listDesc: string;
-    playerTitle: (name: string, league: string) => string;
-    playerDesc: (name: string, nameEn: string | null | undefined, league: string, prize: string, average: unknown, highRun: unknown) => string;
+    /** prize = pbaPrizeText 글. ko 만 제목에 싣는다 */
+    playerTitle: (name: string, league: string, prize?: string | null) => string;
+    playerDesc: (name: string, nameEn: string | null | undefined, league: string, prize: string, average: unknown, highRun: unknown, seasonRank?: PbaSeasonRank | null) => string;
     incomeNote: string;
     incomeQ: (name: string) => string;
     incomeA: (name: string, prize: string) => string;
@@ -77,8 +104,8 @@ export const PBA_L10N: Record<PbaLang, PbaL10n> = {
     ko: {
         listTitle: PBA_LIST_TITLE_KO,
         listDesc: PBA_LIST_DESC_KO,
-        playerTitle: (n, lg) => `${n} 상금·연봉 — ${lg} 프로당구 선수 | 랭큐`,
-        playerDesc: (n, ne, lg, pz, avg, hr) => `${n}${ne ? ` (${ne})` : ""} — ${lg} 통산 상금 ${pz}, 에버리지 ${avg ?? "-"}, 하이런 ${hr ?? "-"}. 프로당구는 연봉제가 아니라 상금 중심입니다.`,
+        playerTitle: pbaPlayerTitleKo,
+        playerDesc: pbaPlayerDescKo,
         incomeNote: PBA_INCOME_NOTE_KO,
         incomeQ: (n) => `${n} 선수 연봉은 얼마인가요?`,
         incomeA: (n, pz) => `${n} 선수는 연봉을 받는 것이 아니라 대회 성적에 따른 상금을 받습니다. 공식 기록 기준 통산 상금은 ${pz}입니다.`,

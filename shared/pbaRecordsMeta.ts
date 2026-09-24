@@ -244,27 +244,29 @@ export const cutKo = (c: NonNullable<PbaRecordSection["cut"]>) =>
 export const leagueFactsKo = (l: PbaRecordsLeague) =>
     `통산 기록이 있는 선수 ${l.players}명, 그중 ${PBA_RECORDS_MIN_GAMES}경기 이상 ${l.qualified}명.${l.updated ? ` 기록 갱신 ${dateKo(l.updated)}(선수별로 돌아가며 다시 받습니다).` : ""}`;
 
-/** 1위 한 줄 — 공동 1위면 그렇게 적는다 */
+/** 1위 한 줄 — 공동 1위면 그렇게 적는다. 리그 이름은 PBA → LPBA 순서로 읽히게 LPBA 에만 붙인다 */
 function leaderKo(l: PbaRecordsLeague | undefined, key: PbaRecordKey): string {
     const s = l ? recordSection(l, key) : undefined;
     const top = s?.rows[0];
     if (!l || !s || !top) return "";
     const tied = s.rows.filter((x) => x.rank === 1).length;
-    return `${l.league} ${top.nameKo}${tied > 1 ? ` 등 ${tied}명` : ""} ${recordValue(key, top.value)}`;
+    return `${l.league === "LPBA" ? "LPBA " : ""}${top.nameKo}${tied > 1 ? ` 등 ${tied}명` : ""} ${recordValue(key, top.value)}`;
 }
 
-/** 설명 겸 본문 첫 문단 */
+/**
+ * 설명 겸 본문 첫 문단 — 1위 숫자를 앞에, 100자 안팎(2026-09-24: 198자라 상금 1위가 잘려 보였다).
+ * 기록 종류 나열·최소 경기 수 안내는 제목과 본문 머리말(PBA_RECORDS_RULE_KO)이 말한다. 리그 이름은 LPBA 에만 붙인다(PBA → LPBA 순서).
+ */
 export function pbaRecordsDescription(r: PbaRecordsReport): string {
     const pba = recordLeague(r, "PBA");
     const lpba = recordLeague(r, "LPBA");
-    const avg = [leaderKo(pba, "average"), leaderKo(lpba, "average")].filter(Boolean).join(", ");
-    const prize = [leaderKo(pba, "careerPrize"), leaderKo(lpba, "careerPrize")].filter(Boolean).join(", ");
+    const avg = [leaderKo(pba, "average"), leaderKo(lpba, "average")].filter(Boolean).join("·");
+    const prize = [leaderKo(pba, "careerPrize"), leaderKo(lpba, "careerPrize")].filter(Boolean).join("·");
     const upd = pbaRecordsUpdated(r);
+    const leaders = [avg ? `통산 에버리지 1위 ${avg}` : "", prize ? `상금 1위 ${prize}` : ""].filter(Boolean).join(", ");
     return [
-        "PBA·LPBA 프로당구 선수 통산 기록 순위 톱 20 — 에버리지·하이런·뱅크샷 비율·승률·통산 상금.",
-        avg ? `통산 에버리지 1위 ${avg}.` : "",
-        prize ? `통산 상금 1위 ${prize}.` : "",
-        `비율 기록은 ${PBA_RECORDS_MIN_GAMES}경기 이상 선수만.`,
+        // '톱 20·PBA·LPBA'는 제목과 h1 이 이미 말한다 — 설명은 1위 숫자부터
+        leaders ? `${leaders}.` : `PBA·LPBA 통산 기록 톱 ${PBA_RECORDS_TOP}.`,
         // '기준'(모든 숫자가 그날 값)이 아니라 '갱신' — 상세는 하루 60명씩 돌아가며 받아서 선수마다 받은 날이 다르다
         upd ? `${dateKo(upd)} 갱신.` : "",
     ].filter(Boolean).join(" ");

@@ -15,6 +15,8 @@ import { regionName } from "@/components/hiq/umb/types";
 import { GolferSheet } from "@/components/hiq/golf/GolferSheet";
 import { GMove, useGolfTheme } from "@/components/hiq/golf/ui";
 import { golferName, iocToAlpha2, type GolfRankRow, type GolfRankingsResponse, type GolfStatKey, type GolfStatRow, type GolfTour } from "@/components/hiq/golf/types";
+import { golferCardUrl } from "@/lib/playerCard";
+import { golfRankingDesc, golfRankingPath, golfRankingTitle, golfSeoLang } from "@shared/siteGraph";
 
 const PAGE_SIZE = 50;
 const API = "/api/hiq/golf-rank";
@@ -38,10 +40,20 @@ export default function HiqGolfRanking() {
     const meta = GOLF_TOUR_META[tour];
     const homeFed = "KOR";
 
+    // 제목·설명은 프리렌더(server/prerender.ts)와 같은 함수·같은 톱 50 — 필터(한국·검색)와 상관없이 그 투어의 기본 목록으로 만든다(2026-09-24).
+    // 쿼리 키가 필터 없는 목록과 같아 캐시를 나눠 쓴다(요청이 하나 더 생기지 않는다).
+    const seoLang = golfSeoLang(locale);
+    const { data: topData } = useQuery<GolfRankingsResponse>({
+        queryKey: [`${API}/rankings`, `${tour}|false|`],
+        queryFn: async () => apiRequest(`${API}/rankings?tour=${tour}&limit=${PAGE_SIZE}`),
+        staleTime: 10 * 60 * 1000,
+    });
+    const topRows = topData?.rows ?? [];
     useSeo({
-        title: `${t("golf.pageTitle")} — ${t("golf.subtitle")} | RANKUE`,
-        description: t("golf.seoDesc"),
-        path: "/golf-ranking",
+        title: golfRankingTitle(seoLang, tour, topRows),
+        description: topRows.length ? golfRankingDesc(seoLang, tour, topData?.edition, topRows) : t("golf.seoDesc"),
+        path: golfRankingPath(tour),
+        image: topRows[0] ? golferCardUrl(tour, topRows[0].playerId, locale) : undefined,
     });
 
     const [debouncedQ, setDebouncedQ] = useState("");

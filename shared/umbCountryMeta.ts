@@ -140,19 +140,22 @@ export function countryIndexable(r: UmbCountryReport): boolean {
 export const countryTitle = (fed: string) => `${fedNameKo(fed)} 당구 선수 세계랭킹 — UMB 3쿠션 | 랭큐`;
 export const countryH1 = (fed: string) => `${fedNameKo(fed)} 당구 선수 세계랭킹 — UMB 3쿠션`;
 
-/** 설명 겸 본문 첫 문단. 남자 부문이 있으면 그 숫자로, 없으면 여자·주니어 인원으로. */
+/**
+ * 설명 겸 본문 첫 문단. 남자 부문이 있으면 그 숫자로, 없으면 여자·주니어 인원으로.
+ * 숫자를 앞에, 100자 안팎 — 국가 순위 셈법(상위 5명 합산)은 본문 표 머리말이 말한다(2026-09-24).
+ */
 export function countryDescription(r: UmbCountryReport): string {
   const name = fedNameKo(r.fed);
   const men = sectionOf(r.sections, "players");
   const others = r.sections.filter((s) => s.category !== "players").map((s) => `${CAT_KO[s.category]} ${s.total}명`);
   if (men && men.rows.length) {
     const best = men.rows[0];
+    // 국가 순위는 남자 부문 셈이다(본문 "국가 순위(남자)") — '남자'를 순위 앞에 붙여야 전체 순위로 읽히지 않는다
+    const lead = men.nationRank ? `${name} 3쿠션 남자 국가 순위 ${men.nationRank}위` : `${name} 3쿠션 남자 세계랭킹`;
     const parts = [
-      `${name} 선수 ${num(men.total)}명이 UMB 3쿠션 남자 세계랭킹에 올라 있습니다.`,
-      `최고 순위는 ${nameShortKo(best)} ${best.rank}위${men.top100 > 0 ? `, 톱 100 안에 ${men.top100}명` : ""}.`,
-      men.nationRank ? `국가 순위 ${men.nationRank}위(상위 5명 합산 포인트).` : "",
-      others.length ? `${others.join("·")} 등재.` : "",
-      `${editionDateKo(men.date)} 회차 기준.`,
+      `${lead} — ${num(men.total)}명 등재, 최고 ${nameShortKo(best)} ${best.rank}위${men.top100 > 0 ? `, 톱 100에 ${men.top100}명` : ""}.`,
+      others.length ? `${others.join("·")}.` : "",
+      `UMB ${editionDateKo(men.date)} 회차 기준.`,
     ];
     return parts.filter(Boolean).join(" ");
   }
@@ -169,15 +172,16 @@ export function moversIndexable(r: UmbMoversReport): boolean {
 export const MOVERS_TITLE = "당구 세계랭킹 순위 변동 — UMB 3쿠션 최신 회차 상승·하락 | 랭큐";
 export const MOVERS_H1 = "당구 세계랭킹 순위 변동 — UMB 3쿠션 최신 회차";
 
+/** 한국 선수 숫자를 앞에(국내 검색자가 먼저 찾는 것), 100자 안팎 — 직전 회차 날짜·상승/하락·신규 수는 본문 부문별 문단에 있다(2026-09-24). */
 export function moversDescription(r: UmbMoversReport): string {
   const men = sectionOf(r.sections, "players");
   if (!men) return "UMB 3쿠션 세계랭킹 최신 회차와 직전 회차를 비교한 순위 상승·하락·신규 등재 선수.";
   const top = men.risers[0];
-  return [
-    `UMB 3쿠션 남자 세계랭킹 ${editionDateKo(men.date)} 회차를 직전 ${editionDateKo(men.prevDate)} 회차와 비교했습니다.`,
-    `순위가 바뀐 선수 ${num(men.changed)}명(상승 ${num(men.up)}·하락 ${num(men.down)}), 신규 등재 ${num(men.newCount)}명.`,
-    // 상승 목록은 현재 300위 안에서만 뽑는다(MOVER_RANK_CUTOFF) — 문장에도 그 선을 적어야 '전체 1위 상승'으로 읽히지 않는다
-    top ? `${MOVER_RANK_CUTOFF}위 안에서 가장 많이 오른 선수 ${nameShortKo(top)} ▲${top.move}(${top.rank}위).` : "",
-    `한국 선수 상승 ${men.kr.up}명·하락 ${men.kr.down}명.`,
-  ].filter(Boolean).join(" ");
+  const kr = men.kr;
+  const krTxt = kr.up || kr.down ? ` — 한국 선수 ${kr.up}명 상승·${kr.down}명 하락,` : kr.same ? ` — 한국 선수 ${kr.same}명 순위 그대로,` : " —";
+  const head = `UMB 3쿠션 남자 세계랭킹 ${editionDateKo(men.date)} 회차${krTxt} 전체 ${num(men.changed)}명 변동.`;
+  // 상승 목록은 현재 300위 안에서만 뽑는다(MOVER_RANK_CUTOFF) — 문장에도 그 선을 적어야 '전체 1위 상승'으로 읽히지 않는다
+  const riser = top ? ` ${MOVER_RANK_CUTOFF}위 안 최대 상승 ${nameShortKo(top)} ▲${top.move}(${top.rank}위).` : "";
+  // 긴 로마자 이름이면 100자를 넘는다(9/6 회차 116자) — 그땐 뺀다. 그 선수는 본문 '가장 많이 오른 선수' 목록 맨 위에 있다
+  return head.length + riser.length <= 100 ? head + riser : head;
 }

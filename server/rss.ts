@@ -41,16 +41,16 @@ function renderItem(i: Item): string {
 export async function generateRss(): Promise<string> {
     const items: Item[] = [];
 
-    // 1) 일일 브리핑 — 최근 14일. 날짜별 고정 URL 이라 RSS 와 궁합이 좋다.
+    // 1) 오늘의 브리핑 한 건 — 링크는 색인되는 /briefing 한 장.
+    // 날짜별 /briefing/:date 는 noindex 라(2026-09-18) 피드에 실으면 "제출했는데 noindex" 경고만 쌓인다(2026-09-24).
+    // guid 는 날짜별로 달라 네이버가 매일 새 글로 보고 /briefing 을 다시 가져간다.
     try {
-        const base = new Date(`${todayKst()}T00:00:00Z`).getTime();
-        for (let i = 0; i < 14; i++) {
-            const d = new Date(base - i * 86400000).toISOString().slice(0, 10);
-            const b = await storage.umb.getBriefing(d).catch(() => null);
-            if (!b) continue;
+        const d = todayKst();
+        const b = await storage.umb.getBriefing(d).catch(() => null);
+        if (b) {
             items.push({
                 title: briefingTitle(d),
-                link: `${ORIGIN}/briefing/${d}`,
+                link: `${ORIGIN}/briefing`,
                 desc: briefingDesc(b as any, d),
                 date: new Date(`${d}T00:00:00Z`),
                 guid: `briefing-${d}`,

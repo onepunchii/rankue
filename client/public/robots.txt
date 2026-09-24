@@ -1,49 +1,34 @@
 # RANKUE 랭큐 — robots.txt
-# 일반 검색엔진: 전체 허용
+# 봇은 자기 이름이 적힌 그룹 하나만 읽고 * 그룹은 물려받지 않는다. 그래서 이름을 적은 봇 그룹에도
+# 같은 Disallow 를 반드시 함께 적는다 — 예전엔 Yeti·Bingbot 등이 Allow 만 받아 /api/·/admin 이 열려 있었다(2026-09-24).
+
+# 일반 검색엔진: 전체 허용(비공개 경로만 제외)
 User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /admin
 Disallow: /partner/login
 
-# 네이버
+# 명시적 허용 — 네이버(Yeti), 빙, Apple(Siri·Spotlight), 답변엔진·생성형 AI(AEO·GEO). 규칙은 위와 같다.
 User-agent: Yeti
-Allow: /
-
-# 빙 / MS
 User-agent: Bingbot
-Allow: /
-
-# Apple (Siri / Spotlight)
 User-agent: Applebot
-Allow: /
 User-agent: Applebot-Extended
-Allow: /
-
-# ── 답변엔진 / 생성형 AI (AEO · GEO) 명시적 허용 ──
 User-agent: GPTBot
-Allow: /
 User-agent: OAI-SearchBot
-Allow: /
 User-agent: ChatGPT-User
-Allow: /
 User-agent: ClaudeBot
-Allow: /
 User-agent: Claude-Web
-Allow: /
 User-agent: anthropic-ai
-Allow: /
 User-agent: PerplexityBot
-Allow: /
 User-agent: Perplexity-User
-Allow: /
 User-agent: Google-Extended
-Allow: /
 User-agent: Amazonbot
-Allow: /
 User-agent: cohere-ai
 Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /partner/login
 
+# RSS(/rss.xml)는 사이트맵이 아니라 여기 적지 않는다 — 네이버 서치어드바이저 'RSS 제출'에 따로 낸다.
 Sitemap: https://www.rankue.co.kr/sitemap.xml
-# RSS — 네이버 서치어드바이저 RSS 제출용(최근 브리핑·커뮤니티)
-Sitemap: https://www.rankue.co.kr/rss.xml

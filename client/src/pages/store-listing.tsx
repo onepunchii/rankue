@@ -197,7 +197,8 @@ export default function StoreListingPage() {
 
   // 메타·구조화데이터는 shared/storeMeta 로 프리렌더와 공유한다(문자 단위 일치).
   useSeo({
-    title: s ? storeTitleKo(s.name, s.region) : `당구장 | 랭큐`,
+    // 동네 제목("화성 남양")은 세 번째 인자 s.address — 프리렌더(/stores/:code)가 같은 세 인자를 넘길 때 함께 켠다(2026-09-24)
+    title: s ? storeTitleKo(s.name, s.region, s.address) : `당구장 | 랭큐`,
     description: s ? storeDescKo(s.name, s.address, s, s.openHours) : "전국 당구장 디렉토리",
     path: `/stores/${code}`,
     locale,

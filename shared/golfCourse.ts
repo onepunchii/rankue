@@ -103,26 +103,64 @@ export function distinctAliases(name: string, aliases: readonly string[] | null 
     }
     return out;
 }
-export function courseTitle(c: CourseSeoFacts): string {
-    const parts = ["부킹", "조인", "그린피"];
-    if (c.topPrice) parts.unshift("회원권 시세");
-    // 개명한 골프장은 옛 이름을 괄호로 — 아직 옛 이름으로 찾는 사람이 많다(한 개만, 제목이 길어지지 않게)
-    const old = distinctAliases(c.name, c.aliases).find((a) => a.length <= 14);
-    return `${c.name}${old ? `(${old})` : ""} ${parts.join("·")} | 랭큐 골프`;
+// ── 실제 도 이름 ─────────────────────────────────────────────────
+// 우리 region 은 '경상·전라' 같은 묶음이라 설명에 그대로 쓰면 "전라 완주"처럼 어색하다(2026-09-24 검색 결과 점검).
+// 주소 첫 낱말은 "완주군 …"·"경북 …"·"전라북도 …"가 섞여 못 믿으니, 시군 → 도를 여기 적는다(골프장 490곳의 시군 전부).
+// 묶음 안에 같은 이름이 있으면(고성군: 강원·경남, 광주시: 경기·광주) region 이 가른다. 없는 시군은 묶음 이름으로 돌아간다.
+const PROVINCE_BY_CITY: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+    경기: { 인천시: "인천", 강화군: "인천", 옹진군: "인천", 서울시: "서울" },
+    경상: {
+        ...Object.fromEntries("거제시 거창군 고성군 김해시 남해군 밀양시 사천시 산청군 양산시 의령군 진주시 창녕군 창원시 통영시 하동군 함안군 함양군 합천군".split(" ").map((c) => [c, "경남"])),
+        ...Object.fromEntries("경산시 경주시 고령군 구미시 김천시 문경시 봉화군 상주시 성주군 안동시 영덕군 영양군 영주시 영천시 예천군 울릉군 울진군 의성군 청도군 청송군 칠곡군 포항시".split(" ").map((c) => [c, "경북"])),
+        // 군위군은 2023-07 대구광역시로 편입됐다
+        대구시: "대구", 달성군: "대구", 군위군: "대구", 부산시: "부산", 기장군: "부산", 울산시: "울산", 울주군: "울산",
+    },
+    전라: {
+        ...Object.fromEntries("고창군 군산시 김제시 남원시 무주군 부안군 순창군 완주군 익산시 임실군 장수군 전주시 정읍시 진안군".split(" ").map((c) => [c, "전북"])),
+        ...Object.fromEntries("강진군 고흥군 곡성군 광양시 구례군 나주시 담양군 목포시 무안군 보성군 순천시 신안군 여수시 영광군 영암군 완도군 장성군 장흥군 진도군 함평군 해남군 화순군".split(" ").map((c) => [c, "전남"])),
+        광주시: "광주",
+    },
+    충청: {
+        ...Object.fromEntries("괴산군 단양군 보은군 영동군 옥천군 음성군 제천시 증평군 진천군 청주시 충주시".split(" ").map((c) => [c, "충북"])),
+        ...Object.fromEntries("계룡시 공주시 금산군 논산시 당진시 보령시 부여군 서산시 서천군 아산시 예산군 천안시 청양군 태안군 홍성군".split(" ").map((c) => [c, "충남"])),
+        대전시: "대전", 세종시: "세종",
+    },
+};
+/** "전북 완주" · "경북 경주" · "인천"(광역시는 한 번만) — 모르는 시군은 묶음 이름(경기·수도권 → 경기). */
+export function courseWhere(region: string, city: string | null | undefined): string {
+    const prov = (city && PROVINCE_BY_CITY[region]?.[city]) || (REGION_LABEL[region] ?? region).replace(/·수도권$/, "");
+    const short = cityShort(city);
+    return short && short !== prov ? `${prov} ${short}` : prov;
 }
+
+const courseOld = (c: CourseSeoFacts) => distinctAliases(c.name, c.aliases).find((a) => a.length <= 14);
+export function courseTitle(c: CourseSeoFacts): string {
+    // 개명한 골프장은 옛 이름을 괄호로 — 아직 옛 이름으로 찾는 사람이 많다(한 개만, 제목이 길어지지 않게)
+    const old = courseOld(c);
+    if (c.topPrice) return `${c.name}${old ? `(${old})` : ""} 회원권 시세·부킹·조인·그린피 | 랭큐 골프`;
+    // 시세가 없는 곳(대중제 311곳 대부분)은 '그린피'가 첫 검색어다. 옛 이름이 없으면 괄호에 시군을 — "360도CC(여주)"(2026-09-24)
+    const city = cityShort(c.city);
+    const paren = old ?? (city && !c.name.includes(city) && c.name.length + city.length <= 23 ? city : "");
+    return `${c.name}${paren ? `(${paren})` : ""} 그린피·부킹·조인 | 랭큐 골프`;
+}
+/**
+ * 검색 결과 설명 — 이름으로 시작하고(검색어와 겹치면 굵게 뜬다) 가장 강한 숫자(시세 → 그린피)를 앞에 둔다.
+ * 요금이 없는 곳도 이름·도·시군·홀수가 골프장마다 달라 같은 문장이 되지 않는다. 덧붙임은 100자 안에서만(2026-09-24).
+ */
 export function courseDescription(c: CourseSeoFacts): string {
-    const where = [REGION_LABEL[c.region] ?? c.region, cityShort(c.city)].filter(Boolean).join(" ");
     const shape = [c.holes ? `${c.holes}홀` : "", c.kind ?? ""].filter(Boolean).join(" ");
-    const bits = [`${where} ${shape}`.trim() + " 골프장."];
     const fee = weekdayFee(c.fees);
-    if (fee) bits.push(`주중 비회원 그린피 ${wonShort(fee)}.`);
-    else if (c.feeFrom) bits.push(`그린피 ${wonShort(c.feeFrom)}부터.`);
-    if (c.topPrice) bits.push(`회원권 시세 ${manwonText(c.topPrice)}.`);
-    const traits = [...(c.grass ?? []), ...(c.play ?? []).map((p) => PLAY_WORD[p] ?? p)];
-    if (traits.length) bits.push(`${traits.join(" · ")}.`);
+    const nums = [
+        c.topPrice ? `회원권 시세 ${manwonText(c.topPrice)}` : "",
+        fee ? `주중 비회원 그린피 ${wonShort(fee)}` : c.feeFrom ? `그린피 ${wonShort(c.feeFrom)}부터` : "",
+    ].filter(Boolean).join(" · ");
+    let out = `${c.name} ${nums || "그린피·부킹·조인"} — ${`${courseWhere(c.region, c.city)} ${shape}`.trim()} 골프장.`;
     // 글이 없을 때 붙던 권유 문장("…알림으로 받으세요")은 뺐다 — 골프장 473곳 설명마다 같은 문장이 반복됐다(2026-09-24 검토).
-    if (c.listingCount) bits.push(`지금 올라온 티타임 ${c.listingCount}건.`);
-    return bits.join(" ");
+    const traits = [...(c.grass ?? []), ...(c.play ?? []).map((p) => PLAY_WORD[p] ?? p)];
+    for (const extra of [c.listingCount ? `지금 올라온 티타임 ${c.listingCount}건.` : "", traits.length ? `${traits.join(" · ")}.` : ""]) {
+        if (extra && out.length + 1 + extra.length <= 100) out += ` ${extra}`;
+    }
+    return out;
 }
 export function listTitle(o: { intent?: GolfIntent | null; region?: string | null; city?: string | null }): string {
     const where = o.city ? cityShort(o.city) : o.region ? (REGION_LABEL[o.region] ?? o.region) : "전국";

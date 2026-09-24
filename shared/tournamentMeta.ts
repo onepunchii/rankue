@@ -307,6 +307,8 @@ const CITY_KO: Record<string, string> = {
     Antwerp: "앤트워프", Porto: "포르투", Ankara: "앙카라", "Ho Chi Minh City": "호치민", Seoul: "서울", Gwangju: "광주",
     Bogota: "보고타", "Sharm El Sheikh": "샤름엘셰이크", Veghel: "베겔", "Las Vegas": "라스베이거스", Murcia: "무르시아",
     Blois: "블루아", "Binh Thuan": "빈투안", Cartagena: "카르타헤나", Viersen: "피어젠", Istanbul: "이스탄불", Hurghada: "후르가다",
+    // 2026 벨기에 월드컵 — 중계(SOOP)와 대부분의 기사가 '리르'(일부 '리에르')(2026-09-24 확인)
+    Lier: "리르",
 };
 export const cityKo = (city: string) => CITY_KO[city] ?? city;
 
@@ -405,19 +407,56 @@ export function tourDescription(p: Pick<PbaTourPage, "tour" | "winner" | "today"
     return `${head} 대회 일정. ${facts}.`;
 }
 
-export const umbEventTitle = (e: UmbEventSummary) => `${umbEventName(e)} 선수별 랭킹 포인트 | 랭큐`;
+/** 짧은 이름 — 한글 이름이 있으면 한글만(제목·설명 길이를 아낀다) */
+const umbRowShort = (r: Pick<UmbEventRow, "playerName" | "nativeName">) => r.nativeName || r.playerName;
 
+/**
+ * 제목에 이 대회 최다 포인트 선수를 — 우리가 가진 사실은 '포인트'라 '우승'이라 쓰지 않는다(2026-09-24).
+ * 포인트 표가 없는 요약만 받으면 예전 제목.
+ */
+export function umbEventTitle(e: UmbEventSummary & Partial<Pick<UmbEventDetail, "sections">>): string {
+    const name = umbEventName(e);
+    const plain = `${name} 선수별 랭킹 포인트 | 랭큐`;
+    const sec = e.sections ? primarySection({ sections: e.sections }) : undefined;
+    const top = sec?.rows[0];
+    if (!sec || !top) return plain;
+    // 주니어 표만 남은 월드컵은 어느 랭킹인지 밝힌다(주니어 세계선수권은 이름에 이미 '주니어')
+    const cat = sec.category !== "players" && !isJuniorEvent(e) ? `${CAT_KO[sec.category]} ` : "";
+    // 공동이면 한 명만 '최다'라 적으면 틀린 말이다 — "A 등 2명"
+    const tied = sec.rows.filter((r) => r.points === top.points).length;
+    const who = `${umbRowShort(top)}${tied > 1 ? ` 등 ${tied}명` : ""}`;
+    // 브랜드 앞 40자 안 — 넘으면 점수를 떼고, 그래도 넘으면(긴 로마자 이름) 예전 제목(그대로 두면 38곳 중 28곳이 35자, 최대 55자였다)
+    const fit = [`${name} — ${cat}최다 포인트 ${who} ${num(top.points)}점`, `${name} — ${cat}최다 포인트 ${who}`].find((t) => t.length <= 40);
+    return fit ? `${fit} | 랭큐` : plain;
+}
+
+/**
+ * 설명 — 숫자(최다 포인트·한국 선수)를 앞에, 100자 안. '대회 순위가 아니다'는 본문 표 머리말이 말한다(2026-09-24).
+ * 넘치면 덜 중요한 것부터 뗀다 — 주관 단체 → 2위 → 한국 최고 선수.
+ */
 export function umbEventDescription(d: UmbEventDetail): string {
     const sec = primarySection(d);
     const rows = sec?.rows ?? [];
     const kr = rows.filter((r) => r.fed === "KR");
     const [y, m] = ymd(d.date);
-    const where = `${y}년 ${m}월 ${cityKo(d.city)}(${fedNameKo(d.country)})`;
     const org = d.org && d.org !== "UMB" ? `(${d.org} 주관)` : "";
-    const krTxt = kr.length ? ` 한국 선수 ${kr.length}명 — 최고 ${umbRowNameKo(kr[0])} ${num(kr[0].points)}점.` : "";
-    // 남자 표가 없으면(남자 회차는 2025-02 부터 보관) 어느 랭킹의 포인트인지 밝힌다
-    const cat = sec && sec.category !== "players" ? `${CAT_KO[sec.category]} ` : "";
-    return `${where}에서 열린 UMB ${isJuniorEvent(d) ? "주니어 " : ""}3쿠션 ${UMB_KIND_KO[d.kind]}${org}에서 ${cat}세계랭킹 포인트를 받은 선수 ${num(rows.length)}명을 포인트 순으로 정리했습니다.${krTxt} 대회 순위가 아니라 UMB 랭킹 포인트 기준입니다.`;
+    const junior = isJuniorEvent(d);
+    const head = `${y}년 ${m}월 ${fedNameKo(d.country)} ${cityKo(d.city)} UMB ${junior ? "주니어 " : ""}3쿠션 ${UMB_KIND_KO[d.kind]}`;
+    if (!rows.length) return `${head}${org}.`;
+    // 남자 표가 없으면(남자 회차는 2025-02 부터 보관) 어느 랭킹의 포인트인지 밝힌다 — 주니어 세계선수권은 이름에 이미 있다
+    const cat = sec && sec.category !== "players" && !junior ? `${CAT_KO[sec.category]} ` : "";
+    const pts = (r: UmbEventRow) => `${umbRowShort(r)} ${num(r.points)}점`;
+    // 공동 최다면 "A 등 2명 10점" — 제목과 같은 규칙
+    const tied = rows.filter((r) => r.points === rows[0].points).length;
+    const build = (withOrg: boolean, n: 1 | 2, best: boolean) => {
+        const shown = tied > 1 ? rows.slice(0, tied) : rows.slice(0, n);
+        const krBest = best && kr[0] && !shown.includes(kr[0]) ? `(최고 ${pts(kr[0])})` : "";
+        const topTxt = tied > 1 ? `${umbRowShort(rows[0])} 등 ${tied}명 ${num(rows[0].points)}점` : shown.map(pts).join(", ");
+        return `${head}${withOrg ? org : ""} — 최다 랭킹 포인트 ${topTxt}. `
+            + `${cat}랭킹 포인트를 받은 선수 ${num(rows.length)}명${kr.length ? ` 중 한국 선수 ${kr.length}명${krBest}` : ""}.`;
+    };
+    const tries = [build(true, 2, true), build(false, 2, true), build(false, 1, true), build(false, 1, false)];
+    return tries.find((t) => t.length <= 100) ?? tries[tries.length - 1];
 }
 
 /* ── 구조화데이터 ── 화면은 useSeo 에 객체 하나만 넘길 수 있어 @graph 로 묶는다. 프리렌더도 같은 객체를 싣는다. */

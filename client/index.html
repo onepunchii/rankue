@@ -87,7 +87,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- 구조화 데이터 (JSON-LD) — 검색(SEO)·답변엔진(AEO)·생성형엔진(GEO) 공통 -->
+  <!-- 구조화 데이터 (JSON-LD) — 검색(SEO)·답변엔진(AEO)·생성형엔진(GEO) 공통
+       Organization·WebSite·MobileApplication 과 위 소유확인 메타 3개는 shared/siteGraph.ts 와 같아야 한다(봇 홈이 그걸 낸다, 2026-09-24).
+       shared/siteGraph.test.ts 가 둘을 대조한다. -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -106,7 +108,8 @@
         "@type": "WebSite",
         "@id": "https://www.rankue.co.kr/#website",
         "url": "https://www.rankue.co.kr/",
-        "name": "RANKUE 랭큐",
+        "name": "랭큐",
+        "alternateName": ["RANKUE", "랭큐 RANKUE"],
         "publisher": { "@id": "https://www.rankue.co.kr/#organization" },
         "inLanguage": ["ko", "en", "vi", "tr", "es"]
       },

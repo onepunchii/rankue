@@ -1,6 +1,9 @@
+import { sql } from "drizzle-orm";
 import { page, esc, hubNav } from "../prerender.js";
 import { entry } from "../sitemap.js";
 import { storage } from "../storage/index.js";
+import { db } from "../db.js";
+import { playerCardUrl, CARD_SIZE } from "../services/playerCard.js";
 import {
   CAT_KO, COUNTRY_INDEX_MIN, MOVER_RANK_CUTOFF, MOVERS_H1, MOVERS_PATH, MOVERS_TITLE,
   countryDescription, countryH1, countryIndexable, countryPath, countryTitle, editionDateKo, fedNameKo,
@@ -52,6 +55,33 @@ function moveKo(r: UmbMoveRow, hasPrev: boolean): string {
 const editionKo = (edition: string | null, date: string | null) =>
   edition ? `${edition} 회차(${editionDateKo(date)})` : "";
 
+/*
+ * 페이지 고유 이미지(2026-09-24) — 허브가 모두 브랜드 og.png 라 검색·카톡 썸네일이 당구공 그림 하나였다.
+ * 이미 있는 선수 카드(/og/player/…)를 og:image·본문 <img>·사이트맵 image 세 곳에 같은 주소로 건다.
+ */
+type PageImage = { url: string; width: number; height: number; alt: string };
+const cardImage = (cat: UmbCat, id: string, alt: string): PageImage =>
+  ({ url: playerCardUrl(ORIGIN, cat, id), width: CARD_SIZE, height: CARD_SIZE, alt });
+const cardImg = (img: PageImage | null) =>
+  img ? `\n  <img src="${esc(img.url)}" width="${img.width}" height="${img.height}" alt="${esc(img.alt)}" />` : "";
+
+/** 나라의 대표 카드 — 최고 순위, 동순위면 id 순(사이트맵의 DISTINCT ON … ORDER BY rank, player_umb_id 와 같은 선수) */
+function countryCardRow(rows: UmbMoveRow[]): UmbMoveRow | null {
+  let best: UmbMoveRow | null = null;
+  for (const x of rows) {
+    if (x.rank === null) continue;
+    if (!best || x.rank < best.rank! || (x.rank === best.rank && x.playerUmbId < best.playerUmbId)) best = x;
+  }
+  return best;
+}
+
+/** 순위 변동의 대표 카드 — 남자(없으면 첫 부문) 현재 300위 안에서 가장 많이 오른 선수(risers 가 컷 안만 담는다). 페이지와 사이트맵이 같이 쓴다. */
+function moversCard(r: UmbMoversReport): { cat: UmbCat; row: UmbMoveRow; date: string } | null {
+  const s = sectionOf(r.sections, "players") ?? r.sections[0];
+  const row = s?.risers[0];
+  return s && row && row.rank !== null ? { cat: s.category, row, date: s.date } : null;
+}
+
 /* ── 국가 페이지 ── */
 
 function countrySectionHtml(r: UmbCountryReport, s: UmbCountrySection): string {
@@ -92,8 +122,13 @@ function renderCountry(r: UmbCountryReport): RankingExtraRender {
   // 다른 나라 — 색인 대상(남자 10명 이상)만 잇는다. 국가표 순서 그대로.
   const others = r.nations.filter((n) => n.fed !== r.fed && n.players >= COUNTRY_INDEX_MIN);
   const top10 = (men ?? lead).rows.slice(0, 10);
+  const cardSec = men ?? lead;
+  const cardRow = countryCardRow(cardSec.rows);
+  const image = cardRow
+    ? cardImage(cardSec.category, cardRow.playerUmbId, `${name} 최고 순위 ${nameFullKo(cardRow)} — 3쿠션 ${CAT_KO[cardSec.category]} 세계랭킹 ${cardRow.rank}위`)
+    : null;
   const body = `<main>
-  <h1>${esc(countryH1(r.fed))}</h1>
+  <h1>${esc(countryH1(r.fed))}</h1>${cardImg(image)}
   <p>${esc(countryDescription(r))}</p>
 
   <h2>한눈에 보기</h2>
@@ -122,6 +157,7 @@ function renderCountry(r: UmbCountryReport): RankingExtraRender {
       desc: countryDescription(r),
       canonical,
       noindex: !indexable,
+      ...(image ? { image } : {}),
       jsonLd: [
         {
           "@context": "https://schema.org",
@@ -180,8 +216,12 @@ async function renderMovers(): Promise<RankingExtraRender> {
   const { nations } = await storage.umb.getNations("players");
   const linkable = new Set<string>(nations.filter((n: any) => n.players >= COUNTRY_INDEX_MIN).map((n: any) => n.fed));
   const men = sectionOf(r.sections, "players");
+  const mc = moversCard(r);
+  const image = mc
+    ? cardImage(mc.cat, mc.row.playerUmbId, `${editionDateKo(mc.date)} 회차 ${MOVER_RANK_CUTOFF}위 안 최대 상승 ${nameFullKo(mc.row)} — 3쿠션 ${CAT_KO[mc.cat]} 세계랭킹 ${mc.row.rank}위(▲${mc.row.move})`)
+    : null;
   const body = `<main>
-  <h1>${esc(MOVERS_H1)}</h1>
+  <h1>${esc(MOVERS_H1)}</h1>${cardImg(image)}
   <p>${esc(moversDescription(r))}</p>
   ${r.sections.map((s) => moversSectionHtml(s, linkable)).join("\n")}
   <p>출처: UMB 공식 랭킹 — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
@@ -197,6 +237,7 @@ async function renderMovers(): Promise<RankingExtraRender> {
       desc: moversDescription(r),
       canonical,
       noindex: !indexable,
+      ...(image ? { image } : {}),
       jsonLd: [
         {
           "@context": "https://schema.org",
@@ -250,7 +291,11 @@ export async function rankingExtraSitemapParts(): Promise<string[]> {
   try {
     const mv = await storage.umb.getMoversReport();
     if (moversIndexable(mv)) {
-      parts.push(entry(`${ORIGIN}${MOVERS_PATH}`, { changefreq: "weekly", priority: "0.6", lastmod: sectionOf(mv.sections, "players")?.date ?? null }));
+      const mc = moversCard(mv);
+      parts.push(entry(`${ORIGIN}${MOVERS_PATH}`, {
+        changefreq: "weekly", priority: "0.6", lastmod: sectionOf(mv.sections, "players")?.date ?? null,
+        ...(mc ? { image: playerCardUrl(ORIGIN, mc.cat, mc.row.playerUmbId) } : {}),
+      }));
     }
   } catch (e) {
     console.warn("[sitemap] umb movers failed:", (e as Error)?.message);
@@ -258,10 +303,21 @@ export async function rankingExtraSitemapParts(): Promise<string[]> {
   try {
     const [latest] = await storage.umb.getLatestEditions("players", 1);
     const { nations } = await storage.umb.getNations("players");
+    // 나라별 대표 카드 — 색인 대상 나라는 남자 10명 이상이라 페이지의 카드도 늘 남자 최고 순위(countryCardRow 와 같은 순서)
+    const top = new Map<string, string>();
+    if (latest) {
+      const res: any = await db.execute(sql`
+        select distinct on (fed) fed, player_umb_id from umb_rankings
+        where category = 'players' and edition = ${latest.edition}
+        order by fed, rank asc, player_umb_id asc`);
+      for (const x of (res.rows ?? res) as Array<{ fed: string; player_umb_id: string }>) top.set(x.fed, String(x.player_umb_id));
+    }
     for (const n of nations as Array<{ fed: string; players: number }>) {
       if (n.players < COUNTRY_INDEX_MIN) continue;
+      const id = top.get(n.fed);
       parts.push(entry(`${ORIGIN}${countryPath(n.fed)}`, {
         changefreq: "weekly", priority: n.players >= 100 ? "0.6" : "0.5", lastmod: latest?.editionDate ?? null,
+        ...(id ? { image: playerCardUrl(ORIGIN, "players", id) } : {}),
       }));
     }
   } catch (e) {

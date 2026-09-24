@@ -15,6 +15,7 @@ import { UMB_CATEGORIES, UMB_SOURCE_URL, displayName, regionName as intlRegionNa
 import { ShareButton } from "@/components/hiq/ShareButton";
 import { EXTRA_TEXT } from "@/components/hiq/umb/rankingExtraParts";
 import { MOVERS_PATH, countryPath } from "@shared/umbCountryMeta";
+import { worldRankingSeo } from "@shared/siteGraph";
 
 const PAGE_SIZE = 50;
 
@@ -35,9 +36,11 @@ export default function HiqWorldRanking() {
     const { data: me } = useQuery<any>({ queryKey: ["/api/hiq/me"], retry: false });
     const homeFed = resolveHomeFed(me?.countryCode, locale);
 
+    // 프리렌더(server/prerender.ts)와 같은 함수·같은 언어 규칙 — 봇과 사람이 같은 제목을 본다(2026-09-24: 예전엔 언어와 상관없이 한국어였다)
+    const wrSeo = worldRankingSeo(locale);
     useSeo({
-        title: "당구 세계랭킹 — UMB 공식 3쿠션 랭킹 | 랭큐",
-        description: "UMB 공식 3쿠션 세계랭킹을 매주 업데이트. 남자·여자·주니어 전체 순위, 한국 선수, 순위 변동과 선수별 히스토리를 한눈에.",
+        title: wrSeo.title,
+        description: wrSeo.desc,
         path: "/world-ranking",
     });
 

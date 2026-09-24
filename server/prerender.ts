@@ -11,7 +11,7 @@ import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW, LANDING_LANGS, landingContent } from "../shared/landingContent.js";
 import {
   formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared,
-  PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo, pbaIncomeAnswerKo, PBA_LIST_TITLE_KO, PBA_LIST_DESC_KO,
+  PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo, pbaIncomeAnswerKo, PBA_LIST_TITLE_KO, PBA_LIST_DESC_KO, pbaLatestSeasonRank,
   PBA_LANGS, pbaL10n,
 } from "../shared/pbaMeta.js";
 import { briefingLineKo, briefingDateKo, briefingTitle, briefingDesc, todayKst } from "../shared/briefingMeta.js";
@@ -26,6 +26,13 @@ import { renderRankingExtra, type RankingExtraRender } from "./seo/rankingExtra.
 import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js";
 import { renderTournaments, type TournamentsRender } from "./seo/tournaments.js";
 import { renderPbaRecords, type PbaRecordsRender } from "./seo/pbaRecords.js";
+import { tournamentsRepo } from "./storage/tournaments.repo.js";
+import { COUNTRY_INDEX_MIN, MOVERS_PATH, countryPath, fedNameKo, type UmbCat } from "../shared/umbCountryMeta.js";
+import { hasTourPage, pbaTourPath, tourNameWithSeason, umbEventPath, umbEventSlug } from "../shared/tournamentMeta.js";
+import {
+  BRAND_KO, GOLF_LIST_SEO_LIMIT, GOLF_TOUR_LABEL, SITE_GRAPH_LD, SITE_VERIFICATION_META, worldRankingSeo,
+  golferDesc, golferNameFull, golferTitle, golfRankingDesc, golfRankingPath, golfRankingTitle, umbPlayerDesc, umbPlayerTitle,
+} from "../shared/siteGraph.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
 //
@@ -38,8 +45,8 @@ import { renderPbaRecords, type PbaRecordsRender } from "./seo/pbaRecords.js";
 // 클로킹이 아닌 이유: 여기서 내보내는 본문은 같은 경로에서 React 가 실제로 렌더하는 문구와
 // 동일하다. 문안 원본을 공유하거나(shared/aboutContent.ts), 사용자에게도 공개된 API
 // 데이터만 쓴다. 봇에게만 있는 문구를 만들지 않는 것이 이 파일의 유일한 금선이다.
-//   → 홈(/) 을 아예 다루지 않는 이유도 그것과 이어진다. 홈의 실제 렌더 결과는 로그인 폼뿐이고,
-//     정적 셸이 이미 더 나은 메타를 갖고 있다. 자세한 근거는 registerPrerender 안의 주석 참고.
+//   → 홈(/) 도 프리렌더한다(랜딩 문안 = shared/landingContent.ts). 정적 셸의 @graph·소유확인 메타는
+//     shared/siteGraph.ts 에서 같은 값을 받아 그대로 싣는다. 자세한 근거는 registerPrerender 안의 주석 참고.
 //
 // 실사용자는 이 미들웨어를 타지 않는다. vercel.json 이 User-Agent 헤더로 봇만
 // /api/index.ts 로 우회시킨다(routes 의 has 조건). 앱이 Capacitor 원격URL 모드로
@@ -101,17 +108,25 @@ const HUB_L10N: Record<string, { home: string; wr: string; pba: string; golf: st
   es: { home: "Inicio RANKUE", wr: "Ranking mundial de billar", pba: "Ranking PBA Tour", golf: "Rankings de golf", stores: "Salas de billar en Corea", briefing: "Boletín diario de billar", community: "Comunidad", about: "Acerca de RANKUE", support: "Soporte" },
 };
 export function hubNav(lang = "ko"): string {
-  const H = HUB_L10N[lang] ?? HUB_L10N.en;
+  // 허브 언어판이 없는 언어(/about 의 ja·zh)는 영어판으로 잇는다 — ?lang=ja 는 ko 로 떨어지는 비정본 주소다.
+  if (!HUB_L10N[lang]) lang = "en";
+  const H = HUB_L10N[lang];
   const q = lang === "ko" ? "" : `?lang=${lang}`;
   const golfQ = lang === "en" ? "?lang=en" : "";
+  const ko = lang === "ko";
   const links: Array<[string, string]> = [
-    [`/${q}`, H.home], [`/world-ranking${q}`, H.wr], [`/pba${q}`, H.pba], [`/golf-ranking${golfQ}`, H.golf],
+    [`/${q}`, H.home], [`/world-ranking${q}`, H.wr],
+    // 순위 변동·PBA 통산 기록(2026-09-24) — 한국어 전용 허브라 한국어 문서에만. 이전엔 거의 고아였다(각각 1~5곳에서만 링크).
+    ...(ko ? [[MOVERS_PATH, "세계랭킹 순위 변동"] as [string, string]] : []),
+    [`/pba${q}`, H.pba],
+    ...(ko ? [["/pba/records", "PBA 통산 기록"] as [string, string]] : []),
+    [`/golf-ranking${golfQ}`, H.golf],
     // 골프장 허브(2026-09-24) — 골프 예약·시세는 한국 전용이라 한국어 문서에만 건다.
-    ...(lang === "ko" ? [["/golf/courses", "전국 골프장"] as [string, string]] : []),
+    ...(ko ? [["/golf/courses", "전국 골프장"] as [string, string]] : []),
     // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 문서에만 건다.
-    ...(lang === "ko" ? [["/billiards/terms", "당구 용어"] as [string, string]] : []),
+    ...(ko ? [["/billiards/terms", "당구 용어"] as [string, string]] : []),
     // 당구 대회(2026-09-24) — 프리렌더가 한국어 전용(?lang= 무시)이라 한국어 문서에만 건다.
-    ...(lang === "ko" ? [["/tournaments", "당구 대회"] as [string, string]] : []),
+    ...(ko ? [["/tournaments", "당구 대회"] as [string, string]] : []),
     ["/stores", H.stores], ["/briefing", H.briefing], ["/community", H.community], [`/about${q}`, H.about], ["/support", H.support],
   ];
   return `<nav aria-label="RANKUE">${links.map(([href, label]) => `<a href="${href}">${esc(label)}</a>`).join(" · ")}</nav>`;
@@ -122,6 +137,8 @@ export function hubNav(lang = "ko"): string {
 // 썸네일이 사라진다(스크래퍼 UA 인 kakaotalk-scrap·facebookexternalhit·Twitterbot 이
 // 모두 봇 패턴에 걸려 이 프리렌더를 받기 때문이다).
 const OG_IMAGE = `${ORIGIN}/og.png`;
+// 골프 기본 썸네일(2026-09-24) — 골프 페이지가 당구 og.png(큐대·공)를 달고 나가 골프 검색결과·공유 카드에 당구 그림이 떴다.
+const OG_GOLF_IMAGE = `${ORIGIN}/og-golf.png`;
 const OG_LOCALE: Record<string, string> = {
   ko: "ko_KR", en: "en_US", vi: "vi_VN", tr: "tr_TR", es: "es_ES", ja: "ja_JP", zh: "zh_CN",
 };
@@ -149,6 +166,8 @@ export interface PageParts {
   image?: { url: string; width: number; height: number; alt: string };
   body: string;
   jsonLd?: unknown[];
+  /** <head> 에 더 싣는 meta(name·content). 봇 홈의 소유확인 메타용 — 정적 셸을 대체하므로 여기서 다시 내야 한다. */
+  headMeta?: ReadonlyArray<{ name: string; content: string }>;
 }
 
 // 본문 목차(점프 링크) — 구글이 검색결과에 "섹션 칩"(오행 분포 · 2026년 운세 …처럼 페이지 안 절로
@@ -177,10 +196,12 @@ export function page(p: PageParts): string {
   // 상호(reciprocal) hreflang: 어느 언어판을 내보내든 **같은 전체 클러스터**를 선언해야
   // 구글이 묶음으로 인식한다. 한쪽만 선언하면 선언 전체가 무시된다.
   const base = p.altBase ?? p.canonical;
+  // 기준 URL 에 이미 쿼리가 있으면(/golf-ranking?tour=rolex) & 로 잇는다
+  const sep = base.includes("?") ? "&" : "?";
   const alts = (p.altLangs ?? []).length
     ? `\n  <link rel="alternate" hreflang="ko" href="${esc(base)}" />` +
       (p.altLangs ?? [])
-        .map((l) => `\n  <link rel="alternate" hreflang="${hreflangOf(l)}" href="${esc(base + "?lang=" + l)}" />`)
+        .map((l) => `\n  <link rel="alternate" hreflang="${hreflangOf(l)}" href="${esc(base + sep + "lang=" + l)}" />`)
         .join("") +
       `\n  <link rel="alternate" hreflang="x-default" href="${esc(base)}" />`
     : "";
@@ -200,11 +221,12 @@ export function page(p: PageParts): string {
     .join("");
 
   const lang = p.lang ?? "ko";
+  const headMeta = (p.headMeta ?? []).map((m) => `\n  <meta name="${esc(m.name)}" content="${esc(m.content)}" />`).join("");
   return `<!DOCTYPE html>
 <html lang="${esc(lang)}">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />${headMeta}
   <title>${esc(p.title)}</title>
   <meta name="description" content="${esc(p.desc)}" />
   <meta name="robots" content="${p.noindex ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1"}" />
@@ -296,7 +318,7 @@ const APP_LD = {
 };
 
 /** /about — 문안은 shared/aboutContent.ts 가 정본. ?lang= 로 7개 언어. */
-function aboutBody(c: AboutContent): string {
+function aboutBody(c: AboutContent, lang: string): string {
   return `<main>
   <h1>${esc(c.h1)}</h1>
   <p>${esc(c.tagline)}</p>
@@ -321,6 +343,7 @@ function aboutBody(c: AboutContent): string {
   <p>${esc(c.ctaBody)}</p>
 
   <nav><a href="/">${esc(c.home)}</a> <a href="/support">${esc(c.support)}</a> <a href="/privacy">${esc(c.privacy)}</a></nav>
+  ${hubNav(lang)}
 </main>`;
 }
 
@@ -517,17 +540,25 @@ function golfIntentLinks(s: GolfSummary, sc: { region: string | null; city: stri
   return links.join(" · ");
 }
 
-/** 보이는 경로 표시 + BreadcrumbList. 마지막 칸은 현재 페이지(링크 없음). */
-function golfCrumbs(items: { name: string; path: string }[]): { html: string; ld: unknown } {
-  const html = `<nav aria-label="경로">${items.map((c, i) => i === items.length - 1 ? esc(c.name) : `<a href="${esc(c.path)}">${esc(c.name)}</a>`).join(" › ")}</nav>`;
+/**
+ * 보이는 경로 표시 + BreadcrumbList — 한 목록에서 둘 다 만든다(보이는 것과 마크업이 어긋나지 않게). 마지막 칸은 현재 페이지(링크 없음).
+ * ld 는 @context 가 없다 — @graph 안에 넣거나 withContext() 로 감싸 단독으로 낸다.
+ */
+function crumbs(items: { name: string; path: string }[], lang = "ko"): { html: string; ld: Record<string, unknown> } {
+  const html = `<nav aria-label="${lang === "ko" ? "경로" : "Breadcrumb"}">${items.map((c, i) => i === items.length - 1 ? esc(c.name) : `<a href="${esc(c.path)}">${esc(c.name)}</a>`).join(" › ")}</nav>`;
   const ld = {
     "@type": "BreadcrumbList",
     itemListElement: items.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: `${ORIGIN}${c.path}` })),
   };
   return { html, ld };
 }
+const golfCrumbs = crumbs;
+const withContext = (o: Record<string, unknown>) => ({ "@context": "https://schema.org", ...o });
+/** 경로의 첫 칸(랭큐 홈) — 언어판이 있는 허브는 같은 언어의 홈으로 */
+const rootCrumb = (lang = "ko") => (lang === "ko" ? { name: "랭큐", path: "/" } : { name: "RANKUE", path: `/?lang=${lang}` });
 
-const golfImage = (alt: string) => ({ url: OG_IMAGE, width: 1200, height: 630, alt });
+// 골프 페이지 기본 썸네일 — 그림이 골프 브랜드 이미지라 alt 도 그것만 말한다(골프장 이름을 적으면 그림과 다른 설명이 된다).
+const golfImage = () => ({ url: OG_GOLF_IMAGE, width: 1200, height: 630, alt: "랭큐 골프" });
 
 // ── /golf/course/:slug ────────────────────────────────────────────
 async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): Promise<GolfRender> {
@@ -745,7 +776,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     title,
     desc,
     canonical,
-    image: golfImage(`${p.name} — 랭큐 골프`),
+    image: golfImage(),
     jsonLd: [{ "@context": "https://schema.org", "@graph": [course, crumbs.ld] }],
     body: `<main>
   ${crumbs.html}
@@ -840,7 +871,7 @@ function renderGolfList(s: GolfSummary, sc: GolfScope, now: number): GolfRender 
     title,
     desc,
     canonical,
-    image: golfImage(`${where} 골프장 — 랭큐 골프`),
+    image: golfImage(),
     jsonLd: [{
       "@context": "https://schema.org",
       "@graph": [
@@ -921,7 +952,7 @@ function renderGolfIntent(s: GolfSummary, intent: GolfIntent, sc: GolfScope, now
     desc,
     canonical,
     noindex,
-    image: golfImage(`${title.split(" | ")[0]} — 랭큐 골프`),
+    image: golfImage(),
     jsonLd: [{ "@context": "https://schema.org", "@graph": [crumbs.ld] }],
     body: `<main>
   ${crumbs.html}
@@ -957,20 +988,15 @@ export async function renderGolfPath(pathname: string): Promise<GolfRender | nul
 }
 
 export function registerPrerender(app: Express) {
-  // ── 홈(/) 은 일부러 프리렌더하지 않는다 ────────────────────────────
-  // client/index.html 의 정적 홈이 이미 더 낫다:
-  //   · title·description·canonical 이 이미 홈 기준으로 정확하다(홈이 문제였던 적이 없다.
-  //     문제는 **다른 페이지들이 홈의 메타를 물려받는** 것이었고, 그건 아래 라우트들이 고친다)
-  //   · @graph 로 Organization + WebSite + MobileApplication + FAQPage 4종을 이미 낸다
-  //     — 여기서 만들 수 있는 SoftwareApplication 하나보다 풍부하다
-  //   · naver-site-verification 2개 + google-site-verification 이 들어 있다.
-  //     홈을 프리렌더로 대체하면 이 메타가 사라져 **소유확인이 풀릴 위험**이 있다
-  //   · og:image 와 hreflang 4개 언어도 이미 선언돼 있다
-  // 반면 홈의 실제 렌더 결과는 로그인 폼 4줄(landing.tsx)뿐이라 프리렌더로 얻을 본문이 없다.
-  // → 홈은 정적 셸에 맡긴다. vercel.json 의 봇 라우트에서도 "/" 를 제외해야 한다.
-
-  // ── /about ─────────────────────────────────────────────────────────
-  // 홈(/) — 검색 방문자에게 보이는 랜딩과 **같은 문안**을 봇에게 텍스트로 준다.
+  // ── 홈(/) ─────────────────────────────────────────────────────────
+  // 봇 홈은 정적 셸(client/index.html)을 **통째로 대체**한다(vercel.json 이 "/" 도 봇이면 여기로 보낸다).
+  // 그래서 셸에만 있던 두 가지를 여기서 다시 내야 한다(2026-09-24 감사: 둘 다 빠져 있었다 — 예전 주석은
+  // "홈은 프리렌더하지 않는다"였지만 아래 라우트가 이미 돌고 있었다):
+  //   · Organization + WebSite + MobileApplication @graph — 구글이 검색결과 사이트 이름("랭큐")을 고르는 근거
+  //   · naver-site-verification 2개 + google-site-verification — 빠지면 재확인 때 소유확인이 풀릴 수 있다
+  // 둘 다 shared/siteGraph.ts 가 정본이고, client/index.html 과 같은 값인지는 shared/siteGraph.test.ts 가 대조한다.
+  //
+  // 본문은 검색 방문자에게 보이는 랜딩과 **같은 문안**을 봇에게 텍스트로 준다.
   // 구글은 JS를 렌더링해 랜딩 본문을 읽지만 네이버(Yeti)는 그러지 않아, 프리렌더가 없으면
   // 정적 셸의 메타 태그만 보고 본문(기능·크루·FAQ)을 통째로 못 본다.
   // 문안은 shared/landingContent.ts 정본을 그대로 써서 클로킹이 되지 않게 한다.
@@ -1018,7 +1044,10 @@ export function registerPrerender(app: Express) {
         canonical: lang === "ko" ? `${ORIGIN}/` : `${ORIGIN}/?lang=${lang}`,
         altLangs: LANDING_LANGS.filter((l) => l !== "ko") as unknown as string[],
         altBase: `${ORIGIN}/`,
+        headMeta: SITE_VERIFICATION_META,
         jsonLd: [
+          // 앱은 이 @graph 의 MobileApplication 하나로 낸다 — APP_LD(SoftwareApplication)까지 실으면 같은 앱이 두 개체가 된다.
+          SITE_GRAPH_LD,
           {
             "@context": "https://schema.org",
             "@type": "FAQPage",
@@ -1028,7 +1057,6 @@ export function registerPrerender(app: Express) {
               acceptedAnswer: { "@type": "Answer", text: f.a },
             })),
           },
-          APP_LD,
         ],
         body: `<main>
   <h1>${esc(c.h1)}</h1>
@@ -1069,8 +1097,9 @@ export function registerPrerender(app: Express) {
     ladiesH: string; juniorsH: string; fedH: string | null; moreH: string;
   }> = {
     ko: {
-      title: "당구 세계랭킹 — UMB 공식 3쿠션 랭킹 | 랭큐 RANKUE",
-      desc: "UMB 공식 3쿠션 세계랭킹을 매주 업데이트. 남자·여자·주니어 전체 순위와 한국 선수, 선수별 순위 히스토리를 랭큐에서 확인하세요.",
+      // 제목·설명은 화면(world-ranking.tsx useSeo)과 같은 worldRankingSeo — 예전엔 봇과 사람 사이에 달랐다(2026-09-24)
+      title: worldRankingSeo("ko").title,
+      desc: worldRankingSeo("ko").desc,
       intro: "UMB(세계당구연맹) 공식 3쿠션 세계랭킹입니다. 매주 갱신되며 남자·여자·주니어 부문 전체 순위와 선수별 순위 변동을 볼 수 있습니다.",
       topH: "남자 세계랭킹 톱 10", faqH: "자주 묻는 질문",
       faq1q: "당구 세계랭킹 1위는 누구인가요?",
@@ -1086,8 +1115,8 @@ export function registerPrerender(app: Express) {
       ladiesH: "여자 세계랭킹 톱 20", juniorsH: "주니어 세계랭킹 톱 10", fedH: "한국 선수 세계랭킹 톱 20", moreH: "남자 세계랭킹 11~50위",
     },
     en: {
-      title: "Billiards World Ranking — Official UMB 3-Cushion Rankings | RANKUE",
-      desc: "Official UMB 3-cushion world rankings, updated weekly. Full men's, women's and junior standings with per-player rank history on RANKUE.",
+      title: worldRankingSeo("en").title,
+      desc: worldRankingSeo("en").desc,
       intro: "The official UMB (Union Mondiale de Billard) 3-cushion world ranking, updated weekly with full men's, women's and junior standings.",
       topH: "Men's world ranking top 10", faqH: "Frequently asked questions",
       faq1q: "Who is No.1 in the billiards world ranking?",
@@ -1103,8 +1132,8 @@ export function registerPrerender(app: Express) {
       ladiesH: "Women's world ranking top 20", juniorsH: "Junior world ranking top 10", fedH: null, moreH: "Men's world ranking No.11–50",
     },
     tr: {
-      title: "Bilardo Dünya Sıralaması — Resmî UMB 3 Bant Sıralaması | RANKUE",
-      desc: "Resmî UMB 3 bant dünya sıralaması, her hafta güncellenir. Erkekler, kadınlar ve gençler tam sıralama ve oyuncu bazlı sıralama geçmişi RANKUE'de.",
+      title: worldRankingSeo("tr").title,
+      desc: worldRankingSeo("tr").desc,
       intro: "UMB (Dünya Bilardo Birliği) resmî 3 bant dünya sıralaması. Her hafta güncellenir; erkekler, kadınlar ve gençler kategorilerinin tam sıralamasını içerir.",
       topH: "Erkekler dünya sıralaması ilk 10", faqH: "Sık sorulan sorular",
       faq1q: "Bilardo dünya sıralamasında 1 numara kim?",
@@ -1120,8 +1149,8 @@ export function registerPrerender(app: Express) {
       ladiesH: "Kadınlar dünya sıralaması ilk 20", juniorsH: "Gençler dünya sıralaması ilk 10", fedH: "Türk oyuncular — dünya sıralaması ilk 20", moreH: "Erkekler dünya sıralaması 11–50",
     },
     vi: {
-      title: "BXH Bida Thế giới — BXH 3 băng chính thức của UMB | RANKUE",
-      desc: "BXH bida 3 băng thế giới chính thức của UMB, cập nhật hằng tuần. Đầy đủ nam, nữ, trẻ và diễn biến thứ hạng từng cơ thủ trên RANKUE.",
+      title: worldRankingSeo("vi").title,
+      desc: worldRankingSeo("vi").desc,
       intro: "BXH bida 3 băng thế giới chính thức của UMB (Liên đoàn Bida Thế giới), cập nhật hằng tuần với đầy đủ các hạng mục nam, nữ và trẻ.",
       topH: "Top 10 BXH nam thế giới", faqH: "Câu hỏi thường gặp",
       faq1q: "Ai đang đứng số 1 BXH bida thế giới?",
@@ -1137,8 +1166,8 @@ export function registerPrerender(app: Express) {
       ladiesH: "Top 20 BXH nữ thế giới", juniorsH: "Top 10 BXH trẻ thế giới", fedH: "Top 20 cơ thủ Việt Nam trên BXH thế giới", moreH: "BXH nam thế giới hạng 11–50",
     },
     es: {
-      title: "Ranking Mundial de Billar — Ranking oficial UMB de tres bandas | RANKUE",
-      desc: "Ranking mundial oficial UMB de billar a tres bandas, actualizado cada semana. Clasificación completa masculina, femenina y juvenil en RANKUE.",
+      title: worldRankingSeo("es").title,
+      desc: worldRankingSeo("es").desc,
       intro: "Ranking mundial oficial de billar a tres bandas de la UMB (Unión Mundial de Billar), actualizado semanalmente con las categorías masculina, femenina y juvenil.",
       topH: "Top 10 del ranking mundial masculino", faqH: "Preguntas frecuentes",
       faq1q: "¿Quién es el N.º 1 del ranking mundial de billar?",
@@ -1257,7 +1286,11 @@ export function registerPrerender(app: Express) {
     await section(W.ladiesH, "ladies", { limit: 20 });
     await section(W.juniorsH, "juniors", { limit: 10 });
     if (W.fedH && W.fedFaq) await section(W.fedH, "players", { limit: 20, fed: W.fedFaq.fed });
+    // 허브 경로 "랭큐 › 당구 세계랭킹"(2026-09-24) — 없으면 데스크톱 검색결과에 영문 슬러그(› world-ranking)가 뜬다
+    const wrCrumbs = crumbs([rootCrumb(lang), { name: (HUB_L10N[lang] ?? HUB_L10N.en).wr, path: `/world-ranking${langSuffix}` }], lang);
+    jsonLd.push(withContext(wrCrumbs.ld));
     res.setHeader("X-Prerender", `world-ranking:${lang}`);
+    noStore(res);
     res.send(
       page({
         title: W.title,
@@ -1268,6 +1301,7 @@ export function registerPrerender(app: Express) {
         altBase: `${ORIGIN}/world-ranking`,
         jsonLd,
         body: `<main>
+  ${wrCrumbs.html}
   <h1>${esc(W.title.split(" | ")[0])}${esc(editionLabel)}</h1>
   <p>${esc(W.intro)}</p>
   <h2>${esc(W.topH)}</h2>
@@ -1307,11 +1341,10 @@ export function registerPrerender(app: Express) {
   // 데이터(순위·포인트)는 언어 중립 — 템플릿 문장만 언어별로 바꾼다.
   const UMB_LANGS = ["en", "tr", "vi", "es"] as const;
   type UmbLang = "ko" | (typeof UMB_LANGS)[number];
+  // 제목·설명은 shared/siteGraph.ts 의 umbPlayerTitle·umbPlayerDesc — 화면(world-player.tsx)과 같은 함수다(2026-09-24).
   const UMB_L10N: Record<UmbLang, {
     cat: Record<string, string>;
     rankingName: string;              // "당구 세계랭킹" — h1·브레드크럼 공용
-    playerTitle: (name: string, rank: number) => string;
-    playerDesc: (name: string, fed: string, cat: string, rank: number, pts: number, best: number) => string;
     statsLine: (fed: string, rank: number, pts: number, best: number, natl: string, updated: string) => string;
     faqH: string;
     faq1q: (name: string) => string;
@@ -1331,9 +1364,8 @@ export function registerPrerender(app: Express) {
     ko: {
       cat: { players: "남자", ladies: "여자", juniors: "주니어" },
       rankingName: "당구 세계랭킹",
-      playerTitle: (n, r) => `${n} — 당구 세계랭킹 ${r}위 | 랭큐 RANKUE`,
-      playerDesc: (n, f, c, r, p, b) => `${n} (${f}) UMB 공식 3쿠션 ${c} 세계랭킹 ${r}위, ${p}점. 역대 최고 ${b}위. 주간 순위 히스토리와 대회별 포인트를 랭큐에서 확인하세요.`,
-      statsLine: (f, r, p, b, natl, u) => `UMB 공식 3쿠션 세계랭킹. 국가 ${f} · 현재 ${r}위 · ${p}점 · 역대 최고 ${b}위 · 국내 ${natl}위${u ? ` · ${u} 기준` : ""}`,
+      // f 는 한국어 나라 이름(fedNameKo) — "국내"는 한국으로 읽혀서 나라 이름을 쓴다(2026-09-24)
+      statsLine: (f, r, p, b, natl, u) => `UMB 공식 3쿠션 세계랭킹. 국가 ${f} · 현재 ${r}위 · ${p}점 · 역대 최고 ${b}위 · ${f} 선수 중 ${natl}위${u ? ` · ${u} 기준` : ""}`,
       faqH: "자주 묻는 질문",
       faq1q: (n) => `${n}의 현재 세계랭킹은 몇 위인가요?`,
       faq1a: (n, c, r, p, u) => `${n} 선수는 UMB 공식 3쿠션 ${c} 세계랭킹 ${r}위입니다 (${p}점${u ? `, ${u} 기준` : ""}).`,
@@ -1351,8 +1383,6 @@ export function registerPrerender(app: Express) {
     en: {
       cat: { players: "Men's", ladies: "Women's", juniors: "Junior" },
       rankingName: "Billiards World Ranking",
-      playerTitle: (n, r) => `${n} — 3-Cushion Billiards World Ranking No.${r} | RANKUE`,
-      playerDesc: (n, f, c, r, p, b) => `${n} (${f}) is No.${r} in the official UMB 3-cushion ${c.toLowerCase()} world ranking with ${p} points. Career best No.${b}. Weekly rank history and points by tournament on RANKUE.`,
       statsLine: (f, r, p, b, natl, u) => `Official UMB 3-cushion world ranking. Country ${f} · current No.${r} · ${p} pts · career best No.${b} · national No.${natl}${u ? ` · as of ${u}` : ""}`,
       faqH: "Frequently asked questions",
       faq1q: (n) => `What is ${n}'s current world ranking?`,
@@ -1371,8 +1401,6 @@ export function registerPrerender(app: Express) {
     tr: {
       cat: { players: "Erkekler", ladies: "Kadınlar", juniors: "Gençler" },
       rankingName: "Bilardo Dünya Sıralaması",
-      playerTitle: (n, r) => `${n} — 3 Bant Bilardo Dünya Sıralaması ${r}. | RANKUE`,
-      playerDesc: (n, f, c, r, p, b) => `${n} (${f}), resmî UMB 3 bant ${c.toLowerCase()} dünya sıralamasında ${p} puanla ${r}. sırada. Kariyer rekoru ${b}. sıra. Haftalık sıralama geçmişi RANKUE'de.`,
       statsLine: (f, r, p, b, natl, u) => `Resmî UMB 3 bant dünya sıralaması. Ülke ${f} · güncel ${r}. · ${p} puan · kariyer rekoru ${b}. · ulusal ${natl}.${u ? ` · ${u} itibarıyla` : ""}`,
       faqH: "Sık sorulan sorular",
       faq1q: (n) => `${n}'in güncel dünya sıralaması kaç?`,
@@ -1391,8 +1419,6 @@ export function registerPrerender(app: Express) {
     vi: {
       cat: { players: "Nam", ladies: "Nữ", juniors: "Trẻ" },
       rankingName: "BXH Bida Thế giới",
-      playerTitle: (n, r) => `${n} — BXH Bida 3 băng Thế giới hạng ${r} | RANKUE`,
-      playerDesc: (n, f, c, r, p, b) => `${n} (${f}) đứng hạng ${r} BXH bida 3 băng ${c.toLowerCase()} thế giới chính thức của UMB với ${p} điểm. Cao nhất sự nghiệp hạng ${b}. Xem diễn biến thứ hạng hằng tuần trên RANKUE.`,
       statsLine: (f, r, p, b, natl, u) => `BXH bida 3 băng thế giới chính thức của UMB. Quốc gia ${f} · hiện tại hạng ${r} · ${p} điểm · cao nhất hạng ${b} · trong nước hạng ${natl}${u ? ` · tính đến ${u}` : ""}`,
       faqH: "Câu hỏi thường gặp",
       faq1q: (n) => `Thứ hạng thế giới hiện tại của ${n} là bao nhiêu?`,
@@ -1411,8 +1437,6 @@ export function registerPrerender(app: Express) {
     es: {
       cat: { players: "Masculino", ladies: "Femenino", juniors: "Juvenil" },
       rankingName: "Ranking Mundial de Billar",
-      playerTitle: (n, r) => `${n} — Ranking Mundial de Billar a Tres Bandas N.º ${r} | RANKUE`,
-      playerDesc: (n, f, c, r, p, b) => `${n} (${f}) es N.º ${r} del ranking mundial oficial UMB de billar a tres bandas (${c.toLowerCase()}) con ${p} puntos. Mejor puesto histórico: N.º ${b}. Historial semanal en RANKUE.`,
       statsLine: (f, r, p, b, natl, u) => `Ranking mundial oficial UMB de tres bandas. País ${f} · actual N.º ${r} · ${p} pts · mejor histórico N.º ${b} · nacional N.º ${natl}${u ? ` · a ${u}` : ""}`,
       faqH: "Preguntas frecuentes",
       faq1q: (n) => `¿Cuál es el ranking mundial actual de ${n}?`,
@@ -1451,6 +1475,33 @@ export function registerPrerender(app: Express) {
       // ko는 한글 이름 우선("조명우 (CHO Myung Woo)"), 그 외 언어는 로마자 원표기
       const nameMain = lang === "ko" ? (p.nativeName || p.playerName) : p.playerName;
       const nameFull = lang === "ko" && p.nativeName ? `${p.nativeName} (${p.playerName})` : p.playerName;
+      // 제목·설명 재료 — 화면(world-player.tsx)도 같은 API 응답에서 같은 값을 넘긴다
+      const seo = {
+        category: category as UmbCat, playerName: p.playerName, nativeName: p.nativeName, fed: p.fed,
+        rank: p.rank, points: p.points, bestRank: data.bestRank, nationalRank: p.nationalRank,
+      };
+      const desc = umbPlayerDesc(lang, seo);
+      // 출전 대회 페이지(/tournaments/umb/:slug, 한국어 전용) — 있는 대회만 연도에 링크한다. 목록은 10분 캐시라 싸다.
+      let umbEventSlugs: Set<string> | null = null;
+      if (lang === "ko" && data.eventHistory?.rows.length) {
+        try {
+          umbEventSlugs = new Set((await tournamentsRepo.getUmbEvents()).map((e) => e.slug));
+        } catch (e) {
+          console.warn("[prerender] player umb events failed:", (e as Error)?.message);
+        }
+      }
+      // 국가 페이지 — 남자 등재가 기준(COUNTRY_INDEX_MIN)을 넘어 색인되는 나라만 잇는다(작은 나라는 noindex 라 크롤 예산만 쓴다)
+      let countryHtml = "";
+      if (lang === "ko" && /^[A-Za-z]{2}$/.test(String(p.fed ?? ""))) {
+        try {
+          const men = category === "players"
+            ? (data.national?.fedCount ?? 0)
+            : (await storage.umb.getRankings("players", { fed: p.fed, limit: 1 })).total;
+          if (men >= COUNTRY_INDEX_MIN) countryHtml = `<a href="${esc(countryPath(p.fed))}">${esc(fedNameKo(p.fed))} 당구 선수 세계랭킹</a>`;
+        } catch (e) {
+          console.warn("[prerender] player country count failed:", (e as Error)?.message);
+        }
+      }
       const base = `${ORIGIN}/player/${category}/${req.params.umbId}`;
       const canonical = lang === "ko" ? base : `${base}?lang=${lang}`;
       const historySummary = data.history.slice(-10).map((h: any) =>
@@ -1463,9 +1514,13 @@ export function registerPrerender(app: Express) {
       const evHistHtml = eh && eh.rows.length
         ? `\n  <h2>${esc(L.evHistH)}</h2>\n  <ul>\n  ${eh.rows.slice(0, 12).map((r) => {
             const title = [L.evKind[r.kind] ?? r.label, r.city].filter(Boolean).join(" · ");
-            const cells = r.cells.map((c) => `${c.year} ${c.points}`).join(" · ");
+            const cells = r.cells.map((c) => {
+              const slug = umbEventSlugs ? umbEventSlug(c.label) : null;
+              const year = slug && umbEventSlugs!.has(slug) ? `<a href="${esc(umbEventPath(slug))}">${esc(c.year)}</a>` : esc(c.year);
+              return `${year} ${esc(c.points)}`;
+            }).join(" · ");
             const d = r.delta == null || r.delta === 0 ? "" : r.delta > 0 ? ` (▲${r.delta})` : ` (▼${-r.delta})`;
-            return `<li>${esc(title)}: ${esc(cells)}${esc(d)}</li>`;
+            return `<li>${esc(title)}: ${cells}${esc(d)}</li>`;
           }).join("\n  ")}\n  </ul>`
         : "";
       // 인접 순위 ±5 — 선수 페이지끼리 사슬로 이어져 사이트맵에 없는 하위 순위도 크롤러가 따라간다.
@@ -1484,11 +1539,15 @@ export function registerPrerender(app: Express) {
       // 선수 카드(정사각형 PNG) — 검색 썸네일·미리보기의 재료. 클라이언트 useSeo 와 같은 주소(playerCardUrl).
       const card = playerCardUrl(ORIGIN, category, req.params.umbId, lang);
       const cardAlt = `${nameFull} — ${L.rankingName} ${L.rankWord(p.rank)}`;
+      // 경로 "랭큐 › 당구 세계랭킹 › 선수" — 보이는 경로와 BreadcrumbList 를 한 목록에서(2026-09-24: 마크업에만 있고 첫 칸이 랭큐가 아니었다)
+      const lq = lang === "ko" ? "" : `?lang=${lang}`;
+      const pCrumbs = crumbs([rootCrumb(lang), { name: L.rankingName, path: `/world-ranking${lq}` }, { name: nameMain, path: `/player/${category}/${req.params.umbId}${lq}` }], lang);
       res.setHeader("X-Prerender", `umb-player:${lang}`);
+      noStore(res);
       res.send(
         page({
-          title: L.playerTitle(nameFull, p.rank),
-          desc: L.playerDesc(nameFull, p.fed, catName, p.rank, p.points, data.bestRank),
+          title: umbPlayerTitle(lang, seo),
+          desc,
           canonical,
           lang,
           altLangs: [...UMB_LANGS],
@@ -1501,24 +1560,18 @@ export function registerPrerender(app: Express) {
               name: nameMain,
               alternateName: p.nativeName && lang === "ko" ? p.playerName : (p.nativeName || undefined),
               nationality: { "@type": "Country", name: p.fed },
-              description: L.playerDesc(nameMain, p.fed, catName, p.rank, p.points, data.bestRank),
+              description: desc,
               url: canonical,
               image: card,
               knowsAbout: "Three-cushion billiards",
             },
-            {
-              "@context": "https://schema.org",
-              "@type": "BreadcrumbList",
-              itemListElement: [
-                { "@type": "ListItem", position: 1, name: L.rankingName, item: `${ORIGIN}/world-ranking${lang === "ko" ? "" : `?lang=${lang}`}` },
-                { "@type": "ListItem", position: 2, name: nameMain, item: canonical },
-              ],
-            },
+            withContext(pCrumbs.ld),
           ],
           body: `<main>
+  ${pCrumbs.html}
   <h1>${esc(nameFull)} — ${esc(L.rankingName)} ${esc(L.rankWord(p.rank))}</h1>
   <img src="${esc(card)}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(cardAlt)}" />
-  <p>${esc(L.statsLine(p.fed, p.rank, p.points, data.bestRank, String(p.nationalRank ?? "-"), updatedAt))}${(() => {
+  <p>${esc(L.statsLine(lang === "ko" ? fedNameKo(p.fed) : p.fed, p.rank, p.points, data.bestRank, String(p.nationalRank ?? "-"), updatedAt))}${(() => {
       const w = data.history.filter((h: any) => h.rank === 1).length;
       return w > 0 ? " " + esc(L.reignNote(w)) : "";
     })()}</p>
@@ -1534,7 +1587,7 @@ export function registerPrerender(app: Express) {
   ${historySummary}
   </ul>${evHistHtml}${nearHtml}
   <p>${esc(L.source)} — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
-  <nav><a href="/world-ranking${lang === "ko" ? "" : `?lang=${lang}`}">${esc(L.navAll)}</a></nav>
+  <nav><a href="/world-ranking${lang === "ko" ? "" : `?lang=${lang}`}">${esc(L.navAll)}</a>${lang === "ko" ? `${countryHtml ? ` · ${countryHtml}` : ""} · <a href="${MOVERS_PATH}">이번 회차 순위 변동</a>` : ""}</nav>
   ${hubNav(lang)}
 </main>`,
         }),
@@ -1547,24 +1600,15 @@ export function registerPrerender(app: Express) {
 
   // ── /golf-ranking, /golfer/:tour/:id ──────────────────────────────
   // 골프 랭킹(2026-09-13 오너: 공개 전체·검색 유입). 출처 표기는 작게 한 줄. 언어판은 ko·en 만 — 나머지는 ko 로 떨어진다.
+  // 제목·설명·투어 이름·목록 주소는 shared/siteGraph.ts — 화면(golf-ranking.tsx·golfer.tsx useSeo)과 같은 함수다(2026-09-24).
   const GOLF_L10N = {
     ko: {
-      listTitle: "골프 랭킹 — 세계·KPGA·KLPGA 공식 순위 | 랭큐 RANKUE",
-      listDesc: "남자·여자 세계 골프 랭킹(OWGR·롤렉스)과 KPGA·KLPGA 투어 순위, 드라이브 거리·페어웨이·그린 적중률 등 시즌 기록을 매주 업데이트.",
-      tour: { owgr: "남자 세계 골프랭킹", rolex: "여자 세계 골프랭킹", kpga: "KPGA 코리안투어", klpga: "KLPGA 투어" } as Record<string, string>,
       rankWord: (r: number) => `${r}위`,
-      playerTitle: (n: string, tour: string, r: number | null) => `${n} — ${tour} ${r === null ? "" : `${r}위`} | 랭큐 RANKUE`,
-      playerDesc: (n: string, c: string, tour: string, r: number | null, best: number | null) => `${n} (${c}) ${tour} ${r === null ? "순위" : `${r}위`}${best !== null ? `, 역대 최고 ${best}위` : ""}. 순위 추이와 시즌 기록(드라이브 거리·페어웨이·그린 적중률)을 랭큐에서 확인하세요.`,
-      statsH: "시즌 기록", histH: "최근 순위", source: (n: string) => `출처: ${n}`, navAll: "골프 랭킹 전체", navHome: "랭큐 홈",
+      statsH: "시즌 기록", histH: "최근 순위", nearH: "비슷한 순위의 선수", source: (n: string) => `출처: ${n}`, navAll: "골프 랭킹 전체",
     },
     en: {
-      listTitle: "Golf Rankings — World, KPGA & KLPGA | RANKUE",
-      listDesc: "Men's and women's world golf rankings (OWGR, Rolex) plus KPGA & KLPGA tour standings with season stats — driving distance, fairways, GIR — updated weekly.",
-      tour: { owgr: "Men's World Golf Ranking", rolex: "Women's World Golf Ranking", kpga: "KPGA Korean Tour", klpga: "KLPGA Tour" } as Record<string, string>,
       rankWord: (r: number) => `No.${r}`,
-      playerTitle: (n: string, tour: string, r: number | null) => `${n} — ${tour} ${r === null ? "" : `No.${r}`} | RANKUE`,
-      playerDesc: (n: string, c: string, tour: string, r: number | null, best: number | null) => `${n} (${c}) is ${r === null ? "ranked" : `No.${r}`} in the ${tour}${best !== null ? `, career best No.${best}` : ""}. Rank history and season stats (driving distance, fairways, GIR) on RANKUE.`,
-      statsH: "Season stats", histH: "Recent ranks", source: (n: string) => `Source: ${n}`, navAll: "All golf rankings", navHome: "RANKUE home",
+      statsH: "Season stats", histH: "Recent ranks", nearH: "Players ranked nearby", source: (n: string) => `Source: ${n}`, navAll: "All golf rankings",
     },
   };
   const GOLF_TOURS_ALL = ["owgr", "rolex", "kpga", "klpga"] as const;
@@ -1574,42 +1618,55 @@ export function registerPrerender(app: Express) {
     if (!isBot(req)) return next();
     const lang = golfLang(req);
     const G = GOLF_L10N[lang];
+    const T = GOLF_TOUR_LABEL[lang];
     const tq = String(req.query.tour ?? "owgr");
     const tour = (GOLF_TOURS_ALL as readonly string[]).includes(tq) ? tq as (typeof GOLF_TOURS_ALL)[number] : "owgr";
     try {
       const { GOLF_TOUR_META } = await import("../shared/golfTours.js");
-      const data = await storage.golfRank.getRankings(tour, { limit: 50 });
+      const data = await storage.golfRank.getRankings(tour, { limit: GOLF_LIST_SEO_LIMIT });
       if (!data.rows.length) return sendUnavailable(res);
       const langSuffix = lang === "ko" ? "" : `?lang=${lang}`;
       const disp = (r: { playerName: string; nameKo: string | null }) => lang === "ko" && r.nameKo ? `${r.nameKo} (${r.playerName})` : r.playerName;
       const list = data.rows.map((r) => `  <li><a href="/golfer/${tour}/${esc(r.playerId)}${langSuffix}">${esc(disp(r))}</a> (${esc(r.country)}) — ${r.points}</li>`).join("\n");
-      const tabs = GOLF_TOURS_ALL.map((tid) => `<a href="/golf-ranking?tour=${tid}">${esc(G.tour[tid])}</a>`).join(" · ");
+      // 탭은 정본 주소로 — ?tour=owgr 은 canonical 이 /golf-ranking 이라 비정본이다
+      const tabs = GOLF_TOURS_ALL.map((tid) => tid === tour ? `<strong>${esc(T[tid])}</strong>` : `<a href="${esc(golfRankingPath(tid, lang))}">${esc(T[tid])}</a>`).join(" · ");
+      const title = golfRankingTitle(lang, tour, data.rows);
+      const desc = golfRankingDesc(lang, tour, data.edition, data.rows);
+      const top = data.rows[0];
+      const topName = lang === "ko" ? (top.nameKo || top.playerName) : top.playerName;
+      const gCrumbs = crumbs([rootCrumb(lang), { name: T[tour], path: golfRankingPath(tour, lang) }], lang);
       res.setHeader("X-Prerender", `golf-ranking:${tour}:${lang}`);
       noStore(res);
       res.send(page({
-        title: `${esc(G.tour[tour])} — ${G.listTitle}`,
-        desc: G.listDesc,
+        title,
+        desc,
         /*
          * 기본 투어(owgr)는 맨 주소 /golf-ranking 이 대표다. 예전엔 /golf-ranking 이 canonical 로 ?tour=owgr 을 가리키고,
          * 사이트맵에는 둘 다 올라가 있어 구글이 같은 페이지 둘로 보고 하나를 버렸다(2026-09-18 서치 콘솔).
          */
-        canonical: tour === "owgr"
-          ? `${ORIGIN}/golf-ranking${lang === "ko" ? "" : `?lang=${lang}`}`
-          : `${ORIGIN}/golf-ranking?tour=${tour}${lang === "ko" ? "" : `&lang=${lang}`}`,
+        canonical: `${ORIGIN}${golfRankingPath(tour, lang)}`,
         lang,
-        jsonLd: [{
-          "@context": "https://schema.org", "@type": "ItemList", name: G.tour[tour],
-          itemListElement: data.rows.slice(0, 20).map((r, i) => ({ "@type": "ListItem", position: i + 1, name: lang === "ko" ? (r.nameKo || r.playerName) : r.playerName, url: `${ORIGIN}/golfer/${tour}/${r.playerId}${langSuffix}` })),
-        }],
+        // 실제로 서빙하는 언어판은 en 하나(2026-09-24 감사: 사이트맵이 vi·tr·es 를 선언했지만 그 주소는 ko 로 떨어졌다)
+        altLangs: ["en"],
+        altBase: `${ORIGIN}${golfRankingPath(tour, "ko")}`,
+        // 1위 선수 카드 — 골프 검색결과·공유에 당구 og.png 대신 이 투어의 얼굴이 뜬다
+        image: { url: golferCardUrl(ORIGIN, tour, top.playerId, lang), width: CARD_SIZE, height: CARD_SIZE, alt: `${T[tour]} ${G.rankWord(top.rank)} ${topName}` },
+        jsonLd: [
+          {
+            "@context": "https://schema.org", "@type": "ItemList", name: T[tour],
+            itemListElement: data.rows.slice(0, 20).map((r, i) => ({ "@type": "ListItem", position: i + 1, name: lang === "ko" ? (r.nameKo || r.playerName) : r.playerName, url: `${ORIGIN}/golfer/${tour}/${r.playerId}${langSuffix}` })),
+          },
+          withContext(gCrumbs.ld),
+        ],
         body: `<main>
-  <h1>${esc(G.tour[tour])} — ${esc(G.listTitle.split(" | ")[0])}</h1>
-  <p>${esc(G.listDesc)} (${esc(data.edition ?? "")})</p>
+  ${gCrumbs.html}
+  <h1>${esc(T[tour])}</h1>
+  <p>${esc(desc)}</p>
   <nav>${tabs}</nav>
   <ol>
 ${list}
   </ol>
   <p>${esc(G.source(GOLF_TOUR_META[tour].sourceName))} — <a href="${esc(GOLF_TOUR_META[tour].sourceUrl)}" rel="noopener">${esc(GOLF_TOUR_META[tour].sourceUrl.replace("https://", ""))}</a></p>
-  <nav><a href="/golf-ranking${langSuffix}">${esc(G.navAll)}</a></nav>
   ${hubNav(lang)}
 </main>`,
       }));
@@ -1625,43 +1682,61 @@ ${list}
     if (!tour || !/^\d{1,10}$/.test(req.params.id)) return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
     const lang = golfLang(req);
     const G = GOLF_L10N[lang];
+    const T = GOLF_TOUR_LABEL[lang];
     try {
       const { GOLF_TOUR_META } = await import("../shared/golfTours.js");
       const data = await storage.golfRank.getPlayer(tour, req.params.id);
       if (!data?.player) return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
       const p = data.player;
       const nameMain = lang === "ko" ? (p.nameKo || p.playerName) : p.playerName;
-      const nameFull = lang === "ko" && p.nameKo && p.nameKo !== p.playerName ? `${p.nameKo} (${p.playerName})` : p.playerName;
+      const nameFull = golferNameFull(lang, p);
       const base = `${ORIGIN}/golfer/${tour}/${req.params.id}`;
       const canonical = lang === "ko" ? base : `${base}?lang=${lang}`;
       const langSuffix = lang === "ko" ? "" : `?lang=${lang}`;
+      const desc = golferDesc(lang, tour, p, data.bestRank);
       const hist = data.history.slice(-10).map((h) => `<li>${esc(h.edition)}: ${esc(G.rankWord(h.rank))} (${h.points})</li>`).join("\n  ");
       const stats = data.stats.slice(0, 12).map((s) => `<li>${esc(s.label)}: ${s.value}${s.unit ? ` ${esc(s.unit)}` : ""} — ${esc(G.rankWord(s.rank))}${s.of ? `/${s.of}` : ""}</li>`).join("\n  ");
+      // 인접 순위 ±5(2026-09-24) — 목록은 톱 50 만 링크하므로, 그 아래 골퍼들은 이 사슬이 아니면 사이트맵으로만 닿았다
+      let nearHtml = "";
+      if (p.rank !== null) {
+        try {
+          const near = await storage.golfRank.getRankings(tour, { offset: Math.max(0, p.rank - 6), limit: 11 });
+          const others = near.rows.filter((r) => r.playerId !== p.playerId);
+          if (others.length) {
+            nearHtml = `\n  <h2>${esc(G.nearH)}</h2>\n  <ul>\n  ${others.map((r) =>
+              `<li>${esc(G.rankWord(r.rank))} <a href="/golfer/${tour}/${esc(r.playerId)}${langSuffix}">${esc(golferNameFull(lang, r))}</a> (${esc(r.country)})</li>`).join("\n  ")}\n  </ul>`;
+          }
+        } catch (e) {
+          console.warn("[prerender] golfer neighbors failed:", (e as Error)?.message);
+        }
+      }
+      // 경로의 가운데 칸은 목록 정본 주소 — owgr 은 ?tour=owgr 이 아니라 맨 /golf-ranking(2026-09-24 감사)
+      const gCrumbs = crumbs([rootCrumb(lang), { name: T[tour], path: golfRankingPath(tour, lang) }, { name: nameMain, path: `/golfer/${tour}/${req.params.id}${langSuffix}` }], lang);
       // 선수 카드(정사각형 PNG) — 클라이언트 golfer.tsx useSeo 와 같은 주소(golferCardUrl)
       const card = golferCardUrl(ORIGIN, tour, req.params.id, lang);
-      const cardAlt = `${nameFull} — ${G.tour[tour]}${p.rank === null ? "" : ` ${G.rankWord(p.rank)}`}`;
+      const cardAlt = `${nameFull} — ${T[tour]}${p.rank === null ? "" : ` ${G.rankWord(p.rank)}`}`;
       res.setHeader("X-Prerender", `golfer:${lang}`);
+      noStore(res);
       res.send(page({
-        title: G.playerTitle(nameFull, G.tour[tour], p.rank),
-        desc: G.playerDesc(nameFull, p.country, G.tour[tour], p.rank, data.bestRank),
+        title: golferTitle(lang, tour, p),
+        desc,
         canonical, lang, altLangs: ["en"], altBase: base,
         image: { url: card, width: CARD_SIZE, height: CARD_SIZE, alt: cardAlt },
         jsonLd: [
           { "@context": "https://schema.org", "@type": "Person", name: nameMain, alternateName: p.nameKo && p.nameKo !== p.playerName ? p.playerName : undefined,
-            nationality: { "@type": "Country", name: p.country }, description: G.playerDesc(nameMain, p.country, G.tour[tour], p.rank, data.bestRank), url: canonical, image: card, knowsAbout: "Golf" },
-          { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
-            { "@type": "ListItem", position: 1, name: G.tour[tour], item: `${ORIGIN}/golf-ranking?tour=${tour}${lang === "ko" ? "" : `&lang=${lang}`}` },
-            { "@type": "ListItem", position: 2, name: nameMain, item: canonical },
-          ] },
+            nationality: { "@type": "Country", name: p.country }, description: desc, url: canonical, image: card, knowsAbout: "Golf" },
+          withContext(gCrumbs.ld),
         ],
         body: `<main>
-  <h1>${esc(nameFull)} — ${esc(G.tour[tour])} ${p.rank === null ? "" : esc(G.rankWord(p.rank))}</h1>
+  ${gCrumbs.html}
+  <h1>${esc(nameFull)} — ${esc(T[tour])}${p.rank === null ? "" : ` ${esc(G.rankWord(p.rank))}`}</h1>
   <img src="${esc(card)}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(cardAlt)}" />
-  <p>${esc(G.playerDesc(nameMain, p.country, G.tour[tour], p.rank, data.bestRank))}</p>
+  <p>${esc(desc)}</p>
   ${stats ? `<h2>${esc(G.statsH)}</h2>\n  <ul>\n  ${stats}\n  </ul>` : ""}
-  ${hist ? `<h2>${esc(G.histH)}</h2>\n  <ul>\n  ${hist}\n  </ul>` : ""}
+  ${hist ? `<h2>${esc(G.histH)}</h2>\n  <ul>\n  ${hist}\n  </ul>` : ""}${nearHtml}
   <p>${esc(G.source(GOLF_TOUR_META[tour].sourceName))} — <a href="${esc(GOLF_TOUR_META[tour].sourceUrl)}" rel="noopener">${esc(GOLF_TOUR_META[tour].sourceUrl.replace("https://", ""))}</a></p>
-  <nav><a href="/golf-ranking?tour=${tour}${lang === "ko" ? "" : `&lang=${lang}`}">${esc(G.navAll)}</a> <a href="/">${esc(G.navHome)}</a></nav>
+  <nav><a href="${esc(golfRankingPath(tour, lang))}">${esc(G.navAll)}</a></nav>
+  ${hubNav(lang)}
 </main>`,
       }));
     } catch (e) {
@@ -1767,6 +1842,8 @@ ${list}
       const season = await storage.pba.getDisplaySeason("PBA", currentPbaSeason());
       const rows = (await storage.pba.getRankings("PBA", season, "prize", 50)) as any[];
       if (!rows.length) return sendUnavailable(res);
+      // 허브 경로 "랭큐 › PBA 투어 랭킹"(2026-09-24)
+      const pbaCrumbs = crumbs([rootCrumb(plang), { name: (HUB_L10N[plang] ?? HUB_L10N.en).pba, path: plang === "ko" ? "/pba" : `/pba?lang=${plang}` }], plang);
       res.setHeader("X-Prerender", "pba");
       noStore(res);
       res.send(
@@ -1778,6 +1855,7 @@ ${list}
           altLangs: PBA_LANGS.filter((l) => l !== "ko") as unknown as string[],
           altBase: `${ORIGIN}/pba`,
           jsonLd: [
+            withContext(pbaCrumbs.ld),
             {
               "@context": "https://schema.org",
               "@type": "ItemList",
@@ -1789,6 +1867,7 @@ ${list}
             },
           ],
           body: `<main>
+  ${pbaCrumbs.html}
   <h1>${esc(PL.navList)}</h1>
   <p>${esc(PL.listDesc)}</p>
   <p>${esc(pbaSeasonLabel(season))}</p>
@@ -1830,6 +1909,44 @@ ${list}
     // 선수 카드(정사각형 PNG) — 클라이언트 pba-player.tsx useSeo 와 같은 주소(pbaCardUrl)
     const pbaCard = pbaCardUrl(ORIGIN, p.memCode, pplang);
     const pbaCardAlt = `${p.nameKo}${p.nameEn ? ` (${p.nameEn})` : ""} — ${p.league}`;
+    // 크롤 사슬(2026-09-24) — 선수 페이지가 /pba 링크 하나뿐인 막다른 길이었다(480쪽 대부분이 사이트맵으로만 닿았다).
+    // 같은 시즌 상금 순위 ±5 · 우승한 대회 · 통산 기록. 각각 실패해도 페이지는 나간다.
+    const ko = pplang === "ko";
+    const ls = ko ? "" : `?lang=${pplang}`;
+    let nearHtml = "";
+    const lastRanked = [...(p.seasons ?? [])].reverse().find((s: any) => s.prizeRank != null && (s.league === "PBA" || s.league === "LPBA"));
+    if (lastRanked) {
+      try {
+        const r0 = Number(lastRanked.prizeRank);
+        const rows = (await storage.pba.getRankings(lastRanked.league, lastRanked.season, "prize", r0 + 5)) as any[];
+        const near = rows.filter((r) => r.memCode !== p.memCode && r.prizeRank >= r0 - 5 && r.prizeRank <= r0 + 5);
+        if (near.length) {
+          const head = ko
+            ? `${pbaSeasonLabel(lastRanked.season)} 시즌 ${lastRanked.league} 상금랭킹 — 비슷한 순위의 선수`
+            : `${pbaSeasonLabel(lastRanked.season)} ${lastRanked.league} prize ranking — players nearby`;
+          nearHtml = `\n  <h2>${esc(head)}</h2>\n  <ul>\n  ${near.map((r) =>
+            `<li>${ko ? `${r.prizeRank}위` : `No.${r.prizeRank}`} <a href="/pba-player/${esc(encodeURIComponent(r.memCode))}${ls}">${esc(ko ? r.nameKo : (r.nameEn || r.nameKo))}</a></li>`).join("\n  ")}\n  </ul>`;
+        }
+      } catch (e) {
+        console.warn("[prerender] pba-player neighbors failed:", (e as Error)?.message);
+      }
+    }
+    // 우승한 대회 — pba_tournaments.winner_mem_code(대회 페이지가 있는 것만, 최근 먼저). 대회 페이지는 한국어 전용이다.
+    let winsHtml = "";
+    try {
+      const won = (await tournamentsRepo.allPbaRows())
+        .filter((r) => r.winnerMemCode === p.memCode && hasTourPage(r))
+        .sort((a, b) => b.startDate.localeCompare(a.startDate));
+      if (won.length) {
+        winsHtml = `\n  <h2>${esc(ko ? `우승한 대회 ${won.length}개` : `Titles won (${won.length})`)}</h2>\n  <ul>\n  ${won.map((r) =>
+          `<li><a href="${esc(pbaTourPath(r.season, r.tourCode!))}">${esc(tourNameWithSeason(r))}</a></li>`).join("\n  ")}\n  </ul>`;
+      }
+    } catch (e) {
+      console.warn("[prerender] pba-player wins failed:", (e as Error)?.message);
+    }
+    // 경로 "랭큐 › PBA 투어 랭킹 › 선수" — 보이는 경로와 BreadcrumbList 를 한 목록에서(2026-09-24: 둘이 달랐고 첫 칸이 랭큐가 아니었다).
+    // 본문이 한국어라 경로도 한국어 — 예전 BreadcrumbList 와 같은 이름·주소다.
+    const ppCrumbs = crumbs([rootCrumb("ko"), { name: "PBA 투어 랭킹", path: "/pba" }, { name: p.nameKo, path: `/pba-player/${encodeURIComponent(p.memCode)}` }]);
     res.setHeader("X-Prerender", "pba-player");
     noStore(res);
     res.send(
@@ -1838,8 +1955,9 @@ ${list}
         lang: pplang,
         image: { url: pbaCard, width: CARD_SIZE, height: CARD_SIZE, alt: pbaCardAlt },
         // ko 는 한글 이름, 그 외 언어는 로마자 원표기(현지 팬이 검색하는 형태)
-        title: PP.playerTitle(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), p.league),
-        desc: PP.playerDesc(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), pplang === "ko" ? p.nameEn : null, p.league, prizeStr, p.average, p.highRun),
+        // 통산 상금(제목)·최근 시즌 상금랭킹(설명) — 화면 pba-player.tsx 가 같은 인자로 부른다(2026-09-24)
+        title: PP.playerTitle(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), p.league, prizeStr),
+        desc: PP.playerDesc(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), pplang === "ko" ? p.nameEn : null, p.league, prizeStr, p.average, p.highRun, pbaLatestSeasonRank(p.seasons)),
         canonical: pplang === "ko"
           ? `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`
           : `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}?lang=${pplang}`,
@@ -1857,14 +1975,7 @@ ${list}
             url: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
             image: pbaCard,
           },
-          {
-            "@context": "https://schema.org",
-            "@type": "BreadcrumbList",
-            itemListElement: [
-              { "@type": "ListItem", position: 1, name: "PBA 투어 랭킹", item: `${ORIGIN}/pba` },
-              { "@type": "ListItem", position: 2, name: p.nameKo, item: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}` },
-            ],
-          },
+          withContext(ppCrumbs.ld),
           // "OOO 연봉" 은 조회가 많은 질의인데 프로당구엔 연봉 자체가 없다. 없는 수치를 지어내지 않고
           // 질문에 정확히 답하는 FAQ 를 준다 — AI 검색·구글 FAQ 리치결과 대응.
           {
@@ -1880,7 +1991,7 @@ ${list}
           },
         ],
         body: `<main>
-  <nav><a href="/pba">← PBA 투어 랭킹</a></nav>
+  ${ppCrumbs.html}
   <h1>${esc(p.nameKo)}</h1>
   <img src="${esc(pbaCard)}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(pbaCardAlt)}" />
   <p>${esc(p.nameEn ?? "")} · ${esc(p.league)}${p.nationCode ? ` · ${esc(p.nationCode)}` : ""}</p>
@@ -1898,8 +2009,10 @@ ${list}
   <ul>
   ${(p.seasons ?? []).map((s: any) => `<li>${esc(pbaSeasonLabel(s.season))} 시즌 — ${s.prizeRank != null ? `상금랭킹 ${s.prizeRank}위, ` : ""}상금 ${esc(formatPrizeKo(s.prize))}원, 포인트 ${s.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
   </ul>
-  ${p.umbPlayerId && p.umbCategory ? `<p><a href="/player/${esc(p.umbCategory)}/${esc(p.umbPlayerId)}">이 선수의 UMB 세계랭킹 기록 보기</a></p>` : ""}
+  ${p.umbPlayerId && p.umbCategory ? `<p><a href="/player/${esc(p.umbCategory)}/${esc(p.umbPlayerId)}">이 선수의 UMB 세계랭킹 기록 보기</a></p>` : ""}${winsHtml}${nearHtml}
+  <nav><a href="/pba/records">${esc(ko ? "PBA·LPBA 통산 기록 순위" : "PBA·LPBA career records")}</a> · <a href="/tournaments">${esc(ko ? "당구 대회 일정·결과" : "Billiards tournaments")}</a></nav>
   <p>출처: PBA 투어 공식 기록 — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
+  ${hubNav(pplang)}
 </main>`,
       }),
     );
@@ -1943,6 +2056,7 @@ ${list}
   <h1>오늘의 당구 브리핑 — ${esc(briefingDateKo(date))}</h1>
   ${b ? `<p><a href="/player/players/${esc(b.playerUmbId)}">${esc(briefingLineKo(b))}</a></p>` : "<p>이 날짜의 브리핑이 없습니다.</p>"}
   <p>출처: UMB 공식 랭킹 — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a> · 매일 자동 갱신</p>
+  ${hubNav("ko")}
 </main>`,
       }),
     );
@@ -1963,9 +2077,10 @@ ${list}
       console.warn("[prerender] community list failed:", (e as Error)?.message);
     }
     res.setHeader("X-Prerender", "community");
+    noStore(res);
     res.send(
       page({
-        title: "당구 커뮤니티 — 한 큐 자랑·질문·매장·레슨 | 랭큐 RANKUE",
+        title: `당구 커뮤니티 — 한 큐 자랑·질문·매장·레슨${BRAND_KO}`,
         desc: "전국 당구인들의 커뮤니티. 한 큐 자랑, 당구 질문, 매장 소식, 레슨 정보를 나눠보세요.",
         canonical: `${ORIGIN}/community`,
         body: `<main>
@@ -1974,7 +2089,7 @@ ${list}
   <ul>
   ${listHtml || "<li>첫 글을 남겨보세요.</li>"}
   </ul>
-  <nav><a href="/">랭큐 홈</a> <a href="/world-ranking">당구 세계랭킹</a></nav>
+  ${hubNav("ko")}
 </main>`,
       }),
     );
@@ -1988,16 +2103,18 @@ ${list}
       if (!post || post.isBlinded) return next(); // 블라인드 글은 색인시키지 않는다
       const title = (post.title || post.content.split("\n")[0] || "당구 커뮤니티 글").slice(0, 60);
       res.setHeader("X-Prerender", "community-post");
+      noStore(res);
       res.send(
         page({
-          title: `${title} | 랭큐 당구 커뮤니티`,
+          title: `${title} — 당구 커뮤니티${BRAND_KO}`,
           desc: post.content.slice(0, 150).replace(/\n/g, " "),
           canonical: `${ORIGIN}/community/${req.params.id}`,
           body: `<main>
   <h1>${esc(title)}</h1>
   <p>${esc(post.content.slice(0, 1000))}</p>
   <p>작성: ${esc(post.author?.name || "")} · ${esc(new Date(post.createdAt).toLocaleDateString("ko-KR"))}</p>
-  <nav><a href="/community">당구 커뮤니티</a> <a href="/">랭큐 홈</a></nav>
+  <nav><a href="/community">당구 커뮤니티</a></nav>
+  ${hubNav("ko")}
 </main>`,
         }),
       );
@@ -2041,7 +2158,7 @@ ${list}
           },
           APP_LD,
         ],
-        body: aboutBody(c),
+        body: aboutBody(c, lang),
       }),
     );
   });
@@ -2234,7 +2351,7 @@ ${list}
     res.send(
       page({
         // client/src/pages/store-listing.tsx 의 useSeo title/desc 와 문자 단위로 같아야 한다.
-        title: storeTitleKo(s.name, s.region),
+        title: storeTitleKo(s.name, s.region, s.address), // 시·구·동까지 — 화면 store-listing.tsx 와 같은 인자
         desc: storeDescKo(s.name, s.address, s as any, s.openHours),
         canonical: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
         jsonLd: [

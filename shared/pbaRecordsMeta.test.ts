@@ -93,4 +93,16 @@ describe("buildPbaRecords", () => {
         expect(d).toContain("9억 7,230만원");
         expect(d).toContain("2026년 9월 24일 갱신");
     });
+
+    it("설명문은 1위 숫자가 앞에, 100자 안팎 — 두 리그 1위가 다 들어가도 잘리지 않는다(2026-09-24)", () => {
+        const r = buildPbaRecords([
+            p("SAN", { nameKo: "다니엘 산체스", average: 1.723, careerPrize: 400_000_000 }),
+            p("MAR", { nameKo: "다비드 마르티네스", average: 1.5, careerPrize: 1_041_500_000 }),
+            p("KIM", { nameKo: "김가영", league: "LPBA", average: 1.055, careerPrize: 972_300_000 }),
+        ], { PBA: "2026-09-24" });
+        const d = pbaRecordsDescription(r);
+        expect(d).toBe("통산 에버리지 1위 다니엘 산체스 1.723·LPBA 김가영 1.055, 상금 1위 다비드 마르티네스 10억 4,150만원·LPBA 김가영 9억 7,230만원. 2026년 9월 24일 갱신.");
+        expect(d.length).toBeLessThanOrEqual(110);
+        expect(pbaRecordsDescription(buildPbaRecords([], {}))).toBe("PBA·LPBA 통산 기록 톱 20.");
+    });
 });

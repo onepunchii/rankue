@@ -34,7 +34,8 @@ export default function BriefingPage() {
   useSeo({
     title: briefingTitle(date),
     description: briefingDesc(b ?? null, date),
-    path: `/briefing/${date}`,
+    // /briefing 은 자기 자신이 대표 주소다(프리렌더 canonical 과 같게) — 날짜 주소는 보관 페이지
+    path: params?.date ? `/briefing/${date}` : "/briefing",
     locale: "ko",
   });
 

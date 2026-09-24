@@ -6,6 +6,7 @@ import { LucideChevronLeft } from "@/lib/icons";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { UmbPlayerBody, usePlayerDetail } from "@/components/hiq/umb/UmbPlayerSheet";
 import type { UmbCategory } from "@/components/hiq/umb/types";
+import { umbPlayerDesc, umbPlayerTitle } from "@shared/siteGraph";
 
 const CATEGORIES = ["players", "ladies", "juniors"];
 
@@ -22,13 +23,14 @@ export default function HiqWorldPlayer() {
     const { data } = usePlayerDetail(category, umbId);
     const p = data?.player;
     const nameMain = p ? (p.nativeName || p.playerName) : null;
+    // 제목·설명은 프리렌더(server/prerender.ts)와 같은 함수·같은 API 값 — 봇과 사람이 같은 제목을 본다(2026-09-24)
+    const seo = p && data ? {
+        category, playerName: p.playerName, nativeName: p.nativeName ?? null, fed: p.fed,
+        rank: p.rank, points: p.points, bestRank: data.bestRank, nationalRank: p.nationalRank,
+    } : null;
     useSeo({
-        title: p
-            ? `${p.nativeName ? `${p.nativeName} (${p.playerName})` : p.playerName} — ${t("umb.pageTitle")} ${p.rank}${t("umb.rankSuffix")} | RANKUE`
-            : `${t("umb.pageTitle")} | RANKUE`,
-        description: p
-            ? `${nameMain} (${p.fed}) — ${t("umb.subtitle")} ${p.rank}${t("umb.rankSuffix")}, ${p.points}${t("umb.pointsUnit")}. ${t("umb.rankHistory")}·${t("umb.pointsBreakdown")}`
-            : t("umb.subtitle"),
+        title: seo ? umbPlayerTitle(locale, seo) : `${t("umb.pageTitle")} | RANKUE`,
+        description: seo ? umbPlayerDesc(locale, seo) : t("umb.subtitle"),
         path: `/player/${category}/${umbId}`,
         // 선수 카드 PNG — 프리렌더(server/prerender.ts)와 같은 주소. 공유 미리보기·검색 썸네일.
         image: p ? `https://www.rankue.co.kr/og/player/${category}/${umbId}.png${locale === "ko" ? "" : `?lang=${locale}`}` : undefined,
@@ -39,7 +41,7 @@ export default function HiqWorldPlayer() {
             name: nameMain,
             alternateName: p.nativeName ? p.playerName : undefined,
             nationality: { "@type": "Country", name: p.fed },
-            description: `${t("umb.subtitle")} ${p.rank}${t("umb.rankSuffix")} (${p.points}${t("umb.pointsUnit")})`,
+            description: seo ? umbPlayerDesc(locale, seo) : undefined,
             url: `https://www.rankue.co.kr/player/${category}/${umbId}`,
             knowsAbout: "Three-cushion billiards",
         } : null,

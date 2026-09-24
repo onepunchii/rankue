@@ -12,6 +12,7 @@ import { rankingExtraSitemapParts } from "./seo/rankingExtra.js";
 import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
 import { tournamentsSitemapParts } from "./seo/tournaments.js";
 import { pbaRecordsSitemapParts } from "./seo/pbaRecords.js";
+import { todayKst } from "../shared/briefingMeta.js";
 
 // 동적 사이트맵 — /sitemap.xml 은 **사이트맵 인덱스**, 실제 URL 은 주제별 5개 파일에 나눠 싣는다.
 //
@@ -50,6 +51,14 @@ function esc(s: string): string {
 
 const day = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
 
+// lastmod 는 오늘(KST)을 넘지 않게 자른다 — 롤렉스 랭킹 회차 날짜가 발표보다 뒤(9/28)라 미래 lastmod 231개가 나갔다.
+// 미래 날짜가 섞이면 구글이 그 파일의 lastmod 를 통째로 안 믿는다(2026-09-24). 모든 섹션이 여기를 지난다.
+export function lastmodDay(d: Date | string): string {
+  const s = day(d);
+  const today = todayKst();
+  return s > today ? today : s;
+}
+
 // image: 선수 카드 PNG(/og/…) — 이미지 사이트맵 확장. 구글 이미지·썸네일 발견 경로(2026-09-14).
 export function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; priority?: string; lastmod?: Date | string | null; image?: string }): string {
   let alts = "";
@@ -62,7 +71,7 @@ export function entry(loc: string, opts?: { langs?: string[]; changefreq?: strin
   }
   return (
     `  <url>\n    <loc>${esc(loc)}</loc>${alts}` +
-    (opts?.lastmod ? `\n    <lastmod>${day(opts.lastmod)}</lastmod>` : "") +
+    (opts?.lastmod ? `\n    <lastmod>${lastmodDay(opts.lastmod)}</lastmod>` : "") +
     (opts?.image ? `\n    <image:image><image:loc>${esc(opts.image)}</image:loc></image:image>` : "") +
     (opts?.changefreq ? `\n    <changefreq>${opts.changefreq}</changefreq>` : "") +
     (opts?.priority ? `\n    <priority>${opts.priority}</priority>` : "") +
@@ -172,12 +181,14 @@ async function pbaParts(): Promise<string[]> {
   return parts;
 }
 
-// 골프 랭킹(2026-09-13) — 랭킹 + 선수(golfRank.repo.getPlayersForSitemap 의 컷). 언어판은 프리렌더가 준다.
+// 골프 랭킹(2026-09-13) — 랭킹 + 선수(golfRank.repo.getPlayersForSitemap 의 컷).
+// 언어판은 실제로 서빙하는 en 하나만 — vi·tr·es 는 한국어 페이지가 나가 hreflang 오류였다(2026-09-24, 프리렌더 altLangs 와 짝).
+const GOLF_LANGS = ["en"];
 async function golfParts(): Promise<string[]> {
   const parts: string[] = [];
   try {
     const players = await storage.golfRank.getPlayersForSitemap();
-    parts.push(entry(`${ORIGIN}/golf-ranking`, { langs: APP_LANGS, changefreq: "weekly", priority: "0.8" }));
+    parts.push(entry(`${ORIGIN}/golf-ranking`, { langs: GOLF_LANGS, changefreq: "weekly", priority: "0.8" }));
     // owgr 은 맨 주소(/golf-ranking)가 대표라 여기서 빼고 나머지 투어만 — 중복 URL 을 올리면 구글이 하나를 버린다.
     for (const tour of ["rolex", "kpga", "klpga"]) parts.push(entry(`${ORIGIN}/golf-ranking?tour=${tour}`, { changefreq: "weekly", priority: "0.6" }));
     for (const p of players) parts.push(entry(`${ORIGIN}/golfer/${p.tour}/${p.playerId}`, { changefreq: "weekly", priority: "0.4", lastmod: p.lastmod, image: golferCardUrl(ORIGIN, p.tour, p.playerId) }));

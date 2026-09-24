@@ -9,7 +9,7 @@ import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { seasonLabel, formatPrize } from "./pba";
-import { PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo } from "@shared/pbaMeta";
+import { PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo, pbaPrizeText, pbaLatestSeasonRank } from "@shared/pbaMeta";
 import { ShareButton } from "@/components/hiq/ShareButton";
 import { PlayerCardShareButton } from "@/components/hiq/PlayerCardShareButton";
 import { pbaCardUrl } from "@/lib/playerCard";
@@ -102,14 +102,15 @@ export default function HiqPbaPlayer() {
         // 선수 카드 PNG — 프리렌더(server/prerender.ts)와 같은 주소. 공유 미리보기·검색 썸네일.
         image: p ? pbaCardUrl(memCode, locale) : undefined,
         // ko 는 "OOO 연봉" 검색 대응 문안(shared/pbaMeta)을 쓴다 — 프리렌더와 문자 단위로 같아야 한다.
+        // 제목의 통산 상금·설명의 최근 시즌 상금랭킹 — 프리렌더와 같은 인자(2026-09-24)
         title: p
             ? (locale === "ko"
-                ? pbaPlayerTitleKo(p.nameKo, p.league)
+                ? pbaPlayerTitleKo(p.nameKo, p.league, pbaPrizeText(p.careerPrize))
                 : `${p.nameKo} — ${p.league} pro billiards player | 랭큐`)
             : "PBA | 랭큐",
         description: p
             ? (locale === "ko"
-                ? pbaPlayerDescKo(p.nameKo, p.nameEn, p.league, p.careerPrize, p.average, p.highRun)
+                ? pbaPlayerDescKo(p.nameKo, p.nameEn, p.league, pbaPrizeText(p.careerPrize), p.average, p.highRun, pbaLatestSeasonRank(p.seasons))
                 : `${p.nameKo}${p.nameEn ? ` (${p.nameEn})` : ""} — ${p.league} ${t.prize} ${p.careerPrize != null ? formatPrize(p.careerPrize, locale) : "-"}, ${t.average} ${p.average ?? "-"}, ${t.hr} ${p.highRun ?? "-"}.`)
             : "PBA 선수 프로필",
         path: `/pba-player/${memCode}`,

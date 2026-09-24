@@ -242,7 +242,9 @@ export class GolfRankRepository {
                 : sql`true`;
             const rows = await db.select({ playerId: golfRankings.playerId }).from(golfRankings)
                 .where(and(eq(golfRankings.tour, tour), eq(golfRankings.edition, latest.edition), cond)).orderBy(asc(golfRankings.rank));
-            for (const r of rows) out.push({ tour, playerId: r.playerId, lastmod: latest.editionDate });
+            // 롤렉스 회차 날짜는 발표보다 며칠 뒤(9/24 수집분이 9/28)라 그대로 쓰면 미래 lastmod 가 된다 — 지금을 넘지 않게(2026-09-24)
+            const lastmod = new Date(Math.min(new Date(latest.editionDate).getTime(), Date.now()));
+            for (const r of rows) out.push({ tour, playerId: r.playerId, lastmod });
         }
         return out;
     }

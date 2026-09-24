@@ -4,6 +4,7 @@
 //   /tournaments/pba/:season/:tourCode         PBA 대회 — 끝났고 우승자가 있어야 색인(예정·진행 중 noindex), 시즌이 틀리거나 코드에 앞자리 0 이면 301
 //   /tournaments/umb/:slug                     UMB 대회 — 포인트 받은 선수 16명 미만이면 noindex, 대문자 주소는 소문자로 301
 // 제목·설명·색인 기준·JSON-LD 는 shared/tournamentMeta.ts — 화면(useSeo)·사이트맵과 같은 함수다.
+// 봇 문서에만 덧붙이는 것: 선수 카드 이미지(og:image·<img>·SportsEvent.image)와 UMB 세계선수권 SportsEvent(2026-09-24).
 // 본문은 같은 주소에서 React 가 그리는 것과 같은 데이터(GET /tournaments… 와 같은 저장소 함수)만 쓴다.
 // 한국어 전용(?lang= 무시, canonical 은 늘 한국어 주소). DB 예외는 그대로 던진다 — 부른 쪽이 503 으로 바꾼다.
 // X-Prerender tag 는 ASCII 만(슬러그는 [a-z0-9-], 나머지는 숫자·고정 꼬리표).
@@ -12,6 +13,7 @@
 import { page, esc, hubNav } from "../prerender.js";
 import { entry } from "../sitemap.js";
 import { tournamentsRepo } from "../storage/tournaments.repo.js";
+import { playerCardUrl, pbaCardUrl, CARD_SIZE } from "../services/playerCard.js";
 import { todayKst } from "../../shared/briefingMeta.js";
 import { CAT_KO, fedNameKo, num } from "../../shared/umbCountryMeta.js";
 import {
@@ -40,6 +42,101 @@ function crumbs(items: Array<{ name: string; path?: string }>): string {
 }
 const HOME = { name: "랭큐", path: "/" };
 const HUB = { name: "당구 대회", path: TOURNAMENTS_PATH };
+
+/*
+ * 페이지 고유 이미지(2026-09-24) — 대회 페이지가 모두 브랜드 og.png 라 검색·카톡 썸네일이 똑같았다.
+ * PBA 대회는 우승자 카드, UMB 대회는 포인트를 가장 많이 받은 선수 카드를 og:image·본문 <img>·JSON-LD·사이트맵에 같은 주소로 건다.
+ */
+type PageImage = { url: string; width: number; height: number; alt: string };
+const cardImg = (img: PageImage | null) =>
+    img ? `\n  <img src="${esc(img.url)}" width="${img.width}" height="${img.height}" alt="${esc(img.alt)}" />` : "";
+
+function tourImage(p: PbaTourPage): PageImage | null {
+    const w = p.winner;
+    if (!w) return null;
+    return {
+        url: pbaCardUrl(ORIGIN, w.memCode), width: CARD_SIZE, height: CARD_SIZE,
+        alt: `${tourNameWithSeason(p.tour)} 우승 ${w.nameKo}${w.nameEn ? ` (${w.nameEn})` : ""} — ${w.league} 선수 카드`,
+    };
+}
+
+/** UMB 대회의 대표 선수 — 대표 부문에서 포인트가 가장 많은 선수(표 첫 줄, 페이지·사이트맵 같은 행) */
+function umbTop(d: UmbEventDetail): { sec: UmbEventSection; row: UmbEventSection["rows"][number] } | null {
+    const sec = primarySection(d);
+    return sec && sec.rows.length ? { sec, row: sec.rows[0] } : null;
+}
+
+function umbImage(d: UmbEventDetail): PageImage | null {
+    const t = umbTop(d);
+    if (!t) return null;
+    return {
+        url: playerCardUrl(ORIGIN, t.sec.category, t.row.playerUmbId), width: CARD_SIZE, height: CARD_SIZE,
+        alt: `${umbEventName(d)} 최다 랭킹 포인트 ${num(t.row.points)}점 ${umbRowNameKo(t.row)} — 3쿠션 ${CAT_KO[t.sec.category]} 세계랭킹 선수 카드`,
+    };
+}
+
+/** shared 의 JSON-LD(@graph) 속 SportsEvent 에 image 를 붙인다 — shared 쪽이 이미 붙였으면 그대로 둔다 */
+function withEventImage(ld: object, url: string | null): object {
+    const g = (ld as { "@graph"?: Array<Record<string, unknown>> })["@graph"];
+    if (!url || !Array.isArray(g)) return ld;
+    return { ...ld, "@graph": g.map((n) => (n["@type"] === "SportsEvent" && !n.image ? { ...n, image: [url] } : n)) };
+}
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const ymd = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+/**
+ * UMB 라벨에 적힌 대회 기간 — 세계선수권 "14/18 Oct. 2025" 꼴만. 월드컵 라벨의 날짜 하나는 **마지막 날**이라
+ * (DB 라벨 전부 토·일요일, 2026-09-24 실측) 시작일을 모른다 → null. 모르는 시작일을 지어 넣지 않는다.
+ */
+export function umbEventRange(labels: string[], date: string): { startDate: string; endDate: string } | null {
+    for (const label of labels) {
+        const m = /(\d{1,2})\/(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*(\d{4})/i.exec(label);
+        if (!m) continue;
+        const y = Number(m[4]), mon = MONTHS.indexOf(m[3].toLowerCase()), d1 = Number(m[1]), d2 = Number(m[2]);
+        const endDate = ymd(y, mon, d2);
+        // 달을 넘는 기간("30/03 Oct.")은 시작이 앞 달
+        const startDate = d1 <= d2 ? ymd(y, mon, d1) : mon === 0 ? ymd(y - 1, 11, d1) : ymd(y, mon - 1, d1);
+        // 페이지가 보여 주는 대회일(d.date)과 끝날이 같을 때만 믿는다
+        if (endDate === date) return { startDate, endDate };
+    }
+    return null;
+}
+
+/**
+ * UMB 대회 SportsEvent — 이름·기간·도시·국가·주관만, 전부 UMB 라벨에서 읽은 값(2026-09-24).
+ * 시작일을 모르는 월드컵은 싣지 않는다: 구글 행사 결과는 startDate 가 필수라 빠지면 서치 콘솔 '잘못된 항목'만 쌓인다.
+ */
+export function umbSportsEvent(d: UmbEventDetail, image: string | null): object | null {
+    const range = umbEventRange(d.sections.map((s) => s.label), d.date);
+    if (!range) return null;
+    return {
+        "@type": "SportsEvent",
+        name: umbEventName(d),
+        url: `${ORIGIN}${umbEventPath(d.slug)}`,
+        sport: "Three-cushion billiards",
+        startDate: range.startDate,
+        endDate: range.endDate,
+        eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+        eventStatus: "https://schema.org/EventScheduled",
+        location: {
+            "@type": "Place",
+            name: `${cityKo(d.city)}, ${fedNameKo(d.country)}`,
+            address: { "@type": "PostalAddress", addressLocality: d.city, addressCountry: d.country },
+        },
+        ...(d.org ? { organizer: { "@type": "Organization", name: d.org, ...(d.org === "UMB" ? { url: UMB_OFFICIAL } : {}) } } : {}),
+        ...(image ? { image: [image] } : {}),
+    };
+}
+
+/** umbEventJsonLd(@graph)에 SportsEvent 를 더한다 — shared 쪽이 이미 만들었으면 image 만 채운다 */
+function withUmbEvent(ld: object, d: UmbEventDetail, image: string | null): object {
+    const g = (ld as { "@graph"?: Array<Record<string, unknown>> })["@graph"];
+    if (!Array.isArray(g)) return ld;
+    if (g.some((n) => n["@type"] === "SportsEvent")) return withEventImage(ld, image);
+    const ev = umbSportsEvent(d, image);
+    return ev ? { ...ld, "@graph": [...g, ev] } : ld;
+}
 
 const STATUS_KO = { upcoming: "예정", live: "진행 중", finished: "종료" } as const;
 const SOURCE = `<p>출처: PBA 투어 공식 기록(${outLink("https://www.pbatour.org", "pbatour.org")}) · UMB 공식 랭킹·달력(${outLink(UMB_OFFICIAL, "umb-carom.org")})</p>`;
@@ -218,9 +315,10 @@ function renderTour(p: PbaTourPage): TournamentsRender {
   ${p.history.map((h) => `<li>${esc(seasonLabelFull(h.season))} · ${h.tourCode === r.tourCode ? esc(h.title) : tourTitleHtml(h)} — ${h.winnerName ? `우승 ${winnerHtml(h)}` : esc(STATUS_KO[tourStatus(h, p.today)])}</li>`).join("\n  ")}
   </ul>` : "";
     const near = [p.prev ? `이전 대회: ${tourTitleHtml(p.prev)}` : "", p.next ? `다음 대회: ${tourTitleHtml(p.next)}` : ""].filter(Boolean);
+    const image = tourImage(p);
     const body = `<main>
   ${crumbs([HOME, HUB, { name: `${seasonLabelFull(r.season)} PBA 투어`, path: pbaSeasonPath(r.season) }, { name: r.title }])}
-  <h1>${esc(tourNameWithSeason(r))}</h1>
+  <h1>${esc(tourNameWithSeason(r))}</h1>${cardImg(image)}
   <p>${esc(tourDescription(p))}</p>
   <h2>대회 정보</h2>
   <ul>
@@ -238,7 +336,7 @@ ${hubNav("ko")}`;
         tag: `tournaments:pba-tour:${code}${indexable ? "" : ":noindex"}`,
         html: page({
             lang: "ko", title: tourTitle(r), desc: tourDescription(p), canonical: `${ORIGIN}${pbaTourPath(r.season, code)}`,
-            noindex: !indexable, jsonLd: [tourJsonLd(p)], body,
+            noindex: !indexable, ...(image ? { image } : {}), jsonLd: [withEventImage(tourJsonLd(p), image?.url ?? null)], body,
         }),
     };
 }
@@ -271,9 +369,10 @@ function renderUmb(d: UmbEventDetail): TournamentsRender {
         d.org ? `주관: ${d.org}` : "",
         `대회일(UMB 랭킹 표기): ${dateRangeKo(d.date, d.date)}`,
     ].filter(Boolean);
+    const image = umbImage(d);
     const body = `<main>
   ${crumbs([HOME, HUB, { name: umbEventName(d) }])}
-  <h1>${esc(umbEventName(d))}</h1>
+  <h1>${esc(umbEventName(d))}</h1>${cardImg(image)}
   <p>${esc(umbEventDescription(d))}</p>
   <h2>대회 정보</h2>
   <ul>
@@ -296,7 +395,7 @@ ${hubNav("ko")}`;
         tag: `tournaments:umb:${d.slug}${indexable ? "" : ":noindex"}`,
         html: page({
             lang: "ko", title: umbEventTitle(d), desc: umbEventDescription(d), canonical: `${ORIGIN}${umbEventPath(d.slug)}`,
-            noindex: !indexable, jsonLd: [umbEventJsonLd(d)], body,
+            noindex: !indexable, ...(image ? { image } : {}), jsonLd: [withUmbEvent(umbEventJsonLd(d), d, image?.url ?? null)], body,
         }),
     };
 }
@@ -362,6 +461,8 @@ export async function tournamentsSitemapParts(): Promise<string[]> {
                 if (!hasTourPage(t) || !tourIndexable(t, today)) continue;
                 parts.push(entry(`${ORIGIN}${pbaTourPath(t.season, t.tourCode)}`, {
                     changefreq: "yearly", priority: t.league === "PBA" || t.league === "LPBA" ? "0.5" : "0.4", lastmod: t.endDate,
+                    // 우승자 카드 — winnerMemCode 는 pba_players 와 하나로 맞은 행에만 있어 페이지의 tourImage 와 같은 조건
+                    ...(t.winnerMemCode ? { image: pbaCardUrl(ORIGIN, t.winnerMemCode) } : {}),
                 }));
             }
         }
@@ -371,10 +472,20 @@ export async function tournamentsSitemapParts(): Promise<string[]> {
     try {
         const events = await tournamentsRepo.getUmbEvents();
         const detail = await tournamentsRepo.getUmbEventDates();
-        for (const e of events) {
-            if (e.date && (!latestResult || e.date > latestResult) && e.date <= today) latestResult = e.date;
-            if (!umbEventIndexable(e)) continue;
-            parts.push(entry(`${ORIGIN}${umbEventPath(e.slug)}`, { changefreq: "monthly", priority: "0.5", lastmod: detail.get(e.slug) ?? e.date }));
+        for (const e of events) if (e.date && (!latestResult || e.date > latestResult) && e.date <= today) latestResult = e.date;
+        const indexable = events.filter((e) => umbEventIndexable(e));
+        // 대표 선수 카드 — 페이지와 같은 함수(getUmbEventDetail)의 표 첫 줄. 대회당 쿼리 1~3개라 4개씩 나눠 부른다.
+        const cards = new Map<string, string>();
+        for (let i = 0; i < indexable.length; i += 4) {
+            await Promise.all(indexable.slice(i, i + 4).map(async (e) => {
+                const d = await tournamentsRepo.getUmbEventDetail(e.slug).catch(() => null);
+                const img = d ? umbImage(d) : null;
+                if (img) cards.set(e.slug, img.url);
+            }));
+        }
+        for (const e of indexable) {
+            const image = cards.get(e.slug);
+            parts.push(entry(`${ORIGIN}${umbEventPath(e.slug)}`, { changefreq: "monthly", priority: "0.5", lastmod: detail.get(e.slug) ?? e.date, ...(image ? { image } : {}) }));
         }
     } catch (e) {
         console.warn("[sitemap] umb tournaments failed:", (e as Error)?.message);
