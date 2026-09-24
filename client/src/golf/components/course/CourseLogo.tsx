@@ -11,6 +11,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const SIZE = {
+    xs: "h-7 min-w-[28px] max-w-[72px] rounded-md px-1 py-0.5", // 상단 바 — 뒤로 옆, 이름 앞(2026-09-24 오너)
     sm: "w-12 h-12 rounded-xl p-1",        // 목록 줄
     md: "w-14 h-14 rounded-xl p-1.5",      // 가까운 골프장
     lg: "h-16 min-w-[64px] max-w-[176px] rounded-2xl px-3 py-2", // 상세 머리 — 가로형 워드마크가 길게 눕는다
@@ -32,7 +33,7 @@ export function CourseLogo({ logo, name, size = "sm", className }: { logo: strin
                 aria-hidden="true"
                 className={cn(
                     "shrink-0 inline-flex items-center justify-center bg-[#FFFFFF0F] border border-[#FFFFFF14] text-[#FFFFFF99] font-semibold",
-                    size === "lg" ? "w-16 h-16 rounded-2xl text-[20px]" : size === "md" ? "w-14 h-14 rounded-xl text-[16px]" : "w-12 h-12 rounded-xl text-[15px]",
+                    size === "lg" ? "w-16 h-16 rounded-2xl text-[20px]" : size === "md" ? "w-14 h-14 rounded-xl text-[16px]" : size === "xs" ? "w-7 h-7 rounded-md text-[12px]" : "w-12 h-12 rounded-xl text-[15px]",
                     className,
                 )}
             >
@@ -41,14 +42,14 @@ export function CourseLogo({ logo, name, size = "sm", className }: { logo: strin
         );
     }
     return (
-        <span className={cn("shrink-0 inline-flex items-center justify-center bg-[#FFFFFF] shadow-[0_1px_2px_#00000040]", SIZE[size], className)}>
+        <span className={cn("shrink-0 inline-flex items-center justify-center bg-[#FFFFFF] ring-1 ring-[#FFFFFF1A]", SIZE[size], className)}>
             <img
                 src={logo!}
                 alt={`${name} 로고`}
                 loading={size === "lg" ? "eager" : "lazy"}
                 decoding="async"
                 onError={() => setBroken(true)}
-                className={cn("block max-w-full max-h-full object-contain", size === "lg" ? "h-full w-auto" : "w-full h-full")}
+                className={cn("block max-w-full max-h-full object-contain", size === "lg" || size === "xs" ? "h-full w-auto" : "w-full h-full")}
             />
         </span>
     );

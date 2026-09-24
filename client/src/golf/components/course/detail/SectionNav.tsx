@@ -44,17 +44,19 @@ export function SectionNav({ ids }: { ids: SectionId[] }) {
 
     if (ids.length < 3) return null;
     return (
-        <div className="sticky z-30 mt-6 bg-[#0A0A0A] border-b border-[#FFFFFF0F]" style={{ top: "calc(56px + env(safe-area-inset-top))" }}>
-            <div ref={bar} className="flex gap-1 px-3 py-1.5 overflow-x-auto scrollbar-hide">
+        <div className="sticky z-30 mt-8 bg-[#0A0A0AF2] backdrop-blur-md border-b border-[#FFFFFF0F]" style={{ top: "calc(56px + env(safe-area-inset-top))" }}>
+            <div ref={bar} className="flex gap-5 px-5 overflow-x-auto scrollbar-hide">
                 {ids.map((id) => (
                     <button
                         key={id} type="button" data-nav={id} onClick={() => jumpTo(id)}
                         className={cn(
-                            "shrink-0 h-9 px-3 rounded-full text-[14px] font-medium transition-colors",
-                            active === id ? "bg-[#FFFFFF1A] text-white" : "text-[#FFFFFF80] active:text-white",
+                            "relative shrink-0 h-11 text-[14px] transition-colors",
+                            active === id ? "text-white font-semibold" : "text-[#FFFFFF73] font-medium active:text-white",
                         )}
                     >
                         {SECTION_LABEL[id]}
+                        {/* 밑줄 — 알약보다 조용하고, 지금 어디인지는 똑같이 말한다 */}
+                        <span className={cn("absolute left-0 right-0 -bottom-px h-[2px] rounded-full transition-colors", active === id ? "bg-[#64DD17]" : "bg-transparent")} />
                     </button>
                 ))}
             </div>

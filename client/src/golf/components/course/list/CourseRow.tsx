@@ -25,7 +25,7 @@ export function LiveBadges({ counts, className }: { counts: CourseCounts; classN
     return (
         <span className={cn("inline-flex items-center gap-1", className)}>
             {items.map((x) => (
-                <span key={x.label} className={cn("h-5 px-1.5 rounded-md text-[12px] font-semibold leading-5 tabular-nums whitespace-nowrap", x.cls)}>
+                <span key={x.label} className={cn("h-5 px-1.5 rounded text-[12px] font-semibold leading-5 tabular-nums whitespace-nowrap", x.cls)}>
                     {x.label} {x.n}
                 </span>
             ))}
@@ -45,43 +45,42 @@ export function PriceChange({ change, className }: { change: number | null | und
 }
 
 export function CourseRow({ c, km, myWatch }: { c: CourseListItem; km: number | null; myWatch: { filters: WatchFilters } | null }) {
-    // 더블이글 줄처럼 "지역 · 그린피" 가 먼저 — 그린피 표가 없는 곳은 대표 그린피(자료)로.
+    // 한 줄에 셋 — 이름 / 어디·얼마·몇 홀 / 특징. 칩 대신 글(2026-09-24 둘째 판: 알약이 줄마다 쌓여 무거웠다).
     const meta = [cityShort(c.city) || c.region, c.feeFrom ? `${wonShort(c.feeFrom)}~` : null, c.holes ? `${c.holes}홀` : null, km != null ? formatDistance(km) : null].filter(Boolean);
-    const tags = (c.play ?? []).map((p) => PLAY_LABEL[p] ?? p);
+    const traits = [...(c.play ?? []).map((p) => PLAY_LABEL[p] ?? p), ...(c.grass ?? [])];
     const live = c.counts.booking + c.counts.join > 0;
     return (
-        <li className="flex items-stretch border-b border-[#FFFFFF0F] last:border-b-0">
+        <li className="relative flex items-stretch after:absolute after:left-[80px] after:right-0 after:bottom-0 after:h-px after:bg-[#FFFFFF0F] last:after:hidden">
             <Link
                 href={coursePath(c.slug)}
-                className="flex-1 min-w-0 flex items-center gap-3 pl-4 pr-1 py-3.5 active:bg-[#FFFFFF08] transition-colors"
+                className="flex-1 min-w-0 flex items-center gap-3.5 pl-5 pr-1 py-3.5 active:bg-[#FFFFFF08] transition-colors"
             >
                 <CourseLogo logo={c.logo} name={c.name} size="sm" />
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 min-w-0">
-                        {live && <span className="w-1.5 h-1.5 rounded-full bg-[#64DD17] shrink-0" aria-hidden="true" />}
-                        <span className="text-[15px] font-semibold text-[#FFFFFF] truncate">{c.name}</span>
+                        <span className="text-[16px] font-semibold tracking-tight text-[#FFFFFF] truncate">{c.name}</span>
+                        {live && <span className="w-1.5 h-1.5 rounded-full bg-[#64DD17] shrink-0" aria-label="지금 티타임" />}
                     </span>
-                    <span className="mt-0.5 block text-[13px] text-[#FFFFFF73] truncate">{meta.join(" · ")}</span>
-                    {(live || c.watchers > 0 || tags.length > 0) && (
-                        <span className="mt-1.5 flex items-center gap-1.5 min-w-0 overflow-hidden">
+                    <span className="mt-0.5 block text-[13px] text-[#FFFFFF8C] truncate tabular-nums">{meta.join(" · ")}</span>
+                    {(live || traits.length > 0) && (
+                        <span className="mt-1 flex items-center gap-2 min-w-0">
                             <LiveBadges counts={c.counts} />
-                            {tags.map((t) => <span key={t} className="h-5 px-1.5 rounded-md bg-[#FFFFFF0F] text-[12px] leading-5 text-[#FFFFFF99] whitespace-nowrap">{t}</span>)}
-                            {c.watchers > 0 && <span className="text-[12px] text-[#FFFFFF66] whitespace-nowrap">관심 {c.watchers}</span>}
+                            {traits.length > 0 && <span className="text-[12px] text-[#FFFFFF59] truncate">{traits.join(" · ")}</span>}
                         </span>
                     )}
                 </span>
                 {c.price && (
-                    <span className="shrink-0 text-right">
+                    <span className="shrink-0 text-right pl-1">
                         <span className="block text-[14px] font-semibold text-[#FFFFFF] tabular-nums whitespace-nowrap">{manwonText(c.price.price)}</span>
-                        <span className="mt-0.5 flex items-center justify-end gap-1 text-[12px] text-[#FFFFFF66]">
-                            <span className="whitespace-nowrap">회원권 {c.price.label}</span>
+                        <span className="mt-0.5 flex items-center justify-end gap-1 text-[12px] text-[#FFFFFF59]">
+                            <span className="whitespace-nowrap max-w-[84px] truncate">회원권</span>
                             <PriceChange change={c.price.change} />
                         </span>
                     </span>
                 )}
             </Link>
             {/* 글이 붙을 수 없는 골프장(자료로만 만든 새 페이지)엔 별이 없다 — 알림을 약속할 수 없다 */}
-            <div className="shrink-0 flex items-center pr-2 w-12 justify-center">
+            <div className="shrink-0 flex items-center pr-3 w-12 justify-center">
                 {c.bookable !== false && <WatchButton slug={c.slug} name={c.name} myWatch={myWatch} watchers={c.watchers} size="sm" />}
             </div>
         </li>
@@ -90,13 +89,12 @@ export function CourseRow({ c, km, myWatch }: { c: CourseListItem; km: number | 
 
 export function CourseRowSkeleton() {
     return (
-        <li className="flex items-center gap-3 px-4 py-4 border-b border-[#FFFFFF0F]">
+        <li className="flex items-center gap-3.5 px-5 py-4">
             <span className="w-12 h-12 rounded-xl bg-[#FFFFFF0A] animate-pulse shrink-0" />
             <span className="flex-1 space-y-2">
                 <span className="block h-4 w-2/5 rounded bg-[#FFFFFF0F] animate-pulse" />
                 <span className="block h-3 w-3/5 rounded bg-[#FFFFFF0A] animate-pulse" />
             </span>
-            <span className="h-4 w-16 rounded bg-[#FFFFFF0A] animate-pulse" />
         </li>
     );
 }

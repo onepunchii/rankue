@@ -262,7 +262,7 @@ export function WatchButton({ slug, myWatch, watchers, size = "lg", name, classN
             {on ? (
                 <button
                     type="button" onClick={press}
-                    className={cn("w-full h-[52px] px-4 rounded-2xl border border-[#64DD1766] bg-[#64DD171A] flex items-center gap-2.5 text-left active:bg-[#64DD1729]", className)}
+                    className={cn("w-full h-[52px] px-4 rounded-2xl bg-[#64DD171A] ring-1 ring-inset ring-[#64DD174D] flex items-center gap-2.5 text-left active:bg-[#64DD1729]", className)}
                 >
                     <span className="w-7 h-7 rounded-full bg-[#64DD17] flex items-center justify-center shrink-0">
                         <LucideCheck weight="bold" className="w-4 h-4 text-[#051907]" />
@@ -276,10 +276,10 @@ export function WatchButton({ slug, myWatch, watchers, size = "lg", name, classN
             ) : (
                 <button
                     type="button" onClick={press}
-                    className={cn("w-full h-[52px] rounded-2xl bg-[#64DD17] text-[#051907] text-[16px] font-semibold flex items-center justify-center gap-2 active:bg-[#58C414]", className)}
+                    className={cn("w-full h-[52px] rounded-2xl bg-[#64DD17] text-[#051907] text-[16px] font-semibold tracking-tight flex items-center justify-center gap-2 active:bg-[#58C414] transition-colors", className)}
                 >
-                    <LucideBellRing weight="fill" className="w-5 h-5" />
-                    관심 등록 · 취소티 알림 받기
+                    <LucideBellRing weight="fill" className="w-[18px] h-[18px]" />
+                    관심 등록하고 취소티 알림 받기
                 </button>
             )}
             {sheet}

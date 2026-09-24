@@ -55,8 +55,8 @@ export function MembershipPrices({ prices }: { prices: CoursePrice[] }) {
                         <button
                             key={x.itemId} type="button" onClick={() => setSel(x.itemId)} aria-pressed={x.itemId === p.itemId}
                             className={cn(
-                                "shrink-0 h-9 px-3 rounded-full text-[13px] font-medium border whitespace-nowrap transition-colors",
-                                x.itemId === p.itemId ? "bg-[#FFFFFF] text-[#0A0A0A] border-transparent" : "bg-transparent border-[#FFFFFF1F] text-[#FFFFFFB3]",
+                                "shrink-0 h-8 px-3.5 rounded-full text-[13px] whitespace-nowrap transition-colors",
+                                x.itemId === p.itemId ? "bg-[#FFFFFF] text-[#0A0A0A] font-semibold" : "bg-[#FFFFFF0A] text-[#FFFFFFB3] font-medium active:bg-[#FFFFFF14]",
                             )}
                         >
                             {x.label}

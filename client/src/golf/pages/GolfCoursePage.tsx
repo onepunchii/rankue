@@ -22,6 +22,7 @@ import { distanceKm, formatDistance, isKoreaCoord } from "@shared/golfJoin";
 import { ORIGIN, REGION_LABEL, cityShort, courseDescription, coursePath, courseTitle, distinctAliases, listPath } from "@shared/golfCourse";
 import { COURSES_KEY, slugForCourseId, useCourseDetail, type CourseDetail, type CourseListItem } from "@/golf/lib/courseApi";
 import { CourseShell } from "@/golf/components/course/CourseShell";
+import { CourseLogo } from "@/golf/components/course/CourseLogo";
 import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/CourseHeader";
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";
 import { MembershipPrices, topPrice } from "@/golf/components/course/detail/MembershipPrices";
@@ -126,13 +127,6 @@ export default function GolfCoursePage() {
     // 다른 골프장으로 건너가면 맨 위에서 시작한다
     useEffect(() => { window.scrollTo(0, 0); }, [slug]);
 
-    // 머리의 이름이 위로 지나가면 상단 바에 이름이 뜬다(처음부터 띄우면 같은 이름이 두 번 보인다)
-    const [past, setPast] = useState(false);
-    useEffect(() => {
-        const on = () => setPast(window.scrollY > 96);
-        on(); window.addEventListener("scroll", on, { passive: true });
-        return () => window.removeEventListener("scroll", on);
-    }, []);
 
     const { location, ask } = useMyLocation();
     const hasCoord = !!d && isKoreaCoord(d.lat, d.lng);
@@ -203,7 +197,16 @@ export default function GolfCoursePage() {
     const ids = has ? (Object.keys(has) as SectionId[]).filter((k) => has[k]) : [];
 
     return (
-        <CourseShell hideBottomCta={!!d?.bookable} title={<span className={`transition-opacity duration-200 ${past ? "opacity-100" : "opacity-0"}`}>{d?.name ?? prefill?.name ?? ""}</span>} right={shareBtn} backTo={d ? listPath({ region: d.region, city: d.city }) : "/golf/courses"}>
+        <CourseShell
+            hideBottomCta={!!d?.bookable}
+            // 상단 바 = 뒤로 · 로고 · 골프장명(2026-09-24 오너: "뒤로가기 아이콘 옆에 로고 깔끔하게 골프장명"). 스크롤과 무관하게 늘 보인다.
+            title={(d ?? prefill) ? (
+                <span className="flex items-center gap-2.5 min-w-0">
+                    <CourseLogo logo={d?.logo ?? prefill?.logo ?? null} name={d?.name ?? prefill?.name ?? ""} size="xs" />
+                    <span className="truncate text-[16px] font-semibold text-white">{d?.name ?? prefill?.name}</span>
+                </span>
+            ) : <span />}
+            right={shareBtn} backTo={d ? listPath({ region: d.region, city: d.city }) : "/golf/courses"}>
             {notFound ? <NotFound /> : (
                 <>
                     {base ? (

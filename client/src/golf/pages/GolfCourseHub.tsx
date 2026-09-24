@@ -184,44 +184,54 @@ export default function GolfCourseHub() {
     const hubRows = hub.data ?? [];
     const tabColor = INTENT_TABS.find((t) => t.intent === intent)!.color;
 
+    const liveBits = (["urgent", "join", "booking"] as const).filter((k) => sums[k] > 0);
+    const DOT: Record<GolfIntent, string> = { booking: "#64DD17", join: "#FF6B00", urgent: "#FF3B30" };
+
     return (
         <CourseShell backTo={backTo}>
-            {/* ── 머리 ── */}
-            <div className="px-4 pt-4 pb-4">
+            {/* ── 머리 ── 제목 하나 + 조용한 한 줄. 검색어 같은 부제("부킹·조인·그린피·회원권 시세")는 <title> 에만 둔다. */}
+            <div className="px-5 pt-5">
                 {crumbs.length > 1 && (
-                    <nav aria-label="위치" className="mb-2 flex items-center gap-1 text-[13px] text-[#FFFFFF73] min-w-0">
+                    <nav aria-label="위치" className="mb-1.5 flex items-center gap-1 text-[13px] text-[#FFFFFF66] min-w-0">
                         {crumbs.map((c, i) => (
                             <span key={c.path} className="flex items-center gap-1 min-w-0">
-                                {i > 0 && <LucideChevronRight className="w-3.5 h-3.5 shrink-0 text-[#FFFFFF40]" />}
+                                {i > 0 && <LucideChevronRight className="w-3.5 h-3.5 shrink-0 text-[#FFFFFF33]" />}
                                 {i < crumbs.length - 1
                                     ? <Link href={c.path} className="truncate active:text-[#FFFFFF]">{c.name}</Link>
-                                    : <span className="truncate text-[#FFFFFFB3]">{c.name}</span>}
+                                    : <span className="truncate text-[#FFFFFFA6]">{c.name}</span>}
                             </span>
                         ))}
                     </nav>
                 )}
-                <h1 className="leading-tight tracking-tight">
-                    <span className="block text-[26px] font-bold text-[#FFFFFF]">{headMain}</span>
-                    {headSub && <span className="mt-1 block text-[14px] font-medium text-[#FFFFFF8C]">{headSub}</span>}
-                </h1>
-                <p className="mt-2 text-[13px] text-[#FFFFFF73] tabular-nums h-[18px]">
+                <h1 className="text-[28px] leading-[1.18] font-bold tracking-tight text-[#FFFFFF]">{headMain}</h1>
+                <p className="mt-1.5 h-[20px] text-[14px] text-[#FFFFFF73] tabular-nums">
                     {list.isSuccess && (
-                        <>골프장 {courseCount.toLocaleString()}곳 · 지금 올라온 {intent ? INTENT_NOUN[intent] : "글"} <span style={{ color: listingCount ? tabColor === "#FFFFFF" ? "#8BE84A" : tabColor : undefined }}>{listingCount}</span></>
+                        <>{courseCount.toLocaleString()}곳 · 지금 티타임 <span className={listingCount ? "text-[#8BE84A] font-medium" : ""}>{listingCount.toLocaleString()}건</span></>
                     )}
                 </p>
             </div>
 
-            {/* ── 지도 + 의도 ── 점 하나가 골프장 한 곳, 색이 들어온 점이 지금 글이 있는 곳 */}
-            <section className="mx-4 rounded-3xl border border-[#FFFFFF14] bg-[#FFFFFF08] overflow-hidden flex">
-                <div className="w-[132px] sm:w-[172px] shrink-0 border-r border-[#FFFFFF0F] bg-[#FFFFFF05] relative">
-                    <CourseDotMap dots={dots} focus={focus} aspect={0.62} className="absolute inset-0 w-full h-full" />
-                    {regionLabel && (
-                        <span className="absolute left-2.5 top-2.5 text-[12px] font-medium text-[#FFFFFF8C]">
-                            {city ? cityShort(city) : regionLabel}
-                        </span>
+            {/* ── 검색 ── 이 화면에서 제일 많이 하는 일이라 맨 위 */}
+            <div className="px-5 mt-5">
+                <label className="h-12 rounded-2xl bg-[#FFFFFF0D] flex items-center gap-2.5 px-4 ring-1 ring-inset ring-transparent focus-within:ring-[#64DD1780] transition-shadow">
+                    <LucideSearch className="w-[18px] h-[18px] text-[#FFFFFF66] shrink-0" />
+                    <input
+                        value={q} onChange={(e) => setQ(e.target.value)}
+                        placeholder="골프장 이름 · 옛 이름으로 찾기"
+                        enterKeyHint="search"
+                        className="flex-1 min-w-0 bg-transparent outline-none text-[16px] text-[#FFFFFF] placeholder:text-[#FFFFFF4D]"
+                    />
+                    {q && (
+                        <button type="button" onClick={() => setQ("")} aria-label="지우기" className="w-7 h-7 -mr-1.5 rounded-full flex items-center justify-center bg-[#FFFFFF14] active:bg-[#FFFFFF24]">
+                            <LucideX className="w-3.5 h-3.5 text-[#FFFFFFB3]" />
+                        </button>
                     )}
-                </div>
-                <nav aria-label="보기" className="flex-1 min-w-0 p-2 flex flex-col gap-1">
+                </label>
+            </div>
+
+            {/* ── 보기 ── 한 줄 세그먼트. 링크라서 검색엔진이 허브 사이를 따라간다. */}
+            <nav aria-label="보기" className="px-5 mt-3">
+                <div className="grid grid-cols-4 p-1 rounded-2xl bg-[#FFFFFF0A]">
                     {INTENT_TABS.map((t) => {
                         const active = t.intent === intent;
                         const n = t.intent ? sums[t.intent] : courseCount;
@@ -230,59 +240,83 @@ export default function GolfCourseHub() {
                                 key={t.label}
                                 href={listPath({ intent: t.intent, region, city })}
                                 aria-current={active ? "page" : undefined}
-                                className={cn("h-12 rounded-2xl px-3 flex items-center gap-2.5 transition-colors", !active && "active:bg-[#FFFFFF0A]")}
-                                style={active ? { backgroundColor: `${t.color}1F` } : undefined}
+                                className={cn(
+                                    "h-11 rounded-xl flex flex-col items-center justify-center leading-none transition-colors",
+                                    active ? "bg-[#FFFFFF1A]" : "active:bg-[#FFFFFF0A]",
+                                )}
                             >
-                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.intent ? t.color : "#FFFFFF8C" }} />
-                                <span className={cn("text-[14px] truncate", active ? "font-semibold" : "font-medium text-[#FFFFFFB3]")} style={active ? { color: t.intent ? t.color : "#FFFFFF" } : undefined}>
-                                    {t.label}
+                                <span className={cn("flex items-center gap-1 text-[13px]", active ? "text-[#FFFFFF] font-semibold" : "text-[#FFFFFF8C] font-medium")}>
+                                    {t.intent && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: n > 0 || active ? t.color : "#FFFFFF33" }} />}
+                                    {t.intent ? t.label : "전체"}
                                 </span>
-                                <span className={cn("ml-auto text-[19px] font-semibold tabular-nums", n ? "text-[#FFFFFF]" : "text-[#FFFFFF40]")}>
+                                <span className={cn("mt-1 text-[12px] tabular-nums", active ? "text-[#FFFFFFB3]" : n > 0 ? "text-[#FFFFFF99]" : "text-[#FFFFFF40]")}>
                                     {list.isSuccess ? n.toLocaleString() : "·"}
                                 </span>
                             </Link>
                         );
                     })}
-                </nav>
-            </section>
+                </div>
+            </nav>
 
             {/* ── 지역 · 시군 ── */}
-            <div className="mt-4 flex gap-1.5 overflow-x-auto scrollbar-hide px-4">
+            <div className="mt-4 flex gap-2 overflow-x-auto scrollbar-hide px-5">
                 <Chip href={listPath({ intent })} active={!region} label="전국" n={totalCourses} />
                 {GOLF_REGIONS.map((r) => (
                     <Chip key={r} href={listPath({ intent, region: r })} active={region === r} label={r} n={regionCount(r)} />
                 ))}
             </div>
             {region && cities.length > 0 && (
-                <div className="mt-2 flex gap-1.5 overflow-x-auto scrollbar-hide px-4">
-                    <Chip small href={listPath({ intent, region })} active={!city} label={`${region} 전체`} />
+                <div className="mt-2 flex gap-1.5 overflow-x-auto scrollbar-hide px-5">
+                    <Chip small href={listPath({ intent, region })} active={!city} label="전체" />
                     {cities.map((c) => (
                         <Chip
                             key={c.city} small href={listPath({ intent, region, city: c.short })}
                             active={city === c.short || city === c.city} label={c.short} n={c.courses}
-                            live={(intent ? c.counts[intent] : c.counts.booking + c.counts.join) > 0 ? (intent ? INTENT_TABS.find((t) => t.intent === intent)!.color : "#64DD17") : undefined}
+                            live={(intent ? c.counts[intent] : c.counts.booking + c.counts.join) > 0 ? (intent ? DOT[intent] : "#64DD17") : undefined}
                         />
                     ))}
                 </div>
             )}
 
+            {/* ── 지도 요약 ── 왼쪽은 숫자, 오른쪽은 점 지도(점 하나 = 골프장 한 곳, 색 = 지금 티타임) */}
+            <section aria-label="지도" className="mx-5 mt-4 h-[148px] rounded-2xl bg-[#FFFFFF06] flex overflow-hidden">
+                <div className="flex-1 min-w-0 p-4 flex flex-col">
+                    <span className="text-[13px] text-[#FFFFFF73] truncate">{city ? cityShort(city) : regionLabel ?? "전국"}</span>
+                    <span className="mt-0.5 text-[26px] font-bold tracking-tight text-[#FFFFFF] tabular-nums leading-none">
+                        {list.isSuccess ? courseCount.toLocaleString() : "·"}<span className="ml-0.5 text-[15px] font-semibold text-[#FFFFFF8C]">곳</span>
+                    </span>
+                    <div className="mt-auto space-y-1">
+                        {liveBits.length ? liveBits.map((k) => (
+                            <span key={k} className="flex items-center gap-1.5 text-[12.5px] text-[#FFFFFFB3] tabular-nums">
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: DOT[k] }} />
+                                {INTENT_TABS.find((t) => t.intent === k)!.label} {sums[k]}건
+                            </span>
+                        )) : (
+                            <span className="text-[12.5px] text-[#FFFFFF59]">지금 올라온 티타임 없음</span>
+                        )}
+                    </div>
+                </div>
+                <div className="w-[46%] shrink-0 relative">
+                    <CourseDotMap dots={dots} focus={focus} aspect={0.95} className="absolute inset-0 w-full h-full" />
+                </div>
+            </section>
+
             {/* ── 지금 올라온 글(의도 허브만) ── */}
             {intent && (
-                <section className="mt-6">
-                    <h2 className="px-4 mb-2 flex items-center gap-2 text-[16px] font-semibold text-[#FFFFFF]">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tabColor }} />
+                <section className="mt-8">
+                    <h2 className="px-5 mb-3 flex items-baseline gap-2 text-[19px] font-bold tracking-tight text-[#FFFFFF]">
                         지금 올라온 {INTENT_NOUN[intent]}
-                        {hubRows.length > 0 && <span className="text-[#FFFFFF73] font-medium tabular-nums">{Math.max(listingCount, hubRows.length)}</span>}
+                        {hubRows.length > 0 && <span className="text-[15px] font-medium text-[#FFFFFF66] tabular-nums">{Math.max(listingCount, hubRows.length)}</span>}
                     </h2>
                     {hub.isPending ? (
-                        <div className="mx-4 h-[68px] rounded-2xl bg-[#FFFFFF08] animate-pulse" />
+                        <div className="mx-5 h-[68px] rounded-2xl bg-[#FFFFFF08] animate-pulse" />
                     ) : hubRows.length === 0 ? (
-                        <p className="mx-4 rounded-2xl border border-[#FFFFFF14] bg-[#FFFFFF08] px-4 py-3.5 text-[13px] leading-relaxed text-[#FFFFFF8C]">
+                        <p className="mx-5 rounded-2xl bg-[#FFFFFF08] px-4 py-4 text-[14px] leading-relaxed text-[#FFFFFF8C] break-keep">
                             지금 올라온 {INTENT_NOUN[intent]}이 없어요. 골프장 옆 <span className="text-[#FFFFFF]">☆</span>을 눌러 두면 올라올 때 알려 드려요.
                         </p>
                     ) : (
                         <>
-                            <ul className="mx-4 rounded-2xl border border-[#FFFFFF14] bg-[#FFFFFF08] overflow-hidden divide-y divide-[#FFFFFF0F]">
+                            <ul className="mx-5 rounded-2xl bg-[#FFFFFF08] overflow-hidden divide-y divide-[#FFFFFF0F]">
                                 {hubRows.slice(0, listingLimit).map((l) => <HubListingRow key={l.id} l={l} now={now} onOpen={openListing} />)}
                             </ul>
                             {hubRows.length > listingLimit && (
@@ -293,56 +327,37 @@ export default function GolfCourseHub() {
                 </section>
             )}
 
-            {/* ── 골프장 목록 ── */}
-            <section className="mt-6 pb-6">
-                <div className="px-4 flex items-baseline gap-2 mb-2">
-                    <h2 className="text-[16px] font-semibold text-[#FFFFFF]">{city ? `${cityShort(city)} 골프장` : regionLabel ? `${regionLabel} 골프장` : "전국 골프장"}</h2>
-                    {list.isSuccess && <span className="text-[14px] text-[#FFFFFF73] tabular-nums">{q ? `${shown.length} / ${courseCount}` : courseCount}</span>}
+            {/* ── 골프장 목록 ── 상자 없이 전체 폭, 줄 사이는 얇은 선 */}
+            <section className="mt-8 pb-6">
+                <div className="px-5 flex items-baseline gap-2">
+                    <h2 className="text-[19px] font-bold tracking-tight text-[#FFFFFF]">{city ? `${cityShort(city)} 골프장` : regionLabel ? `${regionLabel} 골프장` : "전국 골프장"}</h2>
+                    {list.isSuccess && <span className="text-[15px] font-medium text-[#FFFFFF66] tabular-nums">{q || feats.length || onlyWatched ? `${shown.length} / ${courseCount}` : courseCount}</span>}
                 </div>
 
-                <div className="px-4">
-                    <label className="h-11 rounded-xl bg-[#FFFFFF0D] border border-[#FFFFFF14] flex items-center gap-2 px-3 focus-within:border-[#64DD1766]">
-                        <LucideSearch className="w-[18px] h-[18px] text-[#FFFFFF66] shrink-0" />
-                        <input
-                            value={q} onChange={(e) => setQ(e.target.value)}
-                            placeholder="골프장 이름"
-                            enterKeyHint="search"
-                            className="flex-1 min-w-0 bg-transparent outline-none text-[16px] text-[#FFFFFF] placeholder:text-[#FFFFFF59]"
-                        />
-                        {q && (
-                            <button type="button" onClick={() => setQ("")} aria-label="지우기" className="w-7 h-7 -mr-1 rounded-full flex items-center justify-center active:bg-[#FFFFFF14]">
-                                <LucideX className="w-4 h-4 text-[#FFFFFF8C]" />
-                            </button>
-                        )}
-                    </label>
-                    <div className="mt-2 flex gap-1 overflow-x-auto scrollbar-hide">
-                        {([["rec", "추천"], ["near", "가까운 순"], ["price", "시세 높은 순"], ["name", "이름순"]] as [Sort, string][]).map(([k, label]) => (
-                            <button
-                                key={k} type="button" onClick={() => { if (k === "near" && !me) askNear(); setSort(k); }} aria-pressed={sort === k}
-                                className={cn(
-                                    "h-8 px-3 rounded-full text-[13px] whitespace-nowrap shrink-0 transition-colors",
-                                    sort === k ? "bg-[#FFFFFF] text-[#0A0A0A] font-semibold" : "text-[#FFFFFF99] font-medium active:bg-[#FFFFFF0F]",
-                                )}
-                            >{label}</button>
-                        ))}
-                    </div>
-                    <div className="mt-2 flex gap-1.5 overflow-x-auto scrollbar-hide">
-                        {member && (
-                            <FeatChip on={onlyWatched} onClick={() => setOnlyWatched((v) => !v)} label="☆ 내 관심" />
-                        )}
-                        {FEATURES.map(([k, label]) => (
-                            <FeatChip key={k} on={feats.includes(k)} onClick={() => setFeats((a) => (a.includes(k) ? a.filter((x) => x !== k) : [...a, k]))} label={label} />
-                        ))}
-                    </div>
+                {/* 정렬 — 글자 탭 */}
+                <div className="px-5 mt-2 flex gap-4 overflow-x-auto scrollbar-hide">
+                    {([["rec", "추천"], ["near", "가까운 순"], ["price", "시세 높은 순"], ["name", "이름순"]] as [Sort, string][]).map(([k, label]) => (
+                        <button
+                            key={k} type="button" onClick={() => { if (k === "near" && !me) askNear(); setSort(k); }} aria-pressed={sort === k}
+                            className={cn("h-9 text-[14px] whitespace-nowrap shrink-0 transition-colors", sort === k ? "text-[#FFFFFF] font-semibold" : "text-[#FFFFFF66] font-medium active:text-[#FFFFFF]")}
+                        >{label}</button>
+                    ))}
+                </div>
+                {/* 특징 — 누르면 켜지는 칩(여러 개 = 전부 만족) */}
+                <div className="mt-1 flex gap-1.5 overflow-x-auto scrollbar-hide px-5">
+                    {member && <FeatChip on={onlyWatched} onClick={() => setOnlyWatched((v) => !v)} label="☆ 내 관심" />}
+                    {FEATURES.map(([k, label]) => (
+                        <FeatChip key={k} on={feats.includes(k)} onClick={() => setFeats((a) => (a.includes(k) ? a.filter((x) => x !== k) : [...a, k]))} label={label} />
+                    ))}
                 </div>
 
-                <ul className="mt-3 mx-4 rounded-2xl border border-[#FFFFFF14] bg-[#FFFFFF08] overflow-hidden">
+                <ul className="mt-3 border-t border-[#FFFFFF0F]">
                     {list.isPending ? (
                         Array.from({ length: 6 }, (_, i) => <CourseRowSkeleton key={i} />)
                     ) : list.isError ? (
-                        <li className="px-4 py-5 text-[13px] text-[#FFFFFF8C]">불러오지 못했어요.</li>
+                        <li className="px-5 py-6 text-[14px] text-[#FFFFFF8C]">불러오지 못했어요.</li>
                     ) : shown.length === 0 ? (
-                        <li className="px-4 py-5 text-[13px] text-[#FFFFFF8C]">{q ? `'${q}' 골프장이 없어요.` : feats.length || onlyWatched ? "조건에 맞는 골프장이 없어요." : "이 지역엔 골프장이 없어요."}</li>
+                        <li className="px-5 py-6 text-[14px] text-[#FFFFFF8C]">{q ? `'${q}' 골프장이 없어요.` : feats.length || onlyWatched ? "조건에 맞는 골프장이 없어요." : "이 지역엔 골프장이 없어요."}</li>
                     ) : (
                         shown.slice(0, limit).map((c) => <CourseRow key={c.slug} c={c} km={kmOf.get(c.slug) ?? null} myWatch={watchOf.get(c.slug) ?? null} />)
                     )}
@@ -361,8 +376,8 @@ function FeatChip({ on, onClick, label }: { on: boolean; onClick: () => void; la
         <button
             type="button" onClick={onClick} aria-pressed={on}
             className={cn(
-                "h-8 px-3 rounded-full border text-[13px] whitespace-nowrap shrink-0 transition-colors",
-                on ? "bg-[#64DD171F] border-[#64DD1766] text-[#8BE84A] font-semibold" : "border-[#FFFFFF1A] text-[#FFFFFF99] font-medium active:bg-[#FFFFFF0F]",
+                "h-8 px-3 rounded-full text-[13px] whitespace-nowrap shrink-0 transition-colors",
+                on ? "bg-[#64DD1726] text-[#9BEF5C] font-semibold ring-1 ring-inset ring-[#64DD1766]" : "bg-[#FFFFFF0A] text-[#FFFFFF99] font-medium active:bg-[#FFFFFF14]",
             )}
         >{label}</button>
     );
@@ -374,14 +389,14 @@ function Chip({ href, active, label, n, small, live }: { href: string; active: b
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-                "shrink-0 rounded-full border inline-flex items-center gap-1.5 whitespace-nowrap transition-colors",
+                "shrink-0 rounded-full inline-flex items-center gap-1.5 whitespace-nowrap transition-colors",
                 small ? "h-8 px-3 text-[13px]" : "h-9 px-3.5 text-[14px]",
-                active ? "bg-[#FFFFFF] border-[#FFFFFF] text-[#0A0A0A] font-semibold" : "border-[#FFFFFF1A] text-[#FFFFFFB3] font-medium active:bg-[#FFFFFF0F]",
+                active ? "bg-[#FFFFFF] text-[#0A0A0A] font-semibold" : "bg-[#FFFFFF0A] text-[#FFFFFFB3] font-medium active:bg-[#FFFFFF14]",
             )}
         >
             {live && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: live }} />}
             {label}
-            {n != null && <span className={cn("tabular-nums", active ? "text-[#0A0A0A8C]" : "text-[#FFFFFF59]")}>{n}</span>}
+            {n != null && <span className={cn("tabular-nums", active ? "text-[#0A0A0A73]" : "text-[#FFFFFF59]")}>{n}</span>}
         </Link>
     );
 }
@@ -390,7 +405,7 @@ function MoreButton({ onClick, rest, unit }: { onClick: () => void; rest: number
     return (
         <button
             type="button" onClick={onClick}
-            className="mt-2 mx-4 w-[calc(100%-2rem)] h-11 rounded-xl border border-[#FFFFFF14] text-[14px] font-medium text-[#FFFFFFB3] active:bg-[#FFFFFF0A]"
+            className="mt-3 mx-5 w-[calc(100%-2.5rem)] h-12 rounded-2xl bg-[#FFFFFF0A] text-[14px] font-medium text-[#FFFFFFB3] active:bg-[#FFFFFF14]"
         >
             더 보기 <span className="text-[#FFFFFF66] tabular-nums">{rest.toLocaleString()}{unit}</span>
         </button>

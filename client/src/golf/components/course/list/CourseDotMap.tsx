@@ -13,8 +13,8 @@ export type DotTone = "dim" | "on" | "booking" | "join" | "urgent";
 export interface MapDot { key: string; lat: number; lng: number; tone: DotTone }
 
 const TONE_FILL: Record<DotTone, string> = {
-    dim: "#FFFFFF1F",
-    on: "#FFFFFF8C",
+    dim: "#FFFFFF14",
+    on: "#FFFFFF59",
     booking: "#64DD17",
     join: "#FF6B00",
     urgent: "#FF3B30",
@@ -89,15 +89,11 @@ export function CourseDotMap({ dots, focus, aspect = 0.62, className }: {
             {sorted.map((d) => {
                 const x = px(d.lng), y = py(d.lat);
                 const live = d.tone === "booking" || d.tone === "join" || d.tone === "urgent";
-                const r = (live ? 2.6 : d.tone === "on" ? 1.5 : 1.25) * unit;
+                const r = (live ? 2.4 : d.tone === "on" ? 1.15 : 1) * unit;
                 return (
                     <g key={d.key}>
-                        {live && (
-                            <circle
-                                cx={x} cy={y} r={r} fill={TONE_FILL[d.tone]}
-                                className="animate-ping motion-reduce:animate-none [transform-box:fill-box] [transform-origin:center] opacity-60"
-                            />
-                        )}
+                        {/* 지금 티타임이 있는 곳 — 번쩍이는 대신 옅은 후광 하나(2026-09-24 둘째 판) */}
+                        {live && <circle cx={x} cy={y} r={r * 2.6} fill={TONE_FILL[d.tone]} opacity={0.18} />}
                         <circle cx={x} cy={y} r={r} fill={TONE_FILL[d.tone]} />
                     </g>
                 );

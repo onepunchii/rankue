@@ -1,22 +1,28 @@
 /**
- * 골프장 상세의 머리(2026-09-24) — 이름, 지역·종류 칩, 내 위치에서 거리, 한눈 숫자 셋, 그리고 **관심 단추**(주 행동).
+ * 골프장 상세의 머리(2026-09-24 두 번째 판 — 오너: "아이디어는 좋은데 디자인이 아쉬워. 전문 디자이너가 작업한 것처럼").
  *
- * 한눈 숫자는 데이터가 있는 것만 그린다(주중 그린피 · 회원권 시세 · 지금 티타임). 셋 다 없으면 줄째로 없다.
- * 목록에서 들어오면 목록 캐시로 이름·칩이 먼저 뜨고(prefill), 상세가 오면 나머지가 채워진다.
+ * 무엇을 바꿨나(첫 판 → 둘째 판):
+ *  - **큰 흰 로고판을 없앴다.** 어두운 화면에 흰 사각형이 떠서 시선을 다 가져갔다. 로고는 상단 바(뒤로 옆, 이름 앞)로 옮겼다.
+ *  - **칩을 글 한 줄로.** 테두리 칩·채운 칩이 섞여 여섯 개씩 두 줄이던 것 → "경기 · 용인" 한 줄(누르면 지역 목록) +
+ *    "회원제+대중제 · 54홀 · 한국잔디 · 3인 가능" 한 줄. 상자는 줄이고 글자 크기·색으로 순서를 만든다.
+ *  - **한눈 숫자 세 칸을 한 띠로.** 상자 셋 → 얇은 세로선으로 나눈 한 줄. 누르면 그 섹션으로 간다.
+ *  - 관심 단추는 하나 — 이 화면의 주 행동이다.
+ *
+ * 목록에서 들어오면 목록 캐시로 이름·줄이 먼저 뜨고(prefill), 상세가 오면 숫자가 채워진다.
  */
 import { Link } from "wouter";
-import { LucideLocateFixed, LucideNavigation, LucideStar } from "@/lib/icons";
-import { cityShort, distinctAliases, listPath, manwonText, weekdayFee, wonShort, type Fees } from "@shared/golfCourse";
+import { LucideLocateFixed } from "@/lib/icons";
+import { cityShort, distinctAliases, listPath, manwonText, weekdayFee, wonShort, REGION_LABEL, type Fees } from "@shared/golfCourse";
 import type { CourseCounts, CoursePrice } from "@/golf/lib/courseApi";
 import { WatchButton } from "../WatchSheet";
-import { CourseLogo, PLAY_LABEL } from "../CourseLogo";
+import { PLAY_LABEL } from "../CourseLogo";
 import { Skel, trendColor, type SectionId } from "./ui";
 
 export interface HeaderData {
     slug: string; name: string; region: string; city: string | null; kind: string | null; holes: number | null;
     watchers: number;
     logo?: string | null;
-    /** 옛 이름·다른 이름 — "구 큐로CC" 처럼 한 줄로. 옛 이름으로 검색해 들어온 사람이 "여기 맞나" 를 바로 안다. */
+    /** 옛 이름·다른 이름 — 정말 다른 이름만 보인다(distinctAliases) */
     aliases?: string[];
     grass?: string[];
     play?: string[];
@@ -44,75 +50,80 @@ function compactManwon(n: number): string {
     return manwonText(n).replace(/원$/, "");
 }
 
-const chip = "h-7 px-2.5 rounded-full text-[12.5px] font-medium inline-flex items-center border";
+type Stat = { key: SectionId; label: string; value: string; sub?: string; subColor?: string; live?: boolean };
 
 export function CourseHeader({ base, fees, top, counts, listingCount = 0, myWatch, loaded, distance, onJump }: Props) {
     const fee = weekdayFee(fees);
     const city = cityShort(base.city);
-    const tiles: { key: SectionId; label: string; value: string; sub?: string; subColor?: string; live?: boolean }[] = [];
-    if (loaded && listingCount > 0) {
-        const bits = [counts?.booking ? `부킹 ${counts.booking}` : "", counts?.join ? `조인 ${counts.join}` : ""].filter(Boolean).join(" · ");
-        tiles.push({ key: "tee", label: "지금 티타임", value: `${listingCount}건`, sub: counts?.urgent ? `긴급 ${counts.urgent}` : bits, subColor: counts?.urgent ? "#FF3B30" : undefined, live: true });
-    }
-    if (fee) tiles.push({ key: "fee", label: "주중 그린피", value: wonShort(fee), sub: "비회원" });
-    else if (base.feeFrom) tiles.push({ key: "map", label: "그린피", value: `${wonShort(base.feeFrom)}~`, sub: "대표 요금" });
+    const aliases = distinctAliases(base.name, base.aliases);
+    const traits = [
+        base.kind,
+        base.holes ? `${base.holes}홀` : null,
+        ...(base.grass ?? []),
+        ...(base.play ?? []).map((p) => PLAY_LABEL[p] ?? p),
+    ].filter(Boolean) as string[];
+
+    const stats: Stat[] = [];
+    if (fee) stats.push({ key: "fee", label: "주중 그린피", value: wonShort(fee), sub: "비회원" });
+    else if (base.feeFrom) stats.push({ key: "map", label: "그린피", value: `${wonShort(base.feeFrom)}~`, sub: "대표 요금" });
     if (top) {
-        tiles.push({
+        stats.push({
             key: "price", label: "회원권", value: compactManwon(top.price),
             sub: top.change ? `${top.change > 0 ? "▲" : "▼"} ${Math.abs(top.change).toLocaleString("ko-KR")}만` : top.label,
             subColor: top.change ? trendColor(top.change) : undefined,
         });
     }
+    if (base.bookable !== false && loaded) {
+        const bits = [counts?.booking ? `부킹 ${counts.booking}` : "", counts?.join ? `조인 ${counts.join}` : ""].filter(Boolean).join(" · ");
+        stats.push({
+            key: "tee", label: "지금 티타임", value: listingCount > 0 ? `${listingCount}건` : "없음",
+            sub: counts?.urgent ? `긴급 ${counts.urgent}` : bits || (listingCount ? undefined : "알림으로 받기"),
+            subColor: counts?.urgent ? "#FF3B30" : undefined, live: listingCount > 0,
+        });
+    }
 
     return (
-        <header className="px-4 pt-5">
-            {base.logo !== undefined && (
-                <div className="mb-4"><CourseLogo logo={base.logo} name={base.name} size="lg" /></div>
-            )}
-            <div className="flex flex-wrap gap-1.5">
-                <Link href={listPath({ region: base.region })} className={`${chip} border-[#FFFFFF1F] text-[#FFFFFFCC] active:bg-[#FFFFFF14]`}>{base.region}</Link>
-                {city && <Link href={listPath({ region: base.region, city: base.city })} className={`${chip} border-[#FFFFFF1F] text-[#FFFFFFCC] active:bg-[#FFFFFF14]`}>{city}</Link>}
-                {base.kind && <span className={`${chip} border-transparent bg-[#FFFFFF0F] text-[#FFFFFFB3]`}>{base.kind}</span>}
-                {base.holes ? <span className={`${chip} border-transparent bg-[#FFFFFF0F] text-[#FFFFFFB3]`}>{base.holes}홀</span> : null}
-                {(base.grass ?? []).map((g) => <span key={g} className={`${chip} border-transparent bg-[#64DD1714] text-[#8BE84A]`}>{g}</span>)}
-                {(base.play ?? []).map((x) => <span key={x} className={`${chip} border-transparent bg-[#FFFFFF0F] text-[#FFFFFFB3]`}>{PLAY_LABEL[x] ?? x}</span>)}
+        <header className="px-5 pt-6">
+            {/* 어디 · 얼마나 먼지 — 지역·시군은 목록으로 가는 링크(검색엔진도 이 길을 따라간다) */}
+            <div className="flex items-center gap-1.5 text-[13px] text-[#FFFFFF8C] min-w-0">
+                <Link href={listPath({ region: base.region })} className="shrink-0 active:text-white">{REGION_LABEL[base.region] ?? base.region}</Link>
+                {city && (<><span className="text-[#FFFFFF33]">·</span><Link href={listPath({ region: base.region, city: base.city })} className="shrink-0 active:text-white">{city}</Link></>)}
+                {distance && (
+                    <>
+                        <span className="text-[#FFFFFF33]">·</span>
+                        {"text" in distance ? (
+                            <span className="truncate">내 위치에서 <span className="text-[#FFFFFFCC] tabular-nums">{distance.text}</span></span>
+                        ) : (
+                            <button type="button" onClick={distance.ask} className="inline-flex items-center gap-1 -my-1 py-1 active:text-white">
+                                <LucideLocateFixed className="w-3.5 h-3.5" />내 위치에서 거리
+                            </button>
+                        )}
+                    </>
+                )}
             </div>
 
-            <h1 className="mt-3 text-[28px] leading-[1.2] font-semibold tracking-tight text-white break-keep">{base.name}</h1>
-            {distinctAliases(base.name, base.aliases).length > 0 && (
-                <p className="mt-1 text-[13px] text-[#FFFFFF73] break-keep">{distinctAliases(base.name, base.aliases).slice(0, 3).join(" · ")}</p>
+            <h1 className="mt-2 text-[28px] leading-[1.18] font-bold tracking-tight text-white break-keep">{base.name}</h1>
+            {aliases.length > 0 && <p className="mt-1 text-[13px] text-[#FFFFFF66] break-keep">{aliases.slice(0, 2).join(" · ")}</p>}
+            {traits.length > 0 && (
+                <p className="mt-2.5 text-[14px] leading-relaxed text-[#FFFFFFB3] break-keep">{traits.join(" · ")}</p>
             )}
 
-            {(distance || base.watchers > 0) && (
-                <div className="mt-2 flex items-center gap-3 text-[13px] text-[#FFFFFF99]">
-                    {distance && ("text" in distance ? (
-                        <span className="inline-flex items-center gap-1"><LucideNavigation className="w-4 h-4 text-[#64DD17]" />내 위치에서 {distance.text}</span>
-                    ) : (
-                        <button type="button" onClick={distance.ask} className="inline-flex items-center gap-1 h-7 -my-1 px-2 -mx-2 rounded-full active:bg-[#FFFFFF14]">
-                            <LucideLocateFixed className="w-4 h-4" />내 위치에서 거리
-                        </button>
-                    ))}
-                    {base.watchers > 0 && (
-                        <span className="inline-flex items-center gap-1"><LucideStar weight="fill" className="w-4 h-4 text-[#64DD17]" />관심 {base.watchers.toLocaleString("ko-KR")}명</span>
-                    )}
-                </div>
-            )}
-
+            {/* 한눈 숫자 — 한 띠, 얇은 세로선. 있는 것만. */}
             {!loaded ? (
-                <div className="mt-5 grid grid-cols-3 gap-2"><Skel className="h-[74px] rounded-2xl" /><Skel className="h-[74px] rounded-2xl" /><Skel className="h-[74px] rounded-2xl" /></div>
-            ) : tiles.length > 0 && (
-                <div className={`mt-5 grid gap-2 ${tiles.length === 1 ? "grid-cols-1" : tiles.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
-                    {tiles.map((t) => (
+                <Skel className="mt-6 h-[76px] rounded-2xl" />
+            ) : stats.length > 0 && (
+                <div className="mt-6 flex rounded-2xl bg-[#FFFFFF08] divide-x divide-[#FFFFFF0F]">
+                    {stats.map((t) => (
                         <button
                             key={t.key} type="button" onClick={() => onJump(t.key)}
-                            className="min-w-0 text-left rounded-2xl bg-[#FFFFFF08] border border-[#FFFFFF14] px-3 py-2.5 active:bg-[#FFFFFF0F]"
+                            className="flex-1 min-w-0 text-left px-4 py-3.5 first:rounded-l-2xl last:rounded-r-2xl active:bg-[#FFFFFF0A]"
                         >
-                            <span className="flex items-center gap-1.5 text-[12px] text-[#FFFFFF80]">
-                                {t.live && <span className="relative flex w-1.5 h-1.5"><span className="absolute inset-0 rounded-full bg-[#64DD17] animate-ping opacity-60" /><span className="relative w-1.5 h-1.5 rounded-full bg-[#64DD17]" /></span>}
+                            <span className="flex items-center gap-1.5 text-[12px] text-[#FFFFFF73]">
+                                {t.live && <span className="w-1.5 h-1.5 rounded-full bg-[#64DD17]" />}
                                 {t.label}
                             </span>
-                            <span className="block mt-0.5 text-[18px] font-semibold text-white tabular-nums truncate">{t.value}</span>
-                            {t.sub && <span className="block text-[12px] truncate" style={{ color: t.subColor ?? "#FFFFFF66" }}>{t.sub}</span>}
+                            <span className="block mt-1 text-[19px] leading-tight font-semibold text-white tabular-nums truncate">{t.value}</span>
+                            {t.sub && <span className="block mt-0.5 text-[12px] truncate" style={{ color: t.subColor ?? "#FFFFFF59" }}>{t.sub}</span>}
                         </button>
                     ))}
                 </div>
@@ -123,6 +134,9 @@ export function CourseHeader({ base, fees, top, counts, listingCount = 0, myWatc
                     {loaded ? (
                         <WatchButton slug={base.slug} name={base.name} myWatch={myWatch ?? null} watchers={base.watchers} size="lg" />
                     ) : <Skel className="h-[52px] rounded-2xl" />}
+                    {base.watchers > 0 && (
+                        <p className="mt-2 text-center text-[12px] text-[#FFFFFF59] tabular-nums">{base.watchers.toLocaleString("ko-KR")}명이 이 골프장 티타임을 기다려요</p>
+                    )}
                 </div>
             )}
         </header>

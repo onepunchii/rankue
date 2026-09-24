@@ -14,9 +14,9 @@ export const SCROLL_MARGIN = "calc(96px + env(safe-area-inset-top))";
 
 export function Section({ id, title, aside, children, className }: { id?: SectionId; title: ReactNode; aside?: ReactNode; children: ReactNode; className?: string }) {
     return (
-        <section id={id ? `sec-${id}` : undefined} data-sec={id} className={cn("px-4 pt-8", className)} style={{ scrollMarginTop: SCROLL_MARGIN }}>
-            <div className="flex items-end justify-between gap-3 mb-3">
-                <h2 className="text-[18px] font-semibold text-white leading-tight">{title}</h2>
+        <section id={id ? `sec-${id}` : undefined} data-sec={id} className={cn("px-5 pt-10", className)} style={{ scrollMarginTop: SCROLL_MARGIN }}>
+            <div className="flex items-end justify-between gap-3 mb-3.5">
+                <h2 className="text-[19px] font-bold tracking-tight text-white leading-tight">{title}</h2>
                 {aside}
             </div>
             {children}
@@ -25,7 +25,8 @@ export function Section({ id, title, aside, children, className }: { id?: Sectio
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-    return <div className={cn("rounded-2xl bg-[#FFFFFF08] border border-[#FFFFFF14]", className)}>{children}</div>;
+    // 테두리 없는 평평한 면(2026-09-24 둘째 판) — 테두리 상자가 겹겹이라 무거웠다. 면 하나, 안은 얇은 선으로 나눈다.
+    return <div className={cn("rounded-2xl bg-[#FFFFFF08]", className)}>{children}</div>;
 }
 
 export function Skel({ className }: { className?: string }) {
