@@ -7,6 +7,9 @@ import { asc, sql } from "drizzle-orm";
 import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
 import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingIntents } from "../shared/golfCourse.js";
+// seo/* 는 이 파일의 entry 를 되받아 쓴다(순환). entry 는 함수 선언이고 요청 시점에만 불리므로 안전하다.
+import { rankingExtraSitemapParts } from "./seo/rankingExtra.js";
+import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
 
 // 동적 사이트맵 — /sitemap.xml 은 **사이트맵 인덱스**, 실제 URL 은 주제별 5개 파일에 나눠 싣는다.
 //
@@ -18,6 +21,8 @@ import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingInt
 //   /sitemap-stores.xml     매장 디렉토리(수집 1,195곳)
 //   /sitemap-golf-courses.xml  골프장 475곳 전부(2026-09-24) — 시세가 매일 바뀌어 daily
 //   /sitemap-golf-hubs.xml     골프장 목록·지역·시군 + 부킹·조인·취소티 허브(글이 있는 조합만)
+//   /sitemap-rankings.xml      국가별 세계랭킹(남자 10명 이상) + 순위 변동 한 장(2026-09-24)
+//   /sitemap-terms.xml         당구 용어 사전 허브 + 용어 페이지(본문 300자 이상, 2026-09-24)
 //
 // 2026-09-14 분할 이유: 단일 사이트맵에 5,173 URL 을 제출했더니 색인 4개, "발견됨 - 색인 안 됨" 3,660.
 // 서버 렌더 내부 링크가 거의 없는(홈에 링크 1개) 저권위 도메인에 한 번에 쏟은 게 원인이라
@@ -31,7 +36,7 @@ const ORIGIN = "https://www.rankue.co.kr";
 const APP_LANGS = ["en", "vi", "tr", "es"];
 const ABOUT_LANGS = ["en", "vi", "tr", "es", "ja", "zh"];
 
-export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs"] as const;
+export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs", "rankings", "terms"] as const;
 export type SitemapSection = (typeof SITEMAP_SECTIONS)[number];
 
 function esc(s: string): string {
@@ -270,6 +275,7 @@ async function golfHubParts(): Promise<string[]> {
 const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
   core: coreParts, players: playerParts, pba: pbaParts, golf: golfParts, stores: storeParts,
   "golf-courses": golfCourseParts, "golf-hubs": golfHubParts,
+  rankings: rankingExtraSitemapParts, terms: billiardsTermsSitemapParts,
 };
 
 export async function generateSitemapSection(section: SitemapSection): Promise<string> {

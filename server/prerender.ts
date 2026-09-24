@@ -21,6 +21,9 @@ import {
   courseTitle, courseDescription, listTitle, listDescription, listingIntents, teePart, distinctAliases, type Fees, type GolfIntent,
 } from "../shared/golfCourse.js";
 import { JOIN_TYPE_LABEL, distanceKm, formatDistance, type JoinType } from "../shared/golfJoin.js";
+// seo/* 는 이 파일의 page·esc·hubNav 를 되받아 쓴다(순환). 둘 다 요청 시점에만 부르므로 초기화 순서와 무관하다.
+import { renderRankingExtra, type RankingExtraRender } from "./seo/rankingExtra.js";
+import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
 //
@@ -103,6 +106,8 @@ export function hubNav(lang = "ko"): string {
     [`/${q}`, H.home], [`/world-ranking${q}`, H.wr], [`/pba${q}`, H.pba], [`/golf-ranking${golfQ}`, H.golf],
     // 골프장 허브(2026-09-24) — 골프 예약·시세는 한국 전용이라 한국어 문서에만 건다.
     ...(lang === "ko" ? [["/golf/courses", "전국 골프장"] as [string, string]] : []),
+    // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 문서에만 건다.
+    ...(lang === "ko" ? [["/billiards/terms", "당구 용어"] as [string, string]] : []),
     ["/stores", H.stores], ["/briefing", H.briefing], ["/community", H.community], [`/about${q}`, H.about], ["/support", H.support],
   ];
   return `<nav aria-label="RANKUE">${links.map(([href, label]) => `<a href="${href}">${esc(label)}</a>`).join(" · ")}</nav>`;
@@ -1265,11 +1270,31 @@ export function registerPrerender(app: Express) {
   ${listHtml || `<p>${esc(W.loading)}</p>`}
   ${faqHtml}
   ${moreHtml}${sectionsHtml}
+  ${lang === "ko" ? `<nav><a href="/world-ranking/country/KR">대한민국 선수 세계랭킹 전체</a> · <a href="/world-ranking/movers">이번 회차 순위 변동</a></nav>` : ""}
   <p>${esc(W.source)} — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
   ${hubNav(lang)}
 </main>`,
       }),
     );
+  });
+
+  // ── /world-ranking/country/:fed · /world-ranking/movers (2026-09-24) ──
+  // 한국어 전용(?lang= 무시). "/world-ranking" 은 문자열 라우트라 정확 일치 — 이 하위 경로를 먹지 않는다.
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  app.get(/^\/world-ranking\/(?:country\/[^/]+|movers)\/?$/, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    let r: RankingExtraRender | null;
+    try {
+      r = await renderRankingExtra(req.path, req.query as Record<string, string>);
+    } catch (e) {
+      console.warn("[prerender] ranking extra failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    if (!r) return next();
+    noStore(res);
+    res.setHeader("X-Prerender", r.tag); // 이미 ASCII(국가 코드·고정 꼬리표)
+    if (r.status === 301 && r.location) return res.redirect(301, r.location);
+    res.status(r.status).send(r.html);
   });
 
   // ── /player/:category/:umbId ──────────────────────────────────────
@@ -1657,6 +1682,26 @@ ${list}
     noStore(res);
     // X-Prerender 에 한글을 그대로 넣으면 Node 가 ERR_INVALID_CHAR 로 죽는다 — tag 는 이미 encodeURIComponent 된 값이다.
     res.setHeader("X-Prerender", r.tag);
+    if (r.status === 301 && r.location) return res.redirect(301, r.location);
+    res.status(r.status).send(r.html);
+  });
+
+  // ── /billiards/terms[/:slug] 당구 용어 사전(2026-09-24) ──────────────
+  // 정규식 라우트라 req.path 가 인코딩된 채로 온다(한글 슬러그) — 디코드는 renderBilliardsTerms 가 한다.
+  // 본문이 코드에 있어 DB 를 안 타지만, 예외가 나도 404 로 떨어지지 않게 다른 핸들러와 같이 503 으로 낸다.
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  app.get(/^\/billiards\/terms(?:\/[^/]+)?\/?$/, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    let r: TermsRender | null;
+    try {
+      r = await renderBilliardsTerms(req.path, req.query as Record<string, string>);
+    } catch (e) {
+      console.warn("[prerender] billiards terms failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    if (!r) return next();
+    noStore(res);
+    res.setHeader("X-Prerender", r.tag); // 슬러그는 인코딩돼 ASCII
     if (r.status === 301 && r.location) return res.redirect(301, r.location);
     res.status(r.status).send(r.html);
   });

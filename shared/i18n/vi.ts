@@ -318,6 +318,7 @@ export const vi: Record<string, string> = {
   "err.umb.cheerNotFound": "Không tìm thấy lời cổ vũ",
   "err.umb.badDate": "Ngày không hợp lệ",
   "err.umb.noBriefing": "Không có bản tin cho ngày này",
+  "err.umb.countryNotFound": "Không tìm thấy quốc gia",
   "err.pba.badLeague": "Giải đấu không hợp lệ",
   "err.pba.badSeason": "Mùa giải không hợp lệ",
   "notif.umb.rankEntry.title": "🌍 {name} lọt vào bảng xếp hạng thế giới",

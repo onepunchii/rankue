@@ -318,6 +318,7 @@ export const tr: Record<string, string> = {
   "err.umb.cheerNotFound": "Mesaj bulunamadı",
   "err.umb.badDate": "Geçersiz tarih",
   "err.umb.noBriefing": "Bu tarih için özet yok",
+  "err.umb.countryNotFound": "Ülke bulunamadı",
   "err.pba.badLeague": "Geçersiz lig",
   "err.pba.badSeason": "Geçersiz sezon",
   "notif.umb.rankEntry.title": "🌍 {name} dünya sıralamasına girdi",

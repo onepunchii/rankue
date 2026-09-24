@@ -25,7 +25,8 @@ import {
     LucideUser,
     LucideGlobe,
     LucideShare2,
-    LucideHistory
+    LucideHistory,
+    LucideBookOpen
 } from "@/lib/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { flagEmoji } from "@/lib/flag";
@@ -54,7 +55,7 @@ import { goLogin } from "@/components/hiq/LoginGate";
 import { forgetPushToken, storedPushToken } from "@/lib/nativeBridge";
 
 export default function HiqMenu() {
-    const { t } = useT();
+    const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -455,6 +456,10 @@ export default function HiqMenu() {
                         { icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') },
                         { icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') },
                         ...(isGolf ? [] : [{ icon: LucideTrophy, label: t("menu.rankingSystem"), desc: t("menu.rankingSystemDesc"), onClick: () => openInfoModal('ranking') }]),
+                        // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 화면에만 둔다(문구도 그래서 사전 키 없이 한국어).
+                        ...(!isGolf && locale === "ko"
+                            ? [{ icon: LucideBookOpen, label: "당구 용어 사전", desc: "하이런·에버리지·빈쿠션… 용어 뜻 풀이", onClick: () => setLocation("/billiards/terms") }]
+                            : []),
                         // 로그아웃·계정 삭제는 계정이 있어야 성립한다
                         ...(!isGuest
                             ? [

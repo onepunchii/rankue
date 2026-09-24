@@ -318,6 +318,7 @@ export const ko: Record<string, string> = {
   "err.umb.cheerNotFound": "응원글을 찾을 수 없습니다",
   "err.umb.badDate": "잘못된 날짜입니다",
   "err.umb.noBriefing": "브리핑이 없는 날짜입니다",
+  "err.umb.countryNotFound": "국가를 찾을 수 없습니다",
   "err.pba.badLeague": "잘못된 리그입니다",
   "err.pba.badSeason": "잘못된 시즌입니다",
   "notif.umb.rankEntry.title": "🌍 {name} 세계랭킹 진입",

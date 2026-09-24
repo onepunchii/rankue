@@ -9,6 +9,7 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { msg } from "../../lib/i18n.js";
 import type { UmbCategory } from "../../services/umbService.js";
+import { normalizeFed } from "../../../shared/umbCountryMeta.js";
 
 // UMB 세계랭킹 공개 API — 출처 표기(UMB) 하에 사실 데이터를 제공한다.
 // 전부 비로그인 읽기 허용: 세계 랭킹 페이지는 검색 유입용 공개 화면이다.
@@ -116,6 +117,22 @@ router.get("/movers", asyncHandler(async (req: any, res: Response) => {
     if (!category) return sendError(res, 400, "err.umb.badCategory");
     const movers = await storage.umb.getMovers(category);
     return sendSuccess(res, movers);
+}));
+
+// GET /umb/weekly-movers — 순위 변동 페이지(/world-ranking/movers, 2026-09-24). 최신 vs 직전 회차, 남자·여자.
+// /movers(세계랭킹 화면의 무버 띠 5명)와 응답 모양이 달라 경로를 나눴다 — 그 띠를 깨지 않으려고.
+router.get("/weekly-movers", asyncHandler(async (_req: any, res: Response) => {
+    return sendSuccess(res, await storage.umb.getMoversReport());
+}));
+
+// GET /umb/country/:fed — 국가별 세계랭킹(/world-ranking/country/:fed, 2026-09-24). 코드 모양이 아니거나
+// 어느 부문 최신 회차에도 선수가 없으면 404. 소문자 코드도 받는다(화면 주소는 대문자로 고친다).
+router.get("/country/:fed", asyncHandler(async (req: any, res: Response) => {
+    const fed = normalizeFed(req.params.fed);
+    if (!fed) return sendError(res, 404, "err.umb.countryNotFound");
+    const data = await storage.umb.getCountryReport(fed);
+    if (!data) return sendError(res, 404, "err.umb.countryNotFound");
+    return sendSuccess(res, data);
 }));
 
 // GET /umb/nations?category= — 국가별 집계 (당구 강국 랭킹)

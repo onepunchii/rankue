@@ -318,6 +318,7 @@ export const en: Record<string, string> = {
   "err.umb.cheerNotFound": "Message not found",
   "err.umb.badDate": "Invalid date",
   "err.umb.noBriefing": "No briefing for this date",
+  "err.umb.countryNotFound": "Country not found",
   "err.pba.badLeague": "Invalid league",
   "err.pba.badSeason": "Invalid season",
   "notif.umb.rankEntry.title": "🌍 {name} enters the world ranking",

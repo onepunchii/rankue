@@ -35,6 +35,8 @@ import HiqJoin from "@/pages/hiq/join";
 import HiqCommunity from "@/pages/hiq/community";
 import HiqCommunityPost from "@/pages/hiq/community-post";
 import HiqWorldRanking from "@/pages/hiq/world-ranking";
+import HiqWorldRankingCountry from "@/pages/hiq/world-ranking-country";
+import HiqWorldRankingMovers from "@/pages/hiq/world-ranking-movers";
 import HiqPba from "@/pages/hiq/pba";
 import HiqPbaPlayer from "@/pages/hiq/pba-player";
 import HiqGolfRanking from "@/pages/hiq/golf-ranking";
@@ -129,6 +131,8 @@ const FramedCommunity = framed(HiqCommunity);
 const FramedCommunityPost = framed(HiqCommunityPost);
 // 데이터 표 페이지들은 데스크탑에서 넓게 (사이드 패널 없이 중앙 720px)
 const FramedWorldRanking = framed(HiqWorldRanking, { wide: true });
+const FramedWorldRankingCountry = framed(HiqWorldRankingCountry, { wide: true });
+const FramedWorldRankingMovers = framed(HiqWorldRankingMovers, { wide: true });
 const FramedWorldPlayer = framed(HiqWorldPlayer, { wide: true });
 const FramedPba = framed(HiqPba, { wide: true });
 const FramedPbaPlayer = framed(HiqPbaPlayer, { wide: true });
@@ -143,6 +147,17 @@ function SimulatorLazy() {
       <SimulatorPage />
     </Suspense>
   );
+}
+
+// 당구 용어 사전(2026-09-24) — 본문(shared/billiardsTerms.ts)이 길어 메인 청크에서 뺀다. 페이지가 자체 max-w-2xl 레이아웃이라 프레임 없이.
+const BilliardsTermsHub = lazy(() => import("@/pages/billiards-terms"));
+const BilliardsTerm = lazy(() => import("@/pages/billiards-term"));
+const termsFallback = <div className="min-h-[100dvh] bg-surface-0" aria-busy="true" />;
+function BilliardsTermsRoute() {
+  return <Suspense fallback={termsFallback}><BilliardsTermsHub /></Suspense>;
+}
+function BilliardsTermRoute() {
+  return <Suspense fallback={termsFallback}><BilliardsTerm /></Suspense>;
 }
 
 /**
@@ -247,6 +262,9 @@ function AppRoutes() {
       <Route path="/stores/:code" component={StoreListing} />
       <Route path="/briefing" component={BriefingPage} />
       <Route path="/briefing/:date" component={BriefingPage} />
+      {/* 당구 용어 사전(2026-09-24) — 공개 문서, 로그인 불필요. 봇에게는 server/seo/billiardsTerms.ts */}
+      <Route path="/billiards/terms" component={BilliardsTermsRoute} />
+      <Route path="/billiards/terms/:slug" component={BilliardsTermRoute} />
       <Route path="/store/:slug" component={StoreDetail} />
       {/* 공유 링크로 열리는 공개 경기 결과 — 로그인 불필요 */}
       <Route path="/r/:id" component={SharedResult} />
@@ -319,6 +337,9 @@ function AppRoutes() {
       <Route path="/community" component={FramedCommunity} />
       <Route path="/community/:id" component={FramedCommunityPost} />
       <Route path="/world-ranking" component={FramedWorldRanking} />
+      {/* 국가별 세계랭킹·순위 변동(2026-09-24) — 공개. 봇에게는 server/seo/rankingExtra.ts */}
+      <Route path="/world-ranking/country/:fed" component={FramedWorldRankingCountry} />
+      <Route path="/world-ranking/movers" component={FramedWorldRankingMovers} />
       <Route path="/player/:category/:umbId" component={FramedWorldPlayer} />
       <Route path="/pba" component={FramedPba} />
       <Route path="/pba-player/:memCode" component={FramedPbaPlayer} />

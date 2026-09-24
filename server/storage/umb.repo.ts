@@ -10,6 +10,7 @@ export type PlayerCategory = UmbCategory | GolfTour;
 import { expiringEvents, projectedRank } from "../../shared/umbExpiry.js";
 import { buildEventHistory } from "../../shared/umbEventHistory.js";
 import { toKoreanName } from "../services/umbKoreanName.js";
+import { MOVER_RANK_CUTOFF, type UmbCountryReport, type UmbCountrySection, type UmbMoveRow, type UmbMoversReport, type UmbMoversSection } from "../../shared/umbCountryMeta.js";
 
 // UMB 세계랭킹 저장소. 공개 데이터라 뷰어 개인화·차단 로직이 없고,
 // 회차(edition) 단위 스냅샷의 멱등 적재가 핵심이다.
@@ -18,6 +19,19 @@ import { toKoreanName } from "../services/umbKoreanName.js";
 // 엔드포인트가 Neon 컴퓨트를 직격한다 — 데이터가 주 1회 갱신이므로 모듈 캐시로 흡수.
 const EDITIONS_TTL_MS = 5 * 60 * 1000;
 const editionsCache = new Map<string, { at: number; data: Array<{ edition: string; editionDate: Date }> }>();
+
+// 국가별 페이지·순위 변동 페이지(2026-09-24) — 두 회차를 맞대는 집계라 화면 API·프리렌더가 같이 부르면 같은 계산을 두 번 한다.
+// 데이터가 주 1회 바뀌므로 회차 캐시와 같은 5분 모듈 캐시로 흡수하고, 새 회차 적재 때 함께 비운다.
+const reportCache = new Map<string, { at: number; data: unknown }>();
+async function cachedReport<T>(key: string, load: () => Promise<T>): Promise<T> {
+    const hit = reportCache.get(key);
+    if (hit && Date.now() - hit.at < EDITIONS_TTL_MS) return hit.data as T;
+    const data = await load();
+    reportCache.set(key, { at: Date.now(), data });
+    return data;
+}
+/** 회차 날짜 → "YYYY-MM-DD". drizzle 이 timestamp(시간대 없음)를 UTC 로 읽으므로 UTC 날짜가 곧 UMB 발표일이다. */
+const ymd = (d: Date) => new Date(d).toISOString().slice(0, 10);
 
 export class UmbRepository {
 
@@ -70,6 +84,7 @@ export class UmbRepository {
             }
         });
         editionsCache.delete(entry.category); // 새 회차 적재 즉시 반영
+        reportCache.clear();
         return parsed.rows.length;
     }
 
@@ -491,6 +506,152 @@ export class UmbRepository {
         `);
         const nations = (result.rows ?? result) as any[];
         return { edition: latest.edition, editionDate: latest.editionDate, nations };
+    }
+
+    /**
+     * 국가별 세계랭킹(/world-ranking/country/:fed, 2026-09-24). 부문마다 그 나라 선수 전원 + 직전 회차 대비 변동,
+     * 국가 랭킹표 자리(getNations 순서 그대로 — 앱 '국가' 탭과 같은 표), 톱 100·300 인원, 이번 회차 상승·하락 5명씩.
+     * 어느 부문에도 선수가 없으면 null(=404). fed 는 부른 쪽이 대문자 두 글자로 검증해 넘긴다.
+     */
+    async getCountryReport(fed: string): Promise<UmbCountryReport | null> {
+        return cachedReport(`country:${fed}`, async () => {
+            let nationsMen: UmbCountryReport["nations"] = [];
+            const cur = alias(umbRankings, "cur");
+            const before = alias(umbRankings, "before");
+            // 부문 셋은 서로 독립 — 차례로 돌리면 콜드 스타트에서 3초 가까이 걸려(실측 2.7초) 한 번에 보낸다
+            const built = await Promise.all((["players", "ladies", "juniors"] as UmbCategory[]).map(async (category): Promise<UmbCountrySection | null> => {
+                const editions = await this.getLatestEditions(category, 2);
+                if (!editions.length) return null;
+                const [latest, prev] = editions;
+                const raw = await db.select({
+                    playerUmbId: cur.playerUmbId, playerName: cur.playerName, nativeName: umbPlayerNames.nativeName, fed: cur.fed,
+                    rank: cur.rank, points: cur.points, prevRank: before.rank, prevPoints: before.points,
+                })
+                    .from(cur)
+                    .leftJoin(before, and(eq(before.category, category), eq(before.edition, prev?.edition ?? "__none__"), eq(before.playerUmbId, cur.playerUmbId)))
+                    .leftJoin(umbPlayerNames, eq(umbPlayerNames.playerUmbId, cur.playerUmbId))
+                    .where(and(eq(cur.category, category), eq(cur.edition, latest.edition), eq(cur.fed, fed)))
+                    .orderBy(asc(cur.rank));
+                // 남자 국가표는 이 나라에 남자 선수가 없어도 받는다 — 다른 나라로 가는 링크의 재료다
+                if (!raw.length && category !== "players") return null;
+                const { nations } = await this.getNations(category);
+                if (category === "players") nationsMen = nations.map((n: any, i: number) => ({ fed: n.fed, players: n.players, pos: i + 1 }));
+                if (!raw.length) return null;
+
+                const rows: UmbMoveRow[] = raw.map((r) => ({
+                    ...r, nativeName: r.nativeName ?? null, prevRank: r.prevRank ?? null, prevPoints: r.prevPoints ?? null,
+                    // 직전 회차가 아예 없으면 변동을 모른다(null) — 이때 화면·프리렌더는 '신규'를 붙이지 않고 변동 칸을 비운다(prevEdition=null)
+                    move: prev && r.prevRank != null ? r.prevRank - r.rank : null,
+                }));
+                const idx = nations.findIndex((n: any) => n.fed === fed);
+                const risers = rows.filter((r) => (r.move ?? 0) > 0 && r.rank! <= MOVER_RANK_CUTOFF)
+                    .sort((a, b) => b.move! - a.move! || a.rank! - b.rank!).slice(0, 5);
+                const fallers = rows.filter((r) => (r.move ?? 0) < 0 && r.prevRank! <= MOVER_RANK_CUTOFF)
+                    .sort((a, b) => a.move! - b.move! || a.rank! - b.rank!).slice(0, 5);
+                return {
+                    category,
+                    edition: latest.edition, date: ymd(latest.editionDate),
+                    prevEdition: prev?.edition ?? null, prevDate: prev ? ymd(prev.editionDate) : null,
+                    worldTotal: nations.reduce((s: number, n: any) => s + (n.players ?? 0), 0),
+                    nationRank: idx >= 0 ? idx + 1 : null,
+                    nationCount: nations.length,
+                    top5Points: idx >= 0 ? (nations[idx].top5Points ?? null) : null,
+                    total: rows.length,
+                    top100: rows.filter((r) => r.rank! <= 100).length,
+                    top300: rows.filter((r) => r.rank! <= 300).length,
+                    rows, risers, fallers,
+                    newCount: prev ? rows.filter((r) => r.prevRank == null).length : 0,
+                };
+            }));
+            const sections = built.filter((s): s is UmbCountrySection => s !== null);
+            return sections.length ? { fed, sections, nations: nationsMen } : null;
+        });
+    }
+
+    /**
+     * 순위 변동(/world-ranking/movers, 2026-09-24) — 최신 회차 vs 직전 회차. 남자·여자(주니어는 회차 간격이 들쭉날쭉해 뺐다).
+     * 두 회차를 선수 id 로 FULL OUTER JOIN 해 집계(상승·하락·그대로·신규·이탈)는 전원, 목록은 필요한 조각만 가져온다.
+     * 상승·하락은 MOVER_RANK_CUTOFF(300) 안에서만 — 이유는 shared/umbCountryMeta.ts 주석.
+     */
+    async getMoversReport(): Promise<UmbMoversReport> {
+        return cachedReport("movers", async () => {
+            const built = await Promise.all((["players", "ladies"] as UmbCategory[]).map(async (category): Promise<UmbMoversSection | null> => {
+                const editions = await this.getLatestEditions(category, 2);
+                if (editions.length < 2) return null;
+                const [latest, prev] = editions;
+                const j = sql`j AS (
+                    SELECT coalesce(c.player_umb_id, p.player_umb_id) AS id,
+                           coalesce(c.player_name, p.player_name) AS name,
+                           coalesce(c.fed, p.fed) AS fed,
+                           c.rank AS rank, p.rank AS prev_rank, c.points AS points, p.points AS prev_points
+                    FROM (SELECT player_umb_id, player_name, fed, rank, points FROM umb_rankings
+                          WHERE category = ${category} AND edition = ${latest.edition}) c
+                    FULL OUTER JOIN (SELECT player_umb_id, player_name, fed, rank, points FROM umb_rankings
+                          WHERE category = ${category} AND edition = ${prev.edition}) p
+                      ON p.player_umb_id = c.player_umb_id)`;
+                const [countRows, listed] = await Promise.all([db.execute(sql`WITH ${j}
+                    SELECT count(*) FILTER (WHERE rank IS NOT NULL)::int AS total,
+                           count(*) FILTER (WHERE rank < prev_rank)::int AS up,
+                           count(*) FILTER (WHERE rank > prev_rank)::int AS down,
+                           count(*) FILTER (WHERE rank = prev_rank)::int AS same,
+                           count(*) FILTER (WHERE prev_rank IS NULL)::int AS new_count,
+                           count(*) FILTER (WHERE rank IS NULL)::int AS out_count,
+                           count(*) FILTER (WHERE fed = 'KR' AND rank IS NOT NULL)::int AS kr_total,
+                           count(*) FILTER (WHERE fed = 'KR' AND rank < prev_rank)::int AS kr_up,
+                           count(*) FILTER (WHERE fed = 'KR' AND rank > prev_rank)::int AS kr_down,
+                           count(*) FILTER (WHERE fed = 'KR' AND rank = prev_rank)::int AS kr_same,
+                           count(*) FILTER (WHERE fed = 'KR' AND prev_rank IS NULL)::int AS kr_new,
+                           count(*) FILTER (WHERE fed = 'KR' AND rank IS NULL)::int AS kr_out
+                    FROM j`).then((r: any) => (r.rows ?? r) as any[]), db.execute(sql`WITH ${j}
+                    SELECT s.kind, s.id, s.name, s.fed, s.rank, s.prev_rank, s.points, s.prev_points, n.native_name
+                    FROM (
+                        (SELECT 'up' AS kind, j.* FROM j WHERE rank <= ${MOVER_RANK_CUTOFF} AND prev_rank > rank
+                            ORDER BY prev_rank - rank DESC, rank ASC LIMIT 20)
+                        UNION ALL
+                        (SELECT 'down' AS kind, j.* FROM j WHERE prev_rank <= ${MOVER_RANK_CUTOFF} AND rank > prev_rank
+                            ORDER BY rank - prev_rank DESC, prev_rank ASC LIMIT 20)
+                        UNION ALL
+                        (SELECT 'new' AS kind, j.* FROM j WHERE prev_rank IS NULL ORDER BY rank ASC LIMIT 30)
+                        UNION ALL
+                        (SELECT 'out' AS kind, j.* FROM j WHERE rank IS NULL ORDER BY prev_rank ASC LIMIT 30)
+                        UNION ALL
+                        -- 화면·프리렌더가 "아래는 300위 안 선수"라고 적으므로 잘라내지 않는다(현재·직전 300위 합집합은 최대 600명)
+                        (SELECT 'kr' AS kind, j.* FROM j WHERE fed = 'KR' AND (rank <= ${MOVER_RANK_CUTOFF} OR prev_rank <= ${MOVER_RANK_CUTOFF})
+                            ORDER BY coalesce(rank, prev_rank) ASC LIMIT ${MOVER_RANK_CUTOFF * 2})
+                    ) s
+                    LEFT JOIN umb_player_names n ON n.player_umb_id = s.id`).then((r: any) => (r.rows ?? r) as any[])]);
+
+                const toRow = (r: any): UmbMoveRow => ({
+                    playerUmbId: r.id, playerName: r.name, nativeName: r.native_name ?? null, fed: r.fed,
+                    rank: r.rank ?? null, prevRank: r.prev_rank ?? null,
+                    move: r.rank != null && r.prev_rank != null ? r.prev_rank - r.rank : null,
+                    points: r.points ?? null, prevPoints: r.prev_points ?? null,
+                });
+                // LEFT JOIN 뒤에는 순서가 보장되지 않는다 — 각 조각의 ORDER BY 와 같은 기준으로 다시 줄 세운다
+                const pick = (kind: string, cmp: (a: UmbMoveRow, b: UmbMoveRow) => number) =>
+                    listed.filter((r) => r.kind === kind).map(toRow).sort(cmp);
+                const c = countRows[0] ?? {};
+                return {
+                    category,
+                    edition: latest.edition, date: ymd(latest.editionDate),
+                    prevEdition: prev.edition, prevDate: ymd(prev.editionDate),
+                    total: c.total ?? 0,
+                    changed: (c.up ?? 0) + (c.down ?? 0),
+                    up: c.up ?? 0, down: c.down ?? 0, same: c.same ?? 0,
+                    newCount: c.new_count ?? 0, outCount: c.out_count ?? 0,
+                    risers: pick("up", (a, b) => b.move! - a.move! || a.rank! - b.rank!),
+                    fallers: pick("down", (a, b) => a.move! - b.move! || a.prevRank! - b.prevRank!),
+                    entries: pick("new", (a, b) => a.rank! - b.rank!),
+                    dropouts: pick("out", (a, b) => a.prevRank! - b.prevRank!),
+                    kr: {
+                        total: c.kr_total ?? 0, up: c.kr_up ?? 0, down: c.kr_down ?? 0, same: c.kr_same ?? 0,
+                        newCount: c.kr_new ?? 0, outCount: c.kr_out ?? 0,
+                        rows: pick("kr", (a, b) => (a.rank ?? a.prevRank!) - (b.rank ?? b.prevRank!)),
+                    },
+                };
+            }));
+            return { sections: built.filter((s): s is UmbMoversSection => s !== null) };
+        });
     }
 
     // 대회 캘린더 — 최신 회차 레전드에서 도시·국가·날짜를 파싱.

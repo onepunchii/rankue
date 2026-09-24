@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -13,6 +13,8 @@ import { UmbPlayerSheet } from "@/components/hiq/umb/UmbPlayerSheet";
 import { MoveBadge } from "@/components/hiq/umb/WorldRankingCard";
 import { UMB_CATEGORIES, UMB_SOURCE_URL, displayName, regionName as intlRegionName, resolveHomeFed, type UmbCategory, type UmbRankingRow, type UmbRankingsResponse } from "@/components/hiq/umb/types";
 import { ShareButton } from "@/components/hiq/ShareButton";
+import { EXTRA_TEXT } from "@/components/hiq/umb/rankingExtraParts";
+import { MOVERS_PATH, countryPath } from "@shared/umbCountryMeta";
 
 const PAGE_SIZE = 50;
 
@@ -224,11 +226,13 @@ export default function HiqWorldRanking() {
                     {(nationsData?.nations || []).map((n, idx) => {
                         const isKr = n.fed === homeFed;
                         const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
+                        // 줄 전체가 국가별 세계랭킹(2026-09-24)으로 간다 — 그 나라 선수 전원·순위 변동
                         return (
-                            <div
+                            <Link
                                 key={n.fed}
+                                href={countryPath(n.fed)}
                                 className={cn(
-                                    "flex items-center gap-3 px-3.5 py-3 rounded-2xl",
+                                    "flex items-center gap-3 px-3.5 py-3 rounded-2xl active:scale-[0.99] transition-transform",
                                     isKr ? "bg-brand/[0.10]" : "bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                                 )}
                             >
@@ -249,7 +253,7 @@ export default function HiqWorldRanking() {
                                     <div className="font-bold text-[16px] tabular-nums text-ink-1">{n.top5Points ?? 0}</div>
                                     <div className="text-[10px] font-semibold text-black/40">{t("umb.top5Sum")}</div>
                                 </div>
-                            </div>
+                            </Link>
                         );
                     })}
                     <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-center text-[11px] font-medium text-black/35 py-3">
@@ -285,9 +289,15 @@ export default function HiqWorldRanking() {
             {/* 이번 주 무버 */}
             {movers.length > 0 && !q && !krOnly && (
                 <div className="mb-4">
-                    <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink-2 mb-2">
-                        <LucideTrendingUp className="w-4 h-4 text-brand" /> {t("umb.movers")}
-                    </h2>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                        <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink-2">
+                            <LucideTrendingUp className="w-4 h-4 text-brand" /> {t("umb.movers")}
+                        </h2>
+                        {/* 회차 전체 변동(2026-09-24) — 오른·내린·신규·이탈 */}
+                        <Link href={MOVERS_PATH} className="shrink-0 text-[12px] font-semibold text-brand active:opacity-60">
+                            {(EXTRA_TEXT[locale] ?? EXTRA_TEXT.en).moversTitle} ›
+                        </Link>
+                    </div>
                     <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-5 px-5">
                         {movers.map(m => (
                             <button
