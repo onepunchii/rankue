@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "wouter";
+import { listPath } from "@shared/golfCourse";
 
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { ScorecardScanner } from "../components/ScorecardScanner";
@@ -9,7 +11,6 @@ import { PassportHeader } from "../components/passport/PassportHeader";
 import { PassportStatsCard } from "../components/passport/PassportStatsCard";
 import { RegionMap } from "../components/passport/RegionMap";
 import { StampList } from "../components/passport/StampList";
-import { GuideList } from "../components/passport/GuideList";
 import { RegionSheet } from "../components/passport/RegionSheet";
 import { ViewSwitcher } from "../components/passport/ViewSwitcher";
 import { Elite60Banner } from "../components/passport/Elite60Banner";
@@ -17,9 +18,12 @@ import { COURSES } from "@/golf/data/golfCourses";
 
 // Hooks
 import { usePassportData } from "../hooks/usePassportData";
-import { useCourseFilter } from "../hooks/useCourseFilter";
 
-type ViewMode = 'map' | 'stamp' | 'guide';
+/**
+ * 'guide' 탭은 뺐다(2026-09-24 오너: "가이드 부분은 중복이라 빼도 되지 않을까") — 정적 목록 + 사진은 스톡 이미지였고,
+ * 같은 일을 전국 골프장(/golf/courses, 실제 그린피·시세·티타임)이 더 잘한다. 지역 시트의 '보기'도 그 지역 목록으로 보낸다.
+ */
+type ViewMode = 'map' | 'stamp';
 
 export default function Passport() {
     const [viewMode, setViewMode] = useState<ViewMode>('map');
@@ -31,7 +35,7 @@ export default function Passport() {
 
     // Hooks
     const { stats, stamps, savedImages, isLoading, handleScanComplete } = usePassportData();
-    const courseFilter = useCourseFilter(); // Lifted state for filtering
+    const [, setLocation] = useLocation();
 
     // View mode change effect: scroll to top
     useEffect(() => {
@@ -43,10 +47,8 @@ export default function Passport() {
     const rankue60ConqueredCount = COURSES.filter(c => c.isRankue60 && conqueredCourses.includes(c.name)).length;
 
     const handleRegionSheetGoToGuide = (regionName: string) => {
-        // Automatically switch filter to the selected region and move to guide view
-        courseFilter.handleFilterToggle('Region', regionName);
-        setViewMode('guide');
         setIsRegionalPopupOpen(false);
+        setLocation(listPath({ region: regionName }));
     };
 
     if (isLoading) {
@@ -93,13 +95,6 @@ export default function Passport() {
                         </motion.div>
                     )}
 
-                    {viewMode === 'guide' && (
-                        <GuideList
-                            savedImages={savedImages}
-                            conqueredCourses={conqueredCourses}
-                            filterHook={courseFilter}
-                        />
-                    )}
                 </AnimatePresence>
             </main>
 

@@ -1,7 +1,7 @@
-import { LucideMap, LucideStamp, LucideBookOpen } from "lucide-react";
+import { LucideMap, LucideStamp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type ViewMode = 'map' | 'stamp' | 'guide';
+type ViewMode = 'map' | 'stamp';
 
 interface Props {
     current: ViewMode;
@@ -11,7 +11,7 @@ interface Props {
 export const ViewSwitcher = ({ current, onChange }: Props) => {
     return (
         <div className="flex p-1.5 bg-white/5 rounded-2xl mb-8 border border-white/10 shadow-2xl">
-            {(['map', 'stamp', 'guide'] as ViewMode[]).map((mode) => (
+            {(['map', 'stamp'] as ViewMode[]).map((mode) => (
                 <button
                     key={mode}
                     onClick={() => onChange(mode)}
@@ -24,7 +24,6 @@ export const ViewSwitcher = ({ current, onChange }: Props) => {
                 >
                     {mode === 'map' && <LucideMap className="w-3.5 h-3.5" />}
                     {mode === 'stamp' && <LucideStamp className="w-3.5 h-3.5" />}
-                    {mode === 'guide' && <LucideBookOpen className="w-3.5 h-3.5" />}
                     {mode.toUpperCase()}
                 </button>
             ))}

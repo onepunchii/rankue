@@ -105,9 +105,9 @@ export const RegionSheet = ({ isOpen, onClose, regionId, conqueredCourses, onGoT
                                 onClose();
                             }
                         }}
-                        className="w-full mt-8 h-14 rounded-2xl bg-[#ffffff] text-[#0a0a0a] font-black uppercase tracking-widest hover:opacity-90"
+                        className="w-full mt-8 h-14 rounded-2xl bg-[#ffffff] text-[#0a0a0a] text-[15px] font-semibold hover:opacity-90"
                     >
-                        전체 구장 가이드 보기
+                        {regionName ? `${regionName} 골프장 전체 보기` : "골프장 전체 보기"}
                     </Button>
                 </div>
             </SheetContent>
