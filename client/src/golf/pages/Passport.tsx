@@ -103,6 +103,7 @@ export default function Passport() {
                 onClose={() => setIsRegionalPopupOpen(false)}
                 regionId={regionalSheetRegion}
                 conqueredCourses={conqueredCourses}
+                stampClubIds={stamps.map((s) => s.clubId).filter(Boolean) as string[]}
                 onGoToGuide={handleRegionSheetGoToGuide}
                 regionTotals={stats.regionTotals}
                 regionConquered={stats.regionConquered}

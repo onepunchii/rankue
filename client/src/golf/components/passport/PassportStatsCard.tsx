@@ -43,7 +43,7 @@ export const PassportStatsCard = ({ stats }: Props) => {
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                        <span className="h-6 px-2 rounded-md bg-[#FFC43D1F] text-[#FFD266] text-[12px] font-semibold leading-6 tabular-nums">Lv.{stats.levelNum}</span>
+                        <span className="h-6 px-2 rounded-md bg-[#FF8A3D26] text-[#FFB27A] text-[12px] font-semibold leading-6 tabular-nums">Lv.{stats.levelNum}</span>
                         {toNext != null && toNext > 0 && (
                             <span className="text-[13px] text-[#FFFFFF8C] tabular-nums">다음 레벨까지 {toNext}곳</span>
                         )}
@@ -53,9 +53,10 @@ export const PassportStatsCard = ({ stats }: Props) => {
                 <button
                     type="button"
                     onClick={() => setLocation('/golf/game/new?mode=match')}
-                    className="shrink-0 h-10 px-4 rounded-full bg-[#ffffff] text-[#0a0a0a] text-[14px] font-semibold inline-flex items-center gap-1.5 active:bg-[#E6E6E6]"
+                    className="shrink-0 h-10 px-4 rounded-full bg-gradient-to-br from-[#FF8A3D] to-[#E85200] shadow-md shadow-[#FF6B00]/20 text-[#ffffff] text-[14px] font-semibold inline-flex items-center gap-1.5 active:opacity-90"
                 >
-                    <LucideFlag weight="fill" className="w-4 h-4 text-[#3FAE0A]" />
+                    {/* 주황 포인트(2026-09-24 오너: 골프 색은 그린 + 주황) — 이 화면의 주 행동 하나에만 */}
+                    <LucideFlag weight="fill" className="w-4 h-4" />
                     라운드 시작
                 </button>
             </div>
@@ -63,7 +64,7 @@ export const PassportStatsCard = ({ stats }: Props) => {
             {stats.nextLevelAt != null && (
                 <div className="mt-4">
                     <div className="h-1.5 rounded-full bg-[#FFFFFF14] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={stats.nextLevelAt} aria-valuenow={stats.conquered} aria-label="다음 레벨까지">
-                        <div className="h-full rounded-full bg-[#64DD17]" style={{ width: `${pct}%` }} />
+                        <div className="h-full rounded-full bg-gradient-to-r from-[#FF8A3D] to-[#E85200]" style={{ width: `${pct}%` }} />
                     </div>
                     <p className="mt-1.5 text-right text-[12px] text-[#FFFFFF59] tabular-nums">{stats.conquered} / {stats.nextLevelAt}곳</p>
                 </div>

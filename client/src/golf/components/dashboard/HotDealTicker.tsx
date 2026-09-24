@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { LucideZap, LucideChevronRight, LucidePlus, LucideUsers } from "lucide-react";
+import { LucideTimer, LucideChevronRight, LucidePlus, LucideUsers } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { kstDateKey, kstTime } from "@/lib/kst";
@@ -79,7 +79,8 @@ function whenLabel(datetime: string): string {
 
 /** 다섯 가지 상태가 나눠 쓰는 **하나뿐인** 뼈대. 크기·바탕·테두리는 여기서만 정한다. */
 // 홈 맨 위에서 4초마다 넘어가는 자리다 — 여백을 넉넉히 주면 화면의 5분의 1을 먹는다(첫 시안 156px).
-const SHELL = "w-full rounded-2xl bg-white/[0.035] border border-white/[0.07] px-4 py-3 text-left transition-colors";
+// 주황 면(2026-09-24 오너: "긴급티 배너를 전국 골프장 카드와 같은 주황으로 — 골프 색은 그린과 이 주황이 잘 어울린다"). 홈 GOLF COURSES 카드와 같은 그라데이션.
+const SHELL = "w-full rounded-2xl bg-gradient-to-br from-[#FF8A3D] to-[#E85200] shadow-lg shadow-[#FF6B00]/20 px-4 py-3 text-left transition-transform";
 
 /** 카드 맨 위 줄: 왼쪽 배지 · 오른쪽 '언제'. */
 function TopRow({ badge, when, tone }: { badge: ReactNode; when?: string; tone: "urgent" | "lime" | "muted" }) {
@@ -90,7 +91,7 @@ function TopRow({ badge, when, tone }: { badge: ReactNode; when?: string; tone: 
                 <span
                     className={cn(
                         "ml-auto text-[12px] font-extrabold tabular-nums",
-                        tone === "urgent" ? "text-[#FFB020]" : tone === "lime" ? "text-white/60" : "text-white/30",
+                        tone === "muted" ? "text-[#FFFFFF80]" : "text-[#FFFFFFE6]",
                     )}
                 >
                     {when}
@@ -121,7 +122,6 @@ export function DealCard({ deal, onOpen }: { deal: Deal; onOpen: (d: Deal) => vo
             className={cn(
                 SHELL,
                 "active:scale-[0.995]",
-                tone === "urgent" ? "hover:border-[#FFB020]/40" : tone === "lime" ? "hover:border-[#64DD17]/30" : "hover:border-white/15",
             )}
         >
             <TopRow
@@ -130,15 +130,15 @@ export function DealCard({ deal, onOpen }: { deal: Deal; onOpen: (d: Deal) => vo
                 when={closed ? undefined : isUrgent ? timeLeft(deal.datetime) : whenLabel(deal.datetime)}
                 badge={
                     tone === "urgent" ? (
-                        <span className="shrink-0 inline-flex items-center gap-1 h-[22px] px-2 rounded-md bg-[#FFB020] text-[#2A1800] text-[10.5px] font-black">
-                            <LucideZap className="w-3 h-3" />긴급
+                        <span className="shrink-0 inline-flex items-center gap-1 h-[22px] px-2 rounded-md bg-[#FFFFFF] text-[#D94A00] text-[10.5px] font-black">
+                            <LucideTimer className="w-3 h-3" />긴급
                         </span>
                     ) : tone === "lime" ? (
-                        <span className="shrink-0 inline-flex items-center h-[22px] px-2 rounded-md bg-[#64DD17]/[0.14] text-[#64DD17] text-[10.5px] font-black">
+                        <span className="shrink-0 inline-flex items-center h-[22px] px-2 rounded-md bg-[#FFFFFF33] text-[#FFFFFF] text-[10.5px] font-black">
                             {isJoin ? "조인" : "부킹"}
                         </span>
                     ) : (
-                        <span className="shrink-0 inline-flex items-center h-[22px] px-2 rounded-md bg-white/[0.07] text-white/40 text-[10.5px] font-black">
+                        <span className="shrink-0 inline-flex items-center h-[22px] px-2 rounded-md bg-[#0000001F] text-[#FFFFFF99] text-[10.5px] font-black">
                             마감
                         </span>
                     )
@@ -146,34 +146,34 @@ export function DealCard({ deal, onOpen }: { deal: Deal; onOpen: (d: Deal) => vo
             />
 
             <span className="mt-1.5 flex items-baseline gap-1">
-                <span className={cn("text-[28px] font-black leading-none tabular-nums", closed ? "text-white/35" : "text-white")}>
+                <span className={cn("text-[28px] font-black leading-none tabular-nums", closed ? "text-[#FFFFFF80]" : "text-[#FFFFFF]")}>
                     {Number(deal.greenFee).toLocaleString()}
                 </span>
-                <span className={cn("text-[15px] font-extrabold", closed ? "text-white/25" : "text-white/55")}>원</span>
+                <span className={cn("text-[15px] font-extrabold", closed ? "text-[#FFFFFF66]" : "text-[#FFFFFFB3]")}>원</span>
             </span>
             {/* 값이 싼 이유를 설명하는 줄이라 값 바로 밑에 붙인다 — 이게 없으면 '너무 싼데 뭔가 있나' 가 된다. */}
-            <span className="mt-1 block text-[11px] font-bold text-white/35 break-keep">
+            <span className="mt-1 block text-[11px] font-bold text-[#FFFFFFBF] break-keep">
                 그린피 1인{isUrgent && " · 카트·캐디피는 현장에서 N빵이에요"}
             </span>
 
-            <span className="mt-2.5 block h-px bg-white/[0.06]" />
+            <span className="mt-2.5 block h-px bg-[#FFFFFF33]" />
 
             {/* 이름만 줄어들고 잘린다. 시각·자리는 물론 **지역도** 안 줄인다 —
                 이름과 지역을 한 truncate 덩어리로 묶으면 "사우스스프링스 컨트리클럽 경…" 처럼
                 지역이 한 글자만 남아 고장 난 것처럼 보였다. 2시간 뒤 티오프에서 갈지 말지를 정하는 건 지역이다. */}
             <span className="mt-2 flex items-center gap-2">
                 <span className="min-w-0 flex-1 flex items-baseline gap-1.5">
-                    <span className={cn("min-w-0 truncate text-[12.5px] font-black", closed ? "text-white/40" : "text-white/85")}>{name}</span>
-                    {deal.region && <span className="shrink-0 text-[11px] font-bold text-white/30">{deal.region}</span>}
+                    <span className={cn("min-w-0 truncate text-[12.5px] font-black", closed ? "text-[#FFFFFF99]" : "text-[#FFFFFF]")}>{name}</span>
+                    {deal.region && <span className="shrink-0 text-[11px] font-bold text-[#FFFFFFB3]">{deal.region}</span>}
                 </span>
                 <span className="shrink-0 flex items-center gap-2">
-                    <span className="text-[11.5px] font-bold text-white/40 tabular-nums">{kstTime(deal.datetime)} 티오프</span>
+                    <span className="text-[11.5px] font-bold text-[#FFFFFFCC] tabular-nums">{kstTime(deal.datetime)} 티오프</span>
                     {left != null && !closed && (
-                        <span className="flex items-center gap-1 text-[11.5px] font-extrabold text-white/55">
+                        <span className="flex items-center gap-1 text-[11.5px] font-extrabold text-[#FFFFFF]">
                             <LucideUsers className="w-3 h-3" />{left}자리
                         </span>
                     )}
-                    <LucideChevronRight className="w-4 h-4 text-white/20" />
+                    <LucideChevronRight className="w-4 h-4 text-[#FFFFFF99]" />
                 </span>
             </span>
         </button>
@@ -241,11 +241,11 @@ export function HotDealTicker() {
     if (isLoading) {
         return (
             <div className={cn(SHELL, "mb-4 animate-pulse")} aria-hidden>
-                <span className="flex items-center h-[22px]"><span className="block w-12 h-[22px] rounded-md bg-white/[0.06]" /></span>
-                <span className="mt-2 block w-28 h-[30px] rounded-md bg-white/[0.06]" />
-                <span className="mt-1.5 block w-40 h-3 rounded bg-white/[0.045]" />
-                <span className="mt-3 block h-px bg-white/[0.06]" />
-                <span className="mt-2.5 block w-48 h-3.5 rounded bg-white/[0.045]" />
+                <span className="flex items-center h-[22px]"><span className="block w-12 h-[22px] rounded-md bg-[#FFFFFF33]" /></span>
+                <span className="mt-2 block w-28 h-[30px] rounded-md bg-[#FFFFFF33]" />
+                <span className="mt-1.5 block w-40 h-3 rounded bg-[#FFFFFF26]" />
+                <span className="mt-3 block h-px bg-[#FFFFFF33]" />
+                <span className="mt-2.5 block w-48 h-3.5 rounded bg-[#FFFFFF26]" />
             </div>
         );
     }
@@ -255,23 +255,23 @@ export function HotDealTicker() {
         return (
             <button
                 onClick={() => setLocation("/golf/booking-list?view=JOIN")}
-                className={cn(SHELL, "mb-4 group hover:border-[#64DD17]/30")}
+                className={cn(SHELL, "mb-4 group active:scale-[0.995]")}
             >
                 <span className="flex items-center h-[22px]">
-                    <span className="shrink-0 inline-flex items-center gap-1 h-[22px] px-2 rounded-md bg-white/[0.07] text-white/40 text-[10.5px] font-black">
-                        <LucideZap className="w-3 h-3" />긴급티
+                    <span className="shrink-0 inline-flex items-center gap-1 h-[22px] px-2 rounded-md bg-[#FFFFFF33] text-[#FFFFFF] text-[10.5px] font-black">
+                        <LucideTimer className="w-3 h-3" />긴급티
                     </span>
                 </span>
-                <span className="mt-2 block text-[15px] font-black text-white/75 leading-none break-keep">지금 열린 긴급티가 없어요</span>
-                <span className="mt-1.5 block text-[11px] font-bold text-white/35 break-keep">오늘 급하게 나온 자리가 여기에 떠요</span>
+                <span className="mt-2 block text-[15px] font-black text-[#FFFFFF] leading-none break-keep">지금 열린 긴급티가 없어요</span>
+                <span className="mt-1.5 block text-[11px] font-bold text-[#FFFFFFBF] break-keep">오늘 급하게 나온 자리가 여기에 떠요</span>
 
-                <span className="mt-3 block h-px bg-white/[0.06]" />
+                <span className="mt-3 block h-px bg-[#FFFFFF33]" />
 
                 <span className="mt-2.5 flex items-center gap-1.5">
-                    <span className="text-[11.5px] font-bold text-white/30">내가 먼저 올려도 돼요</span>
-                    <span className="ml-auto shrink-0 flex items-center gap-1 text-[12px] font-black text-[#64DD17]">
+                    <span className="text-[11.5px] font-bold text-[#FFFFFFB3]">내가 먼저 올려도 돼요</span>
+                    <span className="ml-auto shrink-0 flex items-center gap-1 text-[12px] font-black text-[#FFFFFF]">
                         <LucidePlus className="w-3.5 h-3.5" />조인 만들기
-                        <LucideChevronRight className="w-4 h-4 text-[#64DD17]/50" />
+                        <LucideChevronRight className="w-4 h-4 text-[#FFFFFF99]" />
                     </span>
                 </span>
             </button>
@@ -299,7 +299,7 @@ export function HotDealTicker() {
                             aria-label={`${i + 1}번째 긴급티 보기`}
                             className={cn(
                                 "h-1.5 rounded-full transition-all",
-                                i === idx ? "w-4 bg-white/70" : "w-1.5 bg-white/15 hover:bg-white/30",
+                                i === idx ? "w-4 bg-[#FF8A3D]" : "w-1.5 bg-[#FFFFFF26] hover:bg-[#FFFFFF4D]",
                             )}
                         />
                     ))}

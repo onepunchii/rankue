@@ -717,7 +717,7 @@ export default function GolfNewGame() {
                                 {isHost ? (
                                     <button
                                         type="button"
-                                        className="w-full h-14 rounded-2xl bg-[#64DD17] text-[#051907] text-[16px] font-semibold active:bg-[#58C414] disabled:bg-[#FFFFFF14] disabled:text-[#FFFFFF73]"
+                                        className="w-full h-14 rounded-2xl bg-gradient-to-br from-[#FF8A3D] to-[#E85200] shadow-lg shadow-[#FF6B00]/20 text-[#ffffff] text-[16px] font-semibold active:opacity-90 disabled:bg-none disabled:bg-[#FFFFFF14] disabled:shadow-none disabled:text-[#FFFFFF73]"
                                         onClick={() => {
                                             apiRequest(`/api/hiq/golf/match/${activeSession.id}/start`, { method: "POST" })
                                                 .then(() => setLocation(`/golf/game/${activeSession.id}`))
@@ -808,10 +808,10 @@ export default function GolfNewGame() {
                                 {[selectedCourseData.name, selectedFrontCourse && selectedBackCourse ? `${selectedFrontCourse} → ${selectedBackCourse}` : "", selectedGame === 'skins' ? `타당 ${formatMoney(stake)}${unit === 'KRW' ? '원' : 'P'}` : isSolo ? "혼자 기록" : "함께 기록"].filter(Boolean).join(" · ")}
                             </p>
                         )}
-                        {/* 왜 안 눌리는지 버튼이 말해 준다 — 예전엔 회색으로 죽어 있기만 했다(2026-09-10) */}
+                        {/* 왜 안 눌리는지 버튼이 말해 준다 — 예전엔 회색으로 죽어 있기만 했다(2026-09-10). 주황 = 골프 포인트 색(2026-09-24 오너) */}
                         <button
                             type="button"
-                            className="w-full h-14 rounded-2xl bg-[#64DD17] text-[#051907] text-[16px] font-semibold active:bg-[#58C414] disabled:bg-[#FFFFFF14] disabled:text-[#FFFFFF73] inline-flex items-center justify-center"
+                            className="w-full h-14 rounded-2xl bg-gradient-to-br from-[#FF8A3D] to-[#E85200] shadow-lg shadow-[#FF6B00]/20 text-[#ffffff] text-[16px] font-semibold active:opacity-90 disabled:bg-none disabled:bg-[#FFFFFF14] disabled:shadow-none disabled:text-[#FFFFFF73] inline-flex items-center justify-center"
                             onClick={() => { rememberTypedCourses(); createMatch.mutate(); }}
                             disabled={createMatch.isPending || !!setupMissing}
                         >
