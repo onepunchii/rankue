@@ -32,7 +32,7 @@ import {
     JoinTypeBadge, SlotDots, costText, hostSeatLabel, isConvertedJoin, joinTypeOf,
     kakaoMapUrl, kakaoRouteUrl, slotLegend, slotsOf,
 } from "../components/join/joinUi";
-import { MAX_SLOTS } from "@shared/golfJoin";
+import { JOIN_TYPE_LABEL, MAX_SLOTS } from "@shared/golfJoin";
 import {
     MY_LISTINGS_QUERY_KEY, MY_REQUESTS_QUERY_KEY,
     hasUnseenRequestChange, markRequestsSeen, readRequestsSeen,
@@ -122,33 +122,49 @@ function canChatOf(it: Item): boolean {
 const PILL = "h-9 px-3.5 rounded-full bg-white/[0.06] text-[12.5px] font-medium text-white/80 inline-flex items-center shrink-0";
 const PILL_OUTLINE = "h-9 px-3.5 rounded-full border border-white/10 text-[12.5px] font-medium text-white/55 inline-flex items-center shrink-0 active:text-red-400";
 
-/** 다음 라운드 — 이 화면에 온 사람이 가장 먼저 보러 온 것. */
+/**
+ * 다음 라운드 — 이 화면에 온 사람이 가장 먼저 보러 온 것.
+ * 둘째 판(2026-09-24 오너: "색상이랑 더 깔끔하게 — 화이트 카드도 되고 심플하고 깔끔하게"):
+ * 라임 테두리·색 칩을 걷고 **흰 카드 한 장**. 색은 D-day 알약 하나만(오늘이면 라임), 나머지는 글자 굵기·농도로 순서를 만든다.
+ * 단추는 카드 아래 한 줄을 나눠 쓰는 글자 단추 — 알약 여러 개보다 조용하다.
+ * ⚠️ 흰 면은 `bg-[#ffffff]`, 글자는 리터럴 hex — 골프 테마가 `.bg-white` 를 어둡게, `.text-black/*` 를 밝게 바꿔 끼운다.
+ */
 function NextRound({ item, now, onDetail, onChat }: { item: Item; now: number; onDetail: () => void; onChat: () => void }) {
     const name: string = item.isBlind ? item.blindName : item.courseName;
     const isJoin = item.listingType === "JOIN";
     const dday = ddayText(item.datetime, now);
+    const kind = isJoin ? JOIN_TYPE_LABEL[joinTypeOf(item)] ?? "조인" : item.sellerType === "PERSONAL" ? "개인 양도 부킹" : "부킹";
     const who = item.role === "mine"
         ? `내 모집 · 확정 ${item.joinApplied ?? 0}/${item.joinCapacity ?? "?"}`
         : isJoin ? `신청 확정 · ${item.joinApplied ?? 0}/${item.joinCapacity ?? "?"}명` : `예약 확정${Number(item.myHeadcount) > 1 ? ` · ${item.myHeadcount}명` : ""}`;
+    const actions: { label: string; href?: string; onClick?: () => void }[] = [
+        ...(!item.isBlind ? [{ label: "길찾기", href: kakaoRouteUrl(name, item.lat, item.lng) }] : []),
+        ...(canChatOf(item) ? [{ label: "채팅방", onClick: onChat }] : []),
+        { label: "자세히", onClick: onDetail },
+    ];
+    const btn = "flex-1 h-12 inline-flex items-center justify-center text-[14px] font-semibold text-[#0a0a0a] active:bg-[#0000000A]";
     return (
-        <section aria-label="다음 라운드" className="rounded-2xl bg-[#64DD17]/[0.07] ring-1 ring-inset ring-[#64DD17]/25 p-4">
-            <div className="flex items-center justify-between gap-2">
-                <span className="text-[12px] font-medium text-[#8BE84A]">다음 라운드</span>
-                <span className={cn(
-                    "h-6 px-2 rounded-full text-[12px] font-semibold leading-6 tabular-nums",
-                    dday === "오늘" ? "bg-[#64DD17] text-[#051907]" : "bg-white/[0.08] text-white/85",
-                )}>{dday}</span>
+        <section aria-label="다음 라운드" className="rounded-2xl bg-[#ffffff] overflow-hidden">
+            <div className="px-4 pt-4 pb-3.5">
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-medium text-[#0a0a0a8c]">다음 라운드</span>
+                    <span className={cn(
+                        "h-6 px-2.5 rounded-full text-[12px] font-semibold leading-6 tabular-nums",
+                        dday === "오늘" ? "bg-[#64DD17] text-[#051907]" : "bg-[#0a0a0a] text-[#ffffff]",
+                    )}>{dday}</span>
+                </div>
+                <p className="mt-1.5 text-[22px] leading-tight font-bold tracking-tight text-[#0a0a0a] tabular-nums">
+                    {kstDateLabel(item.datetime, { weekday: "short" })} {kstTime(item.datetime)}
+                </p>
+                <p className="mt-1 text-[16px] font-semibold text-[#0a0a0a] truncate">{name}</p>
+                <p className="mt-0.5 text-[13px] text-[#0a0a0a8c] tabular-nums truncate">{kind} · {who}</p>
             </div>
-            <p className="mt-2 text-[15px] font-semibold text-white tabular-nums">{kstDateLabel(item.datetime)} {kstTime(item.datetime)}</p>
-            <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                <KindBadge item={item} />
-                <span className="text-[17px] font-semibold text-white truncate">{name}</span>
-            </div>
-            <p className="mt-1 text-[12.5px] text-white/60 tabular-nums">{who}</p>
-            <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-                {!item.isBlind && <a href={kakaoRouteUrl(name, item.lat, item.lng)} target="_blank" rel="noreferrer" className={PILL}>길찾기</a>}
-                {canChatOf(item) && <button type="button" onClick={onChat} className={PILL}>채팅방</button>}
-                <button type="button" onClick={onDetail} className={PILL}>자세히</button>
+            <div className="flex border-t border-[#0000000F] divide-x divide-[#0000000F]">
+                {actions.map((a) => a.href ? (
+                    <a key={a.label} href={a.href} target="_blank" rel="noreferrer" className={btn}>{a.label}</a>
+                ) : (
+                    <button key={a.label} type="button" onClick={a.onClick} className={btn}>{a.label}</button>
+                ))}
             </div>
         </section>
     );
@@ -520,10 +536,7 @@ export default function GolfMyBookings() {
                                     className={cn(
                                         "relative flex-1 h-9 rounded-full text-[13px] font-medium transition-colors tabular-nums",
                                         // ⚠️ 고른 탭에 `bg-white text-black` 을 쓰면 안 된다 — 골프 테마가 .bg-white 만 어두운 면으로 되받는다.
-                                        // 조인 탭은 고르면 주황 바탕(2026-09-24 오너: "배경색을 조인에 주황 칼라로") — 조인 배지·대기 칩과 같은 #FF6B00.
-                                        pageTab === k
-                                            ? k === "join" ? "bg-[#FF6B00] text-[#0a0a0a] font-semibold" : "bg-[#ffffff] text-[#0a0a0a] font-semibold"
-                                            : "text-white/70 active:text-white",
+                                        pageTab === k ? "bg-[#ffffff] text-[#0a0a0a] font-semibold" : "text-white/70 active:text-white",
                                     )}
                                 >
                                     {k === "watch" ? "관심" : KIND_LABEL[k]}
