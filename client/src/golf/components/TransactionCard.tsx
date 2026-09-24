@@ -26,7 +26,7 @@ export function TransactionCard({ fromName, toName, amount, details, unit = "P" 
                 </div>
                 <div className="flex flex-wrap gap-1">
                     {details.map((detail, idx) => (
-                        <span key={idx} className="text-[10px] font-bold text-white/50">
+                        <span key={idx} className="text-[12px] font-bold text-white/50">
                             {detail}{idx < details.length - 1 && " · "}
                         </span>
                     ))}
@@ -34,7 +34,7 @@ export function TransactionCard({ fromName, toName, amount, details, unit = "P" 
             </div>
 
             <div className="text-right shrink-0">
-                <p className="text-md font-black text-white italic tracking-tight">
+                <p className="text-md font-bold text-white tracking-tight">
                     {formatMoney(amount, unit)}
                 </p>
             </div>

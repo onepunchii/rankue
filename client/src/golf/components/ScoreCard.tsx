@@ -1,9 +1,19 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
+/**
+ * 랭큐매치 스코어 입력(2026-09-24 둘째 판 — 오너: "게임 화면도 … 디자인 전면 수정").
+ *
+ * 무엇을 바꿨나:
+ *  - 선수 카드 한 장이 화면 반을 차지하던 것(👑 아이콘·STROKES·기울인 굵은 글씨) → **한 사람 한 줄**. 4명이 한 화면에 든다.
+ *  - 타수는 기본이 파다(0 = 아직 안 적음 = 파로 보인다, 다음 홀로 가면 파로 채운다). 그래서 버디는 −, 보기는 + **한 번**.
+ *    더 크게 벌어진 점수(더블·트리플·이글)는 숫자를 누르면 펼쳐지는 칩으로 한 번에.
+ *  - 18홀 기록표는 실제 스코어카드 표기 — 파보다 적으면 **동그라미**(버디 하나·이글 두 겹), 많으면 **네모**.
+ *  - 카드 전체를 누르면 펼쳐지던 것(± 누르다 실수로 접히던 것)을 이름 줄의 '기록표' 단추로.
+ * ⚠️ 리터럴 색만 — 골프 테마가 `.bg-white`·`.text-black/*` 를 바꿔 끼운다.
+ */
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { HiqMember } from "@shared/schema";
-import { useQuery } from "@tanstack/react-query";
-import { LucideWaves, LucideXCircle } from "lucide-react";
+import { calculateGolfScore } from "../hooks/useGolfScore";
 
 interface ScoreCardProps {
     players: Array<{ id: string; name: string }>;
@@ -17,215 +27,157 @@ interface ScoreCardProps {
     isHost?: boolean;
 }
 
-import { useGolfScore, calculateGolfScore } from "../hooks/useGolfScore";
-import { useState } from "react";
+/** 파 대비 이름 — 화면 말 */
+export function scoreName(diff: number): string {
+    if (diff <= -3) return "앨버트로스";
+    if (diff === -2) return "이글";
+    if (diff === -1) return "버디";
+    if (diff === 0) return "파";
+    if (diff === 1) return "보기";
+    if (diff === 2) return "더블 보기";
+    return "트리플 이상";
+}
+/** 합계(파 대비) 글자·색 — 한국 스코어 관례: 언더 파랑·오버 빨강 대신, 골프 화면 톤에 맞춰 하늘·주황 */
+export function toParText(n: number): string { return n === 0 ? "E" : n > 0 ? `+${n}` : String(n); }
+const toParColor = (n: number) => (n < 0 ? "text-[#7DD3FC]" : n > 0 ? "text-[#FFB27A]" : "text-[#FFFFFFB3]");
 
-export function ScoreCard({ players, playerScores, playerPenalties = {}, currentHole, pars, onScoreChange, onPenaltyChange, isSolo = false, isHost = true }: ScoreCardProps) {
-    const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
-    const { data: member } = useQuery<HiqMember>({
-        queryKey: ["/api/hiq/me"],
-    });
+/**
+ * 18홀 기록표 한 판(전반·후반 두 줄). 혼자 기록 화면과 선수 줄의 '기록표'가 같이 쓴다.
+ * 동그라미 = 파보다 적게(버디 하나, 이글 이상 두 겹), 네모 = 파보다 많게(보기 한 겹, 더블 이상 채움). 파는 숫자만.
+ */
+export function HoleGrid({ scores, pars, currentHole }: { scores: number[]; pars: number[]; currentHole: number }) {
+    const half = (from: number) => {
+        const idx = Array.from({ length: 9 }, (_, i) => from + i);
+        const sum = idx.reduce((a, i) => a + (scores[i] || 0), 0);
+        const parSum = idx.reduce((a, i) => a + (pars[i] || 0), 0);
+        return (
+            <div className="grid grid-cols-[34px_repeat(9,minmax(0,1fr))_36px] gap-y-1 items-center text-center">
+                <span className="text-[11px] text-[#FFFFFF59] text-left">홀</span>
+                {idx.map((i) => (
+                    <span key={i} className={cn("text-[11px] tabular-nums", i === currentHole ? "text-[#9BEF5C] font-semibold" : "text-[#FFFFFF73]")}>{i + 1}</span>
+                ))}
+                <span className="text-[11px] text-[#FFFFFF59]">{from === 0 ? "전반" : "후반"}</span>
 
-    const currentHolePar = pars[currentHole];
+                <span className="text-[11px] text-[#FFFFFF59] text-left">파</span>
+                {idx.map((i) => <span key={i} className="text-[11px] text-[#FFFFFF8C] tabular-nums">{pars[i]}</span>)}
+                <span className="text-[11px] text-[#FFFFFF8C] tabular-nums">{parSum}</span>
+
+                <span className="text-[11px] text-[#FFFFFF59] text-left">타수</span>
+                {idx.map((i) => {
+                    const s = scores[i] || 0;
+                    const d = s > 0 ? s - pars[i] : null;
+                    return (
+                        <span key={i} className="flex items-center justify-center h-7">
+                            <span className={cn(
+                                "w-6 h-6 flex items-center justify-center text-[12px] font-semibold tabular-nums",
+                                d === null ? "text-[#FFFFFF33]"
+                                    : d <= -2 ? "rounded-full ring-1 ring-[#9BEF5C] outline outline-1 outline-offset-2 outline-[#9BEF5C] text-[#9BEF5C]"
+                                        : d === -1 ? "rounded-full ring-1 ring-[#7DD3FC] text-[#7DD3FC]"
+                                            : d === 0 ? "text-[#ffffff]"
+                                                : d === 1 ? "rounded-[4px] ring-1 ring-[#FFB27A] text-[#FFB27A]"
+                                                    : "rounded-[4px] bg-[#FF8A3333] ring-1 ring-[#FF8A33] text-[#FFC9A3]",
+                                i === currentHole && d === null && "rounded-full ring-1 ring-[#64DD1780]",
+                            )}>{s > 0 ? s : "·"}</span>
+                        </span>
+                    );
+                })}
+                <span className="text-[12px] font-semibold text-[#ffffff] tabular-nums">{sum || "–"}</span>
+            </div>
+        );
+    };
+    return (
+        <div className="space-y-3">
+            {half(0)}
+            <div className="h-px bg-[#FFFFFF0F]" />
+            {half(9)}
+        </div>
+    );
+}
+
+export function ScoreCard({ players, playerScores, currentHole, pars, onScoreChange, isSolo = false, isHost = true }: ScoreCardProps) {
+    const [gridFor, setGridFor] = useState<string | null>(null);
+    const [jumpFor, setJumpFor] = useState<string | null>(null);
+    const { data: member } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
+
+    const par = pars[currentHole];
 
     return (
-        <div className={cn(
-            "overflow-y-auto px-6 space-y-4",
-            isSolo ? "pb-4" : "pb-40 flex-1"
-        )}>
+        <div className={cn("px-4 space-y-2", isSolo ? "pb-4" : "pb-40")}>
             {players.map((p) => {
-                const pId = p.id;
-                const scores = playerScores[pId] || Array(18).fill(0);
-                const penalties = playerPenalties[pId] || Array(18).fill({});
-                const currentPenalty = penalties[currentHole] || { ob: false, hazard: false };
-
+                const scores = playerScores[p.id] || Array(18).fill(0);
                 const { totalStrokes, currentOverPar } = calculateGolfScore(scores, pars, 18, currentHole);
-                const holeScore = scores[currentHole] || currentHolePar;
+                const hole = scores[currentHole] || par;
+                const diff = hole - par;
+                const me = p.id === member?.id;
+                const set = (target: number) => { if (target >= 1 && target !== hole) onScoreChange(p.id, target - hole); };
 
                 return (
-                    <Card
-                        key={pId}
-                        className={cn(
-                            "bg-white/[0.03] border-white/5 rounded-[2rem] overflow-hidden group transition-all duration-300 cursor-pointer active:scale-[0.99]",
-                            expandedPlayerId === pId && "bg-white/[0.07] border-white/10 ring-1 ring-white/10"
-                        )}
-                        onClick={() => setExpandedPlayerId(expandedPlayerId === pId ? null : pId)}
-                    >
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-xl shadow-inner">
-                                        {pId === member?.id ? "👑" : "🧢"}
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-lg tracking-tight">{p.name}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-end gap-2 leading-none">
-                                    <span className={cn(
-                                        "text-3xl font-black italic tracking-tighter",
-                                        currentOverPar > 0 ? "text-[#FF4444]" : currentOverPar < 0 ? "text-cyan-400" : "text-white/60"
-                                    )}>
-                                        {currentOverPar > 0 ? `+${currentOverPar}` : currentOverPar === 0 ? "E" : currentOverPar}
-                                    </span>
-                                    <span className="text-white/30 text-2xl font-black mb-0.5">/</span>
-                                    <span className="text-white/70 text-2xl font-black mb-0.5">{totalStrokes}</span>
-                                </div>
-                            </div>
+                    <section key={p.id} className="rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F]">
+                        <div className="px-4 pt-3 flex items-center gap-2">
+                            <span className="flex-1 min-w-0 flex items-center gap-1.5">
+                                <span className="text-[15px] font-semibold text-[#ffffff] truncate">{p.name}</span>
+                                {me && <span className="shrink-0 h-5 px-1.5 rounded bg-[#FFFFFF14] text-[11px] text-[#FFFFFFB3] leading-5">나</span>}
+                            </span>
+                            <span className="shrink-0 text-[13px] tabular-nums">
+                                <span className={cn("font-semibold", toParColor(currentOverPar))}>{toParText(currentOverPar)}</span>
+                                <span className="text-[#FFFFFF59]"> · {totalStrokes}타</span>
+                            </span>
+                            <button
+                                type="button" onClick={() => setGridFor(gridFor === p.id ? null : p.id)} aria-expanded={gridFor === p.id}
+                                className="shrink-0 h-7 px-2.5 -mr-1 rounded-full text-[12px] text-[#FFFFFF99] active:bg-[#FFFFFF14]"
+                            >{gridFor === p.id ? "접기" : "기록표"}</button>
+                        </div>
 
-                            <div className="flex items-center gap-4">
-                                {isHost && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            onScoreChange(pId, -1);
-                                        }}
-                                        title="타수 줄이기"
-                                        className="w-16 h-16 rounded-2xl bg-white/5 hover:bg-white/10 active:scale-90 transition-all flex items-center justify-center border border-white/10 relative z-10"
-                                    >
-                                        <span className="text-2xl font-black text-white/40">-</span>
-                                    </button>
-                                )}
-
-                                <div className="flex-1 h-16 bg-black/40 rounded-2xl border border-white/5 flex flex-col items-center justify-center relative overflow-hidden group/input">
-                                    <div className="absolute inset-0 bg-[#84cc16]/5 opacity-0 group-hover/input:opacity-100 transition-opacity" />
-                                    <span className="text-3xl font-black italic tracking-tighter text-white z-10">{holeScore}</span>
-                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em] z-10">STROKES</span>
-                                </div>
-
-                                {isHost && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            onScoreChange(pId, 1);
-                                        }}
-                                        title="타수 늘리기"
-                                        className="w-16 h-16 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] active:scale-90 transition-all flex items-center justify-center shadow-[0_10px_20px_rgba(100,221,23,0.2)] relative z-10"
-                                    >
-                                        <span className="text-2xl font-black text-[#051907]">+</span>
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Score Name Display (e.g., Birdie, Bogey) */}
-                            <div className="mt-4 text-center">
+                        {/* 이번 홀 타수 — [−] 숫자 [+]. 숫자를 누르면 크게 벌어진 점수로 바로 가는 칩 */}
+                        <div className="px-3 pt-2.5 pb-3 flex items-center gap-2">
+                            {isHost && (
+                                <button
+                                    type="button" onClick={() => set(hole - 1)} disabled={hole <= 1} aria-label={`${p.name} 한 타 줄이기`}
+                                    className="w-14 h-14 rounded-2xl bg-[#FFFFFF0F] text-[26px] font-medium text-[#ffffff] active:bg-[#FFFFFF24] disabled:opacity-30 flex items-center justify-center"
+                                >−</button>
+                            )}
+                            <button
+                                type="button" disabled={!isHost} onClick={() => setJumpFor(jumpFor === p.id ? null : p.id)} aria-label={`${p.name} ${hole}타 — 점수 고르기`}
+                                className="flex-1 h-14 rounded-2xl bg-[#00000059] flex items-center justify-center gap-2 active:bg-[#0000008C]"
+                            >
+                                <span className="text-[30px] leading-none font-bold text-[#ffffff] tabular-nums">{hole}</span>
                                 <span className={cn(
-                                    "text-sm font-black uppercase tracking-[0.3em] transition-all duration-300",
-                                    holeScore - currentHolePar <= -2 ? "text-[#64DD17] drop-shadow-[0_0_10px_rgba(100,221,23,0.5)] scale-125" :
-                                        holeScore - currentHolePar === -1 ? "text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)] scale-110" :
-                                            holeScore - currentHolePar === 0 ? "text-slate-400" :
-                                                holeScore - currentHolePar === 1 ? "text-orange-400" :
-                                                    holeScore - currentHolePar >= 2 ? "text-red-500 font-extrabold" :
-                                                        "text-slate-400"
-                                )}>
-                                    {(() => {
-                                        const diff = holeScore - currentHolePar;
-                                        if (diff <= -3) return "앨버트로스";
-                                        if (diff === -2) return "이글";
-                                        if (diff === -1) return "버디";
-                                        if (diff === 0) return "파";
-                                        if (diff === 1) return "보기";
-                                        if (diff === 2) return "더블 보기";
-                                        if (diff >= 3) return "트리플 보기 이상";
-                                        return `${diff > 0 ? '+' : ''}${diff} 오버`;
-                                    })()}
-                                </span>
+                                    "text-[13px] font-medium",
+                                    diff <= -2 ? "text-[#9BEF5C]" : diff === -1 ? "text-[#7DD3FC]" : diff === 0 ? "text-[#FFFFFF8C]" : diff === 1 ? "text-[#FFB27A]" : "text-[#FF8A8C]",
+                                )}>{scoreName(diff)}</span>
+                            </button>
+                            {isHost && (
+                                <button
+                                    type="button" onClick={() => set(hole + 1)} aria-label={`${p.name} 한 타 늘리기`}
+                                    className="w-14 h-14 rounded-2xl bg-[#64DD17] text-[26px] font-medium text-[#051907] active:bg-[#58C414] flex items-center justify-center"
+                                >+</button>
+                            )}
+                        </div>
+
+                        {isHost && jumpFor === p.id && (
+                            <div className="px-3 pb-3 -mt-1 flex gap-1.5 overflow-x-auto scrollbar-hide">
+                                {[-2, -1, 0, 1, 2, 3].map((d) => {
+                                    const v = par + d;
+                                    if (v < 1) return null;
+                                    return (
+                                        <button
+                                            key={d} type="button" onClick={() => { set(v); setJumpFor(null); }} aria-pressed={v === hole}
+                                            className={cn(
+                                                "shrink-0 h-9 px-3 rounded-full text-[13px] whitespace-nowrap tabular-nums",
+                                                v === hole ? "bg-[#ffffff] text-[#0a0a0a] font-semibold" : "bg-[#FFFFFF0D] text-[#FFFFFFCC] font-medium active:bg-[#FFFFFF1A]",
+                                            )}
+                                        >{scoreName(d)} {v}</button>
+                                    );
+                                })}
                             </div>
+                        )}
 
-                            {/* Dropdown Scorecard Grid */}
-                            <AnimatePresence>
-                                {expandedPlayerId === pId && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="mt-6 pt-6 border-t border-white/5 overflow-hidden"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <div className="space-y-4">
-                                            {/* Front 9 */}
-                                            <div className="grid grid-cols-10 gap-1">
-                                                <div className="text-[8px] font-bold text-white/20 flex items-center justify-center border-b border-white/5 pb-1 uppercase italic">Hole</div>
-                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(h => (
-                                                    <div key={h} className="text-[8px] font-bold text-white/40 flex items-center justify-center border-b border-white/5 pb-1">{h}</div>
-                                                ))}
-                                                <div className="text-[8px] font-bold text-white/20 flex items-center justify-center border-b border-white/5 pb-1 uppercase italic">Par</div>
-                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(idx => (
-                                                    <div key={idx} className="text-[8px] font-bold text-white/60 flex items-center justify-center border-b border-white/5 pb-1">{pars[idx]}</div>
-                                                ))}
-                                                <div className="text-[8px] font-bold text-white/20 flex items-center justify-center py-2 uppercase italic">Score</div>
-                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(idx => {
-                                                    const s = scores[idx] || 0;
-                                                    const p = pars[idx];
-                                                    // Batch Update: If score is 0 and it's current hole, treat as Par (0 diff)
-                                                    const d = s > 0 ? s - p : (idx <= currentHole ? 0 : null);
-                                                    const isCur = idx === currentHole;
-                                                    let bg = "bg-white/5";
-                                                    let tx = "text-white/20";
-                                                    if (d !== null) {
-                                                        tx = "text-white";
-                                                        if (d <= -2) { bg = "bg-[#64DD17]"; tx = "text-[#051907]"; }
-                                                        else if (d === -1) { bg = "bg-cyan-500"; }
-                                                        else if (d === 0) { bg = "bg-[#4A4E57]"; }
-                                                        else if (d === 1) { bg = "bg-orange-500"; }
-                                                        else { bg = "bg-red-500"; }
-                                                    }
-                                                    return (
-                                                        <div key={idx} className={cn(
-                                                            "aspect-square flex flex-col items-center justify-center rounded-md text-[9px] font-black",
-                                                            bg, tx, isCur && "ring-1 ring-[#64DD17] ring-offset-1 ring-offset-black"
-                                                        )}>
-                                                            {d !== null ? (d === 0 ? "0" : (d > 0 ? `+${d}` : d)) : "-"}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            {/* Back 9 */}
-                                            <div className="grid grid-cols-10 gap-1">
-                                                <div className="text-[8px] font-bold text-white/20 flex items-center justify-center border-b border-white/5 pb-1 uppercase italic">Hole</div>
-                                                {[10, 11, 12, 13, 14, 15, 16, 17, 18].map(h => (
-                                                    <div key={h} className="text-[8px] font-bold text-white/40 flex items-center justify-center border-b border-white/5 pb-1">{h}</div>
-                                                ))}
-                                                <div className="text-[8px] font-bold text-white/20 flex items-center justify-center border-b border-white/5 pb-1 uppercase italic">Par</div>
-                                                {[9, 10, 11, 12, 13, 14, 15, 16, 17].map(idx => (
-                                                    <div key={idx} className="text-[8px] font-bold text-white/60 flex items-center justify-center border-b border-white/5 pb-1">{pars[idx]}</div>
-                                                ))}
-                                                <div className="text-[8px] font-bold text-white/20 flex items-center justify-center py-2 uppercase italic">Score</div>
-                                                {[9, 10, 11, 12, 13, 14, 15, 16, 17].map(idx => {
-                                                    const s = scores[idx] || 0;
-                                                    const p = pars[idx];
-                                                    // Batch Update: If score is 0 and it's current hole, treat as Par (0 diff)
-                                                    const d = s > 0 ? s - p : (idx <= currentHole ? 0 : null);
-                                                    const isCur = idx === currentHole;
-                                                    let bg = "bg-white/5";
-                                                    let tx = "text-white/20";
-                                                    if (d !== null) {
-                                                        tx = "text-white";
-                                                        if (d <= -2) { bg = "bg-[#64DD17]"; tx = "text-[#051907]"; }
-                                                        else if (d === -1) { bg = "bg-cyan-500"; }
-                                                        else if (d === 0) { bg = "bg-[#4A4E57]"; }
-                                                        else if (d === 1) { bg = "bg-orange-500"; }
-                                                        else { bg = "bg-red-500"; }
-                                                    }
-                                                    return (
-                                                        <div key={idx} className={cn(
-                                                            "aspect-square flex flex-col items-center justify-center rounded-md text-[9px] font-black",
-                                                            bg, tx, isCur && "ring-1 ring-[#64DD17] ring-offset-1 ring-offset-black"
-                                                        )}>
-                                                            {d !== null ? (d === 0 ? "0" : (d > 0 ? `+${d}` : d)) : "-"}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </CardContent>
-                    </Card>
+                        {gridFor === p.id && (
+                            <div className="px-4 pb-4 pt-1 border-t border-[#FFFFFF0F]">
+                                <div className="pt-3"><HoleGrid scores={scores} pars={pars} currentHole={currentHole} /></div>
+                            </div>
+                        )}
+                    </section>
                 );
             })}
         </div>

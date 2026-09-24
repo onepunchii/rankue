@@ -8,7 +8,7 @@ import { useRankueMatch } from "../hooks/useRankueMatch";
 import { useMoneyUnit, formatMoney } from "../lib/money";
 import { roundTotals, isCompleteRound, isGuestId, formatRelative } from "@shared/golfMatch";
 import { useGolfScore } from "../hooks/useGolfScore";
-import { ScoreCard } from "../components/ScoreCard";
+import { ScoreCard, HoleGrid } from "../components/ScoreCard";
 import { TransactionCard } from "../components/TransactionCard";
 import { GolfBackButton } from "../components/common/GolfBackButton";
 import {
@@ -16,7 +16,6 @@ import {
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
 } from "@/components/ui/select";
 import {
     Dialog,
@@ -32,8 +31,6 @@ import {
     LucideFlag,
     LucideTrophy,
     LucideCoins,
-    LucideMapPin,
-    LucideChevronDown,
     LucideWallet,
     LucideArrowRight
 } from "lucide-react";
@@ -156,7 +153,7 @@ export default function GolfScorecard() {
     if (error && !session) return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-5 px-8 text-center">
             <p className="text-white/80 font-bold break-keep">{error?.message || "경기를 불러오지 못했어요"}</p>
-            <Button onClick={() => setLocation("/dashboard")} className="h-12 px-6 rounded-2xl bg-[#64DD17] text-[#051907] font-black border-none">홈으로</Button>
+            <Button onClick={() => setLocation("/dashboard")} className="h-12 px-6 rounded-2xl bg-[#64DD17] text-[#051907] font-bold border-none">홈으로</Button>
         </div>
     );
 
@@ -168,9 +165,9 @@ export default function GolfScorecard() {
 
     if (session.status === "abandoned") return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-5 px-8 text-center">
-            <p className="text-white font-black text-lg">방장이 이 경기를 접었어요</p>
+            <p className="text-white font-bold text-lg">방장이 이 경기를 접었어요</p>
             <p className="text-white/50 text-sm font-bold">기록은 남지 않았어요.</p>
-            <Button onClick={() => setLocation("/dashboard")} className="h-12 px-6 rounded-2xl bg-[#64DD17] text-[#051907] font-black border-none">홈으로</Button>
+            <Button onClick={() => setLocation("/dashboard")} className="h-12 px-6 rounded-2xl bg-[#64DD17] text-[#051907] font-bold border-none">홈으로</Button>
         </div>
     );
 
@@ -179,7 +176,7 @@ export default function GolfScorecard() {
         <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6 px-8 text-center">
             <LucideFlag className="w-10 h-10 text-[#64DD17] animate-pulse" />
             <div>
-                <p className="text-[#64DD17] font-black text-lg">방장이 시작하길 기다리는 중</p>
+                <p className="text-[#64DD17] font-bold text-lg">방장이 시작하길 기다리는 중</p>
                 <p className="text-white/60 text-sm font-bold mt-1">{session.courseName || "골프장 미정"}</p>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
@@ -241,7 +238,7 @@ export default function GolfScorecard() {
                                 <div className="bg-[#1a1a1a]/90 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
                                     <div className="flex items-center gap-2 mb-4">
                                         <LucideCoins className="w-5 h-5 text-[#FFD700]" />
-                                        <h3 className="text-sm font-black text-white/80 tracking-widest">게임 점수 현황</h3>
+                                        <h3 className="text-sm font-bold text-white/80">게임 점수 현황</h3>
                                         <button
                                             onClick={() => setUnit(unit === "P" ? "KRW" : "P")}
                                             className="ml-auto text-[11px] font-bold text-white/50 underline underline-offset-2"
@@ -256,7 +253,7 @@ export default function GolfScorecard() {
                                                 <div key={p.memberId} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/10">
                                                     <span className="font-bold">{p.name}</span>
                                                     <span className={cn(
-                                                        "font-black tracking-tighter",
+                                                        "font-bold tracking-tight",
                                                         money > 0 ? "text-[#64DD17]" : money < 0 ? "text-[#FF6E6E]" : "text-white/40"
                                                     )}>
                                                         {formatMoney(money, unit, true)}
@@ -270,7 +267,7 @@ export default function GolfScorecard() {
                                 {/* Detailed Transactions - Grouped by Hole */}
                                 <div className="space-y-3">
                                     <div className="px-4">
-                                        <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">상세 내역 (홀별)</span>
+                                        <span className="text-[12px] font-bold text-white/30">상세 내역 (홀별)</span>
                                     </div>
                                     {moneyTransactions.length === 0 ? (
                                         <div className="py-12 text-center bg-white/5 rounded-3xl border border-dashed border-white/10">
@@ -294,7 +291,7 @@ export default function GolfScorecard() {
                                                         <div className="flex items-center justify-between px-5 py-3 bg-white/[0.03] border-b border-white/5">
                                                             <div className="flex items-center gap-2">
                                                                 <LucideFlag className="w-3.5 h-3.5 text-[#64DD17]" />
-                                                                <span className="text-xs font-black text-white/70 tracking-wider">{holeIdx + 1}번 홀</span>
+                                                                <span className="text-xs font-bold text-white/70">{holeIdx + 1}번 홀</span>
                                                             </div>
                                                         </div>
                                                         {/* Hole Transactions */}
@@ -322,77 +319,60 @@ export default function GolfScorecard() {
                 )}
             </AnimatePresence>
 
-            {/* Header with Integrated Hole Nav */}
-            <header className="px-4 py-3 flex items-center justify-between relative z-20">
-                {/* 예전엔 1번 홀에서 이 버튼이 '게임을 종료하고 나가시겠습니까?' 였는데, 눌러도 경기는 안 끝나고
-                    돌아올 길만 사라졌다. 이제 나가기·끝내기·접기를 한 곳에서 고른다. 홀 이동은 아래 버튼. */}
-                {/* mr-2: 단추 속 -ml-2 만큼 되돌려 오른쪽 w-10 과 폭을 맞춘다 — 가운데 홀 알약이 한가운데 온다 */}
-                <GolfBackButton onClick={() => setExitOpen(true)} label="나가기·끝내기" className="mr-2" />
-
-                <div className="flex flex-col items-center flex-1 mx-4">
-                    <div className="flex flex-col items-center gap-1.5">
-                        <div className="flex items-center gap-2 bg-white/5 px-4 py-1.5 rounded-full border border-white/5">
-                            <div className="flex items-baseline gap-1.5 min-w-[70px] justify-center">
-                                <span className="text-lg font-black italic tracking-tighter text-[#64DD17]">{currentHole + 1}번 홀</span>
-                                {parKnown[currentHole] ? (
-                                    <span className="text-[10px] font-bold text-white/60 uppercase">Par {coursePar[currentHole]}</span>
-                                ) : (
-                                    // 이 코스는 파 자료가 없다 — 추정값을 사실처럼 보이지 않는다. 버디 보너스·배판 판정에도 안 쓴다.
-                                    <span className="text-[10px] font-bold text-amber-300/90" title="이 홀의 파 정보가 없어요. 버디 보너스·배판은 계산하지 않아요">파 미확인</span>
-                                )}
-                            </div>
-
-                            {(
-                                <div className="flex items-center gap-1.5 pl-3 border-l border-white/10">
-                                    <Select
-                                        value={currentSubCourseName || ""}
-                                        onValueChange={(val) => {
-                                            if (isFrontNine) {
-                                                updateCourse({ frontCourseName: val });
-                                            } else {
-                                                updateCourse({ backCourseName: val });
-                                            }
-                                        }}
-                                        disabled={!isHost}
-                                    >
-                                        <SelectTrigger className="h-8 bg-transparent border-none p-0 text-lg font-black italic tracking-tight text-[#64DD17] hover:brightness-125 transition-all focus:ring-0 justify-start gap-2 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:text-[#64DD17] [&>svg]:opacity-40 pr-4">
-                                            <span className="inline-block translate-y-[1px] pr-1">
-                                                {((currentSubCourseName || "선택").replace(/\s*코스\s*/g, ""))}
-                                            </span>
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-[#0A0A0A] border-white/10 text-white rounded-none">
-                                            {(subCourses || []).map((c) => (
-                                                <SelectItem key={c.id} value={c.name} className="text-xs focus:bg-[#64DD17] focus:text-black">
-                                                    {c.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+            {/* 머리 — 뒤로 · 몇 번 홀·파·코스 · 포인트(2026-09-24 둘째 판: 기울인 굵은 글씨·네온을 걷고 한 줄로) */}
+            <header className="relative z-20 bg-[#050505] border-b border-[#FFFFFF0F]">
+                <div className="h-16 px-3 flex items-center gap-2">
+                    {/* 예전엔 1번 홀에서 이 버튼이 '게임을 종료하고 나가시겠습니까?' 였는데, 눌러도 경기는 안 끝나고
+                        돌아올 길만 사라졌다. 이제 나가기·끝내기·접기를 한 곳에서 고른다. 홀 이동은 아래 버튼. */}
+                    <GolfBackButton onClick={() => setExitOpen(true)} label="나가기·끝내기" className="-ml-1" />
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-[20px] font-bold tracking-tight text-[#ffffff] tabular-nums">{currentHole + 1}번 홀</span>
+                            {parKnown[currentHole] ? (
+                                <span className="text-[14px] font-medium text-[#9BEF5C] tabular-nums">파 {coursePar[currentHole]}</span>
+                            ) : (
+                                // 이 코스는 파 자료가 없다 — 추정값을 사실처럼 보이지 않는다. 버디 보너스·배판 판정에도 안 쓴다.
+                                <span className="text-[12.5px] text-[#FFD266]" title="이 홀의 파 정보가 없어요. 버디 보너스·배판은 계산하지 않아요">파 미확인</span>
                             )}
                         </div>
+                        {/* 코스(전반·후반) — 방장만 바꾼다 */}
+                        <Select
+                            value={currentSubCourseName || ""}
+                            onValueChange={(val) => updateCourse(isFrontNine ? { frontCourseName: val } : { backCourseName: val })}
+                            disabled={!isHost}
+                        >
+                            <SelectTrigger className="h-5 w-auto max-w-full bg-transparent border-none p-0 gap-1 text-[12.5px] text-[#FFFFFF8C] focus:ring-0 justify-start [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:opacity-60">
+                                <span className="truncate">{session.courseName ? `${session.courseName} · ` : ""}{isFrontNine ? "전반" : "후반"} {currentSubCourseName || "코스 선택"}</span>
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#141414] border-[#FFFFFF1A] text-white">
+                                {(subCourses || []).map((c) => (
+                                    <SelectItem key={c.id} value={c.name} className="text-[14px]">{c.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
-                </div>
-
-                {/* 점수 게임(포인트)을 안 하는 경기엔 볼 게 없다 — 예전엔 스트로크 경기에도 숨은 판돈으로 금액이 떴다 */}
-                {hasStakes ? (<button
-                    onClick={() => setShowMoney(!showMoney)}
-                    title="스코어 관리"
-                    aria-label="스코어 관리"
-                    className={cn(
-                        "w-10 h-10 flex items-center justify-center rounded-full transition-all border",
-                        showMoney
-                            ? "bg-[#FFD700]/20 text-[#FFD700] border-[#FFD700]/30"
-                            : "bg-white/5 border-white/5 text-white/40 hover:text-white hover:bg-white/10"
+                    {/* 점수 게임(포인트)을 안 하는 경기엔 볼 게 없다 — 예전엔 스트로크 경기에도 숨은 판돈으로 금액이 떴다 */}
+                    {hasStakes && (
+                        <button
+                            type="button" onClick={() => setShowMoney(!showMoney)} aria-label="포인트 현황" aria-pressed={showMoney}
+                            className={cn("shrink-0 h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-[13px] font-medium", showMoney ? "bg-[#FFC43D] text-[#1F1500]" : "bg-[#FFFFFF0F] text-[#FFFFFFCC]")}
+                        >
+                            <LucideCoins className="w-4 h-4" />포인트
+                        </button>
                     )}
-                >
-                    <LucideCoins className="w-5 h-5" />
-                </button>) : <div className="w-10" aria-hidden />}
+                </div>
+                {/* 18홀 진행 막대 — 전반 9칸 | 후반 9칸. 적은 홀은 채우고 지금 홀은 라임 */}
+                <div className="px-4 pb-2.5 flex gap-[3px]" aria-hidden>
+                    {Array.from({ length: 18 }, (_, i) => {
+                        const done = (localPlayers[0]?.scores?.[i] ?? 0) > 0;
+                        return <span key={i} className={cn("h-1 flex-1 rounded-full", i === 9 && "ml-1.5", i === currentHole ? "bg-[#64DD17]" : done ? "bg-[#FFFFFF59]" : "bg-[#FFFFFF14]")} />;
+                    })}
+                </div>
             </header>
 
             {/* Score Cards Area - Only in Group Mode */}
             {!(session.strokeMode === 'solo' || session.players.length === 1) && (
-                <div className="transition-all duration-500">
+                <div className="pt-3">
                     <ScoreCard
                         players={playersAdapter}
                         playerScores={playerScoresAdapter}
@@ -406,11 +386,9 @@ export default function GolfScorecard() {
                     />
 
                     {!isHost && (
-                        <div className="mt-8 px-8 py-4 mx-6 rounded-2xl bg-[#64DD17]/5 border border-[#64DD17]/10 text-center">
-                            <span className="text-[11px] font-bold text-[#64DD17]">
-                                🔒 방장이 점수를 적어요 · 방장이 홀을 넘기면 여기에도 보여요
-                            </span>
-                        </div>
+                        <p className="mt-2 mx-4 px-4 py-3 rounded-2xl bg-[#FFFFFF08] text-center text-[13px] text-[#FFFFFF99]">
+                            방장이 점수를 적어요 · 방장이 홀을 넘기면 여기에도 보여요
+                        </p>
                     )}
                 </div>
             )}
@@ -438,64 +416,35 @@ export default function GolfScorecard() {
 
                 if (netScore <= -2) {
                     statusMessage = `🔥 핸디캡보다 ${Math.abs(netScore)}타 앞서고 있어요! (완벽)`;
-                    statusColor = "text-[#64DD17]";
+                    statusColor = "text-[#9BEF5C]";
                 } else if (netScore === -1) {
                     statusMessage = `✨ 핸디캡보다 1타 앞서는 중! (우수)`;
-                    statusColor = "text-[#64DD17]";
+                    statusColor = "text-[#9BEF5C]";
                 } else if (netScore === 0) {
                     statusMessage = `👍 핸디캡대로 진행 중 (본전)`;
                     statusColor = "text-white";
                 } else if (netScore <= 2) {
                     statusMessage = `⚠️ 핸디캡보다 ${netScore}타 뒤처짐 (주의)`;
-                    statusColor = "text-orange-400";
+                    statusColor = "text-[#FFB27A]";
                 } else {
                     statusMessage = `🚨 핸디캡보다 ${netScore}타 뒤처짐 (부진)`;
-                    statusColor = "text-red-400";
+                    statusColor = "text-[#FF8A8C]";
                 }
 
                 return (
-                    <div className="px-6 pb-6">
-                        <div className="bg-white/[0.03] border border-white/5 rounded-[2rem] p-6 backdrop-blur-sm">
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <div className="w-6 h-6 rounded-md bg-purple-500/10 flex items-center justify-center text-xs">
-                                            🎯
-                                        </div>
-                                        <span className="text-[10px] font-black text-white/40 uppercase tracking-wider">핸디캡 페이스</span>
-                                    </div>
-                                    <div className="flex gap-4">
-                                        <div className="flex flex-col">
-                                            <span className="text-[9px] text-white/30 font-bold uppercase">평균 핸디캡</span>
-                                            <span className="text-sm font-black text-white">{myHandicap}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="text-right flex flex-col items-end">
-                                    <span className="text-[9px] text-white/30 font-bold uppercase mb-1">넷 스코어</span>
-                                    <span className={cn(
-                                        "text-4xl font-black italic leading-none transition-all",
-                                        statusColor
-                                    )}>
-                                        {netScore >= 0 ? `+${netScore}` : netScore}
-                                    </span>
-                                </div>
-                            </div>
-
-
-                            <div className={cn(
-                                "mt-4 py-2 px-3 rounded-xl text-center transition-all border",
-                                netScore < 0
-                                    ? "bg-[#64DD17]/10 border-[#64DD17]/10"
-                                    : netScore === 0
-                                        ? "bg-white/5 border-white/5"
-                                        : "bg-orange-500/10 border-orange-500/10"
-                            )}>
-                                <span className={cn("text-[11px] font-bold", statusColor)}>
-                                    {statusMessage}
+                    <div className="px-4 pt-3">
+                        {/* 핸디캡 페이스 — 한 줄 요약. 이모지·경고 문구 줄 대신 숫자와 짧은 말 하나 */}
+                        <div className="rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] px-4 py-3.5 flex items-center gap-3">
+                            <span className="flex-1 min-w-0">
+                                <span className="block text-[12px] text-[#FFFFFF73]">핸디캡 {myHandicap} 기준 페이스</span>
+                                <span className={cn("block mt-0.5 text-[14px] font-medium", statusColor)}>
+                                    {netScore < 0 ? `핸디캡보다 ${Math.abs(netScore)}타 앞서요` : netScore === 0 ? "핸디캡대로 가고 있어요" : `핸디캡보다 ${netScore}타 뒤져요`}
                                 </span>
-                            </div>
+                            </span>
+                            <span className="shrink-0 text-right">
+                                <span className="block text-[11px] text-[#FFFFFF59]">넷</span>
+                                <span className={cn("block text-[26px] leading-none font-bold tabular-nums", statusColor)}>{netScore >= 0 ? `+${netScore}` : netScore}</span>
+                            </span>
                         </div>
                     </div>
                 );
@@ -510,126 +459,13 @@ export default function GolfScorecard() {
                 const scores = player?.scores || Array(18).fill(0);
 
                 return (
-                    <div className="px-6 mt-2">
-                        <div className="bg-white/[0.03] border border-white/5 rounded-[2rem] p-6 backdrop-blur-sm">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 rounded-lg bg-[#64DD17]/10 flex items-center justify-center">
-                                        <LucideTrophy className="w-3.5 h-3.5 text-[#64DD17]" />
-                                    </div>
-                                    <span className="text-xs font-black text-white/40 uppercase tracking-wider">Score Card</span>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-[10px] text-white/30 font-bold">총 타수</div>
-                                    <div className="text-xl font-black text-white italic">
-                                        {golfScore.totalStrokes}
-                                    </div>
-                                </div>
+                    <div className="px-4 mt-2">
+                        <div className="rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] px-4 py-4">
+                            <div className="flex items-baseline justify-between mb-3">
+                                <span className="text-[13px] font-semibold text-[#FFFFFF99]">기록표</span>
+                                <span className="text-[13px] text-[#FFFFFF73] tabular-nums">총 <span className="text-[17px] font-bold text-[#ffffff]">{golfScore.totalStrokes}</span>타</span>
                             </div>
-
-                            {/* Front 9 (1-9홀) */}
-                            <div className="mb-3">
-                                <div className="grid grid-cols-10 gap-1 mb-0.5">
-                                    <div className="text-[9px] font-bold text-white/30 text-center py-2 border-b border-white/10">HOLE</div>
-                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(hole => (
-                                        <div key={hole} className="text-[9px] font-bold text-white/40 text-center py-2 border-b border-white/10">
-                                            {hole}
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-10 gap-1 mb-0.5">
-                                    <div className="text-[9px] font-bold text-white/30 text-center py-2 border-b border-white/10">PAR</div>
-                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(idx => (
-                                        <div key={idx} className="text-[9px] font-bold text-white/60 text-center py-2 border-b border-white/10">
-                                            {coursePar[idx]}
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-10 gap-1">
-                                    <div className="text-[9px] font-bold text-white/30 text-center py-2">SCORE</div>
-                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(idx => {
-                                        const score = scores[idx] || 0;
-                                        const par = coursePar[idx];
-                                        // Batch Update: If score is 0 and it's current/past hole, treat as Par (0 diff)
-                                        const diff = score > 0 ? score - par : (idx <= currentHole ? 0 : null);
-                                        const isCurrent = idx === currentHole;
-
-                                        let bgClass = "bg-white/5";
-                                        let textClass = "text-white/20";
-
-                                        if (diff !== null) {
-                                            textClass = "text-white";
-                                            if (diff <= -2) { bgClass = "bg-[#64DD17]"; textClass = "text-[#051907]"; }
-                                            else if (diff === -1) { bgClass = "bg-cyan-500"; }
-                                            else if (diff === 0) { bgClass = "bg-[#4A4E57]"; } // Cool Grey
-                                            else if (diff === 1) { bgClass = "bg-orange-500"; }
-                                            else { bgClass = "bg-red-500"; }
-                                        }
-
-                                        return (
-                                            <div key={idx} className={cn(
-                                                "aspect-square flex flex-col items-center justify-center rounded-md text-[10px] font-black transition-all",
-                                                bgClass, textClass,
-                                                isCurrent && "ring-2 ring-[#64DD17] ring-offset-2 ring-offset-black"
-                                            )}>
-                                                <span>{diff !== null ? (diff === 0 ? "0" : (diff > 0 ? `+${diff}` : diff)) : "-"}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Back 9 (10-18홀) */}
-                            <div>
-                                <div className="grid grid-cols-10 gap-1 mb-0.5">
-                                    <div className="text-[9px] font-bold text-white/30 text-center py-2 border-b border-white/10">HOLE</div>
-                                    {[10, 11, 12, 13, 14, 15, 16, 17, 18].map(hole => (
-                                        <div key={hole} className="text-[9px] font-bold text-white/40 text-center py-2 border-b border-white/10">
-                                            {hole}
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-10 gap-1 mb-0.5">
-                                    <div className="text-[9px] font-bold text-white/30 text-center py-2 border-b border-white/10">PAR</div>
-                                    {[9, 10, 11, 12, 13, 14, 15, 16, 17].map(idx => (
-                                        <div key={idx} className="text-[9px] font-bold text-white/60 text-center py-2 border-b border-white/10">
-                                            {coursePar[idx]}
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-10 gap-1">
-                                    <div className="text-[9px] font-bold text-white/30 text-center py-2">SCORE</div>
-                                    {[9, 10, 11, 12, 13, 14, 15, 16, 17].map(idx => {
-                                        const score = scores[idx] || 0;
-                                        const par = coursePar[idx];
-                                        // Batch Update: If score is 0 and it's current/past hole, treat as Par (0 diff)
-                                        const diff = score > 0 ? score - par : (idx <= currentHole ? 0 : null);
-                                        const isCurrent = idx === currentHole;
-
-                                        let bgClass = "bg-white/5";
-                                        let textClass = "text-white/20";
-
-                                        if (diff !== null) {
-                                            textClass = "text-white";
-                                            if (diff <= -2) { bgClass = "bg-[#64DD17]"; textClass = "text-[#051907]"; }
-                                            else if (diff === -1) { bgClass = "bg-cyan-500"; }
-                                            else if (diff === 0) { bgClass = "bg-[#4A4E57]"; }
-                                            else if (diff === 1) { bgClass = "bg-orange-500"; }
-                                            else { bgClass = "bg-red-500"; }
-                                        }
-
-                                        return (
-                                            <div key={idx} className={cn(
-                                                "aspect-square flex flex-col items-center justify-center rounded-md text-[10px] font-black transition-all",
-                                                bgClass, textClass,
-                                                isCurrent && "ring-2 ring-[#64DD17] ring-offset-2 ring-offset-black"
-                                            )}>
-                                                <span>{diff !== null ? (diff === 0 ? "0" : (diff > 0 ? `+${diff}` : diff)) : "-"}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            <HoleGrid scores={scores} pars={coursePar} currentHole={currentHole} />
                         </div>
                     </div>
                 );
@@ -638,7 +474,7 @@ export default function GolfScorecard() {
 
             {/* Solo Mode: 3. Score Input Card (Thumb-friendly position) */}
             {(session.strokeMode === 'solo' || session.players.length === 1) && (
-                <div className="mt-8 pb-32">
+                <div className="mt-3 pb-32">
                     <ScoreCard
                         players={playersAdapter}
                         playerScores={playerScoresAdapter}
@@ -652,41 +488,37 @@ export default function GolfScorecard() {
                     />
 
                     {!isHost && (
-                        <div className="mt-8 px-8 py-4 mx-6 rounded-2xl bg-[#64DD17]/5 border border-[#64DD17]/10 text-center">
-                            <span className="text-[11px] font-bold text-[#64DD17]">
-                                🔒 방장이 점수를 적어요 · 방장이 홀을 넘기면 여기에도 보여요
-                            </span>
-                        </div>
+                        <p className="mt-2 mx-4 px-4 py-3 rounded-2xl bg-[#FFFFFF08] text-center text-[13px] text-[#FFFFFF99]">
+                            방장이 점수를 적어요 · 방장이 홀을 넘기면 여기에도 보여요
+                        </p>
                     )}
                 </div>
             )}
 
 
-            {/* Bottom Action Bar */}
-            <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent z-40" style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}>
-                <div className="max-w-md mx-auto flex gap-3">
-                    <Button
-                        variant="ghost"
-                        className="flex-1 h-16 rounded-2xl bg-[#1a1a1a] border border-white/10 text-white/70 font-black text-sm hover:bg-white/5 hover:text-white disabled:opacity-30"
+            {/* 아래 단추 — 이전 홀 · 다음 홀(18번 홀이면 라운드 끝내기) */}
+            <div className="fixed bottom-0 inset-x-0 z-40 bg-[#050505F2] border-t border-[#FFFFFF14] px-4 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
+                <div className="max-w-md mx-auto flex gap-2">
+                    <button
+                        type="button"
+                        className="w-[34%] h-14 rounded-2xl bg-[#FFFFFF0F] text-[15px] font-medium text-[#FFFFFFCC] active:bg-[#FFFFFF1A] disabled:opacity-30 inline-flex items-center justify-center gap-1"
                         onClick={() => runOnce(async () => {
                             if (isHost) { try { await saveCurrentHoleScores(); } catch { return; } }
                             setCurrentHole(prev => Math.max(0, prev - 1));
                         })}
                         disabled={currentHole === 0 || busy}
                     >
-                        이전 홀
-                    </Button>
+                        <LucideChevronLeft className="w-4 h-4" />{currentHole > 0 ? `${currentHole}번 홀` : "이전"}
+                    </button>
 
                     {/* 18번 홀: 예전엔 홀 번호가 17(0부터)에 묶여 종료 버튼이 뜨는 상태에 영영 못 가서
                         스트로크 경기는 끝낼 방법이 없었다. 이제 모드와 상관없이 '라운드 끝내기' 확인창을 연다. */}
-                    <Button
+                    <button
+                        type="button"
                         disabled={(isLast && !isHost) || busy}
                         className={cn(
-                            "flex-[2] h-16 rounded-2xl font-black text-sm transition-all active:scale-95",
-                            isLast && isHost
-                                ? "bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] border-none shadow-[0_0_30px_rgba(100,221,23,0.3)]"
-                                : "bg-[#1a1a1a] border border-white/10 text-white hover:bg-white/5",
-                            isLast && !isHost && "text-white/50 disabled:opacity-100",
+                            "flex-1 h-14 rounded-2xl text-[16px] font-semibold inline-flex items-center justify-center gap-1.5",
+                            isLast && !isHost ? "bg-[#FFFFFF0A] text-[#FFFFFF73] text-[13.5px] font-medium" : "bg-[#64DD17] text-[#051907] active:bg-[#58C414]",
                         )}
                         onClick={() => runOnce(async () => {
                             const h = currentHoleNow();
@@ -706,9 +538,9 @@ export default function GolfScorecard() {
                         })}
                     >
                         {isLast
-                            ? (isHost ? <span className="flex items-center gap-2"><LucideTrophy className="w-5 h-5" />라운드 끝내기</span> : "방장이 끝내면 결과로 넘어가요")
-                            : "다음 홀"}
-                    </Button>
+                            ? (isHost ? <><LucideTrophy className="w-5 h-5" />라운드 끝내기</> : "방장이 끝내면 결과로 넘어가요")
+                            : <>{currentHole + 2}번 홀로<LucideChevronRight className="w-5 h-5" /></>}
+                    </button>
                 </div>
             </div>
 
@@ -716,7 +548,7 @@ export default function GolfScorecard() {
             <Dialog open={settlementOpen} onOpenChange={setSettlementOpen}>
                 <DialogContent className="bg-[#0A0A0A] border-white/10 text-white max-w-[90vw] rounded-3xl p-6">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-black italic tracking-tighter text-[#64DD17] flex items-center gap-2">
+                        <DialogTitle className="text-xl font-bold tracking-tight text-[#64DD17] flex items-center gap-2">
                             <LucideWallet className="w-5 h-5" />
                             <span>{settlementHole + 1}번 홀 결과</span>
                         </DialogTitle>
@@ -731,22 +563,22 @@ export default function GolfScorecard() {
                                 <div key={idx} className="bg-white/5 rounded-2xl p-4 border border-white/5">
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm font-black text-white">{t.fromName}</span>
+                                            <span className="text-sm font-bold text-white">{t.fromName}</span>
                                             <LucideArrowRight className="w-3 h-3 text-white/40" />
-                                            <span className="text-sm font-black text-[#64DD17]">{t.toName}</span>
+                                            <span className="text-sm font-bold text-[#64DD17]">{t.toName}</span>
                                         </div>
-                                        <span className="text-base font-black text-white italic">{formatMoney(t.amount, unit)}</span>
+                                        <span className="text-base font-bold text-white">{formatMoney(t.amount, unit)}</span>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                         {t.details.map((d: string, i: number) => (
-                                            <span key={i} className="text-[10px] font-bold text-white/60 bg-white/5 px-2 py-0.5 rounded-full">{d}</span>
+                                            <span key={i} className="text-[12px] font-bold text-white/60 bg-white/5 px-2 py-0.5 rounded-full">{d}</span>
                                         ))}
                                     </div>
                                 </div>
                             ))
                         ) : (
                             <div className="py-12 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-dashed border-white/10">
-                                <span className="text-sm font-black text-white/60">비겼어요 🤝</span>
+                                <span className="text-sm font-bold text-white/60">비겼어요 🤝</span>
                                 <span className="text-[11px] font-bold text-white/40 mt-1">이 홀에서는 오간 포인트가 없어요.</span>
                             </div>
                         )}
@@ -756,19 +588,19 @@ export default function GolfScorecard() {
                         {settlementHole === 17 ? (
                             isHost ? (
                                 <Button
-                                    className="w-full h-14 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] font-black text-sm border-none"
+                                    className="w-full h-14 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] font-bold text-sm border-none"
                                     onClick={() => { setSettlementOpen(false); setFinishOpen(true); }}
                                 >
                                     <span className="flex items-center gap-2"><LucideTrophy className="w-5 h-5" />라운드 끝내기</span>
                                 </Button>
                             ) : (
-                                <Button className="w-full h-14 rounded-2xl bg-white/10 text-white/80 font-black text-sm border-none" onClick={() => setSettlementOpen(false)}>
+                                <Button className="w-full h-14 rounded-2xl bg-white/10 text-white/80 font-bold text-sm border-none" onClick={() => setSettlementOpen(false)}>
                                     확인
                                 </Button>
                             )
                         ) : (
                             <Button
-                                className="w-full h-14 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] font-black text-sm border-none"
+                                className="w-full h-14 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] font-bold text-sm border-none"
                                 onClick={() => { if (!settlementOpen) return; setSettlementOpen(false); setCurrentHole(Math.min(17, settlementHole + 1)); }}
                             >
                                 다음 홀로 이동
@@ -782,7 +614,7 @@ export default function GolfScorecard() {
             <Dialog open={finishOpen} onOpenChange={setFinishOpen}>
                 <DialogContent className="bg-[#0A0A0A] border-white/10 text-white max-w-[90vw] rounded-3xl p-6">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-black tracking-tight text-[#64DD17]">라운드를 끝낼까요?</DialogTitle>
+                        <DialogTitle className="text-xl font-bold tracking-tight text-[#64DD17]">라운드를 끝낼까요?</DialogTitle>
                         <DialogDescription className="text-white/60 text-xs font-bold break-keep">
                             끝내면 점수를 고칠 수 없어요. 18홀을 모두 적은 회원만 평균·여권 도장에 기록돼요.
                         </DialogDescription>
@@ -796,13 +628,13 @@ export default function GolfScorecard() {
                                 <div key={p.memberId} className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
                                     <span className="font-bold text-sm">
                                         {p.name}
-                                        {guest && <span className="ml-1.5 text-[10px] font-bold text-white/40">게스트</span>}
+                                        {guest && <span className="ml-1.5 text-[12px] font-bold text-white/40">게스트</span>}
                                     </span>
                                     <span className="text-right">
-                                        <span className="block text-sm font-black">
+                                        <span className="block text-sm font-bold">
                                             {t.strokes}타 <span className="text-white/50 text-xs">({formatRelative(t.relative)})</span>
                                         </span>
-                                        <span className={cn("block text-[10px] font-bold", full && !guest ? "text-[#64DD17]" : "text-white/40")}>
+                                        <span className={cn("block text-[12px] font-bold", full && !guest ? "text-[#64DD17]" : "text-white/40")}>
                                             {guest ? "기록 안 남음" : full ? "기록돼요" : `${18 - t.holesPlayed}홀 미입력 · 기록 안 남음`}
                                         </span>
                                     </span>
@@ -811,12 +643,12 @@ export default function GolfScorecard() {
                         })}
                     </div>
                     <DialogFooter className="flex-row gap-2">
-                        <Button variant="ghost" className="flex-1 h-14 rounded-2xl bg-white/5 text-white/70 font-black" onClick={() => setFinishOpen(false)}>
+                        <Button variant="ghost" className="flex-1 h-14 rounded-2xl bg-white/5 text-white/70 font-bold" onClick={() => setFinishOpen(false)}>
                             계속 치기
                         </Button>
                         <Button
                             disabled={isFinishing || busy}
-                            className="flex-[2] h-14 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] font-black border-none"
+                            className="flex-[2] h-14 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] font-bold border-none"
                             onClick={() => runOnce(async () => {
                                 if (isHost) { try { await saveCurrentHoleScores(); } catch { return; } }
                                 finishMatch();
@@ -832,14 +664,14 @@ export default function GolfScorecard() {
             <Dialog open={exitOpen} onOpenChange={setExitOpen}>
                 <DialogContent className="bg-[#0A0A0A] border-white/10 text-white max-w-[90vw] rounded-3xl p-6">
                     <DialogHeader>
-                        <DialogTitle className="text-lg font-black">경기에서 나갈까요?</DialogTitle>
+                        <DialogTitle className="text-lg font-bold">경기에서 나갈까요?</DialogTitle>
                         <DialogDescription className="text-white/60 text-xs font-bold break-keep">
                             경기는 그대로 남아요. 홈의 '진행 중 라운드'에서 이어서 할 수 있어요.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2 mt-4">
                         <Button
-                            className="w-full h-14 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-black border-none"
+                            className="w-full h-14 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold border-none"
                             onClick={async () => {
                                 if (isHost) { try { await saveCurrentHoleScores(); } catch { /* 나가는 건 막지 않는다 */ } }
                                 setLocation("/dashboard");
@@ -849,7 +681,7 @@ export default function GolfScorecard() {
                         </Button>
                         {isHost && (
                             <Button
-                                className="w-full h-14 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] font-black border-none"
+                                className="w-full h-14 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] font-bold border-none"
                                 onClick={() => { setExitOpen(false); setFinishOpen(true); }}
                             >
                                 지금까지로 라운드 끝내기
