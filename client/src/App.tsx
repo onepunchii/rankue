@@ -39,6 +39,7 @@ import HiqWorldRankingCountry from "@/pages/hiq/world-ranking-country";
 import HiqWorldRankingMovers from "@/pages/hiq/world-ranking-movers";
 import HiqPba from "@/pages/hiq/pba";
 import HiqPbaPlayer from "@/pages/hiq/pba-player";
+import HiqPbaRecords from "@/pages/hiq/pba-records";
 import HiqGolfRanking from "@/pages/hiq/golf-ranking";
 import HiqGolfer from "@/pages/hiq/golfer";
 import HiqWorldPlayer from "@/pages/hiq/world-player";
@@ -136,6 +137,14 @@ const FramedWorldRankingMovers = framed(HiqWorldRankingMovers, { wide: true });
 const FramedWorldPlayer = framed(HiqWorldPlayer, { wide: true });
 const FramedPba = framed(HiqPba, { wide: true });
 const FramedPbaPlayer = framed(HiqPbaPlayer, { wide: true });
+const FramedPbaRecords = framed(HiqPbaRecords, { wide: true });
+
+// 당구 대회(2026-09-24) — 허브·PBA 시즌/대회·UMB 대회. 공유 메타(shared/tournamentMeta)가 길어 메인 청크에서 뺀다.
+const HiqTournaments = lazy(() => import("@/pages/hiq/tournaments"));
+const HiqTournamentDetail = lazy(() => import("@/pages/hiq/tournament-detail"));
+const tournamentsFallback = <div className="min-h-[100dvh] bg-surface-0" aria-busy="true" />;
+const FramedTournaments = framed(() => <Suspense fallback={tournamentsFallback}><HiqTournaments /></Suspense>, { wide: true });
+const FramedTournamentDetail = framed(() => <Suspense fallback={tournamentsFallback}><HiqTournamentDetail /></Suspense>, { wide: true });
 
 // 푸시 토큰 서버 등록(syncPushToken)은 lib/nativeBridge.ts 로 옮겼다 — 네이티브 registration 이벤트도 같은 함수를 쓴다.
 
@@ -342,7 +351,14 @@ function AppRoutes() {
       <Route path="/world-ranking/movers" component={FramedWorldRankingMovers} />
       <Route path="/player/:category/:umbId" component={FramedWorldPlayer} />
       <Route path="/pba" component={FramedPba} />
+      {/* PBA·LPBA 통산 기록 순위(2026-09-24) — 공개. 봇에게는 server/seo/pbaRecords.ts */}
+      <Route path="/pba/records" component={FramedPbaRecords} />
       <Route path="/pba-player/:memCode" component={FramedPbaPlayer} />
+      {/* 당구 대회(2026-09-24) — 공개. 봇에게는 server/seo/tournaments.ts. 상세 셋은 한 화면이 useRoute 로 가른다 */}
+      <Route path="/tournaments" component={FramedTournaments} />
+      <Route path="/tournaments/pba/:season" component={FramedTournamentDetail} />
+      <Route path="/tournaments/pba/:season/:tourCode" component={FramedTournamentDetail} />
+      <Route path="/tournaments/umb/:slug" component={FramedTournamentDetail} />
       {/* 골프 랭킹(2026-09-13 오너: 공개 전체) — GolfOnly 를 타지 않는다. 검색 유입용 공개 페이지 */}
       <Route path="/golf-ranking" component={FramedGolfRanking} />
       <Route path="/golfer/:tour/:id" component={FramedGolfer} />

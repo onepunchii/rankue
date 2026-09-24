@@ -67,6 +67,19 @@ async function handlePbaSync(req: any, res: any) {
 router.get("/pba-sync", asyncHandler(handlePbaSync));
 router.post("/pba-sync", asyncHandler(handlePbaSync));
 
+// PBA 대회 일일 동기화(2026-09-24, /tournaments) — 현재 + 다음 시즌 일정·투어 목록(우승자)을 pba_tournaments 에 쓴다.
+// 요청 4번(시즌당 일정 1 + 투어 목록 1). 지난 시즌 전체는 server/scripts/backfill-pba-tournaments.ts 로 한 번 채운다.
+// pba-sync(21:30)가 pbatour.org 를 먼저 두드리고 끝난 뒤인 21:45 에 돈다(vercel.json).
+async function handlePbaTournaments(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { runPbaTournamentsCron } = await import("../../services/pbaTournaments.js");
+    return sendSuccess(res, await runPbaTournamentsCron());
+}
+router.get("/pba-tournaments", asyncHandler(handlePbaTournaments));
+router.post("/pba-tournaments", asyncHandler(handlePbaTournaments));
+
 // 골프 랭킹 동기화(2026-09-13) — 투어별로 따로 부른다(?tour=owgr|rolex|kpga|klpga). 한 번에 넷을 돌리면
 // KPGA 40여 개·KLPGA 20여 개 요청이 서버리스 시간 제한에 걸린다. tour 가 없으면 넷 다(수동용).
 async function handleGolfSync(req: any, res: any) {

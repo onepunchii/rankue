@@ -1843,6 +1843,34 @@ export const pbaSeasonRanks = pgTable("pba_season_ranks", {
 export type PbaPlayer = typeof pbaPlayers.$inferSelect;
 export type PbaSeasonRank = typeof pbaSeasonRanks.$inferSelect;
 
+// PBA 대회(2026-09-24, /tournaments) — 일정(schedule/ajax/list)과 투어 목록(getTourList, 우승자)을 합친 한 줄.
+// 주키가 tour_code 가 아닌 이유(실측): 팀리그(TLG) 코드는 따로 번호를 매겨 2025-26 팀리그 85~90 이
+// 2021-22 투어 코드 85~90 과 겹치고, 아직 코드가 없는 예정 대회("PBA 제4차 투어")도 일정에 먼저 올라온다.
+// 그래서 id = "T{투어코드}"(코드 있는 개인 투어) 또는 "S{일정 SEQ}"(팀리그·코드 없는 일정)이고, tour_code 는 개인 투어에만 채운다.
+// 사진·로고는 저장하지 않는다(초상권·저작권) — 사실 정보만.
+export const pbaTournaments = pgTable("pba_tournaments", {
+  id: text("id").primaryKey().notNull(),
+  tourCode: integer("tour_code"), // 개인 투어(PBA·LPBA·드림·챌린지)만. 팀리그·미정 일정은 null
+  season: integer("season").notNull(), // 2025 = 2025-26 시즌
+  league: text("league").notNull(), // PBA · LPBA · DREAM(PBA2) · CHALLENGE(PBA3) · TEAM(TLG)
+  title: text("title").notNull(),
+  titleEn: text("title_en"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  place: text("place"),
+  totalPrize: bigint("total_prize", { mode: "number" }), // 원. 공식 표기("2억 5천만원")를 읽을 수 있을 때만
+  winnerPrize: bigint("winner_prize", { mode: "number" }),
+  winnerName: text("winner_name"), // 공식 표기 그대로("산체스", "김현우1")
+  winnerMemCode: text("winner_mem_code"), // pba_players 와 하나로만 맞을 때만
+  participants: integer("participants"),
+  officialSeq: text("official_seq"), // pbatour 대회 안내 페이지(/ko/tournament/info/index?seq=) — 공식이 '자세히보기'를 여는 대회만
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.tourCode),
+  index("pba_tournaments_season_idx").on(table.season),
+]);
+export type PbaTournament = typeof pbaTournaments.$inferSelect;
+
 export const insertHiqCommunityPostSchema = createInsertSchema(hiqCommunityPosts).omit({
   id: true, createdAt: true, updatedAt: true, isBlinded: true, blindReason: true, appealText: true, appealAt: true,
 });

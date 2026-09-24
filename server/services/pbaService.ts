@@ -197,7 +197,8 @@ async function getUndici() {
     return undiciPair;
 }
 
-async function fetchJson(path: string): Promise<any> {
+// 대회 수집(pbaTournaments.ts)도 이 고정 체인을 그대로 쓴다 — 인증서 갱신을 한 곳에서만 하려고 내보낸다
+export async function fetchJson(path: string): Promise<any> {
     const { fetch: uFetch, dispatcher } = await getUndici();
     const res = await uFetch(`${ORIGIN}${path}`, {
         headers: { "User-Agent": UA, Accept: "application/json" },

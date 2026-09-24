@@ -42,6 +42,12 @@ router.get("/rankings", asyncHandler(async (req: any, res: Response) => {
     return sendSuccess(res, { league, season, by, rows });
 }));
 
+// GET /pba/records — PBA·LPBA 통산 기록 순위(에버리지·하이런·뱅크샷·승률·상금 톱 20).
+// 프리렌더(server/seo/pbaRecords.ts)와 같은 저장소 함수 — 봇과 사람이 같은 순위를 본다.
+router.get("/records", asyncHandler(async (_req: any, res: Response) => {
+    return sendSuccess(res, await storage.pba.getRecords());
+}));
+
 // GET /pba/player/:memCode — 프로필 + 시즌 히스토리
 router.get("/player/:memCode", asyncHandler(async (req: any, res: Response) => {
     if (!MEM_CODE_RE.test(req.params.memCode)) return sendError(res, 404, "err.umb.playerNotFound");

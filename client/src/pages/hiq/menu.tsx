@@ -26,7 +26,8 @@ import {
     LucideGlobe,
     LucideShare2,
     LucideHistory,
-    LucideBookOpen
+    LucideBookOpen,
+    LucideCalendar
 } from "@/lib/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { flagEmoji } from "@/lib/flag";
@@ -53,6 +54,15 @@ import { useShare } from "@/hooks/useShare";
 import { appDownloadUrl } from "@shared/appLinks";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { forgetPushToken, storedPushToken } from "@/lib/nativeBridge";
+
+// 당구 대회 메뉴 문구 — 화면(/tournaments)의 TOUR_TEXT 와 같은 이름. 그 파일을 끌어오면 대회 청크가 메뉴에 섞여 여기 따로 둔다.
+const TOURNAMENTS_MENU: Record<string, { label: string; desc: string }> = {
+    ko: { label: "당구 대회", desc: "PBA·UMB 3쿠션 대회 일정과 결과" },
+    en: { label: "Billiards tournaments", desc: "PBA & UMB 3-cushion schedule and results" },
+    vi: { label: "Giải đấu bi-a", desc: "Lịch và kết quả PBA · UMB 3 băng" },
+    tr: { label: "Bilardo turnuvaları", desc: "PBA ve UMB 3 bant takvimi ve sonuçları" },
+    es: { label: "Torneos de billar", desc: "Calendario y resultados PBA y UMB a tres bandas" },
+};
 
 export default function HiqMenu() {
     const { t, locale } = useT();
@@ -460,6 +470,8 @@ export default function HiqMenu() {
                         ...(!isGolf && locale === "ko"
                             ? [{ icon: LucideBookOpen, label: "당구 용어 사전", desc: "하이런·에버리지·빈쿠션… 용어 뜻 풀이", onClick: () => setLocation("/billiards/terms") }]
                             : []),
+                        // 당구 대회(2026-09-24) — 공개 화면, 5개 언어. 로그인한 사람에게도 따로 들어갈 곳이 없어 여기 둔다.
+                        ...(isGolf ? [] : [{ icon: LucideCalendar, ...(TOURNAMENTS_MENU[locale] ?? TOURNAMENTS_MENU.en), onClick: () => setLocation("/tournaments") }]),
                         // 로그아웃·계정 삭제는 계정이 있어야 성립한다
                         ...(!isGuest
                             ? [

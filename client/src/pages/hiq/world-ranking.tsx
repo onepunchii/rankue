@@ -181,7 +181,10 @@ export default function HiqWorldRanking() {
             {seasonEvents.length > 0 && !q && !krOnly && (
                 <div className="mb-4">
                     <div className="flex items-baseline justify-between mb-2">
-                        <h2 className="text-[13px] font-bold text-ink-2">🗓️ {t("umb.calendarTitle")}</h2>
+                        {/* 제목이 대회 허브(2026-09-24)로 간다 — 지난 대회 결과·한국 선수 포인트까지 */}
+                        <h2 className="text-[13px] font-bold text-ink-2">
+                            <Link href="/tournaments" className="active:opacity-60">🗓️ {t("umb.calendarTitle")} ›</Link>
+                        </h2>
                         <span className="text-[10.5px] font-medium text-black/35">{t("umb.watchNote")}</span>
                     </div>
                     <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-5 px-5">

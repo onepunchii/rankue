@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { LucideChevronLeft, LucideMedal, LucideGlobe } from "@/lib/icons";
+import { LucideChevronLeft, LucideMedal, LucideGlobe, LucideTrophy, LucideCalendar } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { useT, type Locale } from "@/lib/i18n";
@@ -31,6 +31,8 @@ const L: Record<Locale, Record<string, string>> = {
         byPrize: "상금순", byPoint: "포인트순", prize: "상금", point: "포인트",
         season: "시즌", empty: "데이터가 없습니다", source: "출처: PBA 투어 공식 기록",
         umbLink: "UMB 세계랭킹 보기", upcoming: "다가오는 대회", dday: "D-", today: "진행 중",
+        // 프리렌더(/pba 한국어판)의 같은 링크와 같은 문구
+        recordsLink: "통산 기록 순위", tournamentsLink: "대회 일정·결과", allEvents: "전체 일정",
         // ko 메타는 프리렌더와 문자 단위 일치가 필요해 shared/pbaMeta 상수를 쓴다("연봉" 질의 대응 포함)
         metaTitle: PBA_LIST_TITLE_KO,
         metaDesc: PBA_LIST_DESC_KO,
@@ -40,6 +42,7 @@ const L: Record<Locale, Record<string, string>> = {
         byPrize: "By prize", byPoint: "By points", prize: "Prize", point: "Points",
         season: "Season", empty: "No data", source: "Source: PBA Tour official records",
         umbLink: "UMB World Ranking", upcoming: "Upcoming events", dday: "D-", today: "Live now",
+        recordsLink: "Career records", tournamentsLink: "Schedule & results", allEvents: "All events",
         metaTitle: "PBA Tour Rankings · Korean Pro Billiards | RANKUE",
         metaDesc: "PBA & LPBA season rankings — prize money, ranking points, and career records of Korean pro billiards players.",
     },
@@ -48,6 +51,7 @@ const L: Record<Locale, Record<string, string>> = {
         byPrize: "Theo tiền thưởng", byPoint: "Theo điểm", prize: "Tiền thưởng", point: "Điểm",
         season: "Mùa giải", empty: "Chưa có dữ liệu", source: "Nguồn: PBA Tour",
         umbLink: "BXH thế giới UMB", upcoming: "Giải sắp tới", dday: "D-", today: "Đang diễn ra",
+        recordsLink: "Kỷ lục sự nghiệp", tournamentsLink: "Lịch & kết quả", allEvents: "Tất cả giải",
         metaTitle: "BXH PBA Tour · Bi-a chuyên nghiệp Hàn Quốc | RANKUE",
         metaDesc: "BXH mùa giải PBA & LPBA — tiền thưởng, điểm xếp hạng và thành tích của các cơ thủ chuyên nghiệp.",
     },
@@ -56,6 +60,7 @@ const L: Record<Locale, Record<string, string>> = {
         byPrize: "Para ödülü", byPoint: "Puan", prize: "Ödül", point: "Puan",
         season: "Sezon", empty: "Veri yok", source: "Kaynak: PBA Tour",
         umbLink: "UMB Dünya Sıralaması", upcoming: "Yaklaşan turnuvalar", dday: "D-", today: "Devam ediyor",
+        recordsLink: "Kariyer rekorları", tournamentsLink: "Takvim ve sonuçlar", allEvents: "Tüm turnuvalar",
         metaTitle: "PBA Tur Sıralaması · Kore Profesyonel Bilardo | RANKUE",
         metaDesc: "PBA & LPBA sezon sıralamaları — para ödülleri, sıralama puanları ve oyuncu kariyer kayıtları.",
     },
@@ -64,6 +69,7 @@ const L: Record<Locale, Record<string, string>> = {
         byPrize: "Por premios", byPoint: "Por puntos", prize: "Premios", point: "Puntos",
         season: "Temporada", empty: "Sin datos", source: "Fuente: PBA Tour",
         umbLink: "Ranking mundial UMB", upcoming: "Próximos torneos", dday: "D-", today: "En curso",
+        recordsLink: "Récords de carrera", tournamentsLink: "Calendario y resultados", allEvents: "Todos",
         metaTitle: "Ranking PBA Tour · Billar Profesional Coreano | RANKUE",
         metaDesc: "Rankings de temporada PBA y LPBA — premios, puntos y récords de los jugadores profesionales.",
     },
@@ -192,7 +198,10 @@ export default function HiqPba() {
             {/* 다가오는 대회 스트립 */}
             {(sched?.upcoming?.length ?? 0) > 0 && (
                 <div className="mb-4">
-                    <p className="text-[11.5px] font-bold text-black/40 mb-2">{t.upcoming}</p>
+                    <div className="flex items-baseline justify-between gap-2 mb-2">
+                        <p className="text-[11.5px] font-bold text-black/40">{t.upcoming}</p>
+                        <Link href="/tournaments" className="shrink-0 text-[12px] font-semibold text-brand active:opacity-60">{t.allEvents} ›</Link>
+                    </div>
                     <div className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5 scrollbar-hide">
                         {sched!.upcoming.map((e) => {
                             const d = dday(e.startDate);
@@ -271,10 +280,21 @@ export default function HiqPba() {
                 )}
             </div>
 
+            {/* 통산 기록 순위·대회 일정(2026-09-24) — 같은 공개 데이터의 다른 단면. UMB 버튼과 같은 모양 */}
+            <div className="mt-5 grid grid-cols-2 gap-2">
+                <Link href="/pba/records" className="flex items-center justify-center gap-1.5 py-3.5 px-2 rounded-2xl bg-brand/[0.08] text-brand text-[13.5px] font-bold text-center">
+                    <LucideTrophy className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{t.recordsLink}</span>
+                </Link>
+                <Link href="/tournaments" className="flex items-center justify-center gap-1.5 py-3.5 px-2 rounded-2xl bg-brand/[0.08] text-brand text-[13.5px] font-bold text-center">
+                    <LucideCalendar className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{t.tournamentsLink}</span>
+                </Link>
+            </div>
             {/* UMB 교차 링크 + 출처 */}
             <button
                 onClick={() => setLocation("/world-ranking")}
-                className="mt-5 w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-brand/[0.08] text-brand text-[13.5px] font-bold"
+                className="mt-2 w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-brand/[0.08] text-brand text-[13.5px] font-bold"
             >
                 <LucideGlobe className="w-4 h-4" />
                 {t.umbLink}

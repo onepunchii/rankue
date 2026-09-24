@@ -24,6 +24,8 @@ import { JOIN_TYPE_LABEL, distanceKm, formatDistance, type JoinType } from "../s
 // seo/* 는 이 파일의 page·esc·hubNav 를 되받아 쓴다(순환). 둘 다 요청 시점에만 부르므로 초기화 순서와 무관하다.
 import { renderRankingExtra, type RankingExtraRender } from "./seo/rankingExtra.js";
 import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js";
+import { renderTournaments, type TournamentsRender } from "./seo/tournaments.js";
+import { renderPbaRecords, type PbaRecordsRender } from "./seo/pbaRecords.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
 //
@@ -108,6 +110,8 @@ export function hubNav(lang = "ko"): string {
     ...(lang === "ko" ? [["/golf/courses", "전국 골프장"] as [string, string]] : []),
     // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 문서에만 건다.
     ...(lang === "ko" ? [["/billiards/terms", "당구 용어"] as [string, string]] : []),
+    // 당구 대회(2026-09-24) — 프리렌더가 한국어 전용(?lang= 무시)이라 한국어 문서에만 건다.
+    ...(lang === "ko" ? [["/tournaments", "당구 대회"] as [string, string]] : []),
     ["/stores", H.stores], ["/briefing", H.briefing], ["/community", H.community], [`/about${q}`, H.about], ["/support", H.support],
   ];
   return `<nav aria-label="RANKUE">${links.map(([href, label]) => `<a href="${href}">${esc(label)}</a>`).join(" · ")}</nav>`;
@@ -1270,7 +1274,7 @@ export function registerPrerender(app: Express) {
   ${listHtml || `<p>${esc(W.loading)}</p>`}
   ${faqHtml}
   ${moreHtml}${sectionsHtml}
-  ${lang === "ko" ? `<nav><a href="/world-ranking/country/KR">대한민국 선수 세계랭킹 전체</a> · <a href="/world-ranking/movers">이번 회차 순위 변동</a></nav>` : ""}
+  ${lang === "ko" ? `<nav><a href="/world-ranking/country/KR">대한민국 선수 세계랭킹 전체</a> · <a href="/world-ranking/movers">이번 회차 순위 변동</a> · <a href="/tournaments">UMB 월드컵·세계선수권 대회</a></nav>` : ""}
   <p>${esc(W.source)} — <a href="https://www.umb-carom.org" rel="noopener">umb-carom.org</a></p>
   ${hubNav(lang)}
 </main>`,
@@ -1706,6 +1710,44 @@ ${list}
     res.status(r.status).send(r.html);
   });
 
+  // ── /tournaments · /tournaments/pba/:season[/:tourCode] · /tournaments/umb/:slug (2026-09-24) ──
+  // 한국어 전용(?lang= 무시). 허브는 pba_tournaments 테이블 + UMB 공식 달력을 읽는다 — DB 예외는 503.
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  app.get(/^\/tournaments(?:\/pba\/[^/]+(?:\/[^/]+)?|\/umb\/[^/]+)?\/?$/, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    let r: TournamentsRender | null;
+    try {
+      r = await renderTournaments(req.path, req.query as Record<string, string>);
+    } catch (e) {
+      console.warn("[prerender] tournaments failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    if (!r) return next();
+    noStore(res);
+    res.setHeader("X-Prerender", r.tag); // 슬러그는 [a-z0-9-], 나머지는 숫자·고정 꼬리표라 ASCII
+    if (r.status === 301 && r.location) return res.redirect(301, r.location);
+    res.status(r.status).send(r.html);
+  });
+
+  // ── /pba/records PBA·LPBA 통산 기록 순위(2026-09-24) ──────────────
+  // 아래 "/pba" 는 문자열 라우트라 정확 일치 — 이 하위 경로를 먹지 않는다. 한국어 전용(?lang= 무시).
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  app.get(/^\/pba\/records\/?$/, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    let r: PbaRecordsRender | null;
+    try {
+      r = await renderPbaRecords(req.path, req.query as Record<string, string>);
+    } catch (e) {
+      console.warn("[prerender] pba records failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    if (!r) return next();
+    noStore(res);
+    res.setHeader("X-Prerender", r.tag); // 고정 꼬리표라 ASCII
+    if (r.status === 301 && r.location) return res.redirect(301, r.location);
+    res.status(r.status).send(r.html);
+  });
+
   // ── /pba, /pba-player/:memCode ────────────────────────────────────
   // PBA 투어 — pbatour.org 공개 데이터 재가공(사실 정보). "스롱 피아비 상금" 같은
   // 국내 롱테일 검색 타깃이라 ko 단일 언어로 서빙한다.
@@ -1754,6 +1796,7 @@ ${list}
   ${rows.map((r) => `<li><a href="/pba-player/${esc(r.memCode)}">${esc(r.nameKo)}</a>${r.nameEn ? ` (${esc(r.nameEn)})` : ""} — 상금 ${esc(formatPrizeKo(r.prize))}원, 랭킹포인트 ${r.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
   </ol>
   <p>${esc(PL.incomeNote)}</p>
+  ${plang === "ko" ? `<nav><a href="/pba/records">통산 기록 순위</a> · <a href="/tournaments">대회 일정·결과</a></nav>` : ""}
   <p>${esc(PL.source)} — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
   ${hubNav(plang)}
 </main>`,
