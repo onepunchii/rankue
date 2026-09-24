@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { useT } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
-import { LucideChevronLeft, LucideSearch, LucideTrendingUp } from "@/lib/icons";
+import { LucideSearch, LucideTrendingUp } from "@/lib/icons";
+import { GolfBackButton } from "@/golf/components/common/GolfBackButton";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { ShareButton } from "@/components/hiq/ShareButton";
 import { GOLF_TOURS, GOLF_TOUR_META, STAT_HIGHLIGHTS, formatRankValue, formatStatValue, isGolfTour } from "@shared/golfTours";
@@ -124,14 +124,7 @@ export default function HiqGolfRanking() {
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
             <div className="flex items-center gap-3 mb-6 relative z-10">
-                <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setLocation("/dashboard")}
-                    className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center transition-transform text-ink-2 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                    aria-label={t("golf.back")}
-                >
-                    <LucideChevronLeft className="w-5 h-5" />
-                </motion.button>
+                <GolfBackButton onClick={() => setLocation("/dashboard")} label={t("golf.back")} />
                 <div className="min-w-0">
                     <h1 className="text-[26px] font-bold tracking-tight text-ink-1 leading-none">⛳ {t("golf.pageTitle")}</h1>
                     <p className="text-[13px] font-medium text-ink-3 mt-1 truncate">{t("golf.subtitle")}</p>

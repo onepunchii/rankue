@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    LucideChevronLeft,
     LucideTrophy,
     LucideCoins,
     LucideSwords,
@@ -24,6 +23,7 @@ import { useMoneyUnit } from "../lib/money";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
+import { GolfBackButton } from "../components/common/GolfBackButton";
 
 // import { COURSES } from "@/golf/data/golfCourses"; // 더 이상 사용하지 않음
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -342,21 +342,15 @@ export default function GolfNewGame() {
 
             {/* Header */}
             <header className="px-6 pt-12 pb-4 relative z-10 flex items-center justify-between">
-                <button
-                    onClick={handleBack}
-                    className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
-                    aria-label="뒤로 가기"
-                    title="뒤로 가기"
-                >
-                    <LucideChevronLeft className="w-6 h-6" />
-                </button>
+                <GolfBackButton onClick={handleBack} label="뒤로 가기" />
                 <div className="text-center">
                     <h1 className="text-2xl font-black italic tracking-tighter">
                         GAME <span className="text-[#64DD17]">SETUP</span>
                     </h1>
                     <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] mt-0.5">오늘의 승부를 설계하세요</p>
                 </div>
-                <div className="w-10" />
+                {/* 뒤로 단추의 -ml-2 와 짝 — 가운데 제목이 4px 왼쪽으로 쏠리지 않게 */}
+                <div className="w-10 -mr-2" />
             </header>
 
             <main className="relative z-10">

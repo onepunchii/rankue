@@ -10,11 +10,11 @@
  */
 import type { ReactNode } from "react";
 import { useLocation } from "wouter";
-import { LucideChevronLeft } from "@/lib/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { goLogin } from "@/components/hiq/LoginGate";
+import { GolfBackButton } from "../common/GolfBackButton";
 
 export const COURSE_COLORS = {
     bg: "#0A0A0A",
@@ -23,6 +23,7 @@ export const COURSE_COLORS = {
     lime: "#64DD17",         // 부킹·브랜드
     orange: "#FF6B00",       // 조인
     red: "#FF3B30",          // 긴급·하락
+    watch: "#FFC43D",        // 관심(☆)·알림 — 라임 위 검은 글자가 탁해 보여 호박색으로(2026-09-24 오너). 주황은 조인이라 피했다
     rise: "#FF4D4F",         // 한국 시세 관례: 오름 = 빨강
     fall: "#3B82F6",         // 내림 = 파랑
 } as const;
@@ -50,11 +51,9 @@ export function CourseShell({ title, right, backTo = "/golf/courses", hideBottom
         <div className={`min-h-screen bg-[#0A0A0A] text-white font-sans ${golfOk ? "pb-nav" : hideBottomCta ? "pb-8" : "pb-24"}`}>
             <header className="sticky top-0 z-40 bg-[#0A0A0AE6] backdrop-blur-md border-b border-[#FFFFFF0F]" style={{ paddingTop: "env(safe-area-inset-top)" }}>
                 <div className="h-14 px-3 flex items-center gap-1.5">
-                    <button type="button" onClick={back} aria-label="뒤로" className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center active:bg-[#FFFFFF14]">
-                        <LucideChevronLeft className="w-6 h-6" />
-                    </button>
-                    <div className="flex-1 min-w-0 text-[16px] font-semibold truncate">
-                        {title ?? <span className="text-[#64DD17]">랭큐 골프</span>}
+                    <GolfBackButton onClick={back} className="-ml-1" />
+                    <div className="flex-1 min-w-0 text-[16px] font-semibold tracking-tight text-[#FFFFFF] truncate">
+                        {title ?? "랭큐 골프"}
                     </div>
                     {right}
                     {!isLoading && !member && (
@@ -67,7 +66,7 @@ export function CourseShell({ title, right, backTo = "/golf/courses", hideBottom
             <main className="max-w-[720px] mx-auto">{children}</main>
             {golfOk ? <HiqNavigation /> : !isLoading && !member && !hideBottomCta ? (
                 <div className="fixed inset-x-0 bottom-0 z-40 bg-[#0A0A0AF2] border-t border-[#FFFFFF14] px-4 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
-                    <button type="button" onClick={() => goLogin(setLocation)} className="w-full h-12 rounded-xl bg-[#64DD17] text-[#051907] text-[15px] font-semibold">
+                    <button type="button" onClick={() => goLogin(setLocation)} className="w-full h-12 rounded-xl bg-[#FFC43D] text-[#1F1500] text-[15px] font-semibold active:bg-[#F0B22A]">
                         로그인하고 취소티 알림 받기
                     </button>
                 </div>

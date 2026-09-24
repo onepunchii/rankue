@@ -195,7 +195,7 @@ export default function GolfCourseHub() {
                     <nav aria-label="위치" className="mb-1.5 flex items-center gap-1 text-[13px] text-[#FFFFFF66] min-w-0">
                         {crumbs.map((c, i) => (
                             <span key={c.path} className="flex items-center gap-1 min-w-0">
-                                {i > 0 && <LucideChevronRight className="w-3.5 h-3.5 shrink-0 text-[#FFFFFF33]" />}
+                                {i > 0 && <LucideChevronRight weight="bold" className="w-3.5 h-3.5 shrink-0 text-[#FFFFFF33]" />}
                                 {i < crumbs.length - 1
                                     ? <Link href={c.path} className="truncate active:text-[#FFFFFF]">{c.name}</Link>
                                     : <span className="truncate text-[#FFFFFFA6]">{c.name}</span>}
@@ -297,7 +297,7 @@ export default function GolfCourseHub() {
                     </div>
                 </div>
                 <div className="w-[46%] shrink-0 relative">
-                    <CourseDotMap dots={dots} focus={focus} aspect={0.95} className="absolute inset-0 w-full h-full" />
+                    <CourseDotMap dots={dots} focus={focus} aspect={1.04} cols={30} bg="#0F0F0F" className="absolute inset-0 w-full h-full" />
                 </div>
             </section>
 

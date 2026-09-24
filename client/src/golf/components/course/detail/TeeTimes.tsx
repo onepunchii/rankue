@@ -89,7 +89,7 @@ function Row({ l, showDate, onOpen }: { l: PublicListing; showDate: boolean; onO
                 </span>
                 <span className="shrink-0 flex items-center gap-0.5">
                     {price && <span className={cn("text-[16px] font-semibold tabular-nums", l.isUrgent ? "text-[#FF6B61]" : "text-white")}>{price}</span>}
-                    <LucideChevronRight className="w-4 h-4 text-[#FFFFFF4D]" />
+                    <LucideChevronRight weight="bold" className="w-4 h-4 text-[#FFFFFF4D]" />
                 </span>
             </button>
         </li>
@@ -137,7 +137,7 @@ export function TeeTimes({ slug, name, listings, counts, myWatch, watchers }: {
                 <Card className="px-4 py-4">
                     <p className="text-[14px] text-[#FFFFFFB3]">지금 올라온 티타임이 없어요</p>
                     {/* 관심 단추는 바로 위 머리에 하나만 — 첫 화면에 같은 단추가 두 번 보였다(2026-09-24) */}
-                    {myWatch && <p className="mt-1 text-[13px] text-[#8BE84A]">관심 등록돼 있어요 — 올라오면 바로 알려 드려요</p>}
+                    {myWatch && <p className="mt-1 text-[13px] text-[#FFD266]">관심 등록돼 있어요 — 올라오면 바로 알려 드려요</p>}
                 </Card>
             ) : (
                 <div className="space-y-4">
@@ -153,7 +153,7 @@ export function TeeTimes({ slug, name, listings, counts, myWatch, watchers }: {
                     ))}
                     {hidden > 0 && (
                         <button type="button" onClick={() => setAll(true)} className="w-full h-11 rounded-xl bg-[#FFFFFF0A] text-[14px] font-medium text-[#FFFFFFB3] inline-flex items-center justify-center gap-1 active:bg-[#FFFFFF14]">
-                            {hidden}건 더 보기<LucideChevronDown className="w-4 h-4" />
+                            {hidden}건 더 보기<LucideChevronDown weight="bold" className="w-3.5 h-3.5" />
                         </button>
                     )}
                 </div>

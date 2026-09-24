@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
-import { LucideChevronLeft, LucideTrophy, LucideUsers, LucideCalendarDays } from "@/lib/icons";
+import { LucideTrophy, LucideUsers, LucideCalendarDays } from "@/lib/icons";
+import { GolfBackButton } from "@/golf/components/common/GolfBackButton";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 
 /**
@@ -15,9 +16,7 @@ export default function ProAm() {
         <div className="min-h-screen bg-[#0A0A0A] text-white pb-nav font-sans">
             <div className="sticky top-0 z-40 bg-[#0A0A0A]/90 backdrop-blur-2xl border-b border-white/5">
                 <div className="px-5 h-16 flex items-center gap-3">
-                    <button onClick={() => setLocation("/dashboard")} aria-label="뒤로" className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full active:bg-white/10">
-                        <LucideChevronLeft className="w-6 h-6" />
-                    </button>
+                    <GolfBackButton onClick={() => setLocation("/dashboard")} label="뒤로" />
                     <h1 className="text-[17px] font-bold">랭큐 프로암</h1>
                 </div>
             </div>

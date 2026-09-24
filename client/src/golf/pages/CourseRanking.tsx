@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    LucideChevronLeft,
     LucideSearch,
     LucideStar,
     LucideZap,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { GolfBackButton } from "@/golf/components/common/GolfBackButton";
 
 // Types
 type FilterCategory = 'Region' | 'Difficulty' | 'Speed' | 'Vibe' | 'Grass';
@@ -124,6 +124,7 @@ const FILTERS = {
 };
 
 export default function CourseRanking() {
+    const [, setLocation] = useLocation();
     const [selectedFilters, setSelectedFilters] = useState<Record<string, string>>({
         Region: '전체',
         Difficulty: '',
@@ -172,11 +173,7 @@ export default function CourseRanking() {
         <div className="min-h-screen bg-[#0A0A0A] text-white pb-32 font-sans relative overflow-x-hidden">
             {/* Sticky Header */}
             <header className="sticky top-0 z-50 bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-white/5 py-4 px-6 flex items-center justify-between">
-                <Link href="/dashboard">
-                    <button className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors" title="뒤로 가기">
-                        <LucideChevronLeft className="w-6 h-6" />
-                    </button>
-                </Link>
+                <GolfBackButton onClick={() => setLocation("/dashboard")} label="뒤로 가기" />
                 <h1 className="text-sm font-extrabold tracking-[0.3em] uppercase opacity-40">Rankue Guide</h1>
                 <LucideInfo className="w-5 h-5 text-white/20" />
             </header>

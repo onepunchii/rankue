@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    LucideChevronLeft,
     LucideSearch,
     LucidePlus,
     LucideLoader2
@@ -21,6 +20,7 @@ import { JoinCreateSheet } from "../components/join/JoinCreateSheet";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { distanceKm, isKoreaCoord, JOIN_TYPE_LABEL, JOIN_TYPES, type JoinType } from "@shared/golfJoin";
 import { GlobalSearch } from "../components/GlobalSearch";
+import { GolfBackButton } from "../components/common/GolfBackButton";
 import { kstDateKey, kstDateLabel, kstHour, kstTime } from "@/lib/kst";
 
 // Constants & Hooks
@@ -476,9 +476,7 @@ export default function BookingList() {
                 {/* 375px 에 뒤로·달·부킹/조인·골프장·검색이 한 줄로 들어가야 한다(2026-09-24 '골프장' 단추가 조인 알약 위로 겹쳤다) — 여백을 줄였다 */}
                 <div className="px-4 h-16 flex items-center justify-between gap-2 overflow-hidden">
                     <div className="flex items-center gap-2 min-w-0">
-                        <button onClick={() => window.history.back()} className="p-1.5 -ml-1.5 rounded-full hover:bg-white/5 transition-colors" title="뒤로가기">
-                            <LucideChevronLeft className="w-6 h-6" />
-                        </button>
+                        <GolfBackButton onClick={() => window.history.back()} label="뒤로가기" />
                         {/* 달만 적는다(2026-09-21 오너: "9/25 금요일"이 길어 모바일에서 헤더가 옆으로 밀렸다 — 날짜는 바로 아래 띠가 보여 준다). */}
                         <div className={cn("px-3 py-2 rounded-full border shrink-0", viewType === 'JOIN' ? "bg-[#FF6B00]/10 border-[#FF6B00]/20" : "bg-[#64DD17]/10 border-[#64DD17]/20")}>
                             <h1 className={cn("text-sm font-black tracking-tight whitespace-nowrap", theme.text)} aria-label={weekDates[selectedDate].displayDate}>

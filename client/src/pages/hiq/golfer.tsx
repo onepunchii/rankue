@@ -1,14 +1,13 @@
 import { useLocation, useRoute } from "wouter";
-import { motion } from "framer-motion";
 import { useT } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
-import { LucideChevronLeft } from "@/lib/icons";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { GOLF_TOUR_META, isGolfTour } from "@shared/golfTours";
 import { GolferBody, useGolferDetail } from "@/components/hiq/golf/GolferSheet";
 import { useGolfTheme } from "@/components/hiq/golf/ui";
 import { golferName, type GolfTour } from "@/components/hiq/golf/types";
 import { golferCardUrl } from "@/lib/playerCard";
+import { GolfBackButton } from "@/golf/components/common/GolfBackButton";
 
 // 골프 선수 전용 페이지(/golfer/:tour/:id) — 시트와 같은 본문을 공유 가능한 URL 로. 검색 색인·링크 공유가 목적.
 export default function HiqGolfer() {
@@ -47,14 +46,7 @@ export default function HiqGolfer() {
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
             <div className="flex items-center gap-3 mb-5 relative z-10">
-                <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setLocation(`/golf-ranking?tour=${tour}`)}
-                    className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center transition-transform text-ink-2 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                    aria-label={t("golf.back")}
-                >
-                    <LucideChevronLeft className="w-5 h-5" />
-                </motion.button>
+                <GolfBackButton onClick={() => setLocation(`/golf-ranking?tour=${tour}`)} label={t("golf.back")} />
                 <h2 className="text-[20px] font-bold tracking-tight text-ink-1">⛳ {t("golf.pageTitle")}</h2>
             </div>
             <div className="rounded-card bg-surface-1 border border-surface-line p-6 relative z-10">

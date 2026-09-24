@@ -1,6 +1,7 @@
-import { LucideArrowLeft, LucideFilter, LucideTrendingUp, LucideGift } from "lucide-react";
+import { LucideFilter, LucideTrendingUp, LucideGift } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "./SearchBar";
+import { GolfBackButton } from "@/golf/components/common/GolfBackButton";
 
 interface ExchangeHeaderProps {
     viewMode: 'RESALE' | 'PRESALE';
@@ -21,13 +22,7 @@ export function ExchangeHeader({
         <header className="sticky top-0 z-40 bg-[#09090b]/95 backdrop-blur-xl px-4 pt-6 pb-2 border-b border-white/5">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => window.history.back()}
-                        title="뒤로가기"
-                        className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all"
-                    >
-                        <LucideArrowLeft className="w-5 h-5 text-white" />
-                    </button>
+                    <GolfBackButton onClick={() => window.history.back()} label="뒤로가기" />
                     <h1 className="text-2xl font-black tracking-tight">회원권 거래소</h1>
                 </div>
                 <button

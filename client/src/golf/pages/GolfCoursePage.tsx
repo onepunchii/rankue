@@ -84,7 +84,7 @@ function NotFound() {
         <div className="px-4 pt-16 pb-10 text-center">
             <p className="text-[16px] text-[#FFFFFFCC]">골프장을 찾을 수 없어요</p>
             <Link href="/golf/courses" className="mt-4 inline-flex h-11 px-5 rounded-xl bg-[#FFFFFF14] text-[15px] font-medium text-white items-center gap-1 active:bg-[#FFFFFF1F]">
-                전체 골프장<LucideChevronRight className="w-4 h-4" />
+                전체 골프장<LucideChevronRight weight="bold" className="w-4 h-4" />
             </Link>
         </div>
     );
@@ -269,11 +269,11 @@ function Body({ d, ids, distance }: { d: CourseDetail; ids: SectionId[]; distanc
 
             <nav className="px-4 pt-8 flex flex-wrap gap-2" aria-label="지역 골프장">
                 <Link href={listPath({ region: d.region })} className="h-10 px-4 rounded-full border border-[#FFFFFF1F] text-[14px] text-[#FFFFFFCC] inline-flex items-center gap-1 active:bg-[#FFFFFF0F]">
-                    {REGION_LABEL[d.region] ?? d.region} 골프장 전체<LucideChevronRight className="w-4 h-4 text-[#FFFFFF66]" />
+                    {REGION_LABEL[d.region] ?? d.region} 골프장 전체<LucideChevronRight weight="bold" className="w-4 h-4 text-[#FFFFFF66]" />
                 </Link>
                 {city && (
                     <Link href={listPath({ region: d.region, city: d.city })} className="h-10 px-4 rounded-full border border-[#FFFFFF1F] text-[14px] text-[#FFFFFFCC] inline-flex items-center gap-1 active:bg-[#FFFFFF0F]">
-                        {city} 골프장<LucideChevronRight className="w-4 h-4 text-[#FFFFFF66]" />
+                        {city} 골프장<LucideChevronRight weight="bold" className="w-4 h-4 text-[#FFFFFF66]" />
                     </Link>
                 )}
             </nav>

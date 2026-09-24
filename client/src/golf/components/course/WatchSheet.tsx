@@ -65,7 +65,7 @@ function clean(f: WatchFilters): WatchFilters {
 
 const chipCls = (on: boolean) => cn(
     "h-10 px-3.5 rounded-full text-[14px] font-medium border transition-colors whitespace-nowrap",
-    on ? "bg-[#64DD17] border-[#64DD17] text-[#051907]" : "bg-[#FFFFFF08] border-[#FFFFFF1A] text-[#FFFFFFB3] active:bg-[#FFFFFF14]",
+    on ? "bg-[#FFFFFF] border-[#FFFFFF] text-[#0A0A0A] font-semibold" : "bg-[#FFFFFF08] border-[#FFFFFF1A] text-[#FFFFFFB3] active:bg-[#FFFFFF14]",
 );
 
 /** 여러 개 고르는 칩 — '전부'가 켜져 있으면 조건 없음. 다 고르면 다시 '전부'로 접는다. */
@@ -173,7 +173,7 @@ export function WatchSheet({ slug, name, open, onOpenChange, myWatch }: SheetPro
                                 {unwatch.isPending ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : "해제"}
                             </button>
                         )}
-                        <button type="button" onClick={save} disabled={busy} className="flex-1 h-12 rounded-xl bg-[#64DD17] text-[#051907] text-[15px] font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-2">
+                        <button type="button" onClick={save} disabled={busy} className="flex-1 h-12 rounded-xl bg-[#FFC43D] text-[#1F1500] text-[15px] font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-2 active:bg-[#F0B22A]">
                             {watch.isPending ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : <LucideBellRing className="w-5 h-5" />}
                             {myWatch ? "조건 저장" : "알림 받기"}
                         </button>
@@ -249,7 +249,7 @@ export function WatchButton({ slug, myWatch, watchers, size = "lg", name, classN
                     className={cn("shrink-0 w-10 h-10 -m-1 rounded-full flex items-center justify-center active:bg-[#FFFFFF14]", className)}
                 >
                     {watch.isPending ? <LucideLoader2 className="w-5 h-5 animate-spin text-[#FFFFFF80]" />
-                        : <LucideStar weight={on ? "fill" : "regular"} className={cn("w-[22px] h-[22px]", on ? "text-[#64DD17]" : "text-[#FFFFFF66]")} />}
+                        : <LucideStar weight={on ? "fill" : "regular"} className={cn("w-[22px] h-[22px]", on ? "text-[#FFC43D]" : "text-[#FFFFFF66]")} />}
                 </button>
                 {sheet}
             </>
@@ -262,21 +262,21 @@ export function WatchButton({ slug, myWatch, watchers, size = "lg", name, classN
             {on ? (
                 <button
                     type="button" onClick={press}
-                    className={cn("w-full h-[52px] px-4 rounded-2xl bg-[#64DD171A] ring-1 ring-inset ring-[#64DD174D] flex items-center gap-2.5 text-left active:bg-[#64DD1729]", className)}
+                    className={cn("w-full h-[52px] px-4 rounded-2xl bg-[#FFC43D14] ring-1 ring-inset ring-[#FFC43D4D] flex items-center gap-2.5 text-left active:bg-[#FFC43D24]", className)}
                 >
-                    <span className="w-7 h-7 rounded-full bg-[#64DD17] flex items-center justify-center shrink-0">
-                        <LucideCheck weight="bold" className="w-4 h-4 text-[#051907]" />
+                    <span className="w-7 h-7 rounded-full bg-[#FFC43D] flex items-center justify-center shrink-0">
+                        <LucideCheck weight="bold" className="w-4 h-4 text-[#1F1500]" />
                     </span>
                     <span className="flex-1 min-w-0">
-                        <span className="block text-[15px] font-semibold text-[#8BE84A] leading-tight">관심 골프장 · 알림 켜짐</span>
+                        <span className="block text-[15px] font-semibold text-[#FFD266] leading-tight">관심 골프장 · 알림 켜짐</span>
                         <span className="block text-[12px] text-[#FFFFFF80] truncate">{summary || "모든 티타임"}</span>
                     </span>
-                    <span className="text-[13px] text-[#FFFFFF80] flex items-center shrink-0">조건<LucideChevronRight className="w-4 h-4" /></span>
+                    <span className="text-[13px] text-[#FFFFFF80] flex items-center shrink-0">조건<LucideChevronRight weight="bold" className="w-3.5 h-3.5 ml-0.5" /></span>
                 </button>
             ) : (
                 <button
                     type="button" onClick={press}
-                    className={cn("w-full h-[52px] rounded-2xl bg-[#64DD17] text-[#051907] text-[16px] font-semibold tracking-tight flex items-center justify-center gap-2 active:bg-[#58C414] transition-colors", className)}
+                    className={cn("w-full h-[52px] rounded-2xl bg-[#FFC43D] text-[#1F1500] text-[16px] font-semibold tracking-tight flex items-center justify-center gap-2 active:bg-[#F0B22A] transition-colors", className)}
                 >
                     <LucideBellRing weight="fill" className="w-[18px] h-[18px]" />
                     관심 등록하고 취소티 알림 받기

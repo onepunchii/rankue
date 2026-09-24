@@ -10,6 +10,7 @@ import { roundTotals, isCompleteRound, isGuestId, formatRelative } from "@shared
 import { useGolfScore } from "../hooks/useGolfScore";
 import { ScoreCard } from "../components/ScoreCard";
 import { TransactionCard } from "../components/TransactionCard";
+import { GolfBackButton } from "../components/common/GolfBackButton";
 import {
     Select,
     SelectContent,
@@ -31,7 +32,6 @@ import {
     LucideFlag,
     LucideTrophy,
     LucideCoins,
-    LucideMenu,
     LucideMapPin,
     LucideChevronDown,
     LucideWallet,
@@ -326,14 +326,8 @@ export default function GolfScorecard() {
             <header className="px-4 py-3 flex items-center justify-between relative z-20">
                 {/* 예전엔 1번 홀에서 이 버튼이 '게임을 종료하고 나가시겠습니까?' 였는데, 눌러도 경기는 안 끝나고
                     돌아올 길만 사라졌다. 이제 나가기·끝내기·접기를 한 곳에서 고른다. 홀 이동은 아래 버튼. */}
-                <button
-                    onClick={() => setExitOpen(true)}
-                    title="나가기·끝내기"
-                    aria-label="나가기·끝내기"
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all"
-                >
-                    <LucideMenu className="w-5 h-5" />
-                </button>
+                {/* mr-2: 단추 속 -ml-2 만큼 되돌려 오른쪽 w-10 과 폭을 맞춘다 — 가운데 홀 알약이 한가운데 온다 */}
+                <GolfBackButton onClick={() => setExitOpen(true)} label="나가기·끝내기" className="mr-2" />
 
                 <div className="flex flex-col items-center flex-1 mx-4">
                     <div className="flex flex-col items-center gap-1.5">

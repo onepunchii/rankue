@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE, type WheelEvent as RWE } from "react";
 import { useLocation } from "wouter";
-import { LucideChevronLeft, LucideSettings2, LucideX } from "lucide-react";
+import { LucideSettings2, LucideX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CLUBS, nominalCarryM } from "@shared/golf/field/clubs";
 import { RANGE } from "@shared/golf/field/course";
@@ -17,6 +17,7 @@ import type { ClubId, Preset, StrokeInput, StrokeResult } from "@shared/golf/fie
 import { FieldCanvas, type Shot } from "./FieldCanvas";
 import { GradeFlash, FlightPill, ResultBar, verdictOf, type Verdict } from "./ShotHud";
 import { ArcSwing, type SwingResult } from "./ArcSwing";
+import { GolfBackButton } from "../components/common/GolfBackButton";
 
 const CLUB_LIST: ClubId[] = ["D", "3W", "5I", "7I", "9I", "PW", "SW"];
 // 스탠스 = 스윙 패스. 드라이버 3° 면 축 14°·옆 30 m(큰 페이드), 1.5° 가 투어 페이드 급. 엔진은 ±15° 까지 받는다
@@ -136,7 +137,7 @@ export default function RangePage() {
 
                 {/* 상단 바 */}
                 <div className="absolute inset-x-0 top-0 flex items-center gap-2 px-3 pt-3 pb-4 pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0) 100%)", paddingBottom: 26 }}>
-                    <button onClick={() => setLocation("/golf/arcade")} className="pointer-events-auto w-9 h-9 rounded-full backdrop-blur-sm flex items-center justify-center shrink-0" style={{ background: "rgba(8,10,8,0.55)" }} aria-label="뒤로"><LucideChevronLeft className="w-5 h-5" /></button>
+                    <GolfBackButton onClick={() => setLocation("/golf/arcade")} variant="glass" className="pointer-events-auto" />
                     <div className="flex-1 min-w-0">
                         <div className="text-[13px] font-extrabold leading-tight drop-shadow">필드 골프 연습장 <span className="text-[10px] font-bold text-[#64DD17] align-middle">ENGINE 0.3</span></div>
                         <div className="text-[10.5px] text-white/60 leading-tight truncate drop-shadow">{CLUBS[club].id} · {PRESET_KO[preset]} · {`창 ±${Math.round(zoneMs)} ms · ${viewLenM} m`}{aimStance ? ` · ${aimStance > 0 ? "드로우" : "페이드"} ${Math.abs(aimStance / 10).toFixed(1)}°` : ""} · {WINDS.find((w) => w.key === windKey)!.label}</div>

@@ -19,7 +19,7 @@ export function WatchedCourses({ enabled }: { enabled: boolean }) {
         return (
             <div className="py-8 space-y-4">
                 <p className="text-[13px] text-[#FFFFFF66]">관심 골프장이 없어요. 등록하면 취소티가 올라올 때 알려 드려요.</p>
-                <Link href="/golf/courses" className="inline-flex h-11 px-5 items-center rounded-full bg-[#64DD17] text-[#051907] text-[14px] font-semibold">
+                <Link href="/golf/courses" className="inline-flex h-11 px-5 items-center rounded-full bg-[#FFC43D] text-[#1F1500] text-[14px] font-semibold">
                     골프장 둘러보기
                 </Link>
             </div>
@@ -40,7 +40,7 @@ export function WatchedCourses({ enabled }: { enabled: boolean }) {
                                 <span className="mt-0.5 block text-[12px] text-[#FFFFFF80] truncate">{watchSummary(w.filters) || "모든 티타임"}</span>
                             </span>
                             <LiveBadges counts={w.counts} className="shrink-0" />
-                            <LucideChevronRight className="w-4 h-4 text-[#FFFFFF40] shrink-0" />
+                            <LucideChevronRight weight="bold" className="w-4 h-4 text-[#FFFFFF40] shrink-0" />
                         </Link>
                     </li>
                 ))}

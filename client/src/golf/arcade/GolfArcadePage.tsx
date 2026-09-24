@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LucideChevronLeft, LucideCopy, LucideUsers } from "lucide-react";
+import { LucideCopy, LucideUsers } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ import { toParLabel } from "@shared/golf/course";
 import { useMiniGolf } from "./useMiniGolf";
 import { MiniGolf3D } from "./MiniGolf3D";
 import { MiniGolfBoard } from "./MiniGolfBoard";
+import { GolfBackButton } from "../components/common/GolfBackButton";
 
 /** WebGL 이 없으면 2D 보드로 — 게임이 아예 안 뜨는 것보다 낫다(구형 웹뷰·GPU 차단 환경) */
 const WEBGL_OK = (() => {
@@ -86,7 +87,7 @@ export default function GolfArcadePage() {
 function Header({ title, onBack, right }: { title: string; onBack: () => void; right?: React.ReactNode }) {
     return (
         <div className="flex items-center gap-3 mb-5">
-            <button onClick={onBack} className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center" aria-label="뒤로"><LucideChevronLeft className="w-5 h-5" /></button>
+            <GolfBackButton onClick={onBack} />
             <h1 className="text-[20px] font-extrabold flex-1">{title}</h1>
             {right}
         </div>
@@ -205,7 +206,7 @@ function Round({ mode, room, me, onExit, onHoleDone }: { mode: "solo" | "room"; 
         <div className="h-[100dvh] bg-[#0A0A0A] text-white flex flex-col font-sans overflow-hidden">
             {/* HUD */}
             <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-                <button onClick={onExit} className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0" aria-label="나가기"><LucideChevronLeft className="w-5 h-5" /></button>
+                <GolfBackButton onClick={onExit} icon="close" label="나가기" />
                 <div className="flex-1 min-w-0">
                     <div className="text-[15px] font-extrabold leading-tight">{state.holeIndex + 1}번 홀 <span className="text-white/50 font-bold">· 파 {state.hole.par} · {state.hole.name}</span></div>
                     <div className="text-[11.5px] text-white/45 truncate">{state.hole.hint}</div>

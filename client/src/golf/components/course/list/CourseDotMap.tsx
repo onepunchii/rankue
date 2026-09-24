@@ -1,9 +1,15 @@
 /**
  * 골프장 점 지도(2026-09-24) — 윤곽선 없이 **골프장 좌표만으로** 한반도를 그린다.
- * 지어낸 게 없다: 점 하나가 골프장 한 곳(golf_course_pages.lat/lng)이고, 지금 글이 있는 곳만 색이 들어온다.
+ * 지어낸 게 없다: 점은 골프장 좌표(golf_course_pages.lat/lng)에서만 나오고, 지금 글이 있는 곳만 색이 들어온다.
  *
- * 지역·시군을 고르면 그쪽으로 부드럽게 당겨 들어간다(viewBox 를 rAF 로 옮긴다). 점 크기는 확대와 상관없이
- * 화면에서 같은 크기로 보이게 viewBox 너비에 비례해 다시 잡는다 — 안 그러면 시군으로 들어가면 점이 동전만 해진다.
+ * 셋째 판(2026-09-24 오너: "점이 너무 뿌옇게 보여서 깔끔해 보이지 않음 — 쨍쨍한, 깔끔한 점 느낌으로"):
+ *   뿌옇던 이유는 두 가지였다 — ① 반투명 점 수백 개가 겹쳐 수도권이 안개처럼 뭉쳤고 ② 점이 1px 남짓이라 번졌다.
+ *   그래서 **점 격자(도트 매트릭스)** 로 바꿨다. 화면을 벌집 격자로 나눠 한 칸에 점 하나만 찍는다(겹침 없음).
+ *   한 칸에 골프장이 많을수록 밝게(1곳·2곳·3곳+ 세 단계), 글이 있는 칸은 그 색으로 조금 크게.
+ *   후광(흐린 원)도 뺐다 — 색 점 둘레에 바탕색 테두리를 둘러 옆 점과 떼어 선명하게 보이게 한다.
+ *
+ * 지역·시군을 고르면 그쪽으로 부드럽게 당겨 들어간다(viewBox 를 rAF 로 옮긴다). 격자는 **도착할 화면** 기준이라
+ * 당겨 들어가는 동안 점이 커지며 자리를 잡는다.
  *
  * 누르는 기능은 없다(점이 손가락보다 작다). 보는 그림이라 aria-hidden.
  */
@@ -12,13 +18,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export type DotTone = "dim" | "on" | "booking" | "join" | "urgent";
 export interface MapDot { key: string; lat: number; lng: number; tone: DotTone }
 
-const TONE_FILL: Record<DotTone, string> = {
-    dim: "#FFFFFF14",
-    on: "#FFFFFF59",
+const LIVE_FILL: Record<"booking" | "join" | "urgent", string> = {
     booking: "#64DD17",
     join: "#FF6B00",
     urgent: "#FF3B30",
 };
+/** 한 칸의 골프장 수 → 밝기(1·2·3곳 이상). 한 칸에 점 하나라 반투명이어도 겹쳐 뿌예지지 않는다. */
+const ON_FILL = ["#FFFFFF6B", "#FFFFFFA6", "#FFFFFFE6"] as const;
+const DIM_FILL = "#FFFFFF1F";
 
 // 등거리 투영에 위도 36° 코사인을 곱한다 — 한반도 안에서는 이 정도면 모양이 맞는다.
 const px = (lng: number) => (lng - 125.5) * 81;
@@ -48,17 +55,44 @@ function fitBox(pts: { lat: number; lng: number }[], aspect: number): Box {
     return [cx - w / 2, cy - h / 2, w, h];
 }
 
-/** 색 있는 점이 흐린 점에 덮이지 않게 그리는 순서(나중 것이 위). */
-const ORDER: Record<DotTone, number> = { dim: 0, on: 1, booking: 2, join: 3, urgent: 4 };
+/** 칸 하나에 여러 골프장이 들어오면 가장 급한 색이 이긴다. */
+const RANK: Record<DotTone, number> = { dim: 0, on: 1, booking: 2, join: 3, urgent: 4 };
+
+interface Cell { key: string; x: number; y: number; n: number; tone: DotTone }
+
+/** 벌집 격자(홀수 줄은 반 칸 밀기)에 점을 모은다. g = 칸 너비(지도 좌표). */
+function toCells(dots: MapDot[], g: number): Cell[] {
+    const rowH = g * 0.866;
+    const map = new Map<string, Cell>();
+    for (const d of dots) {
+        const x = px(d.lng), y = py(d.lat);
+        const r = Math.round(y / rowH);
+        const off = (r & 1) * (g / 2);
+        const c = Math.round((x - off) / g);
+        const k = `${r}:${c}`;
+        const cur = map.get(k);
+        if (!cur) map.set(k, { key: k, x: c * g + off, y: r * rowH, n: 1, tone: d.tone });
+        else {
+            if (d.tone !== "dim") cur.n += 1;
+            if (RANK[d.tone] > RANK[cur.tone]) cur.tone = d.tone;
+        }
+    }
+    // 색 있는 칸이 위에 오게(나중에 그린 것이 위)
+    return [...map.values()].sort((a, b) => RANK[a.tone] - RANK[b.tone]);
+}
 
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
-export function CourseDotMap({ dots, focus, aspect = 0.62, className }: {
+export function CourseDotMap({ dots, focus, aspect = 0.62, cols = 34, bg = "#111111", className }: {
     dots: MapDot[];
     /** 당겨 볼 점들(지역·시군의 골프장). 없으면 전국. */
     focus: { lat: number; lng: number }[] | null;
     /** 너비/높이 */
     aspect?: number;
+    /** 가로 칸 수 — 많을수록 점이 잘다. 150px 안팎 카드에 34칸이면 점 지름 ≈ 3px. */
+    cols?: number;
+    /** 색 점 둘레 테두리(옆 점과 떼는 선) — 지도가 놓인 바탕색 */
+    bg?: string;
     className?: string;
 }) {
     const target = useMemo(() => fitBox(focus?.length ? focus : dots, aspect), [focus, dots, aspect]);
@@ -81,22 +115,18 @@ export function CourseDotMap({ dots, focus, aspect = 0.62, className }: {
         return () => cancelAnimationFrame(raf);
     }, [target]);
 
-    const unit = box[2] / 100; // 화면 너비의 1%
-    const sorted = useMemo(() => [...dots].sort((a, b) => ORDER[a.tone] - ORDER[b.tone]), [dots]);
+    // 격자는 도착할 화면(target) 기준 — 애니메이션 중에 칸이 바뀌면 점이 깜빡인다.
+    const g = target[2] / cols;
+    const cells = useMemo(() => toCells(dots, g), [dots, g]);
 
     return (
-        <svg viewBox={box.join(" ")} preserveAspectRatio="xMidYMid meet" className={className} aria-hidden="true">
-            {sorted.map((d) => {
-                const x = px(d.lng), y = py(d.lat);
-                const live = d.tone === "booking" || d.tone === "join" || d.tone === "urgent";
-                const r = (live ? 2.4 : d.tone === "on" ? 1.15 : 1) * unit;
-                return (
-                    <g key={d.key}>
-                        {/* 지금 티타임이 있는 곳 — 번쩍이는 대신 옅은 후광 하나(2026-09-24 둘째 판) */}
-                        {live && <circle cx={x} cy={y} r={r * 2.6} fill={TONE_FILL[d.tone]} opacity={0.18} />}
-                        <circle cx={x} cy={y} r={r} fill={TONE_FILL[d.tone]} />
-                    </g>
-                );
+        <svg viewBox={box.join(" ")} preserveAspectRatio="xMidYMid meet" className={className} aria-hidden="true" shapeRendering="geometricPrecision">
+            {cells.map((c) => {
+                if (c.tone === "booking" || c.tone === "join" || c.tone === "urgent") {
+                    return <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.5} fill={LIVE_FILL[c.tone]} stroke={bg} strokeWidth={g * 0.16} paintOrder="stroke" />;
+                }
+                const fill = c.tone === "dim" ? DIM_FILL : ON_FILL[Math.min(c.n, 3) - 1];
+                return <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.3} fill={fill} />;
             })}
         </svg>
     );

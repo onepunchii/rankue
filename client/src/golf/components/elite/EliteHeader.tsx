@@ -1,4 +1,5 @@
-import { LucideChevronLeft, LucideCrown } from "lucide-react";
+import { LucideCrown } from "lucide-react";
+import { GolfBackButton } from "@/golf/components/common/GolfBackButton";
 
 export const EliteHeader = () => {
     return (
@@ -8,13 +9,7 @@ export const EliteHeader = () => {
             </div>
 
             <div className="flex items-center justify-between mb-4 relative z-10">
-                <button
-                    onClick={() => window.history.back()}
-                    className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors"
-                    title="뒤로 가기"
-                >
-                    <LucideChevronLeft className="w-6 h-6" />
-                </button>
+                <GolfBackButton onClick={() => window.history.back()} label="뒤로 가기" />
             </div>
 
             <div className="flex flex-col items-center justify-center pt-4 pb-4 relative z-10">

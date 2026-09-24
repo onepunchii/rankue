@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LucideChevronLeft, LucideChevronDown, LucideLoader2 } from "lucide-react";
+import { LucideChevronDown, LucideLoader2 } from "lucide-react";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,7 @@ import {
     hasUnseenRequestChange, markRequestsSeen, readRequestsSeen,
 } from "../lib/myListings";
 import { WatchedCourses } from "../components/course/list/WatchedCourses";
+import { GolfBackButton } from "../components/common/GolfBackButton";
 
 type Tab = "mine" | "applied";
 /** 글 탭 둘 + 관심 골프장(2026-09-24). 관심은 글이 아니라 골프장이라 Row·펼치기 흐름을 타지 않는다. */
@@ -342,9 +343,7 @@ export default function GolfMyBookings() {
                 <div className="px-5 h-16 flex items-center gap-2.5">
                     {/* 알림을 눌러 앱이 **막 켜진** 경우엔 돌아갈 데가 없다 — 그냥 back() 하면 앱 밖으로 나간다.
                         이 화면은 푸시가 직접 가리키는 곳이라(거절·자리 참) 그 길이 실제로 자주 열린다. 채팅방과 같은 방식. */}
-                    <button onClick={() => (window.history.length > 1 ? window.history.back() : setLocation("/golf/booking-list"))} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors" title="뒤로가기">
-                        <LucideChevronLeft className="w-6 h-6" />
-                    </button>
+                    <GolfBackButton onClick={() => (window.history.length > 1 ? window.history.back() : setLocation("/golf/booking-list"))} />
                     <div className="min-w-0">
                         <h1 className="text-[17px] font-semibold text-white leading-tight">내 예약</h1>
                     </div>

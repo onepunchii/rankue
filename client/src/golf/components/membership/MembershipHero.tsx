@@ -1,4 +1,5 @@
-import { LucideChevronLeft, LucideStar, LucideCamera, LucideCrown } from "lucide-react";
+import { LucideStar, LucideCamera, LucideCrown } from "lucide-react";
+import { GolfBackButton } from "@/golf/components/common/GolfBackButton";
 
 interface MembershipHeroProps {
     data: any;
@@ -18,9 +19,7 @@ export function MembershipHero({ data, onBack }: MembershipHeroProps) {
             </div>
 
             <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-30">
-                <button onClick={onBack} className="p-2 -ml-2 rounded-full bg-black/20 backdrop-blur-md border border-white/10 text-white transition-all active:scale-90">
-                    <LucideChevronLeft className="w-6 h-6" />
-                </button>
+                <GolfBackButton onClick={onBack} variant="glass" />
                 <div className="flex gap-2">
                     <button className="p-2 rounded-full bg-black/20 backdrop-blur-md border border-white/10 text-white active:scale-90"><LucideStar className="w-5 h-5" /></button>
                     <button className="p-2 rounded-full bg-black/20 backdrop-blur-md border border-white/10 text-white active:scale-90"><LucideCamera className="w-5 h-5" /></button>
