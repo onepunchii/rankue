@@ -5,6 +5,8 @@ import { storeListings } from "../shared/schema.js";
 import { hreflangOf } from "../shared/aboutContent.js";
 import { asc, sql } from "drizzle-orm";
 import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.js";
+import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
+import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingIntents } from "../shared/golfCourse.js";
 
 // 동적 사이트맵 — /sitemap.xml 은 **사이트맵 인덱스**, 실제 URL 은 주제별 5개 파일에 나눠 싣는다.
 //
@@ -14,6 +16,8 @@ import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.
 //   /sitemap-pba.xml        PBA 투어 랭킹 + 선수
 //   /sitemap-golf.xml       골프 랭킹 + 선수 — 세계 톱 150·한국 500위 이내, KPGA·KLPGA 전원
 //   /sitemap-stores.xml     매장 디렉토리(수집 1,195곳)
+//   /sitemap-golf-courses.xml  골프장 475곳 전부(2026-09-24) — 시세가 매일 바뀌어 daily
+//   /sitemap-golf-hubs.xml     골프장 목록·지역·시군 + 부킹·조인·취소티 허브(글이 있는 조합만)
 //
 // 2026-09-14 분할 이유: 단일 사이트맵에 5,173 URL 을 제출했더니 색인 4개, "발견됨 - 색인 안 됨" 3,660.
 // 서버 렌더 내부 링크가 거의 없는(홈에 링크 1개) 저권위 도메인에 한 번에 쏟은 게 원인이라
@@ -27,7 +31,7 @@ const ORIGIN = "https://www.rankue.co.kr";
 const APP_LANGS = ["en", "vi", "tr", "es"];
 const ABOUT_LANGS = ["en", "vi", "tr", "es", "ja", "zh"];
 
-export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores"] as const;
+export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs"] as const;
 export type SitemapSection = (typeof SITEMAP_SECTIONS)[number];
 
 function esc(s: string): string {
@@ -61,7 +65,7 @@ function urlset(parts: string[]): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${parts.join("\n")}\n</urlset>\n`;
 }
 
-/** 인덱스 — 자식 사이트맵 5개. lastmod 는 오늘(매일 갱신되는 브리핑·커뮤니티가 있어 사실에 가깝다). */
+/** 인덱스 — 자식 사이트맵 전부. lastmod 는 오늘(매일 갱신되는 브리핑·커뮤니티가 있어 사실에 가깝다). */
 export function generateSitemapIndex(): string {
   const today = day(new Date());
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${
@@ -187,15 +191,95 @@ async function storeParts(): Promise<string[]> {
   return parts;
 }
 
+// 골프장 490곳(2026-09-24) — 한국어 전용이라 hreflang 없음. 주소의 한글은 coursePath 가 퍼센트 인코딩한다.
+// lastmod = 골프장 행 갱신·회원권 시세 기준일·가장 최근 글 중 가장 늦은 날. 비공개·가려진 글은 페이지에 안 나오므로 뺀다.
+async function golfCourseParts(): Promise<string[]> {
+  const parts: string[] = [];
+  try {
+    const r: any = await db.execute(sql`
+      select p.slug, p.logo, to_char(greatest(
+        p.updated_at::date,
+        (select max(m.as_of) from golf_membership_prices m where m.slug = p.slug),
+        (select max(b.created_at)::date from golf_bookings b
+           where b.course_id = any(p.course_ids::text[]) and b.is_blinded = false and coalesce(b.is_blind, false) = false)
+      ), 'YYYY-MM-DD') as lastmod
+      from golf_course_pages p where p.slug <> '' and btrim(p.name) <> '' order by p.slug`);
+    for (const x of (r.rows ?? r) as { slug: string; logo: string | null; lastmod: string | null }[]) {
+      // 로고가 있으면 이미지 사이트맵으로도 알린다 — "OO CC 로고" 이미지 검색에서 골프장 페이지로 들어온다.
+      parts.push(entry(`${ORIGIN}${coursePath(x.slug)}`, { changefreq: "daily", priority: "0.6", lastmod: x.lastmod, ...(x.logo ? { image: `${ORIGIN}${x.logo}` } : {}) }));
+    }
+  } catch (e) {
+    console.warn("[sitemap] golf courses failed:", (e as Error)?.message);
+  }
+  return parts;
+}
+
+// 골프장 허브 — 목록(전국·지역 6·시군 전부)은 항상, 의도 허브는 최상위 3개 + **글이 있는** 지역·시군 조합만.
+// 빈 조합은 프리렌더가 noindex 로 내보낸다 — 사이트맵에 올리면 "제출됨·noindex" 경고만 쌓인다.
+async function golfHubParts(): Promise<string[]> {
+  const parts: string[] = [];
+  try {
+    const raw = await loadGolfCourseSummary();
+    // 이름·슬러그가 빈 행은 프리렌더도 싣지 않는다(server/prerender.ts golfView) — 같은 기준
+    const ok = (p: { slug: string; name: string } | undefined) => !!p && !!p.slug && !!p.name?.trim();
+    const s = { ...raw, pages: raw.pages.filter(ok), listings: raw.listings.filter((l) => ok(raw.bySlug.get(l.slug))) };
+    const now = Date.now();
+    parts.push(entry(`${ORIGIN}${listPath()}`, { changefreq: "daily", priority: "0.8" }));
+    const cities = new Map<string, { region: string; city: string }>();
+    for (const r of GOLF_REGIONS) {
+      if (!s.pages.some((p) => p.region === r)) continue;
+      parts.push(entry(`${ORIGIN}${listPath({ region: r })}`, { changefreq: "daily", priority: "0.7" }));
+      for (const p of s.pages) if (p.region === r && p.city) {
+        const k = `${r}/${cityShort(p.city)}`;
+        if (!cities.has(k)) cities.set(k, { region: r, city: p.city });
+      }
+    }
+    for (const c of cities.values()) parts.push(entry(`${ORIGIN}${listPath(c)}`, { changefreq: "daily", priority: "0.6" }));
+    // 의도 × 지역 · 의도 × 시군 — 프리렌더의 noindex 판정과 같은 식(같은 요약·같은 listingIntents)
+    const live = new Map<string, number>();
+    for (const l of s.listings) {
+      const p = s.bySlug.get(l.slug);
+      if (!p) continue;
+      for (const i of listingIntents(l, now)) {
+        const kr = `${i}|${p.region}|`;
+        live.set(kr, (live.get(kr) ?? 0) + 1);
+        if (p.city) {
+          const kc = `${i}|${p.region}|${cityShort(p.city)}`;
+          live.set(kc, (live.get(kc) ?? 0) + 1);
+        }
+      }
+    }
+    for (const intent of GOLF_INTENTS) {
+      parts.push(entry(`${ORIGIN}${listPath({ intent })}`, { changefreq: "hourly", priority: "0.7" }));
+      for (const r of GOLF_REGIONS) {
+        if (!live.get(`${intent}|${r}|`)) continue;
+        parts.push(entry(`${ORIGIN}${listPath({ intent, region: r })}`, { changefreq: "hourly", priority: "0.5" }));
+        for (const c of cities.values()) {
+          if (c.region === r && live.get(`${intent}|${r}|${cityShort(c.city)}`)) {
+            parts.push(entry(`${ORIGIN}${listPath({ intent, region: r, city: c.city })}`, { changefreq: "hourly", priority: "0.4" }));
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[sitemap] golf hubs failed:", (e as Error)?.message);
+  }
+  return parts;
+}
+
+const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
+  core: coreParts, players: playerParts, pba: pbaParts, golf: golfParts, stores: storeParts,
+  "golf-courses": golfCourseParts, "golf-hubs": golfHubParts,
+};
+
 export async function generateSitemapSection(section: SitemapSection): Promise<string> {
-  const parts = await ({ core: coreParts, players: playerParts, pba: pbaParts, golf: golfParts, stores: storeParts })[section]();
-  return urlset(parts);
+  return urlset(await SECTION_PARTS[section]());
 }
 
 /** 예전 단일 사이트맵과 같은 내용 — 테스트·점검용(전체 URL 수 세기). 서빙은 인덱스+섹션으로 한다. */
 export async function generateSitemap(): Promise<string> {
   const all: string[] = [];
-  for (const s of SITEMAP_SECTIONS) all.push(...(await ({ core: coreParts, players: playerParts, pba: pbaParts, golf: golfParts, stores: storeParts })[s]()));
+  for (const s of SITEMAP_SECTIONS) all.push(...(await SECTION_PARTS[s]()));
   return urlset(all);
 }
 

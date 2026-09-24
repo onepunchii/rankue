@@ -14,7 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookingCreateSheet } from "../components/booking/BookingCreateSheet";
-import { MY_LISTINGS_QUERY_KEY, MY_REQUESTS_QUERY_KEY, hasUnseenRequestChange, readRequestsSeen } from "../lib/myListings";
+import { MY_LISTINGS_QUERY_KEY } from "../lib/myListings";
+import { useMyWatches } from "../lib/courseApi";
 import { ToJoinSheet } from "../components/booking/ToJoinSheet";
 import { JoinCreateSheet } from "../components/join/JoinCreateSheet";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
@@ -430,25 +431,9 @@ export default function BookingList() {
         applyMutation.mutate({ id: item.id, joined: !!item.joinedByMe, headcount, isJoin: item.listingType === 'JOIN' });
     }, [applyMutation]);
 
-    // 내 신청에 안 본 변화(확정·거절)가 있으면 헤더 "내역"에 빨간 점. 가볍게 1분마다.
-    const myRequests = useQuery<any[]>({
-        queryKey: MY_REQUESTS_QUERY_KEY,
-        queryFn: () => apiRequest("/api/hiq/golf/bookings?applied=1"),
-        enabled: !!user,
-        staleTime: 30_000,
-        refetchInterval: 60_000,
-    });
-    // 내 예약 페이지에 다녀오면 '봤다' 시각이 바뀌어 있다 — 돌아왔을 때 다시 읽어야 점이 꺼진다.
-    const [seenAt, setSeenAt] = useState(readRequestsSeen);
-    useEffect(() => {
-        const refresh = () => setSeenAt(readRequestsSeen());
-        // visibilitychange 는 document 에서 난다 — window 로도 거슬러 오지만(bubbles), 받는 곳을 헷갈리지 않게 문서에 건다.
-        document.addEventListener("visibilitychange", refresh);
-        window.addEventListener("focus", refresh);
-        return () => { document.removeEventListener("visibilitychange", refresh); window.removeEventListener("focus", refresh); };
-    }, []);
-    useEffect(() => { setSeenAt(readRequestsSeen()); }, [routePath]);
-    const unseen = hasUnseenRequestChange(myRequests.data, seenAt);
+    // 머리의 '골프장' 단추 — 내 관심 골프장에 지금 글이 있으면 라임 점(안 본 신청 소식 빨간 점은 하단 '내 예약' 탭이 맡는다).
+    const myWatches = useMyWatches(!!user);
+    const watchedLive = (myWatches.data ?? []).some((w) => w.counts.booking + w.counts.join > 0);
 
     const handleReserve = useCallback((item: any) => {
         const phoneNumber = item.managerPhone || "010-1234-5678";
@@ -488,13 +473,14 @@ export default function BookingList() {
         <div className="min-h-screen bg-[#0A0A0A] text-white pb-nav font-sans selection:bg-[#64DD17]/30">
             {/* Header */}
             <div className="sticky top-0 z-50 bg-[#0A0A0A]/90 backdrop-blur-2xl border-b border-white/5">
-                <div className="px-5 h-16 flex items-center justify-between gap-2 overflow-hidden">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <button onClick={() => window.history.back()} className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors" title="뒤로가기">
+                {/* 375px 에 뒤로·달·부킹/조인·골프장·검색이 한 줄로 들어가야 한다(2026-09-24 '골프장' 단추가 조인 알약 위로 겹쳤다) — 여백을 줄였다 */}
+                <div className="px-4 h-16 flex items-center justify-between gap-2 overflow-hidden">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <button onClick={() => window.history.back()} className="p-1.5 -ml-1.5 rounded-full hover:bg-white/5 transition-colors" title="뒤로가기">
                             <LucideChevronLeft className="w-6 h-6" />
                         </button>
                         {/* 달만 적는다(2026-09-21 오너: "9/25 금요일"이 길어 모바일에서 헤더가 옆으로 밀렸다 — 날짜는 바로 아래 띠가 보여 준다). */}
-                        <div className={cn("px-3.5 py-2 rounded-full border shrink-0", viewType === 'JOIN' ? "bg-[#FF6B00]/10 border-[#FF6B00]/20" : "bg-[#64DD17]/10 border-[#64DD17]/20")}>
+                        <div className={cn("px-3 py-2 rounded-full border shrink-0", viewType === 'JOIN' ? "bg-[#FF6B00]/10 border-[#FF6B00]/20" : "bg-[#64DD17]/10 border-[#64DD17]/20")}>
                             <h1 className={cn("text-sm font-black tracking-tight whitespace-nowrap", theme.text)} aria-label={weekDates[selectedDate].displayDate}>
                                 {weekDates[selectedDate].monthLabel}
                             </h1>
@@ -507,7 +493,7 @@ export default function BookingList() {
                                     key={type}
                                     onClick={() => setViewType(type)}
                                     className={cn(
-                                        "px-5 h-full rounded-full text-xs font-black transition-all flex items-center justify-center whitespace-nowrap min-w-[70px]",
+                                        "px-3 h-full rounded-full text-xs font-black transition-all flex items-center justify-center whitespace-nowrap min-w-[54px]",
                                         viewType === type ? (type === 'BOOKING' ? "bg-[#64DD17] text-[#051907]" : "bg-[#FF6B00] text-white") : "text-white/40 hover:text-white"
                                     )}
                                 >
@@ -517,20 +503,19 @@ export default function BookingList() {
                         </div>
 
                     </div>
-                    <div className="flex items-center gap-2">
-                        {/* 내역 시트를 열던 자리다(2026-09-23 페이지로 옮겼다). 입구는 그대로 두고 갈 곳만 바꿨다 —
-                            여기서 여는 데 익숙한 사람의 손가락을 옮기게 하지 않는다. 하단 탭에도 같은 페이지가 있다. */}
-                        {user && (
-                            <button
-                                onClick={() => setLocation(`/golf/my-bookings?tab=${unseen ? "applied" : "mine"}`)}
-                                className="relative h-9 px-3 rounded-full text-[12.5px] font-medium border whitespace-nowrap transition-colors bg-white/[0.04] border-white/10 text-white/70 active:bg-white/10"
-                                title="내가 올린 글 · 신청한 글"
-                            >
-                                내 예약
-                                {unseen && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" aria-label="새 소식" />}
-                            </button>
-                        )}
-                        <button onClick={() => setIsSearchOpen(true)} className="p-2 rounded-full hover:bg-white/5 transition-colors" title="검색">
+                    <div className="flex items-center gap-1 shrink-0">
+                        {/* 골프장 목록(2026-09-24 오너: "내 예약은 네비게이션바에 있으니 그거 대신 골프장"). 492곳을 보고 ☆ 를 눌러 두면
+                            그 골프장 티가 올라올 때 알림 — 더블이글 목록과 같은 자리다. 안 본 신청 소식 빨간 점은 하단 '내 예약' 탭으로 옮겼다.
+                            관심 골프장에 지금 글이 있으면 라임 점. */}
+                        <button
+                            onClick={() => setLocation("/golf/courses")}
+                            className="relative h-9 px-3 rounded-full text-[12.5px] font-medium border whitespace-nowrap transition-colors bg-white/[0.04] border-white/10 text-white/80 active:bg-white/10 inline-flex items-center"
+                            title="전체 골프장 · 관심 골프장 알림"
+                        >
+                            골프장
+                            {watchedLive && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#64DD17]" aria-label="관심 골프장에 티타임" />}
+                        </button>
+                        <button onClick={() => setIsSearchOpen(true)} className="p-1.5 -mr-1.5 rounded-full hover:bg-white/5 transition-colors" title="검색">
                             <LucideSearch className="w-5 h-5 opacity-40 hover:opacity-100 transition-opacity" />
                         </button>
                     </div>

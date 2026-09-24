@@ -185,3 +185,12 @@ export const Target = ((Ph as any).Target ?? F) as Ph.Icon;
 export const User = ((Ph as any).User ?? F) as Ph.Icon;
 export const X = ((Ph as any).X ?? F) as Ph.Icon;
 export const Zap = ((Ph as any).Lightning ?? F) as Ph.Icon;
+
+// 골프장 페이지(2026-09-24) — 관심 알림·길찾기·티켓·조건·바깥 링크·골프공·시세선
+export const LucideBellRing = ((Ph as any).BellRinging ?? F) as Ph.Icon;
+export const LucideNavigation = ((Ph as any).NavigationArrow ?? F) as Ph.Icon;
+export const LucideTicket = ((Ph as any).Ticket ?? F) as Ph.Icon;
+export const LucideSlidersHorizontal = ((Ph as any).SlidersHorizontal ?? F) as Ph.Icon;
+export const LucideExternalLink = ((Ph as any).ArrowSquareOut ?? F) as Ph.Icon;
+export const LucideGolf = ((Ph as any).Golf ?? F) as Ph.Icon;   // Phosphor 에 GolfBall 은 없다(빌드 경고)
+export const LucideChartLine = ((Ph as any).ChartLine ?? F) as Ph.Icon;

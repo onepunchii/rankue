@@ -763,6 +763,106 @@ export const golfBookings = pgTable("golf_bookings", {
  *
  * 조인 글 자체는 golf_bookings(listing_type='JOIN') 행이다. 여기는 그 글에 대한 신청만 담는다.
  */
+/**
+ * 골프장 한 곳 = 페이지 한 장(2026-09-24 오너: "홈에 전체 골프장, 관심 누르면 취소티 알림, 골프장 누르면 정보 — 우리는 더 심화").
+ *
+ * 왜 새 표인가: 골프장 명부가 세 벌로 갈라져 있었다 — 부킹·조인 글이 가리키는 정적 목록 525곳
+ * (client/src/golf/data/golfCourses.ts), 랭큐매치가 쓰는 rankue_golf_clubs 652곳(좌표·코스 파),
+ * TGM 234종목(그린피·소개·회원권 시세). 이 표가 셋을 하나로 묶는다.
+ *
+ * 한 행 = **골프장**이다. 정적 목록은 회원제·대중제를 두 줄로 적어(가야 384·385) 같은 이름·같은 주소의
+ * 페이지가 둘 생겼다 — course_ids 에 둘 다 담아 한 장으로 합친다.
+ *
+ * ⚠️ 정적 목록의 rating·difficulty·vibe·grass·imageUrl·phone 은 **가짜 자리채움 값**이다
+ * (평점은 4.5/4.9 두 값뿐, 전화는 031-107-1013 → 031-114-1026 식 등차수열). 여기로 옮기지 않는다.
+ */
+export const golfCoursePages = pgTable("golf_course_pages", {
+  /** 한글 슬러그 — 검색어가 주소에 그대로 보인다(/golf/course/렉스필드). */
+  slug: text("slug").primaryKey().notNull(),
+  name: text("name").notNull(),
+  /** 시도(경기·강원 …) — 지역 허브의 열쇠 */
+  region: text("region").notNull(),
+  /** 시군구(이천시·김해시 …) */
+  city: text("city"),
+  address: text("address"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+  /** 정적 목록 id 들 — 부킹·조인 글의 course_id 가 이걸 가리킨다. TGM 에만 있는 골프장은 빈 배열. */
+  courseIds: integer("course_ids").array().default([]).notNull(),
+  /** 랭큐매치 명부(rankue_golf_clubs.id) — 라운드 기록·코스 파 */
+  clubId: uuid("club_id"),
+  /** 회원제 · 대중제 · 회원제+대중제 */
+  kind: text("kind"),
+  holes: integer("holes"),
+  /** [{ courseId, kind, holes }] — 회원제 45홀 + 대중제 9홀 처럼 */
+  parts: jsonb("parts"),
+  /** [{ name, par }] — rankue_golf_courses 의 코스별 파 */
+  courses: jsonb("courses"),
+  /** TGM 이 직접 쓴 소개문(golf-intros.json). 동아에서 온 '기본정보.소개'는 쓰지 않는다. */
+  intro: text("intro"),
+  /** { opened, members, homepage, membershipTypes, notes } */
+  info: jsonb("info"),
+  /** { rows: [{ day, nonMember, member, family }], extra: { caddie, cart }, notes } */
+  fees: jsonb("fees"),
+  /** 이 골프장에 붙은 TGM 회원권 종목 id 들 */
+  tgmItems: text("tgm_items").array().default([]).notNull(),
+  /**
+   * 2026-09-24 보강(오너가 준 골프장 자료 304곳 — 로고·잔디·플레이 방식·연락처).
+   * logo 는 /img/golf-logos/<id>.png(흰 바탕 워드마크라 화면은 흰 로고판 위에 얹는다).
+   * 그 자료의 이름은 **지금 이름**이라(로제비앙GC ← 구 큐로CC) 대표 이름으로 쓰고, 옛 이름은 aliases 로 남긴다 — 두 이름 다 검색에 걸리게.
+   * 그 자료의 평점·즐겨찾기 수는 **싣지 않는다**(남의 사이트 숫자다. popularity 는 목록 정렬에만 쓴다).
+   */
+  logo: text("logo"),
+  /** 한국잔디 · 양잔디 · 벤트그라스 */
+  grass: text("grass").array().default([]).notNull(),
+  /** 3인가능 · 2인가능 · 노캐디 */
+  play: text("play").array().default([]).notNull(),
+  phone: text("phone"),
+  website: text("website"),
+  /** 대표 그린피(원) — 그린피 표가 없는 골프장의 참고값 */
+  feeFrom: integer("fee_from"),
+  popularity: integer("popularity").default(0).notNull(),
+  aliases: text("aliases").array().default([]).notNull(),
+  extIds: integer("ext_ids").array().default([]).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [index("golf_course_pages_region_idx").on(t.region, t.city)]);
+
+/** 회원권 시세 — TGM 이 매일 20시(KST)에 갱신하는 값을 받아 둔다. 단위 만원. */
+export const golfMembershipPrices = pgTable("golf_membership_prices", {
+  itemId: text("item_id").primaryKey().notNull(),
+  slug: text("slug").references(() => golfCoursePages.slug, { onDelete: "cascade" }).notNull(),
+  /** 종목 이름 — '개인', '법인', '주중', '무기명' … */
+  label: text("label").notNull(),
+  price: integer("price").notNull(),
+  yearHigh: integer("year_high"),
+  yearLow: integer("year_low"),
+  /** 전일 대비 등락(만원). 이력 마지막 두 점에서 계산한다. */
+  change: integer("change"),
+  asOf: date("as_of"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [index("golf_membership_prices_slug_idx").on(t.slug)]);
+
+export const golfMembershipPriceHistory = pgTable("golf_membership_price_history", {
+  itemId: text("item_id").notNull(),
+  d: date("d").notNull(),
+  price: integer("price").notNull(),
+}, (t) => [primaryKey({ columns: [t.itemId, t.d] })]);
+
+/**
+ * 관심 골프장(☆) — 그 골프장에 부킹·조인·긴급티가 올라오면 푸시.
+ * filters: { days?: ("weekday"|"weekend")[], parts?: ("morning"|"afternoon"|"night")[], maxFee?: number, minSeats?: number, kinds?: ("BOOKING"|"JOIN")[] }
+ * 비어 있으면 전부 받는다.
+ */
+export const golfCourseWatches = pgTable("golf_course_watches", {
+  memberId: uuid("member_id").references(() => hiqMembers.id, { onDelete: "cascade" }).notNull(),
+  slug: text("slug").references(() => golfCoursePages.slug, { onDelete: "cascade" }).notNull(),
+  filters: jsonb("filters"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.memberId, t.slug] }), index("golf_course_watches_slug_idx").on(t.slug)]);
+
+export type GolfCoursePage = typeof golfCoursePages.$inferSelect;
+export type GolfMembershipPrice = typeof golfMembershipPrices.$inferSelect;
+
 export const golfJoinRequests = pgTable("golf_join_requests", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   bookingId: uuid("booking_id").references(() => golfBookings.id, { onDelete: "cascade" }).notNull(),

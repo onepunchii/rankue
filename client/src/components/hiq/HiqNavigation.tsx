@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -18,6 +18,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { useT } from "@/lib/i18n";
+import { MY_REQUESTS_QUERY_KEY, hasUnseenRequestChange, readRequestsSeen } from "@/golf/lib/myListings";
 
 export function HiqNavigation() {
     const { t } = useT();
@@ -58,13 +59,34 @@ export function HiqNavigation() {
         staleTime: 30_000,
     });
     const chatUnread = unreadData?.unread ?? 0;
+
+    // 골프 '내 예약' 탭의 빨간 점 — 내 신청에 안 본 변화(확정·거절). 원래 조인 목록 머리의 '내 예약' 단추에 있었는데
+    // 그 자리를 '골프장' 입구에 내주면서 이리로 옮겼다(2026-09-24 오너: "내 예약은 네비게이션바에 있으니"). 가볍게 1분마다.
+    const myRequests = useQuery<any[]>({
+        queryKey: MY_REQUESTS_QUERY_KEY,
+        queryFn: () => apiRequest("/api/hiq/golf/bookings?applied=1"),
+        enabled: !!member && currentSport === "GOLF",
+        staleTime: 30_000,
+        refetchInterval: 60_000,
+    });
+    // 내 예약 페이지에 다녀오면 '봤다' 시각이 바뀐다 — 돌아오거나 앱이 다시 보일 때 읽어야 점이 꺼진다.
+    const [seenAt, setSeenAt] = useState(readRequestsSeen);
+    useEffect(() => { setSeenAt(readRequestsSeen()); }, [location]);
+    useEffect(() => {
+        const refresh = () => setSeenAt(readRequestsSeen());
+        document.addEventListener("visibilitychange", refresh);
+        window.addEventListener("focus", refresh);
+        return () => { document.removeEventListener("visibilitychange", refresh); window.removeEventListener("focus", refresh); };
+    }, []);
+    const bookingUnseen = currentSport === "GOLF" && hasUnseenRequestChange(myRequests.data, seenAt);
     const tabs = isGolf
         ? [
             { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
             // to 는 이동할 주소, path 는 탭 켜짐 판정용 경로다. 질의를 안 붙이면 '조인' 탭인데
             // 부킹 화면이 열렸다(목록의 기본 보기가 부킹이다).
-            { id: "join", label: "hiqNavigation.join", icon: LucideCalendarDays, path: "/golf/booking-list", to: "/golf/booking-list?view=JOIN" },
+            // 골프장 목록·상세(/golf/courses·/golf/course/:slug·의도 허브)도 조인 탭에서 들어가는 화면이라 조인 탭을 켠다.
+            { id: "join", label: "hiqNavigation.join", icon: LucideCalendarDays, path: "/golf/booking-list", to: "/golf/booking-list?view=JOIN", also: ["/golf/courses", "/golf/course", "/golf/booking", "/golf/join", "/golf/urgent"] },
             // 아이콘은 달력+체크(예약) — LucideBarChart3 은 기록 아이콘이라 당구 '기록' 탭과 헷갈린다.
             { id: "myBookings", label: "hiqNavigation.myBookings", icon: LucideCalendarCheck, path: "/golf/my-bookings" },
             // 전체(≡)는 머리줄로 올라갔고 이 자리는 채팅이다(2026-09-21 오너: "전체 대신 메시지")
@@ -80,7 +102,7 @@ export function HiqNavigation() {
         ];
 
     // 조인은 상세(/golf/booking-list/:id)로 들어가도 그 탭이 켜져 있어야 한다 — 정확히 같을 때만 보면 꺼진다.
-    const isActive = (path: string) => location === path || location.startsWith(path + "/");
+    const isActive = (path: string, also?: string[]) => [path, ...(also ?? [])].some((p) => location === p || location.startsWith(p + "/"));
 
     return (
         <nav
@@ -94,12 +116,13 @@ export function HiqNavigation() {
         >
             <div className="max-w-md mx-auto px-6 flex items-center justify-between">
                 {tabs.map((tab) => {
-                    const active = isActive(tab.path);
+                    const active = isActive(tab.path, (tab as any).also);
                     return (
                         <motion.button
                             key={tab.id}
                             whileTap={{ scale: 0.9 }}
-                            onClick={() => setLocation((tab as any).to ?? tab.path)}
+                            // 안 본 신청 소식이 있으면 '내가 신청한 글' 탭으로 바로(예전 머리 단추와 같은 동작)
+                            onClick={() => setLocation(tab.id === "myBookings" && bookingUnseen ? "/golf/my-bookings?tab=applied" : (tab as any).to ?? tab.path)}
                             className="flex-1 flex flex-col items-center justify-center py-2 gap-2 relative group"
                         >
                             <div className={`relative transition-all duration-300 ${active ? 'scale-110' : 'opacity-55 group-hover:opacity-100'}`}>
@@ -107,6 +130,9 @@ export function HiqNavigation() {
                                     className="w-7 h-7 transition-all duration-300"
                                     style={active ? { color: activeColor } : { color: 'var(--nav-idle)' }}
                                 />
+                                {tab.id === "myBookings" && bookingUnseen && (
+                                    <span className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white" aria-label="새 소식" />
+                                )}
                                 {tab.id === "chat" && chatUnread > 0 && (
                                     <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10.5px] font-semibold flex items-center justify-center rk-num" aria-label={`안 읽은 메시지 ${chatUnread}`}>
                                         {chatUnread > 99 ? "99+" : chatUnread}

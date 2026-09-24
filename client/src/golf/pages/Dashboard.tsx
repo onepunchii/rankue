@@ -17,6 +17,7 @@ import { HotDealTicker } from "../components/dashboard/HotDealTicker";
 import { GameModeSheet } from "../components/dashboard/GameModeSheet";
 import { PinEntrySheet } from "../components/dashboard/PinEntrySheet";
 import { ActiveRoundCard } from "../components/dashboard/ActiveRoundCard";
+import { CourseHomeEntry } from "../components/course/list/CourseHomeEntry";
 
 // Hooks
 import { useGolfMatch } from "../hooks/useGolfMatch";
@@ -92,6 +93,9 @@ export default function GolfDashboard() {
                 onOpenGameMode={() => setIsGameModeOpen(true)}
                 onOpenJoin={() => matchLogic.setIsJoinOpen(true)}
             />
+
+            {/* 전국 골프장(2026-09-24) — 골프장 목록·지역·부킹/조인/긴급 허브의 입구 */}
+            <CourseHomeEntry />
 
             {/* Dashboard Widgets */}
             <StatsChart

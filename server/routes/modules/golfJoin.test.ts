@@ -166,11 +166,17 @@ describe("부킹 → 조인 전환(2026-09-23 오너: '내가 올린 부킹 내�
 
     it("알림·긴급 방송은 응답 전에 기다린다 — 서버리스는 응답 뒤 얼어붙는다", () => {
         const notify = block.indexOf("await Promise.allSettled(waiting.map");
-        const broadcast = block.indexOf("await broadcastUrgentJoin(");
+        // 긴급 방송과 관심 알림은 함께 기다린다(2026-09-24 — 차례로 기다리면 응답이 12초까지 늘었다). 둘 다 응답 전이어야 한다.
+        const together = block.indexOf("await Promise.allSettled([");
+        const broadcast = block.indexOf("broadcastUrgentJoin(", together);
+        const watch = block.indexOf("notifyCourseWatchers(", together);
         const success = block.indexOf("return sendSuccess(res");
         expect(notify).toBeGreaterThan(-1);
         expect(notify).toBeLessThan(success);
-        expect(broadcast).toBeGreaterThan(-1);
+        expect(together).toBeGreaterThan(-1);
+        expect(broadcast).toBeGreaterThan(together);
+        expect(watch).toBeGreaterThan(together);
         expect(broadcast).toBeLessThan(success);
+        expect(watch).toBeLessThan(success);
     });
 });

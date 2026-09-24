@@ -103,6 +103,24 @@ router.post("/golf-ingest", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, { result, followAlerts });
 }));
 
+// 골프 회원권 시세 매일 동기화(2026-09-24) — TGM 이 20시 KST 에 시세를 갱신·재배포한 뒤 그 피드
+// (env TGM_FEED_URL, 키 TGM_FEED_KEY)를 받아 golf_membership_prices·이력에 쓴다. 피드가 죽었거나 종목이 너무 적으면
+// **아무것도 쓰지 않고** 실패로 답한다(반쯤 빈 피드로 덮어쓰면 골프장 페이지의 시세가 사라진다). ?dry=1 이면 쓰지 않고 결과만.
+async function handleGolfPrices(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { syncMembershipPrices } = await import("../../services/golfPriceSync.js");
+    const result = await syncMembershipPrices({ dryRun: req.query.dry === "1" });
+    if (!result.ok) {
+        console.error("[GolfPriceSync]", result.reason);
+        return sendError(res, 502, result.reason, "GOLF_PRICE_FEED");
+    }
+    return sendSuccess(res, result);
+}
+router.get("/golf-prices", asyncHandler(handleGolfPrices));
+router.post("/golf-prices", asyncHandler(handleGolfPrices));
+
 /** 알림함 보존 기간(오너 결정 2026-09-23). 읽은 것도 안 읽은 것도 이 날짜가 지나면 지운다. */
 const NOTIFICATION_KEEP_DAYS = 7;
 

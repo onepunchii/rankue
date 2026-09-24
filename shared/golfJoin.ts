@@ -141,6 +141,17 @@ export function recruitCondition(genders: readonly SlotGender[]): string {
 }
 
 /**
+ * 글의 정원 — 조인은 모집 자리 수(사람), 부킹은 1(팀). 서버 라우트(golf.ts joinCapacity)와
+ * 공개 골프장 페이지(golfCourses.ts)가 같은 값을 쓰게 여기 둔다.
+ */
+export function listingCapacity(b: { listingType?: string | null; slots?: unknown; joinHeadcount?: number | null; joinCondition?: string | null }): number {
+    if (b.listingType !== "JOIN") return 1;
+    const slots = Array.isArray(b.slots) ? normalizeSlots(b.slots) : null;
+    if (slots) return openSlotCount(slots);
+    return Number(b.joinHeadcount) > 0 ? Math.min(MAX_SLOTS - 1, Number(b.joinHeadcount)) : openSlotCount(slotsFromLegacy(b.joinHeadcount, b.joinCondition));
+}
+
+/**
  * 옛 글(자리 없음) 호환: 모집 인원과 조건 문자열로 자리를 만들어 준다.
  * 조건이 '남성'이면 모집 자리를 M, '여성'이면 F, 그 밖은 ANY. 호스트 성별은 모른다(ANY).
  */

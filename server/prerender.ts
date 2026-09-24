@@ -15,6 +15,12 @@ import {
   PBA_LANGS, pbaL10n,
 } from "../shared/pbaMeta.js";
 import { briefingLineKo, briefingDateKo, briefingTitle, briefingDesc, todayKst } from "../shared/briefingMeta.js";
+import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
+import {
+  GOLF_REGIONS, GOLF_INTENTS, REGION_LABEL, INTENT_LABEL, cityShort, coursePath, listPath, manwonText, wonShort, weekdayFee,
+  courseTitle, courseDescription, listTitle, listDescription, listingIntents, teePart, distinctAliases, type Fees, type GolfIntent,
+} from "../shared/golfCourse.js";
+import { JOIN_TYPE_LABEL, distanceKm, formatDistance, type JoinType } from "../shared/golfJoin.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
 //
@@ -95,6 +101,8 @@ function hubNav(lang = "ko"): string {
   const golfQ = lang === "en" ? "?lang=en" : "";
   const links: Array<[string, string]> = [
     [`/${q}`, H.home], [`/world-ranking${q}`, H.wr], [`/pba${q}`, H.pba], [`/golf-ranking${golfQ}`, H.golf],
+    // 골프장 허브(2026-09-24) — 골프 예약·시세는 한국 전용이라 한국어 문서에만 건다.
+    ...(lang === "ko" ? [["/golf/courses", "전국 골프장"] as [string, string]] : []),
     ["/stores", H.stores], ["/briefing", H.briefing], ["/community", H.community], [`/about${q}`, H.about], ["/support", H.support],
   ];
   return `<nav aria-label="RANKUE">${links.map(([href, label]) => `<a href="${href}">${esc(label)}</a>`).join(" · ")}</nav>`;
@@ -305,6 +313,638 @@ function aboutBody(c: AboutContent): string {
 
   <nav><a href="/">${esc(c.home)}</a> <a href="/support">${esc(c.support)}</a> <a href="/privacy">${esc(c.privacy)}</a></nav>
 </main>`;
+}
+
+// ── 골프장 페이지(2026-09-24) ─────────────────────────────────────
+//   /golf/course/:slug                   골프장 한 곳(정본) — 기본정보·그린피·회원권 시세·코스·소개·티타임·가까운 곳
+//   /golf/courses[/:region[/:city]]      목록 허브 — 항상 색인
+//   /golf/{booking|join|urgent}[/…]      의도 허브 — 글이 0건인 지역·시군 조합은 noindex(최상위는 항상 색인)
+// 제목·설명·주소·돈 표기는 전부 shared/golfCourse.ts — 화면(useSeo)·사이트맵과 같은 함수다.
+// 데이터에 없는 것(평점·난이도·잔디·사진·전화)은 그리지 않는다. 정적 목록의 그 값들은 가짜였다.
+// 이 페이지들은 네이버(Yeti)의 유일한 색인 경로다 — JS 를 돌리지 않으므로 여기 없는 글자는 네이버에 없다.
+type GolfSummary = Awaited<ReturnType<typeof loadGolfCourseSummary>>;
+type GolfPageRow = GolfSummary["pages"][number];
+type GolfListingRow = GolfSummary["listings"][number];
+/** 렌더 결과 — Express 없이 불러 검증할 수 있게 응답과 분리했다. */
+export interface GolfRender { status: 200 | 301 | 404; tag: string; html: string; location?: string }
+
+/** /golf/booking-list/… 같은 앱 화면은 걸리지 않는다(키워드 뒤가 '/' 또는 끝이어야 한다). */
+const GOLF_PAGE_RE = /^\/golf\/(?:course|courses|booking|join|urgent)(?:\/.*)?$/;
+
+/** 경로 한 조각 → 한글. 잘못된 퍼센트 인코딩은 null(=404). 맥의 NFD 한글도 NFC 로 접는다. */
+function golfDecode(seg: string): string | null {
+  try {
+    const s = decodeURIComponent(seg).normalize("NFC").trim();
+    return s || null;
+  } catch {
+    return null;
+  }
+}
+
+function golfGone(title: string, msg: string): GolfRender {
+  return {
+    status: 404, tag: "404",
+    html: `<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8" /><title>${esc(title)}</title>
+<meta name="robots" content="noindex, follow" /></head>
+<body><main><h1>${esc(title)}</h1><p>${esc(msg)}</p>
+<nav><a href="/golf/courses">전국 골프장</a> <a href="/">홈으로</a></nav></main></body>
+</html>
+`,
+  };
+}
+
+const KST_DOW = ["일", "월", "화", "수", "목", "금", "토"];
+const pad2 = (n: number) => String(n).padStart(2, "0");
+/** 티타임 표기 — "9월 28일(일) 06:34". golf_bookings.datetime 은 UTC 라 +9h 해서 읽는다. */
+function kstTeeText(iso: string): string {
+  const d = new Date(new Date(iso).getTime() + 9 * 3600_000);
+  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${KST_DOW[d.getUTCDay()]}) ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+}
+/** "1986-10-04" → "1986년 10월 4일" */
+function dateKo(ymd: unknown): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd ?? ""));
+  return m ? `${Number(m[1])}년 ${Number(m[2])}월 ${Number(m[3])}일` : "";
+}
+const wonFull = (n: unknown) => (typeof n === "number" && n > 0 ? `${n.toLocaleString("ko-KR")}원` : "");
+const golfFees = (p: GolfPageRow): Fees | null => (p.fees && Array.isArray(p.fees.rows) ? (p.fees as Fees) : null);
+const golfWhere = (region: string | null, city: string | null) =>
+  city ? `${REGION_LABEL[region ?? ""] ?? region ?? ""} ${cityShort(city)}`.trim() : region ? (REGION_LABEL[region] ?? region) : "전국";
+/** "18홀 회원제" · 여러 부면 "27홀(회원제 18홀 · 대중제 9홀)" */
+function golfShape(p: GolfPageRow): string {
+  const parts: { kind?: string; holes?: number | null }[] = Array.isArray(p.parts) ? p.parts : [];
+  if (parts.length > 1) {
+    const inner = parts.map((x) => [x.kind, x.holes ? `${x.holes}홀` : ""].filter(Boolean).join(" ")).join(" · ");
+    return p.holes ? `${p.holes}홀(${inner})` : inner;
+  }
+  return [p.holes ? `${p.holes}홀` : "", p.kind ?? ""].filter(Boolean).join(" ");
+}
+
+/** 글 한 줄 — "9월 28일(일) 06:34 · 1부 · 조인 · 27만원 · 빈자리 2". 연락처·글쓴이는 공개 요약에 애초에 없다. */
+function golfListingText(l: GolfListingRow): string {
+  const jt = l.joinType as JoinType | null | undefined;
+  const kind = l.listingType === "JOIN" ? `조인${jt && jt !== "FIELD" && JOIN_TYPE_LABEL[jt] ? `(${JOIN_TYPE_LABEL[jt]})` : ""}` : "부킹";
+  const bits = [kstTeeText(l.datetime), `${teePart(l.datetime)}부`, kind];
+  if (l.isUrgent) bits.push("긴급");
+  const fee = l.costMode === "SPLIT" ? "1/N" : wonShort(l.greenFee);
+  if (fee) bits.push(fee);
+  if (l.listingType === "JOIN") {
+    const left = Math.max(0, (l.joinCapacity ?? 0) - (l.joinApplied ?? 0));
+    bits.push(left ? `빈자리 ${left}` : "마감");
+  }
+  return bits.join(" · ");
+}
+
+/**
+ * 이름·슬러그가 빈 행은 싣지 않는다(적재 데이터에 슬러그 ''·이름 '' 인 행이 실제로 있다 — 링크가 /golf/course/ 가 된다).
+ * 그 골프장의 글도 같이 뺀다. 한 곳 조회(bySlug)는 그대로 — 빈 슬러그는 애초에 경로로 들어올 수 없다.
+ */
+const golfPageOk = (p: GolfPageRow | undefined): p is GolfPageRow => !!p && !!p.slug && !!p.name?.trim();
+function golfView(raw: GolfSummary): GolfSummary {
+  return { ...raw, pages: raw.pages.filter(golfPageOk), listings: raw.listings.filter((l) => golfPageOk(raw.bySlug.get(l.slug))) };
+}
+
+/** 한 번의 렌더에서 여러 번 쓰는 골프장별 글 묶음. */
+function golfListingsBySlug(s: GolfSummary): Map<string, GolfListingRow[]> {
+  const m = new Map<string, GolfListingRow[]>();
+  for (const l of s.listings) {
+    const a = m.get(l.slug);
+    if (a) a.push(l); else m.set(l.slug, [l]);
+  }
+  return m;
+}
+
+/** 목록 정렬 — API(/golf-courses)와 같은 무게: 지금 글이 있는 곳 → 시세·그린피가 있는 곳 → 이름. */
+function golfSort(s: GolfSummary, pages: GolfPageRow[], byListing: Map<string, GolfListingRow[]>, now: number, intent: GolfIntent | null): GolfPageRow[] {
+  const w = (p: GolfPageRow) => {
+    const ls = byListing.get(p.slug) ?? [];
+    const n = intent ? ls.filter((l) => listingIntents(l, now).includes(intent)).length : ls.length;
+    return n * 1000 + (s.top.has(p.slug) ? 10 : 0) + (golfFees(p) ? 5 : 0);
+  };
+  return [...pages].sort((a, b) => w(b) - w(a) || a.name.localeCompare(b.name, "ko"));
+}
+
+/** 목록의 골프장 한 줄 — 이름 링크 + 시군·규모·주중 그린피·대표 시세·지금 글 수. */
+function golfCourseLi(s: GolfSummary, p: GolfPageRow, byListing: Map<string, GolfListingRow[]>, opts: { where?: boolean; km?: number | null } = {}): string {
+  const bits: string[] = [];
+  if (opts.where) bits.push(golfWhere(p.region, p.city));
+  else if (p.city) bits.push(cityShort(p.city));
+  const shape = [p.holes ? `${p.holes}홀` : "", p.kind ?? ""].filter(Boolean).join(" ");
+  if (shape) bits.push(shape);
+  const fee = weekdayFee(golfFees(p));
+  if (fee) bits.push(`주중 그린피 ${wonShort(fee)}`);
+  else if (p.feeFrom) bits.push(`그린피 ${wonShort(p.feeFrom)}부터`);
+  if (p.grass?.length) bits.push(p.grass.join("·"));
+  const t = s.top.get(p.slug);
+  if (t) bits.push(`회원권 ${manwonText(t.price)}`);
+  const n = byListing.get(p.slug)?.length ?? 0;
+  if (n) bits.push(`티타임 ${n}건`);
+  if (opts.km != null) bits.push(formatDistance(opts.km));
+  return `<li><a href="${esc(coursePath(p.slug))}">${esc(p.name)}</a>${bits.length ? ` — ${esc(bits.join(" · "))}` : ""}</li>`;
+}
+
+/** 허브 글 목록 한 줄 — 골프장 링크 + 글 요약. */
+function golfListingLi(s: GolfSummary, l: GolfListingRow, withCourse: boolean): string {
+  const p = s.bySlug.get(l.slug);
+  const head = withCourse && p ? `<a href="${esc(coursePath(p.slug))}">${esc(p.name)}</a> — ` : "";
+  return `<li>${head}${esc(golfListingText(l))}</li>`;
+}
+
+// ── 범위(전국 · 지역 · 시군) ──────────────────────────────────────
+interface GolfScope { region: string | null; city: string | null; short: string | null; pages: GolfPageRow[] }
+const golfInScope = (p: GolfPageRow, sc: { region: string | null; short: string | null }) =>
+  (!sc.region || p.region === sc.region) && (!sc.short || (!!p.city && cityShort(p.city) === sc.short));
+
+/**
+ * 경로 조각 → 범위. 없는 지역·시군은 null(404). 시군을 긴 꼴("이천시")로 쓰면 짧은 꼴 주소로 보낸다(301) —
+ * 같은 목록이 주소 두 개로 색인되면 구글이 하나를 버린다.
+ */
+function golfScope(s: GolfSummary, segs: string[], intent: GolfIntent | null): GolfScope | { redirect: string } | null {
+  if (segs.length > 2) return null;
+  const decoded = segs.map(golfDecode);
+  if (decoded.some((x) => x == null)) return null;
+  const [region, city] = decoded as string[];
+  if (!region) return { region: null, city: null, short: null, pages: s.pages };
+  if (!(GOLF_REGIONS as readonly string[]).includes(region)) return null;
+  const inRegion = s.pages.filter((p) => p.region === region);
+  if (!inRegion.length) return null;
+  if (!city) return { region, city: null, short: null, pages: inRegion };
+  const hit = inRegion.filter((p) => p.city && cityShort(p.city) === city);
+  if (hit.length) return { region, city: hit[0].city, short: city, pages: hit };
+  const long = inRegion.find((p) => p.city === city);
+  if (long) return { redirect: `${ORIGIN}${listPath({ intent, region, city: long.city })}` };
+  return null;
+}
+
+/** 범위 안의 글(의도가 있으면 그 의도만). */
+function golfScopeListings(s: GolfSummary, sc: { region: string | null; short: string | null }, intent: GolfIntent | null, now: number): GolfListingRow[] {
+  return s.listings.filter((l) => {
+    const p = s.bySlug.get(l.slug);
+    if (!p || !golfInScope(p, sc)) return false;
+    return !intent || listingIntents(l, now).includes(intent);
+  });
+}
+
+/**
+ * 의도 허브 링크 — 이 범위에 그 의도의 글이 있으면 그 범위로, 없으면 한 단계씩 넓힌다(최상위는 항상 색인).
+ * noindex 페이지로 크롤 예산을 흘리지 않고, 링크 글자가 곧 검색어("이천 골프 조인·동반자 모집")가 된다.
+ */
+function golfIntentLinks(s: GolfSummary, sc: { region: string | null; city: string | null; short: string | null }, now: number, except?: GolfIntent): string {
+  const links = GOLF_INTENTS.filter((i) => i !== except).map((intent) => {
+    const tries: { region: string | null; city: string | null; short: string | null }[] = [];
+    if (sc.short) tries.push(sc);
+    if (sc.region) tries.push({ region: sc.region, city: null, short: null });
+    tries.push({ region: null, city: null, short: null });
+    for (const t of tries) {
+      const n = golfScopeListings(s, t, intent, now).length;
+      if (n || (!t.region && !t.short)) {
+        const o = { intent, region: t.region, city: t.city };
+        return `<a href="${esc(listPath(o))}">${esc(listTitle(o).split(" | ")[0])}</a>${n ? ` (${n})` : ""}`;
+      }
+    }
+    return "";
+  }).filter(Boolean);
+  return links.join(" · ");
+}
+
+/** 보이는 경로 표시 + BreadcrumbList. 마지막 칸은 현재 페이지(링크 없음). */
+function golfCrumbs(items: { name: string; path: string }[]): { html: string; ld: unknown } {
+  const html = `<nav aria-label="경로">${items.map((c, i) => i === items.length - 1 ? esc(c.name) : `<a href="${esc(c.path)}">${esc(c.name)}</a>`).join(" › ")}</nav>`;
+  const ld = {
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: `${ORIGIN}${c.path}` })),
+  };
+  return { html, ld };
+}
+
+const golfImage = (alt: string) => ({ url: OG_IMAGE, width: 1200, height: 630, alt });
+
+// ── /golf/course/:slug ────────────────────────────────────────────
+async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): Promise<GolfRender> {
+  const slug = golfDecode(rawSlug);
+  if (!slug) return golfGone("골프장을 찾을 수 없습니다.", "요청한 골프장 정보가 없습니다.");
+  const p = s.bySlug.get(slug);
+  if (!p) {
+    // 옛 주소(/golf/course/74 — 정적 목록 id) → 슬러그 정본으로
+    const old = /^\d{1,6}$/.test(slug) ? s.byCourseId.get(Number(slug)) : undefined;
+    if (old) return { status: 301, tag: "golf-course:301", html: "", location: `${ORIGIN}${coursePath(old.slug)}` };
+    return golfGone("골프장을 찾을 수 없습니다.", "요청한 골프장 정보가 없습니다.");
+  }
+  const rows = async (x: any) => { const r: any = await db.execute(x); return (r.rows ?? r) as any[]; };
+  const [prices, hist, rounds] = await Promise.all([
+    rows(sql`select item_id, label, price, change, year_high, year_low, as_of::text as as_of
+             from golf_membership_prices where slug = ${slug} order by price desc`),
+    rows(sql`select h.item_id, h.d::text as d, h.price from golf_membership_price_history h
+             join golf_membership_prices m on m.item_id = h.item_id
+             where m.slug = ${slug} and h.d > current_date - interval '400 days' order by h.item_id, h.d`),
+    p.clubId
+      ? rows(sql`select count(*)::int n from golf_match_sessions where course_id = ${p.clubId} and status = 'finished'`).catch(() => [{ n: 0 }])
+      : Promise.resolve([{ n: 0 }]),
+  ]);
+  const byListing = golfListingsBySlug(s);
+  const listings = byListing.get(slug) ?? [];
+  const top = s.top.get(slug);
+  const fees = golfFees(p);
+  const facts = {
+    name: p.name, region: p.region, city: p.city, kind: p.kind, holes: p.holes, fees, topPrice: top?.price ?? null, listingCount: listings.length,
+    feeFrom: p.feeFrom, grass: p.grass, play: p.play, aliases: p.aliases,
+  };
+  const title = courseTitle(facts);
+  const desc = courseDescription(facts);
+  const canonical = `${ORIGIN}${coursePath(slug)}`;
+  const regionName = REGION_LABEL[p.region] ?? p.region;
+  const short = p.city ? cityShort(p.city) : null;
+  const crumbs = golfCrumbs([
+    { name: "전국 골프장", path: listPath() },
+    { name: regionName, path: listPath({ region: p.region }) },
+    ...(p.city ? [{ name: short!, path: listPath({ region: p.region, city: p.city }) }] : []),
+    { name: p.name, path: coursePath(slug) },
+  ]);
+
+  // 기본 정보
+  const info = (p.info ?? {}) as { opened?: string | null; members?: number | null; homepage?: string | null; membershipTypes?: string | null; membershipNotes?: string | null };
+  const siteRaw = p.website || info.homepage;
+  const homepage = typeof siteRaw === "string" && /^https?:\/\/[^\s"<>]+$/i.test(siteRaw) ? siteRaw : null;
+  const PLAY_KO: Record<string, string> = { "3인가능": "3인 플레이 가능", "2인가능": "2인 플레이 가능", 노캐디: "노캐디" };
+  const watchers = s.watchers.get(slug) ?? 0;
+  const nRounds = Number(rounds[0]?.n ?? 0);
+  const dl: [string, string][] = [
+    ["다른 이름", distinctAliases(p.name, p.aliases).join(" · ")],
+    ["지역", golfWhere(p.region, p.city)],
+    ["주소", p.address ?? ""],
+    ["대표 전화", p.phone ?? ""],
+    ["규모", golfShape(p)],
+    ["잔디", (p.grass ?? []).join(" · ")],
+    ["플레이", (p.play ?? []).map((x) => PLAY_KO[x] ?? x).join(" · ")],
+    ["그린피", !weekdayFee(fees) && p.feeFrom ? `${wonShort(p.feeFrom)}부터` : ""],
+    ["개장", dateKo(info.opened)],
+    ["회원 수", info.members ? `${info.members.toLocaleString("ko-KR")}명` : ""],
+    ["회원권 종류", info.membershipTypes ?? ""],
+    ["회원권 참고", info.membershipNotes ?? ""],
+    ["랭큐매치 라운드", nRounds ? `${nRounds.toLocaleString("ko-KR")}회` : ""],
+    ["관심 등록", watchers ? `${watchers.toLocaleString("ko-KR")}명` : ""],
+  ];
+  const dlHtml = dl.filter(([, v]) => v).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("\n    ");
+  const mapHtml = p.lat != null && p.lng != null
+    ? `<p><a href="${esc(`https://map.kakao.com/link/map/${encodeURIComponent(p.name)},${p.lat},${p.lng}`)}" rel="noopener">카카오맵에서 보기</a> · <a href="${esc(`https://map.kakao.com/link/to/${encodeURIComponent(p.name)},${p.lat},${p.lng}`)}" rel="noopener">길찾기</a>${homepage ? ` · <a href="${esc(homepage)}" rel="noopener">공식 홈페이지</a>` : ""}</p>`
+    : homepage ? `<p><a href="${esc(homepage)}" rel="noopener">공식 홈페이지</a></p>` : "";
+
+  // 그린피 표 — 값이 하나도 없는 열은 뺀다
+  let feeHtml = "";
+  const feeRows = fees?.rows ?? [];
+  if (feeRows.length) {
+    const cols = ([["nonMember", "비회원"], ["member", "회원"], ["family", "가족"]] as const).filter(([k]) => feeRows.some((r) => (r[k] ?? 0) > 0));
+    const extra = [fees?.extra?.caddie ? `캐디피 ${wonFull(fees.extra.caddie)}` : "", fees?.extra?.cart ? `카트비 ${wonFull(fees.extra.cart)}` : ""].filter(Boolean);
+    if (cols.length) {
+      feeHtml = `
+  <h2>${esc(p.name)} 그린피</h2>
+  <table>
+    <caption>1인 그린피</caption>
+    <thead><tr><th scope="col">구분</th>${cols.map(([, l]) => `<th scope="col">${l}</th>`).join("")}</tr></thead>
+    <tbody>
+    ${feeRows.map((r) => `<tr><th scope="row">${esc(r.day)}</th>${cols.map(([k]) => `<td>${esc(wonFull(r[k]) || "—")}</td>`).join("")}</tr>`).join("\n    ")}
+    </tbody>
+  </table>${extra.length ? `\n  <p>${esc(extra.join(" · "))}</p>` : ""}`;
+    }
+  }
+
+  // 회원권 시세 — 종목별 현재가·직전 대비·1년 최고/최저·기록 시작 이후 변동 + 월별 표
+  let priceHtml = "";
+  if (prices.length) {
+    const byItem = new Map<string, { d: string; p: number }[]>();
+    for (const h of hist) {
+      const a = byItem.get(h.item_id);
+      const pt = { d: String(h.d).slice(0, 10), p: Number(h.price) };
+      if (a) a.push(pt); else byItem.set(h.item_id, [pt]);
+    }
+    const changeText = (c: unknown) => {
+      if (c == null) return "—";
+      const n = Number(c);
+      return n === 0 ? "보합" : n > 0 ? `▲ ${manwonText(n)}` : `▼ ${manwonText(-n)}`;
+    };
+    const sinceText = (m: any) => {
+      const first = byItem.get(m.item_id)?.[0];
+      if (!first || !first.p || !m.as_of || first.d >= m.as_of) return "—";
+      const pct = ((Number(m.price) - first.p) / first.p) * 100;
+      const pctText = Math.abs(pct) < 0.05 ? "변동 없음" : `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
+      return `${pctText} (${first.d.replace(/-/g, ".")}부터)`;
+    };
+    const asOf = prices.map((m) => m.as_of).filter(Boolean).sort().pop();
+    // 월별: 그 달의 마지막 기록(이번 달은 최근가). 최근 13개월.
+    const months = new Map<string, Map<string, number>>();
+    for (const [item, arr] of byItem) for (const x of arr) {
+      const ym = x.d.slice(0, 7);
+      if (!months.has(ym)) months.set(ym, new Map());
+      months.get(ym)!.set(item, x.p);
+    }
+    const yms = [...months.keys()].sort().reverse().slice(0, 13);
+    const monthly = yms.length >= 2
+      ? `
+  <h3>월별 시세</h3>
+  <table>
+    <thead><tr><th scope="col">월</th>${prices.map((m) => `<th scope="col">${esc(m.label)}</th>`).join("")}</tr></thead>
+    <tbody>
+    ${yms.map((ym) => `<tr><th scope="row">${Number(ym.slice(0, 4))}년 ${Number(ym.slice(5, 7))}월</th>${prices.map((m) => `<td>${esc(manwonText(months.get(ym)!.get(m.item_id)) || "—")}</td>`).join("")}</tr>`).join("\n    ")}
+    </tbody>
+  </table>`
+      : "";
+    priceHtml = `
+  <h2>${esc(p.name)} 회원권 시세</h2>
+  <table>
+    <caption>${asOf ? `${esc(dateKo(asOf))} 기준` : "회원권 시세"}</caption>
+    <thead><tr><th scope="col">종목</th><th scope="col">현재가</th><th scope="col">직전 대비</th><th scope="col">연중 최고</th><th scope="col">연중 최저</th><th scope="col">추이</th></tr></thead>
+    <tbody>
+    ${prices.map((m) => `<tr><th scope="row">${esc(m.label)}</th><td>${esc(manwonText(m.price) || "—")}</td><td>${esc(changeText(m.change))}</td><td>${esc(manwonText(m.year_high) || "—")}</td><td>${esc(manwonText(m.year_low) || "—")}</td><td>${esc(sinceText(m))}</td></tr>`).join("\n    ")}
+    </tbody>
+  </table>${monthly}`;
+  }
+
+  // 코스(파)
+  let courseHtml = "";
+  const courses: { name?: string; par?: number; holes?: number }[] = Array.isArray(p.courses) ? p.courses : [];
+  if (courses.length) {
+    const holes = courses.reduce((a, c) => a + (Number(c.holes) || 0), 0);
+    // 파 합계는 18홀일 때만 — 27홀 코스의 "파 108" 은 참이지만 아무도 그렇게 치지 않는다
+    const par = courses.reduce((a, c) => a + (Number(c.par) || 0), 0);
+    courseHtml = `
+  <h2>코스</h2>
+  <ul>
+  ${courses.map((c) => `<li>${esc(c.name ?? "")}${[c.holes ? `${c.holes}홀` : "", c.par ? `파 ${c.par}` : ""].filter(Boolean).length ? ` — ${esc([c.holes ? `${c.holes}홀` : "", c.par ? `파 ${c.par}` : ""].filter(Boolean).join(" · "))}` : ""}</li>`).join("\n  ")}
+  </ul>${courses.length > 1 && holes ? `\n  <p>${esc(`코스 ${courses.length}개 · 총 ${holes}홀${holes === 18 && par ? ` · 파 ${par}` : ""}`)}</p>` : ""}`;
+  }
+
+  const introHtml = p.intro ? `\n  <h2>${esc(p.name)} 소개</h2>\n  <p>${esc(p.intro)}</p>` : "";
+
+  // 지금 올라온 티타임
+  const listingHtml = listings.length
+    ? `\n  <h2>지금 올라온 티타임 ${listings.length}건</h2>\n  <ul>\n  ${listings.slice(0, 40).map((l) => golfListingLi(s, l, false)).join("\n  ")}\n  </ul>`
+    : "";
+
+  // 가까운 골프장 8곳 — 좌표가 있으면 거리순, 없으면 같은 시군 → 같은 지역
+  let near: { x: GolfPageRow; km: number | null }[] = [];
+  if (p.lat != null && p.lng != null) {
+    near = s.pages.filter((x) => x.slug !== slug && x.lat != null && x.lng != null)
+      .map((x) => ({ x, km: distanceKm(p.lat!, p.lng!, x.lat!, x.lng!) }))
+      .sort((a, b) => a.km! - b.km!).slice(0, 8);
+  } else {
+    const same = s.pages.filter((x) => x.slug !== slug && x.region === p.region);
+    near = [...same.filter((x) => p.city && x.city === p.city), ...same.filter((x) => !p.city || x.city !== p.city)].slice(0, 8).map((x) => ({ x, km: null }));
+  }
+  const nearHtml = near.length
+    ? `\n  <h2>${esc(p.name)} 가까운 골프장</h2>\n  <ul>\n  ${near.map(({ x, km }) => golfCourseLi(s, x, byListing, { where: true, km })).join("\n  ")}\n  </ul>`
+    : "";
+
+  const scope = { region: p.region, city: p.city, short };
+  const cityCount = p.city ? s.pages.filter((x) => golfInScope(x, { region: p.region, short })).length : 0;
+  const regionCount = s.pages.filter((x) => x.region === p.region).length;
+  const hubHtml = `
+  <h2>더 찾아보기</h2>
+  <nav aria-label="골프장 목록">${p.city ? `<a href="${esc(listPath({ region: p.region, city: p.city }))}">${esc(short!)} 골프장 ${cityCount}곳</a> · ` : ""}<a href="${esc(listPath({ region: p.region }))}">${esc(regionName)} 골프장 ${regionCount}곳</a> · <a href="${esc(listPath())}">전국 골프장 ${s.pages.length}곳</a></nav>
+  <nav aria-label="티타임">${golfIntentLinks(s, scope, now)}</nav>`;
+
+  // 구조화 데이터 — 데이터에 있는 것만. 평점·리뷰 수는 없다(지어내면 구글 구조화 데이터 정책 위반).
+  const feeVals = feeRows.map((r) => r.nonMember).filter((v): v is number => typeof v === "number" && v > 0);
+  // 1/N(총액을 나누는 글)은 1인 값이 아니라 가격 범위에서 뺀다
+  const priced = listings.filter((l) => l.costMode !== "SPLIT").map((l) => Number(l.greenFee)).filter(l0);
+  const course: Record<string, unknown> = {
+    "@type": "GolfCourse",
+    "@id": `${canonical}#course`,
+    name: p.name,
+    ...(distinctAliases(p.name, p.aliases).length ? { alternateName: distinctAliases(p.name, p.aliases) } : {}),
+    url: canonical,
+    description: desc,
+    ...(p.logo ? { logo: `${ORIGIN}${p.logo}`, image: `${ORIGIN}${p.logo}` } : {}),
+    ...(p.phone ? { telephone: p.phone } : {}),
+    // addressRegion 은 넣지 않는다 — 우리 지역은 '경상·전라' 같은 묶음이라 행정구역으로 적으면 거짓이다(2026-09-24 검토).
+    address: {
+      "@type": "PostalAddress",
+      addressCountry: "KR",
+      ...(p.city ? { addressLocality: p.city } : {}),
+      ...(p.address ? { streetAddress: p.address } : {}),
+    },
+    ...(p.lat != null && p.lng != null ? { geo: { "@type": "GeoCoordinates", latitude: p.lat, longitude: p.lng } } : {}),
+    ...(homepage ? { sameAs: homepage } : {}),
+    ...(/^\d{4}-\d{2}-\d{2}$/.test(String(info.opened ?? "")) ? { foundingDate: info.opened } : {}),
+    ...(feeVals.length ? { priceRange: Math.min(...feeVals) === Math.max(...feeVals) ? wonShort(feeVals[0]) : `${wonShort(Math.min(...feeVals))}~${wonShort(Math.max(...feeVals))}` } : {}),
+    ...(priced.length
+      ? { makesOffer: { "@type": "AggregateOffer", priceCurrency: "KRW", lowPrice: Math.min(...priced), highPrice: Math.max(...priced), offerCount: priced.length, url: canonical } }
+      : {}),
+  };
+
+  const html = page({
+    title,
+    desc,
+    canonical,
+    image: golfImage(`${p.name} — 랭큐 골프`),
+    jsonLd: [{ "@context": "https://schema.org", "@graph": [course, crumbs.ld] }],
+    body: `<main>
+  ${crumbs.html}
+  ${p.logo ? `<img src="${esc(p.logo)}" alt="${esc(`${p.name} 로고`)}" width="160" height="56" loading="eager">` : ""}
+  <h1>${esc(p.name)}</h1>
+  <p>${esc(desc)}</p>
+  <h2>${esc(p.name)} 기본 정보</h2>
+  <dl>
+    ${dlHtml}
+  </dl>
+  ${mapHtml}${listingHtml}${feeHtml}${priceHtml}${courseHtml}${introHtml}${nearHtml}${hubHtml}
+  ${hubNav("ko")}
+</main>`,
+  });
+  return { status: 200, tag: `golf-course:${encodeURIComponent(slug)}`, html };
+}
+/** 티타임 그린피로 믿을 만한 값(1천원~200만원). 입력 실수(27 → 27원)가 가격 범위를 망치지 않게. */
+function l0(v: number): boolean { return Number.isFinite(v) && v >= 1000 && v <= 2_000_000; }
+
+// ── /golf/courses[/:region[/:city]] ──────────────────────────────
+function renderGolfList(s: GolfSummary, sc: GolfScope, now: number): GolfRender {
+  const byListing = golfListingsBySlug(s);
+  const live = golfScopeListings(s, sc, null, now);
+  const o = { region: sc.region, city: sc.city };
+  const title = listTitle(o);
+  const desc = listDescription({ ...o, courseCount: sc.pages.length, listingCount: live.length });
+  const canonical = `${ORIGIN}${listPath(o)}`;
+  const where = sc.short ?? (sc.region ? (REGION_LABEL[sc.region] ?? sc.region) : "전국");
+  const crumbs = golfCrumbs([
+    { name: "전국 골프장", path: listPath() },
+    ...(sc.region ? [{ name: REGION_LABEL[sc.region] ?? sc.region, path: listPath({ region: sc.region }) }] : []),
+    ...(sc.city ? [{ name: sc.short!, path: listPath(o) }] : []),
+  ]);
+  const sorted = golfSort(s, sc.pages, byListing, now, null);
+  const ul = (ps: GolfPageRow[]) => `<ul>\n  ${ps.map((p) => golfCourseLi(s, p, byListing)).join("\n  ")}\n  </ul>`;
+  /** 한 지역의 시군 링크 — 골프장 많은 순. */
+  const cityLinks = (region: string, current?: string | null) => {
+    const m = new Map<string, { city: string; n: number }>();
+    for (const p of s.pages) if (p.region === region && p.city) {
+      const k = cityShort(p.city);
+      const e = m.get(k);
+      if (e) e.n++; else m.set(k, { city: p.city, n: 1 });
+    }
+    return [...m.entries()].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0], "ko"))
+      .map(([k, v]) => k === current ? `<strong>${esc(k)}</strong> (${v.n})` : `<a href="${esc(listPath({ region, city: v.city }))}">${esc(k)} 골프장</a> (${v.n})`).join(" · ");
+  };
+
+  let listHtml = "";
+  if (!sc.region) {
+    // 전국: 지역마다 절 하나 — 시군 링크 + 골프장 전부
+    listHtml = GOLF_REGIONS.map((r) => {
+      const ps = sorted.filter((p) => p.region === r);
+      if (!ps.length) return "";
+      return `
+  <h2><a href="${esc(listPath({ region: r }))}">${esc(REGION_LABEL[r] ?? r)} 골프장</a> ${ps.length}곳</h2>
+  <p>${cityLinks(r)}</p>
+  ${ul(ps)}`;
+    }).join("");
+  } else if (!sc.city) {
+    // 지역: 시군 링크 → 시군별 골프장
+    const groups = new Map<string, GolfPageRow[]>();
+    for (const p of sorted) {
+      const k = p.city ? cityShort(p.city) : "";
+      const a = groups.get(k);
+      if (a) a.push(p); else groups.set(k, [p]);
+    }
+    const keys = [...groups.keys()].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || groups.get(b)!.length - groups.get(a)!.length || a.localeCompare(b, "ko"));
+    listHtml = `
+  <h2>${esc(where)} 시군별 골프장</h2>
+  <p>${cityLinks(sc.region)}</p>
+  <h2>${esc(where)} 골프장 목록</h2>
+  ${keys.map((k) => {
+      const ps = groups.get(k)!;
+      const head = k ? `<a href="${esc(listPath({ region: sc.region, city: ps[0].city }))}">${esc(k)}</a> ${ps.length}곳` : `그 밖의 골프장 ${ps.length}곳`;
+      return `<h3>${head}</h3>\n  ${ul(ps)}`;
+    }).join("\n  ")}`;
+  } else {
+    listHtml = `
+  <h2>${esc(sc.short!)} 골프장 목록</h2>
+  ${ul(sorted)}
+  <h2>${esc(REGION_LABEL[sc.region] ?? sc.region)}의 다른 시군</h2>
+  <p>${cityLinks(sc.region, sc.short)}</p>`;
+  }
+  const otherRegions = sc.region
+    ? `\n  <h2>다른 지역 골프장</h2>\n  <p>${GOLF_REGIONS.filter((r) => r !== sc.region && s.pages.some((p) => p.region === r)).map((r) => `<a href="${esc(listPath({ region: r }))}">${esc(REGION_LABEL[r] ?? r)} 골프장</a>`).join(" · ")}</p>`
+    : "";
+  const liveHtml = live.length
+    ? `\n  <h2>지금 올라온 티타임 ${live.length}건</h2>\n  <ul>\n  ${live.slice(0, 30).map((l) => golfListingLi(s, l, true)).join("\n  ")}\n  </ul>`
+    : "";
+
+  const html = page({
+    title,
+    desc,
+    canonical,
+    image: golfImage(`${where} 골프장 — 랭큐 골프`),
+    jsonLd: [{
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "ItemList",
+          name: `${where} 골프장`,
+          numberOfItems: sorted.length,
+          itemListElement: sorted.map((p, i) => ({ "@type": "ListItem", position: i + 1, name: p.name, url: `${ORIGIN}${coursePath(p.slug)}` })),
+        },
+        crumbs.ld,
+      ],
+    }],
+    body: `<main>
+  ${crumbs.html}
+  <h1>${esc(where)} 골프장 ${sc.pages.length}곳</h1>
+  <p>${esc(desc)}</p>${liveHtml}${listHtml}
+  <h2>${esc(where)} 티타임</h2>
+  <nav aria-label="티타임">${golfIntentLinks(s, sc, now)}</nav>${otherRegions}
+  ${hubNav("ko")}
+</main>`,
+  });
+  return { status: 200, tag: `golf-courses:${encodeURIComponent(sc.short ?? sc.region ?? "all")}`, html };
+}
+
+// ── /golf/{booking|join|urgent}[/:region[/:city]] ────────────────
+function renderGolfIntent(s: GolfSummary, intent: GolfIntent, sc: GolfScope, now: number): GolfRender {
+  const byListing = golfListingsBySlug(s);
+  const live = golfScopeListings(s, sc, intent, now);
+  const o = { intent, region: sc.region, city: sc.city };
+  const title = listTitle(o);
+  const desc = listDescription({ ...o, courseCount: sc.pages.length, listingCount: live.length });
+  const canonical = `${ORIGIN}${listPath(o)}`;
+  const where = sc.short ?? (sc.region ? (REGION_LABEL[sc.region] ?? sc.region) : "전국");
+  const label = INTENT_LABEL[intent];
+  // 빈 조합(지역·시군 × 의도)을 색인시키면 거의 같은 빈 페이지 수백 장이 된다 — 사이트 전체 품질 신호를 끌어내린다.
+  const noindex = !!sc.region && live.length === 0;
+  const crumbs = golfCrumbs([
+    { name: `전국 ${label}`, path: listPath({ intent }) },
+    ...(sc.region ? [{ name: REGION_LABEL[sc.region] ?? sc.region, path: listPath({ intent, region: sc.region }) }] : []),
+    ...(sc.city ? [{ name: sc.short!, path: listPath(o) }] : []),
+  ]);
+  const liveHtml = live.length
+    ? `\n  <h2>${esc(where)} ${esc(label)} ${live.length}건</h2>\n  <ul>\n  ${live.slice(0, 100).map((l) => golfListingLi(s, l, true)).join("\n  ")}\n  </ul>`
+    : "";
+  // 아래 범위(지역·시군) 중 그 의도의 글이 있는 곳만 — 빈 조합은 noindex 라 링크하지 않는다.
+  let subHtml = "";
+  if (!sc.city) {
+    const subs: { name: string; path: string; n: number }[] = [];
+    if (!sc.region) {
+      for (const r of GOLF_REGIONS) {
+        const n = golfScopeListings(s, { region: r, short: null }, intent, now).length;
+        if (n) subs.push({ name: REGION_LABEL[r] ?? r, path: listPath({ intent, region: r }), n });
+      }
+    } else {
+      const seen = new Set<string>();
+      for (const p of sc.pages) {
+        if (!p.city) continue;
+        const k = cityShort(p.city);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const n = golfScopeListings(s, { region: sc.region, short: k }, intent, now).length;
+        if (n) subs.push({ name: k, path: listPath({ intent, region: sc.region, city: p.city }), n });
+      }
+    }
+    if (subs.length) subHtml = `\n  <h2>${esc(sc.region ? "시군별" : "지역별")} ${esc(label)}</h2>\n  <p>${subs.sort((a, b) => b.n - a.n).map((x) => `<a href="${esc(x.path)}">${esc(x.name)} ${esc(label)}</a> (${x.n})`).join(" · ")}</p>`;
+  }
+  // 이 범위의 골프장 — 전국은 앞의 60곳만(전부는 /golf/courses 가 싣는다)
+  const sorted = golfSort(s, sc.pages, byListing, now, intent);
+  const shown = sc.region ? sorted : sorted.slice(0, 60);
+  const coursesHtml = `
+  <h2>${esc(where)} 골프장</h2>
+  <ul>
+  ${shown.map((p) => golfCourseLi(s, p, byListing, { where: !sc.region })).join("\n  ")}
+  </ul>
+  <p><a href="${esc(listPath({ region: sc.region, city: sc.city }))}">${esc(where)} 골프장 ${sc.pages.length}곳 전체</a></p>`;
+  const html = page({
+    title,
+    desc,
+    canonical,
+    noindex,
+    image: golfImage(`${title.split(" | ")[0]} — 랭큐 골프`),
+    jsonLd: [{ "@context": "https://schema.org", "@graph": [crumbs.ld] }],
+    body: `<main>
+  ${crumbs.html}
+  <h1>${esc(title.split(" | ")[0])}</h1>
+  <p>${esc(desc)}</p>${liveHtml}${subHtml}${coursesHtml}
+  <h2>다른 티타임</h2>
+  <nav aria-label="티타임">${golfIntentLinks(s, sc, now, intent)}</nav>
+  ${hubNav("ko")}
+</main>`,
+  });
+  return { status: 200, tag: `golf-${intent}:${encodeURIComponent(sc.short ?? sc.region ?? "all")}${noindex ? ":noindex" : ""}`, html };
+}
+
+/**
+ * 골프장 페이지 경로 하나를 렌더한다(검증 스크립트가 Express 없이 부른다). pathname 은 **인코딩된 그대로**(req.path).
+ * DB 예외는 그대로 던진다 — 부른 쪽이 503 으로 바꾼다(404 로 내면 일시 장애 동안 정본 URL 이 색인에서 빠진다).
+ */
+export async function renderGolfPath(pathname: string): Promise<GolfRender | null> {
+  const path = pathname.replace(/\/+$/, "");
+  if (!GOLF_PAGE_RE.test(path)) return null;
+  const [, , kind, ...rest] = path.split("/");
+  const s = golfView(await loadGolfCourseSummary());
+  const now = Date.now();
+  if (kind === "course") {
+    if (rest.length !== 1) return golfGone("골프장을 찾을 수 없습니다.", "요청한 골프장 정보가 없습니다.");
+    return renderGolfCourse(s, rest[0], now);
+  }
+  const intent = kind === "courses" ? null : (kind as GolfIntent);
+  const sc = golfScope(s, rest, intent);
+  if (!sc) return golfGone("지역을 찾을 수 없습니다.", "요청한 지역의 골프장 정보가 없습니다.");
+  if ("redirect" in sc) return { status: 301, tag: `golf:301`, html: "", location: sc.redirect };
+  return intent ? renderGolfIntent(s, intent, sc, now) : renderGolfList(s, sc, now);
 }
 
 export function registerPrerender(app: Express) {
@@ -999,6 +1639,26 @@ ${list}
       console.warn("[prerender] golfer failed:", (e as Error)?.message);
       return next();
     }
+  });
+
+  // ── /golf/course/:slug · /golf/courses[/…] · /golf/{booking|join|urgent}[/…] (2026-09-24) ──
+  // 정규식(캡처 없음) 라우트라 Express 가 경로를 미리 디코드하지 않는다 — 잘못된 인코딩이 400 이 아니라 404 가 된다.
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  app.get(GOLF_PAGE_RE, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    let r: GolfRender | null;
+    try {
+      r = await renderGolfPath(req.path);
+    } catch (e) {
+      console.warn("[prerender] golf course page failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    if (!r) return next();
+    noStore(res);
+    // X-Prerender 에 한글을 그대로 넣으면 Node 가 ERR_INVALID_CHAR 로 죽는다 — tag 는 이미 encodeURIComponent 된 값이다.
+    res.setHeader("X-Prerender", r.tag);
+    if (r.status === 301 && r.location) return res.redirect(301, r.location);
+    res.status(r.status).send(r.html);
   });
 
   // ── /pba, /pba-player/:memCode ────────────────────────────────────

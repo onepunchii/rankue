@@ -19,6 +19,7 @@ import communityRouter from "./modules/community.js";
 import umbRouter from "./modules/umb.js";
 import pbaRouter from "./modules/pba.js";
 import golfRankRouter from "./modules/golfRank.js";
+import golfCoursesRouter from "./modules/golfCourses.js";
 import listingsRouter from "./modules/listings.js";
 import appMetaRouter from "./modules/appMeta.js";
 
@@ -31,6 +32,9 @@ const router = Router();
 // 골프 온라인게임(미니골프 대전, 2026-09-14) — 골프 라우터보다 먼저(경로가 /golf/arcade 로 겹친다)
 router.use("/golf/arcade", ...requireGolfAccess, golfArcadeRouter);
 router.use("/golf", ...requireGolfAccess, golfRouter);
+// 골프장 페이지(2026-09-24) — 검색으로 들어온 사람이 보는 공개 페이지라 로그인 없이 읽힌다(관심 등록만 로그인).
+// "/golf-courses" 는 "/golf" 마운트에 걸리지 않는다(Express 는 경로 조각 단위로 맞춘다).
+router.use("/golf-courses", golfCoursesRouter);
 
 // 2. Crew (/crews)
 router.use("/crews", crewRouter);

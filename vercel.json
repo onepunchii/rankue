@@ -27,7 +27,7 @@
       "dest": "/api/index.ts"
     },
     {
-      "src": "/sitemap(-[a-z]+)?\\.xml",
+      "src": "/sitemap(-[a-z]+(?:-[a-z]+)*)?\\.xml",
       "dest": "/api/index.ts"
     },
     {
@@ -50,7 +50,7 @@
       "dest": "/api/index.ts"
     },
     {
-      "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking|pba|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|golf-ranking|golfer/[^/]+/[^/]+|(?:store|club|r)/[^/]+)/?",
+      "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking|pba|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|golf-ranking|golfer/[^/]+/[^/]+|(?:store|club|r)/[^/]+|golf/course/[^/]+|golf/(?:courses|booking|join|urgent)(?:/[^/]+){0,2})/?",
       "has": [
         {
           "type": "header",
@@ -104,6 +104,10 @@
     {
       "path": "/api/cron/golf-sync?tour=klpga",
       "schedule": "10 22 * * *"
+    },
+    {
+      "path": "/api/cron/golf-prices",
+      "schedule": "40 12 * * *"
     }
   ],
   "env": {

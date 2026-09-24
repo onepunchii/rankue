@@ -9,7 +9,8 @@ import { notifyCrewChat } from "../../services/crewChatNotify.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { z } from "zod";
 import { notificationService } from "../../services/notificationService.js";
-import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, convertibleSeats, conversionSlots, recruitCondition, type JoinType, type SlotGender } from "../../../shared/golfJoin.js";
+import { notifyCourseWatchers } from "../../services/golfCourseWatch.js";
+import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, convertibleSeats, conversionSlots, recruitCondition, listingCapacity, type JoinType, type SlotGender } from "../../../shared/golfJoin.js";
 import { msg } from "../../lib/i18n.js";
 
 const router = Router();
@@ -97,11 +98,16 @@ function teeTimeOnly(datetime: Date | string): string {
     return `${String(k.getUTCHours()).padStart(2, "0")}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
 }
 
-async function broadcastUrgentJoin(ownerId: string, b: any): Promise<number> {
+/** 긴급 방송을 받을 사람 — 밤·도배 제한이면 빈 목록. 관심 알림이 같은 사람을 두 번 울리지 않게 먼저 뽑아 둔다. */
+async function urgentTargets(ownerId: string): Promise<string[]> {
     const hour = kstHour(Date.now());
-    if (hour < URGENT_PUSH_FROM_HOUR || hour >= URGENT_PUSH_UNTIL_HOUR) return 0;
-    if (await storage.notifs.hasRecentGolfUrgent(ownerId, URGENT_QUIET_HOURS)) return 0;
-    const targets = await storage.notifs.listGolfPushMembers([ownerId], URGENT_BROADCAST_LIMIT);
+    if (hour < URGENT_PUSH_FROM_HOUR || hour >= URGENT_PUSH_UNTIL_HOUR) return [];
+    if (await storage.notifs.hasRecentGolfUrgent(ownerId, URGENT_QUIET_HOURS)) return [];
+    return storage.notifs.listGolfPushMembers([ownerId], URGENT_BROADCAST_LIMIT);
+}
+
+async function broadcastUrgentJoin(ownerId: string, b: any, pre?: string[]): Promise<number> {
+    const targets = pre ?? await urgentTargets(ownerId);
     if (targets.length === 0) return 0;
     // 받는 사람이 수백 명이고 언어도 제각각이라 문장을 여기서 만들지 않는다 — 키로 보내고 서비스가 받는 사람 언어로 푼다.
     // 비공개(isBlind) 글은 실명 대신 가명이다. 확정 전 사람에게 가는 알림에 실명이 실리면 가려 놓은 뜻이 없다.
@@ -203,7 +209,13 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
     // 긴급 조인이면 골프 회원 전체에 알린다. 부킹 시트처럼 한 번에 여러 건을 올려도 **푸시는 1통**(첫 한 건)이다 —
     // 40건이 40통이 되면 그날로 다들 알림을 끈다. 방송이 실패해도 글 등록은 성공이어야 하니 여기서 삼킨다.
     const urgent = results.find((r) => isUrgentJoin(r as any, Date.now()));
-    if (urgent) await broadcastUrgentJoin(req.userId!, urgent).catch((e) => console.error("[GolfUrgentBroadcast]", e));
+    // 관심 골프장 알림(조건·도배 제한·비공개 제외는 서비스가 판정)과 긴급 방송을 **동시에** 보낸다 — 차례로 기다리면 응답이 12초까지 늘었다.
+    // 방송을 받는 사람은 관심 알림을 알림함에만 둔다(같은 글로 두 번 울리지 않게). 응답 전에 기다리고, 실패는 삼킨다.
+    const sentUrgent = urgent ? await urgentTargets(req.userId!).catch(() => [] as string[]) : [];
+    await Promise.allSettled([
+        urgent && sentUrgent.length ? broadcastUrgentJoin(req.userId!, urgent, sentUrgent).catch((e) => console.error("[GolfUrgentBroadcast]", e)) : null,
+        notifyCourseWatchers(req.userId!, results as any[], { silent: new Set(sentUrgent) }).catch((e) => console.error("[GolfCourseWatch]", e)),
+    ]);
 
     return sendSuccess(res, results);
 }));
@@ -268,9 +280,12 @@ router.post("/bookings/:id/to-join", requireAuth, asyncHandler(async (req: AuthR
     }
     // 돌린 글이 당일 떨이 조건(오늘·필드·고정가·3만원 이하)이면 긴급 조인 방송도 여기서 나간다 —
     // 매니저가 남은 자리를 떨이로 넘기는 그 순간이 바로 전체 푸시가 값어치를 하는 때다(등록 라우트와 같은 규칙·같은 도배 제한).
-    if (isUrgentJoin(updated as any, Date.now())) {
-        await broadcastUrgentJoin(req.userId!, updated).catch((e) => console.error("[GolfUrgentBroadcast]", e));
-    }
+    const sentUrgent = isUrgentJoin(updated as any, Date.now()) ? await urgentTargets(req.userId!).catch(() => [] as string[]) : [];
+    // 관심 골프장 알림 — 남은 자리는 방금 연 자리 수(open)다(팔린 자리는 이미 찬 칸). 긴급 방송과 동시에, 방송 받은 사람은 조용히.
+    await Promise.allSettled([
+        sentUrgent.length ? broadcastUrgentJoin(req.userId!, updated, sentUrgent).catch((e) => console.error("[GolfUrgentBroadcast]", e)) : null,
+        notifyCourseWatchers(req.userId!, [{ ...(updated as any), seatsLeft: open }], { silent: new Set(sentUrgent) }).catch((e) => console.error("[GolfCourseWatch]", e)),
+    ]);
     const [withCounts] = await withJoinCounts([updated], req.userId);
     return sendSuccess(res, withCounts);
 }));
@@ -376,11 +391,9 @@ function teeText(booking: { datetime: Date | string }): string {
  * 그 팀이 몇 명인지는 신청의 headcount 가 말한다(1~4). 단위를 섞지 않으려면 seatLimit() 을 써라.
  */
 function joinCapacity(booking: any): number {
-    if (booking.listingType !== "JOIN") return 1;
-    const slots = Array.isArray(booking.slots) ? normalizeSlots(booking.slots) : null;
-    if (slots) return openSlotCount(slots);
+    // 규칙은 shared/golfJoin.listingCapacity 한 곳에 있다 — 공개 골프장 페이지도 같은 값을 쓴다.
     // 옛 글의 모집 인원도 4인 1팀 안으로 묶는다 — 자리 없이 저장된 큰 숫자가 그대로 정원이 되지 않게.
-    return Number(booking.joinHeadcount) > 0 ? Math.min(MAX_SLOTS - 1, Number(booking.joinHeadcount)) : openSlotCount(slotsFromLegacy(booking.joinHeadcount, booking.joinCondition));
+    return listingCapacity(booking);
 }
 
 /**

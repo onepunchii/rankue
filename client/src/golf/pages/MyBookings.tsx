@@ -35,8 +35,11 @@ import {
     MY_LISTINGS_QUERY_KEY, MY_REQUESTS_QUERY_KEY,
     hasUnseenRequestChange, markRequestsSeen, readRequestsSeen,
 } from "../lib/myListings";
+import { WatchedCourses } from "../components/course/list/WatchedCourses";
 
 type Tab = "mine" | "applied";
+/** 글 탭 둘 + 관심 골프장(2026-09-24). 관심은 글이 아니라 골프장이라 Row·펼치기 흐름을 타지 않는다. */
+type PageTab = Tab | "watch";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
     applied: { label: "대기", cls: "bg-[#FF6B00]/15 text-[#FF8A33]" },
@@ -231,15 +234,17 @@ export default function GolfMyBookings() {
 
     // 탭은 주소에 실린다 — 알림이 /golf/my-bookings?tab=applied 로 바로 내 신청을 열 수 있어야 한다(페이지로 옮긴 첫째 이유).
     const tabParam = new URLSearchParams(search).get("tab");
-    const tab: Tab = tabParam === "applied" ? "applied" : "mine";
-    const setTab = useCallback((next: Tab) => setLocation(`/golf/my-bookings?tab=${next}`, { replace: true }), [setLocation]);
+    const pageTab: PageTab = tabParam === "applied" ? "applied" : tabParam === "watch" ? "watch" : "mine";
+    // 글 목록 쪽(폴링·자동 펼치기·Row)은 두 탭만 안다. 관심 탭에서는 '내 신청' 쪽으로 둔다 — 빨간 점 기준만 읽힌다.
+    const tab: Tab = pageTab === "watch" ? "applied" : pageTab;
+    const setTab = useCallback((next: PageTab) => setLocation(`/golf/my-bookings?tab=${next}`, { replace: true }), [setLocation]);
 
     const mine = useQuery<any[]>({
         queryKey: MY_LISTINGS_QUERY_KEY,
         queryFn: () => apiRequest("/api/hiq/golf/bookings?mine=1"),
         enabled: !!member,
         staleTime: 10_000,
-        refetchInterval: tab === "mine" ? 15_000 : false,
+        refetchInterval: pageTab === "mine" ? 15_000 : false,
     });
     const applied = useQuery<any[]>({
         queryKey: MY_REQUESTS_QUERY_KEY,
@@ -247,7 +252,7 @@ export default function GolfMyBookings() {
         // 보고 있지 않아도 한 번은 받는다 — 탭 위 빨간 점(안 본 확정·거절)이 그 답을 보고 찍힌다.
         enabled: !!member,
         staleTime: 10_000,
-        refetchInterval: tab === "applied" ? 15_000 : false,
+        refetchInterval: pageTab === "applied" ? 15_000 : false,
     });
     const q = tab === "mine" ? mine : applied;
 
@@ -257,9 +262,9 @@ export default function GolfMyBookings() {
     const [seenAt, setSeenAt] = useState(readRequestsSeen);
     // 내 신청 탭을 보면 "봤다" — 목록 화면 헤더 '내 예약' 빨간 점의 기준이기도 하다.
     useEffect(() => {
-        if (tab === "applied" && applied.isSuccess) { markRequestsSeen(); setSeenAt(readRequestsSeen()); }
-    }, [tab, applied.isSuccess]);
-    const unseenApplied = tab === "mine" && hasUnseenRequestChange(applied.data, seenAt);
+        if (pageTab === "applied" && applied.isSuccess) { markRequestsSeen(); setSeenAt(readRequestsSeen()); }
+    }, [pageTab, applied.isSuccess]);
+    const unseenApplied = pageTab !== "applied" && hasUnseenRequestChange(applied.data, seenAt);
 
     // 30초마다 시각을 새로 잡는다 — 응답이 같으면(구조 공유) q.data 참조가 그대로라 분류가 처음 계산한 시각에 얼어붙는다.
     const [now, setNow] = useState(() => Date.now());
@@ -346,17 +351,17 @@ export default function GolfMyBookings() {
                 </div>
                 <div className="px-5 pb-3">
                     <div className="flex rounded-full bg-white/[0.05] border border-white/[0.08] p-0.5">
-                        {(["mine", "applied"] as const).map((k) => (
+                        {(["mine", "applied", "watch"] as const).map((k) => (
                             <button
                                 key={k} type="button" onClick={() => setTab(k)}
                                 className={cn(
                                     "relative flex-1 h-9 rounded-full text-[13px] font-medium transition-colors",
                                     // ⚠️ 고른 탭에 `bg-white text-black` 을 쓰면 안 된다 — 골프 테마가 .bg-white 만 어두운 면으로 되받아
                                     //    검은 글씨가 어두운 바탕에 얹힌다. 리터럴 hex 로 쓴다.
-                                    tab === k ? "bg-[#ffffff] text-[#0a0a0a] font-semibold" : "text-white/70 active:text-white",
+                                    pageTab === k ? "bg-[#ffffff] text-[#0a0a0a] font-semibold" : "text-white/70 active:text-white",
                                 )}
                             >
-                                {k === "mine" ? "내가 올린 글" : "내가 신청한 글"}
+                                {k === "mine" ? "내가 올린 글" : k === "applied" ? "내가 신청한 글" : "관심 골프장"}
                                 {k === "applied" && unseenApplied && <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-red-500" aria-label="새 소식" />}
                             </button>
                         ))}
@@ -365,7 +370,9 @@ export default function GolfMyBookings() {
             </div>
 
             <div className="px-5 pt-4 pb-8 space-y-5">
-                {!member ? (
+                {pageTab === "watch" ? (
+                    <WatchedCourses enabled={!!member} />
+                ) : !member ? (
                     <p className="py-6 text-[13px] text-white/40">로그인하면 내가 올린 글과 신청한 글을 볼 수 있어요.</p>
                 ) : q.isPending ? (
                     <div className="flex items-center gap-2 py-6 text-white/40"><LucideLoader2 className="w-4 h-4 animate-spin" /><span className="text-[13px]">불러오는 중…</span></div>

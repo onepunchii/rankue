@@ -48,7 +48,8 @@ import GameResult from "@/golf/pages/GameResult";
 import GolfPassport from "@/golf/pages/Passport";
 import GolfCourseRanking from "@/golf/pages/CourseRanking";
 import GolfElite60 from "@/golf/pages/Elite60";
-import GolfCourseDetail from "@/golf/pages/CourseDetail";
+import GolfCoursePage from "@/golf/pages/GolfCoursePage";
+import GolfCourseHub from "@/golf/pages/GolfCourseHub";
 import GolfBookingList from "@/golf/pages/BookingList";
 import GolfMyBookings from "@/golf/pages/MyBookings";
 import GolfProAm from "@/golf/pages/ProAm";
@@ -281,7 +282,22 @@ function AppRoutes() {
       <Route path="/golf/membership"><GolfOnly><MembershipExchange /></GolfOnly></Route>
       <Route path="/golf/ranking"><GolfOnly><GolfCourseRanking /></GolfOnly></Route>
       <Route path="/golf/elite60"><GolfOnly><GolfElite60 /></GolfOnly></Route>
-      <Route path="/golf/course/:id"><GolfOnly><GolfCourseDetail /></GolfOnly></Route>
+      {/* 골프장 페이지(2026-09-24) — 검색 유입용 공개 페이지라 GolfOnly 를 타지 않는다(GolfOnly 는 비로그인을 /dashboard 로 쫓아낸다).
+          슬러그는 한글(정본). 옛 숫자 주소(/golf/course/74)는 GolfCoursePage 가 슬러그로 바꿔 준다.
+          wouter 는 기본이 정확 일치라(regexparam, loose 아님) /golf/booking 이 /golf/booking-list 를 먹지 않는다. */}
+      <Route path="/golf/course/:slug" component={GolfCoursePage} />
+      <Route path="/golf/courses" component={GolfCourseHub} />
+      <Route path="/golf/courses/:region" component={GolfCourseHub} />
+      <Route path="/golf/courses/:region/:city" component={GolfCourseHub} />
+      <Route path="/golf/booking" component={GolfCourseHub} />
+      <Route path="/golf/booking/:region" component={GolfCourseHub} />
+      <Route path="/golf/booking/:region/:city" component={GolfCourseHub} />
+      <Route path="/golf/join" component={GolfCourseHub} />
+      <Route path="/golf/join/:region" component={GolfCourseHub} />
+      <Route path="/golf/join/:region/:city" component={GolfCourseHub} />
+      <Route path="/golf/urgent" component={GolfCourseHub} />
+      <Route path="/golf/urgent/:region" component={GolfCourseHub} />
+      <Route path="/golf/urgent/:region/:city" component={GolfCourseHub} />
       <Route path="/golf/booking-list/:id?"><GolfOnly><GolfBookingList /></GolfOnly></Route>
       {/* 내 예약(2026-09-23) — 하단 탭 '라운드' 자리를 받았다. 시트였던 '내역'이 주소를 갖는다:
           알림이 "내 신청이 어떻게 됐나"로 바로 보낼 곳이 생긴다. */}
@@ -341,6 +357,9 @@ function InstallBannerGate() {
   if (location.startsWith("/online-game")) return null;
   // 골프 온라인게임(미니골프·필드 연습장)도 하단이 조작부다(실측 2026-09-15: 스윙 패드를 덮음).
   if (location.startsWith("/golf/arcade") || location.startsWith("/golf/range")) return null;
+  // 공개 골프장 페이지(2026-09-24)는 비로그인에게 바닥에 '로그인하고 취소티 알림 받기' 줄을 깐다(CourseShell) —
+  // 설치 배너가 같은 자리(fixed bottom, z-50)에 떠서 그 단추를 덮는다. 한 화면에 바닥 권유 둘은 소음이다.
+  if (/^\/golf\/(course|courses|booking|join|urgent)(\/|$)/.test(location)) return null;
   if (PAGE_BANNER_ROUTES.includes(location)) return null;
   return <HiqInstallBanner />;
 }
