@@ -1,34 +1,24 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import {
-    LucideVote,
-    LucidePlus,
-    LucideClock,
-    LucideUser,
-    LucideCheckCircle2,
-    LucideMoreVertical,
-    LucideX,
-    LucideShieldCheck,
-    LucideUsers,
-    LucideChevronRight,
-    LucideInfo,
-    LucideLoader2,
-    LucideChevronDown,
-    LucideTrash2,
-    LucideSparkles
-} from "@/lib/icons";
-import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { LucidePlus, LucideVote } from "@/lib/icons";
+import { CREW_BTN, CREW_TEXT, ConfirmDialog, CrewEmpty, CrewError, CrewSection, CrewSkeleton } from "@/components/hiq/crew-ui";
 import { CreatePollDialog } from "@/components/hiq/CreatePollDialog";
-import { format, formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
+import { PollCard } from "@/components/hiq/poll/PollCard";
+import { PollVotersSheet } from "@/components/hiq/poll/PollVotersSheet";
+import { useNow } from "@/components/hiq/poll/crewTimeFormat";
+import type { CrewPoll, PollOption } from "@/components/hiq/poll/types";
+import { isPollClosed } from "@shared/crewPoll";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
+
+// 크루 투표 탭(2026-09-26 크루 정비).
+//  - '더보기'로 3개씩 자르던 목록을 **진행 중 / 마감됨** 두 묶음으로 나눴다. 지금 할 일(진행 중)이 늘 위에 있다.
+//  - 마감은 endTime 기준으로 화면에서도 30초마다 다시 판정한다(useNow). 켜 둔 채 마감을 넘기면 카드가 알아서 잠긴다.
+//  - 다른 사람 표가 보이도록, 진행 중 투표가 있으면 30초마다 다시 불러온다(전역 기본값은 5분 캐시 + 포커스 새로고침 없음).
+//  - 투표는 선택지별로 '누르는 중'을 따로 들고 화면을 먼저 바꾼다(낙관적 갱신). 예전엔 아무 투표나 처리 중이면
+//    다른 선택지 탭이 소리 없이 버려졌다.
 
 interface CrewPollTabProps {
     crewId: string;
@@ -36,315 +26,209 @@ interface CrewPollTabProps {
     isMember: boolean;
 }
 
+const CLOSED_PREVIEW = 3;
+
 export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
     const { toast } = useToast();
-    const { t } = useT();
+    const { t, locale } = useT();
+    const { member: me } = useAuth();
     const queryClient = useQueryClient();
+    const key = `/api/hiq/crews/${crewId}/polls`;
     const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [displayLimit, setDisplayLimit] = useState(3);
+    const [showAllClosed, setShowAllClosed] = useState(false);
+    const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+    const [votersOf, setVotersOf] = useState<{ option: PollOption; anonymous: boolean } | null>(null);
+    const [confirm, setConfirm] = useState<{ kind: "delete" | "close"; poll: CrewPoll } | null>(null);
+    const now = useNow(30_000);
 
-    const { data: polls, isLoading } = useQuery<any[]>({
-        queryKey: [`/api/hiq/crews/${crewId}/polls`],
+    const { data: polls, isLoading, isError, refetch } = useQuery<CrewPoll[]>({
+        queryKey: [key],
         enabled: !!crewId,
+        // 탭에 들어올 때마다 새로 — 알림을 눌러 들어온 사람이 5분 묵은 결과를 보면 안 된다.
+        refetchOnMount: "always",
+        refetchInterval: (q) => {
+            const list = q.state.data as CrewPoll[] | undefined;
+            return list?.some((p) => !isPollClosed(p)) ? 30_000 : false;
+        },
     });
+
+    const { open, closed } = useMemo(() => {
+        const o: CrewPoll[] = [];
+        const c: CrewPoll[] = [];
+        for (const p of polls ?? []) (p.isClosed === true || isPollClosed(p, now) ? c : o).push(p);
+        // 진행 중은 마감이 가까운 것부터 — 급한 것이 위에 있어야 한다. 마감 없는 것은 맨 아래.
+        o.sort((a, b) => (a.endTime ? Date.parse(a.endTime) : Infinity) - (b.endTime ? Date.parse(b.endTime) : Infinity));
+        return { open: o, closed: c };
+    }, [polls, now]);
+
+    // ── 투표(토글) — 낙관적 갱신 ─────────────────────────────
+    const applyVote = (list: CrewPoll[] | undefined, pollId: string, optionId: string): CrewPoll[] | undefined =>
+        list?.map((p) => {
+            if (p.id !== pollId) return p;
+            const had = p.myVoteIds.includes(optionId);
+            // 서버 규칙 그대로: 내 표를 다시 누르면 취소, 단일 선택은 다른 표를 지우고 하나만.
+            const mine = had ? p.myVoteIds.filter((id) => id !== optionId) : p.allowMultiple ? [...p.myVoteIds, optionId] : [optionId];
+            const options = p.options.map((o) => {
+                const was = p.myVoteIds.includes(o.id);
+                const is = mine.includes(o.id);
+                return was === is ? o : { ...o, voteCount: Math.max(0, o.voteCount + (is ? 1 : -1)) };
+            });
+            const beforeVoted = p.myVoteIds.length > 0;
+            const afterVoted = mine.length > 0;
+            const voterCount = (p.voterCount ?? p.totalVotes ?? 0) + (afterVoted === beforeVoted ? 0 : afterVoted ? 1 : -1);
+            return { ...p, myVoteIds: mine, options, voterCount: Math.max(0, voterCount), totalVotes: options.reduce((s, o) => s + o.voteCount, 0) };
+        });
 
     const voteMutation = useMutation({
-        mutationFn: async ({ pollId, optionId }: { pollId: string; optionId: string }) => {
-            return await apiRequest(`/api/hiq/crews/${crewId}/polls/${pollId}/vote`, {
-                method: "POST",
-                body: JSON.stringify({ optionId })
-            });
+        mutationFn: ({ pollId, optionId }: { pollId: string; optionId: string }) =>
+            apiRequest(`${key}/${pollId}/vote`, { method: "POST", body: JSON.stringify({ optionId }) }),
+        onMutate: async ({ pollId, optionId }) => {
+            setPending((s) => new Set(s).add(optionId));
+            await queryClient.cancelQueries({ queryKey: [key] });
+            const prev = queryClient.getQueryData<CrewPoll[]>([key]);
+            queryClient.setQueryData<CrewPoll[] | undefined>([key], (list) => applyVote(list, pollId, optionId));
+            return { prev };
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
+        onSuccess: (res: any) => {
+            // 같은 선택지를 다시 눌러 취소된 경우를 말로 알려 준다 — 예전엔 조용히 꺼져서 '안 눌렸다'고 여겼다.
+            if (res && res.voted === false) toast({ title: t("crewPoll.voteCanceled") });
         },
-        onError: (err: any) => {
-            toast({ title: t("crewPollTab.voteFailTitle"), description: err.message, variant: "destructive" });
-        }
+        onError: (err: any, _v, ctx) => {
+            if (ctx?.prev) queryClient.setQueryData([key], ctx.prev);
+            toast({ title: t("crewPollTab.voteFailTitle"), description: err?.message, variant: "destructive" });
+        },
+        onSettled: (_d, _e, { optionId }) => {
+            setPending((s) => { const n = new Set(s); n.delete(optionId); return n; });
+            queryClient.invalidateQueries({ queryKey: [key] });
+        },
     });
 
-    const deletePollMutation = useMutation({
-        mutationFn: async (pollId: string) => {
-            return await apiRequest(`/api/hiq/crews/${crewId}/polls/${pollId}`, {
-                method: "DELETE"
-            });
-        },
+    const deleteMutation = useMutation({
+        mutationFn: (pollId: string) => apiRequest(`${key}/${pollId}`, { method: "DELETE" }),
         onSuccess: () => {
             toast({ title: t("crewPollTab.deleteSuccess") });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
+            setConfirm(null);
+            queryClient.invalidateQueries({ queryKey: [key] });
         },
-        onError: (err: any) => {
-            toast({ title: t("crewPollTab.deleteFailTitle"), description: err.message, variant: "destructive" });
-        }
+        onError: (err: any) => toast({ title: t("crewPollTab.deleteFailTitle"), description: err?.message, variant: "destructive" }),
     });
 
+    const closeMutation = useMutation({
+        mutationFn: (pollId: string) => apiRequest(`${key}/${pollId}`, { method: "PATCH", body: JSON.stringify({ status: "closed" }) }),
+        onSuccess: () => {
+            toast({ title: t("crewPoll.closedDone") });
+            setConfirm(null);
+            queryClient.invalidateQueries({ queryKey: [key] });
+        },
+        onError: (err: any) => toast({ title: t("crewPoll.actionFail"), description: err?.message, variant: "destructive" }),
+    });
+
+    const remindMutation = useMutation({
+        mutationFn: (pollId: string) => apiRequest(`${key}/${pollId}/remind`, { method: "POST" }),
+        onSuccess: (res: any) => {
+            const sent = Number(res?.sent ?? 0);
+            toast({ title: sent > 0 ? t("crewPoll.remindSent").replace("{n}", String(sent)) : t("crewPoll.remindNobody") });
+        },
+        onError: (err: any) => toast({ title: t("crewPoll.actionFail"), description: err?.message, variant: "destructive" }),
+    });
+
+    const renderCard = (poll: CrewPoll) => (
+        <PollCard
+            key={poll.id}
+            poll={poll}
+            now={now}
+            locale={locale}
+            isMember={isMember}
+            canManage={isAdmin || (!!me?.id && poll.authorId === me.id)}
+            pendingOptionIds={pending}
+            onVote={(o) => {
+                // 같은 선택지를 처리 중이면만 막는다(두 번 눌러 켜졌다 꺼지는 것 방지). 다른 선택지는 바로 받는다.
+                if (pending.has(o.id)) return;
+                voteMutation.mutate({ pollId: poll.id, optionId: o.id });
+            }}
+            onCancelMine={() => {
+                const mine = poll.myVoteIds[0];
+                if (mine && !pending.has(mine)) voteMutation.mutate({ pollId: poll.id, optionId: mine });
+            }}
+            onOpenVoters={(o) => setVotersOf({ option: o, anonymous: poll.isAnonymous })}
+            onRemind={() => { if (!remindMutation.isPending) remindMutation.mutate(poll.id); }}
+            onCloseEarly={() => setConfirm({ kind: "close", poll })}
+            onDelete={() => setConfirm({ kind: "delete", poll })}
+        />
+    );
+
+    const closedShown = showAllClosed ? closed : closed.slice(0, CLOSED_PREVIEW);
+
     return (
-        <div className="space-y-8 pt-5 pb-20">
-            {/* Header / CTA */}
-            <div className="px-6 flex items-center justify-between">
-                <div>
-                    <h2 className="text-[15px] font-semibold text-black/55">{t("crewPollTab.title")}</h2>
-                    <p className="text-xs text-black/40 mt-1 font-medium flex items-center gap-1.5 tabular-nums">
-                        <LucideVote className="w-3 h-3" />
-                        {t("crewPollTab.totalPrefix")}{polls?.length || 0}{t("crewPollTab.totalSuffix")}
-                    </p>
-                </div>
+        <div className="px-4 pt-5 pb-20 flex flex-col gap-6">
+            {/* 화면 제목 + 만들기 */}
+            <header className="flex items-center justify-between gap-3">
+                <h2 className={CREW_TEXT.title}>{t("crewPollTab.title")}</h2>
                 {isMember && (
-                    <Button
-                        onClick={() => setIsCreateOpen(true)}
-                        className="h-10 px-4 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl flex items-center gap-2"
-                    >
+                    <button type="button" onClick={() => setIsCreateOpen(true)} className={CREW_BTN.primary}>
                         <LucidePlus className="w-4 h-4" />
                         {t("crewPollTab.createButton")}
-                    </Button>
+                    </button>
                 )}
-            </div>
+            </header>
 
-            {/* Poll List */}
-            <div className="px-6 space-y-4">
-                {isLoading ? (
-                    <>
-                        {Array.from({ length: 3 }).map((_, i) => (
-                            <div
-                                key={i}
-                                className="bg-surface-2 rounded-card overflow-hidden animate-pulse"
-                            >
-                                <div className="p-6 pb-5 space-y-5">
-                                    <div className="space-y-2">
-                                        <div className="h-5 w-16 bg-black/[0.04] rounded-full" />
-                                        <div className="h-5 w-2/3 bg-black/[0.04] rounded-lg" />
-                                    </div>
-                                    <div className="space-y-2.5">
-                                        <div className="h-14 bg-black/[0.04] rounded-2xl" />
-                                        <div className="h-14 bg-black/[0.04] rounded-2xl" />
-                                    </div>
-                                </div>
-                                <div className="px-6 py-4 bg-black/[0.02] border-t border-black/[0.08] flex items-center gap-3">
-                                    <div className="w-5 h-5 rounded-full bg-black/[0.04]" />
-                                    <div className="h-3 w-24 bg-black/[0.04] rounded-full" />
-                                </div>
-                            </div>
-                        ))}
-                    </>
-                ) : (!polls || polls.length === 0) ? (
-                    <div className="py-24 text-center">
-                        <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mx-auto mb-4">
-                            <LucideVote className="w-7 h-7 text-black/40" />
-                        </div>
-                        <p className="text-[15px] font-medium text-ink-2 mb-1">{t("crewPollTab.emptyTitle")}</p>
-                        <p className="text-[13px] text-ink-4">{t("crewPollTab.emptyDesc")}</p>
-                    </div>
-                ) : (
-                    <>
-                        {polls.slice(0, displayLimit).map((poll) => (
-                            <PollCard
-                                key={poll.id}
-                                poll={poll}
-                                votingOptionId={
-                                    voteMutation.isPending && voteMutation.variables?.pollId === poll.id
-                                        ? voteMutation.variables?.optionId
-                                        : undefined
-                                }
-                                onVote={(optionId) => {
-                                    if (voteMutation.isPending) return; // block double-submit / vote race
-                                    voteMutation.mutate({ pollId: poll.id, optionId });
-                                }}
-                                onDelete={() => {
-                                    if (confirm(t("crewPollTab.deleteConfirm"))) {
-                                        deletePollMutation.mutate(poll.id);
-                                    }
-                                }}
-                                isMember={isMember}
-                                isAdmin={isAdmin}
-                            />
-                        ))}
+            {isLoading ? (
+                <CrewSkeleton rows={2} height={260} />
+            ) : isError ? (
+                // 실패를 "투표가 없어요"로 보여 주지 않는다.
+                <CrewError onRetry={() => refetch()} />
+            ) : (polls?.length ?? 0) === 0 ? (
+                <CrewEmpty
+                    icon={<LucideVote />}
+                    title={t("crewPoll.emptyTitle")}
+                    desc={t("crewPollTab.emptyDesc")}
+                    action={isMember ? { label: t("crewPollTab.createButton"), onClick: () => setIsCreateOpen(true) } : undefined}
+                />
+            ) : (
+                <>
+                    <CrewSection title={t("crewPollTab.ongoing")} count={open.length}>
+                        {open.length === 0
+                            ? <CrewEmpty title={t("crewPoll.noOpenTitle")} desc={isMember ? t("crewPoll.noOpenDesc") : undefined} />
+                            : <div className="flex flex-col gap-3">{open.map(renderCard)}</div>}
+                    </CrewSection>
 
-                        {polls.length > displayLimit && (
-                            <Button
-                                variant="ghost"
-                                onClick={() => setDisplayLimit((d) => d + 10)}
-                                className="w-full h-12 bg-black/[0.04] hover:bg-black/[0.06] text-black/55 hover:text-[rgba(0,0,0,0.87)] text-[13px] font-semibold rounded-2xl flex items-center justify-center gap-2 transition-all"
-                            >
-                                {t("crewPollTab.loadMore")}
-                                <LucideChevronDown className="w-4 h-4" />
-                            </Button>
-                        )}
-                    </>
-                )}
-            </div>
+                    {closed.length > 0 && (
+                        <CrewSection
+                            title={t("crewPollTab.closed")}
+                            count={closed.length}
+                            action={closed.length > CLOSED_PREVIEW
+                                ? { label: showAllClosed ? t("crewPoll.fold") : t("crewPoll.seeAll"), onClick: () => setShowAllClosed((v) => !v) }
+                                : undefined}
+                        >
+                            <div className="flex flex-col gap-3">{closedShown.map(renderCard)}</div>
+                        </CrewSection>
+                    )}
+                </>
+            )}
 
-            <CreatePollDialog
-                open={isCreateOpen}
-                onOpenChange={setIsCreateOpen}
+            <CreatePollDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} crewId={crewId} />
+
+            <PollVotersSheet
                 crewId={crewId}
+                option={votersOf?.option ?? null}
+                anonymous={!!votersOf?.anonymous}
+                onOpenChange={(o) => { if (!o) setVotersOf(null); }}
             />
-        </div >
-    );
-}
 
-function PollCard({ poll, onVote, onDelete, isMember, isAdmin, votingOptionId }: {
-    poll: any;
-    onVote: (id: string) => void;
-    onDelete: () => void;
-    isMember: boolean;
-    isAdmin: boolean;
-    votingOptionId?: string;
-}) {
-    const { t } = useT();
-    const isClosed = poll.status === 'closed' || (poll.endTime && new Date(poll.endTime) < new Date());
-    const totalVotes = poll.totalVotes || 0;
-    // Strict, unique leader only — a tie must not light up multiple "winners".
-    const maxVoteCount = poll.options.reduce((max: number, o: any) => Math.max(max, o.voteCount || 0), 0);
-    const hasUniqueWinner = maxVoteCount > 0
-        && poll.options.filter((o: any) => o.voteCount === maxVoteCount).length === 1;
-
-    return (
-        <motion.div
-            layout
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="group relative bg-surface-2 rounded-card overflow-hidden hover:border-brand/30 transition-all duration-300"
-        >
-            <div className="p-6 pb-5">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                    <div className="space-y-1.5 flex-1 pr-4">
-                        <div className="flex items-center gap-2 mb-1.5">
-                            <Badge className={cn(
-                                "h-5 px-2 text-xs font-semibold border-none",
-                                isClosed ? "bg-black/[0.06] text-black/55" : "bg-brand/10 text-brand"
-                            )}>
-                                {isClosed ? t("crewPollTab.closed") : t("crewPollTab.ongoing")}
-                            </Badge>
-                            {poll.isAnonymous && (
-                                <Badge className="h-5 px-2 bg-brand/10 text-brand text-xs font-semibold border-none">
-                                    <LucideShieldCheck className="w-3 h-3 mr-1" /> {t("crewPollTab.anonymous")}
-                                </Badge>
-                            )}
-                            {poll.allowMultiple && (
-                                <Badge className="h-5 px-2 bg-purple-500/10 text-purple-500 text-xs font-semibold border-none">
-                                    {t("crewPollTab.multipleChoice")}
-                                </Badge>
-                            )}
-                        </div>
-                        <h3 className="text-lg font-semibold text-[rgba(0,0,0,0.87)] leading-tight tracking-tight">{poll.title}</h3>
-                        {poll.description && (
-                            <p className="text-xs text-black/55 font-medium leading-relaxed mt-2 line-clamp-2">
-                                {poll.description}
-                            </p>
-                        )}
-                    </div>
-                    {/* Right Side: Time & Delete */}
-                    <div className="flex flex-col items-end gap-2">
-                        {poll.endTime && !isClosed && (
-                            <span className="text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded-full tabular-nums">
-                                {`${formatDistanceToNow(new Date(poll.endTime), { locale: ko })}${t("crewPollTab.remainingSuffix")}`}
-                            </span>
-                        )}
-                        {isAdmin && (
-                            <button
-                                onClick={onDelete}
-                                className="p-1.5 rounded-full hover:bg-red-500/10 text-black/40 hover:text-red-500 transition-colors"
-                                title={t("crewPollTab.deletePollTitle")}
-                            >
-                                <LucideTrash2 className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Options */}
-                <div className="space-y-2.5 mt-5">
-                    {poll.options.map((option: any) => {
-                        const isMyVote = poll.myVoteIds?.includes(option.id);
-                        const progress = totalVotes > 0 ? (option.voteCount / totalVotes) * 100 : 0;
-                        const isWinner = hasUniqueWinner && option.voteCount === maxVoteCount;
-                        const isOptionVoting = votingOptionId === option.id;
-
-                        return (
-                            <button
-                                key={option.id}
-                                disabled={isClosed || !isMember || isOptionVoting}
-                                onClick={() => onVote(option.id)}
-                                className={cn(
-                                    "relative w-full text-left p-4 rounded-2xl group/opt transition-all duration-300 overflow-hidden",
-                                    isMyVote
-                                        ? "bg-brand/[0.06] border border-brand/20"
-                                        : "bg-black/[0.03] hover:border-black/10"
-                                )}
-                            >
-                                {/* Progress Background */}
-                                <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${progress}%` }}
-                                    transition={{ duration: 0.8, ease: "easeOut" }}
-                                    className={cn(
-                                        "absolute inset-y-0 left-0",
-                                        isMyVote ? "bg-brand opacity-[0.1]" : "bg-black opacity-[0.05]"
-                                    )}
-                                />
-
-                                <div className="relative flex items-center justify-between z-10">
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn(
-                                            "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
-                                            isMyVote
-                                                ? "border-brand bg-brand"
-                                                : "border-black/20 bg-transparent group-hover/opt:border-black/40"
-                                        )}>
-                                            {isMyVote && <LucideCheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                                        </div>
-                                        <span className={cn(
-                                            "text-sm font-semibold transition-colors",
-                                            isMyVote ? "text-[rgba(0,0,0,0.87)]" : "text-black/60 group-hover/opt:text-[rgba(0,0,0,0.87)]"
-                                        )}>
-                                            {option.text}
-                                        </span>
-                                        {isWinner && (
-                                            <LucideSparkles className="w-3.5 h-3.5 text-[#cba258] animate-pulse" />
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {isOptionVoting && (
-                                            <LucideLoader2 className="w-3.5 h-3.5 text-black/40 animate-spin" />
-                                        )}
-                                        <span className={cn(
-                                            "text-xs font-semibold tabular-nums",
-                                            isMyVote ? "text-brand" : "text-black/40"
-                                        )}>
-                                            {option.voteCount}
-                                        </span>
-                                        <span className="text-xs font-medium text-black/40 tabular-nums">({Math.round(progress)}%)</span>
-                                    </div>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 bg-black/[0.02] border-t border-black/[0.08] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Avatar className="w-5 h-5 ">
-                        <AvatarImage src={poll.author?.profileImageUrl} />
-                        <AvatarFallback className="bg-black/[0.06] text-[rgba(0,0,0,0.87)] text-xs font-semibold">
-                            {poll.author?.name?.[0]}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                        <span className="text-xs font-medium text-black/55">{poll.author?.name}</span>
-                        <span className="text-xs text-black/40 font-medium tabular-nums">
-                            {format(new Date(poll.createdAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
-                        </span>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 text-black/40">
-                    <LucideUsers className="w-3 h-3" />
-                    <span className="text-xs font-semibold tabular-nums">{totalVotes}{t("crewPollTab.participantsSuffix")}</span>
-                </div>
-            </div>
-        </motion.div>
+            <ConfirmDialog
+                open={!!confirm}
+                onOpenChange={(o) => { if (!o) setConfirm(null); }}
+                title={confirm?.kind === "close" ? t("crewPoll.closeConfirmTitle") : t("crewPoll.deleteConfirmTitle")}
+                desc={confirm?.kind === "close" ? t("crewPoll.closeConfirmDesc") : t("crewPoll.deleteConfirmDesc")}
+                confirmLabel={confirm?.kind === "close" ? t("crewPoll.closeEarly") : t("crewPollTab.deletePollTitle")}
+                danger={confirm?.kind !== "close"}
+                busy={deleteMutation.isPending || closeMutation.isPending}
+                onConfirm={() => {
+                    if (!confirm) return;
+                    if (confirm.kind === "close") closeMutation.mutate(confirm.poll.id);
+                    else deleteMutation.mutate(confirm.poll.id);
+                }}
+            />
+        </div>
     );
 }

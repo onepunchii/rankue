@@ -12,6 +12,7 @@ import {
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { msg } from "../lib/i18n.js";
 import { planKnockout, planLeague, advanceTarget, bracketSize, totalRounds } from "../../shared/tournamentBracket.js";
+import { swapBlockReason, tournamentStatusRank } from "../../shared/crewTournamentRules.js";
 
 // 크루 토너먼트 저장소.
 //
@@ -27,7 +28,10 @@ export class TournamentRepository {
 
     // ---------- 조회 ----------
 
-    /** 크루의 대회 목록 — 진행 중인 것이 위, 끝난 것이 아래. 참가자 수를 함께 센다. */
+    /**
+     * 크루의 대회 목록 — 진행중 → 접수중 → 대진 확정 → 종료 순(shared/crewTournamentRules). 참가자 수를 함께 센다.
+     * 접수중을 대진 확정 위로 올린 이유: 접수중은 크루원이 "지금 신청해야" 하는 대회다(2026-09-26 검토).
+     */
     async listByCrew(crewId: string) {
         // 끝난 대회는 목록에서도 우승자가 제일 중요한 정보라 이름을 같이 붙인다.
         const raw = await db
@@ -51,10 +55,10 @@ export class TournamentRepository {
             .groupBy(hiqCrewTournamentParticipants.tournamentId);
         const byId = new Map(counts.map((c) => [c.tournamentId, Number(c.n)]));
 
-        const rank = (s: string) => (s === "ongoing" ? 0 : s === "drawn" ? 1 : s === "recruiting" ? 2 : 3);
+        // Array.sort 는 안정 정렬이라 같은 상태 안에서는 최신 개설 순(위 orderBy)이 유지된다.
         return rows
             .map((r) => ({ ...r, participantCount: byId.get(r.id) ?? 0 }))
-            .sort((a, b) => rank(a.status) - rank(b.status));
+            .sort((a, b) => tournamentStatusRank(a.status) - tournamentStatusRank(b.status));
     }
 
     /** 대회 하나 + 참가자 + 대진 전부. 화면이 이 한 번의 응답으로 다 그려진다. */
@@ -339,13 +343,14 @@ export class TournamentRepository {
             const ma = rows.find((r) => r.id === a.matchId);
             const mb = rows.find((r) => r.id === b.matchId);
             if (!ma || !mb) throw notFound(msg("err.tournament.matchNotFound"));
-            if (ma.round !== 1 || mb.round !== 1) throw badRequest(msg("err.tournament.firstRoundOnly"));
-            for (const m of [ma, mb]) {
-                if (m.status === "playing" || m.status === "done") {
-                    throw conflict(msg("err.tournament.seatStarted"));
-                }
+            // 부전승(bye) 칸은 막는다(swapBlockReason 주석 참고). 예전엔 부전승 칸과 바꾸면 이 칸의 승자만 다시
+            // 계산하고, 대진을 짤 때 이미 윗칸으로 올려 둔 옛 부전승자는 그대로 둬서 한 대진에 두 사람이 겹쳤다.
+            // 되돌려 다시 올리는 계산보다 막고 "다시 뽑기"를 쓰게 하는 편이 안전하다 — 화면도 ready 칸만 누르게 한다.
+            const blocked = swapBlockReason(ma, mb, a, b);
+            if (blocked) {
+                if (blocked === "err.tournament.seatStarted" || blocked === "err.crewTourney.byeSeat") throw conflict(msg(blocked));
+                throw badRequest(msg(blocked));
             }
-            if (a.matchId === b.matchId && a.side === b.side) throw badRequest(msg("err.tournament.sameSeat"));
 
             const val = (m: typeof ma, side: "p1" | "p2") => (side === "p1" ? m.p1Id : m.p2Id);
             const av = val(ma, a.side);
@@ -365,22 +370,8 @@ export class TournamentRepository {
                     .where(eq(hiqCrewTournamentMatches.id, b.matchId));
             }
 
-            // 자리가 비거나 차면서 부전승 여부가 달라질 수 있다 — 두 경기의 상태를 다시 계산한다.
-            for (const id of [a.matchId, b.matchId]) {
-                const [m] = await tx.select().from(hiqCrewTournamentMatches).where(eq(hiqCrewTournamentMatches.id, id));
-                if (!m) continue;
-                const both = !!m.p1Id && !!m.p2Id;
-                const one = !!m.p1Id !== !!m.p2Id;
-                await tx.update(hiqCrewTournamentMatches)
-                    .set({
-                        // 부전승 자리는 항상 p1 에 사람을 둔다.
-                        p1Id: one ? (m.p1Id ?? m.p2Id) : m.p1Id,
-                        p2Id: one ? null : m.p2Id,
-                        status: both ? "ready" : one ? "bye" : "pending",
-                        winnerId: one ? (m.p1Id ?? m.p2Id) : null,
-                    })
-                    .where(eq(hiqCrewTournamentMatches.id, id));
-            }
+            // 두 칸 다 두 자리가 찬 ready 라서 맞바꿔도 계속 ready 다 — 부전승이 새로 생기거나 사라질 일이 없어
+            // 윗칸을 다시 계산할 필요가 없다(예전의 상태 재계산은 bye 를 허용하던 시절의 것이라 뺐다).
             return { ok: true };
         });
     }

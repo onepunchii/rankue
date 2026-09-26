@@ -1,20 +1,26 @@
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { HiqMember } from "@shared/schema";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { LucideUser, LucideX, LucideChevronDown, LucideCalendar, LucideUsers, LucideSettings2 } from "@/lib/icons";
-import { motion, AnimatePresence } from "framer-motion";
+import { LucideX, LucideChevronRight, LucideCalendar, LucideSettings2, LucideTrash2, LucidePlus } from "@/lib/icons";
 import { MemberSelectionDialog } from "./MemberSelectionDialog";
 import { useQuery } from "@tanstack/react-query";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
 import { useT } from "@/lib/i18n";
+import { useToast } from "@/hooks/use-toast";
+import { CREW_BTN, CREW_TEXT, CrewAvatar, IconButton } from "@/components/hiq/crew-ui";
+import { checkSettlementRound, splitAmount } from "@shared/crewSettlement";
+import { kstParts } from "@shared/crewTime";
+
+// 정산 만들기(2026-09-26 크루 정비).
+//  - 차수를 지울 수 있다(예전엔 늘리기만 됐다).
+//  - 금액·계산한 사람을 확인한다 — 빈 금액이 0원으로, 고르지 않은 계산한 사람이 '첫 참석자'로 조용히 바뀌던 것을 막는다.
+//    서버도 같은 함수(shared/crewSettlement.checkSettlementRound)로 한 번 더 거절한다.
+//  - 1인 금액은 1원 단위로 정확히 나누고, 나누어떨어지지 않는 나머지는 계산한 사람이 부담한다고 적는다.
+//    예전엔 10원 단위 올림이라 계산한 사람이 매번 조금씩 더 걷었다.
+//  - 창을 열 때마다 새로 채운다(제목의 날짜가 전날 것으로 남던 문제). 크루장 전용 가정이 없다 — 서버는 크루원 누구나 받는다.
 
 interface CreateSettlementDialogProps {
     open: boolean;
@@ -26,325 +32,286 @@ interface CreateSettlementDialogProps {
     isPending: boolean;
 }
 
+interface Round {
+    key: number;
+    title: string;
+    amount: string;
+    payerId: string;
+    participants: string[];
+}
+
 export function CreateSettlementDialog({ open, onOpenChange, crewId, members, me, onSubmit, isPending }: CreateSettlementDialogProps) {
     const { t } = useT();
-    const [title, setTitle] = useState(`${new Date().getMonth() + 1}/${new Date().getDate()} ${t("createSettlementDialog.defaultTitleSuffix")}`);
+    const { toast } = useToast();
+
+    // 승인 대기자는 모임에 온 적이 없다 — 어느 차수의 참석자로도 넣지 않는다(1인 금액이 틀어진다).
+    const activeMembers = members.filter((m) => m.role !== "pending");
+    const allIds = () => activeMembers.map((m) => m.member.id as string);
+    const roundName = (n: number) => t("crewSettle.roundN").replace("{n}", String(n));
+    const defaultTitle = () => {
+        const p = kstParts(Date.now());
+        return t("crewSettle.defaultTitle").replace("{m}", String(p.m)).replace("{d}", String(p.d));
+    };
+    const newRound = (key: number, n: number): Round => ({
+        key, title: roundName(n), amount: "",
+        // 대개 정산을 만드는 사람이 계산했다 — 참석자면 기본값으로 둔다(바꿀 수 있다).
+        payerId: me?.id && activeMembers.some((m) => m.member.id === me.id) ? me.id : "",
+        participants: allIds(),
+    });
+
+    const [title, setTitle] = useState("");
     const [accountBank, setAccountBank] = useState("");
     const [accountNumber, setAccountNumber] = useState("");
     const [accountHolder, setAccountHolder] = useState("");
-
-    // Initialize with default account info
-    useEffect(() => {
-        if (open && me) {
-            if (me.defaultAccountBank) setAccountBank(me.defaultAccountBank);
-            if (me.defaultAccountNumber) setAccountNumber(me.defaultAccountNumber);
-            if (me.defaultAccountHolder) setAccountHolder(me.defaultAccountHolder);
-        }
-    }, [open, me]);
-
-    // Pending applicants never attended, so they must not be seeded into any round's
-    // participant set (they corrupt the per-person split). Declared before the useState
-    // initializer that reads it to avoid a temporal-dead-zone ReferenceError.
-    const activeMembers = members.filter(m => m.role !== 'pending');
-
-    // Rounds: [{ id: 1, title: '1차', amount: 0, payerId: '...', participants: ['id1', 'id2'] }]
-    const [rounds, setRounds] = useState<any[]>([
-        { id: 1, title: `${t("createSettlementDialog.roundPrefix")}1${t("createSettlementDialog.roundSuffix")}`, amount: "", payerId: "", participants: activeMembers.map(m => m.member.id) }
-    ]);
+    const [rounds, setRounds] = useState<Round[]>([]);
+    const [nextKey, setNextKey] = useState(2);
+    const [errors, setErrors] = useState<Record<number, string>>({});
     const [isMemberSelectOpen, setIsMemberSelectOpen] = useState(false);
-    const [activeRoundId, setActiveRoundId] = useState<number | null>(null);
+    const [activeRoundKey, setActiveRoundKey] = useState<number | null>(null);
+
+    // 열 때마다 새 양식 — 제출 뒤 다시 열면 지난 내용·어제 날짜가 남아 있었다.
+    useEffect(() => {
+        if (!open) return;
+        setTitle(defaultTitle());
+        setAccountBank(me?.defaultAccountBank ?? "");
+        setAccountNumber(me?.defaultAccountNumber ?? "");
+        setAccountHolder(me?.defaultAccountHolder ?? "");
+        setRounds([newRound(1, 1)]);
+        setNextKey(2);
+        setErrors({});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
 
     const { data: activities } = useQuery({
         queryKey: [`/api/hiq/crews/${crewId}/activities`],
         enabled: open && !!crewId,
     });
-
     const recentActivities = Array.isArray(activities)
         ? [...activities].sort((a, b) => new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime()).slice(0, 5)
         : [];
 
-    const handleImportActivity = (activityId: string, roundId: number) => {
+    const patchRound = (key: number, patch: Partial<Round>) => {
+        setRounds((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+        setErrors((e) => { const n = { ...e }; delete n[key]; return n; });
+    };
+
+    const handleImportActivity = (activityId: string, key: number) => {
         if (!Array.isArray(activities)) return;
         const activity = activities.find((a: any) => a.id === activityId);
-        if (activity && activity.participants) {
-            const participantIds = activity.participants.map((p: any) => p.memberId);
-            setRounds(rounds.map(r => r.id === roundId ? { ...r, participants: participantIds } : r));
+        if (activity?.participants) {
+            const active = new Set(allIds());
+            patchRound(key, { participants: activity.participants.map((p: any) => p.memberId).filter((id: string) => active.has(id)) });
         }
     };
 
-    const handleAddRound = () => {
-        const nextId = rounds.length + 1;
-        setRounds([...rounds, {
-            id: nextId,
-            title: `${t("createSettlementDialog.roundPrefix")}${nextId}${t("createSettlementDialog.roundSuffix")}`,
-            amount: "",
-            payerId: "", // Default empty, user selects
-            participants: activeMembers.map(m => m.member.id) // Default all active members
-        }]);
+    const addRound = () => {
+        setRounds((rs) => [...rs, newRound(nextKey, rs.length + 1)]);
+        setNextKey((k) => k + 1);
     };
-
-    const handleRoundChange = (id: number, field: string, value: any) => {
-        setRounds(rounds.map(r => r.id === id ? { ...r, [field]: value } : r));
-    };
-
-    const toggleParticipant = (roundId: number, memberId: string) => {
-        setRounds(rounds.map(r => {
-            if (r.id !== roundId) return r;
-            const newParticipants = r.participants.includes(memberId)
-                ? r.participants.filter((id: string) => id !== memberId)
-                : [...r.participants, memberId];
-            return { ...r, participants: newParticipants };
-        }));
-    };
+    const removeRound = (key: number) => setRounds((rs) => rs.filter((r) => r.key !== key));
 
     const handleSubmit = () => {
-        // Guard against any non-active (e.g. pending) ids sneaking into a round's participant
-        // set — via the "모임 가져오기" import path or a stale seed — before they reach the server.
-        const activeIds = new Set(activeMembers.map(m => m.member.id));
-        const sanitizedRounds = rounds.map(r => ({
-            ...r,
-            participants: r.participants.filter((mid: string) => activeIds.has(mid))
-        }));
-        const payload = {
-            title,
-            accountBank,
-            accountNumber,
-            accountHolder,
-            items: sanitizedRounds.map((r, idx) => {
-                // The payer must be one of the round's participants. If the selected payer was
-                // removed from the participant set (e.g. via "모임 가져오기" or toggling members),
-                // fall back to the first participant rather than an arbitrary non-participant.
-                const payerId = (r.payerId && r.participants.includes(r.payerId))
-                    ? r.payerId
-                    : (r.participants[0] || activeMembers[0]?.member.id);
-                return {
-                    roundOrder: idx + 1,
-                    title: r.title,
-                    amount: Number(r.amount),
-                    payerId
-                };
-            }),
-            participants: sanitizedRounds.flatMap((r, idx) => r.participants.map((mid: string) => ({
-                roundOrder: idx + 1,
-                memberId: mid
-            }))),
-            sendToChat: true
-        };
-        onSubmit(payload);
+        if (!title.trim()) {
+            toast({ title: t("crewSettle.titleRequired"), variant: "destructive" });
+            return;
+        }
+        const active = new Set(allIds());
+        const clean = rounds.map((r) => ({ ...r, participants: r.participants.filter((id) => active.has(id)) }));
+        const errs: Record<number, string> = {};
+        for (const r of clean) {
+            const e = checkSettlementRound({ amount: r.amount, payerId: r.payerId, participants: r.participants });
+            if (e) errs[r.key] = e === "amount" ? t("crewSettle.errAmount") : e === "participants" ? t("crewSettle.errParticipants") : t("crewSettle.errPayer");
+        }
+        setErrors(errs);
+        if (Object.keys(errs).length > 0) {
+            toast({ title: t("crewSettle.fixRounds"), variant: "destructive" });
+            return;
+        }
+        onSubmit({
+            title: title.trim(),
+            accountBank: accountBank.trim(),
+            accountNumber: accountNumber.trim(),
+            accountHolder: accountHolder.trim(),
+            items: clean.map((r, idx) => ({ roundOrder: idx + 1, title: r.title.trim() || roundName(idx + 1), amount: Number(r.amount), payerId: r.payerId })),
+            participants: clean.flatMap((r, idx) => r.participants.map((memberId) => ({ roundOrder: idx + 1, memberId }))),
+            sendToChat: true,
+        });
     };
+
+    const fieldCls = "h-12 text-[15px] bg-surface-2 border-surface-line rounded-tile";
+    const labelCls = "text-[13px] font-semibold text-ink-2";
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent hideClose className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] max-w-md max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-card">
-                <div className="shrink-0 bg-white border-b border-black/[0.08] p-4 flex items-center justify-between z-10">
-                    <DialogTitle className="font-bold text-[19px] tracking-tight text-brand">{t("createSettlementDialog.title")}</DialogTitle>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-black/40" onClick={() => onOpenChange(false)}>
-                        <LucideX className="w-5 h-5" />
-                    </Button>
+            <DialogContent hideClose className="bg-surface-1 text-ink-1 max-w-md max-h-[90dvh] p-0 gap-0 flex flex-col overflow-hidden rounded-card">
+                <div className="shrink-0 flex items-center justify-between gap-2 pl-4 pr-2 pt-3 pb-2 border-b border-surface-line">
+                    <div className="min-w-0">
+                        <DialogTitle className={CREW_TEXT.section}>{t("createSettlementDialog.title")}</DialogTitle>
+                        <DialogDescription className={CREW_TEXT.caption}>{t("crewSettle.dialogDesc")}</DialogDescription>
+                    </div>
+                    <IconButton label={t("crewPoll.close")} onClick={() => onOpenChange(false)}><LucideX /></IconButton>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                    {/* Basic Info */}
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.titleLabel")}</Label>
-                            <Input
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                className="bg-surface-2 border-surface-line h-12 rounded-tile font-bold"
-                            />
+                <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5">
+                    {/* 기본 정보 */}
+                    <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="st-title" className={labelCls}>{t("createSettlementDialog.titleLabel")}</Label>
+                            <Input id="st-title" value={title} maxLength={60} onChange={(e) => setTitle(e.target.value)} className={fieldCls} />
                         </div>
                         <div className="grid grid-cols-3 gap-2">
-                            <div className="space-y-2 col-span-1">
-                                <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.bankLabel")}</Label>
-                                <Input
-                                    value={accountBank}
-                                    onChange={(e) => setAccountBank(e.target.value)}
-                                    placeholder={t("createSettlementDialog.bankPlaceholder")}
-                                    className="bg-surface-2 border-surface-line h-12 rounded-tile text-base"
-                                />
+                            <div className="flex flex-col gap-1.5 col-span-1">
+                                <Label htmlFor="st-bank" className={labelCls}>{t("createSettlementDialog.bankLabel")}</Label>
+                                <Input id="st-bank" value={accountBank} onChange={(e) => setAccountBank(e.target.value)} placeholder={t("createSettlementDialog.bankPlaceholder")} className={fieldCls} />
                             </div>
-                            <div className="space-y-2 col-span-2">
-                                <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.accountLabel")}</Label>
-                                <Input
-                                    value={accountNumber}
-                                    onChange={(e) => setAccountNumber(e.target.value)}
-                                    placeholder={t("createSettlementDialog.accountPlaceholder")}
-                                    className="bg-surface-2 border-surface-line h-12 rounded-tile text-base"
-                                />
+                            <div className="flex flex-col gap-1.5 col-span-2">
+                                <Label htmlFor="st-account" className={labelCls}>{t("createSettlementDialog.accountLabel")}</Label>
+                                <Input id="st-account" inputMode="numeric" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder={t("createSettlementDialog.accountPlaceholder")} className={fieldCls} />
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.holderLabel")}</Label>
-                            <Input
-                                value={accountHolder}
-                                onChange={(e) => setAccountHolder(e.target.value)}
-                                placeholder={t("createSettlementDialog.holderPlaceholder")}
-                                className="bg-surface-2 border-surface-line h-12 rounded-tile text-base"
-                            />
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="st-holder" className={labelCls}>{t("createSettlementDialog.holderLabel")}</Label>
+                            <Input id="st-holder" value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} placeholder={t("createSettlementDialog.holderPlaceholder")} className={fieldCls} />
                         </div>
+                        <p className={CREW_TEXT.caption}>{t("crewSettle.accountNote")}</p>
                     </div>
 
-                    <div className="h-px bg-black/[0.06] my-2" />
-
-                    {/* Rounds */}
-                    <div className="space-y-6">
-                        {rounds.map((round, index) => (
-                            <div key={round.id} className="relative rk-card-2 p-4">
-                                <div className="absolute top-4 right-4 text-[12px] font-semibold text-brand bg-brand/12 px-2.5 py-1 rounded-full">
-                                    {t("createSettlementDialog.stepPrefix")}{index + 1}{t("createSettlementDialog.stepSuffix")}
+                    {/* 차수 */}
+                    {rounds.map((round, index) => {
+                        const amount = Number(round.amount);
+                        const split = Number.isInteger(amount) && amount > 0 && round.participants.length > 0
+                            ? splitAmount(amount, round.participants, round.payerId || null)
+                            : null;
+                        const err = errors[round.key];
+                        return (
+                            <section key={round.key} className={cn("rk-card-2 p-4 flex flex-col gap-3", err && "ring-1 ring-destructive")}>
+                                <div className="flex items-center justify-between gap-2 -mt-1 -mr-2">
+                                    <span className="rk-chip text-[12px] bg-brand/10 text-brand">{t("crewSettle.stepN").replace("{n}", String(index + 1))}</span>
+                                    {rounds.length > 1 && (
+                                        <IconButton label={t("crewSettle.removeRound")} onClick={() => removeRound(round.key)} tone="danger">
+                                            <LucideTrash2 />
+                                        </IconButton>
+                                    )}
                                 </div>
 
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.roundNameLabel")}</Label>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label className={labelCls}>{t("createSettlementDialog.roundNameLabel")}</Label>
+                                    <Input value={round.title} maxLength={30} onChange={(e) => patchRound(round.key, { title: e.target.value })} className={fieldCls} />
+                                </div>
+
+                                <div className="flex flex-col gap-1.5">
+                                    <Label className={labelCls}>{t("createSettlementDialog.amountLabel")}</Label>
+                                    <div className="relative">
                                         <Input
-                                            value={round.title}
-                                            onChange={(e) => handleRoundChange(round.id, 'title', e.target.value)}
-                                            className="bg-surface-2 border-surface-line h-12 rounded-tile text-base font-bold"
+                                            type="number" inputMode="numeric" min={1} step={1}
+                                            value={round.amount}
+                                            onChange={(e) => patchRound(round.key, { amount: e.target.value })}
+                                            placeholder="0"
+                                            className={cn(fieldCls, "text-[17px] font-semibold pr-10 rk-num")}
                                         />
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[15px] font-medium text-ink-3">{t("createSettlementDialog.currencyUnit")}</span>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.amountLabel")}</Label>
-                                        <div className="relative">
-                                            <Input
-                                                type="number"
-                                                value={round.amount}
-                                                onChange={(e) => handleRoundChange(round.id, 'amount', e.target.value)}
-                                                placeholder="0"
-                                                className="bg-surface-2 border-surface-line h-12 rounded-tile text-lg font-bold pl-4 pr-8"
-                                            />
-                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-black/40">{t("createSettlementDialog.currencyUnit")}</span>
-                                        </div>
-                                    </div>
+                                </div>
 
-                                    <div className="space-y-4 pt-2">
-                                        <div className="flex items-center justify-between px-1">
-                                            <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.participantsLabel")}</Label>
-                                            <div className="flex items-center gap-2">
-                                                {recentActivities.length > 0 && (
-                                                    <Select onValueChange={(val) => handleImportActivity(val, round.id)}>
-                                                        <SelectTrigger className="h-8 bg-black/[0.04] border-black/10 text-[12px] font-semibold text-brand px-3 rounded-full w-auto gap-1">
-                                                            <LucideCalendar className="w-3 h-3" />
-                                                            {t("createSettlementDialog.importActivity")}
-                                                        </SelectTrigger>
-                                                        <SelectContent className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] rounded-tile">
-                                                            {recentActivities.map((act: any) => (
-                                                                <SelectItem key={act.id} value={act.id} className="text-xs">
-                                                                    {format(new Date(act.activityDate), "MM/dd")} {act.title}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                )}
-                                                <button
-                                                    onClick={() => {
-                                                        setActiveRoundId(round.id);
-                                                        setIsMemberSelectOpen(true);
-                                                    }}
-                                                    className="flex items-center gap-1 h-8 text-[12px] font-semibold text-[rgba(0,0,0,0.87)] bg-black/[0.06] px-3 rounded-full hover:bg-black/[0.10] transition-colors"
-                                                >
-                                                    <LucideSettings2 className="w-3 h-3" />
-                                                    {t("createSettlementDialog.editMembers")}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div
-                                            onClick={() => {
-                                                setActiveRoundId(round.id);
-                                                setIsMemberSelectOpen(true);
-                                            }}
-                                            className="bg-black/[0.03] rounded-tile p-4 flex items-center justify-between cursor-pointer hover:border-black/20 transition-all group"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex -space-x-2">
-                                                    {round.participants.slice(0, 5).map((mid: string) => {
-                                                        const m = activeMembers.find(am => am.member.id === mid);
-                                                        return (
-                                                            <Avatar key={mid} className="w-8 h-8 border-2 border-white">
-                                                                <AvatarImage src={m?.member.profileImageUrl} />
-                                                                <AvatarFallback className="bg-black/[0.08] text-[rgba(0,0,0,0.87)] text-[12px] font-semibold">{m?.member.name[0]}</AvatarFallback>
-                                                            </Avatar>
-                                                        );
-                                                    })}
-                                                    {round.participants.length > 5 && (
-                                                        <div className="w-8 h-8 rounded-full bg-black/[0.08] border-2 border-white flex items-center justify-center text-[12px] font-medium text-black/55 relative z-10">
-                                                            +{round.participants.length - 5}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-[15px] font-semibold text-[rgba(0,0,0,0.87)] group-hover:text-brand transition-colors tabular-nums">
-                                                        {round.participants.length}{t("createSettlementDialog.selectedSuffix")}
-                                                    </span>
-                                                    <p className="text-[12px] text-black/55 font-medium">{t("createSettlementDialog.editParticipantsHint")}</p>
-                                                </div>
-                                            </div>
-                                            <LucideChevronDown className="w-5 h-5 text-black/40 group-hover:text-[rgba(0,0,0,0.87)] transition-colors" />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">{t("createSettlementDialog.payerLabel")}</Label>
-                                        <Select
-                                            value={round.payerId}
-                                            onValueChange={(val) => handleRoundChange(round.id, 'payerId', val)}
-                                        >
-                                            <SelectTrigger
-                                                aria-label="Payer select"
-                                                className="w-full h-12 bg-surface-2 border-surface-line rounded-tile px-3 text-base font-bold text-[rgba(0,0,0,0.87)]"
-                                            >
-                                                <SelectValue placeholder={t("createSettlementDialog.payerPlaceholder")} />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-white border-black/10 text-[rgba(0,0,0,0.87)] rounded-tile">
-                                                {activeMembers
-                                                    .filter(m => round.participants.includes(m.member.id))
-                                                    .map(m => (
-                                                        <SelectItem key={m.member.id} value={m.member.id} className="text-base">
-                                                            {m.member.name}
+                                <div className="flex flex-col gap-1.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <Label className={labelCls}>{t("createSettlementDialog.participantsLabel")}</Label>
+                                        {recentActivities.length > 0 && (
+                                            <Select onValueChange={(val) => handleImportActivity(val, round.key)}>
+                                                <SelectTrigger className="h-11 w-auto gap-1 px-3 rounded-pill border-surface-line bg-surface-1 text-[13px] font-semibold text-brand">
+                                                    <LucideCalendar className="w-4 h-4" />
+                                                    {t("createSettlementDialog.importActivity")}
+                                                </SelectTrigger>
+                                                <SelectContent className="bg-surface-1 border-surface-line text-ink-1 rounded-tile">
+                                                    {recentActivities.map((act: any) => (
+                                                        <SelectItem key={act.id} value={act.id} className="min-h-11 text-[15px]">
+                                                            {new Date(act.activityDate).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit" })} {act.title}
                                                         </SelectItem>
                                                     ))}
-                                            </SelectContent>
-                                        </Select>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setActiveRoundKey(round.key); setIsMemberSelectOpen(true); }}
+                                        className="w-full min-h-14 rounded-tile bg-surface-2 border border-surface-line px-3 py-2 flex items-center justify-between gap-3 text-left active:bg-surface-3"
+                                    >
+                                        <span className="flex items-center gap-3 min-w-0">
+                                            <span className="flex -space-x-2 shrink-0">
+                                                {round.participants.slice(0, 5).map((mid) => {
+                                                    const m = activeMembers.find((am) => am.member.id === mid);
+                                                    return <CrewAvatar key={mid} src={m?.member.profileImageUrl} name={m?.member.name} size={28} className="ring-2 ring-[var(--surface-2)]" />;
+                                                })}
+                                            </span>
+                                            <span className="flex flex-col min-w-0">
+                                                <span className="text-[15px] font-semibold text-ink-1 rk-num">{t("crewSettle.peopleN").replace("{n}", String(round.participants.length))}</span>
+                                                <span className={CREW_TEXT.caption}>{t("createSettlementDialog.editMembers")}</span>
+                                            </span>
+                                        </span>
+                                        <LucideSettings2 className="w-5 h-5 text-ink-3 shrink-0" />
+                                    </button>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
 
-                    <Button
-                        variant="outline"
-                        className="w-full border-dashed border-black/20 h-12 text-black/55 hover:text-[rgba(0,0,0,0.87)] hover:bg-black/[0.04] rounded-tile"
-                        onClick={handleAddRound}
-                    >
-                        {t("createSettlementDialog.addRound")}
-                    </Button>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label className={labelCls}>{t("createSettlementDialog.payerLabel")}</Label>
+                                    <Select value={round.payerId} onValueChange={(val) => patchRound(round.key, { payerId: val })}>
+                                        <SelectTrigger aria-label={t("createSettlementDialog.payerLabel")} className={cn(fieldCls, "px-3 font-semibold text-ink-1")}>
+                                            <SelectValue placeholder={t("createSettlementDialog.payerPlaceholder")} />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-surface-1 border-surface-line text-ink-1 rounded-tile">
+                                            {activeMembers
+                                                .filter((m) => round.participants.includes(m.member.id))
+                                                .map((m) => (
+                                                    <SelectItem key={m.member.id} value={m.member.id} className="min-h-11 text-[15px]">{m.member.name}</SelectItem>
+                                                ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* 1인 금액 미리보기 — 1원 단위, 나머지는 계산한 사람 */}
+                                {split && (
+                                    <p className="text-[13px] font-medium text-ink-2 rk-num">
+                                        {t("crewSettle.perPerson").replace("{n}", split.base.toLocaleString("ko-KR"))}
+                                        {split.remainder > 0 && (
+                                            <span className="text-ink-3"> · {t("crewSettle.remainderNote").replace("{n}", String(split.remainder))}</span>
+                                        )}
+                                    </p>
+                                )}
+                                {err && <p className="text-[13px] font-medium text-destructive" role="alert">{err}</p>}
+                            </section>
+                        );
+                    })}
+
+                    <button type="button" onClick={addRound} disabled={rounds.length >= 20} className={cn(CREW_BTN.secondary, "w-full border-dashed")}>
+                        <LucidePlus className="w-4 h-4" />
+                        {t("crewSettle.addRound")}
+                    </button>
                 </div>
 
-                {/* Member Selection Sub-modal */}
+                {/* 참석자 고르기 */}
                 <MemberSelectionDialog
                     open={isMemberSelectOpen}
                     onOpenChange={setIsMemberSelectOpen}
                     members={activeMembers}
-                    selectedIds={rounds.find(r => r.id === activeRoundId)?.participants || []}
+                    selectedIds={rounds.find((r) => r.key === activeRoundKey)?.participants || []}
                     onConfirm={(selectedIds) => {
-                        if (activeRoundId) {
-                            handleRoundChange(activeRoundId, 'participants', selectedIds);
-                        }
+                        if (activeRoundKey == null) return;
+                        const r = rounds.find((x) => x.key === activeRoundKey);
+                        // 계산한 사람이 빠지면 선택을 비운다 — 조용히 다른 사람으로 바꾸지 않는다.
+                        patchRound(activeRoundKey, {
+                            participants: selectedIds,
+                            payerId: r && selectedIds.includes(r.payerId) ? r.payerId : "",
+                        });
                     }}
                 />
 
-                <div className="shrink-0 p-4 bg-white border-t border-black/[0.08] z-20">
-                    <Button
-                        className="w-full h-14 rk-btn-primary text-[16px] rounded-tile"
-                        onClick={handleSubmit}
-                        disabled={isPending}
-                    >
+                <div className="shrink-0 px-4 pt-3 pb-4 border-t border-surface-line">
+                    <button type="button" className={cn(CREW_BTN.primary, "w-full h-12")} onClick={handleSubmit} disabled={isPending}>
                         {isPending ? t("createSettlementDialog.creating") : t("createSettlementDialog.submit")}
-                    </Button>
+                        {!isPending && <LucideChevronRight className="w-4 h-4" />}
+                    </button>
                 </div>
-
             </DialogContent>
         </Dialog>
     );
