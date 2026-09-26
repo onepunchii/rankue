@@ -2,7 +2,7 @@ import { Router } from "express";
 import { storage } from "../../storage/index.js";
 import { insertHiqCrewSchema, insertHiqCrewActivitySchema, insertHiqCrewPostSchema, insertHiqSettlementSchema, insertHiqPollSchema } from "../../../shared/schema.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
-import { msg } from "../../lib/i18n.js";
+import { msg, tr, memberLocale } from "../../lib/i18n.js";
 import { notificationService } from "../../services/notificationService.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
@@ -13,6 +13,11 @@ import { requireTermsAccepted } from "../../middleware/terms.js";
 import { screenCrewFields, screenCrewText, screenCrewProfile, screenCrewBody, changedCrewProfileFields, isCrewReportTarget, isReportReason, type CrewReportTarget } from "../../utils/crewModeration.js";
 
 import { isSuperAdmin } from "../../lib/superAdmin.js";
+import { kstShortDateTime } from "../../../shared/crewActivity.js";
+import {
+    resolveCrewPostCategory, canonicalCrewPostCategory, parseCrewPageQuery, validateCrewPostImages, imageUrlList, unreferencedUrls,
+    decodeCrewCursor, CREW_POSTS_FIRST_PAGE, CREW_PHOTOS_FIRST_PAGE,
+} from "../../../shared/crewBoard.js";
 
 const router = Router();
 
@@ -51,11 +56,46 @@ function activeMembers(members: any[] | undefined): any[] {
 }
 
 
+// 알림 자리표시자의 대체어(이름이 빈 회원 등)는 받는 사람 언어로 — 예전엔 "누군가"·"정모" 가 한국어 그대로 나갔다.
+// 대체어가 필요한 경우는 드물어서, 그때만 받는 사람 행을 읽어 언어를 안다.
+async function fallbackFor(recipientId: string, key: string): Promise<string> {
+    const m = await storage.getMemberById(recipientId).catch(() => null);
+    return tr(memberLocale(m as any), key);
+}
+
+// 글과 사진첩은 같은 파일(Blob URL)을 나눠 쓴다(글 사진이 사진첩에 복사된다). 한쪽 행을 지운 뒤, 아직 다른 행이
+// 쓰는 파일은 남기고 나머지만 지운다. 참조 확인이 실패하면 지우지 않는다 — 고아 파일이 깨진 이미지보다 낫다.
+async function deleteUnreferencedBlobs(urls: unknown): Promise<void> {
+    const list = imageUrlList(urls);
+    if (list.length === 0) return;
+    const still = await storage.crews.findReferencedImageUrls(list).catch(() => new Set<string>(list));
+    await deleteBlobs(unreferencedUrls(list, still));
+}
+
+// 정모 수정·삭제 권한 — 운영진 또는 만든 사람. 만들기는 크루원 누구나 되는데(POST) 고치기·지우기는 운영진만 돼서
+// 자기가 연 번개도 못 고쳤다. 만든 사람도 지금 크루원(승인 대기·탈퇴 아님)이어야 한다.
+async function canManageActivity(req: AuthRequest, activity: { creatorId: string }): Promise<boolean> {
+    const membership = await storage.getCrewMembership(req.params.id, req.userId!);
+    const role = membership?.role;
+    if (role === 'leader' || role === 'manage') return true;
+    if (role && role !== 'pending' && activity.creatorId === req.userId) return true;
+    return isSuperAdmin(req.userId);
+}
+
 // --- Activities ---
 
-// GET /activities - Get upcoming activities
+// GET /activities - 다가오는 정모(시작 뒤 몇 시간은 '진행 중' 으로 포함), ?past=1 이면 지난 정모(최근 것부터)
 // 가입 검토 중인 로그인 사용자에게는 보여주되(가입 유도), 비로그인 크롤러성 접근은 차단
+// 지난 정모 쪽 나누기: ?past=1&before=<activityDate ISO>_<id>&limit=20
 router.get("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (req.query.past === "1" || req.query.past === "true") {
+        const hasBefore = typeof req.query.before === "string" && req.query.before !== "";
+        const cursor = hasBefore ? decodeCrewCursor(req.query.before) : null;
+        if (hasBefore && !cursor) return sendError(res, 400, "err.crew.badCursor");
+        const n = Number(req.query.limit);
+        const past = await storage.crews.getPastCrewActivities(req.params.id, { cursor, limit: Number.isFinite(n) ? n : 20 });
+        return sendSuccess(res, past);
+    }
     const activities = await storage.getUpcomingCrewActivities(req.params.id);
     return sendSuccess(res, activities);
 }));
@@ -89,7 +129,8 @@ router.post("/:id/activities", requireAuth, requireTermsAccepted, asyncHandler(a
         const crewData = await storage.getCrew(req.params.id);
         if (crewData) {
             const creator = await storage.getMemberById(req.userId!);
-            const activityTime = activity.activityDate ? new Date(activity.activityDate).toLocaleString("ko-KR", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "곧";
+            // 한국 시각 "9/27 19:00" — 서버(UTC)의 toLocaleString("ko-KR") 는 9시간 이른 시각을 한국어로만 찍었다.
+            const activityTime = kstShortDateTime(activity.activityDate);
             const blockers = await storage.crews.getBlockerIds(req.userId!); // 만든 사람을 차단한 크루원에게는 알리지 않는다
             await settleNotifications("[ActivityCreateNotif]", activeMembers(crewData.members)
                 .filter((m: any) => m.member.id !== req.userId && !blockers.has(m.member.id))
@@ -99,7 +140,11 @@ router.post("/:id/activities", requireAuth, requireTermsAccepted, asyncHandler(a
                     await notificationService.sendAndSaveNotification({
                         memberId: m.member.id,
                         title: msg("notif.crew.activityNew.title", { crew: crewData.crew.name }),
-                        body: msg("notif.crew.activityNew.body", { name: creator?.name || "누군가", title: activity.title || "정모", time: activityTime }),
+                        body: msg("notif.crew.activityNew.body", {
+                            name: creator?.name || await fallbackFor(m.member.id, "notif.crew.someone"),
+                            title: activity.title || await fallbackFor(m.member.id, "notif.crew.activityFallback"),
+                            time: activityTime,
+                        }),
                         category: crewData.crew.sportCategory || "BILLIARDS",
                         type: "ACTIVITY",
                         params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
@@ -124,8 +169,12 @@ router.post("/:id/activities/:activityId/join", requireAuth, asyncHandler(async 
             await notificationService.sendAndSaveNotification({
                 memberId: act.creatorId,
                 title: "notif.crew.activityJoin.title",
-                body: msg("notif.crew.activityJoin.body", { name: joiner?.name || "누군가", title: act.title || "정모" }),
-                category: "BILLIARDS",
+                body: msg("notif.crew.activityJoin.body", {
+                    name: joiner?.name || await fallbackFor(act.creatorId, "notif.crew.someone"),
+                    title: act.title || await fallbackFor(act.creatorId, "notif.crew.activityFallback"),
+                }),
+                // 종목은 정모 행에 있다 — 예전엔 BILLIARDS 로 박혀 골프 크루 알림이 당구 묶음에 들어갔다.
+                category: act.sportCategory || "BILLIARDS",
                 type: "ACTIVITY",
                 params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
             }).catch((err: any) => console.error("[ActivityJoinNotif]", err));
@@ -143,26 +192,28 @@ router.delete("/:id/activities/:activityId/join", requireAuth, asyncHandler(asyn
     return sendSuccess(res, { success: true });
 }));
 
-// PATCH /activities/:activityId - Update activity (Leader/Manager only)
+// PATCH /activities/:activityId - Update activity (운영진 또는 만든 사람)
 router.patch("/:id/activities/:activityId", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
-    const crewData = await storage.getCrew(req.params.id);
-    if (!crewData) return sendError(res, 404, "err.crew.notFound");
-
-    const me = crewData.members.find((m: any) => m.member.id === req.userId);
-    if ((!me || (me.role !== 'leader' && me.role !== 'manage')) && !(await isSuperAdmin(req.userId))) {
-        return sendError(res, 403, "err.crew.editAdminOnly");
-    }
-
     const activity = await storage.getCrewActivity(req.params.activityId);
     if (!activity || activity.crewId !== req.params.id) return sendError(res, 404, "err.crew.activityNotFound");
+    if (!(await canManageActivity(req, activity))) return sendError(res, 403, "err.crew.activityEditForbidden");
 
     const updateData: any = {};
     if (req.body.title !== undefined) updateData.title = req.body.title;
     if (req.body.description !== undefined) updateData.description = req.body.description;
-    if (req.body.activityDate !== undefined) updateData.activityDate = new Date(req.body.activityDate);
+    if (req.body.activityDate !== undefined) {
+        const d = new Date(req.body.activityDate);
+        if (Number.isNaN(d.getTime())) return sendError(res, 400, "err.crew.activityDateInvalid");
+        updateData.activityDate = d;
+    }
     if (req.body.locationName !== undefined) updateData.locationName = req.body.locationName;
     if (req.body.cost !== undefined) updateData.cost = req.body.cost;
-    if (req.body.maxParticipants !== undefined) updateData.maxParticipants = req.body.maxParticipants;
+    if (req.body.maxParticipants !== undefined) {
+        // null = 제한 없음(서버 참가 검사는 null 을 999 로 본다). 숫자면 2 이상 정수만.
+        const n = req.body.maxParticipants === null ? null : Number(req.body.maxParticipants);
+        if (n !== null && (!Number.isInteger(n) || n < 2 || n > 999)) return sendError(res, 400, "err.crew.activityMaxInvalid");
+        updateData.maxParticipants = n;
+    }
     if (req.body.category !== undefined) updateData.category = req.body.category;
     const screenedEdit = screenCrewBody(updateData, ACTIVITY_TEXT_KEYS);
     if (!screenedEdit.ok) return sendError(res, 400, screenedEdit.reason);
@@ -182,8 +233,8 @@ router.patch("/:id/activities/:activityId", requireAuth, requireTermsAccepted, a
                     if (!setting.activityEnabled) return;
                     await notificationService.sendAndSaveNotification({
                         memberId: pid,
-                        title: msg("notif.crew.activityEdit.title", { crew: crewData?.crew.name || "크루" }),
-                        body: msg("notif.crew.activityEdit.body", { title: updated?.title || activity.title || "정모" }),
+                        title: msg("notif.crew.activityEdit.title", { crew: crewData?.crew.name || await fallbackFor(pid, "notif.crew.crewFallback") }),
+                        body: msg("notif.crew.activityEdit.body", { title: updated?.title || activity.title || await fallbackFor(pid, "notif.crew.activityFallback") }),
                         category: crewData?.crew?.sportCategory || "BILLIARDS",
                         type: "ACTIVITY",
                         params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
@@ -194,18 +245,11 @@ router.patch("/:id/activities/:activityId", requireAuth, requireTermsAccepted, a
     return sendSuccess(res, updated);
 }));
 
-// DELETE /activities/:activityId - Delete activity (Leader/Manager only)
+// DELETE /activities/:activityId - Delete activity (운영진 또는 만든 사람)
 router.delete("/:id/activities/:activityId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const crewData = await storage.getCrew(req.params.id);
-    if (!crewData) return sendError(res, 404, "err.crew.notFound");
-
-    const me = crewData.members.find((m: any) => m.member.id === req.userId);
-    if ((!me || (me.role !== 'leader' && me.role !== 'manage')) && !(await isSuperAdmin(req.userId))) {
-        return sendError(res, 403, "err.crew.deleteAdminOnly");
-    }
-
     const activity = await storage.getCrewActivity(req.params.activityId);
     if (!activity || activity.crewId !== req.params.id) return sendError(res, 404, "err.crew.activityNotFound");
+    if (!(await canManageActivity(req, activity))) return sendError(res, 403, "err.crew.activityDeleteForbidden");
 
     // 삭제하면 참가자 행도 같이 사라지므로 알림 대상은 반드시 삭제 '전에' 확보한다.
     const participantIds = await storage.crews.getActivityParticipantIds(req.params.activityId)
@@ -223,8 +267,8 @@ router.delete("/:id/activities/:activityId", requireAuth, asyncHandler(async (re
                     if (!setting.activityEnabled) return;
                     await notificationService.sendAndSaveNotification({
                         memberId: pid,
-                        title: msg("notif.crew.activityCancel.title", { crew: crewData?.crew.name || "크루" }),
-                        body: msg("notif.crew.activityCancel.body", { title: activity.title || "정모" }),
+                        title: msg("notif.crew.activityCancel.title", { crew: crewData?.crew.name || await fallbackFor(pid, "notif.crew.crewFallback") }),
+                        body: msg("notif.crew.activityCancel.body", { title: activity.title || await fallbackFor(pid, "notif.crew.activityFallback") }),
                         category: crewData?.crew?.sportCategory || "BILLIARDS",
                         type: "ACTIVITY",
                         params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
@@ -247,34 +291,52 @@ router.get("/activities/member/:memberId", requireAuth, asyncHandler(async (req:
 // --- Posts ---
 
 // GET /posts — 승인제 크루의 게시판은 크루원 전용 (비로그인·승인 대기자 차단)
+// 쪽 나누기: 파라미터가 없으면 첫 쪽(고정 공지 + 일반 글 CREW_POSTS_FIRST_PAGE 개) — 예전 호출(club-detail)이 그대로 동작한다.
+// '더 보기' 는 ?before=<createdAt ISO>_<id>&limit=20 — 그보다 오래된 일반 글만 준다(공지는 첫 쪽에만).
 router.get("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
-    const posts = await storage.getCrewPosts(req.params.id, req.userId);
+    const page = parseCrewPageQuery(req.query, CREW_POSTS_FIRST_PAGE);
+    if (!page.ok) return sendError(res, 400, "err.crew.badCursor");
+    const posts = await storage.crews.getCrewPosts(req.params.id, req.userId, { cursor: page.cursor, limit: page.limit });
     return sendSuccess(res, posts);
 }));
+
+// 글 쓰기·고치기에서 사람이 쓰는 칸 검사 — 제목·본문 필터(커뮤니티와 같은 차단 + 연락처 마스킹).
+// 카테고리는 화이트리스트라 필터 대상이 아니다.
+function screenPostText(title: string | null, content: string | null) {
+    return screenCrewFields({ title, content });
+}
 
 // POST /posts
 router.post("/:id/posts", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     const role = await requireCrewMember(req, res);
     if (role === null) return;
+    const isAdmin = role === 'leader' || role === 'manage';
     // 게시 전 필터 — 커뮤니티와 같은 차단(내기·욕설·거래) + 연락처 마스킹 (Apple 1.2 / Play UGC).
     // 크루 게시판도 크루원끼리 보는 UGC 라 심사 요건이 똑같이 걸린다.
     const str = (v: unknown) => (typeof v === "string" ? v : null);
     if ((str(req.body?.content) || "").length > 4000) return sendError(res, 400, "err.crew.contentTooLong");
-    const screened = screenCrewFields({ title: str(req.body?.title), content: str(req.body?.content), category: str(req.body?.category) });
+    const screened = screenPostText(str(req.body?.title), str(req.body?.content));
     if (!screened.ok) return sendError(res, 400, screened.reason);
+    // 카테고리 화이트리스트 — 예전엔 아무 문자열이나 받아서 일반 멤버도 "공지사항" 으로 올릴 수 있었다.
+    const category = resolveCrewPostCategory(req.body?.category, isAdmin);
+    if (!category.ok) return sendError(res, category.reason === "err.crew.postNoticeAdminOnly" ? 403 : 400, category.reason);
+    const images = validateCrewPostImages(req.body?.images);
+    if (!images.ok) return sendError(res, 400, "err.crew.postImagesInvalid");
     // 글의 종목은 크루가 정한다 — 예전엔 안 넣어서 골프 크루 글까지 BILLIARDS 로 저장됐다(2026-09-09 검토).
     const crewForPost = await storage.getCrew(req.params.id);
+    // 화이트리스트 — req.body 를 그대로 펼치지 않는다(id·createdAt·authorId 를 실어 보내는 것 차단).
     const data = {
-        ...req.body,
-        ...(screened.value.title != null ? { title: screened.value.title } : {}),
-        ...(screened.value.content != null ? { content: screened.value.content } : {}),
+        title: screened.value.title ?? "",
+        content: screened.value.content ?? "",
+        category: category.value,
+        images: images.value,
         crewId: req.params.id,
         authorId: req.userId,
         sportCategory: crewForPost?.crew?.sportCategory ?? "BILLIARDS",
         // 공지 등록은 운영진 전용 — 일반 멤버가 isNotice:true를 실어 보내 상단 고정 공지로
-        // 올리는 걸 막는다.
-        isNotice: (role === 'leader' || role === 'manage') ? req.body.isNotice === true : false,
+        // 올리는 걸 막는다. 운영진이 공지사항 카테고리로 쓰면 고정 공지다(화면이 그렇게 보여 왔다).
+        isNotice: isAdmin ? (req.body?.isNotice === true || category.value === "공지사항") : false,
     };
 
     const validation = insertHiqCrewPostSchema.safeParse(data);
@@ -284,6 +346,54 @@ router.post("/:id/posts", requireAuth, requireTermsAccepted, asyncHandler(async 
 
     const post = await storage.createCrewPost(validation.data);
     return sendSuccess(res, post);
+}));
+
+// PATCH /posts/:postId — 글 고치기(글쓴이·운영진) + 공지 고정/해제(운영진, { isNotice })
+// 규칙은 쓰기와 같다: 제목·본문 필터, 카테고리 화이트리스트(공지사항은 운영진만), 사진 목록 검사.
+router.patch("/:id/posts/:postId", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
+    const role = await requireCrewMember(req, res);
+    if (role === null) return;
+    const isAdmin = role === 'leader' || role === 'manage';
+    const post = await storage.getCrewPost(req.params.postId);
+    if (!post || post.crewId !== req.params.id) return sendError(res, 404, "err.crew.postNotFound");
+
+    const body = req.body || {};
+    const editsContent = ["title", "content", "category", "images"].some((k) => body[k] !== undefined);
+    if (editsContent && post.authorId !== req.userId && !isAdmin) return sendError(res, 403, "err.crew.postEditForbidden");
+    if (body.isNotice !== undefined && !isAdmin) return sendError(res, 403, "err.crew.pinAdminOnly");
+
+    const update: Partial<{ title: string; content: string; category: string; images: string[] | null; isNotice: boolean }> = {};
+    const str = (v: unknown) => (typeof v === "string" ? v : null);
+    if (body.title !== undefined || body.content !== undefined) {
+        const title = body.title !== undefined ? str(body.title) : null;
+        const content = body.content !== undefined ? str(body.content) : null;
+        if (body.title !== undefined && !title?.trim()) return sendError(res, 400, "err.crew.postTitleRequired");
+        if ((content || "").length > 4000) return sendError(res, 400, "err.crew.contentTooLong");
+        const screened = screenPostText(title, content);
+        if (!screened.ok) return sendError(res, 400, screened.reason);
+        if (body.title !== undefined) update.title = screened.value.title ?? "";
+        if (body.content !== undefined) update.content = screened.value.content ?? "";
+    }
+    if (body.category !== undefined) {
+        // 원래 카테고리 그대로면 통과 — 화이트리스트 전에 쓰인 옛 글을 고칠 때 카테고리 때문에 막히지 않게.
+        const unchanged = canonicalCrewPostCategory(body.category) !== null && canonicalCrewPostCategory(body.category) === canonicalCrewPostCategory(post.category);
+        const category = resolveCrewPostCategory(body.category, isAdmin || unchanged);
+        if (!category.ok) return sendError(res, category.reason === "err.crew.postNoticeAdminOnly" ? 403 : 400, category.reason);
+        update.category = category.value;
+    }
+    if (body.images !== undefined) {
+        const images = validateCrewPostImages(body.images, imageUrlList((post as any).images));
+        if (!images.ok) return sendError(res, 400, "err.crew.postImagesInvalid");
+        update.images = images.value;
+    }
+    if (body.isNotice !== undefined) update.isNotice = body.isNotice === true;
+    if (Object.keys(update).length === 0) return sendSuccess(res, post);
+
+    const { post: updated, removedUrls } = await storage.crews.updateCrewPost(req.params.postId, update);
+    if (!updated) return sendError(res, 404, "err.crew.postNotFound");
+    // 뺀 사진 — 사진첩 복사본은 저장소가 지웠다. 아직 다른 행이 쓰지 않는 파일만 지운다.
+    await deleteUnreferencedBlobs(removedUrls);
+    return sendSuccess(res, updated);
 }));
 
 // DELETE /posts/:postId
@@ -300,8 +410,10 @@ router.delete("/:id/posts/:postId", requireAuth, asyncHandler(async (req: AuthRe
         return sendError(res, 403, "err.crew.deleteForbidden");
     }
 
+    // 글과 함께 사진첩 복사본 행도 지워진다(deleteCrewPost). 파일은 다른 글·사진이 아직 쓰면 남긴다 —
+    // 예전엔 무조건 지워서, 같은 파일을 쓰던 사진첩 타일이 깨졌다.
     await storage.deleteCrewPost(req.params.postId);
-    await deleteBlobs((post as any).images);
+    await deleteUnreferencedBlobs((post as any).images);
     return sendSuccess(res, { success: true });
 }));
 
@@ -353,8 +465,12 @@ router.post("/:id/posts/:postId/comments", requireAuth, requireTermsAccepted, as
                 await notificationService.sendAndSaveNotification({
                     memberId: post.authorId,
                     title: "notif.crew.comment.title",
-                    body: msg("notif.crew.comment.body", { name: commenter?.name || "누군가", title: post.title || "게시글" }),
-                    category: "BILLIARDS",
+                    body: msg("notif.crew.comment.body", {
+                        name: commenter?.name || await fallbackFor(post.authorId, "notif.crew.someone"),
+                        title: post.title || await fallbackFor(post.authorId, "notif.crew.postFallback"),
+                    }),
+                    // 글 행의 종목(크루가 정한다) — 예전엔 BILLIARDS 로 박혀 있었다.
+                    category: post.sportCategory || "BILLIARDS",
                     type: "POST_COMMENT",
                     params: { url: `/crew/${req.params.id}/board`, crewId: req.params.id, tab: "board" },
                 }).catch((err: any) => console.error("[CommentNotif]", err));
@@ -390,9 +506,12 @@ router.delete("/:id/comments/:commentId", requireAuth, asyncHandler(async (req: 
 // --- Photos ---
 
 // GET /crews/:id/photos — 사진첩도 크루원 전용 (원본 URL 무단 열람 방지)
+// 쪽 나누기: 파라미터가 없으면 첫 쪽(CREW_PHOTOS_FIRST_PAGE 장), '더 보기' 는 ?before=<createdAt ISO>_<id>&limit=
 router.get("/:id/photos", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
-    const photos = await storage.getCrewPhotos(req.params.id, req.userId);
+    const page = parseCrewPageQuery(req.query, CREW_PHOTOS_FIRST_PAGE);
+    if (!page.ok) return sendError(res, 400, "err.crew.badCursor");
+    const photos = await storage.crews.getCrewPhotos(req.params.id, req.userId, { cursor: page.cursor, limit: page.limit });
     return sendSuccess(res, photos);
 }));
 
@@ -460,6 +579,8 @@ router.post("/:id/photos", requireAuth, requireTermsAccepted, asyncHandler(async
     if (await requireCrewMember(req, res) === null) return;
     const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
     if (!url) return sendError(res, 400, "err.crew.photoUrlRequired");
+    // 글 사진과 같은 검사 — https 주소 한 개만(data: URL·javascript: 같은 값이 사진첩에 박히지 않게).
+    if (!validateCrewPostImages([url]).ok) return sendError(res, 400, "err.crew.postImagesInvalid");
     // 캡션도 사진첩에 그대로 보이는 글이라 같은 필터를 건다
     const rawCaption = typeof req.body?.caption === 'string' ? req.body.caption.slice(0, 500) : null;
     const caption = rawCaption ? screenCrewText(rawCaption) : null;
@@ -489,8 +610,10 @@ router.delete("/:id/photos/:photoId", requireAuth, asyncHandler(async (req: Auth
         return sendError(res, 403, "err.crew.deleteForbidden");
     }
 
+    // 사진첩 행만 지우고, 파일은 같은 URL 을 쓰는 글(글 사진이 사진첩에 복사된다)이 없을 때만 지운다 —
+    // 예전엔 무조건 지워서 원래 글의 사진이 깨졌다.
     await storage.deleteCrewPhoto(req.params.photoId);
-    await deleteBlobs((photo as any).url);
+    await deleteUnreferencedBlobs((photo as any).url);
     return sendSuccess(res, { success: true });
 }));
 

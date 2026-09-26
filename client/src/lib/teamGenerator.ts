@@ -30,6 +30,18 @@ export interface Team {
     avg: number;
 }
 
+/**
+ * 직접 입력한 이름(회원이 아닌 사람)의 성별 표시. 회원은 프로필 성별(member.gender)을 쓰지만, 붙여 넣은 이름에는
+ * 성별 정보가 없어서 이름 뒤 표시로만 알 수 있다 — 입력 안내 문구(manualInputHint)가 이 규칙을 설명한다.
+ * '여' 로 끝나는 이름(예: "영희여")도 여성으로 본다: 안내 문구에 적힌 사용법이라 지우면 기존 사용자의 입력이 달라진다.
+ */
+export const isManualFemaleName = (name: string): boolean =>
+    name.includes('♀') || name.includes('(여)') || name.endsWith('여');
+
+/** 회원 성별 값은 'female'(DB enum) — 옛 화면이 쓰던 'F' 도 받는다. */
+export const isFemaleParticipant = (p: { isManual?: boolean; member?: { name?: string; gender?: string | null } }): boolean =>
+    p.member?.gender === 'F' || p.member?.gender === 'female' || (!!p.isManual && isManualFemaleName(p.member?.name ?? ''));
+
 // Uniform shuffle. `arr.sort(() => Math.random() - 0.5)` is NOT a uniform permutation
 // (V8's sort biases elements toward their original positions), which skews "random" teams.
 const shuffle = <T,>(arr: T[]): T[] => {
@@ -74,7 +86,7 @@ export const generateTeams = (
     } else {
         // 3. Balanced Mode with Gender Consideration
         // Identify females (including manual ones with icon)
-        let females = shuffle(participants.filter(p => p.member?.gender === 'F' || p.member?.gender === 'female' || (p.isManual && (p.member.name.includes('♀') || p.member.name.endsWith('여') || p.member.name.includes('(여)')))));
+        let females = shuffle(participants.filter(isFemaleParticipant));
         let males = participants.filter(p => !females.includes(p));
 
         // Step 1: Distribute Females
@@ -169,8 +181,9 @@ export const getSportTerminology = (sportType: SportType) => {
     const b = BILLIARDS_TERMS[getLocale()] ?? BILLIARDS_TERMS.ko;
     return {
         teamLabel: sportType === 'GOLF' ? '조' : b.teamLabel,
-        scoreLabel: sportType === 'GOLF' ? '핸디' : b.scoreLabel,
-        avgLabel: sportType === 'GOLF' ? '평균 핸디' : b.avgLabel,
+        // 골프 점수는 평균 타수(golfAvgScore, 단위 '타')다 — '핸디' 라고 부르면 다른 값이 된다.
+        scoreLabel: sportType === 'GOLF' ? '타수' : b.scoreLabel,
+        avgLabel: sportType === 'GOLF' ? '평균 타수' : b.avgLabel,
         emoji: sportType === 'GOLF' ? '⛳️' : '🎱',
         scoreField: sportType === 'GOLF' ? 'golfAvgScore' : 'avg4c',
         unit: sportType === 'GOLF' ? '타' : b.unit

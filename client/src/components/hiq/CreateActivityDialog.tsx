@@ -3,7 +3,6 @@ import { useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { ko } from "date-fns/locale";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -34,8 +33,10 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import { LucideCalendar, LucideMapPin, LucideCoins, LucideUsers, LucideClock } from "@/lib/icons";
+import { LucideCalendar, LucideMapPin, LucideCoins, LucideUsers, LucideClock, LucideX } from "@/lib/icons";
+import { IconButton } from "@/components/hiq/crew-ui";
 import { useT } from "@/lib/i18n";
+import { useDateLocale } from "@/components/hiq/crew-board/dateLocale";
 
 interface CreateActivityDialogProps {
     open: boolean;
@@ -69,6 +70,7 @@ type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory, initialData }: CreateActivityDialogProps) {
     const { t } = useT();
+    const dateLocale = useDateLocale();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const isEditMode = !!initialData;
@@ -191,18 +193,20 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-white text-ink-1 w-[90%] max-w-[400px] rounded-card p-6">
-                <DialogHeader className="mb-2">
-                    <DialogTitle className="text-xl font-semibold text-brand">
+            {/* 휴대폰에서 제출 버튼이 화면 밖으로 밀리던 것 — 본문만 스크롤하고 제출 줄은 아래에 고정한다. */}
+            <DialogContent hideClose className="bg-surface-1 text-ink-1 w-[calc(100%-32px)] max-w-[400px] max-h-[90dvh] rounded-card sm:rounded-card border-0 p-0 gap-0 flex flex-col overflow-hidden">
+                <DialogHeader className="px-5 pt-5 pb-3 pr-14 text-left space-y-1">
+                    <DialogTitle className="text-[22px] font-semibold text-ink-1">
                         {isEditMode ? t("createActivity.editTitle") : t("createActivity.createTitle")}
                     </DialogTitle>
-                    <DialogDescription className="text-black/55">
+                    <DialogDescription className="text-[13px] font-medium text-ink-3">
                         {isEditMode ? t("createActivity.editDesc") : t("createActivity.createDesc")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 min-h-0 flex flex-col">
+                        <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 space-y-4 custom-scrollbar">
                         {/* 카테고리 선택 */}
                         <FormField
                             control={form.control}
@@ -213,7 +217,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                         selected={field.value as BilliardsCategory}
                                         onSelect={(cat) => field.onChange(cat)}
                                     />
-                                    <FormMessage className="text-brand text-[12px] -mt-4" />
+                                    <FormMessage className="text-destructive text-[12px] -mt-4" />
                                 </FormItem>
                             )}
                         />
@@ -223,15 +227,15 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                             name="title"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[12px] text-black/55 font-semibold ml-1">{t("createActivity.nameLabel")}</FormLabel>
+                                    <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1">{t("createActivity.nameLabel")}</FormLabel>
                                     <FormControl>
                                         <Input
                                             placeholder={t("createActivity.namePlaceholder")}
                                             {...field}
-                                            className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
+                                            className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-ink-4 focus-visible:ring-1 focus-visible:ring-brand/30"
                                         />
                                     </FormControl>
-                                    <FormMessage className="text-brand text-[12px]" />
+                                    <FormMessage className="text-destructive text-[12px]" />
                                 </FormItem>
                             )}
                         />
@@ -242,7 +246,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 name="activityDate"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1 flex flex-col">
-                                        <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
+                                        <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1 flex items-center gap-1">
                                             <LucideCalendar className="w-3 h-3" /> {t("createActivity.dateLabel")}
                                         </FormLabel>
                                         <Popover>
@@ -251,19 +255,19 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                                     <Button
                                                         variant={"ghost"}
                                                         className={cn(
-                                                            "w-full text-left font-normal bg-surface-3 rounded-tile h-12 px-4 justify-start hover:bg-black/[0.06] hover:text-ink-1",
-                                                            !field.value && "text-black/40"
+                                                            "w-full text-left font-medium bg-surface-3 rounded-tile h-12 px-4 justify-start hover:bg-surface-3 hover:text-ink-1 text-ink-1 truncate",
+                                                            !field.value && "text-ink-4"
                                                         )}
                                                     >
                                                         {field.value ? (
-                                                            format(field.value, "PPP", { locale: ko })
+                                                            format(field.value, "MMM d (EEE)", { locale: dateLocale })
                                                         ) : (
                                                             <span>{t("createActivity.datePlaceholder")}</span>
                                                         )}
                                                     </Button>
                                                 </FormControl>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0 bg-white border-black/[0.08]" align="start">
+                                            <PopoverContent className="w-auto p-0 bg-surface-1 border-surface-line" align="start">
                                                 <Calendar
                                                     mode="single"
                                                     selected={field.value}
@@ -278,7 +282,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                                 />
                                             </PopoverContent>
                                         </Popover>
-                                        <FormMessage className="text-brand text-[12px]" />
+                                        <FormMessage className="text-destructive text-[12px]" />
                                     </FormItem>
                                 )}
                             />
@@ -288,18 +292,17 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 name="time"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
+                                        <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1 flex items-center gap-1">
                                             <LucideClock className="w-3 h-3" /> {t("createActivity.timeLabel")}
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="time"
                                                 {...field}
-                                                style={{ colorScheme: "light" }}
                                                 className="bg-surface-3 h-12 rounded-tile px-4 text-sm focus-visible:ring-1 focus-visible:ring-brand/30"
                                             />
                                         </FormControl>
-                                        <FormMessage className="text-brand text-[12px]" />
+                                        <FormMessage className="text-destructive text-[12px]" />
                                     </FormItem>
                                 )}
                             />
@@ -311,7 +314,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 name="locationName"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
+                                        <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1 flex items-center gap-1">
                                             <LucideMapPin className="w-3 h-3" /> {t("createActivity.locationLabel")}
                                         </FormLabel>
                                         <FormControl>
@@ -319,10 +322,10 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                                 placeholder={t("createActivity.locationPlaceholder")}
                                                 {...field}
                                                 value={field.value || ""}
-                                                className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
+                                                className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-ink-4 focus-visible:ring-1 focus-visible:ring-brand/30"
                                             />
                                         </FormControl>
-                                        <FormMessage className="text-brand text-[12px]" />
+                                        <FormMessage className="text-destructive text-[12px]" />
                                     </FormItem>
                                 )}
                             />
@@ -332,7 +335,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 name="maxParticipants"
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
-                                        <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
+                                        <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1 flex items-center gap-1">
                                             <LucideUsers className="w-3 h-3" /> {t("createActivity.maxLabel")}
                                         </FormLabel>
                                         <FormControl>
@@ -343,7 +346,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                                 className="bg-surface-3 h-12 rounded-tile px-4 text-sm focus-visible:ring-1 focus-visible:ring-brand/30"
                                             />
                                         </FormControl>
-                                        <FormMessage className="text-brand text-[12px]" />
+                                        <FormMessage className="text-destructive text-[12px]" />
                                     </FormItem>
                                 )}
                             />
@@ -354,7 +357,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                             name="cost"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[12px] text-black/55 font-semibold ml-1 flex items-center gap-1">
+                                    <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1 flex items-center gap-1">
                                         <LucideCoins className="w-3 h-3" /> {t("createActivity.costLabel")}
                                     </FormLabel>
                                     <FormControl>
@@ -364,10 +367,10 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                             placeholder={t("createActivity.costPlaceholder")}
                                             {...field}
                                             value={field.value || ""}
-                                            className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-black/40 focus-visible:ring-1 focus-visible:ring-brand/30"
+                                            className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-ink-4 focus-visible:ring-1 focus-visible:ring-brand/30"
                                         />
                                     </FormControl>
-                                    <FormMessage className="text-brand text-[12px]" />
+                                    <FormMessage className="text-destructive text-[12px]" />
                                 </FormItem>
                             )}
                         />
@@ -377,24 +380,25 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                             name="description"
                             render={({ field }) => (
                                 <FormItem className="space-y-1">
-                                    <FormLabel className="text-[12px] text-black/55 font-semibold ml-1">{t("createActivity.descLabel")}</FormLabel>
+                                    <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1">{t("createActivity.descLabel")}</FormLabel>
                                     <FormControl>
                                         <Textarea
                                             placeholder={t("createActivity.descPlaceholder")}
                                             {...field}
                                             value={field.value || ""}
-                                            className="bg-surface-3 rounded-tile p-3 resize-none h-20 focus-visible:ring-1 focus-visible:ring-brand transition-all placeholder:text-black/40 text-sm leading-relaxed"
+                                            className="bg-surface-3 rounded-tile p-3 resize-none h-20 focus-visible:ring-1 focus-visible:ring-brand transition-all placeholder:text-ink-4 text-sm leading-relaxed"
                                         />
                                     </FormControl>
-                                    <FormMessage className="text-brand text-[12px]" />
+                                    <FormMessage className="text-destructive text-[12px]" />
                                 </FormItem>
                             )}
                         />
 
-                        <DialogFooter className="pt-2">
+                        </div>
+                        <DialogFooter className="px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] border-t border-surface-line">
                             <Button
                                 type="submit"
-                                className="w-full h-12 rk-btn-primary rounded-tile font-semibold text-[15px]"
+                                className="w-full h-12 rk-btn-primary rounded-pill font-semibold text-[15px]"
                                 disabled={mutation.isPending}
                             >
                                 {mutation.isPending ? (isEditMode ? t("createActivity.updating") : t("createActivity.creating")) : (isEditMode ? t("createActivity.submitEdit") : t("createActivity.submitCreate"))}
@@ -402,6 +406,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                         </DialogFooter>
                     </form>
                 </Form>
+                <IconButton label={t("crewPost.close")} onClick={() => onOpenChange(false)} className="absolute right-2 top-2"><LucideX /></IconButton>
             </DialogContent>
         </Dialog>
     );

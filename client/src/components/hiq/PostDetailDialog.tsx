@@ -1,20 +1,26 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
+import { formatDistanceToNow, format } from "date-fns";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { LucideSend, LucideTrash2 } from "@/lib/icons";
+import { LucideSend, LucideTrash2, LucideHeart, LucideMessageSquare, LucideX, LucidePin } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import { CREW_TEXT, ConfirmDialog, CrewAvatar, CrewError, CrewRoleBadge, CrewSkeleton, IconButton } from "@/components/hiq/crew-ui";
+import { crewPostCategoryLabelKey } from "@shared/crewBoard";
 import { UgcActionMenu } from "./community/UgcActionMenu";
 import { useTermsGate } from "./TermsConsent";
+import { CreatePostDialog } from "./CreatePostDialog";
+import { PostMenu, usePostLike } from "./crew-board/PostMenu";
+import { ImageViewer } from "./crew-board/ImageViewer";
+import { useDateLocale } from "./crew-board/dateLocale";
+import { useLivePost, postsKey, num } from "./crew-board/postCache";
 
 interface Comment {
     id: string;
@@ -35,54 +41,56 @@ interface PostDetailDialogProps {
     currentMemberId?: string;
 }
 
-export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMemberId }: PostDetailDialogProps) {
+export function PostDetailDialog({ open, onOpenChange, post: postProp, isAdmin, currentMemberId }: PostDetailDialogProps) {
     const [commentContent, setCommentContent] = useState("");
+    const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [viewerIndex, setViewerIndex] = useState<number | null>(null);
     const { gate } = useTermsGate();
     const { toast } = useToast();
     const { t } = useT();
+    const dateLocale = useDateLocale();
+    // 글은 목록 캐시에서 최신을 읽는다 — 고정 공지에서 연 상세가 연 순간의 복사본이라 좋아요·댓글 수가 굳어 있었다.
+    const post = useLivePost(postProp);
+    const likeMutation = usePostLike(post);
+    const commentsKey = [`/api/hiq/crews/${post?.crewId}/posts/${post?.id}/comments`];
 
     // Fetch Comments
     const { data: comments, isLoading, isError, refetch } = useQuery<Comment[]>({
-        queryKey: [`/api/hiq/crews/${post?.crewId}/posts/${post?.id}/comments`],
+        queryKey: commentsKey,
         enabled: !!open && !!post?.id
     });
 
     // Create Comment Mutation
     const commentMutation = useMutation({
         mutationFn: async (content: string) => {
-            if (!post?.id) throw new Error("Post ID is missing");
-            if (!post?.crewId) throw new Error("Crew ID is missing");
+            if (!post?.id || !post?.crewId) throw new Error(t("createPost.genericError"));
             return await apiRequest(`/api/hiq/crews/${post.crewId}/posts/${post.id}/comments`, {
                 method: "POST",
-                body: JSON.stringify({ content })
+                body: { content }
             });
         },
         onSuccess: () => {
             setCommentContent("");
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts/${post?.id}/comments`] });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts`] });
+            queryClient.invalidateQueries({ queryKey: commentsKey });
+            queryClient.invalidateQueries({ queryKey: [postsKey(post?.crewId)] });
         },
         onError: (error: any) => {
-            toast({
-                title: t("postDetail.commentCreateFailed"),
-                description: error.message,
-                variant: "destructive"
-            });
+            toast({ title: t("postDetail.commentCreateFailed"), description: error.message, variant: "destructive" });
         }
     });
 
     // Delete Comment Mutation
     const deleteCommentMutation = useMutation({
         mutationFn: async (commentId: string) => {
-            if (!post?.crewId) throw new Error("Crew ID is missing");
-            return await apiRequest(`/api/hiq/crews/${post.crewId}/comments/${commentId}`, {
-                method: "DELETE"
-            });
+            if (!post?.crewId) throw new Error(t("createPost.genericError"));
+            return await apiRequest(`/api/hiq/crews/${post.crewId}/comments/${commentId}`, { method: "DELETE" });
         },
         onSuccess: () => {
+            setDeleteCommentId(null);
             toast({ title: t("postDetail.commentDeleted") });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts/${post?.id}/comments`] });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${post?.crewId}/posts`] });
+            queryClient.invalidateQueries({ queryKey: commentsKey });
+            queryClient.invalidateQueries({ queryKey: [postsKey(post?.crewId)] });
         },
         onError: (error: any) => {
             toast({
@@ -94,97 +102,123 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
     });
 
     const handleSubmitComment = () => {
-        if (!commentContent.trim()) return;
-        gate(() => commentMutation.mutate(commentContent)); // 첫 댓글이면 약관 동의부터(감사 S4)
+        if (!commentContent.trim() || commentMutation.isPending) return;
+        gate(() => commentMutation.mutate(commentContent.trim())); // 첫 댓글이면 약관 동의부터(감사 S4)
     };
+
+    const images: string[] = Array.isArray(post?.images) ? post.images.filter(Boolean) : [];
+    const categoryKey = crewPostCategoryLabelKey(post?.category);
+    const likeCount = num(post?.likeCount);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg bg-white border-black/10 rounded-card p-0 overflow-hidden flex flex-col max-h-[85vh]">
-                <DialogHeader className="px-8 py-6 border-b border-black/10">
-                    <DialogTitle className="text-xl font-semibold text-ink-1">{post?.title}</DialogTitle>
+            <DialogContent
+                hideClose
+                className="w-[calc(100%-32px)] max-w-lg max-h-[88dvh] bg-surface-1 border-0 rounded-card sm:rounded-card p-0 gap-0 overflow-hidden flex flex-col"
+            >
+                <DialogHeader className="flex-row items-start gap-2 px-5 pt-4 pb-3 border-b border-surface-line space-y-0 text-left">
+                    <div className="flex-1 min-w-0 pt-2.5">
+                        {(post?.isNotice || categoryKey) && (
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                                {post?.isNotice && (
+                                    <span className="rk-chip bg-brand/10 text-brand"><LucidePin className="w-3 h-3" />{t("crewBoard.pinnedNotice")}</span>
+                                )}
+                                {categoryKey && <span className="rk-chip bg-surface-3 text-ink-2">{t(categoryKey)}</span>}
+                            </div>
+                        )}
+                        <DialogTitle className="text-[17px] font-semibold text-ink-1 leading-snug break-words">{post?.title}</DialogTitle>
+                    </div>
+                    {post?.id && (
+                        <PostMenu
+                            post={post}
+                            isAdmin={isAdmin}
+                            currentMemberId={currentMemberId}
+                            onEdit={() => setIsEditOpen(true)}
+                            onDeleted={() => onOpenChange(false)}
+                            onBlocked={() => onOpenChange(false)}
+                            className="mr-0"
+                        />
+                    )}
+                    <IconButton label={t("crewPost.close")} onClick={() => onOpenChange(false)} className="-mr-2"><LucideX /></IconButton>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-                    {/* Original Post Content */}
-                    <div className="space-y-4 pb-8 border-b border-black/10">
+                <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
+                    {/* 원글 */}
+                    <div className="space-y-4 pb-5 border-b border-surface-line">
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-black/[0.04] overflow-hidden ">
-                                {post?.author?.profileImageUrl ? (
-                                    <img src={post.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-xs font-semibold text-black/55">
-                                        {post?.author?.name?.charAt(0)}
-                                    </div>
+                            <CrewAvatar src={post?.author?.profileImageUrl} name={post?.author?.name} size={36} />
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[15px] font-semibold text-ink-1 truncate">{post?.author?.name}</span>
+                                    <CrewRoleBadge role={post?.author?.role} />
+                                </div>
+                                {post?.createdAt && (
+                                    <time className={CREW_TEXT.caption} dateTime={post.createdAt} title={format(new Date(post.createdAt), "PPpp", { locale: dateLocale })}>
+                                        {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: dateLocale })}
+                                    </time>
                                 )}
                             </div>
-                            <span className="text-[15px] font-bold text-ink-1">{post?.author?.name}</span>
-                            {post?.id && currentMemberId && post.authorId !== currentMemberId && (
-                                <UgcActionMenu
-                                    targetType="crew_post"
-                                    targetId={post.id}
-                                    crewId={post.crewId}
-                                    authorId={post.authorId}
-                                    authorName={post.author?.name}
-                                    onBlocked={() => onOpenChange(false)}
-                                    wrapperClassName="ml-auto -mr-2"
-                                    className="min-w-[44px] min-h-[44px]"
-                                />
-                            )}
                         </div>
-                        <p className="text-[15px] text-black/70 leading-relaxed whitespace-pre-wrap font-medium">{post?.content}</p>
+                        <p className="text-[15px] text-ink-1 leading-relaxed whitespace-pre-wrap font-medium break-words">{post?.content}</p>
 
-                        {post?.images && post.images.length > 0 && (
-                            <div className="space-y-3 pt-2">
-                                {post.images.map((img: string, idx: number) => (
-                                    <div key={idx} className="rounded-xl overflow-hidden bg-black/[0.04]">
-                                        <img src={img} className="w-full h-auto" alt={`post content ${idx}`} />
-                                    </div>
+                        {images.length > 0 && (
+                            <div className="space-y-2">
+                                {images.map((img, idx) => (
+                                    <button
+                                        key={img + idx}
+                                        type="button"
+                                        onClick={() => setViewerIndex(idx)}
+                                        aria-label={t("crewPost.openPhoto").replace("{n}", String(idx + 1))}
+                                        className="block w-full rounded-tile overflow-hidden bg-surface-3"
+                                    >
+                                        <img src={img} className="w-full h-auto" alt="" loading="lazy" />
+                                    </button>
                                 ))}
                             </div>
                         )}
+
+                        {/* 좋아요 · 댓글 수 — 상세에서도 누를 수 있게(예전엔 목록 카드에서만 됐다) */}
+                        <div className="flex items-center -ml-2">
+                            <button
+                                type="button"
+                                onClick={() => likeMutation.mutate()}
+                                disabled={likeMutation.isPending || !post?.id}
+                                aria-pressed={!!post?.isLiked}
+                                aria-label={post?.isLiked ? t("socialPost.unlike") : t("socialPost.like")}
+                                className="min-h-11 min-w-11 px-2 inline-flex items-center gap-1.5 rounded-pill active:bg-surface-3"
+                            >
+                                <LucideHeart weight={post?.isLiked ? "fill" : "regular"} className={cn("w-5 h-5", post?.isLiked ? "text-brand" : "text-ink-3")} />
+                                <span className={cn("text-[13px] font-semibold rk-num", post?.isLiked ? "text-brand" : "text-ink-3")}>{likeCount}</span>
+                            </button>
+                            <span className="min-h-11 px-2 inline-flex items-center gap-1.5 text-ink-3">
+                                <LucideMessageSquare className="w-5 h-5" />
+                                <span className="text-[13px] font-semibold rk-num">{comments?.length ?? num(post?.commentCount)}</span>
+                            </span>
+                        </div>
                     </div>
 
-                    {/* Comments Section */}
-                    <div className="space-y-5">
-                        <h4 className="text-[12px] font-semibold text-black/55 flex items-center gap-2">
-                            <span className="w-1 h-1 rounded-full bg-brand" />
-                            {t("postDetail.comments")} {comments?.length || 0}
+                    {/* 댓글 */}
+                    <section className="space-y-4" aria-label={t("postDetail.comments")}>
+                        <h4 className={CREW_TEXT.sub}>
+                            {t("postDetail.comments")} <span className="rk-num">{comments?.length || 0}</span>
                         </h4>
                         {isLoading ? (
-                            <div className="py-12 text-center text-black/55 text-[12px] font-semibold">{t("postDetail.loading")}</div>
+                            <CrewSkeleton rows={2} height={48} />
                         ) : isError ? (
-                            <div className="py-16 text-center flex flex-col items-center gap-3">
-                                <p className="text-black/55 text-[12px] font-semibold">{t("postDetail.commentsLoadFailed")}</p>
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => refetch()}
-                                    className="h-9 px-4 rounded-pill bg-black/[0.04] hover:bg-black/[0.06] text-black/70 text-[12px] font-semibold"
-                                >
-                                    {t("postDetail.retry")}
-                                </Button>
-                            </div>
+                            <CrewError message={t("postDetail.commentsLoadFailed")} onRetry={() => refetch()} />
                         ) : comments && comments.length > 0 ? (
-                            <div className="space-y-6">
+                            <ul className="space-y-4">
                                 {comments.map((comment) => (
-                                    <div key={comment.id} className="flex gap-4 group/comment">
-                                        <div className="w-8 h-8 rounded-full bg-black/[0.04] overflow-hidden flex-shrink-0 transition-transform group-hover/comment:scale-105">
-                                            {comment.author.profileImageUrl ? (
-                                                <img src={comment.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-[12px] font-medium text-black/55">
-                                                    {comment.author.name.charAt(0)}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 space-y-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[13px] font-bold text-ink-1">{comment.author.name}</span>
-                                                <span className="text-[12px] font-medium text-black/55">
-                                                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: ko })}
+                                    <li key={comment.id} className="flex gap-3">
+                                        <CrewAvatar src={comment.author.profileImageUrl} name={comment.author.name} size={32} />
+                                        <div className="flex-1 min-w-0 space-y-0.5">
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-[13px] font-semibold text-ink-1 truncate">{comment.author.name}</span>
+                                                <span className={CREW_TEXT.caption}>
+                                                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: dateLocale })}
                                                 </span>
                                             </div>
-                                            <p className="text-[13px] text-black/70 leading-relaxed font-medium">{comment.content}</p>
+                                            <p className="text-[15px] text-ink-2 leading-relaxed font-medium whitespace-pre-wrap break-words">{comment.content}</p>
                                         </div>
                                         {currentMemberId && comment.authorId !== currentMemberId && (
                                             <UgcActionMenu
@@ -198,61 +232,74 @@ export function PostDetailDialog({ open, onOpenChange, post, isAdmin, currentMem
                                             />
                                         )}
                                         {(isAdmin || comment.authorId === currentMemberId) && (
-                                            <button
-                                                onClick={() => {
-                                                    if (confirm(t("postDetail.confirmDeleteComment"))) {
-                                                        deleteCommentMutation.mutate(comment.id);
-                                                    }
-                                                }}
-                                                className="shrink-0 self-start -mr-2 flex items-center justify-center min-w-[44px] min-h-[44px] text-black/40 hover:text-red-500 transition-colors md:opacity-0 md:group-hover/comment:opacity-100"
-                                                title={t("postDetail.deleteComment")}
-                                                aria-label={t("postDetail.deleteComment")}
+                                            <IconButton
+                                                label={t("postDetail.deleteComment")}
+                                                tone="danger"
+                                                onClick={() => setDeleteCommentId(comment.id)}
+                                                className="self-start -mr-2 -mt-2"
                                             >
-                                                <LucideTrash2 className="w-4 h-4" />
-                                            </button>
+                                                <LucideTrash2 />
+                                            </IconButton>
                                         )}
-                                    </div>
+                                    </li>
                                 ))}
-                            </div>
+                            </ul>
                         ) : (
-                            <div className="py-16 text-center text-black/55 text-[12px] font-semibold flex flex-col items-center gap-2">
-                                <div className="w-8 h-px bg-black/10" />
-                                {t("postDetail.firstComment")}
-                            </div>
+                            <p className={cn(CREW_TEXT.sub, "py-6 text-center")}>{t("postDetail.firstComment")}</p>
                         )}
-                    </div>
+                    </section>
                 </div>
 
-                {/* Comment Input Footer */}
-                <div className="p-4 bg-white border-t border-black/10">
-                    <div className="relative flex items-center gap-2">
+                {/* 댓글 입력 */}
+                <div className="px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-surface-line">
+                    <div className="flex items-center gap-2">
                         <input
                             type="text"
                             placeholder={t("postDetail.commentPlaceholder")}
+                            aria-label={t("postDetail.commentPlaceholder")}
                             value={commentContent}
+                            maxLength={1000}
                             onChange={(e) => setCommentContent(e.target.value)}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
+                                // 한글 조합 중 Enter 는 글자 확정이다 — 그때 보내면 마지막 글자가 빠지거나 두 번 간다.
+                                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                     e.preventDefault();
                                     handleSubmitComment();
                                 }
                             }}
-                            className="flex-1 bg-black/[0.04] text-ink-1 text-sm rounded-full h-10 px-4 focus:outline-none focus:border-brand/50 focus:bg-black/[0.06] transition-all placeholder:text-black/40"
+                            className="flex-1 min-w-0 bg-surface-3 text-ink-1 text-[15px] rounded-pill h-11 px-4 outline-none focus-visible:ring-2 focus-visible:ring-brand/40 placeholder:text-ink-4"
                         />
-                        <Button
+                        <button
+                            type="button"
                             disabled={!commentContent.trim() || commentMutation.isPending}
                             onClick={handleSubmitComment}
-                            size="icon"
-                            className="w-10 h-10 rounded-full bg-brand hover:bg-brand-strong text-brand-fg transition-all flex-shrink-0"
+                            aria-label={t("crewPost.sendComment")}
+                            className="w-11 h-11 shrink-0 rounded-full bg-brand text-brand-fg inline-flex items-center justify-center active:bg-brand-strong disabled:opacity-40"
                         >
-                            {commentMutation.isPending ? (
-                                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                            ) : (
-                                <LucideSend className="w-4 h-4 ml-0.5" />
-                            )}
-                        </Button>
+                            <LucideSend className="w-5 h-5" />
+                        </button>
                     </div>
                 </div>
+
+                <ConfirmDialog
+                    open={!!deleteCommentId}
+                    onOpenChange={(o) => { if (!o) setDeleteCommentId(null); }}
+                    title={t("postDetail.deleteComment")}
+                    desc={t("postDetail.confirmDeleteComment")}
+                    confirmLabel={t("socialPost.delete")}
+                    busy={deleteCommentMutation.isPending}
+                    onConfirm={() => { if (deleteCommentId) deleteCommentMutation.mutate(deleteCommentId); }}
+                />
+                {isEditOpen && post && (
+                    <CreatePostDialog open={isEditOpen} onOpenChange={setIsEditOpen} crewId={post.crewId} isAdmin={isAdmin} editPost={post} />
+                )}
+                <ImageViewer
+                    images={images}
+                    index={viewerIndex ?? 0}
+                    onIndexChange={setViewerIndex}
+                    open={viewerIndex !== null}
+                    onOpenChange={(o) => { if (!o) setViewerIndex(null); }}
+                />
             </DialogContent>
         </Dialog >
     );

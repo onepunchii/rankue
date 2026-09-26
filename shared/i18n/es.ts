@@ -412,5 +412,21 @@ export const es: Record<string, string> = {
   "notif.game.started.title": "🎱 La partida empezó",
   "notif.game.started.body": "{host} inició la partida. Abre el marcador.",
   "err.chat.leaveNotAllowed": "No puedes salir de este chat desde aquí",
+  // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
+  "err.crew.badCursor": "Posición de lista no válida. Actualiza la página",
+  "err.crew.postCategoryInvalid": "Categoría de tablón no válida",
+  "err.crew.postNoticeAdminOnly": "Solo los administradores pueden publicar avisos",
+  "err.crew.postEditForbidden": "Solo el autor o los administradores pueden editar esta publicación",
+  "err.crew.pinAdminOnly": "Solo los administradores pueden fijar avisos",
+  "err.crew.postTitleRequired": "Escribe un título",
+  "err.crew.postImagesInvalid": "Datos de foto no válidos",
+  "err.crew.activityEditForbidden": "Solo el organizador o los administradores pueden editar esta quedada",
+  "err.crew.activityDeleteForbidden": "Solo el organizador o los administradores pueden eliminar esta quedada",
+  "err.crew.activityDateInvalid": "Fecha de quedada no válida",
+  "err.crew.activityMaxInvalid": "El cupo debe ser de al menos 2",
+  "notif.crew.someone": "Un miembro",
+  "notif.crew.activityFallback": "quedada",
+  "notif.crew.crewFallback": "Crew",
+  "notif.crew.postFallback": "publicación",
 };
 export default es;

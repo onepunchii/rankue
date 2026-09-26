@@ -1,22 +1,22 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
 import {
     Dialog,
     DialogContent,
-    DialogHeader,
     DialogTitle
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { LucideHeart, LucideMessageSquare, LucideUser, LucideSend } from "@/lib/icons";
+import { LucideHeart, LucideMessageSquare, LucideSend, LucideTrash2, LucideX, LucideChevronLeft, LucideChevronRight } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { CREW_TEXT, ConfirmDialog, CrewAvatar, CrewError, CrewSkeleton, IconButton } from "@/components/hiq/crew-ui";
 import { UgcActionMenu } from "./community/UgcActionMenu";
 import { useTermsGate } from "./TermsConsent";
+import { useHorizontalSwipe, useArrowKeys, PhotoShareButtons } from "./crew-board/ImageViewer";
+import { useDateLocale } from "./crew-board/dateLocale";
+import { photosKey, num } from "./crew-board/postCache";
 
 interface Comment {
     id: string;
@@ -35,72 +35,87 @@ interface PhotoDetailDialogProps {
     photo: any;
     isAdmin?: boolean;
     currentMemberId?: string;
+    /** 좌우로 넘길 사진 목록(사진첩 순서). 있으면 밀어서·화살표로 이웃 사진으로 간다. */
+    photos?: { id: string }[];
+    onNavigate?: (photoId: string) => void;
 }
 
-export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentMemberId }: PhotoDetailDialogProps) {
+/** 사진 캐시(사진첩 무한 쿼리 포함)의 한 장을 고친다 — 좋아요를 누르는 즉시 보이게. */
+function patchPhoto(crewId: string, photoId: string, fn: (p: any) => any) {
+    const snapshot = queryClient.getQueriesData({ queryKey: [photosKey(crewId)] });
+    queryClient.setQueriesData({ queryKey: [photosKey(crewId)] }, (old: any) => {
+        const map = (list: any) => (Array.isArray(list) ? list.map((p: any) => (p?.id === photoId ? fn(p) : p)) : list);
+        if (Array.isArray(old)) return map(old);
+        if (old && Array.isArray(old.pages)) return { ...old, pages: old.pages.map(map) };
+        return old;
+    });
+    return () => { for (const [k, d] of snapshot) queryClient.setQueryData(k, d); };
+}
+
+export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentMemberId, photos, onNavigate }: PhotoDetailDialogProps) {
     const { t } = useT();
     const { gate } = useTermsGate();
     const [commentContent, setCommentContent] = useState("");
+    const [confirmPhotoDelete, setConfirmPhotoDelete] = useState(false);
+    const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
     const { toast } = useToast();
+    const dateLocale = useDateLocale();
+    const commentsKey = [`/api/hiq/crews/${photo?.crewId}/photos/${photo?.id}/comments`];
+
+    // 이웃 사진 — 사진첩 순서대로 좌우 넘기기
+    const idx = photos && photo ? photos.findIndex((p) => p.id === photo.id) : -1;
+    const prevId = idx > 0 ? photos![idx - 1].id : null;
+    const nextId = idx >= 0 && idx < (photos?.length ?? 0) - 1 ? photos![idx + 1].id : null;
+    const goPrev = useCallback(() => { if (prevId) { setCommentContent(""); onNavigate?.(prevId); } }, [prevId, onNavigate]);
+    const goNext = useCallback(() => { if (nextId) { setCommentContent(""); onNavigate?.(nextId); } }, [nextId, onNavigate]);
+    const swipe = useHorizontalSwipe(goPrev, goNext);
+    useArrowKeys(open && !!onNavigate, goPrev, goNext);
 
     // Fetch Comments
-    const { data: comments, isLoading: isCommentsLoading } = useQuery<Comment[]>({
-        queryKey: [`/api/hiq/crews/${photo?.crewId}/photos/${photo?.id}/comments`],
+    const { data: comments, isLoading: isCommentsLoading, isError: isCommentsError, refetch } = useQuery<Comment[]>({
+        queryKey: commentsKey,
         enabled: !!photo?.id && open
     });
 
-    // Like Mutation
+    // Like — 즉시 반영, 실패하면 되돌린다
     const likeMutation = useMutation({
-        mutationFn: async () => {
-            return await apiRequest(`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/like`, {
-                method: "POST"
-            });
+        mutationFn: async () => apiRequest(`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/like`, { method: "POST" }),
+        onMutate: () => ({
+            rollback: patchPhoto(photo.crewId, photo.id, (p) => ({
+                ...p, isLiked: !p.isLiked, likeCount: Math.max(0, num(p.likeCount) + (p.isLiked ? -1 : 1)),
+            })),
+        }),
+        onError: (error: any, _v, ctx) => {
+            ctx?.rollback?.();
+            toast({ title: t("photoDetail.likeFailed"), description: error.message, variant: "destructive" });
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos`] });
-        },
-        onError: (error: any) => {
-            toast({
-                title: t("photoDetail.likeFailed"),
-                description: error.message,
-                variant: "destructive"
-            });
-        }
+        onSettled: () => queryClient.invalidateQueries({ queryKey: [photosKey(photo.crewId)] }),
     });
 
     // Create Comment Mutation
     const commentMutation = useMutation({
-        mutationFn: async (content: string) => {
-            return await apiRequest(`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/comments`, {
-                method: "POST",
-                body: JSON.stringify({ content })
-            });
-        },
+        mutationFn: async (content: string) => apiRequest(`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/comments`, {
+            method: "POST",
+            body: { content }
+        }),
         onSuccess: () => {
             setCommentContent("");
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/comments`] });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos`] });
+            queryClient.invalidateQueries({ queryKey: commentsKey });
+            queryClient.invalidateQueries({ queryKey: [photosKey(photo.crewId)] });
         },
         onError: (error: any) => {
-            toast({
-                title: t("photoDetail.commentFailed"),
-                description: error.message,
-                variant: "destructive"
-            });
+            toast({ title: t("photoDetail.commentFailed"), description: error.message, variant: "destructive" });
         }
     });
 
     // Delete Photo Mutation
     const deletePhotoMutation = useMutation({
-        mutationFn: async () => {
-            return await apiRequest(`/api/hiq/crews/${photo.crewId}/photos/${photo.id}`, {
-                method: "DELETE"
-            });
-        },
+        mutationFn: async () => apiRequest(`/api/hiq/crews/${photo.crewId}/photos/${photo.id}`, { method: "DELETE" }),
         onSuccess: () => {
+            setConfirmPhotoDelete(false);
             toast({ title: t("photoDetail.photoDeleted") });
             onOpenChange(false);
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos`] });
+            queryClient.invalidateQueries({ queryKey: [photosKey(photo.crewId)] });
         },
         onError: (error: any) => {
             toast({
@@ -113,15 +128,12 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
 
     // Delete Comment Mutation
     const deleteCommentMutation = useMutation({
-        mutationFn: async (commentId: string) => {
-            return await apiRequest(`/api/hiq/crews/${photo.crewId}/photo-comments/${commentId}`, {
-                method: "DELETE"
-            });
-        },
+        mutationFn: async (commentId: string) => apiRequest(`/api/hiq/crews/${photo.crewId}/photo-comments/${commentId}`, { method: "DELETE" }),
         onSuccess: () => {
+            setDeleteCommentId(null);
             toast({ title: t("photoDetail.commentDeleted") });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos/${photo.id}/comments`] });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${photo.crewId}/photos`] });
+            queryClient.invalidateQueries({ queryKey: commentsKey });
+            queryClient.invalidateQueries({ queryKey: [photosKey(photo.crewId)] });
         },
         onError: (error: any) => {
             toast({
@@ -133,29 +145,27 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
     });
 
     const handleSubmitComment = () => {
-        if (!commentContent.trim()) return;
-        gate(() => commentMutation.mutate(commentContent)); // 첫 댓글이면 약관 동의부터(감사 S4)
+        if (!commentContent.trim() || commentMutation.isPending) return;
+        gate(() => commentMutation.mutate(commentContent.trim())); // 첫 댓글이면 약관 동의부터(감사 S4)
     };
 
     if (!photo) return null;
+    const canDeletePhoto = isAdmin || photo.uploaderId === currentMemberId;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg bg-white border-black/[0.08] p-0 overflow-hidden flex flex-col max-h-[90vh]">
-                <DialogHeader className="pl-6 pr-16 py-4 border-b border-black/10 flex flex-row items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-black/[0.06] overflow-hidden ">
-                        {photo.author?.profileImageUrl ? (
-                            <img src={photo.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-[12px] font-semibold text-black/40">
-                                {photo.author?.name?.charAt(0)}
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex-1">
-                        <DialogTitle className="text-sm font-bold text-ink-1">{photo.author?.name}</DialogTitle>
-                        <p className="text-[12px] font-medium text-black/55">
-                            {formatDistanceToNow(new Date(photo.createdAt), { addSuffix: true, locale: ko })}
+            {/* 전체 화면 — 휴대폰에서 모서리·여백 없는 사진 보기. 넓은 화면에선 가운데 카드(모서리 둥글게). */}
+            <DialogContent
+                hideClose
+                className="max-w-none md:max-w-lg w-screen md:w-[calc(100%-32px)] h-[100dvh] md:h-auto md:max-h-[90dvh] p-0 gap-0 border-0 rounded-none sm:rounded-none md:rounded-card bg-surface-1 overflow-hidden flex flex-col"
+            >
+                <header className="flex items-center gap-2 pl-1 pr-2 pt-[env(safe-area-inset-top)] min-h-14 border-b border-surface-line shrink-0">
+                    <IconButton label={t("crewPost.close")} onClick={() => onOpenChange(false)}><LucideX /></IconButton>
+                    <CrewAvatar src={photo.author?.profileImageUrl} name={photo.author?.name} size={32} />
+                    <div className="flex-1 min-w-0">
+                        <DialogTitle className="text-[15px] font-semibold text-ink-1 truncate">{photo.author?.name}</DialogTitle>
+                        <p className={CREW_TEXT.caption}>
+                            {photo.createdAt ? formatDistanceToNow(new Date(photo.createdAt), { addSuffix: true, locale: dateLocale }) : ""}
                         </p>
                     </div>
                     {/* 남의 사진 — 신고·차단. 차단하면 사진이 목록에서 빠지므로 창도 닫는다 */}
@@ -167,87 +177,82 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                             authorId={photo.uploaderId}
                             authorName={photo.author?.name}
                             onBlocked={() => onOpenChange(false)}
-                            className="p-2"
-                            iconClassName="w-[18px] h-[18px]"
+                            className="w-11 h-11"
+                            iconClassName="w-5 h-5"
                         />
                     )}
-                    {(isAdmin || photo.uploaderId === currentMemberId) && (
-                        <button
-                            onClick={() => {
-                                if (confirm(t("photoDetail.confirmDeletePhoto"))) {
-                                    deletePhotoMutation.mutate();
-                                }
-                            }}
-                            className="p-2 text-black/40 hover:text-red-500 transition-colors"
-                            title={t("photoDetail.deletePhoto")}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        </button>
+                    {canDeletePhoto && (
+                        <IconButton label={t("photoDetail.deletePhoto")} tone="danger" onClick={() => setConfirmPhotoDelete(true)}>
+                            <LucideTrash2 />
+                        </IconButton>
                     )}
-                </DialogHeader>
+                </header>
 
-                <div className="flex-1 overflow-y-auto">
-                    {/* Photo Display */}
-                    <div className="bg-surface-3 aspect-square flex items-center justify-center overflow-hidden">
-                        <img src={photo.url} className="w-full h-full object-contain" alt="" />
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                    {/* 사진 — 좌우로 밀어 이웃 사진 */}
+                    <div className="relative bg-surface-3 h-[min(70dvh,100vw)] md:h-[420px] flex items-center justify-center overflow-hidden select-none" {...swipe}>
+                        <img key={photo.url} src={photo.url} className="max-w-full max-h-full object-contain" alt={photo.caption || ""} draggable={false} />
+                        {prevId && (
+                            <IconButton label={t("crewAlbum.prev")} onClick={goPrev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-surface-1 shadow-sm hidden md:inline-flex">
+                                <LucideChevronLeft />
+                            </IconButton>
+                        )}
+                        {nextId && (
+                            <IconButton label={t("crewAlbum.next")} onClick={goNext} className="absolute right-2 top-1/2 -translate-y-1/2 bg-surface-1 shadow-sm hidden md:inline-flex">
+                                <LucideChevronRight />
+                            </IconButton>
+                        )}
+                        {photos && idx >= 0 && photos.length > 1 && (
+                            <span className="absolute bottom-2 right-2 rk-chip rk-num bg-surface-1 text-ink-2">{idx + 1} / {photos.length}</span>
+                        )}
                     </div>
 
-                    {/* Actions Row */}
-                    <div className="px-6 py-4 flex items-center gap-4">
-                        <button
-                            onClick={() => likeMutation.mutate()}
-                            disabled={likeMutation.isPending}
-                            className={cn(
-                                "flex items-center gap-1.5 transition-all",
-                                likeMutation.isPending && "opacity-50"
-                            )}
-                        >
-                            <LucideHeart className={cn(
-                                "w-6 h-6 transition-colors",
-                                photo.isLiked ? "text-red-500 fill-red-500" : "text-black/40 hover:text-red-500"
-                            )} />
-                            <span className={cn(
-                                "text-sm font-bold tabular-nums transition-colors",
-                                photo.isLiked ? "text-red-500" : "text-black/55"
-                            )}>
-                                {photo.likeCount || 0}
+                    {/* 캡션 · 좋아요 · 댓글 수 */}
+                    <div className="px-4 pt-2 pb-3 space-y-1">
+                        <div className="flex items-center -ml-2">
+                            <button
+                                type="button"
+                                onClick={() => likeMutation.mutate()}
+                                disabled={likeMutation.isPending}
+                                aria-pressed={!!photo.isLiked}
+                                aria-label={photo.isLiked ? t("socialPost.unlike") : t("socialPost.like")}
+                                className="min-h-11 min-w-11 px-2 inline-flex items-center gap-1.5 rounded-pill active:bg-surface-3"
+                            >
+                                <LucideHeart weight={photo.isLiked ? "fill" : "regular"} className={cn("w-6 h-6", photo.isLiked ? "text-brand" : "text-ink-3")} />
+                                <span className={cn("text-[15px] font-semibold rk-num", photo.isLiked ? "text-brand" : "text-ink-3")}>{num(photo.likeCount)}</span>
+                            </button>
+                            <span className="min-h-11 px-2 inline-flex items-center gap-1.5 text-ink-3">
+                                <LucideMessageSquare className="w-6 h-6" />
+                                <span className="text-[15px] font-semibold rk-num">{comments?.length ?? num(photo.commentCount)}</span>
                             </span>
-                        </button>
-                        <div className="flex items-center gap-1.5">
-                            <LucideMessageSquare className="w-6 h-6 text-black/40" />
-                            <span className="text-sm font-medium tabular-nums text-black/55">{photo.commentCount || 0}</span>
+                            <span className="flex-1" />
+                            {photo.url && <PhotoShareButtons url={photo.url} title={photo.caption ?? undefined} />}
                         </div>
+                        {photo.caption && (
+                            <p className="text-[15px] font-medium text-ink-1 leading-relaxed whitespace-pre-wrap break-words">{photo.caption}</p>
+                        )}
                     </div>
 
-                    {/* Comments List */}
-                    <div className="px-6 pb-6 space-y-5">
-                        <h4 className="text-[12px] font-semibold text-black/55 flex items-center gap-2">
-                            <span className="w-1 h-1 rounded-full bg-brand" />
-                            {t("photoDetail.comments")} {comments?.length || 0}
-                        </h4>
+                    {/* 댓글 */}
+                    <section className="px-4 pb-6 space-y-4 border-t border-surface-line pt-4" aria-label={t("photoDetail.comments")}>
+                        <h4 className={CREW_TEXT.sub}>{t("photoDetail.comments")} <span className="rk-num">{comments?.length || 0}</span></h4>
                         {isCommentsLoading ? (
-                            <div className="py-8 text-center text-black/55 text-[12px] font-semibold">{t("photoDetail.loading")}</div>
+                            <CrewSkeleton rows={2} height={48} />
+                        ) : isCommentsError ? (
+                            <CrewError onRetry={() => refetch()} />
                         ) : comments && comments.length > 0 ? (
-                            <div className="space-y-5">
+                            <ul className="space-y-4">
                                 {comments.map((comment) => (
-                                    <div key={comment.id} className="flex gap-3 group/comment">
-                                        <div className="w-7 h-7 rounded-full bg-black/[0.06] overflow-hidden flex-shrink-0">
-                                            {comment.author.profileImageUrl ? (
-                                                <img src={comment.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-[12px] font-medium text-black/40">
-                                                    {comment.author.name.charAt(0)}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 space-y-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-bold text-ink-1">{comment.author.name}</span>
-                                                <span className="text-[12px] font-medium text-black/55">
-                                                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: ko })}
+                                    <li key={comment.id} className="flex gap-3">
+                                        <CrewAvatar src={comment.author.profileImageUrl} name={comment.author.name} size={32} />
+                                        <div className="flex-1 min-w-0 space-y-0.5">
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-[13px] font-semibold text-ink-1 truncate">{comment.author.name}</span>
+                                                <span className={CREW_TEXT.caption}>
+                                                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: dateLocale })}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-black/70 leading-relaxed font-medium">{comment.content}</p>
+                                            <p className="text-[15px] text-ink-2 leading-relaxed font-medium whitespace-pre-wrap break-words">{comment.content}</p>
                                         </div>
                                         {currentMemberId && comment.authorId !== currentMemberId && (
                                             <UgcActionMenu
@@ -256,61 +261,79 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                                                 crewId={photo.crewId}
                                                 authorId={comment.authorId}
                                                 authorName={comment.author?.name}
-                                                wrapperClassName="self-start"
-                                                className="p-1"
-                                                iconClassName="w-3.5 h-3.5"
+                                                wrapperClassName="self-start -mr-2"
+                                                className="min-w-[44px] min-h-[44px]"
                                             />
                                         )}
+                                        {/* 휴대폰엔 hover 가 없다 — 지우기는 늘 보이게, 44px 로 */}
                                         {(isAdmin || comment.authorId === currentMemberId) && (
-                                            <button
-                                                onClick={() => {
-                                                    if (confirm(t("photoDetail.confirmDeleteComment"))) {
-                                                        deleteCommentMutation.mutate(comment.id);
-                                                    }
-                                                }}
-                                                className="p-1 text-black/40 hover:text-red-500 transition-colors self-start mt-1 opacity-0 group-hover/comment:opacity-100"
-                                                title={t("photoDetail.deleteComment")}
+                                            <IconButton
+                                                label={t("photoDetail.deleteComment")}
+                                                tone="danger"
+                                                onClick={() => setDeleteCommentId(comment.id)}
+                                                className="self-start -mr-2 -mt-2"
                                             >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                            </button>
+                                                <LucideTrash2 />
+                                            </IconButton>
                                         )}
-                                    </div>
+                                    </li>
                                 ))}
-                            </div>
+                            </ul>
                         ) : (
-                            <div className="py-12 text-center text-black/55 text-[12px] font-semibold">
-                                {t("photoDetail.beFirstToComment")}
-                            </div>
+                            <p className={cn(CREW_TEXT.sub, "py-6 text-center")}>{t("photoDetail.beFirstToComment")}</p>
                         )}
-                    </div>
+                    </section>
                 </div>
 
-                {/* Comment Input */}
-                <div className="p-4 bg-white border-t border-black/10">
-                    <div className="relative flex items-center gap-2">
+                {/* 댓글 입력 */}
+                <div className="px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-surface-line shrink-0">
+                    <div className="flex items-center gap-2">
                         <input
                             type="text"
                             placeholder={t("photoDetail.addCommentPlaceholder")}
+                            aria-label={t("photoDetail.addCommentPlaceholder")}
                             value={commentContent}
+                            maxLength={1000}
                             onChange={(e) => setCommentContent(e.target.value)}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
+                                // 한글 조합 중 Enter 는 글자 확정이다 — 그때 보내면 마지막 글자가 빠지거나 두 번 간다.
+                                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                     e.preventDefault();
                                     handleSubmitComment();
                                 }
                             }}
-                            className="flex-1 bg-surface-3 text-ink-1 text-sm rounded-full h-10 px-4 focus:outline-none focus:border-brand/50 focus:bg-black/[0.06] transition-all placeholder:text-black/40"
+                            className="flex-1 min-w-0 bg-surface-3 text-ink-1 text-[15px] rounded-pill h-11 px-4 outline-none focus-visible:ring-2 focus-visible:ring-brand/40 placeholder:text-ink-4"
                         />
-                        <Button
+                        <button
+                            type="button"
                             disabled={!commentContent.trim() || commentMutation.isPending}
                             onClick={handleSubmitComment}
-                            size="icon"
-                            className="w-10 h-10 rounded-full bg-brand hover:bg-brand-strong text-brand-fg transition-all flex-shrink-0"
+                            aria-label={t("crewPost.sendComment")}
+                            className="w-11 h-11 shrink-0 rounded-full bg-brand text-brand-fg inline-flex items-center justify-center active:bg-brand-strong disabled:opacity-40"
                         >
-                            <LucideSend className="w-4 h-4 ml-0.5" />
-                        </Button>
+                            <LucideSend className="w-5 h-5" />
+                        </button>
                     </div>
                 </div>
+
+                <ConfirmDialog
+                    open={confirmPhotoDelete}
+                    onOpenChange={setConfirmPhotoDelete}
+                    title={t("photoDetail.deletePhoto")}
+                    desc={t("photoDetail.confirmDeletePhoto")}
+                    confirmLabel={t("socialPost.delete")}
+                    busy={deletePhotoMutation.isPending}
+                    onConfirm={() => deletePhotoMutation.mutate()}
+                />
+                <ConfirmDialog
+                    open={!!deleteCommentId}
+                    onOpenChange={(o) => { if (!o) setDeleteCommentId(null); }}
+                    title={t("photoDetail.deleteComment")}
+                    desc={t("photoDetail.confirmDeleteComment")}
+                    confirmLabel={t("socialPost.delete")}
+                    busy={deleteCommentMutation.isPending}
+                    onConfirm={() => { if (deleteCommentId) deleteCommentMutation.mutate(deleteCommentId); }}
+                />
             </DialogContent>
         </Dialog >
     );

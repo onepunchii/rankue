@@ -412,5 +412,21 @@ export const vi: Record<string, string> = {
   "notif.game.started.title": "🎱 Trận đấu đã bắt đầu",
   "notif.game.started.body": "{host} đã bắt đầu trận đấu. Mở bảng điểm.",
   "err.chat.leaveNotAllowed": "Không thể rời phòng này từ đây",
+  // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
+  "err.crew.badCursor": "Vị trí danh sách không hợp lệ. Vui lòng tải lại",
+  "err.crew.postCategoryInvalid": "Danh mục bảng tin không hợp lệ",
+  "err.crew.postNoticeAdminOnly": "Chỉ ban quản lý mới được đăng thông báo",
+  "err.crew.postEditForbidden": "Chỉ người viết hoặc ban quản lý mới được sửa bài này",
+  "err.crew.pinAdminOnly": "Chỉ ban quản lý mới được ghim thông báo",
+  "err.crew.postTitleRequired": "Vui lòng nhập tiêu đề",
+  "err.crew.postImagesInvalid": "Thông tin ảnh không hợp lệ",
+  "err.crew.activityEditForbidden": "Chỉ người tạo hoặc ban quản lý mới được sửa buổi gặp này",
+  "err.crew.activityDeleteForbidden": "Chỉ người tạo hoặc ban quản lý mới được xóa buổi gặp này",
+  "err.crew.activityDateInvalid": "Ngày gặp không hợp lệ",
+  "err.crew.activityMaxInvalid": "Số người tối đa phải từ 2 trở lên",
+  "notif.crew.someone": "Một thành viên",
+  "notif.crew.activityFallback": "buổi gặp",
+  "notif.crew.crewFallback": "Crew",
+  "notif.crew.postFallback": "bài viết",
 };
 export default vi;
