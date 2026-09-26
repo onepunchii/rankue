@@ -350,7 +350,7 @@ export default function AdminDashboard() {
                     {tab === "stores" && <StoresView />}
                     {tab === "billing" && <BillingView />}
                     {tab === "crews" && <CrewsView />}
-                    {tab === "online-game" && <OnlineGameView />}
+                    {tab === "online-game" && <OnlineGameView onOpenMember={setOpenMemberId} />}
                     {tab === "golf-orders" && <GolfOrdersView />}
                     {tab === "notices" && <NoticesView />}
 
@@ -396,5 +396,6 @@ const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     stores: "계약된 매장과 사장님 화면(대리 접속).",
     crews: "모든 크루 — 종목·인원·가입 대기.",
     "golf-orders": "골프 회원권 매수·매도 상담 접수.",
+    "online-game": "지금 → 오늘 → 기간(직전 대비) → 깔때기·재방문·품질 순서로 봅니다. 한국 시각 기준.",
     notices: "앱 공지 — 쓰기·고치기·가리기.",
 };

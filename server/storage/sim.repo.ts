@@ -86,131 +86,289 @@ export class SimRepository {
     }
 
     /**
-     * 어드민 "온라인당구 게임" 화면(2026-09-08 오너): 얼마나 쓰는지 — 싱글(세션)·멀티(대전)·드릴 활동을 한 번에.
-     * hiq_sim_* 와 회원 이름만 읽는다. 실전 성적 테이블은 건드리지 않는다.
+     * 어드민 "온라인게임" 대시보드(2026-09-08 오너 → 2026-09-26 개편: "이용 현황 대시보드가 중요").
+     * hiq_sim_* 와 회원 이름·앱 접속만 읽는다. 실전 성적 테이블은 건드리지 않는다.
+     *
+     * 날짜는 모두 **한국 날짜**다(timestamp 칸은 UTC 로 저장 — golf.repo 와 같은 전제). 예전엔 일별 막대를 UTC 로 잘라
+     * 한국 오전 9시 전 플레이가 전날로 갔고, 숫자 대부분이 전체 누적이라 기간(7·30·90일)을 바꿔도 그래프만 바뀌었다.
+     * 지금은 모든 숫자가 기간 안의 값이고, 같은 길이의 **직전 기간**과 비교한다.
+     *
+     * "플레이" = 싱글 세션 시작 · 대전 방 만들기(호스트) · 대전 입장(게스트) · 드릴 시도. 이용자 = 플레이가 있는 회원.
+     * 대전에는 끝난 시각 칸이 없다 — 대전 길이는 시작 → 마지막 샷(last_shot_at)으로 잰다.
      */
     async adminOverview(days = 30) {
-        const one = async (q: ReturnType<typeof sql>) => ((await db.execute(q)).rows[0] ?? {}) as Record<string, string | number | null>;
-        const many = async (q: ReturnType<typeof sql>) => (await db.execute(q)).rows as Record<string, string | number | null>[];
-        const n = (v: string | number | null | undefined) => (v === null || v === undefined ? 0 : Number(v));
+        const rows = async (q: ReturnType<typeof sql>) => (await db.execute(q)).rows as Record<string, unknown>[];
+        const one = async (q: ReturnType<typeof sql>) => (await rows(q))[0] ?? {};
+        const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
+        const numOrNull = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+        const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
 
-        const sessions = await one(sql`
-            select count(*) as total,
-                   count(*) filter (where status = 'finished') as finished,
-                   count(*) filter (where status = 'playing') as playing,
-                   count(*) filter (where kind = 'drill') as drill_kind,
-                   count(distinct member_id) as players,
-                   coalesce(sum(shots), 0) as shots,
-                   coalesce(sum(innings), 0) as innings,
-                   coalesce(sum(mismatches), 0) as mismatches,
-                   count(*) filter (where started_at >= now() - interval '1 day') as d1,
-                   count(*) filter (where started_at >= now() - interval '7 days') as d7,
-                   count(*) filter (where started_at >= now() - interval '30 days') as d30,
-                   avg(innings) filter (where status = 'finished' and innings > 0) as avg_innings,
-                   avg(extract(epoch from (finished_at - started_at)) / 60) filter (where finished_at is not null and status = 'finished') as avg_minutes
-            from hiq_sim_sessions`);
-        const matches = await one(sql`
-            select count(*) as total,
-                   count(*) filter (where status = 'finished') as finished,
-                   count(*) filter (where status = 'playing') as playing,
-                   count(*) filter (where status = 'waiting') as waiting,
-                   count(*) filter (where status = 'canceled') as canceled,
-                   count(*) filter (where status = 'waiting' and is_public) as open_rooms,
-                   count(*) filter (where is_public) as public_total,
-                   count(*) filter (where password_hash is not null) as password_total,
-                   count(*) filter (where invited_id is not null) as invited_total,
-                   count(*) filter (where aim_assist = false) as reality,
-                   count(*) filter (where end_reason = 'target') as end_target,
-                   count(*) filter (where end_reason = 'inningCap') as end_inning_cap,
-                   count(*) filter (where end_reason = 'resign') as end_resign,
-                   count(*) filter (where end_reason = 'claim') as end_claim,
-                   coalesce(sum(shots), 0) as shots,
-                   coalesce(sum(mismatches), 0) as mismatches,
-                   count(*) filter (where created_at >= now() - interval '1 day') as d1,
-                   count(*) filter (where created_at >= now() - interval '7 days') as d7,
-                   count(*) filter (where created_at >= now() - interval '30 days') as d30
-            from hiq_sim_matches`);
-        const matchPlayers = await one(sql`
-            select count(distinct id) as players from (
-                select host_id as id from hiq_sim_matches union select guest_id from hiq_sim_matches where guest_id is not null) u`);
-        const drills = await one(sql`
-            select count(*) as attempts, count(*) filter (where success) as successes, count(distinct member_id) as players,
-                   count(distinct week_id) as weeks,
-                   count(*) filter (where created_at >= now() - interval '7 days') as d7
-            from hiq_sim_drill_attempts`);
-        const active = async (interval: string) => n((await one(sql`
-            select count(distinct id) as c from (
-                select member_id as id from hiq_sim_sessions where started_at >= now() - ${interval}::interval
-                union select host_id from hiq_sim_matches where created_at >= now() - ${interval}::interval
-                union select guest_id from hiq_sim_matches where guest_id is not null and started_at >= now() - ${interval}::interval
-                union select member_id from hiq_sim_drill_attempts where created_at >= now() - ${interval}::interval) u`)).c);
-        const [a1, a7, a30] = await Promise.all([active("1 day"), active("7 days"), active("30 days")]);
+        // 한국 오늘 0시(UTC 벽시계) · 기간 시작 · 직전 기간 시작
+        const TODAY = sql`(date_trunc('day', now() at time zone 'Asia/Seoul') - interval '9 hours')`;
+        const P = sql`(${TODAY} - make_interval(days => ${days - 1}))`;
+        const PP = sql`(${P} - make_interval(days => ${days}))`;
+        const NOW = sql`(now() at time zone 'UTC')`;
+        const KST_DAY = (col: ReturnType<typeof sql>) => sql`((${col}) at time zone 'UTC' at time zone 'Asia/Seoul')::date`;
+        const ISO = (col: ReturnType<typeof sql>) => sql`to_char(${col}, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
+        const PLAYS = sql`(
+            select member_id as mid, started_at as at, 'single' as kind from hiq_sim_sessions
+            union all select host_id, created_at, 'match' from hiq_sim_matches
+            union all select guest_id, started_at, 'match' from hiq_sim_matches where guest_id is not null and started_at is not null
+            union all select member_id, created_at, 'drill' from hiq_sim_drill_attempts
+        )`;
+        const SESSION_MIN = sql`least(extract(epoch from (coalesce(finished_at, last_shot_at, started_at) - started_at)), 14400) / 60`;
+        const MATCH_MIN = sql`least(extract(epoch from (coalesce(finished_at, last_shot_at, started_at) - started_at)), 14400) / 60`;
 
-        const dayKey = (d: Date) => d.toISOString().slice(0, 10);
-        const daily = new Map<string, { day: string; sessions: number; matches: number; drills: number; players: number }>();
+        const [kpi, sess, mat, drill, live, today, funnel] = await Promise.all([
+            one(sql`
+                with plays as ${PLAYS}, firsts as (select mid, min(at) as first_at from plays group by mid)
+                select
+                  (select count(distinct mid) from plays where at >= ${P})::int as players,
+                  (select count(distinct mid) from plays where at >= ${PP} and at < ${P})::int as players_prev,
+                  (select count(*) from firsts where first_at >= ${P})::int as new_players,
+                  (select count(*) from firsts where first_at >= ${PP} and first_at < ${P})::int as new_players_prev,
+                  (select count(*) from plays where at >= ${P})::int as plays,
+                  (select count(*) from plays where at >= ${PP} and at < ${P})::int as plays_prev,
+                  -- 기간 안에 이틀 이상 온 이용자(재방문)
+                  (select count(*) from (select mid from plays where at >= ${P} group by mid having count(distinct ${KST_DAY(sql`at`)}) >= 2) x)::int as returning_players,
+                  (select count(*) from firsts)::int as players_all`),
+            one(sql`
+                select
+                  count(*) filter (where started_at >= ${P})::int as total,
+                  count(*) filter (where started_at >= ${PP} and started_at < ${P})::int as total_prev,
+                  count(*) filter (where started_at >= ${P} and status = 'finished')::int as finished,
+                  count(*) filter (where started_at >= ${P} and kind = 'drill')::int as drill_kind,
+                  count(distinct member_id) filter (where started_at >= ${P})::int as players,
+                  coalesce(sum(shots) filter (where started_at >= ${P}), 0)::int as shots,
+                  coalesce(sum(mismatches) filter (where started_at >= ${P}), 0)::int as mismatches,
+                  count(*) filter (where started_at >= ${P} and mismatches > 0)::int as mismatch_games,
+                  avg(innings) filter (where started_at >= ${P} and status = 'finished' and innings > 0)::float as avg_innings,
+                  avg(${SESSION_MIN}) filter (where started_at >= ${P} and status = 'finished')::float as avg_minutes,
+                  coalesce(sum(${SESSION_MIN}) filter (where started_at >= ${P}), 0)::float as total_minutes,
+                  coalesce(sum(${SESSION_MIN}) filter (where started_at >= ${PP} and started_at < ${P}), 0)::float as total_minutes_prev
+                from hiq_sim_sessions where started_at >= ${PP}`),
+            one(sql`
+                select
+                  count(*) filter (where created_at >= ${P})::int as created,
+                  count(*) filter (where created_at >= ${PP} and created_at < ${P})::int as created_prev,
+                  count(*) filter (where created_at >= ${P} and started_at is not null)::int as started,
+                  count(*) filter (where created_at >= ${P} and status = 'finished')::int as finished,
+                  count(*) filter (where created_at >= ${PP} and created_at < ${P} and status = 'finished')::int as finished_prev,
+                  count(*) filter (where created_at >= ${P} and status = 'canceled')::int as canceled,
+                  count(*) filter (where created_at >= ${P} and is_public)::int as public_rooms,
+                  count(*) filter (where created_at >= ${P} and password_hash is not null)::int as password_rooms,
+                  count(*) filter (where created_at >= ${P} and invited_id is not null)::int as invited,
+                  count(*) filter (where created_at >= ${P} and aim_assist = false)::int as reality,
+                  count(*) filter (where created_at >= ${P} and handicap)::int as handicap,
+                  count(*) filter (where created_at >= ${P} and end_reason = 'target')::int as end_target,
+                  count(*) filter (where created_at >= ${P} and end_reason = 'inningCap')::int as end_inning_cap,
+                  count(*) filter (where created_at >= ${P} and end_reason = 'resign')::int as end_resign,
+                  count(*) filter (where created_at >= ${P} and end_reason = 'claim')::int as end_claim,
+                  coalesce(sum(shots) filter (where created_at >= ${P}), 0)::int as shots,
+                  coalesce(sum(mismatches) filter (where created_at >= ${P}), 0)::int as mismatches,
+                  count(*) filter (where created_at >= ${P} and mismatches > 0)::int as mismatch_games,
+                  -- 방을 만들고 상대가 들어오기까지(초) · 대전 길이(분, 끝난 판)
+                  percentile_cont(0.5) within group (order by extract(epoch from (started_at - created_at)))
+                      filter (where created_at >= ${P} and started_at is not null)::float as median_wait_sec,
+                  avg(${MATCH_MIN}) filter (where created_at >= ${P} and status = 'finished')::float as avg_minutes,
+                  avg(shots) filter (where created_at >= ${P} and status = 'finished')::float as avg_shots,
+                  (select count(distinct id) from (
+                      select host_id as id from hiq_sim_matches where created_at >= ${P} and started_at is not null
+                      union select guest_id from hiq_sim_matches where created_at >= ${P} and guest_id is not null and started_at is not null) u)::int as players
+                from hiq_sim_matches where created_at >= ${PP}`),
+            one(sql`
+                select
+                  count(*) filter (where created_at >= ${P})::int as attempts,
+                  count(*) filter (where created_at >= ${PP} and created_at < ${P})::int as attempts_prev,
+                  count(*) filter (where created_at >= ${P} and success)::int as successes,
+                  count(distinct member_id) filter (where created_at >= ${P})::int as players
+                from hiq_sim_drill_attempts where created_at >= ${PP}`),
+            // 지금 — 싱글은 최근 10분 안에 샷, 대전은 진행 중이고 한쪽이라도 2분 안에 화면을 봄, 열린 방은 1시간 안에 만든 공개 대기 방
+            one(sql`
+                select
+                  (select count(*) from hiq_sim_sessions where status = 'playing' and coalesce(last_shot_at, started_at) > ${NOW} - interval '10 minutes')::int as singles,
+                  (select count(*) from hiq_sim_matches where status = 'playing'
+                      and greatest(coalesce(host_seen_at, 'epoch'), coalesce(guest_seen_at, 'epoch'), coalesce(last_shot_at, 'epoch')) > ${NOW} - interval '2 minutes')::int as matches,
+                  (select count(*) from hiq_sim_matches where status = 'waiting' and is_public and created_at > ${NOW} - interval '1 hour')::int as open_rooms,
+                  (select count(distinct id) from (
+                      select member_id as id from hiq_sim_sessions where status = 'playing' and coalesce(last_shot_at, started_at) > ${NOW} - interval '10 minutes'
+                      union select host_id from hiq_sim_matches where status = 'playing' and coalesce(host_seen_at, 'epoch') > ${NOW} - interval '2 minutes'
+                      union select guest_id from hiq_sim_matches where status = 'playing' and guest_id is not null and coalesce(guest_seen_at, 'epoch') > ${NOW} - interval '2 minutes') u)::int as players`),
+            // 오늘 vs 어제 같은 시각까지
+            one(sql`
+                with plays as ${PLAYS}
+                select
+                  count(distinct mid) filter (where at >= ${TODAY})::int as players,
+                  count(distinct mid) filter (where at >= ${TODAY} - interval '1 day' and at < ${NOW} - interval '1 day')::int as players_yday,
+                  count(*) filter (where at >= ${TODAY} and kind = 'single')::int as singles,
+                  count(*) filter (where at >= ${TODAY} and kind = 'match')::int as match_plays,
+                  count(*) filter (where at >= ${TODAY} and kind = 'drill')::int as drills
+                from plays where at >= ${TODAY} - interval '1 day'`),
+            // 깔때기(기간) — 앱을 연 회원 → 온라인게임 → 대전 1판 → (전체) 대전 배치 완료
+            one(sql`
+                with plays as ${PLAYS}
+                select
+                  (select count(distinct member_id) from hiq_app_sessions where opened_at >= ${P})::int as app_users,
+                  (select count(distinct mid) from plays where at >= ${P})::int as game_users,
+                  (select count(distinct id) from (
+                      select host_id as id from hiq_sim_matches where created_at >= ${P} and started_at is not null
+                      union select guest_id from hiq_sim_matches where created_at >= ${P} and guest_id is not null and started_at is not null) u)::int as match_users,
+                  (select count(distinct member_id) from hiq_sim_match_ratings where matches >= 3)::int as placed_all`),
+        ]);
+
+        // 일별(한국 날짜) — 빈 날도 0 으로
+        const dayRows = await rows(sql`
+            with plays as ${PLAYS}
+            select to_char(${KST_DAY(sql`at`)}, 'YYYY-MM-DD') as day,
+                   count(distinct mid)::int as players,
+                   count(*) filter (where kind = 'single')::int as sessions,
+                   count(*) filter (where kind = 'match')::int as match_plays,
+                   count(*) filter (where kind = 'drill')::int as drills
+            from plays where at >= ${P} group by 1`);
+        const matchDays = await rows(sql`
+            select to_char(${KST_DAY(sql`created_at`)}, 'YYYY-MM-DD') as day,
+                   count(*)::int as created, count(*) filter (where status = 'finished')::int as finished
+            from hiq_sim_matches where created_at >= ${P} group by 1`);
+        const newDays = await rows(sql`
+            with plays as ${PLAYS}, firsts as (select mid, min(at) as first_at from plays group by mid)
+            select to_char(${KST_DAY(sql`first_at`)}, 'YYYY-MM-DD') as day, count(*)::int as c from firsts where first_at >= ${P} group by 1`);
+        const todayKst = new Date(Date.now() + 9 * 3600_000);
+        const daily: { day: string; players: number; newPlayers: number; sessions: number; matches: number; finishedMatches: number; drills: number }[] = [];
+        const byDay = new Map(dayRows.map((r) => [String(r.day), r]));
+        const mByDay = new Map(matchDays.map((r) => [String(r.day), r]));
+        const nByDay = new Map(newDays.map((r) => [String(r.day), n(r.c)]));
         for (let k = days - 1; k >= 0; k--) {
-            const day = dayKey(new Date(Date.now() - k * 86_400_000));
-            daily.set(day, { day, sessions: 0, matches: 0, drills: 0, players: 0 });
-        }
-        const bump = (rows: Record<string, string | number | null>[], key: "sessions" | "matches" | "drills") => {
-            for (const r of rows) { const d = daily.get(String(r.day)); if (d) d[key] = n(r.c); }
-        };
-        bump(await many(sql`select to_char(started_at at time zone 'utc', 'YYYY-MM-DD') as day, count(*) as c from hiq_sim_sessions where started_at >= now() - ${`${days} days`}::interval group by 1`), "sessions");
-        bump(await many(sql`select to_char(created_at at time zone 'utc', 'YYYY-MM-DD') as day, count(*) as c from hiq_sim_matches where created_at >= now() - ${`${days} days`}::interval group by 1`), "matches");
-        bump(await many(sql`select to_char(created_at at time zone 'utc', 'YYYY-MM-DD') as day, count(*) as c from hiq_sim_drill_attempts where created_at >= now() - ${`${days} days`}::interval group by 1`), "drills");
-        for (const r of await many(sql`
-            select day, count(distinct id) as c from (
-                select to_char(started_at at time zone 'utc', 'YYYY-MM-DD') as day, member_id as id from hiq_sim_sessions where started_at >= now() - ${`${days} days`}::interval
-                union select to_char(created_at at time zone 'utc', 'YYYY-MM-DD'), host_id from hiq_sim_matches where created_at >= now() - ${`${days} days`}::interval
-                union select to_char(created_at at time zone 'utc', 'YYYY-MM-DD'), member_id from hiq_sim_drill_attempts where created_at >= now() - ${`${days} days`}::interval) u group by 1`)) {
-            const d = daily.get(String(r.day)); if (d) d.players = n(r.c);
+            const day = new Date(todayKst.getTime() - k * 86_400_000).toISOString().slice(0, 10);
+            const r = byDay.get(day), m = mByDay.get(day);
+            daily.push({
+                day, players: n(r?.players), newPlayers: nByDay.get(day) ?? 0,
+                sessions: n(r?.sessions), matches: n(m?.created), finishedMatches: n(m?.finished), drills: n(r?.drills),
+            });
         }
 
-        const byGame = await many(sql`
-            select g.game_type, g.table_id, coalesce(s.c, 0) as sessions, coalesce(m.c, 0) as matches from
-              (select distinct game_type, table_id from hiq_sim_sessions union select distinct game_type, table_id from hiq_sim_matches) g
-              left join (select game_type, table_id, count(*) as c from hiq_sim_sessions group by 1, 2) s on s.game_type = g.game_type and s.table_id = g.table_id
-              left join (select game_type, table_id, count(*) as c from hiq_sim_matches group by 1, 2) m on m.game_type = g.game_type and m.table_id = g.table_id
-            order by 1, 2`);
-        const topPlayers = await many(sql`
-            select mem.name, r.member_id, sum(r.sessions) as sessions, sum(r.matches) as matches, sum(r.wins) as wins, max(r.sim_rating) as rating, max(r.best_avg) as best_avg, max(r.updated_at) as last_at
-            from hiq_sim_ratings r join hiq_members mem on mem.id = r.member_id
-            group by 1, 2 order by (sum(r.sessions) + sum(r.matches)) desc, max(r.updated_at) desc limit 10`);
-        const recentMatches = await many(sql`
-            select m.id, m.status, m.game_type, m.table_id, m.is_public, m.end_reason, m.shots, m.created_at, m.finished_at,
-                   h.name as host_name, g.name as guest_name
-            from hiq_sim_matches m join hiq_members h on h.id = m.host_id left join hiq_members g on g.id = m.guest_id
-            order by m.created_at desc limit 10`);
+        // 요일 × 시간(한국) — 플레이 수. isodow 1=월 … 7=일
+        const heat = await rows(sql`
+            with plays as ${PLAYS}
+            select extract(isodow from (at at time zone 'UTC' at time zone 'Asia/Seoul'))::int as dow,
+                   extract(hour from (at at time zone 'UTC' at time zone 'Asia/Seoul'))::int as hour,
+                   count(*)::int as c
+            from plays where at >= ${P} group by 1, 2`);
+        const heatmap = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+        for (const h of heat) {
+            const d = n(h.dow) - 1, hr = n(h.hour);
+            if (d >= 0 && d < 7 && hr >= 0 && hr < 24) heatmap[d][hr] = n(h.c);
+        }
+
+        // 첫 플레이 주 코호트(최근 8주) — 다음 날(D1) · 7일 안(D7) 다시 왔나. 날짜는 한국 기준.
+        const cohorts = await rows(sql`
+            with plays as ${PLAYS},
+            pd as (select mid, ${KST_DAY(sql`at`)} as d from plays group by 1, 2),
+            f as (select mid, min(d) as fd from pd group by mid),
+            today as (select (now() at time zone 'Asia/Seoul')::date as t)
+            select to_char(date_trunc('week', fd), 'MM-DD') as week, count(*)::int as players,
+                   count(*) filter (where exists (select 1 from pd where pd.mid = f.mid and pd.d = f.fd + 1))::int as d1,
+                   count(*) filter (where exists (select 1 from pd where pd.mid = f.mid and pd.d > f.fd and pd.d <= f.fd + 7))::int as d7,
+                   (max(fd) + 1 < (select t from today)) as d1_ready,
+                   (max(fd) + 7 < (select t from today)) as d7_ready
+            from f where fd >= (select t from today) - 56
+            group by date_trunc('week', fd) order by date_trunc('week', fd) desc`);
+
+        const byGame = await rows(sql`
+            select g.game_type, g.table_id, coalesce(s.c, 0)::int as sessions, coalesce(m.c, 0)::int as matches from
+              (select distinct game_type, table_id from hiq_sim_sessions where started_at >= ${P}
+               union select distinct game_type, table_id from hiq_sim_matches where created_at >= ${P}) g
+              left join (select game_type, table_id, count(*) as c from hiq_sim_sessions where started_at >= ${P} group by 1, 2) s on s.game_type = g.game_type and s.table_id = g.table_id
+              left join (select game_type, table_id, count(*) as c from hiq_sim_matches where created_at >= ${P} group by 1, 2) m on m.game_type = g.game_type and m.table_id = g.table_id
+            order by 3 + 4 desc, 1, 2`);
+
+        // 기간 상위 이용자 — 플레이 수 기준. 레이팅은 대전 레이팅 최고값(종목 중).
+        const topPlayers = await rows(sql`
+            with plays as ${PLAYS}
+            select p.mid as member_id, mem.name,
+                   count(*) filter (where p.kind = 'single')::int as sessions,
+                   count(*) filter (where p.kind = 'match')::int as matches,
+                   count(*) filter (where p.kind = 'drill')::int as drills,
+                   count(distinct ${KST_DAY(sql`p.at`)})::int as days,
+                   (select count(*) from hiq_sim_matches w where w.winner_id = p.mid and w.created_at >= ${P})::int as wins,
+                   (select max(r.rating) from hiq_sim_match_ratings r where r.member_id = p.mid)::int as rating,
+                   (select max(r.best_avg) from hiq_sim_ratings r where r.member_id = p.mid)::float as best_avg,
+                   ${ISO(sql`max(p.at)`)} as last_at
+            from plays p join hiq_members mem on mem.id = p.mid
+            where p.at >= ${P}
+            group by p.mid, mem.name
+            order by count(*) desc, max(p.at) desc limit 15`);
+
+        const newPlayers = await rows(sql`
+            with plays as ${PLAYS}, firsts as (select mid, min(at) as first_at from plays group by mid)
+            select f.mid as member_id, mem.name, ${ISO(sql`f.first_at`)} as first_at,
+                   (select count(*) from plays p where p.mid = f.mid)::int as plays,
+                   (select kind from plays p where p.mid = f.mid order by p.at asc limit 1) as first_kind
+            from firsts f join hiq_members mem on mem.id = f.mid
+            where f.first_at >= ${P} order by f.first_at desc limit 15`);
+
+        const recentMatches = await rows(sql`
+            select m.id, m.status, m.game_type, m.table_id, m.is_public, (m.password_hash is not null) as has_password,
+                   (m.invited_id is not null) as invited, m.aim_assist, m.end_reason, m.shots, m.mismatches,
+                   ${ISO(sql`m.created_at`)} as created_at, ${ISO(sql`m.started_at`)} as started_at, ${ISO(sql`m.last_shot_at`)} as last_shot_at,
+                   h.name as host_name, g.name as guest_name, w.name as winner_name
+            from hiq_sim_matches m
+            join hiq_members h on h.id = m.host_id
+            left join hiq_members g on g.id = m.guest_id
+            left join hiq_members w on w.id = m.winner_id
+            order by m.created_at desc limit 20`);
 
         return {
             generatedAt: new Date().toISOString(),
             days,
+            live: { players: n(live.players), singles: n(live.singles), matches: n(live.matches), openRooms: n(live.open_rooms) },
+            today: {
+                players: n(today.players), playersYesterdaySoFar: n(today.players_yday),
+                singles: n(today.singles), matchPlays: n(today.match_plays), drills: n(today.drills),
+            },
+            kpi: {
+                players: n(kpi.players), playersPrev: n(kpi.players_prev),
+                newPlayers: n(kpi.new_players), newPlayersPrev: n(kpi.new_players_prev),
+                plays: n(kpi.plays), playsPrev: n(kpi.plays_prev),
+                returningPlayers: n(kpi.returning_players), playersAll: n(kpi.players_all),
+                minutes: Math.round(n(sess.total_minutes) + 0), minutesPrev: Math.round(n(sess.total_minutes_prev)),
+            },
             sessions: {
-                total: n(sessions.total), finished: n(sessions.finished), playing: n(sessions.playing), drillKind: n(sessions.drill_kind),
-                players: n(sessions.players), shots: n(sessions.shots), innings: n(sessions.innings), mismatches: n(sessions.mismatches),
-                d1: n(sessions.d1), d7: n(sessions.d7), d30: n(sessions.d30),
-                avgInnings: sessions.avg_innings === null ? null : Number(sessions.avg_innings),
-                avgMinutes: sessions.avg_minutes === null ? null : Number(sessions.avg_minutes),
+                total: n(sess.total), totalPrev: n(sess.total_prev), finished: n(sess.finished), drillKind: n(sess.drill_kind),
+                players: n(sess.players), shots: n(sess.shots), mismatches: n(sess.mismatches), mismatchGames: n(sess.mismatch_games),
+                avgInnings: numOrNull(sess.avg_innings), avgMinutes: numOrNull(sess.avg_minutes),
             },
             matches: {
-                total: n(matches.total), finished: n(matches.finished), playing: n(matches.playing), waiting: n(matches.waiting), canceled: n(matches.canceled),
-                openRooms: n(matches.open_rooms), publicTotal: n(matches.public_total), passwordTotal: n(matches.password_total), invitedTotal: n(matches.invited_total),
-                reality: n(matches.reality), players: n(matchPlayers.players), shots: n(matches.shots), mismatches: n(matches.mismatches),
-                endReasons: { target: n(matches.end_target), inningCap: n(matches.end_inning_cap), resign: n(matches.end_resign), claim: n(matches.end_claim) },
-                d1: n(matches.d1), d7: n(matches.d7), d30: n(matches.d30),
+                created: n(mat.created), createdPrev: n(mat.created_prev), started: n(mat.started),
+                finished: n(mat.finished), finishedPrev: n(mat.finished_prev), canceled: n(mat.canceled),
+                publicRooms: n(mat.public_rooms), passwordRooms: n(mat.password_rooms), invited: n(mat.invited),
+                reality: n(mat.reality), handicap: n(mat.handicap), players: n(mat.players),
+                shots: n(mat.shots), mismatches: n(mat.mismatches), mismatchGames: n(mat.mismatch_games),
+                medianWaitSec: numOrNull(mat.median_wait_sec), avgMinutes: numOrNull(mat.avg_minutes), avgShots: numOrNull(mat.avg_shots),
+                endReasons: { target: n(mat.end_target), inningCap: n(mat.end_inning_cap), resign: n(mat.end_resign), claim: n(mat.end_claim) },
             },
-            drills: { attempts: n(drills.attempts), successes: n(drills.successes), players: n(drills.players), weeks: n(drills.weeks), d7: n(drills.d7) },
-            activePlayers: { d1: a1, d7: a7, d30: a30 },
-            daily: [...daily.values()],
+            drills: { attempts: n(drill.attempts), attemptsPrev: n(drill.attempts_prev), successes: n(drill.successes), players: n(drill.players) },
+            funnel: { appUsers: n(funnel.app_users), gameUsers: n(funnel.game_users), matchUsers: n(funnel.match_users), placedAll: n(funnel.placed_all) },
+            daily,
+            heatmap,
+            cohorts: cohorts.map((c) => ({
+                week: String(c.week), players: n(c.players), d1: n(c.d1), d7: n(c.d7),
+                d1Ready: c.d1_ready === true, d7Ready: c.d7_ready === true,
+            })),
             byGame: byGame.map((r) => ({ gameType: String(r.game_type), tableId: String(r.table_id), sessions: n(r.sessions), matches: n(r.matches) })),
             topPlayers: topPlayers.map((r) => ({
-                memberId: String(r.member_id), name: String(r.name), sessions: n(r.sessions), matches: n(r.matches), wins: n(r.wins),
-                rating: n(r.rating), bestAvg: Number(r.best_avg ?? 0), lastAt: r.last_at ? new Date(String(r.last_at)).toISOString() : null,
+                memberId: String(r.member_id), name: String(r.name ?? ""), sessions: n(r.sessions), matches: n(r.matches), drills: n(r.drills),
+                days: n(r.days), wins: n(r.wins), rating: numOrNull(r.rating), bestAvg: Number(r.best_avg ?? 0), lastAt: str(r.last_at),
+            })),
+            newPlayers: newPlayers.map((r) => ({
+                memberId: String(r.member_id), name: String(r.name ?? ""), firstAt: String(r.first_at ?? ""),
+                plays: n(r.plays), firstKind: String(r.first_kind ?? "single"),
             })),
             recentMatches: recentMatches.map((r) => ({
-                id: String(r.id), status: String(r.status), gameType: String(r.game_type), tableId: String(r.table_id), isPublic: !!r.is_public,
-                endReason: r.end_reason ? String(r.end_reason) : null, shots: n(r.shots), hostName: String(r.host_name), guestName: r.guest_name ? String(r.guest_name) : null,
-                createdAt: new Date(String(r.created_at)).toISOString(), finishedAt: r.finished_at ? new Date(String(r.finished_at)).toISOString() : null,
+                id: String(r.id), status: String(r.status), gameType: String(r.game_type), tableId: String(r.table_id),
+                isPublic: r.is_public === true, hasPassword: r.has_password === true, invited: r.invited === true, reality: r.aim_assist === false,
+                endReason: str(r.end_reason), shots: n(r.shots), mismatches: n(r.mismatches),
+                hostName: String(r.host_name ?? ""), guestName: str(r.guest_name), winnerName: str(r.winner_name),
+                createdAt: String(r.created_at ?? ""), startedAt: str(r.started_at), lastShotAt: str(r.last_shot_at),
             })),
         };
     }

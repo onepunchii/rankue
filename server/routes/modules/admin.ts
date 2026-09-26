@@ -40,7 +40,7 @@ router.get("/stats", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
 
 // GET /admin/online-game — 온라인당구 게임(시뮬레이터) 이용 현황: 싱글(세션)·멀티(대전)·멀티방·드릴·활성 이용자·일별 추이·상위 이용자
 router.get("/online-game", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
-    const days = Math.min(90, Math.max(7, Number(req.query.days) || 30));
+    const days = Math.min(90, Math.max(1, Math.round(Number(req.query.days)) || 30));
     return sendSuccess(res, await storage.sim.adminOverview(days));
 }));
 
