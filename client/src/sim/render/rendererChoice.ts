@@ -16,6 +16,12 @@ export const RENDERER_PREF_KEY = "rankue.sim.renderer";
 export const VIEW_PREF_KEY = "rankue.sim.view";
 /** 이 횟수만큼 WebGL 컨텍스트를 잃으면 Canvas2D 로 내려간다. */
 export const CONTEXT_LOSS_LIMIT = 2;
+/**
+ * 컨텍스트 손실로 내려간 canvas 선택은 이 기간만 유효하다(2026-09-26 검토). 예전엔 영구 저장이라, 앱을 두어 번 오가며 생긴
+ * (복구되는) 손실만으로도 3D 가 다시는 안 켜졌고 되돌릴 설정도 없었다.
+ */
+export const RENDERER_FALLBACK_KEY = "rankue.sim.renderer.fallbackUntil";
+export const RENDERER_FALLBACK_MS = 3 * 24 * 60 * 60 * 1000;
 
 import { ZOOM_MAX, ZOOM_MIN } from "./Renderer";
 
@@ -24,10 +30,15 @@ export interface StorageLike {
     setItem(key: string, value: string): void;
 }
 
-export function readRendererPref(storage: StorageLike | null | undefined): RendererKind | null {
+export function readRendererPref(storage: StorageLike | null | undefined, now = Date.now()): RendererKind | null {
     if (!storage) return null;
     try {
         const v = storage.getItem(RENDERER_PREF_KEY);
+        if (v === "canvas") {
+            // 손실로 내려간 canvas 는 기한이 있다 — 지나면 다시 WebGL 을 시도한다(기한 없는 canvas 는 예전 저장값 → 한 번 다시 시도)
+            const until = Number(storage.getItem(RENDERER_FALLBACK_KEY) ?? "0");
+            if (!Number.isFinite(until) || until < now) return null;
+        }
         return v === "three" || v === "canvas" ? v : null;
     } catch {
         return null;
@@ -35,10 +46,11 @@ export function readRendererPref(storage: StorageLike | null | undefined): Rende
 }
 
 /** 저장 성공 여부. 사파리 프라이빗 모드 등 쓰기 불가 환경에서는 false. */
-export function writeRendererPref(storage: StorageLike | null | undefined, kind: RendererKind): boolean {
+export function writeRendererPref(storage: StorageLike | null | undefined, kind: RendererKind, now = Date.now()): boolean {
     if (!storage) return false;
     try {
         storage.setItem(RENDERER_PREF_KEY, kind);
+        if (kind === "canvas") storage.setItem(RENDERER_FALLBACK_KEY, String(now + RENDERER_FALLBACK_MS));
         return true;
     } catch {
         return false;

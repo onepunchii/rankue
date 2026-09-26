@@ -1,5 +1,5 @@
 /**
- * 시뮬레이터 대시보드 API(GET /sim/stats/me) — 성적 행·세션 요약·연습 래더 순위·드릴 주별 집계를 한 번에.
+ * 시뮬레이터 대시보드 API(GET /sim/stats/me) — 성적 행·세션 요약·대전 순위·드릴 주별 집계를 한 번에.
  * 대전 목록은 match/MatchList 와 같은 쿼리(GET /sim/matches, MATCH_LIST_QUERY_KEY)를 쓴다.
  * 여기 값은 전부 hiq_sim_* 테이블의 것 — 실전 RP·에버리지와 무관하다.
  */
@@ -41,11 +41,15 @@ export interface SimSessionSummary {
     readonly finishedAt: string | null;
 }
 
-export interface SimRank {
+/**
+ * 온라인 대전 랭킹에서 내 순위 — 종목별(대대·중대 통합, 서버 sim.myMatchRanks).
+ * 배치 전(대전 < PLACEMENT_MATCHES)이면 rank 가 null 이다. 2026-09-26: 멈춘 연습 사다리 순위를 대체한다.
+ */
+export interface SimMatchRank {
     readonly gameType: DashGameType;
-    readonly tableId: DashTableId;
-    readonly rank: number;
+    readonly rank: number | null;
     readonly total: number;
+    readonly matches: number;
 }
 
 export interface SimDrillWeek {
@@ -81,7 +85,7 @@ export interface SimStats {
     readonly matchRatings: readonly SimMatchRatingRow[];
     readonly matchRecords: readonly SimMatchRecord[];
     readonly sessions: readonly SimSessionSummary[];
-    readonly ranks: readonly SimRank[];
+    readonly matchRanks: readonly SimMatchRank[];
     readonly drillWeeks: readonly SimDrillWeek[];
     readonly currentWeekId: string;
 }
@@ -127,10 +131,10 @@ export function parseSimStats(raw: unknown): SimStats {
             status: s.status === "finished" ? "finished" : s.status === "abandoned" ? "abandoned" : "playing",
             startedAt: iso(s.startedAt), finishedAt: s.finishedAt == null ? null : iso(s.finishedAt),
         })),
-        ranks: arr(o.ranks).map((r) => ({
+        matchRanks: arr(o.matchRanks).map((r) => ({
             gameType: r.gameType === "4c" ? "4c" : "3c",
-            tableId: r.tableId === "JUNGDAE_KR" ? "JUNGDAE_KR" : "DAEDAE",
-            rank: num(r.rank), total: num(r.total),
+            rank: r.rank == null || r.rank === "" ? null : num(r.rank),
+            total: num(r.total), matches: num(r.matches),
         })),
         drillWeeks: arr(o.drillWeeks).map((w) => ({ weekId: str(w.weekId), attempts: num(w.attempts), successes: num(w.successes), cushions: num(w.cushions) })),
         currentWeekId: str(o.currentWeekId),

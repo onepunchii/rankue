@@ -91,7 +91,7 @@ function stats(): SimStats {
             { gameType: "4c", tableId: "DAEDAE", sessions: 1, totalScore: 60, totalInnings: 20, bestAvg: 3, bestHighRun: 9, simRating: 1000, matches: 0, wins: 0, updatedAt: day(0) },
         ],
         sessions,
-        ranks: [{ gameType: "3c", tableId: "DAEDAE", rank: 3, total: 12 }],
+        matchRanks: [{ gameType: "3c" as const, rank: 3, total: 12, matches: 3 }],
         drillWeeks: [{ weekId: weekIdFor(NOW), attempts: 4, successes: 2, cushions: 9 }, { weekId: weekIdFor(NOW - 7 * 86_400_000), attempts: 5, successes: 5, cushions: 15 }],
         currentWeekId: weekIdFor(NOW),
     };
@@ -212,7 +212,7 @@ describe("SimDash", () => {
     });
 
     it("기록이 없으면 안내와 대전 만들기(초록 하나), 대전 섹션은 남는다 · sec=matches 도 안전", async () => {
-        const h = mount({ stats: { matchRatings: [], ratings: [], sessions: [], ranks: [], drillWeeks: [], currentWeekId: "2026-W37" }, rows: [], initialSection: "matches" });
+        const h = mount({ stats: { matchRatings: [], ratings: [], sessions: [], matchRanks: [], drillWeeks: [], currentWeekId: "2026-W37" }, rows: [], initialSection: "matches" });
         await settle(h, () => text(h).includes(ko["sim.dash.empty"]));
         const start = buttons(h).find((b) => b.textContent === ko["sim.dash.startMatch"])!;
         expect(start.className).toContain("bg-brand");
@@ -244,7 +244,7 @@ describe("SimDash", () => {
                 { gameType: "4c", tableId: "DAEDAE", sessions: 2, totalScore: 60, totalInnings: 20, bestAvg: 3, bestHighRun: 9, simRating: 1000, matches: 0, wins: 0, updatedAt: day(6) },
                 { gameType: "4c", tableId: "JUNGDAE_KR", sessions: 6, totalScore: 300, totalInnings: 200, bestAvg: 2, bestHighRun: 7, simRating: 1000, matches: 0, wins: 0, updatedAt: day(3) },
             ],
-            ranks: [{ gameType: "3c", tableId: "DAEDAE", rank: 3, total: 12 }],
+            matchRanks: [{ gameType: "3c" as const, rank: 3, total: 12, matches: 3 }],
         };
         // 한 샷도 못 친 기권 대전(이닝 0)도 섞는다 — 나눗셈이 깨지는 자리다
         const rows = [

@@ -21,8 +21,10 @@ import {
     buildConfig, defaultTableFor, defaultTarget, isValidTarget, conditionLabel, clampCondition,
     TARGET_CHIPS, TARGET_MIN, TARGET_MAX, INNING_CAPS, CUSHION_MODELS, SIM_MODES, modePreset, type SimMode,
     CONDITION_MIN, CONDITION_MAX, CONDITION_STEP, CONDITION_DEFAULT,
+    loadSetupPref, saveSetupPref, type SetupPref,
     type SimSetupConfig, type TableId,
 } from "./setupPresets";
+import { safeLocalStorage } from "./render/rendererChoice";
 
 // 시뮬레이터 세션 설정. QuickActions 의 "게임 모드 선택" 모달을 대신한다.
 // 형태는 CreateCrewTournamentDialog 와 같다 — 제목·시작 버튼 고정, 본문만 스크롤.
@@ -140,16 +142,38 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
     };
 
     // 종목이 바뀌면 그 종목의 기본 테이블·다마수로 되돌린다. 4구 다마수를 3쿠션에 들고 가면 말이 안 된다.
+    // 지난번 설정(기기에 저장). 종목을 바꿀 때 그 종목에서 손으로 정했던 다마수를 되살리는 데도 쓴다.
+    const prefRef = useRef<SetupPref | null>(null);
     const pickGameType = (g: GameType) => {
         if (g === gameType) return;
-        touched.current = false;
+        const remembered = prefRef.current?.targets[g];
+        touched.current = remembered !== undefined;
         setGameType(g);
         setTableId(defaultTableFor(g));
-        setTargetText(String(defaultTarget(g, g === "3c" ? member?.handi3c : member?.handi4c)));
+        setTargetText(String(remembered ?? defaultTarget(g, g === "3c" ? member?.handi3c : member?.handi4c)));
     };
 
+    // 열 때마다 지난번 설정으로 채운다(2026-09-26 검토 — 매번 종목·테이블·모드를 다시 골랐다).
     useEffect(() => {
-        if (open) touched.current = false;
+        if (!open) return;
+        touched.current = false;
+        const pref = loadSetupPref(safeLocalStorage());
+        prefRef.current = pref;
+        if (!pref) return;
+        setGameType(pref.gameType);
+        setTableId(pref.tableId);
+        setRuleSet(pref.ruleSet);
+        setThreeCushionDouble(pref.threeCushionDouble);
+        setInningCap(pref.inningCap);
+        setMode(pref.mode);
+        setCushionModel(pref.cushionModel);
+        setCondition(pref.condition);
+        setRecord(pref.record);
+        const remembered = pref.targets[pref.gameType];
+        if (remembered !== undefined) {
+            touched.current = true;
+            setTargetText(String(remembered));
+        }
     }, [open]);
 
     // 열려 있고 아직 손대지 않았으면 다마수를 기본값(핸디 → 종목 기본)으로 채운다. 핸디가 늦게 와도 따라간다.
@@ -173,6 +197,10 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
 
     const submit = () => {
         if (!targetOk) return;
+        // 손으로 정한 다마수만 기억한다 — 안 건드렸으면 다음에도 핸디 기본값이 따라간다.
+        const targets = { ...(prefRef.current?.targets ?? {}) };
+        if (touched.current) targets[gameType] = targetNum; else delete targets[gameType];
+        saveSetupPref(safeLocalStorage(), { gameType, tableId, targets, ruleSet, threeCushionDouble, inningCap, mode, cushionModel, condition, record });
         onStart(buildConfig({
             gameType, tableId, target: targetNum, inningCap, cushionModel, condition, mode,
             rules: gameType === "3c"

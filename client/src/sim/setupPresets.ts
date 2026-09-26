@@ -167,3 +167,56 @@ export function buildConfig(i: BuildConfigInput): SimSetupConfig {
         matchPreview: i.matchPreview === "full" ? "full" : "short",
     };
 }
+
+/**
+ * 마지막 설정 기억(2026-09-26 검토) — 혼자 치기를 열 때마다 종목·테이블·규칙·모드를 다시 고르던 것을 줄인다.
+ * 다마수는 **손으로 바꾼 종목만** 기억한다(안 건드렸으면 핸디 기본값이 계속 따라간다). 값이 이상하면 통째로 버린다.
+ */
+export const SETUP_PREF_KEY = "rankue.sim.setup.v1";
+
+export interface SetupPref {
+    readonly gameType: GameType;
+    readonly tableId: TableId;
+    readonly targets: Partial<Record<GameType, number>>;
+    readonly ruleSet: ThreeCushionRuleSet;
+    readonly threeCushionDouble: boolean;
+    readonly inningCap: number;
+    readonly mode: SimMode;
+    readonly cushionModel: CushionModelId;
+    readonly condition: number;
+    readonly record: boolean;
+}
+
+type PrefStorage = Pick<Storage, "getItem" | "setItem">;
+
+export function loadSetupPref(storage: PrefStorage | null | undefined): SetupPref | null {
+    try {
+        const raw = storage?.getItem(SETUP_PREF_KEY);
+        if (!raw) return null;
+        const v = JSON.parse(raw) as Partial<SetupPref> | null;
+        if (!v || (v.gameType !== "3c" && v.gameType !== "4c")) return null;
+        const targets: Partial<Record<GameType, number>> = {};
+        for (const g of ["3c", "4c"] as const) {
+            const n = v.targets?.[g];
+            if (isValidTarget(n)) targets[g] = n;
+        }
+        return {
+            gameType: v.gameType,
+            tableId: v.tableId === "JUNGDAE_KR" ? "JUNGDAE_KR" : "DAEDAE",
+            targets,
+            ruleSet: v.ruleSet === "pba" ? "pba" : "umb",
+            threeCushionDouble: v.threeCushionDouble === true,
+            inningCap: typeof v.inningCap === "number" && INNING_CAPS.includes(v.inningCap) ? v.inningCap : 0,
+            mode: v.mode === "reality" ? "reality" : "normal",
+            cushionModel: CUSHION_MODELS.includes(v.cushionModel as never) ? (v.cushionModel as CushionModelId) : modePreset(v.mode === "reality" ? "reality" : "normal").cushionModel,
+            condition: clampCondition(typeof v.condition === "number" ? v.condition : CONDITION_DEFAULT),
+            record: v.record !== false,
+        };
+    } catch {
+        return null;
+    }
+}
+
+export function saveSetupPref(storage: PrefStorage | null | undefined, pref: SetupPref): void {
+    try { storage?.setItem(SETUP_PREF_KEY, JSON.stringify(pref)); } catch { /* 저장 불가(사생활 모드 등) */ }
+}

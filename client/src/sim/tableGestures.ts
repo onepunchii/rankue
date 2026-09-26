@@ -16,9 +16,16 @@ import type { Phase } from "./simReducer";
 import { ZOOM_MAX, ZOOM_MIN, type RendererView } from "./render/Renderer";
 
 export type Gesture =
-    | { readonly kind: "aim"; readonly cue: XY; readonly prev: XY; readonly moved: boolean }
-    | { readonly kind: "place"; readonly id: string; readonly grab: XY; readonly moved: boolean }
+    /** dead: 큐볼 중심에서 이 거리(m) 안의 손가락 움직임은 조준을 바꾸지 않는다 — 공 바로 옆에선 몇 픽셀에 수십 도가 돌았다 */
+    | { readonly kind: "aim"; readonly cue: XY; readonly prev: XY; readonly moved: boolean; readonly dead?: number }
+    /** start·slop: 누른 곳에서 slop(m) 넘게 움직여야 공이 옮겨진다 — 누르기만 해도 손 떨림으로 공이 움직이던 것(2026-09-26 검토) */
+    | { readonly kind: "place"; readonly id: string; readonly grab: XY; readonly moved: boolean; readonly start?: XY; readonly slop?: number }
     | { readonly kind: "hold" };
+
+/** 공 옮기기 시작 거리(공 반지름 배수) */
+export const PLACE_START_R = 0.8;
+/** 조준 드래그를 무시하는 큐볼 둘레(공 반지름 배수) */
+export const AIM_DEAD_R = 1.5;
 
 export interface GestureEnv {
     readonly phase: Phase;
@@ -52,11 +59,11 @@ export function beginGesture(env: GestureEnv, p: XY): Gesture | null {
     if (env.phase !== "aim") return null;
     if (env.canPlace) {
         const hit = hitBall(env.balls, p, env.R);
-        if (hit) return { kind: "place", id: hit.id, grab: [p[0] - hit.r[0], p[1] - hit.r[1]], moved: false };
+        if (hit) return { kind: "place", id: hit.id, grab: [p[0] - hit.r[0], p[1] - hit.r[1]], moved: false, start: p, slop: env.R * PLACE_START_R };
     }
     const cue = env.balls.find((b) => b.id === env.cueBallId);
     if (!cue) return null;
-    return { kind: "aim", cue: [cue.r[0], cue.r[1]], prev: p, moved: false };
+    return { kind: "aim", cue: [cue.r[0], cue.r[1]], prev: p, moved: false, dead: env.R * AIM_DEAD_R };
 }
 
 export interface GestureMove {
@@ -71,12 +78,14 @@ export interface GestureMove {
 export function moveGesture(g: Gesture, p: XY, phi: number): GestureMove {
     if (g.kind === "hold") return { gesture: g };
     if (g.kind === "place") {
+        if (!g.moved && g.start && g.slop && Math.hypot(p[0] - g.start[0], p[1] - g.start[1]) < g.slop) return { gesture: g };
         return { gesture: { ...g, moved: true }, place: { id: g.id, x: p[0] - g.grab[0], y: p[1] - g.grab[1] } };
     }
     const dPrev = Math.hypot(g.prev[0] - g.cue[0], g.prev[1] - g.cue[1]);
     const dNext = Math.hypot(p[0] - g.cue[0], p[1] - g.cue[1]);
     const next: Gesture = { ...g, prev: p, moved: true };
-    if (dPrev < 1e-6 || dNext < 1e-6) return { gesture: next };
+    const dead = Math.max(1e-6, g.dead ?? 0);
+    if (dPrev < dead || dNext < dead) return { gesture: next };
     return { gesture: next, phi: phiFromDrag(g.cue, g.prev, p, phi) };
 }
 

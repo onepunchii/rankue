@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import type { SessionState } from "@shared/sim/rules";
 import type { Phase } from "../simReducer";
-import { displayAverage, endTitle, formatAverage, inningsForAverage } from "../hudMath";
+import { displayAverage, displayHighRun, endTitle, formatAverage, inningsForAverage } from "../hudMath";
 
 // 종료 다이얼로그. 승자(gold — 우승 의례 전용 색, 이름에만)·점수/다마수·이닝·에버리지·하이런, (공유: 마지막 샷 카드 + 세션 통계)·다시하기(같은 설정으로 새 세션)·나가기.
 // 초록은 나가기(주 동작) 하나뿐 — 승자 카드 테두리까지 초록이면 색이 두 가지 뜻을 갖는다.
@@ -59,7 +59,7 @@ export const EndDialog = memo(function EndDialog(p: Props) {
                                 <div className="mt-1.5 flex gap-4 text-[12px] font-medium text-ink-3 rk-num">
                                     <span>{t("sim.hud.inning")} {inningsForAverage(pl, p.phase)}</span>
                                     <span>{t("sim.hud.average")} {formatAverage(displayAverage(pl, p.phase, p.session?.rules.gameType))}</span>
-                                    <span>{t("sim.hud.highRun")} {pl.highRun}</span>
+                                    <span>{t("sim.hud.highRun")} {displayHighRun(pl, p.session?.rules.gameType)}</span>
                                 </div>
                             </div>
                         );

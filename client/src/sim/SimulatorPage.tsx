@@ -247,14 +247,17 @@ export function SimulatorPage() {
     const [resignOpen, setResignOpen] = useState(false);
     // 첫 세션 안내: 기기에 저장된 적 없으면 첫 aim 단계에서 한 번
     const [coachOpen, setCoachOpen] = useState(() => { try { return safeLocalStorage()?.getItem(COACH_PREF_KEY) !== "1"; } catch { return false; } });
-    const closeCoach = useCallback(() => { setCoachOpen(false); try { safeLocalStorage()?.setItem(COACH_PREF_KEY, "1"); } catch { /* 저장 불가 */ } }, []);
+    // 기록 표 아래 '조작법 다시 보기'로 연 것 — 이때는 대전 중에도 띄운다(첫 안내만 혼자 치기에서 저절로 뜬다).
+    const [coachAsked, setCoachAsked] = useState(false);
+    const closeCoach = useCallback(() => { setCoachOpen(false); setCoachAsked(false); try { safeLocalStorage()?.setItem(COACH_PREF_KEY, "1"); } catch { /* 저장 불가 */ } }, []);
     const [realityOpen, setRealityOpen] = useState(() => { try { return safeLocalStorage()?.getItem(REALITY_PREF_KEY) !== "1"; } catch { return false; } });
     const closeReality = useCallback(() => { setRealityOpen(false); try { safeLocalStorage()?.setItem(REALITY_PREF_KEY, "1"); } catch { /* 저장 불가 */ } }, []);
     const [turnChip, setTurnChip] = useState(false);
     const queryClient = useQueryClient();
 
     // ── 화면 상태 ─────────────────────────────────────────────────────────
-    const [muted, setMuted] = useState(false);
+    // 소리 끔은 기기에 기억한다(2026-09-26) — 예전엔 화면에 들어올 때마다 다시 켜졌다.
+    const [muted, setMuted] = useState<boolean>(() => { try { return localStorage.getItem("rankue.sim.muted") === "1"; } catch { return false; } });
     const [diamond, setDiamond] = useState(() => readDiamondPref(safeLocalStorage()));
     const [diamondTouched, setDiamondTouched] = useState(false);
     // 카메라 뷰: 저장값으로 시작. ThreeRenderer 가 올라와야(setView 지원) HUD 토글이 보이고 실제로 적용된다.
@@ -532,11 +535,10 @@ export function SimulatorPage() {
         };
         // WebGL 컨텍스트를 CONTEXT_LOSS_LIMIT 회 잃으면 기기 설정을 canvas 로 저장하고, 이벤트 핸들러 밖에서 렌더러를 교체한다.
         // rAF 루프·오버레이·제스처는 rendererRef 만 보므로 교체를 모른다(오버레이 캔버스는 z-index 로 위에 남는다).
-        const onContextLost = () => {
-            contextLossesRef.current += 1;
-            if (contextLossesRef.current < CONTEXT_LOSS_LIMIT || rendererKindRef.current === "canvas") return;
+        const swapToCanvas = (persist: boolean) => {
+            if (rendererKindRef.current === "canvas") return;
             rendererKindRef.current = "canvas";
-            writeRendererPref(safeLocalStorage(), "canvas");
+            if (persist) writeRendererPref(safeLocalStorage(), "canvas");
             swapTimer = setTimeout(() => {
                 swapTimer = null;
                 if (!alive) return;
@@ -545,6 +547,18 @@ export function SimulatorPage() {
                 setViewSupported(false); // Canvas2D 는 항상 top — 토글을 숨긴다(저장값은 남겨 다음에 three 가 되면 다시 쓴다)
                 dirtyRef.current = true;
             }, 0);
+        };
+        // 손실 판정(2026-09-26 검토): 화면이 보일 때 난 손실만 센다 — 앱을 백그라운드로 보내면 iOS 가 GL 을 거둬 가는 건 정상이고
+        // 돌아오면 복구된다. 보일 때 잃었는데 2.5초 안에 복구가 안 되면(검은 테이블) 이번에만 canvas 로 바꾼다.
+        const onContextLost = () => {
+            if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+            contextLossesRef.current += 1;
+            if (contextLossesRef.current >= CONTEXT_LOSS_LIMIT) { swapToCanvas(true); return; }
+            setTimeout(() => {
+                if (!alive) return;
+                const r = rendererRef.current as { stats?: () => { lost?: boolean } } | null;
+                if (r?.stats?.().lost) swapToCanvas(false);
+            }, 2500);
         };
 
         // 먼저 Canvas2D 를 올려 테이블이 즉시 보이게 하고, three.js 는 필요한 기기에서만 동적으로 내려받아
@@ -1119,7 +1133,11 @@ export function SimulatorPage() {
         });
         return () => setBackHandler(null);
     }, [inGame]);
-    const onToggleMute = useCallback(() => setMuted((m) => !m), []);
+    const onToggleMute = useCallback(() => setMuted((m) => {
+        const next = !m;
+        try { localStorage.setItem("rankue.sim.muted", next ? "1" : "0"); } catch { /* 저장 불가 */ }
+        return next;
+    }), []);
     const onToggleDiamond = useCallback(() => {
         setDiamondTouched(true);
         setDiamond((d) => {
@@ -1156,6 +1174,8 @@ export function SimulatorPage() {
     );
     const { share, busy: sharing } = useShare();
     const canShare = sim.mode === "solo" && sim.lastResult !== null && (sim.phase === "aim" || sim.phase === "finished");
+    // 대전은 끝난 뒤 결과 창에서만 공유한다(2026-09-26 검토 — 대전 기록도 자랑할 곳이 필요하다). 경기 중엔 샷 시계 때문에 알약을 띄우지 않는다.
+    const canShareEnd = sim.lastResult !== null && sim.phase === "finished";
     // 드릴 "다시 배치" 는 툴바(토글 묶음 끝)에 놓인다
     const drillReset = drill !== null && !isMatch && sim.phase !== "shooting";
     // 되돌리기는 두께 독 둘째 줄(툴바에 두면 샷 뒤 버튼 수가 늘어 열을 넘쳤다). 독은 재생 중 페이지가 통째로 흐린다
@@ -1169,8 +1189,9 @@ export function SimulatorPage() {
         const url = replayUrl(encodeReplay(replaySource(result, config)));
         const outcomeTitle = shotTitle(t, sim.outcomeLast, gt);
         const d = drillRef.current;
-        // 통계는 1인 세션의 그 선수(2인이면 승자, 없으면 첫 선수)
-        const statsFor = session.players[session.players.length === 1 ? 0 : (session.winnerIndex ?? 0)];
+        // 통계는 1인 세션의 그 선수. 대전이면 나, 그 밖의 2인이면 승자(없으면 첫 선수)
+        const myIdx = sim.match?.myIndex;
+        const statsFor = session.players[session.players.length === 1 ? 0 : (myIdx ?? session.winnerIndex ?? 0)];
         void share(result, {
             table: TABLES[config.tableId], gameType: gt, cueBallId: result.input.cueBallId,
             badge: gameBadge(t, gt),
@@ -1182,7 +1203,7 @@ export function SimulatorPage() {
             replayUrl: url,
             filename: fileNameFor(result),
         });
-    }, [share, sim.config, sim.session, sim.outcomeLast, sim.phase, t]);
+    }, [share, sim.config, sim.session, sim.outcomeLast, sim.phase, sim.match?.myIndex, t]);
     const onShareShot = useCallback(() => shareLast(false), [shareLast]);
     const onShareEnd = useCallback(() => shareLast(true), [shareLast]);
 
@@ -1707,7 +1728,7 @@ export function SimulatorPage() {
                             />
                         </div>
                     )}
-                    {coachOpen && !pathView && sim.phase === "aim" && sim.mode === "solo" && <CoachHint onClose={closeCoach} />}
+                    {coachOpen && !pathView && sim.phase === "aim" && (sim.mode === "solo" || coachAsked) && <CoachHint onClose={closeCoach} />}
                     {!coachOpen && realityOpen && reality && sim.phase === "aim" && <RealityHint onClose={closeReality} />}
                     {/* 결과 배너: 두께 독 위, 오른쪽 열 왼쪽 — 테이블 아래쪽 가운데 */}
                     <div className="absolute left-0 right-[60px] top-0 z-[3] pointer-events-none" style={{ bottom: DOCK_HEIGHT + 8 }}>
@@ -1846,13 +1867,16 @@ export function SimulatorPage() {
                 onCancel={solver.cancel} onRetry={retrySolver}
             />
             <ResignConfirm open={resignOpen} onOpenChange={setResignOpen} busy={exiting} onConfirm={() => { void onResign(); }} />
-            <InningSheet open={sheetOpen} onOpenChange={setSheetOpen} log={log} completed={completed} session={sim.session} names={names} phase={sim.phase} />
+            <InningSheet
+                open={sheetOpen} onOpenChange={setSheetOpen} log={log} completed={completed} session={sim.session} names={names} phase={sim.phase}
+                onHelp={pathView ? undefined : () => { setSheetOpen(false); setCoachAsked(true); setCoachOpen(true); }}
+            />
             <EndDialog
                 open={endOpen} onOpenChange={(o) => { if (!o) setEndDismissed(true); }}
                 session={sim.session} phase={sim.phase} names={names}
                 record={sim.record} offline={isMatch ? false : sim.offline} mismatches={sim.mismatches} busy={exiting}
                 onRestart={onRestart} onExit={() => { void exitNow(); }}
-                onShare={canShare ? onShareEnd : undefined}
+                onShare={canShareEnd ? onShareEnd : undefined}
                 subtitle={endSubtitle} hideRestart={isMatch}
                 rapport={isMatch && sim.match ? (
                     <MatchEndRapport

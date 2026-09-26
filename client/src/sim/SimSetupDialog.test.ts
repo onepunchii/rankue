@@ -243,3 +243,29 @@ describe("플레이 모드", () => {
         expect(h.onStart.mock.calls[0][0]).toMatchObject({ mode: "reality", cushionModel: "mathavan2010", condition: 1.1, target: 20 });
     });
 });
+
+describe("지난 설정 기억", () => {
+    it("시작한 설정을 기억해 다음에 열면 그대로 채운다 — 다마수는 손으로 바꾼 종목만", () => {
+        const mem = new Map<string, string>();
+        const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); }, removeItem: (k: string) => { mem.delete(k); } };
+        Object.defineProperty(dom.window, "localStorage", { value: store, configurable: true });
+        try {
+            const h = mount();
+            click(segment(h, ko["sim.setup.type4c"]));
+            setInput(targetInput(h), "120");
+            click(h.container.querySelector("#sim-opt-record")!);
+            click(startButton(h));
+            h.unmount();
+
+            const h2 = mount();
+            expect(segment(h2, ko["sim.setup.type4c"]).getAttribute("aria-pressed")).toBe("true");
+            expect(targetInput(h2).value).toBe("120");
+            expect(h2.container.querySelector("#sim-opt-record")!.getAttribute("aria-checked")).toBe("false");
+            // 3쿠션 다마수는 손대지 않았으니 기본값(핸디 없음 → 15)
+            click(segment(h2, ko["sim.setup.type3c"]));
+            expect(targetInput(h2).value).toBe("15");
+        } finally {
+            delete (dom.window as unknown as Record<string, unknown>).localStorage;
+        }
+    });
+});

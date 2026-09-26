@@ -114,10 +114,11 @@ describe("dashStats", () => {
     });
 
     it("parseSimStats: 숫자 문자열·누락 필드를 견딘다", () => {
-        const st = parseSimStats({ ratings: [{ gameType: "4c", sessions: "3", bestAvg: "0.5" }], sessions: [{ id: "x", status: "finished", score: "7", innings: "5" }], ranks: [{ rank: "2", total: "9" }], drillWeeks: null, currentWeekId: "2026-W37" });
+        const st = parseSimStats({ ratings: [{ gameType: "4c", sessions: "3", bestAvg: "0.5" }], sessions: [{ id: "x", status: "finished", score: "7", innings: "5" }], matchRanks: [{ rank: "2", total: "9", matches: "5" }, { gameType: "4c", rank: null, matches: 1 }], drillWeeks: null, currentWeekId: "2026-W37" });
         expect(st.ratings[0]).toMatchObject({ gameType: "4c", tableId: "DAEDAE", sessions: 3, bestAvg: 0.5, simRating: 1000 });
         expect(st.sessions[0]).toMatchObject({ id: "x", kind: "solo", score: 7, innings: 5, status: "finished" });
-        expect(st.ranks[0]).toEqual({ gameType: "3c", tableId: "DAEDAE", rank: 2, total: 9 });
+        expect(st.matchRanks[0]).toEqual({ gameType: "3c", rank: 2, total: 9, matches: 5 });
+        expect(st.matchRanks[1]).toEqual({ gameType: "4c", rank: null, total: 0, matches: 1 });
         expect(st.drillWeeks).toEqual([]);
         expect(parseSimStats(undefined).currentWeekId).toBe("");
     });

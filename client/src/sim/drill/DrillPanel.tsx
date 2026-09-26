@@ -11,6 +11,7 @@ import { drillApi, weekProgress, type DrillApi, type DrillWeek, type WeekDrill }
  */
 export const DRILL_WEEK_QUERY_KEY = ["sim-drills", "week"] as const;
 export const DRILL_LADDER_QUERY_KEY = ["sim-drills", "ladder"] as const;
+const LADDER_TOP = 10;
 
 interface Props {
     onPlay: (drill: WeekDrill, week: DrillWeek) => void;
@@ -78,6 +79,11 @@ export function DrillPanel({ onPlay, api = drillApi, myMemberId, onClose }: Prop
     const ladder = useQuery({ queryKey: DRILL_LADDER_QUERY_KEY, queryFn: () => api.getLadder(), staleTime: 30_000 });
     const w = week.data;
     const progress = w ? weekProgress(w) : null;
+    // 상위 10명 + 내가 그 밖이면 내 줄을 한 칸 띄워 덧붙인다(2026-09-26 검토 — 11위부터는 내 순위를 볼 길이 없었다).
+    const ladderRows = ladder.data?.rows ?? [];
+    const myIdx = myMemberId ? ladderRows.findIndex((r) => r.memberId === myMemberId) : -1;
+    const ladderShown = ladderRows.slice(0, LADDER_TOP).map((r, i) => ({ r, i }));
+    if (myIdx >= LADDER_TOP) ladderShown.push({ r: ladderRows[myIdx], i: myIdx });
 
     return (
         <section className="rank-arcade flex flex-col gap-4">
@@ -97,7 +103,17 @@ export function DrillPanel({ onPlay, api = drillApi, myMemberId, onClose }: Prop
             </div>
 
             {week.isLoading && <p className="text-[13px] font-medium text-white/60 min-h-11 flex items-center">{t("sim.match.listLoading")}</p>}
-            {week.isError && <p className="text-[13px] font-medium text-white/80 min-h-11 flex items-center">{t("sim.match.listFailed")}</p>}
+            {week.isError && (
+                <div className="flex items-center justify-between gap-3 min-h-11">
+                    <p className="text-[13px] font-medium text-white/80">{t("sim.match.listFailed")}</p>
+                    <button
+                        type="button" onClick={() => { void week.refetch(); void ladder.refetch(); }}
+                        className="shrink-0 h-11 px-4 rounded-pill border border-white/25 text-[13px] font-bold text-white/85"
+                    >
+                        {t("sim.match.retry")}
+                    </button>
+                </div>
+            )}
 
             {w && progress && (
                 <div>
@@ -133,7 +149,7 @@ export function DrillPanel({ onPlay, api = drillApi, myMemberId, onClose }: Prop
                         </span>
                     </div>
                     <ol className="arc-board rounded-[26px] -mt-4 pt-7 px-3 pb-3 space-y-2">
-                        {ladder.data.rows.slice(0, 10).map((r, i) => {
+                        {ladderShown.map(({ r, i }) => {
                             const mine = r.memberId === myMemberId;
                             const top3 = i < 3;
                             return (
@@ -141,6 +157,7 @@ export function DrillPanel({ onPlay, api = drillApi, myMemberId, onClose }: Prop
                                     key={r.memberId}
                                     className={cn(
                                         "arc-row rounded-pill h-12 px-3 flex items-center gap-3",
+                                        i >= LADDER_TOP && "mt-3",
                                         i === 0 && "arc-row-1", i === 1 && "arc-row-2", i === 2 && "arc-row-3",
                                         mine && "ring-2 ring-white",
                                     )}

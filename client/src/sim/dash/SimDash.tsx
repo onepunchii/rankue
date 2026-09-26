@@ -90,9 +90,8 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
     const form = recentForm(series, FORM_N);
     const rating = data && combo ? ratingFor(data.ratings, combo) : undefined;
     const mr = data && combo ? (data.matchRatings ?? []).find((r) => r.gameType === combo.gameType) : undefined;
-    // 이 순위는 **연습** 사다리(sim.myRanks, hiq_sim_ratings)라 테이블까지 맞춰 찾는 것이 맞다.
-    // 테이블을 합친 것은 온라인 대전 사다리(myMatchRanks)다 — 둘을 헷갈리면 중대 칩에 대대 순위가 뜬다.
-    const rank = data && combo ? data.ranks.find((r) => sameCombo(r, combo)) : undefined;
+    // 온라인 대전 순위(myMatchRanks)는 종목별(대대·중대 통합)이다. 옛 연습 사다리 순위는 갱신이 멈춰 뺐다(2026-09-26).
+    const rank = data && combo ? (data.matchRanks ?? []).find((r) => r.gameType === combo.gameType) : undefined;
     const ms = matchSummary(rows, combo, FORM_N);
     // 승패는 서버의 조합별 전체 집계로 본다. 대전 목록은 최근 20개뿐이라 새 대전이 생길 때마다 승수가 흔들렸다.
     const record = recordFor(data?.matchRecords, combo, ms);
@@ -171,7 +170,13 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                                 <Tile label={t("sim.dash.kMatches")} value={n(record.total || series.length)} />
                                 <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(Math.max(0, ...series.map((p) => p.avg)))} tone="best" />
                                 <Tile label={t("sim.dash.kHighRun")} value={n(Math.max(0, ...series.map((p) => p.highRun)))} tone="best" />
-                                <Tile label={t("sim.dash.kRank")} value={rank ? t("sim.dash.rankValue").replace("{r}", n(rank.rank)) : "–"} sub={rank ? t("sim.dash.rankOf").replace("{n}", n(rank.total)) : undefined} />
+                                <button type="button" onClick={onRank} aria-label={t("sim.rank.title")} className="text-left rounded-tile active:opacity-80" disabled={!onRank}>
+                                    <Tile
+                                        label={t("sim.dash.kRank")}
+                                        value={rank?.rank != null ? t("sim.dash.rankValue").replace("{r}", n(rank.rank)) : "–"}
+                                        sub={rank?.rank != null ? t("sim.dash.rankOf").replace("{n}", n(rank.total)) : t("sim.rank.unranked").replace("{n}", n(rank?.matches ?? 0)).replace("{m}", n(PLACEMENT_MATCHES))}
+                                    />
+                                </button>
                                 <button type="button" onClick={onRank} aria-label={t("sim.rank.title")} className="text-left rounded-tile active:opacity-80" disabled={!onRank}>
                                     <Tile
                                         label={t("sim.dash.kRating")} value={n(mr?.rating ?? 1000)}

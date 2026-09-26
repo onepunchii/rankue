@@ -129,20 +129,21 @@ router.get("/sim/ratings/me", requireAuth, asyncHandler(async (req: AuthRequest,
     return sendSuccess(res, rows);
 }));
 
-// GET /sim/stats/me — 대시보드 한 번에: 성적 행·세션 요약(최근 100, jsonb 없음)·연습 래더 순위·드릴 주별 집계.
+// GET /sim/stats/me — 대시보드 한 번에: 성적 행·세션 요약(최근 100, jsonb 없음)·온라인 대전 순위·드릴 주별 집계.
+// 2026-09-26: 연습 사다리(hiq_sim_ratings) 순위는 더 이상 갱신되지 않아 빼고, 대전 순위(myMatchRanks)를 준다.
 // 대전 목록은 /sim/matches 를 그대로 쓴다(목록 화면과 캐시 공유). 실전 성적(RP·에버리지)은 절대 섞지 않는다.
 router.get("/sim/stats/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const memberId = req.userId!;
-    const [ratings, matchRatings, matchRecords, sessions, ranks, drillWeeks] = await Promise.all([
+    const [ratings, matchRatings, matchRecords, sessions, matchRanks, drillWeeks] = await Promise.all([
         storage.sim.myRatings(memberId),
         storage.sim.myMatchRatings(memberId),      // 공식 기록(대전) — 2026-09-12 부터 대시보드는 이쪽을 본다
         // 종목·테이블별 승패(상한 없음). 대전 목록(최근 20)으로 세던 것을 대체한다 — 2026-09-16 테스터 제보.
         storage.simMatch.myRecords(memberId),
         storage.sim.listSessionSummaries(memberId, 100),
-        storage.sim.myRanks(memberId),
+        storage.sim.myMatchRanks(memberId, PLACEMENT_MATCHES),
         storage.simDrill.myWeeks(memberId, 12),
     ]);
-    return sendSuccess(res, { ratings, matchRatings, matchRecords, sessions, ranks, drillWeeks, currentWeekId: kstWeekIdFor(Date.now()) });
+    return sendSuccess(res, { ratings, matchRatings, matchRecords, sessions, matchRanks, drillWeeks, currentWeekId: kstWeekIdFor(Date.now()) });
 }));
 
 // GET /sim/rank?gameType&tableId&country=KR|all — 온라인 대전 랭킹(배치 3판 뒤). country 없음/all = 전체, 있으면 그 나라(순위 번호는 전역).

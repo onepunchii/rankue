@@ -1,7 +1,7 @@
 import { ZOOM_MAX, ZOOM_MIN } from "./Renderer";
 import { describe, it, expect, vi } from "vitest";
 import {
-    chooseRendererKind, CONTEXT_LOSS_LIMIT, probeWebGL2, readRendererPref, readViewPref, RENDERER_PREF_KEY, selectRendererKind,
+    chooseRendererKind, CONTEXT_LOSS_LIMIT, probeWebGL2, readRendererPref, readViewPref, RENDERER_PREF_KEY, RENDERER_FALLBACK_KEY, RENDERER_FALLBACK_MS, selectRendererKind,
     VIEW_PREF_KEY, writeRendererPref, writeViewPref, type StorageLike, readZoomPref, writeZoomPref} from "./rendererChoice";
 
 function memStorage(initial: Record<string, string> = {}): StorageLike & { data: Record<string, string> } {
@@ -14,7 +14,10 @@ describe("readRendererPref / writeRendererPref", () => {
         expect(readRendererPref(null)).toBeNull();
         expect(readRendererPref(memStorage())).toBeNull();
         expect(readRendererPref(memStorage({ [RENDERER_PREF_KEY]: "three" }))).toBe("three");
-        expect(readRendererPref(memStorage({ [RENDERER_PREF_KEY]: "canvas" }))).toBe("canvas");
+        // canvas 는 기한 안에서만(2026-09-26) — 기한이 없거나 지났으면 다시 WebGL 을 시도한다
+        expect(readRendererPref(memStorage({ [RENDERER_PREF_KEY]: "canvas" }))).toBeNull();
+        expect(readRendererPref(memStorage({ [RENDERER_PREF_KEY]: "canvas", [RENDERER_FALLBACK_KEY]: String(Date.now() + 60_000) }))).toBe("canvas");
+        expect(readRendererPref(memStorage({ [RENDERER_PREF_KEY]: "canvas", [RENDERER_FALLBACK_KEY]: String(Date.now() - 1) }))).toBeNull();
         expect(readRendererPref(memStorage({ [RENDERER_PREF_KEY]: "webgpu" }))).toBeNull();
     });
 
@@ -25,11 +28,15 @@ describe("readRendererPref / writeRendererPref", () => {
         expect(writeRendererPref(null, "canvas")).toBe(false);
     });
 
-    it("쓰기는 키 하나에 값을 남긴다", () => {
+    it("canvas 쓰기는 기한도 함께 남긴다(3일) — 그 안에는 canvas, 지나면 다시 WebGL", () => {
         const s = memStorage();
-        expect(writeRendererPref(s, "canvas")).toBe(true);
-        expect(s.data).toEqual({ [RENDERER_PREF_KEY]: "canvas" });
-        expect(readRendererPref(s)).toBe("canvas");
+        const now = 1_000_000;
+        expect(writeRendererPref(s, "canvas", now)).toBe(true);
+        expect(s.data).toEqual({ [RENDERER_PREF_KEY]: "canvas", [RENDERER_FALLBACK_KEY]: String(now + RENDERER_FALLBACK_MS) });
+        expect(readRendererPref(s, now + 1000)).toBe("canvas");
+        expect(readRendererPref(s, now + RENDERER_FALLBACK_MS + 1)).toBeNull();
+        expect(writeRendererPref(s, "three", now)).toBe(true);
+        expect(readRendererPref(s, now)).toBe("three");
     });
 });
 

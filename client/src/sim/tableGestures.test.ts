@@ -24,6 +24,22 @@ describe("tableGestures", () => {
         expect(hitBall(balls, [cx, cy + 0.5], R)).toBeNull();
     });
 
+    it("연습 공 옮기기는 손 떨림(0.8R 미만)으로는 시작하지 않는다", () => {
+        const g = beginGesture(env({ canPlace: true }), [cx, cy])!;
+        expect(g.kind).toBe("place");
+        const still = moveGesture(g, [cx + R * 0.3, cy], 1);
+        expect(still.place).toBeUndefined();
+        const drag = moveGesture(still.gesture, [cx + R * 2, cy], 1);
+        expect(drag.place).toBeDefined();
+    });
+
+    it("큐볼 바로 옆(1.5R 안)의 조준 드래그는 각을 바꾸지 않는다", () => {
+        const g = beginGesture(env(), [cx + R * 0.5, cy])!;
+        expect(moveGesture(g, [cx, cy + R * 0.5], 1).phi).toBeUndefined();
+        const far = beginGesture(env(), [cx + 0.3, cy])!;
+        expect(moveGesture(far, [cx + 0.3, cy + 0.01], 1).phi).toBeDefined();
+    });
+
     it("setup·finished 에선 제스처 없음, shooting 은 hold", () => {
         expect(beginGesture(env({ phase: "setup" }), [cx, cy + 0.3])).toBeNull();
         expect(beginGesture(env({ phase: "finished" }), [cx, cy + 0.3])).toBeNull();

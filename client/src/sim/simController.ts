@@ -692,6 +692,13 @@ export class SimController {
         if (this.aux.speed === speed) return;
         this.clock = withSpeed(this.clock, this.now(), speed);
         this.setAux({ speed });
+        // 재생 중 배속을 바꾸면 남은 소리·진동을 새 배속으로 다시 건다 — 1배속 시각표 그대로면 4배속에서 공은 멈췄는데
+        // 소리가 몇 초 더 울렸다(2026-09-26 검토).
+        const result = this.aux.lastResult;
+        if (this.pb && result && this.store.get().phase === "shooting") {
+            this.cancelFeedback();
+            this.scheduleFeedback(result, clockTime(this.clock, this.now()), speed);
+        }
     }
 
     /** 재생 시작. result 는 그 재생의 원본 결과(aux.lastResult 로 화면에 노출). */
@@ -749,8 +756,10 @@ export class SimController {
 
     /* ------------------------------------------------------------ 오디오·햅틱 */
 
-    private scheduleFeedback(result: SimResult): void {
-        const events = eventsForFeedback(result);
+    /** fromT(재생 시각, s) 이후 이벤트만 speed 배속 시각표로 건다. */
+    private scheduleFeedback(result: SimResult, fromT = 0, speed = 1): void {
+        const all = eventsForFeedback(result);
+        const events = fromT <= 0 && speed === 1 ? all : all.filter((ev) => ev.t >= fromT).map((ev) => ({ ...ev, t: (ev.t - fromT) / speed }));
         const getCtx = this.deps.getAudioContext;
         if (getCtx) {
             if (!this.audio) {

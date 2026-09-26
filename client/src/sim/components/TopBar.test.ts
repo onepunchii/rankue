@@ -161,7 +161,7 @@ describe("TopBar", () => {
         it("쓰리아웃 점은 **선수마다** 그린다 — 예전엔 지금 차례인 사람 것만 보였다", () => {
             const h = matchBase();
             // 총 6개(3 × 2명), 그중 채워진 것은 1개(최정환 1회)
-            const dots = Array.from(h.container.querySelectorAll("span")).filter((e) => e.className.includes("w-[5px]"));
+            const dots = Array.from(h.container.querySelectorAll("span")).filter((e) => e.className.includes("w-1.5 h-1.5"));
             expect(dots).toHaveLength(SHOT_CLOCK_STRIKES * 2);
             expect(dots.filter((d) => d.className.includes("bg-ball-red"))).toHaveLength(1);
         });

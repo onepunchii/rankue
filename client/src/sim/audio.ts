@@ -4,7 +4,8 @@
  *  - 소리는 물리 이벤트 시각에 정확히 나도록 ctx.currentTime 기준으로 미리 예약한다(재생 루프에서 재감지하지 않음).
  *  - 게인은 접근 속도의 지각 곡선(audioMapping.impulseToGain), 피치는 ±5% 를 이벤트 인덱스로 결정론적으로 흔든다.
  *  - AudioContext 는 앱의 useGameAudio 가 제스처로 잠금 해제한 것을 넘겨받아 공유한다(모바일 웹뷰는 컨텍스트 수 제한).
- *  - iOS: navigator.audioSession.type = 'playback' 을 시도해 무음 스위치 상태에서도 소리가 나게 한다(지원 시).
+ *  - iOS: navigator.audioSession.type = 'ambient' — 게임 효과음답게 무음 스위치를 따르고 듣던 음악을 끊지 않는다(지원 시).
+ *    (2026-09-26 검토: 예전엔 'playback' 이라 무음 모드에서도 소리가 나고 스포티파이 등이 멈췄다.)
  * 합성 자체는 결정론이 필요 없지만 Math.random 을 쓰지 않아 기기마다 같은 소리가 난다.
  */
 import { impulseToGain, playbackRateFor, type SoundEvent, type SoundKind } from "./audioMapping";
@@ -116,13 +117,13 @@ export class SimAudio {
         return ctx;
     }
 
-    /** iOS 17+ WebKit: 무음 스위치를 무시하는 'playback' 세션. 기능 감지로만 시도. */
+    /** iOS 17+ WebKit: 무음 스위치를 따르고 다른 앱 소리와 섞이는 'ambient' 세션. 기능 감지로만 시도. */
     private tryAudioSession(): void {
         if (this.sessionTried) return;
         this.sessionTried = true;
         try {
             const session = (navigator as unknown as { audioSession?: { type?: string } }).audioSession;
-            if (session && typeof session === "object" && "type" in session) session.type = "playback";
+            if (session && typeof session === "object" && "type" in session) session.type = "ambient";
         } catch { /* 미지원 */ }
     }
 
@@ -144,7 +145,7 @@ export class SimAudio {
     schedule(events: readonly SoundEvent[], startAt: number): void {
         const ctx = this.ctx();
         if (!ctx || !this.master) return;
-        if (ctx.state === "suspended") {
+        if (ctx.state !== "running" && ctx.state !== "closed") {   // iOS 는 'interrupted' 도 온다
             // resume() 은 제스처 전이면 비동기로 거부된다 — 미처리 거부(unhandledrejection)를 남기지 않는다.
             try { Promise.resolve(ctx.resume()).catch(() => { /* 제스처 전 */ }); } catch { /* noop */ }
         }

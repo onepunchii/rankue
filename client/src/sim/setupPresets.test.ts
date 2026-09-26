@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aimAssistFor, buildConfig as buildConfigForMode, modePreset } from "./setupPresets";
+import { aimAssistFor, buildConfig as buildConfigForMode, modePreset, loadSetupPref, saveSetupPref, SETUP_PREF_KEY } from "./setupPresets";
 import { DEFAULT_3C_RULES, DEFAULT_4C_RULES } from "@shared/sim/rules";
 import {
     buildRules, buildConfig, defaultTarget, defaultTableFor, clampTarget, isValidTarget,
@@ -139,5 +139,25 @@ describe("플레이 모드", () => {
     it("모드 프리셋은 명시한 물리값을 덮지 않는다", () => {
         const c = buildConfigForMode({ gameType: "4c", target: 80, mode: "reality", cushionModel: "han2005", condition: 0.9 });
         expect(c).toMatchObject({ mode: "reality", cushionModel: "han2005", condition: 0.9 });
+    });
+});
+
+describe("지난 설정 기억(loadSetupPref / saveSetupPref)", () => {
+    const mem = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); } }; };
+    it("저장한 값을 그대로 돌려준다", () => {
+        const st = mem();
+        const pref = { gameType: "4c" as const, tableId: "JUNGDAE_KR" as const, targets: { "4c": 120 }, ruleSet: "umb" as const, threeCushionDouble: true, inningCap: 20, mode: "reality" as const, cushionModel: "mathavan2010" as const, condition: 1.1, record: false };
+        saveSetupPref(st, pref);
+        expect(loadSetupPref(st)).toEqual(pref);
+    });
+    it("깨진 값·범위 밖은 기본으로 바로잡거나 버린다", () => {
+        const st = mem();
+        st.setItem(SETUP_PREF_KEY, "{oops");
+        expect(loadSetupPref(st)).toBeNull();
+        st.setItem(SETUP_PREF_KEY, JSON.stringify({ gameType: "9ball" }));
+        expect(loadSetupPref(st)).toBeNull();
+        st.setItem(SETUP_PREF_KEY, JSON.stringify({ gameType: "3c", targets: { "3c": 5000 }, inningCap: 7, condition: 9, cushionModel: "x" }));
+        expect(loadSetupPref(st)).toMatchObject({ gameType: "3c", tableId: "DAEDAE", targets: {}, inningCap: 0, condition: CONDITION_MAX, cushionModel: "han2005", record: true });
+        expect(loadSetupPref(null)).toBeNull();
     });
 });

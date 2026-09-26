@@ -8,7 +8,7 @@ import { SHOT_CLOCK_STRIKES, type SessionState } from "@shared/sim/rules";
 import type { SimSetupConfig } from "../setupPresets";
 import type { Phase } from "../simReducer";
 import { displayAverage, formatAverage, ruleBadge, tableLabel } from "../hudMath";
-import { BackIcon, PauseIcon } from "./railIcons";
+import { BackIcon, CloseIcon } from "./railIcons";
 import { ShotClock } from "./ShotClock";
 
 /**
@@ -78,10 +78,10 @@ export interface MatchHeaderPlayer {
 }
 
 const SCORE = "rk-num text-[14px] font-bold text-ink-1 leading-none mt-1";
-const TARGET = "rk-num text-[11px] font-medium text-ink-3";
+const TARGET = "rk-num text-[12px] font-medium text-ink-3";
 /** 요약 칩: 36 px 타일 버튼(44 px 띠 안), 라벨(위 10 px) · 값(아래 rk-num 14 px) 두 줄을 가운데 정렬(2026-09-08 오너: 중앙 정렬·디자인 개선). */
 const CHIP = "h-9 min-w-[52px] px-2.5 rounded-xl border bg-surface-1 flex flex-col items-center justify-center text-center shrink-0 whitespace-nowrap active:bg-surface-3";
-const LABEL = "text-[10px] font-medium text-ink-3 leading-none";
+const LABEL = "text-[11px] font-medium text-ink-3 leading-none";
 const VALUE = "rk-num text-[14px] font-bold text-ink-1 leading-none mt-1";
 
 /** 대전 헤더의 한 쪽. mirror = 오른쪽(상대) — 같은 정보를 거울로 놓아 가운데 시계가 축이 된다. */
@@ -94,19 +94,19 @@ function HeaderSide({ p: pl, mirror, onSummary, label }: {
     const flag = flagEmoji(pl.country);          // 없으면 빈 문자열 — 국기를 그리지 않는다
     const pct = pl.target > 0 ? Math.max(0, Math.min(1, pl.score / pl.target)) * 100 : 0;
     const name = (
-        <span className={cn("text-[11.5px] font-semibold leading-none truncate max-w-[78px]", pl.turn ? "text-ink-1" : "text-ink-3")}>
+        <span className={cn("text-[12px] font-semibold leading-none truncate max-w-[78px]", pl.turn ? "text-ink-1" : "text-ink-3")}>
             {pl.name}
         </span>
     );
     const ball = <span className={cn("w-[9px] h-[9px] rounded-pill shrink-0", pl.cueBallId === "white" ? "bg-ball-white border border-surface-line-strong" : "bg-ball-yellow")} />;
     const score = (
         <span className={cn("rk-num text-[14px] font-bold leading-none", pl.winner ? "text-gold" : "text-ink-1")}>
-            {pl.score}<span className="rk-num text-[11px] font-medium text-ink-3">/{pl.target}</span>
+            {pl.score}<span className="rk-num text-[12px] font-medium text-ink-3">/{pl.target}</span>
         </span>
     );
     // 게이지는 남는 폭을 먹고, 좁아지면 먼저 줄어든다 — 100/100 처럼 자릿수가 긴 점수에서 띠가 넘치지 않게.
     const gauge = (
-        <span className="flex-1 min-w-[14px] max-w-[34px] h-[3px] rounded-pill bg-surface-3 overflow-hidden">
+        <span className="flex-1 min-w-[14px] max-w-[34px] h-1 rounded-pill bg-surface-3 overflow-hidden">
             <span className="block h-full rounded-pill bg-brand" style={{ width: `${pct}%` }} />
         </span>
     );
@@ -114,7 +114,7 @@ function HeaderSide({ p: pl, mirror, onSummary, label }: {
     const strikes = (
         <span className="inline-flex gap-[3px] shrink-0">
             {Array.from({ length: SHOT_CLOCK_STRIKES }, (_, i) => (
-                <span key={i} className={cn("w-[5px] h-[5px] rounded-pill", i < pl.timeouts ? "bg-ball-red" : "border border-surface-line-strong")} />
+                <span key={i} className={cn("w-1.5 h-1.5 rounded-pill", i < pl.timeouts ? "bg-ball-red" : "border border-surface-line-strong")} />
             ))}
         </span>
     );
@@ -156,9 +156,10 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                 <button
                     type="button" onClick={p.matchHeader.onExit}
                     aria-label={t("sim.controls.exit")} title={t("sim.controls.exit")}
-                    className="h-9 w-9 -mr-1 shrink-0 rounded-pill flex items-center justify-center text-ink-2 active:bg-surface-3"
+                    className="h-11 w-11 -mr-2 shrink-0 rounded-pill flex items-center justify-center text-ink-2 active:bg-surface-3"
                 >
-                    <PauseIcon />
+                    {/* 나가기 — 일시정지 아이콘이었는데 시계는 멈추지 않는다(2026-09-26 검토). 누르면 나가기 확인이 규칙을 알려 준다 */}
+                    <CloseIcon />
                 </button>
             </div>
         );

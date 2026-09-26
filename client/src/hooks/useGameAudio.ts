@@ -9,26 +9,32 @@ const TTS_LANG: Record<Locale, string> = {
     ko: 'ko-KR', en: 'en-US', vi: 'vi-VN', tr: 'tr-TR', es: 'es-ES',
 };
 
+/**
+ * 앱 전체가 쓰는 AudioContext 하나(모듈 수준, 2026-09-26 검토). 예전엔 훅마다 ref 로 만들어 화면에 들어갈 때마다 새 컨텍스트가
+ * 생기고 닫히지 않았다 — 모바일 웹뷰는 컨텍스트 수 상한이 있고 살아 있는 컨텍스트는 오디오 스레드를 깨워 둔다.
+ */
+let sharedCtx: AudioContext | null = null;
+function sharedAudioContext(): AudioContext | null {
+    if (typeof window === 'undefined') return null;
+    if (!sharedCtx || sharedCtx.state === 'closed') {
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AC) return null;
+        sharedCtx = new AC();
+    }
+    return sharedCtx;
+}
+
 export function useGameAudio() {
     const { locale } = useT();
     const ttsLang = TTS_LANG[locale] ?? 'ko-KR';
     const [isMuted, setIsMuted] = useState(false);
     const synthRef = useRef<SpeechSynthesis | null>(null);
-    const audioCtxRef = useRef<AudioContext | null>(null);
     const unlockedRef = useRef(false);
 
     // One shared AudioContext, created lazily. Mobile webviews cap the number of contexts
     // and start each one 'suspended' until a user gesture resumes it — so the old code that
     // did `new AudioContext()` on every beep would eventually fail. Reuse a single one.
-    const getCtx = useCallback((): AudioContext | null => {
-        if (typeof window === 'undefined') return null;
-        if (!audioCtxRef.current) {
-            const AC = window.AudioContext || (window as any).webkitAudioContext;
-            if (!AC) return null;
-            audioCtxRef.current = new AC();
-        }
-        return audioCtxRef.current;
-    }, []);
+    const getCtx = useCallback((): AudioContext | null => sharedAudioContext(), []);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -46,6 +52,12 @@ export function useGameAudio() {
     // actually produce sound. This is why match TTS was silent after the Capacitor move.
     useEffect(() => {
         const unlock = () => {
+            // 컨텍스트는 매 탭마다 살핀다 — iOS 는 앱을 오가면 'suspended'/'interrupted' 로 돌려놓는데, 예전엔 첫 탭에서 한 번만
+            // 풀어서 그 뒤로 소리가 안 났다. resume 은 제스처 안에서 불러야 먹는다.
+            const ctx = sharedCtx;
+            if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') {
+                try { Promise.resolve(ctx.resume()).catch(() => { /* 제스처 전 */ }); } catch { /* noop */ }
+            }
             if (unlockedRef.current) return;
             unlockedRef.current = true;
             const synth = synthRef.current;

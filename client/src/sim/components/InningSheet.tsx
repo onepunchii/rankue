@@ -18,9 +18,11 @@ interface Props {
     session: SessionState | null;
     names: readonly string[];
     phase: Phase;
+    /** 조작법 안내(CoachHint)를 다시 연다. 처음 한 번 닫으면 다시 볼 길이 없었다(2026-09-26 검토). */
+    onHelp?: () => void;
 }
 
-export const InningSheet = memo(function InningSheet({ open, onOpenChange, log, completed, session, names, phase }: Props) {
+export const InningSheet = memo(function InningSheet({ open, onOpenChange, log, completed, session, names, phase, onHelp }: Props) {
     const { t } = useT();
     const count = session?.players.length ?? 1;
     const rows = useMemo(() => inningRows(log, count, completed), [log, count, completed]);
@@ -82,6 +84,14 @@ export const InningSheet = memo(function InningSheet({ open, onOpenChange, log, 
                                 </tr>
                             </tfoot>
                         </table>
+                    )}
+                    {onHelp && (
+                        <button
+                            type="button" onClick={onHelp}
+                            className="mt-4 h-11 w-full rounded-tile bg-surface-3 text-[13px] font-semibold text-ink-2 active:bg-surface-line"
+                        >
+                            {t("sim.coach.reopen")}
+                        </button>
                     )}
                 </div>
             </SheetContent>
