@@ -74,6 +74,8 @@ const MISSING_TARGET: ResolvedTarget = {
 const BOARD_LABEL: Record<string, string> = { brag: "한 큐 자랑", ask: "물어보기", store: "우리 매장", lesson: "레슨" };
 const STAFF_ROLES: readonly string[] = ["admin", "super_admin"];
 const crewLink = (crewId: string | null) => (crewId ? `/crew/${crewId}` : null);
+/** 한국 날짜 0시를 UTC 벽시계로 — `컬럼 >= 이것` 이 한국 "오늘"이다(appSession.repo 와 같은 식). */
+const KST_TODAY_START = sql`(date_trunc('day', now() at time zone 'Asia/Seoul') - interval '9 hours')`;
 const fmtKst = (d: Date) => d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 const toHistory = (h: HiqModerationAction) => ({
     action: h.action,
@@ -232,20 +234,22 @@ export class AdminRepository {
     }
 
     // --- Stats ---
+    // "오늘"은 한국 날짜다. 서버(Vercel)·DB 는 UTC 라 setHours(0)·CURRENT_DATE 로 자르면 한국 오전 9시에 하루가 바뀐다.
+    // timestamp 컬럼은 UTC 벽시계로 저장된다(golf.repo 와 같은 전제) — 한국 0시를 UTC 로 바꿔 비교한다.
     async getGlobalStats() {
-        const usersCount = await db.select({ count: sql<number>`count(*)` }).from(profiles).where(eq(profiles.role, 'user'));
-        const storesCount = await db.select({ count: sql<number>`count(*)` }).from(hiqStores);
-        const leadsCount = await db.select({ count: sql<number>`count(*)` }).from(partnerLeads).where(eq(partnerLeads.status, 'NEW'));
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const visitsCount = await db.select({ count: sql<number>`count(*)` }).from(hiqVisitLogs).where(gte(hiqVisitLogs.visitedAt, today));
-
+        const [row] = (await db.execute(sql`
+            select
+              (select count(*)::int from profiles where role = 'user') as total_users,
+              (select count(*)::int from hiq_stores) as total_stores,
+              (select count(*)::int from partner_leads where status = 'NEW') as new_leads,
+              (select count(*)::int from hiq_visit_logs where visited_at >= ${KST_TODAY_START}) as visits_today,
+              (select count(*)::int from hiq_members where created_at >= ${KST_TODAY_START}) as new_users_today`)).rows as Record<string, unknown>[];
         return {
-            totalUsers: Number(usersCount[0].count),
-            totalStores: Number(storesCount[0].count),
-            newLeads: Number(leadsCount[0].count),
-            totalVisitsToday: Number(visitsCount[0].count)
+            totalUsers: Number(row?.total_users ?? 0),
+            totalStores: Number(row?.total_stores ?? 0),
+            newLeads: Number(row?.new_leads ?? 0),
+            totalVisitsToday: Number(row?.visits_today ?? 0),
+            newUsersToday: Number(row?.new_users_today ?? 0),
         };
     }
 
@@ -267,6 +271,16 @@ export class AdminRepository {
             lastVisitedAt: hiqMembers.lastVisitedAt,
             createdAt: hiqMembers.createdAt,
             profileId: hiqMembers.profileId,
+            handi3c: hiqMembers.handi3c,
+            handi4c: hiqMembers.handi4c,
+            marketingAgree: hiqMembers.marketingAgree,
+            locale: hiqMembers.locale,
+            // 계정 상태·권한(정지 여부를 회원 관리에서 바로 보이게) — 프로필이 없으면 null
+            status: profiles.status,
+            role: profiles.role,
+            // 가입 경로 매장 이름(시스템 매장이면 slug 로 구분)
+            storeName: sql<string | null>`(select st.name from hiq_stores st where st.id = ${hiqMembers.storeId})`,
+            storeSlug: sql<string | null>`(select st.slug from hiq_stores st where st.id = ${hiqMembers.storeId})`,
             // 국가 = 프로필의 IP 기반 자동 수집값(국가 랭킹 축과 동일).
             countryCode: profiles.countryCode,
             // 기기 = 푸시토큰 접두사로 판별. 'apns:'=애플, 'fcm:'=안드로이드.
@@ -281,7 +295,8 @@ export class AdminRepository {
             simSessions: sql<number>`(select count(*)::int from hiq_sim_sessions s where s.member_id = ${hiqMembers.id})`,
             simMatches: sql<number>`(select count(*)::int from hiq_sim_matches x where x.host_id = ${hiqMembers.id} or x.guest_id = ${hiqMembers.id})`,
             // 앱 접속(2026-09-13 오너: 잔류 측정) — 마지막 접속 · 최근 7일 접속일수 · 최근 30일 평균 세션(분, 4시간 상한)
-            lastSeenAt: sql<string | null>`(select max(coalesce(closed_at, last_seen_at)) from hiq_app_sessions a where a.member_id = ${hiqMembers.id})`,
+            // 'Z' 를 붙인 UTC 문자열로 — 시간대 없는 값을 브라우저가 기기 시각(한국)으로 읽으면 9시간 어긋난다.
+            lastSeenAt: sql<string | null>`(select to_char(max(coalesce(closed_at, last_seen_at)), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from hiq_app_sessions a where a.member_id = ${hiqMembers.id})`,
             activeDays7: sql<number>`(select count(distinct date(opened_at))::int from hiq_app_sessions a where a.member_id = ${hiqMembers.id} and opened_at >= now() - interval '7 days')`,
             avgSessionMin30: sql<number | null>`(select round(avg(least(extract(epoch from (coalesce(closed_at, last_seen_at) - opened_at)), 14400)) / 60)::int
                 from hiq_app_sessions a where a.member_id = ${hiqMembers.id} and opened_at >= now() - interval '30 days')`,
@@ -290,50 +305,74 @@ export class AdminRepository {
             .orderBy(sql`${hiqMembers.createdAt} DESC`);
     }
 
+    /**
+     * 어드민 회원 정보 수정 — 허용한 칸만. 전화번호·RP 는 여기서 바꾸지 않는다
+     * (전화번호는 로그인 열쇠라 프로필과 함께 움직여야 하고, RP 는 경기 기록에서 계산되는 값이다).
+     */
+    async updateMemberForAdmin(id: string, patch: {
+        name?: string; gender?: "male" | "female" | null; birthYear?: number | null;
+        handi3c?: number | null; handi4c?: number | null;
+    }) {
+        const set: Record<string, unknown> = {};
+        if (patch.name !== undefined) set.name = patch.name;
+        if (patch.gender !== undefined) set.gender = patch.gender;
+        if (patch.birthYear !== undefined) set.birthYear = patch.birthYear;
+        if (patch.handi3c !== undefined) set.handi3c = patch.handi3c;
+        if (patch.handi4c !== undefined) set.handi4c = patch.handi4c;
+        if (Object.keys(set).length === 0) return null;
+        set.updatedAt = new Date();
+        const [row] = await db.update(hiqMembers).set(set).where(eq(hiqMembers.id, id))
+            .returning({ id: hiqMembers.id, name: hiqMembers.name, profileId: hiqMembers.profileId });
+        return row ?? null;
+    }
+
+    /**
+     * 사장님 대시보드 숫자. 방문 = 그 매장으로 가입한 회원이 앱을 연 날(hiq_visit_logs, 하루 한 번).
+     * 날짜는 모두 한국 기준(위 getGlobalStats 주석).
+     */
     async getAdminStats(storeId: string): Promise<{
         totalMembers: number;
         visitsToday: number;
         visitsYesterday: number;
         newToday: number;
+        newThisMonth: number;
+        active30: number;
+        dormant30: number;
+        visits7: { date: string; count: number }[];
     }> {
-        const [total] = await db.select({ count: sql<number>`count(*)` })
-            .from(hiqMembers)
-            .where(eq(hiqMembers.storeId, storeId));
-
-        const [today] = await db.select({ count: sql<number>`count(distinct ${hiqVisitLogs.memberId})` })
-            .from(hiqVisitLogs)
-            .innerJoin(hiqMembers, eq(hiqVisitLogs.memberId, hiqMembers.id))
-            .where(
-                and(
-                    eq(hiqMembers.storeId, storeId),
-                    sql`DATE(${hiqVisitLogs.visitedAt}) = CURRENT_DATE`
-                )
-            );
-
-        const [yesterday] = await db.select({ count: sql<number>`count(distinct ${hiqVisitLogs.memberId})` })
-            .from(hiqVisitLogs)
-            .innerJoin(hiqMembers, eq(hiqVisitLogs.memberId, hiqMembers.id))
-            .where(
-                and(
-                    eq(hiqMembers.storeId, storeId),
-                    sql`DATE(${hiqVisitLogs.visitedAt}) = CURRENT_DATE - INTERVAL '1 day'`
-                )
-            );
-
-        const [newMembersToday] = await db.select({ count: sql<number>`count(*)` })
-            .from(hiqMembers)
-            .where(
-                and(
-                    eq(hiqMembers.storeId, storeId),
-                    sql`DATE(${hiqMembers.createdAt}) = CURRENT_DATE`
-                )
-            );
-
+        const [row] = (await db.execute(sql`
+            select
+              (select count(*)::int from hiq_members where store_id = ${storeId}) as total,
+              (select count(*)::int from hiq_members where store_id = ${storeId} and created_at >= ${KST_TODAY_START}) as new_today,
+              (select count(*)::int from hiq_members where store_id = ${storeId}
+                 and created_at >= date_trunc('month', now() at time zone 'Asia/Seoul') - interval '9 hours') as new_month,
+              (select count(*)::int from hiq_members where store_id = ${storeId}
+                 and last_visited_at >= now() at time zone 'UTC' - interval '30 days') as active30`)).rows as Record<string, unknown>[];
+        // 최근 7일(오늘 포함) 날짜별 방문 회원 수 — 빈 날도 0 으로 채운다.
+        const days = (await db.execute(sql`
+            select to_char((v.visited_at at time zone 'UTC' at time zone 'Asia/Seoul')::date, 'YYYY-MM-DD') as d,
+                   count(distinct v.member_id)::int as n
+            from hiq_visit_logs v join hiq_members m on m.id = v.member_id
+            where m.store_id = ${storeId} and v.visited_at >= ${KST_TODAY_START} - interval '6 days'
+            group by 1`)).rows as Record<string, unknown>[];
+        const byDay = new Map(days.map((d) => [String(d.d), Number(d.n ?? 0)]));
+        const visits7: { date: string; count: number }[] = [];
+        const todayKst = new Date(Date.now() + 9 * 3600_000);
+        for (let i = 6; i >= 0; i--) {
+            const key = new Date(todayKst.getTime() - i * 86_400_000).toISOString().slice(0, 10);
+            visits7.push({ date: key, count: byDay.get(key) ?? 0 });
+        }
+        const total = Number(row?.total ?? 0);
+        const active30 = Number(row?.active30 ?? 0);
         return {
-            totalMembers: Number(total.count),
-            visitsToday: Number(today.count || 0),
-            visitsYesterday: Number(yesterday.count || 0),
-            newToday: Number(newMembersToday.count)
+            totalMembers: total,
+            visitsToday: visits7[6].count,
+            visitsYesterday: visits7[5].count,
+            newToday: Number(row?.new_today ?? 0),
+            newThisMonth: Number(row?.new_month ?? 0),
+            active30,
+            dormant30: Math.max(0, total - active30),
+            visits7,
         };
     }
 

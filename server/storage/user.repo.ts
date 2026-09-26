@@ -158,11 +158,10 @@ export class UserRepository {
         const now = new Date();
         const lastVisit = member.lastVisitedAt;
 
-        // Only increment if last visit was not today
-        const isSameDay = lastVisit &&
-            lastVisit.getFullYear() === now.getFullYear() &&
-            lastVisit.getMonth() === now.getMonth() &&
-            lastVisit.getDate() === now.getDate();
+        // 하루 한 번만 — "하루"는 한국 날짜. 서버(UTC)의 getDate() 로 비교하면 한국 오전 9시에 날이 바뀌어
+        // 전날 밤 10시와 다음 날 아침 8시 방문이 같은 날로 묶여 한 번이 빠졌다.
+        const kstDay = (d: Date) => new Date(d.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
+        const isSameDay = !!lastVisit && kstDay(lastVisit) === kstDay(now);
 
         if (!isSameDay) {
             await db
@@ -322,31 +321,58 @@ export class UserRepository {
             .orderBy(sql`${hiqMembers.createdAt} DESC`);
     }
 
+    /**
+     * 사장님 대시보드 회원 목록. **보여 줄 칸만** 고른다 — 예전엔 hiq_members 전체 행을 그대로 내려
+     * 정산 계좌번호·알림 설정·약관 동의 같은 사장님이 볼 이유가 없는 값까지 매장 화면으로 나갔다.
+     * memo 는 사장님 메모(hiq_club_members.memo), 이번 달은 한국 기준 1일 0시부터.
+     */
     async getStoreMembersWithStats(storeId: string) {
-        const members = await this.getAllMembers(storeId);
-        if (members.length === 0) return [];
-
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-
-        const gameCounts = await db.select({
-            memberId: hiqGameHistory.memberId,
-            count: sql<number>`count(*)`
-        })
-            .from(hiqGameHistory)
-            .where(and(
-                inArray(hiqGameHistory.memberId, members.map(m => m.id)),
-                gte(hiqGameHistory.createdAt, startOfMonth)
-            ))
-            .groupBy(hiqGameHistory.memberId);
-
-        const countMap = new Map(gameCounts.map(c => [c.memberId, Number(c.count)]));
-
-        return members.map(m => ({
-            ...m,
-            monthlyGameCount: countMap.get(m.id) || 0
+        const rows = (await db.execute(sql`
+            select m.id, m.name, m.phone, m.gender, m.birth_year,
+                   m.handi_3c, m.handi_4c, m.rating_3c, m.rating_4c, m.avg_3c, m.avg_4c,
+                   coalesce(m.visit_count, 0)::int as visit_count,
+                   to_char(m.last_visited_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as last_visited_at,
+                   to_char(m.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
+                   m.marketing_agree,
+                   cm.memo,
+                   (select count(*)::int from hiq_game_history h
+                      where h.member_id = m.id
+                        and h.created_at >= date_trunc('month', now() at time zone 'Asia/Seoul') - interval '9 hours') as monthly_game_count
+            from hiq_members m
+            left join hiq_club_members cm on cm.store_id = m.store_id and cm.member_id = m.id
+            where m.store_id = ${storeId}
+            order by m.created_at desc`)).rows as Record<string, unknown>[];
+        const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+        return rows.map((r) => ({
+            id: String(r.id),
+            name: String(r.name ?? ""),
+            phone: String(r.phone ?? ""),
+            gender: (r.gender as "male" | "female" | null) ?? null,
+            birthYear: num(r.birth_year),
+            handi3c: num(r.handi_3c),
+            handi4c: num(r.handi_4c),
+            rating3c: Number(r.rating_3c ?? 0),
+            rating4c: Number(r.rating_4c ?? 0),
+            avg3c: Number(r.avg_3c ?? 0),
+            avg4c: Number(r.avg_4c ?? 0),
+            visitCount: Number(r.visit_count ?? 0),
+            lastVisitedAt: (r.last_visited_at as string | null) ?? null,
+            createdAt: String(r.created_at ?? ""),
+            marketingAgree: r.marketing_agree === true,
+            memo: (r.memo as string | null) ?? null,
+            monthlyGameCount: Number(r.monthly_game_count ?? 0),
         }));
+    }
+
+    /** 사장님 메모 저장 — 그 매장으로 가입한 회원에게만. 없으면 false. */
+    async setStoreMemberMemo(storeId: string, memberId: string, memo: string | null): Promise<boolean> {
+        const [m] = await db.select({ id: hiqMembers.id }).from(hiqMembers)
+            .where(and(eq(hiqMembers.id, memberId), eq(hiqMembers.storeId, storeId)));
+        if (!m) return false;
+        await db.execute(sql`
+            insert into hiq_club_members (store_id, member_id, memo) values (${storeId}, ${memberId}, ${memo})
+            on conflict (store_id, member_id) do update set memo = excluded.memo`);
+        return true;
     }
 
     async getMembersByPhone(phone: string): Promise<HiqMember[]> {

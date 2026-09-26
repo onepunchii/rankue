@@ -21,6 +21,16 @@ const checkSuperAdmin = asyncHandler(async (req: any, res: any, next: any) => {
     next();
 });
 
+// /partner/login 과 같은 쿠키 옵션 — 모든 가드가 signedCookies 로 읽으므로 서명이 빠지면 안 된다.
+const PARTNER_COOKIE_OPTS = {
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    signed: true,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
+    path: '/',
+};
+
 // --- Admin Routes ---
 
 router.get("/stats", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
@@ -39,9 +49,69 @@ router.get("/activity", checkSuperAdmin, asyncHandler(async (_req: any, res: any
     return sendSuccess(res, await storage.appSessions.summary(8));
 }));
 
+// GET /admin/activity/today — 오늘(한국 날짜) 앱을 연 회원 목록·시간대별 접속자·어제 같은 시각 비교(2026-09-26 오너)
+router.get("/activity/today", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    return sendSuccess(res, await storage.appSessions.today());
+}));
+
 router.get("/members", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const members = await storage.getAllMembersForAdmin();
     return sendSuccess(res, members);
+}));
+
+/**
+ * PATCH /admin/members/:id — 회원 정보 수정(이름·성별·출생연도·핸디). 받은 칸만 검사해 바꾼다.
+ * 전화번호·RP 는 받지 않는다(storage.admin.updateMemberForAdmin 주석).
+ */
+router.patch("/members/:id", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const b = req.body || {};
+    const patch: Parameters<typeof storage.admin.updateMemberForAdmin>[1] = {};
+    if (b.name !== undefined) {
+        const name = String(b.name ?? "").trim();
+        if (!name || name.length > 30) return sendError(res, 400, "이름은 1~30자로 입력해주세요");
+        patch.name = name;
+    }
+    if (b.gender !== undefined) {
+        if (b.gender !== null && b.gender !== "male" && b.gender !== "female") return sendError(res, 400, "성별 값이 올바르지 않습니다");
+        patch.gender = b.gender;
+    }
+    const intOrNull = (v: unknown, min: number, max: number): number | null | "bad" => {
+        if (v === null || v === "") return null;
+        const n = Number(v);
+        return Number.isInteger(n) && n >= min && n <= max ? n : "bad";
+    };
+    if (b.birthYear !== undefined) {
+        const v = intOrNull(b.birthYear, 1900, new Date().getFullYear());
+        if (v === "bad") return sendError(res, 400, "출생연도가 올바르지 않습니다");
+        patch.birthYear = v;
+    }
+    for (const k of ["handi3c", "handi4c"] as const) {
+        if (b[k] === undefined) continue;
+        const v = intOrNull(b[k], 0, 1000);
+        if (v === "bad") return sendError(res, 400, "핸디는 0~1000 사이 숫자로 입력해주세요");
+        patch[k] = v;
+    }
+    const row = await storage.admin.updateMemberForAdmin(req.params.id, patch);
+    if (!row) return sendError(res, Object.keys(patch).length ? 404 : 400, Object.keys(patch).length ? "회원을 찾을 수 없습니다" : "바꿀 내용이 없습니다");
+    console.info("[admin] 회원 수정", JSON.stringify({ memberId: row.id, fields: Object.keys(patch), by: req.signedCookies?.hiq_partner_auth ?? null }));
+    return sendSuccess(res, row);
+}));
+
+/**
+ * POST /admin/members/:id/status { banned: boolean } — 회원 계정 정지·해제(회원 id 로 받아 연결된 프로필을 바꾼다).
+ * 운영자·관리자 계정은 여기서 정지하지 않는다(실수로 자기 관리자 계정을 잠그는 사고 방지).
+ */
+router.post("/members/:id/status", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const member = await storage.getMemberById(req.params.id);
+    if (!member?.profileId) return sendError(res, 404, "로그인 계정이 연결되지 않은 회원입니다");
+    const profile = await storage.getProfile(member.profileId);
+    if (!profile) return sendError(res, 404, "계정을 찾을 수 없습니다");
+    if (profile.role === "admin" || profile.role === "super_admin") return sendError(res, 400, "관리자 계정은 정지할 수 없습니다");
+    const banned = req.body?.banned === true;
+    if (banned) await storage.banUser(profile.id);
+    else await storage.admin.unbanUser(profile.id);
+    console.info("[admin] 회원 상태", JSON.stringify({ memberId: member.id, profileId: profile.id, banned, by: req.signedCookies?.hiq_partner_auth ?? null }));
+    return sendSuccess(res, { success: true, status: banned ? "banned" : "active" });
 }));
 
 /**
@@ -202,6 +272,24 @@ router.get("/crews", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     return sendSuccess(res, crews);
 }));
 
+/**
+ * POST /admin/impersonate/exit — ⚠️ 아래 "/impersonate/:storeId" 보다 먼저 등록해야 한다(아니면 "exit" 가 storeId 로 잡힌다).
+ * — 매장 대리 접속을 끝내고 관리자 세션으로 돌아간다.
+ * 지금 쿠키는 사장님 것이라 checkSuperAdmin 을 걸 수 없다. 대신 서명된 hiq_admin_origin 이
+ * 가리키는 프로필이 **지금도** 관리자인지 확인하고 나서만 되돌린다.
+ */
+router.post("/impersonate/exit", asyncHandler(async (req: any, res: any) => {
+    const originId = req.signedCookies?.hiq_admin_origin;
+    if (!originId) return sendError(res, 400, "대리 접속 중이 아닙니다");
+    const profile = await storage.getProfile(originId);
+    res.clearCookie('hiq_admin_origin', { path: '/' });
+    if (!profile || (profile.role !== "super_admin" && profile.role !== "admin")) {
+        return sendError(res, 403, "관리자 권한이 없습니다.");
+    }
+    res.cookie('hiq_partner_auth', profile.id, PARTNER_COOKIE_OPTS);
+    return sendSuccess(res, { success: true });
+}));
+
 router.post("/impersonate/:storeId", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const store = await storage.getStoreById(req.params.storeId);
     if (!store || !store.ownerId) return sendError(res, 404, "매장 또는 소유자를 찾을 수 없습니다.");
@@ -210,14 +298,11 @@ router.post("/impersonate/:storeId", checkSuperAdmin, asyncHandler(async (req: a
     // Must be SIGNED with the same options as /partner/login — every guard reads
     // req.signedCookies.hiq_partner_auth, so an unsigned cookie would fail signature
     // verification everywhere (breaking impersonation AND clobbering the admin's own session).
-    res.cookie('hiq_partner_auth', store.ownerId, {
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        signed: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
-        path: '/'
-    });
+    // 관리자 본인 세션을 따로 적어 둔다 — 예전엔 쿠키를 사장님 것으로 덮어써서, 매장 화면을 보고 나면
+    // 관리자 화면으로 돌아갈 길이 없고 로그아웃 후 다시 로그인해야 했다. /impersonate/exit 가 이걸로 되돌린다.
+    // checkSuperAdmin 을 통과했으니 지금 쿠키가 곧 관리자 본인이다. 12시간이 지나면 저절로 사라진다.
+    res.cookie('hiq_admin_origin', req.signedCookies.hiq_partner_auth, { ...PARTNER_COOKIE_OPTS, maxAge: 12 * 60 * 60 * 1000 });
+    res.cookie('hiq_partner_auth', store.ownerId, PARTNER_COOKIE_OPTS);
 
     return sendSuccess(res, { success: true, message: `Switched to ${store.name}` });
 }));

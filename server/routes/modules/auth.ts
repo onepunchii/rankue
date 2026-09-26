@@ -228,6 +228,7 @@ router.post("/logout", asyncHandler(async (req: any, res: any) => {
     }
     res.clearCookie('hiq_user_id', { path: '/' });
     res.clearCookie('hiq_partner_auth', { path: '/' });
+    res.clearCookie('hiq_admin_origin', { path: '/' });
     return sendSuccess(res, { success: true });
 }));
 

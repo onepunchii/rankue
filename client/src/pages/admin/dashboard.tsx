@@ -2,9 +2,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
-import MemberGamesDialog from "./MemberGamesDialog";
+import MembersView from "./MembersView";
+import TodayActiveView from "./TodayActiveView";
+import MemberDetailSheet, { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
+import { KpiTile, kstDate } from "./adminUtils";
 import { useLocation, useSearch } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -14,13 +16,13 @@ import { cn } from "@/lib/utils";
 import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideArrowRight, LucideCheckCircle, LucideLogOut,
-    LucideSearch, LucideTrendingUp, LucideBell, LucideCreditCard, LucideSettings, LucideShieldAlert, LucideMenu, LucideX, LucideUsersRound, LucideMail, LucideFlag, GameController
+    LucideSearch, LucideBell, LucideCreditCard, LucideShieldAlert, LucideMenu, LucideUsersRound, LucideMail, LucideFlag, GameController,
+    LucideZap, LucideMegaphone, LucideUserPlus
 } from "@/lib/icons";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // Assuming Sheet is available or using conditional rendering
-import { flagEmoji } from "@/lib/flag";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 
 // --- Types ---
 type GlobalStats = {
@@ -28,7 +30,12 @@ type GlobalStats = {
     totalUsers: number;
     totalVisitsToday: number;
     newLeads: number;
+    newUsersToday?: number;
 };
+
+type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game";
+
+const LEAD_STATUS_LABEL: Record<string, string> = { NEW: "신규", CONTACTED: "연락함", REGISTERED: "등록 완료" };
 
 type PartnerLead = {
     id: string;
@@ -88,64 +95,92 @@ type Suggestion = {
 };
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members"] as const;
 
-// --- Left Sidebar Component ---
-// --- Sidebar Component (Unified) ---
-function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
-    const menuItems = [
-        { id: "dashboard", label: "Dashboard", icon: LucideLayoutDashboard },
-        { id: "online-game", label: "온라인게임", icon: GameController },
-        { id: "claims", label: "매장 클레임", icon: LucideStore },
-        { id: "registrations", label: "신규 매장 등록", icon: LucideStore },
-        { id: "leads", label: "입점 문의", icon: LucidePhone },
-        { id: "stores", label: "매장 리스트", icon: LucideStore },
-        { id: "crews", label: "크루 현황", icon: LucideUsersRound },
+// --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
+// 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
+const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }[] }[] = [
+    { title: "한눈에", items: [
+        { id: "dashboard", label: "대시보드", icon: LucideLayoutDashboard },
+        { id: "today", label: "오늘 접속", icon: LucideZap },
+    ] },
+    { title: "회원", items: [
         { id: "members", label: "회원 관리", icon: LucideUsers },
         { id: "push", label: "푸시 발송", icon: LucideBell },
-        { id: "golf-orders", label: "골프 회원권", icon: LucideFlag }, // New
-        { id: "billing", label: "결제 관리", icon: LucideCreditCard },
         { id: "suggestions", label: "건의함", icon: LucideMail },
-        { id: "notices", label: "공지사항", icon: LucideBell },
         { id: "moderation", label: "신고/제재", icon: LucideShieldAlert },
-    ];
+    ] },
+    { title: "매장", items: [
+        { id: "claims", label: "매장 클레임", icon: LucideStore },
+        { id: "registrations", label: "신규 매장 등록", icon: LucideUserPlus },
+        { id: "leads", label: "입점 문의", icon: LucidePhone },
+        { id: "stores", label: "매장 리스트", icon: LucideStore },
+        { id: "billing", label: "결제 관리", icon: LucideCreditCard },
+    ] },
+    { title: "콘텐츠", items: [
+        { id: "crews", label: "크루 현황", icon: LucideUsersRound },
+        { id: "online-game", label: "온라인게임", icon: GameController },
+        { id: "golf-orders", label: "골프 회원권", icon: LucideFlag },
+        { id: "notices", label: "공지사항", icon: LucideMegaphone },
+    ] },
+];
 
+function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu, badges }: {
+    tab: Tab; setTab: (t: Tab) => void; handleLogout: () => void; closeMobileMenu?: () => void;
+    badges: Partial<Record<Tab, number>>;
+}) {
     return (
         // 모바일 서랍에서도 메뉴가 다 보이게: 가운데 목록만 스크롤(머리글·로그아웃은 고정), min-h-0 이 없으면 flex 자식이 안 줄어 스크롤이 안 생긴다
         <div className="flex flex-col h-full min-h-0 bg-white border-r border-black/10">
-            <div className="shrink-0 p-6 border-b border-black/10">
+            <div className="shrink-0 px-5 py-5 border-b border-black/10">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                         <LucideGlobe className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-lg font-black tracking-tight text-brand">ADMIN</h1>
-                        <span className="text-[10px] text-black/40 font-bold uppercase tracking-widest block">Control Tower</span>
+                        <h1 className="text-lg font-black tracking-tight text-brand">랭큐 관리자</h1>
+                        <span className="text-[11px] text-black/40 font-bold block">운영 콘솔</span>
                     </div>
                 </div>
             </div>
 
-            <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-1">
-                {menuItems.map((item) => (
-                    <button
-                        key={item.id}
-                        onClick={() => {
-                            setTab(item.id);
-                            if (closeMobileMenu) closeMobileMenu();
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${tab === item.id
-                            ? "bg-brand text-white shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                            : "text-black/60 hover:bg-black/[0.04] hover:text-[rgba(0,0,0,0.87)]"
-                            }`}
-                    >
-                        <item.icon size={18} />
-                        {item.label}
-                    </button>
+            <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3 space-y-4">
+                {MENU_GROUPS.map((g) => (
+                    <div key={g.title}>
+                        <p className="px-3 pb-1 text-[11px] font-black text-black/35">{g.title}</p>
+                        <div className="space-y-0.5">
+                            {g.items.map((item) => {
+                                const n = badges[item.id] ?? 0;
+                                const active = tab === item.id;
+                                return (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => {
+                                            setTab(item.id);
+                                            if (closeMobileMenu) closeMobileMenu();
+                                        }}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${active
+                                            ? "bg-brand text-white shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                                            : "text-black/60 hover:bg-black/[0.04] hover:text-[rgba(0,0,0,0.87)]"
+                                            }`}
+                                    >
+                                        <item.icon size={18} />
+                                        <span className="flex-1 text-left">{item.label}</span>
+                                        {n > 0 && (
+                                            <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-black tabular-nums flex items-center justify-center ${active ? "bg-white text-brand" : "bg-red-500 text-white"}`}>
+                                                {n > 99 ? "99+" : n}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 ))}
             </nav>
 
-            <div className="shrink-0 p-4 border-t border-black/10" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
-                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-500/10 transition">
+            <div className="shrink-0 p-3 border-t border-black/10" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-500/10 transition">
                     <LucideLogOut size={18} />
                     로그아웃
                 </button>
@@ -157,39 +192,13 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu }: any) {
 
 // --- Main Page Component ---
 
-/** 마지막 접속을 "3분 전 · 2일 전" 으로. 기록이 없으면 '-'. */
-function lastSeenLabel(iso: string | null | undefined): string {
-    if (!iso) return "-";
-    const ms = Date.now() - Date.parse(iso);
-    if (!Number.isFinite(ms)) return "-";
-    const min = Math.floor(ms / 60_000);
-    if (min < 1) return "방금";
-    if (min < 60) return `${min}분 전`;
-    const h = Math.floor(min / 60);
-    if (h < 24) return `${h}시간 전`;
-    const d = Math.floor(h / 24);
-    return d < 30 ? `${d}일 전` : `${Math.floor(d / 30)}달 전`;
-}
-/** 30일 넘게 안 들어온 회원은 이탈로 본다 — 붉게. 7일 안이면 진하게. */
-function lastSeenTone(iso: string | null | undefined): string {
-    if (!iso) return "text-black/25";
-    const d = (Date.now() - Date.parse(iso)) / 86_400_000;
-    return d > 30 ? "text-red-600" : d <= 7 ? "text-[rgba(0,0,0,0.87)] font-bold" : "text-black/55";
-}
-/** 리텐션 칸: 아직 그 기간이 안 지난 코호트는 '-' (숫자를 내면 낮게 보여 오해한다). */
-function retentionCell(n: number, signed: number, ready: boolean) {
-    if (!ready || signed === 0) return <span className="text-black/25">-</span>;
-    const pct = Math.round((n / signed) * 100);
-    return <span className={pct >= 40 ? "font-bold text-brand" : pct > 0 ? "text-[rgba(0,0,0,0.87)]" : "text-black/35"}>{pct}%<span className="text-black/35 text-[11px]"> ({n})</span></span>;
-}
-
 export default function AdminDashboard() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     // 모바일 메뉴 서랍(열림 상태를 들고 있어야 메뉴를 고를 때 닫을 수 있다)
     const [menuOpen, setMenuOpen] = useState(false);
-    const [tab, setTab] = useState<"dashboard" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game">(() =>
+    const [tab, setTabState] = useState<Tab>(() =>
         // 신고 알림은 ?tab=moderation(신고/제재 센터), 새 건의 알림은 ?tab=suggestions(건의함)로 온다(2026-09-11).
         // 목록에 없는 값은 무시하고 대시보드를 연다.
         DEEP_LINK_TABS.find((t) => t === new URLSearchParams(window.location.search).get("tab")) ?? "dashboard");
@@ -200,21 +209,20 @@ export default function AdminDashboard() {
     useEffect(() => {
         const t = DEEP_LINK_TABS.find((x) => x === new URLSearchParams(search).get("tab"));
         if (!t) return;
-        setTab(t);
+        setTabState(t);
         // 새 건의 알림으로 왔다 — 5분 캐시를 기다리지 않고 건의함을 다시 읽어 방금 온 건의가 보이게 한다.
         if (t === "suggestions") queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/suggestions"] });
         setLocation(window.location.pathname, { replace: true });
     }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
-    const [memberSearch, setMemberSearch] = useState("");
-    // 기록 정리 대화상자(잘못 만든 경기 삭제) — 회원 표의 '기록' 버튼이 연다
-    const [gamesFor, setGamesFor] = useState<{ id: string; name: string } | null>(null);
-    /** 임시 PIN 발급 결과 — 사용자에게 전달할 때까지 창에 띄워 둔다(한 번만 보인다). */
-    const [pinResult, setPinResult] = useState<{ pin: string; name: string; phone: string } | null>(null);
-    const resetPin = useMutation({
-        mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/members/${id}/reset-pin`, { method: "POST" }) as Promise<{ pin: string; name: string; phone: string }>,
-        onSuccess: (r) => setPinResult(r),
-        onError: (e: any) => toast({ title: "PIN 초기화 실패", description: e?.message ?? "", variant: "destructive" }),
-    });
+    // 탭을 바꾸면 화면 맨 위로 — 폰에서 긴 목록 아래에서 메뉴를 고르면 새 화면 중간부터 보였다.
+    const setTab = (t: Tab) => {
+        setTabState(t);
+        window.scrollTo({ top: 0 });
+    };
+    // 회원 상세 시트 — '오늘 접속'·'회원 관리'·대시보드 어디서 눌러도 같은 시트가 열린다.
+    const [openMemberId, setOpenMemberId] = useState<string | null>(null);
+    const [storeSearch, setStoreSearch] = useState("");
+    const [pushSearch, setPushSearch] = useState("");
     const [crewSportFilter, setCrewSportFilter] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
 
     // Queries
@@ -233,11 +241,9 @@ export default function AdminDashboard() {
         },
         onError: (e: any) => toast({ title: e?.message || "처리 실패", variant: "destructive" }),
     });
-    const { data: members = [] } = useQuery<any[]>({ queryKey: ["/api/hiq/admin/members"] });
-    const { data: activity } = useQuery<{
-        dau: number; wau: number; mau: number; sessions7: number; avgMinutes7: number;
-        cohorts: { week: string; signed: number; d1: number; d7: number; d30: number; d7Ready: boolean; d30Ready: boolean }[];
-    }>({ queryKey: ["/api/hiq/admin/activity"], enabled: tab === "members" });
+    const { data: members = [] } = useQuery<AdminMember[]>({ queryKey: ADMIN_MEMBERS_KEY });
+    const openMember = openMemberId ? members.find((m) => m.id === openMemberId) ?? null : null;
+    const { data: golfOrders = [] } = useQuery<any[]>({ queryKey: ["/api/hiq/admin/membership/orders"] });
 
     // Filter crews
     const filteredCrews = crews.filter(crew => {
@@ -291,6 +297,23 @@ export default function AdminDashboard() {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/store-registrations"] }),
         onError: (e: any) => toast({ title: e?.message || "거절 실패", variant: "destructive" }),
     });
+
+    // 처리할 일 — 사이드바 숫자와 대시보드 '처리할 일' 칸이 같은 값을 본다.
+    const pending = useMemo(() => ({
+        claims: claims.filter((c) => c.status === "pending").length,
+        registrations: registrations.filter((r) => r.status === "pending").length,
+        leads: leads.filter((l) => l.status === "NEW").length,
+        suggestions: suggestions.filter((x) => !x.isRead).length,
+        golfOrders: golfOrders.filter((o) => o.status === "PENDING").length,
+    }), [claims, registrations, leads, suggestions, golfOrders]);
+    const badges: Partial<Record<Tab, number>> = {
+        claims: pending.claims,
+        registrations: pending.registrations,
+        leads: pending.leads,
+        suggestions: pending.suggestions,
+        "golf-orders": pending.golfOrders,
+    };
+    const pendingTotal = Object.values(pending).reduce((a, b) => a + b, 0);
 
     // 공지 숨김·삭제
     const toggleNoticeMutation = useMutation({
@@ -349,8 +372,11 @@ export default function AdminDashboard() {
             return apiRequest(`/api/hiq/admin/impersonate/${storeId}`, { method: "POST" });
         },
         onSuccess: () => {
+            // 사장님 화면 위쪽 '관리자로 돌아가기' 띠로 되돌아온다(서버가 관리자 세션을 따로 적어 둔다).
+            queryClient.clear();
             window.location.href = "/partner/dashboard";
-        }
+        },
+        onError: (e: any) => toast({ title: e?.message || "매장 접속 실패", variant: "destructive" }),
     });
 
         // 건의 답장 — 전화 말고 앱 알림으로 회신한다(오너 요청 2026-08-19).
@@ -410,102 +436,132 @@ export default function AdminDashboard() {
         setLocation("/partner/login");
     };
 
+    const todos: { tab: Tab; label: string; n: number }[] = [
+        { tab: "claims", label: "매장 클레임 대기", n: pending.claims },
+        { tab: "registrations", label: "신규 매장 등록 대기", n: pending.registrations },
+        { tab: "leads", label: "새 입점 문의", n: pending.leads },
+        { tab: "suggestions", label: "안 읽은 건의", n: pending.suggestions },
+        { tab: "golf-orders", label: "골프 회원권 대기", n: pending.golfOrders },
+    ];
+
     return (
         <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans flex flex-col md:flex-row">
-            {/* Mobile Header */}
-            <div className="md:hidden bg-white border-b border-black/10 p-4 sticky top-0 z-30 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
-                        <LucideGlobe className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="font-black text-brand">ADMIN</span>
-                </div>
+            {/* Mobile Header — 높이 고정(h-14): 회원 관리의 거르기 줄이 이 아래(top-14)에 붙는다 */}
+            <div className="md:hidden h-14 bg-white border-b border-black/10 px-2 sticky top-0 z-30 flex items-center gap-1">
                 <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
                     <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label="메뉴" className="text-[rgba(0,0,0,0.87)]">
+                        <Button variant="ghost" size="icon" aria-label="메뉴" className="relative text-[rgba(0,0,0,0.87)]">
                             <LucideMenu />
+                            {pendingTotal > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white" />}
                         </Button>
                     </SheetTrigger>
                     {/* 서랍도 화면 높이에 맞춰 세로 flex — 안의 메뉴가 스크롤된다. 고르면 닫힌다. */}
                     <SheetContent side="left" className="p-0 border-r border-black/10 w-72 max-w-[85vw] bg-white flex flex-col h-full">
-                        <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} closeMobileMenu={() => setMenuOpen(false)} />
+                        <SheetTitle className="sr-only">관리자 메뉴</SheetTitle>
+                        <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} closeMobileMenu={() => setMenuOpen(false)} badges={badges} />
                     </SheetContent>
                 </Sheet>
+                <span className="flex-1 truncate font-black text-[16px]">{getTabTitle(tab)}</span>
+                {tab !== "dashboard" && (
+                    <button onClick={() => setTab("dashboard")} className="px-3 h-9 rounded-lg text-[13px] font-bold text-brand">홈</button>
+                )}
             </div>
 
             {/* Desktop Sidebar */}
             <aside className="hidden md:flex w-64 flex-col fixed h-full z-20">
-                <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} />
+                <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} badges={badges} />
             </aside>
 
             {/* Main Content */}
-            {/* Main Content */}
-            <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto">
-                {/* Header Title */}
-                <header className="mb-8">
-                    <h2 className="text-3xl font-black text-[rgba(0,0,0,0.87)] mb-2">{getTabTitle(tab)}</h2>
-                    <p className="text-black/55 text-sm">시스템 운영 및 관리</p>
+            <main className="flex-1 min-w-0 md:ml-64 p-4 md:p-8">
+                {/* 제목 — 폰에선 위 머리줄이 제목을 보여 주므로 숨긴다 */}
+                <header className="hidden md:block mb-6">
+                    <h2 className="text-3xl font-black text-[rgba(0,0,0,0.87)]">{getTabTitle(tab)}</h2>
                 </header>
 
                 <div className="max-w-6xl">
                     {tab === "dashboard" && (
-                        <div className="space-y-8">
-                            <div className="space-y-8">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <StatCard label="Total Stores" value={stats?.totalStores || 0} icon={<LucideStore className="text-brand" />} sub="가맹점" />
-                                    <StatCard label="New Leads" value={stats?.newLeads || 0} icon={<LucidePhone className="text-brand" />} sub="신규 문의" highlight={!!stats?.newLeads} />
-                                    <StatCard label="Today Traffic" value={stats?.totalVisitsToday || 0} icon={<LucideTrendingUp className="text-orange-500" />} sub="방문객" />
-                                    <StatCard label="Total Users" value={stats?.totalUsers || 0} icon={<LucideUsers className="text-brand" />} sub="회원수" />
+                        <div className="space-y-6">
+                            {/* 처리할 일 — 쌓인 것만 보인다. 누르면 그 메뉴로 */}
+                            <section>
+                                <h3 className="text-[14px] font-black text-black/60 mb-2">처리할 일</h3>
+                                {pendingTotal === 0 ? (
+                                    <div className="rounded-2xl bg-white border border-black/[0.08] p-4 flex items-center gap-2 text-[13.5px] text-black/55">
+                                        <LucideCheckCircle className="w-4 h-4 text-brand" /> 지금 밀린 일이 없습니다.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
+                                        {todos.filter((t) => t.n > 0).map((t) => (
+                                            <KpiTile key={t.tab} label={t.label} value={t.n} unit="건" tone="alert" onClick={() => setTab(t.tab)} sub="눌러서 처리 →" />
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+
+                            <section>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-[14px] font-black text-black/60">오늘 접속</h3>
+                                    <button onClick={() => setTab("today")} className="text-[12.5px] font-bold text-brand">자세히 →</button>
+                                </div>
+                                <TodayActiveView compact onOpenMember={setOpenMemberId} onSeeAll={() => setTab("today")} />
+                            </section>
+
+                            <section>
+                                <h3 className="text-[14px] font-black text-black/60 mb-2">전체 현황</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                                    <KpiTile label="전체 회원" value={(stats?.totalUsers ?? 0).toLocaleString()} unit="명" onClick={() => setTab("members")} />
+                                    <KpiTile label="오늘 가입" value={stats?.newUsersToday ?? 0} unit="명" tone="brand" />
+                                    <KpiTile label="오늘 매장 방문" value={stats?.totalVisitsToday ?? 0} unit="회" sub="회원이 앱에 들어온 날(하루 1회)" />
+                                    <KpiTile label="가맹점" value={stats?.totalStores ?? 0} unit="곳" onClick={() => setTab("stores")} />
+                                </div>
+                            </section>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-white p-5 rounded-2xl border border-black/[0.07]">
+                                    <h3 className="text-[15px] font-bold mb-3 flex items-center gap-2">
+                                        <LucidePhone size={16} className="text-brand" /> 최근 입점 문의
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {leads.slice(0, 3).map(lead => (
+                                            <button key={lead.id} onClick={() => setTab("leads")} className="w-full flex justify-between items-center text-sm p-3 bg-black/[0.03] rounded-xl text-left">
+                                                <div className="min-w-0">
+                                                    <span className="font-bold">{lead.ownerName}</span>
+                                                    <span className="text-black/55 text-xs ml-2">{lead.region} {lead.storeName}</span>
+                                                </div>
+                                                <Badge variant={lead.status === 'NEW' ? 'destructive' : 'secondary'}>{LEAD_STATUS_LABEL[lead.status] ?? lead.status}</Badge>
+                                            </button>
+                                        ))}
+                                        {leads.length === 0 && <div className="text-center text-black/40 py-4 text-xs">문의 내역이 없습니다.</div>}
+                                    </div>
                                 </div>
 
-                                {/* Recent Activity Brief */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-white p-6 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                            <LucidePhone size={18} className="text-brand" /> 최근 입점 문의
-                                        </h3>
-                                        <div className="space-y-3">
-                                            {leads.slice(0, 3).map(lead => (
-                                                <div key={lead.id} className="flex justify-between items-center text-sm p-3 bg-black/[0.04] rounded-xl">
-                                                    <div>
-                                                        <span className="font-bold">{lead.ownerName}</span>
-                                                        <span className="text-black/55 text-xs ml-2">{lead.region}</span>
-                                                    </div>
-                                                    <Badge variant={lead.status === 'NEW' ? 'destructive' : 'secondary'}>{lead.status}</Badge>
-                                                </div>
-                                            ))}
-                                            {leads.length === 0 && <div className="text-center text-black/40 py-4 text-xs">문의 내역이 없습니다.</div>}
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white p-6 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                            <LucideMail size={18} className="text-brand" /> 최근 건의사항
-                                        </h3>
-                                        <div className="space-y-3">
-                                            {suggestions.slice(0, 3).map(suggestion => (
-                                                <div key={suggestion.id} className="p-3 bg-black/[0.04] rounded-xl text-xs space-y-1">
-                                                    <div className="flex justify-between items-center">
-                                                        <Badge variant={suggestion.type === 'BUG' ? 'destructive' : 'secondary'} className="scale-75 origin-left">
+                                <div className="bg-white p-5 rounded-2xl border border-black/[0.07]">
+                                    <h3 className="text-[15px] font-bold mb-3 flex items-center gap-2">
+                                        <LucideMail size={16} className="text-brand" /> 최근 건의사항
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {suggestions.slice(0, 3).map(suggestion => (
+                                            <button key={suggestion.id} onClick={() => setTab("suggestions")} className="w-full p-3 bg-black/[0.03] rounded-xl text-xs space-y-1 text-left">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="flex items-center gap-1.5">
+                                                        {!suggestion.isRead && <span className="w-2 h-2 rounded-full bg-red-500" />}
+                                                        <Badge variant={suggestion.type === 'BUG' ? 'destructive' : 'secondary'} className="scale-90 origin-left">
                                                             {suggestion.type}
                                                         </Badge>
-                                                        <span className="text-black/40">{new Date(suggestion.createdAt).toLocaleDateString()}</span>
-                                                    </div>
-                                                    <p className="text-black/70 line-clamp-1">{suggestion.content}</p>
+                                                    </span>
+                                                    <span className="text-black/40 tabular-nums">{kstDate(suggestion.createdAt)}</span>
                                                 </div>
-                                            ))}
-                                            {suggestions.length === 0 && <div className="text-center text-black/40 py-4 text-xs">건의사항이 없습니다.</div>}
-                                            {suggestions.length > 0 && (
-                                                <Button variant="ghost" className="w-full text-xs text-black/55 h-8 mt-2 hover:bg-black/[0.04]" onClick={() => setTab("suggestions")}>
-                                                    모두 보기
-                                                </Button>
-                                            )}
-                                        </div>
+                                                <p className="text-black/70 line-clamp-1">{suggestion.content}</p>
+                                            </button>
+                                        ))}
+                                        {suggestions.length === 0 && <div className="text-center text-black/40 py-4 text-xs">건의사항이 없습니다.</div>}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
+
+                    {tab === "today" && <TodayActiveView onOpenMember={setOpenMemberId} />}
 
                     {tab === "claims" && (
                         <div className="grid gap-4">
@@ -659,7 +715,7 @@ export default function AdminDashboard() {
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
                                             <Badge variant={lead.status === 'NEW' ? 'destructive' : lead.status === 'REGISTERED' ? 'default' : 'secondary'}>
-                                                {lead.status}
+                                                {LEAD_STATUS_LABEL[lead.status] ?? lead.status}
                                             </Badge>
                                             <span className="text-xs text-black/40">{new Date(lead.createdAt).toLocaleDateString()}</span>
                                         </div>
@@ -683,25 +739,52 @@ export default function AdminDashboard() {
                     )}
 
                     {tab === "stores" && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {stores.map((store) => (
-                                <div key={store.id} className="bg-white p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] group hover:border-brand/50 transition-all">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center">
-                                            <LucideStore className="w-5 h-5 text-brand" />
-                                        </div>
-                                        <Badge variant="outline" className="border-black/10 text-black/60">{store.region || "지역 미설정"}</Badge>
-                                    </div>
-                                    <h3 className="text-xl font-bold mb-1 truncate">{store.name}</h3>
-                                    <p className="text-black/55 text-sm mb-6">점주: {store.ownerName}</p>
-                                    <Button
-                                        className="w-full bg-black/[0.04] hover:bg-brand hover:text-white transition-all"
-                                        onClick={() => impersonateMutation.mutate(store.id)}
-                                    >
-                                        관리자 접속 <LucideArrowRight className="w-4 h-4 ml-2" />
-                                    </Button>
+                        <div className="space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between">
+                                <p className="text-sm font-bold text-black/55">가맹점 <span className="text-brand tabular-nums">{stores.length}</span>곳</p>
+                                <div className="relative sm:w-72">
+                                    <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/35" />
+                                    <input value={storeSearch} onChange={(e) => setStoreSearch(e.target.value)} placeholder="매장명·지역·점주"
+                                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-black/10 text-sm outline-none focus:border-brand/40" />
                                 </div>
-                            ))}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {stores
+                                    .filter((st) => { const q = storeSearch.trim(); return !q || [st.name, st.region, st.ownerName].some((v) => v?.includes(q)); })
+                                    .map((store) => (
+                                    <div key={store.id} className="bg-white p-4 rounded-2xl border border-black/[0.07]">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 shrink-0 rounded-full bg-brand/10 flex items-center justify-center">
+                                                <LucideStore className="w-5 h-5 text-brand" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="text-[16px] font-bold truncate">{store.name}</h3>
+                                                <p className="text-black/50 text-[12.5px] truncate">{store.region || "지역 미설정"} · 점주 {store.ownerName || "-"}</p>
+                                            </div>
+                                            <Badge variant="outline" className={(store as any).subscriptionTier === "PREMIUM" ? "border-brand/40 text-brand" : "border-black/10 text-black/50"}>
+                                                {(store as any).subscriptionTier === "PREMIUM" ? "프리미엄" : "기본"}
+                                            </Badge>
+                                        </div>
+                                        <div className="mt-3 flex gap-2">
+                                            <Button variant="outline" className="flex-1 h-9 text-[13px]" onClick={() => window.open(`/store/${store.slug}`, "_blank")}>
+                                                매장 페이지
+                                            </Button>
+                                            <Button
+                                                className="flex-1 h-9 text-[13px] bg-black/[0.05] text-[rgba(0,0,0,0.8)] hover:bg-brand hover:text-white"
+                                                disabled={impersonateMutation.isPending}
+                                                onClick={() => {
+                                                    if (window.confirm(`'${store.name}' 사장님 화면으로 들어갑니다.\n돌아올 땐 사장님 화면 맨 위 '관리자로 돌아가기'를 누르세요.`)) impersonateMutation.mutate(store.id);
+                                                }}
+                                            >
+                                                사장님 화면 <LucideArrowRight className="w-4 h-4 ml-1" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {stores.length === 0 && (
+                                    <div className="col-span-full bg-white p-8 rounded-2xl text-center text-black/45 text-sm">등록된 가맹점이 없습니다.</div>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -762,19 +845,18 @@ export default function AdminDashboard() {
                     {tab === "billing" && (
                         <div className="space-y-6">
                             <div className="bg-brand/[0.06] border border-brand/20 p-6 rounded-2xl mb-8">
-                                <h3 className="text-xl font-bold text-brand mb-2">💰 Revenue Management (Mockup)</h3>
-                                <p className="text-black/60 mb-0">현재는 Mock Data를 기반으로 표시됩니다.</p>
+                                <h3 className="text-lg font-bold text-brand mb-1">결제 관리 (준비 중)</h3>
+                                <p className="text-black/60 text-sm mb-0">매장별 요금제와 다음 결제일을 보여 줍니다. 청구서 발송은 아직 연결되지 않았습니다.</p>
                             </div>
 
                             <div className="bg-white rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] overflow-x-auto">
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-black/[0.04] text-black/55 text-xs uppercase font-bold">
                                         <tr>
-                                            <th className="p-4">Store Name</th>
-                                            <th className="p-4">Plan</th>
-                                            <th className="p-4">Next Billing</th>
-                                            <th className="p-4">Status</th>
-                                            <th className="p-4 text-right">Action</th>
+                                            <th className="p-4">매장</th>
+                                            <th className="p-4">요금제</th>
+                                            <th className="p-4">다음 결제일</th>
+                                            <th className="p-4">상태</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-black/[0.06]">
@@ -783,22 +865,17 @@ export default function AdminDashboard() {
                                                 <td className="p-4 font-bold">{store.name}</td>
                                                 <td className="p-4">
                                                     <Badge variant={store.plan === 'premium' ? 'default' : 'outline'} className={store.plan === 'premium' ? 'bg-brand' : 'text-black/60'}>
-                                                        {store.plan.toUpperCase()}
+                                                        {(store.plan ?? "free").toUpperCase()}
                                                     </Badge>
                                                 </td>
-                                                <td className="p-4 text-black/60">{store.nextBillingDate ? new Date(store.nextBillingDate).toLocaleDateString() : '-'}</td>
+                                                <td className="p-4 text-black/60 tabular-nums">{store.nextBillingDate ? kstDate(store.nextBillingDate) : '-'}</td>
                                                 <td className="p-4">
                                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${store.subscriptionStatus === 'active' ? 'bg-brand/10 text-brand' :
                                                         store.subscriptionStatus === 'overdue' ? 'bg-red-500/10 text-red-600' : 'bg-black/[0.04] text-black/40'
                                                         }`}>
                                                         <div className={`w-1.5 h-1.5 rounded-full ${store.subscriptionStatus === 'active' ? 'bg-brand' : store.subscriptionStatus === 'overdue' ? 'bg-red-500' : 'bg-gray-400'}`} />
-                                                        {store.subscriptionStatus.toUpperCase()}
+                                                        {store.subscriptionStatus === 'active' ? '정상' : store.subscriptionStatus === 'overdue' ? '미납' : '해지'}
                                                     </span>
-                                                </td>
-                                                <td className="p-4 text-right">
-                                                    <Button size="sm" variant="ghost" className="h-8 text-brand hover:text-brand/80 hover:bg-brand/10">
-                                                        Send Invoice
-                                                    </Button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -978,8 +1055,12 @@ export default function AdminDashboard() {
                                     </button>
                                 </div>
                                 {!pushAll && (
+                                    <input value={pushSearch} onChange={(e) => setPushSearch(e.target.value)} placeholder="받는 사람 검색 (이름·전화번호)"
+                                        className="w-full h-10 px-3 rounded-xl bg-black/[0.04] border border-black/10 text-sm outline-none focus:border-brand/40" />
+                                )}
+                                {!pushAll && (
                                     <div className="max-h-64 overflow-y-auto rounded-xl border border-black/[0.06] divide-y divide-black/[0.05]">
-                                        {members.map((m: any) => (
+                                        {members.filter((m) => !pushSearch.trim() || m.name?.includes(pushSearch.trim()) || m.phone?.includes(pushSearch.trim())).map((m) => (
                                             <label key={m.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-black/[0.02]">
                                                 <input
                                                     type="checkbox"
@@ -1014,14 +1095,14 @@ export default function AdminDashboard() {
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className="bg-white border-black/10 text-[rgba(0,0,0,0.87)]">
-                                        <h3 className="text-xl font-bold mb-4">Create Notice</h3>
+                                        <h3 className="text-xl font-bold mb-4">새 공지사항</h3>
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="text-xs text-black/55 font-bold uppercase block mb-1">Title</label>
+                                                <label className="text-xs text-black/55 font-bold block mb-1">제목</label>
                                                 <Input value={noticeForm.title} onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })} className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)]" />
                                             </div>
                                             <div>
-                                                <label className="text-xs text-black/55 font-bold uppercase block mb-1">Content</label>
+                                                <label className="text-xs text-black/55 font-bold block mb-1">내용</label>
                                                 <Textarea value={noticeForm.content} onChange={e => setNoticeForm({ ...noticeForm, content: e.target.value })} className="bg-black/[0.04] border-black/10 text-[rgba(0,0,0,0.87)] h-32" />
                                             </div>
                                             <div className="flex gap-4">
@@ -1034,7 +1115,7 @@ export default function AdminDashboard() {
                                                     사장님 전용
                                                 </label>
                                             </div>
-                                            <Button onClick={() => createNoticeMutation.mutate(noticeForm)} className="w-full bg-brand text-white mt-2">등록하기</Button>
+                                            <Button onClick={() => createNoticeMutation.mutate(noticeForm)} disabled={!noticeForm.title.trim() || !noticeForm.content.trim() || createNoticeMutation.isPending} className="w-full bg-brand text-white mt-2">등록하기</Button>
                                         </div>
                                     </DialogContent>
                                 </Dialog>
@@ -1070,149 +1151,9 @@ export default function AdminDashboard() {
 
                     {tab === "moderation" && <ModerationView />}
 
-                    {tab === "members" && (
-                        <div>
-                            {/* 앱 접속 요약(2026-09-13 오너: 잔류 측정). 앱을 연 회원 수와 가입 코호트별 재방문 */}
-                            {activity && (
-                                <div className="mb-5 space-y-3">
-                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                                        {[
-                                            ["오늘 접속", activity.dau, "명"], ["7일 접속", activity.wau, "명"], ["30일 접속", activity.mau, "명"],
-                                            ["7일 세션", activity.sessions7, "회"], ["평균 세션", activity.avgMinutes7, "분"],
-                                        ].map(([label, v, unit]) => (
-                                            <div key={String(label)} className="rounded-2xl bg-white border border-black/10 p-4">
-                                                <p className="text-[11px] font-bold text-black/45">{label}</p>
-                                                <p className="text-[22px] font-black text-[rgba(0,0,0,0.87)] tabular-nums">{v}<span className="text-[12px] text-black/40 ml-0.5">{unit}</span></p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="rounded-2xl overflow-hidden border border-black/10 overflow-x-auto">
-                                        <table className="w-full text-left bg-white text-sm whitespace-nowrap">
-                                            <thead>
-                                                <tr className="border-b border-black/10 bg-black/[0.02]">
-                                                    <th className="p-3 font-black text-black/55">가입 주</th>
-                                                    <th className="p-3 font-black text-black/55 text-right">가입</th>
-                                                    <th className="p-3 font-black text-black/55 text-right" title="가입 다음 날 다시 왔나">D1</th>
-                                                    <th className="p-3 font-black text-black/55 text-right" title="가입 후 7일 안에 다시 왔나">D7</th>
-                                                    <th className="p-3 font-black text-black/55 text-right" title="가입 후 30일 안에 다시 왔나">D30</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {activity.cohorts.map((c) => (
-                                                    <tr key={c.week} className="border-b border-black/[0.06]">
-                                                        <td className="p-3 font-mono text-black/60">{c.week}~</td>
-                                                        <td className="p-3 text-right font-mono">{c.signed}</td>
-                                                        <td className="p-3 text-right font-mono">{retentionCell(c.d1, c.signed, true)}</td>
-                                                        <td className="p-3 text-right font-mono">{retentionCell(c.d7, c.signed, c.d7Ready)}</td>
-                                                        <td className="p-3 text-right font-mono">{retentionCell(c.d30, c.signed, c.d30Ready)}</td>
-                                                    </tr>
-                                                ))}
-                                                {activity.cohorts.length === 0 && (
-                                                    <tr><td colSpan={5} className="p-6 text-center text-black/45">최근 8주 가입자가 없습니다.</td></tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <p className="text-[11px] text-black/40">접속 기록은 이 기능을 켠 날부터 쌓입니다. 그 전 가입자의 D1·D7은 기록이 없어 낮게 나옵니다.</p>
-                                </div>
-                            )}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-                                <p className="text-sm font-bold text-black/55">총 <span className="text-brand">{members.length}</span>명</p>
-                                <input
-                                    value={memberSearch}
-                                    onChange={(e) => setMemberSearch(e.target.value)}
-                                    placeholder="이름 또는 전화번호 검색"
-                                    className="w-full sm:w-72 h-11 px-4 rounded-xl bg-white border border-black/10 text-sm outline-none focus:border-brand/40"
-                                />
-                            </div>
-                            <div className="rounded-2xl overflow-hidden border border-black/10 overflow-x-auto">
-                                <table className="w-full text-left bg-white text-sm whitespace-nowrap">
-                                    <thead>
-                                        <tr className="border-b border-black/10 bg-black/[0.02]">
-                                            <th className="p-4 font-black text-black/55">이름</th>
-                                            <th className="p-4 font-black text-black/55">연락처</th>
-                                            <th className="p-4 font-black text-black/55 text-center">성별</th>
-                                            <th className="p-4 font-black text-black/55 text-center">국가</th>
-                                            <th className="p-4 font-black text-black/55 text-center">기기</th>
-                                            <th className="p-4 font-black text-black/55 text-right">3쿠션 RP</th>
-                                            <th className="p-4 font-black text-black/55 text-right">4구 RP</th>
-                                            <th className="p-4 font-black text-black/55 text-center">온라인게임</th>
-                                            <th className="p-4 font-black text-black/55 text-right">방문</th>
-                                            <th className="p-4 font-black text-black/55" title="앱을 마지막으로 연 시각">접속</th>
-                                            <th className="p-4 font-black text-black/55 text-right" title="최근 7일 중 앱을 연 날 수">주간</th>
-                                            <th className="p-4 font-black text-black/55 text-right" title="최근 30일 평균 세션(분, 4시간 상한)">세션</th>
-                                            <th className="p-4 font-black text-black/55">가입일</th>
-                                            <th className="p-4 font-black text-black/55 text-right">기록</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {members
-                                            .filter((m) => !memberSearch || m.name?.includes(memberSearch) || m.phone?.includes(memberSearch))
-                                            .map((m) => (
-                                                <tr key={m.id} className="border-b border-black/[0.06] hover:bg-black/[0.02]">
-                                                    <td className="p-4 font-bold text-[rgba(0,0,0,0.87)]">{m.name}</td>
-                                                    <td className="p-4 text-black/60 font-mono">{m.phone}</td>
-                                                    <td className="p-4 text-center text-black/60">{m.gender === "male" ? "남" : m.gender === "female" ? "여" : "-"}</td>
-                                                    <td className="p-4 text-center">
-                                                        {m.countryCode
-                                                            ? <span title={m.countryCode}>{flagEmoji(m.countryCode) || m.countryCode}</span>
-                                                            : <span className="text-black/25">-</span>}
-                                                    </td>
-                                                    <td className="p-4 text-center">
-                                                        {m.platform === "ios" ? <span title="iOS(애플)">🍎</span>
-                                                            : m.platform === "android" ? <span title="Android(안드로이드)">🤖</span>
-                                                            : <span className="text-black/25" title="앱 미설치(웹) 또는 알림 미허용">-</span>}
-                                                    </td>
-                                                    <td className="p-4 text-right font-mono font-bold text-brand">{m.rating3c ?? 0}</td>
-                                                    <td className="p-4 text-right font-mono font-bold text-brand">{m.rating4c ?? 0}</td>
-                                                    <td className="p-4 text-center font-mono text-black/60" title="연습 세션 · 대전">
-                                                        {(m.simSessions ?? 0) + (m.simMatches ?? 0) > 0
-                                                            ? <span><span className="font-bold text-[rgba(0,0,0,0.87)]">{m.simSessions ?? 0}</span><span className="text-black/35"> · </span><span className="font-bold text-[rgba(0,0,0,0.87)]">{m.simMatches ?? 0}</span></span>
-                                                            : <span className="text-black/25">-</span>}
-                                                    </td>
-                                                    <td className="p-4 text-right text-black/60 font-mono">{m.visitCount ?? 0}</td>
-                                                    <td className={cn("p-4 font-mono text-[12px]", lastSeenTone(m.lastSeenAt))}>{lastSeenLabel(m.lastSeenAt)}</td>
-                                                    <td className="p-4 text-right font-mono">{(m.activeDays7 ?? 0) > 0 ? <span className="font-bold text-[rgba(0,0,0,0.87)]">{m.activeDays7}일</span> : <span className="text-black/25">-</span>}</td>
-                                                    <td className="p-4 text-right font-mono text-black/60">{m.avgSessionMin30 ? `${m.avgSessionMin30}분` : <span className="text-black/25">-</span>}</td>
-                                                    <td className="p-4 text-black/50 font-mono">{m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "-"}</td>
-                                                    <td className="p-4 text-right whitespace-nowrap">
-                                                        <button
-                                                            onClick={() => setGamesFor({ id: m.id, name: m.name })}
-                                                            className="h-8 px-3 rounded-lg border border-black/15 text-xs font-bold text-black/60 hover:border-brand/40 hover:text-brand"
-                                                        >기록</button>
-                                                        {m.phone && !String(m.phone).startsWith("social:") && (
-                                                            <button
-                                                                disabled={resetPin.isPending}
-                                                                onClick={() => {
-                                                                    if (window.confirm(`${m.name}(${m.phone}) 님의 PIN 을 임시 PIN 으로 바꿉니다.\n본인 확인을 마쳤나요? 지금 PIN 은 더 이상 쓸 수 없습니다.`)) resetPin.mutate(m.id);
-                                                                }}
-                                                                className="ml-1.5 h-8 px-3 rounded-lg border border-black/15 text-xs font-bold text-black/60 hover:border-red-400 hover:text-red-600 disabled:opacity-50"
-                                                            >PIN 초기화</button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        {members.length === 0 && (
-                                            <tr><td colSpan={14} className="p-10 text-center text-black/45">회원이 없습니다.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
+                    {tab === "members" && <MembersView onOpenId={setOpenMemberId} />}
 
-                    <MemberGamesDialog member={gamesFor} onClose={() => setGamesFor(null)} />
-                    <Dialog open={pinResult !== null} onOpenChange={(o) => { if (!o) setPinResult(null); }}>
-                        <DialogContent className="max-w-sm">
-                            <h2 className="text-lg font-black text-[rgba(0,0,0,0.87)]">임시 PIN 발급 완료</h2>
-                            <p className="text-sm text-black/60">{pinResult?.name} · {pinResult?.phone}</p>
-                            <p className="my-2 text-center font-mono text-4xl font-black tracking-[0.3em] text-brand">{pinResult?.pin}</p>
-                            <p className="text-xs text-black/50 leading-relaxed">
-                                이 창을 닫으면 다시 볼 수 없습니다. 사용자에게 전달하세요 — 전화번호 + 이 PIN 으로 로그인하면 기존 기록이 그대로 있습니다.
-                                PIN 을 바꾸고 싶으면 로그인 화면의 "PIN을 잊으셨나요?"(보안 질문)로 바꿀 수 있습니다.
-                            </p>
-                        </DialogContent>
-                    </Dialog>
+                    <MemberDetailSheet member={openMember} onClose={() => setOpenMemberId(null)} />
 
                     {tab === "golf-orders" && <GolfOrdersView />}
                     {tab === "online-game" && <OnlineGameView />}
@@ -1223,37 +1164,25 @@ export default function AdminDashboard() {
 }
 
 function getTabTitle(tab: string) {
+    // 폰에선 머리줄의 이 제목이 지금 어느 화면인지 알려 주는 유일한 표시라 전부 채운다(2026-09-08)
     switch (tab) {
-        case "dashboard": return "Dashboard";
+        case "dashboard": return "대시보드";
+        case "today": return "오늘 접속";
         case "members": return "회원 관리";
-        case "leads": return "입점 문의 관리";
+        case "leads": return "입점 문의";
         case "stores": return "가맹점 리스트";
-        case "billing": return "결제 및 정산";
-        case "suggestions": return "건의함 (고객 의견)";
-        case "notices": return "공지사항 관리";
-        case "moderation": return "신고/제재 센터";
-        case "golf-orders": return "골프 회원권 접수 현황";
+        case "billing": return "결제 관리";
+        case "suggestions": return "건의함";
+        case "notices": return "공지사항";
+        case "moderation": return "신고/제재";
+        case "golf-orders": return "골프 회원권 접수";
         case "online-game": return "온라인게임 이용 현황";
-        // 빠져 있던 탭들 — 모바일에선 머리글이 지금 어느 화면인지 알려 주는 유일한 표시라 전부 채운다(2026-09-08)
         case "claims": return "매장 클레임";
         case "registrations": return "신규 매장 등록";
         case "crews": return "크루 현황";
         case "push": return "푸시 발송";
-        default: return "Admin";
+        default: return "관리자";
     }
-}
-
-function StatCard({ label, value, icon, sub, highlight = false }: any) {
-    return (
-        <div className={`p-5 rounded-2xl border shadow-[0_1px_2px_rgba(0,0,0,0.06)] ${highlight ? 'bg-brand/[0.06] border-brand/30' : 'bg-white border-black/[0.07]'}`}>
-            <div className="flex justify-between items-start mb-2">
-                <span className="text-[10px] font-bold text-black/55 uppercase tracking-widest">{label}</span>
-                <div className="opacity-80">{icon}</div>
-            </div>
-            <div className="text-3xl font-black text-[rgba(0,0,0,0.87)] mb-1">{value}</div>
-            <div className="text-xs text-black/40">{sub}</div>
-        </div>
-    );
 }
 
 function GolfOrdersView() {
@@ -1278,7 +1207,7 @@ function GolfOrdersView() {
         }
     });
 
-    if (isLoading) return <div className="text-center py-20 text-black/40">Loading...</div>;
+    if (isLoading) return <div className="text-center py-20 text-black/40">불러오는 중…</div>;
 
     const sortedOrders = orders ? [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [];
 

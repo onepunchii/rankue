@@ -80,6 +80,7 @@ export const LucideHash = ((Ph as any).Hash ?? F) as Ph.Icon;
 export const LucideHeart = ((Ph as any).Heart ?? F) as Ph.Icon;
 export const LucideHistory = ((Ph as any).ClockCounterClockwise ?? F) as Ph.Icon;
 export const LucideHome = ((Ph as any).House ?? F) as Ph.Icon;
+export const LucideQrCode = ((Ph as any).QrCode ?? F) as Ph.Icon;
 export const LucideImage = ((Ph as any).Image ?? F) as Ph.Icon;
 export const LucideImagePlus = ((Ph as any).Image ?? F) as Ph.Icon;
 export const LucideInfo = ((Ph as any).Info ?? F) as Ph.Icon;

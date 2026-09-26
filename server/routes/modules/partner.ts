@@ -24,6 +24,8 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
 
     if (result.success) {
         clearAttempts(key);
+        // 새로 로그인하면 남아 있던 관리자 대리 접속 표시는 지운다(다른 사람이 '관리자로 돌아가기'를 누르지 못하게).
+        res.clearCookie('hiq_admin_origin', { path: '/' });
         res.cookie('hiq_partner_auth', result.profileId, {
             maxAge: 30 * 24 * 60 * 60 * 1000,
             httpOnly: true,
@@ -54,6 +56,7 @@ router.post("/sso", asyncHandler(async (req: any, res: any) => {
     const isAdmin = profile.role === "admin" || profile.role === "super_admin";
     if (!store && !isAdmin) return sendError(res, 403, "파트너 계정이 아닙니다");
 
+    res.clearCookie('hiq_admin_origin', { path: '/' });
     res.cookie('hiq_partner_auth', profile.id, {
         maxAge: 30 * 24 * 60 * 60 * 1000,
         httpOnly: true,
@@ -97,7 +100,11 @@ router.get("/store", requirePartner, asyncHandler(async (req: any, res: any) => 
     } catch (e) {
         console.warn("[partner] listing 조회 실패:", (e as Error)?.message);
     }
-    return sendSuccess(res, { ...store, listing });
+    // 관리자가 '관리자 접속'으로 들어와 보고 있는가 — 대시보드가 '관리자로 돌아가기' 띠를 띄운다.
+    const impersonating = !!req.signedCookies?.hiq_admin_origin;
+    // 결제 빌링키는 서버만 쓴다 — 화면으로 내려 보낼 이유가 없다.
+    const { billingKey: _billingKey, ...safeStore } = store as typeof store & { billingKey?: unknown };
+    return sendSuccess(res, { ...safeStore, listing, impersonating });
 }));
 
 // PATCH /partner/store — allowlisted fields only. Billing/subscription/ownership are
@@ -247,6 +254,39 @@ router.get("/members", requirePartner, asyncHandler(async (req: any, res: any) =
 
     const members = await storage.getStoreMembersWithStats(store.id);
     return sendSuccess(res, members);
+}));
+
+// PATCH /partner/members/:id/memo { memo } — 사장님 메모(우리 매장 회원에게만). 빈 값이면 지운다.
+router.patch("/members/:id/memo", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    const memo = String(req.body?.memo ?? "").trim().slice(0, 300) || null;
+    const ok = await storage.users.setStoreMemberMemo(store.id, req.params.id, memo);
+    if (!ok) return sendError(res, 404, "우리 매장 회원이 아닙니다");
+    return sendSuccess(res, { success: true, memo });
+}));
+
+// GET /partner/tournaments — 우리 매장이 연 대회(최근 10개, 참가자 수 포함)
+router.get("/tournaments", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    const { db } = await import("../../db.js");
+    const { sql } = await import("drizzle-orm");
+    const rows = (await db.execute(sql`
+        select t.id, t.title, t.status, t.game_type, t.max_players,
+               to_char(t.start_date, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as start_date,
+               (select count(*)::int from hiq_tournament_participants p where p.tournament_id = t.id) as participants
+        from hiq_tournaments t where t.store_id = ${store.id}
+        order by t.start_date desc limit 10`)).rows as Record<string, unknown>[];
+    return sendSuccess(res, rows.map((r) => ({
+        id: String(r.id),
+        title: String(r.title ?? ""),
+        status: String(r.status ?? "recruiting"),
+        gameType: String(r.game_type ?? ""),
+        maxPlayers: Number(r.max_players ?? 0),
+        startDate: String(r.start_date ?? ""),
+        participants: Number(r.participants ?? 0),
+    })));
 }));
 
 // POST /partner/tournaments - Create a tournament for the partner's own store
