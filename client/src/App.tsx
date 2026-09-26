@@ -8,6 +8,7 @@ import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
 import { NativePrompts } from "@/components/hiq/NativePrompts";
+import { LiveMatchBanner } from "@/sim/match/LiveMatchBanner";
 import { syncPushToken } from "@/lib/nativeBridge";
 import NotFound from "@/pages/not-found";
 import { useEffect, lazy, Suspense, type ComponentType, type FunctionComponent, type ReactNode } from "react";
@@ -414,6 +415,8 @@ function App() {
             <Toaster />
             {/* 네이티브 앱 전용 안내(업데이트·알림 권한 사전 설명). 웹에선 아무것도 그리지 않는다. */}
             <NativePrompts />
+            {/* 온라인게임 대전 호출 — 방을 열고 다른 화면에 있어도 상대가 들어오면·내 차례면 앱 안에서 바로 알린다(2026-09-26) */}
+            <LiveMatchBanner />
             {/* 앱 설치 유도 — iOS/안드로이드 스토어 우선, 미출시 플랫폼은 PWA 폴백.
                 컴포넌트는 예전부터 있었지만 **어디에도 마운트돼 있지 않아 죽어 있었다**(번들에서도 빠졌다).
                 여기 붙여야 실제로 뜬다. 네이티브 앱 안에서는 컴포넌트가 스스로 숨는다. */}

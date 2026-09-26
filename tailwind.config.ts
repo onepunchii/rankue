@@ -58,6 +58,8 @@ export default {
           2: "var(--surface-2)",
           3: "var(--surface-3)",
           line: "var(--surface-line)",
+          // 진한 선(2026-09-26) — 클래스가 여러 곳에서 쓰였는데 토큰이 없어 아무 선도 안 그려졌다
+          "line-strong": "var(--surface-line-strong)",
         },
         ink: {
           1: "var(--ink-1)",

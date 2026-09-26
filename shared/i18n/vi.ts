@@ -194,6 +194,8 @@ export const vi: Record<string, string> = {
   "notif.sim.inviteClosed.body": "Đối thủ đã mở phòng mới. Vui lòng chờ lời mời mới.",
   "notif.sim.started.title": "Trận đấu trực tuyến bắt đầu",
   "notif.sim.started.body": "{name} đã vào. Cú đánh đầu tiên là của bạn — hãy vào trong 2 phút (sau đó đồng hồ 40 giây bắt đầu).",
+  "notif.sim.remind.title": "Đối thủ đang chờ",
+  "notif.sim.remind.body": "{name} đang chờ lượt của bạn. Nếu không quay lại sẽ bị tính là hết giờ.",
   "notif.sim.invite.title": "{name} mời bạn vào trận đấu trực tuyến",
   "notif.sim.invite.body": "{game} · {target} điểm{pw} — nhấn để bắt đầu ngay",
   "notif.sim.finished.title": "Trận đấu trực tuyến đã kết thúc",

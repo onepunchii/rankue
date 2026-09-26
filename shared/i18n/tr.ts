@@ -194,6 +194,8 @@ export const tr: Record<string, string> = {
   "notif.sim.inviteClosed.body": "Rakibin yeni bir oda açtı. Yeni bir davet bekle.",
   "notif.sim.started.title": "Çevrimiçi maç başladı",
   "notif.sim.started.body": "{name} katıldı. İlk vuruş senin — 2 dakika içinde gel (sonra 40 saniyelik saat başlar).",
+  "notif.sim.remind.title": "Rakibin bekliyor",
+  "notif.sim.remind.body": "{name} vuruşunu bekliyor. Dönmezsen süre aşımı sayılır.",
   "notif.sim.invite.title": "{name} seni çevrimiçi maça davet etti",
   "notif.sim.invite.body": "{game} · {target} sayı{pw} — dokun, hemen başlasın",
   "notif.sim.finished.title": "Çevrimiçi maç bitti",

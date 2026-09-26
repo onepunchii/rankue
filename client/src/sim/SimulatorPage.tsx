@@ -71,6 +71,7 @@ import { MATCH_LIST_QUERY_KEY } from "./match/queryKeys";
 import { endReasonText, shouldOpenMatch } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
 import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
+import { setActiveMatchScreen } from "./match/liveMatchCall";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
 import { MatchEndRapport } from "./match/MatchEndRapport";
 import { MatchIntro, INTRO_MS } from "./match/MatchIntro";
@@ -950,6 +951,12 @@ export function SimulatorPage() {
         return Array.from({ length: n }, (_, i) => playerLabel(i, n, member?.nickname, t));
     }, [matchNames, sim.session?.players.length, member?.nickname, t]);
     const isMatch = sim.mode === "match";
+    // 앱 전역 대전 호출 띠(LiveMatchBanner)에 "이 판은 지금 보고 있다"고 알린다 — 판 위에 호출 띠를 겹쳐 띄우지 않게.
+    const screenMatchId = isMatch && sim.phase !== "setup" ? sim.match?.id ?? null : null;
+    useEffect(() => {
+        setActiveMatchScreen(screenMatchId);
+        return () => setActiveMatchScreen(null);
+    }, [screenMatchId]);
     // 대전이 진행 중인 동안은 화면이 꺼지지 않게 — 상대 차례를 기다리는 중에도 40초 시계가 돈다.
     useKeepAwake(isMatch && sim.match?.status === "playing");
     // ── 40초 룰 시계(대전): 서버가 적은 turnSeenAt 부터 센다(서버 시각 보정). 0 이 되면 내 차례는 스스로, 상대 차례는 10초 유예 뒤 서버에 알린다.

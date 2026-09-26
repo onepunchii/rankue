@@ -639,8 +639,46 @@ router.get("/sim/matches/:id", requireAuth, asyncHandler(async (req: AuthRequest
             if (row) m = { ...m, turnSeenAt: row.turnSeenAt };
         }
     }
+    // 자리를 비운 차례 선수 다시 부르기(2026-09-26 오너: "앱에 있어도 방장에게 누가 들어왔다, 게임 시작한다 푸시를 계속 보내").
+    // 기다리는 사람의 폴링(약 4초)이 방아쇠다 — 서버리스라 따로 도는 타이머가 없다. 응답을 늦추지 않게 기다리지 않는다.
+    if (isPlayer && m.status === "playing") void remindAbsentTurn(m, m.hostId === req.userId ? 0 : 1);
     return sendSuccess(res, publicMatch(m, req.userId!));
 }));
+
+/** 부재 호출 간격·횟수 — 차례(버전)마다 최대 REMIND_MAX 번, REMIND_EVERY_MS 간격. 시계가 끝나기 전까지 두세 번이면 충분하다. */
+const REMIND_EVERY_MS = 40_000;
+const REMIND_MAX = 3;
+/**
+ * 지금 차례인 사람이 자리에 없으면(대전 화면을 PRESENCE_MS 넘게 안 봤다) 푸시를 다시 보낸다. 처음 한 번은 차례가 넘어갈 때
+ * (시작·샷·시간 초과) 이미 나갔으니 REMIND_EVERY_MS 뒤부터. 첫 샷(대전 시작)이면 "누가 들어왔어요" 문구로 다시 부른다.
+ * 인스턴스 메모리로 세므로(overLimit) 인스턴스가 여럿이면 한두 번 더 갈 수 있다 — 빠뜨리는 것보다 낫다.
+ */
+async function remindAbsentTurn(m: MatchWithNames, viewerIndex: 0 | 1): Promise<void> {
+    try {
+        if (m.turn === viewerIndex) return;                 // 내 차례 — 부를 사람이 없다
+        const turnIndex = m.turn === 0 ? 0 : 1;
+        if (isWatching(m, turnIndex)) return;               // 보고 있다
+        const since = (m.lastShotAt ?? m.startedAt ?? m.createdAt).getTime();
+        if (Date.now() - since < REMIND_EVERY_MS) return;   // 방금 넘어간 차례 — 첫 알림이 막 나갔다
+        const key = `remind:${m.id}:${m.version}`;
+        if (overLimit(key, REMIND_MAX, 15 * 60_000)) return;
+        const lastKey = `remindGap:${m.id}:${m.version}`;
+        if (overLimit(lastKey, 1, REMIND_EVERY_MS)) return;
+        countHit(key, 15 * 60_000);
+        countHit(lastKey, REMIND_EVERY_MS);
+        const targetId = turnIndex === 0 ? m.hostId : m.guestId;
+        const otherName = (turnIndex === 0 ? m.guestName : m.hostName) ?? "";
+        const firstShot = m.shots === 0;
+        await notify(
+            targetId,
+            firstShot ? "notif.sim.started.title" : "notif.sim.remind.title",
+            firstShot ? msg("notif.sim.started.body", { name: otherName }) : msg("notif.sim.remind.body", { name: otherName }),
+            m.id,
+        );
+    } catch (e) {
+        console.warn("[sim] remindAbsentTurn", (e as Error)?.message);
+    }
+}
 
 /**
  * 40초 룰 시간 초과 한 번 적용(샷 없이 이닝을 넘기고 차례를 바꾼다, 쓰리아웃이면 실격패). /timeout 과
