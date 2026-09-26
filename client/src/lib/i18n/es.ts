@@ -2053,6 +2053,8 @@ const es: Dict = {
   "sim.common.cancel": "Cancelar",
   "sim.common.close": "Cerrar",
   "sim.aim.fullBall": "Llena",
+  "sim.aim.autoFocus": "Auto",
+  "sim.aim.autoFocusAria": "Enfoque automático — golpe lleno a la bola enfocada. Toca otra vez para la siguiente",
   "sim.sync.mismatch": "Ajustado al resultado del servidor",
   "sim.sync.offlineShots": "Se perdió la conexión. Esta sesión ya no se guardará",
   "sim.sync.offlineCreate": "No se pudo abrir la sesión. Se juega sin registro",

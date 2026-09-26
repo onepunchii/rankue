@@ -2055,6 +2055,8 @@ export const ko: Dict = {
   "sim.common.cancel": "취소",
   "sim.common.close": "닫기",
   "sim.aim.fullBall": "정면",
+  "sim.aim.autoFocus": "자동",
+  "sim.aim.autoFocusAria": "자동 초점 — 초점 공을 정면으로. 다시 누르면 다음 공",
   "sim.sync.mismatch": "서버 결과가 달라 그쪽에 맞췄어요",
   "sim.sync.offlineShots": "연결이 끊겨 이 세션은 더 기록되지 않아요",
   "sim.sync.offlineCreate": "세션을 열지 못해 기록 없이 진행해요",

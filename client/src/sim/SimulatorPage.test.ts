@@ -276,6 +276,8 @@ describe("SimulatorPage", () => {
         await React.act(async () => { click(byText(h, ko["sim.exit.confirm"])!); await new Promise((r) => setTimeout(r, 10)); });
         // 게임을 나가면 온라인게임 입구로(2026-09-26) — 앱 대시보드로 나가면 '한 판 더' 하려면 다시 들어와야 했다
         expect(nav.navigate).toHaveBeenCalledWith("/online-game");
+        // 같은 화면으로 돌아오므로 나가기 확인은 닫혀 있어야 한다 — 남아 있으면 다음 판의 결과·재대결 창까지 막았다(2026-09-26 오너 제보)
+        expect(h.container.textContent).not.toContain(ko["sim.exit.title"]);
     });
 
     it("샷이 끝나면 왼쪽 위 칩 열에 공유 알약이 생기고(툴바 밖), 누르면 결과 토스트가 뜬다(jsdom 은 캔버스가 없어 실패 문구)", async () => {

@@ -654,3 +654,49 @@ describe("두께 버튼과 조준 보정", () => {
         expect(ctrl.store.get().input.phi).toBeCloseTo(toRed, 9);
     });
 });
+
+describe("자동 초점(두께 독 첫 칩, 2026-09-26 오너)", () => {
+    // 개시 배치가 아닌 자리 — 빨간 공(가까움)·노란 공(멀리) 둘 다 후보다
+    const W = params.table.width, L = params.table.length, R = params.table.ball.R;
+    const ball = (id: string, x: number, y: number): BallState => ({ id, r: [x, y, R], v: [0, 0, 0], w: [0, 0, 0], state: "still" } as unknown as BallState);
+    const layout = [ball("white", W / 2, L * 0.2), ball("yellow", W * 0.25, L * 0.8), ball("red", W * 0.6, L * 0.4)];
+    const dir = (from: BallState, to: BallState) => Math.atan2(to.r[1] - from.r[1], to.r[0] - from.r[0]);
+    const setup = () => {
+        const { ctrl } = make({ record: false });
+        ctrl.start(buildConfig({ gameType: "3c", target: 20, mode: "reality" }), { record: false, balls: layout });
+        return ctrl;
+    };
+    it("누르면 빨간 공 정면, 다시 누르면 상대 수구(노란 공) 정면, 또 누르면 빨간 공", () => {
+        const ctrl = setup();
+        ctrl.setPhi(0);
+        ctrl.aimFocus();
+        expect(ctrl.store.get().input.phi).toBeCloseTo(dir(layout[0], layout[2]), 9);
+        expect(ctrl.getAux().aimFocusId).toBe("red");
+        ctrl.aimFocus();
+        expect(ctrl.store.get().input.phi).toBeCloseTo(dir(layout[0], layout[1]), 9);
+        expect(ctrl.getAux().aimFocusId).toBe("yellow");
+        ctrl.aimFocus();
+        expect(ctrl.getAux().aimFocusId).toBe("red");
+    });
+    it("½ 칩은 초점 공 기준 — 먼 노란 공에 초점을 두면 가까운 빨간 공으로 튀지 않는다", () => {
+        const ctrl = setup();
+        ctrl.setPhi(0);
+        ctrl.aimFocus();   // red
+        ctrl.aimFocus();   // yellow
+        const toYellow = dir(layout[0], layout[1]);
+        ctrl.setThickness(0.5);
+        const phi = ctrl.store.get().input.phi;
+        // 노란 공 쪽으로 반 두께 — 노란 공 방향에서 조금만 벗어난다(빨간 공 방향과는 멀다)
+        expect(Math.abs(phi - toYellow)).toBeLessThan(0.1);
+        expect(Math.abs(phi - dir(layout[0], layout[2]))).toBeGreaterThan(0.3);
+    });
+    it("손으로 조준을 돌리면 초점이 풀리고, 두께 칩은 조준선이 가리키는 공을 따른다", () => {
+        const ctrl = setup();
+        ctrl.aimFocus();
+        expect(ctrl.getAux().aimFocusId).not.toBeNull();
+        ctrl.setPhi(dir(layout[0], layout[1]) + 0.02);
+        expect(ctrl.getAux().aimFocusId).toBeNull();
+        ctrl.setThickness(1);
+        expect(ctrl.store.get().input.phi).toBeCloseTo(dir(layout[0], layout[1]), 9);
+    });
+});

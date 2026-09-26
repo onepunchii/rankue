@@ -2053,6 +2053,8 @@ const vi: Dict = {
   "sim.common.cancel": "Hủy",
   "sim.common.close": "Đóng",
   "sim.aim.fullBall": "Đầy",
+  "sim.aim.autoFocus": "Auto",
+  "sim.aim.autoFocusAria": "Tự lấy nét — đánh đầy vào bi đang nhắm. Chạm lần nữa để chuyển bi",
   "sim.sync.mismatch": "Đã khớp với kết quả của máy chủ",
   "sim.sync.offlineShots": "Mất kết nối. Phiên này sẽ không được lưu nữa",
   "sim.sync.offlineCreate": "Không mở được phiên. Chơi mà không lưu",

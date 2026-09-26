@@ -33,7 +33,7 @@ import { simulateShot } from "@shared/sim/simulate";
 import { openingLayout, isValidLayout } from "@shared/sim/layouts";
 import { aimPhi as aimPhiFromCue, cuePhiForAim } from "./aimAssist";
 import { nearerThicknessPhi } from "./aim";
-import { spinWithVertical } from "./controlsMath";
+import { activeThickness, spinWithVertical } from "./controlsMath";
 import { aimAssistFor } from "./setupPresets";
 import { saveResume, clearResume, type Resumable } from "./simResume";
 import { AIM_EPS_RAD, AIM_REPORT_MS, applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
@@ -54,7 +54,7 @@ import {
     type ChatLine, type MatchApi, type MatchEndReason, type MatchPublic, type MatchShot, type PostShotResponse,
 } from "./matchApi";
 import {
-    createSimStore, cueBallIdOf, matchStateFrom, paramsFromConfig, sameBalls, thicknessPhi,
+    createSimStore, cueBallIdOf, matchStateFrom, paramsFromConfig, sameBalls, thicknessPhi, aimCandidates, focusTarget,
     type CueInput, type MatchState, type PendingShot, type Phase, type SimCoreState, type SimStore,
 } from "./simReducer";
 
@@ -154,6 +154,11 @@ export interface SimAux {
      * 내가 보낸 줄도 여기 들어간다(seq 로 병합하므로 폴링으로 같은 줄이 다시 와도 중복되지 않는다).
      */
     readonly chat: readonly ChatLine[];
+    /**
+     * 자동 초점으로 고른 공(2026-09-26 오너: "정면 버튼을 자동 초점으로, ½·¼ 는 초점 잡힌 공 기준"). null = 조준선이 가리키는 공을
+     * 따라간다(focusTarget). 손으로 조준을 돌리거나(setPhi) 샷을 치면 비운다.
+     */
+    readonly aimFocusId: string | null;
 }
 
 /** 한마디 전송 결과. 서버가 내는 거부를 **전부** 담는다 — 빠뜨리면 그 안내 문구가 죽은 키가 된다. */
@@ -186,7 +191,7 @@ export interface ControllerDeps {
     readonly previewDelayMs?: number;
 }
 
-const INITIAL_AUX: SimAux = { setup: null, preview: null, speed: 1, syncing: false, duration: 0, lastResult: null, serverOffsetMs: 0, chat: [] };
+const INITIAL_AUX: SimAux = { setup: null, preview: null, speed: 1, syncing: false, duration: 0, lastResult: null, serverOffsetMs: 0, chat: [], aimFocusId: null };
 /** exit 가 진행 중인 서버 호출을 기다리는 상한 (ms). */
 export const EXIT_SYNC_WAIT_MS = 3000;
 /** 대전 폴링 주기: 상대 차례가 된 뒤 처음 1분은 빠르게, 그 뒤 느리게. */
@@ -556,6 +561,8 @@ export class SimController {
         void this.matchApi.sendAim(s.match.matchId, s.input.phi).catch(() => undefined);
     }
     setPhi(phi: number): void {
+        // 손으로 조준을 돌리면 고른 초점은 풀린다 — 두께 칩은 이제 새로 겨누는 공을 기준으로 한다
+        if (this.aux.aimFocusId !== null) this.setAux({ aimFocusId: null });
         this.setInput({ phi });
     }
     nudgePhi(deltaRad: number): void {
@@ -573,17 +580,48 @@ export class SimController {
         const s = this.store.get();
         const setup = this.aux.setup;
         if (s.phase !== "aim" || !s.session || !setup) return;
-        const args = [s.balls, cueBallIdOf(s.session), s.session.rules.gameType, step] as const;
+        const cueId = cueBallIdOf(s.session);
+        const gt = s.session.rules.gameType;
+        const args = [s.balls, cueId, gt, step] as const;
         const R = setup.params.table.ball.R;
         const opening = isOpeningShot(s.session, s.balls);
+        const nowAim = aimPhiFromCue(s.input.phi, s.input.a, s.aimAssist);
+        // 기준 공: 자동 초점으로 고른 공 → 없으면 지금 조준선이 가리키는 공(예전엔 늘 가장 가까운 공이었다)
+        const target = focusTarget(s.balls, cueId, gt, nowAim, this.aux.aimFocusId, opening);
         const aim = side
-            ? thicknessPhi(...args, side, R, opening)
+            ? thicknessPhi(...args, side, R, opening, target)
             : nearerThicknessPhi(
-                thicknessPhi(...args, "left", R, opening),
-                thicknessPhi(...args, "right", R, opening),
-                aimPhiFromCue(s.input.phi, s.input.a, s.aimAssist),
+                thicknessPhi(...args, "left", R, opening, target),
+                thicknessPhi(...args, "right", R, opening, target),
+                nowAim,
             );
         // 두께는 공이 가는 방향으로 정해지므로, 보정 켜짐이면 큐 방향으로 바꿔 저장한다(옆당점이 있으면 스쿼트만큼 반대로)
+        if (aim !== null) this.setInput({ phi: cuePhiForAim(aim, s.input.a, s.aimAssist) });
+    }
+    /**
+     * 자동 초점(두께 독 첫 칩, 예전 '정면'). 누르면 초점 공을 정면으로 겨눈다. 이미 그 공을 정면으로 겨누고 있으면 **다음 공**으로
+     * 넘어가 정면으로 겨눈다(3쿠션: 빨간 공 → 상대 수구, 4구: 빨간 공 둘). 초점은 샷을 치거나 손으로 조준을 돌릴 때까지 남아
+     * ½·⅓·¼·⅛ 칩이 그 공을 기준으로 한다.
+     */
+    aimFocus(): void {
+        const s = this.store.get();
+        const setup = this.aux.setup;
+        if (s.phase !== "aim" || !s.session || !setup) return;
+        const cueId = cueBallIdOf(s.session);
+        const gt = s.session.rules.gameType;
+        const R = setup.params.table.ball.R;
+        const opening = isOpeningShot(s.session, s.balls);
+        const nowAim = aimPhiFromCue(s.input.phi, s.input.a, s.aimAssist);
+        const cands = aimCandidates(s.balls, cueId, gt, opening);
+        let target = focusTarget(s.balls, cueId, gt, nowAim, this.aux.aimFocusId, opening);
+        if (!target) return;
+        const onIt = activeThickness(s.balls, cueId, gt, nowAim, R, target);
+        if (onIt?.step === 1 && cands.length > 1) {
+            const i = cands.findIndex((b) => b.id === target!.id);
+            target = cands[(i + 1) % cands.length];
+        }
+        const aim = thicknessPhi(s.balls, cueId, gt, 1, "left", R, opening, target);
+        this.setAux({ aimFocusId: target.id });
         if (aim !== null) this.setInput({ phi: cuePhiForAim(aim, s.input.a, s.aimAssist) });
     }
     /** 당점 (a, b) — R 비율. 반지름 0.5R 밖은 미스큐 링으로 클램프된다. */
@@ -705,7 +743,7 @@ export class SimController {
     private startPlayback(pb: Playback, result: SimResult): void {
         this.pb = pb;
         this.clock = startClock(this.now(), this.aux.speed);
-        this.setAux({ duration: pb.duration, lastResult: result });
+        this.setAux({ duration: pb.duration, lastResult: result, aimFocusId: null });
         if (pb.duration <= 0) { this.endPlayback(); return; }
         this.loop();
     }

@@ -7,7 +7,9 @@ import { ChevronLeftIcon, ChevronRightIcon, SpinIcon, UndoIcon } from "./railIco
 
 /**
  * 두께 독(테이블 왼쪽 아래). 흰 알약 묶음 두 줄, 칩 44 px · 간격 8 px:
- *  1. 정면 · ½ · ⅓ · ¼ · ⅛ — 현재 조준이 가장 가까운 적구에 대해 어느 단계인지 brand 틴트(activeThickness)
+ *  1. 자동 초점 · ½ · ⅓ · ¼ · ⅛ — 초점 공(자동 초점으로 고른 공, 아니면 조준선이 가리키는 공)에 대해 어느 단계인지 brand 틴트.
+ *     2026-09-26 오너: "정면 버튼을 수구·적구 자동 초점 버튼으로, ½·¼ 는 초점 잡힌 상태에서" — 첫 칩을 누르면 초점 공을 정면으로
+ *     겨누고, 이미 정면이면 다음 공(3쿠션: 빨간 공 → 상대 수구, 4구: 빨간 공 둘)으로 넘어간다. 공 색 점이 지금 초점을 말한다.
  *  2. 당점 프리셋(무회전 · 밀어치기 · 끌어치기) · [되돌리기(onUndo 가 있을 때)] · ±0.1° 미세 조절(길게 누르면 가속)
  *     좌/우 버튼은 2026-09-17 에 뺐다(오너: "크게 안 쓰는 것 같다") — 두께 칩이 지금 겨누는 쪽으로 맞춘다.
  *     그 자리에 당점 프리셋을 넣었다: 당점은 샷마다 바꾸는 값인데 지금까지 **시트를 열어야만** 바꿀 수 있어
@@ -18,6 +20,12 @@ import { ChevronLeftIcon, ChevronRightIcon, SpinIcon, UndoIcon } from "./railIco
  */
 interface Props {
     active: ActiveThickness | null;
+    /**
+     * 자동 초점 공 id(두께 칩의 기준 공). 첫 칩(예전 '정면')이 이 공 색 점을 보여 주고, 누르면 onFocus —
+     * 그 공을 정면으로, 이미 정면이면 다음 공으로 넘어간다(2026-09-26 오너).
+     */
+    focusBallId?: string | null;
+    onFocus?: () => void;
     disabled?: boolean;
     onThickness: (step: ThicknessStep) => void;
     onNudge: (dir: -1 | 1) => void;
@@ -52,6 +60,13 @@ const SPIN_PRESETS = [
     { key: "back", b: -SPIN_PRESET_B, labelKey: "sim.spin.presetBack" },
 ] as const;
 const CHIP_ON = "border-brand/45 bg-brand/[0.08] text-ink-1";
+/** 초점 공 색 점 — 빨간 공·노란 공·흰 공(흰 공은 테두리로 모양을 잡는다). 모르면 비운 동그라미. */
+function ballDotClass(id: string | null | undefined): string {
+    if (!id) return "border-ink-4 bg-transparent";
+    if (id.startsWith("red")) return "border-transparent bg-ball-red";
+    if (id === "yellow") return "border-transparent bg-ball-yellow";
+    return "border-ink-4 bg-ball-white";
+}
 const CHIP_OFF = "border-surface-line bg-surface-1 text-ink-3";
 
 export const ThicknessDock = memo(function ThicknessDock(p: Props) {
@@ -65,6 +80,20 @@ export const ThicknessDock = memo(function ThicknessDock(p: Props) {
             <div className="flex gap-2">
                 {THICKNESS_UI_STEPS.map((step) => {
                     const on = p.active?.step === step;
+                    if (step === 1 && p.onFocus) {
+                        const label = t("sim.aim.autoFocus");
+                        return (
+                            <button
+                                key={step} type="button" aria-pressed={on} disabled={p.disabled}
+                                aria-label={t("sim.aim.autoFocusAria")} title={t("sim.aim.autoFocusAria")}
+                                onClick={p.onFocus}
+                                className={cn(CHIP, "min-w-[52px] px-2 inline-flex items-center justify-center gap-1", on ? CHIP_ON : CHIP_OFF)}
+                            >
+                                <span aria-hidden="true" className={cn("w-3 h-3 rounded-full shrink-0 border", ballDotClass(p.focusBallId))} />
+                                {label}
+                            </button>
+                        );
+                    }
                     return (
                         <button
                             key={step} type="button" aria-pressed={on} disabled={p.disabled}

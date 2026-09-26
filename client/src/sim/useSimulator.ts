@@ -59,6 +59,8 @@ export interface SimulatorActions {
     /** 두께 단계(aim.THICKNESS_STEPS)와 방향으로 가장 가까운 적구를 겨눈다(4구는 상대 큐볼 제외). */
     /** 두께 맞추기. side 를 안 주면 지금 겨누는 쪽으로 맞춘다. */
     setThickness(step: number, side?: "left" | "right"): void;
+    /** 자동 초점: 초점 공을 정면으로. 이미 정면이면 다음 공으로 넘어간다. */
+    aimFocus(): void;
     /** 당점 (a, b) R 비율. 0.5R 밖은 미스큐 링으로 클램프. */
     setSpin(a: number, b: number): void;
     /** 당점 프리셋: 세로만 정확히 맞추고 옆당점은 링 안으로 줄인다. */
@@ -164,6 +166,8 @@ export interface Simulator {
     readonly outcomeLast: ShotOutcome | null;
     /** 마지막으로 시뮬레이션한 샷의 원본 결과(재생 시작 시점 갱신, 되돌리기·새 세션에 null). 읽기 전용 — 샷 분석 표시용. */
     readonly lastResult: SimResult | null;
+    /** 자동 초점으로 고른 공 id(없으면 조준선이 가리키는 공을 기준으로 한다) */
+    readonly aimFocusId: string | null;
     readonly mismatches: number;
     /** 솔로: 서버 기록 포기됨(로컬 플레이는 계속). 대전: 내 샷 전송이 끊김(폴링 계속, 연결이 돌아오면 다시 보낸다) */
     readonly offline: boolean;
@@ -219,6 +223,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         setPhi: (phi) => ctrl.setPhi(phi),
         nudgePhi: (d) => ctrl.nudgePhi(d),
         setThickness: (step, side) => ctrl.setThickness(step, side),
+        aimFocus: () => ctrl.aimFocus(),
         setSpin: (a, b) => ctrl.setSpin(a, b),
         setSpinVertical: (b) => ctrl.setSpinVertical(b),
         setPower: (V0) => ctrl.setPower(V0),
@@ -286,6 +291,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             playback: { duration: aux.duration, playing: core.phase === "shooting", speed: aux.speed },
             outcomeLast: core.outcomeLast,
             lastResult: aux.lastResult,
+            aimFocusId: aux.aimFocusId,
             mismatches: core.mismatches,
             offline: core.offline,
             record: core.record,

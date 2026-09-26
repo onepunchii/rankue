@@ -94,7 +94,7 @@ import { beginGesture, moveGesture, planGestureReset, staleResetReason, type Ges
 import { reportGestureRecover, type TelemetryMode } from "./gestureTelemetry";
 import { RISK_KEYS, shotRisk } from "./shotRisk";
 import { playerLabel, tableLabel } from "./hudMath";
-import { sameCueInput } from "./simReducer";
+import { focusTarget, openingFor, sameCueInput } from "./simReducer";
 import { easeOppAim, OPP_AIM_PULLBACK } from "./match/oppAim";
 import { MatchChatLog, MatchChatToggle, MatchMiniChat } from "./match/MatchChat";
 import { chatMaxHeight } from "./match/chatLayout";
@@ -1091,10 +1091,15 @@ export function SimulatorPage() {
         void actions.timeout();
     }, [clockRemaining, sim.match, actions]);
 
+    // 두께 칩의 기준 공(자동 초점) — 고른 공이 있으면 그 공, 아니면 조준선이 가리키는 공. 칩 켜짐과 첫 칩의 공 색이 이걸 본다.
+    const focusBall = useMemo(() => {
+        if (!sim.session) return null;
+        return focusTarget(sim.balls, sim.cueBallId, sim.session.rules.gameType, aimPhi(sim.input.phi, sim.input.a, assist), sim.aimFocusId, openingFor(sim.session, sim.balls));
+    }, [sim.balls, sim.cueBallId, sim.session, sim.input.phi, sim.input.a, assist, sim.aimFocusId]);
     const active = useMemo(() => {
         if (!sim.session || !sim.params) return null;
-        return activeThickness(sim.balls, sim.cueBallId, sim.session.rules.gameType, aimPhi(sim.input.phi, sim.input.a, assist), sim.params.table.ball.R);
-    }, [sim.balls, sim.cueBallId, sim.session, sim.params, sim.input.phi, sim.input.a, assist]);
+        return activeThickness(sim.balls, sim.cueBallId, sim.session.rules.gameType, aimPhi(sim.input.phi, sim.input.a, assist), sim.params.table.ball.R, focusBall);
+    }, [sim.balls, sim.cueBallId, sim.session, sim.params, sim.input.phi, sim.input.a, assist, focusBall]);
 
     // 다이아몬드 시스템 읽기: 결과 배너와 같은 타이밍에 "시스템 {예측} · 실제 {3쿠션수}" 한 줄.
     // banner 는 onOutcome(재생 끝) 에, lastResult 는 재생 시작에 갱신되므로 둘은 같은 샷을 가리킨다.
@@ -1110,6 +1115,7 @@ export function SimulatorPage() {
     // ── 조작 콜백(참조 안정 — Controls 는 memo) ──────────────────────────
     /* 좌/우 버튼을 없앴다(2026-09-17 오너) — 컨트롤러가 지금 겨누는 쪽을 골라 준다. */
     const onThickness = useCallback((step: ThicknessStep) => actions.setThickness(step), [actions]);
+    const onAimFocus = useCallback(() => actions.aimFocus(), [actions]);
     const onNudge = useCallback((dir: -1 | 1) => actions.nudgePhi(dir * FINE_STEP_RAD), [actions]);
     const onSpin = useCallback((a: number, b: number) => actions.setSpin(a, b), [actions]);
     const onSpinVertical = useCallback((b: number) => actions.setSpinVertical(b), [actions]);
@@ -1224,6 +1230,12 @@ export function SimulatorPage() {
         try {
             await actions.exit();
         } finally {
+            // 나가면 대화상자 상태도 비운다. 2026-09-26 부터 나가기가 같은 화면(/online-game 입구)으로 돌아와 화면이 그대로 살아 있어서,
+            // 열어 둔 나가기 확인이 입구 위에 계속 떠 있었고(오너: "나가기를 눌러도 창이 남아 있다"), 그 값(exitOpen)이 남은 채로
+            // 다음 판이 끝나면 endOpen(= … && !exitOpen)이 거짓이 돼 **결과·재대결 창이 아예 안 떴다**.
+            setExitOpen(false);
+            setResignOpen(false);
+            setEndDismissed(false);
             // 대전은 서버에 남으므로 목록(로비)으로 돌아간다
             navigate(isMatch ? "/online-game?lobby=1" : drillRef.current ? "/online-game?drills=1" : ENTRY_PATH);
             setDrill(null);
@@ -1425,6 +1437,13 @@ export function SimulatorPage() {
     }, [navigate, sim.phase, entryView]);
 
     const finished = sim.session?.status === "finished";
+    // 새 판이 시작되면(조준 단계로 들어오면) 지난 판에서 닫은 결과 창·나가기 확인 상태를 되돌린다 — 화면이 판 사이에
+    // 살아 있으므로(입구·로비·대전이 한 화면) 지난 판의 "닫음"이 다음 판의 결과 창을 막으면 안 된다.
+    const gameKey = sim.phase === "setup" ? "" : `${sim.mode}:${sim.match?.id ?? sim.serverSessionId ?? ""}`;
+    useEffect(() => {
+        setEndDismissed(false);
+        setExitOpen(false);
+    }, [gameKey]);
     const endOpen = sim.phase === "finished" && !endDismissed && !exitOpen;
     const showLobby = lobby && sim.phase === "setup";
     const showDrills = drillsView && sim.phase === "setup";
@@ -1648,6 +1667,7 @@ export function SimulatorPage() {
                     ) : (
                         <ThicknessDock
                             active={active} disabled={!aiming}
+                            focusBallId={focusBall?.id ?? null} onFocus={onAimFocus}
                             onThickness={onThickness} onNudge={onNudge}
                             spin={{ a: sim.input.a, b: sim.input.b }} onSpinVertical={onSpinVertical}
                             onUndo={undoInDock ? onUndo : null}

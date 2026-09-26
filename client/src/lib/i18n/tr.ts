@@ -2053,6 +2053,8 @@ const tr: Dict = {
   "sim.common.cancel": "Vazgeç",
   "sim.common.close": "Kapat",
   "sim.aim.fullBall": "Tam",
+  "sim.aim.autoFocus": "Oto",
+  "sim.aim.autoFocusAria": "Otomatik odak — odak topa tam vuruş. Sonraki top için tekrar dokun",
   "sim.sync.mismatch": "Sunucu sonucuna göre düzeltildi",
   "sim.sync.offlineShots": "Bağlantı koptu. Bu oturum artık kaydedilmeyecek",
   "sim.sync.offlineCreate": "Oturum açılamadı. Kayıt olmadan devam ediliyor",

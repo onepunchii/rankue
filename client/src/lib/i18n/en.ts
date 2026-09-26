@@ -2053,6 +2053,8 @@ const en: Dict = {
   "sim.common.cancel": "Cancel",
   "sim.common.close": "Close",
   "sim.aim.fullBall": "Full",
+  "sim.aim.autoFocus": "Auto",
+  "sim.aim.autoFocusAria": "Auto focus — full hit on the focus ball. Tap again for the next ball",
   "sim.sync.mismatch": "Synced to the server's result",
   "sim.sync.offlineShots": "Connection lost. This session will no longer be recorded",
   "sim.sync.offlineCreate": "Couldn't open a session. Playing without a record",

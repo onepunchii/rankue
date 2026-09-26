@@ -34,9 +34,11 @@ export interface ActiveThickness {
 /** 현재 조준(phi)이 가장 가까운 적구에 대해 어떤 두께인지. 적구가 없거나 광선이 빗나가면 null. */
 export function activeThickness(
     balls: readonly BallState[], cueBallId: string, gameType: GameType, phi: number, R: number,
+    /** 기준 공(자동 초점, focusTarget). 없으면 가장 가까운 적구. */
+    targetBall?: BallState | null,
 ): ActiveThickness | null {
     const cue = balls.find((b) => b.id === cueBallId);
-    const target = objectTargetFor(balls, cueBallId, gameType);
+    const target = targetBall ?? objectTargetFor(balls, cueBallId, gameType);
     if (!cue || !target) return null;
     const th = thicknessFor([cue.r[0], cue.r[1]], phi, [target.r[0], target.r[1]], R);
     if (th.thickness <= 0) return null;

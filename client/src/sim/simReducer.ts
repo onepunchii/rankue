@@ -19,7 +19,7 @@
  */
 import type { BallState, ShotInput } from "@shared/sim/types";
 import { DEFAULT_CUE, TABLES, type SimParams, type TableSpec } from "@shared/sim/params";
-import { currentPlayer, isOpeningShot, opponentCueBall, type GameType, type SessionState, type ShotOutcome } from "@shared/sim/rules";
+import { currentPlayer, isOpeningShot, objectBallIds, opponentCueBall, type GameType, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import { isValidLayout } from "@shared/sim/layouts";
 import type { SimSetupConfig } from "./setupPresets";
 import type { MatchEndReason, MatchPublic, MatchStatus, PlayerIndex } from "./matchApi";
@@ -118,6 +118,43 @@ export function objectTargetFor(balls: readonly BallState[], cueBallId: string, 
     return nearestObjectBall(cue, balls, exclude);
 }
 
+/**
+ * 조준 초점 후보(2026-09-26 오너: "정면 버튼을 수구·적구 자동 초점 버튼으로"). 이 큐볼이 맞힐 공들 — 3쿠션은 빨간 공 + 상대 수구,
+ * 4구는 빨간 공 둘. 개시 샷(3쿠션)은 규칙상 빨간 공만. 순서는 규칙이 정한 순서(자동 초점 버튼을 누를 때 이 순서로 넘어간다).
+ */
+export function aimCandidates(balls: readonly BallState[], cueBallId: string, gameType: GameType, opening = false): BallState[] {
+    // 3쿠션은 빨간 공을 먼저(적구 → 상대 수구) — 버튼을 처음 누르면 보통 치는 공이 먼저 잡힌다
+    const ids = opening && gameType === "3c" ? ["red"] : gameType === "3c" ? ["red", opponentCueBall(cueBallId)] : [...objectBallIds(gameType, cueBallId)];
+    return ids.map((id) => balls.find((b) => b.id === id)).filter((b): b is BallState => !!b);
+}
+
+/**
+ * 두께 칩(½·⅓·¼·⅛)이 기준으로 삼을 공. 고른 공(explicitId, 자동 초점 버튼)이 있으면 그 공, 개시 샷이면 빨간 공,
+ * 아니면 **지금 조준선이 가리키는 쪽**(각도가 가장 가까운) 공. 예전엔 늘 "가장 가까운 공"이라, 먼 공을 겨누고 ½ 를 누르면
+ * 조준이 엉뚱한 가까운 공으로 튀었다.
+ */
+export function focusTarget(
+    balls: readonly BallState[], cueBallId: string, gameType: GameType, aimPhi: number,
+    explicitId: string | null = null, opening = false,
+): BallState | null {
+    const cands = aimCandidates(balls, cueBallId, gameType, opening);
+    if (cands.length === 0) return objectTargetFor(balls, cueBallId, gameType, opening);
+    if (explicitId) {
+        const hit = cands.find((b) => b.id === explicitId);
+        if (hit) return hit;
+    }
+    const cue = balls.find((b) => b.id === cueBallId);
+    if (!cue || cands.length === 1) return cands[0];
+    let best = cands[0];
+    let bestD = Infinity;
+    for (const b of cands) {
+        const dir = angleBetween([cue.r[0], cue.r[1]], [b.r[0], b.r[1]]);
+        const d = Math.abs(normalizeAngle(dir - aimPhi + Math.PI) - Math.PI);
+        if (d < bestD) { bestD = d; best = b; }
+    }
+    return best;
+}
+
 /** 세션·배치로 개시 샷인지(없는 세션은 false). */
 export function openingFor(session: SessionState | null, balls: readonly BallState[]): boolean {
     return session ? isOpeningShot(session, balls) : false;
@@ -135,9 +172,11 @@ export function defaultPhi(balls: readonly BallState[], cueBallId: string, gameT
 export function thicknessPhi(
     balls: readonly BallState[], cueBallId: string, gameType: GameType,
     thickness: number, side: "left" | "right", R: number, opening = false,
+    /** 기준 공(focusTarget). 없으면 예전처럼 가장 가까운 적구. */
+    targetBall?: BallState | null,
 ): number | null {
     const cue = balls.find((b) => b.id === cueBallId);
-    const target = objectTargetFor(balls, cueBallId, gameType, opening);
+    const target = targetBall ?? objectTargetFor(balls, cueBallId, gameType, opening);
     if (!cue || !target) return null;
     const c: XY = [cue.r[0], cue.r[1]];
     const t: XY = [target.r[0], target.r[1]];
