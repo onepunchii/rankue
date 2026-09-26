@@ -37,12 +37,14 @@ export function InviteDialog({ open, onOpenChange, api, matchId }: InviteDialogP
     const [q, setQ] = useState("");
     const [sending, setSending] = useState<string | null>(null);
     const [sent, setSent] = useState<string | null>(null);
+    // 이번에 연 창에서 보낸 사람 — 줄의 알약이 '보냄'으로 바뀌어 같은 사람에게 두 번 누르지 않게 한다(서버도 3분 막는다).
+    const [sentIds, setSentIds] = useState<ReadonlySet<string>>(new Set());
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!open) return;
         let stop = false;
-        setList(null); setFailed(false); setSent(null); setError(null); setQ("");
+        setList(null); setFailed(false); setSent(null); setError(null); setQ(""); setSentIds(new Set());
         api.listOpponents().then(
             (l) => { if (!stop) setList(l); },
             () => { if (!stop) setFailed(true); },
@@ -56,14 +58,18 @@ export function InviteDialog({ open, onOpenChange, api, matchId }: InviteDialogP
     }, [list, q]);
 
     const send = async (o: OpponentLite) => {
-        if (sending) return;
+        if (sending || sentIds.has(o.id)) return;
         setSending(o.id);
         setError(null);
         try {
             const r = await api.invite(matchId, o.id);
             setSent(r.name || o.name);
-        } catch {
-            setError(t("sim.match.inviteFailed"));
+            setSentIds((prev) => new Set(prev).add(o.id));
+        } catch (e) {
+            // 429(같은 사람 3분·시간당 15번)는 서버 문구를 그대로 보여 준다 — '실패'로만 말하면 또 누른다.
+            const status = (e as { status?: number } | null)?.status;
+            const message = (e as { message?: string } | null)?.message;
+            setError(status === 429 && message ? message : t("sim.match.inviteFailed"));
         } finally {
             setSending(null);
         }
@@ -106,7 +112,7 @@ export function InviteDialog({ open, onOpenChange, api, matchId }: InviteDialogP
                             {rows.map((o) => (
                                 <li key={o.id}>
                                     <button
-                                        type="button" disabled={sending !== null} onClick={() => { void send(o); }}
+                                        type="button" disabled={sending !== null || sentIds.has(o.id)} onClick={() => { void send(o); }}
                                         className="w-full px-3 py-3 rounded-tile border border-surface-line-strong bg-surface-2 flex items-center gap-3 text-left active:bg-surface-3 disabled:opacity-60"
                                     >
                                         <span className="shrink-0 w-10 h-10 rounded-full bg-surface-3 text-ink-1 text-[15px] font-bold flex items-center justify-center">
@@ -116,6 +122,7 @@ export function InviteDialog({ open, onOpenChange, api, matchId }: InviteDialogP
                                             <span className="flex items-center gap-1.5">
                                                 <span className="text-[15px] font-bold text-ink-1 truncate">{o.name}</span>
                                                 {o.friend && <span className="shrink-0 h-[18px] px-1.5 rounded bg-brand text-brand-fg text-[10px] font-bold flex items-center">{t("sim.match.inviteRival")}</span>}
+                                                {o.recent && <span className="shrink-0 h-[18px] px-1.5 rounded border border-surface-line-strong text-ink-2 text-[10px] font-bold flex items-center">{t("sim.match.inviteRecent")}</span>}
                                             </span>
                                             <span className="mt-1.5 flex items-center gap-1.5">
                                                 <Chip type="3c" b={o.b3c} />
@@ -125,9 +132,9 @@ export function InviteDialog({ open, onOpenChange, api, matchId }: InviteDialogP
                                         {/* 줄 전체가 버튼이라 이 알약은 '누를 수 있다'는 표시다(중첩 버튼은 안 만든다) */}
                                         <span className={cn(
                                             "shrink-0 h-8 px-3 rounded-pill text-[12.5px] font-bold flex items-center",
-                                            sending === o.id ? "bg-surface-3 text-ink-3" : "bg-brand text-brand-fg",
+                                            sending === o.id || sentIds.has(o.id) ? "bg-surface-3 text-ink-3" : "bg-brand text-brand-fg",
                                         )}>
-                                            {sending === o.id ? t("sim.match.inviteSending") : t("sim.match.inviteAction")}
+                                            {sending === o.id ? t("sim.match.inviteSending") : sentIds.has(o.id) ? t("sim.match.inviteDone") : t("sim.match.inviteAction")}
                                         </span>
                                     </button>
                                 </li>

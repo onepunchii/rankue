@@ -50,6 +50,15 @@ export function roomAge(createdAt: string, nowMs: number, t: (k: string) => stri
 }
 
 /** 참가 다마수 기본값: 내 실전 핸디(종목별) → 없으면 방장 다마수. */
+/**
+ * 빠른 대전(2026-09-26 검토) — 목록에서 바로 칠 수 있는 방 하나. 방장이 보고 있고 비밀번호가 없는 핸디전 방이 먼저,
+ * 없으면 방장이 보고 있는 비밀번호 없는 방. 그래도 없으면 null(새 방을 연다). 목록은 서버가 방장 접속 순 → 최신순으로 준다.
+ */
+export function pickQuickRoom(rows: readonly MatchPublic[]): MatchPublic | null {
+    const open = rows.filter((m) => m.hostOnline && !m.hasPassword);
+    return open.find((m) => m.handicap) ?? open[0] ?? null;
+}
+
 export function defaultJoinTarget(m: Pick<MatchPublic, "gameType" | "hostTarget">, handi?: { handi3c: number | null; handi4c: number | null }): number {
     const h = handi ? (m.gameType === "3c" ? handi.handi3c : handi.handi4c) : null;
     return h !== null && h !== undefined && isValidTarget(h) ? h : m.hostTarget;
@@ -266,7 +275,17 @@ export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api 
                     {t("sim.entry.roomsOpen")} {rows.length}
                     {live.length > 0 && <span className="text-brand"> · {t("sim.watch.badge")} {live.length}</span>}
                 </span>
-                <button type="button" onClick={onCreate} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black">{t("sim.entry.roomCreate")}</button>
+                <span className="flex gap-2 shrink-0">
+                    {/* 빠른 대전: 바로 칠 수 있는 방의 참가 창을 연다(확인 한 번). 없으면 방 만들기로 */}
+                    <button
+                        type="button" disabled={!q.isSuccess}
+                        onClick={() => { const r = pickQuickRoom(rows); if (r) setTarget(r); else onCreate(); }}
+                        className="h-10 px-4 shrink-0 rounded-pill border border-white/30 text-white text-[13px] font-black disabled:opacity-50"
+                    >
+                        {t("sim.rooms.quick")}
+                    </button>
+                    <button type="button" onClick={onCreate} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black">{t("sim.entry.roomCreate")}</button>
+                </span>
             </div>
             {/* 내가 연 방 — 참가 목록에는 안 들어간다(내 방엔 내가 못 들어간다). 들어가기·닫기만 준다. */}
             {mine && onEnterMine && (

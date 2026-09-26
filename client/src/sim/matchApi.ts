@@ -370,6 +370,8 @@ export interface OpponentLite {
     readonly id: string;
     readonly name: string;
     readonly friend: boolean;
+    /** 최근 온라인 대전 상대(2026-09-26) */
+    readonly recent?: boolean;
     readonly b3c: OpponentBoard;
     readonly b4c: OpponentBoard;
 }
@@ -422,7 +424,7 @@ export function parseOpponents(raw: unknown): readonly OpponentLite[] {
     const out: OpponentLite[] = [];
     for (const r of raw) {
         if (!isRecord(r) || typeof r.id !== "string" || typeof r.name !== "string") continue;
-        out.push({ id: r.id, name: r.name, friend: r.friend === true, b3c: board(r.b3c), b4c: board(r.b4c) });
+        out.push({ id: r.id, name: r.name, friend: r.friend === true, recent: r.recent === true, b3c: board(r.b3c), b4c: board(r.b4c) });
     }
     return out;
 }

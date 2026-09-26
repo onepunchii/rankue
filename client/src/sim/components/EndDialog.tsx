@@ -28,6 +28,8 @@ interface Props {
     hideRestart?: boolean;
     /** 마지막 샷 공유(카드 PNG + 리플레이 링크). 없으면 버튼을 그리지 않는다(대전·샷 없음) */
     onShare?: () => void;
+    /** 끝난 대전을 처음부터 다시 보기(?watch=). 대전에만 준다(2026-09-26 검토 — 내 경기를 되돌려 볼 길이 없었다). */
+    onReplay?: () => void;
     /** 대전 전용 묶음(상대전적·한 판 더·라이벌). 점수 카드 아래에 그대로 끼운다 — 연습에는 없다. */
     rapport?: ReactNode;
 }
@@ -79,6 +81,14 @@ export const EndDialog = memo(function EndDialog(p: Props) {
                             className="flex-1 h-12 rounded-xl border-surface-line text-ink-2 font-semibold"
                         >
                             {t("sim.share.button")}
+                        </Button>
+                    )}
+                    {p.onReplay && (
+                        <Button
+                            type="button" variant="outline" onClick={p.onReplay} disabled={p.busy}
+                            className="flex-1 h-12 rounded-xl border-surface-line text-ink-2 font-semibold"
+                        >
+                            {t("sim.end.replay")}
                         </Button>
                     )}
                     {!p.hideRestart && (

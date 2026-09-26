@@ -40,7 +40,7 @@ type ClientMod = typeof import("react-dom/client");
 type Mod = typeof import("./RoomList");
 type RQ = typeof import("@tanstack/react-query");
 let ROOMS_QUERY_KEY: Mod["ROOMS_QUERY_KEY"];
-let React: ReactMod; let createRoot: ClientMod["createRoot"]; let RoomList: Mod["RoomList"]; let roomAge: Mod["roomAge"]; let defaultJoinTarget: Mod["defaultJoinTarget"]; let rq: RQ; let dom: JSDOM;
+let React: ReactMod; let createRoot: ClientMod["createRoot"]; let RoomList: Mod["RoomList"]; let roomAge: Mod["roomAge"]; let defaultJoinTarget: Mod["defaultJoinTarget"]; let pickQuickRoom: Mod["pickQuickRoom"]; let rq: RQ; let dom: JSDOM;
 const globalsSet: string[] = [];
 
 beforeAll(async () => {
@@ -55,7 +55,7 @@ beforeAll(async () => {
     React = await import("react");
     if (!("React" in g)) { g.React = React; globalsSet.push("React"); }
     ({ createRoot } = await import("react-dom/client"));
-    ({ RoomList, roomAge, defaultJoinTarget, ROOMS_QUERY_KEY } = await import("./RoomList"));
+    ({ RoomList, roomAge, defaultJoinTarget, pickQuickRoom, ROOMS_QUERY_KEY } = await import("./RoomList"));
     rq = await import("@tanstack/react-query");
 });
 afterAll(() => { const g = globalThis as unknown as Record<string, unknown>; for (const k of globalsSet) delete g[k]; dom.window.close(); });
@@ -233,5 +233,18 @@ describe("RoomList: 게임 중인 방 줄", () => {
         const h = mount({ rows: [], live: [liveCard()] });
         await settle(h, () => (h.container.textContent ?? "").includes(ko["sim.rooms.empty"]));
         expect(h.container.textContent ?? "").not.toContain("다대맨");
+    });
+});
+
+describe("빠른 대전(pickQuickRoom)", () => {
+    it("방장이 보고 있고 비밀번호 없는 핸디전 방 → 그 밖의 열린 방 → 없음", () => {
+        const away = room({ id: "away", hostOnline: false, handicap: true });
+        const locked = room({ id: "locked", hostOnline: true, hasPassword: true, handicap: true });
+        const manual = room({ id: "manual", hostOnline: true, handicap: false });
+        const handi = room({ id: "handi", hostOnline: true, handicap: true });
+        expect(pickQuickRoom([away, locked, manual, handi])?.id).toBe("handi");
+        expect(pickQuickRoom([away, locked, manual])?.id).toBe("manual");
+        expect(pickQuickRoom([away, locked])).toBeNull();
+        expect(pickQuickRoom([])).toBeNull();
     });
 });

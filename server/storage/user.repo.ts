@@ -268,6 +268,16 @@ export class UserRepository {
         return rows.map((r) => ({ id: String(r.id), name: r.name }));
     }
 
+    /** 초대 목록용 이름 — 다른 매장 친구·최근 대전 상대처럼 id 만 아는 사람들. 순서는 ids 순서를 지킨다. */
+    async listMemberNamesByIds(ids: readonly string[]): Promise<{ id: string; name: string }[]> {
+        if (ids.length === 0) return [];
+        const rows = await db.select({ id: hiqMembers.id, name: hiqMembers.name })
+            .from(hiqMembers)
+            .where(inArray(hiqMembers.id, ids as string[]));
+        const byId = new Map<string, string>(rows.map((r) => [String(r.id), String(r.name)]));
+        return ids.filter((id) => byId.has(id)).map((id) => ({ id, name: byId.get(id)! }));
+    }
+
     /** 친구 id 만 — getFriends 는 친구마다 상대전적을 계산한다(N+1). 목록 정렬에만 쓸 때는 이걸 쓴다. */
     async listFriendIds(memberId: string, sport: "BILLIARDS" | "GOLF" = "BILLIARDS"): Promise<string[]> {
         const rows = await db.select({ a: hiqFriendships.requesterId, b: hiqFriendships.receiverId })

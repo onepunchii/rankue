@@ -1877,6 +1877,7 @@ export function SimulatorPage() {
                 record={sim.record} offline={isMatch ? false : sim.offline} mismatches={sim.mismatches} busy={exiting}
                 onRestart={onRestart} onExit={() => { void exitNow(); }}
                 onShare={canShareEnd ? onShareEnd : undefined}
+                onReplay={isMatch && sim.match && sim.match.status === "finished" ? () => { const id = sim.match!.id; setEndDismissed(true); navigate(`/online-game?watch=${id}`); } : undefined}
                 subtitle={endSubtitle} hideRestart={isMatch}
                 rapport={isMatch && sim.match ? (
                     <MatchEndRapport

@@ -271,6 +271,29 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                         </div>
                     </section>
 
+                    {/* 혼자 친 기록 경기 — 목록만(집계·그래프 없음). 2026-09-12 오너 "숫자는 공식 대전만" 을 지키면서
+                        혼자 연습한 흔적은 볼 수 있게 한다(2026-09-26 검토). */}
+                    <section className={card}>
+                        <CardHeader
+                            title={t("sim.dash.practiceTitle")} sub={t("sim.dash.practiceSub")}
+                            action={<button type="button" onClick={onPractice} className={pillSm}>{t("sim.dash.startPractice")}</button>}
+                        />
+                        {practice.length === 0 ? (
+                            <p className="text-[13px] font-medium text-ink-4 mt-3">{t("sim.dash.practiceEmpty")}</p>
+                        ) : (
+                            <ul className="mt-2 rk-num text-[13px]">
+                                {[...practice].reverse().map((p) => (
+                                    <li key={p.id} className="flex items-center gap-3 py-2 border-t border-surface-line first:border-t-0">
+                                        <span className="w-14 shrink-0 text-ink-3 font-medium">{shortDate(p.at)}</span>
+                                        <span className="flex-1 text-ink-2 font-medium">{p.score}/{p.target} · {t("sim.dash.inningsN").replace("{n}", n(p.innings))}</span>
+                                        <span className="text-ink-1 font-semibold">{formatAvg(p.avg)}</span>
+                                        <span className="w-10 text-right text-ink-3 font-medium">{t("sim.dash.runN").replace("{n}", n(p.highRun))}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+
                     {recent.length > 0 && (
                         <section className={card}>
                             <CardHeader title={t("sim.dash.sessionsTitle")} sub={t("sim.dash.sessionsSub").replace("{n}", n(recent.length))} />

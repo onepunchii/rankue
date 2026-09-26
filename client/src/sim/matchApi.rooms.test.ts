@@ -44,10 +44,10 @@ describe("matchApi · 멀티방·비밀번호·초대", () => {
         const z = { avg: 0, target: 0, matches: 0, fromRecord: false, rank: null, rankTotal: null };
         expect(parseOpponents([
             { id: "a", name: "가", friend: true, b3c: { avg: 0.447, target: 15, matches: 10, fromRecord: true, rank: 5, rankTotal: 40 }, b4c: null },
-            { id: 1 }, null, { id: "b", name: "나" },
+            { id: 1 }, null, { id: "b", name: "나", recent: true },
         ])).toEqual([
-            { id: "a", name: "가", friend: true, b3c: { avg: 0.447, target: 15, matches: 10, fromRecord: true, rank: 5, rankTotal: 40 }, b4c: z },
-            { id: "b", name: "나", friend: false, b3c: z, b4c: z },
+            { id: "a", name: "가", friend: true, recent: false, b3c: { avg: 0.447, target: 15, matches: 10, fromRecord: true, rank: 5, rankTotal: 40 }, b4c: z },
+            { id: "b", name: "나", friend: false, recent: true, b3c: z, b4c: z },
         ]);
         expect(parseOpponents("x")).toEqual([]);
     });

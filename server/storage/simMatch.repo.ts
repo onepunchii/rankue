@@ -130,6 +130,21 @@ export class SimMatchRepository {
         return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null }));
     }
 
+    /** 최근 온라인 대전 상대 id(최근 순, 중복 없음) — 초대 목록에서 "또 한 판" 상대를 위로 올린다. */
+    async recentOpponentIds(memberId: string, limit = 20): Promise<string[]> {
+        const res = await db.execute(sql`
+            select opp, max(at) as last_at from (
+                select case when host_id = ${memberId} then guest_id else host_id end as opp,
+                       coalesce(finished_at, last_shot_at, created_at) as at
+                from hiq_sim_matches
+                where (host_id = ${memberId} or guest_id = ${memberId})
+                  and guest_id is not null and status in ('playing', 'finished')
+            ) x
+            where opp is not null and opp <> ${memberId}
+            group by opp order by last_at desc limit ${limit}`);
+        return (res.rows as Record<string, unknown>[]).map((r) => String(r.opp));
+    }
+
     /** 멀티방 목록: 공개·대기 중·내 방 아님·sinceMs 이후 만든 방, 최신순. */
     async listPublicWaiting(viewerId: string, sinceMs: number, limit = 50): Promise<MatchWithNames[]> {
         const { q } = this.withNames();

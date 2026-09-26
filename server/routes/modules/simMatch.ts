@@ -487,16 +487,27 @@ router.get("/sim/handicap", requireAuth, asyncHandler(async (req: AuthRequest, r
 router.get("/sim/opponents", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const me = await storage.getMemberById(req.userId!);
     if (!me) return sendError(res, 404, "err.member.notFound");
-    const [friendIds, mates] = await Promise.all([
+    const [friendIds, recentIds, mates] = await Promise.all([
         storage.listFriendIds(req.userId!, "BILLIARDS"),
+        storage.simMatch.recentOpponentIds(req.userId!, 20),
         storage.listStoreMemberNames(me.storeId, me.id),
     ]);
     const isFriend = new Set(friendIds);
-    // 라이벌이 위로 — 화면 이름이 '친구에게 보내기' 다. 그 안에서는 매장 목록 순서(최근 방문)를 지킨다.
-    const rows = mates
+    const isRecent = new Set(recentIds);
+    // 2026-09-26 검토: 예전엔 **같은 매장 회원만** 보여서 다른 매장 라이벌·최근 온라인 상대를 초대할 수 없었다.
+    // 매장 밖의 친구·최근 상대 이름을 따로 읽어 붙인다(이름·id 만 — 실전 성적은 읽지 않는다).
+    const mateIds = new Set(mates.map((m) => m.id));
+    const outside = await storage.listMemberNamesByIds(
+        Array.from(new Set([...friendIds, ...recentIds])).filter((id) => !mateIds.has(id) && id !== req.userId),
+    );
+    // 라이벌 → 최근 대전 상대 → 매장 회원. 같은 무리 안에서는 들어온 순서(최근 상대는 최근 순, 매장은 최근 방문)를 지킨다.
+    const recentOrder = new Map(recentIds.map((id, i) => [id, i]));
+    const rows = [...outside, ...mates]
         .filter((m) => m.id !== req.userId)
-        .map((m) => ({ id: m.id, name: m.name, friend: isFriend.has(m.id) }))
-        .sort((a, b) => Number(b.friend) - Number(a.friend));
+        .map((m) => ({ id: m.id, name: m.name, friend: isFriend.has(m.id), recent: isRecent.has(m.id) }))
+        .sort((a, b) => Number(b.friend) - Number(a.friend)
+            || Number(b.recent) - Number(a.recent)
+            || (a.recent && b.recent ? (recentOrder.get(a.id)! - recentOrder.get(b.id)!) : 0));
     const ids = rows.slice(0, 100).map((r) => r.id);   // 한 번에 보여 줄 만큼만 계산한다
     const [rec3, rec4, rank3, rank4] = await Promise.all([
         storage.simMatch.recentMatchRecords(ids, "3c", RECENT_MATCHES),
@@ -524,7 +535,7 @@ router.get("/sim/opponents", requireAuth, asyncHandler(async (req: AuthRequest, 
         };
     };
     return sendSuccess(res, rows.slice(0, 100).map((r) => ({
-        id: r.id, name: r.name, friend: r.friend,
+        id: r.id, name: r.name, friend: r.friend, recent: r.recent,
         b3c: board(r.id, "3c", rec3, rank3), b4c: board(r.id, "4c", rec4, rank4),
     })));
 }));
