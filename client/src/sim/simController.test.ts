@@ -699,4 +699,23 @@ describe("자동 초점(두께 독 첫 칩, 2026-09-26 오너)", () => {
         ctrl.setThickness(1);
         expect(ctrl.store.get().input.phi).toBeCloseTo(dir(layout[0], layout[1]), 9);
     });
+    it("같은 두께 칩을 다시 누르면 반대쪽, 또 누르면 처음 쪽(2026-09-26 오너)", () => {
+        const ctrl = setup();
+        ctrl.setPhi(0);
+        ctrl.aimFocus();   // 빨간 공 정면
+        const toRed = dir(layout[0], layout[2]);
+        ctrl.setThickness(0.5);
+        const first = ctrl.store.get().input.phi;
+        ctrl.setThickness(0.5);
+        const second = ctrl.store.get().input.phi;
+        ctrl.setThickness(0.5);
+        const third = ctrl.store.get().input.phi;
+        // 두 각은 빨간 공 방향을 사이에 두고 반대편, 세 번째는 첫 번째로 돌아온다
+        expect(Math.sign(first - toRed)).toBe(-Math.sign(second - toRed));
+        expect(Math.abs(Math.abs(first - toRed) - Math.abs(second - toRed))).toBeLessThan(1e-9);
+        expect(third).toBeCloseTo(first, 9);
+        // 다른 두께를 누르면 지금 쪽을 유지한다(뒤집지 않는다)
+        ctrl.setThickness(0.25);
+        expect(Math.sign(ctrl.store.get().input.phi - toRed)).toBe(Math.sign(first - toRed));
+    });
 });

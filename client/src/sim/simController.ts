@@ -574,7 +574,7 @@ export class SimController {
      *
      * 좌/우 버튼을 없앨 수 있는 이유가 여기 있다: 사람은 이미 한쪽으로 겨누고 있고, 두께 칩은 "그 쪽으로 몇 두께"를
      * 뜻한다. 양쪽 각을 다 구해 지금 조준선에 가까운 쪽을 쓰면 버튼이 하던 일이 그대로 없어진다.
-     * 반대쪽을 원하면 그쪽으로 조금 돌린 뒤 칩을 누르면 된다 — 결정을 숨긴 게 아니라 한 단계를 없앤 것이다.
+     * 반대쪽은 같은 칩을 한 번 더 누르면 된다(2026-09-26) — 누를 때마다 좌·우가 번갈아 바뀐다.
      */
     setThickness(step: number, side?: "left" | "right"): void {
         const s = this.store.get();
@@ -588,6 +588,12 @@ export class SimController {
         const nowAim = aimPhiFromCue(s.input.phi, s.input.a, s.aimAssist);
         // 기준 공: 자동 초점으로 고른 공 → 없으면 지금 조준선이 가리키는 공(예전엔 늘 가장 가까운 공이었다)
         const target = focusTarget(s.balls, cueId, gt, nowAim, this.aux.aimFocusId, opening);
+        // 같은 칩을 다시 누르면 반대쪽(2026-09-26 오너: "½ 한 번 더 누르면 좌측, 또 누르면 우측") — 이미 그 두께로 한쪽을
+        // 겨누고 있으면 다른 쪽으로 넘긴다. 처음 누를 땐 예전처럼 지금 조준선에 가까운 쪽.
+        if (!side && step < 1) {
+            const cur = activeThickness(s.balls, cueId, gt, nowAim, R, target);
+            if (cur && cur.step === step && cur.side !== "center") side = cur.side === "left" ? "right" : "left";
+        }
         const aim = side
             ? thicknessPhi(...args, side, R, opening, target)
             : nearerThicknessPhi(

@@ -94,13 +94,23 @@ export const ThicknessDock = memo(function ThicknessDock(p: Props) {
                             </button>
                         );
                     }
+                    // 켜진 칩엔 어느 쪽을 겨누는지 화살표를 붙인다 — 같은 칩을 다시 누르면 반대쪽으로 넘어간다(2026-09-26 오너).
+                    // side "left" = 적구 중심이 조준선 왼쪽 = 공의 **오른쪽**을 겨눔(aim.thicknessFor).
+                    const aimRight = on && p.active?.side === "left";
+                    const aimLeft = on && p.active?.side === "right";
+                    const text = thicknessStepLabel(step, t("sim.aim.fullBall"));
+                    const sideText = aimRight ? t("sim.aim.sideRight") : aimLeft ? t("sim.aim.sideLeft") : null;
+                    const aria = step === 1 ? text : `${text}${sideText ? ` · ${sideText}` : ""} · ${t("sim.aim.sideToggle")}`;
                     return (
                         <button
                             key={step} type="button" aria-pressed={on} disabled={p.disabled}
+                            aria-label={aria} title={aria}
                             onClick={() => p.onThickness(step)}
-                            className={cn(CHIP, step === 1 ? "min-w-[52px] px-2" : "w-10", on ? CHIP_ON : CHIP_OFF)}
+                            className={cn(CHIP, step === 1 ? "min-w-[52px] px-2" : "w-10", "inline-flex items-center justify-center", on ? CHIP_ON : CHIP_OFF)}
                         >
-                            {thicknessStepLabel(step, t("sim.aim.fullBall"))}
+                            {aimLeft && <span aria-hidden="true" className="text-[10px] text-brand -ml-0.5 mr-px">◀</span>}
+                            {text}
+                            {aimRight && <span aria-hidden="true" className="text-[10px] text-brand ml-px -mr-0.5">▶</span>}
                         </button>
                     );
                 })}
