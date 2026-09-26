@@ -1391,7 +1391,9 @@ router.get("/mine", requireAuth, asyncHandler(async (req: AuthRequest, res: any)
     // 골프 부킹 공유 시트가 당구 크루까지 나열해 그 채팅방에 골프 글이 올라갔다(2026-09-09 검토).
     const sport = req.query.sport === "GOLF" ? "GOLF" : "BILLIARDS";
     const crews = await storage.getUserCrews(req.userId!, sport);
-    return sendSuccess(res, crews);
+    // 줄마다 "내일 정모 · 새 글 3" 을 보여 주려고 활동 요약을 붙인다(2026-09-26 크루 디자인 A안). 실패해도 목록은 나간다.
+    const pulse = await storage.crews.crewPulse(crews.map((c) => c.crew.id)).catch(() => new Map());
+    return sendSuccess(res, crews.map((c) => ({ ...c, pulse: pulse.get(c.crew.id) ?? null })));
 }));
 
 // GET /crews - Search/List crews
@@ -1407,7 +1409,9 @@ router.get("/", asyncHandler(async (req: any, res: any) => {
         ? (req.headers["x-vercel-ip-country"] as string).toUpperCase().slice(0, 2)
         : undefined;
     const crews = await storage.searchCrews(query, sport, lat, lng, viewerCountry);
-    return sendSuccess(res, crews);
+    // 인기 크루·'이번 주 정모' 배지용 활동 요약(2026-09-26). 실패해도 목록은 나간다.
+    const pulse = await storage.crews.crewPulse(crews.map((c) => c.id)).catch(() => new Map());
+    return sendSuccess(res, crews.map((c) => ({ ...c, pulse: pulse.get(c.id) ?? null })));
 }));
 
 // GET /crews/:id - Get crew details
@@ -1431,7 +1435,9 @@ async function stripMemberPrivacy(req: any, crew: any): Promise<any> {
 router.get("/:id", asyncHandler(async (req: any, res: any) => {
     const crew = await storage.getCrew(req.params.id);
     if (!crew) return sendError(res, 404, "err.crew.notFound");
-    return sendSuccess(res, await stripMemberPrivacy(req, crew));
+    // 홈 상단 요약 줄의 '이번 달 정모'(2026-09-26 크루 디자인 A안)
+    const pulse = await storage.crews.crewPulse([crew.crew.id]).catch(() => new Map());
+    return sendSuccess(res, { ...(await stripMemberPrivacy(req, crew)), pulse: pulse.get(crew.crew.id) ?? null });
 }));
 
 // GET /crews/:id/members - Get all members of a crew

@@ -3,12 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { CrewDiscoveryCard } from "./CrewDiscoveryCard";
+import { PopularCrews } from "./PopularCrews";
+import { crewPopularity } from "@shared/crewBrand";
+import { crewRowStatus } from "@shared/crewManage";
 import { useMyCrews } from "./useMyCrews";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useToast } from "@/hooks/use-toast";
 import { LucideSearch, LucideUsers, LucideMapPin, LucideLoader2 } from "@/lib/icons";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { CrewChip, CrewChipRow, CrewEmpty, CrewError, CrewSkeleton } from "@/components/hiq/crew-ui";
+import { GAME_TYPE_LABEL } from "./CrewRow";
 import { useT } from "@/lib/i18n";
 
 interface AllCrewListProps {
@@ -70,22 +74,54 @@ export const AllCrewList = memo(({ searchQuery, currentSport }: AllCrewListProps
     const hasQuery = debouncedSearch.trim().length > 0;
     const nearbyActive = nearbyOn && !!gps;
 
+    // 거르기 칩(2026-09-26 A안): 전체 · 모집 중 · 종목(당구 3쿠션·4구 / 골프 필드·스크린). 받은 목록 안에서 거른다.
+    const [filter, setFilter] = useState<"all" | "open" | string>("all");
+    const gameChips = currentSport === "GOLF" ? (["field", "screen"] as const) : (["3c", "4c"] as const);
+    const isOpen = (c: any) => {
+        const st = crewRowStatus(c);
+        return !st.full && !myRoles.has(c.id);
+    };
+    const rows = useMemo(() => (allCrews ?? []).filter((c) =>
+        filter === "all" ? true : filter === "open" ? isOpen(c) : c.gameType === filter,
+    ), [allCrews, filter, myRoles]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // 인기 크루 — 검색하지 않을 때만. 내가 가입한 크루와 정원이 찬 크루는 빼고(들어갈 수 없다) 인기 점수 순 상위 6.
+    const popular = useMemo(() => {
+        if (hasQuery || !allCrews) return [];
+        return allCrews
+            .filter((c) => !myRoles.has(c.id) && !crewRowStatus(c).full)
+            .map((c) => ({ c, score: crewPopularity(c) }))
+            .filter((x) => x.score > 1)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 6)
+            .map((x) => x.c);
+    }, [allCrews, myRoles, hasQuery]);
+
     return (
         <div className="flex flex-col gap-3">
             {/* 내 주변 — 크루 좌표(없으면 베이스캠프 매장 좌표)로 거리를 잰다. 좌표 없는 크루는 뒤로 밀린다(서버 정렬).
                 결과가 비어도 이 칩은 늘 보인다 — 예전엔 빈 목록 화면이 칩보다 먼저 반환돼 켠 걸 끌 수 없었다. */}
+            {popular.length > 0 && (
+                <PopularCrews crews={popular} nearby={nearbyActive} onOpen={(id) => setLocation(`/club/${id}`)} />
+            )}
+
             <CrewChipRow label={t("crewMgmt.sortLabel")}>
                 <CrewChip selected={nearbyActive} onClick={toggleNearby}>
                     {locating ? <LucideLoader2 className="w-3.5 h-3.5 animate-spin" /> : <LucideMapPin className="w-3.5 h-3.5" />}
                     {nearbyActive ? t("club.nearbyOn") : t("club.nearby")}
                 </CrewChip>
+                <CrewChip selected={filter === "all"} onClick={() => setFilter("all")}>{t("crewList.filterAll")}</CrewChip>
+                <CrewChip selected={filter === "open"} onClick={() => setFilter("open")}>{t("crewList.filterOpen")}</CrewChip>
+                {gameChips.map((g) => (
+                    <CrewChip key={g} selected={filter === g} onClick={() => setFilter(g)}>{t(GAME_TYPE_LABEL[g])}</CrewChip>
+                ))}
             </CrewChipRow>
 
             {isLoading && !allCrews ? (
                 <CrewSkeleton rows={3} height={96} />
             ) : isError && !allCrews ? (
                 <CrewError onRetry={() => refetch()} />
-            ) : !allCrews || allCrews.length === 0 ? (
+            ) : !allCrews || rows.length === 0 ? (
                 <CrewEmpty
                     icon={hasQuery ? <LucideSearch /> : <LucideUsers />}
                     title={hasQuery ? t("allCrewList.noResults") : t("allCrewList.emptyTitle")}
@@ -93,7 +129,7 @@ export const AllCrewList = memo(({ searchQuery, currentSport }: AllCrewListProps
                 />
             ) : (
                 <div className="flex flex-col gap-2">
-                    {allCrews.map((crew) => (
+                    {rows.map((crew) => (
                         <CrewDiscoveryCard
                             key={crew.id}
                             crew={crew}

@@ -1,9 +1,11 @@
 import { memo } from "react";
 import { LucideChevronRight, LucideMapPin, LucideUsers } from "@/lib/icons";
 import { CREW_CARD, CrewRoleBadge } from "@/components/hiq/crew-ui";
-import { crewImageSrc, crewRowStatus } from "@shared/crewManage";
+import { crewRowStatus } from "@shared/crewManage";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { CrewEmblem, CrewThumb } from "@/components/hiq/crew-ui/brand";
+import { meetupWhen, type CrewPulseLite } from "@shared/crewBrand";
 
 /**
  * 크루 한 줄 — '내 크루'와 '둘러보기'가 같은 모양을 쓴다(2026-09-26 크루 디자인 정리).
@@ -28,6 +30,9 @@ export interface CrewRowData {
     joinType?: string | null;
     gameType?: string | null;
     distance?: number;
+    sportCategory?: string | null;
+    /** 서버 활동 요약(다음 정모·새 글·이번 주 정모) — 옛 응답엔 없다 */
+    pulse?: CrewPulseLite | null;
 }
 
 /** 활동 종목 코드 → 사전 키. 'any'(상관없음)는 줄에 찍지 않는다 — 모든 크루에 붙어 정보가 없다. */
@@ -56,8 +61,15 @@ interface CrewRowProps {
 export const CrewRow = memo(({ crew, role, variant = "discover", joined, onClick, onMembers }: CrewRowProps) => {
     const { t } = useT();
     const status = crewRowStatus(crew);
-    const thumb = crewImageSrc(crew.emblem) ?? crewImageSrc(crew.coverImage);
-    const initial = crew.name?.trim().charAt(0).toUpperCase() || "?";
+    // 내 크루 줄의 "지금 소식" — 다음 정모(오늘·내일·월/일)와 최근 7일 새 글(2026-09-26 A안)
+    const when = variant === "mine" ? meetupWhen(crew.pulse?.nextActivityAt) : null;
+    const newPosts = variant === "mine" ? crew.pulse?.posts7 ?? 0 : 0;
+    const news: string[] = [];
+    if (when) news.push(when.kind === "today" ? t("crewRow.meetupToday") : when.kind === "tomorrow" ? t("crewRow.meetupTomorrow") : t("crewRow.meetupDate").replace("{m}", String(when.month)).replace("{d}", String(when.day)));
+    if (newPosts > 0) news.push(t("crewRow.newPosts").replace("{n}", String(newPosts)));
+    const soon = when?.kind === "today" || when?.kind === "tomorrow";
+    // 둘러보기 배지: 남은 자리·이번 주 정모
+    const slots = status.max ? Math.max(0, status.max - status.count) : null;
     const intro = variant === "discover" ? (crew.shortIntro || crew.description || "").trim() : "";
     const gameKey = crew.gameType ? GAME_TYPE_LABEL[crew.gameType] : undefined;
     const isPending = role === "pending";
@@ -69,13 +81,8 @@ export const CrewRow = memo(({ crew, role, variant = "discover", joined, onClick
                 onClick={onClick}
                 className="flex-1 min-w-0 flex items-center gap-3 p-4 text-left active:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
             >
-                {thumb ? (
-                    <img src={thumb} alt="" loading="lazy" className="w-12 h-12 shrink-0 rounded-tile object-cover bg-surface-3" />
-                ) : (
-                    <span aria-hidden="true" className="w-12 h-12 shrink-0 rounded-tile bg-brand/10 text-brand text-[17px] font-semibold inline-flex items-center justify-center">
-                        {initial}
-                    </span>
-                )}
+                {/* 2026-09-26 크루 디자인 A안: 내 크루는 크루 색 엠블럼(동그라미), 둘러보기는 자동 미니 커버 썸네일 */}
+                {variant === "mine" ? <CrewEmblem crew={crew} size={48} /> : <CrewThumb crew={crew} size={64} />}
 
                 <span className="min-w-0 flex-1 flex flex-col gap-1">
                     <span className="flex items-center gap-1.5 min-w-0">
@@ -83,6 +90,9 @@ export const CrewRow = memo(({ crew, role, variant = "discover", joined, onClick
                         <CrewRoleBadge role={role} />
                     </span>
                     {intro && <span className="text-[13px] font-medium text-ink-3 truncate">{intro}</span>}
+                    {news.length > 0 && (
+                        <span className={cn("text-[13px] font-semibold truncate", soon ? "text-brand" : "text-ink-2")}>{news.join(" · ")}</span>
+                    )}
                     <span className="flex items-center flex-wrap gap-x-2 gap-y-1 text-[12px] font-medium text-ink-3">
                         <span className={cn("inline-flex items-center gap-1 min-w-0 max-w-full", !crew.region && "text-ink-4")}>
                             <LucideMapPin className="w-3.5 h-3.5 shrink-0" />
@@ -101,6 +111,10 @@ export const CrewRow = memo(({ crew, role, variant = "discover", joined, onClick
                                 {crew.joinType === "approval" ? t("crewMgmt.joinApproval") : t("crewMgmt.joinOpen")}
                             </span>
                         )}
+                        {variant === "discover" && !joined && !isPending && slots !== null && slots > 0 && (
+                            <span className="rk-chip bg-brand/10 text-brand">{t("crewRow.openSlots").replace("{n}", String(slots))}</span>
+                        )}
+                        {variant === "discover" && crew.pulse?.upcomingWeek && <span className="rk-chip bg-surface-3 text-ink-2">{t("crewRow.meetupThisWeek")}</span>}
                         {status.full && !joined && !isPending && <span className="rk-chip bg-surface-3 text-destructive">{t("crewMgmt.full")}</span>}
                         {joined && !isPending && <span className="rk-chip bg-brand/10 text-brand">{t("crewMgmt.joined")}</span>}
                     </span>

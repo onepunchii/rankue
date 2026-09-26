@@ -58,6 +58,9 @@ function readDeepLinkTab(routeTab?: string | null): CrewTab | null {
     return normalized && (VALID_TABS as readonly string[]).includes(normalized) ? (normalized as CrewTab) : null;
 }
 
+/** 홈 스크롤이 이만큼 내려가면 머리가 평소 모양(바탕·제목)으로 바뀐다 — 커버(196px)가 거의 다 지나간 지점 */
+const HOME_SOLID_AT = 140;
+
 export default function HiqClubDetail() {
     const [, params] = useRoute("/club/:id");
     // 호환 별칭: 이미 발송된 푸시 페이로드가 /crew/:id/:tab 로 진입할 수 있다.
@@ -120,6 +123,10 @@ export default function HiqClubDetail() {
         if (nextIndex >= 0 && nextIndex < SWIPE_TABS.length) setActiveTab(SWIPE_TABS[nextIndex]);
     };
     // 탭 컨테이너 공통 — 좌우로 밀어 탭 넘기기. 예전엔 탭마다 같은 코드가 네 벌 복사돼 있었다.
+    // 홈 탭 머리: 커버 위(투명)인지, 내려가서 평소 머리인지
+    const [homeScrolled, setHomeScrolled] = useState(false);
+    const onHome = activeTab === 'home';
+    const overCover = onHome && !homeScrolled;
     const swipeProps = {
         initial: { opacity: 0, x: -20 },
         animate: { opacity: 1, x: 0 },
@@ -166,7 +173,7 @@ export default function HiqClubDetail() {
         }
     });
 
-    const { data: crewData, isLoading, isError, error, refetch, isRefetching } = useQuery<{ crew: HiqCrew, baseStore: HiqStore, baseListing?: { code: string; name: string; address: string } | null, members: any[] }>({
+    const { data: crewData, isLoading, isError, error, refetch, isRefetching } = useQuery<{ crew: HiqCrew, baseStore: HiqStore, baseListing?: { code: string; name: string; address: string } | null, members: any[], pulse?: { monthActivities: number } | null }>({
         queryKey: [`/api/hiq/crews/${id}`],
         enabled: !!id,
         // 들어올 때마다 새로 받는다 — 쿼리 캐시가 localStorage 에 7일 남아서, 가입·승인 직후 돌아오면 옛 멤버 목록이 보였다.
@@ -387,12 +394,18 @@ export default function HiqClubDetail() {
         <div className="fixed inset-0 z-0 bg-surface-0 text-ink-1 font-sans flex flex-col overflow-hidden">
             {/* 1. 고정 헤더 — 뒤로 · 엠블럼+이름 · 공유 · (운영진) 설정 / (크루원) 더보기.
                 바탕은 토큰(surface-1) — 예전 흰 반투명은 골프(어두운 테마)에서 흰 띠로 떴다. */}
-            <header className="shrink-0 z-30 bg-surface-1 border-b border-surface-line pt-[env(safe-area-inset-top)]">
-                <div className="h-14 px-1 flex items-center gap-1">
+            {/* 홈 탭은 머리를 커버 위에 투명하게 얹는다(2026-09-26 크루 디자인 A안) — 커버를 지나 내려가면 평소 머리로 바뀐다.
+                다른 탭은 늘 평소 머리. 홈에서는 absolute 라 내용이 커버부터 시작한다(노치 뒤까지 커버가 깔린다). */}
+            <header className={cn(
+                "z-30 pt-[env(safe-area-inset-top)] transition-colors duration-200",
+                onHome ? "absolute inset-x-0 top-0" : "shrink-0",
+                overCover ? "bg-transparent border-b border-transparent" : "bg-surface-1 border-b border-surface-line",
+            )}>
+                <div className={cn("h-14 px-1 flex items-center gap-1", overCover && "[&_button]:bg-black/30 [&_button]:text-white [&_button]:backdrop-blur-sm [&_button]:mx-0.5")}>
                     <IconButton label={t("common.back")} onClick={goBack}>
                         <LucideChevronLeft />
                     </IconButton>
-                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <div className={cn("flex-1 min-w-0 flex items-center gap-2 transition-opacity", overCover && "opacity-0 pointer-events-none")} aria-hidden={overCover}>
                         <CrewAvatar src={crewImageSrc(crew.emblem) ?? crewImageSrc(crew.coverImage)} name={crew.name} size={28} />
                         <h1 className="text-[17px] font-semibold text-ink-1 truncate">{crew.name}</h1>
                     </div>
@@ -420,7 +433,7 @@ export default function HiqClubDetail() {
             <main className="flex-1 min-h-0 overflow-hidden relative">
                 <AnimatePresence mode="wait">
                     {activeTab === 'home' && (
-                        <motion.div key="home" {...swipeProps}>
+                        <motion.div key="home" {...swipeProps} onScroll={(e) => setHomeScrolled(e.currentTarget.scrollTop > HOME_SOLID_AT)}>
                             <CrewHomeTab
                                 crew={crew}
                                 baseStore={baseStore}
@@ -444,6 +457,10 @@ export default function HiqClubDetail() {
                                 onOpenHallOfFame={() => setLocation(`/crew/${id}/hall-of-fame`)}
                                 sportTab={sportTab}
                                 setSportTab={setSportTab}
+                                pulse={crewData?.pulse ?? null}
+                                myRole={myRole ?? null}
+                                onOpenGallery={() => setActiveTab('gallery')}
+                                onOpenChat={() => setLocation(`/chat/crew/${id}`)}
                             />
                         </motion.div>
                     )}

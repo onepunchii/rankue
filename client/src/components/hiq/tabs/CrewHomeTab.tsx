@@ -3,7 +3,12 @@ import { Link } from "wouter";
 import {
     LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus,
     LucideChevronDown, LucideUsers, LucideLogOut, LucideTrophy, LucidePhone, LucideStore,
+    LucideCalendarPlus, LucideImagePlus, LucideMessageCircle,
 } from "@/lib/icons";
+import { CrewCover, CrewEmblem } from "@/components/hiq/crew-ui/brand";
+import { daysTogether } from "@shared/crewBrand";
+import { crewRowStatus } from "@shared/crewManage";
+import { GAME_TYPE_LABEL } from "@/components/hiq/club/CrewRow";
 import { cn } from "@/lib/utils";
 import { HiqCrew, HiqStore } from "@shared/schema";
 import { isPollClosed } from "@shared/crewActivity";
@@ -14,7 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { BallDot } from "@/components/hiq/BallDot";
 import {
-    CREW_BTN, CREW_CARD, CREW_TEXT, ConfirmDialog, CrewEmpty, CrewError, CrewSection, CrewSkeleton,
+    CREW_BTN, CREW_CARD, CREW_TEXT, ConfirmDialog, CrewEmpty, CrewError, CrewRoleBadge, CrewSection, CrewSkeleton,
 } from "@/components/hiq/crew-ui";
 
 interface CrewHomeTabProps {
@@ -38,9 +43,31 @@ interface CrewHomeTabProps {
     onTournamentClick: () => void;
     onCreateTournament: () => void;
     onOpenHallOfFame: () => void;
+    /** 서버 활동 요약(GET /crews/:id 의 pulse) — 요약 줄의 '이번 달 정모' */
+    pulse?: { monthActivities: number } | null;
+    /** 내 역할(크루장·운영진 배지) */
+    myRole?: string | null;
+    /** 빠른 실행: 사진첩 탭으로 · 크루 채팅으로 */
+    onOpenGallery: () => void;
+    onOpenChat: () => void;
     // Received from parent for API symmetry but not used in this view.
     sportTab?: 'BILLIARDS' | 'GOLF';
     setSportTab?: (tab: 'BILLIARDS' | 'GOLF') => void;
+}
+
+/** 커버 높이 — 머리 버튼(44px)과 엠블럼(76px 중 38px 가 걸침)이 함께 앉는 높이 */
+const COVER_H = 196;
+
+/** 빠른 실행 한 칸 — 52px 둥근 사각 아이콘 + 12px 라벨. 칸 전체가 버튼(44px 이상). */
+function QuickAction({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+    return (
+        <button type="button" onClick={onClick} className="flex flex-col items-center gap-1.5 py-1 rounded-tile active:opacity-70">
+            <span className="w-[52px] h-[52px] rounded-tile bg-surface-1 rk-shadow border border-surface-line flex items-center justify-center text-brand [&_svg]:w-6 [&_svg]:h-6">
+                {icon}
+            </span>
+            <span className="text-[12px] font-semibold text-ink-2 text-center leading-tight">{label}</span>
+        </button>
+    );
 }
 
 /** 한 줄 통계 칸 — 숫자(17) + 라벨(12). 예전 칸은 배경 없이 숫자만 떠 있었다. */
@@ -56,7 +83,7 @@ function Stat({ label, value, sub }: { label: string; value: React.ReactNode; su
 
 export const CrewHomeTab = memo(({
     crew, baseStore, baseListing = null, members, isMember, isPending, isNotMember, isAdmin, me, onJoin, onLeave, isLeaving, isLeader, onCreateActivity, onCreatePoll, onShareToChat,
-    onPollClick, onTournamentClick, onCreateTournament, onOpenHallOfFame
+    onPollClick, onTournamentClick, onCreateTournament, onOpenHallOfFame, pulse = null, myRole = null, onOpenGallery, onOpenChat,
 }: CrewHomeTabProps) => {
     const { t } = useT();
     // 내 크루 카드의 인원 버튼으로 들어오면 멤버 구역까지 내린다. 주소는 한 번 쓰고 지운다 —
@@ -81,8 +108,6 @@ export const CrewHomeTab = memo(({
     const activeMembers = useMemo(() => members.filter((m: any) => m.role !== 'pending'), [members]);
     const isGolf = crew.sportCategory === 'GOLF';
 
-    // 커버/엠블럼 이미지가 없으면 크루 이니셜 타일로 대체
-    const crewInitial = crew.name?.trim().charAt(0).toUpperCase() || "?";
 
     // 통계 계산 (useMemo 최적화)
     const stats = useMemo(() => {
@@ -113,62 +138,78 @@ export const CrewHomeTab = memo(({
     const overParText = stats.overPar === null ? null
         : `${stats.overPar >= 0 ? "+" : ""}${stats.overPar.toFixed(1)}`;
 
+    // 요약 줄의 세 번째 칸 — 당구는 크루 종목(4구면 4구, 아니면 3쿠션) 평균 에버, 골프는 평균 타수(2026-09-26 A안)
+    const avgCell = isGolf
+        ? { label: t("crewHome.avgScore"), value: stats.avgGolfScore ?? "-" }
+        : crew.gameType === "4c"
+            ? { label: t("crewHome.avg4c"), value: stats.avg4c }
+            : { label: t("crewHome.avg3c"), value: stats.avg3c };
+    const together = daysTogether(crew.createdAt as unknown as string);
+    const countLabel = crewRowStatus({ memberCount: activeMembers.length, maxMembers: crew.maxMembers }).countLabel;
+    const [countNow, countMax] = countLabel.split("/");
+    const gameKey = crew.gameType ? GAME_TYPE_LABEL[crew.gameType] : undefined;
+
     return (
         <div className="flex flex-col gap-8 pb-nav">
-            {/* 1. 커버 · 이름 · 소개 */}
+            {/* 1. 커버 · 엠블럼 · 이름 · 요약 줄 · 빠른 실행 (2026-09-26 크루 디자인 A안, 오너 승인 시안)
+                사진이 없는 크루가 대부분이라 커버·엠블럼은 크루 id 로 자동으로 그린다(crew-ui/brand). 머리 버튼(뒤로·공유·설정)은
+                club-detail 이 커버 위에 투명하게 얹는다. */}
             <div>
-                <div className="relative w-full overflow-hidden">
-                    {crew.coverImage ? (
-                        <img
-                            src={crew.coverImage}
-                            className="w-full h-[220px] object-cover"
-                            alt={t("crewHub.coverAlt").replace("{name}", crew.name)}
-                        />
-                    ) : (
-                        <div className="w-full h-[220px] bg-surface-2 flex items-center justify-center" aria-hidden="true">
-                            <span className="text-[72px] font-semibold text-brand/40 leading-none">{crewInitial}</span>
+                <CrewCover crew={crew} height={COVER_H} alt={t("crewHub.coverAlt").replace("{name}", crew.name)} />
+
+                <div className="px-4 -mt-[38px] relative z-10">
+                    <div className="flex items-end gap-3">
+                        <CrewEmblem crew={crew} size={76} ring="var(--surface-0)" showSport />
+                        <div className="pb-1 flex flex-wrap gap-1.5 min-w-0">
+                            <CrewRoleBadge role={myRole} />
+                            {gameKey && <span className="rk-chip bg-surface-3 text-ink-2">{t(gameKey)}</span>}
+                        </div>
+                    </div>
+                    <h1 className={cn(CREW_TEXT.title, "mt-2.5 leading-tight break-words")}>{crew.name}</h1>
+                    <p className={cn(CREW_TEXT.sub, "mt-0.5 text-[14px]")}>{crew.shortIntro || crew.region || t("crewHome.ourCrew")}</p>
+
+                    {/* 요약 한 줄: 멤버 · 이번 달 정모 · 평균 · 함께한 날 */}
+                    <section className={cn(CREW_CARD, "mt-3.5 grid grid-cols-4 divide-x divide-surface-line py-3 px-0")} aria-label={t("crewHub.stats")}>
+                        <Stat label={t("crewHome.members")} value={<>{countNow}{countMax && <span className="text-[12px] text-ink-3">/{countMax}</span>}</>} />
+                        <Stat label={t("crewHome.monthMeetups")} value={pulse ? pulse.monthActivities : "-"} />
+                        <Stat label={avgCell.label} value={avgCell.value} />
+                        <Stat label={t("crewHome.together")} value={together ? <>{together.toLocaleString()}<span className="text-[12px] text-ink-3">{t("crewHome.dayUnit")}</span></> : "-"} />
+                    </section>
+                </div>
+
+                {/* 빠른 실행 — 크루원만. 자주 쓰는 동작을 한 번에(정모 만들기 · 투표 · 사진 올리기 · 크루 채팅) */}
+                {isMember && (
+                    <div className="px-4 mt-4 grid grid-cols-4 gap-2">
+                        <QuickAction icon={<LucideCalendarPlus />} label={t("crewHome.qaMeetup")} onClick={onCreateActivity} />
+                        <QuickAction icon={<LucideVote />} label={t("crewHome.qaPoll")} onClick={onPollClick} />
+                        <QuickAction icon={<LucideImagePlus />} label={t("crewHome.qaPhoto")} onClick={onOpenGallery} />
+                        <QuickAction icon={<LucideMessageCircle />} label={t("crewHome.qaChat")} onClick={onOpenChat} />
+                    </div>
+                )}
+
+                {/* 소개 · 정모 요일 · 지역 — 두 줄까지만, 더 보기로 펼친다 */}
+                <div className="px-4 mt-4 flex flex-col gap-2">
+                    {crew.description && (
+                        <div>
+                            <p className={cn(
+                                "text-[15px] font-medium text-ink-2 leading-relaxed whitespace-pre-wrap",
+                                !isDescriptionExpanded && "line-clamp-2"
+                            )}>
+                                {crew.description}
+                            </p>
+                            {crew.description.length > 50 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                    aria-expanded={isDescriptionExpanded}
+                                    className={cn(CREW_BTN.ghost, "-ml-3 text-brand")}
+                                >
+                                    {isDescriptionExpanded ? t("crewHome.collapse") : t("crewHome.expand")}
+                                    <LucideChevronDown className={cn("w-4 h-4 transition-transform", isDescriptionExpanded && "rotate-180")} />
+                                </button>
+                            )}
                         </div>
                     )}
-                    {/* 아래 가장자리만 페이지 바탕으로 녹인다 — 사진은 선명하게. 바탕 토큰이라 골프(어두운)에서도 맞는다. */}
-                    <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-surface-0 to-transparent" />
-                </div>
-
-                <div className="px-4 -mt-10 relative z-10 flex items-end gap-4">
-                    <div className="w-20 h-20 shrink-0 rounded-tile bg-surface-1 ring-4 ring-surface-0 overflow-hidden">
-                        {crew.emblem ? (
-                            <img src={crew.emblem} className="w-full h-full object-cover" alt={t("crewHub.logoAlt").replace("{name}", crew.name)} />
-                        ) : (
-                            <div className="w-full h-full bg-brand/10 flex items-center justify-center" aria-hidden="true">
-                                <span className="text-[30px] font-semibold text-brand leading-none">{crewInitial}</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="pb-1 min-w-0">
-                        <h1 className={cn(CREW_TEXT.title, "leading-tight break-words")}>{crew.name}</h1>
-                        <p className={cn(CREW_TEXT.sub, "mt-0.5 truncate")}>{crew.shortIntro || crew.region || t("crewHome.ourCrew")}</p>
-                    </div>
-                </div>
-
-                <div className="px-4 mt-4 flex flex-col gap-3">
-                    <div>
-                        <p className={cn(
-                            "text-[15px] font-medium text-ink-2 leading-relaxed whitespace-pre-wrap",
-                            !isDescriptionExpanded && "line-clamp-3"
-                        )}>
-                            {crew.description || t("crewHome.noDescription")}
-                        </p>
-                        {(crew.description?.length || 0) > 60 && (
-                            <button
-                                type="button"
-                                onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                                aria-expanded={isDescriptionExpanded}
-                                className={cn(CREW_BTN.ghost, "-ml-3 text-brand")}
-                            >
-                                {isDescriptionExpanded ? t("crewHome.collapse") : t("crewHome.expand")}
-                                <LucideChevronDown className={cn("w-4 h-4 transition-transform", isDescriptionExpanded && "rotate-180")} />
-                            </button>
-                        )}
-                    </div>
                     <div className="flex flex-wrap gap-2">
                         {crew.meetingDay && (
                             <span className="rk-chip bg-surface-3 text-ink-2 py-2">
@@ -197,24 +238,6 @@ export const CrewHomeTab = memo(({
                         isAdmin={isAdmin}
                     />
                 </CrewSection>
-
-                {/* 3. 한 줄 통계 — '순위 집계 전' 자리 채움 칸은 뺐다(연결된 데이터가 없다) */}
-                <section className={cn(CREW_CARD, "grid divide-x divide-surface-line py-3 px-0", isGolf ? "grid-cols-3" : "grid-cols-4")} aria-label={t("crewHub.stats")}>
-                    {isGolf ? (
-                        <>
-                            <Stat label={t("ranking.golfAvgScore")} value={stats.avgGolfScore ?? "-"} sub={overParText ? t("crewHub.vsPar").replace("{n}", overParText) : undefined} />
-                            <Stat label={t("crewHome.totalRounds")} value={stats.totalRounds.toLocaleString()} />
-                            <Stat label={t("crewHome.activeMembers")} value={stats.count} />
-                        </>
-                    ) : (
-                        <>
-                            <Stat label={t("ranking.threeCushion")} value={stats.avg3c} />
-                            <Stat label={t("ranking.fourBall")} value={stats.avg4c} />
-                            <Stat label={t("crewHome.totalPoints")} value={stats.totalPoints.toLocaleString()} />
-                            <Stat label={t("crewHome.activeMembers")} value={stats.count} />
-                        </>
-                    )}
-                </section>
 
                 {/* 4. 투표 — 크루원 전용(서버가 비회원에게 403). 예전엔 비회원에게 '투표 없음' 으로 잘못 보였다. */}
                 {isMember && (

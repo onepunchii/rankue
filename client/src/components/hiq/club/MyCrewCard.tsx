@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { HiqCrew } from "@shared/schema";
+import type { CrewPulseLite } from "@shared/crewBrand";
 import { CrewRow } from "./CrewRow";
 
 /**
@@ -12,7 +13,7 @@ import { CrewRow } from "./CrewRow";
  */
 
 interface MyCrewCardProps {
-    crew: HiqCrew & { memberCount?: number };
+    crew: HiqCrew & { memberCount?: number; pulse?: CrewPulseLite | null };
     role: string;
     onClick: () => void;
     /** 인원 칸을 눌렀을 때 — 멤버 목록으로. 없으면 인원은 줄 안의 글자로만 보인다. */

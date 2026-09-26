@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import type { HiqCrew } from "@shared/schema";
+import type { CrewPulseLite } from "@shared/crewBrand";
 
 export interface MyCrewEntry {
     crew: HiqCrew;
@@ -10,6 +11,8 @@ export interface MyCrewEntry {
     joinedAt: string;
     /** 활동 인원(승인 대기 제외 — 서버 getUserCrews) */
     memberCount: number;
+    /** 활동 요약(다음 정모·새 글) — 2026-09-26 부터, 옛 응답엔 없다 */
+    pulse?: CrewPulseLite | null;
 }
 
 /**

@@ -59,6 +59,14 @@ const msTrunc = (col: any) => sql`date_trunc('milliseconds', ${col})`;
 const cursorBefore = (createdCol: any, idCol: any, cursor?: CrewCursor | null) =>
     cursor ? sql`(${msTrunc(createdCol)}, ${idCol}) < (${cursor.createdAt}::timestamp, ${cursor.id}::uuid)` : sql`true`;
 
+export interface CrewPulse {
+    nextActivityAt: string | null;
+    monthActivities: number;
+    activities30: number;
+    upcomingWeek: boolean;
+    posts7: number;
+}
+
 export class CrewRepository {
     async createCrew(data: InsertHiqCrew): Promise<HiqCrew> {
         return await db.transaction(async (tx) => {
@@ -408,6 +416,45 @@ export class CrewRepository {
             // 자식 행만 전부 사라지고 멤버 0명짜리 유령 크루가 남는다.
             await tx.delete(hiqCrews).where(eq(hiqCrews.id, crewId));
         });
+    }
+
+    /**
+     * 크루 활동 요약(2026-09-26 크루 디자인 A안) — 목록·홈이 "살아 있는 크루"를 보여 주는 숫자들. 크루 여러 개를 쿼리 하나로.
+     *  - nextActivityAt: 다음 정모(시작 3시간 전까지는 '진행 중'으로 본다 — 홈의 정모 목록과 같은 창)
+     *  - monthActivities: 이번 달(KST) 정모 수
+     *  - activities30: 지난 30일 ~ 앞으로 30일 정모 수(인기 정렬용)
+     *  - upcomingWeek: 앞으로 7일 안에 정모가 있나
+     *  - posts7: 최근 7일 새 글 수
+     * 시각은 UTC 벽시계 timestamp 라 JS 에서 경계를 만들어 넘긴다(DB now() 의 세션 시간대에 기대지 않는다).
+     */
+    async crewPulse(crewIds: readonly string[], now = Date.now()): Promise<Map<string, CrewPulse>> {
+        const out = new Map<string, CrewPulse>();
+        if (crewIds.length === 0) return out;
+        const KST = 9 * 3600_000, DAY = 86_400_000;
+        const k = new Date(now + KST);
+        const monthStart = new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), 1) - KST);
+        const monthEnd = new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth() + 1, 1) - KST);
+        const at = (ms: number) => new Date(ms);
+        const ids = sql.join(crewIds.map((id) => sql`${id}::uuid`), sql`, `);
+        const res = await db.execute(sql`
+            select c.id,
+              (select min(a.activity_date) from hiq_crew_activities a where a.crew_id = c.id and a.activity_date >= ${at(now - 3 * 3600_000)}) as next_at,
+              (select count(*)::int from hiq_crew_activities a where a.crew_id = c.id and a.activity_date >= ${monthStart} and a.activity_date < ${monthEnd}) as month_n,
+              (select count(*)::int from hiq_crew_activities a where a.crew_id = c.id and a.activity_date >= ${at(now - 30 * DAY)} and a.activity_date < ${at(now + 30 * DAY)}) as act30,
+              (select count(*)::int from hiq_crew_activities a where a.crew_id = c.id and a.activity_date >= ${at(now - 3 * 3600_000)} and a.activity_date < ${at(now + 7 * DAY)}) as week_n,
+              (select count(*)::int from hiq_crew_posts p where p.crew_id = c.id and p.created_at >= ${at(now - 7 * DAY)}) as posts7
+            from hiq_crews c where c.id in (${ids})`);
+        for (const r of res.rows as Record<string, unknown>[]) {
+            const next = r.next_at == null ? null : new Date(r.next_at as string | Date);
+            out.set(String(r.id), {
+                nextActivityAt: next && !Number.isNaN(next.getTime()) ? next.toISOString() : null,
+                monthActivities: Number(r.month_n ?? 0),
+                activities30: Number(r.act30 ?? 0),
+                upcomingWeek: Number(r.week_n ?? 0) > 0,
+                posts7: Number(r.posts7 ?? 0),
+            });
+        }
+        return out;
     }
 
     async getUserCrews(memberId: string, sportCategory?: string) {

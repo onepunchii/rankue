@@ -46,6 +46,7 @@ export const LucideBuilding = ((Ph as any).Buildings ?? F) as Ph.Icon;
 export const LucideCalculator = ((Ph as any).Calculator ?? F) as Ph.Icon;
 export const LucideCalendar = ((Ph as any).Calendar ?? F) as Ph.Icon;
 export const LucideCalendarCheck = ((Ph as any).CalendarCheck ?? F) as Ph.Icon;
+export const LucideCalendarPlus = ((Ph as any).CalendarPlus ?? F) as Ph.Icon;
 export const LucideCalendarDays = ((Ph as any).Calendar ?? F) as Ph.Icon;
 export const LucideCamera = ((Ph as any).Camera ?? F) as Ph.Icon;
 export const LucideCar = ((Ph as any).Car ?? F) as Ph.Icon;
